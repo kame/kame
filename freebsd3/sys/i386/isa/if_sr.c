@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_sr.c,v 1.21.2.4 1999/12/01 19:41:37 julian Exp $
+ * $FreeBSD: src/sys/i386/isa/if_sr.c,v 1.21.2.6 2000/01/21 02:02:03 archie Exp $
  */
 
 /*
@@ -60,7 +60,7 @@
 #include "bpfilter.h"
 #endif	/* NETGRAPH */
 
-#ifdef NETGRAPH
+#ifndef NETGRAPH
 #include "sppp.h"
 #if NSPPP <= 0
 #error Device 'sr' requires sppp.
@@ -3358,11 +3358,10 @@ ngsr_constructor(node_p *nodep)
 /*
  * give our ok for a hook to be added...
  * If we are not running this should kick the device into life.
- * We allow hooks called "control" and dlci[1-1023]
  * The hook's private info points to our stash of info about that
  * channel.
  */
-static	int
+static int
 ngsr_newhook(node_p node, hook_p hook, const char *name)
 {
 	struct sr_softc *	sc = node->private;

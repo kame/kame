@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.121.2.21 1999/12/08 19:46:58 julian Exp $
+# $FreeBSD: src/sys/conf/options,v 1.121.2.25 2000/06/13 08:48:00 ru Exp $
 #
 #        On the handling of kernel options   
 # 
@@ -55,7 +55,6 @@ DEVFS
 FAILSAFE
 HW_WDOG
 KTRACE
-MD5
 MFS_ROOT	opt_mfs.h
 MFS_ROOT_SIZE	opt_mfs.h
 NTIMECOUNTER	opt_ntp.h
@@ -179,6 +178,12 @@ SA_1FM_AT_EOD		opt_sa.h
 # Options used only in cam/scsi/scsi_pt.c
 SCSI_PT_DEFAULT_TIMEOUT	opt_pt.h
 
+# Options used in dev/sym/ (Symbios SCSI driver).
+SYM_SETUP_LP_PROBE_MAP	opt_sym.h	# Low Priority Probe Map (bits)
+SYM_SETUP_SCSI_DIFF	opt_sym.h	# HVD support for 825a, 875, 885
+SYM_SETUP_PCI_PARITY	opt_sym.h	# PCI parity checking
+SYM_SETUP_MAX_LUN	opt_sym.h	# Number of LUNs supported
+
 # Options used only in pci/ncr.c
 SCSI_NCR_DEBUG		opt_ncr.h
 SCSI_NCR_DFLT_TAGS	opt_ncr.h
@@ -196,11 +201,13 @@ SCSI_ISP_FCDUPLEX	opt_isp.h
 SCSI_ISP_WWN		opt_isp.h
 ISP_DISABLE_1020_SUPPORT	opt_isp.h
 ISP_DISABLE_1080_SUPPORT	opt_isp.h
+ISP_DISABLE_12160_SUPPORT	opt_isp.h
 ISP_DISABLE_2100_SUPPORT	opt_isp.h
 ISP_DISABLE_2200_SUPPORT	opt_isp.h
 ISP_COMPILE_FW			opt_isp.h
 ISP_COMPILE_1020_FW		opt_isp.h
 ISP_COMPILE_1080_FW		opt_isp.h
+ISP_COMPILE_12160_FW		opt_isp.h
 ISP_COMPILE_2100_FW		opt_isp.h
 ISP_COMPILE_2200_FW		opt_isp.h
 ISP_TARGET_MODE		opt_isp.h
@@ -277,6 +284,7 @@ TCP_RESTRICT_RST	opt_tcp_input.h
 IPFILTER		opt_ipfilter.h
 IPFILTER_LOG		opt_ipfilter.h
 IPFILTER_LKM		opt_ipfilter.h
+IPFILTER_DEFAULT_BLOCK	opt_ipfilter.h
 
 PM			opt_pm.h
 PM_USE_SOCKET		opt_pm.h

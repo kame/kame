@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.9.2.10 1999/11/16 15:36:14 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.9.2.11 2000/01/18 14:14:46 luigi Exp $
  */
 
 /*
@@ -103,6 +103,12 @@
 #include <net/bpf.h>
 #endif
 
+#include "opt_bdg.h"    
+#ifdef BRIDGE
+#include <net/if_types.h>
+#include <net/bridge.h>
+#endif
+
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
 #include <machine/clock.h>      /* for DELAY */
@@ -127,7 +133,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.9.2.10 1999/11/16 15:36:14 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.9.2.11 2000/01/18 14:14:46 luigi Exp $";
 #endif
 
 /*
@@ -1424,17 +1430,37 @@ static void rl_rxeof(sc)
 		 * a broadcast packet, multicast packet, matches our ethernet
 		 * address or the interface is in promiscuous mode.
 		 */
-		if (ifp->if_bpf) {
+		if (ifp->if_bpf)
 			bpf_mtap(ifp, m);
+#endif
+#ifdef	BRIDGE
+		if (do_bridge) {
+		    struct ifnet *bdg_ifp = bridge_in(m);
+		    if (bdg_ifp == BDG_DROP)
+			goto dropit ;
+		    if (bdg_ifp != BDG_LOCAL) {
+			bdg_forward(&m, bdg_ifp);
+			if (m == NULL)
+			    goto dropit;
+			eh = mtod(m, struct ether_header *);
+		    }
+		    if (bdg_ifp != BDG_LOCAL &&
+				bdg_ifp != BDG_BCAST && bdg_ifp != BDG_MCAST)
+			goto dropit;
+		    /* ok, get it */
+		} else
+#endif
 			if (ifp->if_flags & IFF_PROMISC &&
 				(bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
 						ETHER_ADDR_LEN) &&
 					(eh->ether_dhost[0] & 1) == 0)) {
+#ifdef BRIDGE
+dropit:
+		    if (m)
+#endif
 				m_freem(m);
 				continue;
 			}
-		}
-#endif
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 		ether_input(ifp, eh, m);

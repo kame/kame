@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.111.2.4 1999/11/01 22:23:53 des Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.111.2.9 2000/06/13 07:12:34 ru Exp $
  *	$ANA: ip_input.c,v 1.5 1996/09/18 14:34:59 wollman Exp $
  */
 
@@ -215,14 +215,12 @@ SYSCTL_INT(_net_inet_ip, OID_AUTO, stealth, CTLFLAG_RW,
 /* Firewall hooks */
 ip_fw_chk_t *ip_fw_chk_ptr;
 ip_fw_ctl_t *ip_fw_ctl_ptr;
+int fw_enable = 1 ;
 
 #ifdef DUMMYNET
 ip_dn_ctl_t *ip_dn_ctl_ptr;
 #endif
 
-/* IP Network Address Translation (NAT) hooks */ 
-ip_nat_t *ip_nat_ptr;
-ip_nat_ctl_t *ip_nat_ctl_ptr;
 #endif
 
 #if defined(IPFILTER_LKM) || defined(IPFILTER)
@@ -481,7 +479,7 @@ iphack:
 	}
 #endif
 #ifdef COMPAT_IPFW
-	if (ip_fw_chk_ptr) {
+	if (fw_enable && ip_fw_chk_ptr) {
 #ifdef IPFIREWALL_FORWARD
 		/*
 		 * If we've been forwarded from the output side, then
@@ -526,12 +524,6 @@ iphack:
 	}
 pass:
 
-        if (ip_nat_ptr && !(*ip_nat_ptr)(&ip, &m, m->m_pkthdr.rcvif, IP_NAT_IN)) {
-#ifdef IPFIREWALL_FORWARD
-		ip_fw_fwd_addr = NULL;
-#endif
-		return;
-	}
 #endif	/* !COMPAT_IPFW */
 
 #ifdef PM
@@ -1220,7 +1212,7 @@ ip_dooptions(m)
 				break;
 			}
 			off--;			/* 0 origin */
-			if ((off + sizeof(struct in_addr)) > optlen) {
+			if (off > optlen - (int)sizeof(struct in_addr)) {
 				/*
 				 * End of source route.  Should be for us.
 				 */
@@ -1284,7 +1276,7 @@ nosourcerouting:
 
 		case IPOPT_RR:
 			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
-				code = &cp[IPOPT_OLEN] - (u_char *)ip;
+				code = &cp[IPOPT_OFFSET] - (u_char *)ip;
 				goto bad;
 			}
 			if ((off = cp[IPOPT_OFFSET]) < IPOPT_MINOFF) {
@@ -1295,7 +1287,7 @@ nosourcerouting:
 			 * If no space remains, ignore.
 			 */
 			off--;			/* 0 origin */
-			if ((off + sizeof(struct in_addr)) > optlen)
+			if (off > optlen - (int)sizeof(struct in_addr))
 				break;
 			(void)memcpy(&ipaddr.sin_addr, &ip->ip_dst,
 			    sizeof(ipaddr.sin_addr));
@@ -1325,7 +1317,8 @@ nosourcerouting:
 				code = (u_char *)&ipt->ipt_ptr - (u_char *)ip;
 				goto bad;
 			}
-			if (ipt->ipt_ptr > ipt->ipt_len - sizeof(int32_t)) {
+			if (ipt->ipt_ptr >
+			    ipt->ipt_len - (int)sizeof(int32_t)) {
 				if (++ipt->ipt_oflw == 0) {
 					code = (u_char *)&ipt->ipt_ptr -
 					    (u_char *)ip;
@@ -1804,6 +1797,10 @@ ip_forward(m, srcrt)
 		code = 0;
 		break;
 #endif
+
+	case EACCES:			/* ipfw denied packet */
+		m_freem(mcopy);
+		return;
 	}
 	icmp_error(mcopy, type, code, dest, destifp);
 }

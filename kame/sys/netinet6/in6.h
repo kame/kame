@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.46 2000/06/14 17:31:06 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.47 2000/06/25 08:05:29 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -641,7 +641,7 @@ struct in6_pktinfo {
 #endif
 #endif /* !_XOPEN_SOURCE */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 /*
  * Redefinition of mbuf flags
  */

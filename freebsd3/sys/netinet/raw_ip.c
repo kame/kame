@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.56.2.2 1999/08/29 16:29:52 peter Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.56.2.3 2000/01/18 16:03:57 luigi Exp $
  */
 
 #include "opt_inet.h"
@@ -276,12 +276,6 @@ rip_ctloutput(so, sopt)
 				error = ip_fw_ctl_ptr(sopt);
 			break;
 
-		case IP_NAT:
-			if (ip_nat_ctl_ptr == 0)
-				error = ENOPROTOOPT;
-			else
-				error = ip_nat_ctl_ptr(sopt);
-			break;
 #ifdef DUMMYNET
 		case IP_DUMMYNET_GET:
 			if (ip_dn_ctl_ptr == NULL)
@@ -334,12 +328,6 @@ rip_ctloutput(so, sopt)
 				error = ip_fw_ctl_ptr(sopt);
 			break;
 
-		case IP_NAT:
-			if (ip_nat_ctl_ptr == 0)
-				error = ENOPROTOOPT;
-			else
-				error = ip_nat_ctl_ptr(sopt);
-			break;
 #ifdef DUMMYNET
 		case IP_DUMMYNET_CONFIGURE:
 		case IP_DUMMYNET_DEL:

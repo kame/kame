@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1998,1999 Luigi Rizzo
+ * Copyright (c) 1998-2000 Luigi Rizzo
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.c,v 1.4.2.5 1999/12/07 10:28:08 luigi Exp $
+ * $FreeBSD: src/sys/net/bridge.c,v 1.4.2.6 2000/01/18 14:07:13 luigi Exp $
  */
 
 /*
@@ -185,12 +185,12 @@ bdg_promisc_off(int clear_used)
 	    s = splimp();
 	    ret = ifpromisc(ifp, 0);
 	    splx(s);
-	    printf(">> now  %s%d flags 0x%x promisc %d\n",
-		    ifp->if_name, ifp->if_unit,
-		    ifp->if_flags, ret);
 	    ifp2sc[ifp->if_index].flags &= ~(IFF_BDG_PROMISC|IFF_MUTE) ;
 	    if (clear_used)
 		ifp2sc[ifp->if_index].flags &= ~(IFF_USED) ;
+	    printf(">> now %s%d promisc ON if_flags 0x%x bdg_flags 0x%x\n",
+		    ifp->if_name, ifp->if_unit,
+		    ifp->if_flags, ifp2sc[ifp->if_index].flags);
 	}
     }
 }
@@ -217,10 +217,10 @@ bdg_promisc_on()
 	    s = splimp();
 	    ret = ifpromisc(ifp, 1);
 	    splx(s);
-	    printf(">> now  %s%d flags 0x%x promisc %d\n",
-		    ifp->if_name, ifp->if_unit,
-		    ifp->if_flags, ret);
 	    ifp2sc[ifp->if_index].flags |= IFF_BDG_PROMISC ;
+	    printf(">> now %s%d promisc ON if_flags 0x%x bdg_flags 0x%x\n",
+		    ifp->if_name, ifp->if_unit,
+		    ifp->if_flags, ifp2sc[ifp->if_index].flags);
 	}
 	if (MUTED(ifp)) {
 	    printf(">> unmuting %s%d\n", ifp->if_name, ifp->if_unit);
@@ -532,7 +532,7 @@ bridge_in(struct mbuf *m)
 			bdg_loops, eh->ether_shost, ".",
 			ifp->if_name, ifp->if_unit,
 			old->if_name, old->if_unit,
-			old->if_flags & IFF_MUTE ? "muted":"ignore");
+			MUTED(old) ? "muted":"active");
 	    dropit = 1 ;
 	    if ( !MUTED(old) ) {
 		if (++bdg_loops > 10)
@@ -607,9 +607,9 @@ int
 bdg_forward (struct mbuf **m0, struct ifnet *dst)
 {
     struct ifnet *src = (*m0)->m_pkthdr.rcvif; /* could be NULL in output */
-    struct ifnet *ifp ;
+    struct ifnet *ifp, *last = NULL ;
     int error=0, s ;
-    int canfree = 1 ; /* can free the buf at the end */
+    int canfree = 0 ; /* can free the buf at the end if set */
     int once = 0;      /* loop only once */
     struct mbuf *m ;
 
@@ -785,29 +785,20 @@ forward:
 	    return ENOBUFS ;
 	}
     }
-    for ( ; ifp ; ifp = ifp->if_link.tqe_next ) {
-	if (ifp != src &&       /* do not send to itself */
-	    USED(ifp) && /* used for bridging */
-	    ! IF_QFULL(&ifp->if_snd) &&
-	    (ifp->if_flags & (IFF_UP|IFF_RUNNING)) == (IFF_UP|IFF_RUNNING) &&
-	    SAMECLUSTER(ifp, src, eh) && !MUTED(ifp) ) {
-	    /*
-	     * Only copy if we really need to.
-	     * We could be smarter and save a copy from a previous round,
-	     * but the optimization is not worthwhile.
-	     */
-	    if (canfree && (once || ifp->if_link.tqe_next == NULL) )
+    for (;;) {
+	if (last) { /* need to forward packet */
+	    if (canfree && once ) { /* no need to copy */
 		m = *m0 ;
-	    else /* on a P5-90, m_copypacket takes 540 ticks */
+		*m0 = NULL ; /* original is gone */
+	    } else /* on a P5-90, m_copypacket takes 540 ticks */
 		m = m_copypacket(*m0, M_DONTWAIT);
 	    if (m == NULL) {
 		printf("bdg_forward: sorry, m_copy failed!\n");
 		return ENOBUFS ; /* the original is still there... */
 	    }
 	    /*
-	     * execute last part of ether_output:
-	     * Queue message on interface, and start output if interface
-	     * not yet active.
+	     * Last part of ether_output: queue pkt and start
+	     * output if interface not yet active.
 	     */
 	    s = splimp();
 #ifdef ALTQ
@@ -838,36 +829,43 @@ forward:
 	    }
 	    else {
 #endif /* ALTQ */
-	    if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	    if (IF_QFULL(&last->if_snd)) {
+		IF_DROP(&last->if_snd);
 #if 0
-		MUTE(ifp); /* should I also mute ? */
+		MUTE(last); /* should I also mute ? */
 #endif
 		splx(s);
-		/*
-		 * consume the pkt. This is an infrequent case so
-		 * the optimization is not important.
-		 */
-		m_freem(m);
+		m_freem(m); /* consume the pkt anyways */
 		error = ENOBUFS ;
 	    } else {
-		ifp->if_obytes += m->m_pkthdr.len ;
+		last->if_obytes += m->m_pkthdr.len ;
 		if (m->m_flags & M_MCAST)
-		    ifp->if_omcasts++;
-		IF_ENQUEUE(&ifp->if_snd, m);
-		if ((ifp->if_flags & IFF_OACTIVE) == 0)
-		    (*ifp->if_start)(ifp);
+		    last->if_omcasts++;
+		IF_ENQUEUE(&last->if_snd, m);
+		if ((last->if_flags & IFF_OACTIVE) == 0)
+		    (*last->if_start)(last);
 		splx(s);
 	    }
-	    if (m == *m0)
-		*m0 = NULL ;    /* original is gone... */
 #ifdef ALTQ
 	    }
 #endif
-	    BDG_STAT(ifp, BDG_OUT);
+	    BDG_STAT(last, BDG_OUT);
+	    last = NULL ;
+	    if (once)
+		break ;
 	}
-	if (once)
+	if (ifp == NULL)
 	    break ;
+	if (ifp != src &&       /* do not send to self */
+		USED(ifp) &&	/* if used for bridging */
+		! IF_QFULL(&ifp->if_snd) &&
+		(ifp->if_flags & (IFF_UP|IFF_RUNNING)) ==
+			 (IFF_UP|IFF_RUNNING) &&
+		SAMECLUSTER(ifp, src, eh) && !MUTED(ifp) )
+	    last = ifp ;
+	ifp = ifp->if_link.tqe_next ;
+	if (ifp == NULL)
+	    once = 1 ;
     }
 
     return error ;

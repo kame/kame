@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.85.2.4 1999/08/29 16:29:49 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.85.2.8 2000/06/08 15:11:50 jlemon Exp $
  */
 
 #define _IP_VHL
@@ -202,17 +202,19 @@ ip_output(m0, opt, ro, flags, imo)
             /*
              * the packet was already tagged, so part of the
              * processing was already done, and we need to go down.
-             * opt, flags and imo have already been used, and now
-             * they are used to hold ifp, dst and NULL, respectively.
+             * Get parameters from the header.
              */
             rule = (struct ip_fw_chain *)(m->m_data) ;
+            opt = NULL ;
+	    ro = & ( ((struct dn_pkt *)m)->ro ) ;
+            flags = 0 ; /* XXX is this correct ? */
+	    imo = NULL ;
+            dst = ((struct dn_pkt *)m)->dn_dst ;
+	    ifp = ((struct dn_pkt *)m)->ifp ;
+
             m0 = m = m->m_next ;
             ip = mtod(m, struct ip *);
-            dst = (struct sockaddr_in *)flags;
-            ifp = (struct ifnet *)opt;
             hlen = IP_VHL_HL(ip->ip_vhl) << 2 ;
-            opt = NULL ;
-            flags = 0 ; /* XXX is this correct ? */
             goto sendit;
         } else
             rule = NULL ;
@@ -490,15 +492,10 @@ sendit:
 #endif
 
 #ifdef COMPAT_IPFW
-        if (ip_nat_ptr && !(*ip_nat_ptr)(&ip, &m, ifp, IP_NAT_OUT)) {
-		error = EACCES; 
-		goto done;
-	}
-
 	/*
 	 * Check with the firewall...
 	 */
-	if (ip_fw_chk_ptr) {
+	if (fw_enable && ip_fw_chk_ptr) {
 		struct sockaddr_in *old = dst;
 
 		off = (*ip_fw_chk_ptr)(&ip,
@@ -962,6 +959,7 @@ ip_insertoptions(m, opt, phlen)
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		if (n == 0)
 			return (m);
+		n->m_pkthdr.rcvif = (struct ifnet *)0;
 		n->m_pkthdr.len = m->m_pkthdr.len + optlen;
 		m->m_len -= sizeof(struct ip);
 		m->m_data += sizeof(struct ip);
@@ -1361,7 +1359,7 @@ ip_pcbopts(optname, pcbopt, m)
 			if (cnt < IPOPT_OLEN + sizeof(*cp))
 				goto bad;
 			optlen = cp[IPOPT_OLEN];
-			if (optlen < IPOPT_OLEN  + sizeof(*cp) || optlen > cnt)
+			if (optlen < IPOPT_OLEN + sizeof(*cp) || optlen > cnt)
 				goto bad;
 		}
 		switch (opt) {

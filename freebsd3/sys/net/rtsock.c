@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rtsock.c	8.5 (Berkeley) 11/2/94
- * $FreeBSD: src/sys/net/rtsock.c,v 1.37.2.1 1999/08/29 16:28:34 peter Exp $
+ * $FreeBSD: src/sys/net/rtsock.c,v 1.37.2.2 1999/12/30 09:17:22 ru Exp $
  */
 
 /* for MIP6 */
@@ -371,7 +371,8 @@ route_output(m, so)
 	if (genmask) {
 		struct radix_node *t;
 		t = rn_addmask((caddr_t)genmask, 0, 1);
-		if (t && Bcmp(genmask, t->rn_key, *(u_char *)genmask) == 0)
+		if (t && Bcmp((caddr_t *)genmask + 1, (caddr_t *)t->rn_key + 1,
+			      *(u_char *)t->rn_key - 1) == 0)
 			genmask = (struct sockaddr *)(t->rn_key);
 		else
 			senderr(ENOBUFS);

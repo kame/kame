@@ -61,7 +61,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.82.2.3 1999/10/14 11:49:38 des Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.82.2.4 2000/04/25 05:07:54 wes Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -695,7 +695,7 @@ findpcb:
 	}
 	tp = intotcpcb(inp);
 	if (tp == 0)
-		goto dropwithreset;
+		goto maybedropwithreset;
 	if (tp->t_state == TCPS_CLOSED)
 		goto drop;
 
@@ -741,7 +741,7 @@ findpcb:
 				 */
 				if (thflags & TH_ACK) {
 					tcpstat.tcps_badsyn++;
-					goto dropwithreset;
+					goto maybedropwithreset;
 				}
 				goto drop;
 			}
@@ -1079,7 +1079,7 @@ findpcb:
 		if (thflags & TH_RST)
 			goto drop;
 		if (thflags & TH_ACK)
-			goto dropwithreset;
+			goto maybedropwithreset;
 		if ((thflags & TH_SYN) == 0)
 			goto drop;
 		if (th->th_dport == th->th_sport) {
@@ -1145,6 +1145,7 @@ findpcb:
 			 * packet with M_BCAST not set.
 			 */
 			if (m->m_flags & (M_BCAST|M_MCAST) ||
+			    IN_MULTICAST(ntohl(ip->ip_src.s_addr)) ||
 			    IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
 				goto drop;
 			MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME,
@@ -1283,7 +1284,7 @@ findpcb:
 		if ((thflags & TH_ACK) &&
 		    (SEQ_LEQ(th->th_ack, tp->snd_una) ||
 		     SEQ_GT(th->th_ack, tp->snd_max)))
-				goto dropwithreset;
+				goto maybedropwithreset;
 		break;
 
 	/*
@@ -2273,7 +2274,7 @@ dropafterack:
 	if (tp->t_state == TCPS_SYN_RECEIVED && (thflags & TH_ACK) &&
 	    (SEQ_GT(tp->snd_una, th->th_ack) ||
 	     SEQ_GT(th->th_ack, tp->snd_max)) )
-		goto dropwithreset;
+		goto maybedropwithreset;
 #ifdef TCPDEBUG
 	if (so->so_options & SO_DEBUG) {
 #ifdef INET6
@@ -2293,6 +2294,16 @@ dropafterack:
 	(void) tcp_output(tp);
 	return;
 
+	/*
+	 * Conditionally drop with reset or just drop depending on whether
+	 * we think we are under attack or not.
+	 */
+maybedropwithreset:
+#ifdef ICMP_BANDLIM
+	if (badport_bandlim(1) < 0)
+	    goto drop;
+#endif
+	/* fall through */
 dropwithreset:
 #ifdef TCP_RESTRICT_RST
 	if (restrict_rst)
@@ -2307,11 +2318,13 @@ dropwithreset:
 		goto drop;
 #ifdef INET6
 	if (isipv6) {
-		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
+		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_src) ||
+		    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 			goto drop; /* anycast check is done at the top */
 	} else
 #endif /* INET6 */
-	if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
+	if (IN_MULTICAST(ntohl(ip->ip_src.s_addr)) ||
+	    IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
 		goto drop;
 #ifdef TCPDEBUG
 	if (tp == 0 || (tp->t_inpcb->inp_socket->so_options & SO_DEBUG)) {

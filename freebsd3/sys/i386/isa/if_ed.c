@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_ed.c,v 1.148.2.4 1999/09/25 13:08:18 nyan Exp $
+ * $FreeBSD: src/sys/i386/isa/if_ed.c,v 1.148.2.5 2000/01/18 14:19:39 luigi Exp $
  */
 
 /*
@@ -2783,6 +2783,9 @@ ed_get_packet(sc, buf, len, multicast)
 			ed_ring_copy(sc, buf+14, (char *)(eh+1), len - 14);
 		if (ifp != BDG_LOCAL )
 			bdg_forward(&m, ifp); /* not local, need forwarding */
+		if (m == NULL)
+			return ; /* dropped */
+		eh = mtod(m, struct ether_header *);
 		if (ifp == BDG_LOCAL || ifp == BDG_BCAST || ifp == BDG_MCAST)
 			goto getit ;
 		/* not local and not multicast, just drop it */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.51.2.5 1999/08/29 16:26:11 peter Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.51.2.6 2000/06/10 17:44:56 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -282,8 +282,14 @@ int
 soabort(so)
 	struct socket *so;
 {
+	int error;
 
-	return (*so->so_proto->pr_usrreqs->pru_abort)(so);
+	error = (*so->so_proto->pr_usrreqs->pru_abort)(so);
+	if (error) {
+		sofree(so);
+		return error;
+	}
+	return (0);
 }
 
 int
@@ -487,16 +493,24 @@ restart:
 		    } else do {
 			if (top == 0) {
 				MGETHDR(m, M_WAIT, MT_DATA);
+				if (m == NULL) {
+					error = ENOBUFS;
+					goto release;
+				}
 				mlen = MHLEN;
 				m->m_pkthdr.len = 0;
 				m->m_pkthdr.rcvif = (struct ifnet *)0;
 			} else {
 				MGET(m, M_WAIT, MT_DATA);
+				if (m == NULL) {
+					error = ENOBUFS;
+					goto release;
+				}
 				mlen = MLEN;
 			}
 			if (resid >= MINCLSIZE) {
 				MCLGET(m, M_WAIT);
-				if ((m->m_flags & M_EXT) == 0)
+				if ((m->m_flags & M_EXT) == 0) 
 					goto nopages;
 				mlen = MCLBYTES;
 				len = min(min(mlen, resid), space);
@@ -607,6 +621,8 @@ soreceive(so, psa, uio, mp0, controlp, flagsp)
 		flags = 0;
 	if (flags & MSG_OOB) {
 		m = m_get(M_WAIT, MT_DATA);
+		if (m == NULL)
+			return (ENOBUFS);
 		error = (*pr->pr_usrreqs->pru_rcvoob)(so, m, flags & MSG_PEEK);
 		if (error)
 			goto bad;

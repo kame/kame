@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.49.2.3 1999/08/29 16:26:12 peter Exp $
+ * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.49.2.4 2000/06/10 17:44:57 jlemon Exp $
  */
 
 #include "opt_compat.h"
@@ -1628,6 +1628,10 @@ retry_lookup:
 		 * Get an mbuf header and set it up as having external storage.
 		 */
 		MGETHDR(m, M_WAIT, MT_DATA);
+		if (m == NULL) {
+			error = ENOBUFS;
+			goto done;
+		}
 		m->m_ext.ext_free = sf_buf_free;
 		m->m_ext.ext_ref = sf_buf_ref;
 		m->m_ext.ext_buf = (void *)sf->kva;
