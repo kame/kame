@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.12 1999/12/13 00:58:48 itojun Exp $
+	$Id: INSTALL,v 1.13 2000/01/31 05:12:25 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -35,10 +35,13 @@ perform "make obj" unless you are ready to tackle those troubles.
    operating system. For the rest of this document, we assume "netbsd"
    for explanation.
   
-2. Be sure to have the complete KAME tree. In some cases you'll need
-   to get sources and put them into the target directory, then perform
-   "patch" operations.  Please read the documents under your target
-   directory for more information.
+2. Be sure to have the complete KAME tree.  For certain platforms (namely
+   bsdi3 and bsdi4) we cannot ship the whole source code tree into the
+   KAME tar.gz file, and you need to
+   - copy/untar fresh tree from CD-ROM/whatever
+   - apply patch included in KAME kit
+   Please read the documents under your target directory for more information,
+   if you are using bsdi[34].
 
 3. Invoke the following:
 	% make TARGET=netbsd prepare
