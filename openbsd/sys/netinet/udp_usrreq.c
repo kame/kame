@@ -107,6 +107,7 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sysctl.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -426,10 +427,10 @@ udp_input(struct mbuf *m, ...)
 		bzero(&dstsa2, sizeof(dstsa2));
 		srcsa2.sin6_family = dstsa2.sin6_family = AF_INET6;
 		srcsa2.sin6_len = dstsa2.sin6_len = sizeof(struct sockaddr_in6);
-		srcsa2.sin6_addr = srcsa.sin6_addr;
-		dstsa2.sin6_addr = dstsa.sin6_addr;
-		srcsa2.sin6_scope_id = srcsa.sin6_scope_id;
-		dstsa2.sin6_scope_id = dstsa.sin6_scope_id;
+		srcsa2.sin6_addr = srcsa.sin6.sin6_addr;
+		dstsa2.sin6_addr = dstsa.sin6.sin6_addr;
+		srcsa2.sin6_scope_id = srcsa.sin6.sin6_scope_id;
+		dstsa2.sin6_scope_id = dstsa.sin6.sin6_scope_id;
 
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
