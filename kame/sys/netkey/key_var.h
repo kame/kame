@@ -1,4 +1,4 @@
-/*	$KAME: key_var.h,v 1.10 2001/07/27 04:14:12 itojun Exp $	*/
+/*	$KAME: key_var.h,v 1.11 2001/09/12 23:05:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,7 +50,8 @@
 #define KEYCTL_ESP_KEYMIN		9
 #define KEYCTL_ESP_AUTH			10
 #define KEYCTL_AH_KEYMIN		11
-#define KEYCTL_MAXID			12
+#define KEYCTL_PREFERED_OLDSA		12
+#define KEYCTL_MAXID			13
 
 #define KEYCTL_NAMES { \
 	{ 0, 0 }, \
@@ -65,6 +66,7 @@
 	{ "esp_keymin", CTLTYPE_INT }, \
 	{ "esp_auth", CTLTYPE_INT }, \
 	{ "ah_keymin", CTLTYPE_INT }, \
+	{ "prefered_oldsa", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__
@@ -81,6 +83,7 @@
 	&ipsec_esp_keymin, \
 	&ipsec_esp_auth, \
 	&ipsec_ah_keymin, \
+	&key_prefered_oldsa, \
 }
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.211 2001/09/12 08:14:42 sakane Exp $	*/
+/*	$KAME: key.c,v 1.212 2001/09/12 23:05:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -150,6 +150,7 @@ static u_int key_int_random = 60;	/*interval to initialize randseed,1(m)*/
 static u_int key_larval_lifetime = 30;	/* interval to expire acquiring, 30(s)*/
 static int key_blockacq_count = 10;	/* counter for blocking SADB_ACQUIRE.*/
 static int key_blockacq_lifetime = 20;	/* lifetime for blocking SADB_ACQUIRE.*/
+static int key_prefered_oldsa = 1;	/* prefered old sa rather than new sa.*/
 
 static u_int32_t acq_seq = 0;
 static int key_tick_init_random = 0;
@@ -274,6 +275,10 @@ SYSCTL_INT(_net_key, KEYCTL_ESP_KEYMIN,	esp_keymin, CTLFLAG_RW, \
 /* minimum AH key length */
 SYSCTL_INT(_net_key, KEYCTL_AH_KEYMIN,	ah_keymin, CTLFLAG_RW, \
 	&ipsec_ah_keymin,	0,	"");
+
+/* perfered old SA rather than new SA */
+SYSCTL_INT(_net_key, KEYCTL_PREFERED_OLDSA,	prefered_oldsa, CTLFLAG_RW,\
+	&key_prefered_oldsa,	0,	"");
 #endif /* __FreeBSD__ */
 
 #ifndef LIST_FOREACH
@@ -786,12 +791,16 @@ key_do_allocsa_policy(sah, state)
 	struct secashead *sah;
 	u_int state;
 {
-	struct secasvar *sav, *candidate;
+	struct secasvar *sav, *nextsav, *candidate, *d;
 
 	/* initilize */
 	candidate = NULL;
 
-	LIST_FOREACH(sav, &sah->savtree[state], chain) {
+	for (sav = LIST_FIRST(&sah->savtree[state]);
+	     sav != NULL;
+	     sav = nextsav) {
+
+		nextsav = LIST_NEXT(sav, chain);
 
 		/* sanity check */
 		KEY_CHKSASTATE(sav->state, state, "key_do_allocsa_policy");
@@ -809,11 +818,82 @@ key_do_allocsa_policy(sah, state)
 			panic("key_do_allocsa_policy: "
 				"lifetime_current is NULL.\n");
 
-		/* XXX What the best method is to compare ? */
-		if (candidate->lft_c->sadb_lifetime_addtime >
-				sav->lft_c->sadb_lifetime_addtime) {
-			candidate = sav;
+		/* What the best method is to compare ? */
+		if (key_prefered_oldsa) {
+			if (candidate->lft_c->sadb_lifetime_addtime >
+					sav->lft_c->sadb_lifetime_addtime) {
+				candidate = sav;
+			}
 			continue;
+			/*NOTREACHED*/
+		}
+
+		/* prefered new sa rather than old sa */
+		if (candidate->lft_c->sadb_lifetime_addtime <
+				sav->lft_c->sadb_lifetime_addtime) {
+			d = candidate;
+			candidate = sav;
+		} else
+			d = sav;
+
+		/*
+		 * prepared to delete the SA when there is more
+		 * suitable candidate and the lifetime of the SA is not
+		 * permanent.
+		 */
+		if (d->lft_c->sadb_lifetime_addtime != 0) {
+
+			struct mbuf *m, *result;
+
+			key_sa_chgstate(d, SADB_SASTATE_DEAD);
+			key_freesav(d);
+
+			m = key_setsadbmsg(SADB_DELETE, 0,
+					sav->sah->saidx.proto, 0, 0, d->refcnt);
+			if (!m)
+				return NULL;
+			result = m;
+
+			/* set sadb_address for saidx's. */
+			m = key_setsadbaddr(SADB_EXT_ADDRESS_SRC,
+				(struct sockaddr *)&d->sah->saidx.src,
+				d->sah->saidx.src.ss_len << 3,
+				IPSEC_ULPROTO_ANY);
+			if (!m)
+				return NULL;
+			m_cat(result, m);
+
+			/* set sadb_address for saidx's. */
+			m = key_setsadbaddr(SADB_EXT_ADDRESS_DST,
+				(struct sockaddr *)&d->sah->saidx.src,
+				d->sah->saidx.src.ss_len << 3,
+				IPSEC_ULPROTO_ANY);
+			if (!m)
+				return NULL;
+			m_cat(result, m);
+
+			/* create SA extension */
+			m = key_setsadbsa(d);
+			if (!m)
+				return NULL;
+			m_cat(result, m);
+
+			if (result->m_len < sizeof(struct sadb_msg)) {
+				result = m_pullup(result,
+						sizeof(struct sadb_msg));
+				if (result == NULL)
+					return NULL;
+			}
+
+			result->m_pkthdr.len = 0;
+			for (m = result; m; m = m->m_next)
+				result->m_pkthdr.len += m->m_len;
+			mtod(result, struct sadb_msg *)->sadb_msg_len =
+				PFKEY_UNIT64(result->m_pkthdr.len);
+
+			if (key_sendup_mbuf(NULL, result,
+					KEY_SENDUP_REGISTERED))
+				return NULL;
 		}
 	}
 
@@ -7667,6 +7747,9 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case KEYCTL_AH_KEYMIN:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &ipsec_ah_keymin);
+	case KEYCTL_PREFERED_OLDSA:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_prefered_oldsa);
 	default:
 		return EOPNOTSUPP;
 	}
