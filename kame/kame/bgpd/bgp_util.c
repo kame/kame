@@ -215,7 +215,7 @@ bgp_enable_rte(rte)
 		  else {
 			  syslog(LOG_ERR,
 				 "<%s>: failed to add a route dst: %s/%d, "
-				 "gw: %s if: %s", __FUNCTION__,
+				 "gw: %s", __FUNCTION__,
 				 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 				 rte->rt_ripinfo.rip6_plen,
 				 ip6str(&rte->rt_gw,

@@ -298,7 +298,6 @@ set_nexthop(dst, ret_rte)
   struct ifinfo   *ife;
   struct rt_entry *rte;
   struct ripif    *ripif;
-  char             in6txt[INET6_ADDRSTRLEN];
 
   extern byte           ripyes;
   extern struct ifinfo *ifentry;

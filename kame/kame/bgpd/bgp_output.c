@@ -816,7 +816,7 @@ bgp_send_update(bnp, rte, headrte)
 
 
     if (rtp->rtp_type == RTPROTO_BGP) {
-      if (rt->rt_flags & (RTF_UP|RTF_INSTALLED) != (RTF_UP|RTF_INSTALLED)) {
+      if ((rt->rt_flags & (RTF_UP|RTF_INSTALLED)) != (RTF_UP|RTF_INSTALLED)) {
 #ifdef DEBUG
 	    syslog(LOG_DEBUG, "BGP+ SEND\t\t\t(was skipped since unavaiable)");
 #endif
