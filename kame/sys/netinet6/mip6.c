@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.20 2000/03/18 03:05:38 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.21 2000/04/06 08:30:44 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,8 +35,6 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *         Mattias Pettersson <mattias.pettersson@era.ericsson.se>
- *
- * $Id: mip6.c,v 1.20 2000/03/18 03:05:38 itojun Exp $
  *
  */
 

@@ -1,4 +1,4 @@
-/*	$KAME: pim6_var.h,v 1.5 2000/03/25 07:23:59 sumikawa Exp $	*/
+/*	$KAME: pim6_var.h,v 1.6 2000/04/06 08:30:49 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* $Id: pim6_var.h,v 1.5 2000/03/25 07:23:59 sumikawa Exp $ */
 
 #ifndef _NETINET6_PIM6_VAR_H_
 #define _NETINET6_PIM6_VAR_H_

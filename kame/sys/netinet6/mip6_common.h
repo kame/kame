@@ -1,4 +1,4 @@
-/*	$KAME: mip6_common.h,v 1.9 2000/03/25 07:23:50 sumikawa Exp $	*/
+/*	$KAME: mip6_common.h,v 1.10 2000/04/06 08:30:45 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,8 +35,6 @@
  *
  * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
  *             Martti Kuparinen <martti.kuparinen@ericsson.com>
- *
- *  $Id: mip6_common.h,v 1.9 2000/03/25 07:23:50 sumikawa Exp $
  */
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.6 2000/03/25 07:23:45 sumikawa Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.7 2000/04/06 08:30:43 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,7 +57,6 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: in6_rmx.c,v 1.6 2000/03/25 07:23:45 sumikawa Exp $
  */
 
 /*

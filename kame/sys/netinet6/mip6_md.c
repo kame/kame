@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.14 2000/03/25 07:23:53 sumikawa Exp $	*/
+/*	$KAME: mip6_md.c,v 1.15 2000/04/06 08:30:46 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -34,8 +34,6 @@
  * All rights reserved.
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
- *
- * $Id: mip6_md.c,v 1.14 2000/03/25 07:23:53 sumikawa Exp $
  *
  */
 

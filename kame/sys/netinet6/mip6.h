@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.8 2000/03/18 03:05:39 itojun Exp $	*/
+/*	$KAME: mip6.h,v 1.9 2000/04/06 08:30:44 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,11 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/*
- *  $Id: mip6.h,v 1.8 2000/03/18 03:05:39 itojun Exp $
- */
-
 
 #ifndef _NETINET6_MIP6_H_
 #define _NETINET6_MIP6_H_

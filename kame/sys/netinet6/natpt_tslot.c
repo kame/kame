@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.8 2000/03/25 07:23:56 sumikawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.9 2000/04/06 08:30:48 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -27,8 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: natpt_tslot.c,v 1.8 2000/03/25 07:23:56 sumikawa Exp $
  */
 
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_list.c,v 1.6 2000/03/25 07:23:55 sumikawa Exp $	*/
+/*	$KAME: natpt_list.c,v 1.7 2000/04/06 08:30:47 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_list.c,v 1.6 2000/03/25 07:23:55 sumikawa Exp $
  */
 
 #if (defined(KERNEL)) || (defined(_KERNEL))

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_io.c,v 1.7 2000/03/25 07:23:53 sumikawa Exp $	*/
+/*	$KAME: mip6_io.c,v 1.8 2000/04/06 08:30:45 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -34,8 +34,6 @@
  * All rights reserved.
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
- *
- * $Id: mip6_io.c,v 1.7 2000/03/25 07:23:53 sumikawa Exp $
  *
  */
 
