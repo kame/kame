@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.99 2002/06/03 04:39:03 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.100 2002/06/03 19:25:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -183,7 +183,7 @@ main(argc, argv)
 
 	pid = getpid();
 	thiszone = gmt2local(0);
-	while ((ch = getopt(argc, argv, "acd:f:I:i:nprstA:HPR")) != -1)
+	while ((ch = getopt(argc, argv, "acd:f:Ii:nprstA:HPR")) != -1)
 		switch (ch) {
 		case 'a':
 		case 'c':
@@ -193,6 +193,7 @@ main(argc, argv)
 		case 'P':
 		case 'R':
 		case 's':
+		case 'I':
 			if (mode) {
 				usage();
 				/*NOTREACHED*/
@@ -202,7 +203,6 @@ main(argc, argv)
 			break;
 		case 'd':
 		case 'f':
-		case 'I':
 		case 'i' :
 			if (mode) {
 				usage();
@@ -254,12 +254,16 @@ main(argc, argv)
 		break;
 	case 'I':
 #ifdef SIOCSDEFIFACE_IN6	/* XXX: check SIOCGDEFIFACE_IN6 as well? */
-		if (argc != 0) {
+		if (argc > 1) {
 			usage();
 			/*NOTREACHED*/
+		} else if (argc == 1) {
+			if (strcmp(*argv, "delete") == 0 ||
+			    if_nametoindex(*argv))
+				setdefif(*argv);
+			else
+				errx(1, "invalid interface %s", *argv);
 		}
-		if (strcmp(arg, "default") == 0 || if_nametoindex(arg))
-			setdefif(arg);
 		getdefif(); /* always call it to print the result */
 		break;
 #else
@@ -863,8 +867,7 @@ usage()
 	printf("       ndp [-nt] -f filename\n");
 	printf("       ndp [-nt] -i interface [flags...]\n");
 #ifdef SIOCSDEFIFACE_IN6
-	printf("       ndp [-nt] -I interface\n");
-	printf("       ndp [-nt] -I delete\n");
+	printf("       ndp [-nt] -I [interface|delete]\n");
 #endif
 	printf("       ndp [-nt] -s nodename etheraddr [temp] [proxy]\n");
 	exit(1);
