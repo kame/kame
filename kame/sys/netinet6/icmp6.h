@@ -1,2 +1,2 @@
 /* just for backward compatibility, will be nuked shortly */
-#include <netinet/icmp6.h>
+#error "wrong include file - include netinet/icmp6.h instead"

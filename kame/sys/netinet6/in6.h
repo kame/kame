@@ -65,10 +65,8 @@
 #ifndef _NETINET6_IN6_H_
 #define _NETINET6_IN6_H_
 
-#if 0
 #ifndef __KAME_NETINET_IN_H_INCLUDED_
 #error "do not include netinet6/in6.h directly, include netinet/in.h"
-#endif
 #endif
 
 #ifndef _XOPEN_SOURCE
