@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.85 2001/11/07 02:08:14 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.86 2001/11/07 03:30:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -371,11 +371,12 @@ mainloop()
 				nsd = newsockdb(accept(sd->s, NULL, 0), sd->af);
 				if (nsd) {
 					nsd->type = sd->type;
-					if (nsd->s >= 0) {
+					if (nsd->s >= 0)
 						recv_dns(nsd);
+					else {
 						close(nsd->s);
+						delsockdb(nsd);
 					}
-					delsockdb(nsd);
 				}
 				break;
 			case S_ICMP6:
@@ -1398,6 +1399,12 @@ getans_dns(buf, len, from, fromlen)
 		    qc->fromlen);
 	}
 	if (qc->type != N_MULTICAST)
+
+	if (qc->sd->type == S_TCP) {
+		close(qc->sd->s);
+		delsockdb(qc->sd);
+	}
+
 	delqcache(qc);
 
 	if (ret != len)
