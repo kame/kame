@@ -117,17 +117,17 @@ Use NULL encapsulation instead of LLC/SNAP.
 A real ATM interface and a sub interface require different
 sequences to set a shaper.
 For example, to assign a 45Mbps shaper to VC 201 (0xc9) of en0:
-.Pp
+.Bd
 .Dl # ifconfig en0 10.0.0.1
 .Dl # route add -iface 10.0.0.2 -link en0:3.0.0.c9
 .Dl # pvctxctl en0 0xc9 -b 45M
-.Pp
+.Ed
 For a sub interface,
-.Pp
+.Bd
 .Dl # pvcsif en0      			# creates pvc0
 .Dl # ifconfig pvc0 10.0.0.1 10.0.0.2
 .Dl # pvctxctl pvc0 201 -b 45M
-
+.Ed
 .Sh SEE ALSO
 .Xr ifconfig 8 , 
 .Xr route 8 , 
