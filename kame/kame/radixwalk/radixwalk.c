@@ -1,4 +1,4 @@
-/* $KAME: radixwalk.c,v 1.1 2000/08/16 14:40:30 jinmei Exp $ */
+/* $KAME: radixwalk.c,v 1.2 2000/08/19 07:42:43 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -75,6 +75,7 @@ char indentbuf[_POSIX2_LINE_MAX];
 int indentpitch = DEFAULTINDENTPITCH;
 int af = AF_INET6;
 int rtoffset;
+int printdepth;
 static kvm_t *kvmd;
 
 struct rdtree *get_tree __P((struct radix_node *));
@@ -106,10 +107,13 @@ main(argc, argv)
 
 	indenttype = LINE;
 
-	while ((ch = getopt(argc, argv, "ahf:i:")) != -1) {
+	while ((ch = getopt(argc, argv, "adhf:i:")) != -1) {
 		switch(ch) {
 		case 'a':
 			af = AF_UNSPEC;
+			break;
+		case 'd':
+			printdepth = 1;
 			break;
 		case 'f':
 			if (strcasecmp(optarg, "inet6") == 0)
@@ -286,6 +290,8 @@ print_tree(tn, depth, rightp)
 	if (tn->rd_b < 0) {	/* leaf node */
 		if ((tn->rd_flags & RNF_ROOT) != 0)
 			printf("(root) ");
+		if (printdepth)
+			printf("(%d)", depth);
 		print_addr((struct sockaddr *)&tn->rd_key,
 			   (tn->rd_rtflags & RTF_HOST) ? NULL :
 			   (struct sockaddr *)&tn->rd_mask);
