@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.17 2000/07/20 19:07:02 imp Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.38 2000/11/18 09:22:07 non Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -71,23 +71,25 @@ options 	DFLDSIZ="(256*1024*1024)"
 #
 options 	BLKDEV_IOSIZE=8192
 
-# Options for the VM subsystem
+# Options for the VM subsystem.
+options		PQ_CACHESIZE=512	# color for 512k/16k cache
+# Deprecated options supported for backwards compatibility.
 #options 	PQ_NOOPT		# No coloring
-options 	PQ_LARGECACHE		# color for 512k/16k cache
+#options 	PQ_LARGECACHE		# color for 512k/16k cache
 #options 	PQ_HUGECACHE		# color for 1024k/16k cache
-#options 	PQ_MEDIUMCACHE		# color for 64k/16k cache
-#options 	PQ_NORMALCACHE		# color for 256k/16k cache
+#options 	PQ_MEDIUMCACHE		# color for 256k/16k cache
+#options 	PQ_NORMALCACHE		# color for 64k/16k cache
 
 # This allows you to actually store this configuration file into
 # the kernel binary itself, where it may be later read by saying:
-#    strings -aout -n 3 /kernel | grep ^___ | sed -e 's/^___//' > MYKERNEL
+#    strings -n 3 /kernel | sed -n 's/^___//p' > MYKERNEL
 #
 options 	INCLUDE_CONFIG_FILE     # Include this file in kernel
 
 #
 # The root device and filesystem type can be compiled in;
 # this provides a fallback option if the root device cannot
-# be correctly guesst by the bootstrap code, or an override if
+# be correctly guessed by the bootstrap code, or an override if
 # the RB_DFLTROOT flag (-r) is specified when booting the kernel.
 #
 options 	ROOTDEVNAME=\"ufs:da0s2e\"
@@ -98,10 +100,6 @@ options 	ROOTDEVNAME=\"ufs:da0s2e\"
 #
 # SMP enables building of a Symmetric MultiProcessor Kernel.
 # APIC_IO enables the use of the IO APIC for Symmetric I/O.
-# NCPU sets the number of CPUs, defaults to 2.
-# NBUS sets the number of busses, defaults to 4.
-# NAPIC sets the number of IO APICs on the motherboard, defaults to 1.
-# NINTR sets the total number of INTs provided by the motherboard.
 #
 # Notes:
 #
@@ -116,12 +114,6 @@ options 	ROOTDEVNAME=\"ufs:da0s2e\"
 # Mandatory:
 options 	SMP			# Symmetric MultiProcessor Kernel
 options 	APIC_IO			# Symmetric (APIC) I/O
-
-# Optional, these are the defaults plus 1:
-options 	NCPU=5			# number of CPUs
-options 	NBUS=5			# number of busses
-options 	NAPIC=2			# number of IO APICs
-options 	NINTR=25		# number of INTs
 
 #
 # Rogue SMP hardware:
@@ -210,8 +202,8 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 #
 # NO_F00F_HACK disables the hack that prevents Pentiums (and ONLY
 # Pentiums) from locking up when a LOCK CMPXCHG8B instruction is
-# executed.  This should be included for ALL kernels that won't run
-# on a Pentium.
+# executed.  This option is only needed if I586_CPU is also defined,
+# and should be included for any non-Pentium CPU that defines it.
 #
 # NO_MEMORY_HOLE is an optimisation for systems with AMD K6 processors
 # which indicates that the 15-16MB range is *definitely* not being
@@ -280,9 +272,33 @@ options 	USER_LDT		#allow user-level control of i386 ldt
 # Definition-style interprocess communication, in the form of shared
 # memory, semaphores, and message queues, respectively.
 #
-options 	SYSVSHM
-options 	SYSVSEM
-options 	SYSVMSG
+# System V shared memory and tunable parameters
+options 	SYSVSHM		# include support for shared memory
+options 	SHMMAXPGS=1025	# max amount of shared memory pages (4k on i386)
+options 	SHMALL=1025	# max amount of shared memory (bytes)
+options 	SHMMAX="(SHMMAXPGS*PAGE_SIZE+1)"
+				# max shared memory segment size (bytes)
+options 	SHMMIN=2	# min shared memory segment size (bytes)
+options 	SHMMNI=33	# max number of shared memory identifiers
+options 	SHMSEG=9	# max shared memory segments per process
+
+# System V semaphores and tunable parameters
+options 	SYSVSEM		# include support for semaphores
+options 	SEMMAP=31	# amount of entries in semaphore map
+options 	SEMMNI=11	# number of semaphore identifiers in the system
+options 	SEMMNS=61	# number of semaphores in the system
+options 	SEMMNU=31	# number of undo structures in the system
+options 	SEMMSL=61	# max number of semaphores per id
+options 	SEMOPM=101	# max number of operations per semop call
+options 	SEMUME=11	# max number of undo entries per process
+
+# System V message queues and tunable parameters
+options 	SYSVMSG		# include support for message queues
+options 	MSGMNB=2049	# max characters per message
+options 	MSGMNI=41	# max number of message queue identifiers
+options 	MSGSEG=2049	# max number of message segments in the system
+options 	MSGSSZ=16	# size of a message segment MUST be power of 2
+options 	MSGTQL=41	# max amount of messages in the system
 
 
 #####################################################################
@@ -404,6 +420,7 @@ options 	NETGRAPH_ASYNC
 options 	NETGRAPH_BPF
 options 	NETGRAPH_CISCO
 options 	NETGRAPH_ECHO
+options 	NETGRAPH_ETHER
 options 	NETGRAPH_FRAME_RELAY
 options 	NETGRAPH_HOLE
 options 	NETGRAPH_IFACE
@@ -412,6 +429,7 @@ options 	NETGRAPH_LMI
 # MPPC compression requires proprietary files (not included)
 #options 	NETGRAPH_MPPC_COMPRESSION
 options 	NETGRAPH_MPPC_ENCRYPTION
+options 	NETGRAPH_ONE2MANY
 options 	NETGRAPH_PPP
 options 	NETGRAPH_PPPOE
 options 	NETGRAPH_PPTPGRE
@@ -538,6 +556,10 @@ options 	IPFILTER		#ipfilter support
 options 	IPFILTER_LOG		#ipfilter logging
 options 	IPSTEALTH		#support for stealth forwarding
 options 	TCPDEBUG
+
+# Statically Link in accept filters
+options                ACCEPT_FILTER_DATA
+options                ACCEPT_FILTER_HTTP
 
 # The following options add sysctl variables for controlling how certain
 # TCP packets are handled.
@@ -1068,6 +1090,9 @@ device		npx0	at nexus? port IO_NPX flags 0x0 irq 13
 # ahc: Adaptec 274x/284x/294x
 # aic: Adaptec 152x
 # bt: Most Buslogic controllers
+# ncv: NCR 53C500 based SCSI host adapters.
+# nsp: Workbit Ninja SCSI-3 based PC Card SCSI host adapters.
+# stg: TMC 18C30, 18C50 based ISA/PC Card SCSI host adapters.
 #
 # Note that the order is important in order for Buslogic cards to be
 # probed correctly.
@@ -1078,6 +1103,9 @@ device		adv0	at isa?
 device		adw
 device		aha0	at isa?
 device		aic0	at isa?
+device		ncv
+device		nsp
+device		stg0	at isa? port 0x140 irq 11
 
 #
 # Compaq Smart RAID, Mylex DAC960 and AMI MegaRAID controllers.  Only
@@ -1189,7 +1217,7 @@ device		wst
 
 
 #
-# Standard floppy disk controllers and floppy tapes: `fdc', `fd', and `ft'
+# Standard floppy disk controllers: `fdc' and `fd'
 #
 device		fdc0	at isa? port IO_FD1 irq 6 drq 2
 #
@@ -1197,11 +1225,6 @@ device		fdc0	at isa? port IO_FD1 irq 6 drq 2
 # gotta turn it actually on by setting the variable fd_debug with DDB,
 # however.
 options 	FDC_DEBUG
-#
-# Activate this line instead of the fdc0 line above if you happen to
-# have an Insight floppy tape.  Probing them proved to be dangerous
-# for people with floppy disks only, so it's "hidden" behind a flag:
-#device fdc0 at isa? port IO_FD1 flags 1 irq 6 drq 2
 
 device		fd0	at fdc0 drive 0
 device		fd1	at fdc0 drive 1
@@ -1672,6 +1695,11 @@ device		pci
 # The `fxp' device provides support for the Intel EtherExpress Pro/100B
 # PCI Fast Ethernet adapters.
 #
+# The pcn device provides support for PCI fast ethernet adapters based
+# on the AMD Am79c97x chipsets, including the PCnet/FAST, PCnet/FAST+,
+# PCnet/PRO and PCnet/Home. These were previously handled by the lnc
+# driver (and still will be if you leave this driver out of the kernel).
+#
 # The 'rl' device provides support for PCI fast ethernet adapters based
 # on the RealTek 8129/8139 chipset. Note that the RealTek driver defaults
 # to using programmed I/O to do register accesses because memory mapped
@@ -1715,7 +1743,7 @@ device		pci
 # Deskpro systems. It also supports several Olicom 10Mbps and 10/100
 # boards.
 #
-# The `tx' device provides support for the SMC 9432TX cards.
+# The `tx' device provides support for the SMC 9432 TX, BTX and TX_2 cards.
 #
 # The `vr' device provides support for various fast ethernet adapters
 # based on the VIA Technologies VT3043 `Rhine I' and VT86C100A `Rhine II'
@@ -1846,12 +1874,12 @@ device		sym		# NCR/Symbios Logic (newer chipsets)
 #
 #	ISP_TARGET_MODE		-	enable target mode operation
 #
-options 	SCSI_ISP_NO_FWLOAD_MASK=0x12	# disable FW load for isp1, isp4
-options 	SCSI_ISP_NO_NVRAM_MASK=0x1	# disable NVRAM for isp0
-options 	SCSI_ISP_PREFER_MEM_MAP=0	# prefer I/O mapping
-options 	SCSI_ISP_FCDUPLEX=0x4		# isp2 is a Fibre Channel card
+#options 	SCSI_ISP_NO_FWLOAD_MASK=0x12	# disable FW load for isp1, isp4
+#options 	SCSI_ISP_NO_NVRAM_MASK=0x1	# disable NVRAM for isp0
+#options 	SCSI_ISP_PREFER_MEM_MAP=0	# prefer I/O mapping
+#options 	SCSI_ISP_FCDUPLEX=0x4		# isp2 is a Fibre Channel card
 						# we want in full duplex mode.
-options 	SCSI_ISP_WWN="0x5000000099990000"
+#options 	SCSI_ISP_WWN="0x5000000099990000"
 #options 	ISP_DISABLE_1020_SUPPORT
 #options 	ISP_DISABLE_1080_SUPPORT
 #options 	ISP_DISABLE_12160_SUPPORT
@@ -1888,10 +1916,12 @@ device		miibus
 # PCI Ethernet NICs that use the common MII bus controller code.
 device		dc		# DEC/Intel 21143 and various workalikes
 device		rl		# RealTek 8129/8139
+device		pcn		# AMD Am79C79x PCI 10/100 NICs
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
 device		tl		# Texas Instruments ThunderLAN
+device		tx		# SMC EtherPower II (83c17x ``EPIC'')
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
@@ -1899,7 +1929,6 @@ device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
 device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
-device		tx		# SMC 9432TX (83c170 ``EPIC'')
 device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
 device		sk
@@ -1948,20 +1977,25 @@ options 	POWERFAIL_NMI	# make it beep instead of panicing
 #
 # SMB bus
 #
-# System Management Bus support provided by the 'smbus' device.
+# System Management Bus support is provided by the 'smbus' device.
+# Access to the SMBus device is via the 'smb' device (/dev/smb*),
+# which is a child of the 'smbus' device.
 #
 # Supported devices:
-# smb	standard io
+# smb		standard io through /dev/smb*
 #
-# Supported interfaces:
-# iicsmb I2C to SMB bridge with any iicbus interface
-# bktr	brooktree848 I2C hardware interface
-# intpm	Intel PIIX4 Power Management Unit
-# alpm	Acer Aladdin-IV/V/Pro2 Power Management Unit
+# Supported SMB interfaces:
+# iicsmb	I2C to SMB bridge with any iicbus interface
+# bktr		brooktree848 I2C hardware interface
+# intpm		Intel PIIX4 Power Management Unit
+# alpm		Acer Aladdin-IV/V/Pro2 Power Management Unit
+# ichsmb	Intel ICH SMBus controller chips (82801AA, 82801AB, 82801BA)
 #
 device		smbus		# Bus support, required for smb below.
+
 device		intpm
 device		alpm
+device		ichsmb
 
 device		smb
 
@@ -2257,6 +2291,12 @@ options		COMPAT_SVR4	# build emulator statically
 options		DEBUG_SVR4	# enable verbose debugging
 pseudo-device	streams		# STREAMS network driver (required for svr4).
 
+# The 'asr' driver provides support for current DPT/Adaptec SCSI RAID
+# controllers (SmartRAID V and VI and later).
+# These controllers require the CAM infrastructure.
+#
+device		asr
+
 # The 'dpt' driver provides support for DPT controllers (http://www.dpt.com/).
 # These have hardware RAID-{0,1,5} support, and do multi-initiator I/O.
 # The DPT controllers are commonly re-licensed under other brand-names -
@@ -2292,6 +2332,13 @@ options 	DPT_LOST_IRQ
 options 	DPT_RESET_HBA
 options 	DPT_ALLOW_MEMIO
 
+#
+# Mylex AcceleRAID and eXtremeRAID controllers with v6 and later
+# firmware.  These controllers have a SCSI-like interface, and require
+# the CAM infrastructure.
+#
+device          mly
+
 # USB support
 # UHCI controller
 device		uhci
@@ -2310,8 +2357,12 @@ device		ukbd
 device		ulpt
 # USB Iomega Zip 100 Drive
 device		umass
+# USB modem support
+device		umodem
 # USB mouse
 device		ums
+# USB scanners
+device		uscanner
 #
 # ADMtek USB ethernet. Supports the LinkSys USB100TX,
 # the Billionton USB100, the Melco LU-ATX, the D-Link DSB-650TX
@@ -2389,11 +2440,6 @@ options 	KBD_RESETDELAY=201
 options 	KEY
 options 	LOCKF_DEBUG
 options 	LOUTB
-options 	MSGMNB=2049
-options 	MSGMNI=41
-options 	MSGSEG=2049
-options 	MSGSSZ=16
-options 	MSGTQL=41
 options 	NBUF=512
 options 	NETATALKDEBUG
 options 	NMBCLUSTERS=1024
@@ -2409,19 +2455,6 @@ options 	SCSI_NCR_MAX_WIDE=1
 options 	SCSI_NCR_MYADDR=7
 options 	SC_DEBUG_LEVEL
 options 	SC_RENDER_DEBUG
-options 	SEMMAP=31
-options 	SEMMNI=11
-options 	SEMMNS=61
-options 	SEMMNU=31
-options 	SEMMSL=61
-options 	SEMOPM=101
-options 	SEMUME=11
-options 	SHMALL=1025
-options 	SHMMAX="(SHMMAXPGS*PAGE_SIZE+1)"
-options 	SHMMAXPGS=1025
-options 	SHMMIN=2
-options 	SHMMNI=33
-options 	SHMSEG=9
 options 	SHOW_BUSYBUFS	# List buffers that prevent root unmount
 options 	SIMPLELOCK_DEBUG
 options 	SI_DEBUG

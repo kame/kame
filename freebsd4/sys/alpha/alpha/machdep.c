@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.7 2000/07/20 10:35:13 kris Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.9 2000/08/04 22:31:05 peter Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -91,7 +91,6 @@
 #include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_simos.h"
-#include "opt_sysvipc.h"
 #include "opt_msgbuf.h"
 
 #include <sys/param.h>
@@ -140,14 +139,6 @@
 #include <sys/vnode.h>
 #include <miscfs/procfs/procfs.h>
 #include <machine/sigframe.h>
-
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
-
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
 
 struct proc* curproc;
 struct proc* fpcurproc;
@@ -208,7 +199,7 @@ int	ncpus;			/* number of cpus */
 vm_offset_t phys_avail[10];
 
 static int
-sysctl_hw_physmem SYSCTL_HANDLER_ARGS
+sysctl_hw_physmem(SYSCTL_HANDLER_ARGS)
 {
 	int error = sysctl_handle_int(oidp, 0, alpha_ptob(physmem), req);
 	return (error);
@@ -218,7 +209,7 @@ SYSCTL_PROC(_hw, HW_PHYSMEM, physmem, CTLTYPE_INT|CTLFLAG_RD,
 	0, 0, sysctl_hw_physmem, "I", "");
 
 static int
-sysctl_hw_usermem SYSCTL_HANDLER_ARGS
+sysctl_hw_usermem(SYSCTL_HANDLER_ARGS)
 {
 	int error = sysctl_handle_int(oidp, 0,
 		alpha_ptob(physmem - cnt.v_wire_count), req);
@@ -328,18 +319,6 @@ again:
 
 	valloc(callout, struct callout, ncallout);
 	valloc(callwheel, struct callout_tailq, callwheelsize);
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
 
 	/*
 	 * The nominal buffer size (and minimum KVA allocation) is BKVASIZE.
@@ -2036,7 +2015,7 @@ bad:
 }
 
 static int
-sysctl_machdep_adjkerntz SYSCTL_HANDLER_ARGS
+sysctl_machdep_adjkerntz(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2,

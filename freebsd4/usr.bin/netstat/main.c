@@ -42,7 +42,7 @@ char const copyright[] =
 static char sccsid[] = "@(#)main.c	8.4 (Berkeley) 3/1/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34.2.2 2000/07/15 07:29:30 kris Exp $";
+  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34.2.3 2000/08/17 07:25:38 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -174,7 +174,7 @@ struct protox {
 	{ -1,		N_IPSECSTAT,	1,	0,
 	  ipsec_stats,	NULL,		"ipsec",	0},
 #endif
-	{ -1,		-1,		1,	protopr,
+	{ -1,		-1,		1,	0,
 	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
 	{ -1,		-1,		0,	0,
 	  0,		NULL,		0 }
@@ -198,7 +198,7 @@ struct protox ip6protox[] = {
 	{ -1,		N_PIM6STAT,	1,	0,
 	  pim6_stats,	NULL,		"pim6",	0 },
 #endif
-	{ -1,		-1,		1,	protopr,
+	{ -1,		-1,		1,	0,
 	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
 	{ -1,		-1,		0,	0,
 	  0,		NULL,		0,	0 }

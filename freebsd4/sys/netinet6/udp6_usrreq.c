@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.2 2000/07/15 07:14:38 kris Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.21 2000/11/18 08:07:53 jinmei Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.22 2000/11/21 12:19:30 kawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -497,7 +497,7 @@ udp6_ctlinput(cmd, sa, d)
 }
 
 static int
-udp6_getcred SYSCTL_HANDLER_ARGS
+udp6_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct sockaddr_in6 addrs[2];
 	struct inpcb *inp;

@@ -9,7 +9,7 @@
  * Modified by Bill Fenner, PARC, April 1995
  *
  * MROUTING Revision: 3.5
- * $FreeBSD: src/sys/netinet/ip_mroute.c,v 1.56 1999/12/22 19:13:22 shin Exp $
+ * $FreeBSD: src/sys/netinet/ip_mroute.c,v 1.56.2.1 2000/09/21 12:08:13 kjc Exp $
  */
 
 #include "opt_mrouting.h"
@@ -2151,16 +2151,6 @@ rsvp_input(m, off, proto)
 	return;
     }
 
-    /* If the old-style non-vif-associated socket is set, then use
-     * it and ignore the new ones.
-     */
-    if (ip_rsvpd != NULL) {
-	if (rsvpdebug)
-	    printf("rsvp_input: Sending packet up old-style socket\n");
-	rip_input(m, off, proto);  /* xxx */
-	return;
-    }
-
     s = splnet();
 
     if (rsvpdebug)
@@ -2173,35 +2163,33 @@ rsvp_input(m, off, proto)
 
     ifp = m->m_pkthdr.rcvif;
     /* Find which vif the packet arrived on. */
-    for (vifi = 0; vifi < numvifs; vifi++) {
+    for (vifi = 0; vifi < numvifs; vifi++)
 	if (viftable[vifi].v_ifp == ifp)
- 		break;
- 	}
- 
-    if (vifi == numvifs) {
-	/* Can't find vif packet arrived on. Drop packet. */
-	if (rsvpdebug)
-	    printf("rsvp_input: Can't find vif for packet...dropping it.\n");
-	m_freem(m);
-	splx(s);
-	return;
-    }
-
-    if (rsvpdebug)
-	printf("rsvp_input: check socket\n");
+	    break;
 
 #ifdef ALTQ
-    if ((so = viftable[vifi].v_rsvpd) == NULL) {
+    if (vifi == numvifs || (so = viftable[vifi].v_rsvpd) == NULL) {
 #else
-    if (viftable[vifi].v_rsvpd == NULL) {
+    if (vifi == numvifs || viftable[vifi].v_rsvpd == NULL) {
 #endif
-	/* drop packet, since there is no specific socket for this
-	 * interface */
+	/*
+	 * If the old-style non-vif-associated socket is set,
+	 * then use it.  Otherwise, drop packet since there
+	 * is no specific socket for this vif.
+	 */
+	if (ip_rsvpd != NULL) {
 	    if (rsvpdebug)
-		    printf("rsvp_input: No socket defined for vif %d\n",vifi);
+		printf("rsvp_input: Sending packet up old-style socket\n");
+	    rip_input(m, off, proto);  /* xxx */
+	} else {
+	    if (rsvpdebug && vifi == numvifs)
+		printf("rsvp_input: Can't find vif for packet.\n");
+	    else if (rsvpdebug && viftable[vifi].v_rsvpd == NULL)
+		printf("rsvp_input: No socket defined for vif %d\n",vifi);
 	    m_freem(m);
-	    splx(s);
-	    return;
+	}
+	splx(s);
+	return;
     }
     rsvp_src.sin_addr = ip->ip_src;
 

@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79.2.3 2000/07/24 21:51:05 obrien Exp $
+ * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79.2.5 2000/11/17 06:17:44 markm Exp $
  */
 
 /*
@@ -50,6 +50,7 @@
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
+#include <sys/filio.h>
 #include <sys/ioccom.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
@@ -177,16 +178,14 @@ mmrw(dev, uio, flags)
 /* minor device 0 is physical memory */
 		case 0:
 			v = uio->uio_offset;
-			pmap_enter(kernel_pmap, (vm_offset_t)ptvmmap, v,
-				uio->uio_rw == UIO_READ ? VM_PROT_READ : VM_PROT_WRITE,
-				TRUE);
+			v &= ~PAGE_MASK;
+			pmap_kenter((vm_offset_t)ptvmmap, v);
 			o = (int)uio->uio_offset & PAGE_MASK;
 			c = (u_int)(PAGE_SIZE - ((int)iov->iov_base & PAGE_MASK));
 			c = min(c, (u_int)(PAGE_SIZE - o));
 			c = min(c, (u_int)iov->iov_len);
 			error = uiomove((caddr_t)&ptvmmap[o], (int)c, uio);
-			pmap_remove(kernel_pmap, (vm_offset_t)ptvmmap,
-				    (vm_offset_t)&ptvmmap[PAGE_SIZE]);
+			pmap_kremove((vm_offset_t)ptvmmap);
 			continue;
 
 /* minor device 1 is kernel memory */
@@ -465,9 +464,10 @@ random_ioctl(dev, cmd, data, flags, p)
 	/*
 	 * We're the random or urandom device.  The only ioctls are for
 	 * selecting and inspecting which interrupts are used in the muck
-	 * gathering business.
+	 * gathering business and the fcntl() stuff.
 	 */
-	if (cmd != MEM_SETIRQ && cmd != MEM_CLEARIRQ && cmd != MEM_RETURNIRQ)
+	if (cmd != MEM_SETIRQ && cmd != MEM_CLEARIRQ && cmd != MEM_RETURNIRQ
+		&& cmd != FIONBIO && cmd != FIOASYNC)
 		return (ENOTTY);
 
 	/*
@@ -490,6 +490,10 @@ random_ioctl(dev, cmd, data, flags, p)
 	interrupt_mask = 1 << intr;
 	sc = &random_softc[intr];
 	switch (cmd) {
+	/* Really handled in upper layer */
+	case FIOASYNC:
+	case FIONBIO:
+		break;
 	case MEM_SETIRQ:
 		if (interrupt_allowed & interrupt_mask)
 			break;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.5 2000/07/15 07:14:30 kris Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.11 2000/11/01 11:24:44 ru Exp $
  */
 
 #define	_IP_VHL
@@ -346,7 +346,6 @@ ip_input(struct mbuf *m)
 		ipstat.ips_badlen++;
 		goto bad;
 	}
-	NTOHS(ip->ip_id);
 	NTOHS(ip->ip_off);
 
 	/*
@@ -513,18 +512,12 @@ pass:
 			 * The packet is returned (relatively) intact; if
 			 * ip_mforward() returns a non-zero value, the packet
 			 * must be discarded, else it may be accepted below.
-			 *
-			 * (The IP ident field is put in the same byte order
-			 * as expected when ip_mforward() is called from
-			 * ip_output().)
 			 */
-			ip->ip_id = htons(ip->ip_id);
 			if (ip_mforward(ip, m->m_pkthdr.rcvif, m, 0) != 0) {
 				ipstat.ips_cantforward++;
 				m_freem(m);
 				return;
 			}
-			ip->ip_id = ntohs(ip->ip_id);
 
 			/*
 			 * The process-level routing demon needs to receive
@@ -675,20 +668,21 @@ found:
 #endif
 				return;
 			}
-			/* Get the length of the reassembled packets header */
-			hlen = IP_VHL_HL(ip->ip_vhl) << 2;
 			ipstat.ips_reassembled++;
 			ip = mtod(m, struct ip *);
+			/* Get the header length of the reassembled packet */
+			hlen = IP_VHL_HL(ip->ip_vhl) << 2;
 #ifdef IPDIVERT
 			/* Restore original checksum before diverting packet */
 			if (divert_info != 0) {
 				ip->ip_len += hlen;
 				HTONS(ip->ip_len);
 				HTONS(ip->ip_off);
-				HTONS(ip->ip_id);
 				ip->ip_sum = 0;
-				ip->ip_sum = in_cksum_hdr(ip);
-				NTOHS(ip->ip_id);
+				if (hlen == sizeof(struct ip))
+					ip->ip_sum = in_cksum_hdr(ip);
+				else
+					ip->ip_sum = in_cksum(m, hlen);
 				NTOHS(ip->ip_off);
 				NTOHS(ip->ip_len);
 				ip->ip_len -= hlen;
@@ -718,7 +712,6 @@ found:
 		ip->ip_len += hlen;
 		HTONS(ip->ip_len);
 		HTONS(ip->ip_off);
-		HTONS(ip->ip_id);
 
 		/* Deliver packet to divert input routine */
 		ip_divert_cookie = divert_cookie;
@@ -935,9 +928,9 @@ inserted:
 	for (q = nq; q != NULL; q = nq) {
 		nq = q->m_nextpkt;
 		q->m_nextpkt = NULL;
-		m_cat(m, q);
 		m->m_pkthdr.csum_flags &= q->m_pkthdr.csum_flags;
 		m->m_pkthdr.csum_data += q->m_pkthdr.csum_data;
+		m_cat(m, q);
 	}
 
 #ifdef IPDIVERT
@@ -1299,7 +1292,6 @@ nosourcerouting:
 	}
 	return (0);
 bad:
-	ip->ip_len -= IP_VHL_HL(ip->ip_vhl) << 2;   /* XXX icmp_error adds in hdr length */
 	icmp_error(m, type, code, 0, 0);
 	ipstat.ips_badoptions++;
 	return (1);
@@ -1505,7 +1497,6 @@ ip_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	HTONS(ip->ip_id);
 #ifdef IPSTEALTH
 	if (!ipstealth) {
 #endif
@@ -1514,7 +1505,6 @@ ip_forward(m, srcrt)
 			    dest, 0);
 			return;
 		}
-		ip->ip_ttl -= IPTTLDEC;
 #ifdef IPSTEALTH
 	}
 #endif
@@ -1551,6 +1541,14 @@ ip_forward(m, srcrt)
 		mcopy = m_pullup(mcopy, ip->ip_hl << 2);
 #endif
 	}
+
+#ifdef IPSTEALTH
+	if (!ipstealth) {
+#endif
+		ip->ip_ttl -= IPTTLDEC;
+#ifdef IPSTEALTH
+	}
+#endif
 
 	/*
 	 * If forwarding packet using same interface that it came in on,
@@ -1699,6 +1697,8 @@ ip_forward(m, srcrt)
 		m_freem(mcopy);
 		return;
 	}
+	if (mcopy->m_flags & M_EXT)
+		m_copyback(mcopy, 0, sizeof(struct ip), mtod(mcopy, caddr_t));
 	icmp_error(mcopy, type, code, dest, destifp);
 }
 

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.2 2000/05/10 02:04:45 obrien Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.3 2000/10/29 16:59:27 dwmalone Exp $
  */
 
 #include "splash.h"
@@ -3101,7 +3101,19 @@ next_code:
 
 	    case RBT:
 #ifndef SC_DISABLE_REBOOT
-		shutdown_nice();
+		shutdown_nice(0);
+#endif
+		break;
+
+	    case HALT:
+#ifndef SC_DISABLE_REBOOT
+		shutdown_nice(RB_HALT);
+#endif
+		break;
+
+	    case PDWN:
+#ifndef SC_DISABLE_REBOOT
+		shutdown_nice(RB_HALT|RB_POWEROFF);
 #endif
 		break;
 

@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.3 2000/07/15 07:29:30 kris Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.4 2000/09/18 11:18:14 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -248,7 +248,7 @@ pr_rthdr(af)
 
 	if (Aflag)
 		printf("%-8.8s ","Address");
-	if (lflag)
+	if (af == AF_INET || lflag)
 		printf("%-*.*s %-*.*s %-6.6s  %6.6s%8.8s  %8.8s %6s\n",
 			WID_DST(af), WID_DST(af), "Destination",
 			WID_GW(af), WID_GW(af), "Gateway",

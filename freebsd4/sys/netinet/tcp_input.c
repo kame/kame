@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.3 2000/07/15 07:14:31 kris Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.4 2000/08/16 06:14:23 jayanth Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -120,6 +120,11 @@ int tcp_delack_enabled = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, delayed_ack, CTLFLAG_RW, 
     &tcp_delack_enabled, 0, 
     "Delay ACK to try and piggyback it onto a data packet");
+
+int tcp_lq_overflow = 1;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcp_lq_overflow, CTLFLAG_RW,
+    &tcp_lq_overflow, 0, 
+    "Listen Queue Overflow");
 
 #ifdef TCP_DROP_SYNFIN
 static int drop_synfin = 0;
@@ -753,6 +758,9 @@ findpcb:
 				tcpstat.tcps_listendrop++;
 				so2 = sodropablereq(so);
 				if (so2) {
+					if (tcp_lq_overflow)
+						sototcpcb(so2)->t_flags |= 
+						    TF_LQ_OVERFLOW;
 					tcp_drop(sototcpcb(so2), ETIMEDOUT);
 					so2 = sonewconn(so, 0);
 				}

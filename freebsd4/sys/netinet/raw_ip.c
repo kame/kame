@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.1 2000/07/15 07:14:31 kris Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.3 2000/10/17 13:44:57 ru Exp $
  */
 
 #include "opt_inet6.h"
@@ -259,6 +259,7 @@ rip_ctloutput(so, sopt)
 			error = sooptcopyout(sopt, &optval, sizeof optval);
 			break;
 
+		case IP_FW_ADD:
 		case IP_FW_GET:
 			if (ip_fw_ctl_ptr == 0)
 				error = ENOPROTOOPT;
@@ -567,7 +568,7 @@ rip_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 }
 
 static int
-rip_pcblist SYSCTL_HANDLER_ARGS
+rip_pcblist(SYSCTL_HANDLER_ARGS)
 {
 	int error, i, n, s;
 	struct inpcb *inp, **inp_list;

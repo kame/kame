@@ -13,7 +13,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.4 2000/06/11 18:39:44 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.10 2000/11/07 09:50:58 ru Exp $
  */
 
 #define STATEFUL       1
@@ -95,7 +95,7 @@ SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, enable, CTLFLAG_RW,
     &fw_enable, 0, "Enable ipfw");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO,one_pass,CTLFLAG_RW, 
     &fw_one_pass, 0, 
-    "Only do a single pass through ipfw when using divert(4)/dummynet(4)");
+    "Only do a single pass through ipfw when using dummynet(4)");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, debug, CTLFLAG_RW, 
     &fw_debug, 0, "Enable printing of debug ip_fw statements");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose, CTLFLAG_RW, 
@@ -173,7 +173,7 @@ SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, dyn_fin_lifetime, CTLFLAG_RW,
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, dyn_rst_lifetime, CTLFLAG_RW,
     &dyn_rst_lifetime, 0, "Lifetime of dyn. rules for rst");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, dyn_short_lifetime, CTLFLAG_RW,
-    &dyn_rst_lifetime, 0, "Lifetime of dyn. rules for other situations");
+    &dyn_short_lifetime, 0, "Lifetime of dyn. rules for other situations");
 #endif /* STATEFUL */
 
 #endif
@@ -345,6 +345,73 @@ ipopts_match(struct ip *ip, struct ip_fw *f)
 		case IPOPT_TS:
 			opts &= ~IP_FW_IPOPT_TS;
 			nopts &= ~IP_FW_IPOPT_TS;
+			break;
+		}
+		if (opts == nopts)
+			break;
+	}
+	if (opts == 0 && nopts == nopts_sve)
+		return 1;
+	else
+		return 0;
+}
+
+static int
+tcpopts_match(struct tcphdr *tcp, struct ip_fw *f)
+{
+	register u_char *cp;
+	int opt, optlen, cnt;
+	u_char	opts, nopts, nopts_sve;
+
+	cp = (u_char *)(tcp + 1);
+	cnt = (tcp->th_off << 2) - sizeof (struct tcphdr);
+	opts = f->fw_tcpopt;
+	nopts = nopts_sve = f->fw_tcpnopt;
+
+	for (; cnt > 0; cnt -= optlen, cp += optlen) {
+		opt = cp[0];
+		if (opt == TCPOPT_EOL)
+			break;
+		if (opt == TCPOPT_NOP)
+			optlen = 1;
+		else {
+			optlen = cp[1];
+			if (optlen <= 0)
+				break;
+		}
+
+
+		switch (opt) {
+
+		default:
+			break;
+
+		case TCPOPT_MAXSEG:
+			opts &= ~IP_FW_TCPOPT_MSS;
+			nopts &= ~IP_FW_TCPOPT_MSS;
+			break;
+
+		case TCPOPT_WINDOW:
+			opts &= ~IP_FW_TCPOPT_WINDOW;
+			nopts &= ~IP_FW_TCPOPT_WINDOW;
+			break;
+
+		case TCPOPT_SACK_PERMITTED:
+		case TCPOPT_SACK:
+			opts &= ~IP_FW_TCPOPT_SACK;
+			nopts &= ~IP_FW_TCPOPT_SACK;
+			break;
+
+		case TCPOPT_TIMESTAMP:
+			opts &= ~IP_FW_TCPOPT_TS;
+			nopts &= ~IP_FW_TCPOPT_TS;
+			break;
+
+		case TCPOPT_CC:
+		case TCPOPT_CCNEW:
+		case TCPOPT_CCECHO:
+			opts &= ~IP_FW_TCPOPT_CC;
+			nopts &= ~IP_FW_TCPOPT_CC;
 			break;
 		}
 		if (opts == nopts)
@@ -878,28 +945,23 @@ ip_fw_chk(struct ip **pip, int hlen,
 				    goto bogusfrag;			\
 				ip = mtod(*m, struct ip *);		\
 				*pip = ip;				\
-				offset = (ip->ip_off & IP_OFFMASK);	\
 			    }						\
 			} while (0)
 
 	/*
 	 * Collect parameters into local variables for faster matching.
 	 */
+	proto = ip->ip_p;
+	src_ip = ip->ip_src;
+	dst_ip = ip->ip_dst;
 	offset = (ip->ip_off & IP_OFFMASK);
-	{
+	if (offset == 0) {
 	    struct tcphdr *tcp;
 	    struct udphdr *udp;
 
-	    dst_ip = ip->ip_dst ;
-	    src_ip = ip->ip_src ;
-	    proto = ip->ip_p ;
-	    /*
-	     * warning - if offset != 0, port values are bogus.
-	     * Not a problem for ipfw, but could be for dummynet.
-	     */
 	    switch (proto) {
 	    case IPPROTO_TCP :
-		PULLUP_TO(hlen + 14);
+		PULLUP_TO(hlen + sizeof(struct tcphdr));
 		tcp =(struct tcphdr *)((u_int32_t *)ip + ip->ip_hl);
 		dst_port = tcp->th_dport ;
 		src_port = tcp->th_sport ;
@@ -907,29 +969,29 @@ ip_fw_chk(struct ip **pip, int hlen,
 		break ;
 
 	    case IPPROTO_UDP :
-		PULLUP_TO(hlen + 4);
+		PULLUP_TO(hlen + sizeof(struct udphdr));
 		udp =(struct udphdr *)((u_int32_t *)ip + ip->ip_hl);
 		dst_port = udp->uh_dport ;
 		src_port = udp->uh_sport ;
 		break;
 
 	    case IPPROTO_ICMP:
-		PULLUP_TO(hlen + 2);
+		PULLUP_TO(hlen + 4);	/* type, code and checksum. */
 		flags = ((struct icmp *)
 			((u_int32_t *)ip + ip->ip_hl))->icmp_type ;
 		break ;
 
 	    default :
-		src_port = dst_port = 0 ;
+		break;
 	    }
-#undef PULLUP_TO
-	    last_pkt.src_ip = ntohl(src_ip.s_addr) ;
-	    last_pkt.dst_ip = ntohl(dst_ip.s_addr) ;
-	    last_pkt.proto = proto ;
-	    last_pkt.src_port = ntohs(src_port) ;
-	    last_pkt.dst_port = ntohs(dst_port) ;
-	    last_pkt.flags = flags ;
 	}
+#undef PULLUP_TO
+	last_pkt.src_ip = ntohl(src_ip.s_addr);
+	last_pkt.dst_ip = ntohl(dst_ip.s_addr);
+	last_pkt.proto = proto;
+	last_pkt.src_port = ntohs(src_port);
+	last_pkt.dst_port = ntohs(dst_port);
+	last_pkt.flags = flags;
 
 	if (*flow_id) {
 		/* Accept if passed first test */
@@ -1146,6 +1208,9 @@ again:
 				break;
 			}
 			tcp = (struct tcphdr *) ((u_int32_t *)ip + ip->ip_hl);
+
+			if (f->fw_tcpopt != f->fw_tcpnopt && !tcpopts_match(tcp, f))
+				continue;
 			if (f->fw_tcpf != f->fw_tcpnf && !tcpflg_match(tcp, f))
 				continue;
 			goto check_ports;
@@ -1401,7 +1466,7 @@ add_entry(struct ip_fw_head *chainptr, struct ip_fw *frwl)
 		}
 		if (nbr < IPFW_DEFAULT_RULE - 100)
 			nbr += 100;
-		ftmp->fw_number = nbr;
+		ftmp->fw_number = frwl->fw_number = nbr;
 	}
 
 	/* Got a valid number; now insert it, keeping the list ordered */
@@ -1705,11 +1770,11 @@ ip_fw_ctl(struct sockopt *sopt)
 	struct ip_fw frwl, *bp , *buf;
 
 	/*
-	 * Disallow sets in really-really secure mode, but still allow
+	 * Disallow modifications in really-really secure mode, but still allow
 	 * the logging counters to be reset.
 	 */
-	if (sopt->sopt_dir == SOPT_SET && securelevel >= 3 &&
-	    sopt->sopt_name != IP_FW_RESETLOG)
+	if (securelevel >= 3 && (sopt->sopt_name == IP_FW_ADD ||
+	    (sopt->sopt_dir == SOPT_SET && sopt->sopt_name != IP_FW_RESETLOG)))
 			return (EPERM);
 	error = 0;
 
@@ -1810,6 +1875,8 @@ ip_fw_ctl(struct sockopt *sopt)
 			error = EINVAL;
 		} else {
 			error = add_entry(&ip_fw_chain, &frwl);
+			if (!error && sopt->sopt_dir == SOPT_GET)
+				error = sooptcopyout(sopt, &frwl, sizeof frwl);
 		}
 		break;
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.3 2000/07/15 07:14:29 kris Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.4 2000/09/04 21:50:39 rwatson Exp $
  */
 
 /*
@@ -189,7 +189,7 @@ contiguousfail:
 	case AF_APPLETALK:
 		break;
 	default:
-		printf("looutput: af=%d unexpected", dst->sa_family);
+		printf("looutput: af=%d unexpected\n", dst->sa_family);
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.2 2000/07/17 21:24:39 archie Exp $
+ * $FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.4 2000/11/02 00:04:28 wpaul Exp $
  */
 
 /*
@@ -224,7 +224,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.2 2000/07/17 21:24:39 archie Exp $";
+  "$FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.4 2000/11/02 00:04:28 wpaul Exp $";
 #endif
 
 /*
@@ -1134,10 +1134,10 @@ static int tl_attach(dev)
 	/*
 	 * Map control/status registers.
 	 */
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 	command |= (PCIM_CMD_PORTEN|PCIM_CMD_MEMEN|PCIM_CMD_BUSMASTEREN);
-	pci_write_config(dev, PCI_COMMAND_STATUS_REG, command, 4);
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef TL_USEIOSPACE
 	if (!(command & PCIM_CMD_PORTEN)) {
@@ -1213,7 +1213,7 @@ static int tl_attach(dev)
 	    tl_intr, sc, &sc->tl_intrhand);
 
 	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_res);
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->tl_irq);
 		bus_release_resource(dev, TL_RES, TL_RID, sc->tl_res);
 		printf("tl%d: couldn't set up irq\n", unit);
 		goto fail;

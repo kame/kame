@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rtsock.c	8.5 (Berkeley) 11/2/94
- * $FreeBSD: src/sys/net/rtsock.c,v 1.44 2000/02/13 03:31:56 peter Exp $
+ * $FreeBSD: src/sys/net/rtsock.c,v 1.44.2.2 2000/08/03 00:09:34 ps Exp $
  */
 
 
@@ -947,7 +947,7 @@ sysctl_iflist(af, w)
 }
 
 static int
-sysctl_rtsock SYSCTL_HANDLER_ARGS
+sysctl_rtsock(SYSCTL_HANDLER_ARGS)
 {
 	int	*name = (int *)arg1;
 	u_int	namelen = arg2;

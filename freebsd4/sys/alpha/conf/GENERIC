@@ -19,7 +19,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.7 2000/07/20 00:19:38 obrien Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.10 2000/10/03 18:46:53 wpaul Exp $
 
 machine		alpha
 cpu		EV4
@@ -43,7 +43,7 @@ options 	DEC_3000_300		# DEC3000/300* Pelic* family
 options 	DEC_3000_500		# DEC3000/[4-9]00 Flamingo/Sandpiper family
 options 	DEC_1000A		# AlphaServer 1000, 1000A, 800
 options 	DEC_KN8AE		# AlphaServer 8200/8400 (Turbolaser)
-options 	DEC_KN300		# AlphaServer 4100 (Rawhide)
+options 	DEC_KN300		# AlphaServer 4100 (Rawhide), 1200 (Tincup)
 
 options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
@@ -98,6 +98,10 @@ device		sa		# Sequential Access (tape etc)
 device		cd		# CD
 device		pass		# Passthrough device (direct SCSI access)
 
+# RAID controllers
+device		amr		# AMI MegaRAID
+device		mlx		# Mylex DAC960 family
+
 # atkbdc0 controls both the keyboard and the PS/2 mouse
 device		atkbdc0	at isa? port IO_KBD
 device		atkbd0	at atkbdc? irq 1
@@ -135,6 +139,7 @@ device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 # PCI Ethernet NICs that use the common MII bus controller code.
 device		miibus		# MII bus support
 device		dc		# DEC/Intel 21143 and workalikes
+device		pcn		# AMD Am79C79x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016

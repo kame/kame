@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.1 2000/06/08 15:11:21 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.3 2000/11/02 11:00:47 ru Exp $
  */
 
 #include "opt_ipsec.h"
@@ -171,7 +171,7 @@ icmp_error(n, type, code, dest, destifp)
 	m = m_gethdr(M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
 		goto freeit;
-	icmplen = oiplen + min(8, oip->ip_len);
+	icmplen = min(oiplen + 8, oip->ip_len);
 	m->m_len = icmplen + ICMP_MINLEN;
 	MH_ALIGN(m, m->m_len);
 	icp = mtod(m, struct icmp *);
@@ -199,7 +199,12 @@ icmp_error(n, type, code, dest, destifp)
 	icp->icmp_code = code;
 	bcopy((caddr_t)oip, (caddr_t)&icp->icmp_ip, icmplen);
 	nip = &icp->icmp_ip;
-	nip->ip_len = htons((u_short)(nip->ip_len + oiplen));
+
+	/*
+	 * Convert fields to network representation.
+	 */
+	HTONS(nip->ip_len);
+	HTONS(nip->ip_off);
 
 	/*
 	 * Now, copy old ip header (without options)

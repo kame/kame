@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.39 2000/03/11 19:51:04 shin Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.39.2.3 2000/09/22 14:44:16 asmodai Exp $
  */
 
 #ifndef _SYS_SOCKET_H_
@@ -73,6 +73,7 @@ typedef u_int32_t	socklen_t;
 #define	SO_OOBINLINE	0x0100		/* leave received OOB data in line */
 #define	SO_REUSEPORT	0x0200		/* allow local address & port reuse */
 #define	SO_TIMESTAMP	0x0400		/* timestamp received dgram traffic */
+#define	SO_ACCEPTFILTER	0x1000		/* there is an accept filter */
 
 /*
  * Additional options, not kept in so_options.
@@ -93,6 +94,11 @@ typedef u_int32_t	socklen_t;
 struct	linger {
 	int	l_onoff;		/* option on/off */
 	int	l_linger;		/* linger time */
+};
+
+struct accept_filter_arg {
+	char    af_name[16];
+	char    af_arg[256-16];
 };
 
 /*
@@ -165,7 +171,7 @@ struct sockproto {
 };
 
 /*
- * bsd-api-new-02a: protocol-independent placeholder for socket addresses
+ * RFC 2553: protocol-independent placeholder for socket addresses
  */
 #define	_SS_MAXSIZE	128
 #define	_SS_ALIGNSIZE	(sizeof(int64_t))
@@ -371,6 +377,8 @@ struct cmsgcred {
 	    (struct cmsghdr *)((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len)))
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
+
+/* RFC 2292 additions */
 
 #define	CMSG_SPACE(l)		(ALIGN(sizeof(struct cmsghdr)) + ALIGN(l))
 #define	CMSG_LEN(l)		(ALIGN(sizeof(struct cmsghdr)) + (l))

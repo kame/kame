@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.4 2000/07/17 21:24:32 archie Exp $
+ * $FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.5 2000/09/07 17:10:41 wpaul Exp $
  */
 
 /*
@@ -109,7 +109,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.4 2000/07/17 21:24:32 archie Exp $";
+  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.5 2000/09/07 17:10:41 wpaul Exp $";
 #endif
 
 #ifdef foo
@@ -1008,6 +1008,9 @@ static int wi_ioctl(ifp, command, data)
 	case SIOCGWAVELAN:
 		error = copyin(ifr->ifr_data, &wreq, sizeof(wreq));
 		if (error)
+			break;
+		/* Don't show WEP keys to non-root users. */
+		if (wreq.wi_type == WI_RID_DEFLT_CRYPT_KEYS && suser(p))
 			break;
 		if (wreq.wi_type == WI_RID_IFACE_STATS) {
 			bcopy((char *)&sc->wi_stats, (char *)&wreq.wi_val,

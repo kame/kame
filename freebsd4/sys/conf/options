@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.191.2.11 2000/07/20 00:45:06 kris Exp $
+# $FreeBSD: src/sys/conf/options,v 1.191.2.20 2000/11/16 17:28:30 archie Exp $
 #
 #        On the handling of kernel options
 #
@@ -40,6 +40,8 @@ AHC_TMODE_ENABLE	opt_aic7xxx.h	# Bitmap of units to enable
 AHC_DUMP_EEPROM		opt_aic7xxx.h	# Dump the contents of our
 					# configuration prom.
 
+AHC_DEBUG_SEQUENCER	opt_aic7xxx.h	# Enable diagnostic sequencer code
+
 ADW_ALLOW_MEMIO		opt_adw.h	# Allow PCI devices to use memory
 					# mapped I/O
 
@@ -74,6 +76,18 @@ SHMMAXPGS	opt_sysvipc.h
 SHMMIN		opt_sysvipc.h
 SHMMNI		opt_sysvipc.h
 SHMSEG		opt_sysvipc.h
+SEMMAP		opt_sysvipc.h
+SEMMNI		opt_sysvipc.h
+SEMMNS		opt_sysvipc.h
+SEMMNU		opt_sysvipc.h
+SEMMSL		opt_sysvipc.h
+SEMOPM		opt_sysvipc.h
+SEMUME		opt_sysvipc.h
+MSGMNB		opt_sysvipc.h
+MSGMNI		opt_sysvipc.h
+MSGSEG		opt_sysvipc.h
+MSGSSZ		opt_sysvipc.h
+MSGTQL		opt_sysvipc.h
 UCONSOLE
 ICMP_BANDLIM
 VFS_AIO
@@ -134,21 +148,9 @@ UNION
 HZ		opt_param.h
 MAXFILES	opt_param.h
 MAXUSERS	opt_param.h
-MSGMNB		opt_param.h
-MSGMNI		opt_param.h
-MSGSEG		opt_param.h
-MSGSSZ		opt_param.h
-MSGTQL		opt_param.h
 NBUF		opt_param.h
 NMBCLUSTERS	opt_param.h
 NSFBUFS		opt_param.h
-SEMMAP		opt_param.h
-SEMMNI		opt_param.h
-SEMMNS		opt_param.h
-SEMMNU		opt_param.h
-SEMMSL		opt_param.h
-SEMOPM		opt_param.h
-SEMUME		opt_param.h
 
 # Generic SCSI options.
 CAM_MAX_HIGHPOWER	opt_cam.h
@@ -203,6 +205,7 @@ ISP_TARGET_MODE		opt_isp.h
 # Options used in the 'ata' ATA/ATAPI driver
 ATA_STATIC_ID		opt_ata.h
 ATA_ENABLE_ATAPI_DMA	opt_ata.h
+ATA_ENABLE_TAGS		opt_ata.h
 
 # Resource limits.
 DFLDSIZ			opt_rlimit.h
@@ -228,6 +231,8 @@ ALTQ_PRIQ		opt_altq.h
 ALTQ_NOPCC		opt_altq.h
 ALTQ_DEBUG		opt_altq.h
  
+ACCEPT_FILTER_DATA
+ACCEPT_FILTER_HTTP
 BOOTP			opt_bootp.h
 BOOTP_COMPAT		opt_bootp.h
 BOOTP_NFSROOT		opt_bootp.h
@@ -297,6 +302,7 @@ NETGRAPH_LMI		opt_netgraph.h
 # MPPC compression requires proprietary files (not included)
 NETGRAPH_MPPC_COMPRESSION	opt_netgraph.h
 NETGRAPH_MPPC_ENCRYPTION	opt_netgraph.h
+NETGRAPH_ONE2MANY	opt_netgraph.h
 NETGRAPH_PPP		opt_netgraph.h
 NETGRAPH_PPPOE		opt_netgraph.h
 NETGRAPH_PPTPGRE	opt_netgraph.h
@@ -326,6 +332,9 @@ DPT_HANDLE_TIMEOUTS	opt_dpt.h
 DPT_TIMEOUT_FACTOR	opt_dpt.h
 DPT_LOST_IRQ		opt_dpt.h
 DPT_RESET_HBA		opt_dpt.h
+
+# Adaptec ASR and DPT V/VI controller options
+ASR_MEASURE_PERFORMANCE	opt_asr.h
 
 # Misc debug flags.  Most of these should probably be replaced with
 # 'DEBUG', and then let people recompile just the interesting modules
@@ -374,11 +383,10 @@ PQ_NORMALCACHE		opt_vmpage.h
 PQ_MEDIUMCACHE		opt_vmpage.h
 PQ_LARGECACHE		opt_vmpage.h
 PQ_HUGECACHE		opt_vmpage.h
+PQ_CACHESIZE		opt_vmpage.h
 
 # Standard SMP options
 SMP			opt_global.h
-NCPU			opt_smp.h
-NBUS			opt_smp.h
 
 # sys/netkey
 KEY
@@ -407,12 +415,18 @@ OVERRIDE_TUNER			opt_bktr.h
 OVERRIDE_DBX			opt_bktr.h
 OVERRIDE_MSP			opt_bktr.h
 BROOKTREE_SYSTEM_DEFAULT	opt_bktr.h
+BROOKTREE_ALLOC_PAGES		opt_bktr.h
+BKTR_OVERRIDE_CARD		opt_bktr.h
+BKTR_OVERRIDE_TUNER		opt_bktr.h
+BKTR_OVERRIDE_DBX		opt_bktr.h
+BKTR_OVERRIDE_MSP		opt_bktr.h
+BKTR_SYSTEM_DEFAULT		opt_bktr.h
+BKTR_ALLOC_PAGES		opt_bktr.h
 BKTR_USE_PLL			opt_bktr.h	
 BKTR_GPIO_ACCESS		opt_bktr.h
 BKTR_NO_MSP_RESET		opt_bktr.h
 BKTR_430_FX_MODE		opt_bktr.h
 BKTR_SIS_VIA_MODE		opt_bktr.h
-
 
 # meteor opt_meteor.h
 METEOR_ALLOC_PAGES	opt_meteor.h

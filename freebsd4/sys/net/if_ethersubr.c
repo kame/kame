@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.8 2000/07/17 21:24:34 archie Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.9 2000/10/20 18:26:30 bp Exp $
  */
 
 #include "opt_atalk.h"
@@ -73,7 +73,7 @@
 #include <netipx/ipx_if.h>
 int (*ef_inputp)(struct ifnet*, struct ether_header *eh, struct mbuf *m);
 int (*ef_outputp)(struct ifnet *ifp, struct mbuf **mp,
-		struct sockaddr *dst, short *tp);
+		struct sockaddr *dst, short *tp, int *hlen);
 #endif
 
 #ifdef NS
@@ -199,7 +199,7 @@ ether_output(ifp, m, dst, rt0)
 #ifdef IPX
 	case AF_IPX:
 		if (ef_outputp) {
-		    error = ef_outputp(ifp, &m, dst, &type);
+		    error = ef_outputp(ifp, &m, dst, &type, &hlen);
 		    if (error)
 			goto bad;
 		} else

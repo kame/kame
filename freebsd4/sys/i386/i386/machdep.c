@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.4 2000/07/20 10:35:14 kris Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.9 2000/10/27 09:07:22 ps Exp $
  */
 
 #include "apm.h"
@@ -50,8 +50,6 @@
 #include "opt_maxmem.h"
 #include "opt_msgbuf.h"
 #include "opt_perfmon.h"
-#include "opt_smp.h"
-#include "opt_sysvipc.h"
 #include "opt_user_ldt.h"
 #include "opt_userconfig.h"
 
@@ -72,14 +70,6 @@
 #include <sys/sysctl.h>
 #include <sys/vmmeter.h>
 #include <sys/bus.h>
-
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
-
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -161,7 +151,7 @@ int physmem = 0;
 int cold = 1;
 
 static int
-sysctl_hw_physmem SYSCTL_HANDLER_ARGS
+sysctl_hw_physmem(SYSCTL_HANDLER_ARGS)
 {
 	int error = sysctl_handle_int(oidp, 0, ctob(physmem), req);
 	return (error);
@@ -171,7 +161,7 @@ SYSCTL_PROC(_hw, HW_PHYSMEM, physmem, CTLTYPE_INT|CTLFLAG_RD,
 	0, 0, sysctl_hw_physmem, "I", "");
 
 static int
-sysctl_hw_usermem SYSCTL_HANDLER_ARGS
+sysctl_hw_usermem(SYSCTL_HANDLER_ARGS)
 {
 	int error = sysctl_handle_int(oidp, 0,
 		ctob(physmem - cnt.v_wire_count), req);
@@ -182,7 +172,7 @@ SYSCTL_PROC(_hw, HW_USERMEM, usermem, CTLTYPE_INT|CTLFLAG_RD,
 	0, 0, sysctl_hw_usermem, "I", "");
 
 static int
-sysctl_hw_availpages SYSCTL_HANDLER_ARGS
+sysctl_hw_availpages(SYSCTL_HANDLER_ARGS)
 {
 	int error = sysctl_handle_int(oidp, 0,
 		i386_btop(avail_end - avail_start), req);
@@ -193,7 +183,7 @@ SYSCTL_PROC(_hw, OID_AUTO, availpages, CTLTYPE_INT|CTLFLAG_RD,
 	0, 0, sysctl_hw_availpages, "I", "");
 
 static int
-sysctl_machdep_msgbuf SYSCTL_HANDLER_ARGS
+sysctl_machdep_msgbuf(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 
@@ -216,7 +206,7 @@ SYSCTL_PROC(_machdep, OID_AUTO, msgbuf, CTLTYPE_STRING|CTLFLAG_RD,
 static int msgbuf_clear;
 
 static int
-sysctl_machdep_msgbuf_clear SYSCTL_HANDLER_ARGS
+sysctl_machdep_msgbuf_clear(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2,
@@ -282,7 +272,7 @@ cpu_startup(dummy)
 
 		printf("Physical memory chunk(s):\n");
 		for (indx = 0; phys_avail[indx + 1] != 0; indx += 2) {
-			int size1 = phys_avail[indx + 1] - phys_avail[indx];
+			unsigned int size1 = phys_avail[indx + 1] - phys_avail[indx];
 
 			printf("0x%08x - 0x%08x, %u bytes (%u pages)\n",
 			    phys_avail[indx], phys_avail[indx + 1] - 1, size1,
@@ -325,18 +315,6 @@ again:
 
 	valloc(callout, struct callout, ncallout);
 	valloc(callwheel, struct callout_tailq, callwheelsize);
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
 
 	/*
 	 * The nominal buffer size (and minimum KVA allocation) is BKVASIZE.
@@ -1102,7 +1080,7 @@ setregs(p, entry, stack, ps_strings)
 }
 
 static int
-sysctl_machdep_adjkerntz SYSCTL_HANDLER_ARGS
+sysctl_machdep_adjkerntz(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2,
@@ -1133,11 +1111,7 @@ SYSCTL_INT(_machdep, CPU_WALLCLOCK, wall_cmos_clock,
  */
 
 int _default_ldt;
-#ifdef SMP
-union descriptor gdt[NGDT * NCPU];	/* global descriptor table */
-#else
-union descriptor gdt[NGDT];		/* global descriptor table */
-#endif
+union descriptor gdt[NGDT * MAXCPU];	/* global descriptor table */
 static struct gate_descriptor idt0[NIDT];
 struct gate_descriptor *idt = &idt0[0];	/* interrupt descriptor table */
 union descriptor ldt[NLDT];		/* local descriptor table */
@@ -2220,6 +2194,24 @@ set_dbregs(p, dbregs)
 	struct dbreg *dbregs;
 {
 	struct pcb *pcb;
+	int i;
+	u_int32_t mask1, mask2;
+
+	/*
+	 * Don't let an illegal value for dr7 get set.  Specifically,
+	 * check for undefined settings.  Setting these bit patterns
+	 * result in undefined behaviour and can lead to an unexpected
+	 * TRCTRAP.
+	 */
+	for (i = 0, mask1 = 0x3<<16, mask2 = 0x2<<16; i < 8; 
+	     i++, mask1 <<= 2, mask2 <<= 2)
+		if ((dbregs->dr7 & mask1) == mask2)
+			return (EINVAL);
+
+	if (dbregs->dr7 & 0x0000fc00)
+		return (EINVAL);
+
+
 
 	pcb = &p->p_addr->u_pcb;
 

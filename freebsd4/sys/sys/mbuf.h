@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.5 2000/07/15 07:14:43 kris Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.7 2000/10/12 16:36:10 ru Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -79,7 +79,7 @@ struct pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
 	int	len;			/* total packet length */
 	/* variables for ip and tcp reassembly */
-	caddr_t	header;			/* pointer to packet header */
+	void	*header;		/* pointer to packet header */
 	/* variables for hardware checksum */
 	int	csum_flags;		/* flags regarding checksum */
 	int	csum_data;		/* data field used by csum routines */
@@ -181,6 +181,8 @@ struct mbuf {
 #define	MT_CONTROL	14	/* extra-data protocol message */
 #define	MT_OOBDATA	15	/* expedited data  */
 
+#define	MT_NTYPES	16	/* number of mbuf types for mbtypes[] */
+
 /*
  * mbuf statistics
  */
@@ -192,7 +194,6 @@ struct mbstat {
 	u_long	m_drops;	/* times failed to find space */
 	u_long	m_wait;		/* times waited for space */
 	u_long	m_drain;	/* times drained protocols for space */
-	u_short	m_mtypes[256];	/* type specific mbuf allocations */
 	u_long	m_mcfail;	/* times m_copym failed */
 	u_long	m_mpfail;	/* times m_pullup failed */
 	u_long	m_msize;	/* length of an mbuf */
@@ -299,9 +300,9 @@ union mcluster {
 	_mm = mmbfree;							\
 	if (_mm != NULL) {						\
 		mmbfree = _mm->m_next;					\
-		mbstat.m_mtypes[MT_FREE]--;				\
+		mbtypes[MT_FREE]--;					\
 		_mm->m_type = _mtype;					\
-		mbstat.m_mtypes[_mtype]++;				\
+		mbtypes[_mtype]++;					\
 		_mm->m_next = NULL;					\
 		_mm->m_nextpkt = NULL;					\
 		_mm->m_data = _mm->m_dat;				\
@@ -329,9 +330,9 @@ union mcluster {
 	_mm = mmbfree;							\
 	if (_mm != NULL) {						\
 		mmbfree = _mm->m_next;					\
-		mbstat.m_mtypes[MT_FREE]--;				\
+		mbtypes[MT_FREE]--;					\
 		_mm->m_type = _mtype;					\
-		mbstat.m_mtypes[_mtype]++;				\
+		mbtypes[_mtype]++;					\
 		_mm->m_next = NULL;					\
 		_mm->m_nextpkt = NULL;					\
 		_mm->m_data = _mm->m_pktdat;				\
@@ -438,7 +439,7 @@ union mcluster {
 	struct mbuf *_mm = (m);						\
 									\
 	KASSERT(_mm->m_type != MT_FREE, ("freeing free mbuf"));		\
-	mbstat.m_mtypes[_mm->m_type]--;					\
+	mbtypes[_mm->m_type]--;						\
 	if ((_mm->m_flags & M_PKTHDR) != 0 && _mm->m_pkthdr.aux) {	\
 		m_freem(_mm->m_pkthdr.aux);				\
 		_mm->m_pkthdr.aux = NULL;				\
@@ -447,7 +448,7 @@ union mcluster {
 		MEXTFREE1(m);						\
 	(n) = _mm->m_next;						\
 	_mm->m_type = MT_FREE;						\
-	mbstat.m_mtypes[MT_FREE]++;					\
+	mbtypes[MT_FREE]++;						\
 	_mm->m_next = mmbfree;						\
 	mmbfree = _mm;							\
 	MMBWAKEUP();							\
@@ -531,8 +532,8 @@ union mcluster {
 	int _mt = (t);							\
 	int _ms = splimp();						\
 									\
-	mbstat.m_mtypes[_mm->m_type]--;					\
-	mbstat.m_mtypes[_mt]++;						\
+	mbtypes[_mm->m_type]--;						\
+	mbtypes[_mt]++;							\
 	splx(_ms);							\
 	_mm->m_type = (_mt);						\
 } while (0)
@@ -560,6 +561,7 @@ extern	int		 max_protohdr;	/* largest protocol header */
 extern	int		 max_hdr;	/* largest link+protocol header */
 extern	int		 max_datalen;	/* MHLEN - max_hdr */
 extern	struct mbstat	 mbstat;
+extern	u_long		 mbtypes[MT_NTYPES]; /* per-type mbuf allocations */
 extern	int		 mbuf_wait;	/* mbuf sleep time */
 extern	struct mbuf	*mbutl;		/* virtual address of mclusters */
 extern	char		*mclrefcnt;	/* cluster reference counts */
