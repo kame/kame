@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.428 2004/02/17 11:36:55 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.429 2004/02/25 05:56:55 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1086,7 +1086,7 @@ skip_ipsec2:;
 	dst_sa.sin6_len = sizeof(dst_sa);
 	in6_recoverscope(&dst_sa, &ip6->ip6_dst, NULL);
 	in6_embedscope(&dst_sa.sin6_addr, &dst_sa);
-	
+
 	if ((error = in6_selectroute(&dst_sa, opt, im6o, ro,
 	    &ifp, &rt, clone)) != 0) {
 		switch (error) {
