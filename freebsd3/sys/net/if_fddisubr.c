@@ -1,4 +1,20 @@
 /*
+ * Copyright (c) 1996 and 1997  WIDE Project. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modifications, are permitted provided that the above copyright notice
+ * and this paragraph are duplicated in all such forms and that any
+ * documentation, advertising materials, and other materials related to
+ * such distribution and use acknowledge that the software was developed
+ * by the WIDE Project, Japan. The name of the Project may not be used to
+ * endorse or promote products derived from this software without
+ * specific prior written permission. THIS SOFTWARE IS PROVIDED ``AS IS''
+ * AND WITHOUT ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, WITHOUT
+ * LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE.
+ * 
+ */
+/*
  * Copyright (c) 1995, 1996
  *	Matt Thomas <matt@3am-software.com>.  All rights reserved.
  * Copyright (c) 1982, 1989, 1993
@@ -66,6 +82,13 @@
 #ifdef IPX
 #include <netipx/ipx.h> 
 #include <netipx/ipx_if.h>
+#endif
+
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/nd6.h>
 #endif
 
 #ifdef NS
@@ -187,6 +210,13 @@ fddi_output(ifp, m0, dst, rt0)
 		type = htons(ETHERTYPE_IP);
 		break;
 	}
+#endif
+#ifdef INET6
+	case AF_INET6:
+		if (!nd6_resolve(&ac->ac_if, rt, m, dst, edst))
+			return (0);	/* if not yet resolved */
+		type = htons(ETHERTYPE_IPV6);
+		break;
 #endif
 #ifdef IPX
 	case AF_IPX:
@@ -473,7 +503,7 @@ fddi_input(ifp, fh, m)
 
 	l = mtod(m, struct llc *);
 	switch (l->llc_dsap) {
-#if defined(INET) || defined(NS) || defined(DECNET) || defined(IPX) || defined(NETATALK)
+#if defined(INET) || defined(INET6) || defined(NS) || defined(DECNET) || defined(IPX) || defined(NETATALK)
 	case LLC_SNAP_LSAP:
 	{
 		u_int16_t type;
@@ -531,6 +561,13 @@ fddi_input(ifp, fh, m)
 			schednetisr(NETISR_NS);
 			inq = &nsintrq;
 			break;
+#endif
+#ifdef INET6
+		case ETHERTYPE_IPV6:
+			schednetisr(NETISR_IPV6);
+			inq = &ip6intrq;
+			break;
+
 #endif
 #ifdef DECNET
 		case ETHERTYPE_DECNET:
@@ -679,7 +716,7 @@ fddi_ifattach(ifp)
 	ifp->if_flags |= IFF_NOTRAILERS;
 #endif
 #if defined(__FreeBSD__)
-	ifa = ifnet_addrs[ifp->if_index - 1];
+	ifa = ifnet_addrs[ifp->if_index];
 	sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 	sdl->sdl_type = IFT_FDDI;
 	sdl->sdl_alen = ifp->if_addrlen;

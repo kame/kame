@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -35,6 +64,9 @@
  */
 
 #include "opt_tcpdebug.h"
+#include "opt_inet.h"
+
+#define _IP_VHL
 
 #include <stddef.h>
 
@@ -50,8 +82,10 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/in_pcb.h>
+#include <netinet/ip6.h>
 #include <netinet/ip_var.h>
+#include <netinet6/ip6_var.h>
+#include <netinet/in_pcb.h>
 #include <netinet/tcp.h>
 #define	TCPOUTFLAGS
 #include <netinet/tcp_fsm.h>
@@ -79,12 +113,20 @@ tcp_output(tp)
 	register long len, win;
 	int off, flags, error;
 	register struct mbuf *m;
-	register struct tcpiphdr *ti;
+	struct ip *ip = NULL;
+	struct ipovly *ipov = NULL;
+#ifdef INET6
+	struct ip6_hdr *ip6 = NULL;
+#endif /* INET6 */
+	struct tcphdr *th;
 	u_char opt[TCP_MAXOLEN];
 	unsigned ipoptlen, optlen, hdrlen;
 	int idle, sendalot;
 	struct rmxp_tao *taop;
 	struct rmxp_tao tao_noncached;
+#ifdef INET6
+	int isipv6 = (tp->t_inpcb->inp_vflag & INP_IPV4) == 0;
+#endif
 
 	/*
 	 * Determine length of data that should be transmitted,
@@ -103,6 +145,19 @@ tcp_output(tp)
 again:
 	sendalot = 0;
 	off = tp->snd_nxt - tp->snd_una;
+#if 0 /* XXX: leaving this for future debugging */
+	if (so && so->so_snd.sb_mb) {
+		int mlen = 0;
+		struct mbuf *msb;
+
+		for (msb = so->so_snd.sb_mb; msb; msb = msb->m_next)
+			mlen += msb->m_len;
+		if (mlen < off)
+			printf("tcp_output: off = %d, snd_nxt = %d, "
+			       "snd_una = %d, total mlen = %d\n",
+			       off, tp->snd_nxt, tp->snd_una, mlen);
+	}
+#endif
 	win = min(tp->snd_wnd, tp->snd_cwnd);
 
 	flags = tcp_outflags[tp->t_state];
@@ -164,8 +219,9 @@ again:
 		flags &= ~TH_SYN;
 		off--, len++;
 		if (len > 0 && tp->t_state == TCPS_SYN_SENT &&
-		    taop->tao_ccsent == 0)
+		    taop->tao_ccsent == 0) {
 			return 0;
+		}
 	}
 
 	/*
@@ -320,6 +376,11 @@ send:
 	 *	max_linkhdr + sizeof (struct tcpiphdr) + optlen <= MHLEN
 	 */
 	optlen = 0;
+#ifdef INET6
+	if (isipv6)
+		hdrlen = sizeof (struct tcpip6hdr);
+	else
+#endif
 	hdrlen = sizeof (struct tcpiphdr);
 	if (flags & TH_SYN) {
 		tp->snd_nxt = tp->iss;
@@ -328,7 +389,7 @@ send:
 
 			opt[0] = TCPOPT_MAXSEG;
 			opt[1] = TCPOLEN_MAXSEG;
-			mss = htons((u_short) tcp_mssopt(tp));
+			mss = htons((u_short) tcp_mssopt(tp, isipv6));
 			(void)memcpy(opt + 2, &mss, sizeof(mss));
 			optlen = TCPOLEN_MAXSEG;
 
@@ -436,7 +497,11 @@ send:
 
  	hdrlen += optlen;
 
-	if (tp->t_inpcb->inp_options) {
+	if (
+#ifdef INET6
+	    isipv6 == 0 &&
+#endif /* INET6 */
+	    tp->t_inpcb->inp_options) {
 		ipoptlen = tp->t_inpcb->inp_options->m_len -
 				offsetof(struct ipoption, ipopt_list);
 	} else {
@@ -463,6 +528,30 @@ send:
 		panic("tcphdr too big");
 /*#endif*/
 
+#ifdef ALTQ_ECN
+	if (tcp_ecn) {
+		/*
+		 * if we have received congestion experienced segs,
+		 * set ECNECHO bit.
+		 * if this is a SYN seg, set ECNECHO and CWR for a pure SYN,
+		 * set only ECNECHO for SYN-ACK.
+		 */
+		if (tp->t_flags & TF_RCVD_CE)
+			flags |= TH_ECNECHO;
+		if ((flags & (TH_SYN|TH_ACK)) == TH_SYN)
+			flags |= (TH_ECNECHO|TH_CWR);
+		else if ((flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK))
+			flags |= TH_ECNECHO;
+		/*
+		 * if we have reduced the congestion window, notify
+		 * the peer by setting CWR bit.
+		 */
+		if (tp->t_flags & TF_SENDCWR) {
+			flags |= TH_CWR;
+			tp->t_flags &= ~TF_SENDCWR;
+		}
+	}
+#endif
 	/*
 	 * Grab a header mbuf, attaching a copy of data to
 	 * be transmitted, and initialize the header from
@@ -495,6 +584,11 @@ send:
 			error = ENOBUFS;
 			goto out;
 		}
+#ifdef INET6
+		if (isipv6 && (MHLEN < hdrlen + max_linkhdr)) {
+			MH_ALIGN(m, hdrlen);
+		} else
+#endif
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 		if (len <= MHLEN - hdrlen - max_linkhdr) {
@@ -502,6 +596,25 @@ send:
 			    mtod(m, caddr_t) + hdrlen);
 			m->m_len += len;
 		} else {
+#if 0 /* XXX: leaving this for future debugging */
+			if (off < 0) panic("tcp_output: m_copy: off < 0");
+			if (len < 0) panic("tcp_output: m_copy: len < 0");
+			if (so->so_snd.sb_mb == NULL)
+		 		panic("tcp_output: m_copy: sb_mb == NULL");
+			else {
+				int mlen = 0;
+				struct mbuf *msb;
+
+				for (msb = so->so_snd.sb_mb; msb;
+				     msb = msb->m_next)
+					mlen += msb->m_len;
+				if (mlen < off)
+					panic("tcp_output: m_copy: "
+					      "sb_mb < off. "
+					      "sb_mb = %d, off = %d",
+					      mlen, off);
+				}
+#endif
 			m->m_next = m_copy(so->so_snd.sb_mb, off, (int) len);
 			if (m->m_next == 0) {
 				(void) m_free(m);
@@ -533,15 +646,61 @@ send:
 			error = ENOBUFS;
 			goto out;
 		}
+#ifdef INET6
+		if (isipv6) {
+			MH_ALIGN(m, hdrlen);
+		} else
+#endif
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
 	}
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
-	ti = mtod(m, struct tcpiphdr *);
 	if (tp->t_template == 0)
 		panic("tcp_output");
-	(void)memcpy(ti, tp->t_template, sizeof (struct tcpiphdr));
+#ifdef INET6
+	if (isipv6) {
+		ip6 = mtod(m, struct ip6_hdr *);
+		th = (struct tcphdr *)(ip6 + 1);
+		bcopy((caddr_t)&tp->t_template->tt_i6, (caddr_t)ip6,
+		      sizeof(struct ip6_hdr));
+		bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
+		      sizeof(struct tcphdr));
+	} else {
+#endif /* INET6 */
+	ip = mtod(m, struct ip *);
+	ipov = (struct ipovly *)ip;
+	th = (struct tcphdr *)(ip + 1);
+	bcopy((caddr_t)&tp->t_template->tt_i, (caddr_t)ip, sizeof(struct ip));
+	bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
+	      sizeof(struct tcphdr));
+#ifdef INET6
+	}
+#endif /* INET6 */
 
+#ifdef ALTQ_ECN
+	if (tcp_ecn) {
+		/*
+		 * if we have received congestion experienced segs,
+		 * set ECNECHO bit.
+		 * if this is a SYN seg, set ECNECHO and CWR for a pure SYN,
+		 * set only ECNECHO for SYN-ACK.
+		 */
+		if (tp->t_flags & TF_RCVD_CE)
+			flags |= TH_ECNECHO;
+		if ((flags & (TH_SYN|TH_ACK)) == TH_SYN)
+			flags |= (TH_ECNECHO|TH_CWR);
+		else if ((flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK))
+			flags |= TH_ECNECHO;
+		/*
+		 * if we have reduced the congestion window, notify
+		 * the peer by setting CWR bit.
+		 */
+		if (tp->t_flags & TF_SENDCWR) {
+			flags |= TH_CWR;
+			tp->t_flags &= ~TF_SENDCWR;
+		}
+	}
+#endif
 	/*
 	 * Fill in fields, remembering maximum advertised
 	 * window for use in delaying messages about window sizes.
@@ -564,15 +723,15 @@ send:
 	 * (retransmit and persist are mutually exclusive...)
 	 */
 	if (len || (flags & (TH_SYN|TH_FIN)) || tp->t_timer[TCPT_PERSIST])
-		ti->ti_seq = htonl(tp->snd_nxt);
+		th->th_seq = htonl(tp->snd_nxt);
 	else
-		ti->ti_seq = htonl(tp->snd_max);
-	ti->ti_ack = htonl(tp->rcv_nxt);
+		th->th_seq = htonl(tp->snd_max);
+	th->th_ack = htonl(tp->rcv_nxt);
 	if (optlen) {
-		bcopy(opt, ti + 1, optlen);
-		ti->ti_off = (sizeof (struct tcphdr) + optlen) >> 2;
+		bcopy(opt, th + 1, optlen);
+		th->th_off = (sizeof (struct tcphdr) + optlen) >> 2;
 	}
-	ti->ti_flags = flags;
+	th->th_flags = flags;
 	/*
 	 * Calculate receive window.  Don't shrink window,
 	 * but avoid silly window syndrome.
@@ -583,10 +742,10 @@ send:
 		win = (long)(tp->rcv_adv - tp->rcv_nxt);
 	if (win > (long)TCP_MAXWIN << tp->rcv_scale)
 		win = (long)TCP_MAXWIN << tp->rcv_scale;
-	ti->ti_win = htons((u_short) (win>>tp->rcv_scale));
+	th->th_win = htons((u_short) (win>>tp->rcv_scale));
 	if (SEQ_GT(tp->snd_up, tp->snd_nxt)) {
-		ti->ti_urp = htons((u_short)(tp->snd_up - tp->snd_nxt));
-		ti->ti_flags |= TH_URG;
+		th->th_urp = htons((u_short)(tp->snd_up - tp->snd_nxt));
+		th->th_flags |= TH_URG;
 	} else
 		/*
 		 * If no urgent pointer to send, then we pull
@@ -600,10 +759,25 @@ send:
 	 * Put TCP length in extended header, and then
 	 * checksum extended header and data.
 	 */
+	m->m_pkthdr.len = hdrlen + len;
+#ifdef INET6
+	if (isipv6) {
+#if 0		/* ip6_plen will be filled in ip6_output. */
+		ip6->ip6_plen = htons((u_short)(sizeof(struct tcphdr) +
+						optlen + len));
+#endif
+
+		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
+				       sizeof(struct tcphdr) + optlen + len);
+	} else {
+#endif /* INET6 */
 	if (len + optlen)
-		ti->ti_len = htons((u_short)(sizeof (struct tcphdr) +
-		    optlen + len));
-	ti->ti_sum = in_cksum(m, (int)(hdrlen + len));
+		ipov->ih_len = htons((u_short)(sizeof (struct tcphdr) +
+					       optlen + len));
+	th->th_sum = in_cksum(m, (int)(hdrlen + len));
+#ifdef INET6
+	}
+#endif /* INET6 */
 
 	/*
 	 * In transmit state, time the transmission and arrange for
@@ -661,9 +835,23 @@ send:
 	/*
 	 * Trace.
 	 */
-	if (so->so_options & SO_DEBUG)
-		tcp_trace(TA_OUTPUT, tp->t_state, tp, ti, 0);
-#endif
+	if (so->so_options & SO_DEBUG) {
+#ifdef INET6
+		if (isipv6)
+			ip6->ip6_vfc = IPV6_VERSION;
+		else
+			ip->ip_vhl = IP_MAKE_VHL(IPVERSION,
+						 IP_VHL_HL(ip->ip_vhl));
+#endif /* INET6 */
+		tcp_trace(TA_OUTPUT, tp->t_state, tp, 
+#ifdef INET6
+			  isipv6 ? (void *)ip6 :
+#endif /* INET6 */
+			  ip,
+			  th, 0);
+
+	}
+#endif /* TCPDEBUG */
 
 	/*
 	 * Fill in IP length and desired time to live and
@@ -671,14 +859,38 @@ send:
 	 * to handle ttl and tos; we could keep them in
 	 * the template, but need a way to checksum without them.
 	 */
-	m->m_pkthdr.len = hdrlen + len;
-    {
+#ifdef INET6
+	if (isipv6) {
+		ip6->ip6_vfc = /* tp->t_inpcb->inp_oflowinfo | */ IPV6_VERSION;
+		ip6->ip6_plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
+		ip6->ip6_nxt = IPPROTO_TCP;
+		ip6->ip6_hlim = tp->t_inpcb->in6p_ip6_hlim;
+		/* TODO: IPv6 IP6TOS_ECT bit on */
+#ifdef IPSEC
+		m->m_pkthdr.rcvif = (struct ifnet *)so;
+#endif /*IPSEC*/
+		error = ip6_output(m,
+			    tp->t_inpcb->in6p_outputopts,
+			    &tp->t_inpcb->in6p_route,
+			    (so->so_options & SO_DONTROUTE) /* | IP6_DONTFRAG */,
+			    NULL);
+	} else
+#endif /* INET6 */
+	{
 #if 1
 	struct rtentry *rt;
 #endif
-	((struct ip *)ti)->ip_len = m->m_pkthdr.len;
-	((struct ip *)ti)->ip_ttl = tp->t_inpcb->inp_ip_ttl;	/* XXX */
-	((struct ip *)ti)->ip_tos = tp->t_inpcb->inp_ip_tos;	/* XXX */
+	ip->ip_len = m->m_pkthdr.len;
+	ip->ip_ttl = tp->t_inpcb->inp_ip_ttl;	/* XXX */
+	ip->ip_tos = tp->t_inpcb->inp_ip_tos;	/* XXX */
+#ifdef ALTQ_ECN
+	/*
+	 * if peer is ECN capable and this is not a pure ack seg,
+	 * set ECN capable bit in IP header.
+	 */
+	if ((tp->t_flags & TF_REQ_ECN) && len > 0)
+		ip->ip_tos |= IPTOS_ECT;
+#endif
 #if 1
 	/*
 	 * See if we should do MTU discovery.  We do it only if the following
@@ -690,12 +902,17 @@ send:
 	if ((rt = tp->t_inpcb->inp_route.ro_rt)
 	    && rt->rt_flags & RTF_UP
 	    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {
-		((struct ip *)ti)->ip_off |= IP_DF;
+		ip->ip_off |= IP_DF;
 	}
 #endif
+
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = (struct ifnet *)so;
+#endif /*IPSEC*/
+
 	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
 	    so->so_options & SO_DONTROUTE, 0);
-    }
+	}
 	if (error) {
 out:
 		if (error == ENOBUFS) {
@@ -710,7 +927,7 @@ out:
 			 * initiate retransmission, so it is important to
 			 * not do so here.
 			 */
-			tcp_mtudisc(tp->t_inpcb, 0);
+			tcp_mtudisc(tp->t_inpcb, error);
 			return 0;
 		}
 #endif

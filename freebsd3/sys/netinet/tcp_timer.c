@@ -36,6 +36,7 @@
 
 #include "opt_compat.h"
 #include "opt_tcpdebug.h"
+#include "opt_inet.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,7 +52,10 @@
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/in_pcb.h>
+#include <netinet6/in6_pcb.h>
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
@@ -155,7 +159,8 @@ tcp_slowtimo()
 				if (tp->t_inpcb->inp_socket->so_options
 				    & SO_DEBUG)
 					tcp_trace(TA_USER, ostate, tp,
-						  (struct tcpiphdr *)0,
+						  (void *)0,
+						  (struct tcphdr *)0,
 						  PRU_SLOWTIMO);
 #endif
 			}
@@ -203,6 +208,9 @@ tcp_timers(tp, timer)
 	int timer;
 {
 	register int rexmt;
+#ifdef INET6
+	int isipv6 = (tp->t_inpcb->inp_vflag & INP_IPV4) == 0;
+#endif /* INET6 */
 
 	switch (timer) {
 
@@ -247,6 +255,11 @@ tcp_timers(tp, timer)
 		 * retransmit times until then.
 		 */
 		if (tp->t_rxtshift > TCP_MAXRXTSHIFT / 4) {
+#ifdef INET6
+			if (isipv6)
+				in6_losing(tp->t_inpcb);
+			else
+#endif /* INET6 */
 			in_losing(tp->t_inpcb);
 			tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
 			tp->t_srtt = 0;
@@ -291,8 +304,12 @@ tcp_timers(tp, timer)
 		tp->snd_cwnd = tp->t_maxseg;
 		tp->snd_ssthresh = win * tp->t_maxseg;
 		tp->t_dupacks = 0;
+#ifdef ALTQ_ECN
+		tp->t_flags |= TF_SENDCWR;
+		tp->snd_rcvr = tp->snd_max;
+#endif
 		}
-		(void) tcp_output(tp);
+		(void)tcp_output(tp);
 		break;
 
 	/*
@@ -317,7 +334,7 @@ tcp_timers(tp, timer)
 		}
 		tcp_setpersist(tp);
 		tp->t_force = 1;
-		(void) tcp_output(tp);
+		(void)tcp_output(tp);
 		tp->t_force = 0;
 		break;
 
@@ -352,11 +369,31 @@ tcp_timers(tp, timer)
 			 * The keepalive packet must have nonzero length
 			 * to get a 4.2 host to respond.
 			 */
-			tcp_respond(tp, tp->t_template, (struct mbuf *)NULL,
-			    tp->rcv_nxt - 1, tp->snd_una - 1, 0);
+#ifdef INET6
+			if (isipv6)
+				tcp_respond(tp, (void *)&tp->t_template->tt_i6,
+					    &tp->t_template->tt_t,
+					    (struct mbuf *)NULL,
+					    tp->rcv_nxt - 1, tp->snd_una - 1,
+					    0, isipv6);
+			else
+#endif /* INET6 */
+			tcp_respond(tp, (void *)&tp->t_template->tt_i,
+				    &tp->t_template->tt_t, (struct mbuf *)NULL,
+				    tp->rcv_nxt - 1, tp->snd_una - 1, 0,
+				    isipv6);
 #else
-			tcp_respond(tp, tp->t_template, (struct mbuf *)NULL,
-			    tp->rcv_nxt, tp->snd_una - 1, 0);
+#ifdef INET6
+			if (isipv6)
+				tcp_respond(tp, (void *)&tp->t_template->tt_i6,
+					    &tp->t_template->tt_t,
+					    (struct mbuf *)NULL, tp->rcv_nxt,
+					    tp->snd_una - 1, 0, isipv6);
+			else
+#endif /* INET6 */
+			tcp_respond(tp, (void *)&tp->t_template->tt_i,
+				    &tp->t_template->tt_t, (struct mbuf *)NULL,
+				    tp->rcv_nxt, tp->snd_una - 1, 0, isipv6);
 #endif
 			tp->t_timer[TCPT_KEEP] = tcp_keepintvl;
 		} else

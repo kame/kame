@@ -1154,6 +1154,9 @@ rl_attach(config_id, unit)
 	ifp->if_init = rl_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	if (sc->rl_type == RL_8129) {
 		if (bootverbose)
@@ -1502,6 +1505,12 @@ static void rl_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, RL_IMR, RL_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		rl_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		rl_start(ifp);
 	}
@@ -1575,6 +1584,12 @@ static void rl_start(ifp)
 	}
 
 	while(RL_CUR_TXMBUF(sc) == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;

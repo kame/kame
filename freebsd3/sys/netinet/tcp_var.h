@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1993, 1994, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -36,18 +65,47 @@
 
 #ifndef _NETINET_TCP_VAR_H_
 #define _NETINET_TCP_VAR_H_
+
 /*
- * Kernel variables for tcp.
+ * Ip (reassembly or sequence) queue structures.
+ *
+ * XXX -- The following explains why the ipqe_m field is here, for TCP's use:
+ * We want to avoid doing m_pullup on incoming packets but that
+ * means avoiding dtom on the tcp reassembly code.  That in turn means
+ * keeping an mbuf pointer in the reassembly queue (since we might
+ * have a cluster).  As a quick hack, the source & destination
+ * port numbers (which are no longer needed once we've located the
+ * tcpcb) are overlayed with an mbuf pointer.
  */
+LIST_HEAD(ipqehead, ipqent);
+struct ipqent {
+	LIST_ENTRY(ipqent) ipqe_q;
+	union {
+		struct ip	*_ip;
+#ifdef INET6
+		struct ipv6	*_ip6;
+#endif
+		struct tcpiphdr *_tcp;
+	} _ipqe_u1;
+	struct mbuf	*ipqe_m;	/* mbuf contains packet */
+	u_int8_t	ipqe_mff;	/* for IP fragmentation */
+};
+#define	ipqe_ip		_ipqe_u1._ip
+#ifdef INET6
+#define	ipqe_ip6	_ipqe_u1._ip6
+#endif
+#define	ipqe_tcp	_ipqe_u1._tcp
+
+#define tcp6cb		tcpcb  /* for KAME src sync over BSD*'s */
 
 /*
  * Tcp control block, one per tcp; fields:
  * Organized for 16 byte cacheline efficiency.
  */
 struct tcpcb {
-	struct	mbuf *t_segq;
+	struct ipqehead segq;		/* sequencing queue */
 	int	t_dupacks;		/* consecutive dup acks recd */
-	struct	tcpiphdr *t_template;	/* skeletal packet for transmit */
+	struct tcptemp	*t_template;	/* skeletal packet for transmit */
 
 	int	t_timer[TCPT_NTIMERS];	/* tcp timers */
 
@@ -71,6 +129,11 @@ struct tcpcb {
 #define	TF_RCVD_CC	0x04000		/* a CC was received in SYN */
 #define	TF_SENDCCNEW	0x08000		/* send CCnew instead of CC in SYN */
 #define	TF_MORETOCOME	0x10000		/* More data to be appended to sock */
+#ifdef ALTQ_ECN
+#define TF_REQ_ECN	0x20000		/* peer is ECN capable */
+#define TF_RCVD_CE	0x40000		/* send ECN in next seg */
+#define TF_SENDCWR	0x80000		/* send CWR in next seg */
+#endif
 	int	t_force;		/* 1 if forcing out a byte */
 
 	tcp_seq	snd_una;		/* send unacknowledged */
@@ -85,6 +148,9 @@ struct tcpcb {
 	tcp_seq	iss;			/* initial send sequence number */
 	tcp_seq	irs;			/* initial receive sequence number */
 
+/* #ifdef ALTQ_ECN */ /* usr.bin/netstat is confused by this ifdef */
+	tcp_seq snd_rcvr;		/* outstanding seg at fastrecovery */
+/* #endif */
 	tcp_seq	rcv_nxt;		/* receive next */
 	tcp_seq	rcv_adv;		/* advertised window */
 	u_long	rcv_wnd;		/* receive window */
@@ -128,6 +194,7 @@ struct tcpcb {
 
 	u_long	ts_recent_age;		/* when last updated */
 	tcp_seq	last_ack_sent;
+
 /* RFC 1644 variables */
 	tcp_cc	cc_send;		/* send connection count */
 	tcp_cc	cc_recv;		/* receive connection count */
@@ -149,6 +216,7 @@ struct tcpopt {
 	u_long	to_tsecr;
 	tcp_cc	to_cc;		/* holds CC or CCnew */
 	tcp_cc	to_ccecho;
+	u_short to_maxseg;
 };
 
 /*
@@ -244,6 +312,7 @@ struct	tcpstat {
 	u_long	tcps_rcvbyte;		/* bytes received in sequence */
 	u_long	tcps_rcvbadsum;		/* packets received with ccksum errs */
 	u_long	tcps_rcvbadoff;		/* packets received with bad offset */
+	u_long	tcps_rcvmemdrop;	/* packets dropped for lack of memory */
 	u_long	tcps_rcvshort;		/* packets received too short */
 	u_long	tcps_rcvduppack;	/* duplicate-only packets received */
 	u_long	tcps_rcvdupbyte;	/* duplicate-only bytes received */
@@ -305,7 +374,13 @@ struct	xtcpcb {
 #define	TCPCTL_RECVSPACE	9	/* receive buffer space */
 #define	TCPCTL_KEEPINIT		10	/* receive buffer space */
 #define	TCPCTL_PCBLIST		11	/* list of all outstanding PCBs */
-#define TCPCTL_MAXID		12
+#define	TCPCTL_V6MSSDFLT	12	/* MSS default for IPv6 */
+#ifdef ALTQ_ECN
+#define	TCPCTL_ECN		13	/* explicit congestion notification */
+#define TCPCTL_MAXID		14
+#else
+#define TCPCTL_MAXID		13
+#endif
 
 #define TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -320,6 +395,7 @@ struct	xtcpcb {
 	{ "recvspace", CTLTYPE_INT }, \
 	{ "keepinit", CTLTYPE_INT }, \
 	{ "pcblist", CTLTYPE_STRUCT }, \
+	{ "v6mssdflt", CTLTYPE_INT }, \
 }
 
 #ifdef KERNEL
@@ -327,13 +403,22 @@ extern	struct inpcbhead tcb;		/* head of queue of active tcpcb's */
 extern	struct inpcbinfo tcbinfo;
 extern	struct tcpstat tcpstat;	/* tcp statistics */
 extern	int tcp_mssdflt;	/* XXX */
+extern	int tcp_v6mssdflt;	/* XXX */
 extern	u_long tcp_now;		/* for RFC 1323 timestamps */
 extern	int tcp_delack_enabled;
+#ifdef MALLOC_DECLARE
+MALLOC_DECLARE(M_IPQ);
+#endif /* MALLOC_DECLARE */
 
 void	 tcp_canceltimers __P((struct tcpcb *));
 struct tcpcb *
 	 tcp_close __P((struct tcpcb *));
 void	 tcp_ctlinput __P((int, struct sockaddr *, void *));
+#ifdef INET6
+struct ip6_hdr;
+void	 tcp6_ctlinput __P((int, struct sockaddr *, struct ip6_hdr *,
+			    struct mbuf *, int));
+#endif
 int	 tcp_ctloutput __P((struct socket *, struct sockopt *));
 struct tcpcb *
 	 tcp_drop __P((struct tcpcb *, int));
@@ -341,30 +426,75 @@ void	 tcp_drain __P((void));
 void	 tcp_fasttimo __P((void));
 struct rmxp_tao *
 	 tcp_gettaocache __P((struct inpcb *));
-void	 tcp_init __P((void));
-void	 tcp_input __P((struct mbuf *, int));
+void     tcp_init __P((void));
+#ifdef INET6
+void     tcp6_init __P((void));
+int	 tcp6_input __P((struct mbuf **, int *, int));
+#endif /* INET6 */
+void	 tcp_input __P((struct mbuf *, int, int));
+#ifdef INET6
+void	 tcp_mss __P((struct tcpcb *, int, int));
+int	 tcp_mssopt __P((struct tcpcb *, int));
+#else /* INET6 */
 void	 tcp_mss __P((struct tcpcb *, int));
 int	 tcp_mssopt __P((struct tcpcb *));
+#endif /* INET6 */
+
 void	 tcp_mtudisc __P((struct inpcb *, int));
 struct tcpcb *
 	 tcp_newtcpcb __P((struct inpcb *));
 int	 tcp_output __P((struct tcpcb *));
 void	 tcp_quench __P((struct inpcb *, int));
-void	 tcp_respond __P((struct tcpcb *,
-	    struct tcpiphdr *, struct mbuf *, tcp_seq, tcp_seq, int));
+#ifdef INET6
+void	 tcp_respond __P((struct tcpcb *, void *, struct tcphdr *,
+			  struct mbuf *, tcp_seq, tcp_seq, int, int));
+#else /* INET6 */
+void	 tcp_respond __P((struct tcpcb *, void *, struct tcphdr *,
+			  struct mbuf *, tcp_seq, tcp_seq, int));
+#endif /* INET6 */
+
 struct rtentry *
 	 tcp_rtlookup __P((struct inpcb *));
+#ifdef INET6
+struct rtentry *
+	 tcp_rtlookup6 __P((struct inpcb *));
+#endif /* INET6 */
 void	 tcp_setpersist __P((struct tcpcb *));
 void	 tcp_slowtimo __P((void));
-struct tcpiphdr *
+struct tcptemp *
 	 tcp_template __P((struct tcpcb *));
 struct tcpcb *
 	 tcp_timers __P((struct tcpcb *, int));
-void	 tcp_trace __P((int, int, struct tcpcb *, struct tcpiphdr *, int));
+#ifdef INET6
+void	 tcp_trace __P((int, int, struct tcpcb *, void *, struct tcphdr *, 
+			int));
+#else
+void	 tcp_trace __P((int, int, struct tcpcb *, struct ip *,
+			struct tcphdr *, int));
+#endif
+
+#ifdef INET6
+int	 tcp_reass __P((struct tcpcb *, struct tcphdr *, int,
+	    struct mbuf *, int));
+#else /* INET6 */
+int	 tcp_reass __P((struct tcpcb *, struct tcphdr *, int, struct mbuf *));
+/* suppress INET6 only args */
+#define tcp_reass(x, y, z, t, i)		tcp_reass(x, y, z, t)
+#define tcp_mss(x, y, i)			tcp_mss(x, y)
+#define tcp_mssopt(x, i)			tcp_mssopt(x)
+#define tcp_respond(x, y, z, m, s1, s2, f, i)	tcp_respond(x, y, z, m, s1, \
+							    s2, f)
+#endif /* INET6 */
 
 extern	struct pr_usrreqs tcp_usrreqs;
+#ifdef INET6
+extern	struct pr_usrreqs tcp6_usrreqs;
+#endif /* INET6 */
 extern	u_long tcp_sendspace;
 extern	u_long tcp_recvspace;
+#ifdef ALTQ_ECN
+extern	int tcp_ecn;
+#endif
 
 #endif /* KERNEL */
 

@@ -1203,13 +1203,13 @@ nfs_rephead(siz, nd, slp, err, cache, frev, mrq, mbp, bposp)
 	 * If this is a big reply, use a cluster else
 	 * try and leave leading space for the lower level headers.
 	 */
+	mreq->m_len = 6 * NFSX_UNSIGNED;
 	siz += RPC_REPLYSIZ;
 	if (siz >= MINCLSIZE) {
 		MCLGET(mreq, M_WAIT);
 	} else
-		mreq->m_data += max_hdr;
+		mreq->m_data += min(max_hdr, M_TRAILINGSPACE(mreq));
 	tl = mtod(mreq, u_int32_t *);
-	mreq->m_len = 6 * NFSX_UNSIGNED;
 	bpos = ((caddr_t)tl) + mreq->m_len;
 	*tl++ = txdr_unsigned(nd->nd_retxid);
 	*tl++ = rpc_reply;

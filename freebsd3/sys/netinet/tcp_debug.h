@@ -42,7 +42,15 @@ struct	tcp_debug {
 	short	td_act;
 	short	td_ostate;
 	caddr_t	td_tcb;
-	struct	tcpiphdr td_ti;
+	union {
+		struct	ip _td_ip4;
+#define td_ip	_td_ipx._td_ip4
+#ifdef INET6
+		struct  ip6_hdr _td_ip6;
+#define td_ip6	_td_ipx._td_ip6
+#endif
+	} _td_ipx;
+	struct tcphdr td_th;
 	short	td_req;
 	struct	tcpcb td_cb;
 };

@@ -60,6 +60,8 @@
 #error Device 'sr' requires sppp.
 #endif
 
+#include "opt_inet.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -70,6 +72,11 @@
 
 #include <net/if.h>
 #include <net/if_sppp.h>
+#ifdef INET6
+#include <net/if_types.h>
+#include <netinet/in.h>
+#include <netinet6/in6_ifattach.h>
+#endif
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
@@ -825,6 +832,12 @@ srattach(struct sr_hardc *hc)
 		ifp->if_ioctl = srioctl;
 		ifp->if_start = srstart;
 		ifp->if_watchdog = srwatchdog;
+#ifdef INET6
+		ifp->if_type = IFT_PPP;	/*none of IFTs*/
+#endif
+#ifdef ALTQ
+		ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 		printf("sr%d: Adapter %d, port %d.\n",
 		       sc->unit, hc->cunit, sc->subunit);
@@ -1173,7 +1186,13 @@ top_srstart:
 		 * hardcoded.  A packet can't be larger than 3 buffers (3 x
 		 * 512).
 		 */
+#if 0 /* defined(ALTQ) */
+		/* XXX use 6KB buffer instead of 16KB to reduce latency */
+		/* quick dirty hack, but very effective! */
+		if ((i + 3) >= (blkp->txmax * 6 / 16)) {  /* enough remains? */
+#else
 		if ((i + 3) >= blkp->txmax) {	/* enough remains? */
+#endif
 #if BUGGY > 9
 			printf("sr%d.srstart: i=%d (%d pkts); card full.\n",
 			       sc->unit, i, pkts);

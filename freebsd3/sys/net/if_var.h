@@ -74,6 +74,9 @@ struct	ether_header;
 #endif
 
 #include <sys/queue.h>		/* get TAILQ macros */
+#if 1 /* ALTQ */
+#include <net/if_altq.h>
+#endif
 
 TAILQ_HEAD(ifnethead, ifnet);	/* we use TAILQs so that the order of */
 TAILQ_HEAD(ifaddrhead, ifaddr);	/* instantiation is preserved in the list */
@@ -138,6 +141,17 @@ struct ifnet {
 		__P((struct ifnet *, struct sockaddr **, struct sockaddr *));
 	struct	ifqueue if_snd;		/* output queue */
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
+#if 1 /* ALTQ */
+	/* alternate queueing related stuff */
+	int	if_altqtype;		/* queueing scheme id */
+	int	if_altqflags;		/* altq flags (e.g. ready, in-use) */
+	void	*if_altqp;		/* queue state */
+	int	(*if_altqenqueue)
+		__P((struct ifnet *, struct mbuf *, struct pr_hdr *, int));
+	struct mbuf *(*if_altqdequeue)
+		__P((struct ifnet *, int));
+#endif /* ALTQ */
+	struct	ifprefix *if_prefixlist; /* linked list of prefixes per if */
 };
 typedef void if_init_f_t __P((void *));
 
@@ -261,6 +275,20 @@ struct ifaddr {
 #define	IFA_ROUTE	RTF_UP		/* route installed */
 
 /*
+ * The prefix structure contains information about one prefix
+ * of an interface.  They are maintained by the different address families,
+ * are allocated and attached when an prefix or an address is set,
+ * and are linked together so all prfefixes for an interface can be located.
+ */
+struct ifprefix {
+	struct	sockaddr *ifpr_prefix;	/* prefix of interface */
+	struct	ifnet *ifpr_ifp;	/* back-pointer to interface */
+	struct ifprefix *ifpr_next;
+	u_char	ifpr_plen;		/* prefix length in bits */
+	u_char	ifpr_type;		/* protocol dependent prefix type */
+};
+
+/*
  * Multicast address structure.  This is analogous to the ifaddr
  * structure except that it keeps track of multicast addresses.
  * Also, the reference count here is a count of requests for this
@@ -283,6 +311,7 @@ struct ifmultiaddr {
 		(ifa)->ifa_refcnt--;
 
 extern	struct ifnethead ifnet;
+extern struct	ifnet	**ifindex2ifnet;
 extern	int ifqmaxlen;
 extern	struct ifnet loif[];
 extern	int if_index;
@@ -307,6 +336,7 @@ void	if_up __P((struct ifnet *));
 int	ifioctl __P((struct socket *, u_long, caddr_t, struct proc *));
 int	ifpromisc __P((struct ifnet *, int));
 struct	ifnet *ifunit __P((char *));
+struct  ifnet *if_withname __P((struct sockaddr *));
 
 int	if_poll_recv_slow __P((struct ifnet *ifp, int *quotap));
 void	if_poll_xmit_slow __P((struct ifnet *ifp, int *quotap));
@@ -327,8 +357,6 @@ struct	ifmultiaddr *ifmaof_ifpforaddr __P((struct sockaddr *,
 					    struct ifnet *));
 int	if_simloop __P((struct ifnet *ifp, struct mbuf *m,
 		struct sockaddr *dst, int hlen));
-
 #endif /* KERNEL */
-
 
 #endif /* !_NET_IF_VAR_H_ */

@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -42,6 +71,9 @@
 #include "opt_ipdn.h"
 #include "opt_ipdivert.h"
 #include "opt_ipfilter.h"
+#include "opt_inet.h"
+#include "opt_pm.h"
+#include "opt_ptr.h"
 
 #include <stddef.h>
 
@@ -78,6 +110,17 @@
 #include <netinet/ip_fw.h>
 #endif
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#include <netkey/key_debug.h>
+#endif
+
+#include "faith.h"
+#if defined(NFAITH) && NFAITH > 0
+#include <net/if_types.h>
+#endif
+
 #ifdef DUMMYNET
 #include <netinet/ip_dummynet.h>
 #endif
@@ -105,6 +148,11 @@ SYSCTL_INT(_net_inet_ip, IPCTL_SOURCEROUTE, sourceroute, CTLFLAG_RW,
 static int	ip_acceptsourceroute = 0;
 SYSCTL_INT(_net_inet_ip, IPCTL_ACCEPTSOURCEROUTE, accept_sourceroute,
 	CTLFLAG_RW, &ip_acceptsourceroute, 0, "");
+
+static int	ip_keepfaith = 0;
+SYSCTL_INT(_net_inet_ip, IPCTL_KEEPFAITH, keepfaith, CTLFLAG_RW,
+	&ip_keepfaith,	0, "");
+
 #ifdef DIAGNOSTIC
 static int	ipprintfs = 0;
 #endif
@@ -198,13 +246,32 @@ struct sockaddr_in *ip_fw_fwd_addr;
 
 static void save_rte __P((u_char *, struct in_addr));
 static int	 ip_dooptions __P((struct mbuf *));
-static void	 ip_forward __P((struct mbuf *, int));
+#ifndef PTR
+static
+#endif
+void	 ip_forward __P((struct mbuf *, int));
 static void	 ip_freef __P((struct ipq *));
-static struct ip *
+static struct mbuf *
 	 ip_reass __P((struct mbuf *, struct ipq *, struct ipq *));
 static struct in_ifaddr *
 	 ip_rtaddr __P((struct in_addr));
 static void	ipintr __P((void));
+
+#if defined(PM)
+extern	int	doNatFil;
+extern	int	doRoute;
+
+extern	int		 pm_in	    __P((struct ifnet *, struct ip *, struct mbuf *));
+extern	struct route	*pm_route   __P((struct mbuf *));
+#endif
+
+#if defined(PTR)
+extern	int		ip6_protocol_tr;
+
+int	 ptr_in4	__P((struct mbuf *, struct mbuf **));
+void	 ip6_forward	__P((struct mbuf *, int));
+#endif
+
 /*
  * IP initialization: fill in IP protocol switch table.
  * All protocols not implemented in kernel go to raw IP protocol handler.
@@ -446,6 +513,42 @@ pass:
 	}
 #endif	/* !COMPAT_IPFW */
 
+#if defined(PM)
+	/*
+	 * Process ip-filter/NAT.
+	 * Return TRUE  if this packed is discarded.
+	 * Return FALSE if this packed is accepted.
+	 */
+
+	if (doNatFil && pm_in(m->m_pkthdr.rcvif, ip, m))
+	    return;
+#endif
+
+#if defined(PTR)
+	/*
+	 *
+	 */
+	if (ip6_protocol_tr)
+	{
+	    struct mbuf	*m1 = NULL;
+	    
+	    switch (ptr_in4(m, &m1))
+	    {
+	      case IPPROTO_IP:					goto dooptions;
+	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
+	      case IPPROTO_IPV6:	ip6_forward(m1, 1);	break;
+	      case IPPROTO_MAX:			/* discard this packet	*/
+	      default:
+	    }
+
+	    if (m != m1)
+		m_freem(m);
+
+	    return;
+	}
+  dooptions:
+#endif
+
 	/*
 	 * Process options and, if not destined for us,
 	 * ship it on.  ip_dooptions returns 1 when an
@@ -518,13 +621,11 @@ pass:
 			 * as expected when ip_mforward() is called from
 			 * ip_output().)
 			 */
-			ip->ip_id = htons(ip->ip_id);
 			if (ip_mforward(ip, m->m_pkthdr.rcvif, m, 0) != 0) {
 				ipstat.ips_cantforward++;
 				m_freem(m);
 				return;
 			}
-			ip->ip_id = ntohs(ip->ip_id);
 
 			/*
 			 * The process-level routing demon needs to receive
@@ -552,6 +653,19 @@ pass:
 	if (ip->ip_dst.s_addr == INADDR_ANY)
 		goto ours;
 
+#if defined(NFAITH) && 0 < NFAITH
+	/*
+	 * FAITH(Firewall Aided Internet Translator)
+	 */
+	if (m->m_pkthdr.rcvif && m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
+		if (ip_keepfaith) {
+			if (ip->ip_p == IPPROTO_TCP || ip->ip_p == IPPROTO_ICMP) 
+				goto ours;
+		}
+		m_freem(m);
+		return;
+	}
+#endif
 	/*
 	 * Not for us; forward if possible and desirable.
 	 */
@@ -575,6 +689,7 @@ ours:
 	 * but it's not worth the time; just let them time out.)
 	 */
 	if (ip->ip_off & (IP_MF | IP_OFFMASK | IP_RF)) {
+#if 0
 		if (m->m_flags & M_EXT) {		/* XXX */
 			if ((m = m_pullup(m, hlen)) == 0) {
 				ipstat.ips_toosmall++;
@@ -589,6 +704,7 @@ ours:
 			}
 			ip = mtod(m, struct ip *);
 		}
+#endif
 		sum = IPREASS_HASH(ip->ip_src.s_addr, ip->ip_id);
 		/*
 		 * Look for queue of fragments
@@ -648,8 +764,8 @@ found:
 		if (mff || ip->ip_off) {
 			ipstat.ips_fragments++;
 			m->m_pkthdr.header = ip;
-			ip = ip_reass(m, fp, &ipq[sum]);
-			if (ip == 0) {
+			m = ip_reass(m, fp, &ipq[sum]);
+			if (m == 0) {
 #ifdef	IPFIREWALL_FORWARD
 				ip_fw_fwd_addr = NULL;
 #endif
@@ -658,7 +774,7 @@ found:
 			/* Get the length of the reassembled packets header */
 			hlen = IP_VHL_HL(ip->ip_vhl) << 2;
 			ipstat.ips_reassembled++;
-			m = dtom(ip);
+			ip = mtod(m, struct ip *);
 #ifdef IPDIVERT
 			if (frag_divert_port) {
 				ip->ip_len += hlen;
@@ -689,7 +805,7 @@ found:
 		ipstat.ips_delivered++;
 		ip_divert_port = frag_divert_port;
 		frag_divert_port = 0;
-		(*inetsw[ip_protox[IPPROTO_DIVERT]].pr_input)(m, hlen);
+		(*inetsw[ip_protox[IPPROTO_DIVERT]].pr_input)(m, hlen, 0);
 		return;
 	}
 
@@ -705,11 +821,15 @@ found:
 	 * Switch out to protocol's input routine.
 	 */
 	ipstat.ips_delivered++;
-	(*inetsw[ip_protox[ip->ip_p]].pr_input)(m, hlen);
+    {
+	int off = hlen, nh = ip->ip_p;
+
+	(*inetsw[ip_protox[nh]].pr_input)(m, off, nh);
 #ifdef	IPFIREWALL_FORWARD
 	ip_fw_fwd_addr = NULL;	/* tcp needed it */
 #endif
 	return;
+    }
 bad:
 #ifdef	IPFIREWALL_FORWARD
 	ip_fw_fwd_addr = NULL;
@@ -737,14 +857,14 @@ ipintr(void)
 }
 
 NETISR_SET(NETISR_IP, ipintr);
-  
+
 /*
  * Take incoming datagram fragment and try to
  * reassemble it into whole datagram.  If a chain for
  * reassembly of this datagram already exists, then it
  * is given as fp; otherwise have to make a chain.
  */
-static struct ip *
+static struct mbuf *
 ip_reass(m, fp, where)
 	register struct mbuf *m;
 	register struct ipq *fp;
@@ -806,7 +926,7 @@ ip_reass(m, fp, where)
 		if (i > 0) {
 			if (i >= ip->ip_len)
 				goto dropfrag;
-			m_adj(dtom(ip), i);
+			m_adj(m, i);
 			ip->ip_off += i;
 			ip->ip_len -= i;
 		}
@@ -914,11 +1034,11 @@ inserted:
 	/* some debugging cruft by sklower, below, will go away soon */
 	if (m->m_flags & M_PKTHDR) { /* XXX this should be done elsewhere */
 		register int plen = 0;
-		for (t = m; m; m = m->m_next)
-			plen += m->m_len;
-		t->m_pkthdr.len = plen;
+		for (t = m; t; t = t->m_next)
+			plen += t->m_len;
+		m->m_pkthdr.len = plen;
 	}
-	return (ip);
+	return (m);
 
 dropfrag:
 #ifdef IPDIVERT
@@ -1217,7 +1337,8 @@ nosourcerouting:
 	}
 	return (0);
 bad:
-	ip->ip_len -= IP_VHL_HL(ip->ip_vhl) << 2;   /* XXX icmp_error adds in hdr length */
+	/* XXX icmp_error adds in hdr length */
+	ip->ip_len -= IP_VHL_HL(ip->ip_vhl) << 2;
 	icmp_error(m, type, code, 0, 0);
 	ipstat.ips_badoptions++;
 	return (1);
@@ -1393,7 +1514,10 @@ u_char inetctlerrmap[PRC_NCMDS] = {
  * The srcrt parameter indicates whether the packet is being forwarded
  * via a source route.
  */
-static void
+#ifndef PTR
+static
+#endif
+void
 ip_forward(m, srcrt)
 	struct mbuf *m;
 	int srcrt;
@@ -1405,6 +1529,9 @@ ip_forward(m, srcrt)
 	struct mbuf *mcopy;
 	n_long dest;
 	struct ifnet *destifp;
+#ifdef IPSEC
+	struct ifnet dummyifp;
+#endif
 
 	dest = 0;
 #ifdef DIAGNOSTIC
@@ -1426,6 +1553,24 @@ ip_forward(m, srcrt)
 		return;
 	}
 	ip->ip_ttl -= IPTTLDEC;
+
+#if defined(PM)
+	if (doRoute)
+	{
+	    struct  route   *ipfw_rt;
+
+	    if ((ipfw_rt = pm_route(m)) != NULL)
+	    {
+		mcopy = m_copy(m, 0, imin((int)ip->ip_len, 64));
+#ifdef IPSEC
+		m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
+		error = ip_output(m, (struct mbuf *)0, ipfw_rt,
+				  IP_FORWARDING | IP_PROTOCOLROUTE , 0);
+		goto    clearAway;
+	    }
+	}
+#endif
 
 	sin = (struct sockaddr_in *)&ipforward_rt.ro_dst;
 	if ((rt = ipforward_rt.ro_rt) == 0 ||
@@ -1484,8 +1629,14 @@ ip_forward(m, srcrt)
 		}
 	}
 
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt, 
 			  IP_FORWARDING, 0);
+#if defined(PM)
+      clearAway:;
+#endif
 	if (error)
 		ipstat.ips_cantforward++;
 	else {
@@ -1522,15 +1673,77 @@ ip_forward(m, srcrt)
 	case EMSGSIZE:
 		type = ICMP_UNREACH;
 		code = ICMP_UNREACH_NEEDFRAG;
+#ifndef IPSEC
 		if (ipforward_rt.ro_rt)
 			destifp = ipforward_rt.ro_rt->rt_ifp;
+#else
+		/*
+		 * If the packet is routed over IPsec tunnel, tell the
+		 * originator the tunnel MTU.
+		 *	tunnel MTU = if MTU - sizeof(IP) - ESP/AH hdrsiz
+		 * XXX quickhack!!!
+		 */
+		if (ipforward_rt.ro_rt) {
+			struct secpolicy *sp = NULL;
+			int ipsecerror;
+			int ipsechdr;
+			struct route *ro;
+
+			sp = ipsec4_getpolicybyaddr(mcopy,
+			                            IP_FORWARDING,
+			                            &ipsecerror);
+
+			if (sp == NULL)
+				destifp = ipforward_rt.ro_rt->rt_ifp;
+			else {
+				/* count IPsec header size */
+				ipsechdr = ipsec4_hdrsiz(mcopy, NULL);
+
+				/*
+				 * find the correct route for outer IPv4
+				 * header, compute tunnel MTU.
+				 *
+				 * XXX BUG ALERT
+				 * The "dummyifp" code relies upon the fact
+				 * that icmp_error() touches only ifp->if_mtu.
+				 */
+				/*XXX*/
+				destifp = NULL;
+				if (sp->req != NULL
+				 && sp->req->sa != NULL) {
+					ro = &sp->req->sa->saidx->sa_route;
+					if (ro->ro_rt && ro->ro_rt->rt_ifp) {
+						dummyifp.if_mtu =
+						    ro->ro_rt->rt_ifp->if_mtu;
+						dummyifp.if_mtu -= ipsechdr;
+						destifp = &dummyifp;
+					}
+				}
+
+				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+					printf("DP ip_forward calls free "
+					       "SP:%lx\n", sp));
+				key_freesp(sp);
+			}
+		}
+#endif /*IPSEC*/
 		ipstat.ips_cantfrag++;
 		break;
 
 	case ENOBUFS:
+#ifdef ALTQ
+		/*
+		 * don't generate ICMP_SOURCEQUENCH
+		 * (RFC1812 Requirements for IP Version 4 Routers)
+		 */
+		if (mcopy)
+			m_freem(mcopy);
+		return;
+#else
 		type = ICMP_SOURCEQUENCH;
 		code = 0;
 		break;
+#endif
 	}
 	icmp_error(mcopy, type, code, dest, destifp);
 }
@@ -1589,7 +1802,7 @@ ip_savecontrol(inp, mp, ip, m)
 		if (((ifp = m->m_pkthdr.rcvif)) 
 		&& ( ifp->if_index && (ifp->if_index <= if_index))) {
 			sdp = (struct sockaddr_dl *)(ifnet_addrs
-					[ifp->if_index - 1]->ifa_addr);
+					[ifp->if_index]->ifa_addr);
 			/*
 			 * Change our mind and don't try copy.
 			 */

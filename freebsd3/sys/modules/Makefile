@@ -12,4 +12,6 @@ SUBDIR=	ccd cd9660 coda fdesc if_disc if_ppp if_sl if_tun ipfw kernfs \
 SUBDIR+=atapi coff fpu gnufpu ibcs2 joy linux lkm splash syscons vesa # pcic
 .endif
 
+SUBDIR+=altq
+
 .include <bsd.subdir.mk>

@@ -1238,11 +1238,19 @@ sockargs(mp, buf, buflen, type)
 			buflen = MLEN;		/* unix domain compat. hack */
 		else
 #endif
-		return (EINVAL);
+		if ((u_int)buflen > MCLBYTES)
+			return(EINVAL);
 	}
 	m = m_get(M_WAIT, type);
 	if (m == NULL)
 		return (ENOBUFS);
+	if ((u_int)buflen > MLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			return(ENOBUFS);
+		}
+	}
 	m->m_len = buflen;
 	error = copyin(buf, mtod(m, caddr_t), (u_int)buflen);
 	if (error)

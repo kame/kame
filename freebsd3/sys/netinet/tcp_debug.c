@@ -55,6 +55,8 @@
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
@@ -64,7 +66,7 @@
 #include <netinet/tcp_debug.h>
 
 #ifdef TCPDEBUG
-static int	tcpconsdebug = 0;
+static int	tcpconsdebug = 1;
 #endif
 
 static struct tcp_debug tcp_debug[TCP_NDEBUG];
@@ -74,12 +76,20 @@ static int	tcp_debx;
  * Tcp debug routines
  */
 void
-tcp_trace(act, ostate, tp, ti, req)
+tcp_trace(act, ostate, tp, ip, th, req)
 	short act, ostate;
 	struct tcpcb *tp;
-	struct tcpiphdr *ti;
+#ifdef INET6
+	void *ip;
+#else
+	struct ip *ip;
+#endif
+	struct tcphdr *th;
 	int req;
 {
+#ifdef INET6
+	int isipv6 = (ip != NULL && ((struct ip *)ip)->ip_v == 6) ? 1 : 0;
+#endif /* INET6 */
 	tcp_seq seq, ack;
 	int len, flags;
 	struct tcp_debug *td = &tcp_debug[tcp_debx++];
@@ -94,10 +104,24 @@ tcp_trace(act, ostate, tp, ti, req)
 		td->td_cb = *tp;
 	else
 		bzero((caddr_t)&td->td_cb, sizeof (*tp));
-	if (ti)
-		td->td_ti = *ti;
-	else
-		bzero((caddr_t)&td->td_ti, sizeof (*ti));
+	if (ip) {
+#ifdef INET6
+		if (isipv6)
+			td->td_ip6 = *(struct ip6_hdr *)ip;
+		else
+			td->td_ip = *(struct ip *)ip;
+#else /* INET6 */
+		td->td_ip = *ip;
+#endif /* INET6 */
+	} else
+#ifdef INET6
+		bzero((caddr_t)&td->_td_ipx, sizeof (td->_td_ipx));
+#else /* INET6 */
+		bzero((caddr_t)&td->td_ip, sizeof (*ip));
+#endif /* INET6 */
+	if (th)
+		td->td_th = *th;
+
 	td->td_req = req;
 #ifdef TCPDEBUG
 	if (tcpconsdebug == 0)
@@ -112,11 +136,19 @@ tcp_trace(act, ostate, tp, ti, req)
 	case TA_INPUT:
 	case TA_OUTPUT:
 	case TA_DROP:
-		if (ti == 0)
+		if (ip == 0)
 			break;
-		seq = ti->ti_seq;
-		ack = ti->ti_ack;
-		len = ti->ti_len;
+#ifdef INET6
+		if (isipv6) {
+			len = ((struct ip6_hdr *)ip)->ip6_plen;
+		} else {
+			len = ((struct ip *)ip)->ip_len;
+		}
+#else /* INET6 */
+		len = ip->ip_len;
+#endif /* INET6 */
+		seq = th->th_seq;
+		ack = th->th_ack;
 		if (act == TA_OUTPUT) {
 			seq = ntohl(seq);
 			ack = ntohl(ack);
@@ -128,12 +160,12 @@ tcp_trace(act, ostate, tp, ti, req)
 			printf("[%x..%x)", seq, seq+len);
 		else
 			printf("%x", seq);
-		printf("@%x, urp=%x", ack, ti->ti_urp);
-		flags = ti->ti_flags;
+		printf("@%x, urp=%x", ack, th->th_urp);
+		flags = th->th_flags;
 		if (flags) {
 			char *cp = "<";
 #define pf(f) {					\
-	if (ti->ti_flags & TH_##f) {		\
+	if (th->th_flags & TH_##f) {		\
 		printf("%s%s", cp, #f);		\
 		cp = ",";			\
 	}					\

@@ -87,6 +87,8 @@
 #include <sys/malloc.h>
 
 #include <net/if.h>
+/* XXX to avoid confilict with macro TIMEOUT defined in sys/net/if_altq.h */
+#undef TIMEOUT
 #include <net/if_types.h>
 #include <net/netisr.h>
 

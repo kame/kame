@@ -1049,6 +1049,9 @@ vr_attach(config_id, unit)
 	ifp->if_init = vr_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = VR_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	if (bootverbose)
 		printf("vr%d: probing for a PHY\n", sc->vr_unit);
@@ -1498,6 +1501,12 @@ static void vr_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, VR_IMR, VR_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		vr_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		vr_start(ifp);
 	}
@@ -1607,6 +1616,12 @@ static void vr_start(ifp)
 	start_tx = sc->vr_cdata.vr_tx_free;
 
 	while(sc->vr_cdata.vr_tx_free->vr_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -1882,6 +1897,11 @@ static void vr_watchdog(ifp)
 	vr_reset(sc);
 	vr_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		vr_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		vr_start(ifp);
 

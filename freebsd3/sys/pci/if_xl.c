@@ -1556,6 +1556,9 @@ xl_attach(config_id, unit)
 	ifp->if_init = xl_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = XL_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Figure out the card type. 3c905B adapters have the
@@ -2192,6 +2195,12 @@ static void xl_intr(arg)
 
 	XL_SEL_WIN(7);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		xl_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		xl_start(ifp);
 
@@ -2357,6 +2366,12 @@ static void xl_start(ifp)
 	start_tx = sc->xl_cdata.xl_tx_free;
 
 	while(sc->xl_cdata.xl_tx_free != NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -2386,6 +2401,13 @@ static void xl_start(ifp)
 			bpf_mtap(ifp, cur_tx->xl_mbuf);
 #endif
 	}
+#ifdef ALTQ /* fix imported from 1.5.2.14 1998/12/05 */
+	/*
+	 * If there are no packets queued, bail.
+	 */
+	if (cur_tx == NULL)
+		return;
+#endif
 
 	/*
 	 * If there are no packets queued, bail.

@@ -90,6 +90,10 @@ void	malloc_uninit __P((void *));
 MALLOC_MAKE_TYPE(M_CACHE, "namecache", "Dynamically allocated cache entries");
 MALLOC_MAKE_TYPE(M_DEVBUF, "devbuf", "device driver memory");
 MALLOC_MAKE_TYPE(M_TEMP, "temp", "misc temporary data buffers");
+#if 1 /*INET6*/
+MALLOC_MAKE_TYPE(M_IP6OPT, "ip6opt", "IPv6 options");
+MALLOC_MAKE_TYPE(M_IP6NDP, "ip6ndp", "IPv6 Neighbour Discovery");
+#endif
 #endif	/* KERNEL */
 
 /*

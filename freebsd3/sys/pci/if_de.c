@@ -4264,6 +4264,11 @@ tulip_txput(
 #else
     struct mbuf *m0;
 #endif
+#ifdef ALTQ
+    struct ifnet *ifp = &sc->tulip_if;
+    struct mbuf *ombuf = m;
+    int compressed = 0;
+#endif
 
 #if defined(TULIP_DEBUG)
     if ((sc->tulip_cmdmode & TULIP_CMD_TXRUN) == 0) {
@@ -4414,6 +4419,28 @@ tulip_txput(
 		 * entries that we can use for one packet, so we have
 		 * recopy it into one mbuf and then try again.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+		    struct mbuf *tmp;
+		    /*
+		     * tulip_mbuf_compress() frees the original mbuf.
+		     * thus, we have to remove the mbuf from the queue
+		     * before calling it.
+		     * we don't have to worry about space shortage
+		     * after compressing the mbuf since the compressed
+		     * mbuf will take only two segs.
+		     */
+		    if (compressed) {
+			/* should not happen */
+			printf("tulip_txput: compress called twice!\n");
+			goto finish;
+		    }
+		    tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		    if (tmp != ombuf)
+			panic("tulip_txput: different mbuf dequeued!");
+		    compressed = 1;
+		}
+#endif
 		m = tulip_mbuf_compress(m);
 		if (m == NULL)
 		    goto finish;
@@ -4469,6 +4496,18 @@ tulip_txput(
      * The descriptors have been filled in.  Now get ready
      * to transmit.
      */
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	if (!compressed && (sc->tulip_flags & TULIP_TXPROBE_ACTIVE) == 0) {
+	    /* remove the mbuf from the queue */
+	    struct mbuf *tmp;
+	    tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	    if (tmp != ombuf)
+		panic("tulip_txput: different mbuf dequeued!");
+	}
+    }
+#endif
+
     IF_ENQUEUE(&sc->tulip_txq, m);
     m = NULL;
 
@@ -4537,6 +4576,16 @@ tulip_txput(
     /*
      * switch back to the single queueing ifstart.
      */
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	/*
+	 * de driver is too clever that it doesn't call if_start
+	 * when it thinks it doesn't need to, but altq needs it!
+	 */
+	sc->tulip_flags |= TULIP_WANTTXSTART;
+    }
+    else
+#endif
     sc->tulip_flags &= ~TULIP_WANTTXSTART;
     if (sc->tulip_txtimer == 0)
 	sc->tulip_txtimer = TULIP_TXTIMER;
@@ -4862,6 +4911,14 @@ tulip_ifioctl(
     return error;
 }
 
+#ifdef ALTQ
+/*
+ * the original dequeueing policy is dequeue-and-prepend if something
+ * goes wrong.  when altq is used, it is changed to peek-and-dequeue.
+ * the modification becomes a bit complicated since tulip_txput() might
+ * copy and modify the mbuf passed.
+ */
+#endif
 /*
  * These routines gets called at device spl (from ether_output).  This might
  * pose a problem for TULIP_USE_SOFTINTR if ether_output is called at
@@ -4880,6 +4937,21 @@ tulip_ifstart(
 	if ((sc->tulip_flags & (TULIP_WANTSETUP|TULIP_TXPROBE_ACTIVE)) == TULIP_WANTSETUP)
 	    tulip_txput_setup(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    struct mbuf *m, *m0;
+	    while ((m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK)) != NULL) {
+		if ((m0 = tulip_txput(sc, m)) != NULL) {
+		    /* txput failed */
+		    if (m0 != m)
+			/* should not happen */
+			printf("tulip_if_start: bad mbuf dequeued!\n");
+		    break;
+		}
+	    }
+	}
+	else
+#endif /* ALTQ */
 	while (sc->tulip_if.if_snd.ifq_head != NULL) {
 	    struct mbuf *m;
 	    IF_DEQUEUE(&sc->tulip_if.if_snd, m);
@@ -4902,6 +4974,21 @@ tulip_ifstart_one(
     TULIP_PERFSTART(ifstart_one)
     tulip_softc_t * const sc = TULIP_IFP_TO_SOFTC(ifp);
 
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	struct mbuf *m, *m0;
+	if ((sc->tulip_if.if_flags & IFF_RUNNING)
+	        && ((m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK)) != NULL)) {
+	    if ((m0 = tulip_txput(sc, m)) != NULL) {
+		/* txput tailed! */
+		if (m0 != m)
+		    /* should not happen */
+		    printf("tulip_if_start: bad mbuf dequeued!\n");
+	    }
+	}
+    }
+    else
+#endif /* !ALTQ */
     if ((sc->tulip_if.if_flags & IFF_RUNNING)
 	    && sc->tulip_if.if_snd.ifq_head != NULL) {
 	struct mbuf *m;
@@ -5101,6 +5188,9 @@ tulip_attach(
 
     tulip_reset(sc);
 
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
 #if defined(__bsdi__) && _BSDI_VERSION >= 199510
     sc->tulip_pf = printf;
     TULIP_ETHER_IFATTACH(sc);

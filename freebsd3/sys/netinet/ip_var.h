@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -121,6 +150,7 @@ struct	ipstat {
 	u_long	ips_rawout;		/* total raw ip packets generated */
 	u_long	ips_toolong;		/* ip length > max ip packet size */
 	u_long	ips_notmember;		/* multicasts for unregistered grps */
+	u_long	ips_nogif;		/* no match gif found */
 };
 
 #ifdef KERNEL
@@ -130,6 +160,10 @@ struct	ipstat {
 #define	IP_RAWOUTPUT		0x2		/* raw ip header exists */
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
+
+#if defined(PM)
+#define	IP_PROTOCOLROUTE	0x8000		/* use protocol routing */
+#endif
 
 struct ip;
 struct inpcb;
@@ -165,10 +199,10 @@ void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
 int	 rip_ctloutput __P((struct socket *, struct sockopt *));
 void	 rip_ctlinput __P((int, struct sockaddr *, void *));
 void	 rip_init __P((void));
-void	 rip_input __P((struct mbuf *, int));
+void	 rip_input __P((struct mbuf *, int, int));
 int	 rip_output __P((struct mbuf *, struct socket *, u_long));
-void	ipip_input __P((struct mbuf *, int));
-void	rsvp_input __P((struct mbuf *, int));
+void	ipip_input __P((struct mbuf *, int, int));
+void	rsvp_input __P((struct mbuf *, int, int));
 int	ip_rsvp_init __P((struct socket *));
 int	ip_rsvp_done __P((void));
 int	ip_rsvp_vif_init __P((struct socket *, struct sockopt *));
@@ -177,7 +211,7 @@ void	ip_rsvp_force_done __P((struct socket *));
 
 #ifdef IPDIVERT
 void	div_init __P((void));
-void	div_input __P((struct mbuf *, int));
+void	div_input __P((struct mbuf *, int, int));
 extern struct pr_usrreqs div_usrreqs;
 extern u_short ip_divert_port;
 extern u_short ip_divert_cookie;

@@ -73,7 +73,7 @@ struct protosw {
 	short	pr_protocol;		/* protocol number */
 	short	pr_flags;		/* see below */
 /* protocol-protocol hooks */
-	void	(*pr_input) __P((struct mbuf *, int len));
+	void	(*pr_input) __P((struct mbuf *, int, int));
 					/* input to protocol (from below) */
 	int	(*pr_output)	__P((struct mbuf *m, struct socket *so));
 					/* output to protocol (from above) */

@@ -250,8 +250,8 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 	 * Set up our ``Ethernet address'' to reflect the underlying
 	 * physical interface's.
 	 */
-	ifa1 = ifnet_addrs[ifv->ifv_if.if_index - 1];
-	ifa2 = ifnet_addrs[p->if_index - 1];
+	ifa1 = ifnet_addrs[ifv->ifv_if.if_index];
+	ifa2 = ifnet_addrs[p->if_index];
 	sdl1 = (struct sockaddr_dl *)ifa1->ifa_addr;
 	sdl2 = (struct sockaddr_dl *)ifa2->ifa_addr;
 	sdl1->sdl_type = IFT_ETHER;

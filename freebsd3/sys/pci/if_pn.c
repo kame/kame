@@ -1145,6 +1145,9 @@ pn_attach(config_id, unit)
 	ifp->if_init = pn_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = PN_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	ifmedia_init(&sc->ifmedia, 0, pn_ifmedia_upd, pn_ifmedia_sts);
 
@@ -1761,6 +1764,12 @@ static void pn_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, PN_IMR, PN_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		pn_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		pn_start(ifp);
 	}
@@ -1887,6 +1896,12 @@ static void pn_start(ifp)
 	start_tx = sc->pn_cdata.pn_tx_free;
 
 	while(sc->pn_cdata.pn_tx_free->pn_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -2200,6 +2215,11 @@ static void pn_watchdog(ifp)
 	pn_reset(sc);
 	pn_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		pn_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		pn_start(ifp);
 

@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -34,11 +63,16 @@
  *	$Id: udp_usrreq.c,v 1.49 1998/12/03 20:23:21 dillon Exp $
  */
 
+#include "opt_inet.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+#include <sys/domain.h>
+#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -61,6 +95,10 @@
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
+
 /*
  * UDP protocol implementation.
  * Per RFC 768, August, 1980.
@@ -73,26 +111,31 @@ static int	udpcksum = 0;		/* XXX */
 SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_RW,
 		&udpcksum, 0, "");
 
-static int log_in_vain = 0;
+int log_in_vain;
 SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW, 
 	&log_in_vain, 0, "");
 
-static struct	inpcbhead udb;		/* from udp_var.h */
-static struct	inpcbinfo udbinfo;
+struct	inpcbhead udb;		/* from udp_var.h */
+#define	udb6	udb  /* for KAME src sync over BSD*'s */
+struct	inpcbinfo udbinfo;
 
 #ifndef UDBHASHSIZE
 #define UDBHASHSIZE 16
 #endif
 
-static struct	udpstat udpstat;	/* from udp_var.h */
+struct	udpstat udpstat;	/* from udp_var.h */
 SYSCTL_STRUCT(_net_inet_udp, UDPCTL_STATS, stats, CTLFLAG_RD,
 	&udpstat, udpstat, "");
 
 static struct	sockaddr_in udp_in = { sizeof(udp_in), AF_INET };
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+static struct	sockaddr_in6 udp_in6;
+static int udp_in6_init_done;
+#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
 
-static	int udp_output __P((struct inpcb *, struct mbuf *, struct sockaddr *,
-			    struct mbuf *, struct proc *));
-static	void udp_notify __P((struct inpcb *, int));
+static int udp_detach __P((struct socket *so));
+static int udp_output __P((struct inpcb *, struct mbuf *, struct sockaddr *,
+			   struct mbuf *, struct proc *));
 
 void
 udp_init()
@@ -107,16 +150,18 @@ udp_init()
 }
 
 void
-udp_input(m, iphlen)
+udp_input(m, off, proto)
 	register struct mbuf *m;
-	int iphlen;
+	int off, proto;
 {
+	int iphlen = off;
 	register struct ip *ip;
 	register struct udphdr *uh;
 	register struct inpcb *inp;
 	struct mbuf *opts = 0;
 	int len;
 	struct ip save_ip;
+	struct sockaddr *append_sa = (struct sockaddr *)&udp_in;
 
 	udpstat.udps_ipackets++;
 
@@ -208,7 +253,12 @@ udp_input(m, iphlen)
 		 * (Algorithm copied from raw_intr().)
 		 */
 		last = NULL;
-		for (inp = udb.lh_first; inp != NULL; inp = inp->inp_list.le_next) {
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+		udp_in6_init_done = NULL;
+#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+		LIST_FOREACH(inp, &udb, inp_list) {
+			if ((inp->inp_vflag & INP_IPV4) == NULL)
+				continue;
 			if (inp->inp_lport != uh->uh_dport)
 				continue;
 			if (inp->inp_laddr.s_addr != INADDR_ANY) {
@@ -226,13 +276,33 @@ udp_input(m, iphlen)
 			if (last != NULL) {
 				struct mbuf *n;
 
+#ifdef IPSEC
+				/* check AH/ESP integrity. */
+				if (last != NULL &&
+				    ipsec4_in_reject_so(m, last->inp_socket)) {
+					ipsecstat.in_polvio++;
+					/* do not inject data to pcb */
+				} else
+#endif /*IPSEC*/
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 					if (last->inp_flags & INP_CONTROLOPTS
 					    || last->inp_socket->so_options & SO_TIMESTAMP)
 						ip_savecontrol(last, &opts, ip, n);
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+					if (last->inp_vflag & INP_IPV6) {
+						if (udp_in6_init_done == NULL) {
+							in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
+							udp_in6_init_done = 1;
+						}
+						append_sa = (struct sockaddr *)
+							&udp_in6;
+					} else
+						append_sa = (struct sockaddr *)
+							&udp_in;
+#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
 					if (sbappendaddr(&last->inp_socket->so_rcv,
-						(struct sockaddr *)&udp_in,
-						n, opts) == 0) {
+							 append_sa, n, opts)
+					    == 0) {
 						m_freem(n);
 						if (opts)
 						    m_freem(opts);
@@ -264,12 +334,27 @@ udp_input(m, iphlen)
 			udpstat.udps_noportbcast++;
 			goto bad;
 		}
+#ifdef IPSEC
+		/* check AH/ESP integrity. */
+		if (last != NULL && ipsec4_in_reject_so(m, last->inp_socket)) {
+			ipsecstat.in_polvio++;
+			goto bad;
+		}
+#endif /*IPSEC*/
 		if (last->inp_flags & INP_CONTROLOPTS
 		    || last->inp_socket->so_options & SO_TIMESTAMP)
 			ip_savecontrol(last, &opts, ip, m);
-		if (sbappendaddr(&last->inp_socket->so_rcv,
-		     (struct sockaddr *)&udp_in,
-		     m, opts) == 0) {
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+		if (last->inp_vflag & INP_IPV6) {
+			if (udp_in6_init_done == NULL) {
+				in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
+				udp_in6_init_done = 1;
+			}
+			append_sa = (struct sockaddr *)&udp_in6;
+		}
+#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+		if (sbappendaddr(&last->inp_socket->so_rcv, append_sa, m, opts)
+		    == 0) {
 			udpstat.udps_fullsock++;
 			goto bad;
 		}
@@ -280,7 +365,7 @@ udp_input(m, iphlen)
 	 * Locate pcb for datagram.
 	 */
 	inp = in_pcblookup_hash(&udbinfo, ip->ip_src, uh->uh_sport,
-	    ip->ip_dst, uh->uh_dport, 1);
+	    ip->ip_dst, uh->uh_dport, 1, m->m_pkthdr.rcvif);
 	if (inp == NULL) {
 		if (log_in_vain) {
 			char buf[4*sizeof "123"];
@@ -304,6 +389,12 @@ udp_input(m, iphlen)
 		icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0);
 		return;
 	}
+#ifdef IPSEC
+	if (inp != NULL && ipsec4_in_reject_so(m, inp->inp_socket)) {
+		ipsecstat.in_polvio++;
+		goto bad;
+	}
+#endif /*IPSEC*/
 
 	/*
 	 * Construct sockaddr format source address.
@@ -318,8 +409,13 @@ udp_input(m, iphlen)
 	m->m_len -= iphlen;
 	m->m_pkthdr.len -= iphlen;
 	m->m_data += iphlen;
-	if (sbappendaddr(&inp->inp_socket->so_rcv, (struct sockaddr *)&udp_in,
-	    m, opts) == 0) {
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
+		if (inp->inp_vflag & INP_IPV6) {
+			in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
+			append_sa = (struct sockaddr *)&udp_in6;
+		}
+#endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+	if (sbappendaddr(&inp->inp_socket->so_rcv, append_sa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
 	}
@@ -329,13 +425,14 @@ bad:
 	m_freem(m);
 	if (opts)
 		m_freem(opts);
+	return;
 }
 
 /*
  * Notify a udp user of an asynchronous error;
  * just wake up so that he can collect error status.
  */
-static void
+void
 udp_notify(inp, errno)
 	register struct inpcb *inp;
 	int errno;
@@ -531,6 +628,11 @@ udp_output(inp, m, addr, control, p)
 	((struct ip *)ui)->ip_ttl = inp->inp_ip_ttl;	/* XXX */
 	((struct ip *)ui)->ip_tos = inp->inp_ip_tos;	/* XXX */
 	udpstat.udps_opackets++;
+
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = (struct ifnet *)inp->inp_socket;
+#endif /*IPSEC*/
+		
 	error = ip_output(m, inp->inp_options, &inp->inp_route,
 	    inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST),
 	    inp->inp_moptions);
@@ -547,12 +649,19 @@ release:
 	return (error);
 }
 
-static u_long	udp_sendspace = 9216;		/* really max datagram size */
-					/* 40 1K datagrams */
+u_long	udp_sendspace = 9216;		/* really max datagram size */
+
 SYSCTL_INT(_net_inet_udp, UDPCTL_MAXDGRAM, maxdgram, CTLFLAG_RW,
 	&udp_sendspace, 0, "");
 
-static u_long	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
+
+u_long	udp_recvspace = 40 * (1024 + /* 40 1K datagrams */
+#ifdef INET6
+				      sizeof(struct sockaddr_in6)
+#else /* INET6 */
+				      sizeof(struct sockaddr_in)
+#endif /* INET6 */
+				      );
 SYSCTL_INT(_net_inet_udp, UDPCTL_RECVSPACE, recvspace, CTLFLAG_RW,
 	&udp_recvspace, 0, "");
 
@@ -590,7 +699,14 @@ udp_attach(struct socket *so, int proto, struct proc *p)
 	error = soreserve(so, udp_sendspace, udp_recvspace);
 	if (error)
 		return error;
-	((struct inpcb *) so->so_pcb)->inp_ip_ttl = ip_defttl;
+	inp = (struct inpcb *)so->so_pcb;
+	inp->inp_vflag |= INP_IPV4;
+	inp->inp_ip_ttl = ip_defttl;
+#ifdef IPSEC
+	error = ipsec_init_policy(&inp->inp_sp);
+	if (error)
+		return error;
+#endif /*IPSEC*/
 	return 0;
 }
 
@@ -677,7 +793,7 @@ udp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	return udp_output(inp, m, addr, control, p);
 }
 
-static int
+int
 udp_shutdown(struct socket *so)
 {
 	struct inpcb *inp;

@@ -1231,6 +1231,9 @@ ax_attach(config_id, unit)
 	ifp->if_init = ax_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = AX_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	if (bootverbose)
 		printf("ax%d: probing for a PHY\n", sc->ax_unit);
@@ -1727,6 +1730,12 @@ static void ax_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, AX_IMR, AX_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		ax_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		ax_start(ifp);
 	}
@@ -1853,6 +1862,12 @@ static void ax_start(ifp)
 	start_tx = sc->ax_cdata.ax_tx_free;
 
 	while(sc->ax_cdata.ax_tx_free->ax_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -2162,6 +2177,11 @@ static void ax_watchdog(ifp)
 	ax_reset(sc);
 	ax_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		ax_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		ax_start(ifp);
 

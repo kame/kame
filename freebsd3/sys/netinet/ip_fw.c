@@ -51,6 +51,9 @@
 #include <netinet/tcp.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
+#ifdef INET6
+#include <netinet/ip6.h>
+#endif
 #include <netinet/tcpip.h>
 #include <netinet/udp.h>
 
@@ -817,13 +820,14 @@ got_match:
 			NTOHL(tip->ti_ack);
 			tip->ti_len = ip->ip_len - hlen - (tip->ti_off << 2);
 			if (tcp->th_flags & TH_ACK) {
-				tcp_respond(NULL, tip, *m,
-				    (tcp_seq)0, ntohl(tcp->th_ack), TH_RST);
+				tcp_respond(NULL, (void *)tip, &tip->ti_t, *m,
+				    (tcp_seq)0, ntohl(tcp->th_ack), TH_RST, 0);
 			} else {
 				if (tcp->th_flags & TH_SYN)
 					tip->ti_len++;
-				tcp_respond(NULL, tip, *m, tip->ti_seq
-				    + tip->ti_len, (tcp_seq)0, TH_RST|TH_ACK);
+				tcp_respond(NULL, (void *)tip, &tip->ti_t, *m,
+					    tip->ti_seq + tip->ti_len,
+					    (tcp_seq)0, TH_RST|TH_ACK, 0);
 			}
 			*m = NULL;
 			break;

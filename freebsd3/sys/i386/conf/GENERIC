@@ -21,6 +21,8 @@ cpu		"I686_CPU"
 ident		GENERIC
 maxusers	32
 
+## WARNING: do not attempt to use IPDIVERT option!
+## WARNING: options MROUTING does not work.
 options		MATH_EMULATE		#Support for x87 emulation
 options		INET			#InterNETworking
 options		FFS			#Berkeley Fast Filesystem

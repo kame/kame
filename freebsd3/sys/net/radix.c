@@ -34,6 +34,7 @@
  *	$Id: radix.c,v 1.15 1998/07/11 10:51:01 bde Exp $
  */
 
+#ifndef RADISH
 /*
  * Routines to build and maintain radix trees for routing lookups.
  */
@@ -1023,3 +1024,4 @@ rn_init()
 	if (rn_inithead((void **)&mask_rnhead, 0) == 0)
 		panic("rn_init 2");
 }
+#endif /* !RADISH */

@@ -139,8 +139,9 @@ div_init(void)
  * by seeing if hlen == 0, which is a hack.
  */
 void
-div_input(struct mbuf *m, int hlen)
+div_input(struct mbuf *m, int off, int proto)
 {
+	int hlen = off;
 	struct ip *ip;
 	struct inpcb *inp;
 	struct socket *sa;
@@ -305,6 +306,9 @@ div_output(so, m, addr, control)
 
 		/* Send packet to output processing */
 		ipstat.ips_rawout++;			/* XXX */
+#ifdef IPSEC
+		m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 		error = ip_output(m, inp->inp_options, &inp->inp_route,
 			(so->so_options & SO_DONTROUTE) |
 			IP_ALLOWBROADCAST | IP_RAWOUTPUT, inp->inp_moptions);
@@ -369,6 +373,11 @@ div_attach(struct socket *so, int proto, struct proc *p)
 	/* The socket is always "connected" because
 	   we always know "where" to send the packet */
 	so->so_state |= SS_ISCONNECTED;
+#ifdef IPSEC
+	error = ipsec_init_policy(&inp->inp_sp);
+	if (error)
+		return error;
+#endif /*IPSEC*/
 	return 0;
 }
 

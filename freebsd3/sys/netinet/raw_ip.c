@@ -34,6 +34,8 @@
  *	$Id: raw_ip.c,v 1.56 1998/12/14 18:09:13 luigi Exp $
  */
 
+#include "opt_inet.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -61,6 +63,10 @@
 
 #include <netinet/ip_fw.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
+
 #include "opt_ipdn.h"
 #ifdef DUMMYNET
 #include <netinet/ip_dummynet.h>
@@ -72,8 +78,8 @@
 #undef COMPAT_IPFW
 #endif
 
-static struct inpcbhead ripcb;
-static struct inpcbinfo ripcbinfo;
+struct inpcbhead ripcb;
+struct inpcbinfo ripcbinfo;
 
 /*
  * Nominal space allocated to a raw ip socket.
@@ -111,9 +117,9 @@ static struct	sockaddr_in ripsrc = { sizeof(ripsrc), AF_INET };
  * mbuf chain.
  */
 void
-rip_input(m, iphlen)
+rip_input(m, off, proto)
 	struct mbuf *m;
-	int iphlen;
+	int off, proto;
 {
 	register struct ip *ip = mtod(m, struct ip *);
 	register struct inpcb *inp;
@@ -121,8 +127,10 @@ rip_input(m, iphlen)
 	struct mbuf *opts = 0;
 
 	ripsrc.sin_addr = ip->ip_src;
-	for (inp = ripcb.lh_first; inp != NULL; inp = inp->inp_list.le_next) {
-		if (inp->inp_ip_p && inp->inp_ip_p != ip->ip_p)
+	LIST_FOREACH(inp, &ripcb, inp_list) {
+		if ((inp->inp_vflag & INP_IPV4) == NULL)
+			continue;
+		if (inp->inp_ip_p && inp->inp_ip_p != proto)
 			continue;
 		if (inp->inp_laddr.s_addr &&
                   inp->inp_laddr.s_addr != ip->ip_dst.s_addr)
@@ -163,9 +171,10 @@ rip_input(m, iphlen)
 			sorwakeup(last->inp_socket);
 	} else {
 		m_freem(m);
-              ipstat.ips_noproto++;
-              ipstat.ips_delivered--;
-      }
+		ipstat.ips_noproto++;
+		ipstat.ips_delivered--;
+	}
+	return;
 }
 
 /*
@@ -208,7 +217,7 @@ rip_output(m, so, dst)
 		ip = mtod(m, struct ip *);
 		/* don't allow both user specified and setsockopt options,
 		   and don't allow packet length sizes that will crash */
-		if (((IP_VHL_HL(ip->ip_vhl) != (sizeof (*ip) >> 2)) 
+		if (((IP_VHL_HL(ip->ip_vhl) != (sizeof (*ip) >> 2))
 		     && inp->inp_options)
 		    || (ip->ip_len > m->m_pkthdr.len)
 		    || (ip->ip_len < (IP_VHL_HL(ip->ip_vhl) << 2))) {
@@ -221,6 +230,11 @@ rip_output(m, so, dst)
 		flags |= IP_RAWOUTPUT;
 		ipstat.ips_rawout++;
 	}
+
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = (struct ifnet *)so;	/*XXX*/
+#endif /*IPSEC*/
+
 	return (ip_output(m, inp->inp_options, &inp->inp_route, flags,
 			  inp->inp_moptions));
 }
@@ -432,8 +446,8 @@ rip_ctlinput(cmd, sa, vip)
 	}
 }
 
-static u_long	rip_sendspace = RIPSNDQ;
-static u_long	rip_recvspace = RIPRCVQ;
+u_long	rip_sendspace = RIPSNDQ;
+u_long	rip_recvspace = RIPRCVQ;
 
 SYSCTL_INT(_net_inet_raw, OID_AUTO, maxdgram, CTLFLAG_RW, &rip_sendspace,
 	   0, "");
@@ -461,7 +475,13 @@ rip_attach(struct socket *so, int proto, struct proc *p)
 	if (error)
 		return error;
 	inp = (struct inpcb *)so->so_pcb;
+	inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_p = proto;
+#ifdef IPSEC
+	error = ipsec_init_policy(&inp->inp_sp);
+	if (error)
+		return error;
+#endif /*IPSEC*/
 	return 0;
 }
 

@@ -152,6 +152,7 @@ struct ifma_msghdr {
  */
 struct	ifreq {
 #define	IFNAMSIZ	16
+#define	IF_NAMESIZE	IFNAMSIZ
 	char	ifr_name[IFNAMSIZ];		/* if name, e.g. "en0" */
 	union {
 		struct	sockaddr ifru_addr;
@@ -212,11 +213,38 @@ struct	ifconf {
 #define	ifc_req	ifc_ifcu.ifcu_req	/* array of structures returned */
 };
 
+
+/*
+ * Structure for SIOC[AGD]LIFADDR
+ */
+struct if_laddrreq {
+	char iflr_name[IFNAMSIZ];
+	unsigned int flags;
+#define IFLR_PREFIX    0x8000  /* in: prefix given  out: kernel fills id */
+	unsigned int prefixlen;         /* in/out */
+	struct sockaddr_storage addr;   /* in/out */
+	struct sockaddr_storage dstaddr; /* out */
+};
+
 #ifdef KERNEL
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_IFADDR);
 MALLOC_DECLARE(M_IFMADDR);
 #endif
+#endif
+
+#ifndef KERNEL
+struct if_nameindex {
+	unsigned int	if_index;	/* 1, 2, ... */
+	char		*if_name;	/* null terminated name: "le0", ... */
+};
+
+__BEGIN_DECLS
+unsigned int if_nametoindex __P((const char *));
+char *if_indextoname __P((unsigned int, char *));
+struct if_nameindex *if_nameindex __P((void));
+void if_freenameindex __P((struct if_nameindex *));
+__END_DECLS
 #endif
 
 /* XXX - this should go away soon */

@@ -1456,6 +1456,9 @@ mx_attach(config_id, unit)
 	ifp->if_init = mx_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = MX_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	if (sc->mx_type == MX_TYPE_98713) {
 		if (bootverbose)
@@ -1940,6 +1943,12 @@ static void mx_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, MX_IMR, MX_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		mx_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		mx_start(ifp);
 	}
@@ -2078,6 +2087,12 @@ static void mx_start(ifp)
 	start_tx = sc->mx_cdata.mx_tx_free;
 
 	while(sc->mx_cdata.mx_tx_free->mx_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -2415,6 +2430,11 @@ static void mx_watchdog(ifp)
 	mx_reset(sc);
 	mx_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		mx_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		mx_start(ifp);
 

@@ -83,6 +83,13 @@
 #include <netinet/if_ether.h>
 #endif
 
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_ifattach.h>
+#endif /*INET6*/
+
 #ifdef IPX
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
@@ -787,6 +794,11 @@ epinit(sc)
     GO_WINDOW(1);
     epstart(ifp);
 
+#ifdef INET6
+    in6_ifattach(&sc->arpcom.ac_if, IN6_IFT_802,
+		 (caddr_t)sc->arpcom.ac_enaddr, 0);
+#endif /* INET6 */
+
     splx(s);
 }
 
@@ -1062,7 +1074,7 @@ read_again:
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (!m)
 	    goto out;
-	if (rx_fifo >= MINCLSIZE)
+	if (rx_fifo >= MHLEN)
 	    MCLGET(m, M_DONTWAIT);
 	sc->top = sc->mcur = top = m;
 #define EROUND  ((sizeof(struct ether_header) + 3) & ~3)
@@ -1090,7 +1102,7 @@ read_again:
 	    MGET(m, M_DONTWAIT, MT_DATA);
 	    if (!m)
 		goto out;
-	    if (rx_fifo >= MINCLSIZE)
+	    if (rx_fifo >= MHLEN)
 		MCLGET(m, M_DONTWAIT);
 	    m->m_len = 0;
 	    mcur->m_next = m;

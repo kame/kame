@@ -69,7 +69,7 @@
  */
 
 static	void en_pci_attach __P((pcici_t, int));
-static	const char *en_pci_probe __P((pcici_t, pcidi_t));
+static	char *en_pci_probe __P((pcici_t, pcidi_t));
 static void en_pci_shutdown __P((int, void *));
 
 /*
@@ -191,7 +191,7 @@ void *v;
  * autoconfig stuff
  */
 
-static const char *en_pci_probe(config_id, device_id)
+static char *en_pci_probe(config_id, device_id)
 
 pcici_t config_id;
 pcidi_t device_id;
@@ -247,7 +247,7 @@ int unit;
   enpcis[unit] = scp;			/* lock it in */
   en_cd.cd_devs[unit] = sc;		/* fake a cfdriver structure */
   en_cd.cd_ndevs = NEN;
-  snprintf(sc->sc_dev.dv_xname, sizeof(sc->sc_dev.dv_xname), "en%d", unit);
+  sprintf(sc->sc_dev.dv_xname, "en%d", unit);
   sc->enif.if_unit = unit;
   sc->enif.if_name = "en";
   scp->en_confid = config_id;

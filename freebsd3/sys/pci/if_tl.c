@@ -1716,6 +1716,9 @@ tl_attach(config_id, unit)
 	ifp->if_init = tl_init;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 	callout_handle_init(&sc->tl_stat_ch);
 
 	/* Reset the adapter again. */
@@ -2241,6 +2244,12 @@ static void tl_intr(xsc)
 		CMD_PUT(sc, TL_CMD_ACK | r | type);
 	}
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		tl_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		tl_start(ifp);
 
@@ -2410,6 +2419,12 @@ static void tl_start(ifp)
 	start_tx = sc->tl_cdata.tl_tx_free;
 
 	while(sc->tl_cdata.tl_tx_free != NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -2439,6 +2454,13 @@ static void tl_start(ifp)
 			bpf_mtap(ifp, cur_tx->tl_mbuf);
 #endif
 	}
+#ifdef ALTQ /* fix imported from 1.16.2.5 1998/12/05 */
+	/*
+	 * If there are no packets queued, bail.
+	 */
+	if (cur_tx == NULL)
+		return;
+#endif
 
 	/*
 	 * If there are no packets queued, bail.

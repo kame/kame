@@ -40,6 +40,9 @@
 typedef	u_int32_t tcp_seq;
 typedef u_int32_t tcp_cc;		/* connection count per rfc1644 */
 
+#define tcp6_seq	tcp_seq	/* for KAME src sync over BSD*'s */
+#define tcp6hdr		tcphdr	/* for KAME src sync over BSD*'s */
+
 /*
  * TCP header.
  * Per RFC 793, September, 1981.
@@ -64,7 +67,13 @@ struct tcphdr {
 #define	TH_PUSH	0x08
 #define	TH_ACK	0x10
 #define	TH_URG	0x20
+#if 1 /* ALTQ_ECN */
+#define	TH_ECNECHO	0x40		/* ecn echo */
+#define	TH_CWR		0x80		/* congestion window reduced */
+#define TH_FLAGS (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG|TH_ECNECHO|TH_CWR)
+#else
 #define TH_FLAGS (TH_FIN|TH_SYN|TH_RST|TH_ACK|TH_URG)
+#endif
 
 	u_short	th_win;			/* window */
 	u_short	th_sum;			/* checksum */
@@ -101,6 +110,14 @@ struct tcphdr {
  * This should be defined as MIN(512, IP_MSS - sizeof (struct tcpiphdr)).
  */
 #define	TCP_MSS	512
+
+/*
+ * Default maximum segment size for TCP6.
+ * With an IP6 MSS of 1280, this is 1220,
+ * but 1024 is probably more convenient. (xxx kazu in doubt)
+ * This should be defined as MIN(1024, IP6_MSS - sizeof (struct tcpip6hdr))
+ */
+#define	TCP6_MSS	1024
 
 #define	TCP_MAXWIN	65535	/* largest value for (unscaled) window */
 #define	TTCP_CLIENT_SND_WND	4096	/* dflt send window for T/TCP client */

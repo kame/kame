@@ -30,7 +30,12 @@ S=	../..
 .endif
 I386=	${S}/i386
 
+.if ${CFLAGS:M-g} == ""
 COPTFLAGS?=-O
+.else
+COPTFLAGS=-O0
+.endif
+
 INCLUDES= -nostdinc -I- -I. -I$S
 # This hack is to allow kernel compiles to succeed on machines w/out srcdist
 .if exists($S/../include)
@@ -86,11 +91,23 @@ SYSTEM_DEP= Makefile symbols.exclude symbols.sort ${SYSTEM_OBJS}
 SYMORDER_EXCLUDE=-x symbols.exclude
 .endif
 SYSTEM_LD_HEAD= @echo loading ${.TARGET}; rm -f ${.TARGET}
+.if ${CFLAGS:M-g} == ""
+SYSTEM_LD_TAIL_COMMON=
+.else
+.if ${KERNFORMAT} == elf
+STRIP_OPTION= --strip-debug -elf
+.else
+STRIP_OPTION= -d -aout
+.endif
+SYSTEM_LD_TAIL_COMMON= cp ${.TARGET} ${.TARGET}.debug; \
+	strip ${STRIP_OPTION} ${.TARGET}
+.endif
 .if ${KERNFORMAT} == aout || ${KERNFORMAT} == aoutkld
 SYSTEM_OBJS= locore.o vnode_if.o ${OBJS} ioconf.o param.o config.o
 SYSTEM_LD= @${LD} -aout -Bforcedynamic -Z -T ${LOAD_ADDRESS} -o ${.TARGET} -X ${SYSTEM_OBJS} vers.o
 SYSTEM_LD_TAIL= @echo rearranging symbols; \
 	symorder -m ${SYMORDER_EXCLUDE} symbols.sort ${.TARGET}; \
+	eval ${SYSTEM_LD_TAIL_COMMON}; \
 	size -aout ${.TARGET} ; chmod 755 ${.TARGET}
 .endif
 .if ${KERNFORMAT} == elf
@@ -99,7 +116,8 @@ SYSTEM_OBJS= locore.o setdef0.o vnode_if.o ${OBJS} ioconf.o param.o config.o \
 SYSTEM_LD= @${LD} -elf -Bdynamic -T $S/i386/conf/kernel.script \
 	-export-dynamic -dynamic-linker /red/herring \
 	-o ${.TARGET} -X ${SYSTEM_OBJS} vers.o
-SYSTEM_LD_TAIL= @size -elf ${.TARGET} ; chmod 755 ${.TARGET}
+SYSTEM_LD_TAIL= @eval ${SYSTEM_LD_TAIL_COMMON}; \
+	size -elf ${.TARGET} ; chmod 755 ${.TARGET}
 SYSTEM_DEP+= $S/i386/conf/kernel.script
 .endif
 
