@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.101 2001/02/03 19:35:21 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.102 2001/02/04 04:19:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -477,7 +477,7 @@ nd6_timer(ignored_arg)
 #endif
 #ifdef __NetBSD__
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,
-	    nd6_timer, NULL);
+		      nd6_timer, NULL);
 #else
 	timeout(nd6_timer, (caddr_t)0, nd6_prune * hz);
 #endif
@@ -628,8 +628,8 @@ nd6_timer(ignored_arg)
 			 * address.  Otherwise, we'd see an infinite loop of
 			 * regeneration. 
 			 */
-			if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
-			    ip6_use_tempaddr) {
+			if (ip6_use_tempaddr &&
+			    (ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
 				if (regen_tmpaddr(ia6) == 0)
 					regen = 1;
 			}
@@ -648,9 +648,10 @@ nd6_timer(ignored_arg)
 			 * If a temporary address has just become deprecated,
 			 * regenerate a new one if possible.
 			 */
-			if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
-			    (oldflags & IN6_IFF_DEPRECATED) == 0 &&
-			    ip6_use_tempaddr) {
+			if (ip6_use_tempaddr &&
+			    (ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
+			    (oldflags & IN6_IFF_DEPRECATED) == 0) {
+
 				if (regen_tmpaddr(ia6) == 0) {
 					/*
 					 * A new temporary address is
@@ -712,7 +713,7 @@ nd6_timer(ignored_arg)
 
 static int
 regen_tmpaddr(ia6)
-	struct in6_ifaddr *ia6; /* deprecated temporary address */
+	struct in6_ifaddr *ia6; /* deprecated/invalidated temporary address */
 {
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
@@ -747,16 +748,15 @@ regen_tmpaddr(ia6)
 		/*
 		 * Now we are looking at an autoconf address with the same
 		 * prefix as ours.  If the address is temporary and is still
-		 * still preferred, do not create another one.  It would be
-		 * rare, but could happen, for example, when we resume a
-		 * laptop PC from a long period.
+		 * preferred, do not create another one.  It would be rare, but
+		 * could happen, for example, when we resume a laptop PC after
+		 * a long period.
 		 */
-		if ((it6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
-			if (ia6->ia6_lifetime.ia6t_preferred == 0 ||
-			    ia6->ia6_lifetime.ia6t_preferred > time_second) {
-				public_ifa6 = NULL;
-				break;
-			}
+		if ((it6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
+		    (it6->ia6_lifetime.ia6t_preferred == 0 ||
+		     it6->ia6_lifetime.ia6t_preferred > time_second)) {
+			public_ifa6 = NULL;
+			break;
 		}
 
 		/*
