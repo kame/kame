@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.29 2001/02/22 03:37:43 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.30 2001/02/22 04:52:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -672,7 +672,8 @@ frag6_slowtimo()
 	 * (due to the limit being lowered), drain off
 	 * enough to get down to the new limit.
 	 */
-	while (frag6_nfragpackets > (u_int)ip6_maxfragpackets) {
+	while (frag6_nfragpackets > (u_int)ip6_maxfragpackets &&
+	    ip6q.ip6q_prev) {
 		ip6stat.ip6s_fragoverflow++;
 		/* XXX in6_ifstat_inc(ifp, ifs6_reass_fail) */
 		frag6_freef(ip6q.ip6q_prev);
