@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.11 2000/06/04 03:31:27 itojun Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.12 2000/08/03 02:28:48 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -57,6 +57,7 @@
 #include <sys/kernel.h>
 #include <net/if.h>
 #include <net/if_types.h>
+#include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/ip6.h>
