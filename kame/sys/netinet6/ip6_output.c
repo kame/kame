@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.107 2000/05/30 10:16:24 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.108 2000/05/30 14:57:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3220,16 +3220,41 @@ ip6_mloopback(ifp, m, dst)
 	register struct mbuf *m;
 	register struct sockaddr_in6 *dst;
 {
-	struct	mbuf *copym;
+	struct mbuf *copym;
+	struct ip6_hdr *ip6;
+	struct ip6_exthdrs exthdrs;
 
 	copym = m_copy(m, 0, M_COPYALL);
-	if (copym != NULL) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		(void)if_simloop(ifp, copym, (struct sockaddr *)dst, NULL);
+	if (copym == NULL)
+		return;
+#ifndef FAKE_LOOPBACK_IF
+	if ((ifp->if_flags & IFF_LOOPBACK) == 0)
 #else
-		(void)looutput(ifp, copym, (struct sockaddr *)dst, NULL);
+	if (1)
 #endif
+	{
+		/* make sure to deep-copy IPv6 header portion */
+		bzero(&exthdrs, sizeof(exthdrs));
+		if (ip6_splithdr(copym, &exthdrs) != 0)
+			return;
+		copym = exthdrs.ip6e_ip6;
+#ifdef DIAGNOSTIC
+		if (copym->m_len < sizeof(*ip6)) {
+			m_freem(copym);
+			return;
+		}
+#endif
+		ip6 = mtod(copym, struct ip6_hdr *);
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+			ip6->ip6_src.s6_addr16[1] = 0;
+		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
+			ip6->ip6_dst.s6_addr16[1] = 0;
 	}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	(void)if_simloop(ifp, copym, (struct sockaddr *)dst, NULL);
+#else
+	(void)looutput(ifp, copym, (struct sockaddr *)dst, NULL);
+#endif
 }
 
 /*
