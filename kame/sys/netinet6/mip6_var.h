@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.36 2002/06/18 02:11:06 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.37 2002/06/19 12:30:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -50,6 +50,17 @@
 					u_int32_t s = htonl(v);		\
 					bcopy(&s, (p), sizeof(s));	\
 				} while (0)
+
+#define HOME_COOKIE_SIZE	16
+#define CAREOF_COOKIE_SIZE	16
+#define MIP6_NONCE_SIZE		16	/* recommended by the spec (5.5.2) */
+					/* must be multiple of size of u_short */
+#define MIP6_NONCE_HISTORY	32
+typedef u_int8_t mip6_nonce_t[MIP6_NONCE_SIZE];
+typedef u_int8_t mip6_nodekey_t[20];	/* This size is specified at 5.5.1 in mip6 spec */
+typedef u_int8_t mip6_home_cookie_t[HOME_COOKIE_SIZE];
+typedef u_int8_t mip6_careof_cookie_t[CAREOF_COOKIE_SIZE];
+
 
 /* Callout table for MIP6 structures */
 struct mip6_timeout {
@@ -132,9 +143,9 @@ struct mip6_bu {
 	u_int8_t            mbu_flags;      /* BU flags */
 	u_int32_t           mbu_mobile_cookie;
 	u_int16_t           mbu_home_nonce_index;
-	u_int8_t            mbu_home_cookie[16];
+	u_int8_t            mbu_home_cookie[HOME_COOKIE_SIZE];
 	u_int16_t           mbu_careof_nonce_index;
-	u_int8_t            mbu_careof_cookie[16];
+	u_int8_t            mbu_careof_cookie[CAREOF_COOKIE_SIZE];
 	u_int8_t            mbu_state;
 	u_int8_t            mbu_fsm_state;  /* registration status */
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
@@ -247,6 +258,20 @@ struct mip6_buffer {
 #define IP6OPT_COALEN 16 /* Length of Alternate COA sub-option */
 #define IP6OPT_AUTHDATALEN 4 /* Minimum length of Authentication Data sub-option */
 
+struct mip6_mobility_options {
+	u_int16_t valid_options;	/* shows valid options in this structure */
+	u_int16_t	mopt_uid;		/* Unique ID */
+	struct in6_addr mopt_altcoa;		/* Alternate CoA */
+	u_int16_t	mopt_ho_nonce_idx;	/* Home Nonce Index */
+	u_int16_t	mopt_co_nonce_idx;	/* Care-of Nonce Index */
+	caddr_t mopt_auth;			/* Authenticator */
+};
+
+#define MOPT_UID	0x0001
+#define MOPT_ALTCOA	0x0002
+#define MOPT_NONCE_IDX	0x0004
+#define MOPT_AUTHDATA	0x0008
+
 /*
  * the list entry to hold the destination addresses which do not use a
  * home address as a source address when communicating.
@@ -263,6 +288,9 @@ struct encaptab;
 
 extern struct mip6_config mip6_config;
 extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
+#ifdef MIP6_DRAFT17
+extern u_int16_t nonce_index;		/* Current noce index */
+#endif /* MIP6_DRAFT17 */
 
 void mip6_init __P((void));
 
@@ -338,8 +366,6 @@ int mip6_addr_exchange			__P((struct mbuf *,
 int mip6_process_destopt		__P((struct mbuf *,
 					     struct ip6_dest *,
 					     u_int8_t *, int));
-u_int8_t *mip6_destopt_find_subopt	__P((u_int8_t *,
-					     u_int8_t, u_int8_t));
 void mip6_create_addr			__P((struct sockaddr_in6 *,
 					     const struct sockaddr_in6 *,
 					     struct nd_prefix *));
@@ -490,6 +516,9 @@ int mip6_ip6mu_input			__P((struct mbuf *,
 int mip6_ip6ma_input			__P((struct mbuf *,
 					     struct ip6m_binding_ack *,
 					     int));
+int mip6_ip6mhti_input			__P((struct mbuf *,
+					     struct ip6m_home_test_init *,
+					     int));
 int mip6_bu_fsm				__P((struct mip6_bu *, int, void *));
 int mip6_bu_send_hoti			__P((struct mip6_bu *));
 int mip6_bu_send_coti			__P((struct mip6_bu *));
@@ -527,6 +556,12 @@ struct ifaddr *mip6_dad_find		__P((struct in6_addr *, struct ifnet *));
 void mip6_ha_print __P((struct mip6_ha *));
 
 int mip6_setpktaddrs __P((struct mbuf *));
+#ifdef MIP6_DRAFT17
+int mip6_get_nonce __P((int, mip6_nonce_t *));
+int mip6_is_valid_bu (struct ip6_hdr *, struct ip6m_binding_update *,
+		      int, struct sockaddr_in6 *);
+#endif /* MIP6_DRAFT17 */
+
 #endif /* _KERNEL */
 
 #endif /* !_MIP6_VAR_H_ */

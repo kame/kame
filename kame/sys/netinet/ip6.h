@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.30 2002/06/18 03:07:33 k-sugyou Exp $	*/
+/*	$KAME: ip6.h,v 1.31 2002/06/19 12:30:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -414,7 +414,7 @@ struct ip6m_binding_error {
 #define IP6MOPT_UID		2
 #define IP6MOPT_ALTCOA		3
 #define IP6MOPT_NONCE		4
-#define IP6MTOP_AUTHDATA	5
+#define IP6MOPT_AUTHDATA	5
 
 /* Unique Identifier */
 struct ip6m_opt_uid {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.133 2002/06/19 03:34:30 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.134 2002/06/19 12:30:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -54,6 +54,10 @@
 #error "MIP6 is not released yet"
 #endif
 
+#ifdef __NetBSD__
+#define HAVE_SHA1
+#endif
+
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/malloc.h>
@@ -91,6 +95,12 @@
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #include <netkey/keydb.h>
+#endif
+#ifdef HAVE_SHA1
+#include <sys/sha1.h>
+#define SHA1_RESULTLEN	20
+#else
+#include <crypto/sha1.h>
 #endif
 
 #include <net/if_hif.h>
@@ -158,6 +168,13 @@ struct callout mip6_pfx_ch;
 #endif
 int mip6_pfx_timer_running = 0;
 
+#ifdef MIP6_DRAFT17
+mip6_nonce_t mip6_nonce[MIP6_NONCE_HISTORY];
+mip6_nodekey_t mip6_nodekey[MIP6_NONCE_HISTORY];	/* this is described as 'Kcn' in the spec */
+u_int16_t nonce_index;		/* the idx value pointed by nonce_head */
+mip6_nonce_t *nonce_head;	/* Current position of nonce on the array mip6_nonce */
+#endif /* MIP6_DRAFT17 */
+
 static int mip6_prefix_list_update_sub __P((struct hif_softc *,
 					    struct sockaddr_in6 *,
 					    struct nd_prefix *,
@@ -178,6 +195,12 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 					  struct sockaddr_in6 *,
 					  struct sockaddr_in6 *,
 					  struct hif_softc *));
+#ifdef MIP6_DRAFT17
+static void mip6_create_nonce __P((mip6_nonce_t *));
+static void mip6_create_nodekey __P((mip6_nodekey_t *));
+static int mip6_get_mobility_options __P((struct ip6m_binding_update *,
+					 int, struct mip6_mobility_options *));
+#endif /* MIP6_DRAFT17 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 struct ipsecrequest *mip6_getipsecrequest __P((struct sockaddr_in6 *,
@@ -214,6 +237,14 @@ mip6_init()
 
 	LIST_INIT(&mip6_subnet_list);
 	LIST_INIT(&mip6_unuse_hoa);
+
+#ifdef MIP6_DRAFT17
+	/* Initialize nonce, key, and something else for CN */
+	nonce_head = mip6_nonce;
+	nonce_index = 0;
+	mip6_create_nonce(mip6_nonce);
+	mip6_create_nodekey(mip6_nodekey);
+#endif /* MIP6_DRAFT17 */
 }
 
 /*
@@ -2362,34 +2393,6 @@ mip6_addr_exchange(m, dstm)
 	return (0);
 }
 
-u_int8_t *
-mip6_destopt_find_subopt(subopt, suboptlen, subopttype)
-	u_int8_t *subopt;    /* Ptr to first sub-option in current option */
-	u_int8_t suboptlen;  /* Remaining option length */
-	u_int8_t subopttype;
-{
-	u_int8_t *match = NULL;
-
-	/* Search all sub-options for current option */
-	while (suboptlen > 0) {
-		if (*subopt == IP6OPT_PAD1) {
-			suboptlen -= 1;
-			subopt += 1;
-		} else if (*subopt == subopttype) {
-			match = subopt;
-			break;
-		} else {
-			suboptlen -= *(subopt + 1) + 2;
-			subopt += *(subopt + 1) + 2;
-		}
-		if (match)
-			break;
-	}
-
-	return (match);
-}
-
-
 int64_t
 mip6_coa_get_lifetime(coa)
 	struct in6_addr *coa;
@@ -2502,3 +2505,174 @@ mip6_setpktaddrs(m)
 		return(ENOBUFS);
 	return(0);
 }
+
+#ifdef MIP6_DRAFT17
+static void
+mip6_create_nonce(nonce)
+	mip6_nonce_t *nonce;
+{
+	int i;
+
+	for (i = 0; i < MIP6_NONCE_SIZE / sizeof(u_long); i++)
+		((u_long *)nonce)[i] = random();
+}
+
+static void
+mip6_create_nodekey(nodekey)
+	mip6_nodekey_t *nodekey;
+{
+	/* To Be Written, soon */
+}
+
+int
+mip6_get_nonce(index, nonce)
+	int index;	/* nonce index */
+	mip6_nonce_t *nonce;
+{
+	signed int offset = index - nonce_index;
+
+	if (offset > 0)
+		return (-1);
+	
+	if (nonce_head + offset >= mip6_nonce + MIP6_NONCE_HISTORY)
+		offset = offset - MIP6_NONCE_HISTORY;
+	
+	if (nonce_head + offset < mip6_nonce)
+		return (-1);
+
+	bcopy(&nonce_head[offset], nonce, sizeof(mip6_nonce_t));
+	return (0);
+}
+
+int
+mip6_get_nodekey(index, nonce)
+	int index;	/* nonce index */
+	mip6_nonce_t *nonce;
+{
+	/* To Be Written, soon */
+	return (0);
+}
+
+/*
+ *	Check a Binding Update packet whether it is valid 
+ */
+int
+mip6_is_valid_bu(ip6, ip6mu, ip6mulen, hoa_sa)
+	struct ip6_hdr *ip6;
+	struct ip6m_binding_update *ip6mu;
+	int ip6mulen;
+	struct sockaddr_in6 *hoa_sa;
+{
+	int error;
+	struct mip6_mobility_options mopt;
+	mip6_nonce_t home_nonce, coa_nonce;
+	mip6_nodekey_t home_nodekey, coa_nodekey;
+	mip6_home_cookie_t home_cookie;
+	mip6_careof_cookie_t careof_cookie;
+	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t authdata[SHA1_RESULTLEN];
+	SHA1_CTX ctx;
+
+	if (error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt))
+		return (error);
+
+	/* Nonce index & Auth. data mobility options are required */
+	if (mopt.valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA) == 0)
+		return (EINVAL);
+
+	if ((mip6_get_nonce(mopt.mopt_ho_nonce_idx, &home_nonce) != 0) ||
+	    (mip6_get_nonce(mopt.mopt_co_nonce_idx, &coa_nonce) != 0))
+		return (EINVAL);
+
+	if ((mip6_get_nodekey(mopt.mopt_ho_nonce_idx, &home_nodekey) != 0) ||
+	    (mip6_get_nodekey(mopt.mopt_co_nonce_idx, &coa_nodekey) != 0))
+		return (EINVAL);
+/*
+	hmac_sha1_init(state);
+	hmac_sha1_loop(state, ip6mu->ip6mu_homeaddr,
+		       sizeof(ip6mu->ip6mu_homeaddr));
+	hmac_sha1_loop(state, &home_nonce, sizeof(home_nonce));
+	hmac_sha1_result(state, &home_cookie);
+*/
+/*
+	hmac_sha1_init(state);
+	hmac_sha1_loop(state, ip6->ip6_src,
+		       sizeof(ip6->ip6_src));
+	hmac_sha1_loop(state, &careof_nonce, sizeof(careof_nonce));
+	hmac_sha1_result(state, &careof_cookie);
+*/
+	SHA1Init(&ctx);
+	SHA1Update(&ctx, (caddr_t)&home_cookie, sizeof(home_cookie));
+	SHA1Update(&ctx, (caddr_t)&careof_cookie, sizeof(careof_cookie));
+	SHA1Final(key_bu, &ctx);
+
+/*
+	hmac_sha1_init(state);
+	hmac_sha1_loop(state, ip6->ip6_src,
+		       sizeof(ip6->ip6_src));
+	hmac_sha1_loop(state, ip6->ip6_dest
+		       sizeof(ip6->ip6_dest));
+	hmac_sha1_loop(state, ip6mu, ip6mulen);
+	/* XXX must exclude Authentication mobility option
+	hmac_sha1_result(state, authdata);
+ */
+
+	return (bcmp(mopt.mopt_auth, authdata, sizeof(authdata)));
+}
+
+static int
+mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
+	struct ip6m_binding_update *ip6mu;
+	int ip6mulen;
+	struct mip6_mobility_options *mopt;
+{
+	u_int8_t *mh, *mhend;
+	u_int16_t valid_option;
+
+	mh = (caddr_t)(ip6mu + 1);
+	mhend = (caddr_t)(ip6mu) + ip6mulen;
+	mopt->valid_options = 0;
+
+	while (mh < mhend) {
+		valid_option = 0;
+		switch (*mh) {
+			case IP6MOPT_PAD1:
+				mh++;
+				continue;
+			case IP6MOPT_PADN:
+				break;
+			case IP6MOPT_UID:
+				/* XXX Should be checked length value ? */
+				valid_option = MOPT_UID;
+				GET_NETVAL_S(mh + 2, mopt->mopt_uid);
+				break;
+			case IP6MOPT_ALTCOA:
+				valid_option = MOPT_ALTCOA;
+				bcopy(mh + 2, &mopt->mopt_altcoa,
+				      sizeof(mopt->mopt_altcoa));
+				break;
+			case IP6MOPT_NONCE:
+				valid_option = MOPT_NONCE_IDX;
+				GET_NETVAL_S(mh + 2, mopt->mopt_ho_nonce_idx);
+				GET_NETVAL_S(mh + 4, mopt->mopt_co_nonce_idx);
+				break;
+			case IP6MOPT_AUTHDATA:
+				valid_option = MOPT_AUTHDATA;
+				mopt->mopt_auth = mh + 2;
+				break;
+			default:
+				/*	'... MUST quietly ignore ... (6.2.1)'
+				mip6log((LOG_ERR,
+					 "%s:%d: invalid mobility option (%02x). \n",
+				 __FILE__, __LINE__, *mh));
+				 */
+				break;
+		}
+		
+		mh += *(mh + 1) + 2;
+		mopt->valid_options |= valid_option;
+	}
+	
+	return (0);
+}
+#endif /* MIP6_DRAFT17 */

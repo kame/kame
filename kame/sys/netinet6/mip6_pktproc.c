@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.11 2002/06/18 13:52:13 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.12 2002/06/19 12:30:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -86,6 +86,8 @@ static int mip6_ip6mci_create __P((struct ip6_mobility **,
 static int mip6_cksum __P((struct sockaddr_in6 *,
 			   struct sockaddr_in6 *,
 			   u_int32_t, u_int8_t,	char *));
+static void mip6_create_cn_cookie __P((struct sockaddr_in6 *,
+				       u_int8_t *, int));
 
 int
 mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
@@ -172,9 +174,9 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_pproto = IPPROTO_NONE;
 	ip6mh->ip6mh_len = ip6mh_size >> 3;
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
-	/* XXX ip6mh->ip6mh_nonce_index; */
+	ip6mh->ip6mh_nonce_index = htonl(nonce_index);
 	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
-	/* XXX ip6mh->ip6mh_home_cookie; */
+	mip6_create_cn_cookie(src, ip6mh->ip6mh_cookie, HOME_COOKIE_SIZE);
 
 	/* calculate checksum. */
 	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
@@ -270,8 +272,9 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_pproto = IPPROTO_NONE;
 	ip6mc->ip6mc_len = ip6mc_size >> 3;
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
-	/* XXX ip6mc->ip6mc_nonce_index; */
+	ip6mc->ip6mc_nonce_index = htonl(nonce_index);
 	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
+	
 	/* XXX ip6mc->ip6mc_careof_cookie; */
 
 	/* calculate checksum. */
@@ -429,6 +432,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct mip6_bc *mbc;
 	u_int16_t seqno;
 	int error = 0;
+	u_int8_t bu_safe = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
@@ -476,15 +480,20 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	 *              not HR -> x  not HR -> o
 	 */
 #if 1 /* XXX temporally */
-	if (ip6mu_flags & IP6MU_HOME)
+	if (ip6mu_flags & IP6MU_HOME) {
+		bu_safe = 1;
 		goto accept_binding_update;
+	}
 #endif
 	if (isprotected
-	    && haseen)
+	    && haseen) {
+		bu_safe = 1;
 		goto accept_binding_update;
+	}
 	if ((haseen == 0)
 	    && ((ip6mu_flags & IP6MU_HOME) == 0))
-		goto accept_binding_update;
+		goto accept_binding_update;	/* Must be checked its safety
+						 * with RR later */
 
 	/* otherwise, discard this packet. */
 	return (EINVAL);
@@ -501,45 +510,44 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
-	if (mbc == NULL)
-		goto check_mobility_options;
-
-	/* check a sequence number. */
-	seqno = ntohs(ip6mu->ip6mu_seqno);
-	if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
-		mip6log((LOG_NOTICE,
-		    "%s:%d: received sequence no (%d) <= current "
-		    "seq no (%d) in BU from host %s.\n",
-		    __FILE__, __LINE__, seqno, mbc->mbc_seqno,
-		    ip6_sprintf(&ip6->ip6_src)));
-		/*
-		 * the seqno of this binding update is smaller than the
-		 * corresponding binding cache.  we send TOO_SMALL
-		 * binding ack as an error.  in this case, we use the
-		 * coa of the incoming packet instead of the coa
-		 * stored in the binding cache as a destination
-		 * addrress.  because the sending mobile node's coa
-		 * might have changed after it had registered before.
-		 */
-		error = mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr,
-		    &coa_sa, IP6MA_STATUS_SEQNO_TOO_SMALL, mbc->mbc_seqno,
-		    0, 0);
-		if (error) {
+	if (mbc == NULL) {
+		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &hoa_sa)) {
 			mip6log((LOG_ERR,
-			    "%s:%d: sending a binding ack failed (%d)\n",
-			    __FILE__, __LINE__, error));
+				 "%s:%d: RR authentication was failed.\n",
+				 __FILE__, __LINE__));
+			return (EINVAL);
 		}
+	} else {
+		/* check a sequence number. */
+		seqno = ntohs(ip6mu->ip6mu_seqno);
+		if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
+			mip6log((LOG_NOTICE,
+			    "%s:%d: received sequence no (%d) <= current "
+			    "seq no (%d) in BU from host %s.\n",
+			    __FILE__, __LINE__, seqno, mbc->mbc_seqno,
+			    ip6_sprintf(&ip6->ip6_src)));
+			/*
+			 * the seqno of this binding update is smaller than the
+			 * corresponding binding cache.  we send TOO_SMALL
+			 * binding ack as an error.  in this case, we use the
+			 * coa of the incoming packet instead of the coa
+			 * stored in the binding cache as a destination
+			 * addrress.  because the sending mobile node's coa
+			 * might have changed after it had registered before.
+			 */
+			error = mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr,
+			    &coa_sa, IP6MA_STATUS_SEQNO_TOO_SMALL, mbc->mbc_seqno,
+			    0, 0);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: sending a binding ack failed (%d)\n",
+				    __FILE__, __LINE__, error));
+			}
 
-		/* discard. */
-		return (EINVAL);
+			/* discard. */
+			return (EINVAL);
+		}
 	}
-
-
- check_mobility_options:
-
-	/* XXX parameter processing. */
-
-	/* XXX cookie processing. */
 
 	return (mip6_ip6mu_process(m, ip6mu, ip6mulen));
 }
@@ -627,7 +635,6 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen)
 		}
 	} else {
 		/* request to cache/remove a binding. */
-		/* CN part XXX */
 	}
 
 
@@ -1448,7 +1455,6 @@ mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 					IPPROTO_MOBILITY, (char *)ip6me);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6me;
-
 	return (0);
 }
 
@@ -1513,3 +1519,17 @@ mip6_cksum(src_sa, dst_sa, plen, nh, mobility)
 }
 #undef ADDCARRY
 #undef REDUCE
+
+static void
+mip6_create_cn_cookie(saddr, cookie, size)
+	struct sockaddr_in6 *saddr;
+	u_int8_t *cookie;
+	int size;	/* HOME_COOKIE_SIZE || CAREOF_COOKIE_SIZE */
+{
+	/* XXX Generatie cookie */
+	/* cookie = MAC_Kcn(saddr | nonce) */
+	mip6_nonce_t nonce;
+	
+	mip6_nonce(nonce_index, &nonce);
+	bzero(cookie, size);	/* XXX */
+}
