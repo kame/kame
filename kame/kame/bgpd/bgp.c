@@ -1769,7 +1769,7 @@ bgp_selectroute(rte, bnp)
 				if (bgp_preferred_rte(rte, orte)) {
 					/* a new RTE may prefer */
 					bgp_disable_rte(orte);
-					orte->rt_flags &= ~RTF_INSTALLED;
+					orte->rt_flags &= ~RTF_UP;
 				}
 				else {
 					/*
@@ -2219,7 +2219,7 @@ bgp_flush(struct rpcb *bnp)
     crte.rt_next = crte.rt_prev = &crte;
     crte.rt_ripinfo.rip6_metric = RIPNG_METRIC_UNREACHABLE;
 
-    if (bnp->rp_adj_ribs_in->rt_flags & RTF_UP) {
+    if (bnp->rp_adj_ribs_in->rt_flags & RTF_INSTALLED) {
 	    /* If it is actually used, withdraw it by routing protocols */
 	    bgp_disable_rte(bnp->rp_adj_ribs_in);
 	    propagate(&crte);

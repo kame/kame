@@ -284,7 +284,8 @@ bgp_recover_rte(drte)
   orte = rrte = NULL;
   obnp = bgb;
   while(obnp) {
-    if (/* bnp != obnp && */
+    if ((drte->rt_proto.rtp_type != RTPROTO_BGP ||
+	 obnp != drte->rt_proto.rtp_bgp) &&
 	(orte = find_rte(drte, obnp->rp_adj_ribs_in))) {
       
       if (obnp->rp_mode & BGPO_IGP &&
