@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+MPRECV=/usr/local/v6/sbin/mprecv
+INTERFACE=fxp0
+MADDR=ff05::9998
+
+$MPRECV -d -i $INTERFACE -m $MADDR
