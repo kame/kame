@@ -1,1 +1,4 @@
+@comment $FreeBSD: ports/net/pchar/pkg/PLIST,v 1.1.1.1 1999/11/04 08:33:27 obrien Exp $
 sbin/pchar
+share/doc/pchar/FAQ
+share/doc/pchar/README
