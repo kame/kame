@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.46 2000/04/17 16:16:32 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.47 2000/04/18 03:45:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -574,6 +574,7 @@ udp6_ctlinput(cmd, sa, d)
 	}
 }
 
+#if !defined(__NetBSD__)
 int
 udp6_output(in6p, m, addr6, control)
 	register struct in6pcb *in6p;
@@ -814,6 +815,7 @@ releaseopt:
 	}
 	return(error);
 }
+#endif
 
 extern	int udp6_sendspace;
 extern	int udp6_recvspace;
