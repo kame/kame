@@ -205,11 +205,17 @@ These are linked to
 .Ic identifier
 directive.
 .\"
-.It Ic certificate_type Ar certtype ;
-specifies certificate type.
-.Ar certtype
+.It Ic certificate_type Ar certspec ;
+specifies a certificate specification.
+.Ar certspec
 is one of followings:
-.Ic x509 , pkcs7 , pgp .
+.Bl -tag -width Ds -compact
+.It Ic x509 Ar certfile Ar privkeyfile;
+.Ar certfile
+means a file name of certificate.
+.Ar privkeyfile
+means a file name of secret key.
+.El
 .\"
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
@@ -356,7 +362,7 @@ remote 172.168.2.2 [7000]
 	# specify the identifier type
 	# "address", "fqdn", "user_fqdn", "keyid"
 	identifier user_fqdn;
-	certificate_type pgp;
+	certificate_type x509 "mycert" "mypriv";
 
 	# specify the bytes length of nonce.
 	nonce_size 16;
