@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.113 2000/08/15 02:52:43 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.114 2000/08/15 07:37:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -623,6 +623,7 @@ ip6_input(m)
 	}
 	break;
 	case OURS_CHECK_ALG_HASH:
+	case OURS_CHECK_ALG_LARGEHASH:
 	{
 		struct in6_ifaddr *ia;
 		struct in6hash *ih;
