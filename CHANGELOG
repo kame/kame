@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.213 1999/10/26 04:28:32 itojun Exp $
+$Id: CHANGELOG,v 1.214 1999/10/26 04:35:21 itojun Exp $
 
 <199910>
 Tue Oct 26 13:27:43 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/www/wwwoffle: add wwwoffle 2.5 with IPv6 patch.
+	* netbsd/pkgsrc/net/zebra, freebsd2/ports/zebra: upgrade to 0.80.
 
 Tue Oct 26 02:58:19 JST 1999 sakane@ydc.co.jp
 	* freebsd3/sys/netinet tcp_input.c udp_usrreq.c
