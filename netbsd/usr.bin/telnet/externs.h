@@ -1,4 +1,4 @@
-/*	$NetBSD: externs.h,v 1.13.2.1 2000/01/23 12:02:43 he Exp $	*/
+/*	$NetBSD: externs.h,v 1.18.4.1 2000/06/22 07:09:06 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -150,6 +150,7 @@ extern int
     termdata,		/* Print out terminal data flow */
 #endif	/* defined(unix) */
     debug,		/* Debug level */
+    doaddrlookup,	/* do a reverse address lookup? */
     clienteof;		/* Client received EOF */
 
 extern cc_t escape;	/* Escape to command mode */
@@ -168,6 +169,11 @@ extern char
     wont[],
     options[],		/* All the little options */
     *hostname;		/* Who are we connected to? */
+
+#ifdef	ENCRYPTION
+extern void (*encrypt_output) P((unsigned char *, int));
+extern int (*decrypt_input) P((int));
+#endif	/* ENCRYPTION */
 
 /*
  * We keep track of each side of the option negotiation.
@@ -243,7 +249,7 @@ extern jmp_buf
 
 
 /* authenc.c */
-int net_write P((unsigned char *, int));
+int telnet_net_write P((unsigned char *, int));
 void net_encrypt P((void));
 int telnet_spin P((void));
 char *telnet_getenv P((char *));
@@ -274,6 +280,7 @@ unsigned char *env_getvalue P((unsigned char *));
 void env_varval P((unsigned char *));
 int auth_cmd P((int, char *[]));
 int ayt_status P((void));
+int encrypt_cmd P((int, char *[]));
 int tn P((int, char *[]));
 void command P((int, char *, int));
 void cmdrc P((const char *, const char *));

@@ -1,4 +1,4 @@
-/*	$NetBSD: fstat.c,v 1.34 1999/02/18 06:09:25 lukem Exp $	*/
+/*	$NetBSD: fstat.c,v 1.42.4.1 2000/10/02 03:11:37 enami Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1988, 1993\n\
 #if 0
 static char sccsid[] = "@(#)fstat.c	8.3 (Berkeley) 5/2/95";
 #else
-__RCSID("$NetBSD: fstat.c,v 1.34 1999/02/18 06:09:25 lukem Exp $");
+__RCSID("$NetBSD: fstat.c,v 1.42.4.1 2000/10/02 03:11:37 enami Exp $");
 #endif
 #endif /* not lint */
 
@@ -61,17 +61,29 @@ __RCSID("$NetBSD: fstat.c,v 1.34 1999/02/18 06:09:25 lukem Exp $");
 #include <sys/sysctl.h>
 #include <sys/filedesc.h>
 #define	_KERNEL
+#define _LKM
 #include <sys/file.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
+#undef _LKM
+#undef _KERNEL
+#define _KERNEL
+#include <sys/mount.h>
 #undef _KERNEL
 #define NFS
-#include <sys/mount.h>
 #include <nfs/nfsproto.h>
 #include <nfs/rpcv2.h>
 #include <nfs/nfs.h>
 #include <nfs/nfsnode.h>
 #undef NFS
+#include <msdosfs/denode.h>
+#include <msdosfs/bpb.h>
+#define	_KERNEL
+#include <msdosfs/msdosfsmount.h>
+#undef _KERNEL
+#define	_KERNEL
+#include <miscfs/genfs/layer.h>
+#undef _KERNEL
 
 #include <net/route.h>
 #include <netinet/in.h>
@@ -143,7 +155,9 @@ int	ext2fs_filestat __P((struct vnode *, struct filestat *));
 int	getfname __P((char *));
 void	getinetproto __P((int));
 char   *getmnton __P((struct mount *));
+char   *layer_filestat __P((struct vnode *, struct filestat *));
 int	main __P((int, char **));
+int	msdosfs_filestat __P((struct vnode *, struct filestat *));
 int	nfs_filestat __P((struct vnode *, struct filestat *));
 #ifdef INET6
 static const char *inet6_addrstr __P((struct in6_addr *));
@@ -151,7 +165,9 @@ static const char *inet6_addrstr __P((struct in6_addr *));
 void	socktrans __P((struct socket *, int));
 int	ufs_filestat __P((struct vnode *, struct filestat *));
 void	usage __P((void));
+char   *vfilestat __P((struct vnode *, struct filestat *));
 void	vtrans __P((struct vnode *, int, int));
+void	ftrans __P((struct file *, int));
 
 int
 main(argc, argv)
@@ -299,9 +315,9 @@ dofiles(kp)
 	struct kinfo_proc *kp;
 {
 	int i;
-	struct file file;
 	struct filedesc0 filed0;
 #define	filed	filed0.fd_fd
+	struct cwdinfo cwdi;
 	struct proc *p = &kp->kp_proc;
 	struct eproc *ep = &kp->kp_eproc;
 
@@ -309,10 +325,14 @@ dofiles(kp)
 	Pid = p->p_pid;
 	Comm = p->p_comm;
 
-	if (p->p_fd == NULL)
+	if (p->p_fd == NULL || p->p_cwdi == NULL)
 		return;
 	if (!KVM_READ(p->p_fd, &filed0, sizeof (filed0))) {
 		warnx("can't read filedesc at %p for pid %d", p->p_fd, Pid);
+		return;
+	}
+	if (!KVM_READ(p->p_cwdi, &cwdi, sizeof(cwdi))) {
+		warnx("can't read cwdinfo at %p for pid %d", p->p_cwdi, Pid);
 		return;
 	}
 	if (filed.fd_nfiles < 0 || filed.fd_lastfile >= filed.fd_nfiles ||
@@ -323,17 +343,17 @@ dofiles(kp)
 	/*
 	 * root directory vnode, if one
 	 */
-	if (filed.fd_rdir)
-		vtrans(filed.fd_rdir, RDIR, FREAD);
+	if (cwdi.cwdi_rdir)
+		vtrans(cwdi.cwdi_rdir, RDIR, FREAD);
 	/*
 	 * current working directory vnode
 	 */
-	vtrans(filed.fd_cdir, CDIR, FREAD);
+	vtrans(cwdi.cwdi_cdir, CDIR, FREAD);
 	/*
 	 * ktrace vnode, if one
 	 */
 	if (p->p_tracep)
-		vtrans(p->p_tracep, TRACE, FREAD|FWRITE);
+		ftrans(p->p_tracep, TRACE);
 	/*
 	 * open files
 	 */
@@ -352,22 +372,87 @@ dofiles(kp)
 	for (i = 0; i <= filed.fd_lastfile; i++) {
 		if (ofiles[i] == NULL)
 			continue;
-		if (!KVM_READ(ofiles[i], &file, sizeof (struct file))) {
-			dprintf("can't read file %d at %p for pid %d",
-			    i, ofiles[i], Pid);
-			continue;
-		}
-		if (file.f_type == DTYPE_VNODE)
-			vtrans((struct vnode *)file.f_data, i, file.f_flag);
-		else if (file.f_type == DTYPE_SOCKET) {
-			if (checkfile == 0)
-				socktrans((struct socket *)file.f_data, i);
-		}
-		else {
-			dprintf("unknown file type %d for file %d of pid %d",
-				file.f_type, i, Pid);
+		ftrans(ofiles[i], i);
+	}
+}
+
+void
+ftrans (fp, i)
+	struct file *fp;
+	int i;
+{
+	struct file file;
+
+	if (!KVM_READ(fp, &file, sizeof (struct file))) {
+		dprintf("can't read file %d at %p for pid %d",
+		    i, fp, Pid);
+		return;
+	}
+	if (file.f_type == DTYPE_VNODE)
+		vtrans((struct vnode *)file.f_data, i, file.f_flag);
+	else if (file.f_type == DTYPE_SOCKET) {
+		if (checkfile == 0)
+			socktrans((struct socket *)file.f_data, i);
+	} else {
+		dprintf("unknown file type %d for file %d of pid %d",
+		    file.f_type, i, Pid);
+	}
+}
+
+char *
+vfilestat(vp, fsp)
+	struct vnode *vp;
+	struct filestat *fsp;
+{
+	char *badtype = NULL;
+
+	if (vp->v_type == VNON || vp->v_tag == VT_NON)
+		badtype = "none";
+	else if (vp->v_type == VBAD)
+		badtype = "bad";
+	else
+		switch (vp->v_tag) {
+		case VT_UFS:
+			if (!ufs_filestat(vp, fsp))
+				badtype = "error";
+			break;
+		case VT_MFS:
+			if (!ufs_filestat(vp, fsp))
+				badtype = "error";
+			break;
+		case VT_MSDOSFS:
+			if (!msdosfs_filestat(vp, fsp))
+				badtype = "error";
+			break;
+		case VT_NFS:
+			if (!nfs_filestat(vp, fsp))
+				badtype = "error";
+			break;
+		case VT_EXT2FS:
+			if (!ext2fs_filestat(vp, fsp))
+				badtype = "error";
+			break;
+		case VT_ISOFS:
+			if (!isofs_filestat(vp, fsp))
+				badtype = "error";
+			break;
+		case VT_NTFS:
+			if (!ntfs_filestat(vp, fsp))
+				badtype = "error";
+			break;
+		case VT_NULL:
+		case VT_OVERLAY:
+		case VT_UMAP:
+			badtype = layer_filestat(vp, fsp);
+			break;
+		default: {
+			static char unknown[10];
+			(void)snprintf(badtype = unknown, sizeof unknown,
+			    "?(%x)", vp->v_tag);
+			break;
 		}
 	}
+	return (badtype);
 }
 
 void
@@ -379,46 +464,14 @@ vtrans(vp, i, flag)
 	struct vnode vn;
 	struct filestat fst;
 	char mode[15], rw[3];
-	char *badtype = NULL, *filename;
+	char *badtype, *filename;
 
-	filename = badtype = NULL;
-	if (!KVM_READ(vp, &vn, sizeof (struct vnode))) {
+	filename = NULL;
+	if (!KVM_READ(vp, &vn, sizeof(struct vnode))) {
 		dprintf("can't read vnode at %p for pid %d", vp, Pid);
 		return;
 	}
-	if (vn.v_type == VNON || vn.v_tag == VT_NON)
-		badtype = "none";
-	else if (vn.v_type == VBAD)
-		badtype = "bad";
-	else
-		switch (vn.v_tag) {
-		case VT_UFS:
-			if (!ufs_filestat(&vn, &fst))
-				badtype = "error";
-			break;
-		case VT_MFS:
-			if (!ufs_filestat(&vn, &fst))
-				badtype = "error";
-			break;
-		case VT_NFS:
-			if (!nfs_filestat(&vn, &fst))
-				badtype = "error";
-			break;
-		case VT_EXT2FS:
-			if (!ext2fs_filestat(&vn, &fst))
-				badtype = "error";
-			break;
-		case VT_ISOFS:
-			if (!isofs_filestat(&vn, &fst))
-				badtype = "error";
-			break;
-		default: {
-			static char unknown[10];
-			(void)snprintf(badtype = unknown, sizeof unknown,
-			    "?(%x)", vn.v_tag);
-			break;;
-		}
-	}
+	badtype = vfilestat(&vn, &fst);
 	if (checkfile) {
 		int fsmatch = 0;
 		DEVS *d;
@@ -522,7 +575,6 @@ nfs_filestat(vp, fsp)
 {
 	struct nfsnode nfsnode;
 	struct vattr va;
-	mode_t mode;
 
 	if (!KVM_READ(VTONFS(vp), &nfsnode, sizeof (nfsnode))) {
 		dprintf("can't read nfsnode at %p for pid %d", VTONFS(vp),
@@ -538,37 +590,67 @@ nfs_filestat(vp, fsp)
 	fsp->fileid = va.va_fileid;
 	fsp->size = nfsnode.n_size;
 	fsp->rdev = va.va_rdev;
-	mode = (mode_t)va.va_mode;
-	switch (vp->v_type) {
-	case VREG:
-		mode |= S_IFREG;
-		break;
-	case VDIR:
-		mode |= S_IFDIR;
-		break;
-	case VBLK:
-		mode |= S_IFBLK;
-		break;
-	case VCHR:
-		mode |= S_IFCHR;
-		break;
-	case VLNK:
-		mode |= S_IFLNK;
-		break;
-	case VSOCK:
-		mode |= S_IFSOCK;
-		break;
-	case VFIFO:
-		mode |= S_IFIFO;
-		break;
-	default:
-		break;
-	};
-	fsp->mode = mode;
+	fsp->mode = (mode_t)va.va_mode | getftype(vp->v_type);
 
 	return 1;
 }
 
+int
+msdosfs_filestat(vp, fsp)
+	struct vnode *vp;
+	struct filestat *fsp;
+{
+	struct denode de;
+	struct msdosfsmount mp;
+
+	if (!KVM_READ(VTONFS(vp), &de, sizeof(de))) {
+		dprintf("can't read denode at %p for pid %d", VTONFS(vp),
+		    Pid);
+		return 0;
+	}
+	if (!KVM_READ(de.de_pmp, &mp, sizeof(mp))) {
+		dprintf("can't read mount struct at %p for pid %d", de.de_pmp,
+		    Pid);
+		return 0;
+	}
+
+	fsp->fsid = de.de_dev & 0xffff;
+	fsp->fileid = 0; /* XXX see msdosfs_vptofh() for more info */
+	fsp->size = de.de_FileSize;
+	fsp->rdev = 0;	/* msdosfs doesn't support device files */
+	fsp->mode = (0777 & mp.pm_mask) | getftype(vp->v_type);
+	return 1;
+}
+
+char *
+layer_filestat(vp, fsp)
+	struct vnode *vp;
+	struct filestat *fsp;
+{
+	struct layer_node layer_node;
+	struct mount mount;
+	struct vnode vn;
+	char *badtype;
+
+	if (!KVM_READ(VTOLAYER(vp), &layer_node, sizeof(layer_node))) {
+		dprintf("can't read layer_node at %p for pid %d",
+		    VTOLAYER(vp), Pid);
+		return ("error");
+	}
+	if (!KVM_READ(vp->v_mount, &mount, sizeof(struct mount))) {
+		dprintf("can't read mount struct at %p for pid %d",
+		    vp->v_mount, Pid);
+		return ("error");
+	}
+	vp = layer_node.layer_lowervp;
+	if (!KVM_READ(vp, &vn, sizeof(struct vnode))) {
+		dprintf("can't read vnode at %p for pid %d", vp, Pid);
+		return ("error");
+	}
+	if ((badtype = vfilestat(&vn, fsp)) == NULL)
+		fsp->fsid = mount.mnt_stat.f_fsid.val[0];
+	return (badtype);
+}
 
 char *
 getmnton(m)
@@ -600,7 +682,7 @@ getmnton(m)
 }
 
 #ifdef INET6
-const char *
+static const char *
 inet6_addrstr(p)
 	struct in6_addr *p;
 {
@@ -890,6 +972,42 @@ getfname(filename)
 	cur->fsid = statbuf.st_dev & 0xffff;
 	cur->name = filename;
 	return(1);
+}
+
+mode_t
+getftype(v_type)
+	enum vtype v_type;
+{
+	mode_t ftype;
+
+	switch (v_type) {
+	case VREG:
+		ftype = S_IFREG;
+		break;
+	case VDIR:
+		ftype = S_IFDIR;
+		break;
+	case VBLK:
+		ftype = S_IFBLK;
+		break;
+	case VCHR:
+		ftype = S_IFCHR;
+		break;
+	case VLNK:
+		ftype = S_IFLNK;
+		break;
+	case VSOCK:
+		ftype = S_IFSOCK;
+		break;
+	case VFIFO:
+		ftype = S_IFIFO;
+		break;
+	default:
+		ftype = 0;
+		break;
+	};
+
+	return ftype;
 }
 
 void

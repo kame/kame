@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.15 1999/01/03 21:58:37 cjs Exp $
+#	$NetBSD: Makefile,v 1.20.2.2 2000/06/24 06:59:37 thorpej Exp $
 #
 # Copyright (c) 1990 The Regents of the University of California.
 # All rights reserved.
@@ -34,41 +34,26 @@
 #	from: @(#)Makefile	8.1 (Berkeley) 6/6/93
 #
 
-.include <bsd.own.mk>			# for EXPORTABLE_SYSTEM definition
-
-# XXX Keep telnet(1) and libtelnet from getting out of sync during the build
-# XXX process.
-.if !exists(${.CURDIR}/../../domestic/usr.bin/telnet) || \
-    defined(EXPORTABLE_SYSTEM) || \
-    make(obj) || make(clean) || make(cleandir) || make(distclean)
+.include <bsd.own.mk>
 
 PROG=	telnet
 
 CPPFLAGS+=-DTERMCAP -DKLUDGELINEMODE -DUSE_TERMIO -Dunix
 CPPFLAGS+=-DENV_HACK
-CPPFLAGS+=-I${.CURDIR}/../../lib
+CPPFLAGS+=-I${.CURDIR}
+
 LDADD+= -ltermcap -ltelnet
-DPADD=	${LIBTERMCAP} ${LIBTELNET}
+DPADD+=	${LIBTERMCAP} ${LIBTELNET}
 
 SRCS=	authenc.c commands.c main.c network.c ring.c sys_bsd.c telnet.c \
 	terminal.c tn3270.c utilities.c
 
-# These are the sources that have encryption stuff in them.
-CRYPT_SRC= authenc.c commands.c externs.h main.c network.c
-CRYPT_SRC+= ring.c ring.h telnet.c terminal.c utilities.c Makefile
-NOCRYPT_DIR=${.CURDIR}/Nocrypt
+CPPFLAGS+=-I${.CURDIR}/../../lib
 
-.include <bsd.prog.mk>
-
-.else	# EXPORTABLE_SYSTEM
-
-MAN=	telnet.1
-
-.include <bsd.man.mk>
-
-.endif	# EXPORTABLE_SYSTEM
-
-CPPFLAGS+=-DIPSEC -DINET6
+CPPFLAGS+=-DIPSEC
+#LDADD+=	-lipsec
+#DPADD+=	${LIBIPSEC}
+CPPFLAGS+=-DINET6
 LDADD+=	-L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -lipsec -linet6
@@ -79,5 +64,12 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
-nocrypt:
-	@echo "Encryption code already removed."
+#.if (${MKKERBEROS} != "no")
+#CPPFLAGS+=-DAUTHENTICATION -DENCRYPTION -DKRB4
+#CPPFLAGS+=-DKRB5 -DFORWARD
+#
+#LDADD+= -lkrb5 -lkrb -lcrypto -lasn1 -lcom_err -lroken
+#DPADD+=	${LIBKRB5} ${LIBKRB} ${LIBCRYPTO} ${LIBASN1} ${LIBCOM_ERR} ${LIBROKEN}
+#.endif
+
+.include <bsd.prog.mk>
