@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.233 2001/07/21 05:44:54 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.234 2001/07/21 05:49:43 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1340,65 +1340,6 @@ compatibility support in KAME tree.  To enumerate:
   no strict/loose bitmap (it was removed from RFC2460).  KAME tree obeys
   RFC2460 IPv6, and lacks support for strict/loose bitmap.
 
-1.17 Multipath routing support
-
-NOTE: this section applies to IPv4 too.
-
-KAME/NetBSD includes kernel support for multipath routing support.  Users can
-install multiple routing entries toward the same destination address prefix
-(rt_key).  If combined with routing daemons support, it can provide equal
-cost multipath routing, as described in RFC2291/2292.
-
-Multipath support will be enabled for inet and inet6 radix table,
-if "options RADIX_MPATH" is specified.  Even with multipath support
-enabled, there's no behavior change if you operate it normally with
-single routing entries per rt_key.
-
-If you issue multiple RTM_ADD requests with the same rt_key, they
-will coexist in the routing table (4.4BSD behavior: the latter one
-gets rejected with EEXIST).  First one to get added will appear
-at the top of rn_dupedkey, so on normal lookups the first one 
-will be picked up (fewer behavior change).
-
-On RTM_DELETE/CHANGE/LOCK, it is now required to specify
-rt_gateway, if there are multiple route entries with the same
-rt_key.  If there's only one entry, no need for rt_gateway, and the original
-behavior for non-multipath case is preserved.
-
-On RTM_GET, you can identify single route out of multipaths
-if you specify rt_gateway.  rt_gateway is still optional,
-and the first route is returned if it is not specified.
-
-IPv4 and IPv6 output logic will pick a route out of multiple
-gateways, based on Modulo-N Hash (RFC2991) using lowermost 32bits
-from ip{,6}_dst.  For example, it is likely that packets to 3ffe::1 and
-3ffe::2 (or 10.0.0.1 and 10.0.0.2) will go through a different gateway.
-
-DEMO:
-(adding multipath routes)
-# route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.1
-# route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.2
-# route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.3
-(use different gateways based on ip_dst)
-# ping -n -c1 10.1.0.1
-# ping -n -c1 10.1.0.2
-# ping -n -c1 10.1.0.3
-# ping -n -c1 10.1.0.4
-(removing only one of them)
-# route delete -inet 10.1.0.0 10.0.0.2
-(it will raise error as there are two routes with the same rt_key)
-# route delete -inet 10.1.0.0
-(it is not ambiguous, it works)
-# route delete -inet 10.1.0.0 10.0.0.3
-(now you can erase the route without rt_gateway, as there's only one)
-# route delete -inet 10.1.0.0
-
-TODO:
-- routing: reject same key/gw pair on RTM_ADD
-- L3: more clever hash/gw selection policy (-> RFC2991/2992),
-  avoid faulty gateways/nonworking paths, revisit issues with cached
-  route on struct route/sendto(3)
-
 2. Network Drivers
 
 KAME requires three items to be added into the standard drivers:
@@ -1955,7 +1896,83 @@ Other implementations are also available.
 	NEC: http://www.6bone.nec.co.jp/mipv6/internal-dist/ (-13 draft)
 	SFC: http://neo.sfc.wide.ad.jp/~mip6/ (-13 draft)
 
-7. Coding style
+7. Routing table extensions
+
+7.1 ART routing table lookup algorithm
+
+ART stands for Allotment Routing Table, and was developed by Donald Knuth
+and Yoichi Hariguchi <yoichi@yottanet.com>.  The algorithm is faster and
+simpler than Patricia tree (sys/net/radix.c), suitable for hardware-based
+acceleration, but tend to eat more memory.
+Complete documentation can be found in sys/net/radix_art.c as comment.
+
+"options RADIX_ART" will enable ART routing table lookup support for both
+IPv4 and IPv6 (see COVERAGE document for platform support details).
+The code is still being stabilized, and there could be kernel panic depending
+on your setups.
+
+RADIX_ART kernel compilation option conflicts with RADIX_MPATH.
+
+7.2 Multipath routing support
+
+KAME/NetBSD includes kernel support for multipath routing support.  Users can
+install multiple routing entries toward the same destination address prefix
+(rt_key).  If combined with routing daemons support, it can provide equal
+cost multipath routing, as described in RFC2291/2292.
+
+Multipath support will be enabled for inet and inet6 radix table,
+if "options RADIX_MPATH" is specified.  Even with multipath support
+enabled, there's no behavior change if you operate it normally with
+single routing entries per rt_key.
+
+If you issue multiple RTM_ADD requests with the same rt_key, they
+will coexist in the routing table (4.4BSD behavior: the latter one
+gets rejected with EEXIST).  First one to get added will appear
+at the top of rn_dupedkey, so on normal lookups the first one 
+will be picked up (fewer behavior change).
+
+On RTM_DELETE/CHANGE/LOCK, it is now required to specify
+rt_gateway, if there are multiple route entries with the same
+rt_key.  If there's only one entry, no need for rt_gateway, and the original
+behavior for non-multipath case is preserved.
+
+On RTM_GET, you can identify single route out of multipaths
+if you specify rt_gateway.  rt_gateway is still optional,
+and the first route is returned if it is not specified.
+
+IPv4 and IPv6 output logic will pick a route out of multiple
+gateways, based on Modulo-N Hash (RFC2991) using lowermost 32bits
+from ip{,6}_dst.  For example, it is likely that packets to 3ffe::1 and
+3ffe::2 (or 10.0.0.1 and 10.0.0.2) will go through a different gateway.
+
+DEMO:
+(adding multipath routes)
+# route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.1
+# route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.2
+# route add -inet 10.1.0.0 -netmask 0xffffff00 10.0.0.3
+(use different gateways based on ip_dst)
+# ping -n -c1 10.1.0.1
+# ping -n -c1 10.1.0.2
+# ping -n -c1 10.1.0.3
+# ping -n -c1 10.1.0.4
+(removing only one of them)
+# route delete -inet 10.1.0.0 10.0.0.2
+(it will raise error as there are two routes with the same rt_key)
+# route delete -inet 10.1.0.0
+(it is not ambiguous, it works)
+# route delete -inet 10.1.0.0 10.0.0.3
+(now you can erase the route without rt_gateway, as there's only one)
+# route delete -inet 10.1.0.0
+
+TODO:
+- routing: reject same key/gw pair on RTM_ADD
+- L3: more clever hash/gw selection policy (-> RFC2991/2992),
+  avoid faulty gateways/nonworking paths, revisit issues with cached
+  route on struct route/sendto(3)
+
+RADIX_MPATH kernel compilation option conflicts with RADIX_ART.
+
+8. Coding style
 
 The KAME developers basically do not make a bother about coding
 style.  However, there is still some agreement on the style, in order

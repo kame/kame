@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1798 2001/07/21 05:44:54 itojun Exp $
+$KAME: CHANGELOG,v 1.1799 2001/07/21 05:49:43 itojun Exp $
 
 <200107>
 Sat Jul 21 13:30:21 JST 2001  itojun@iijlab.net
@@ -11,7 +11,7 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	* *bsd*/sys/net/route.c: make equal() more pickier about sa_len,
 	  to avoid possible data buffer overrun.
 	* netbsd/sys/net/radix.c: multipath support in radix routing table.
-	  experimental, netbsd only.  see 1.17 of IMPLEMENTATION.
+	  experimental, netbsd only.  see 7.2 of IMPLEMENTATION.
 
 Fri Jul 20 14:20:51 JST 2001  itojun@iijlab.net
 	* nodeinfod: a daemon that responds to node information queries.
