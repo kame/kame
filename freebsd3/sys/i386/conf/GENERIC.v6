@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.22 1999/09/14 22:53:30 jkh Exp $
-# $Id: GENERIC.v6,v 1.6 1999/10/02 06:54:59 itojun Exp $
+# $Id: GENERIC.v6,v 1.7 1999/10/07 12:00:25 sakane Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -39,13 +39,14 @@ maxusers	32
 ##	IPDIVERT MROUTING BRIDGE DUMMYNET
 options 	MATH_EMULATE		#Support for x87 emulation
 options 	INET			#InterNETworking
-options		"INET6"			#IPv6
+options 	"INET6"			#IPv6
 #options 	RADISH			#not yet
 options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
+#options 	"IPSEC_IPV6FWD"         #IP security tunnel for IPv6
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
-options	MAPPED_ADDR_ENABLED	#enable IPv4, on IPv6 socket
+options 	MAPPED_ADDR_ENABLED	#enable IPv4, on IPv6 socket
 
 # special kernel for TAHI test team - not for general users
 ###options		TAHI
