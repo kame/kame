@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.85 2003/10/09 04:09:08 keiichi Exp $	*/
+/*	$KAME: config.c,v 1.86 2003/10/10 07:50:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -161,15 +161,15 @@ getconfig(intface)
 #ifdef MIP6
 	if ((val = agetusec("maxinterval")) < 0)
 		val = DEF_MAXRTRADVINTERVAL * 1000;
-	if (val < MIN_MAXUINTERVAL || val > MAX_MAXUINTERVAL) {
+	if (val < MIN_MAXMINTERVAL || val > MAX_MAXMINTERVAL) {
 		syslog(LOG_ERR,
 		       "<%s> maxinterval (%0.3f) on %s is invalid "
 		       "(must be between %0.3f and %u)", __func__,
 		       val / 1000.0, intface,
-		       MIN_MAXUINTERVAL / 1000.0, MAX_MAXUINTERVAL / 1000);
+		       MIN_MAXMINTERVAL / 1000.0, MAX_MAXMINTERVAL / 1000);
 		exit(1);
 	}
-	tmp->maxuinterval = (u_int)val;
+	tmp->maxminterval = (u_int)val;
 #else
 	MAYHAVE(val, "maxinterval", DEF_MAXRTRADVINTERVAL);
 	if (val < MIN_MAXINTERVAL || val > MAX_MAXINTERVAL) {
@@ -183,23 +183,23 @@ getconfig(intface)
 #endif
 #ifdef MIP6
 	if ((val = agetusec("mininterval")) < 0)
-		val = tmp->maxuinterval/3;
-	if (val < MIN_MINUINTERVAL || val > (tmp->maxuinterval * 3) / 4) {
+		val = tmp->maxminterval/3;
+	if (val < MIN_MINMINTERVAL || val > (tmp->maxminterval * 3) / 4) {
 		syslog(LOG_ERR,
 		       "<%s> mininterval (%0.3f) on %s is invalid "
 		       "(must be between %0.3f and %0.3f)",
 		       __func__, val / 1000.0, intface,
-		       MIN_MINUINTERVAL / 1000.0,
-		       (tmp->maxuinterval * 3.0) / 4.0);
+		       MIN_MINMINTERVAL / 1000.0,
+		       (tmp->maxminterval * 3.0) / 4.0);
 		exit(1);
 	}
-	tmp->minuinterval = (u_int)val;
+	tmp->minminterval = (u_int)val;
 
 	/* calculate MIN_DELAY_BETWEEN_RAS for this interface. */
-	if (tmp->minuinterval > MIN_DELAY_BETWEEN_RAS * 1000)
+	if (tmp->minminterval > MIN_DELAY_BETWEEN_RAS * 1000)
 		tmp->delaybetweenras = MIN_DELAY_BETWEEN_RAS * 1000;
 	else
-		tmp->delaybetweenras = tmp->minuinterval;
+		tmp->delaybetweenras = tmp->minminterval;
 
 #else
 	MAYHAVE(val, "mininterval", tmp->maxinterval/3);
@@ -264,9 +264,9 @@ getconfig(intface)
 
 #ifdef MIP6
 	MAYHAVE(val, "rltime",
-	    MAX(tmp->maxuinterval / 1000 * 3, MINROUTERLIFETIME));
+	    MAX(tmp->maxminterval / 1000 * 3, MINROUTERLIFETIME));
 	if (val
-	    && (val < (tmp->maxuinterval / 1000) || val > MAXROUTERLIFETIME))
+	    && (val < (tmp->maxminterval / 1000) || val > MAXROUTERLIFETIME))
 #else
 	MAYHAVE(val, "rltime", tmp->maxinterval * 3);
 	if (val && (val < tmp->maxinterval || val > MAXROUTERLIFETIME))
@@ -277,7 +277,7 @@ getconfig(intface)
 		       "(must be 0 or between %d and %d)",
 		       __func__, val, intface,
 #ifdef MIP6
-		       tmp->maxuinterval / 1000,
+		       tmp->maxminterval / 1000,
 #else
 		       tmp->maxinterval,
 #endif
@@ -1030,7 +1030,7 @@ make_packet(struct rainfo *rainfo)
 	if (rainfo->linkmtu)
 		packlen += sizeof(struct nd_opt_mtu);
 #ifdef MIP6
-	if (mobileip6 && rainfo->maxuinterval)
+	if (mobileip6 && rainfo->maxminterval)
 		packlen += sizeof(struct nd_opt_advinterval);
 	if (mobileip6 && rainfo->hatime)
 		packlen += sizeof(struct nd_opt_homeagent_info);
@@ -1099,12 +1099,12 @@ make_packet(struct rainfo *rainfo)
 	}
 
 #ifdef MIP6
-	if (mobileip6 && rainfo->maxuinterval) {
+	if (mobileip6 && rainfo->maxminterval) {
 		ndopt_advint = (struct nd_opt_advinterval *)buf;
 		ndopt_advint->nd_opt_adv_type = ND_OPT_ADVINTERVAL;
 		ndopt_advint->nd_opt_adv_len = 1;
 		ndopt_advint->nd_opt_adv_reserved = 0;
-		ndopt_advint->nd_opt_adv_interval = htonl(rainfo->maxuinterval);
+		ndopt_advint->nd_opt_adv_interval = htonl(rainfo->maxminterval);
 		buf += sizeof(struct nd_opt_advinterval);
 	}
 #endif

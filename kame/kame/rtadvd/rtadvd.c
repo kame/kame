@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.83 2003/10/10 07:34:34 t-momose Exp $	*/
+/*	$KAME: rtadvd.c,v 1.84 2003/10/10 07:50:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1761,11 +1761,11 @@ ra_timer_update(void *data, struct timeval *tm)
 	 * MaxRtrAdvInterval (RFC2461 6.2.4).
 	 */
 #ifdef MIP6
-	interval = rai->minuinterval; 
+	interval = rai->minminterval; 
 #ifdef HAVE_ARC4RANDOM
-	interval += arc4random() % (rai->maxuinterval - rai->minuinterval);
+	interval += arc4random() % (rai->maxminterval - rai->minminterval);
 #else
-	interval += random() % (rai->maxuinterval - rai->minuinterval);
+	interval += random() % (rai->maxminterval - rai->minminterval);
 #endif
 #else
 	interval = rai->mininterval; 

@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.27 2003/08/06 04:19:41 ono Exp $	*/
+/*	$KAME: rtadvd.h,v 1.28 2003/10/10 07:50:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -47,9 +47,9 @@
 #define MAXROUTERLIFETIME 9000
 #ifdef MIP6
 #define MINROUTERLIFETIME 12
-#define MIN_MAXUINTERVAL 70
-#define MAX_MAXUINTERVAL 1800000
-#define MIN_MINUINTERVAL 30
+#define MIN_MAXMINTERVAL 70
+#define MAX_MAXMINTERVAL 1800000
+#define MIN_MINMINTERVAL 30
 #else
 #define MIN_MAXINTERVAL 4
 #define MAX_MAXINTERVAL 1800
@@ -128,8 +128,8 @@ struct	rainfo {
 	/* Router configuration variables */
 	u_short lifetime;	/* AdvDefaultLifetime */
 #ifdef MIP6
-	u_int	maxuinterval;	/* MaxRtrAdvInterval (unit usec) */
-	u_int	minuinterval;	/* MinRtrAdvInterval (unit usec) */
+	u_int	maxminterval;	/* MaxRtrAdvInterval (unit msec) */
+	u_int	minminterval;	/* MinRtrAdvInterval (unit msec) */
 	u_int	delaybetweenras;
 #else
 	u_int	maxinterval;	/* MaxRtrAdvInterval */
