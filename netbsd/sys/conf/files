@@ -598,6 +598,7 @@ file netinet6/raw_ip6.c			inet6
 #file netinet6/tcp6_subr.c		inet6 & tcp6
 #file netinet6/tcp6_timer.c		inet6 & tcp6
 #file netinet6/tcp6_usrreq.c		inet6 & tcp6
+file netinet6/udp6_output.c		inet6
 file netinet6/udp6_usrreq.c		inet6
 
 file netinet6/ah_core.c			ipsec
