@@ -1,4 +1,4 @@
-/*	$KAME: strnames.c,v 1.18 2001/07/14 14:06:40 sakane Exp $	*/
+/*	$KAME: strnames.c,v 1.19 2001/07/31 09:17:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -793,7 +793,6 @@ static struct ksmap name_pfkey_satype[] = {
 { SADB_SATYPE_RIPV2,	"RIPV2",	NULL },
 { SADB_SATYPE_MIP,	"MIP",		NULL },
 { SADB_X_SATYPE_IPCOMP,	"IPCOMP",	NULL },
-{ SADB_X_SATYPE_POLICY,	"POLICY",	NULL },
 };
 
 char *
