@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.184 2002/11/29 11:46:36 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.185 2002/11/29 12:31:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -173,7 +173,6 @@ struct callout mip6_pfx_ch;
 #endif
 int mip6_pfx_timer_running = 0;
 
-#ifdef MIP6_DRAFT18
 mip6_nonce_t mip6_nonce[MIP6_NONCE_HISTORY];
 mip6_nodekey_t mip6_nodekey[MIP6_NONCE_HISTORY];	/* this is described as 'Kcn' in the spec */
 u_int16_t nonce_index;		/* the idx value pointed by nonce_head */
@@ -183,7 +182,6 @@ struct callout mip6_nonce_upd_ch = CALLOUT_INITIALIZER;
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_nonce_upd_ch;
 #endif
-#endif /* MIP6_DRAFT18 */
 
 static int mip6_prefix_list_update_sub(struct hif_softc *,
     struct sockaddr_in6 *, struct nd_prefix *, struct nd_defrouter *);
@@ -251,7 +249,6 @@ mip6_init()
 	LIST_INIT(&mip6_subnet_list);
 	LIST_INIT(&mip6_unuse_hoa);
 
-#ifdef MIP6_DRAFT18
 	/* Initialize nonce, key, and something else for CN */
 	nonce_head = mip6_nonce;
 	nonce_index = 0;
@@ -267,7 +264,6 @@ mip6_init()
 	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
 		hz * NONCE_UPDATE_PERIOD);
 #endif
-#endif /* MIP6_DRAFT18 */
 }
 
 /*
@@ -2547,41 +2543,6 @@ mip6_create_addr(addr, ifid, ndpr)
 	}
 }
 
-/* an ad-hoc supplement function to set full sockaddr src/dst to a packet */
-int
-mip6_setpktaddrs(m)
-	struct mbuf *m;
-{
-	struct sockaddr_in6 src_sa, dst_sa;
-	struct in6_addr *src, *dst;
-	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-	int error;
-
-	src = &ip6->ip6_src;
-	dst = &ip6->ip6_dst;
-
-	bzero(&src_sa, sizeof(src_sa));
-	bzero(&dst_sa, sizeof(dst_sa));
-
-	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
-	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	src_sa.sin6_addr = *src;
-	dst_sa.sin6_addr = *dst;
-
-	/* recover scope zone IDs */
-	if ((error = in6_recoverscope(&src_sa, src, NULL)) != 0)
-		return (error);
-	src_sa.sin6_addr = *src; /* XXX */
-	if ((error = in6_recoverscope(&dst_sa, dst, NULL)) != 0)
-		return (error);
-	dst_sa.sin6_addr = *dst; /* XXX */
-
-	if (!ip6_setpktaddrs(m, &src_sa, &dst_sa))
-		return (ENOBUFS);
-	return (0);
-}
-
-#ifdef MIP6_DRAFT18
 static void
 mip6_create_nonce(nonce)
 	mip6_nonce_t *nonce;
@@ -2939,4 +2900,3 @@ mip6_hexdump("MN: Auth: ", restlen, data + exclude_offset + exclude_data_len);
 mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);
 #endif
 }
-#endif /* MIP6_DRAFT18 */

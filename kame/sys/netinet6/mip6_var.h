@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.73 2002/11/29 11:46:37 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.74 2002/11/29 12:31:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -377,9 +377,7 @@ struct encaptab;
 
 extern struct mip6_config mip6_config;
 extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
-#ifdef MIP6_DRAFT18
 extern u_int16_t nonce_index;		/* Current noce index */
-#endif /* MIP6_DRAFT18 */
 extern struct mip6stat mip6stat;	/* statistics */
 
 void mip6_init(void);
@@ -557,7 +555,6 @@ int mip6_dad_duplicated(struct ifaddr *);
 int mip6_dad_error(struct ifaddr *, int);
 struct ifaddr *mip6_dad_find(struct in6_addr *, struct ifnet *);
 
-int mip6_setpktaddrs(struct mbuf *);
 int mip6_get_nonce(int, mip6_nonce_t *);
 int mip6_get_nodekey(int, mip6_nodekey_t *);
 int mip6_is_valid_bu(struct ip6_hdr *, struct ip6m_binding_update *, int,

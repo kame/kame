@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.58 2002/11/29 11:46:37 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.59 2002/11/29 12:31:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -287,37 +287,41 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	struct mbuf *n;
 	struct ip6_hdr *ip6, *otip6, oip6, *nip6;
 	int otip6off, nxt;
-	struct sockaddr_in6 oip6dst;
+	struct sockaddr_in6 *dst_sa, oip6src_sa, oip6dst_sa;
 	struct icmp6_hdr *icmp6, *nicmp6;
 	struct mip6_bc *mbc;
 	int error = 0;
 
 	if (!MIP6_IS_HA) {
 		/*
-		 * this check is needed only for a node that is acting
-		 * as a homeagent.
+		 * this check is needed only for the node that is
+		 * acting as a home agent.
 		 */
 		return (0);
 	}
+
+	/* get packet addresses. */
+	if (ip6_getpktaddrs(m, NULL, &dst_sa))
+		return (EINVAL);
 
 	/* check if we have enough icmp payload size. */
 	if (icmp6len < sizeof(*otip6) + sizeof(oip6)) {
 		/*
 		 * we don't have enough size of icmp payload.  to
 		 * determine that this icmp is against the tunneled
-		 * ip, we at least have two ip header, one is for
-		 * tunneling from the home agent to the correspondent
-		 * node and the other is the original header from the
-		 * mobile node to the correspondent node.
+		 * packet, we at least have two ip header, one is for
+		 * tunneling from a home agent to a correspondent node
+		 * and the other is a original header from a mobile
+		 * node to the correspondent node.
 		 */
 		return (0);
 	}
 
 	/*
-	 * check if this icmp is generated on the way to sending from
-	 * a home agent to a mobile node by encapsulating the original
-	 * packet.  if so, relay this icmp to the sender of the
-	 * original packet.
+	 * check if this icmp is generated on the way from a home
+	 * agent to a mobile node by encapsulating an original packet
+	 * which is from a correspondent node to the mobile node.  if
+	 * so, relay this icmp to the sender of the original packet.
 	 *
 	 * the icmp packet against the encapsulated packet looks like
 	 * as follows.
@@ -365,14 +369,26 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		return (0);
 	}
 	m_copydata(m, otip6off, sizeof(oip6), (caddr_t)&oip6);
-	oip6dst.sin6_len = sizeof(oip6dst);
-	oip6dst.sin6_family = AF_INET6;
-	oip6dst.sin6_addr = oip6.ip6_dst;
-	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6dst.sin6_addr,
-			   &oip6dst.sin6_scope_id))
+	/* create a src addr of the original packet. */
+	oip6src_sa.sin6_len = sizeof(oip6src_sa);
+	oip6src_sa.sin6_family = AF_INET6;
+	oip6src_sa.sin6_addr = oip6.ip6_src;
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6src_sa.sin6_addr,
+			   &oip6src_sa.sin6_scope_id))
+		return (0); /* XXX */
+	if (in6_embedscope(&oip6src_sa.sin6_addr, &oip6src_sa))
+		return (0); /* XXX */
+	/* create a dst addr of the original packet. */
+	oip6dst_sa.sin6_len = sizeof(oip6dst_sa);
+	oip6dst_sa.sin6_family = AF_INET6;
+	oip6dst_sa.sin6_addr = oip6.ip6_dst;
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6dst_sa.sin6_addr,
+			   &oip6dst_sa.sin6_scope_id))
+		return (0); /* XXX */
+	if (in6_embedscope(&oip6dst_sa.sin6_addr, &oip6dst_sa))
 		return (0); /* XXX */
 
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6dst);
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6dst_sa);
 	if (mbc == NULL) {
 		/* we are not a home agent of this mobile node ?? */
 		return (0);
@@ -396,6 +412,10 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		/* continue. */
 		return (0);
 	}
+	if (!ip6_setpktaddrs(n, dst_sa, &oip6src_sa)) {
+		m_freem(n);
+		return (0);
+	}
 	/* fill the ip6_hdr. */
 	nip6 = mtod(n, struct ip6_hdr *);
 	nip6->ip6_flow = 0;
@@ -404,8 +424,10 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	nip6->ip6_plen = htons(n->m_pkthdr.len - sizeof(struct ip6_hdr));
 	nip6->ip6_nxt = IPPROTO_ICMPV6;
 	nip6->ip6_hlim = ip6_defhlim;
-	nip6->ip6_src = ip6->ip6_dst;
-	nip6->ip6_dst = oip6.ip6_src;
+	nip6->ip6_src = dst_sa->sin6_addr;
+	in6_clearscope(&nip6->ip6_src);
+	nip6->ip6_dst = oip6src_sa.sin6_addr;
+	in6_clearscope(&nip6->ip6_dst);
 
 	/* fill the icmp6_hdr. */
 	nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
@@ -422,10 +444,6 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	/* XXX IPSEC? */
 
-	if ((error = mip6_setpktaddrs(n)) != 0) { /* XXX */
-		m_freem(n);
-		return (0);
-	}
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
