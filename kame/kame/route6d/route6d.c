@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.6 1999/09/10 08:20:59 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.7 1999/12/21 12:18:56 jinmei Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.6 1999/09/10 08:20:59 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.7 1999/12/21 12:18:56 jinmei Exp $";
 #endif
 
 #include <stdio.h>
@@ -544,8 +544,15 @@ init()
 		fatal("rip IPV6_MULTICAST_LOOP");
 #ifdef ADVAPI
 	i = 1;
-	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_PKTINFO, &i, sizeof(i)) < 0)
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &i,
+		       sizeof(i)) < 0)
+		fatal("rip IPV6_RECVPKTINFO");
+#else  /* old adv. API */
+	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_PKTINFO, &i,
+		       sizeof(i)) < 0)
 		fatal("rip IPV6_PKTINFO");
+#endif 
 #endif /*ADVAPI*/
 
 	memset(&hints, 0, sizeof(hints));

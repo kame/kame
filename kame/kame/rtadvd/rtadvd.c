@@ -1052,21 +1052,39 @@ sock_open()
 
 	/* specify to tell receiving interface */
 	on = 1;
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		       sizeof(on)) < 0) {
+		syslog(LOG_ERR, "<%s> IPV6_RECVPKTINFO: %s",
+		       __FUNCTION__, strerror(errno));
+		exit(1);
+	}
+#else  /* old adv. API */
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		       sizeof(on)) < 0) {
 		syslog(LOG_ERR, "<%s> IPV6_PKTINFO: %s",
 		       __FUNCTION__, strerror(errno));
 		exit(1);
 	}
+#endif 
 
 	on = 1;
 	/* specify to tell value of hoplimit field of received IP6 hdr */
+#ifdef IPV6_RECVHOPLIMIT
+	if (setsockopt(sock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
+		       sizeof(on)) < 0) {
+		syslog(LOG_ERR, "<%s> IPV6_RECVHOPLIMIT: %s",
+		       __FUNCTION__, strerror(errno));
+		exit(1);
+	}
+#else  /* old adv. API */
 	if (setsockopt(sock, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
 		       sizeof(on)) < 0) {
 		syslog(LOG_ERR, "<%s> IPV6_HOPLIMIT: %s",
 		       __FUNCTION__, strerror(errno));
 		exit(1);
 	}
+#endif 
 
 	ICMP6_FILTER_SETBLOCKALL(&filt);
 	ICMP6_FILTER_SETPASS(ND_ROUTER_SOLICIT, &filt);

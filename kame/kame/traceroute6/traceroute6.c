@@ -497,14 +497,26 @@ main(argc, argv)
 	rcvmhdr.msg_controllen = sizeof(rcvcmsgbuf);
 
 	/* specify to tell receiving interface */
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
 	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_PKTINFO)");
+#endif 
 
 	/* specify to tell value of hoplimit field of received IP6 hdr */
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_HOPLIMIT)");
+		err(1, "setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
+		       sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_PKTINFO)");
+#endif 
 
 	if (options & SO_DEBUG)
 		(void) setsockopt(rcvsock, SOL_SOCKET, SO_DEBUG,
