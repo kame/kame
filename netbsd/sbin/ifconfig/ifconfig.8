@@ -283,6 +283,10 @@ for
 .It Cm pltime Ar n
 (inet6 only)
 Set preferred lifetime for the address.
+To configure infinite lifetime,
+.Ar n
+should be set to
+.Dq Li infty .
 .It Cm prefixlen Ar n
 (inet6 only)
 Effect is similar to
@@ -331,6 +335,10 @@ the hardware will be re-initialized.
 .It Cm vltime Ar n
 (inet6 only)
 Set valid lifetime for the address.
+To configure infinite lifetime,
+.Ar n
+should be set to
+.Dq Li infty .
 .El
 .Pp
 .Nm

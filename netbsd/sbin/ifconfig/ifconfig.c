@@ -840,20 +840,31 @@ setia6lifetime(cmd, val)
 	char *val;
 {
 	time_t newval, t;
+	u_int32_t expire, period;
 	char *ep;
 
-	t = time(NULL);
-	newval = (time_t)strtoul(val, &ep, 0);
-	if (val == ep)
-		errx(1, "invalid %s", cmd);
 	if (afp->af_af != AF_INET6)
 		errx(1, "%s not allowed for the AF", cmd);
+	if (strcmp(val, "infty") == 0) {
+		expire = 0;
+		period = ND6_INFINITE_LIFETIME;
+	} else {
+		if (!*val)
+			errx(1, "invalid %s", cmd);
+		newval = (time_t)strtoul(val, &ep, 0);
+		if (*ep)
+			errx(1, "invalid %s", cmd);
+
+		t = time(NULL);
+		expire = (u_int32_t)(t + newval);
+		period = (u_int32_t)newval;
+	}
 	if (strcmp(cmd, "vltime") == 0) {
-		in6_addreq.ifra_lifetime.ia6t_expire = t + newval;
-		in6_addreq.ifra_lifetime.ia6t_vltime = newval;
+		in6_addreq.ifra_lifetime.ia6t_expire = expire;
+		in6_addreq.ifra_lifetime.ia6t_vltime = period;
 	} else if (strcmp(cmd, "pltime") == 0) {
-		in6_addreq.ifra_lifetime.ia6t_preferred = t + newval;
-		in6_addreq.ifra_lifetime.ia6t_pltime = newval;
+		in6_addreq.ifra_lifetime.ia6t_preferred = expire;
+		in6_addreq.ifra_lifetime.ia6t_pltime = period;
 	}
 }
 #endif
