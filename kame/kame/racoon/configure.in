@@ -31,13 +31,16 @@ AC_MSG_RESULT($enable_pedant)
 efence_dir=
 AC_MSG_CHECKING(if --with-efence option is specified)
 AC_ARG_WITH(efence, [  --with-efence=DIR       specify ElectricFence directory],
-	[efence_dir=$withval])
-AC_MSG_RESULT(${efence_dir-"default"})
-if test "$efence_dir" = "default"; then
-	AC_CHECK_LIB(efence, EF_Print)
-else
-	AC_CHECK_LIB(efence, EF_Print, [LIBS="$LIBS -L$efence_dir/lib -lefence"],
+	[efence_dir=$withval], [efence_dir=no])
+AC_MSG_RESULT(${efence_dir})
+if test "$efence_dir" != "no"; then
+	if test "x$efence_dir" = "x"; then
+		AC_CHECK_LIB(efence, EF_Print)
+	else
+		AC_CHECK_LIB(efence, EF_Print,
+			[LIBS="$LIBS -L$efence_dir/lib -lefence"],
 			[], [-L$efence_dir/lib])
+	fi
 fi
 
 AC_MSG_CHECKING(if you have KAME tcpdump in $srcdir/../tcpdump)
