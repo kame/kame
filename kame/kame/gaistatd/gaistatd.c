@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.3 2001/07/04 16:45:46 jinmei Exp $	*/
+/*	$KAME: gaistatd.c,v 1.4 2001/07/19 07:13:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -44,6 +44,7 @@
 #include <kvm.h>
 #include <limits.h>
 #include <err.h>
+#include <stdlib.h>
 
 struct gai_orderstat
 {
@@ -82,6 +83,9 @@ main()
 
 	if ((kvmd  = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) == NULL)
 		errx(1, "kvm_openfiles failed");
+
+	/* daemonize */
+	daemon(0, 0);
 
 	while(1) {
 		int cc, cnt;
