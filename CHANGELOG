@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.906 2000/05/19 07:38:39 jinmei Exp $
+$Id: CHANGELOG,v 1.907 2000/05/19 07:40:51 jinmei Exp $
 
 <200005>
 2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): loosened scope check
 	in ip6_mdq() for packets forwarded to a register I/F. Without
-	this, such packet could be mistakenly discarded.
+	this, such packets could be mistakenly discarded.
 	In response to: a report from Noriaki Takamiya
 	<takamiya@po.ntts.co.jp>
 	
