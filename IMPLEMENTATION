@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.359 2003/10/22 09:19:08 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.360 2003/10/22 15:55:51 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2374,7 +2374,7 @@ right (IPR) restriction.  KAME's stance is stated below.
     The reason for (1) is, even if KAME contracts with the IPR holder in
     question, the users of KAME stack (usually implementers of some other
     codebase) would need to make a license contract with the IPR holder.
-    it would damage "freely redistributable" status of KAME codebase.
+    It would damage the "freely redistributable" status of KAME codebase.
 
     By doing so KAME is (implicitly) trying to advocate no-license-contract,
     royalty-free, release of IPRs.
