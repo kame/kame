@@ -1,6 +1,11 @@
 Installation procedure - grabbing tree via anoncvs
 KAME project
-$Id: INSTALL.anoncvs,v 1.4 1999/08/25 02:29:04 itojun Exp $
+$Id: INSTALL.anoncvs,v 1.5 1999/12/12 10:23:53 itojun Exp $
+
+
+NOTE: The following description applies only to KAME SNAP kits.
+If you are using any of past KAME STABLE kits, or KAME RELEASE kits,
+the following description does not apply to you.
 
 
 You can grab the latest KAME tree via anonymous cvs (anoncvs).
