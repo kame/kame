@@ -1023,7 +1023,7 @@ add_bgppeer(asnum, routerid, peerinfo)
 		}
 		if (routerid && info->routerid == routerid) {
 			yywarn("BGP peer (routerID: %x) doubly defined",
-			       htonl(routerid));
+			       ntohl(routerid));
 			return(-1);
 		}
 		if (sa6_equal(&info->peeraddr, &peerinfo->peeraddr)) {
@@ -1485,9 +1485,9 @@ bgp_config()
 			}
 			if (info->routerid) {
 				bnp->rp_mode |= BGPO_IDSTATIC;
-				bnp->rp_id = htonl(info->routerid);
+				bnp->rp_id = info->routerid;
 				cprint("routerID: %x ",
-				       (u_int)(htonl(info->routerid)));
+				       (u_int)(ntohl(info->routerid)));
 			}
 		}
 		else {		/* EBGP */
