@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -27,125 +27,142 @@
  * SUCH DAMAGE.
  */
 
-#ifdef INET6
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-
-#include <netinet/in.h>
-#include <netinet/ip6.h>
-
-#include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include <net/if_var.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include <netinet6/in6_var.h>
-#include <netinet6/mip6.h>
+
+#ifndef lint
+static const char rcsid[] _U_ =
+     "@(#) $Header: /tcpdump/master/tcpdump/print-ip6opts.c,v 1.14.2.3 2003/11/19 00:35:44 guy Exp $";
+#endif
+
+#ifdef INET6
+#include <tcpdump-stdinc.h>
 
 #include <stdio.h>
-#include <string.h>
+
+#include "ip6.h"
 
 #include "interface.h"
 #include "addrtoname.h"
+#include "extract.h"
 
-void
-ip6_subopt_print(const u_char *bp, int len)
+/* items outside of rfc2292bis */
+#ifndef IP6OPT_MINLEN
+#define IP6OPT_MINLEN	2
+#endif
+#ifndef IP6OPT_RTALERT_LEN
+#define IP6OPT_RTALERT_LEN	4
+#endif
+#ifndef IP6OPT_JUMBO_LEN
+#define IP6OPT_JUMBO_LEN	6
+#endif
+#define IP6OPT_HOMEADDR_MINLEN 18
+#define IP6OPT_BU_MINLEN       10
+#define IP6OPT_BA_MINLEN       13
+#define IP6OPT_BR_MINLEN        2
+#define IP6SOPT_UI            0x2
+#define IP6SOPT_UI_MINLEN       4
+#define IP6SOPT_ALTCOA        0x3
+#define IP6SOPT_ALTCOA_MINLEN  18
+#define IP6SOPT_AUTH          0x4
+#define IP6SOPT_AUTH_MINLEN     6
+
+static void ip6_sopt_print(const u_char *, int);
+
+static void
+ip6_sopt_print(const u_char *bp, int len)
 {
     int i;
     int optlen;
-    struct in6_addr *in6, *ep;
-    /* due to unaligned-ness, we need to copy them */
-    struct mip6_subopt_id id;
-    struct mip6_subopt_coa coa;
 
     for (i = 0; i < len; i += optlen) {
+	if (bp[i] == IP6OPT_PAD1)
+	    optlen = 1;
+	else {
+	    if (i + 1 < len)
+		optlen = bp[i + 1] + 2;
+	    else
+		goto trunc;
+	}
+	if (i + optlen > len)
+	    goto trunc;
+
 	switch (bp[i]) {
 	case IP6OPT_PAD1:
-	    optlen = 1;
+            printf(", pad1");
 	    break;
 	case IP6OPT_PADN:
 	    if (len - i < IP6OPT_MINLEN) {
-		printf("(padn: trunc)");
+		printf(", padn: trunc");
 		goto trunc;
 	    }
-	    optlen = bp[i + 1] + 2;
+            printf(", padn");
 	    break;
-	case IP6SUBOPT_UNIQUEID:	/* Untested */
-	    if (len - i < IP6OPT_UIDLEN + IP6OPT_MINLEN) {
-		printf("(UniqueId: trunc)");
+        case IP6SOPT_UI:
+             if (len - i < IP6SOPT_UI_MINLEN) {
+		printf(", ui: trunc");
 		goto trunc;
 	    }
-	    optlen = bp[i + 1] + 2;
-	    memcpy(&id, &bp[i], sizeof(id));
-	    printf("(UniqueId: %d)", ntohs(id.id));
+            printf(", ui: 0x%04x ", EXTRACT_16BITS(&bp[i + 2]));
 	    break;
-	case IP6SUBOPT_HALIST:		/* this suboption is obsolete */
-	    if (len - i < IP6OPT_HAMINLEN) {
-		printf("(HAList: trunc)");
+        case IP6SOPT_ALTCOA:
+             if (len - i < IP6SOPT_ALTCOA_MINLEN) {
+		printf(", altcoa: trunc");
 		goto trunc;
 	    }
-	    optlen = bp[i + 1] + 2;
-	    printf("(HAList:");
-	    in6 = (struct in6_addr *)&bp[i + 2];
-	    ep = (struct in6_addr *)&bp[i + 2 + bp[i + 1]];
-	    while (in6 < ep) {
-		printf(" %s", ip6addr_string(in6));
-		in6++;
-	    }
-	    printf(")");
+            printf(", alt-CoA: %s", ip6addr_string(&bp[i+2]));
 	    break;
-	case IP6SUBOPT_ALTCOA:
-	    if (len - i < IP6OPT_COALEN + IP6OPT_MINLEN) {
-		printf("(AltCOA: trunc)");
+        case IP6SOPT_AUTH:
+             if (len - i < IP6SOPT_AUTH_MINLEN) {
+		printf(", auth: trunc");
 		goto trunc;
 	    }
-	    optlen = bp[i + 1] + 2;
-	    memcpy(&coa, &bp[i], sizeof(coa));
-	    printf("(AltCOA: %s)", ip6addr_string(&coa.coa));
+            printf(", auth spi: 0x%08x", EXTRACT_32BITS(&bp[i + 2]));
 	    break;
 	default:
 	    if (len - i < IP6OPT_MINLEN) {
-		printf("(type %d: trunc)", bp[i]);
+		printf(", sopt_type %d: trunc)", bp[i]);
 		goto trunc;
 	    }
-	    printf("(type 0x%02x: len=%d) ", bp[i], bp[i + 1]);
-	    optlen = bp[i + 1] + 2;
+	    printf(", sopt_type 0x%02x: len=%d", bp[i], bp[i + 1]);
 	    break;
 	}
     }
-
-#if 0
-end:
-#endif
     return;
 
 trunc:
     printf("[trunc] ");
 }
 
-
 void
 ip6_opt_print(const u_char *bp, int len)
 {
     int i;
-    int optlen;
-    /* due to unaligned-ness, we need to copy them */
-    struct mip6_opt_bu bu;
-    struct mip6_opt_ba ba;
-    struct mip6_opt_ha ha;
+    int optlen = 0;
 
     for (i = 0; i < len; i += optlen) {
+	if (bp[i] == IP6OPT_PAD1)
+	    optlen = 1;
+	else {
+	    if (i + 1 < len)
+		optlen = bp[i + 1] + 2;
+	    else
+		goto trunc;
+	}
+	if (i + optlen > len)
+	    goto trunc;
+
 	switch (bp[i]) {
 	case IP6OPT_PAD1:
-	    optlen = 1;
+            printf("(pad1)");
 	    break;
 	case IP6OPT_PADN:
 	    if (len - i < IP6OPT_MINLEN) {
 		printf("(padn: trunc)");
 		goto trunc;
 	    }
-	    optlen = bp[i + 1] + 2;
+            printf("(padn)");
 	    break;
 	case IP6OPT_ROUTER_ALERT:
 	    if (len - i < IP6OPT_RTALERT_LEN) {
@@ -156,8 +173,7 @@ ip6_opt_print(const u_char *bp, int len)
 		printf("(rtalert: invalid len %d)", bp[i + 1]);
 		goto trunc;
 	    }
-	    printf("(rtalert: 0x%04x) ", ntohs(*(u_short *)&bp[i + 2]));
-	    optlen = IP6OPT_RTALERT_LEN;
+	    printf("(rtalert: 0x%04x) ", EXTRACT_16BITS(&bp[i + 2]));
 	    break;
 	case IP6OPT_JUMBO:
 	    if (len - i < IP6OPT_JUMBO_LEN) {
@@ -168,102 +184,94 @@ ip6_opt_print(const u_char *bp, int len)
 		printf("(jumbo: invalid len %d)", bp[i + 1]);
 		goto trunc;
 	    }
-	    printf("(jumbo: %u) ", (u_int32_t)ntohl(*(u_int *)&bp[i + 2]));
-	    optlen = IP6OPT_JUMBO_LEN;
+	    printf("(jumbo: %u) ", EXTRACT_32BITS(&bp[i + 2]));
 	    break;
-	case IP6OPT_BINDING_UPDATE:
-	    if (len - i < IP6OPT_BUMINLEN) {
-		printf("(bindupdate: trunc)");
-		goto trunc;
-	    }
-
-	    memcpy(&bu, &bp[i], sizeof(bu));
-	    printf("(BindUpd flg=%s%s%s/%x plen=%d",	/*)*/
-		   (bu.flags & MIP6_BU_AFLAG) ? "A" : "",
-		   (bu.flags & MIP6_BU_HFLAG) ? "H" : "",
-		   (bu.flags & MIP6_BU_RFLAG) ? "R" : "",
-		   bu.flags, bu.prefix_len);
-	    printf(" seq=%u", ntohs(bu.seqno));
-	    printf(" life=%u", (u_int32_t)ntohl(bu.lifetime));
-
-	    if (bp[i + 1] > IP6OPT_BUMINLEN) {
-		printf(" subopt ");
-		ip6_subopt_print(bp + IP6OPT_BUMINLEN, 
-		     MIN(bp[i + 1] - IP6OPT_BUMINLEN + IP6OPT_MINLEN, len - i));
-	    }
-	    /*(*/
-	    printf(")");
-
-	    optlen = bp[i + 1] + 2;
-	    break;
-	case IP6OPT_BINDING_ACK:
-	    if (len - i < IP6OPT_BAMINLEN) {
-		printf("(bindack: trunc)");
-		goto trunc;
-	    }
-
-	    memcpy(&ba, &bp[i], sizeof(ba));
-	    printf("(BindAck status=%d", ba.status);	/*)*/
-	    printf(" seq=%d", ntohs(ba.seqno));
-	    printf(" life=%u", (u_int32_t)ntohl(ba.lifetime));
-	    printf(" refresh=%u", (u_int32_t)ntohl(ba.refresh));
-
-	    if (bp[i + 1] > IP6OPT_BAMINLEN) {
-		printf(" subopt ");
-		ip6_subopt_print(bp + IP6OPT_BAMINLEN, 
-				 MIN(bp[i + 1] - IP6OPT_BAMINLEN,
-				     len - i));
-	    }
-	    /*(*/
-	    printf(")");
-
-	    optlen = bp[i + 1] + 2;
-	    break;
-	case IP6OPT_BINDING_REQ:
-	    if (len - i < IP6OPT_BRMINLEN) {
-		printf("(bindreq: trunc)");
-		goto trunc;
-	    }
-
-	    printf("(BindReq");	/*)*/
-
-	    if (bp[i + 1] > IP6OPT_BRMINLEN) {
-		printf(" subopt ");
-		ip6_subopt_print(bp + IP6OPT_BRMINLEN, 
-				 MIN(bp[i + 1] - IP6OPT_BRMINLEN,
-				     len - i));
-	    }
-	    /*(*/
-	    printf(")");
-	    optlen = bp[i + 1] + 2;
-	    break;
-	case IP6OPT_HOME_ADDRESS:
-	    if (len - i < IP6OPT_HAMINLEN) {
+        case IP6OPT_HOME_ADDRESS:
+	    if (len - i < IP6OPT_HOMEADDR_MINLEN) {
 		printf("(homeaddr: trunc)");
 		goto trunc;
 	    }
-
-	    memcpy(&ha, &bp[i], sizeof(ha));
-	    printf("(HomeAddr %s",	/*)*/
-		   ip6addr_string((struct in6_addr *)&ha.home_addr));
-
-	    if (bp[i + 1] > IP6OPT_HAMINLEN) {
-		printf(" subopt ");
-		ip6_subopt_print(bp + IP6OPT_HAMINLEN, 
-				 MIN(bp[i + 1] - IP6OPT_HAMINLEN,
-				     len - i));
+	    if (bp[i + 1] < IP6OPT_HOMEADDR_MINLEN - 2) {
+		printf("(homeaddr: invalid len %d)", bp[i + 1]);
+		goto trunc;
 	    }
-	    /*(*/
+	    printf("(homeaddr: %s", ip6addr_string(&bp[i + 2]));
+            if (bp[i + 1] > IP6OPT_HOMEADDR_MINLEN - 2) {
+		ip6_sopt_print(&bp[i + IP6OPT_HOMEADDR_MINLEN],
+		    (optlen - IP6OPT_HOMEADDR_MINLEN));
+	    }
+            printf(")");
+	    break;
+        case IP6OPT_BINDING_UPDATE:
+	    if (len - i < IP6OPT_BU_MINLEN) {
+		printf("(bu: trunc)");
+		goto trunc;
+	    }
+	    if (bp[i + 1] < IP6OPT_BU_MINLEN - 2) {
+		printf("(bu: invalid len %d)", bp[i + 1]);
+		goto trunc;
+	    }
+	    printf("(bu: ");
+	    if (bp[i + 2] & 0x80)
+		    printf("A");
+	    if (bp[i + 2] & 0x40)
+		    printf("H");
+	    if (bp[i + 2] & 0x20)
+		    printf("S");
+	    if (bp[i + 2] & 0x10)
+		    printf("D");
+	    if ((bp[i + 2] & 0x0f) || bp[i + 3] || bp[i + 4])
+		    printf("res");
+	    printf(", sequence: %u", bp[i + 5]);
+	    printf(", lifetime: %u", EXTRACT_32BITS(&bp[i + 6]));
+
+	    if (bp[i + 1] > IP6OPT_BU_MINLEN - 2) {
+		ip6_sopt_print(&bp[i + IP6OPT_BU_MINLEN],
+		    (optlen - IP6OPT_BU_MINLEN));
+	    }
 	    printf(")");
-	    optlen = bp[i + 1] + 2;
+	    break;
+	case IP6OPT_BINDING_ACK:
+	    if (len - i < IP6OPT_BA_MINLEN) {
+		printf("(ba: trunc)");
+		goto trunc;
+	    }
+	    if (bp[i + 1] < IP6OPT_BA_MINLEN - 2) {
+		printf("(ba: invalid len %d)", bp[i + 1]);
+		goto trunc;
+	    }
+	    printf("(ba: ");
+	    printf("status: %u", bp[i + 2]);
+	    if (bp[i + 3])
+		    printf("res");
+	    printf(", sequence: %u", bp[i + 4]);
+	    printf(", lifetime: %u", EXTRACT_32BITS(&bp[i + 5]));
+	    printf(", refresh: %u", EXTRACT_32BITS(&bp[i + 9]));
+
+	    if (bp[i + 1] > IP6OPT_BA_MINLEN - 2) {
+		ip6_sopt_print(&bp[i + IP6OPT_BA_MINLEN],
+		    (optlen - IP6OPT_BA_MINLEN));
+	    }
+            printf(")");
+	    break;
+        case IP6OPT_BINDING_REQ:
+	    if (len - i < IP6OPT_BR_MINLEN) {
+		printf("(br: trunc)");
+		goto trunc;
+	    }
+            printf("(br");
+            if (bp[i + 1] > IP6OPT_BR_MINLEN - 2) {
+		ip6_sopt_print(&bp[i + IP6OPT_BR_MINLEN],
+		    (optlen - IP6OPT_BR_MINLEN));
+	    }
+            printf(")");
 	    break;
 	default:
 	    if (len - i < IP6OPT_MINLEN) {
 		printf("(type %d: trunc)", bp[i]);
 		goto trunc;
 	    }
-	    printf("(type 0x%02x: len=%d) ", bp[i], bp[i + 1]);
-	    optlen = bp[i + 1] + 2;
+	    printf("(opt_type 0x%02x: len=%d) ", bp[i], bp[i + 1]);
 	    break;
 	}
     }
@@ -284,11 +292,11 @@ hbhopt_print(register const u_char *bp)
     register const u_char *ep;
     int hbhlen = 0;
 
-    /* 'ep' points to the end of avaible data. */
+    /* 'ep' points to the end of available data. */
     ep = snapend;
     TCHECK(dp->ip6h_len);
     hbhlen = (int)((dp->ip6h_len + 1) << 3);
-    TCHECK2(dp, hbhlen);
+    TCHECK2(*dp, hbhlen);
     printf("HBH ");
     if (vflag)
 	ip6_opt_print((const u_char *)dp + sizeof(*dp), hbhlen - sizeof(*dp));
@@ -297,7 +305,7 @@ hbhopt_print(register const u_char *bp)
 
   trunc:
     fputs("[|HBH]", stdout);
-    return(hbhlen);
+    return(-1);
 }
 
 int
@@ -307,7 +315,7 @@ dstopt_print(register const u_char *bp)
     register const u_char *ep;
     int dstoptlen = 0;
 
-    /* 'ep' points to the end of avaible data. */
+    /* 'ep' points to the end of available data. */
     ep = snapend;
     TCHECK(dp->ip6d_len);
     dstoptlen = (int)((dp->ip6d_len + 1) << 3);
@@ -322,6 +330,6 @@ dstopt_print(register const u_char *bp)
 
   trunc:
     fputs("[|DSTOPT]", stdout);
-    return(dstoptlen);
+    return(-1);
 }
 #endif /* INET6 */

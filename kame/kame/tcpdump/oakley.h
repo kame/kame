@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.1.1.1 1999/08/08 23:32:01 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.4 2002/12/11 07:13:56 guy Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -51,9 +51,6 @@
 #define   OAKLEY_ATTR_AUTH_METHOD_RSA           3
 #define   OAKLEY_ATTR_AUTH_METHOD_RSAENC        4
 #define   OAKLEY_ATTR_AUTH_METHOD_RSAREV        5
-#define   OAKLEY_ATTR_AUTH_METHOD_EGENC         6
-#define   OAKLEY_ATTR_AUTH_METHOD_EGREV         7
-#define   OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB    65001
 #define OAKLEY_ATTR_GRP_DESC                  4 /* B */
 #define   OAKLEY_ATTR_GRP_DESC_MODP768          1
 #define   OAKLEY_ATTR_GRP_DESC_MODP1024         2
@@ -78,8 +75,6 @@
 #define OAKLEY_ATTR_KEY_LEN                  14 /* B */
 #define OAKLEY_ATTR_FIELD_SIZE               15 /* B */
 #define OAKLEY_ATTR_GRP_ORDER                16 /* V */
-#define OAKLEY_ATTR_BLOCK_SIZE               17 /* B */
-#define OAKLEY_ATTR_GSS_ID                   16384 /* B/V */
 
 #define OAKLEY_ID_IPV4_ADDR          0
 #define OAKLEY_ID_IPV4_ADDR_SUBNET   1

@@ -20,34 +20,18 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) /master/usr.sbin/tcpdump/tcpdump/print-icmp.c,v 2.1 1995/02/03 18:14:42 polk Exp (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-ipcomp.c,v 1.17.2.3 2003/11/19 00:35:45 guy Exp $";
+#endif
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
 
 #include <string.h>
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-
-#include <net/route.h>
-#include <net/if.h>
-
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-#include <netinet/tcp.h>
+#include <tcpdump-stdinc.h>
 
 #include <stdio.h>
-
-#ifdef INET6
-#include <netinet/ip6.h>
-#endif
 
 struct ipcomp {
 	u_int8_t comp_nxt;	/* Next Header */
@@ -61,9 +45,10 @@ struct ipcomp {
 
 #include "interface.h"
 #include "addrtoname.h"
+#include "extract.h"
 
 int
-ipcomp_print(register const u_char *bp, register const u_char *bp2, int *nhdr)
+ipcomp_print(register const u_char *bp, int *nhdr _U_)
 {
 	register const struct ipcomp *ipcomp;
 	register const u_char *ep;
@@ -73,16 +58,16 @@ ipcomp_print(register const u_char *bp, register const u_char *bp2, int *nhdr)
 #endif
 
 	ipcomp = (struct ipcomp *)bp;
-	cpi = (u_int16_t)ntohs(ipcomp->comp_cpi);
+	cpi = EXTRACT_16BITS(&ipcomp->comp_cpi);
 
-	/* 'ep' points to the end of avaible data. */
+	/* 'ep' points to the end of available data. */
 	ep = snapend;
 
 	if ((u_char *)(ipcomp + 1) >= ep - sizeof(struct ipcomp)) {
 		fputs("[|IPCOMP]", stdout);
 		goto fail;
 	}
-	printf("IPComp(cpi=%u)", cpi);
+	printf("IPComp(cpi=0x%04x)", cpi);
 
 #if defined(HAVE_LIBZ) && defined(HAVE_ZLIB_H)
 	if (1)
@@ -102,7 +87,5 @@ ipcomp_print(register const u_char *bp, register const u_char *bp2, int *nhdr)
 
 #endif
 fail:
-	if (nhdr)
-		*nhdr = -1;
-	return 65536;
+	return -1;
 }

@@ -21,130 +21,119 @@
  * Format and print bootp packets.
  */
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-bootp.c,v 1.1.1.1 1999/08/08 23:32:03 itojun Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-bootp.c,v 1.75.2.3 2004/03/02 07:45:13 hannes Exp $ (LBL)";
 #endif
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-
-#if __STDC__
-struct mbuf;
-struct rtentry;
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include <net/if.h>
 
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
+#include <tcpdump-stdinc.h>
 
-#include <ctype.h>
-#ifdef HAVE_MEMORY_H
-#include <memory.h>
-#endif
 #include <stdio.h>
 #include <string.h>
 
 #include "interface.h"
 #include "addrtoname.h"
+#include "extract.h"
+#include "ether.h"
 #include "bootp.h"
 
-static void rfc1048_print(const u_char *, u_int);
-static void cmu_print(const u_char *, u_int);
+static void rfc1048_print(const u_char *);
+static void cmu_print(const u_char *);
 
 static char tstr[] = " [|bootp]";
+
+static const struct tok bootp_flag_values[] = {
+    { 0x8000,                   "Broadcast" },
+    { 0, NULL}
+};
+
+static const struct tok bootp_op_values[] = {
+    { BOOTPREQUEST,             "Request" },
+    { BOOTPREPLY,               "Reply" },
+    { 0, NULL}
+};
 
 /*
  * Print bootp requests
  */
 void
-bootp_print(register const u_char *cp, u_int length,
-	    u_short sport, u_short dport)
+bootp_print(register const u_char *cp, u_int length)
 {
 	register const struct bootp *bp;
-	static u_char vm_cmu[4] = VM_CMU;
-	static u_char vm_rfc1048[4] = VM_RFC1048;
+	static const u_char vm_cmu[4] = VM_CMU;
+	static const u_char vm_rfc1048[4] = VM_RFC1048;
 
-	bp = (struct bootp *)cp;
+	bp = (const struct bootp *)cp;
 	TCHECK(bp->bp_op);
-	switch (bp->bp_op) {
 
-	case BOOTREQUEST:
-		/* Usually, a request goes from a client to a server */
-		if (sport != IPPORT_BOOTPC || dport != IPPORT_BOOTPS)
-			printf(" (request)");
-		break;
+        printf("BOOTP/DHCP, %s",
+	       tok2str(bootp_op_values, "unknown (0x%02x)", bp->bp_op));
 
-	case BOOTREPLY:
-		/* Usually, a reply goes from a server to a client */
-		if (sport != IPPORT_BOOTPS || dport != IPPORT_BOOTPC)
-			printf(" (reply)");
-		break;
-
-	default:
-		printf(" bootp-#%d", bp->bp_op);
+	if (bp->bp_htype == 1 && bp->bp_hlen == 6 && bp->bp_op == BOOTPREQUEST) {
+		TCHECK2(bp->bp_chaddr[0], 6);
+		printf(" from %s", etheraddr_string(bp->bp_chaddr));
 	}
+
+        printf(", length: %u", length);
+
+        if (!vflag)
+            return;
 
 	TCHECK(bp->bp_secs);
 
 	/* The usual hardware address type is 1 (10Mb Ethernet) */
 	if (bp->bp_htype != 1)
-		printf(" htype-#%d", bp->bp_htype);
+		printf(", htype-#%d", bp->bp_htype);
 
 	/* The usual length for 10Mb Ethernet address is 6 bytes */
 	if (bp->bp_htype != 1 || bp->bp_hlen != 6)
-		printf(" hlen:%d", bp->bp_hlen);
+		printf(", hlen:%d", bp->bp_hlen);
 
 	/* Only print interesting fields */
 	if (bp->bp_hops)
-		printf(" hops:%d", bp->bp_hops);
+		printf(", hops:%d", bp->bp_hops);
 	if (bp->bp_xid)
-		printf(" xid:0x%x", (u_int32_t)ntohl(bp->bp_xid));
+		printf(", xid:0x%x", EXTRACT_32BITS(&bp->bp_xid));
 	if (bp->bp_secs)
-		printf(" secs:%d", ntohs(bp->bp_secs));
-	if (bp->bp_flags)
-		printf(" flags:0x%x", ntohs(bp->bp_flags));
+		printf(", secs:%d", EXTRACT_16BITS(&bp->bp_secs));
+
+	printf(", flags: [%s]",
+	       bittok2str(bootp_flag_values, "none", EXTRACT_16BITS(&bp->bp_flags)));
+	if (vflag>1)
+	  printf( " (0x%04x)", EXTRACT_16BITS(&bp->bp_flags));
 
 	/* Client's ip address */
 	TCHECK(bp->bp_ciaddr);
 	if (bp->bp_ciaddr.s_addr)
-		printf(" C:%s", ipaddr_string(&bp->bp_ciaddr));
+		printf("\n\t  Client IP: %s", ipaddr_string(&bp->bp_ciaddr));
 
 	/* 'your' ip address (bootp client) */
 	TCHECK(bp->bp_yiaddr);
 	if (bp->bp_yiaddr.s_addr)
-		printf(" Y:%s", ipaddr_string(&bp->bp_yiaddr));
+		printf("\n\t  Your IP: %s", ipaddr_string(&bp->bp_yiaddr));
 
 	/* Server's ip address */
 	TCHECK(bp->bp_siaddr);
 	if (bp->bp_siaddr.s_addr)
-		printf(" S:%s", ipaddr_string(&bp->bp_siaddr));
+		printf("\n\t  Server IP: %s", ipaddr_string(&bp->bp_siaddr));
 
 	/* Gateway's ip address */
 	TCHECK(bp->bp_giaddr);
 	if (bp->bp_giaddr.s_addr)
-		printf(" G:%s", ipaddr_string(&bp->bp_giaddr));
+		printf("\n\t  Gateway IP: %s", ipaddr_string(&bp->bp_giaddr));
 
 	/* Client's Ethernet address */
 	if (bp->bp_htype == 1 && bp->bp_hlen == 6) {
-		register const struct ether_header *eh;
-		register const char *e;
-
 		TCHECK2(bp->bp_chaddr[0], 6);
-		eh = (struct ether_header *)packetp;
-		if (bp->bp_op == BOOTREQUEST)
-			e = (const char *)ESRC(eh);
-		else if (bp->bp_op == BOOTREPLY)
-			e = (const char *)EDST(eh);
-		else
-			e = 0;
-		if (e == 0 || memcmp((char *)bp->bp_chaddr, e, 6) != 0)
-			printf(" ether %s", etheraddr_string(bp->bp_chaddr));
+		printf("\n\t  Client Ethernet Address: %s", etheraddr_string(bp->bp_chaddr));
 	}
 
 	TCHECK2(bp->bp_sname[0], 1);		/* check first char only */
 	if (*bp->bp_sname) {
-		printf(" sname \"");
+		printf("\n\t  sname \"");
 		if (fn_print(bp->bp_sname, snapend)) {
 			putchar('"');
 			fputs(tstr + 1, stdout);
@@ -152,9 +141,9 @@ bootp_print(register const u_char *cp, u_int length,
 		}
 		putchar('"');
 	}
-	TCHECK2(bp->bp_sname[0], 1);		/* check first char only */
+	TCHECK2(bp->bp_file[0], 1);		/* check first char only */
 	if (*bp->bp_file) {
-		printf(" file \"");
+		printf("\n\t  file \"");
 		if (fn_print(bp->bp_file, snapend)) {
 			putchar('"');
 			fputs(tstr + 1, stdout);
@@ -165,19 +154,18 @@ bootp_print(register const u_char *cp, u_int length,
 
 	/* Decode the vendor buffer */
 	TCHECK(bp->bp_vend[0]);
-	length -= sizeof(*bp) - sizeof(bp->bp_vend);
-	if (memcmp((char *)bp->bp_vend, (char *)vm_rfc1048,
+	if (memcmp((const char *)bp->bp_vend, vm_rfc1048,
 		 sizeof(u_int32_t)) == 0)
-		rfc1048_print(bp->bp_vend, length);
-	else if (memcmp((char *)bp->bp_vend, (char *)vm_cmu,
+		rfc1048_print(bp->bp_vend);
+	else if (memcmp((const char *)bp->bp_vend, vm_cmu,
 		      sizeof(u_int32_t)) == 0)
-		cmu_print(bp->bp_vend, length);
+		cmu_print(bp->bp_vend);
 	else {
 		u_int32_t ul;
 
-		memcpy((char *)&ul, (char *)bp->bp_vend, sizeof(ul));
+		ul = EXTRACT_32BITS(&bp->bp_vend);
 		if (ul != 0)
-			printf("vend-#0x%x", ul);
+			printf("\n\t  Vendor-#0x%x", ul);
 	}
 
 	return;
@@ -185,12 +173,24 @@ trunc:
 	fputs(tstr, stdout);
 }
 
-/* The first character specifies the format to print */
+/*
+ * The first character specifies the format to print:
+ *     i - ip address (32 bits)
+ *     p - ip address pairs (32 bits + 32 bits)
+ *     l - long (32 bits)
+ *     L - unsigned long (32 bits)
+ *     s - short (16 bits)
+ *     b - period-seperated decimal bytes (variable length)
+ *     x - colon-seperated hex bytes (variable length)
+ *     a - ascii string (variable length)
+ *     B - on/off (8 bits)
+ *     $ - special (explicit code to handle)
+ */
 static struct tok tag2str[] = {
 /* RFC1048 tags */
 	{ TAG_PAD,		" PAD" },
 	{ TAG_SUBNET_MASK,	"iSM" },	/* subnet mask (RFC950) */
-	{ TAG_TIME_OFFSET,	"lTZ" },	/* seconds from UTC */
+	{ TAG_TIME_OFFSET,	"LTZ" },	/* seconds from UTC */
 	{ TAG_GATEWAY,		"iDG" },	/* default gateway */
 	{ TAG_TIME_SERVER,	"iTS" },	/* time servers (RFC868) */
 	{ TAG_NAME_SERVER,	"iIEN" },	/* IEN name servers (IEN116) */
@@ -237,7 +237,7 @@ static struct tok tag2str[] = {
 	{ TAG_VENDOR_OPTS,	"bVO" },
 	{ TAG_NETBIOS_NS,	"iWNS" },
 	{ TAG_NETBIOS_DDS,	"iWDD" },
-	{ TAG_NETBIOS_NODE,	"bWNT" },
+	{ TAG_NETBIOS_NODE,	"$WNT" },
 	{ TAG_NETBIOS_SCOPE,	"aWSC" },
 	{ TAG_XWIN_FS,		"iXFS" },
 	{ TAG_XWIN_DM,		"iXDM" },
@@ -254,7 +254,7 @@ static struct tok tag2str[] = {
 	{ TAG_STREETTALK_STDA,	"iSTDA" },
 	{ TAG_REQUESTED_IP,	"iRQ" },
 	{ TAG_IP_LEASE,		"lLT" },
-	{ TAG_OPT_OVERLOAD,	"bOO" },
+	{ TAG_OPT_OVERLOAD,	"$OO" },
 	{ TAG_TFTP_SERVER,	"aTFTP" },
 	{ TAG_BOOTFILENAME,	"aBF" },
 	{ TAG_DHCP_MESSAGE,	" DHCP" },
@@ -264,23 +264,91 @@ static struct tok tag2str[] = {
 	{ TAG_MAX_MSG_SIZE,	"sMSZ" },
 	{ TAG_RENEWAL_TIME,	"lRN" },
 	{ TAG_REBIND_TIME,	"lRB" },
-	{ TAG_VENDOR_CLASS,	"bVC" },
-	{ TAG_CLIENT_ID,	"bCID" },
+	{ TAG_VENDOR_CLASS,	"aVC" },
+	{ TAG_CLIENT_ID,	"$CID" },
+/* RFC 2485 */
+	{ TAG_OPEN_GROUP_UAP,	"aUAP" },
+/* RFC 2563 */
+	{ TAG_DISABLE_AUTOCONF,	"BNOAUTO" },
+/* RFC 2610 */
+	{ TAG_SLP_DA,		"bSLP-DA" },	/*"b" is a little wrong */
+	{ TAG_SLP_SCOPE,	"bSLP-SCOPE" },	/*"b" is a little wrong */
+/* RFC 2937 */
+	{ TAG_NS_SEARCH,	"sNSSEARCH" },	/* XXX 's' */
+/* RFC 3011 */
+	{ TAG_IP4_SUBNET_SELECT, "iSUBNET" },
+/* http://www.iana.org/assignments/bootp-dhcp-extensions/index.htm */
+	{ TAG_USER_CLASS,	"aCLASS" },
+	{ TAG_SLP_NAMING_AUTH,	"aSLP-NA" },
+	{ TAG_CLIENT_FQDN,	"$FQDN" },
+	{ TAG_AGENT_CIRCUIT,	"bACKT" },
+	{ TAG_AGENT_REMOTE,	"bARMT" },
+	{ TAG_AGENT_MASK,	"bAMSK" },
+	{ TAG_TZ_STRING,	"aTZSTR" },
+	{ TAG_FQDN_OPTION,	"bFQDNS" },	/* XXX 'b' */
+	{ TAG_AUTH,		"bAUTH" },	/* XXX 'b' */
+	{ TAG_VINES_SERVERS,	"iVINES" },
+	{ TAG_SERVER_RANK,	"sRANK" },
+	{ TAG_CLIENT_ARCH,	"sARCH" },
+	{ TAG_CLIENT_NDI,	"bNDI" },	/* XXX 'b' */
+	{ TAG_CLIENT_GUID,	"bGUID" },	/* XXX 'b' */
+	{ TAG_LDAP_URL,		"aLDAP" },
+	{ TAG_6OVER4,		"i6o4" },
+	{ TAG_PRINTER_NAME,	"aPRTR" },
+	{ TAG_MDHCP_SERVER,	"bMDHCP" },	/* XXX 'b' */
+	{ TAG_IPX_COMPAT,	"bIPX" },	/* XXX 'b' */
+	{ TAG_NETINFO_PARENT,	"iNI" },
+	{ TAG_NETINFO_PARENT_TAG, "aNITAG" },
+	{ TAG_URL,		"aURL" },
+	{ TAG_FAILOVER,		"bFAIL" },	/* XXX 'b' */
+	{ 0,			NULL }
+};
+/* 2-byte extended tags */
+static struct tok xtag2str[] = {
+	{ 0,			NULL }
+};
+
+/* DHCP "options overload" types */
+static struct tok oo2str[] = {
+	{ 1,			"file" },
+	{ 2,			"sname" },
+	{ 3,			"file+sname" },
+	{ 0,			NULL }
+};
+
+/* NETBIOS over TCP/IP node type options */
+static struct tok nbo2str[] = {
+	{ 0x1,			"b-node" },
+	{ 0x2,			"p-node" },
+	{ 0x4,			"m-node" },
+	{ 0x8,			"h-node" },
+	{ 0,			NULL }
+};
+
+/* ARP Hardware types, for Client-ID option */
+static struct tok arp2str[] = {
+	{ 0x1,			"ether" },
+	{ 0x6,			"ieee802" },
+	{ 0x7,			"arcnet" },
+	{ 0xf,			"frelay" },
+	{ 0x17,			"strip" },
+	{ 0x18,			"ieee1394" },
 	{ 0,			NULL }
 };
 
 static void
-rfc1048_print(register const u_char *bp, register u_int length)
+rfc1048_print(register const u_char *bp)
 {
-	register u_char tag;
+	register u_int16_t tag;
 	register u_int len, size;
 	register const char *cp;
 	register char c;
 	int first;
 	u_int32_t ul;
-	u_short us;
+	u_int16_t us;
+	u_int8_t uc;
 
-	printf(" vend-rfc1048");
+	printf("\n\t  Vendor-rfc1048:");
 
 	/* Step over magic cookie */
 	bp += sizeof(int32_t);
@@ -292,9 +360,18 @@ rfc1048_print(register const u_char *bp, register u_int length)
 			continue;
 		if (tag == TAG_END)
 			return;
-		cp = tok2str(tag2str, "?T%d", tag);
+		if (tag == TAG_EXTENDED_OPTION) {
+			TCHECK2(*(bp + 1), 2);
+			tag = EXTRACT_16BITS(bp + 1);
+			/* XXX we don't know yet if the IANA will
+			 * preclude overlap of 1-byte and 2-byte spaces.
+			 * If not, we need to offset tag after this step.
+			 */
+			cp = tok2str(xtag2str, "?xT%u", tag);
+		} else
+			cp = tok2str(tag2str, "?T%u", tag);
 		c = *cp++;
-		printf(" %s:", cp);
+		printf("\n\t    %s:", cp);
 
 		/* Get the length; check for truncation */
 		if (bp + 1 >= snapend) {
@@ -303,13 +380,13 @@ rfc1048_print(register const u_char *bp, register u_int length)
 		}
 		len = *bp++;
 		if (bp + len >= snapend) {
-			fputs(tstr, stdout);
+			printf("[|bootp %u]", len);
 			return;
 		}
 
 		if (tag == TAG_DHCP_MESSAGE && len == 1) {
-			c = *bp++;
-			switch (c) {
+			uc = *bp++;
+			switch (uc) {
 			case DHCPDISCOVER:	printf("DISCOVER");	break;
 			case DHCPOFFER:		printf("OFFER");	break;
 			case DHCPREQUEST:	printf("REQUEST");	break;
@@ -318,7 +395,7 @@ rfc1048_print(register const u_char *bp, register u_int length)
 			case DHCPNAK:		printf("NACK");		break;
 			case DHCPRELEASE:	printf("RELEASE");	break;
 			case DHCPINFORM:	printf("INFORM");	break;
-			default:		printf("%u", c);	break;
+			default:		printf("%u", uc);	break;
 			}
 			continue;
 		}
@@ -326,8 +403,22 @@ rfc1048_print(register const u_char *bp, register u_int length)
 		if (tag == TAG_PARM_REQUEST) {
 			first = 1;
 			while (len-- > 0) {
-				c = *bp++;
-				cp = tok2str(tag2str, "?%d", c);
+				uc = *bp++;
+				cp = tok2str(tag2str, "?T%u", uc);
+				if (!first)
+					putchar('+');
+				printf("%s", cp + 1);
+				first = 0;
+			}
+			continue;
+		}
+		if (tag == TAG_EXTENDED_REQUEST) {
+			first = 1;
+			while (len > 1) {
+				len -= 2;
+				us = EXTRACT_16BITS(bp);
+				bp += 2;
+				cp = tok2str(xtag2str, "?xT%u", us);
 				if (!first)
 					putchar('+');
 				printf("%s", cp + 1);
@@ -361,13 +452,17 @@ rfc1048_print(register const u_char *bp, register u_int length)
 
 		case 'i':
 		case 'l':
+		case 'L':
 			/* ip addresses/32-bit words */
 			while (size >= sizeof(ul)) {
 				if (!first)
 					putchar(',');
-				memcpy((char *)&ul, (char *)bp, sizeof(ul));
-				if (c == 'i')
+				ul = EXTRACT_32BITS(bp);
+				if (c == 'i') {
+					ul = htonl(ul);
 					printf("%s", ipaddr_string(&ul));
+				} else if (c == 'L')
+					printf("%d", ul);
 				else
 					printf("%u", ul);
 				bp += sizeof(ul);
@@ -381,10 +476,10 @@ rfc1048_print(register const u_char *bp, register u_int length)
 			while (size >= 2*sizeof(ul)) {
 				if (!first)
 					putchar(',');
-				memcpy((char *)&ul, (char *)bp, sizeof(ul));
+				memcpy((char *)&ul, (const char *)bp, sizeof(ul));
 				printf("(%s:", ipaddr_string(&ul));
 				bp += sizeof(ul);
-				memcpy((char *)&ul, (char *)bp, sizeof(ul));
+				memcpy((char *)&ul, (const char *)bp, sizeof(ul));
 				printf("%s)", ipaddr_string(&ul));
 				bp += sizeof(ul);
 				size -= 2*sizeof(ul);
@@ -397,8 +492,8 @@ rfc1048_print(register const u_char *bp, register u_int length)
 			while (size >= sizeof(us)) {
 				if (!first)
 					putchar(',');
-				memcpy((char *)&us, (char *)bp, sizeof(us));
-				printf("%d", us);
+				us = EXTRACT_16BITS(bp);
+				printf("%u", us);
 				bp += sizeof(us);
 				size -= sizeof(us);
 				first = 0;
@@ -418,7 +513,7 @@ rfc1048_print(register const u_char *bp, register u_int length)
 					putchar('Y');
 					break;
 				default:
-					printf("%d?", *bp);
+					printf("%u?", *bp);
 					break;
 				}
 				++bp;
@@ -428,36 +523,110 @@ rfc1048_print(register const u_char *bp, register u_int length)
 			break;
 
 		case 'b':
+		case 'x':
 		default:
 			/* Bytes */
 			while (size > 0) {
 				if (!first)
-					putchar('.');
-				printf("%d", *bp);
+					putchar(c == 'x' ? ':' : '.');
+				if (c == 'x')
+					printf("%02x", *bp);
+				else
+					printf("%u", *bp);
 				++bp;
 				--size;
 				first = 0;
 			}
 			break;
+
+		case '$':
+			/* Guys we can't handle with one of the usual cases */
+			switch (tag) {
+
+			case TAG_NETBIOS_NODE:
+				tag = *bp++;
+				--size;
+				fputs(tok2str(nbo2str, NULL, tag), stdout);
+				break;
+
+			case TAG_OPT_OVERLOAD:
+				tag = *bp++;
+				--size;
+				fputs(tok2str(oo2str, NULL, tag), stdout);
+				break;
+
+			case TAG_CLIENT_FQDN:
+				/* option 81 should be at least 4 bytes long */
+				if (len < 4) 
+                                        printf("ERROR: options 81 len %u < 4 bytes", len);
+					break;
+				if (*bp++)
+					printf("[svrreg]");
+				if (*bp)
+					printf("%u/%u/", *bp, *(bp+1));
+				bp += 2;
+				putchar('"');
+				(void)fn_printn(bp, size - 3, NULL);
+				putchar('"');
+				bp += size - 3;
+				size = 0;
+				break;
+
+			case TAG_CLIENT_ID:
+			    {	int type = *bp++;
+				size--;
+				if (type == 0) {
+					putchar('"');
+					(void)fn_printn(bp, size, NULL);
+					putchar('"');
+					bp += size;
+					size = 0;
+					break;
+				} else {
+					printf("[%s]", tok2str(arp2str, "type-%d", type));
+				}
+				while (size > 0) {
+					if (!first)
+						putchar(':');
+					printf("%02x", *bp);
+					++bp;
+					--size;
+					first = 0;
+				}
+				break;
+			    }
+
+			default:
+				printf("[unknown special tag %u, size %u]",
+				    tag, size);
+				bp += size;
+				size = 0;
+				break;
+			}
+			break;
 		}
 		/* Data left over? */
-		if (size)
-			printf("[len %d]", len);
+		if (size) {
+			printf("[len %u]", len);
+			bp += size;
+		}
 	}
+	return;
+trunc:
+	printf("|[rfc1048]");
 }
 
 static void
-cmu_print(register const u_char *bp, register u_int length)
+cmu_print(register const u_char *bp)
 {
 	register const struct cmu_vend *cmu;
-	char *fmt = " %s:%s";
 
 #define PRINTCMUADDR(m, s) { TCHECK(cmu->m); \
     if (cmu->m.s_addr != 0) \
-	printf(fmt, s, ipaddr_string(&cmu->m.s_addr)); }
+	printf(" %s:%s", s, ipaddr_string(&cmu->m.s_addr)); }
 
 	printf(" vend-cmu");
-	cmu = (struct cmu_vend *)bp;
+	cmu = (const struct cmu_vend *)bp;
 
 	/* Only print if there are unknown bits */
 	TCHECK(cmu->v_flags);

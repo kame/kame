@@ -1,5 +1,7 @@
+/*	$NetBSD: print-ah.c,v 1.4 1996/05/20 00:41:16 fvdl Exp $	*/
+
 /*
- * Copyright (c) 1988, 1989, 1990, 1991, 1993, 1994
+ * Copyright (c) 1988, 1989, 1990, 1991, 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -20,79 +22,50 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) /master/usr.sbin/tcpdump/tcpdump/print-icmp.c,v 2.1 1995/02/03 18:14:42 polk Exp (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-ah.c,v 1.19.2.3 2003/11/19 00:35:43 guy Exp $ (LBL)";
 #endif
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <net/route.h>
-#include <net/if.h>
-
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-#include <netinet/tcp.h>
+#include <tcpdump-stdinc.h>
 
 #include <stdio.h>
 
-/* there's no standard definition so we are on our own */
-struct ah {
-	u_int8_t	ah_nxt;		/* Next Header */
-	u_int8_t	ah_len;		/* Length of data, in 32bit */
-	u_int16_t	ah_reserve;	/* Reserved for future use */
-	u_int32_t	ah_spi;		/* Security parameter index */
-	/* variable size, 32bit bound*/	/* Authentication data */
-};
-
-struct newah {
-	u_int8_t	ah_nxt;		/* Next Header */
-	u_int8_t	ah_len;		/* Length of data + 1, in 32bit */
-	u_int16_t	ah_reserve;	/* Reserved for future use */
-	u_int32_t	ah_spi;		/* Security parameter index */
-	u_int32_t	ah_seq;		/* Sequence number field */
-	/* variable size, 32bit bound*/	/* Authentication data */
-};
+#include "ah.h"
 
 #include "interface.h"
 #include "addrtoname.h"
+#include "extract.h"
 
 int
-ah_print(register const u_char *bp, register const u_char *bp2)
+ah_print(register const u_char *bp)
 {
 	register const struct ah *ah;
 	register const u_char *ep;
 	int sumlen;
 	u_int32_t spi;
 
-	ah = (struct ah *)bp;
-	ep = snapend;		/* 'ep' points to the end of avaible data. */
+	ah = (const struct ah *)bp;
+	ep = snapend;		/* 'ep' points to the end of available data. */
 
-	if ((u_char *)(ah + 1) >= ep - sizeof(struct ah))
-		goto trunc;
+	TCHECK(*ah);
 
 	sumlen = ah->ah_len << 2;
-	spi = (u_int32_t)ntohl(ah->ah_spi);
+	spi = EXTRACT_32BITS(&ah->ah_spi);
 
-	printf("AH(spi=%u", spi);
+	printf("AH(spi=0x%08x", spi);
 	if (vflag)
 		printf(",sumlen=%d", sumlen);
-	if (Rflag)
-		printf(",seq=0x%x", (u_int32_t)ntohl(*(u_int32_t *)(ah + 1)));
+	printf(",seq=0x%x", EXTRACT_32BITS(ah + 1));
 	if (bp + sizeof(struct ah) + sumlen > ep)
 		fputs("[truncated]", stdout);
 	fputs("): ", stdout);
-	
+
 	return sizeof(struct ah) + sumlen;
  trunc:
 	fputs("[|AH]", stdout);
-	return 65535;
+	return -1;
 }

@@ -22,63 +22,51 @@
  *  and address to string conversion routines
  */
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/addrtoname.c,v 1.4 1999/11/20 15:32:35 itojun Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/addrtoname.c,v 1.96.2.6 2004/03/24 04:14:31 guy Exp $ (LBL)";
 #endif
 
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-
-#if __STDC__
-struct mbuf;
-struct rtentry;
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include <net/if.h>
 
-#include <netinet/in.h>
+#include <tcpdump-stdinc.h>
+
+#ifdef USE_ETHER_NTOHOST
+#ifdef HAVE_NETINET_IF_ETHER_H
+struct mbuf;		/* Squelch compiler warnings on some platforms for */
+struct rtentry;		/* declarations in <net/if.h> */
+#include <net/if.h>	/* for "struct ifnet" in "struct arpcom" on Solaris */
 #include <netinet/if_ether.h>
+#endif /* HAVE_NETINET_IF_ETHER_H */
+#ifdef HAVE_NETINET_ETHER_H
+#include <netinet/ether.h>  /* ether_ntohost on linux */
+#endif /* HAVE_NETINET_ETHER_H */
+#endif /* USE_ETHER_NTOHOST */
 
-#ifdef INET6
-#include <netinet/ip6.h>
-#endif
-
-#include <arpa/inet.h>
-
-#include <ctype.h>
-#include <netdb.h>
 #include <pcap.h>
 #include <pcap-namedb.h>
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
-#ifdef HAVE_MEMORY_H
-#include <memory.h>
-#endif
 #include <signal.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "interface.h"
 #include "addrtoname.h"
 #include "llc.h"
-#include "savestr.h"
 #include "setsignal.h"
-
-/* Forwards */
-static RETSIGTYPE nohostname(int);
 
 /*
  * hash tables for whatever-to-name translations
+ *
+ * XXX there has to be error checks against strdup(3) failure
  */
 
 #define HASHNAMESIZE 4096
 
 struct hnamemem {
 	u_int32_t addr;
-	char *name;
+	const char *name;
 	struct hnamemem *nxt;
 };
 
@@ -88,6 +76,52 @@ struct hnamemem uporttable[HASHNAMESIZE];
 struct hnamemem eprototable[HASHNAMESIZE];
 struct hnamemem dnaddrtable[HASHNAMESIZE];
 struct hnamemem llcsaptable[HASHNAMESIZE];
+struct hnamemem ipxsaptable[HASHNAMESIZE];
+
+#if defined(INET6) && defined(WIN32)
+/*
+ * fake gethostbyaddr for Win2k/XP
+ * gethostbyaddr() returns incorrect value when AF_INET6 is passed
+ * to 3rd argument.
+ *
+ * h_name in struct hostent is only valid.
+ */
+static struct hostent *
+win32_gethostbyaddr(const char *addr, int len, int type)
+{
+	static struct hostent host;
+	static char hostbuf[NI_MAXHOST];
+	char hname[NI_MAXHOST];
+	struct sockaddr_in6 addr6;
+
+	host.h_name = hostbuf;
+	switch (type) {
+	case AF_INET:
+		return gethostbyaddr(addr, len, type);
+		break;
+	case AF_INET6:
+		memset(&addr6, 0, sizeof(addr6));
+		addr6.sin6_family = AF_INET6;
+		memcpy(&addr6.sin6_addr, addr, len);
+#ifdef __MINGW32__
+		/* MinGW doesn't provide getnameinfo */
+		return NULL;
+#else
+		if (getnameinfo((struct sockaddr *)&addr6, sizeof(addr6),
+			hname, sizeof(hname), NULL, 0, 0)) {
+		    return NULL;
+		} else {
+			strcpy(host.h_name, hname);
+			return &host;
+		}
+#endif /* __MINGW32__ */
+		break;
+	default:
+		return NULL;
+	}
+}
+#define gethostbyaddr win32_gethostbyaddr
+#endif /* INET6 & WIN32*/
 
 #ifdef INET6
 struct h6namemem {
@@ -103,18 +137,20 @@ struct enamemem {
 	u_short e_addr0;
 	u_short e_addr1;
 	u_short e_addr2;
-	char *e_name;
+	const char *e_name;
 	u_char *e_nsap;			/* used only for nsaptable[] */
+#define e_bs e_nsap			/* for bytestringtable */
 	struct enamemem *e_nxt;
 };
 
 struct enamemem enametable[HASHNAMESIZE];
 struct enamemem nsaptable[HASHNAMESIZE];
+struct enamemem bytestringtable[HASHNAMESIZE];
 
 struct protoidmem {
 	u_int32_t p_oui;
 	u_short p_proto;
-	char *p_name;
+	const char *p_name;
 	struct protoidmem *p_nxt;
 };
 
@@ -123,7 +159,7 @@ struct protoidmem protoidtable[HASHNAMESIZE];
 /*
  * A faster replacement for inet_ntoa().
  */
-char *
+const char *
 intoa(u_int32_t addr)
 {
 	register char *cp;
@@ -155,38 +191,34 @@ intoa(u_int32_t addr)
 
 static u_int32_t f_netmask;
 static u_int32_t f_localnet;
-static u_int32_t netmask;
-
-/*
- * "getname" is written in this atrocious way to make sure we don't
- * wait forever while trying to get hostnames from yp.
- */
-#include <setjmp.h>
-
-jmp_buf getname_env;
-
-static RETSIGTYPE
-nohostname(int signo)
-{
-	longjmp(getname_env, 1);
-}
 
 /*
  * Return a name for the IP address pointed to by ap.  This address
  * is assumed to be in network byte order.
+ *
+ * NOTE: ap is *NOT* necessarily part of the packet data (not even if
+ * this is being called with the "ipaddr_string()" macro), so you
+ * *CANNOT* use the TCHECK{2}/TTEST{2} macros on it.  Furthermore,
+ * even in cases where it *is* part of the packet data, the caller
+ * would still have to check for a null return value, even if it's
+ * just printing the return value with "%s" - not all versions of
+ * printf print "(null)" with "%s" and a null pointer, some of them
+ * don't check for a null pointer and crash in that case.
+ *
+ * The callers of this routine should, before handing this routine
+ * a pointer to packet data, be sure that the data is present in
+ * the packet buffer.  They should probably do those checks anyway,
+ * as other data at that layer might not be IP addresses, and it
+ * also needs to check whether they're present in the packet buffer.
  */
-char *
+const char *
 getname(const u_char *ap)
 {
 	register struct hostent *hp;
 	u_int32_t addr;
 	static struct hnamemem *p;		/* static for longjmp() */
 
-#ifndef LBL_ALIGN
-	addr = *(const u_int32_t *)ap;
-#else
 	memcpy(&addr, ap, sizeof(addr));
-#endif
 	p = &hnametable[addr & (HASHNAMESIZE-1)];
 	for (; p->nxt; p = p->nxt) {
 		if (p->addr == addr)
@@ -196,38 +228,29 @@ getname(const u_char *ap)
 	p->nxt = newhnamemem();
 
 	/*
-	 * Only print names when:
-	 *	(1) -n was not given.
+	 * Print names unless:
+	 *	(1) -n was given.
 	 *      (2) Address is foreign and -f was given. (If -f was not
-	 *	    give, f_netmask and f_local are 0 and the test
+	 *	    given, f_netmask and f_localnet are 0 and the test
 	 *	    evaluates to true)
-	 *      (3) -a was given or the host portion is not all ones
-	 *          nor all zeros (i.e. not a network or broadcast address)
 	 */
 	if (!nflag &&
-	    (addr & f_netmask) == f_localnet &&
-	    (aflag ||
-	    !((addr & ~netmask) == 0 || (addr | netmask) == 0xffffffff))) {
-		if (!setjmp(getname_env)) {
-			(void)setsignal(SIGALRM, nohostname);
-			(void)alarm(20);
-			hp = gethostbyaddr((char *)&addr, 4, AF_INET);
-			(void)alarm(0);
-			if (hp) {
-				char *dotp;
+	    (addr & f_netmask) == f_localnet) {
+		hp = gethostbyaddr((char *)&addr, 4, AF_INET);
+		if (hp) {
+			char *dotp;
 
-				p->name = savestr(hp->h_name);
-				if (Nflag) {
-					/* Remove domain qualifications */
-					dotp = strchr(p->name, '.');
-					if (dotp)
-						*dotp = '\0';
-				}
-				return (p->name);
+			p->name = strdup(hp->h_name);
+			if (Nflag) {
+				/* Remove domain qualifications */
+				dotp = strchr(p->name, '.');
+				if (dotp)
+					*dotp = '\0';
 			}
+			return (p->name);
 		}
 	}
-	p->name = savestr(intoa(addr));
+	p->name = strdup(intoa(addr));
 	return (p->name);
 }
 
@@ -236,13 +259,13 @@ getname(const u_char *ap)
  * Return a name for the IP6 address pointed to by ap.  This address
  * is assumed to be in network byte order.
  */
-char *
+const char *
 getname6(const u_char *ap)
 {
 	register struct hostent *hp;
 	struct in6_addr addr;
 	static struct h6namemem *p;		/* static for longjmp() */
-	register char *cp;
+	register const char *cp;
 	char ntop_buf[INET6_ADDRSTRLEN];
 
 	memcpy(&addr, ap, sizeof(addr));
@@ -255,43 +278,25 @@ getname6(const u_char *ap)
 	p->nxt = newh6namemem();
 
 	/*
-	 * Only print names when:
-	 *	(1) -n was not given.
-	 *      (2) Address is foreign and -f was given. (If -f was not
-	 *	    give, f_netmask and f_local are 0 and the test
-	 *	    evaluates to true)
-	 *      (3) -a was given or the host portion is not all ones
-	 *          nor all zeros (i.e. not a network or broadcast address)
+	 * Do not print names if -n was given.
 	 */
-	if (!nflag
-#if 0
-	&&
-	    (addr & f_netmask) == f_localnet &&
-	    (aflag ||
-	    !((addr & ~netmask) == 0 || (addr | netmask) == 0xffffffff))
-#endif
-	    ) {
-		if (!setjmp(getname_env)) {
-			(void)setsignal(SIGALRM, nohostname);
-			(void)alarm(20);
-			hp = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET6);
-			(void)alarm(0);
-			if (hp) {
-				char *dotp;
+	if (!nflag) {
+		hp = gethostbyaddr((char *)&addr, sizeof(addr), AF_INET6);
+		if (hp) {
+			char *dotp;
 
-				p->name = savestr(hp->h_name);
-				if (Nflag) {
-					/* Remove domain qualifications */
-					dotp = strchr(p->name, '.');
-					if (dotp)
-						*dotp = '\0';
-				}
-				return (p->name);
+			p->name = strdup(hp->h_name);
+			if (Nflag) {
+				/* Remove domain qualifications */
+				dotp = strchr(p->name, '.');
+				if (dotp)
+					*dotp = '\0';
 			}
+			return (p->name);
 		}
 	}
-	cp = (char *)inet_ntop(AF_INET6, &addr, ntop_buf, sizeof(ntop_buf));
-	p->name = savestr(cp);
+	cp = inet_ntop(AF_INET6, &addr, ntop_buf, sizeof(ntop_buf));
+	p->name = strdup(cp);
 	return (p->name);
 }
 #endif /* INET6 */
@@ -329,13 +334,58 @@ lookup_emem(const u_char *ep)
 	return tp;
 }
 
+/*
+ * Find the hash node that corresponds to the bytestring 'bs'
+ * with length 'nlen'
+ */
+
+static inline struct enamemem *
+lookup_bytestring(register const u_char *bs, const unsigned int nlen)
+{
+	struct enamemem *tp;
+	register u_int i, j, k;
+
+	if (nlen >= 6) {
+		k = (bs[0] << 8) | bs[1];
+		j = (bs[2] << 8) | bs[3];
+		i = (bs[4] << 8) | bs[5];
+	} else if (nlen >= 4) {
+		k = (bs[0] << 8) | bs[1];
+		j = (bs[2] << 8) | bs[3];
+		i = 0;
+	} else
+		i = j = k = 0;
+
+	tp = &bytestringtable[(i ^ j) & (HASHNAMESIZE-1)];
+	while (tp->e_nxt)
+		if (tp->e_addr0 == i &&
+		    tp->e_addr1 == j &&
+		    tp->e_addr2 == k &&
+		    memcmp((const char *)bs, (const char *)(tp->e_bs), nlen) == 0)
+			return tp;
+		else
+			tp = tp->e_nxt;
+
+	tp->e_addr0 = i;
+	tp->e_addr1 = j;
+	tp->e_addr2 = k;
+
+	tp->e_bs = (u_char *) calloc(1, nlen + 1);
+	memcpy(tp->e_bs, bs, nlen);
+	tp->e_nxt = (struct enamemem *)calloc(1, sizeof(*tp));
+	if (tp->e_nxt == NULL)
+		error("lookup_bytestring: calloc");
+
+	return tp;
+}
+
 /* Find the hash node that corresponds the NSAP 'nsap' */
 
 static inline struct enamemem *
 lookup_nsap(register const u_char *nsap)
 {
 	register u_int i, j, k;
-	int nlen = *nsap;
+	unsigned int nlen = *nsap;
 	struct enamemem *tp;
 	const u_char *ensap = nsap + nlen - 6;
 
@@ -353,7 +403,7 @@ lookup_nsap(register const u_char *nsap)
 		    tp->e_addr1 == j &&
 		    tp->e_addr2 == k &&
 		    tp->e_nsap[0] == nlen &&
-		    memcmp((char *)&(nsap[1]),
+		    memcmp((const char *)&(nsap[1]),
 			(char *)&(tp->e_nsap[1]), nlen) == 0)
 			return tp;
 		else
@@ -364,7 +414,7 @@ lookup_nsap(register const u_char *nsap)
 	tp->e_nsap = (u_char *)malloc(nlen + 1);
 	if (tp->e_nsap == NULL)
 		error("lookup_nsap: malloc");
-	memcpy((char *)tp->e_nsap, (char *)nsap, nlen + 1);
+	memcpy((char *)tp->e_nsap, (const char *)nsap, nlen + 1);
 	tp->e_nxt = (struct enamemem *)calloc(1, sizeof(*tp));
 	if (tp->e_nxt == NULL)
 		error("lookup_nsap: calloc");
@@ -400,10 +450,10 @@ lookup_protoid(const u_char *pi)
 	return tp;
 }
 
-char *
+const char *
 etheraddr_string(register const u_char *ep)
 {
-	register u_int i, j;
+	register u_int i;
 	register char *cp;
 	register struct enamemem *tp;
 	char buf[sizeof("00:00:00:00:00:00")];
@@ -411,31 +461,59 @@ etheraddr_string(register const u_char *ep)
 	tp = lookup_emem(ep);
 	if (tp->e_name)
 		return (tp->e_name);
-#ifdef HAVE_ETHER_NTOHOST
+#ifdef USE_ETHER_NTOHOST
 	if (!nflag) {
-		char buf[128];
-		if (ether_ntohost(buf, (struct ether_addr *)ep) == 0) {
-			tp->e_name = savestr(buf);
+		char buf2[128];
+		if (ether_ntohost(buf2, (const struct ether_addr *)ep) == 0) {
+			tp->e_name = strdup(buf2);
 			return (tp->e_name);
 		}
 	}
 #endif
 	cp = buf;
+        *cp++ = hex[*ep >> 4 ];
+	*cp++ = hex[*ep++ & 0xf];
+	for (i = 5; (int)--i >= 0;) {
+		*cp++ = ':';
+                *cp++ = hex[*ep >> 4 ];
+		*cp++ = hex[*ep++ & 0xf];
+	}
+	*cp = '\0';
+	tp->e_name = strdup(buf);
+	return (tp->e_name);
+}
+
+const char *
+linkaddr_string(const u_char *ep, const unsigned int len)
+{
+	register u_int i, j;
+	register char *cp;
+	register struct enamemem *tp;
+
+	if (len == 6)	/* XXX not totally correct... */
+		return etheraddr_string(ep);
+
+	tp = lookup_bytestring(ep, len);
+	if (tp->e_name)
+		return (tp->e_name);
+
+	tp->e_name = cp = (char *)malloc(len*3);
+	if (tp->e_name == NULL)
+		error("linkaddr_string: malloc");
 	if ((j = *ep >> 4) != 0)
 		*cp++ = hex[j];
 	*cp++ = hex[*ep++ & 0xf];
-	for (i = 5; (int)--i >= 0;) {
+	for (i = len-1; i > 0 ; --i) {
 		*cp++ = ':';
 		if ((j = *ep >> 4) != 0)
 			*cp++ = hex[j];
 		*cp++ = hex[*ep++ & 0xf];
 	}
 	*cp = '\0';
-	tp->e_name = savestr(buf);
 	return (tp->e_name);
 }
 
-char *
+const char *
 etherproto_string(u_short port)
 {
 	register char *cp;
@@ -457,11 +535,11 @@ etherproto_string(u_short port)
 	*cp++ = hex[port >> 4 & 0xf];
 	*cp++ = hex[port & 0xf];
 	*cp++ = '\0';
-	tp->name = savestr(buf);
+	tp->name = strdup(buf);
 	return (tp->name);
 }
 
-char *
+const char *
 protoid_string(register const u_char *pi)
 {
 	register u_int i, j;
@@ -484,14 +562,13 @@ protoid_string(register const u_char *pi)
 		*cp++ = hex[*pi++ & 0xf];
 	}
 	*cp = '\0';
-	tp->p_name = savestr(buf);
+	tp->p_name = strdup(buf);
 	return (tp->p_name);
 }
 
-char *
+const char *
 llcsap_string(u_char sap)
 {
-	register char *cp;
 	register struct hnamemem *tp;
 	register u_int32_t i = sap;
 	char buf[sizeof("sap 00")];
@@ -503,17 +580,12 @@ llcsap_string(u_char sap)
 	tp->addr = i;
 	tp->nxt = newhnamemem();
 
-	cp = buf;
-	(void)strcpy(cp, "sap ");
-	cp += strlen(cp);
-	*cp++ = hex[sap >> 4 & 0xf];
-	*cp++ = hex[sap & 0xf];
-	*cp++ = '\0';
-	tp->name = savestr(buf);
+	snprintf(buf, sizeof(buf), "sap %02x", sap & 0xff);
+	tp->name = strdup(buf);
 	return (tp->name);
 }
 
-char *
+const char *
 isonsap_string(const u_char *nsap)
 {
 	register u_int i, nlen = nsap[0];
@@ -538,7 +610,7 @@ isonsap_string(const u_char *nsap)
 	return (tp->e_name);
 }
 
-char *
+const char *
 tcpport_string(u_short port)
 {
 	register struct hnamemem *tp;
@@ -552,12 +624,12 @@ tcpport_string(u_short port)
 	tp->addr = i;
 	tp->nxt = newhnamemem();
 
-	(void)sprintf(buf, "%u", i);
-	tp->name = savestr(buf);
+	(void)snprintf(buf, sizeof(buf), "%u", i);
+	tp->name = strdup(buf);
 	return (tp->name);
 }
 
-char *
+const char *
 udpport_string(register u_short port)
 {
 	register struct hnamemem *tp;
@@ -571,8 +643,34 @@ udpport_string(register u_short port)
 	tp->addr = i;
 	tp->nxt = newhnamemem();
 
-	(void)sprintf(buf, "%u", i);
-	tp->name = savestr(buf);
+	(void)snprintf(buf, sizeof(buf), "%u", i);
+	tp->name = strdup(buf);
+	return (tp->name);
+}
+
+const char *
+ipxsap_string(u_short port)
+{
+	register char *cp;
+	register struct hnamemem *tp;
+	register u_int32_t i = port;
+	char buf[sizeof("0000")];
+
+	for (tp = &ipxsaptable[i & (HASHNAMESIZE-1)]; tp->nxt; tp = tp->nxt)
+		if (tp->addr == i)
+			return (tp->name);
+
+	tp->addr = i;
+	tp->nxt = newhnamemem();
+
+	cp = buf;
+	NTOHS(port);
+	*cp++ = hex[port >> 12 & 0xf];
+	*cp++ = hex[port >> 8 & 0xf];
+	*cp++ = hex[port >> 4 & 0xf];
+	*cp++ = hex[port & 0xf];
+	*cp++ = '\0';
+	tp->name = strdup(buf);
 	return (tp->name);
 }
 
@@ -597,10 +695,10 @@ init_servarray(void)
 		while (table->name)
 			table = table->nxt;
 		if (nflag) {
-			(void)sprintf(buf, "%d", port);
-			table->name = savestr(buf);
+			(void)snprintf(buf, sizeof(buf), "%d", port);
+			table->name = strdup(buf);
 		} else
-			table->name = savestr(sv->s_name);
+			table->name = strdup(sv->s_name);
 		table->addr = port;
 		table->nxt = newhnamemem();
 	}
@@ -608,7 +706,11 @@ init_servarray(void)
 }
 
 /*XXX from libbpfc.a */
+#ifndef WIN32
 extern struct eproto {
+#else
+__declspec( dllimport) struct eproto {
+#endif
 	char *s;
 	u_short p;
 } eproto_db[];
@@ -620,15 +722,27 @@ init_eprotoarray(void)
 	register struct hnamemem *table;
 
 	for (i = 0; eproto_db[i].s; i++) {
-		int j = ntohs(eproto_db[i].p) & (HASHNAMESIZE-1);
+		int j = htons(eproto_db[i].p) & (HASHNAMESIZE-1);
 		table = &eprototable[j];
 		while (table->name)
 			table = table->nxt;
 		table->name = eproto_db[i].s;
-		table->addr = ntohs(eproto_db[i].p);
+		table->addr = htons(eproto_db[i].p);
 		table->nxt = newhnamemem();
 	}
 }
+
+static struct protoidlist {
+	const u_char protoid[5];
+	const char *name;
+} protoidlist[] = {
+	{{ 0x00, 0x00, 0x0c, 0x01, 0x07 }, "CiscoMLS" },
+	{{ 0x00, 0x00, 0x0c, 0x20, 0x00 }, "CiscoCDP" },
+	{{ 0x00, 0x00, 0x0c, 0x20, 0x01 }, "CiscoCGMP" },
+	{{ 0x00, 0x00, 0x0c, 0x20, 0x03 }, "CiscoVTP" },
+	{{ 0x00, 0xe0, 0x2b, 0x00, 0xbb }, "ExtremeEDP" },
+	{{ 0x00, 0x00, 0x00, 0x00, 0x00 }, NULL }
+};
 
 /*
  * SNAP proto IDs with org code 0:0:0 are actually encapsulated Ethernet
@@ -639,6 +753,7 @@ init_protoidarray(void)
 {
 	register int i;
 	register struct protoidmem *tp;
+	struct protoidlist *pl;
 	u_char protoid[5];
 
 	protoid[0] = 0;
@@ -649,13 +764,22 @@ init_protoidarray(void)
 
 		memcpy((char *)&protoid[3], (char *)&etype, 2);
 		tp = lookup_protoid(protoid);
-		tp->p_name = savestr(eproto_db[i].s);
+		tp->p_name = strdup(eproto_db[i].s);
+	}
+	/* Hardwire some SNAP proto ID names */
+	for (pl = protoidlist; pl->name != NULL; ++pl) {
+		tp = lookup_protoid(pl->protoid);
+		/* Don't override existing name */
+		if (tp->p_name != NULL)
+			continue;
+
+		tp->p_name = pl->name;
 	}
 }
 
 static struct etherlist {
-	u_char addr[6];
-	char *name;
+	const u_char addr[6];
+	const char *name;
 } etherlist[] = {
 	{{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff }, "Broadcast" },
 	{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }, NULL }
@@ -680,7 +804,7 @@ init_etherarray(void)
 {
 	register struct etherlist *el;
 	register struct enamemem *tp;
-#ifdef HAVE_ETHER_NTOHOST
+#ifdef USE_ETHER_NTOHOST
 	char name[256];
 #else
 	register struct pcap_etherent *ep;
@@ -691,7 +815,7 @@ init_etherarray(void)
 	if (fp != NULL) {
 		while ((ep = pcap_next_etherent(fp)) != NULL) {
 			tp = lookup_emem(ep->addr);
-			tp->e_name = savestr(ep->name);
+			tp->e_name = strdup(ep->name);
 		}
 		(void)fclose(fp);
 	}
@@ -704,10 +828,10 @@ init_etherarray(void)
 		if (tp->e_name != NULL)
 			continue;
 
-#ifdef HAVE_ETHER_NTOHOST
+#ifdef USE_ETHER_NTOHOST
                 /* Use yp/nis version of name if available */
-                if (ether_ntohost(name, (struct ether_addr *)el->addr) == 0) {
-                        tp->e_name = savestr(name);
+                if (ether_ntohost(name, (const struct ether_addr *)el->addr) == 0) {
+                        tp->e_name = strdup(name);
 			continue;
 		}
 #endif
@@ -725,6 +849,9 @@ static struct tok llcsap_db[] = {
 	{ LLCSAP_RS511,		"eia-rs511" },
 	{ LLCSAP_ISO8208,	"x.25/llc2" },
 	{ LLCSAP_PROWAY,	"proway" },
+	{ LLCSAP_SNAP,		"snap" },
+	{ LLCSAP_IPX,		"IPX" },
+	{ LLCSAP_NETBEUI,	"netbeui" },
 	{ LLCSAP_ISONS,		"iso-clns" },
 	{ LLCSAP_GLOBAL,	"global" },
 	{ 0,			NULL }
@@ -746,6 +873,240 @@ init_llcsaparray(void)
 	}
 }
 
+static struct tok ipxsap_db[] = {
+	{ 0x0000, "Unknown" },
+	{ 0x0001, "User" },
+	{ 0x0002, "User Group" },
+	{ 0x0003, "PrintQueue" },
+	{ 0x0004, "FileServer" },
+	{ 0x0005, "JobServer" },
+	{ 0x0006, "Gateway" },
+	{ 0x0007, "PrintServer" },
+	{ 0x0008, "ArchiveQueue" },
+	{ 0x0009, "ArchiveServer" },
+	{ 0x000a, "JobQueue" },
+	{ 0x000b, "Administration" },
+	{ 0x000F, "Novell TI-RPC" },
+	{ 0x0017, "Diagnostics" },
+	{ 0x0020, "NetBIOS" },
+	{ 0x0021, "NAS SNA Gateway" },
+	{ 0x0023, "NACS AsyncGateway" },
+	{ 0x0024, "RemoteBridge/RoutingService" },
+	{ 0x0026, "BridgeServer" },
+	{ 0x0027, "TCP/IP Gateway" },
+	{ 0x0028, "Point-to-point X.25 BridgeServer" },
+	{ 0x0029, "3270 Gateway" },
+	{ 0x002a, "CHI Corp" },
+	{ 0x002c, "PC Chalkboard" },
+	{ 0x002d, "TimeSynchServer" },
+	{ 0x002e, "ARCserve5.0/PalindromeBackup" },
+	{ 0x0045, "DI3270 Gateway" },
+	{ 0x0047, "AdvertisingPrintServer" },
+	{ 0x004a, "NetBlazerModems" },
+	{ 0x004b, "BtrieveVAP" },
+	{ 0x004c, "NetwareSQL" },
+	{ 0x004d, "XtreeNetwork" },
+	{ 0x0050, "BtrieveVAP4.11" },
+	{ 0x0052, "QuickLink" },
+	{ 0x0053, "PrintQueueUser" },
+	{ 0x0058, "Multipoint X.25 Router" },
+	{ 0x0060, "STLB/NLM" },
+	{ 0x0064, "ARCserve" },
+	{ 0x0066, "ARCserve3.0" },
+	{ 0x0072, "WAN CopyUtility" },
+	{ 0x007a, "TES-NetwareVMS" },
+	{ 0x0092, "WATCOM Debugger/EmeraldTapeBackupServer" },
+	{ 0x0095, "DDA OBGYN" },
+	{ 0x0098, "NetwareAccessServer" },
+	{ 0x009a, "Netware for VMS II/NamedPipeServer" },
+	{ 0x009b, "NetwareAccessServer" },
+	{ 0x009e, "PortableNetwareServer/SunLinkNVT" },
+	{ 0x00a1, "PowerchuteAPC UPS" },
+	{ 0x00aa, "LAWserve" },
+	{ 0x00ac, "CompaqIDA StatusMonitor" },
+	{ 0x0100, "PIPE STAIL" },
+	{ 0x0102, "LAN ProtectBindery" },
+	{ 0x0103, "OracleDataBaseServer" },
+	{ 0x0107, "Netware386/RSPX RemoteConsole" },
+	{ 0x010f, "NovellSNA Gateway" },
+	{ 0x0111, "TestServer" },
+	{ 0x0112, "HP PrintServer" },
+	{ 0x0114, "CSA MUX" },
+	{ 0x0115, "CSA LCA" },
+	{ 0x0116, "CSA CM" },
+	{ 0x0117, "CSA SMA" },
+	{ 0x0118, "CSA DBA" },
+	{ 0x0119, "CSA NMA" },
+	{ 0x011a, "CSA SSA" },
+	{ 0x011b, "CSA STATUS" },
+	{ 0x011e, "CSA APPC" },
+	{ 0x0126, "SNA TEST SSA Profile" },
+	{ 0x012a, "CSA TRACE" },
+	{ 0x012b, "NetwareSAA" },
+	{ 0x012e, "IKARUS VirusScan" },
+	{ 0x0130, "CommunicationsExecutive" },
+	{ 0x0133, "NNS DomainServer/NetwareNamingServicesDomain" },
+	{ 0x0135, "NetwareNamingServicesProfile" },
+	{ 0x0137, "Netware386 PrintQueue/NNS PrintQueue" },
+	{ 0x0141, "LAN SpoolServer" },
+	{ 0x0152, "IRMALAN Gateway" },
+	{ 0x0154, "NamedPipeServer" },
+	{ 0x0166, "NetWareManagement" },
+	{ 0x0168, "Intel PICKIT CommServer/Intel CAS TalkServer" },
+	{ 0x0173, "Compaq" },
+	{ 0x0174, "Compaq SNMP Agent" },
+	{ 0x0175, "Compaq" },
+	{ 0x0180, "XTreeServer/XTreeTools" },
+	{ 0x018A, "NASI ServicesBroadcastServer" },
+	{ 0x01b0, "GARP Gateway" },
+	{ 0x01b1, "Binfview" },
+	{ 0x01bf, "IntelLanDeskManager" },
+	{ 0x01ca, "AXTEC" },
+	{ 0x01cb, "ShivaNetModem/E" },
+	{ 0x01cc, "ShivaLanRover/E" },
+	{ 0x01cd, "ShivaLanRover/T" },
+	{ 0x01ce, "ShivaUniversal" },
+	{ 0x01d8, "CastelleFAXPressServer" },
+	{ 0x01da, "CastelleLANPressPrintServer" },
+	{ 0x01dc, "CastelleFAX/Xerox7033 FaxServer/ExcelLanFax" },
+	{ 0x01f0, "LEGATO" },
+	{ 0x01f5, "LEGATO" },
+	{ 0x0233, "NMS Agent/NetwareManagementAgent" },
+	{ 0x0237, "NMS IPX Discovery/LANternReadWriteChannel" },
+	{ 0x0238, "NMS IP Discovery/LANternTrapAlarmChannel" },
+	{ 0x023a, "LANtern" },
+	{ 0x023c, "MAVERICK" },
+	{ 0x023f, "NovellSMDR" },
+	{ 0x024e, "NetwareConnect" },
+	{ 0x024f, "NASI ServerBroadcast Cisco" },
+	{ 0x026a, "NMS ServiceConsole" },
+	{ 0x026b, "TimeSynchronizationServer Netware 4.x" },
+	{ 0x0278, "DirectoryServer Netware 4.x" },
+	{ 0x027b, "NetwareManagementAgent" },
+	{ 0x0280, "Novell File and Printer Sharing Service for PC" },
+	{ 0x0304, "NovellSAA Gateway" },
+	{ 0x0308, "COM/VERMED" },
+	{ 0x030a, "GalacticommWorldgroupServer" },
+	{ 0x030c, "IntelNetport2/HP JetDirect/HP Quicksilver" },
+	{ 0x0320, "AttachmateGateway" },
+	{ 0x0327, "MicrosoftDiagnostiocs" },
+	{ 0x0328, "WATCOM SQL Server" },
+	{ 0x0335, "MultiTechSystems MultisynchCommServer" },
+	{ 0x0343, "Xylogics RemoteAccessServer/LANModem" },
+	{ 0x0355, "ArcadaBackupExec" },
+	{ 0x0358, "MSLCD1" },
+	{ 0x0361, "NETINELO" },
+	{ 0x037e, "Powerchute UPS Monitoring" },
+	{ 0x037f, "ViruSafeNotify" },
+	{ 0x0386, "HP Bridge" },
+	{ 0x0387, "HP Hub" },
+	{ 0x0394, "NetWare SAA Gateway" },
+	{ 0x039b, "LotusNotes" },
+	{ 0x03b7, "CertusAntiVirus" },
+	{ 0x03c4, "ARCserve4.0" },
+	{ 0x03c7, "LANspool3.5" },
+	{ 0x03d7, "LexmarkPrinterServer" },
+	{ 0x03d8, "LexmarkXLE PrinterServer" },
+	{ 0x03dd, "BanyanENS NetwareClient" },
+	{ 0x03de, "GuptaSequelBaseServer/NetWareSQL" },
+	{ 0x03e1, "UnivelUnixware" },
+	{ 0x03e4, "UnivelUnixware" },
+	{ 0x03fc, "IntelNetport" },
+	{ 0x03fd, "PrintServerQueue" },
+	{ 0x040A, "ipnServer" },
+	{ 0x040D, "LVERRMAN" },
+	{ 0x040E, "LVLIC" },
+	{ 0x0414, "NET Silicon (DPI)/Kyocera" },
+	{ 0x0429, "SiteLockVirus" },
+	{ 0x0432, "UFHELPR???" },
+	{ 0x0433, "Synoptics281xAdvancedSNMPAgent" },
+	{ 0x0444, "MicrosoftNT SNA Server" },
+	{ 0x0448, "Oracle" },
+	{ 0x044c, "ARCserve5.01" },
+	{ 0x0457, "CanonGP55" },
+	{ 0x045a, "QMS Printers" },
+	{ 0x045b, "DellSCSI Array" },
+	{ 0x0491, "NetBlazerModems" },
+	{ 0x04ac, "OnTimeScheduler" },
+	{ 0x04b0, "CD-Net" },
+	{ 0x0513, "EmulexNQA" },
+	{ 0x0520, "SiteLockChecks" },
+	{ 0x0529, "SiteLockChecks" },
+	{ 0x052d, "CitrixOS2 AppServer" },
+	{ 0x0535, "Tektronix" },
+	{ 0x0536, "Milan" },
+	{ 0x055d, "Attachmate SNA gateway" },
+	{ 0x056b, "IBM8235 ModemServer" },
+	{ 0x056c, "ShivaLanRover/E PLUS" },
+	{ 0x056d, "ShivaLanRover/T PLUS" },
+	{ 0x0580, "McAfeeNetShield" },
+	{ 0x05B8, "NLM to workstation communication (Revelation Software)" },
+	{ 0x05BA, "CompatibleSystemsRouters" },
+	{ 0x05BE, "CheyenneHierarchicalStorageManager" },
+	{ 0x0606, "JCWatermarkImaging" },
+	{ 0x060c, "AXISNetworkPrinter" },
+	{ 0x0610, "AdaptecSCSIManagement" },
+	{ 0x0621, "IBM AntiVirus" },
+	{ 0x0640, "Windows95 RemoteRegistryService" },
+	{ 0x064e, "MicrosoftIIS" },
+	{ 0x067b, "Microsoft Win95/98 File and Print Sharing for NetWare" },
+	{ 0x067c, "Microsoft Win95/98 File and Print Sharing for NetWare" },
+	{ 0x076C, "Xerox" },
+	{ 0x079b, "ShivaLanRover/E 115" },
+	{ 0x079c, "ShivaLanRover/T 115" },
+	{ 0x07B4, "CubixWorldDesk" },
+	{ 0x07c2, "Quarterdeck IWare Connect V2.x NLM" },
+	{ 0x07c1, "Quarterdeck IWare Connect V3.x NLM" },
+	{ 0x0810, "ELAN License Server Demo" },
+	{ 0x0824, "ShivaLanRoverAccessSwitch/E" },
+	{ 0x086a, "ISSC Collector" },
+	{ 0x087f, "ISSC DAS AgentAIX" },
+	{ 0x0880, "Intel Netport PRO" },
+	{ 0x0881, "Intel Netport PRO" },
+	{ 0x0b29, "SiteLock" },
+	{ 0x0c29, "SiteLockApplications" },
+	{ 0x0c2c, "LicensingServer" },
+	{ 0x2101, "PerformanceTechnologyInstantInternet" },
+	{ 0x2380, "LAI SiteLock" },
+	{ 0x238c, "MeetingMaker" },
+	{ 0x4808, "SiteLockServer/SiteLockMetering" },
+	{ 0x5555, "SiteLockUser" },
+	{ 0x6312, "Tapeware" },
+	{ 0x6f00, "RabbitGateway" },
+	{ 0x7703, "MODEM" },
+	{ 0x8002, "NetPortPrinters" },
+	{ 0x8008, "WordPerfectNetworkVersion" },
+	{ 0x85BE, "Cisco EIGRP" },
+	{ 0x8888, "WordPerfectNetworkVersion/QuickNetworkManagement" },
+	{ 0x9000, "McAfeeNetShield" },
+	{ 0x9604, "CSA-NT_MON" },
+	{ 0xb6a8, "OceanIsleReachoutRemoteControl" },
+	{ 0xf11f, "SiteLockMetering" },
+	{ 0xf1ff, "SiteLock" },
+	{ 0xf503, "Microsoft SQL Server" },
+	{ 0xF905, "IBM TimeAndPlace" },
+	{ 0xfbfb, "TopCallIII FaxServer" },
+	{ 0xffff, "AnyService/Wildcard" },
+	{ 0, (char *)0 }
+};
+
+static void
+init_ipxsaparray(void)
+{
+	register int i;
+	register struct hnamemem *table;
+
+	for (i = 0; ipxsap_db[i].s != NULL; i++) {
+		int j = htons(ipxsap_db[i].v) & (HASHNAMESIZE-1);
+		table = &ipxsaptable[j];
+		while (table->name)
+			table = table->nxt;
+		table->name = ipxsap_db[i].s;
+		table->addr = htons(ipxsap_db[i].v);
+		table->nxt = newhnamemem();
+	}
+}
+
 /*
  * Initialize the address to name translation machinery.  We map all
  * non-local IP addresses to numeric addresses if fflag is true (i.e.,
@@ -755,7 +1116,6 @@ init_llcsaparray(void)
 void
 init_addrtoname(u_int32_t localnet, u_int32_t mask)
 {
-	netmask = mask;
 	if (fflag) {
 		f_localnet = localnet;
 		f_netmask = mask;
@@ -771,9 +1131,10 @@ init_addrtoname(u_int32_t localnet, u_int32_t mask)
 	init_eprotoarray();
 	init_llcsaparray();
 	init_protoidarray();
+	init_ipxsaparray();
 }
 
-char *
+const char *
 dnaddr_string(u_short dnaddr)
 {
 	register struct hnamemem *tp;

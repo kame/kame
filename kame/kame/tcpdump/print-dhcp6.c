@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -26,196 +26,473 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * RFC3315: DHCPv6
+ * supported DHCPv6 options: 
+ *  RFC3319,
+ *  draft-ietf-dhc-dhcpv6-opt-dnsconfig-04.txt,
+ *  draft-ietf-dhc-dhcpv6-opt-prefix-delegation-05.txt
+ *  draft-ietf-dhc-dhcpv6-opt-timeconfig-02.txt,
+ */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.5 1999/11/02 14:55:01 itojun Exp $";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-dhcp6.c,v 1.27.2.4 2003/11/18 23:26:14 guy Exp $";
 #endif
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-
-#if __STDC__
-struct mbuf;
-struct rtentry;
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include <net/if.h>
 
-#include <netinet/in.h>
+#include <tcpdump-stdinc.h>
 
-#include <ctype.h>
-#ifdef HAVE_MEMORY_H
-#include <memory.h>
-#endif
 #include <stdio.h>
 #include <string.h>
-#include <arpa/inet.h>
 
 #include "interface.h"
 #include "addrtoname.h"
-#include "dhcp6.h"
-#include "dhcp6opt.h"
+#include "extract.h"
 
-#if 0
-static void dhcp6opttab_init __P((void));
-static struct dhcp6_opt *dhcp6opttab_byname __P((char *));
-#endif
-static struct dhcp6_opt *dhcp6opttab_bycode __P((u_int));
+/* lease duration */
+#define DHCP6_DURATITION_INFINITE 0xffffffff
 
-static char tstr[] = " [|dhcp6]";
+/* Error Values */
+#define DH6ERR_FAILURE		16
+#define DH6ERR_AUTHFAIL		17
+#define DH6ERR_POORLYFORMED	18
+#define DH6ERR_UNAVAIL		19
+#define DH6ERR_OPTUNAVAIL	20
 
-static struct dhcp6_opt dh6opttab[] = {
-	/* IP Address Extension */
-	{ 1, OL6_N,	"IP Address",			OT6_NONE, },
+/* Message type */
+#define DH6_SOLICIT	1
+#define DH6_ADVERTISE	2
+#define DH6_REQUEST	3
+#define DH6_CONFIRM	4
+#define DH6_RENEW	5
+#define DH6_REBIND	6
+#define DH6_REPLY	7
+#define DH6_RELEASE	8
+#define DH6_DECLINE	9
+#define DH6_RECONFIGURE	10
+#define DH6_INFORM_REQ	11
+#define DH6_RELAY_FORW	12
+#define DH6_RELAY_REPLY	13
 
-	/* General Extension */
-	{ 2, 4,		"Time Offset",			OT6_NUM, },
-	{ 3, OL6_N,	"IEEE 1003.1 POSIX Timezone",	OT6_STR, },
-	{ 6, OL6_16N,	"Domain Name Server",		OT6_V6, },
-	{ 10, OL6_N,	"Domain Name",			OT6_STR, },
+/* DHCP6 base packet format */
+struct dhcp6 {
+	union {
+		u_int8_t m;
+		u_int32_t x;
+	} dh6_msgtypexid;
+	/* options follow */
+};
+#define dh6_msgtype	dh6_msgtypexid.m
+#define dh6_xid		dh6_msgtypexid.x
+#define DH6_XIDMASK	0x00ffffff
 
-	/* Application and Service Parameters */
-	{ 16, OL6_N,	"Directory Agent",		OT6_NONE, },
-	{ 17, OL6_N,	"Service Scope"	,		OT6_NONE, },
-	{ 18, OL6_16N,	"Network Time Protocol Servers", OT6_V6, },
-	{ 19, OL6_N,	"NIS Domain",			OT6_STR, },
-	{ 20, OL6_16N,	"NIS Servers",			OT6_V6, },
-	{ 21, OL6_N,	"NIS+ Domain",			OT6_STR, },
-	{ 22, OL6_16N,	"NIS+ Servers",			OT6_V6, },
-
-	/* TCP Parameters */
-	{ 32, 4,	"TCP Keepalive Interval",	OT6_NUM, },
-
-	/* DHCPv6 Extensions */
-	{ 40, 4,	"Maximum DHCPv6 Message Size",	OT6_NUM, },
-	{ 41, OL6_N,	"DHCP Retransmission and Configuration Parameter",
-							OT6_NONE, },
-	{ 48, OL6_N,	"Platform Specific Information", OT6_NONE, },
-	{ 49, OL6_N,	"Platform Class Identifier",	OT6_STR, },
-	{ 64, OL6_N,	"Class Identifier",		OT6_STR, },
-	{ 66, 16,	"Reconfigure Multicast Address", OT6_V6, },
-	{ 67, 16,	"Renumber DHCPv6 Server Address",
-							OT6_V6, },
-	{ 68, OL6_N,	"DHCP Relay ICMP Error Message", OT6_NONE, },
-	{ 84, OL6_N,	"Client-Server Authentication",	OT6_NONE, },
-	{ 85, 4,	"Client Key Selection",		OT6_NUM, },
-
-	/* End Extension */
-	{ 65536, OL6_Z,	"End",				OT6_NONE, },
-
-	{ 0 },
+/* DHCPv6 relay messages */
+struct dhcp6_relay {
+	u_int8_t dh6relay_msgtype;
+	u_int8_t dh6relay_hcnt;
+	u_int8_t dh6relay_linkaddr[16];	/* XXX: badly aligned */
+	u_int8_t dh6relay_peeraddr[16];
+	/* options follow */
 };
 
-#if 0
-static struct dhcp6_opt *dh6o_pad;
-static struct dhcp6_opt *dh6o_end;
+/* options */
+#define DH6OPT_CLIENTID	1
+#define DH6OPT_SERVERID	2
+#define DH6OPT_IA_NA 3
+#define DH6OPT_IA_TMP 4
+#define DH6OPT_IADDR 5
+#define DH6OPT_ORO 6
+#define DH6OPT_PREFERENCE 7
+#  define DH6OPT_PREF_UNDEF -1
+#  define DH6OPT_PREF_MAX 255
+#define DH6OPT_ELAPSED_TIME 8
+#define DH6OPT_RELAY_MSG 9
+/*#define DH6OPT_SERVER_MSG 10 deprecated */
+#define DH6OPT_AUTH 11
+#define DH6OPT_UNICAST 12
+#define DH6OPT_STATUS_CODE 13
+#  define DH6OPT_STCODE_SUCCESS 0
+#  define DH6OPT_STCODE_UNSPECFAIL 1
+#  define DH6OPT_STCODE_NOADDRAVAIL 2
+#  define DH6OPT_STCODE_NOBINDING 3
+#  define DH6OPT_STCODE_NOTONLINK 4
+#  define DH6OPT_STCODE_USEMULTICAST 5
+#  define DH6OPT_STCODE_NOPREFIXAVAIL 6
+#define DH6OPT_RAPID_COMMIT 14
+#define DH6OPT_USER_CLASS 15
+#define DH6OPT_VENDOR_CLASS 16
+#define DH6OPT_VENDOR_OPTS 17
+#define DH6OPT_INTERFACE_ID 18
+#define DH6OPT_RECONF_MSG 19
+#define DH6OPT_RECONF_ACCEPT 20
+#define DH6OPT_SIP_SERVER_D 21
+#define DH6OPT_SIP_SERVER_A 22
+#define DH6OPT_DNS 23
+#define DH6OPT_DNSNAME 24
+
+/*
+ * The option type has not been assigned for the following options.
+ * We temporarily adopt values used in the service specification document
+ * (200206xx version) by NTT Communications.
+ * Note that we'll change the following definitions if different type values
+ * are officially assigned.
+ */
+#define DH6OPT_PREFIX_DELEGATION 30
+#define DH6OPT_PREFIX_INFORMATION 31
+#define DH6OPT_PREFIX_REQUEST 32
+
+/*
+ * The followings are also unassigned numbers.
+ * We temporarily use values as of KAME snap 20031013.
+ */
+#define DH6OPT_IA_PD 33
+#define DH6OPT_IA_PD_PREFIX 34
+#define DH6OPT_NTP_SERVERS 35
+
+struct dhcp6opt {
+	u_int16_t dh6opt_type;
+	u_int16_t dh6opt_len;
+	/* type-dependent data follows */
+};
+
+struct dhcp6_ia {
+	u_int16_t dh6opt_ia_type;
+	u_int16_t dh6opt_ia_len;
+	u_int32_t dh6opt_ia_iaid;
+	u_int32_t dh6opt_ia_t1;
+	u_int32_t dh6opt_ia_t2;
+};
+
+struct dhcp6_ia_prefix {
+	u_int16_t dh6opt_ia_prefix_type;
+	u_int16_t dh6opt_ia_prefix_len;
+	u_int32_t dh6opt_ia_prefix_pltime;
+	u_int32_t dh6opt_ia_prefix_vltime;
+	u_int8_t dh6opt_ia_prefix_plen;
+	struct in6_addr dh6opt_ia_prefix_addr;
+}  __attribute__ ((__packed__));
+
+static const char *
+dhcp6opt_name(int type)
+{
+	static char genstr[sizeof("opt_65535") + 1]; /* XXX thread unsafe */
+
+	if (type > 65535)
+		return "INVALID option";
+
+	switch(type) {
+	case DH6OPT_CLIENTID:
+		return "client ID";
+	case DH6OPT_SERVERID:
+		return "server ID";
+	case DH6OPT_IA_NA:
+		return "IA_NA";
+	case DH6OPT_ORO:
+		return "option request";
+	case DH6OPT_PREFERENCE:
+		return "preference";
+	case DH6OPT_ELAPSED_TIME:
+		return "elapsed time";
+	case DH6OPT_RELAY_MSG:
+		return "relay message";
+	case DH6OPT_STATUS_CODE:
+		return "status code";
+	case DH6OPT_RAPID_COMMIT:
+		return "rapid commit";
+	case DH6OPT_INTERFACE_ID:
+		return "interface ID";
+	case DH6OPT_RECONF_MSG:
+		return "reconfigure message";
+	case DH6OPT_RECONF_ACCEPT:
+		return "reconfigure accept";
+	case DH6OPT_SIP_SERVER_D:
+		return "SIP Servers Domain";
+	case DH6OPT_SIP_SERVER_A:
+		return "SIP Servers Address";
+	case DH6OPT_DNS:
+		return "DNS";
+	case DH6OPT_PREFIX_DELEGATION:
+		return "prefix delegation";
+	case DH6OPT_PREFIX_INFORMATION:
+		return "prefix information";
+	case DH6OPT_IA_PD:
+		return "IA_PD";
+	case DH6OPT_IA_PD_PREFIX:
+		return "IA_PD prefix";
+	case DH6OPT_NTP_SERVERS:
+		return "NTP Server";
+	default:
+		snprintf(genstr, sizeof(genstr), "opt_%d", type);
+		return(genstr);
+	}
+}
+
+static const char *
+dhcp6stcode(int code)
+{
+	static char genstr[sizeof("code255") + 1]; /* XXX thread unsafe */
+
+	if (code > 255)
+		return "INVALID code";
+
+	switch(code) {
+	case DH6OPT_STCODE_SUCCESS:
+		return "success";
+	case DH6OPT_STCODE_UNSPECFAIL:
+		return "unspec failure";
+	case DH6OPT_STCODE_NOADDRAVAIL:
+		return "no addresses";
+	case DH6OPT_STCODE_NOBINDING:
+		return "no binding";
+	case DH6OPT_STCODE_NOTONLINK:
+		return "not on-link";
+	case DH6OPT_STCODE_USEMULTICAST:
+		return "use multicast";
+	case DH6OPT_STCODE_NOPREFIXAVAIL:
+		return "no prefixes";
+	default:
+		snprintf(genstr, sizeof(genstr), "code%d", code);
+		return(genstr);
+	}
+}
 
 static void
-dhcp6opttab_init()
+dhcp6opt_print(const u_char *cp, const u_char *ep)
 {
-	dh6o_pad = dhcp6opttab_bycode(0);
-	dh6o_end = dhcp6opttab_bycode(65536);
-}
-#endif
-
-#if 0
-static struct dhcp6_opt *
-dhcp6opttab_byname(name)
-	char *name;
-{
-	struct dhcp6_opt *p;
-
-	for (p = dh6opttab; p->code; p++)
-		if (strcmp(name, p->name) == 0)
-			return p;
-	return NULL;
-}
-#endif
-
-static struct dhcp6_opt *
-dhcp6opttab_bycode(code)
-	u_int code;
-{
-	struct dhcp6_opt *p;
-
-	for (p = dh6opttab; p->code; p++)
-		if (p->code == code)
-			return p;
-	return NULL;
-}
-
-static void
-dhcp6ext_print(u_char *cp, u_char *ep)
-{
-	u_int16_t code, len;
-	struct dhcp6_opt *p;
-	char buf[BUFSIZ];
-	int i;
+	struct dhcp6opt *dh6o;
+	u_char *tp;
+	size_t i;
+	u_int16_t opttype;
+	size_t optlen;
+	u_int16_t val16;
+	u_int32_t val32;
+	struct in6_addr addr6;
+	struct dhcp6_ia ia;
+	struct dhcp6_ia_prefix ia_prefix;
 
 	if (cp == ep)
 		return;
-	printf(" ");
 	while (cp < ep) {
-		code = ntohs(*(u_int16_t *)&cp[0]);
-		if (code != 65535)
-			len = ntohs(*(u_int16_t *)&cp[2]);
-		else
-			len = 0;
-		p = dhcp6opttab_bycode(code);
-		if (p == NULL) {
-			printf("(unknown, len=%d)", len);
-			cp += len + 4;
-			continue;
-		}
-
-		/* sanity check on length */
-		switch (p->len) {
-		case OL6_N:
-			break;
-		case OL6_16N:
-			if (len % 16 != 0)
-				goto trunc;
-			break;
-		case OL6_Z:
-			if (len != 0)
-				goto trunc;
-			break;
-		default:
-			if (len != p->len)
-				goto trunc;
-			break;
-		}
-		if (cp + 4 + len > ep) {
-			printf("[|%s]", p->name);
-			return;
-		}
-
-		printf("(%s, ", p->name);
-		switch (p->type) {
-		case OT6_V6:
-			for (i = 0; i < len; i += 16) {
-				inet_ntop(AF_INET6, &cp[4 + i], buf,
-					sizeof(buf));
-				if (i != 0)
-					printf(",");
-				printf("%s", buf);
+		if (ep < cp + sizeof(*dh6o))
+			goto trunc;
+		dh6o = (struct dhcp6opt *)cp;
+		optlen = EXTRACT_16BITS(&dh6o->dh6opt_len);
+		if (ep < cp + sizeof(*dh6o) + optlen)
+			goto trunc;
+		opttype = EXTRACT_16BITS(&dh6o->dh6opt_type);
+		printf(" (%s", dhcp6opt_name(opttype));
+		switch (opttype) {
+		case DH6OPT_CLIENTID:
+		case DH6OPT_SERVERID:
+			if (optlen < 2) {
+				/*(*/
+				printf(" ?)");
+				break;
+			}
+			tp = (u_char *)(dh6o + 1);
+			switch (EXTRACT_16BITS(tp)) {
+			case 1:
+				if (optlen >= 2 + 6) {
+					printf(" hwaddr/time type %u time %u ",
+					    EXTRACT_16BITS(&tp[2]),
+					    EXTRACT_32BITS(&tp[4]));
+					for (i = 8; i < optlen; i++)
+						printf("%02x", tp[i]);
+					/*(*/
+					printf(")");
+				} else {
+					/*(*/
+					printf(" ?)");
+				}
+				break;
+			case 2:
+				if (optlen >= 2 + 8) {
+					printf(" vid ");
+					for (i = 2; i < 2 + 8; i++)
+						printf("%02x", tp[i]);
+					/*(*/
+					printf(")");
+				} else {
+					/*(*/
+					printf(" ?)");
+				}
+				break;
+			case 3:
+				if (optlen >= 2 + 2) {
+					printf(" hwaddr type %u ",
+					    EXTRACT_16BITS(&tp[2]));
+					for (i = 4; i < optlen; i++)
+						printf("%02x", tp[i]);
+					/*(*/
+					printf(")");
+				} else {
+					/*(*/
+					printf(" ?)");
+				}
+				break;
+			default:
+				printf(" type %d)", EXTRACT_16BITS(tp));
+				break;
 			}
 			break;
-		case OT6_STR:
-			memset(&buf, 0, sizeof(buf));
-			strncpy(buf, &cp[4], len);
-			printf("%s", buf);
+		case DH6OPT_ORO:
+			if (optlen % 2) {
+				printf(" ?)");
+				break;
+			}
+			tp = (u_char *)(dh6o + 1);
+			for (i = 0; i < optlen; i += 2) {
+				u_int16_t opt;
+
+				memcpy(&opt, &tp[i], sizeof(opt));
+				printf(" %s", dhcp6opt_name(ntohs(opt)));
+			}
+			printf(")");
 			break;
-		case OT6_NUM:
-			printf("%d", (u_int32_t)ntohl(*(u_int32_t *)&cp[4]));
+		case DH6OPT_PREFERENCE:
+			if (optlen != 1) {
+				printf(" ?)");
+				break;
+			}
+			printf(" %d)", *((u_char *)(dh6o + 1) + 1));
+			break;
+		case DH6OPT_ELAPSED_TIME:
+			if (optlen != 2) {
+				printf(" ?)");
+				break;
+			}
+			memcpy(&val16, dh6o + 1, sizeof(val16));
+			val16 = ntohs(val16);
+			printf(" %d)", (int)val16);
+			break;
+		case DH6OPT_RELAY_MSG:
+			printf(" (");
+			dhcp6_print((const u_char *)(dh6o + 1), optlen);
+			printf(")");
+			break;
+		case DH6OPT_RAPID_COMMIT: /* nothing todo */
+			printf(")");
+			break;
+		case DH6OPT_INTERFACE_ID:
+			/*
+			 * Since we cannot predict the encoding, print hex dump
+			 * at most 10 characters.
+			 */
+			for (i = 0; i < optlen && i < 10; i++)
+				printf("%02x", ((u_char *)(dh6o + 1))[i]);
+			break;
+		case DH6OPT_RECONF_MSG:
+			tp = (u_char *)(dh6o + 1);
+			switch (*tp) {
+			case DH6_RENEW:
+				printf(" for renew)");
+				break;
+			case DH6_INFORM_REQ:
+				printf(" for inf-req)");
+				break;
+			default:
+				printf(" for ?\?\?(%02x))", *tp);
+				break;
+			}
+			break;
+		case DH6OPT_RECONF_ACCEPT: /* nothing todo */
+			printf(")");
+			break;
+		case DH6OPT_SIP_SERVER_A:
+		case DH6OPT_DNS:
+		case DH6OPT_NTP_SERVERS:
+			if (optlen % 16) {
+				printf(" ?)");
+				break;
+			}
+			tp = (u_char *)(dh6o + 1);
+			for (i = 0; i < optlen; i += 16)
+				printf(" %s", ip6addr_string(&tp[i]));
+			printf(")");
+			break;
+		case DH6OPT_PREFIX_DELEGATION:
+			dhcp6opt_print((u_char *)(dh6o + 1),
+			    (u_char *)(dh6o + 1) + optlen);
+			printf(")");
+			break;
+		case DH6OPT_PREFIX_INFORMATION:
+			if (optlen % 21)
+				printf(" ?)");
+			memcpy(&addr6, (u_char *)(dh6o + 1) + 5,
+			    sizeof(addr6));
+			printf(" %s/%d", ip6addr_string(&addr6),
+			    (int)*((u_char *)(dh6o + 1) + 4));
+			memcpy(&val32, dh6o + 1, sizeof(val32));
+			val32 = ntohl(val32);
+			if (val32 == DHCP6_DURATITION_INFINITE)
+				printf(" lease-duration: infinite)");
+			else
+				printf(" lease-duration: %u)", val32);
+			break;
+		case DH6OPT_STATUS_CODE:
+			if (optlen < 2) {
+				printf(" ?)");
+				break;
+			}
+			memcpy(&val16, (u_char *)(dh6o + 1), sizeof(val16));
+			val16 = ntohs(val16);
+			printf(" %s)", dhcp6stcode(val16));
+			break;
+		case DH6OPT_IA_NA:
+		case DH6OPT_IA_PD:
+			if (optlen < sizeof(ia) - 4) {
+				printf(" ?)");
+				break;
+			}
+			memcpy(&ia, (u_char *)dh6o, sizeof(ia));
+			ia.dh6opt_ia_iaid = ntohl(ia.dh6opt_ia_iaid);
+			ia.dh6opt_ia_t1 = ntohl(ia.dh6opt_ia_t1);
+			ia.dh6opt_ia_t2 = ntohl(ia.dh6opt_ia_t2);
+			printf(" IAID:%lu T1:%lu T2:%lu",
+			    (unsigned long)ia.dh6opt_ia_iaid,
+			    (unsigned long)ia.dh6opt_ia_t1,
+			    (unsigned long)ia.dh6opt_ia_t2);
+			if (optlen > sizeof(ia) - 4) {
+				/* there are sub-options */
+				dhcp6opt_print((u_char *)dh6o + sizeof(ia),
+				    (u_char *)(dh6o + 1) + optlen);
+			}
+			printf(")");
+			break;
+		case DH6OPT_IA_PD_PREFIX:
+			if (optlen < sizeof(ia_prefix) - 4) {
+				printf(" ?)");
+				break;
+			}
+			memcpy(&ia_prefix, (u_char *)dh6o, sizeof(ia_prefix));
+			printf(" %s/%d",
+			    ip6addr_string(&ia_prefix.dh6opt_ia_prefix_addr),
+			    ia_prefix.dh6opt_ia_prefix_plen);
+			ia_prefix.dh6opt_ia_prefix_pltime =
+			    ntohl(ia_prefix.dh6opt_ia_prefix_pltime);
+			ia_prefix.dh6opt_ia_prefix_vltime =
+			    ntohl(ia_prefix.dh6opt_ia_prefix_vltime);
+			printf(" pltime:%lu vltime:%lu",
+			    (unsigned long)ia_prefix.dh6opt_ia_prefix_pltime,
+			    (unsigned long)ia_prefix.dh6opt_ia_prefix_vltime);
+			if (optlen > sizeof(ia_prefix) - 4) {
+				/* there are sub-options */
+				dhcp6opt_print((u_char *)dh6o +
+				    sizeof(ia_prefix),
+				    (u_char *)(dh6o + 1) + optlen);
+			}
+			printf(")");
 			break;
 		default:
-			for (i = 0; i < len; i++)
-				printf("%02x", cp[4 + i] & 0xff);
+			printf(")");
+			break;
 		}
-		printf(")");
-		cp += len + 4;
+
+		cp += sizeof(*dh6o) + optlen;
 	}
 	return;
 
@@ -224,115 +501,109 @@ trunc:
 }
 
 /*
- * Print dhcp6 requests
+ * Print dhcp6 packets
  */
 void
-dhcp6_print(register const u_char *cp, u_int length,
-	    u_short sport, u_short dport)
+dhcp6_print(const u_char *cp, u_int length)
 {
-	union dhcp6 *dh6;
-	u_char *ep;
+	struct dhcp6 *dh6;
+	struct dhcp6_relay *dh6relay;
+	const u_char *ep;
 	u_char *extp;
+	const char *name;
 
 	printf("dhcp6");
 
 	ep = (u_char *)snapend;
+	if (cp + length < ep)
+		ep = cp + length;
 
-	dh6 = (union dhcp6 *)cp;
-	TCHECK(dh6->dh6_msgtype);
+	dh6 = (struct dhcp6 *)cp;
+	dh6relay = (struct dhcp6_relay *)cp;
+	TCHECK(dh6->dh6_xid);
 	switch (dh6->dh6_msgtype) {
 	case DH6_SOLICIT:
-		if (vflag && TTEST(dh6->dh6_sol.dh6sol_relayaddr)) {
-			printf(" solicit(");
-			if ((dh6->dh6_sol.dh6sol_flags & DH6SOL_CLOSE) != 0)
-				printf("C");
-			if (dh6->dh6_sol.dh6sol_flags != 0)
-				printf(" ");
-			printf("cliaddr=%s",
-				ip6addr_string(&dh6->dh6_sol.dh6sol_cliaddr));
-			printf(" relayaddr=%s", 
-				ip6addr_string(&dh6->dh6_sol.dh6sol_relayaddr));
-			printf(")");
-		} else
-			printf(" solicit");
+		name = "solicit";
 		break;
-	case DH6_ADVERT:
-		if (!(vflag && TTEST(dh6->dh6_adv.dh6adv_serveraddr))) {
-			printf(" advert");
-			break;
-		}
-		printf(" advert(");
-		if ((dh6->dh6_adv.dh6adv_flags & DH6ADV_SERVPRESENT) != 0)
-			printf("S");
-		if (dh6->dh6_adv.dh6adv_flags != 0)
-			printf(" ");
-		printf("pref=%u", dh6->dh6_adv.dh6adv_pref);
-		printf(" cliaddr=%s",
-			ip6addr_string(&dh6->dh6_adv.dh6adv_cliaddr));
-		printf(" relayaddr=%s", 
-			ip6addr_string(&dh6->dh6_adv.dh6adv_relayaddr));
-		printf(" servaddr=%s", 
-			ip6addr_string(&dh6->dh6_adv.dh6adv_serveraddr));
-		extp = (u_char *)((&dh6->dh6_adv) + 1);
-		dhcp6ext_print(extp, ep);
-		printf(")");
+	case DH6_ADVERTISE:
+		name = "advertise";
 		break;
 	case DH6_REQUEST:
-		if (!(vflag && TTEST(dh6->dh6_req.dh6req_relayaddr))) {
-			printf(" request");
-			break;
-		}
-		printf(" request(");
-		if ((dh6->dh6_req.dh6req_flags & DH6REQ_CLOSE) != 0)
-			printf("C");
-		if ((dh6->dh6_req.dh6req_flags & DH6REQ_SERVPRESENT) != 0)
-			printf("S");
-		if ((dh6->dh6_req.dh6req_flags & DH6REQ_REBOOT) != 0)
-			printf("R");
-		if (dh6->dh6_req.dh6req_flags != 0)
-			printf(" ");
-		printf("xid=0x%04x", dh6->dh6_req.dh6req_xid);
-		printf(" cliaddr=%s",
-			ip6addr_string(&dh6->dh6_req.dh6req_cliaddr));
-		printf(" relayaddr=%s", 
-			ip6addr_string(&dh6->dh6_req.dh6req_relayaddr));
-		extp = (char *)((&dh6->dh6_req) + 1);
-		if ((dh6->dh6_req.dh6req_flags & DH6REQ_SERVPRESENT) != 0) {
-			printf(" servaddr=%s", ip6addr_string(extp));
-			extp += 16;
-		}
-		dhcp6ext_print(extp, ep);
-		printf(")");
+		name = "request";
+		break;
+	case DH6_CONFIRM:
+		name = "confirm";
+		break;
+	case DH6_RENEW:
+		name = "renew";
+		break;
+	case DH6_REBIND:
+		name = "rebind";
 		break;
 	case DH6_REPLY:
-		if (!(vflag && TTEST(dh6->dh6_rep.dh6rep_xid))) {
-			printf(" reply");
-			break;
-		}
-		printf(" reply(");
-		if ((dh6->dh6_rep.dh6rep_flagandstat & DH6REP_CLIPRESENT) != 0)
-			printf("C");
-		if (dh6->dh6_rep.dh6rep_flagandstat != 0)
-			printf(" ");
-		printf("stat=0x%02x",
-			dh6->dh6_rep.dh6rep_flagandstat & DH6REP_STATMASK);
-		extp = (u_char *)((&dh6->dh6_rep) + 1);
-		if ((dh6->dh6_rep.dh6rep_flagandstat & DH6REP_CLIPRESENT) != 0) {
-			printf(" cliaddr=%s", ip6addr_string(extp));
-			extp += 16;
-		}
-		dhcp6ext_print(extp, ep);
-		printf(")");
+		name = "reply";
 		break;
 	case DH6_RELEASE:
-		printf(" release");
+		name = "release";
 		break;
-	case DH6_RECONFIG:
-		printf(" reconfig");
+	case DH6_DECLINE:
+		name = "decline";
+		break;
+	case DH6_RECONFIGURE:
+		name = "reconfigure";
+		break;
+	case DH6_INFORM_REQ:
+		name= "inf-req";
+		break;
+	case DH6_RELAY_FORW:
+		name= "relay-fwd";
+		break;
+	case DH6_RELAY_REPLY:
+		name= "relay-reply";
+		break;
+	default:
+		name = NULL;
 		break;
 	}
+
+	if (!vflag) {
+		if (name)
+			printf(" %s", name);
+		else if (dh6->dh6_msgtype != DH6_RELAY_FORW &&
+		    dh6->dh6_msgtype != DH6_RELAY_REPLY) {
+			printf(" msgtype-%u", dh6->dh6_msgtype);
+		}
+		return;
+	}
+
+	/* XXX relay agent messages have to be handled differently */
+
+	if (name)
+		printf(" %s (", name);	/*)*/
+	else
+		printf(" msgtype-%u (", dh6->dh6_msgtype);	/*)*/
+	if (dh6->dh6_msgtype != DH6_RELAY_FORW &&
+	    dh6->dh6_msgtype != DH6_RELAY_REPLY) {
+		printf("xid=%x", EXTRACT_32BITS(&dh6->dh6_xid) & DH6_XIDMASK);
+		extp = (u_char *)(dh6 + 1);
+		dhcp6opt_print(extp, ep);
+	} else {		/* relay messages */
+		struct in6_addr addr6;
+
+		TCHECK(dh6relay->dh6relay_peeraddr);
+
+		memcpy(&addr6, dh6relay->dh6relay_linkaddr, sizeof (addr6));
+		printf("linkaddr=%s", ip6addr_string(&addr6));
+
+		memcpy(&addr6, dh6relay->dh6relay_peeraddr, sizeof (addr6));
+		printf(" peeraddr=%s", ip6addr_string(&addr6));
+
+		dhcp6opt_print((u_char *)(dh6relay + 1), ep);
+	}
+	/*(*/
+	printf(")");
 	return;
 
 trunc:
-	printf("%s", tstr);
+	printf("[|dhcp6]");
 }

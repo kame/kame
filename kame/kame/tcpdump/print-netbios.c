@@ -23,24 +23,17 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-netbios.c,v 1.1.1.1 1999/08/08 23:32:07 itojun Exp $";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-netbios.c,v 1.18.2.2 2003/11/16 08:51:35 guy Exp $";
 #endif
 
-#include <sys/param.h>
-#include <sys/socket.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-#include <netinet/tcp.h>
+#include <tcpdump-stdinc.h>
 
-#ifdef __STDC__
 #include <stdlib.h>
-#endif
 #include <stdio.h>
 #include <string.h>
 

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.1.1.1 1999/08/08 23:31:57 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.7 2002/12/11 07:13:53 guy Exp $ */
 
 /* refer to RFC 2407 */
 
@@ -51,6 +51,9 @@
 #define   IPSECDOI_AH_MD5                              2
 #define   IPSECDOI_AH_SHA                              3
 #define   IPSECDOI_AH_DES                              4
+#define   IPSECDOI_AH_SHA2_256                         5
+#define   IPSECDOI_AH_SHA2_384                         6
+#define   IPSECDOI_AH_SHA2_512                         7
 
 /* 4.4.1 IPSEC Security Protocol Identifiers */
 #define IPSECDOI_PROTO_IPSEC_ESP                     3
@@ -66,6 +69,8 @@
 #define   IPSECDOI_ESP_DES_IV32                        9
 #define   IPSECDOI_ESP_RC4                            10
 #define   IPSECDOI_ESP_NULL                           11
+#define   IPSECDOI_ESP_RIJNDAEL				12
+#define   IPSECDOI_ESP_AES				12
 
 /* 4.4.1 IPSEC Security Protocol Identifiers */
 #define IPSECDOI_PROTO_IPCOMP                        4
@@ -73,7 +78,6 @@
 #define   IPSECDOI_IPCOMP_OUI                          1
 #define   IPSECDOI_IPCOMP_DEFLATE                      2
 #define   IPSECDOI_IPCOMP_LZS                          3
-#define   IPSECDOI_IPCOMP_V42BIS                       4
 
 /* 4.5 IPSEC Security Association Attributes */
 #define IPSECDOI_ATTR_SA_LTYPE                1 /* B */
@@ -88,16 +92,17 @@
 #define   IPSECDOI_ATTR_ENC_MODE_TUNNEL         1
 #define   IPSECDOI_ATTR_ENC_MODE_TRNS           2
 #define IPSECDOI_ATTR_AUTH                    5 /* B */
+	/* 0 means not to use authentication. */
 #define   IPSECDOI_ATTR_AUTH_HMAC_MD5           1
 #define   IPSECDOI_ATTR_AUTH_HMAC_SHA1          2
 #define   IPSECDOI_ATTR_AUTH_DES_MAC            3
-#define   IPSECDOI_ATTR_AUTH_KPDK               4
+#define   IPSECDOI_ATTR_AUTH_KPDK               4 /*RFC-1826(Key/Pad/Data/Key)*/
 	/*
-	When negotiating ESP without authentication, the Auth
-	Algorithm attribute MUST NOT be included in the proposal.
-	When negotiating ESP without confidentiality, the Auth
-	Algorithm attribute MUST be included in the proposal and
-	the ESP transform ID must be ESP_NULL.
+	 * When negotiating ESP without authentication, the Auth
+	 * Algorithm attribute MUST NOT be included in the proposal.
+	 * When negotiating ESP without confidentiality, the Auth
+	 * Algorithm attribute MUST be included in the proposal and
+	 * the ESP transform ID must be ESP_NULL.
 	*/
 #define IPSECDOI_ATTR_KEY_LENGTH              6 /* B */
 #define IPSECDOI_ATTR_KEY_ROUNDS              7 /* B */
@@ -109,12 +114,12 @@ struct ipsecdoi_sa {
 	struct isakmp_gen h;
 	u_int32_t doi; /* Domain of Interpretation */
 	u_int32_t sit; /* Situation */
-} __attribute__((__packed__));
+};
 
 struct ipsecdoi_secrecy_h {
 	u_int16_t len;
 	u_int16_t reserved;
-} __attribute__((__packed__));
+};
 
 /* 4.6.2.1 Identification Type Values */
 struct ipsecdoi_id {
@@ -123,7 +128,7 @@ struct ipsecdoi_id {
 	u_int8_t  proto_id;	/* Protocol ID */
 	u_int16_t port;		/* Port */
 	/* Identification Data */
-} __attribute__((__packed__));
+};
 
 #define IPSECDOI_ID_IPV4_ADDR                        1
 #define IPSECDOI_ID_FQDN                             2
