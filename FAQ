@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.75 2001/12/14 09:24:49 jinmei Exp $
+$KAME: FAQ,v 1.76 2001/12/16 19:38:47 sumikawa Exp $
 
 
 GENERAL
@@ -532,6 +532,16 @@ stateless autoconfiguration, the interface route corresponding to the
 configured with ifconfig(8) immediately disappears.
 	This is the intentional behavior.
 	XXX: need more description.
+
+OS SPECIFIC
+===========
+Q: [FreeBSD] Why do you provide the mozilla+ipv6 port?  Why can't you
+make the plain mozilla port handle IPv6 also?
+	Current IPv6 enabled mozilla requires IPv6 capability on
+	kernel even if it connects to IPv4 Web servers since it
+	handles IPv4 connection as IPv6 connection using "IPv6 mapped
+	address" e.g. ::ffff:10.0.0.1.  So we must provide IPv6
+	disabled mozilla for the kernel without "options INET6".
 
 LICENSE AND CRYPTO EXPORT
 =========================
