@@ -17,9 +17,7 @@ PLAT=	freebsd2 freebsd3 kame netbsd openbsd
 
 update: update-doc update-plat
 update-doc:
-	for i in $(DOC); do \
-		cvs update -d -P $$i; \
-	done
+	cvs update -d -P $(DOC)
 update-plat:
 	for i in $(PLAT); do \
 		if test -d $$i; then \
