@@ -1,4 +1,4 @@
-.\"	$KAME: bgpd.conf.5,v 1.7 2000/11/09 03:04:06 itojun Exp $
+.\"	$KAME: bgpd.conf.5,v 1.8 2000/11/10 12:12:09 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -80,7 +80,8 @@ and
 .Ar option...
 .Ic ;
 .Xc
-Specify debug messages to be printed out. Each
+Specify debug messages to be printed out.
+Each
 .Ar option
 usually specifies a subset of the messages to be printed.
 If an
@@ -88,7 +89,8 @@ If an
 begins with
 .Ic no ,
 it means that the set of the messages that are specified by the option
-will not be printed. For example,
+will not be printed.
+For example,
 .Ic `all norip'
 means that all the messages except RIPng related ones will be printed.
 Valid options are
@@ -116,7 +118,8 @@ The following four route filters can be specified, each of which
 is for a RIPng interface or a BGP peer (see below).
 .Bl -tag -width Ds -compact
 .It Ic filterin Ar prefix Ic ;
-Specifies incoming route filtering. If an incoming route on the
+Specifies incoming route filtering.
+If an incoming route on the
 interface or from the peer matches the specified prefix,
 it will be ignored and will not be installed in the kernel.
 .Pp
@@ -153,7 +156,8 @@ can be specified as a prefix, which means that all non default routes
 will be ignored on the interface or from the peer.
 .\"
 .It Ic filterout Ar prefix Ic ;
-Specifies outgoing route filtering. If an outgoing route on the
+Specifies outgoing route filtering.
+If an outgoing route on the
 interface or to the peer matches the specified prefix,
 it will not be advertised.
 The special string
@@ -426,13 +430,15 @@ will be ignored.
 .\"
 .It Ic metricin Ar metric
 Specifies metric which is added to any incoming RIPng routes
-before route calculation. Its value must be no less than 1 and
+before route calculation.
+Its value must be no less than 1 and
 no greater than 16.
 .El
 .\"
 .It Ic sitelocal (yes \(ba no);
 Specifies whether or not site-local prefixes should be accepted and
-advertised via RIPng. If
+advertised via RIPng.
+If
 .Ic yes
 is specified, all site-local prefixes will be accepted and advertised
 on all RIPng available interfaces unless a specific filter will filter
@@ -444,7 +450,8 @@ advertised on any RIPng available interfaces despite of other specific
 filters.
 Note that
 .Nm bgpd
-does not care about site boundary. When it receives a site-local
+does not care about site boundary.
+When it receives a site-local
 prefix on an interface and if it should be accepted by this statement,
 the prefix will be automatically advertised on all other interfaces,
 even if the receiving node is a site boundary.
@@ -467,7 +474,8 @@ prefix will be advertised instead of each specific prefix.
 .Pp
 There are two type of substatements that can be appeared in an
 .Ic aggregate
-statement. One is specification of interfaces on which aggregated
+statement.
+One is specification of interfaces on which aggregated
 routes are advertised, and the other is to describe routes that
 should not be aggregated.
 .Pp
@@ -482,7 +490,8 @@ specifies interfaces to advertise aggregated route.
 By default, bgpd doesn't advertise aggregated routes on any interface
 even if there is an
 .Ic aggregate
-statement. To advertise aggregated routes, you should explicitly
+statement.
+To advertise aggregated routes, you should explicitly
 specify the interface by this
 .Ar substatement .
 .It Xo

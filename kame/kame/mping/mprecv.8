@@ -1,4 +1,4 @@
-.\"	$KAME: mprecv.8,v 1.2 2000/11/09 03:04:09 itojun Exp $
+.\"	$KAME: mprecv.8,v 1.3 2000/11/10 12:12:11 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -67,18 +67,21 @@ The options are as follows:
 .It Fl d
 Specify the
 .Nm
-to run in daemon mode. 
+to run in daemon mode.
 .It Fl p Ar port
-Specify the UDP port number. Default value is 9998.
+Specify the UDP port number.
+Default value is 9998.
 .It Fl D Ar dumpfile
-Specify the name of dumpfile. By default
+Specify the name of dumpfile.
+By default
 .Pa /tmp/mprecv.dump
 is used.
 .It Fl H Ar history
 Specify the number of "packet lost" history kept for each logging
 interval.
 .It Fl L Ar logfile
-Specify the name of logfile. By default
+Specify the name of logfile.
+By default
 .Pa /var/log/mprecv.log
 is used.
 .It Fl T Ar loginterval

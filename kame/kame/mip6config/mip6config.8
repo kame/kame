@@ -1,4 +1,4 @@
-.\"	$KAME: mip6config.8,v 1.2 2000/06/04 03:31:28 itojun Exp $
+.\"	$KAME: mip6config.8,v 1.3 2000/11/10 12:12:11 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -115,24 +115,31 @@
 .\"
 .Sh DESCRIPTION
 The Mobile IPv6 implementation has been integrated as part of the FreeBSD 
-kernel. It consists of three different parts: The correspondent node, which 
+kernel.
+It consists of three different parts: The correspondent node, which 
 is mandatory, must always be included for an IPv6 node to claim "IPv6 
 compliance" The home agent part is optional and required if a router is 
-acting as a home agent at the home network. The mobile node part is optional 
+acting as a home agent at the home network.
+The mobile node part is optional 
 and is required by a host (router or host) to be able to move between 
 different sub-networks while maintaining transport and higher layer 
-connections. A node may not act as mobile node and home agent simultaneously.
+connections.
+A node may not act as mobile node and home agent simultaneously.
 .Pp
 There are two different ways of including the Mobile IPv6 software in the
-kernel. The first alternative is to add it during compilation. The 
+kernel.
+The first alternative is to add it during compilation.
+The 
 correspondent node part must always be included and the optional parts can
-be included if desired. The second alternative is to add the correspondent node
+be included if desired.
+The second alternative is to add the correspondent node
 part at compilation time and add the optional parts as modules during 
 runtime.
 .Pp
 The
 .Nm
-command is used for configuration of the Mobile IPv6 code. Depending on which 
+command is used for configuration of the Mobile IPv6 code.
+Depending on which 
 part of the code that has been loaded in the kernel, different options will 
 be enabled/disabled.
 .\"
@@ -156,7 +163,10 @@ Set the binding update lifetime.
 .It Fl d Li 0|1
 Disable/Enable debug messages.
 .It Fl e Li 0|1|2
-Disable/Enable eager Movement Detection. Two levels are provided. At level 1 more aggressive parameter settings are used. At level 2, in addition, new prefixes are taken as indication of handover, rather than the expiration of the previous default router.
+Disable/Enable eager Movement Detection.
+Two levels are provided.
+At level 1 more aggressive parameter settings are used.
+At level 2, in addition, new prefixes are taken as indication of handover, rather than the expiration of the previous default router.
 .It Fl f Ar filename
 Read configuration from file.
 .It Fl g

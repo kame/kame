@@ -1,4 +1,4 @@
-.\"	$KAME: bindresvport.3,v 1.3 2000/05/17 14:13:14 itojun Exp $
+.\"	$KAME: bindresvport.3,v 1.4 2000/11/10 12:12:09 itojun Exp $
 .\"	$OpenBSD: bindresvport.3,v 1.13 1999/12/30 20:50:13 deraadt Exp $
 .\"
 .Dd August 9, 1997
@@ -39,7 +39,8 @@ If the value of
 .Va sin->sin_port
 is non-zero,
 .Fn bindresvport
-attempts to use the specified port.  If that fails, it
+attempts to use the specified port.
+If that fails, it
 chooses another privileged port number automatically.
 .Pp
 It is legal to pass null pointer to

@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.34 2000/11/09 03:04:12 itojun Exp $
+.\"	$KAME: setkey.8,v 1.35 2000/11/10 12:12:12 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -93,7 +93,8 @@ it has been expired but remains
 because it is referenced by SPD entries.
 .It Fl d
 Enable to print debugging messages for command parser,
-without talking to kernel.  It is not used usually.
+without talking to kernel.
+It is not used usually.
 .It Fl x
 Loop forever and dump all the messages transmitted to
 .Dv PF_KEY
@@ -114,7 +115,8 @@ The program will dump messages exchanged on
 socket, including messages sent from other processes to the kernel.
 .El
 .Pp
-Operations have the following grammar. Note that lines starting with
+Operations have the following grammar.
+Note that lines starting with
 hashmarks ('#') are treated as comment lines.
 .Bl -tag -width Ds
 .It Xo
@@ -241,12 +243,14 @@ The default value is
 .It Fl r Ar size
 Specify window size of bytes for replay prevention.
 .Ar size
-must be decimal number in 32-bit word.  If
+must be decimal number in 32-bit word.
+If
 .Ar size
 is zero or not specified, replay check don't take place.
 .\"
 .It Fl u Ar id
-Specify the identifier of policy.  See also
+Specify the identifier of policy.
+See also
 .Xr ipsec_set_policy 3 .
 .\"
 .It Fl f Ar pad_option

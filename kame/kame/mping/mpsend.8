@@ -1,4 +1,4 @@
-.\"	$KAME: mpsend.8,v 1.2 2000/11/09 03:04:09 itojun Exp $
+.\"	$KAME: mpsend.8,v 1.3 2000/11/10 12:12:11 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -71,14 +71,19 @@ By default, the
 .Nm
 sends packets infinitely.
 .It Fl l Ar hop_limit
-Specify the hop_limit value of the packets. Default value is 1.
+Specify the hop_limit value of the packets.
+Default value is 1.
 .It Fl p Ar port
-Specify the UDP port number. Default value is 9998.
+Specify the UDP port number.
+Default value is 9998.
 .It Fl s Ar size
-Specify the packet payload size in byte. IPv6/UDP headers are not
-included. Default value is 128 and minimum value is 16.
+Specify the packet payload size in byte.
+IPv6/UDP headers are not
+included.
+Default value is 128 and minimum value is 16.
 .It Fl t Ar interval
-Specify the interval of packets in second. Default value is 10.
+Specify the interval of packets in second.
+Default value is 10.
 Note this value can be a floating point value, such as 0.1sec.
 Only the super user can specify smaller value than 1sec.
 .It Fl v
