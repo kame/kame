@@ -280,17 +280,6 @@ rip6_input(mp, offp, proto)
 
     foundone = 1;
 
-#ifdef IPSEC
-    /* Perform input-side policy check. Drop packet if policy says to drop it.
-
-       Note: For ICMPv6 packets, we also checked policy in ipv6_icmp_input().
-
-       XXX - state arg should NOT be NULL, it should be the netproc state
-       carried up the stack - cmetz */
-    if (!netproc_inputpolicy(NULL, (struct sockaddr *)&srcsa,
-	 (struct sockaddr *)&dstsa, nexthdr, m, NULL, NULL))
-#endif /* IPSEC */
-
     /* Note the inefficiency here; this is a consequence of the interfaces of
        the functions being used. The raw code is not performance critical
        enough to require an immediate fix. - cmetz */
