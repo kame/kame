@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.114 2001/09/13 12:35:33 itojun Exp $
+$KAME: COVERAGE,v 1.115 2001/09/15 00:26:46 itojun Exp $
 
 
 x: supported/integrated
@@ -195,6 +195,9 @@ getnameinfo, 2nd arg type is socklen_t
 
 getnameinfo uses EAI_xx as return value (2553bis)
 		x	x	x	x	x	x	x	-
+
+'options insecure1' in /etc/resolv.conf
+		x	x	x	-	-	-	-	-
 
 ALTQ		(+)	x	-	-	-	-	-	-
 
