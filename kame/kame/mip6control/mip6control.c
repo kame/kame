@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.51 2003/08/15 06:46:56 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.52 2003/08/25 08:37:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -134,6 +134,7 @@ usage()
 	(void)fprintf(stderr,
 		      "usage: %s [-i ifname] [-abcghlmnw]"
 		      " [-H home_prefix -P prefixlen]"
+		      " [-A homeagent_global_addr] [-L homeagent_linklocal_addr]"
 		      " [-u address#port] [-v address#port]"
 		      " [-S 0|1] [-D 0|1]\n",
 		      __progname);
