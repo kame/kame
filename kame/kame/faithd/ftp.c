@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.9 2000/09/14 00:20:22 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.10 2000/09/14 00:23:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -922,6 +922,7 @@ eprtparamfail:
 		}
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_STREAM;
 		error = getaddrinfo(hostp, portp, &hints, &res);
 		if (error) {
 			n = snprintf(sbuf, sizeof(sbuf),
