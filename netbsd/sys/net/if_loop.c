@@ -181,6 +181,9 @@ looutput(ifp, m, dst, rt)
 {
 	int s, isr;
 	register struct ifqueue *ifq = 0;
+#if 0 /*def PULLDOWN_TEST*/
+	struct mbuf *n, *prev;
+#endif
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("looutput: no header mbuf");
@@ -260,6 +263,27 @@ looutput(ifp, m, dst, rt)
 		printf("loop: not contiguous...\n");
 		m_freem(m);
 		return ENOBUFS;
+	}
+#endif
+#else
+#if 0
+	/*
+	 * remove zero-length mbuf in the chain, this does not make sense to
+	 * keep them.
+	 */
+	prev = m;
+	n = m->m_next;
+	while (prev && n) {
+		if (n->m_len == 0) {
+			prev->m_next = n->m_next;
+			n->m_next = NULL;
+			m_free(n);
+			n = prev->m_next;
+			continue;
+		}
+
+		prev = n;
+		n = n->m_next;
 	}
 #endif
 #endif
