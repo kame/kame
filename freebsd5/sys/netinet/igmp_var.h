@@ -170,8 +170,6 @@ struct igmpstat {
 #define	IGMP_UNSOL_INTVL	1	/* Unsolicited Report Interval (sec.) */
 #define	IGMP_DEF_QUERY		10	/* v1 Max. Response Time (sec.) */
 
-extern	struct router_info *Head;
-
 #ifdef IGMPV3_DEBUG
 #define igmplog(x)	do { if (1) log x; } while (/*CONSTCOND*/ 0)
 #else

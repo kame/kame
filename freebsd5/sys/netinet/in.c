@@ -89,6 +89,7 @@
 #include <netinet/in_pcb.h>
 
 #include <netinet/igmp_var.h>
+extern SLIST_HEAD(, router_info) router_info_head;
 
 static MALLOC_DEFINE(M_IPMADDR, "in_multi", "internet multicast address");
 
@@ -1038,7 +1039,7 @@ in_addmulti(ap, ifp)
 	 * Let IGMP know that we have joined a new IP multicast group.
 	 */
 #ifdef IGMPV3
-	    for (rti = Head; rti != 0; rti = rti->rti_next) {
+	    SLIST_FOREACH(rti, &router_info_head, rti_list) {
 		if (rti->rti_ifp == inm->inm_ifp) {
 		    inm->inm_rti = rti;
 		    break;
@@ -1488,7 +1489,7 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 	    ifma->ifma_protospec = inm;
 	    LIST_INSERT_HEAD(&in_multihead, inm, inm_link);
 
-	    for (rti = Head; rti != 0; rti = rti->rti_next) {
+	    SLIST_FOREACH(rti, &router_info_head, rti_list) {
 		if (rti->rti_ifp == inm->inm_ifp) {
 		    inm->inm_rti = rti;
 		    break;
