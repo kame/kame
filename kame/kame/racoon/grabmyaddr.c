@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.22 2000/11/10 04:44:11 jinmei Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.23 2000/11/18 11:21:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -395,8 +395,11 @@ suitable_ifaddr6(ifname, ifaddr)
 	if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 		plog(logp, LOCATION, NULL,
 			"ioctl(SIOCGIFAFLAG_IN6) failed:%s\n", strerror(errno));
+		close(s);
 		return 0;
 	}
+
+	close(s);
 
 	if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TENTATIVE
 	 || ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DUPLICATED
