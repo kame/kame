@@ -1,9 +1,9 @@
-#       $Id: Makefile,v 1.16 1999/01/17 20:53:48 peter Exp $
+# $FreeBSD: src/sys/modules/if_ppp/Makefile,v 1.16.2.1 1999/08/29 16:27:16 peter Exp $
 
 .PATH:  ${.CURDIR}/../../net
 KMOD=   if_ppp
 SRCS=	if_ppp.c ppp_tty.c slcompress.c \
-	bpfilter.h ppp.h opt_inet.h opt_ipx.h opt_ppp.h vnode_if.h
+	bpfilter.h ppp.h opt_inet.h opt_inet6.h opt_ipx.h opt_ppp.h vnode_if.h
 NOMAN=
 CLEANFILES+=	vnode_if.c vnode_if.h
 
@@ -12,6 +12,7 @@ PPP_BSDCOMP?=	1	# 0/1
 PPP_DEFLATE?=	1	# 0/1
 PPP_FILTER?=	0	# 0/1 - requires bpf to be configured in kernel
 PPP_INET?=	1	# 0/1 - requires INET to be configured in kernel
+PPP_INET6?=	1	# 0/1 - requires INET to be configured in kernel
 PPP_IPX?=	0	# 0/1 - requires IPX to be configured in kernel
 
 CFLAGS+= ${PROTOS}
@@ -35,6 +36,12 @@ opt_inet.h:
 	touch opt_inet.h
 .if ${PPP_INET} > 0
 	echo "#define INET 1" > opt_inet.h
+.endif
+
+opt_inet6.h:
+	touch opt_inet6.h
+.if ${PPP_INET6} > 0
+	echo "#define INET6 1" > opt_inet6.h
 .endif
 
 opt_ipx.h:
