@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.275 2002/05/27 11:44:47 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.276 2002/05/27 12:56:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2823,6 +2823,9 @@ in6_setmaxmtu()
 	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
 #endif
 	{
+		/* this function can be called during ifnet initialization */
+		if (!ifp->if_afdata[AF_INET6])
+			continue;
 		if ((ifp->if_flags & IFF_LOOPBACK) == 0 &&
 		    IN6_LINKMTU(ifp) > maxmtu)
 			maxmtu = IN6_LINKMTU(ifp);
