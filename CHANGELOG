@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.694 2000/03/16 08:03:24 jinmei Exp $
+$Id: CHANGELOG,v 1.695 2000/03/16 08:32:54 jinmei Exp $
 
 <200003>
+2000-03-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/cfparse.y: correclty parsed data_timeout
+	In response to a report from <Benoit.HILT@colmar.uha.fr>
+
 2000-03-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c: added additional arguments for the -i
 	option to set some ND-related parameters per i/f basis.
