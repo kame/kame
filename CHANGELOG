@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.751 2000/04/06 05:43:26 itojun Exp $
+$Id: CHANGELOG,v 1.752 2000/04/06 05:52:24 sakane Exp $
 
 <200003>
 Thu Apr  6 14:41:26 JST 2000  itojun@iijlab.net
@@ -10,6 +10,12 @@ Thu Apr  6 14:41:26 JST 2000  itojun@iijlab.net
 	    # setkey -c
 	    spdadd ::1 ::1 any -P out ipsec esp/tunnel/10.1.1.1-10.1.1.1/use;
 	    ^D
+
+Thu Apr  6 14:51:03 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon/cfparse.y:
+	  disable algorithm direcitive.
+	  if there is in the config file, parser will bark as warning.
+	  if strength is used the file, parser will stop to parse config file.
 
 Tue Apr  4 17:48:20 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: support IPV6_USE_MIN_MTU in 2292bis
