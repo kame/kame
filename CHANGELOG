@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.538 2000/02/08 15:12:57 jinmei Exp $
+$Id: CHANGELOG,v 1.539 2000/02/08 16:10:01 itojun Exp $
 
 <200002>
+Wed Feb  9 01:09:21 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/gated: upgrade base version to gated-ipv6, 2000/2/3.
+
 2000-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c: removed in6_canforward() according to
 	the recent clarification in ip6_forward().
