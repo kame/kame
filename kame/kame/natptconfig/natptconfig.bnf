@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptconfig.bnf,v 1.2 2000/01/07 14:33:33 fujisawa Exp $
+ *	$Id: natptconfig.bnf,v 1.3 2000/02/18 11:39:54 fujisawa Exp $
  */
 
 /* Top level definitions							*/
@@ -60,7 +60,7 @@
 
 /* Interface definitions							*/
 
-      <interface> ::= "?"
+      <interface> ::= "interface" "?"
 		    | "interface" <netdevice> <in_ex>
 
 	  <in_ex> ::= "internal"
@@ -69,7 +69,7 @@
 
 /* Set faith/NATPT prefix to the kernel						*/
 
-	 <prefix> ::= "?"
+	 <prefix> ::= "prefix" "?"
 		    | "faith" IPV6ADDR
 		    | "faith" IPV6ADDR "/" DECIMAL
 		    | "natpt" IPV6ADDR
@@ -78,12 +78,12 @@
 
 /* Tranlation rule definitions							*/
 
-	   <rule> ::= "?"
-		    | "map" "from" <ipv4addr> "to" "faith"
-		    | "map" "from" <ipv4ddr> <opt_port> "to"   <ipv6addr> <opt_port>
-		    | "map" <dir> "from" <ipv4addr> "to" <ipv6addr> <opt_port>
-		    | "map" "from" <ipv6addr> "to" <ipv4addr> <opt_port>
-		    | "map" <dir> "from" <ipv6addr> "to" <ipv4addr> <opt_port>
+	   <rule> ::= "map" "?"
+		    | "map" <dir> "from" <ipaddrport> "to" <ipaddrport>
+		    | "map" <dir> "from" "any4" "to" <ipaddrport>
+		    | "map" <dir> "from" "any6" "to" <ipaddrport>
+		    | "map" "from" "any6" "to" "faith"
+		    | "map" "from" <ipaddrport> "to" "faith"
 		    | "map" "flush" <opt_type>
 
 
@@ -108,7 +108,7 @@
 
 /* Show definitions								*/
 
-	   <show> ::= "?"
+	   <show> ::= "show" "?"
 		    | "show" "interface" <opt_netdevice>
 		    | "show" "prefix"
 		    | "show" "static"
@@ -126,14 +126,34 @@
       <netdevice> ::= STRING
 		    | NAME
 
-	 <ipaddr> ::= <ipv4addr>
-		    | <ipv6addr>
+      ipaddrport> ::= <ipv4addrs>
+		    | <ipv4addrs> <port>
+		    | <ipv6addrs>
+		    | <ipv6addrs> <port>
+
+      <ipv4addrs> ::= <ipv4addr>
+		    | <ipv4addr> "/" <decimal>
+		    | <ipv4addr> "-" <ipv4addr>
+
+      <ipv6addrs> ::= <ipv6addr>
+		    | <ipv6addr> "/" <decimal>
 
        <ipv4addr> ::= IPV4ADDR
 
        <ipv6addr> ::= IPV6ADDR
 
-       <opt_port> ::= eps
+	   <name> ::= SNAME
+
+	<decimal> ::= SDECIMAL
+
+     <hexdecimal> ::= SHEXDECIMAL
+
+	   <port> ::= "port" SDECIMAL
+		    | "port" SDECIMAL ":" SDECIMAL
+		    | "port" SDECIMAL "-" SDECIMAL
+
+
+/* Optional termila definitions							*/
 
        <opt_type> ::= eps
 		    | "static"

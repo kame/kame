@@ -26,12 +26,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: cftoken.l,v 1.2 2000/01/07 14:33:33 fujisawa Exp $
+ *	$Id: cftoken.l,v 1.3 2000/02/18 11:39:55 fujisawa Exp $
  */
 
 %{
+#include <string.h>
 #include <sys/types.h>
-
 #include "natptconfig.y.h"
 
 #define	YY_DECL		int _yylex(void)
@@ -92,12 +92,20 @@ void
 reassembleCommandLine(int argc, char *argv[], char *Wow)
 {
     YY_BUFFER_STATE	 yyb;
+    char	*spc;
     char	*s, *d;
 
     for (d = Wow; argc; argc--, argv++)
     {
 	s = *(argv);
+	spc = strchr(s, ' ');
+	if (spc == NULL)
+	    spc = strchr(s, '\t');
+
+	if (spc)	*d++ = '"';
 	while (*s)	*d++ = *s++;
+	if (spc)	*d++ = '"';
+
 	*d++ = ' ';
     }
 
@@ -109,7 +117,7 @@ reassembleCommandLine(int argc, char *argv[], char *Wow)
 int
 getDecimal(char *yytext)
 {
-    yylval.Int = strtol(yytext, NULL, 0);
+    yylval.UInt = strtol(yytext, NULL, 0);
     return (SDECIMAL);
 }
 
@@ -117,7 +125,7 @@ getDecimal(char *yytext)
 int
 getHexdicimal(char *yytext)
 {
-    yylval.ULong = strtoul(yytext, NULL, 0);
+    yylval.UInt = strtoul(yytext, NULL, 0);
     return (SHEXDECIMAL);
 }
 

@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -14,7 +14,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: cfparse.y,v 1.3 2000/02/03 10:10:16 fujisawa Exp $
+ *	$Id: cfparse.y,v 1.4 2000/02/18 11:39:55 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -35,7 +35,7 @@
 #include <string.h>
 #include <netdb.h>
 
-#include <sys/param.h>
+#include <sys/types.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -45,11 +45,9 @@
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_soctl.h>
 
+#include "defs.h"
 #include "miscvar.h"
 #include "showvar.h"
-#include "extern.h"
-
-#define	ROUNDUP(x)		roundup(x, sizeof(void *))
 
 struct	msgBox		mBox;
 
@@ -59,6 +57,7 @@ int	 yylineno = 0;
 
 extern	char	*yytext;
 
+void		 printHelp	__P((int, char *));
 int		 yylex		__P((void));
 
 static void
@@ -79,25 +78,26 @@ yyerror(char *msg, ...)
 %union
 {
     int			 Int;
-    u_long		 ULong;	
-    int			*Intp;
+    u_int		 UInt;
+    u_short		*UShrt;	
     char		*Char;
-    struct addrCouple	*Acpl;
+    struct pAddr	*Aport;
     struct addrinfo	*Ainfo;
 }
 
 
-/*  End of line mark. This token is *NOT* use in YACC parser.
+/*  End of line mark.  This token is *NOT* use in YACC parser.
     It is convinience for lexecal analyzer.
     And this token *must* comes first.					*/
 %token		SEOS
 
 /*  Keyword								*/
+%token		SANY4
+%token		SANY6
 %token		SBREAK
 %token		SDISABLE
 %token		SDYNAMIC
 %token		SENABLE
-%token		SSET
 %token		SEXTERNAL
 %token		SFAITH
 %token		SFLUSH
@@ -106,6 +106,7 @@ yyerror(char *msg, ...)
 %token		SINCOMING
 %token		SINTERFACE
 %token		SINTERNAL
+%token		SLOG
 %token		SMAP
 %token		SMAPPING
 %token		SNATPT
@@ -113,13 +114,17 @@ yyerror(char *msg, ...)
 %token		SOUTGOING
 %token		SPORT
 %token		SPREFIX
+%token		SSET
 %token		SSHOW
 %token		SSTATIC
+%token		STCP
+%token		STEST
 %token		STO
+%token		SUDP
 %token		SVARIABLES
 %token		SXLATE
 
-/*  End of reserved word mark.	And this marker position should not changed. */
+/*  End of reserved word mark.	This marker position should not changed. */
 %token		SOTHER
 
 /*  special token							*/
@@ -136,26 +141,27 @@ yyerror(char *msg, ...)
 %token		STILDA
 
 /*  Conventional token							*/
-%token	<Int>	SDECIMAL
-%token	<Int>	SHEXDECIMAL
+%token	<UInt>	SDECIMAL
+%token	<UInt>	SHEXDECIMAL
 %token		SNAME
 %token		SSTRING
 %token		IPV4ADDR
 %token		IPV6ADDR
 
 %type	<Int>	in_ex
-%type	<Int>	decimal
+%type	<UInt>	decimal
 %type	<Int>	dir
-%type	<Int>	hexdecimal
+%type	<UInt>	hexdecimal
 %type	<Char>	name
 %type	<Char>	netdevice
 %type	<Char>	opt_netdevice
-%type	<Acpl>	ipv4addrs
-%type	<Acpl>	ipv6addrs
-%type	<Ainfo>	ipaddr
+%type	<Aport>	ipaddrport
+%type	<Aport>	ipv4addrs
+%type	<Aport>	ipv6addrs
 %type	<Ainfo>	ipv4addr
 %type	<Ainfo>	ipv6addr
-%type	<Intp>	opt_port
+%type	<UShrt>	port
+%type	<Int>	opt_proto
 %type	<Int>	opt_type
 %type	<Int>	opt_decimal
 
@@ -165,6 +171,7 @@ yyerror(char *msg, ...)
 %%
 
 /* Top level definitions						*/
+
 statement
 		: comment
 		| question
@@ -175,6 +182,7 @@ statement
 		| switch
 		| set
 		| show
+		| test
 		| error
 		;
 
@@ -186,12 +194,14 @@ comment		: SCOMMENT
 
 
 /* ???									*/
+
 question
 		: SQUESTION
-		    { printHelp(NULL); }
+		    { printHelp(SQUESTION, NULL); }
 		;
 
 /* Stop at breakpoint							*/
+
 break
 		: SBREAK
 		    { debugBreak(); }
@@ -199,9 +209,10 @@ break
 
 
 /* Interface definition							*/
+
 interface
 		: SINTERFACE SQUESTION
-		    { printInterfaceHelp(); }
+		    { printHelp(SINTERFACE, NULL); }
 		| SINTERFACE netdevice in_ex
 		    { setInterface($2, $3); }
 		;
@@ -215,34 +226,36 @@ in_ex
 
 
 /* Set faith/NATPT prefix to the kernel					*/
-prefix		
+
+prefix
 		: SPREFIX SQUESTION
-		    { printPrefixHelp(); }
+		    { printHelp(SPREFIX, NULL); }
 		| SPREFIX SFAITH ipv6addr
-		    { setFaithPrefix($3, 0); }
+		    { setPrefix(PREFIX_FAITH, $3, 0); }
 		| SPREFIX SFAITH ipv6addr SSLASH SDECIMAL
-		    { setFaithPrefix($3, $5); }
+		    { setPrefix(PREFIX_FAITH, $3, $5); }
 		| SPREFIX SNATPT ipv6addr
-		    { setNatptPrefix($3, 0); }
+		    { setPrefix(PREFIX_NATPT, $3, 0); }
 		| SPREFIX SNATPT ipv6addr SSLASH SDECIMAL
-		    { setNatptPrefix($3, $5); }
+		    { setPrefix(PREFIX_NATPT, $3, $5); }
 		;
 
 
 /* Translation rule definition						*/
+
 rule
 		: SMAP SQUESTION
-		    { printRuleHelp(); }
-		| SMAP SFROM ipv4addrs STO SFAITH
+		    { printHelp(SMAP, NULL); }
+		| SMAP dir opt_proto SFROM ipaddrport STO ipaddrport
+		    { setRule($2, $3, $5, $7); }
+		| SMAP dir opt_proto SFROM SANY4 port STO ipaddrport
+		    { setFromAnyRule($2, $3, SANY4, $6, $8); }
+		| SMAP dir opt_proto SFROM SANY6 port STO ipaddrport
+		    { setFromAnyRule($2, $3, SANY6, $6, $8); }
+		| SMAP SFROM SANY6 STO SFAITH
+		    { setFaithRule(NULL); }
+		| SMAP SFROM ipaddrport STO SFAITH
 		    { setFaithRule($3); }
-		| SMAP SFROM ipv4addrs STO ipaddr opt_port
-		    { setRule(0, $3, $5, $6); }
-		| SMAP dir SFROM ipv4addrs STO ipaddr opt_port
-		    { setRule($2, $4, $6, $7); }
-		| SMAP SFROM ipv6addrs STO ipaddr opt_port
-		    { setRule(0, $3, $5, $6); }
-		| SMAP dir SFROM ipv6addrs STO ipaddr opt_port
-		    { setRule($2, $4, $6, $7); }
 		| SMAP SFLUSH opt_type
 		    { flushRule($3); }
 		;
@@ -260,6 +273,7 @@ dir
 
 
 /* Translator on/off							*/
+
 switch
 		: SMAP SENABLE
 		    { enableTranslate(SENABLE); }
@@ -269,9 +283,10 @@ switch
 
 
 /* Set something							*/
+
 set
 		: SSET SQUESTION
-		    { printSetHelp(); }
+		    { printHelp(SSET, NULL); }
 		| SSET name SEQUAL decimal
 		    { setValue($2, $4); }
 		| SSET name SEQUAL hexdecimal
@@ -280,9 +295,10 @@ set
 
 
 /* Show something							*/
+
 show
 		: SSHOW SQUESTION
-		    { printShowHelp(); }
+		    { printHelp(SSHOW, NULL); }
 		| SSHOW SINTERFACE opt_netdevice
 		    { showInterface($3); }
 		| SSHOW SPREFIX
@@ -299,7 +315,23 @@ show
 		    { showMapping(); }
 		;
 
+
+/* Test something							*/
+
+test
+		: STEST SQUESTION
+		    { printHelp(STEST, NULL); }
+		| STEST SLOG
+		    { testLog(NULL); }
+		| STEST SLOG SNAME
+		    { testLog(yytext); }
+		| STEST SLOG SSTRING
+		    { testLog(yytext); }
+		;
+
+
 /* ...									*/
+
 opt_netdevice
 		:
 		    { $$ = NULL; }
@@ -320,35 +352,39 @@ netdevice
 		    }
 		;
 
-ipaddr
-		: ipv4addr
-		| ipv6addr
+ipaddrport
+		: ipv4addrs
+		    { $$ = $1; }
+		| ipv4addrs port
+		    { $$ = setAddrPort($1, $2); }
+		| ipv6addrs
+		    { $$ = $1; }
+		| ipv6addrs port
+		    { $$ = setAddrPort($1, $2); }
 		;
 
 ipv4addrs
 		: ipv4addr
-		    { $$ = getAddrBlock(AF_INET, ADDR_SINGLE, $1, NULL); }
-		| ipv4addr SSLASH SDECIMAL
+		    { $$ = getAddrPort(AF_INET, ADDR_SINGLE, $1, NULL); }
+		| ipv4addr SSLASH decimal
 		    {
 			int	dec = $3;
 
-			$$ = getAddrBlock(AF_INET, ADDR_MASK, $1, (void *)&dec);
+			$$ = getAddrPort(AF_INET, ADDR_MASK, $1, (void *)&dec);
 		    }
 		| ipv4addr SMINUS ipv4addr
-		    { $$ = getAddrBlock(AF_INET, ADDR_RANGE, $1, $3); }
+		    { $$ = getAddrPort(AF_INET, ADDR_RANGE, $1, $3); }
 		;
 
 ipv6addrs
 		: ipv6addr
-		    { $$ = getAddrBlock(AF_INET6, ADDR_SINGLE, $1, NULL); }
-		| ipv6addr SSLASH SDECIMAL
+		    { $$ = getAddrPort(AF_INET6, ADDR_SINGLE, $1, NULL); }
+		| ipv6addr SSLASH decimal
 		    {
 			int	dec = $3;
 
-			$$ = getAddrBlock(AF_INET6, ADDR_MASK, $1, (void *)&dec);
+			$$ = getAddrPort(AF_INET6, ADDR_MASK, $1, (void *)&dec);
 		    }
-		| ipv6addr SMINUS ipv6addr
-		    { $$ = getAddrBlock(AF_INET6, ADDR_RANGE, $1, $3); }
 		;
 
 ipv4addr
@@ -378,33 +414,48 @@ hexdecimal
 		;
 
 
-opt_port
-		:
-		    { $$ = NULL; }
-		| SPORT SDECIMAL
+port
+		: SPORT SDECIMAL
 		    {
-			static	int	optPort[2];
+			u_short	*optPort;
 
-			optPort[0] = $2;
+			debugProbe("<port> ::= SPORT SDECIMAL\n");
+			optPort = (u_short *)malloc(sizeof(u_short[2]));
+			optPort[0] = htons((u_short)($2));
 			optPort[1] = 0;
 			$$ = optPort;
 		    }
 		| SPORT SDECIMAL SCOLON SDECIMAL
 		    {
-			static	int	optPort[2];
+			u_short	*optPort;
 
-			optPort[0] = $2;
-			optPort[1] = $2 + $4;
+			debugProbe("<port> ::= SPORT SDECIMAL SCOLON SDECIMAL\n");
+			optPort = (u_short *)malloc(sizeof(u_short[2]));
+			optPort[0] = htons((u_short)($2));
+			optPort[1] = htons((u_short)($2 + $4));
 			$$ = optPort;
 		    }
 		| SPORT SDECIMAL SMINUS SDECIMAL
 		    {
-			static	int	optPort[2];
+			u_short	*optPort;
 
-			optPort[0] = $2;
-			optPort[1] = $4;
+			debugProbe("<port> ::= SPORT SDECIMAL SMINUS SDECIMAL\n");
+			optPort = (u_short *)malloc(sizeof(u_short[2]));
+			optPort[0] = htons((u_short)($2));
+			optPort[1] = htons((u_short)($4));
 			$$ = optPort;
 		    }
+		;
+
+/* optional ...								*/
+
+opt_proto
+		:
+		    { $$ = 0; }
+		| STCP
+		    { $$ = IPPROTO_TCP; }
+		| SUDP
+		    { $$ = IPPROTO_UDP; }
 		;
 
 opt_type

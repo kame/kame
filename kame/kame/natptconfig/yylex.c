@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: yylex.c,v 1.2 2000/01/07 14:33:34 fujisawa Exp $
+ *	$Id: yylex.c,v 1.3 2000/02/18 11:39:56 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -36,7 +36,6 @@
 #include <sys/syslog.h>
 
 #include "defs.h"
-#include "extern.h"
 #include "natptconfig.y.h"
 
 
@@ -53,6 +52,8 @@ struct
     char    *tokenstring;
 }   keyTable[] =
 {
+    { "any4",		SANY4,		"SANY4",	},
+    { "any6",		SANY6,		"SANY6",	},
     { "break",		SBREAK,		"SBREAK",	},
     { "disable",	SDISABLE,	"SDISABLE",	},
     { "dynamic",	SDYNAMIC,	"SDYNAMIC",	},
@@ -65,6 +66,7 @@ struct
     { "incoming",	SINCOMING,	"SINCOMING",	},
     { "interface",	SINTERFACE,	"SINTERFACE",	},
     { "internal",	SINTERNAL,	"SINTERNAL",	},
+    { "log",		SLOG,		"SLOG",		},
     { "map",		SMAP,		"SMAP",		},
     { "mapping",	SMAPPING,	"SMAPPING",	},
     { "natpt",		SNATPT,		"SNATPT",	},
@@ -75,7 +77,10 @@ struct
     { "set",		SSET,		"SSET",		},
     { "show",		SSHOW,		"SSHOW",	},
     { "static",		SSTATIC,	"SSTATIC",	},
+    { "tcp",		STCP,		"STCP",		},
+    { "test",		STEST,		"STEST",	},
     { "to",		STO,		"STO",		},
+    { "udp",		SUDP,		"SUDP",		},
     { "variables",	SVARIABLES,	"SVARIABLES",	},
     { "xlate",		SXLATE,		"SXLATE",	},
     {  NULL,		NULL,		 NULL,		},
@@ -126,6 +131,8 @@ yylexExitHook(int token)
 
 	switch (token)
 	{
+	  case SEOS:	fprintf(stderr, " [SEOS]\n");			break;
+
 	  case SOTHER:	fprintf(stderr, " Unknown:%s", yytext);		break;
 
 	  case SNAME:	fprintf(stderr, " [%s]", yytext);		break;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.2 2000/01/07 14:33:31 fujisawa Exp $
+ *	$Id: defs.h,v 1.3 2000/02/18 11:39:53 fujisawa Exp $
  */
 
 /*
@@ -42,11 +42,22 @@
 #endif
 
 
+#define	ROUNDUP(x)		roundup(x, sizeof(void *))
+
+#ifndef roundup						/* comes from <sys/param.h> */
+#define	roundup(x, y)		((((x)+((y)-1))/(y))*(y))  /* to any y */
+#define	roundup2(x, y)		(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
+#endif
+
+
 #define	isDebug(d)		(_debug & (d))
+extern	u_int	_debug;
+
 
 /* Bit assign for _debug						*/
 #define	D_LEXTOKEN		0x00000001
 #define	D_YYDEBUG		0x00000010
 #define	D_SHOWROUTE		0x00000100
+#define	D_SHOWCSLOT		0x00000200
 #define	D_DUMPIOCTL		0x00010000
 #define	D_NOSOCKET		0x01000000

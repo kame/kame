@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.3 2000/02/14 09:59:23 itojun Exp $
+ *	$Id: natptlog.c,v 1.4 2000/02/18 11:39:57 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -46,6 +46,7 @@
 #include <sys/param.h>
 #include <sys/mbuf.h>
 
+#include <net/if.h>
 #include <net/if_dl.h>
 
 #include <netinet/in.h>
@@ -56,7 +57,10 @@
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 
+#include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_log.h>
+
+#include "../natptconfig/showsubs.h"
 
 
 /*
@@ -110,6 +114,7 @@ void	 printLogMBuf		__P((struct lbuf *));
 void	 printLogIP4		__P((struct lbuf *));
 void	 printLogIP6		__P((struct lbuf *));
 void	 printLogIN6addr	__P((struct lbuf *));
+void	 printLogCSlot		__P((struct lbuf *));
 
 char	*displaySockaddr	__P((struct sockaddr *));
 char	*displaySockaddrIn4	__P((struct sockaddr_in *));
@@ -250,6 +255,11 @@ recvMesg(int sockfd)
 		  case LOG_IP4:		printLogIP4(lbuf);	break;
 		  case LOG_IP6:		printLogIP6(lbuf);	break;
 		  case LOG_IN6ADDR:	printLogIN6addr(lbuf);	break;
+		  case LOG_CSLOT:	printLogCSlot(lbuf);	break;
+		    
+		  default:
+		    log(lbuf->l_hdr.lh_pri, "%d uninstalled", lbuf->l_hdr.lh_type);
+		    break;
 		}
 	    }
 	    break;
@@ -341,6 +351,16 @@ printLogIN6addr(struct lbuf *lbuf)
 
     inet_ntop(AF_INET6, (char *)lbuf->l_addr.in6addr, in6addr, INET6_ADDRSTRLEN);
     log(lbuf->l_hdr.lh_pri, "%s%s", lbuf->l_addr.__msg, in6addr);
+}
+
+
+void
+printLogCSlot(struct lbuf *lbuf)
+{
+    struct logmsg	*lmsg = composeCSlotEntry((struct _cSlot *)lbuf->l_dat.__buf);
+
+    log(lbuf->l_hdr.lh_pri, "%s", &lmsg->lmsg_data[0]);
+    free(lmsg);
 }
 
 
@@ -498,7 +518,6 @@ log(int priority, char *fmt, ...)
 
     va_end(ap);
 }
-
 
 
 void

@@ -26,22 +26,25 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: miscvar.h,v 1.3 2000/02/03 10:10:16 fujisawa Exp $
+ *	$Id: miscvar.h,v 1.4 2000/02/18 11:39:54 fujisawa Exp $
  */
 
 void		 setInterface		__P((char *, int));
-void		 setFaithPrefix		__P((struct addrinfo *, int));
-void		 setNatptPrefix		__P((struct addrinfo *, int));
-void		 setRule		__P((int, struct addrCouple *, struct addrinfo *, int *));
-void		 setFaithRule		__P((struct addrCouple *));
+void		 setPrefix		__P((int, struct addrinfo *, int));
+void		 setFaithRule		__P((struct pAddr *));
+void		 setRule		__P((int, int, struct pAddr *, struct pAddr *));
+void		 setFromAnyRule		__P((int, int, int, u_short *, struct pAddr *));
 void		 flushRule		__P((int));
 void		 enableTranslate	__P((int));
 void		 setValue		__P((char *, int));
+void		 testLog		__P((char *));
 void		 debugBreak		__P((void));
+
 int		 soctl			__P((int, u_long, ...));
 
-struct addrinfo		*getAddrInfo	__P((int, char *));
-struct addrCouple	*getAddrBlock	__P((int, int, struct addrinfo *, void *));
+struct addrinfo	*getAddrInfo		__P((int, char *));
+struct pAddr	*getAddrPort		__P((int, int, struct addrinfo *, void *));
+struct pAddr	*setAddrPort		__P((struct pAddr *, u_short *));
 
 int		 in6_prefix2len		__P((struct in6_addr *));
 
@@ -49,3 +52,10 @@ int		 in4_mask2len		__P((struct in_addr *));
 int		 in6_mask2len		__P((struct in6_addr *));
 struct in_addr	*in4_len2mask		__P((int));
 struct in6_addr *in6_len2mask		__P((int));
+
+void		 debugProbe		__P((char *));
+void		 openFD			__P((void));
+void		 closeFD		__P((void));
+void		 init_misc		__P((void));
+
+

@@ -26,12 +26,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: showvar.h,v 1.3 2000/02/14 09:51:27 itojun Exp $
+ *	$Id: showvar.h,v 1.4 2000/02/18 11:39:55 fujisawa Exp $
  */
 
 void	 showInterface		__P((char *));
 void	 showPrefix		__P((void));
 void	 showRule		__P((int));
+void	 showCSlotEntry		__P((struct _cSlot *cslot));
 void	 showXlate		__P((int));
 void	 showVariables		__P((void));
 void	 showMapping		__P((void));

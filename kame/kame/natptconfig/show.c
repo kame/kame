@@ -26,10 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.4 2000/02/14 09:51:26 itojun Exp $
+ *	$Id: show.c,v 1.5 2000/02/18 11:39:55 fujisawa Exp $
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <err.h>
@@ -56,9 +57,9 @@
 #include <arpa/inet.h>
 
 #include "defs.h"
-#include "extern.h"
 #include "miscvar.h"
 #include "showvar.h"
+#include "showsubs.h"
 
 
 /*
@@ -81,10 +82,11 @@ kvm_t	*kd;
 
 static	struct nlist	nl[] =
 {
-    { "_ptrStatic" },
-    { "_ptrDynamic" },
+    { "_natptStatic" },
+    { "_natptDynamic" },
     { "_tSlotEntry" },
     { "_natpt_debug" },
+    { "_natpt_dump" },
     { "_natpt_prefix" },
     { "_natpt_prefixmask" },
     { "_ip6_protocol_tr" },
@@ -96,9 +98,6 @@ static	struct nlist	nl[] =
 static void	_showRuleStatic		__P((int, struct _cSlot *));
 static void	_showRuleDynamic	__P((int, struct _cSlot *));
 static void	_showRuleFaith		__P((int, struct _cSlot *));
-
-static void	_showIPaddrCouple	__P((int, int, union inaddr *));
-static void	_showIPaddr		__P((int, union inaddr *));
 
 static void	_showXlate		__P((u_long));
 static void	_showXlateHeterogeneous	__P((struct _tSlot *));
@@ -121,7 +120,7 @@ showInterface(char *ifName)
 	strcpy(mBox.m_aux, ifName);
 
     if (soctl(_fd, SIOCGETIF, &mBox) < 0)
-	err(errno, "showInterface: soctl failre");
+	err(errno, "showInterface: soctl failure");
 }
 
 
@@ -132,30 +131,31 @@ showPrefix()
     struct in6_addr	prefix;
     struct in6_addr	prefixmask;
 
-    if ((rv = readNL((caddr_t)&prefix, sizeof(prefix), "_natpt_prefix")) <= 0)
-	return ;
-
-    if (rv != sizeof(struct in6_addr))
-	errx(1, "failure on read prefix");
-    else
+    if ((rv = readNL((caddr_t)&prefix, sizeof(prefix), "_natpt_prefix")) > 0)
     {
-	char	in6txt[INET6_ADDRSTRLEN];
-    
-	inet_ntop(AF_INET6, (char *)&prefix, in6txt, INET6_ADDRSTRLEN);
-	printf("prefix: %s\n", in6txt);
+	if (rv != sizeof(struct in6_addr))
+	    errx(1, "failure on read prefix");
+	else
+	{
+	    char	in6txt[INET6_ADDRSTRLEN];
+
+	    inet_ntop(AF_INET6, (char *)&prefix, in6txt, INET6_ADDRSTRLEN);
+	    printf("prefix: %s\n", in6txt);
+	}
     }
 
-    if ((rv = readNL((caddr_t)&prefixmask, sizeof(prefixmask), "_natpt_prefixmask")) <= 0)
-	return ;
-
-    if (rv != sizeof(struct in6_addr))
-	errx(1, "failure on read prefixmask");
-    else
+    if ((rv = readNL((caddr_t)&prefixmask, sizeof(prefixmask), "_natpt_prefixmask")) > 0)
     {
-	char	in6txt[INET6_ADDRSTRLEN];
-    
-	inet_ntop(AF_INET6, (char *)&prefixmask, in6txt, INET6_ADDRSTRLEN);
-	printf("prefixmask: %s\n", in6txt);
+	if (rv != sizeof(struct in6_addr))
+	    errx(1, "failure on read prefixmask");
+	else
+	{
+	    char	in6txt[INET6_ADDRSTRLEN];
+
+	    inet_ntop(AF_INET6, (char *)&prefixmask, in6txt, INET6_ADDRSTRLEN);
+	    printf("prefixmask: %s ", in6txt);
+	    printf("prefixlen %d\n", in6_mask2len(&prefixmask));
+	}
     }
 }
 
@@ -164,13 +164,13 @@ void
 showRule(int type)
 {
     struct _cell	 cons;
-    char		*n_name = "_ptrStatic";
+    char		*n_name = "_natptStatic";
     int			 num = 0;
     u_long		 pos;
     int			 rv;
 
     if (type == NATPT_DYNAMIC)
-	n_name = "_ptrDynamic";
+	n_name = "_natptDynamic";
 
     if ((rv = readNL((caddr_t)&pos, sizeof(pos), n_name)) <= 0)
 	return ;
@@ -183,13 +183,14 @@ showRule(int type)
 	    struct _cSlot	acs;
 
 	    readKvm((void *)&acs, sizeof(struct _cSlot), (u_long)cons.car);
-	    switch (acs.c.flags)
+	    switch (acs.flags)
 	    {
 	      case NATPT_STATIC:	_showRuleStatic(num, &acs);	break;
 	      case NATPT_DYNAMIC:	_showRuleDynamic(num, &acs);	break;
 	      case NATPT_FAITH:		_showRuleFaith(num, &acs);	break;
 	    }
 	}
+	num++;
 	pos = (u_long)cons.cdr;
     }
 }
@@ -198,13 +199,13 @@ showRule(int type)
 void
 showVariables()
 {
-    int		rv;
-    int		debug;
+    u_int	value;
 
-    if ((rv = readNL((caddr_t)&debug, sizeof(debug), "_natpt_debug")) <= 0)
-	return ;
+    if (readNL((caddr_t)&value, sizeof(value), "_natpt_debug") > 0)
+	printf("%12s: 0x%08x (%d)\n", "natpt_debug", value, value);
 
-    printf("debug: 0x%08x (%d)\n", debug, debug);
+    if (readNL((caddr_t)&value, sizeof(value), "_natpt_dump") > 0)
+	printf("%12s: 0x%08x (%d)\n", "natpt_dump",  value, value);
 }
 
 
@@ -214,71 +215,25 @@ showMapping()
     int		rv;
     int		map;
 
-    if ((rv = readNL((caddr_t)&map, sizeof(map), "_ip6_protocol_tr")) <= 0)
-	return ;
-
-    if (rv != sizeof(int))
-	errx(1, "failure on read ip6_protocol_tr");
-    else
+    if ((rv = readNL((caddr_t)&map, sizeof(map), "_ip6_protocol_tr")) > 0)
     {
-	printf("mapping: %s\n", (map != 0) ? "enable" : "disable");
+	if (rv != sizeof(int))
+	    errx(1, "failure on read ip6_protocol_tr");
+	else
+	{
+	    printf("mapping: %s\n", (map != 0) ? "enable" : "disable");
+	}
     }
 }
 
 
-static void
-_showRuleStatic(int num, struct _cSlot *acs)
+void
+showCSlotEntry(struct _cSlot *cslot)
 {
-    printf("%3d: ", num++);
+    struct logmsg	*lmsg = composeCSlotEntry(cslot);
 
-    printf("from ");
-    _showIPaddr(acs->c.lfamily, &acs->local);
-    printf(" to ");
-    _showIPaddr(acs->c.rfamily, &acs->remote);
-
-    printf("\n");
-}
-
-
-static void
-_showRuleDynamic(int num, struct _cSlot *acs)
-{
-    printf("%3d: ", num++);
-
-    switch (acs->c.dir)
-    {
-      case NATPT_UNSPEC:	printf("unspec");	break;
-      case NATPT_INBOUND:	printf("inbound");	break;
-      case NATPT_OUTBOUND:	printf("outbound");	break;
-      default:			printf("unknown");	break;
-	break;
-    }
-
-    printf(" from ");
-    _showIPaddrCouple(acs->c.lfamily, acs->c.adrtype, &acs->local);
-    printf(" to ");
-    _showIPaddr(acs->c.rfamily, &acs->remote);
-
-    if (acs->sport || acs->eport)
-    {
-	printf(" port %d - %d", acs->sport, acs->eport);
-    }
-
-    printf("\n");
-}
-
-
-static void
-_showRuleFaith(int num, struct _cSlot *acs)
-{
-    printf("%3d: ", num++);
-
-    printf("from ");
-    _showIPaddrCouple(acs->c.lfamily, acs->c.adrtype, &acs->local);
-    printf(" to ");
-    _showIPaddr(acs->c.rfamily, &acs->remote);
-
-    printf("\n");
+    printf("%s", (char *)&lmsg->lmsg_data[0]);
+    free(lmsg);
 }
 
 
@@ -313,37 +268,35 @@ showXlate(int interval)
  */
 
 static void
-_showIPaddrCouple(int family, int type, union inaddr *addr)
+_showRuleStatic(int num, struct _cSlot *acs)
 {
-    switch (type)
-    {
-      case ADDR_ANY:
-	printf("any");
-	break;
+    printf("%3d: ", num);
 
-      case ADDR_SINGLE:
-	_showIPaddr(family, addr);
-	break;
+    showCSlotEntry(acs);
 
-      case ADDR_MASK:
-	_showIPaddr(family, addr);
-	printf("/%d", in6_prefix2len(&(addr+1)->in6));
-	break;
-
-      case ADDR_RANGE:
-	_showIPaddr(family, &addr[0]);
-	_showIPaddr(family, &addr[1]);
-	break;
-    }
+    printf("\n");
 }
 
 
 static void
-_showIPaddr(int family, union inaddr *addr)
+_showRuleDynamic(int num, struct _cSlot *acs)
 {
-    char	Wow[128];
+    printf("%3d: ", num);
 
-    printf("%s", inet_ntop(family, addr, Wow, sizeof(Wow)));
+    showCSlotEntry(acs);
+
+    printf("\n");
+}
+
+
+static void
+_showRuleFaith(int num, struct _cSlot *acs)
+{
+    printf("%3d: ", num);
+
+    printf("faith");
+
+    printf("\n");
 }
 
 
@@ -396,7 +349,7 @@ _showXlate(u_long pos)
 	    }
 	    printf("%-6s", p);
 
-	    if (tslot.local.ip_p != tslot.remote.ip_p)
+	    if (tslot.local.sa_family != tslot.remote.sa_family)
 		_showXlateHeterogeneous(&tslot);
 	    else
 		_showXlateHomogeneous(&tslot);
@@ -442,15 +395,15 @@ _showXlateHeterogeneous(struct _tSlot *tslot )
 {
     char	ntop_buf[INET6_ADDRSTRLEN];
     
-    printf("%s.%d ", inet_ntop(tslot->local.src.sa_family, &tslot->local.src.u.in6, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->local.sport));
-    printf("%s.%d ", inet_ntop(tslot->local.dst.sa_family, &tslot->local.dst.u.in6, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->local.dport));
+    printf("%s.%d ", inet_ntop(tslot->local.sa_family, &tslot->local.in6src, ntop_buf, sizeof(ntop_buf)),
+	   ntohs(tslot->local._sport));
+    printf("%s.%d ", inet_ntop(tslot->local.sa_family, &tslot->local.in6dst, ntop_buf, sizeof(ntop_buf)),
+	   ntohs(tslot->local._dport));
 
-    printf("%s.%d ", inet_ntop(tslot->remote.src.sa_family, &tslot->remote.src.u.in6, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->remote.sport));
-    printf("%s.%d ", inet_ntop(tslot->remote.dst.sa_family, &tslot->remote.dst.u.in6, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->remote.dport));
+    printf("%s.%d ", inet_ntop(tslot->remote.sa_family, &tslot->remote.in6src, ntop_buf, sizeof(ntop_buf)),
+	   ntohs(tslot->remote._sport));
+    printf("%s.%d ", inet_ntop(tslot->remote.sa_family, &tslot->remote.in6dst, ntop_buf, sizeof(ntop_buf)),
+	   ntohs(tslot->remote._dport));
 }
 
 

@@ -18,16 +18,16 @@
 
 BINDIR=	${PREFIX}/bin
 PROG=	natptlog
-SRCS=	natptlog.c
+SRCS=	natptlog.c showsubs.c
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+= -Wall
 .endif
 
-CFLAGS+= -g -DNATPT
+CFLAGS+= -g -I${.CURDIR}/../../sys/ -DNATPT
 
 LDADD+=	-L${.CURDIR}/../libinet6 -L${.CURDIR}/../libinet6/obj \
-	-L/usr/local/v6/lib -linet6 -lkvm -ly -ll
+	-L/usr/local/v6/lib -linet6
 DPADD+=	${.CURDIR}/../libinet6/libinet6.a \
 	${.CURDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
@@ -37,5 +37,9 @@ MAN8=	natptlog.8
 .else
 MAN=	natptlog.8
 .endif
+
+etags:
+		etags *.[ch] ../natptconfig/showsubs.c
+
 
 .include <bsd.prog.mk>

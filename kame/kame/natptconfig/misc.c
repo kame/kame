@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.5 2000/02/06 09:51:47 itojun Exp $
+ *	$Id: misc.c,v 1.6 2000/02/18 11:39:54 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -38,7 +38,6 @@
 #include <errno.h>
 #include <netdb.h>
 
-#include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/syslog.h>
@@ -51,15 +50,16 @@
 #include <netinet6/natpt_soctl.h>
 
 #include "defs.h"
-#include "extern.h"
 #include "natptconfig.y.h"
 #include "miscvar.h"
-
+#include "showvar.h"
+#include "showsubs.h"
 
 /*
  *
  */
 
+#define	LOGTESTPATTERN	"The quick brown fox jumped over the lazy dog."
 
 int	_fd;
 u_long	mtobits[33];
@@ -90,93 +90,63 @@ getInterface()
 
 
 void
-setFaithPrefix(struct addrinfo *prefix, int masklen)
+setPrefix(int type, struct addrinfo *prefix, int masklen)
 {
     struct msgBox	 mBox;
-    struct addrCouple	*freight;
+    struct pAddr	*freight;
 
     bzero(&mBox, sizeof(struct msgBox));
+    mBox.flags = type;
+    mBox.size = sizeof(struct pAddr);
+    mBox.freight = (caddr_t)(freight = (struct pAddr *)malloc(mBox.size));
 
-    mBox.flags = PREFIX_FAITH;
-    mBox.size = sizeof(struct addrCouple);
-    mBox.freight
-	= (caddr_t)(freight = (struct addrCouple *)malloc(mBox.size));
     bzero(freight, mBox.size);
-
     freight->addr[0].in6 = ((struct sockaddr_in6 *)prefix->ai_addr)->sin6_addr;
 
     if (masklen <= 0)
 	masklen = in6_prefix2len(&((struct sockaddr_in6 *)prefix->ai_addr)->sin6_addr);
+    freight->ad.prefix = masklen;
     freight->addr[1].in6 = *in6_len2mask(masklen);
 
-    if(soctl(_fd, SIOCSETPREFIX, &mBox) < 0)
+    if (soctl(_fd, SIOCSETPREFIX, &mBox) < 0)
 	err(errno, "setFaithPrefix: soctl failure");
 }
 
 
 void
-setNatptPrefix(struct addrinfo *prefix, int masklen)
+setRule(int dir, int proto, struct pAddr *from, struct pAddr *to)
 {
-    struct msgBox	 mBox;
-    struct addrCouple	*freight;
-
-    bzero(&mBox, sizeof(struct msgBox));
-
-    mBox.flags = PREFIX_NATPT;
-    mBox.size = sizeof(struct addrCouple);
-    mBox.freight
-	= (caddr_t)(freight = (struct addrCouple *)malloc(mBox.size));
-    bzero(freight, mBox.size);
-
-    freight->addr[0].in6 = ((struct sockaddr_in6 *)prefix->ai_addr)->sin6_addr;
-
-    if (masklen <= 0)
-	masklen = in6_prefix2len(&((struct sockaddr_in6 *)prefix->ai_addr)->sin6_addr);
-    freight->addr[1].in6 = *in6_len2mask(masklen);
-
-    if (soctl(_fd, SIOCSETPREFIX, &mBox) < 0)
-	err(errno, "setNatptPrefix: soctl failure");
-}
-
-
-void
-setRule(int dir, struct addrCouple *from, struct addrinfo *to, int *port)
-{
-    int			 type;
     struct msgBox	 mBox;
     struct _cSlot	*freight;
-
-    if ((from->type == ADDR_SINGLE)
-	&& (port == NULL))
-	type = NATPT_STATIC;
-    else
-	type = NATPT_DYNAMIC;
+    struct pAddr	*local, *remote;
 
     bzero(&mBox, sizeof(struct msgBox));
-    mBox.flags = type;
-    mBox.size = sizeof(struct _cSlot);
-    mBox.freight
-	= (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
+    mBox.flags = NATPT_STATIC;
+    mBox.size  = sizeof(struct _cSlot);
+    mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
+
     bzero(freight, mBox.size);
+    freight->flags = NATPT_STATIC;
+    freight->dir   = dir;
+    freight->proto = proto;
 
-    freight->c.flags   = type;
-    freight->c.adrtype = from->type;
-    freight->c.dir     = dir;
-    freight->c.lfamily	= from->family;
-    freight->local = from->addr[0];
-    freight->lmask = from->addr[1];
+    freight->prefix  = from->ad.prefix;
 
-    freight->c.rfamily = to->ai_family;
-    if (to->ai_family == AF_INET)
-	freight->remote.in4 = ((struct sockaddr_in *)to->ai_addr)->sin_addr;
-    else
-	freight->remote.in6 = ((struct sockaddr_in6 *)to->ai_addr)->sin6_addr;
+    local = from, remote = to;
+    if (dir == NATPT_INBOUND)
+	local = to, remote = from;
 
-    if (port)
+    freight->local  = *local;
+    freight->remote = *remote;
+
+    if (to->port[0] != 0)
     {
-	freight->sport = port[0];
-	freight->eport = port[1];
+	freight->map |= NATPT_PORT_MAP;
+	if (to->port[1] != 0)
+	    freight->map |= NATPT_PORT_MAP_DYNAMIC;
     }
+
+    if (isDebug(D_SHOWCSLOT))		showCSlotEntry(freight), printf("\n");
 
     if (soctl(_fd, SIOCSETRULE, &mBox) < 0)
 	err(errno, "setRule: soctl failure");
@@ -184,7 +154,54 @@ setRule(int dir, struct addrCouple *from, struct addrinfo *to, int *port)
 
 
 void
-setFaithRule(struct addrCouple *from)
+setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
+{
+    struct msgBox	 mBox;
+    struct _cSlot	*freight;
+    struct pAddr	 from;
+    struct pAddr	*local, *remote;
+
+    if ((*(port+0) != 0) && (*(port+1) != 0))
+	errx(1, "port range specified at \"from\" address.");
+
+    bzero(&mBox, sizeof(struct msgBox));
+    mBox.flags = NATPT_STATIC;
+    mBox.size  = sizeof(struct _cSlot);
+    mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
+
+    bzero(freight, mBox.size);
+    freight->flags = NATPT_STATIC;
+    freight->dir   = dir;
+    freight->proto = proto;
+
+    bzero(&from, sizeof(struct pAddr));
+    from.sa_family = (any == SANY4) ? AF_INET : AF_INET6;
+    from.ad.type = ADDR_ANY;
+    from._sport  = *(port+0);
+
+    local = &from, remote = to;
+    if (dir == NATPT_INBOUND)
+	local = to, remote = &from;
+
+    freight->local  = *local;
+    freight->remote = *remote;
+
+    if (to->port[0] != 0)
+    {
+	freight->map |= NATPT_PORT_MAP;
+	if (to->port[1] != 0)
+	    freight->map |= NATPT_PORT_MAP_DYNAMIC;
+    }
+
+    if (isDebug(D_SHOWCSLOT))		showCSlotEntry(freight), printf("\n");
+
+    if (soctl(_fd, SIOCSETRULE, &mBox) < 0)
+	err(errno, "setRule: soctl failure");
+}
+
+
+void
+setFaithRule(struct pAddr *from)
 {
     struct msgBox	 mBox;
     struct _cSlot	*freight;
@@ -194,14 +211,20 @@ setFaithRule(struct addrCouple *from)
     mBox.size  = sizeof(struct _cSlot);
     mBox.freight
 	= (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
-    bzero(freight, mBox.size);
-    
-    freight->c.flags = NATPT_FAITH;
-    freight->c.adrtype = from->type;
 
-    freight->c.lfamily = from->family;
-    freight->local = from->addr[0];
-    freight->lmask = from->addr[1];
+    bzero(freight, mBox.size);
+    freight->flags = NATPT_FAITH;
+    freight->dir   = NATPT_OUTBOUND;
+
+    if (from == NULL)
+    {
+	freight->local.ad.type = ADDR_ANY;
+	freight->remote.ad.type = ADDR_FAITH;
+    }
+    else
+    {
+	freight->local = *from;
+    }
 
     if (soctl(_fd, SIOCSETRULE, &mBox) < 0)
 	err(errno, "setFaithRule: soctl failure");
@@ -217,9 +240,9 @@ flushRule(int type)
 
     switch (type)
     {
-      case NATPT_STATIC:	mBox.flags = NATPT_STATIC;			break;
-      case NATPT_DYNAMIC:	mBox.flags = NATPT_DYNAMIC;			break;
-      default:			mBox.flags = (NATPT_STATIC | NATPT_DYNAMIC);	break;
+      case NATPT_STATIC:	mBox.flags = FLUSH_STATIC;			break;
+      case NATPT_DYNAMIC:	mBox.flags = FLUSH_DYNAMIC;			break;
+      default:			mBox.flags = (FLUSH_STATIC | FLUSH_DYNAMIC);	break;
     }
     
     if (soctl(_fd, SIOCFLUSHRULE, &mBox) < 0)
@@ -253,7 +276,8 @@ setValue(char *name, int val)
 
     bzero(&mBox, sizeof(struct msgBox));
 
-    if (strcmp(name, "debug") == 0)		type =NATPT_DEBUG;
+    if (strcmp(name, "natpt_debug") == 0)		type =NATPT_DEBUG;
+    else if (strcmp(name, "natpt_dump") == 0)		type =NATPT_DUMP;
 
     if (type == 0)
 	errx(1, "%s: no such variable\n", name);
@@ -263,7 +287,31 @@ setValue(char *name, int val)
     *((u_int *)mBox.m_aux) = val;
 
     if (soctl(_fd, SIOCSETVALUE, &mBox) < 0)
-	err(errno, "setValue: soctl failre");
+	err(errno, "setValue: soctl failure");
+}
+
+
+void
+testLog(char *str)
+{
+    int			 slen;
+    char		*freight;
+    struct msgBox	 mBox;
+
+    bzero(&mBox, sizeof(struct msgBox));
+
+    if (str == NULL)
+	str = LOGTESTPATTERN;
+
+    slen = ROUNDUP(strlen(str)+1);
+    freight = malloc(slen);
+    bzero(freight, slen);
+    strcpy(freight, str);
+    mBox.size = slen;
+    mBox.freight = freight;
+
+    if (soctl(_fd, SIOCTESTLOG, &mBox) < 0)
+	err(errno, "testLog: soctl failure");
 }
 
 
@@ -281,6 +329,12 @@ soctl(int fd, u_long request, ...)
     int		rv = 0;
     va_list	ap;
 
+    if (_fd == -1)
+    {
+	errno = EPERM;
+	return (-1);
+    }
+    
     va_start(ap, request);
 
     if (!isDebug(D_NOSOCKET))
@@ -313,64 +367,68 @@ getAddrInfo(int family, char *text)
 }
 
 
-struct addrCouple *
-getAddrBlock(int family, int type, struct addrinfo *one, void *two)
+struct pAddr *
+getAddrPort(int family, int type, struct addrinfo *one, void *two)
 {
-    struct sockaddr	*sin;
-    struct addrCouple	*block;
+    struct sockaddr_in	*sin4;
+    struct sockaddr_in6	*sin6;
+    struct pAddr	*block;
 
-    block = malloc(sizeof(struct addrCouple));
-    bzero(block, sizeof(struct addrCouple));
+    block = malloc(sizeof(struct pAddr));
+    bzero(block, sizeof(struct pAddr));
 
-    block->family = family;
-    block->type	  = type;
+    block->sa_family = family;
+    block->ad.type  = type;
 
     switch (family)
     {
       case AF_INET:
-	block->addr[0].in4 = ((struct sockaddr_in *)one)->sin_addr;
+	sin4 = (struct sockaddr_in *)one->ai_addr;
+	block->in4Addr = sin4->sin_addr;
 	break;
 
       case AF_INET6:
-	block->addr[0].in6 = ((struct sockaddr_in6 *)one)->sin6_addr;
+	sin6 = (struct sockaddr_in6 *)one->ai_addr;
+	block->in6Addr = sin6->sin6_addr;
 	break;
     }
 
-    switch (type)
+    if (two)
     {
-      case ADDR_SINGLE:
-	break;
-
-      case ADDR_MASK:
-	switch (family)
+	switch (type)
 	{
-	  case AF_INET:
-	    block->addr[1].in4 = *in4_len2mask(*(int *)two);
+	  case ADDR_SINGLE:
 	    break;
 
-	  case AF_INET6:
-	    block->addr[1].in6 = *in6_len2mask(*(int *)two);
+	  case ADDR_MASK:
+	    switch (family)
+	    {
+	      case AF_INET:
+	      case AF_INET6:
+		block->ad.prefix = *(int *)two;
+		break;
+	    }
 	    break;
+
+	  case ADDR_RANGE:
+	    if (family == AF_INET)
+	    {
+		block->in4Mask = ((struct sockaddr_in *)two)->sin_addr;
+	    }
 	}
-	break;
-
-      case ADDR_RANGE:
-	switch (family)
-	{
-	  case AF_INET:
-	    sin = ((struct addrinfo *)two)->ai_addr;
-	    block->addr[1].in4 = ((struct sockaddr_in *)sin)->sin_addr;
-	    break;
-
-	  case AF_INET6:
-	    sin = ((struct addrinfo *)two)->ai_addr;
-	    block->addr[1].in6 = ((struct sockaddr_in6 *)sin)->sin6_addr;
-	    break;
-	}
-	break;
     }
 
     return (block);
+}
+
+
+struct pAddr *
+setAddrPort(struct pAddr *aport, u_short *optPort)
+{
+    aport->port[0] = *(optPort+0);
+    aport->port[1] = *(optPort+1);
+    free(optPort);
+    return (aport);
 }
 
 
@@ -476,7 +534,23 @@ debugProbe(char *msg)
 
 
 void
-close_fd()
+openFD()
+{
+    if (_fd != 0)
+	return ;
+
+    if ((!isDebug(D_NOSOCKET)
+	 && (_fd = socket(PF_INET, SOCK_RAW, IPPROTO_AHIP)) < 0))
+	warnx("openFD: socket open failure: %s", strerror(errno));
+
+/* These two function call are equivalent in output.			*/
+/*	warn ("openFD: socket open failure");				*/
+/*	warnx("openFD: socket open failure: %s", strerror(errno));	*/
+}
+
+
+void
+closeFD()
 {
     close(_fd);
 }
@@ -486,13 +560,6 @@ void
 init_misc()
 {
     int		iter, mask;
-
-    if (_fd != 0)
-	return ;
-
-    if ((!isDebug(D_NOSOCKET)
-	 && (_fd = socket(PF_INET, SOCK_RAW, IPPROTO_AHIP)) < 0))
-	err(errno, "init_misc:");
 
     bzero(mtobits, sizeof(mtobits));
     mask = 0x80000000;

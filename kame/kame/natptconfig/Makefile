@@ -16,18 +16,18 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
-.PATH:		${.CURDIR}/../../../sys/netinet6
+.PATH:		${.CURDIR}/../../sys/
 
 BINDIR=	${PREFIX}/sbin
 PROG=	natptconfig
-SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c yylex.c
+SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c showsubs.c yylex.c
 CLEANFILES+= natptconfig.y.c natptconfig.l.c natptconfig.y.h y.output y.tab.c y.tab.h
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+= -Wall
 .endif
 
-CFLAGS+= -g -DYYDEBUG -DNATPT -DreadKMEM
+CFLAGS+= -g -I${.CURDIR}/../../sys/ -DYYDEBUG -DNATPT -DNATPTCONFIG -DreadKMEM
 
 LDADD+=	-L${.CURDIR}/../libinet6 -L${.CURDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6 -lkvm -ly -ll
@@ -41,6 +41,9 @@ MAN8=	natptconfig.8
 MAN=	natptconfig.8
 .endif
 
+main.o:		main.c natptconfig.y.h
+misc.o:		misc.c natptconfig.y.h
+yylex.o:	yylex.c natptconfig.y.h
 
 natptconfig.y.c \
 natptconfig.y.h:	natptconfig.y showvar.h
@@ -50,6 +53,9 @@ natptconfig.y.h:	natptconfig.y showvar.h
 
 natptconfig.l.c:	natptconfig.l
 		$(LEX) -t -L natptconfig.l > natptconfig.l.c
+
+etags:
+		etags *.[chly] ../../sys/netinet6/*.[ch]
 
 
 .include <bsd.prog.mk>

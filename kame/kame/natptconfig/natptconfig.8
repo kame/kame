@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: natptconfig.8,v 1.1 2000/01/07 14:33:32 fujisawa Exp $
+.\"	$Id: natptconfig.8,v 1.2 2000/02/18 11:39:54 fujisawa Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -52,7 +52,7 @@ kernel.
 .Nm Natptconfig
 has two format of command line araguments.  First one has the
 following options.
-.Bl -tag -width Fl
+.Bl -tag -width Ds
 .It Fl f Ar configfile
 Evaluate the content of file specified by configfile, as configuration
 directives.  By specifying
@@ -133,7 +133,7 @@ map enable
 .Ed
 .Pp
 The following is an example of '?' directive.
-.Bd -literal -offset indent
+.Bd -literal -offset Ds
 % natptconfig ?
 	interface	Mark interface as outside or inside.
 	map		Set translation rule.
