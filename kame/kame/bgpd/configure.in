@@ -89,8 +89,10 @@ fi
 AC_MSG_CHECKING(for inet_ntop support)
 AC_CACHE_VAL(bgp_cv_ntop, [dnl
 AC_TRY_LINK([#include <sys/types.h>
-#include <sys/socket.h>],
-        [char *a, *b; inet_ntop(AF_INET, a, b)],
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>],
+        [char *a, *b; inet_ntop(AF_INET, a, b, 0)],
         [bgp_cv_ntop="yes"], [bgp_cv_ntop="no"])])
 AC_MSG_RESULT($bgp_cv_ntop)
 if test "$bgp_cv_ntop" = no; then
