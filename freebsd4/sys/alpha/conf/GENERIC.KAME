@@ -195,8 +195,24 @@ device		kue		# Kawasaki LSI USB ethernet
 options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
+#pseudo-device	sec			#IPsec tunnel by sec* device
 #options 	NATM			#native mode ATM
+#options 	ENABLE_DEFAULT_SCOPE
+
+#options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
+
 options 	NEW_STRUCT_ROUTE	# mandatory
+
+#options 	RADIX_MPATH	# equal cost multipath
+
+#options 	SCTP		# adds SCTP stack to kernel - requires INET6
+#options 	SCTP_DEBUG	# adds debugging support for SCTP
+#options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
+#options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
+#options 	SCTP_ALTERNATE_ROUTE	# alternate route support - TBD
+
+# Router Preference on host side
+#options 	RTPREF
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"

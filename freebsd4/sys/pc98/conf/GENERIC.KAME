@@ -404,3 +404,59 @@ pseudo-device	bpf		#Berkeley packet filter
 #device		aue		# ADMtek USB ethernet
 #device		cue		# CATC USB ethernet
 #device		kue		# Kawasaki LSI USB ethernet
+
+# KAME extensions
+#
+
+options 	IPSEC			#IP security
+options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
+#options 	IPSEC_DEBUG		#debug for IP security
+#pseudo-device	sec			#IPsec tunnel by sec* device
+#options 	NATM			#native mode ATM
+#options 	ENABLE_DEFAULT_SCOPE
+
+#options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
+
+options 	NEW_STRUCT_ROUTE	# mandatory
+
+#options 	RADIX_MPATH	# equal cost multipath
+
+#options 	SCTP		# adds SCTP stack to kernel - requires INET6
+#options 	SCTP_DEBUG	# adds debugging support for SCTP
+#options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
+#options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
+#options 	SCTP_ALTERNATE_ROUTE	# alternate route support - TBD
+
+# Router Preference on host side
+#options 	RTPREF
+
+# IPv6 firewall
+#options 	"IPV6FIREWALL"
+#options 	"IPV6FIREWALL_VERBOSE"
+#options 	"IPV6FIREWALL_DEFAULT_TO_ACCEPT"
+
+# ALTQ
+options 	ALTQ		#alternate queueing
+#options 	ALTQ_CBQ	#class based queueing
+#options 	ALTQ_WFQ	#weighted fair queueing
+#options 	ALTQ_FIFOQ	#fifo queueing
+#options 	ALTQ_RED	#random early detection
+#options 	ALTQ_FLOWVALVE	#flowvalve for RED (needs RED)
+#options 	ALTQ_RIO	#triple red for diffserv (needs RED)
+#options 	ALTQ_LOCALQ	#local use
+#options 	ALTQ_HFSC	#hierarchical fair service curve
+#options 	ALTQ_IPSEC	#check ipsec in IPv4
+#options 	ALTQ_CDNR	#diffserv traffic conditioner
+#options 	ALTQ_BLUE	#blue by wu-chang feng
+#options 	ALTQ_PRIQ	#priority queue
+#options 	ALTQ_NOPCC	#don't use processor cycle counter
+#options 	ALTQ_DEBUG	#for debugging
+
+options 	TCP_ECN		# ECN support in TCP
+
+# Network Address Translation - Protocol Translation (NAT-PT)
+#options 	NATPT
+
+#pseudo-device	atm
+#pseudo-device	dummy	1
+#pseudo-device	stf
