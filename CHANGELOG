@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2253 2002/10/17 09:09:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.2254 2002/10/17 12:34:21 jinmei Exp $
 
 <200210>
+2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd/sbin/ifconfig/ifconfig.c: made the IN6_IFF_DEPRECATED flag
+	obsolete, since it was not effectively used in the kernel any
+	more.
+	- "ifconfig ADDR deprecate" is now equivalent to
+	  "ifconfig ADDR pltime 0".
+	- "ifconfig [ifname]" prints "deprecated" when pltime is 0,
+	  regardless of the flag value.
+	(Note: there should be no difference on the behavior for users.)
+	
 2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* netbsd/sys/net/route.h: used padding in the route structure
 	instead of using sockaddr_storage.  (See the change on Oct 7 below.)
