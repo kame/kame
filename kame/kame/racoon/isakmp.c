@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.57 2000/05/17 11:29:28 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.58 2000/05/22 21:40:57 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -933,7 +933,7 @@ isakmp_parsewoh(np0, gen, len)
 			return NULL;
 		}
 
-		YIPSDEBUG(DEBUG_NOTIFY,
+		YIPSDEBUG(DEBUG_SA,
 			plog(logp, LOCATION, NULL,
 				"seen nptype=%u(%s)\n", np,
 				s_isakmp_nptype(np)));
