@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.19 2002/01/13 13:30:17 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.20 2002/01/18 06:26:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -222,18 +222,43 @@ writeXlateHeader(int type)
 }
 
 
-void
-showVariables()
+int
+showVariables(char *word)
 {
 	const char *fn = __FUNCTION__;
 
+	int			 type;
 	int			 idx, val;
 	char			 Bow[128];
 	char			 Wow[INET6_ADDRSTRLEN];
 	struct natptctl_names	 ctlnames[] = NATPTCTL_NAMES;
 
+	type = 0;
+	if (word != NULL) {
+		if (*word == '?') {
+			printf("	show variables\n");
+			printf("	show variables all\n");
+			printf("	show variables tslot\n");
+			return (0);
+		}
+		else if (strncasecmp(word, "all", strlen("all")) == 0)
+			type = NATPTCTL_ALL;
+		else if (strncasecmp(word, "tslot", strlen("tslot")) == 0)
+			type = NATPTCTL_TSLOT;
+		else
+			return (1);
+	}
+
 	for (idx = 0; ctlnames[idx].ctl_name; idx++) {
-		if ((ctlnames[idx].ctl_attr & NATPTCTL_DEFAULT) == 0)
+		if (type == NATPTCTL_ALL)
+			;
+		else if (type == NATPTCTL_TSLOT) {
+			if ((ctlnames[idx].ctl_attr & NATPTCTL_TSLOT) == 0)
+				continue;
+			else
+				;
+		}
+		else if ((ctlnames[idx].ctl_attr & NATPTCTL_DEFAULT) == 0)
 			continue;
 
 		if (getValue(idx, (caddr_t)&Bow) <= 0) {
@@ -256,6 +281,8 @@ showVariables()
 
 		printf("\n");
 	}
+
+	return (0);
 }
 
 

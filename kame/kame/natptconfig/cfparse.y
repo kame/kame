@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.18 2001/11/16 07:42:22 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.19 2002/01/18 06:26:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -162,6 +162,7 @@ yyerror(char *msg, ...)
 %type	<UInt>	opt_long
 %type	<UShrt>	opt_ports
 %type	<UInt>	opt_proto
+%type	<Char>	opt_word
 %type	<UInt>	proto
 %type	<UInt>	protos
 
@@ -368,8 +369,11 @@ show
 		    { showRules($3); }
 		| SSHOW SXLATE opt_long opt_decimal
 		    { showXlate($3, $4); }
-		| SSHOW SVARIABLES
-		    { showVariables(); }
+		| SSHOW SVARIABLES opt_word
+		    {
+			if (showVariables($3) != 0)
+				yyerror("invalid argument: `%s'", $3);
+		    }
 		| SSHOW SMAPPING
 		    { showMapping(); }
 		;
@@ -453,6 +457,16 @@ opt_decimal
 		    { $$ = 0; }
 		| SDECIMAL
 		    { $$ = $1; }
+		;
+
+opt_word
+		:
+		    { $$ = 0; }
+		| SNAME
+		    { $$ = strdup(yytext); }
+		| SQUESTION
+		    { $$ = strdup(yytext); }
+
 		;
 
 daddr4
