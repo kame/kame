@@ -848,7 +848,7 @@ getaddr(which, s, hpp)
 			int			sock;
 			struct ifreq		iflist[MAX_IFACES];
 			struct ifconf		ifconf;
-			struct ifreq		*ifr, *ifr_end;
+			struct ifreq		*ifr, *ifr_end, ifr_flg;
 			struct sockaddr_dl	*dl, *sdl = NULL;
 
 			/* Get socket */
@@ -871,11 +871,17 @@ getaddr(which, s, hpp)
 						    + ifr->ifr_addr.sa_len)) {
 				dl = (struct sockaddr_dl *)&ifr->ifr_addr;
 				if (ifr->ifr_addr.sa_family == AF_LINK
-				    && (ifr->ifr_flags & IFF_POINTOPOINT)
 				    && !strncmp(s, dl->sdl_data, dl->sdl_nlen)
 				    && s[dl->sdl_nlen] == 0) {
-					sdl = dl;
-					break;
+					memset(&ifr_flg, 0, sizeof(ifr_flg));
+					strcpy(ifr_flg.ifr_name,
+					       ifr->ifr_name);
+					if (ioctl(sock, SIOCGIFFLAGS,
+						  (caddr_t)&ifr_flg) == 0 &&
+					    ifr_flg.ifr_flags & IFF_POINTOPOINT) {
+						sdl = dl;
+						break;
+					}
 				}
 			}
 
