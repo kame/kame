@@ -1,0 +1,6 @@
+include/tcpd.h
+lib/libwrap.a
+lib/libwrap.la
+lib/libwrap.so
+lib/libwrap.so.1
+libexec/tcpd

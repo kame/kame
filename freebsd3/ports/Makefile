@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.29 2000/06/23 16:00:45 sumikawa Exp $
+# $Id: Makefile,v 1.30 2000/06/23 16:20:40 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -60,7 +60,7 @@ SUBDIR+=	solidpop3d
 SUBDIR+=	squid11
 SUBDIR+=	ssh
 SUBDIR+=	tcp_wrapper
-SUBDIR+=	tcpd6
+SUBDIR+=	tcpd
 SUBDIR+=	tcpdump
 SUBDIR+=	tcptrace
 SUBDIR+=	totd
