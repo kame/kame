@@ -66,7 +66,7 @@ struct iovec sndiov[2];
 struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
 int sock, rtsock;
-int accept_rr = 1;
+int accept_rr = 0;
 int dflag = 0, sflag = 0;
 
 u_char *conffile = NULL;
@@ -140,7 +140,7 @@ main(argc, argv)
 	openlog(*argv, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
 	/* get command line options and arguments */
-	while ((ch = getopt(argc, argv, "c:dDfs")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dDfRs")) != -1) {
 		switch(ch) {
 		 case 'c':
 			 conffile = optarg;
@@ -154,15 +154,19 @@ main(argc, argv)
 		 case 'f':
 			 fflag = 1;
 			 break;
+		 case 'R':
+			 accept_rr = 1;
+			 break;
 		 case 's':
 			 sflag = 1;
+			 break;
 		}
 	}
 	argc -= optind;
 	argv += optind;
 	if (argc == 0) {
 		fprintf(stderr,
-			"usage: rtadvd [-c conffile] [-d|D] [-f] [-s]"
+			"usage: rtadvd [-dDfsR] [-c conffile] "
 			"interfaces...\n");
 		exit(1);
 	}
