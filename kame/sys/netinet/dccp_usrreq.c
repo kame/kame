@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.41 2005/01/18 10:51:07 suz Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.42 2005/01/19 09:29:41 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -428,7 +428,7 @@ dccp_input(struct mbuf *m, ...)
 	{
 		bzero(ipov->ih_x1, sizeof(ipov->ih_x1));
 		((struct ipovly *)ip)->ih_len = htons(len);
-		dh->dh_sum = in_cksum(m, cslen + sizeof (struct ip));
+		dh->dh_sum = in4_cksum(m, IPPROTO_DCCP, off, cslen);
 
 		if (dh->dh_sum) {
 			DCCP_DEBUG((LOG_INFO, "Bad checksum, dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
@@ -1772,11 +1772,28 @@ again:
 	m->m_pkthdr.len = hdrlen + len;
 
 	if (dh->dh_cscov == 0) {
-		cslen = (hdrlen - sizeof(struct ip6_hdr)) + len;
+#ifdef INET6
+		if (isipv6)
+			cslen = (hdrlen - sizeof(struct ip6_hdr)) + len;
+		else
+			cslen = (hdrlen - sizeof(struct ip)) + len;
+#else
+		cslen = (hdrlen - sizeof(struct ip)) + len;
+#endif
 	} else {
 		cslen = dh->dh_off * 4 + (dh->dh_cscov - 1) * 4;
+#ifdef INET6
+		if (isipv6) {
+			if (cslen > (hdrlen - sizeof(struct ip6_hdr)) + len)
+				cslen = (hdrlen - sizeof(struct ip6_hdr)) + len;
+		} else {
+			if (cslen > (hdrlen - sizeof(struct ip)) + len)
+				cslen = (hdrlen - sizeof(struct ip)) + len;
+		}
+#else
 		if (cslen > (hdrlen - sizeof(struct ip)) + len)
 			cslen = (hdrlen - sizeof(struct ip)) + len;
+#endif
 	}
 
 	/*
@@ -1797,11 +1814,6 @@ again:
 	} else
 #endif
 	{
-		dh->dh_sum = in4_cksum(m, 0, 20, cslen);
-#ifndef __OpenBSD__
-		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
-#endif
-
 #ifdef __OpenBSD__
 		ip->ip_len = htons(hdrlen + len);
 #else
@@ -1813,6 +1825,12 @@ again:
 #else
 		ip->ip_ttl = dp->inp_ip_ttl;	/* XXX */
 		ip->ip_tos = dp->inp_ip_tos;	/* XXX */
+#endif
+
+		dh->dh_sum = in4_cksum(m, IPPROTO_DCCP, sizeof(struct ip),
+		    cslen);
+#ifndef __OpenBSD__
+		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
 #endif
 	}
 
