@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.58 2004/01/20 07:51:19 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.59 2004/01/20 09:55:50 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1415,7 +1415,7 @@ mip6_get_nodekey(index, nodekey)
 		offset = offset - 0xffff;
 	}
 
-	if (offset < -MIP6_NONCE_HISTORY) {
+	if (offset <= -MIP6_NONCE_HISTORY) {
 		/* too old index. */
 		return (-1);
 	}
