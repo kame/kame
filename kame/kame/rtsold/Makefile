@@ -26,9 +26,9 @@ CC=	gcc
 CFLAGS+=-Wall
 .endif
 .if (${OPSYS} != "NetBSD")
-CFLAGS+=-DINET6
+CFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 .else
-CPPFLAGS+=-DINET6
+CPPFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 .endif
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6

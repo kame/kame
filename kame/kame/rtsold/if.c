@@ -63,6 +63,9 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <limits.h>
+#ifdef HAVE_GETIFADDRS
+#include <ifaddrs.h>
+#endif
 
 #include "rtsold.h"
 
@@ -70,7 +73,9 @@ extern int rssock;
 static int ifsock;
 
 static int get_llflag __P((const char *name));
+#ifndef HAVE_GETIFADDRS
 static unsigned int if_maxindex __P((void));
+#endif
 static void get_rtaddrs __P((int addrs, struct sockaddr *sa,
 			     struct sockaddr **rti_info));
 
@@ -309,6 +314,51 @@ getinet6sysctl(int code)
 static int
 get_llflag(const char *name)
 {
+#ifdef HAVE_GETIFADDRS
+	struct ifaddrs *ifap, *ifa;
+	struct in6_ifreq ifr6;
+	struct sockaddr_in6 *sin6;
+	int s;
+
+	if ((s = socket(PF_INET6, SOCK_DGRAM, 0)) < 0) {
+		warnmsg(LOG_ERR, __FUNCTION__, "socket(SOCK_DGRAM): %s",
+		    strerror(errno));
+		exit(1);
+	}
+	if (getifaddrs(&ifap) != 0) {
+		warnmsg(LOG_ERR, __FUNCTION__, "etifaddrs: %s",
+		    strerror(errno));
+		exit(1);
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (strlen(ifa->ifa_name) != strlen(name)
+		 || strncmp(ifa->ifa_name, name, strlen(name)) != 0)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+		if (!IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+			continue;
+
+		memset(&ifr6, 0, sizeof(ifr6));
+		strcpy(ifr6.ifr_name, name);
+		memcpy(&ifr6.ifr_ifru.ifru_addr, sin6, sin6->sin6_len);
+		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+			warnmsg(LOG_ERR, __FUNCTION__,
+			    "ioctl(SIOCGIFAFLAG_IN6): %s", strerror(errno));
+			exit(1);
+		}
+
+		free(ifap);
+		close(s);
+		return ifr6.ifr_ifru.ifru_flags6;
+	}
+
+	free(ifap);
+	close(s);
+	return -1;
+#else
 	int s;
 	unsigned int maxif;
 	struct ifreq *iflist;
@@ -370,8 +420,10 @@ get_llflag(const char *name)
 	free(iflist);
 	close(s);
 	return -1;
+#endif
 }
 
+#ifndef HAVE_GETIFADDRS
 static unsigned int
 if_maxindex()
 {
@@ -386,6 +438,7 @@ if_maxindex()
 	if_freenameindex(p0);
 	return max;
 }
+#endif
 
 static void
 get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
