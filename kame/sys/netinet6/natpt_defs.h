@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.53 2002/05/29 10:31:23 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.54 2002/06/12 04:36:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -34,6 +34,9 @@
 
 #define	NATPT_FRGHDRSZ	(sizeof(struct ip6_hdr) + sizeof(struct ip6_frag))
 #define	NATPT_MAXULP	(IPV6_MMTU - NATPT_FRGHDRSZ)
+
+/* 64 bits of Original Data Datagram in ICMP message */
+#define	ICMP4_DGRAM	8
 
 #define	SIN4(s)		((struct sockaddr_in  *)s)
 #define	SIN6(s)		((struct sockaddr_in6 *)s)

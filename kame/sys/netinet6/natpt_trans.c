@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.120 2002/06/10 07:47:54 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.121 2002/06/12 04:36:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -490,7 +490,7 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 	icmpip4 = (struct ip *)((caddr_t)icmp4 + ICMP_MINLEN);
 	icmpip4pyld = (caddr_t)icmpip4 + sizeof(struct ip);
 
-	dgramlen = (caddr_t)icmp6 + ntohs(ip6->ip6_plen) - icmpip6pyld;
+	dgramlen = min(ip6end - icmpip6pyld, ICMP4_DGRAM);
 
 	bzero(icmpip4, sizeof(struct ip));
 	bcopy(icmpip6pyld, icmpip4pyld, dgramlen);
@@ -593,6 +593,7 @@ natpt_translateUDPv6To4(struct pcv *cv6, struct pAddr *pad)
 	} else {
 		cv4.pyld.udp->uh_sum = 0;
 	}
+
 	return (m4);
 }
 
