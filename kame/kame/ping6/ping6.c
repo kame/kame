@@ -105,7 +105,6 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <netinet/ip_var.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
-#include <netinet6/ah.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
@@ -120,6 +119,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <unistd.h>
 
 #ifdef IPSEC
+#include <netinet6/ah.h>
 #include <netinet6/ipsec.h>
 #endif
 
@@ -900,12 +900,14 @@ pr_pack(buf, cc, mhdr)
 			fprintf(stderr, "header chain: type=0x%x\n", nh);
 
 		switch (nh) {
+#ifdef IPSEC
 		case IPPROTO_AH:
 			ah = (struct ah *)(buf + off);
 			off += sizeof(struct ah);
 			off += (ah->ah_len << 2);
 			nh = ah->ah_nxt;
 			break;
+#endif
 
 		 case IPPROTO_HOPOPTS:
 			ip6e = (struct ip6_ext *)(buf + off);
@@ -1411,8 +1413,8 @@ pr_retip(ip6, end)
 
 	nh = ip6->ip6_nxt;
 	cp += hlen;
-	while(end - cp >= 8) {
-		switch(nh) {
+	while (end - cp >= 8) {
+		switch (nh) {
 		 case IPPROTO_HOPOPTS:
 			 printf("HBH ");
 			 hlen = (((struct ip6_hbh *)cp)->ip6h_len+1) << 3;
@@ -1433,11 +1435,13 @@ pr_retip(ip6, end)
 			 hlen = (((struct ip6_rthdr *)cp)->ip6r_len+1) << 3;
 			 nh = ((struct ip6_rthdr *)cp)->ip6r_nxt;
 			 break;
+#ifdef IPSEC
 		 case IPPROTO_AH:
 			 printf("AH ");
 			 hlen = (((struct ah *)cp)->ah_len+2) << 2;
 			 nh = ((struct ah *)cp)->ah_nxt;
 			 break;
+#endif
 		 case IPPROTO_ICMPV6:
 			 printf("ICMP6: type = %d, code = %d\n",
 				*cp, *(cp + 1));
