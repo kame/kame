@@ -2255,7 +2255,7 @@ ok:
 
 		/* don't increment, no more packets accepted */
 		if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0)
-			return 1;
+			return 0;
 
 		log(LOG_AUTH, "replay counter made %d cycle. %s\n",
 			replay->overflow,

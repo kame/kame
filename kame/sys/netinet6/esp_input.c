@@ -270,7 +270,10 @@ esp4_input(m, va_alist)
 	 * update sequence number.
 	 */
 	if ((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay) {
-		(void)ipsec_updatereplay(ntohl(((struct newesp *)esp)->esp_seq), sav);
+		if (ipsec_updatereplay(ntohl(((struct newesp *)esp)->esp_seq), sav)) {
+			ipsecstat.in_espreplay++;
+			goto bad;
+		}
 	}
 
 noreplaycheck:
@@ -691,7 +694,10 @@ esp6_input(mp, offp, proto)
 	 * update sequence number.
 	 */
 	if ((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay) {
-		(void)ipsec_updatereplay(ntohl(((struct newesp *)esp)->esp_seq), sav);
+		if (ipsec_updatereplay(ntohl(((struct newesp *)esp)->esp_seq), sav)) {
+			ipsec6stat.in_espreplay++;
+			goto bad;
+		}
 	}
 
 noreplaycheck:
