@@ -1,4 +1,4 @@
-/*	$KAME: mld6.h,v 1.3 2000/12/04 06:33:10 itojun Exp $	*/
+/*	$KAME: mld6.h,v 1.4 2002/04/03 05:37:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -46,3 +46,19 @@
 #define MLD6_OTHER_QUERIER_PRESENT_INTERVAL (MLD6_ROBUSTNESS_VARIABLE * \
 		MLD6_QUERY_INTERVAL + \
 		MLD6_QUERY_RESPONSE_INTERVAL / (2 * MLD6_TIMER_SCALE))
+
+/* portability with older KAME headers */
+#ifndef MLD_LISTENER_QUERY
+#define MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
+#define MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
+#define MLD_LISTENER_DONE	MLD6_LISTENER_DONE
+#define MLD_MTRACE_RESP		MLD6_MTRACE_RESP
+#define MLD_MTRACE		MLD6_MTRACE
+#define mld_hdr		mld6_hdr
+#define mld_type	mld6_type
+#define mld_code	mld6_code
+#define mld_cksum	mld6_cksum
+#define mld_maxdelay	mld6_maxdelay
+#define mld_reserved	mld6_reserved
+#define mld_addr	mld6_addr
+#endif
