@@ -1,3 +1,5 @@
+/*	$KAME: strdup.c,v 1.1.1.2 2001/08/08 09:56:22 sakane Exp $	*/
+
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.  All rights reserved.
  *
@@ -24,9 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-/*
- * $Id: strdup.c,v 1.1.1.1 1999/08/08 23:31:31 itojun Exp $
  */
 
 #include <sys/types.h>
