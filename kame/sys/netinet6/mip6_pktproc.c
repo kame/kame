@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.48 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.49 2002/09/17 11:18:15 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -567,19 +567,11 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		coa_sa.sin6_addr = ip6a->ip6a_coa;
 	}
 
-	/*
-	 *              HAO          no HAO
-	 * IPseced      HR     -> o  HR     -> x
-	 *              not HR -> o  not HR -> o
-	 * not IPseced  HR     -> x  HR     -> x
-	 *              not HR -> x  not HR -> o
-	 */
-#if 1 /* XXX temporally */
-	if (ip6mu_flags & IP6MU_HOME) {
+	if (!mip6_config.mcfg_use_ipsec && (ip6mu_flags & IP6MU_HOME)) {
 		bu_safe = 1;
 		goto accept_binding_update;
 	}
-#endif
+
 	if (isprotected
 	    && haseen) {
 		bu_safe = 1;
@@ -782,6 +774,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 #endif
 	int error = 0;
 	struct mip6_mobility_options mopt;
+	u_int8_t ba_safe = 0;
 
 	mip6stat.mip6s_ba++;
 
@@ -817,6 +810,11 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		return (EINVAL);
 	}
 
+	if (((m->m_flags & M_DECRYPTED) != 0)
+	    || ((m->m_flags & M_AUTHIPHDR) != 0)) {
+		ba_safe = 1;
+	}
+
 	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6ma,
 					       sizeof(*ip6ma),
 					       ip6malen, &mopt))) {
@@ -826,8 +824,6 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	mip6log((LOG_INFO, "%s:%d: Mobility options: %b\n", 
 			 __FILE__, __LINE__, mopt.valid_options,
 		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
-
-	/* XXX autorization */
 
 	mip6stat.mip6s_ba_hist[ip6ma->ip6ma_status]++;
 
@@ -858,6 +854,23 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		mip6stat.mip6s_nobue++;
                 return (EINVAL);
 	}
+
+	if (!mip6_config.mcfg_use_ipsec && (mbu->mbu_flags & IP6MU_HOME)) {
+		ba_safe = 1;
+		goto accept_binding_ack;
+	}
+
+	if ((mbu->mbu_flags & IP6MU_HOME) == 0) {
+		goto accept_binding_ack;
+	}
+
+	/* otherwise, discard this packet. */
+	m_freem(m);
+	mip6stat.mip6s_haopolicy++; /* XXX */
+	return (EINVAL);
+
+ accept_binding_ack:
+
 	seqno = htons(ip6ma->ip6ma_seqno);
 	if (ip6ma->ip6ma_status == IP6MA_STATUS_SEQNO_TOO_SMALL) {
                 /*
@@ -887,6 +900,12 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 
  check_mobility_options:
 
+	if (!ba_safe) {
+		/* XXX autorization */
+                mip6log((LOG_NOTICE,
+                         "%s:%d: BA authentication not supported\n",
+                         __FILE__, __LINE__));
+	}
 
 	if (ip6ma->ip6ma_status >= IP6MA_STATUS_ERRORBASE) {
                 mip6log((LOG_NOTICE,
