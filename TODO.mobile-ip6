@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.14 2001/10/04 06:06:17 itojun Exp $
+$KAME: TODO.mobile-ip6,v 1.15 2001/10/09 11:45:12 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -22,12 +22,13 @@ todo
 - mobile prefix advertisement.
 - complete dynamic home agent discovery.
 - BR.
-- tunneled ICMP.
+- homeagent info handling.
+- ICMP against tunneled packet handling.
 - registration to the old AR.
 - path mtu discovery when triangle routing.
 - some timeout routines.
 - BSD/OS support.
-- draft-15.
+- draft-15 (or later).
 - think again about home/care-of address swap.  at least the current code in
   sys/netinet6/dest6.c is not friendly with (1) icmp6 error generator, (2)
   tunnels used for PIM, and maybe others.
@@ -53,26 +54,34 @@ HA side
 - build kernel with MIP6 and hif pseudo-if
 	options MIP6
 	pseudo-device hif 1
-- build rtadvd with -DMIP6 for HA.  The easiest way is to add CFLAGS
-  (or CPPFLAGS) in kame/$OS/usr.sbin/rtadvd/Makefile and recompile rtadvd.
+- build rtadvd with -DMIP6 to become a HA.  The easiest way is to add
+  CFLAGS (or CPPFLAGS) in kame/$OS/usr.sbin/rtadvd/Makefile and
+  recompile rtadvd.
 	CFLAGS+=-DMIP6
 - build mip6control in kame/kame/mip6control.
 - to become a HA.
-	invode rtadvd with -m option
+	invoke rtadvd with -m option
 	mip6control -g
 - to become a MN
 	mip6control -H your_home_prefix -P64
 	mip6control -m
 
 
+<<Schedule>>
+
+- NetBSD support (the end of October)
+- Beta release (for FreeBSD/NetBSD, the end of this year)
+
+
 <<Old MIP6 code>>
 
 The Ericsson's code integrated before has been removed. Tha last
-kame-snap that includes MIP code is 20010604. You can also retreive a
-patch for the 20010611 snap from
+kame-snap that includes the MIP code is 20010604. You can also
+retreive a patch for the 20010611 snap from
 ftp://ftp.kame.net/pub/kame/contrib/mip6/ericsson.
 
-Also, NEC provides mipbile ipv6 (based on draft 13) patch for KAME.
-You can get it from www.6bone.nec.co.jp.
+Also, NEC provides mobile ipv6 (based on draft 13) patch freely
+available for the KAME stack.  You can get it from
+www.6bone.nec.co.jp.
 
 [EOF]
