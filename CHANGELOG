@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1481 2001/01/16 01:44:47 jinmei Exp $
+$KAME: CHANGELOG,v 1.1482 2001/01/17 17:02:11 itojun Exp $
 
 <200101>
+Thu Jan 18 02:00:32 JST 2001  itojun@iijlab.net
+	* netbsd, openbsd, bsdi4: fix unsafe typecast in rtrequest1().
+	  clarify 3rd arg handling in eonrtrequest().
+	* netbsd, openbsd: integrate post-4.4BSD rtrequest1(), and argument
+	  type change on ifa_rtrequest (3rd arg).
+
 2001-01-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dtcp/dtcps.rb (tunnelcleanup): deleted the pair of
 	physical addresses by "gifconfig delete" after the session. This
