@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.55 2002/12/24 06:37:10 suz Exp $	*/
+/*	$KAME: debug.c,v 1.56 2003/01/11 07:49:17 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -998,7 +998,12 @@ dump_rp_set(fp)
 			sa6_fmt(&rp->rpentry->upstream->address),
 			uvifs[rp->rpentry->incoming].uv_name);
 	} else {
-		fprintf(fp, "%s(none)\n", sa6_fmt(&rp->rpentry->address));
+		if (local_address(&rp->rpentry->address) != NO_VIF) {
+			fprintf(fp, "%s(myself)\n",
+				sa6_fmt(&rp->rpentry->address));
+		} else {
+			fprintf(fp, "%s(none)\n", sa6_fmt(&rp->rpentry->address));
+		}
 	}
 
 	if ((rp_grp_entry = rp->rp_grp_next) == NULL)
