@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.8 1999/11/30 12:52:25 sumikawa Exp $
+# $Id: Makefile,v 1.9 1999/12/07 07:25:22 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -55,9 +55,11 @@ SUBDIR+=	v6tun
 SUBDIR+=	vat6
 SUBDIR+=	vic6
 SUBDIR+=	vnc
+SUBDIR+=	w3m
 SUBDIR+=	wbd
 SUBDIR+=	wget
 SUBDIR+=	wu-ftpd
+SUBDIR+=	wwwoffle
 SUBDIR+=	zebra
 
 .include <bsd.port.subdir.mk>
