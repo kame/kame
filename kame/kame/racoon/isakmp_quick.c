@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.10 2000/01/11 19:22:29 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.11 2000/01/11 19:45:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -164,7 +164,7 @@ quick_i1send(iph2, msg)
 	}
 
 	/* create SA payload for my proposal */
-	sa = ipsecdoi_setph2proposal(iph2->spidx->policy->proposal, iph2->keys);
+	sa = ipsecdoi_setph2proposal(iph2, iph2->keys);
 	if (sa == NULL)
 		goto end;
 
@@ -1204,7 +1204,7 @@ quick_r2send(iph2, msg)
 	}
 
 	/* create SA payload for my proposal */
-	sa = ipsecdoi_setph2proposal(iph2->spidx->policy->proposal, iph2->keys);
+	sa = ipsecdoi_setph2proposal(iph2, iph2->keys);
 	if (sa == NULL)
 		goto end;
 	memmove(sa->v, sa->v + sizeof(*gen), sa->l - sizeof(*gen));

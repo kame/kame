@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.20 2000/01/11 19:23:47 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.21 2000/01/11 19:45:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2544,10 +2544,11 @@ setph1attr(sa, buf)
  * INCLUDING isakmp general header of SA payload.
  */
 vchar_t *
-ipsecdoi_setph2proposal(proposal, keys)
-	struct ipsecsa *proposal;
+ipsecdoi_setph2proposal(iph2, keys)
+	struct ph2handle *iph2;
 	struct ipsecsakeys *keys;
 {
+	struct ipsecsa *proposal;
 	vchar_t *mysa;
 	struct ipsecdoi_pl_sa *sa;
 	struct isakmp_pl_p *prop;
@@ -2558,6 +2559,10 @@ ipsecdoi_setph2proposal(proposal, keys)
 	u_int8_t *np_t; /* pointer next trns type in previous header */
 	int proplen, trns_num, attrlen;
 	caddr_t p;
+
+	proposal = iph2->side == INITIATOR
+			? iph2->spidx->policy->proposal
+			: iph2->approval;
 
 	/* count total size of SA minus isakpm general header */
 	/* INCLUDING isakmp general header of SA payload. */
@@ -2594,7 +2599,7 @@ ipsecdoi_setph2proposal(proposal, keys)
 	    {
 		struct sockaddr *dst;
 		struct ipsecsakeys *k;
-		dst = n->dst ? n->dst : proposal->ipsp->spidx->ph2->dst;
+		dst = n->dst ? n->dst : iph2->dst;
 		for (k = keys; k != NULL; k = k->next) {
 			if (n->proto_id == k->proto_id
 			 && n->encmode == k->encmode
