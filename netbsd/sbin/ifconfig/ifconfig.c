@@ -142,7 +142,7 @@ int	clearaddr, s;
 int	newaddr = -1;
 int	nsellength = 1;
 int	af;
-int	Aflag, aflag, bflag, dflag, lflag, mflag, sflag, uflag;
+int	Aflag = 1, aflag, bflag, dflag, lflag, mflag, sflag, uflag;
 #ifdef INET6
 int	Lflag;
 #endif
