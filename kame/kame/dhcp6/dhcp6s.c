@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.147 2005/03/20 06:46:09 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.148 2005/03/20 07:50:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1604,7 +1604,6 @@ react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	/*
 	 * Locates the client's binding and verifies that the information
 	 * from the client matches the information stored for that client.
-	 * (Note that our implementation does not assign addresses (nor will)).
 	 */
 	for (ia = TAILQ_FIRST(&optinfo->iapd_list); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
@@ -1843,7 +1842,6 @@ react_release(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	/*
 	 * Locates the client's binding and verifies that the information
 	 * from the client matches the information stored for that client.
-	 * (Note that our implementation does not assign addresses (nor will)).
 	 */
 	for (ia = TAILQ_FIRST(&optinfo->iapd_list); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
