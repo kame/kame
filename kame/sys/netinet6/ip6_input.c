@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.105 2000/08/12 09:47:26 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.106 2000/08/14 02:49:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -578,7 +578,7 @@ ip6_input(m)
 	/*
 	 *  Unicast check
 	 */
-#ifdef OURS_CHECK_LINER
+#ifdef OURS_CHECK_LINEAR
 	/* traditional linear search: just for measurement */
 	{
 		struct in6_ifaddr *ia;
