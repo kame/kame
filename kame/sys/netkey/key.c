@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.59 2000/01/17 14:11:15 itojun Exp $ */
+/* KAME $Id: key.c,v 1.60 2000/01/17 14:38:21 sumikawa Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -105,10 +105,6 @@
 #include <netinet6/ipcomp.h>
 
 #include <net/net_osdep.h>
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
-#endif
 
 /*
  * Note on SA reference counting:
