@@ -567,4 +567,4 @@ AC_SUBST(sysconfdir_x)
 dnl Checks for getifaddrs
 AC_CHECK_FUNCS(getifaddrs)
 
-AC_OUTPUT(Makefile samples/psk.txt samples/racoon.conf samples/remote.conf racoon.8)
+AC_OUTPUT(Makefile samples/psk.txt samples/racoon.conf samples/remote.conf)
