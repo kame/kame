@@ -1785,17 +1785,22 @@ nge_start(ifp)
 		return;
 
 	while(sc->nge_ldata->nge_tx_list[idx].nge_mbuf == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
-		if (m_head == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+		if (m_head == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		if (nge_encap(sc, m_head, &idx)) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 
 		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+		IFQ_UNLOCK(&ifp->if_snd);
 		pkts++;
 
 		/*

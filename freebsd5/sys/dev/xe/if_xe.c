@@ -396,7 +396,8 @@ xe_start(struct ifnet *ifp) {
    * Loop while there are packets to be sent, and space to send them.
    */
   while (1) {
-    IFQ_POLL(&ifp->if_snd, mbp);
+    IFQ_LOCK(&ifp->if_snd);
+    IFQ_POLL_NOLOCK(&ifp->if_snd, mbp);
 
     if (mbp == NULL) {
       /*
@@ -406,16 +407,19 @@ xe_start(struct ifnet *ifp) {
        * we haven't filled all the buffers with data then we still want to
        * accept more.
        */
+      IFQ_UNLOCK(&ifp->if_snd);
       ifp->if_flags &= ~IFF_OACTIVE;
       return;
     }
 
     if (xe_pio_write_packet(scp, mbp) != 0) {
+      IFQ_UNLOCK(&ifp->if_snd);
       ifp->if_flags |= IFF_OACTIVE;
       return;
     }
 
-    IFQ_DEQUEUE(&ifp->if_snd, mbp);
+    IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, mbp);
+    IFQ_UNLOCK(&ifp->if_snd);
 
     /* Tap off here if there is a bpf listener */
     BPF_MTAP(ifp, mbp);

@@ -2249,9 +2249,12 @@ bge_start(ifp)
 	prodidx = CSR_READ_4(sc, BGE_MBX_TX_HOST_PROD0_LO);
 
 	while(sc->bge_cdata.bge_tx_chain[prodidx] == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
-		if (m_head == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+		if (m_head == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		/*
 		 * XXX
@@ -2265,6 +2268,7 @@ bge_start(ifp)
 		    m_head->m_pkthdr.csum_flags & (CSUM_DELAY_DATA)) {
 			if ((BGE_TX_RING_CNT - sc->bge_txcnt) <
 			    m_head->m_pkthdr.csum_data + 16) {
+				IFQ_UNLOCK(&ifp->if_snd);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
@@ -2276,12 +2280,14 @@ bge_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (bge_encap(sc, m_head, &prodidx)) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 
 		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+		IFQ_UNLOCK(&ifp->if_snd);
 		pkts++;
 
 		/*

@@ -220,6 +220,7 @@ iso88025_output(ifp, m, dst, rt0)
 	struct sockaddr_dl *sdl = NULL;
 	struct rtentry *rt;
 	struct arpcom *ac = (struct arpcom *)ifp;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -271,6 +272,12 @@ iso88025_output(ifp, m, dst, rt0)
 		}
 	}
 	
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
@@ -393,10 +400,7 @@ iso88025_output(ifp, m, dst, rt0)
 			}       
         }      
 
-	if (! IF_HANDOFF_ADJ(&ifp->if_snd, m, ifp, ISO88025_HDR_LEN + (sizeof(struct llc))) ) {
-		printf("iso88025_output: packet dropped QFULL.\n");
-		senderr(ENOBUFS);
-	}
+	IFQ_HANDOFF(ifp, m, &pktattr, error);
 	return (error);
 
 bad:

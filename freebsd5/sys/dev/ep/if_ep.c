@@ -445,8 +445,10 @@ ep_if_start(ifp)
 
 startagain:
     /* Sneak a peek at the next packet */
-    IFQ_POLL(&ifp->if_snd, m);
+    IFQ_LOCK(&ifp->if_snd);
+    IFQ_POLL_NOLOCK(&ifp->if_snd, m);
     if (m == 0) {
+	IFQ_UNLOCK(&ifp->if_snd);
 	return;
     }
     for (len = 0, top = m; m; m = m->m_next)
@@ -462,7 +464,8 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
-	IFQ_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m);
+	IFQ_UNLOCK(&ifp->if_snd);
 	m_freem(m);
 	goto readcheck;
     }
@@ -472,13 +475,15 @@ startagain:
 	/* make sure */
 	if (inw(BASE + EP_W1_FREE_TX) < len + pad + 4) {
 	    ifp->if_flags |= IFF_OACTIVE;
+	    IFQ_UNLOCK(&ifp->if_snd);
 	    return;
 	}
     } else {
 	outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | EP_THRESH_DISABLE);
     }
 
-    IFQ_DEQUEUE(&ifp->if_snd, m);
+    IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m);
+    IFQ_UNLOCK(&ifp->if_snd);
 
     s = splhigh();
 

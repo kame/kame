@@ -774,7 +774,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	struct sppp *sp = (struct sppp*) ifp;
 	struct ppp_header *h;
 	struct ifqueue *ifq = NULL;
-	int s, len, rv = 0;
+	int s, error, rv = 0;
 	int ipproto = PPP_IP;
 	int debug = ifp->if_flags & IFF_DEBUG;
 	ALTQ_DECL(struct altq_pktattr pktattr;)
@@ -985,9 +985,16 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (! IF_HANDOFF_ADJ(ifq, m, ifp, 3)) {
+	if (ifq != NULL) {
+		if (! IF_HANDOFF_ADJ(ifq, m, ifp, 3))
+			error = ENOBUFS;
+		else
+			error = 0;
+	} else
+		IFQ_HANDOFF(ifp, m, NULL, error);
+	if (error != 0) {
 		++ifp->if_oerrors;
-		return (rv? rv: ENOBUFS);
+		return (rv? rv: error);
 	}
 	/*
 	 * Unlike in sppp_input(), we can always bump the timestamp

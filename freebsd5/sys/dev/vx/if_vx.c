@@ -400,8 +400,10 @@ vxstart(ifp)
 
 startagain:
     /* Sneak a peek at the next packet */
-    IFQ_POLL(&ifp->if_snd, m);
+    IFQ_LOCK(&ifp->if_snd);
+    IFQ_POLL_NOLOCK(&ifp->if_snd, m);
     if (m == NULL) {
+	IFQ_UNLOCK(&ifp->if_snd);
 	return;
     }
     /* We need to use m->m_pkthdr.len, so require the header */
@@ -419,7 +421,8 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
-	IFQ_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m);
+	IFQ_UNLOCK(&ifp->if_snd);
 	m_freem(m);
 	goto readcheck;
     }
@@ -428,13 +431,15 @@ startagain:
 	CSR_WRITE_2(sc,  VX_COMMAND, SET_TX_AVAIL_THRESH | ((len + pad + 4) >> 2));
 	/* not enough room in FIFO */
 	if (CSR_READ_2(sc, VX_W1_FREE_TX) < len + pad + 4) { /* make sure */
+	    IFQ_UNLOCK(&ifp->if_snd);
 	    ifp->if_flags |= IFF_OACTIVE;
 	    ifp->if_timer = 1;
 	    return;
 	}
     }
     CSR_WRITE_2(sc,  VX_COMMAND, SET_TX_AVAIL_THRESH | (8188 >> 2));
-    IFQ_DEQUEUE(&ifp->if_snd, m);
+    IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m);
+    IFQ_UNLOCK(&ifp->if_snd);
     if (m == NULL) 		/* not really needed */
 	return;
 

@@ -289,7 +289,7 @@ options 	NEW_STRUCT_ROUTE	# mandatory
 #options 	"IPV6FIREWALL_DEFAULT_TO_ACCEPT"
 
 # ALTQ
-#options 	ALTQ		#alternate queueing
+options 	ALTQ		#alternate queueing
 #options 	ALTQ_CBQ	#class based queueing
 #options 	ALTQ_WFQ	#weighted fair queueing
 #options 	ALTQ_FIFOQ	#fifo queueing

@@ -106,6 +106,7 @@ arc_output(ifp, m, dst, rt0)
 #if __FreeBSD_version < 500000
 	int			s;
 #endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		return(ENETDOWN); /* m, m1 aren't initialized yet */
@@ -136,6 +137,12 @@ arc_output(ifp, m, dst, rt0)
 			    time_second < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	switch (dst->sa_family) {
 #ifdef INET
@@ -231,10 +238,7 @@ arc_output(ifp, m, dst, rt0)
 		(*ifp->if_start)(ifp);
 	splx(s);
 #else
-	if (!IF_HANDOFF(&ifp->if_snd, m, ifp)) {
-		m = 0;
-		senderr(ENOBUFS);
-	}
+	IFQ_HANDOFF(ifp, m, &pktattr, error);
 #endif
 
 	return (error);

@@ -1086,16 +1086,21 @@ pcn_start(ifp)
 	}
 
 	while(sc->pcn_cdata.pcn_tx_chain[idx] == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
-		if (m_head == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+		if (m_head == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		if (pcn_encap(sc, m_head, &idx)) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+		IFQ_UNLOCK(&ifp->if_snd);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1104,8 +1109,10 @@ pcn_start(ifp)
 		BPF_MTAP(ifp, m_head);
 
 	}
-	if (idx == sc->pcn_cdata.pcn_tx_prod)
+	if (idx == sc->pcn_cdata.pcn_tx_prod) {
+		PCN_UNLOCK(sc);
 		return;
+	}
 
 	/* Transmit */
 	sc->pcn_cdata.pcn_tx_prod = idx;

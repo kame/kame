@@ -1069,16 +1069,14 @@ forward:
 			af = AF_UNSPEC;
 		IFQ_CLASSIFY(&last->if_snd, m, af, &pktattr);
 	    }
-#else
-	    IFQ_HANDOFF(last, m, &pktattr, error);
 #endif /* ALTQ */
+
+	    IFQ_HANDOFF(last, m, &pktattr, error);
 	    if (error != 0) {
 #if 0
 		BDG_MUTE(last); /* should I also mute ? */
 #endif
 	    }
-	    splx(s);
-
 	    BDG_STAT(last, BDG_OUT);
 	    last = NULL ;
 	    if (once)

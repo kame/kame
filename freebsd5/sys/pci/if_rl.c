@@ -1541,20 +1541,30 @@ rl_start(ifp)
 {
 	struct rl_softc		*sc;
 	struct mbuf		*m_head = NULL;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 	RL_LOCK(sc);
 
 	while(RL_CUR_TXMBUF(sc) == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
-		if (m_head == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+		if (m_head == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		if (rl_encap(sc, m_head)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
+			IFQ_UNLOCK(&ifp->if_snd);
+			m_freem(m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+		IFQ_UNLOCK(&ifp->if_snd);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1576,6 +1586,10 @@ rl_start(ifp)
 		    RL_CUR_TXMBUF(sc)->m_pkthdr.len);
 
 		RL_INC(sc->rl_cdata.cur_tx);
+	}
+	if (pkts == 0) {
+		RL_UNLOCK(sc);
+		return;
 	}
 
 	/*

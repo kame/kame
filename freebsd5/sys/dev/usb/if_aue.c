@@ -1180,18 +1180,23 @@ aue_start(struct ifnet *ifp)
 		return;
 	}
 
-	IF_DEQUEUE(&ifp->if_snd, m_head);
+	IFQ_LOCK(&ifp->if_snd);
+	IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
 	if (m_head == NULL) {
+		IFQ_UNLOCK(&ifp->if_snd);
 		AUE_UNLOCK(sc);
 		return;
 	}
 
 	if (aue_encap(sc, m_head, 0)) {
-		IF_PREPEND(&ifp->if_snd, m_head);
+		IFQ_UNLOCK(&ifp->if_snd);
 		ifp->if_flags |= IFF_OACTIVE;
 		AUE_UNLOCK(sc);
 		return;
 	}
+
+	IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+	IFQ_UNLOCK(&ifp->if_snd);
 
 	/*
 	 * If there's a BPF listener, bounce a copy of this frame

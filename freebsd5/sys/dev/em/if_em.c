@@ -471,13 +471,13 @@ em_start(struct ifnet *ifp)
 	s = splimp();      
 	while (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 		
-		IFQ_POLL(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		if (m_head == NULL) break;
 
 		if (em_encap(adapter, m_head)) {
+			m_freem(m_head);
 			ifp->if_flags |= IFF_OACTIVE;
-			IF_PREPEND(&ifp->if_snd, m_head);
 			break;
 		}
 

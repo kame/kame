@@ -162,7 +162,7 @@ lo_clone_create(ifc, unit)
 	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, ifqmaxlen);
 	IFQ_SET_READY(&sc->sc_if.if_snd);
 #ifdef ALTQ
-	ifp->if_start = lo_altqstart;
+	sc->sc_if.if_start = lo_altqstart;
 #endif
 	sc->sc_if.if_softc = sc;
 	if_attach(&sc->sc_if);
@@ -363,10 +363,8 @@ if_simloop(ifp, m, af, hlen)
 		afp = mtod(m, int32_t *);
 		*afp = (int32_t)af;
 
-	        s = splimp();
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
 		(*ifp->if_start)(ifp);
-		splx(s);
 		return (error);
 	}
 #endif /* ALTQ */
@@ -424,12 +422,10 @@ lo_altqstart(ifp)
 	struct ifqueue *ifq;
 	struct mbuf *m;
 	int32_t af, *afp;
-	int s, isr;
+	int isr;
 	
 	while (1) {
-		s = splimp();
 		IFQ_DEQUEUE(&ifp->if_snd, m);
-		splx(s);
 		if (m == NULL)
 			return;
 
@@ -474,25 +470,17 @@ lo_altqstart(ifp)
 			ifq = &atintrq2;
 			isr = NETISR_ATALK;
 			break;
-#endif NETATALK
+#endif
 		default:
 			printf("lo_altqstart: can't handle af%d\n", af);
 			m_freem(m);
 			return;
 		}
 
-		s = splimp();
-		if (IF_QFULL(ifq)) {
-			IF_DROP(ifq);
-			m_freem(m);
-			splx(s);
-			return;
-		}
-		IF_ENQUEUE(ifq, m);
-		schednetisr(isr);
 		ifp->if_ipackets++;
 		ifp->if_ibytes += m->m_pkthdr.len;
-		splx(s);
+		(void) IF_HANDOFF(ifq, m, NULL);
+		schednetisr(isr);
 	}
 }
 #endif /* ALTQ */

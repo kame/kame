@@ -147,7 +147,7 @@ static void	ppp_ccp_closed(struct ppp_softc *);
 static void	ppp_inproc(struct ppp_softc *, struct mbuf *);
 static void	pppdumpm(struct mbuf *m0);
 #ifdef ALTQ
-tatic void	ppp_ifstart(struct ifnet *ifp);
+static void	ppp_ifstart(struct ifnet *ifp);
 #endif
 static int	ppp_clone_create(struct if_clone *, int);
 static void	ppp_clone_destroy(struct ifnet *);
@@ -910,18 +910,29 @@ pppoutput(ifp, m0, dst, rtp)
 	sc->sc_npqtail = &m0->m_nextpkt;
     } else {
 	/* fastq and if_snd are emptied at spl[soft]net now */
-	ifq = (m0->m_flags & M_HIGHPRI)? &sc->sc_fastq: &ifp->if_snd;
-        IF_LOCK(ifq);
-	if (_IF_QFULL(ifq) && dst->sa_family != AF_UNSPEC) {
-	    _IF_DROP(ifq);
+	if ((m0->m_flags & M_HIGHPRI)
+#ifdef ALTQ
+	    && !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+#endif
+		) {
+	    ifq = &sc->sc_fastq;
+	    IF_LOCK(ifq);
+	    if (_IF_QFULL(ifq) && dst->sa_family != AF_UNSPEC) {
+		_IF_DROP(ifq);
+		m_freem(m0);
+		error = ENOBUFS;
+	    } else {
+		_IF_ENQUEUE(ifq, m0);
+		error = 0;
+	    }
 	    IF_UNLOCK(ifq);
+	} else
+	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, &pktattr, error);
+	if (error != 0) {
 	    sc->sc_if.if_oerrors++;
 	    sc->sc_stats.ppp_oerrors++;
-	    error = ENOBUFS;
-	    goto bad;
+	    return (error);
 	}
-	_IF_ENQUEUE(ifq, m0);
-        IF_UNLOCK(ifq);
 	(*sc->sc_start)(sc);
     }
     getmicrotime(&ifp->if_lastchange);
@@ -946,8 +957,8 @@ ppp_requeue(sc)
     struct ppp_softc *sc;
 {
     struct mbuf *m, **mpp;
-    struct ifqueue *ifq;
     enum NPmode mode;
+    int error;
 
     for (mpp = &sc->sc_npqueue; (m = *mpp) != NULL; ) {
 	switch (PPP_PROTOCOL(mtod(m, u_char *))) {
@@ -965,8 +976,14 @@ ppp_requeue(sc)
 	     */
 	    *mpp = m->m_nextpkt;
 	    m->m_nextpkt = NULL;
-	    ifq = (m->m_flags & M_HIGHPRI)? &sc->sc_fastq: &sc->sc_if.if_snd;
-            if (! IF_HANDOFF(ifq, m, NULL)) {
+	    if (m->m_flags & M_HIGHPRI) {
+		    if (! IF_HANDOFF(&sc->sc_fastq, m, NULL))
+			    error = ENOBUFS;
+		    else
+			    error = 0;
+	    } else
+		    IFQ_HANDOFF(&sc->sc_if, m, NULL, error);
+            if (error != 0) {
 		sc->sc_if.if_oerrors++;
 		sc->sc_stats.ppp_oerrors++;
 	    }
@@ -1640,3 +1657,19 @@ done:
     *bp = 0;
     printf("%s\n", buf);
 }
+
+#ifdef ALTQ
+/*
+ * a wrapper to transmit a packet from if_start since ALTQ uses
+ * if_start to send a packet.
+ */
+static void
+ppp_ifstart(ifp)
+	struct ifnet *ifp;
+{
+	struct ppp_softc *sc;
+
+	sc = ifp->if_softc;
+	(*sc->sc_start)(sc);
+}
+#endif

@@ -2973,7 +2973,7 @@ dc_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	sc->rxcycles = count;
 	dc_rxeof(sc);
 	dc_txeof(sc);
-	if (ifp->if_snd.ifq_head != NULL && !(ifp->if_flags & IFF_OACTIVE))
+	if (!IFQ_IS_EMPTY(&ifp->if_snd) && !(ifp->if_flags & IFF_OACTIVE))
 		dc_start(ifp);
 
 	if (cmd == POLL_AND_CHECK_STATUS) { /* also check status register */
@@ -3225,7 +3225,7 @@ dc_start(ifp)
 {
 	struct dc_softc		*sc;
 	struct mbuf		*m_head = NULL;
-	int			idx;
+	int			idx, coalesced;
 
 	sc = ifp->if_softc;
 
@@ -3244,24 +3244,47 @@ dc_start(ifp)
 	idx = sc->dc_cdata.dc_tx_prod;
 
 	while(sc->dc_cdata.dc_tx_chain[idx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
-		if (m_head == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+		if (m_head == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		if (sc->dc_flags & DC_TX_COALESCE &&
 		    (m_head->m_next != NULL ||
 		     sc->dc_flags & DC_TX_ALIGN)) {
+#ifdef ALTQ
+			/* note: dc_coal breaks the poll-and-dequeue rule.
+			 * if dc_coal fails, we lose the packet.
+			 */
+#endif
+			IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+			IFQ_UNLOCK(&ifp->if_snd);
 			if (dc_coal(sc, &m_head)) {
-				IF_PREPEND(&ifp->if_snd, m_head);
+				m_freem(m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
-		}
+			coalesced = 1;
+		} else
+			coalesced = 0;
 
 		if (dc_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
+			if (coalesced)
+				m_freem(m_head);
+			else
+				IFQ_UNLOCK(&ifp->if_snd);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
+		}
+
+		/* now we are committed to transmit the packet */
+		if (coalesced) {
+			/* if mbuf is coalesced, it is already dequeued */
+		} else {
+			IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+			IFQ_UNLOCK(&ifp->if_snd);
 		}
 
 		/*
@@ -3275,8 +3298,10 @@ dc_start(ifp)
 			break;
 		}
 	}
-	if (idx == sc->dc_cdata.dc_tx_prod)
+	if (idx == sc->dc_cdata.dc_tx_prod) {
+		DC_UNLOCK(sc);
 		return;
+	}
 
 	/* Transmit */
 	sc->dc_cdata.dc_tx_prod = idx;

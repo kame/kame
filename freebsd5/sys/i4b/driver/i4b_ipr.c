@@ -280,8 +280,7 @@ i4biproutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 {
 	struct ipr_softc *sc;
 	int unit;
-	int s;
-	struct ifqueue *ifq;
+	int s, error;
 	struct ip *ip;
 	
 	s = SPLI4B();
@@ -378,19 +377,18 @@ i4biproutput(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 
 	ip = mtod(m, struct ip *);		/* get ptr to ip header */
 	 
-	if(ip->ip_tos & IPTOS_LOWDELAY)
-		ifq = &sc->sc_fastq;
-	else
-	        ifq = &sc->sc_if.if_snd;
-
-	/* check for space in choosen send queue */
-	
-	if(! IF_HANDOFF(ifq, m, NULL))
-	{
+	if(ip->ip_tos & IPTOS_LOWDELAY) {
+		if(! IF_HANDOFF(&sc->sc_fastq, m, NULL))
+			error = ENOBUFS;
+		else
+			error = 0;
+	} else
+		IFQ_HANDOFF(&sc->sc_if, m, NULL, error);
+	if (error != 0) {
 		NDBGL4(L4_IPRDBG, "ipr%d: send queue full!", unit);
 		splx(s);
 		sc->sc_if.if_oerrors++;
-		return(ENOBUFS);
+		return(error);
 	}
 	
 	NDBGL4(L4_IPRDBG, "ipr%d: add packet to send queue!", unit);

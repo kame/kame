@@ -137,7 +137,7 @@ pdq_ifstart(
     }
     sc->sc_flags |= PDQIF_DOWNCALL;
     for (;; tx = 1) {
-	IF_DEQUEUE(ifq, m);
+	IF_DEQUEUE(&ifp->if_snd, m);
 	if (m == NULL)
 	    break;
 #if defined(PDQ_BUS_DMA) && !defined(PDQ_BUS_DMA_NOTX)
@@ -431,8 +431,7 @@ pdq_ifattach(pdq_softc_t *sc)
 
     ifp->if_softc = sc;
     ifp->if_init = (if_init_f_t *)pdq_ifinit;
-    IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-    IFQ_SET_READY(&ifp->if_snd);
+    ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
     ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_NOTRAILERS|IFF_MULTICAST;
 
 #if (defined(__FreeBSD__) && BSD >= 199506) || defined(__NetBSD__)

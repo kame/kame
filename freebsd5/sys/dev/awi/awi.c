@@ -1134,9 +1134,12 @@ awi_start(ifp)
 		} else {
 			if (!(ifp->if_flags & IFF_RUNNING))
 				break;
-			IFQ_POLL(&ifp->if_snd, m0);
-			if (m0 == NULL)
+			IFQ_LOCK(&ifp->if_snd);
+			IFQ_POLL_NOLOCK(&ifp->if_snd, m0);
+			if (m0 == NULL) {
+				IFQ_UNLOCK(&ifp->if_snd);
 				break;
+			}
 			len = m0->m_pkthdr.len + sizeof(struct ieee80211_frame);
 			if (sc->sc_format_llc)
 				len += sizeof(struct llc) -
@@ -1145,10 +1148,12 @@ awi_start(ifp)
 				len += IEEE80211_WEP_IVLEN +
 				    IEEE80211_WEP_KIDLEN + IEEE80211_WEP_CRCLEN;
 			if (awi_next_txd(sc, len, &frame, &ntxd)) {
+				IFQ_UNLOCK(&ifp->if_snd);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
-			IFQ_DEQUEUE(&ifp->if_snd, m0);
+			IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m0);
+			IFQ_UNLOCK(&ifp->if_snd);
 			AWI_BPF_MTAP(sc, m0, AWI_BPF_NORM);
 			m0 = awi_fix_txhdr(sc, m0);
 			if (sc->sc_wep_algo != NULL && m0 != NULL)

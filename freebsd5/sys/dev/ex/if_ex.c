@@ -383,9 +383,12 @@ ex_start(struct ifnet *ifp)
 	 * more packets left, or the card cannot accept any more yet.
 	 */
 	while (!(ifp->if_flags & IFF_OACTIVE)) {
-		IFQ_POLL(&ifp->if_snd, opkt);
-		if (opkt == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, opkt);
+		if (opkt == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		/*
 		 * Ensure there is enough free transmit buffer space for
@@ -418,7 +421,8 @@ ex_start(struct ifnet *ifp)
 		DODEBUG(Sent_Pkts, printf("i=%d, avail=%d\n", i, avail););
 
 		if (avail >= len + XMT_HEADER_LEN) {
-			IFQ_DEQUEUE(&ifp->if_snd, opkt);
+			IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, opkt);
+			IFQ_UNLOCK(&ifp->if_snd);
 
 #ifdef EX_PSA_INTR      
 			/*
@@ -532,6 +536,7 @@ ex_start(struct ifnet *ifp)
 			ifp->if_opackets++;
 			m_freem(opkt);
 		} else {
+			IFQ_UNLOCK(&ifp->if_snd);
 			ifp->if_flags |= IFF_OACTIVE;
 			DODEBUG(Status, printf("OACTIVE start\n"););
 		}

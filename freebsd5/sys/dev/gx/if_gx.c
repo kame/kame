@@ -1581,9 +1581,12 @@ gx_start(struct ifnet *ifp)
 	gx = ifp->if_softc;
 
 	for (;;) {
-		IFQ_POLL(&ifp->if_snd, m_head);
-		if (m_head == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+		if (m_head == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		/*
 		 * Pack the data into the transmit ring. If we
@@ -1591,11 +1594,13 @@ gx_start(struct ifnet *ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (gx_encap(gx, m_head) != 0) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+		IFQ_UNLOCK(&ifp->if_snd);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame

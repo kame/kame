@@ -104,6 +104,7 @@ atm_output(ifp, m0, dst, rt0)
 	struct atmllc *atmllc;
 	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
+	int error;
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 #ifdef MAC
@@ -231,8 +232,7 @@ atm_output(ifp, m0, dst, rt0)
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (! IF_HANDOFF(&ifp->if_snd, m, ifp))
-		return (ENOBUFS);
+	IFQ_HANDOFF(ifp, m, &pktattr, error);
 	return (error);
 
 bad:

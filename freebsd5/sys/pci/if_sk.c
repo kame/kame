@@ -1498,9 +1498,12 @@ sk_start(ifp)
 	idx = sc_if->sk_cdata.sk_tx_prod;
 
 	while(sc_if->sk_cdata.sk_tx_chain[idx].sk_mbuf == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
-		if (m_head == NULL)
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
+		if (m_head == NULL) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			break;
+		}
 
 		/*
 		 * Pack the data into the transmit ring. If we
@@ -1508,11 +1511,13 @@ sk_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (sk_encap(sc_if, m_head, &idx)) {
+			IFQ_UNLOCK(&ifp->if_snd);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
+		IFQ_UNLOCK(&ifp->if_snd);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1520,8 +1525,10 @@ sk_start(ifp)
 		 */
 		BPF_MTAP(ifp, m_head);
 	}
-	if (idx == sc_if->sk_cdata.sk_tx_prod)
+	if (idx == sc_if->sk_cdata.sk_tx_prod) {
+		SK_IF_UNLOCK(sc_if);
 		return;
+	}
 
 	/* Transmit */
 	sc_if->sk_cdata.sk_tx_prod = idx;

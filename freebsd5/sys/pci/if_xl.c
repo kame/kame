@@ -883,6 +883,7 @@ xl_testpacket(sc)
 {
 	struct mbuf		*m;
 	struct ifnet		*ifp;
+	int			error;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -900,7 +901,7 @@ xl_testpacket(sc)
 	mtod(m, unsigned char *)[15] = 0;
 	mtod(m, unsigned char *)[16] = 0xE3;
 	m->m_len = m->m_pkthdr.len = sizeof(struct ether_header) + 3;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	IFQ_ENQUEUE(&ifp->if_snd, m, NULL, error);
 	xl_start(ifp);
 
 	return;
@@ -1483,7 +1484,8 @@ xl_attach(dev)
 	ifp->if_watchdog = xl_watchdog;
 	ifp->if_init = xl_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = XL_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, XL_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_capenable = ifp->if_capabilities;
 
 	/*
@@ -2164,7 +2166,7 @@ xl_intr(arg)
 		}
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	XL_UNLOCK(sc);
@@ -2336,7 +2338,7 @@ xl_start(ifp)
 	start_tx = sc->xl_cdata.xl_tx_free;
 
 	while(sc->xl_cdata.xl_tx_free != NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2503,7 +2505,7 @@ static void xl_start_90xB(ifp)
 			break;
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2970,7 +2972,7 @@ xl_watchdog(ifp)
 	xl_reset(sc);
 	xl_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	XL_UNLOCK(sc);

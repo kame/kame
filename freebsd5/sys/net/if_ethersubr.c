@@ -386,6 +386,8 @@ int
 ether_output_frame(struct ifnet *ifp, struct mbuf *m)
 {
 	struct ip_fw *rule = NULL;
+	int error;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/* Extract info from dummynet tag, ignore others */
 	for (; m->m_type == MT_TAG; m = m->m_next)
@@ -414,11 +416,17 @@ ether_output_frame(struct ifnet *ifp, struct mbuf *m)
 		}
 	}
 
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
+		altq_etherclassify(&ifp->if_snd, m, &pktattr);
+#endif
+
 	/*
 	 * Queue message on interface, update output statistics if
 	 * successful, and start output if interface not yet active.
 	 */
-	return (IF_HANDOFF(&ifp->if_snd, m, ifp) ? 0 : ENOBUFS);
+	IFQ_HANDOFF(ifp, m, &pktattr, error);
+	return (error);
 }
 
 /*
@@ -676,10 +684,7 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 #if defined(NETATALK)
 	register struct llc *l;
 #endif
-	int len;
 	struct ip_fw *rule = NULL;
-	short mflags;
-	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/* Extract info from dummynet tag, ignore others */
 	for (;m->m_type == MT_TAG; m = m->m_next)
@@ -758,12 +763,6 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 		ifp->if_imcasts++;
 
 post_stats:
-#ifdef ALTQ
-	if (ALTQ_IS_ENABLED(&ifp->if_snd))
-		altq_etherclassify(&ifp->if_snd, m, &pktattr);
-#endif
-	mflags = m->m_flags;
-	len = m->m_pkthdr.len;
 	if (IPFW_LOADED && ether_ipfw != 0) {
 		if (ether_ipfw_chk(&m, NULL, &rule, 0) == 0) {
 			if (m)

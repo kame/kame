@@ -341,9 +341,12 @@ outloop:
 		return;
 	}
 
-	IFQ_POLL(&ifp->if_snd, m);
-	if (m == 0)
+	IFQ_LOCK(&ifp->if_snd);
+	IFQ_POLL_NOLOCK(&ifp->if_snd, m);
+	if (m == 0) {
+		IFQ_UNLOCK(&ifp->if_snd);
 		return;
+	}
 
 	/* We need the header for m_pkthdr.len. */
 	if ((m->m_flags & M_PKTHDR) == 0)
@@ -362,10 +365,12 @@ outloop:
 	 * it to the o/p queue.
 	 */
 	if ((sonicput(sc, m, mtd_next)) == 0) {
+		IFQ_UNLOCK(&ifp->if_snd);
 		return;
 	}
 
-	IFQ_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m);
+	IFQ_UNLOCK(&ifp->if_snd);
 
 	sc->mtd_prev = sc->mtd_free;
 	sc->mtd_free = mtd_next;

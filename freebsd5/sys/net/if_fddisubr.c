@@ -349,8 +349,7 @@ fddi_output(ifp, m, dst, rt0)
 		}
 	}
 
-	if (! IF_HANDOFF(&ifp->if_snd, m, ifp))
-		senderr(ENOBUFS);
+	IFQ_HANDOFF(ifp, m, &pktattr, error);
 	return (error);
 
 bad:

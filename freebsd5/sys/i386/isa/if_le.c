@@ -953,14 +953,13 @@ lemac_start(
     struct ifnet *ifp)
 {
     le_softc_t *sc = (le_softc_t *) ifp;
-    struct ifqueue *ifq = &ifp->if_snd;
 
     if ((ifp->if_flags & IFF_RUNNING) == 0)
 	return;
 
     LEMAC_INTR_DISABLE(sc);
 
-    while (ifq->ifq_head != NULL) {
+    while (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 	struct mbuf  *m;
 	int tx_pg;
 	u_int txhdr, txoff;
@@ -980,7 +979,7 @@ lemac_start(
 	    break;
 	}
 
-	IF_DEQUEUE(ifq, m);
+	IF_DEQUEUE(&ifp->if_snd, m);
 	LE_OUTB(sc, LEMAC_REG_MPN, tx_pg);	/* Shift 2K window. */
 
 	/*
@@ -1782,7 +1781,6 @@ lance_start(
     struct ifnet *ifp)
 {
     le_softc_t *sc = (le_softc_t *) ifp;
-    struct ifqueue *ifq = &ifp->if_snd;
     lance_ring_t *ri = &sc->lance_txinfo;
     lance_descinfo_t *di;
     ln_desc_t desc;
@@ -1794,7 +1792,7 @@ lance_start(
 	return;
 
     for (;;) {
-	IF_DEQUEUE(ifq, m);
+	IF_DEQUEUE(&ifp->if_snd, m);
 	if (m == NULL)
 	    break;
 
@@ -1820,7 +1818,7 @@ lance_start(
 	     */
 	    if (lance_tx_intr(sc) > 0) {
 		LN_STAT(tx_drains[0]++);
-		IF_PREPEND(ifq, m);
+		IF_PREPEND(&ifp->if_snd, m);
 		continue;
 	    }
 	    LN_STAT(tx_nospc[0]++);

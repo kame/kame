@@ -67,9 +67,6 @@ static void	tunclone(void *arg, char *name, int namelen, dev_t *dev);
 static void	tuncreate(dev_t dev);
 static int	tunifioctl(struct ifnet *, u_long, caddr_t);
 static int	tuninit(struct ifnet *);
-#ifdef ALTQ
-static void	tunstart(struct ifnet *);
-#endif
 static int	tunmodevent(module_t, int, void *);
 static int	tunoutput(struct ifnet *, struct mbuf *, struct sockaddr *,
 		    struct rtentry *rt);
@@ -222,6 +219,17 @@ static void
 tunstart(struct ifnet *ifp)
 {
 	struct tun_softc *tp = ifp->if_softc;
+#ifdef ALTQ
+	struct mbuf *m;
+
+	if (ALTQ_IS_ENABLED(&ifp->if_snd)) {
+		IFQ_LOCK(&ifp->if_snd);
+		IFQ_POLL_NOLOCK(&ifp->if_snd, m);
+		IFQ_UNLOCK(&ifp->if_snd);
+		if (m == NULL)
+			return;
+	}
+#endif
 
 	if (tp->tun_flags & TUN_RWAIT) {
 		tp->tun_flags &= ~TUN_RWAIT;
@@ -320,7 +328,7 @@ tunclose(dev_t dev, int foo, int bar, struct thread *td)
 	/*
 	 * junk all pending output
 	 */
-	IF_DRAIN(&ifp->if_snd);
+	IFQ_PURGE(&ifp->if_snd);
 
 	if (ifp->if_flags & IFF_UP) {
 		s = splimp();
@@ -442,9 +450,8 @@ tunoutput(
 	struct rtentry *rt)
 {
 	struct tun_softc *tp = ifp->if_softc;
-#ifdef MAC
 	int error;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	TUNDEBUG ("%s%d: tunoutput\n", ifp->if_name, ifp->if_unit);
 
@@ -536,9 +543,10 @@ tunoutput(
 		}
 	}
 
-	if (! IF_HANDOFF(&ifp->if_snd, m0, ifp)) {
+	IFQ_HANDOFF(ifp, m0, NULL, error);
+	if (error != 0) {
 		ifp->if_collisions++;
-		return (ENOBUFS);
+		return (error);
 	}
 	ifp->if_opackets++;
 	return (0);
@@ -625,14 +633,16 @@ tunioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		break;
 	case FIONREAD:
 		s = splimp();
+		IFQ_LOCK(&tp->tun_if.if_snd);
 		if (!IFQ_IS_EMPTY(&tp->tun_if.if_snd)) {
 			struct mbuf *mb;
 
-			IFQ_POLL(&tp->tun_if.if_snd, mb);
+			IFQ_POLL_NOLOCK(&tp->tun_if.if_snd, mb);
 			for( *(int *)data = 0; mb != 0; mb = mb->m_next) 
 				*(int *)data += mb->m_len;
 		} else
 			*(int *)data = 0;
+		IFQ_UNLOCK(&tp->tun_if.if_snd);
 		splx(s);
 		break;
 	case FIOSETOWN:
@@ -854,33 +864,3 @@ tunpoll(dev_t dev, int events, struct thread *td)
 	splx(s);
 	return (revents);
 }
-
-#ifdef ALTQ
-/*
- * Start packet transmission on the interface.
- * when the interface queue is rate-limited by ALTQ or TBR,
- * if_start is needed to drain packets from the queue in order
- * to notify readers when outgoing packets become ready.
- */
-static void
-tunstart(ifp)
-	struct ifnet *ifp;
-{
-	struct tun_softc *tp = ifp->if_softc;
-	struct mbuf *m;
-
-	if (!ALTQ_IS_ENABLED(&ifp->if_snd) && !TBR_IS_ENABLED(&ifp->if_snd))
-		return;
-
-	IFQ_POLL(&ifp->if_snd, m);
-	if (m != NULL) {
-		if (tp->tun_flags & TUN_RWAIT) {
-			tp->tun_flags &= ~TUN_RWAIT;
-			wakeup((caddr_t)tp);
-		}
-		if (tp->tun_flags & TUN_ASYNC && tp->tun_sigio)
-			pgsigio(tp->tun_sigio, SIGIO, 0);
-		selwakeup(&tp->tun_rsel);
-	}
-}
-#endif

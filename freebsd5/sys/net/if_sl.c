@@ -304,7 +304,7 @@ slcreate()
 	sc->sc_fastq.ifq_maxlen = 32;
 	sc->sc_if.if_linkmib = sc;
 	sc->sc_if.if_linkmiblen = sizeof *sc;
-	IFQ_SET_READY(&sc->sc_if);
+	IFQ_SET_READY(&sc->sc_if.if_snd);
 	mtx_init(&sc->sc_fastq.ifq_mtx, "sl_fastq", NULL, MTX_DEF);
 
 	/*
@@ -548,7 +548,7 @@ sloutput(ifp, m, dst, rtp)
 	register struct sl_softc *sc = ifp->if_softc;
 	register struct ip *ip;
 	register struct ifqueue *ifq;
-	int s;
+	int s, error;
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
@@ -572,17 +572,22 @@ sloutput(ifp, m, dst, rtp)
 		m_freem(m);
 		return (EHOSTUNREACH);
 	}
-	ifq = &sc->sc_if.if_snd;
 	ip = mtod(m, struct ip *);
 	if (sc->sc_if.if_flags & SC_NOICMP && ip->ip_p == IPPROTO_ICMP) {
 		m_freem(m);
 		return (ENETRESET);		/* XXX ? */
 	}
-	if (ip->ip_tos & IPTOS_LOWDELAY)
+	if (ip->ip_tos & IPTOS_LOWDELAY) {
 		ifq = &sc->sc_fastq;
-	if (! IF_HANDOFF(ifq, m, NULL)) {
+		if (! IF_HANDOFF(ifq, m, NULL))
+			error = ENOBUFS;
+		else
+			error = 0;
+	} else
+		IFQ_HANDOFF(&sc->sc_if, m, NULL, error);
+	if (error != 0) {
 		sc->sc_if.if_oerrors++;
-		return (ENOBUFS);
+		return (error);
 	}
 	s = splimp();
 	if (sc->sc_ttyp->t_outq.c_cc == 0)
