@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.24 2003/08/14 15:29:37 t-momose Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.25 2003/08/15 12:49:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -393,7 +393,8 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			mpfx->mpfx_pltime = tmpmpfx.mpfx_pltime;
 			mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 			/* XXX mpfx->mpfx_haddr; */
-			mip6_prefix_settimer(mpfx, mpfx->mpfx_pltime * hz);
+			mip6_prefix_settimer(mpfx,
+			    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
 			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
 		} else {
 			/* this is a new prefix. */
@@ -986,6 +987,13 @@ mip6_add_haddrs(sc, ifp)
 	struct in6_aliasreq ifra;
 	struct in6_ifaddr *ia6;
 	int error = 0;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif /* __FreeBSD__ */
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif /* __FreeBSD__ */
 
 	if ((sc == NULL) || (ifp == NULL)) {
 		return (EINVAL);
@@ -1024,7 +1032,7 @@ mip6_add_haddrs(sc, ifp)
 		ifra.ifra_addr.sin6_addr = mpfx->mpfx_haddr.sin6_addr;
 		ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 		ifra.ifra_prefixmask.sin6_family = AF_INET6;
-		ifra.ifra_flags = IN6_IFF_HOME;
+		ifra.ifra_flags = IN6_IFF_HOME | IN6_IFF_AUTOCONF;
 		if (ifp->if_type == IFT_HIF) {
 			in6_prefixlen2mask(&ifra.ifra_prefixmask.sin6_addr,
 			    128);
@@ -1032,21 +1040,18 @@ mip6_add_haddrs(sc, ifp)
 			in6_prefixlen2mask(&ifra.ifra_prefixmask.sin6_addr,
 			    mpfx->mpfx_prefixlen);
 		}
-		/*
-		 * XXX: TODO mobile prefix sol/adv to update
-		 * address lifetime.
-		 */
-#if 0
-		ifra.ifra_lifetime.ia6t_vltime
-		    = mpfx->mpfx_lifetime; /* XXX */
-		ifra.ifra_lifetime.ia6t_pltime
-		    = mpfx->mpfx_lifetime; /* XXX */
-#else
-		ifra.ifra_lifetime.ia6t_vltime
-		    = ND6_INFINITE_LIFETIME; /* XXX */
-		ifra.ifra_lifetime.ia6t_pltime
-		    = ND6_INFINITE_LIFETIME; /* XXX */
-#endif
+		ifra.ifra_lifetime.ia6t_vltime = mpfx->mpfx_vltime;
+		ifra.ifra_lifetime.ia6t_pltime = mpfx->mpfx_pltime;
+		if (ifra.ifra_lifetime.ia6t_vltime == ND6_INFINITE_LIFETIME)
+			ifra.ifra_lifetime.ia6t_expire = 0;
+		else
+			ifra.ifra_lifetime.ia6t_expire = mono_time.tv_sec
+			    + ifra.ifra_lifetime.ia6t_vltime;
+		if (ifra.ifra_lifetime.ia6t_pltime == ND6_INFINITE_LIFETIME)
+			ifra.ifra_lifetime.ia6t_preferred = 0;
+		else
+			ifra.ifra_lifetime.ia6t_preferred = mono_time.tv_sec
+			    + ifra.ifra_lifetime.ia6t_pltime;
 		ia6 = in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr);
 		error = in6_update_ifa(ifp, &ifra, ia6);
 		if (error) {

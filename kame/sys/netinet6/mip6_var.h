@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.99 2003/08/14 10:06:07 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.100 2003/08/15 12:49:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -282,7 +282,9 @@ struct mip6_prefix {
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
 #define MIP6_PREFIX_STATE_PREFERRED 0
-#define MIP6_PREFIX_STATE_VALID     1
+#define MIP6_PREFIX_STATE_EXPIRING  1
+
+#define MIP6_PREFIX_EXPIRE_TIME(pltime) ((pltime) / 4 * 3) /* XXX */
 
 /* packet options used by the mip6 packet output processing routine. */
 struct mip6_pktopts {

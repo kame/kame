@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.72 2003/08/14 11:18:17 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.73 2003/08/15 12:49:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -872,7 +872,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	int icmp6len;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 src_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct mobile_prefix_advert *mp_adv;
 	union nd_opts ndopts;
 	struct nd_opt_hdr *ndopt;
@@ -880,10 +880,13 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	struct sockaddr_in6 prefix_sa;
 	struct mip6_prefix *mpfx;
 	struct mip6_ha *mha;
+	struct hif_softc *hif;
+	struct mip6_bu *mbu;
+	struct ifaddr *ifa;
+	int error = 0;
 #ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif /* __FreeBSD__ */
-	int error = 0;
 
 #ifdef __FreeBSD__
 	microtime(&mono_time);
@@ -894,7 +897,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &src_sa, NULL)) {
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		error = EINVAL;
 		goto freeit;
 	}
@@ -918,6 +921,35 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		error = EINVAL;
 		goto freeit;
 	}
+
+	/* find relevant hif interface. */
+	hif = hif_list_find_withhaddr(&dst_sa);
+	if (hif == NULL) {
+		error = EINVAL;
+		goto freeit;
+	}
+
+	/* sanity check. */
+	mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list, &dst_sa);
+	if (mbu == NULL) {
+		error = EINVAL;
+		goto freeit;
+	}
+	if (!SA6_ARE_ADDR_EQUAL(&mbu->mbu_paddr, &src_sa)) {
+		mip6log((LOG_ERR,
+		    "%s:%d: the source address of a mobile prefix adv (%s)"
+		    "is not the home agent addrss of a binding update "
+		    "entry(%s)\n",
+		    __FILE__, __LINE__,
+		    ip6_sprintf(&mbu->mbu_paddr.sin6_addr),
+		    ip6_sprintf(&src_sa.sin6_addr)));
+		error = EINVAL;
+		goto freeit;
+	}
+
+	/* check type2 routing header. */
+
+	/* check id.  if it doesn't match, send mps. */
 
 	icmp6len -= sizeof(*mp_adv);
 	nd6_option_init(mp_adv + 1, icmp6len, &ndopts);
@@ -983,6 +1015,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		mpfx = mip6_prefix_list_find_withprefix(&prefix_sa,
 		    ndopt_pi->nd_opt_pi_prefix_len);
 		if (mpfx == NULL) {
+#if 0
 			mpfx = mip6_prefix_create(&prefix_sa,
 			    ndopt_pi->nd_opt_pi_prefix_len,
 			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
@@ -994,7 +1027,9 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
 			mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
 
-			/* XXX a new address configuration. */
+			/* XXX a new home address configuration and
+			 * home registration. */
+#endif
 
 		} else {
 			mpfx->mpfx_vltime
@@ -1005,10 +1040,60 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			    = mono_time.tv_sec + mpfx->mpfx_vltime;
 			mpfx->mpfx_plexpire
 			    = mono_time.tv_sec + mpfx->mpfx_pltime;
-			mip6_prefix_settimer(mpfx, mpfx->mpfx_pltime * hz);
+			mip6_prefix_settimer(mpfx,
+			    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
 			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
-		}
 
+			/* XXX address lifetimes update. */
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+			for (ifa = ((struct ifnet *)hif)->if_addrlist; ifa;
+			     ifa = ifa->ifa_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+			TAILQ_FOREACH(ifa, &((struct ifnet *)hif)->if_addrlist,
+			    ifa_list)
+#else
+			for (ifa = ((struct ifnet *)hif)->if_addrlist.tqh_first;
+			     ifa; ifa = ifa->ifa_list.tqe_next)
+#endif
+			{
+				struct in6_ifaddr *ifa6;
+
+				if (ifa->ifa_addr->sa_family != AF_INET6)
+					continue;
+
+				ifa6 = (struct in6_ifaddr *)ifa;
+
+				if ((ifa6->ia6_flags & IN6_IFF_HOME) == 0)
+					continue;
+
+				if ((ifa6->ia6_flags & IN6_IFF_AUTOCONF) == 0)
+					continue;
+
+				if (!SA6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr,
+				    &ifa6->ia_addr))
+					continue;
+
+				ifa6->ia6_lifetime.ia6t_vltime
+				    = mpfx->mpfx_vltime;
+				ifa6->ia6_lifetime.ia6t_pltime
+				    = mpfx->mpfx_pltime;
+				if (ifa6->ia6_lifetime.ia6t_vltime ==
+				    ND6_INFINITE_LIFETIME)
+					ifa6->ia6_lifetime.ia6t_expire = 0;
+				else
+					ifa6->ia6_lifetime.ia6t_expire =
+					    mono_time.tv_sec
+					    + mpfx->mpfx_vltime;
+				if (ifa6->ia6_lifetime.ia6t_pltime ==
+				    ND6_INFINITE_LIFETIME)
+					ifa6->ia6_lifetime.ia6t_preferred = 0;
+				else
+					ifa6->ia6_lifetime.ia6t_preferred =
+					    mono_time.tv_sec
+					    + mpfx->mpfx_pltime;
+				ifa6->ia6_updatetime = mono_time.tv_sec;
+			}
+		}
 
 		if (ndopt_pi->nd_opt_pi_flags_reserved
 		    & ND_OPT_PI_FLAG_ROUTER) {
