@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.41 2000/11/30 03:36:40 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.42 2000/11/30 05:38:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1095,22 +1095,6 @@ ah6_ctlinput(cmd, sa, d)
 	}
 
 	if (ip6cp && ip6cp->ip6c_finaldst) {
-		bzero(&sa6_src, sizeof(sa6_src));
-		sa6_src.sin6_family = AF_INET6;
-		sa6_src.sin6_len = sizeof(sa6_src);
-		sa6_src.sin6_addr = *ip6cp->ip6c_finaldst;
-		/* XXX: assuming M is valid in this case */
-		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							 ip6cp->ip6c_finaldst);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6_src, NULL,
-				   NULL)) {
-			/* should be impossbile */
-			printf("ah6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
-
 		bzero(&sa6_dst, sizeof(sa6_dst));
 		sa6_dst.sin6_family = AF_INET6;
 		sa6_dst.sin6_len = sizeof(sa6_dst);
@@ -1133,6 +1117,21 @@ ah6_ctlinput(cmd, sa, d)
 		 * XXX: We assume that when ip6 is non NULL,
 		 * M and OFF are valid.
 		 */
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		/* XXX: assuming M is valid in this case */
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL,
+				   NULL)) {
+			/* should be impossbile */
+			printf("ah6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
 
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(ah))
