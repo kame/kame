@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.144 2000/08/16 07:56:20 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.145 2000/08/17 01:29:04 itojun Exp $
 
 1. IPv6
 
@@ -1081,6 +1081,11 @@ or bypass security controls:
 	2002:0000::/24		2002:7f00::/24		2002:e000::/24
 	2002:ff00::/24		2002:0a00::/24		2002:ac10::/28	
 	2002:c0a8::/32
+- IPv4 compatible address that embeds unspecified/multicast/loopback/broadcast
+  IPv4 address (if they are in IPv6 native packet header, they are malicious).
+  Note that, since KAME doe snot support RFC1933 auto tunnels, KAME nodes are
+  not vulnerable to these packets.
+	::0.0.0.0/104	::127.0.0.0/104	::224.0.0.0/100	::255.0.0.0/104 
 
 Also, since KAME does not support RFC1933 auto tunnels, seeing IPv4 compatible
 is very rare.  You should take caution if you see those on the wire.
