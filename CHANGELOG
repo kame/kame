@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.432 2000/01/12 08:22:17 sumikawa Exp $
+$Id: CHANGELOG,v 1.433 2000/01/12 08:24:47 sumikawa Exp $
 
 <200001>
 Wed Jan 12 17:21:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* Upgrade to 1.4.3 and sync with FreeBSD-cuurent. No extra IPv6
-	  patch is not necessary anymore.
+	  patch is necessary anymore.
 
 Wed Jan 12 15:40:05 JST 2000  itojun@iijlab.net
 	* {bsdi3,netbsd}/usr.sbin/inetd: allow multiple IPsec policy
