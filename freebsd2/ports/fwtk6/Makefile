@@ -4,18 +4,18 @@
 # Date created:                         15th June 1996
 # Whom:                                 gpalmer
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/09 01:36:59 itojun Exp $
+# $Id: Makefile,v 1.1.1.1.2.1 1999/10/12 08:05:08 itojun Exp $
 #
 
 DISTNAME=	fwtk2.1
 PKGNAME=	fwtk6-2.1
 CATEGORIES=	security net
-EXTRACT_SUFX=	.tar.Z
 DISTFILES=	fwtk2.1${EXTRACT_SUFX} fwtk-doc-only${EXTRACT_SUFX}
+EXTRACT_SUFX=	.tar.Z
 
 PATCH_SITES=	http://www.imasy.or.jp/~ume/ipv6/
-PATCHFILES=	fwtk2.1-ipv6-19990423.diff.gz
-PATCH_DIST_STRIP=	-p1
+PATCHFILES=	fwtk2.1-ipv6-1.0.diff.gz
+PATCH_DIST_STRIP=	-p3
 
 MAINTAINER=	ume@mahoroba.org
 
@@ -28,12 +28,17 @@ CONFIGURE_SCRIPT=	fixmake
 MAN3=		auth.3
 MAN5=		netperm-table.5
 MAN8=		authmgr.8 authsrv.8 ftp-gw.8 http-gw.8 login-sh.8 netacl.8 \
-		plug-gw.8 rlogin-gw.8 smap.8 smapd.8 tn-gw.8 x-gw.8
+		plug-gw.8 rlogin-gw.8 smap.8 smapd.8 tn-gw.8
 DOCS=		sample-report.txt manpages.ps admin_guide.ps user_guide.ps \
 		overview.ps presentation.ps
 SBIN_BINS=	authdump authload authmgr
 LIBEXEC_BINS=	authsrv ftp-gw http-gw netacl plug-gw rlogin-gw smap smapd \
-		tn-gw x-gw
+		tn-gw
+
+.if !defined(NO_X11)
+LIBEXEC_BINS+=	x-gw
+MAN8+=		x-gw.8
+.endif
 
 PREFIX=		/usr/local/v6
 
@@ -65,6 +70,5 @@ post-install:
 .if !defined(NOPORTDOCS)
 	( cd ${WRKSRC}/doc ; ${INSTALL_MAN} ${DOCS} ${PREFIX}/share/doc/fwtk )
 .endif
-	${INSTALL_DATA} ${FILESDIR}/netperm-table.v6-sample ${PREFIX}/etc
 
 .include <bsd.port.post.mk>

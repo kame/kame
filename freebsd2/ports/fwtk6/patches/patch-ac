@@ -2,7 +2,7 @@
 +++ config/Makefile	Wed May 15 21:28:28 1996
 @@ -11,7 +11,7 @@
  #
- # RcsId: "$Header: /usr/home/sumikawa/kame/kame/freebsd2/ports/fwtk6/patches/patch-ac,v 1.1.1.1 1999/08/09 01:37:00 itojun Exp $"
+ # RcsId: "$Header: /usr/home/sumikawa/kame/kame/freebsd2/ports/fwtk6/patches/patch-ac,v 1.1.1.1.2.1 1999/10/12 08:05:10 itojun Exp $"
  
  include	../Makefile.config
  

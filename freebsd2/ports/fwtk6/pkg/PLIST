@@ -13,7 +13,6 @@ libexec/smapd
 libexec/tn-gw
 libexec/x-gw
 etc/netperm-table
-etc/netperm-table.v6-sample
 share/doc/fwtk/LICENSE
 share/doc/fwtk/admin_guide.ps
 share/doc/fwtk/manpages.ps
