@@ -589,16 +589,6 @@ skip_ipsec:
 	 * Too large for interface; fragment if possible.
 	 * Must be able to put at least 8 bytes per fragment.
 	 */
-#if 0
-	/*
-	 * If IPsec packet is too big for the interface, try fragment it.
-	 * XXX This really is a quickhack.  May be inappropriate.
-	 * XXX fails if somebody is sending AH'ed packet, with:
-	 *	sizeof(packet without AH) < mtu < sizeof(packet with AH)
-	 */
-	if (sab && ip->ip_p != IPPROTO_AH && (flags & IP_FORWARDING) == 0)
-		ip->ip_off &= ~IP_DF;
-#endif /*IPSEC*/
 	if (ip->ip_off & IP_DF) {
 		if (flags & IP_RETURNMTU)
 			*mtu_p = mtu;
