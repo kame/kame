@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.23 2001/04/04 05:30:16 itojun Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.24 2001/04/04 08:54:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -855,7 +855,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 	    m6next->m_len  -= cv4->poff;
 
 	    if (MHLEN > sizeof(struct ip6_hdr)) {
-		errno = ENOBUFS:
+		errno = ENOBUFS;
 		return NULL;
 	    }
 	    MGETHDR(m6, M_NOWAIT, MT_HEADER);
@@ -863,7 +863,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 
 	    m6->m_pkthdr.rcvif = NULL;
 	    m6->m_next	= m6next;
-	    MH_ALIGN(m6, sizoef(struct ip6_hdr));
+	    MH_ALIGN(m6, sizeof(struct ip6_hdr));
 	    m6->m_len	= sizeof(struct ip6_hdr);
 	    m6->m_pkthdr.len = sizeof(struct ip6_hdr) + cv4->plen;
 	    ip6 = mtod(m6, struct ip6_hdr *);
@@ -880,7 +880,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 	    caddr_t	tcp6;
 
 	    if (MHLEN > sizeof(struct ip6_hdr)) {
-		errno = ENOBUFS:
+		errno = ENOBUFS;
 		return NULL;
 	    }
 	    MGETHDR(m6, M_NOWAIT, MT_HEADER);
