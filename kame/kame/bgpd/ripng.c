@@ -1304,7 +1304,6 @@ rip_make_dump(ripif)
       break;
     }
 
-
     rte = base;
     while(rte) {
       if ((rte->rt_flags & RTF_UP ||   /* iw97: avoid doublebooking */

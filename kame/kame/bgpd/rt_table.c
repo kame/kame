@@ -1205,6 +1205,7 @@ install_static()
 					      ifp->ifi_ifn->if_index));
 				fatalx("failed to install a static route");
 			}
+			rte->rt_flags |= RTF_UP;
 			/* chain this rte to as an interface route */
 			remque(rte);
 			if (ifp->ifi_rte != NULL)
