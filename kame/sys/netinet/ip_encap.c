@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.71 2001/09/12 07:25:23 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.72 2001/09/27 06:36:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -171,7 +171,7 @@ static int encap_remove __P((struct encaptab *));
 static int encap_afcheck __P((int, const struct sockaddr *, const struct sockaddr *));
 #ifdef USE_RADIX
 static struct radix_node_head *encap_rnh __P((int));
-static int mask_matchlen __P((const u_int8_t *, size_t));
+static int mask_matchlen __P((const struct sockaddr *));
 #endif
 #ifndef USE_RADIX
 static int mask_match __P((const struct encaptab *, const struct sockaddr *,
@@ -268,16 +268,8 @@ encap4_lookup(m, off, proto, dir)
 	rn = rnh->rnh_matchaddr((caddr_t)&pack, rnh);
 	if (rn && (rn->rn_flags & RNF_ROOT) == 0) {
 		match = (struct encaptab *)rn;
-		matchprio = mask_matchlen((const u_int8_t *)match->maskpack,
-		    match->maskpack->sa_len - 1);
-		/*
-		 * penalty: mask_matchlen will probably count 4 extra bytes
-		 * (for sa_len and sa_family), so subtract 32.
-		 */
-		if (matchprio > 32)
-			matchprio -= 32;
-		else
-			matchprio = 1;
+		matchprio = mask_matchlen(match->srcmask) +
+		    mask_matchlen(match->dstmask);
 	}
 #endif
 
@@ -466,16 +458,8 @@ encap6_lookup(m, off, proto, dir)
 	rn = rnh->rnh_matchaddr((caddr_t)&pack, rnh);
 	if (rn && (rn->rn_flags & RNF_ROOT) == 0) {
 		match = (struct encaptab *)rn;
-		matchprio = mask_matchlen((const u_int8_t *)match->maskpack,
-		    match->maskpack->sa_len - 1);
-		/*
-		 * penalty: mask_matchlen will probably count 4 extra bytes
-		 * (for sa_len and sa_family), so subtract 32.
-		 */
-		if (matchprio > 32)
-			matchprio -= 32;
-		else
-			matchprio = 1;
+		matchprio = mask_matchlen(match->srcmask) +
+		    mask_matchlen(match->dstmask);
 	}
 #endif
 
@@ -972,19 +956,22 @@ encap_rnh(af)
 }
 
 static int
-mask_matchlen(p, l)
-	const u_int8_t *p;
-	size_t l;
+mask_matchlen(sa)
+	const struct sockaddr *sa;
 {
-	int matchlen;
-	int i;
+	const char *p, *ep;
+	int l;
 
-	matchlen = 0;
-	for (i = 0; i < l; i++) {
-		/* XXX rough estimate */
-		matchlen += (p[i] ? 8 : 0);
+	p = (const char *)sa;
+	ep = p + sa->sa_len;
+	p += 2;	/* sa_len + sa_family */
+
+	l = 0;
+	while (p < ep) {
+		l += (*p ? 8 : 0);	/* estimate */
+		p++;
 	}
-	return matchlen;
+	return l;
 }
 #endif
 
