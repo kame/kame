@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.51 2000/01/16 13:09:28 itojun Exp $ */
+/* KAME $Id: key.c,v 1.52 2000/01/17 09:19:12 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -255,9 +255,6 @@ do { \
 		free((caddr_t)(p), M_SECA);                                  \
 	} while (0)
 #endif
-
-#define KEY_NEWBUF(dst, t, src, len)                                         \
-	((dst) = (t)key_newbuf((src), (len)))
 
 /*
  * set parameters into secpolicyindex buffer.
@@ -2245,7 +2242,7 @@ key_setsaval(sav, mhp)
 			goto err;
 		}
 
-		KEY_NEWBUF(sav->key_auth, struct sadb_key *, key0, len);
+		sav->key_auth = (struct sadb_key *)key_newbuf(key0, len);
 		if (sav->key_auth == NULL) {
 			printf("key_setsaval: No more memory.\n");
 			error = ENOBUFS;
@@ -2288,7 +2285,7 @@ key_setsaval(sav, mhp)
 			goto err;
 		}
 
-		KEY_NEWBUF(sav->key_enc, struct sadb_key *, key0, len);
+		sav->key_enc = (struct sadb_key *)key_newbuf(key0, len);
 		if (sav->key_enc == NULL) {
 			printf("key_setsaval: No more memory.\n");
 			error = ENOBUFS;
@@ -2366,8 +2363,8 @@ key_setsaval(sav, mhp)
 
 	lft0 = (struct sadb_lifetime *)mhp[SADB_EXT_LIFETIME_HARD];
 	if (lft0 != NULL) {
-		KEY_NEWBUF(sav->lft_h, struct sadb_lifetime *,
-		           lft0, sizeof(*lft0));
+		sav->lft_h = (struct sadb_lifetime *)key_newbuf(lft0,
+				sizeof(*lft0));
 		if (sav->lft_h == NULL) {
 			printf("key_setsaval: No more memory.\n");
 			error = ENOBUFS;
@@ -2378,8 +2375,8 @@ key_setsaval(sav, mhp)
 
 	lft0 = (struct sadb_lifetime *)mhp[SADB_EXT_LIFETIME_SOFT];
 	if (lft0 != NULL) {
-		KEY_NEWBUF(sav->lft_s, struct sadb_lifetime *,
-		           lft0, sizeof(*lft0));
+		sav->lft_s = (struct sadb_lifetime *)key_newbuf(lft0,
+				sizeof(*lft0));
 		if (sav->lft_s == NULL) {
 			printf("key_setsaval: No more memory.\n");
 			error = ENOBUFS;
