@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.1 2001/07/11 08:36:58 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.2 2002/09/15 08:17:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -117,7 +117,16 @@ interface_list:
 interface: 	
 	   STRING
 	 {
-		int ifindex = if_nametoindex($1);
+		int ifindex;
+
+		if (strlen($1) == strlen("reg0") &&
+		    strcmp($1, "reg0") == 0) {
+			$$ = add_reg_mif();
+			if ($$ == NULL)
+				errx(1, "something wrong with register I/F");
+			break;
+		}
+		ifindex = if_nametoindex($1);
 		if (ifindex == 0)
 			errx(1, "invalid interface %s", $1);
 

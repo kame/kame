@@ -1,4 +1,4 @@
-.\"	$KAME: mfc.8,v 1.2 2001/07/11 09:54:58 itojun Exp $
+.\"	$KAME: mfc.8,v 1.3 2002/09/15 08:17:20 suz Exp $
 .\"
 .\" Copyright (C) 2001 WIDE Project.
 .\" All rights reserved.
@@ -58,9 +58,9 @@ IPv6 Multicast destination address.  It should be an IPv6 multicast address with
 .It src
 IPv6 Source address.  It should be a global or site-local IPv6 unicast address.
 .It incoming I/F
-Specifies the incoming I/F.
+Specifies the incoming I/F.  You can use "reg0" to specify register I/F.
 .It outgoing I/F list
-Specifies the I/Fs where packets are to be distributed.
+Specifies the I/Fs where packets are to be distributed.  You can use "reg0" to specify register I/F within this list.
 .El
 .Sh RETURN VALUES
 .Nm

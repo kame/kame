@@ -1,4 +1,4 @@
-/*	$KAME: mfc.c,v 1.1 2001/07/11 08:36:59 suz Exp $	*/
+/*	$KAME: mfc.c,v 1.2 2002/09/15 08:17:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -39,6 +39,7 @@ static int get_mifi(mifi_t *,  int);
 static void mfc_init(void);
 
 mifi_t add_mif(const char *ifname);
+mifi_t add_reg_mif(void);
 void add_mfc(struct sockaddr *src, struct sockaddr *dst, mifi_t in, 
 	     struct if_set *out);
 
@@ -93,6 +94,29 @@ add_mif(const char *ifname)
 	if (err != 0) {
 		errx(1, "MRT6_ADD_MIF for %s failed: %s",
 		     ifname, strerror(errno));
+	}
+
+end:
+	return mif6c.mif6c_mifi;
+}
+
+mifi_t
+add_reg_mif(void)
+{
+	struct mif6ctl mif6c;
+	int ifindex = 0;
+	int err;
+
+	bzero(&mif6c, sizeof(mif6c));
+	ifindex = if_nametoindex("lo0");
+	if (get_mifi(&mif6c.mif6c_mifi, ifindex) == 0)
+		goto end; /* it's already registered */
+	mif6c.mif6c_pifi = ifindex;
+	mif6c.mif6c_flags = MIFF_REGISTER;
+	err =setsockopt(s, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6c, sizeof(mif6c)); 
+	if (err != 0) {
+		errx(1, "MRT6_ADD_MIF for %s failed: %s",
+		     "reg0", strerror(errno));
 	}
 
 end:
