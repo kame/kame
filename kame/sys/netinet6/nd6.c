@@ -744,6 +744,16 @@ nd6_free(rt)
 			 * router selection and on-link detection of advertised
 			 * prefixes.
 			 */
+
+			/*
+			 * Temporarily fake the state to choose a new default
+			 * router and to perform on-link determination of
+			 * prefixes coreectly.
+			 * Below the state will be set correctly,
+			 * or the entry itself will be deleted.
+			 */
+			ln->ln_state = ND6_LLINFO_INCOMPLETE;
+
 			if (dr == TAILQ_FIRST(&nd_defrouter)) {
 				/*
 				 * It is used as the current default router,
@@ -754,14 +764,6 @@ nd6_free(rt)
 				 */
 				TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 				TAILQ_INSERT_TAIL(&nd_defrouter, dr, dr_entry);
-
-				/*
-				 * Temporarily fake the state to choose a
-				 * new default router. Below the state will be
-				 * set correctly, or the entry itself will be
-				 * deleted.
-				 */
-				ln->ln_state = ND6_LLINFO_INCOMPLETE;
 
 				defrouter_select();
 			}
