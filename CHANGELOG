@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1774 2001/07/16 00:59:23 inoue Exp $
+$KAME: CHANGELOG,v 1.1775 2001/07/17 02:00:05 sumikawa Exp $
 
 <200107>
+Tue Jul 17 10:58:21 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/sys/kern/kern_exec.c: applied the patch of 'FreeBSD
+	  Security Advisory FreeBSD-SA-01:42.signal'
+
 2001-07-16 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_dispatch.c (configCv4, configCv6):
 	- configCv4() and configCv6() returns real payload number or
