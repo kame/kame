@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.30 2000/05/31 14:56:13 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.31 2000/05/31 16:41:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -629,17 +629,25 @@ getans(buf, len, from)
 	}
 	delqcache(qc);
 
-	if (n)
+	if (n) {
+		/* LINTED const cast */
 		free((char *)n);
-	if (on)
+	}
+	if (on) {
+		/* LINTED const cast */
 		free((char *)on);
+	}
 	return 0;
 
 fail:
-	if (n)
+	if (n) {
+		/* LINTED const cast */
 		free((char *)n);
-	if (on)
+	}
+	if (on) {
+		/* LINTED const cast */
 		free((char *)on);
+	}
 	return -1;
 }
 
@@ -664,7 +672,7 @@ relay(sd, buf, len, from)
 	if (dflag)
 		dnsdump("relay I", buf, len, from);
 	if (hp->qr == 0 && hp->opcode == QUERY) {
-		/* query, no recurse - multicast it */
+		/* query - relay it */
 		qc = newqcache(from, buf, len);
 		qc->sd = sd;
 
@@ -675,7 +683,9 @@ relay(sd, buf, len, from)
 
 		sent = 0;
 		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
-			printnsdb(ns);
+			if (dflag)
+				printnsdb(ns);
+
 			sd = af2sockdb(ns->addr.ss_family,
 			    ns->type == N_MULTICAST ? S_MULTICAST : S_UNICAST);
 			if (sd == NULL)
