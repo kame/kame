@@ -7,7 +7,7 @@ SRCS=	pcap-bpf.c pcap.c inet.c gencode.c optimize.c nametoaddr.c \
 
 MAN=	pcap.3
 
-CFLAGS=	-O2
+CFLAGS+=	-O2
 DEFS=  -DHAVE_MALLOC_H=1 -DHAVE_SYS_IOCCOM_H=1 -DHAVE_SYS_SOCKIO_H=1 -DHAVE_ETHER_HOSTTON=1 -DHAVE_STRERROR=1 -DHAVE_SOCKADDR_SA_LEN=1 
 CPPFLAGS+=	${DEFS} -I${SRCDIR} -I${.CURDIR}
 YFLAGS+=	-d
@@ -24,6 +24,11 @@ grammar.c: grammar.y
 	$(YACC) $(YFLAGS) $<
 	mv y.tab.c grammar.c
 	mv y.tab.h tokdefs.h
+
+grammar.o: grammar.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c $>
+grammar.po: grammar.c
+	$(CC) $(CFLAGS) $(CPPFLAGS) -Dyylval=pcap_lval -c -pg -o $@ $>
 
 version.c: VERSION
 	@rm -f $@
