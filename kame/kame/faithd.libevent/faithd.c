@@ -182,6 +182,7 @@ doaccept(parent, event, arg)
 	struct sockaddr_in relayto;
 	socklen_t relaytolen;
 	const struct config *conf;
+	char h1[NI_MAXHOST], h2[NI_MAXHOST], sbuf[NI_MAXSERV];
 
 	event_add(pev, NULL);
 
@@ -214,6 +215,12 @@ doaccept(parent, event, arg)
 	memcpy(&relayto.sin_addr, &to.sin6_addr.s6_addr[12],
 	    sizeof(relayto.sin_addr));
 	relayto.sin_port = to.sin6_port;
+
+	getnameinfo((struct sockaddr *)&from, fromlen, h1, sizeof(h1), NULL, 0,
+	    NI_NUMERICHOST);
+	getnameinfo((struct sockaddr *)&relayto, relaytolen, h2, sizeof(h2),
+	    sbuf, sizeof(sbuf), NI_NUMERICHOST);
+	syslog(LOG_INFO, "relaying %s -> %s, service %s", h1, h2, sbuf);
 
 	conf = config_match((struct sockaddr *)&from,
 	    (struct sockaddr *)&relayto);
