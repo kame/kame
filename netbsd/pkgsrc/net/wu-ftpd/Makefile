@@ -3,7 +3,7 @@
 # Date created:		18 Oct 1994
 # Whom:			torstenb
 #
-# $Id: Makefile,v 1.1.1.2 1999/08/10 09:14:47 itojun Exp $
+# $Id: Makefile,v 1.1.1.2.2.1 1999/10/12 09:43:10 itojun Exp $
 #
 # REMINDER: to use ftpaccess(5) you need to specify -a in command line,
 # it is changed from previous versions
@@ -21,6 +21,8 @@ PATCHFILES=	wu-ftpd-242b18-v6-980924.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=     ache@FreeBSD.org
+
+BROKEN=		"old beta, with security hole"
 
 do-build:
 	cd ${WRKSRC} && ./build nbs
