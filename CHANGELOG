@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2140 2002/04/25 02:52:19 jinmei Exp $
+$KAME: CHANGELOG,v 1.2141 2002/04/25 10:03:17 sakane Exp $
 
 <200204>
+Thu Apr 25 19:03:16 JST 2002 sakane@kame.net
+	* kame/kame/racoon:
+	fixed the key length of the null encryption for phase 2.
+	racoon configured incorrect key length of the null encryption
+	to the kernel.
+
 2002-04-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c.c (client6_recvreply):
 	tightened DUID validation.
