@@ -9,8 +9,8 @@ MASTER_SITES=		http://solidpop3d.pld.org.pl/ \
 			ftp://sedez.iq.pl/pub/solidpop3d/ \
 			ftp://dione.ids.pl/pub/solidpop3d/
 
-PATCHFILES=		solidpop3d-014-v6-20000201.diff.gz
 PATCH_SITES=		ftp://ftp.kame.net/pub/kame/misc/
+PATCHFILES=		solidpop3d-014-v6-20000201.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=		itojun@kame.net
@@ -19,7 +19,6 @@ HOMEPAGE=		http://solidpop3d.pld.org.pl/download.html
 GNU_CONFIGURE=		yes
 CONFIGURE_ARGS+=	--enable-ipv6 --enable-apop --disable-bulletins
 
-# popper makefile doesn't have an install target...
 post-install:
 	${INSTALL_DATA} ${WRKSRC}/doc/config.example \
 		${PREFIX}/etc/spop3d.conf.sample
