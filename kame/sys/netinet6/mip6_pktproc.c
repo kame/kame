@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.85 2002/11/27 14:06:04 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.86 2002/11/29 11:18:48 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -74,7 +74,7 @@
 
 #define SHA1_RESULTLEN	20
 
-/* Calculation pad length te be appended */
+/* Calculation pad length to be appended */
 /* xn + y; x must be 2^m */
 #define PADLEN(cur_offset, x, y)	\
 	((x + y) - ((cur_offset) % (x))) % (x)
