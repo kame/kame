@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.321 2003/11/28 03:17:54 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.322 2003/12/10 04:48:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2978,10 +2978,11 @@ key_delsah(sah)
 			/* sanity check */
 			KEY_CHKSASTATE(state, sav->state, "key_delsah");
 
-			key_freesav(sav);
-
 			/* remove back pointer */
 			sav->sah = NULL;
+
+			key_freesav(sav);
+
 			sav = NULL;
 		}
 	}
