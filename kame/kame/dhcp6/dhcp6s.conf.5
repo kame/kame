@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.2 2002/05/23 13:50:58 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.1 2002/05/23 13:50:58 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -28,21 +28,21 @@
 .\" SUCH DAMAGE.
 .\"
 .Dd May 23, 2002
-.Dt DHCP6C.CONF 5
+.Dt DHCP6S.CONF 5
 .Os KAME
 .\"
 .Sh NAME
-.Nm dhcp6c.conf
-.Nd DHCPv6 client configuration file
+.Nm dhcp6s.conf
+.Nd DHCPv6 server configuration file
 .\"
 .Sh SYNOPSIS
-.Pa /usr/local/v6/etc/dhcp6c.conf
+.Pa /usr/local/v6/etc/dhcp6s.conf
 .\"
 .Sh DESCRIPTION
 The
 .Nm
-file contains configuration information for KAME's DHCPv6 client,
-.Nm dhcp6c .
+file contains configuration information for KAME's DHCPv6 server,
+.Nm dhcp6s .
 The configuration file consists of a sequence of statements terminated
 by a semi-colon (`;').
 Statements are composed of tokens separated by white space,
@@ -60,6 +60,26 @@ Interfaces are specified in the form of "name unit", such as
 and
 .Ar gif1.
 .\"
+.Sh Option statement
+An option statement specifies configuration parameters provided for
+every client.
+The format of the statement is as follows.
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic option Ar option-name Op Ar option-value
+;
+.Xc
+The following options can be specified in an option statement.
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic domain-name-servers Ar dns-address Op Ar dns-addresses...
+.Xc
+provides DNS server address(es).
+Each
+.Ar dns-address
+must be a numeric IPv6 address.
+.El
+.\"
 .Sh Interface statement
 An interface statement specifies configuration parameters on the
 interface.
@@ -76,101 +96,91 @@ The followings are possible
 in an interface statement.
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic send Ar send-options
+.Ic allow Ar allow-options
 ;
 .Xc
-This statement specifies DHCPv6 options to be sent to the server(s).
-Some options can only appear in particular messages according to the
-specification,
-in which case the appearance of the options is limited to be compliant
-with the specification.
+This statement specifies DHCPv6 options that is accepted by the server.
 Currently only
 .Ar rapid-commit
-can be specified in a send statement, which specifies to include
-a rapid-commit option in solicit messages.
-.It Ic request Ar request-options ;
-This statement specifies DHCPv6 options to be included in an
-option-request option.
-Currently only
-.Ar prefix-delegation
-can be specified in a request statement, which requests the server to
-delegate IPv6 prefixes.
-.It Ic information-only ;
-This statement specifies
-.Nm dhcp6c
-to only exchange informational configuration parameters with servers.
-A list of DNS server addresses is an example of such parameters.
-This statement is useful when the client does not need stateful
-configuration parameters such as IPv6 addresses or prefixes.
+can be specified in an allow statement, which specifies the server to
+accept a rapid-commit option in solicit messages.
+.It Ic preference Ar pref ;
+This statement sets the server's preference value on the
+interface to the value
+.Ar pref .
+The specified value will be contained in a preference option of
+advertise messages.
+The preference value must be a decimal integer and be between 0 and
+255.
 .El
 .El
 .\"
-.Sh Prefix interface statement
-A prefix interface statement specifies configuration parameters of
-prefixes on local interfaces that are derived from delegated prefixes.
-The generic format of an interface statement is as follows:
+.Sh Host statement
+A host statement specifies configuration parameters for a particular
+client.
+The generic format of a host statement is as follows:
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic prefix-interface Ar interface
+.Ic host Ar name
 {
 .Ar substatements
 };
 .Xc
-When an IPv6 prefix is delegated from a DHCPv6 server,
-.Nm dhcp6c
-will assign a prefix on the
-.Ar interface
-.Pq unless the interface received the DHCPv6 message containing the prefix
-with the delegated prefix and the parameters provided in
-.Ar substatements .
+.Ar host
+is an arbitrary string.
+It does not affect server's behavior but is provided for
+readability of log messages.
 Possible substatements are as follows.
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic sla-id Ar ID
+.Ic duid Ar ID
 ;
 .Xc
-This statement specifies the identifier value of the site-level aggregator
-.Pq SLA
-on the interface.
+This statement defines the client's DHCP unique identifier
+.Pq DUID .
 .Ar ID
-must be a decimal integer which fits in the length of SLA IDs
-.Pq which is 16 bits in the current implementation .
-For example,
-if
-.Ar ID
-is 1 and the client is delegated an IPv6 prefix 3ffe:ffff::/48,
-.Nm dhcp6c
-will combine the two values into a single IPv6 prefix,
-3ffe:ffff:0:1::/64,
-and will configure the prefix on the specified
-.Ar interface .
+is a colon-separated hexadecimal sequence where each separated part
+must be composed of two hexadecimal values.
+This statement is used to identify a particular host by the server
+and must be included in a host statement.
+.It Ic prefix Ar ipv6-prefix duration ;
+This statement specifies an IPv6 prefix to be delegated to the client.
+.Ar ipv6-prefix
+is a string representing a valid IPv6 prefix
+.Pq see the example below .
+.Ar duration
+is the lease duration of the prefix.
+A positive decimal number or a special string
+.Ic infinity
+can be specified as
+.Ar duration .
+A decimal number provides the duration in seconds,
+while
+.Ic infinity
+means the prefix never expires.
+Multiple prefixes can be specified,
+each of which is given by a single
+.Ic prefix
+statement.
+In that case,
+all of the specified prefixes will be delegated to the client.
 .El
 .El
 .\"
 .Sh Examples
-The followings are a sample configuration to be delegated an IPv6
-prefix from an upstream service provider.
-With this configuration
-.Nm dhcp6c
-will send solicit messages containing a prefix delegation option in an
-option request option on an upstream PPP link,
-.Ar ppp0 .
-After receiving some prefixes from a server,
-.Nm dhcp6c
-will then configure derived IPv6 prefixes with the SLA ID 1 on a
-local ethernet interface,
-.Ar ne0 .
+The followings are a sample configuration to provide a DNS server
+address for every client as well as to delegate an IPv6
+prefix to a client whose DUID is 00:01:00:01:aa:bb.
 .Bd -literal -offset
-interface ppp0 {
-        request prefix-delegation;
-};
+option domain-name-servers 3ffe:ffff::42;
 
-prefix-interface ne0 {
-        sla-id 1;
+host kame {
+	duid 00:01:00:01:aa:bb;
+	prefix 3ffe:ffff:1111::/48 infinity;
 };
 .Ed
 .Sh SEE ALSO
-.Xr dhcp6c 8
+.Xr dhcp6s 8
 .\"
 .Sh HISTORY
 The
