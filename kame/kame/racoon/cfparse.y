@@ -537,6 +537,7 @@ secproto_spec
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
 			int doi;
+			int defklen;
 
 			doi = algtype2doi($1, $2);
 			if (doi == -1) {
@@ -550,7 +551,29 @@ secproto_spec
 					return -1;
 				}
 				prhead->spspec->algclass[algclass_ipsec_enc] = doi;
-				prhead->spspec->encklen = $3;
+				switch (doi) {
+				case IPSECDOI_ESP_CAST:
+					defklen = 128;
+					break;
+				case IPSECDOI_ESP_RC5:
+					defklen = 128;
+					break;
+				case IPSECDOI_ESP_BLOWFISH:
+					defklen = 128;
+					break;
+				default:
+					/* fixed length ciphers */
+					defklen = 0;
+					break;
+				}
+				if ($3) {
+					if (defklen == 0) {
+						yyerror("keylen not allowed");
+						return -1;
+					}
+					prhead->spspec->encklen = $3;
+				} else
+					prhead->spspec->encklen = defklen;
 				break;
 			case algclass_ipsec_auth:
 				if (prhead->spspec->proto_id == IPSECDOI_PROTO_IPCOMP) {
