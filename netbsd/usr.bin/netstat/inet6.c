@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.5 1999/08/23 12:36:37 jinmei Exp $");
+__RCSID("$Id: inet6.c,v 1.6 1999/10/05 10:14:16 jinmei Exp $");
 #endif
 #endif /* not lint */
 
@@ -688,6 +688,7 @@ ip6_ifstats(ifname)
 	p(ifs6_in_toobig, "\t%qu datagram%s exceeded MTU received\n");
 	p(ifs6_in_noroute, "\t%qu datagram%s with no route received\n");
 	p(ifs6_in_addrerr, "\t%qu datagram%s with invalid dst received\n");
+	p(ifs6_in_truncated, "\t%qu truncated datagram%s received\n");
 	p(ifs6_in_protounknown, "\t%qu datagram%s with unknown proto received\n");
 	p(ifs6_in_discard, "\t%qu input datagram%s discarded\n");
 	p(ifs6_in_deliver,
