@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.45 2004/06/29 12:18:35 jinmei Exp $	*/
+/*	$KAME: name6.c,v 1.46 2004/06/30 01:58:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1539,6 +1539,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		hbuf.h_addr_list = hlist;
 		hlist[0] = (char *)addr;
 		hlist[1] = NULL;
+		free(buf);
 		return _hpcopy(&hbuf, errp);
 	}
 	free(buf);
