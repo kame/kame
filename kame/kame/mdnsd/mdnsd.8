@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.25 2000/06/05 15:00:44 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.26 2000/06/07 05:10:40 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -182,16 +182,15 @@ on UDP port 53
 .Pq standard DNS UDP port .
 You need to be root to issue
 .Xr bind 2
-to privileged port.
+on privileged port.
 .Bd -literal -offset indent
 # mdnsd -6 -i wi0
 .Ed
 .Pp
 Then, configure
 .Xr resolv.conf 5
-to ask names to
-.Nm
-on the local node.
+to resolve IP addresses from names using
+.Nm Ns .
 .Bd -literal -offset indent
 search itojun.org
 nameserver ::
