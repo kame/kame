@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.7 2000/04/21 10:45:38 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.8 2000/04/21 10:46:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -511,7 +511,7 @@ SYSCTL_PROC(_net_inet6_udp6, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
 int
 udp6_output(in6p, m, addr6, control, p)
 	register struct inpcb *in6p;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *addr6;
 	struct mbuf *control;
 	struct proc *p;
