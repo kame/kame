@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.18 2000/09/16 09:37:19 sakane Exp $	*/
+/*	$KAME: kmpstat.c,v 1.19 2000/09/19 16:04:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.18 2000/09/16 09:37:19 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.19 2000/09/19 16:04:00 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -413,10 +413,9 @@ get_combuf(ac, av)
 {
 	struct cmd_tag *cp;
 
-	/* if no argument, it's interpreted the command as showing status. */
 	if (ac == 0) {
-		printf("XXXXXXXXXXXXXxx\n");
-		return NULL;
+		Usage();
+		exit(0);
 	}
 
 	/* checking the string of command. */
