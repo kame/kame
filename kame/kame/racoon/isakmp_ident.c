@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.14 2000/01/18 20:15:50 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.15 2000/01/18 22:04:16 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1254,7 +1254,7 @@ end:
  * initiator's 4th exchange
  * send to responder
  * 	psk: HDR*, IDi1, HASH_I
- * 	sig: HDR*, IDi1, [ CERT, ] SIG_I
+ * 	sig: HDR*, IDi1, [ CR, ] [ CERT, ] SIG_I
  * 	rsa: HDR*, HASH_I
  * 	rev: HDR*, HASH_I
  * responders 3rd exchnage
