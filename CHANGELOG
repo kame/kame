@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1002 2000/06/12 18:40:06 sakane Exp $
+$Id: CHANGELOG,v 1.1003 2000/06/13 02:31:17 jinmei Exp $
 
 <200006>
+2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/common.c (getifaddr): corrected arguments to
+	in6_addrscopebyif().
+	In response to a report from Hajimu UMEMOTO<ume@bisd.hitachi.co.jp>
+
 Tue Jun 13 03:39:42 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	send error message against sadb_acquire message to the kernel
