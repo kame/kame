@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.125 2001/08/14 12:26:07 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.126 2001/08/16 20:22:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -916,6 +916,7 @@ pk_sendupdate(iph2)
 	struct sockaddr *src = NULL, *dst = NULL;
 	int e_type, e_keylen, a_type, a_keylen, flags;
 	u_int satype, mode;
+	u_int64_t lifebyte = 0;
 
 	/* sanity check */
 	if (iph2->approval == NULL) {
@@ -961,6 +962,12 @@ pk_sendupdate(iph2)
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
+#if 0
+		lifebyte = iph2->approval->lifebyte * 1024,
+#else
+		lifebyte = 0;
+#endif
+
 		plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_update\n");
 
 		if (pfkey_send_update(
@@ -974,8 +981,7 @@ pk_sendupdate(iph2)
 				4,	/* XXX static size of window */
 				pr->keymat->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
-				0, iph2->approval->lifebyte * 1024,
-				iph2->approval->lifetime, 0,
+				0, lifebyte, iph2->approval->lifetime, 0,
 				iph2->seq) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"libipsec failed send update (%s)\n",
@@ -1151,6 +1157,7 @@ pk_sendadd(iph2)
 	struct sockaddr *src = NULL, *dst = NULL;
 	int e_type, e_keylen, a_type, a_keylen, flags;
 	u_int satype, mode;
+	u_int64_t lifebyte = 0;
 
 	/* sanity check */
 	if (iph2->approval == NULL) {
@@ -1196,6 +1203,12 @@ pk_sendadd(iph2)
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
+#if 0
+		lifebyte = iph2->approval->lifebyte * 1024,
+#else
+		lifebyte = 0;
+#endif
+
 		plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_add\n");
 
 		if (pfkey_send_add(
@@ -1209,8 +1222,7 @@ pk_sendadd(iph2)
 				4,	/* XXX static size of window */
 				pr->keymat_p->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
-				0, iph2->approval->lifebyte * 1024,
-				iph2->approval->lifetime, 0,
+				0, lifebyte, iph2->approval->lifetime, 0,
 				iph2->seq) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"libipsec failed send add (%s)\n",
