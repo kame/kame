@@ -3,7 +3,7 @@
 # Date created:		28 Jan 1999
 # Whom:			Chip Marshall <chip@eboai.org>
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:04 itojun Exp $
+# $Id: Makefile,v 1.2 2001/03/12 12:31:59 itojun Exp $
 #
 
 DISTNAME=	icecast-1.1.4
@@ -15,6 +15,8 @@ PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
 PATCHFILES=	icecast-114-v6-19990618a.diff.gz
 PATCH_DIST_STRIP=	-p1
+
+BROKEN=		numerous remote buffer overrun
 
 MAINTAINER=	itojun@kame.net
 

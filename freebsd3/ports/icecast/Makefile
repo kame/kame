@@ -2,7 +2,7 @@
 # Date created:		28 Jan 1999
 # Whom:			Chip Marshall <chip@eboai.org>
 #
-# $KAME: Makefile,v 1.2 2000/06/25 10:58:33 sumikawa Exp $
+# $KAME: Makefile,v 1.3 2001/03/12 12:31:59 itojun Exp $
 #
 
 PORTNAME=	icecast
@@ -15,6 +15,8 @@ PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
 PATCHFILES=	icecast-114-v6-19990527a.diff.gz
 PATCH_DIST_STRIP=	-p1
+
+BROKEN=		numerous remote buffer overrun
 
 MAINTAINER=	itojun@kame.net
 
