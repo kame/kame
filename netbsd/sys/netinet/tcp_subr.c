@@ -1056,6 +1056,9 @@ tcp6_ctlinput(cmd, sa, ip6, m, off)
 	extern struct in6_addr zeroin6_addr;	/* netinet6/in6_pcb.c */
 	struct sockaddr_in6 sa6;
 
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
 	if (cmd == PRC_QUENCH)
 		notify = tcp6_quench;
 	else if (cmd == PRC_MSGSIZE)
@@ -1125,6 +1128,9 @@ tcp_ctlinput(cmd, sa, v)
 	int errno;
 	int nmatch;
 
+	if (sa->sa_family != AF_INET ||
+	    sa->sa_len != sizeof(struct sockaddr_in))
+		return NULL;
 	if ((unsigned)cmd >= PRC_NCMDS)
 		return NULL;
 	errno = inetctlerrmap[cmd];

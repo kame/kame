@@ -454,6 +454,9 @@ udp_ctlinput(cmd, sa, v)
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	int errno;
 
+	if (sa->sa_family != AF_INET
+	 || sa->sa_len != sizeof(struct sockaddr_in))
+		return NULL;
 	if ((unsigned)cmd >= PRC_NCMDS)
 		return NULL;
 	errno = inetctlerrmap[cmd];
