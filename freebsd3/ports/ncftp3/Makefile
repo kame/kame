@@ -2,17 +2,17 @@
 # Date created:         4 Nov 1994
 # Whom:                 ache
 #
-# $KAME: Makefile,v 1.8 2000/06/25 10:58:39 sumikawa Exp $
+# $KAME: Makefile,v 1.9 2000/11/12 19:19:58 sumikawa Exp $
 #
 
 PORTNAME=	ncftp
-PORTVERSION=	3.0.1
+PORTVERSION=	3.0.2
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.ncftp.com/ncftp/
 DISTNAME=       ${PKGNAME}-src
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ncftp-301-v6-20000412.diff.gz
+PATCHFILES=	ncftp-302-v6-20001113.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
