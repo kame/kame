@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.115 2003/08/07 08:49:17 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.116 2003/08/09 14:41:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -266,7 +266,7 @@ struct	ip6stat {
 	 * from the destination is chosen.
 	 */
 	u_quad_t ip6s_sources_otherscope[16];
-	/* number of times that an deprecated address is chosen */
+	/* number of times that a deprecated address is chosen */
 	u_quad_t ip6s_sources_deprecated[16];
 
 	u_quad_t ip6s_forward_cachehit;
