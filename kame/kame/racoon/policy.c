@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.1 2000/01/09 01:31:30 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.2 2000/01/10 21:25:05 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -236,7 +236,7 @@ spidx2str(spidx)
 	p += i;
 	blen -= i;
 
-	snprintf(p, blen, "%d %d %d",
+	snprintf(p, blen, "proto=%d dir=%d action=%d",
 		spidx->ul_proto, spidx->dir, spidx->action);
 
 	return buf;
