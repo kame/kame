@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.70 2001/06/04 08:57:48 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.71 2001/06/11 09:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,6 +85,9 @@
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/ip6_fw.h>
+#endif
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#include <net/pfil.h>
 #endif
 
 #include <net/net_osdep.h>
@@ -596,6 +599,32 @@ ip6_forward(m, srcrt)
 	in6_clearscope(&ip6->ip6_src);
 	in6_clearscope(&ip6->ip6_dst);
 #endif
+
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+    {
+	struct packet_filter_hook *pfh;
+	struct mbuf *m1;
+	int rv;
+
+	/*
+	 * Run through list of hooks for output packets.
+	 */
+	m1 = m;
+	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
+	for (; pfh; pfh = pfh->pfil_link.tqe_next)
+		if (pfh->pfil_func) {
+		    	rv = pfh->pfil_func(ip6, sizeof(*ip6), rt->rt_ifp, 1, &m1);
+			if (rv) {
+				error = EHOSTUNREACH;
+				goto freecopy;
+			}
+			m = m1;
+			if (m == NULL)
+				goto freecopy;
+			ip6 = mtod(m, struct ip6_hdr *);
+		}
+    }
+#endif /* PFIL_HOOKS */
 
 	error = nd6_output(rt->rt_ifp, origifp, m, dst, rt);
 	if (error) {
