@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.82 2002/05/29 22:38:57 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.83 2002/05/29 23:07:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.82 2002/05/29 22:38:57 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.83 2002/05/29 23:07:33 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -49,6 +49,7 @@ static char _rcsid[] = "$KAME: route6d.c,v 1.82 2002/05/29 22:38:57 itojun Exp $
 #include <stddef.h>
 #include <errno.h>
 #include <err.h>
+#include <util.h>
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -281,7 +282,9 @@ main(argc, argv)
 	int	error = 0;
 	struct	ifc *ifcp;
 	sigset_t mask, omask;
+#if !(defined(__OpenBSD__) || defined(__NetBSD__))
 	FILE	*pidfile;
+#endif
 	char *progname;
 	char *ep;
 
@@ -389,11 +392,15 @@ main(argc, argv)
 	if (dflag)
 		ifrtdump(0);
 
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+	pidfile(NULL);
+#else
 	pid = getpid();
 	if ((pidfile = fopen(ROUTE6D_PID, "w")) != NULL) {
 		fprintf(pidfile, "%d\n", pid);
 		fclose(pidfile);
 	}
+#endif
 
 	if ((ripbuf = (struct rip6 *)malloc(RIP6_MAXMTU)) == NULL) {
 		fatal("malloc");
@@ -3264,14 +3271,15 @@ char *
 allocopy(p)
 	char *p;
 {
-	char *q = (char *)malloc(strlen(p) + 1);
+	int len = strlen(p) + 1;
+	char *q = (char *)malloc(len);
 
 	if (!q) {
 		fatal("malloc");
 		/*NOTREACHED*/
 	}
 
-	strcpy(q, p);
+	strlcpy(q, p, len);
 	return q;
 }
 
