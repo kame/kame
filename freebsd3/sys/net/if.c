@@ -252,9 +252,12 @@ void
 if_attachdomain()
 {
 	struct ifnet *ifp;
+	int s;
 
+	s = splnet();
 	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
 		if_attachdomain1(ifp);
+	splx(s);
 }
 
 static void
