@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.78 2003/03/14 07:59:24 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.79 2003/03/14 11:54:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1330,7 +1330,7 @@ nd6_options(struct nd_opt_hdr *hdr, int limit,
 	int optlen = 0;
 
 	for (; limit > 0; limit -= optlen) {
-		if (limit < sizeof(struct nd_opt_hdr *)) {
+		if (limit < sizeof(struct nd_opt_hdr)) {
 			syslog(LOG_INFO, "<%s> short option header", __func__);
 			goto bad;
 		}
