@@ -1,8 +1,8 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.789 2000/04/18 08:44:23 jinmei Exp $
+$Id: CHANGELOG,v 1.790 2000/04/18 11:28:25 itojun Exp $
 
-<200003>
+<200004>
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/scope6config/scope6config.c: added to configure and
 	view the scope zone identifiers of a particular interface.
@@ -196,6 +196,7 @@ Sat Apr  1 22:47:12 JST 2000  itojun@iijlab.net
 	* sys/sys/socket.h (all platforms): avoid namespace pollution
 	  for CMSG_ALIGN().
 
+<200003>
 Thu Mar 30 2000  itojun@iijlab.net
 	* libinet6: by defining USE_EDNS0, resolver will make queries with
 	  EDNS0 UDP buffer size report. (experimental since BIND4/8 chokes
