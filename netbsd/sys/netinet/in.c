@@ -463,22 +463,6 @@ in_control(so, cmd, data, ifp, p)
 
 	case SIOCSIFADDR:
 		error = in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), 1);
-#if 0
-		/*
-		 * the code chokes if we are to assign multiple addresses with
-		 * the same address prefix (rtinit() will return EEXIST, which
-		 * is not fatal actually).  we will get memory leak if we
-		 * don't do it.
-		 * -> we may want to hide EEXIST from rtinit().
-		 */
-  undo:
-		if (error && newifaddr) {
-			TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
-			IFAFREE(&ia->ia_ifa);
-			TAILQ_REMOVE(&in_ifaddr, ia, ia_list);
-			IFAFREE(&ia->ia_ifa);
-		}
-#endif
 		return error;
 
 	case SIOCSIFNETMASK:
@@ -512,10 +496,6 @@ in_control(so, cmd, data, ifp, p)
 		if (ifra->ifra_addr.sin_family == AF_INET &&
 		    (hostIsNew || maskIsNew)) {
 			error = in_ifinit(ifp, ia, &ifra->ifra_addr, 0);
-#if 0
-			if (error)
-				goto undo;
-#endif
 		}
 		if ((ifp->if_flags & IFF_BROADCAST) &&
 		    (ifra->ifra_broadaddr.sin_family == AF_INET))
@@ -790,17 +770,7 @@ in_ifscrub(ifp, ia)
 	struct in_ifaddr *ia;
 {
 
-#if 1
 	in_scrubprefix(ia);
-#else
-	if ((ia->ia_flags & IFA_ROUTE) == 0)
-		return;
-	if (ifp->if_flags & (IFF_LOOPBACK|IFF_POINTOPOINT))
-		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
-	else
-		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, 0);
-	ia->ia_flags &= ~IFA_ROUTE;
-#endif
 }
 
 /*
@@ -881,16 +851,7 @@ in_ifinit(ifp, ia, sin, scrub)
 			return (0);
 		flags |= RTF_HOST;
 	}
-#if 1
 	error = in_addprefix(ia, flags);
-#else
-	error = rtinit(&ia->ia_ifa, (int)RTM_ADD, flags);
-	if (!error)
-		ia->ia_flags |= IFA_ROUTE;
-	/* XXX check if the subnet route points to the same interface */
-	if (error == EEXIST)
-		error = 0;
-#endif
 	/*
 	 * recover multicast kludge entry, if there is.
 	 */
@@ -921,7 +882,10 @@ bad:
 	(((((x)->ia_ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) != 0) && \
 	  (x)->ia_dstaddr.sin_family == AF_INET) ? RTF_HOST : 0)
 
-/* (may) add a route to prefix ("connected route" in cisco terminology) */
+/*
+ * add a route to prefix ("connected route" in cisco terminology).
+ * does nothing if there's some interface address with the same prefix already.
+ */
 static int
 in_addprefix(target, flags)
 	struct in_ifaddr *target;
@@ -968,6 +932,11 @@ in_addprefix(target, flags)
 	return error;
 }
 
+/*
+ * remove a route to prefix ("connected route" in cisco terminology).
+ * re-installs the route by using another interface address, if there's one
+ * with the same prefix (otherwise we lose the route mistakenly).
+ */
 static int
 in_scrubprefix(target)
 	struct in_ifaddr *target;
