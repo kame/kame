@@ -181,7 +181,6 @@ int	tcbhashsize = TCBHASHSIZE;
 int	tcp_freeq __P((struct tcpcb *));
 
 struct pool tcpcb_pool;
-extern struct pool syn_cache_link_pool;
 
 /*
  * Tcp initialization
@@ -707,6 +706,7 @@ tcp_newtcpcb(family, aux)
 	tp->t_peermss = tcp_mssdflt;
 	tp->t_ourmss = tcp_mssdflt;
 	tp->t_segsz = tcp_mssdflt;
+	LIST_INIT(&tp->t_sc);
 
 	tp->t_flags = 0;
 	if (tcp_do_rfc1323 && tcp_do_win_scale)
@@ -899,18 +899,11 @@ tcp_close(tp)
 	TCP_REASS_UNLOCK(tp);
 
 	TCP_CLEAR_DELACK(tp);
+	syn_cache_cleanup(tp);
 
 	if (tp->t_template) {
 		m_free(tp->t_template);
 		tp->t_template = NULL;
-	}
-	if (tp->t_scl) {
-		tp->t_scl->scl_refcnt--;
-		tp->t_scl->scl_tp = NULL;
-		if (tp->t_scl->scl_refcnt < 0)
-			printf("%s %d: scl_refcnt < 0\n", __FILE__, __LINE__);
-		if (tp->t_scl->scl_refcnt <= 0)
-			pool_put(&syn_cache_link_pool, tp->t_scl);
 	}
 	pool_put(&tcpcb_pool, tp);
 	if (inp) {

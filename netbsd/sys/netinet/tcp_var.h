@@ -128,8 +128,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 /*
  * Tcp control block, one per tcp; fields:
  */
-struct syn_cache_link;
-
 struct tcpcb {
 	int	t_family;		/* address family on the wire */
 	struct ipqehead segq;		/* sequencing queue */
@@ -227,8 +225,8 @@ struct tcpcb {
 /* SACK stuff */
 	struct ipqehead timeq;		/* time sequenced queue (for SACK) */
 
-/* back pointer from syn cache */
-	struct syn_cache_link *t_scl;
+/* pointer for syn cache entries*/
+	LIST_HEAD(, syn_cache) t_sc;	/* list of entries by this tcb */
 };
 
 #ifdef _KERNEL
@@ -327,14 +325,6 @@ struct tcp_opt_info {
 };
 
 /*
- * syn_cache <-> tcpcb linkage structure with refcnt'ing.
- */
-struct syn_cache_link {
-	int scl_refcnt;
-	struct tcpcb *scl_tp;
-};
-
-/*
  * Data for the TCP compressed state engine.
  */
 union syn_cache_sa {
@@ -380,7 +370,9 @@ struct syn_cache {
 	u_int16_t sc_ourmaxseg;
 	u_int8_t sc_request_r_scale	: 4,
 		 sc_requested_s_scale	: 4;
-	struct syn_cache_link *sc_scl;
+
+	struct tcpcb *sc_tp;			/* tcb for listening socket */
+	LIST_ENTRY(syn_cache) sc_tpq;		/* list of entries by same tp */
 };
 
 struct syn_cache_head {
@@ -692,13 +684,14 @@ struct socket *syn_cache_get __P((struct sockaddr *, struct sockaddr *,
 		struct tcphdr *, unsigned int, unsigned int,
 		struct socket *so, struct mbuf *));
 void	 syn_cache_init __P((void));
-void	 syn_cache_insert __P((struct syn_cache *));
+void	 syn_cache_insert __P((struct syn_cache *, struct tcpcb *));
 struct syn_cache *syn_cache_lookup __P((struct sockaddr *, struct sockaddr *,
 		struct syn_cache_head **));
 void	 syn_cache_reset __P((struct sockaddr *, struct sockaddr *,
 		struct tcphdr *));
 int	 syn_cache_respond __P((struct syn_cache *, struct mbuf *));
 void	 syn_cache_timer __P((void));
+void	 syn_cache_cleanup __P((struct tcpcb *));
 
 int	tcp_newreno __P((struct tcpcb *, struct tcphdr *));
 #endif

@@ -2330,6 +2330,8 @@ do {									\
 #define	SYN_CACHE_RM(sc)						\
 do {									\
 	LIST_REMOVE((sc), sc_bucketq);					\
+	(sc)->sc_tp = NULL;						\
+	LIST_REMOVE((sc), sc_tpq);					\
 	tcp_syn_cache[(sc)->sc_bucketidx].sch_length--;			\
 	TAILQ_REMOVE(&tcp_syn_cache_timeq[(sc)->sc_rxtshift], (sc), sc_timeq); \
 	syn_cache_count--;						\
@@ -2341,18 +2343,10 @@ do {									\
 		(void) m_free((sc)->sc_ipopts);				\
 	if ((sc)->sc_route4.ro_rt != NULL)				\
 		RTFREE((sc)->sc_route4.ro_rt);				\
-	if ((sc)->sc_scl) {						\
-		(sc)->sc_scl->scl_refcnt--;				\
-		if ((sc)->sc_scl->scl_refcnt < 0)			\
-			printf("%s %d: scl_refcnt < 0\n", __FILE__, __LINE__); \
-		if ((sc)->sc_scl->scl_refcnt <= 0)			\
-			pool_put(&syn_cache_link_pool, (sc)->sc_scl);	\
-	}								\
 	pool_put(&syn_cache_pool, (sc));				\
 } while (0)
 
 struct pool syn_cache_pool;
-struct pool syn_cache_link_pool;
 
 /*
  * We don't estimate RTT with SYNs, so each packet starts with the default
@@ -2385,15 +2379,12 @@ syn_cache_init()
 	/* Initialize the syn cache pool. */
 	pool_init(&syn_cache_pool, sizeof(struct syn_cache), 0, 0, 0,
 	    "synpl", 0, NULL, NULL, M_PCB);
-
-	/* Initialize the syn cache link pool. */
-	pool_init(&syn_cache_link_pool, sizeof(struct syn_cache_link), 0, 0, 0,
-	    "synlpl", 0, NULL, NULL, M_PCB);
 }
 
 void
-syn_cache_insert(sc)
+syn_cache_insert(sc, tp)
 	struct syn_cache *sc;
+	struct tcpcb *tp;
 {
 	struct syn_cache_head *scp;
 	struct syn_cache *sc2;
@@ -2484,6 +2475,9 @@ syn_cache_insert(sc)
 	SYN_CACHE_TIMER_ARM(sc);
 	TAILQ_INSERT_TAIL(&tcp_syn_cache_timeq[sc->sc_rxtshift], sc, sc_timeq);
 
+	/* Link it from tcpcb entry */
+	LIST_INSERT_HEAD(&tp->t_sc, sc, sc_tpq);
+
 	/* Put it into the bucket. */
 	LIST_INSERT_HEAD(&scp->sch_bucket, sc, sc_bucketq);
 	scp->sch_length++;
@@ -2553,6 +2547,36 @@ syn_cache_timer()
 		SYN_CACHE_RM(sc);
 		SYN_CACHE_PUT(sc);
 	}
+	splx(s);
+}
+
+/*
+ * Remove syn cache created by the specified tcb entry,
+ * because this does not make sense to keep them
+ * (if there's no tcb entry, syn cache entry will never be used)
+ */
+void
+syn_cache_cleanup(tp)
+	struct tcpcb *tp;
+{
+	struct syn_cache *sc, *nsc;
+	int s;
+
+	s = splsoftnet();
+
+	for (sc = LIST_FIRST(&tp->t_sc); sc != NULL; sc = nsc) {
+		nsc = LIST_NEXT(sc, sc_tpq);
+
+#ifdef DIAGNOSTIC
+		if (sc->sc_tp != tp)
+			panic("invalid sc_tp in syn_cache_cleanup");
+#endif
+		SYN_CACHE_RM(sc);
+		SYN_CACHE_PUT(sc);
+	}
+	/* just for safety */
+	LIST_INIT(&tp->t_sc);
+
 	splx(s);
 }
 
@@ -3131,23 +3155,9 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 		sc->sc_requested_s_scale = 15;
 		sc->sc_request_r_scale = 15;
 	}
-
-	/* fill syn_cache_link for tcpcb <-> syn_cache relationship */
-	if (tp->t_scl == NULL) {
-		tp->t_scl = pool_get(&syn_cache_link_pool, PR_NOWAIT);
-		if (tp->t_scl) {
-			bzero(tp->t_scl, sizeof(*tp->t_scl));
-			tp->t_scl->scl_tp = tp;
-			tp->t_scl->scl_refcnt = 1;
-		}
-	}
-	if (tp->t_scl != NULL) {
-		sc->sc_scl = tp->t_scl;
-		sc->sc_scl->scl_refcnt++;
-	}
-
+	sc->sc_tp = tp;
 	if (syn_cache_respond(sc, m) == 0) {
-		syn_cache_insert(sc);
+		syn_cache_insert(sc, tp);
 		tcpstat.tcps_sndacks++;
 		tcpstat.tcps_sndtotal++;
 	} else {
@@ -3213,11 +3223,11 @@ syn_cache_respond(sc, m)
 	m->m_data += max_linkhdr;
 	m->m_len = m->m_pkthdr.len = tlen;
 #ifdef IPSEC
-	if (sc->sc_scl && sc->sc_scl->scl_tp) {
+	if (sc->sc_tp) {
 		struct tcpcb *tp;
 		struct socket *so;
 
-		tp = sc->sc_scl->scl_tp;
+		tp = sc->sc_tp;
 		if (tp->t_inpcb)
 			so = tp->t_inpcb->inp_socket;
 #ifdef INET6
