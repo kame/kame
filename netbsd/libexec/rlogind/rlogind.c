@@ -227,6 +227,11 @@ doit(f, fromp)
 	u_int16_t *portp;
 	struct addrinfo hints, *res, *res0;
 	int gaierror;
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
 
 	alarm(60);
 	read(f, &c, 1);
@@ -248,8 +253,11 @@ doit(f, fromp)
 		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
 		exit(1);
 	}
-	getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
-		    naddr, sizeof(naddr), NULL, 0, NI_NUMERICHOST);
+	if (getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
+		    naddr, sizeof(naddr), NULL, 0, niflags) != 0) {
+		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
+		exit(1);
+	}
 
 	if (getnameinfo((struct sockaddr *)fromp, fromp->sa_len,
 		    saddr, sizeof(saddr), NULL, 0, NI_NAMEREQD) == 0) {
@@ -282,7 +290,7 @@ doit(f, fromp)
 					if (getnameinfo(res->ai_addr,
 						res->ai_addrlen,
 						raddr, sizeof(raddr), NULL, 0,
-						NI_NUMERICHOST) == 0
+						niflags) == 0
 					 && strcmp(naddr, raddr) == 0) {
 						hostname = res->ai_canonname
 							? res->ai_canonname
