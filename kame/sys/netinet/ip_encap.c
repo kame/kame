@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.23 2000/04/14 08:29:43 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.24 2000/04/15 02:21:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,6 +52,7 @@
  * So, clearly good old protosw does not work for protocol #4 and #41.
  * The code will let you match protocol via src/dst address pair.
  */
+/* XXX is M_NETADDR correct? */
 
 #ifdef __FreeBSD__
 # include "opt_mrouting.h"
@@ -107,6 +108,7 @@
 MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
 #endif
 
+static void encap_add __P((struct encaptab *));
 static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
 static void encap_fillarg __P((struct mbuf *, const struct encaptab *));
@@ -271,6 +273,24 @@ encap6_input(mp, offp, proto)
 }
 #endif
 
+static void
+encap_add(ep)
+	struct encaptab *ep;
+{
+	/*
+	 * Order of insertion will determine the priority in lookup.
+	 * We should be careful putting them in specific-one-first order.
+	 * The question is, since we have two "mask" portion, we cannot really
+	 * define total order between entries.
+	 * For example, which of these should be preferred?
+	 *	src=3ffe::/16, dst=3ffe:501::/32
+	 *	src=3ffe:501::/32, dst=3ffe::/16
+	 *
+	 * At this moment we don't care about the ordering.
+	 */
+	LIST_INSERT_HEAD(&encaptab, ep, chain);
+}
+
 /*
  * sp (src ptr) is always my side, and dp (dst ptr) is always remote side.
  * length of mask (sm and dm) is assumed to be same as sp/dp.
@@ -343,18 +363,8 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	ep->psw = psw;
 	ep->arg = arg;
 
-	/*
-	 * Order of insertion will determine the priority in lookup.
-	 * We should be careful putting them in specific-one-first order.
-	 * The question is, since we have two "mask" portion, we cannot really
-	 * define total order between entries.
-	 * For example, which of these should be preferred?
-	 *	src=3ffe::/16, dst=3ffe:501::/32
-	 *	src=3ffe:501::/32, dst=3ffe::/16
-	 *
-	 * At this moment we don't care about the ordering.
-	 */
-	LIST_INSERT_HEAD(&encaptab, ep, chain);
+	encap_add(ep);
+
 	error = 0;
 	splx(s);
 	return ep;
@@ -400,18 +410,8 @@ encap_attach_func(af, proto, func, psw, arg)
 	ep->psw = psw;
 	ep->arg = arg;
 
-	/*
-	 * Order of insertion will determine the priority in lookup.
-	 * We should be careful putting them in specific-one-first order.
-	 * The question is, since we have two "mask" portion, we cannot really
-	 * define total order between entries.
-	 * For example, which of these should be checked first?
-	 *	src=3ffe::/16, dst=3ffe:501::/32
-	 *	src=3ffe:501::/32, dst=3ffe::/16
-	 *
-	 * At this moment we don't care about the ordering.
-	 */
-	LIST_INSERT_HEAD(&encaptab, ep, chain);
+	encap_add(ep);
+
 	error = 0;
 	splx(s);
 	return ep;
