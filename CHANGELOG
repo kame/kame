@@ -1,11 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2357 2003/03/14 05:43:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.2358 2003/03/14 11:09:22 jinmei Exp $
 
 <200303>
 2003-03-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/dhcp6/configure.in: checked if __func__ works with
-	string concatenation.
-	From: Masahiro =Rhythm Drive= Ishiyama <masahiro@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: C99 compliance; avoid using __func__ with
+	concatenating other strings since the it is a const char variable.
 
 2003-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rafixd: this is a new application.  The rafixd daemon
