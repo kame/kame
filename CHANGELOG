@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1986 2001/11/25 10:48:06 jinmei Exp $
+$KAME: CHANGELOG,v 1.1987 2001/11/26 11:53:53 jinmei Exp $
 
 <200111>
+2001-11-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c(ip6_output): initialized the last
+	argument to ip6_process_hopopts(), because the callee requires it
+	to be 0 when a jumbo payload option is contained.
+	(We may have to reconsider the requirement, though.)
+
 2001-11-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/{altq*, hroute6d, ppp, pvc*, ifconfig}/Makefile:
 	linked KAME's libinet6 in order to make sure to use the latest
