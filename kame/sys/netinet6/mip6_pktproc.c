@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.87 2002/11/29 11:46:37 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.88 2002/12/05 09:22:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -567,13 +567,11 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		goto accept_binding_update;
 	}
 
-	if (isprotected
-	    && haseen) {
+	if (isprotected && haseen) {
 		bu_safe = 1;
 		goto accept_binding_update;
 	}
-	if ((haseen == 1)
-	    && ((bi.mbc_flags & IP6MU_HOME) == 0))
+	if ((haseen == 1) && ((bi.mbc_flags & IP6MU_HOME) == 0))
 		goto accept_binding_update;	/* Must be checked its safety
 						 * with RR later */
 
@@ -601,6 +599,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		error = EINVAL;
 		goto send_ba;
 	}
+#if 0
 #ifdef __NetBSD__
 {
 	char bitmask_buf[128];
@@ -614,6 +613,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	mip6log((LOG_INFO, "%s:%d: Mobility options: %b\n", 
 			 __FILE__, __LINE__, mopt.valid_options,
 		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
+#endif
 #endif
 
 	if (mopt.valid_options & MOPT_ALTCOA)
