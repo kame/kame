@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.10 2001/11/22 01:27:27 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.11 2001/11/26 07:18:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -587,11 +587,6 @@ mip6_subnet_timeout(arg)
 		     msha = msha_next) {
 			msha_next = TAILQ_NEXT(msha, msha_entry);
 
-			mha = msha->msha_mha;
-			if (mha == NULL) {
-				/* must not happen. */
-				continue;
-			}
 			/*
 			 * XXX: TODO
 			 *
@@ -599,6 +594,10 @@ mip6_subnet_timeout(arg)
 			 */
 		}
 		msha_head = TAILQ_FIRST(&ms->ms_msha_list);
+		if (msha_head == NULL) {
+			/* no home agent is found yet. */
+			continue;
+		}
 		if ((mha_head = msha_head->msha_mha) == NULL) {
 			/* must not happen. */
 			continue;
