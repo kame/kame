@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.125 2001/07/24 08:55:28 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.126 2001/07/24 09:42:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -920,7 +920,7 @@ in6_ifattach(ifp, altifp)
 #ifdef IFT_STF
 	case IFT_STF:
 		/*
-		 * 6to4 interface is a very speical kind of beast.
+		 * 6to4 interface is a very special kind of beast.
 		 * no multicast, no linklocal (based on 03 draft).
 		 */
 		goto statinit;
