@@ -90,6 +90,8 @@
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
 
+#include "faith.h"
+
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
@@ -370,10 +372,16 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
 			sin6->sin6_addr = in6addr_loopback;
 	}
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)) {
+	{
+		/*
+		 * XXX: in6_selectsrc might replace the bound local address
+		 * with the address specified by setsockopt(IPV6_PKTINFO).
+		 * Is it the intended behavior?
+		 */
 		if ((*plocal_addr6 = in6_selectsrc(sin6, inp->in6p_outputopts,
 						   inp->in6p_moptions,
 						   &inp->in6p_route,
+						   &inp->in6p_laddr,
 						   &error)) == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -460,16 +468,17 @@ in6_pcbconnect(inp, nam, p)
  * an entry to the caller for later use.
  */
 struct in6_addr *
-in6_selectsrc(dstsock, opts, mopts, ro, errorp)
+in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
 	struct route_in6 *ro;
+	struct in6_addr *laddr;
 	int *errorp;
 {
 	struct in6_addr *dst;
 	struct in6_ifaddr *ia6 = 0;
-	struct in6_pktinfo *pi;
+	struct in6_pktinfo *pi = NULL;
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
@@ -477,23 +486,32 @@ in6_selectsrc(dstsock, opts, mopts, ro, errorp)
 	/*
 	 * If the source address is explicitly specified by the caller,
 	 * use it.
+	 */
+	if (opts && (pi = opts->ip6po_pktinfo) &&
+	    !IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr))
+		return(&pi->ipi6_addr);
+
+	/*
+	 * If the source address is not specified but the socket(if any)
+	 * is already bound, use the bound address.
+	 */
+	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(laddr))
+		return(laddr);
+
+	/*
 	 * If the caller doesn't specify the source address but
 	 * the outgoing interface, use an address associated with
 	 * the interface.
 	 */
-	if (opts && (pi = opts->ip6po_pktinfo)) {
-		if (!IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr))
-			return(&pi->ipi6_addr);
-		else if (pi->ipi6_ifindex) {
-			/* XXX boundary check is assumed to be already done. */
-			ia6 = in6_ifawithscope(ifindex2ifnet[pi->ipi6_ifindex],
-					       dst);
-			if (ia6 == 0) {
-				*errorp = EADDRNOTAVAIL;
-                                return(0);
-			}
-			return(&ia6->ia_addr.sin6_addr);
+	if (pi && pi->ipi6_ifindex) {
+		/* XXX boundary check is assumed to be already done. */
+		ia6 = in6_ifawithscope(ifindex2ifnet[pi->ipi6_ifindex],
+				       dst);
+		if (ia6 == 0) {
+			*errorp = EADDRNOTAVAIL;
+			return(0);
 		}
+		return(&satosin6(&ia6->ia_addr)->sin6_addr);
 	}
 
 	/*
@@ -623,7 +641,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, errorp)
 		}
 #endif /* 0 */
 		if (ia6 == 0) {
-			*errorp = EHOSTUNREACH; /* no route */
+			*errorp = EHOSTUNREACH;	/* no route */
 			return(0);
 		}
 		return(&satosin6(&ia6->ia_addr)->sin6_addr);
@@ -652,12 +670,8 @@ in6_pcbdetach(inp)
 	struct inpcbinfo *ipi = inp->inp_pcbinfo;
 
 #ifdef IPSEC
-	if (sotoinpcb(so) != 0) {
-		KEYDEBUG(KEYDEBUG_KEY_STAMP,
-			printf("DP call free SO=%lx from in6_pcbdetach\n",
-			       so));
+	if (sotoinpcb(so) != 0)
 		key_freeso(so);
-	}
 	ipsec6_delete_pcbpolicy(inp);
 #endif /* IPSEC */
 	inp->inp_gencnt = ++ipi->ipi_gencnt;

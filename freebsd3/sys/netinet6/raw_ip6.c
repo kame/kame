@@ -101,6 +101,8 @@
 #include <netinet6/ipsec.h>
 #endif /*IPSEC*/
 
+#include <machine/stdarg.h>
+
 #include "faith.h"
 
 #define satosin6(sa)	((struct sockaddr_in6 *)(sa))
@@ -149,10 +151,10 @@ rip6_input(mp, offp, proto)
 		if (in6p->in6p_ip6_nxt &&
 		    in6p->in6p_ip6_nxt != proto)
 			continue;
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_laddr) &&
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
 		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst))
 			continue;
-		if (!IN6_IS_ADDR_ANY(&in6p->in6p_faddr) &&
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) &&
 		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src))
 			continue;
 		if (in6p->in6p_cksum != -1
@@ -215,34 +217,53 @@ rip6_input(mp, offp, proto)
  * Tack on options user may have setup with control call.
  */
 int
-rip6_output(m, so, dstsock, control)
-	register struct mbuf *m;
+#if __STDC__
+rip6_output(struct mbuf *m, ...)
+#else
+rip6_output(m, va_alist)
+	struct mbuf *m;
+	va_dcl
+#endif
+{
 	struct socket *so;
 	struct sockaddr_in6 *dstsock;
 	struct mbuf *control;
-{
 	struct in6_addr *dst;
 	struct ip6_hdr *ip6;
-	struct inpcb *in6p = sotoinpcb(so);
+	struct inpcb *in6p;
 	u_int	plen = m->m_pkthdr.len;
 	int error = 0;
 	struct ip6_pktopts opt, *optp = 0;
 	struct ifnet *oifp = NULL;
+	int priv = 0;
+	va_list ap;
 
+	va_start(ap, m);
+	so = va_arg(ap, struct socket *);
+	dstsock = va_arg(ap, struct sockaddr_in6 *);
+	control = va_arg(ap, struct mbuf *);
+	va_end(ap);
+
+	in6p = sotoin6pcb(so);
+
+	priv = 0;
+#ifdef __NetBSD__
+    {
+	struct proc *p = curproc;	/* XXX */
+
+	if (p && !suser(p->p_ucred, &p->p_acflag))
+		priv = 1;
+    }
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+	if (so->so_uid == 0)
+		priv = 1;
+#else
+	if ((so->so_state & SS_PRIV) != 0)
+		priv = 1;
+#endif
 	dst = &dstsock->sin6_addr;
 	if (control) {
-		if (error = ip6_setpktoptions(control, &opt,
-					      /*
-					       * XXX: need to rethink this
-					       * rule
-					       */
-					      /* so->so_state & SS_PRIV */
-					      /*
-					       * XXX: this is OK now, as long
-					       * as root user ID is 0
-					       */
-					      so->so_uid == 0
-					      ))
+		if ((error = ip6_setpktoptions(control, &opt, priv)) != 0)
 			goto bad;
 		optp = &opt;
 	} else
@@ -291,12 +312,16 @@ rip6_output(m, so, dstsock, control)
 		}
 	}
 
-	if (IN6_IS_ADDR_ANY(&in6p->in6p_laddr)) {
+	/*
+	 * Source address selection.
+	 */
+	{
 		struct in6_addr *in6a;
 
 		if ((in6a = in6_selectsrc(dstsock, optp,
 					  in6p->in6p_moptions,
 					  &in6p->in6p_route,
+					  &in6p->in6p_laddr,
 					  &error)) == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -305,8 +330,7 @@ rip6_output(m, so, dstsock, control)
 		ip6->ip6_src = *in6a;
 		if (in6p->in6p_route.ro_rt)
 			oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
-	} else
-		ip6->ip6_src = in6p->in6p_laddr;
+	}
 
 	ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 	ip6->ip6_vfc  = IPV6_VERSION;
@@ -319,19 +343,20 @@ rip6_output(m, so, dstsock, control)
 	else
 		ip6->ip6_hlim = in6p->in6p_ip6_hlim;
 
-	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6
-	 || in6p->in6p_cksum != -1) {
+	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6 ||
+	    in6p->in6p_cksum != -1) {
 		struct mbuf *n;
 		int off;
-		u_int8_t *p[2];
-		u_int16_t sum;
+		u_int16_t *p;
+
+#define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
 
 		/* compute checksum */
 		if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
 			off = offsetof(struct icmp6_hdr, icmp6_cksum);
 		else
 			off = in6p->in6p_cksum;
-		if (!(off + 1 < plen)) {
+		if (plen < off + 1) {
 			error = EINVAL;
 			goto bad;
 		}
@@ -344,28 +369,9 @@ rip6_output(m, so, dstsock, control)
 		}
 		if (!n)
 			goto bad;
-		p[0] = (u_int8_t *)(mtod(n, caddr_t) + off);
-		if (off + 1 < n->m_len)
-			p[1] = p[0] + 1;
-		else {
-			n = n->m_next;
-			while (n) {
-				if (n->m_len)
-					break;
-				n = n->m_next;
-			}
-			if (n && n->m_len)
-				p[1] = mtod(n, u_int8_t *);
-			else {
-				error = EINVAL;	/*XXX*/
-				goto bad;
-			}
-		}
-
-		*p[0] = *p[1] = 0;
-		sum = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
-		*p[0] = (htons(sum) >> 8) & 0xff;
-		*p[1] = htons(sum) & 0xff;
+		p = (u_int16_t *)(mtod(n, caddr_t) + off);
+		*p = 0;
+		*p = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
 	}
 
 #ifdef IPSEC
@@ -563,10 +569,10 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	/* Source address selection. XXX: need pcblookup? */
 	in6a = &inp->in6p_laddr;
-	if (IN6_IS_ADDR_ANY(in6a) &&
+	if (IN6_IS_ADDR_UNSPECIFIED(in6a) &&
 	    (in6a = in6_selectsrc(addr, inp->in6p_outputopts,
 				  inp->in6p_moptions, &inp->in6p_route,
-				  &error)) == NULL)
+				  &inp->in6p_laddr, &error)) == NULL)
 		return (error ? error : EADDRNOTAVAIL);
 	inp->in6p_laddr = *in6a;
 	inp->in6p_faddr = addr->sin6_addr;

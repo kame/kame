@@ -95,7 +95,7 @@ int	in6_mapped_sockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
 struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 			struct ip6_pktopts *, struct ip6_moptions *,
-			struct route_in6 *, int *));
+			struct route_in6 *, struct in6_addr *, int *));
 
 void	init_sin6 __P((struct sockaddr_in6 *sin6, struct mbuf *m));
 #endif /* KERNEL */
