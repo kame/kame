@@ -172,6 +172,7 @@ c_func	deletetunnel;
 #ifdef INET6
 c_func	setifprefixlen;
 c_func	setip6flags;
+c_func	setip6deprecated;
 c_func  setip6pltime;
 c_func  setip6vltime;
 c_func2	setip6lifetime;
@@ -216,8 +217,8 @@ struct	cmd {
 	{ "anycast",	IN6_IFF_ANYCAST, setip6flags },
 	{ "tentative",	IN6_IFF_TENTATIVE, setip6flags },
 	{ "-tentative",	-IN6_IFF_TENTATIVE, setip6flags },
-	{ "deprecated",	IN6_IFF_DEPRECATED, setip6flags },
-	{ "-deprecated", -IN6_IFF_DEPRECATED, setip6flags },
+	{ "deprecated",	1, setip6deprecated },
+	{ "-deprecated", 0, setip6deprecated },
 	{ "autoconf",	IN6_IFF_AUTOCONF, setip6flags },
 	{ "-autoconf",	-IN6_IFF_AUTOCONF, setip6flags },
 	{ "pltime",     NEXTARG,        setip6pltime },
@@ -911,6 +912,17 @@ setip6flags(dummyaddr, flag, dummysoc, afp)
 }
 
 void
+setip6deprecated(seconds, deprecated, s, afp)
+    	const char *seconds;
+	int deprecated;
+	int s;
+	const struct afswtch *afp;
+{
+	if (deprecated)
+		setip6lifetime("pltime", "0", s, afp);
+}
+
+void
 setip6pltime(seconds, dummy, s, afp)
     	const char *seconds;
 	int dummy __unused;
@@ -1434,7 +1446,11 @@ in6_status(s, info)
 		printf("duplicated ");
 	if ((flags6 & IN6_IFF_DETACHED) != 0)
 		printf("detached ");
-	if ((flags6 & IN6_IFF_DEPRECATED) != 0)
+	/*
+	 * XXX: we used to have a flag for deprecated addresses, but it was
+	 * obsolete except for compatibility purposes.
+	 */
+	if (lifetime.ia6t_pltime == 0)
 		printf("deprecated ");
 	if ((flags6 & IN6_IFF_AUTOCONF) != 0)
 		printf("autoconf ");
