@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.111 2002/07/26 11:51:46 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.112 2002/07/29 11:22:24 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1891,6 +1891,8 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	/* sanity check for overflow */
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
+#ifdef MIP6_CALLOUT_TEST
+#endif
 	mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.149 2002/07/29 09:40:33 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.150 2002/07/29 11:22:24 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -147,6 +147,8 @@
 #define MIP6_CONFIG_BU_USE_SINGLE 0
 #endif /* !MIP6_CONFIG_BU_USE_SINGLE */
 
+#define NONCE_UPDATE_PERIOD	300	/* XXX */
+
 extern struct mip6_subnet_list mip6_subnet_list;
 extern struct mip6_prefix_list mip6_prefix_list;
 
@@ -174,6 +176,11 @@ mip6_nonce_t mip6_nonce[MIP6_NONCE_HISTORY];
 mip6_nodekey_t mip6_nodekey[MIP6_NONCE_HISTORY];	/* this is described as 'Kcn' in the spec */
 u_int16_t nonce_index;		/* the idx value pointed by nonce_head */
 mip6_nonce_t *nonce_head;	/* Current position of nonce on the array mip6_nonce */
+#ifdef __NetBSD__
+struct callout mip6_nonce_upd_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+struct callout mip6_nonce_upd_ch;
+#endif
 #endif /* MIP6_DRAFT17 */
 
 static int mip6_prefix_list_update_sub __P((struct hif_softc *,
@@ -199,9 +206,7 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 #ifdef MIP6_DRAFT17
 static void mip6_create_nonce __P((mip6_nonce_t *));
 static void mip6_create_nodekey __P((mip6_nodekey_t *));
-#if 0
-static void mip6_update_nonce_nodekey(void);
-#endif
+static void mip6_update_nonce_nodekey(void *);
 #endif /* MIP6_DRAFT17 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -246,6 +251,16 @@ mip6_init()
 	nonce_index = 0;
 	mip6_create_nonce(mip6_nonce);
 	mip6_create_nodekey(mip6_nodekey);
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+        callout_init(&mip6_nonce_upd_ch);
+	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
+		      mip6_update_nonce_nodekey, NULL);
+#elif defined(__OpenBSD__)
+	/* XXX */
+#else
+	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
+		hz * NONCE_UPDATE_PERIOD);
+#endif
 #endif /* MIP6_DRAFT17 */
 }
 
@@ -2538,19 +2553,37 @@ mip6_create_nodekey(nodekey)
 		((u_long *)nodekey)[i] = random();
 }
 
-#if 0
 /* This function should be called periodically */
 static void
-mip6_update_nonce_nodekey()
+mip6_update_nonce_nodekey(ignored_arg)
+	void	*ignored_arg;
 {
+	int s;
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
+		      mip6_update_nonce_nodekey, NULL);
+#elif defined(__OpenBSD__)
+	/* XXX */
+#else
+	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
+		hz * NONCE_UPDATE_PERIOD);
+#endif
+
 	nonce_index++;
 	if (++nonce_head >= mip6_nonce + MIP6_NONCE_HISTORY)
 		nonce_head = mip6_nonce;
 	
 	mip6_create_nonce(nonce_head);
 	mip6_create_nodekey(mip6_nodekey + (nonce_head - mip6_nonce));
+
+	splx(s);
 }
-#endif
 
 int
 mip6_get_nonce(index, nonce)
