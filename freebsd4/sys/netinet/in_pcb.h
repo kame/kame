@@ -238,7 +238,7 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	IN6P_DSTOPTS		0x080000 /* receive dst options after rthdr */
 #define	IN6P_RTHDR		0x100000 /* receive routing header */
 #define	IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
-#define	IN6P_BINDV6ONLY		0x400000 /* do not grab IPv4 traffic */
+#define	IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
 #define IN6P_MINMTU		0x20000000 /* use minimum MTU */
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
