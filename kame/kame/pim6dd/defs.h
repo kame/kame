@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: defs.h,v 1.4 1999/09/12 17:00:07 jinmei Exp $
+ *  $Id: defs.h,v 1.5 1999/10/27 11:40:29 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -488,7 +488,7 @@ extern int receive_pim6_join_prune    __P((struct sockaddr_in6 *src,
 extern int send_pim6_jp              __P((mrtentry_t *mrtentry_ptr, int action,
 					  mifi_t mifi,
 					  struct sockaddr_in6 *target_addr, 
-					  u_int16 holdtime));
+					  u_int16 holdtime, int echo));
 
 extern int receive_pim6_assert        __P((struct sockaddr_in6 *src,
 					   char *pim_message, int datalen));

@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: route.c,v 1.2 1999/08/24 10:04:56 jinmei Exp $
+ *  $Id: route.c,v 1.3 1999/10/27 11:40:30 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -600,7 +600,7 @@ process_wrong_iif(im)
 	if(uvifs[mifi].uv_rmt_addr)
 	    send_pim6_jp(mrtentry_ptr, PIM_ACTION_PRUNE, mifi, 
 			uvifs[mifi].uv_rmt_addr, 
-			max_prune_timeout(mrtentry_ptr));
+			max_prune_timeout(mrtentry_ptr), 0);
 	else 
 	    log(LOG_WARNING, 0, 
 		"Can't send wrongvif prune on p2p %s: no remote address",
@@ -638,7 +638,7 @@ trigger_prune_alert(mrtentry_ptr)
     if(mrtentry_ptr->upstream) 
 	send_pim6_jp(mrtentry_ptr, PIM_ACTION_PRUNE, mrtentry_ptr->incoming,
 		     &mrtentry_ptr->upstream->address, 
-		     max_prune_timeout(mrtentry_ptr));
+		     max_prune_timeout(mrtentry_ptr), 0);
 }
 
 void
