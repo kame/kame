@@ -1,9 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.106 1999/09/11 04:52:35 itojun Exp $
+$Id: CHANGELOG,v 1.107 1999/09/12 14:46:50 itojun Exp $
 
 
 <199909>
+Sun Sep 12 23:44:00 JST 1999  itojun@iijlab.net
+	* kame/dhcp6: experimental DHCPv6 client/server.  many restrictions
+	  due to incomplete implementation (and we may not be improving this
+	  in the future).  not included in default compilation tree.
+	  use at your own risk.
+
 Sat Sep 11 13:51:25 JST 1999  itojun@iijlab.net
 	* kame/tcpdump: add support for dhcp6.
 
