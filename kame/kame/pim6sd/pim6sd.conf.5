@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.conf.5,v 1.17 2002/10/04 10:44:48 suz Exp $
+.\"	$KAME: pim6sd.conf.5,v 1.18 2002/10/04 11:11:48 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -150,9 +150,12 @@ corresponds to query-response-interval and query-interval in MLDv2 Query
 message, and their default value is 10000ms (query_rsp_interval), and
 125s (query_interval).
 .Ic mld_version
-is used to specify the acceptable version of MLD.  For example if it is configured
-as 1, then only MLDv1 packet is permitted on this interface.  Its default value is
-1.
+is used to specify the acceptable version of MLD.  For example if it is 
+configured as 1, then only MLDv1 packet is permitted on this interface.
+If the argument is 
+.Ic any
+, then any version of MLD (currently v1 and v2) are permitted.
+Its default value is 1.
 .\"
 .It Xo
 .Ic default_source_preference Ar preference;
