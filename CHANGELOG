@@ -1,8 +1,24 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.529 2000/02/07 06:06:13 jinmei Exp $
+$Id: CHANGELOG,v 1.530 2000/02/07 12:34:53 itojun Exp $
 
 <200002>
+Mon Feb  7 21:32:13 JST 2000  itojun@iijlab.net
+	* sys/netinet6/{ip6,icmp6,in6.h}, sys/netinet/{ip6,icmp6,in.h}:
+	  to promote RFC2553/2292 conforming applications, we now disallow
+	  direct inclusion of the following files:
+		netinet6/ip6.h
+		netinet6/icmp6.h
+		netinet6/in6.h
+	  users need to include the following items instead:
+		netinet/ip6.h
+		netinet/icmp6.h
+		netinet/in.h (pulls in both IPv4 and IPv6 decls)
+	* sys/netkey/keyv2.h, sys/net/pfkeyv2.h:
+	  similarly, to promote RFC2367 conforming applications, inclusion of
+	  netkey/keyv2.h is now disallowed.  include net/pfkeyv2.h instead.
+	  (based on discussion in kame team)
+
 Mon Feb  7 03:03:42 JST 2000  itojun@iijlab.net
 	* sys/net/rtsock.c (except bsdi[34])
 	  avoid panic on RTM_IFINFO, due to decreased MHLEN.
