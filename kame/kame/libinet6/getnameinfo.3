@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.29 2003/08/28 01:38:04 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.30 2003/08/28 01:41:02 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -339,7 +339,7 @@ if (error == 0) {
 	if (getaddrinfo(addr, "0", &hints, &res) == 0) {
 		/* malicious PTR record */
 		freeaddrinfo(res);
-		printf("bogus PTR record\n");
+		printf("bogus PTR record\\n");
 		return -1;
 	}
 	/* addr is FQDN as a result of PTR lookup */
