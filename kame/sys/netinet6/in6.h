@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.81 2001/03/02 04:54:45 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.82 2001/03/02 11:43:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -804,7 +804,6 @@ struct ip6_mtuinfo {
 /*
  * Redefinition of mbuf flags
  */
-#define	M_ANYCAST6	M_PROTO1
 #define	M_AUTHIPHDR	M_PROTO2
 #define	M_DECRYPTED	M_PROTO3
 #define	M_LOOP		M_PROTO4

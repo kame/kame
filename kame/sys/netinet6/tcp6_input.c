@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.40 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.41 2001/03/02 11:43:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,11 +125,6 @@
 #include "faith.h"
 #if defined(NFAITH) && NFAITH > 0
 #include <net/if_faith.h>
-#endif
-
-/* hack for backward compat - should be nuked */
-#ifndef M_ANYCAST6
-#define M_ANYCAST6	0
 #endif
 
 struct tcp6stat	tcp6stat;
@@ -953,7 +948,7 @@ after_listen:
 		 * in6_broadcast() should never return true on a received
 		 * packet with M_BCAST not set.
 		 */
-		if (m->m_flags & (M_BCAST|M_MCAST|M_ANYCAST6) ||
+		if (m->m_flags & (M_BCAST|M_MCAST) ||
 		    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 			goto drop;
 #if 1
@@ -1784,7 +1779,7 @@ dropwithreset:
 	 * Make ACK acceptable to originator of segment.
 	 * Don't bother to respond if destination was broadcast/multicast.
 	 */
-	if ((thflags & TH_RST) || m->m_flags & (M_BCAST|M_MCAST|M_ANYCAST6) ||
+	if ((thflags & TH_RST) || m->m_flags & (M_BCAST|M_MCAST) ||
 	    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 		goto drop;
 	if (thflags & TH_ACK)
@@ -2713,7 +2708,7 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 	ip6 = mtod(m, struct ip6_hdr *);
 	th = (struct tcp6hdr *)((caddr_t)ip6 + off);
 
-	if (m->m_flags & (M_BCAST|M_MCAST|M_ANYCAST6) ||
+	if (m->m_flags & (M_BCAST|M_MCAST) ||
 	    IN6_IS_ADDR_MULTICAST(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 		return (0);

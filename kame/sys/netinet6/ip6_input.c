@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.184 2001/03/01 22:54:29 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.185 2001/03/02 11:43:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -749,10 +749,6 @@ ip6_input(m)
 			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
 			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
 					       &ip6->ip6_dst)) {
-#ifdef M_ANYCAST6
-				if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
-					m->m_flags |= M_ANYCAST6;
-#endif
 				/* record address information into m_aux. */
 				(void)ip6_setdstifaddr(m, ia6);
 #ifdef MEASURE_PERFORMANCE
@@ -781,10 +777,6 @@ ip6_input(m)
 		if ((ih = in6h_lookup(&ip6->ip6_dst, m->m_pkthdr.rcvif)) !=
 		    NULL &&
 		    (ia = ih->in6h_ifa) != NULL) {
-#ifdef M_ANYCAST6
-			if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
-				m->m_flags |= M_ANYCAST6;
-#endif
 			/* record address information into m_aux. */
 			(void)ip6_setdstifaddr(m, ia6);
 
@@ -878,11 +870,6 @@ ip6_input(m)
 		if (1)
 #endif
 			add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
-#endif
-
-#ifdef M_ANYCAST6
-		if (ia6->ia6_flags & IN6_IFF_ANYCAST)
-			m->m_flags |= M_ANYCAST6;
 #endif
 
 		/*
