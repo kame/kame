@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.6 1999/10/20 13:11:22 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.7 1999/10/27 17:08:57 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -143,13 +143,13 @@ add_command
 	/* delete */
 delete_command
 	:	DELETE { p_type = SADB_DELETE; }
-		sa_selector_spec EOT
+		sa_selector_spec extension_spec EOT
 	;
 
 	/* get command */
 get_command
 	:	GET { p_type = SADB_GET; }
-		sa_selector_spec EOT
+		sa_selector_spec extension_spec EOT
 	;
 
 	/* flush */
