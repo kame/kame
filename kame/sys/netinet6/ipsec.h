@@ -104,9 +104,10 @@ struct inpcbpolicy {
 };
 #endif /*_KERNEL*/
 
-#define IPSEC_PORT_ANY		65535
+/* according to IANA assignment, port 0x0000 and proto 0xff are reserved. */
+#define IPSEC_PORT_ANY		0
 #define IPSEC_ULPROTO_ANY	255
-#define IPSEC_PROTO_ANY		65535
+#define IPSEC_PROTO_ANY		65535	/*?*/
 
 /* mode of security protocol */
 /* NOTE: DON'T use IPSEC_MODE_ANY at SPD.  It's only use in SAD */
