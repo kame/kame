@@ -540,7 +540,7 @@ tcp_input(m, va_alist)
 		 * Note that packets with unspecified IPv6 destination is
 		 * already dropped in ip6_input.
 		 */
-		if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&ipv6->ip6_src)) {
 			/* XXX stat */
 			goto drop;
 		}
