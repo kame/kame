@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.16 2002/02/20 10:40:39 kjc Exp $	*/
+/*	$KAME: parser.c,v 1.17 2003/04/17 08:47:00 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2002
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -98,6 +98,7 @@ struct cmd_tab {
 	int		(*parser)(char *);
 	const char	*help;
 } cmd_tab[] = {
+	{"?",		NULL,	"help | ?"},
 	{"help",	NULL,	"help | ?"},
 	{"quit",	NULL,	"quit"},
 	{"interface",	interface_parser,	"interface if_name [bandwidth bps] [cbq|hfsc]"},
@@ -180,7 +181,7 @@ read_line:
 			rval = 0;
 		else if (strcmp(tp->cmd, "help") == 0 ||
 			 strcmp(tp->cmd, "?") == 0) {
-			for (tp = cmd_tab; tp->cmd != NULL; tp++)
+			for (tp = &cmd_tab[1]; tp->cmd != NULL; tp++)
 				printf("%s\n", tp->help);
 			rval = 1;
 		} else if (strcmp(tp->cmd, "debug") == 0) {
