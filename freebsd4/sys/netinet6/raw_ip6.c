@@ -315,7 +315,7 @@ rip6_output(m, va_alist)
 	struct inpcb *in6p;
 	u_int	plen = m->m_pkthdr.len;
 	int error = 0;
-	struct ip6_pktopts opt, *optp = 0;
+	struct ip6_pktopts opt, *stickyopt = NULL;
 	struct ifnet *oifp = NULL;
 	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
@@ -329,6 +329,7 @@ rip6_output(m, va_alist)
 	va_end(ap);
 
 	in6p = sotoin6pcb(so);
+	stickyopt = in6p->in6p_outputopts;
 
 	priv = 0;
 	if (so->so_cred->cr_uid == 0)
@@ -337,9 +338,8 @@ rip6_output(m, va_alist)
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt, priv, 0)) != 0)
 			goto bad;
-		optp = &opt;
-	} else
-		optp = in6p->in6p_outputopts;
+		in6p->in6p_outputopts = &opt;
+	}
 
 	/*
 	 * For an ICMPv6 packet, we should know its type and code
@@ -360,43 +360,17 @@ rip6_output(m, va_alist)
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
+	/* KAME hack: embed scopeid */
+	if (in6_embedscope(dst, dstsock, in6p, NULL) != 0) {
+		error = EINVAL;
+		goto bad;
+	}
+	ip6->ip6_dst = *dst;
+
 	/*
 	 * Next header might not be ICMP6 but use its pseudo header anyway.
 	 */
 	ip6->ip6_dst = *dst;
-
-	/*
-	 * If the scope of the destination is link-local, embed the interface
-	 * index in the address.
-	 *
-	 * XXX advanced-api value overrides sin6_scope_id
-	 */
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
-		struct in6_pktinfo *pi;
-
-		/*
-		 * XXX Boundary check is assumed to be already done in
-		 * ip6_setpktoptions().
-		 */
-		if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
-			ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
-			oifp = ifindex2ifnet[pi->ipi6_ifindex];
-		} else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
-			 in6p->in6p_moptions &&
-			 in6p->in6p_moptions->im6o_multicast_ifp) {
-			oifp = in6p->in6p_moptions->im6o_multicast_ifp;
-			ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
-		} else if (dstsock->sin6_scope_id) {
-			/* boundary check */
-			if (dstsock->sin6_scope_id < 0
-			 || if_index < dstsock->sin6_scope_id) {
-				error = ENXIO;  /* XXX EINVAL? */
-				goto bad;
-			}
-			ip6->ip6_dst.s6_addr16[1]
-				= htons(dstsock->sin6_scope_id & 0xffff);/*XXX*/
-		}
-	}
 
 	/*
 	 * Source address selection.
@@ -404,7 +378,7 @@ rip6_output(m, va_alist)
 	{
 		struct in6_addr *in6a;
 
-		if ((in6a = in6_selectsrc(dstsock, optp,
+		if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
 					  in6p->in6p_moptions,
 					  &in6p->in6p_route,
 					  &in6p->in6p_laddr,
@@ -481,11 +455,9 @@ rip6_output(m, va_alist)
 		m_freem(m);
 
  freectl:
-	if (optp == &opt && optp->ip6po_rthdr && optp->ip6po_route.ro_rt)
-		RTFREE(optp->ip6po_route.ro_rt);
 	if (control) {
-		if (optp == &opt)
-			ip6_clearpktopts(optp, 0, -1);
+		ip6_clearpktopts(in6p->in6p_outputopts, 0, -1);
+		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}
 	return(error);
