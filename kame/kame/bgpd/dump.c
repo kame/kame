@@ -500,12 +500,14 @@ print_rip_dump(FILE *fp)
 		fputc('\n', fp);
 
 		/* statistics */
-		fprintf(fp, "  Responses: in/out/fail: %qu/%qu/%qu\n",
-			ripif->rip_responsercvd, ripif->rip_responsesent,
-			ripif->rip_respfail);
-		fprintf(fp, "  Requests: in/out/fail: %qu/%qu/%qu\n",
-			ripif->rip_requestrcvd, ripif->rip_requestsent,
-			ripif->rip_reqsentfail);
+		fprintf(fp, "  Responses: in/out/fail: %llu/%llu/%llu\n",
+			(unsigned long long)ripif->rip_responsercvd,
+			(unsigned long long)ripif->rip_responsesent,
+			(unsigned long long)ripif->rip_respfail);
+		fprintf(fp, "  Requests: in/out/fail: %llu/%llu/%llu\n",
+			(unsigned long long)ripif->rip_requestrcvd,
+			(unsigned long long)ripif->rip_requestsent,
+			(unsigned long long)ripif->rip_reqsentfail);
 
 		/* RIPng routing table */
 		fprintf(fp, "  RIPng routing table\n");		
@@ -801,25 +803,26 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 	     ((bnp->rp_mode & BGPO_PASSIVE) == 0 &&
 	      find_active_peer(bnp) == NULL))) {
 		fprintf(fp, "%sStatistics:\n", indent);
-		fprintf(fp, "%s Connection retries: %qu\n",
-			indent, abnp->rp_stat.rps_connretry);
-		fprintf(fp, "%s Peering establishments: %qu\n",
-			indent, abnp->rp_stat.established);
-		fprintf(fp, "%s OPENs: in/out: %qu/%qu\n",
-			indent, abnp->rp_stat.openrcvd,
-			abnp->rp_stat.opensent);
-		fprintf(fp, "%s UPDATEs: in/out: %qu/%qu\n",
-			indent, abnp->rp_stat.updatercvd,
-			abnp->rp_stat.updatesent);
-		fprintf(fp, "%s NOTIFYs: in/out: %qu/%qu\n",
-			indent, abnp->rp_stat.notifyrcvd,
-			abnp->rp_stat.notifysent);
-		fprintf(fp, "%s KEEPALIVEs: in/out: %qu/%qu\n",
-			indent, abnp->rp_stat.keepalivercvd,
-			abnp->rp_stat.keepalivesent);
-		fprintf(fp, "%s WITHDRAWs: in/out: %qu/%qu\n",
-			indent, abnp->rp_stat.withdrawrcvd,
-			abnp->rp_stat.withdrawsent);
+		fprintf(fp, "%s Connection retries: %llu\n",
+			indent,
+			(unsigned long long)abnp->rp_stat.rps_connretry);
+		fprintf(fp, "%s Peering establishments: %llu\n",
+			indent, (unsigned long long)abnp->rp_stat.established);
+		fprintf(fp, "%s OPENs: in/out: %llu/%llu\n",
+			indent, (unsigned long long)abnp->rp_stat.openrcvd,
+			(unsigned long long)abnp->rp_stat.opensent);
+		fprintf(fp, "%s UPDATEs: in/out: %llu/%llu\n",
+			indent, (unsigned long long)abnp->rp_stat.updatercvd,
+			(unsigned long long)abnp->rp_stat.updatesent);
+		fprintf(fp, "%s NOTIFYs: in/out: %llu/%llu\n",
+			indent, (unsigned long long)abnp->rp_stat.notifyrcvd,
+			(unsigned long long)abnp->rp_stat.notifysent);
+		fprintf(fp, "%s KEEPALIVEs: in/out: %llu/%llu\n",
+			indent, (unsigned long long)abnp->rp_stat.keepalivercvd,
+			(unsigned long long)abnp->rp_stat.keepalivesent);
+		fprintf(fp, "%s WITHDRAWs: in/out: %llu/%llu\n",
+			indent, (unsigned long long)abnp->rp_stat.withdrawrcvd,
+			(unsigned long long)abnp->rp_stat.withdrawsent);
 		if (abnp->rp_stat.last_established) {
 			/* ctime appends \n */
 			fprintf(fp, "%s Last esbalished: %s", indent,

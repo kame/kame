@@ -142,7 +142,7 @@ main(argc, argv)
   openlog(ident, LOG_NDELAY|LOG_PID, LOG_DAEMON);
  }
   syslog(LOG_NOTICE, "IPv6 routing started, pid %d ******************", pid);
-  (void *)time(&bgpd_start_time);
+  (void)time(&bgpd_start_time);
 
   /* write PID file */
   if (confcheck == 0) { 
