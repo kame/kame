@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.47 2002/09/27 05:55:53 itojun Exp $	*/
+/*	$KAME: main.c,v 1.48 2002/11/20 02:06:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,7 +93,9 @@ static void parse __P((int, char **));
 static void restore_params __P((void));
 static void save_params __P((void));
 static void saverestore_params __P((int));
+#if 0
 static void cleanup_pidfile __P((void));
+#endif
 
 void
 usage()
@@ -250,6 +252,7 @@ main(ac, av)
 	exit(0);
 }
 
+#if 0
 static void
 cleanup_pidfile()
 {
@@ -262,6 +265,7 @@ cleanup_pidfile()
 		(void) unlink(pid_file);
 	}
 }
+#endif
 
 static void
 parse(ac, av)
