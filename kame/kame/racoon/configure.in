@@ -8,6 +8,8 @@ AC_PROG_LEX
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 
+AC_CANONICAL_HOST
+
 AC_SUBST(OPTFLAG)
 OPTFLAG="-O"
 AC_MSG_CHECKING(if --enable-debug option is specified)
@@ -76,8 +78,11 @@ for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 	if test -d $dir/lib -a -f $dir/lib/libcrypto.a; then
 		ssleay_lib="$dir/lib"
 	fi
-	if test -d $dir/lib -a -f `echo $dir/lib/libcrypto.so* | head -1`; then
+	if test -d $dir/lib -a -f `echo $dir/lib/libcrypto.so* | head -1 | sed -e 's/ .*//'`; then
 		ssleay_lib="$dir/lib"
+		case $host_os in
+		netbsd*) LDFLAGS="$LDFLAGS -Wl,-R$dir/lib" ;;
+		esac
 	fi
 	if test -d $dir/include -a -f $dir/include/md5.h; then
 		ssleay_include="-I$dir/include"
@@ -401,11 +406,11 @@ main()
                       NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
         goto bad;
       }
-      if (strcmp(strport, "54321") != 0) {
-        goto bad;
-      }
       switch (ai->ai_family) {
       case AF_INET:
+	if (strcmp(strport, "54321") != 0) {
+	  goto bad;
+	}
         if (passive) {
           if (strcmp(straddr, "0.0.0.0") != 0) {
             goto bad;
@@ -418,6 +423,9 @@ main()
         inet4++;
         break;
       case AF_INET6:
+	if (strcmp(strport, "54321") != 0) {
+	  goto bad;
+	}
         if (passive) {
           if (strcmp(straddr, "::") != 0) {
             goto bad;
@@ -439,7 +447,9 @@ main()
     }
   }
 
-  if (inet6 != 2 || inet4 != 2)
+  if (!(inet4 == 0 || inet4 == 2))
+    goto bad;
+  if (!(inet6 == 0 || inet6 == 2))
     goto bad;
 
   if (aitop)
