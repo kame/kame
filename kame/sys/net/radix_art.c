@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.9 2001/07/13 03:44:46 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.10 2001/07/17 04:18:07 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -131,7 +131,7 @@
  *
  * ART algorithm is memory-eater; well, we have plenty of memory to spare,
  * and we need a speedup.  However, we do need to worry about kernel VM
- * shortage.  Here are some test results:
+ * shortage.  Here are some test results with ART_BITLEN == 8:
  *	IPv4, 10000 random entires - around 1700 phys pages (6.8M)
  *	IPv4, 20000 random entires - around 2400 phys pages (9.6M)
  *
