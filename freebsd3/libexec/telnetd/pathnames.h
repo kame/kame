@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)pathnames.h	8.1 (Berkeley) 6/4/93
- *	$Id: pathnames.h,v 1.5 1997/02/22 14:22:29 peter Exp $
+ * $FreeBSD: src/libexec/telnetd/pathnames.h,v 1.5.2.1 1999/08/29 15:04:19 peter Exp $
  */
 
 #if BSD > 43

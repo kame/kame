@@ -1,4 +1,4 @@
-/*	$Id: complete.c,v 1.4 1997/12/13 20:38:14 pst Exp $	*/
+/* $FreeBSD: src/usr.bin/ftp/complete.c,v 1.4.4.1 1999/08/29 15:28:10 peter Exp $	*/
 /*	$NetBSD: complete.c,v 1.11 1997/09/13 09:05:53 lukem Exp $	*/
 
 /*-
@@ -41,7 +41,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$Id: complete.c,v 1.4 1997/12/13 20:38:14 pst Exp $");
+__RCSID("$FreeBSD: src/usr.bin/ftp/complete.c,v 1.4.4.1 1999/08/29 15:28:10 peter Exp $");
 __RCSID_SOURCE("$NetBSD: complete.c,v 1.11 1997/09/13 09:05:53 lukem Exp $");
 #endif /* not lint */
 

@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: file.c,v 1.4.2.1 1999/03/02 04:17:02 alex Exp $
+ * $FreeBSD: src/usr.bin/fetch/file.c,v 1.4.2.2 1999/08/29 15:27:36 peter Exp $
  */
 
 #include <sys/types.h>

@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: main.c,v 1.49.2.1 1999/02/25 18:36:32 wollman Exp $ */
+/* $FreeBSD: src/usr.bin/fetch/main.c,v 1.49.2.4 1999/08/29 15:27:37 peter Exp $ */
 
 #include <sys/types.h>
 
@@ -54,7 +54,7 @@ usage(void)
 	fprintf(stderr,
 		"usage: fetch [-ADHILMNPRTVablmnpqrstv] [-o outputfile] "
 		"[-S bytes]\n"
-		"             [-f file -h host [-c dir] | URL]");
+		"             [-f file -h host [-c dir] | URL]\n");
 	exit(EX_USAGE);
 }
 
@@ -351,7 +351,7 @@ display(struct fetch_state *fs, off_t size, ssize_t n)
 	}
 	bytes -= bytestart;
 	d = t.tv_sec + t.tv_usec/1.e6 - t_start.tv_sec - t_start.tv_usec/1.e6;
-	fprintf (stderr, "\n%qd bytes transfered in %.1f seconds",
+	fprintf (stderr, "\n%qd bytes transferred in %.1f seconds",
 	    (long long)bytes, d); 
 	d = bytes/d;
 	if (d < 1000)

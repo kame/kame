@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ext.h	8.2 (Berkeley) 12/15/93
- *	$Id: ext.h,v 1.6 1997/02/22 14:22:28 peter Exp $
+ * $FreeBSD: src/libexec/telnetd/ext.h,v 1.6.2.1 1999/08/29 15:04:18 peter Exp $
  */
 
 /*
