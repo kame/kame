@@ -735,9 +735,10 @@ explore_numeric(pai, hostname, servname, res)
 	flags = pai->ai_flags;
 
 	if (inet_pton(afd->a_af, hostname, pton) == 1) {
+#if 0
 		u_int32_t v4a;
 #ifdef INET6
-		u_char pfx;
+		struct in6_addr *v6a;
 #endif
 
 		switch (afd->a_af) {
@@ -751,12 +752,21 @@ explore_numeric(pai, hostname, servname, res)
 			break;
 #ifdef INET6
 		case AF_INET6:
-			pfx = ((struct in6_addr *)pton)->s6_addr[0];
-			if (pfx == 0 || pfx == 0xfe || pfx == 0xff)
+			v6a = (struct in6_addr *)pton;
+			if (IN6_IS_ADDR_MULTICAST(v6a))
 				flags &= ~AI_CANONNAME;
+			if (IN6_IS_ADDR_UNSPECIFIED(v6a) ||
+			    IN6_IS_ADDR_LOOPBACK(v6a))
+				flags &= ~AI_CANONNAME;
+			if (IN6_IS_ADDR_LINKLOCAL(v6a))
+				flags &= ~AI_CANONNAME;
+
+			/* XXX sitelocal? */
+
 			break;
 #endif
 		}
+#endif
 
 		if (pai->ai_family == afd->a_af ||
 		    pai->ai_family == PF_UNSPEC /*?*/) {
