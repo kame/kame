@@ -23,7 +23,7 @@ and CDNR (Diffserv Traffic Conditioner) can be configured in this file.
 .Ar if_name
 .Op Cm bandwidth Ar bps
 .Op Ar sched_type
-.Op Ar efficient
+.Op Cm efficient
 .El
 
 .Pp
@@ -228,9 +228,9 @@ for HFSC.
 .Ar class_name
 .Ar parent_name
 .Op Cm admission cntlload|none
-.Op Bq sc Em m1 d m2
-.Op Bq rt Em m1 d m2
-.Op Bq ls Em m1 d m2
+.Op Bq Cm sc Em m1 d m2
+.Op Bq Cm rt Em m1 d m2
+.Op Bq Cm ls Em m1 d m2
 .Op Cm pshare Ar percent
 .Op Cm grate Ar bps
 .Op Cm default
