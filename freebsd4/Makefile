@@ -1,7 +1,7 @@
 .include <bsd.own.mk>			# for configuration variables.
 
-SUBDIR=	lib usr.sbin
-#SUBDIR=	lib libexec sbin usr.bin share
+SUBDIR=	lib sbin share usr.bin usr.sbin
+#SUBDIR=	lib libexec
 
 includes:
 	(cd ${.CURDIR}/include; $(MAKE))
