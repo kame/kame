@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.285 2001/12/12 01:28:57 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.286 2001/12/12 01:30:42 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -200,7 +200,7 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
       (and extensions can appear unaligned).  our code follows the comment.
 draft-ietf-ipngwg-rfc2553bis-03.txt:
 	Basic Socket Interface Extensions for IPv6 (revised)
-draft-ietf-ipngwg-rfc2292bis-02.txt:
+draft-ietf-ipngwg-rfc2292bis-03.txt:
 	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
@@ -210,11 +210,12 @@ draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
     * host-side: only router preferences is supported.
-draft-ietf-ipngwg-scoping-arch-02.txt:
+draft-ietf-ipngwg-scoping-arch-03.txt:
 	The architecture, text representation, and usage of IPv6
 	scoped addresses.
     * some part of the documentation (especially about the routing
       model) is not supported yet.
+    * zone indices that contain scope types have not been supported yet.
 draft-ietf-ipngwg-temp-addresses-v2-00.txt:
 	Privacy Extensions for Stateless Address Autoconfiguration in IPv6
     * a revised version of RFC 3041.
