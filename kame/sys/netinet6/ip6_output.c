@@ -1913,7 +1913,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else  /* new advanced API */
 #ifdef HAVE_NRL_INPCB
 #define in6p inp
-#define in6p_outputopts inp_outputopts
+#define in6p_outputopts inp_outputopts6
 #endif
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 						      optname, &optdata,
