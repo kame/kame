@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.29 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.30 2000/04/24 11:40:48 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -79,11 +79,9 @@
 #include "strnames.h"
 
 /* prototype */
-#if 0
 static int pfkey_setspidxbymsg __P((caddr_t *mhp, struct policyindex *spidx));
 static int pfkey_spidxinfo __P((struct sadb_ident *id, struct sockaddr *saddr,
 	u_int8_t *pref, u_int16_t *ul_proto)); 
-#endif
 static int admin2pfkey_proto __P((u_int proto));
 static u_int ipsecdoi2pfkey_aalg __P((u_int hashtype));
 static u_int ipsecdoi2pfkey_ealg __P((u_int t_id));
@@ -219,7 +217,6 @@ end:
 	return(error);
 }
 
-#if 0
 static int
 pfkey_setspidxbymsg(mhp, spidx)
 	caddr_t *mhp;
@@ -237,7 +234,6 @@ pfkey_setspidxbymsg(mhp, spidx)
 			&spidx->prefd, &spidx->ul_proto) < 0)
 		return -1;
 
-	spidx->action = IPSEC_POLICY_IPSEC;
 	spidx->dir = IPSEC_DIR_OUTBOUND;
 
 	return 0;
@@ -267,7 +263,6 @@ pfkey_spidxinfo(id, saddr, pref, ul_proto)
 
 	return 0;
 }
-#endif
 
 /*
  * dump SADB
@@ -1284,7 +1279,8 @@ pk_recvacquire(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_x_policy *xpl;
-	struct ph2handle *iph2;
+	struct policyindex spidxtmp;
+	struct secpolicy *sp;
 #ifdef YIPS_DEBUG
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
 	char s1[NI_MAXSERV], s2[NI_MAXSERV];
@@ -1294,6 +1290,11 @@ pk_recvacquire(mhp)
 	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 #endif
+#define MAXNESTEDSA	5	/* XXX */
+	struct ph2handle *iph2[MAXNESTEDSA];
+	struct ipsecrequest *req;
+	struct saprop *newpp = NULL;
+	int n;	/* # of phase 2 handler */
 
 	/* ignore this message becauase of local test mode. */
 	if (f_local)
@@ -1322,53 +1323,165 @@ pk_recvacquire(mhp)
 	}
 
 	/* check there is phase 2 handler ? */
-	iph2 = getph2byspid(xpl->sadb_x_policy_id);
-	if (iph2 != NULL) {
+	if (getph2byspid(xpl->sadb_x_policy_id) != NULL) {
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL,
 				"ph2 found. ignore it.\n"));
 		return -1;
 	}
 
-	/* allocate a phase 2 handler at least. */
-	iph2 = newph2();
-	if (iph2 == NULL) {
+	/* set index of policyindex */
+	if (pfkey_setspidxbymsg(mhp, &spidxtmp) < 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to get policy index.\n");
+		return -1;
+	}
+
+	/* search for proper policyindex */
+	sp = getsp(&spidxtmp);
+	if (sp == NULL) {
+		plog(logp, LOCATION, NULL,
+			"no policy found %s.\n", spidx2str(&spidxtmp));
+		return -1;
+	}
+
+	memset(iph2, 0, MAXNESTEDSA);
+
+	n = 0;
+
+	/* allocate a phase 2 */
+	iph2[n] = newph2();
+	if (iph2[n] == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to allocate phase2 entry. (%s)\n",
 			strerror(errno));
 		return -1;
 	}
-	iph2->spid = xpl->sadb_x_policy_id;
-	iph2->seq = msg->sadb_msg_seq;
-	iph2->status = PHASE2ST_STATUS2;
+	iph2[n]->spid = xpl->sadb_x_policy_id;
+	iph2[n]->seq = msg->sadb_msg_seq;
+	iph2[n]->status = PHASE2ST_STATUS2;
 
 	/* set end addresses of SA */
-	iph2->dst = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]));
-	if (iph2->dst == NULL)
+	iph2[n]->dst = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]));
+	if (iph2[n]->dst == NULL)
 		return -1;
-	iph2->src = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]));
-	if (iph2->src == NULL)
+	iph2[n]->src = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]));
+	if (iph2[n]->src == NULL)
 		return -1;
 
 	YIPSDEBUG(DEBUG_NOTIFY,
 		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
-		getnameinfo(iph2->src, iph2->src->sa_len,
+		getnameinfo(iph2[n]->src, iph2[n]->src->sa_len,
 		    h1, sizeof(h1), s1, sizeof(s1), niflags);
-		getnameinfo(iph2->dst, iph2->dst->sa_len,
+		getnameinfo(iph2[n]->dst, iph2[n]->dst->sa_len,
 		    h2, sizeof(h2), s2, sizeof(s2), niflags);
 		plog(logp, LOCATION, NULL,
 			"new acquire iph2 %p: src %s %s dst %s %s\n",
 			iph2, h1, s1, h2, s2));
 
-	insph2(iph2);
-
-	/* get a policy from kernel */
-	if (pfkey_send_spdget(lcconf->sock_pfkey, xpl->sadb_x_policy_id) < 0) {
+	/* get sa entitiy */
+	iph2[n]->sainfo = getsainfo((caddr_t)iph2[n]->dst, iph2[n]->dst->sa_len);
+	if (iph2[n]->sainfo == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to get a policy.\n");
-		return -1;
+			"failed to get sainfo.\n");
+		goto err;
+		/* XXX should use the algorithm list from register message */
 	}
 
+	/* allocate first proposal */
+	newpp = newsaprop();
+	if (newpp == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to allocate saprop (%s).\n",
+			strerror(errno));
+		goto err;
+	}
+	newpp->prop_no = 1;
+	newpp->lifetime = iph2[n]->sainfo->lifetime;
+	newpp->lifebyte = iph2[n]->sainfo->lifebyte;
+	newpp->pfs_group = iph2[n]->sainfo->pfs_group;
+
+	/* set new saprop */
+	inssaprop(&iph2[n]->proposal, newpp);
+
+	insph2(iph2[n]);
+
+	for (req = sp->req; req; req = req->next) {
+		struct saproto *newpr;
+		struct sockaddr *psaddr = NULL;
+		struct sockaddr *pdaddr = NULL;
+
+		/* check if SA bundle ? */
+		if (req->saidx.src.ss_len && req->saidx.dst.ss_len) {
+
+			psaddr = (struct sockaddr *)&req->saidx.src;
+			pdaddr = (struct sockaddr *)&req->saidx.dst;
+
+			/* check end addresses of SA */
+			if (memcmp(iph2[n]->src, psaddr, iph2[n]->src->sa_len)
+			 || memcmp(iph2[n]->dst, pdaddr, iph2[n]->dst->sa_len)){
+				/*
+				 * XXX nested SAs with each destination
+				 * address are different.
+				 *       me +--- SA1 ---+ peer1
+				 *       me +--- SA2 --------------+ peer2
+				 */
+
+				/* check first ph2's proposal */
+				if (iph2[0]->proposal == NULL) {
+					plog(logp, LOCATION, NULL,
+						"SA addresses mismatch.\n");
+					goto err;
+				}
+
+				/* XXX new ph2 should be alloated. */
+				
+				plog(logp, LOCATION, NULL,
+					"not supported nested SA. Ignore.\n");
+				break;
+			}
+		}
+
+		/* allocate ipsec sa protocol */
+		newpr = newsaproto();
+		if (newpr == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to allocate saproto (%s).\n",
+				strerror(errno));
+			goto err;
+		}
+
+		newpr->proto_id = ipproto2doi(req->saidx.proto);
+		newpr->spisize = 4;
+		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
+		newpr->reqid = req->saidx.reqid;
+
+		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0)
+			goto err;
+
+		/* set new saproto */
+		inssaproto(newpp, newpr);
+	}
+
+	/* start isakmp initiation by using ident exchange */
+	/* XXX should be looped if there are multiple phase 2 handler. */
+	if (isakmp_post_acquire(iph2[n]) < 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to begin ipsec sa negotication.\n");
+		unbindph12(iph2[n]);
+		goto err;
+	}
+
+	return 0;
+
+err:
+	while (n >= 0) {
+		remph2(iph2[n]);
+		delph2(iph2[n]);
+		iph2[n] = NULL;
+		n--;
+	}
+	return -1;
 	return 0;
 }
 
@@ -1495,192 +1608,14 @@ static int
 pk_recvspdget(mhp)
 	caddr_t *mhp;
 {
-#define MAXNESTEDSA	5	/* XXX */
-	struct sadb_msg *msg;
-	struct sadb_address *saddr, *daddr;
-	struct ph2handle *iph2[MAXNESTEDSA];
-	int n;	/* # of phase 2 handler */
-	struct sadb_x_policy *xpl;
-	struct sadb_x_ipsecrequest *xisr;
-	struct saprop *newpp = NULL;
-	int tlen;
-
-	/* ignore this message if local test mode. */
-	if (f_local)
-		return 0;
-
 	/* sanity check */
-	if (mhp[0] == NULL
-	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
-	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
-	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
-	msg = (struct sadb_msg *)mhp[0];
-	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
-	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
-	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
-
-	/* ignore if type is not IPSEC_POLICY_IPSEC */
-	if (xpl->sadb_x_policy_type != IPSEC_POLICY_IPSEC) {
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"ignore SPDGET message. "
-				"type is not IPsec.\n"));
-		return 0;
-	}
-
-	memset(iph2, 0, MAXNESTEDSA);
-
-	n = 0;
-
-	/* get phase 2 handler. there must be one at least. */
-	iph2[n] = getph2byspid(xpl->sadb_x_policy_id);
-	if (iph2[n] == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no ph2 found. it must be there at least.\n");
-		return -1;
-	}
-	if (iph2[n]->status != PHASE2ST_STATUS2) {
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"ignore SPDGET message. "
-				"phase 2 status proceeded.\n"));
-		return 0;
-	}
-
-	/* get sa entitiy */
-	iph2[n]->sainfo = getsainfo((caddr_t)iph2[n]->dst, iph2[n]->dst->sa_len);
-	if (iph2[n]->sainfo == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to get sainfo.\n");
-		goto err;
-		/* XXX should use the algorithm list from register message */
-	}
-
-	/* allocate first proposal */
-	newpp = newsaprop();
-	if (newpp == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to allocate saprop (%s).\n",
-			strerror(errno));
-		goto err;
-	}
-	newpp->prop_no = 1;
-	newpp->lifetime = iph2[n]->sainfo->lifetime;
-	newpp->lifebyte = iph2[n]->sainfo->lifebyte;
-	newpp->pfs_group = iph2[n]->sainfo->pfs_group;
-
-	/* set new saprop */
-	inssaprop(&iph2[n]->proposal, newpp);
-
-	tlen = PFKEY_UNUNIT64(xpl->sadb_x_policy_len) - sizeof(*xpl);
-	xisr = (struct sadb_x_ipsecrequest *)(xpl + 1);
-
-	while (tlen > 0) {
-		struct saproto *newpr;
-		struct sockaddr *psaddr = NULL;
-		struct sockaddr *pdaddr = NULL;
-
-		/* sanity check */
-		if (tlen < sizeof(*xisr)) {
-			plog(logp, LOCATION, NULL,
-				"invalid sadb_x_ipsecrequest length (%d).\n",
-				tlen);
-			goto err;
-		}
-
-		/* get IP addresses if there */
-		if (xisr->sadb_x_ipsecrequest_len > sizeof(*xisr)) {
-			psaddr = (struct sockaddr *)(xisr + 1);
-			pdaddr = (struct sockaddr *)((caddr_t)psaddr
-						+ psaddr->sa_len);
-
-			/* check end addresses of SA */
-			if (memcmp(iph2[n]->src, psaddr, iph2[n]->src->sa_len)
-			 || memcmp(iph2[n]->dst, pdaddr, iph2[n]->dst->sa_len)) {
-				/*
-				 * XXX nested SAs with each destination
-				 * address are different.
-				 *       me +--- SA1 ---+ peer1
-				 *       me +--- SA2 --------------+ peer2
-				 */
-
-				/* check first ph2's proposal */
-				if (iph2[0]->proposal == NULL) {
-					plog(logp, LOCATION, NULL,
-						"SA addresses mismatch.\n");
-					goto err;
-				}
-
-				/* XXX new ph2 should be alloated. */
-				
-				plog(logp, LOCATION, NULL,
-					"not supported nested SA. Ignore.\n");
-				goto err;
-			}
-
-			/*
-			 * the src/dst addresses in phase 2 are same to
-			 * the addresses in ipsecrequest. also set sainfo.
-			 */
-		}
-
-		/* allocate ipsec sa protocol */
-		newpr = newsaproto();
-		if (newpr == NULL) {
-			plog(logp, LOCATION, NULL,
-				"failed to allocate saproto (%s).\n",
-				strerror(errno));
-			goto err;
-		}
-
-		newpr->proto_id = ipproto2doi(xisr->sadb_x_ipsecrequest_proto);
-		newpr->spisize = 4;
-		newpr->encmode = pfkey2ipsecdoi_mode(xisr->sadb_x_ipsecrequest_mode);
-		newpr->reqid = xisr->sadb_x_ipsecrequest_reqid;
-
-		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0)
-			goto err;
-
-		/* set new saproto */
-		inssaproto(newpp, newpr);
-
-		/* initialization for the next. */
-		tlen -= xisr->sadb_x_ipsecrequest_len;
-
-		/* validity check */
-		if (tlen < 0) {
-			plog(logp, LOCATION, NULL,
-				"total length of policy mismatch.\n");
-			goto err;
-		}
-
-		xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xisr
-				 + xisr->sadb_x_ipsecrequest_len);
-	}
-
-	/* start isakmp initiation by using ident exchange */
-	/* XXX should be looped if there are multiple phase 2 handler. */
-	if (isakmp_post_acquire(iph2[n]) < 0) {
-		plog(logp, LOCATION, NULL,
-			"failed to begin ipsec sa negotication.\n");
-		unbindph12(iph2[n]);
-		goto err;
-	}
 
 	return 0;
-
-err:
-	while (n >= 0) {
-		remph2(iph2[n]);
-		delph2(iph2[n]);
-		iph2[n] = NULL;
-		n--;
-	}
-	return -1;
 }
 
 static int
