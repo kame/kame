@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.187 2001/02/07 02:06:20 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.188 2001/02/16 01:55:32 itojun Exp $
 
 1. IPv6
 
@@ -101,6 +101,10 @@ RFC2893: Transition Mechanisms for IPv6 Hosts and Routers
       See 1.5 in this document for details.
 RFC2894: Router renumbering for IPv6
 RFC3041: Privacy Extensions for Stateless Address Autoconfiguration in IPv6
+RFC3056: Connection of IPv6 Domains via IPv4 Clouds
+    * So-called "6to4".
+    * "stf" interface implements it.  Be sure to read the next item before
+      configuring it, there are security issues.
 draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
 draft-ietf-pim-ipv6-03.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
@@ -128,10 +132,6 @@ draft-ietf-ngtrans-tcpudp-relay-01.txt:
 	An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
       details.
-draft-ietf-ngtrans-6to4-06.txt:
-	Connection of IPv6 Domains via IPv4 Clouds without Explicit Tunnels
-    * "stf" interface implements it.  Be sure to read the next item before
-      configuring it, there are security issues.
 draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies
     * KAME does not implement RFC1933/2893 automatic tunnel.
@@ -1139,8 +1139,8 @@ or bypass security controls:
   IPv4 address (if they are in IPv6 native packet header, they are malicious)
 	::ffff:0.0.0.0/104	::ffff:127.0.0.0/104
 	::ffff:224.0.0.0/100	::ffff:255.0.0.0/104 
-- 6to4 prefix generated from unspecified/multicast/loopback/broadcast/private
-  IPv4 address
+- 6to4 (RFC3056) prefix generated from unspecified/multicast/loopback/
+  broadcast/private IPv4 address
 	2002:0000::/24		2002:7f00::/24		2002:e000::/24
 	2002:ff00::/24		2002:0a00::/24		2002:ac10::/28	
 	2002:c0a8::/32
