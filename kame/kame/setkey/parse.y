@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.72 2003/04/24 10:34:15 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.73 2003/05/27 07:09:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -97,7 +97,7 @@ extern void yyerror __P((const char *));
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
 %token F_MODE MODE F_REQID
 %token F_EXT EXTENSION NOCYCLICSEQ
-%token ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
+%token ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP ALG_ENC_OLD
 %token F_LIFETIME_HARD F_LIFETIME_SOFT
 %token DECSTRING QUOTEDSTRING HEXSTRING STRING ANY
 	/* SPD management */
@@ -107,6 +107,7 @@ extern void yyerror __P((const char *));
 
 %type <num> prefix protocol_spec upper_spec
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
+%type <num> ALG_ENC_OLD
 %type <num> PR_ESP PR_AH PR_IPCOMP
 %type <num> EXTENSION MODE
 %type <ulnum> DECSTRING
@@ -309,6 +310,14 @@ enc_alg
 				yyerror("unsupported algorithm");
 				return -1;
 			}
+			p_alg_enc = $1;
+		}
+	|	ALG_ENC_OLD {
+			if ($1 < 0) {
+				yyerror("unsupported algorithm");
+				return -1;
+			}
+			yyerror("WARNING: encryption algorithm is obsoleted.");
 			p_alg_enc = $1;
 		}
 	|	ALG_ENC_DESDERIV
