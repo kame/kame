@@ -3787,13 +3787,12 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 
     if (cand_rp_flag == TRUE)
     {
-	/* If change in the BSR address, send immediately Cand-RP-Adv */
+	/* If change in the BSR address, schedule immediate Cand-RP-Adv */
 	/* TODO: use some random delay? */
 
 	if (!inet6_equal(&new_bsr_address , &curr_bsr_address))
 	{
-	    send_pim6_cand_rp_adv();
-	    SET_TIMER(pim_cand_rp_adv_timer, my_cand_rp_adv_period);
+	    SET_TIMER(pim_cand_rp_adv_timer, 0);
 	}
     }
 
