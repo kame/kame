@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.20 2000/05/12 15:43:28 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.21 2000/05/18 07:34:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -422,7 +422,7 @@ key_sendup_mbuf(so, m, target)
 	struct keycb *kp;
 	int sendup;
 	struct rawcb *rp;
-	int error;
+	int error = 0;
 
 	if (m == NULL)
 		panic("key_sendup_mbuf: NULL pointer was passed.\n");
@@ -521,8 +521,10 @@ key_sendup_mbuf(so, m, target)
 	if (so) {
 		error = key_sendup0(sotorawcb(so), m, 0);
 		m = NULL;
-	} else
+	} else {
+		error = 0;
 		m_freem(m);
+	}
 	return error;
 }
 

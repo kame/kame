@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.108 2000/05/18 07:24:21 sakane Exp $	*/
+/*	$KAME: key.c,v 1.109 2000/05/18 07:34:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5519,13 +5519,17 @@ key_acquire(saidx, sp)
 	}
 #endif
 
-	if ((result->m_flags & M_PKTHDR) == 0)
+	if ((result->m_flags & M_PKTHDR) == 0) {
+		error = EINVAL;
 		goto fail;
+	}
 
 	if (result->m_len < sizeof(struct sadb_msg)) {
 		result = m_pullup(result, sizeof(struct sadb_msg));
-		if (result == NULL)
+		if (result == NULL) {
+			error = ENOBUFS;
 			goto fail;
+		}
 	}
 
 	result->m_pkthdr.len = 0;
