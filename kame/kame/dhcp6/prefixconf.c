@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.14 2003/01/14 17:04:05 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.15 2003/01/14 17:04:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -140,7 +140,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 	    (pinfo->pltime == DHCP6_DURATITION_INFINITE ||
 	    pinfo->pltime > pinfo->vltime)) {
 		dprintf(LOG_INFO, "%s" "invalid prefix %s/%d: "
-		    "pltime (%lu) is larger than pltime (%lu)",
+		    "pltime (%lu) is larger than vltime (%lu)",
 		    FNAME, in6addr2str(&pinfo->addr, 0), pinfo->plen,
 		    pinfo->pltime, pinfo->vltime);
 		return (-1);
