@@ -41,6 +41,15 @@ YHEADER=yes
 YFLAGS+=-d
 .endif
 
+# libpfkey
+.PATH: ${.CURDIR}/../libipsec ${.CURDIR}/../../sys/netkey
+SRCS+=	pfkey.c pfkey_dump.c key_debug.c ipsec_strerror.c
+.if (${OPSYS} == "NetBSD")
+CPPFLAGS+=	-I${.CURDIR}/../libipsec
+.else
+CFLAGS+=	-I${.CURDIR}/../libipsec
+.endif
+
 SCRIPTS=	scriptdump
 
 BINOWN  = root
@@ -75,11 +84,16 @@ DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 .else
+.if exists(/usr/local/v6/lib/libipsec.a)
 LDADD+= -L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
 	-L/usr/local/v6/lib -lipsec
 DPADD+=	${.OBJDIR}/../libipsec/libipsec.a \
 	${.OBJDIR}/../libipsec/obj/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
+.else
+LDADD+=	-lipsec
+DPADD+=	${LIBIPSEC}
+.endif
 .endif
 CLEANFILES+=	scriptdump
 
