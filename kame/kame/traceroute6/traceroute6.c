@@ -1078,7 +1078,7 @@ packet_ok(mhdr, cc, seq)
 	}
 	if (verbose) {
 		int i;
-		u_long *lp = (u_long *)(icp + 1);
+		u_int8_t *p;
 		char sbuf[NI_MAXHOST+1], dbuf[INET6_ADDRSTRLEN];
 
 		if (getnameinfo((struct sockaddr *)from, from->sin6_len,
@@ -1089,8 +1089,19 @@ packet_ok(mhdr, cc, seq)
 				   dbuf, sizeof(dbuf)));
 		Printf(": icmp type %d (%s) code %d\n", type, pr_type(type),
 		       icp->icmp6_code);
-		for (i = 4; i < cc ; i += sizeof(long))
-			Printf("%2d: %8.8x\n", i, (u_int32_t)ntohl(*lp++));
+		p = (u_int8_t *)(icp + 1);
+#define WIDTH	16
+		for (i = 0; i < cc; i++) {
+			if (i % WIDTH == 0)
+				Printf("%04x:", i);
+			if (i % 4 == 0)
+				Printf(" ");
+			Printf("%02x", p[i]);
+			if (i % WIDTH == WIDTH - 1)
+				Printf("\n");
+		}
+		if (cc % WIDTH != 0)
+			Printf("\n");
 	}
 	return(0);
 }
