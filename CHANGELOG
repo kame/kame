@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.830 2000/04/28 06:23:50 itojun Exp $
+$Id: CHANGELOG,v 1.831 2000/04/28 07:57:42 jinmei Exp $
 
 <200004>
+2000-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/traceroute6/traceroute6.c (main): always printed the
+	source address of proving packets.
+
 Fri Apr 28 13:34:27 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/rsync, netbsd/pkgsrc/net/rsync: upgrade to 2.4.3
 
