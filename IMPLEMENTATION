@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.278 2001/10/03 07:22:40 keiichi Exp $
+	$KAME: IMPLEMENTATION,v 1.279 2001/10/04 06:46:54 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2146,9 +2146,6 @@ Complete documentation can be found in sys/net/radix_art.c as comment.
 IPv4 and IPv6 (see COVERAGE document for platform support details).
 The code is still being stabilized, and there could be kernel panic depending
 on your setups.
-
-ART currently has a bug or two, and can be unstable depening on your systems
-setup (like the MAC address you have on your ethernet card).
 
 RADIX_ART kernel compilation option conflicts with RADIX_MPATH.
 
