@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.52 2000/07/26 16:25:25 itojun Exp $
+	$KAME: RELNOTES,v 1.53 2000/07/26 16:57:21 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -80,7 +80,5 @@ Many of old ones have been solved.
   and kame/netbsd.
 
 - libinet6 resolver code does not support NIS lookup.
-
-- kame/openbsd27 seems to have some issue with IPv6 TCP path mtu discovery.
 
 							<end of RELNOTES>
