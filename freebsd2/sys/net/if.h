@@ -176,6 +176,7 @@ struct ifnet {
 		__P((struct ifnet *, struct mbuf *, struct pr_hdr *, int));
 	struct mbuf *(*if_altqdequeue)
 		__P((struct ifnet *, int));
+	void	*if_altqcdnr;		/* input traffic conditioner */
 #endif /* ALTQ */
 	struct	ifprefix *if_prefixlist; /* linked list of prefixes per if */
 };

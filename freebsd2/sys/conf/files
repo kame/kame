@@ -220,8 +220,11 @@ netatalk/ddp_usrreq.c	optional netatalk
 #netimp/if_imphost.c	optional imp
 #netimp/raw_imp.c	optional imp
 netinet/altq_afmap.c	optional altq
+netinet/altq_blue.c	optional altq
 netinet/altq_cbq.c	optional altq
+netinet/altq_cdnr.c	optional altq
 netinet/altq_fifoq.c	optional altq
+netinet/altq_hfsc.c	optional altq
 netinet/altq_localq.c	optional altq
 netinet/altq_red.c	optional altq
 netinet/altq_rio.c	optional altq

@@ -27,7 +27,7 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.1 1999/08/05 17:18:18 itojun Exp $
+ * $Id: altq_cbq.c,v 1.2 1999/10/02 05:58:58 itojun Exp $
  */
 
 #ifndef _NO_OPT_ALTQ_H_
@@ -38,7 +38,7 @@
 #endif /* !_NO_OPT_ALTQ_H_ */
 #ifdef CBQ	/* cbq is enabled by CBQ option in opt_altq.h */
 
-#pragma ident "@(#)cbq.c  1.39     98/05/13 SMI"
+/* #pragma ident "@(#)cbq.c  1.39     98/05/13 SMI" */
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -58,12 +58,8 @@
 #include <netinet/altq.h>
 #include <netinet/altq_classq.h>
 #include <netinet/altq_rmclass.h>
-#ifdef CBQ_RED
 #include <netinet/altq_red.h>
-#ifdef CBQ_RIO
 #include <netinet/altq_rio.h>
-#endif
-#endif /* CBQ_RED */
 #include <netinet/altq_cbq.h>
 
 /*
@@ -397,9 +393,6 @@ cbq_delete_filter(dfp)
 /*
  * cbq_clear_hierarchy deletes all classes and their filters on the
  * given interface.
- * note that this doesn't affect the enable state and leaves
- * the root class and the default class intact.  This behavior is
- * different from Sun's CBQ implementation.
  */
 static int
 cbq_clear_hierarchy(ifacep)
@@ -432,9 +425,26 @@ cbq_clear_interface(cbqp)
 			if ((cl = cbqp->cbq_class_tbl[i]) != NULL) {
 				if (is_a_parent_class(cl))
 					again++;
-				else
+				else {
 					cbq_class_destroy(cbqp, cl);
+					cbqp->cbq_class_tbl[i] = NULL;
+				}
 			}
+		}
+		if (cbqp->ifnp.ctl_ != NULL &&
+		    !is_a_parent_class(cbqp->ifnp.ctl_)) {
+			cbq_class_destroy(cbqp, cbqp->ifnp.ctl_);
+			cbqp->ifnp.ctl_ = NULL;
+		}
+		if (cbqp->ifnp.default_ != NULL &&
+		    !is_a_parent_class(cbqp->ifnp.default_)) {
+			cbq_class_destroy(cbqp, cbqp->ifnp.default_);
+			cbqp->ifnp.default_ = NULL;
+		}
+		if (cbqp->ifnp.root_ != NULL &&
+		    !is_a_parent_class(cbqp->ifnp.root_)) {
+			cbq_class_destroy(cbqp, cbqp->ifnp.root_);
+			cbqp->ifnp.root_ = NULL;
 		}
 	} while (again);
 
@@ -528,43 +538,14 @@ get_class_stats(statsp, cl)
 	statsp->qcnt		= qlen(cl->q_);
 	statsp->avgidle		= cl->avgidle_;
 
+	statsp->qtype		= qtype(cl->q_);
 #ifdef CBQ_RED
-	if (cl->red_ != NULL) {
-		if (q_is_red(cl->q_)) {
-			red_t *rp = cl->red_;
-			statsp->q_avg = rp->red_avg >> cl->red_->red_wshift;
-			statsp->xmit_packets    = rp->red_stats.xmit_packets;
-			statsp->drop_forced    = rp->red_stats.drop_forced;
-			statsp->drop_unforced  = rp->red_stats.drop_unforced;
-			statsp->marked_packets = rp->red_stats.marked_packets;
-			statsp->in_xmit_packets	= 0;
-		}
-#ifdef CBQ_RIO
-		else {
-			rio_t *rp = (rio_t *)cl->red_;
-
-			statsp->q_avg = rp->q.avg >> rp->rio_wshift;
-			statsp->xmit_packets   = rp->q_stat.xmit_packets;
-			statsp->drop_forced    = rp->q_stat.drop_forced;
-			statsp->drop_unforced  = rp->q_stat.drop_unforced;
-			statsp->marked_packets = rp->q_stat.marked_packets;
-			statsp->in_avg = rp->in.avg >> rp->rio_wshift;
-			statsp->in_xmit_packets   = rp->in_stat.xmit_packets;
-			statsp->in_drop_forced    = rp->in_stat.drop_forced;
-			statsp->in_drop_unforced  = rp->in_stat.drop_unforced;
-			statsp->in_marked_packets = rp->in_stat.marked_packets;
-		}
+	if (q_is_red(cl->q_))
+		red_getstats(cl->red_, &statsp->red[0]);
 #endif
-	}
-	else {
-#endif /* CBQ_RED */
-		statsp->xmit_packets    = 0;
-		statsp->in_xmit_packets	= 0;
-		statsp->drop_forced	= 0;
-		statsp->drop_unforced	= 0;
-		statsp->marked_packets	= 0;
-#ifdef CBQ_RED
-	}
+#ifdef CBQ_RIO
+	if (q_is_rio(cl->q_))
+		rio_getstats((rio_t *)cl->red_, &statsp->red[0]);
 #endif
 }
 
@@ -903,6 +884,9 @@ static int
 cbq_add_riometer(rmp)
 	struct cbq_riometer *rmp;
 {
+#if 1
+	return (0);
+#else
 	char		*ifacename;
 	cbq_state_t 	*cbqp;
 	rio_t		*rp;
@@ -936,6 +920,7 @@ cbq_add_riometer(rmp)
 	if (depth == 0)
 		depth = cl->ifdat_->maxpkt_ * 6;
 	return rio_set_meter(rp, rate, depth, rmp->codepoint);
+#endif
 }
 
 #endif /* CBQ_RIO */

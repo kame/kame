@@ -204,6 +204,10 @@ ip_nat_t *ip_nat_ptr = NULL;
 ip_nat_ctl_t *ip_nat_ctl_ptr = NULL;
 #endif
 
+#ifdef ALTQ
+int (*altq_input) __P((struct mbuf *, int)) = NULL;
+#endif
+
 /*
  * We need to save the IP options in case a protocol wants to respond
  * to an incoming packet over the same route if the packet got here
@@ -400,6 +404,11 @@ ip_input(struct mbuf *m)
 		goto bad;
 	}
 
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET) == 0)
+		/* packet is dropped by traffic conditioner */
+		return;
+#endif
 	/*
 	 * Convert fields to host representation.
 	 */

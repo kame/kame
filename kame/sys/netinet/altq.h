@@ -23,12 +23,26 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq.h,v 1.1 1999/08/05 17:18:17 itojun Exp $
+ * $Id: altq.h,v 1.2 1999/10/02 05:58:58 itojun Exp $
  */
 #ifndef _NETINET_ALTQ_H_
 #define _NETINET_ALTQ_H_
 
 #include <netinet/in.h>
+
+/* altq discipline type */
+#define ALTQT_NONE	0	/* reserved */
+#define ALTQT_CBQ	1	/* cbq */
+#define ALTQT_WFQ	2	/* wfq */
+#define ALTQT_AFMAP	3	/* afmap */
+#define ALTQT_FIFOQ	4	/* fifoq */
+#define ALTQT_RED	5	/* red */
+#define ALTQT_RIO	6	/* rio */
+#define ALTQT_LOCALQ	7	/* local use */
+#define ALTQT_HFSC	8	/* hfsc */
+#define ALTQT_CDNR	9	/* traffic conditioner */
+#define ALTQT_BLUE	10	/* blue */
+#define ALTQT_MAX	10
 
 /*
  * common network flow info structure
@@ -78,6 +92,7 @@ struct flowinfo_in6 {
  * flow filters for AF_INET and AF_INET6
  */
 struct flow_filter {
+	int			ff_ruleno;
 	struct flowinfo_in	ff_flow;
 	struct {
 		struct in_addr	mask_dst;
@@ -90,6 +105,7 @@ struct flow_filter {
 
 #ifdef SIN6_LEN
 struct flow_filter6 {
+	int			ff_ruleno;
 	struct flowinfo_in6	ff_flow6;
 	struct {
 		struct in6_addr	mask6_dst;
@@ -102,6 +118,15 @@ struct flow_filter6 {
 
 #if defined(KERNEL) || defined(_KERNEL)
 #include <netinet/altq_var.h>
+#endif
+
+/* queue macros only in FreeBSD */
+#ifndef LIST_EMPTY
+#define	LIST_EMPTY(head) ((head)->lh_first == NULL)
+#endif
+#ifndef LIST_FOREACH
+#define LIST_FOREACH(var, head, field)					\
+	for((var) = (head)->lh_first; (var); (var) = (var)->field.le_next)
 #endif
 
 #endif /* _NETINET_ALTQ_H_ */

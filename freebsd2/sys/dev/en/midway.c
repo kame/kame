@@ -1322,6 +1322,9 @@ caddr_t data;
 			error = EAFNOSUPPORT;
 			break;
 		}
+#else
+		error = EINVAL;
+#endif
 		break;
 
 	case SIOCGPVCSIF:
@@ -1362,6 +1365,22 @@ caddr_t data;
 		if ((error = suser(curproc->p_ucred, &curproc->p_acflag)) == 0)
 			error = en_pvctx(sc, (struct pvctxreq *)data);
 		break;
+
+	case SIOCGPVCFWD:
+	{
+		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
+		error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2, 2);
+		break;
+	}	
+
+	case SIOCSPVCFWD:
+	{
+		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
+		if ((error = suser(curproc->p_ucred, &curproc->p_acflag)) == 0)
+			error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2,
+					    req->pvc_op);
+		break;
+	}
 
 #endif /* ATM_PVCEXT */
 
@@ -1791,19 +1810,34 @@ struct ifnet *ifp;
 	      ap = mtod(m, struct atm_pseudohdr *);
 	      atm_vci = ATM_PH_VCI(ap);
 	      txchan = sc->txvc2slot[atm_vci];
-	      if (sc->txslot[txchan].mbsize > 20*1024) {
-	          EN_COUNT(sc->txmbovr); /* this isn't a right stat counter */
+	      if (sc->txslot[txchan].mbsize > 20*1024)
 		  return;
-	      }
 
 	      tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
 	      if (tmp != m)
 		  panic("en_start: different mbuf dequeued!");
 	  }
       }
-      else
+      else {
+#endif
+#ifdef ATM_PVCEXT
+      /*
+       * if this is a pvc sub-interface and the tx channel is backlogged,
+       * don't dequeue the packet.  a pvc interface doesn't suffer from
+       * head-of-line blocking so that we should prevent tx buffer overflow.
+       */
+      if (ifp != &sc->enif && (m = ifp->if_snd.ifq_head) != NULL) {
+	      ap = mtod(m, struct atm_pseudohdr *);
+	      atm_vci = ATM_PH_VCI(ap);
+	      txchan = sc->txvc2slot[atm_vci];
+	      if (sc->txslot[txchan].mbsize > 20*1024)
+		      return;
+      }
 #endif
       IF_DEQUEUE(ifq, m);
+#ifdef ALTQ
+      }
+#endif
       if (m == NULL)
 	return;		/* EMPTY: >>> exit here <<< */
     
@@ -3074,26 +3108,27 @@ void *arg;
   sc->vtrash += MID_VTRASH(reg);
 #endif
 
-#ifdef ALTQ
-  /* when altq is used, better try to dequeue the next packet. */
 #ifdef ATM_PVCEXT
-  /* round-robin scheduling to avoid starvation */
+  /*
+   * when the tx buffer is full, packets are left in the interface queue.
+   * (en dequeues all packets even when the tx buffer is full.)
+   * call en_start for each pvc interface using round-robin scheduling
+   * to avoid starvation.
+   */
   if (kick) {
     struct rrp *rrp_start;
 
     if ((rrp_start = sc->txrrp) != NULL) {
-      do {
-	if (ALTQ_IS_ON(sc->txrrp->ifp))
-	  en_start(sc->txrrp->ifp);
-	sc->txrrp = sc->txrrp->next;
-      } while (sc->txrrp != rrp_start);
+      while (1) {
+	en_start(sc->txrrp->ifp);
+	if (sc->txrrp->next == rrp_start)
+	  break;
+	else
+	  sc->txrrp = sc->txrrp->next;
+      }
     }
   }
-#else
-  if (ALTQ_IS_ON(&sc->enif))
-    en_start(&sc->enif);
 #endif
-#endif /* ALTQ */
 
   EN_INTR_RET(1); /* for us */
 }

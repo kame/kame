@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.h,v 1.1 1999/08/05 17:18:22 itojun Exp $
+ * $Id: altq_conf.h,v 1.2 1999/10/02 05:58:57 itojun Exp $
  */
 #ifndef _NET_ALTQ_CONF_H_
 #define _NET_ALTQ_CONF_H_
@@ -55,6 +55,10 @@ typedef int d_open_t __P((dev_t dev, int oflags, int devtype, struct proc *p));
 typedef int d_close_t __P((dev_t dev, int fflag, int devtype, struct proc *p));
 typedef int d_ioctl_t __P((dev_t dev, u_long cmd, caddr_t data,
 			   int fflag, struct proc *p));
+
+#define noopen	(dev_type_open((*))) enodev
+#define noclose	(dev_type_close((*))) enodev
+#define noioctl	(dev_type_ioctl((*))) enodev
 #endif
 
 /*

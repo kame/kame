@@ -11,7 +11,7 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: ALTQ,v 1.4 1999/09/07 11:06:21 itojun Exp $
+#	$Id: ALTQ,v 1.5 1999/10/02 05:59:06 itojun Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -46,11 +46,16 @@ options		WFQ		#weighted fair queueing
 options		RED		#random early detection
 options		FLOWVALVE	#flowvalve for RED (needs RED)
 options		CBQ_RED		#red for cbq (needs CBQ and RED)
-#options	RIO		#twin red for diffserv (needs RED)
-#options	CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
+options 	RIO		#twin red for diffserv (needs RED)
+options 	CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
 #options	LOCALQ		#local use
+options 	HFSC		#hierarchical fair service curve
+options 	HFSC_RED	#red for hfsc (needs HFSC and RED)
+options 	HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
 options		ALTQ_ACCOUNT	#altq accounting
 #options	ALTQ_ECN	#ecn extention to tcp
+options 	CDNR		#diffserv traffic conditioner
+options 	BLUE		#blue by wu-chang feng
 # you might want to set kernel timer to 1kHz if you use CBQ,
 # especially with 100baseT
 #options	HZ=1000

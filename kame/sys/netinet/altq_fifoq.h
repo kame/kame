@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_fifoq.h,v 1.1 1999/08/05 17:18:18 itojun Exp $
+ * $Id: altq_fifoq.h,v 1.2 1999/10/02 05:58:59 itojun Exp $
  */
 
 #ifndef _NETINET_ALTQ_FIFOQ_H_

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.h,v 1.1 1999/08/05 17:18:20 itojun Exp $
+ * $Id: altq_rio.h,v 1.2 1999/10/02 05:59:00 itojun Exp $
  */
 
 #ifndef _NETINET_ALTQ_RIO_H_
@@ -31,74 +31,40 @@
 
 /*
  * RIO: RED with IN/OUT bit
+ * (extended to support more than 2 drop precedence values)
  */
+#define RIO_NDROPPREC	3	/* number of drop precedence values */
 
 struct rio_interface {
 	char	rio_ifname[IFNAMSIZ];
 };
 
-struct redstat {
-	u_int		xmit_packets;
-	u_int		drop_packets;
-	u_int		drop_forced;
-	u_int		drop_unforced;
-	u_int		marked_packets;
-	u_quad_t	xmit_bytes;
-	u_quad_t	drop_bytes;
-};
-
-struct tbmstat {
-	u_int		packets;
-	u_quad_t	bytes;
-	u_int		in_packets;
-	u_quad_t	in_bytes;
-};
-
-struct redparams {
-	int th_min;		/* red min threshold */
-	int th_max;		/* red max threshold */
-	int inv_pmax;		/* inverse of max drop probability */
-};
-
 struct rio_stats {
 	struct rio_interface iface;
-	int q_len;
-	int q_avg;
-	int in_len;
-	int in_avg;
-	struct redstat q_stat, in_stat;
-
-	struct tbmstat tb_stat;
+	int q_len[RIO_NDROPPREC];
+	struct redstats q_stats[RIO_NDROPPREC];
 
 	/* static red parameters */
 	int q_limit;
 	int weight;
 	int flags;
-	struct redparams q_params, in_params;
+	struct redparams q_params[RIO_NDROPPREC];
 };
 
 struct rio_conf {
 	struct rio_interface iface;
-	struct redparams q_params, in_params;
+	struct redparams q_params[RIO_NDROPPREC];
 	int rio_weight;		/* weight for EWMA */
 	int rio_limit;		/* max queue length */
 	int rio_pkttime;	/* average packet time in usec */
 	int rio_flags;		/* see below */
 };
 
-struct rio_meter {
-	struct rio_interface iface;
-	int rate;		/* service rate in bits-per-second */
-	int depth;		/* token-bucket depth in bytes */
-	int codepoint;		/* codepoint to write into ds-field */
-};
-
 /* rio flags */
 #define RIOF_ECN4	0x01	/* use packet marking for IPv4 packets */
 #define RIOF_ECN6	0x02	/* use packet marking for IPv6 packets */
 #define RIOF_ECN	(RIOF_ECN4 | RIOF_ECN6)
-#define RIOF_METERONLY		0x100	/* meter only, skip rio dropper */
-#define RIOF_CLEARCODEPOINT	0x200	/* clear codepoint */
+#define RIOF_CLEARDSCP	0x200	/* clear diffserv codepoint */
 
 /* 
  * IOCTLs for RIO
@@ -111,32 +77,31 @@ struct rio_meter {
 #define	RIO_ACC_DISABLE		_IOW('Q', 6, struct rio_interface)
 #define	RIO_GETSTATS		_IOWR('Q', 7, struct rio_stats)
 #define	RIO_CONFIG		_IOWR('Q', 8, struct rio_conf)
-#define	RIO_ADD_METER		_IOWR('Q', 9, struct rio_meter)
+#define	RIO_SETDEFAULTS		_IOW('Q', 9, struct redparams[RIO_NDROPPREC])
 
 #if defined(KERNEL) || defined(_KERNEL)
 
 typedef struct rio {
-	struct {
+	/* per drop precedence structure */
+	struct dropprec_state {
 		/* red parameters */
 		int inv_pmax;	/* inverse of max drop probability */
-		int th_min;		/* red min threshold */
-		int th_max;		/* red max threshold */
+		int th_min;	/* red min threshold */
+		int th_max;	/* red max threshold */
 
 		/* variables for internal use */
 		int th_min_s;	/* th_min scaled by avgshift */
 		int th_max_s;	/* th_max scaled by avgshift */
-		int probd;		/* drop probability denominator */
+		int probd;	/* drop probability denominator */
 
-		int avg;		/* (scaled) queue length average */
-		int count; 	  	/* packet count since the last dropped/marked
+		int qlen;	/* queue length */
+		int avg;	/* (scaled) queue length average */
+		int count; 	/* packet count since the last dropped/marked
 				   packet */
-		int idle;		/* queue was empty */
-		int old;		/* avg is above th_min */
-		struct timeval last;  /* timestamp when the queue becomes idle */
-		
-	} q, in;  /* for total-queue and in-queue */
-
-	int in_qlen;		/* queue length for in-packets */
+		int idle;	/* queue was empty */
+		int old;	/* avg is above th_min */
+		struct timeval last;  /* timestamp when queue becomes idle */
+	} rio_precstate[RIO_NDROPPREC];
 		
 	int rio_wshift;		/* log(red_weight) */
 	int rio_weight;		/* weight for EWMA */
@@ -148,24 +113,10 @@ typedef struct rio {
 
 	u_int8_t rio_codepoint;		/* codepoint value to tag packets */
 	u_int8_t rio_codepointmask;	/* codepoint mask bits */
-	struct rio_tbm *rio_meter;	/* traffic meter/tagger */
 	
-	struct redstat q_stat, in_stat;		/* statistics */
+	struct redstats q_stats[RIO_NDROPPREC];	/* statistics */
 } rio_t;
 
-
-/*
- * rio traffic meter/tagger using a token bucket algorithm.
- */
-struct rio_tbm {
-	int	tb_kbps;	/* rate (r parameter) in kilo-bits-per-sec */
-	int	tb_max;		/* bucket size (d parameter) in bytes */
-	int	tb_token;	/* current token in bytes */
-	int	tb_filluptime;	/* time in usec to fill up the token bucket */
-	struct timeval tb_last; /* timestamp of the last packet sent */
-
-	struct tbmstat tb_stat;	/* statistics */
-};
 
 typedef struct rio_queue {
 	struct rio_queue *rq_next;	/* next red_state in the list */
@@ -176,8 +127,9 @@ typedef struct rio_queue {
 	rio_t *rq_rio;
 } rio_queue_t;
 
-extern rio_t *rio_alloc __P((int, int, int, int, int, int, int, int, int));
+extern rio_t *rio_alloc __P((int, struct redparams *, int, int));
 extern void rio_destroy __P((rio_t *));
+extern void rio_getstats __P((rio_t *, struct redstats *));
 extern int rio_addq __P((rio_t *, class_queue_t *, struct mbuf *,
 			 struct pr_hdr *));
 extern struct mbuf *rio_getq __P((rio_t *, class_queue_t *));

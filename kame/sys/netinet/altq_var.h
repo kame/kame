@@ -23,13 +23,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_var.h,v 1.1 1999/08/05 17:18:21 itojun Exp $
+ * $Id: altq_var.h,v 1.2 1999/10/02 05:59:02 itojun Exp $
  */
 #ifndef _NETINET_ALTQ_VAR_H_
 #define _NETINET_ALTQ_VAR_H_
 
 #if defined(KERNEL) || defined(_KERNEL)
 
+#include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/queue.h>
 
 /*
@@ -92,6 +94,41 @@ struct acc_classifier {
 
 #define FIMB4_PORTS	(FIMB4_DPORT|FIMB4_SPORT|FIMB4_GPI)
 #define FIMB6_PORTS	(FIMB6_DPORT|FIMB6_SPORT|FIMB6_GPI)
+
+/*
+ * machine dependent clock
+ * a 64bit high resolution time counter.
+ */
+extern u_int32_t machclk_freq;
+extern u_int32_t machclk_per_tick;
+extern void init_machclk(void);
+#if !defined(_MACHINE_ARCH)
+#define _MACHINE_ARCH	i386
+#endif
+#if (_MACHINE_ARCH == i386)
+/* for pentium tsc */
+#define read_machclk()	rdtsc()
+#ifndef __FreeBSD__
+static __inline u_int64_t rdtsc(void)
+{
+	u_int64_t rv;
+
+	__asm __volatile(".byte 0x0f, 0x31" : "=A" (rv));
+	return (rv);
+}
+#endif /* !__FreeBSD__ */
+#else /* !i386 */
+/* emulate 256MHz using microtime() */
+#define MACHCLK_SHIFT	8
+static __inline u_int64_t read_machclk(void)
+{
+	struct timeval tv;
+	
+	microtime(&tv);
+	return (((u_int64_t)(tv.tv_sec - boottime.tv_sec) * 1000000
+		 + tv.tv_usec) << MACHCLK_SHIFT);
+}
+#endif /* !i386 */
 
 /*
  * debug support
@@ -161,6 +198,8 @@ typedef void (timeout_t)(void *);
 #endif
 #endif /* INET6 */
 
+#define	m_pktlen(m)		((m)->m_pkthdr.len)
+
 struct ifnet; struct mbuf; struct flowinfo;
 
 int if_altqattach __P((struct ifnet *, void *,
@@ -178,6 +217,8 @@ int acc_add_filter __P((struct acc_classifier *, struct flow_filter *,
 int acc_delete_filter __P((struct acc_classifier *, u_long));
 int acc_discard_filters __P((struct acc_classifier *, void *, int));
 void *acc_classify __P((struct acc_classifier *, struct flowinfo *));
+u_int8_t read_dsfield __P((struct pr_hdr *));
+void write_dsfield __P((struct pr_hdr *, u_int8_t));
 void altq_assert __P((const char *, int, const char *));
 
 #endif /* KERNEL */

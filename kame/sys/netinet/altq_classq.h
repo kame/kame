@@ -1,4 +1,4 @@
-/* $Id: altq_classq.h,v 1.1 1999/08/05 17:18:18 itojun Exp $ */
+/* $Id: altq_classq.h,v 1.2 1999/10/02 05:58:59 itojun Exp $ */
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
  * All rights reserved.
@@ -41,6 +41,14 @@
 extern "C" {
 #endif
 
+/*
+ * Packet Queue types: RED or DROPHEAD.
+ */
+#define Q_DROPHEAD	0x00
+#define Q_RED		0x01
+#define Q_RIO		0x02
+#define Q_DROPTAIL	0x03
+
 #if defined(KERNEL) || defined(_KERNEL)
 
 /*
@@ -54,13 +62,6 @@ struct _class_queue_ {
 };
 
 typedef struct _class_queue_	class_queue_t;
-
-/*
- * Packet Queue types: RED or DROPHEAD.
- */
-#define Q_DROPHEAD	0x00
-#define Q_RED		0x01
-#define Q_RIO		0x02
 
 #define qtype(q)	(q)->qtype_		/* Get queue type */
 #define qlimit(q)	(q)->qlim_		/* Max packets to be queued */
