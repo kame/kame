@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.145 2001/08/16 20:27:41 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.146 2001/08/17 12:18:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -368,12 +368,16 @@ get_ph1approvalx(p, proposal, sap)
 		/* XXX to be considered */
 		if (tsap->lifetime > s->lifetime) ;
 		if (tsap->lifebyte > s->lifebyte) ;
-		if (tsap->encklen >= s->encklen) ;
 #endif
+		/*
+		 * if responder side and peer's key length in proposal
+		 * is bigger than mine, it might be accepted.
+		 */
 		if(tsap->enctype == s->enctype 
 		 && tsap->authmethod == s->authmethod
 		 && tsap->hashtype == s->hashtype
-		 && tsap->dh_group == s->dh_group)
+		 && tsap->dh_group == s->dh_group
+		 && tsap->encklen == s->encklen)
 			break;
 	}
 

@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.46 2001/08/17 10:47:23 sakane Exp $
+$KAME: helsinki-result.jp,v 1.47 2001/08/17 12:18:02 sakane Exp $
 
 
 generic
@@ -392,8 +392,8 @@ SSH
 	racoonはfujixeroxがサインした証明書でもOK
 
 	AES phase1 がうまくいかない。間違いなくracoonの問題。
-
-
+	key expantino問題。
+	
 freeswan
 	IPv4, IPComp + ESP, transport mode
 	phase 1 3DES + SHA1, group 5, lifetime = 10min
