@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.72 2001/11/06 01:20:29 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.73 2001/11/07 03:28:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2147,12 +2147,20 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 	case IP6OPT_BINDING_REQ:
 		if (!MIP6_IS_MN)
 			return (0);
-		
-		if (mip6_validate_br(m, opt)) {
+
+		error = mip6_validate_br(m, opt);
+		if (error == -1) {
 			mip6log((LOG_ERR,
 				 "%s:%d: invalid BR received\n",
 				 __FILE__, __LINE__));
 			goto bad;
+		}
+		if (error == 1) {
+			/* invalid BR.  we ignore this silently */
+			mip6log((LOG_NOTICE,
+				 "%s:%d: invalid BR received.  ignore this.\n",
+				 __FILE__, __LINE__));
+			return (0);
 		}
 
 		if (mip6_process_br(m, opt) != 0) {
