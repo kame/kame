@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.53 2002/10/09 17:24:23 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.55 2002/10/25 05:11:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -242,7 +242,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
 					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
-					mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED, NULL);
+					mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB, NULL);
 				}
 				break;
 			}
@@ -269,7 +269,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
 					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
-					mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED, NULL);
+					mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB, NULL);
 				}
 				break;
 			}
@@ -349,7 +349,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 #endif
 	otip6off = off + sizeof(*icmp6) + sizeof(*otip6);
 	nxt = otip6->ip6_nxt;
-	while(nxt != IPPROTO_IPV6) {
+	while (nxt != IPPROTO_IPV6) {
 		int off;
 
 		off = otip6off;

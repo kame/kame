@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.123 2002/09/11 02:34:17 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.124 2002/10/25 05:11:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -447,21 +447,21 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			 * simultaneously.
 			 */
 			if ((mbu_ia_best &&
-			     (mbu_ia_best->mbu_fsm_state
-			      == MIP6_BU_FSM_STATE_IDLE))
+			     (mbu_ia_best->mbu_pri_fsm_state
+			      == MIP6_BU_PRI_FSM_STATE_IDLE))
 			    &&
 			    !(mbu_ia &&
-			      (mbu_ia->mbu_fsm_state
-			       == MIP6_BU_FSM_STATE_IDLE))) {
+			      (mbu_ia->mbu_pri_fsm_state
+			       == MIP6_BU_PRI_FSM_STATE_IDLE))) {
 				NEXT(4);
 			}
 			if (!(mbu_ia_best &&
-			      (mbu_ia_best->mbu_fsm_state
-			       == MIP6_BU_FSM_STATE_IDLE))
+			      (mbu_ia_best->mbu_pri_fsm_state
+			       == MIP6_BU_PRI_FSM_STATE_IDLE))
 			    &&
 			    (mbu_ia &&
-			     (mbu_ia->mbu_fsm_state
-			      == MIP6_BU_FSM_STATE_IDLE))) {
+			     (mbu_ia->mbu_pri_fsm_state
+			      == MIP6_BU_PRI_FSM_STATE_IDLE))) {
 				REPLACE(4);
 			}
 			if (usecoa != 0) {

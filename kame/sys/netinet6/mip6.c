@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.177 2002/10/17 12:49:34 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.178 2002/10/25 05:11:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1809,12 +1809,12 @@ mip6_exthdr_create(m, opt, mip6opt)
 	if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 		/* to my home agent. */
 		if (!need_hao &&
-		    (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_IDLE ||
-		     mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_WAITD))
+		    (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_IDLE ||
+		     mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD))
 			goto noneed;
 	} else {
 		/* to any of correspondent nodes. */
-		if (!need_hao && mbu->mbu_fsm_state != MIP6_BU_FSM_STATE_BOUND)
+		if (!need_hao && !MIP6_IS_BU_BOUND_STATE(mbu))
 			goto noneed;
 	}
 	/* create haddr destopt. */

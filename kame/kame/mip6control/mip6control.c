@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.36 2002/10/07 06:44:03 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.37 2002/10/25 05:11:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,7 +69,8 @@ static int getaddress __P((char *, struct sockaddr_in6 *));
 static const char *ip6_sprintf __P((const struct in6_addr *));
 static const char *raflg_sprintf __P((u_int8_t));
 static const char *buflg_sprintf __P((u_int8_t));
-static const char *bufsmstate_sprintf __P((u_int8_t));
+static const char *bufpsmstate_sprintf __P((u_int8_t));
+static const char *bufssmstate_sprintf __P((u_int8_t));
 static const char *bustate_sprintf __P((u_int8_t));
 static const char *bcflg_sprintf __P((u_int8_t));
 static struct hif_softc *get_hif_softc __P((char *));
@@ -81,8 +82,8 @@ static const char *pfx_desc[] = {
 	"prefix\t\t\t\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n"
 };
 static const char *bu_desc[] = {
-	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tackexp\tseqno\tflags\trstate\tstate\n",
-	"paddr\t\t\t\t\thaddr\t\t\t\t\tcoa\t\t\t\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tackexp\tseqno\tflags\trstate\tstate\n"
+	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tretexp\tseqno\tflags\tpfsm\tsfsm\tstate\n",
+	"paddr\t\t\t\t\thaddr\t\t\t\t\tcoa\t\t\t\t\tlifetim\tltexp\trefresh\trefexp\tacktimo\tretexp\tseqno\tflags\tpfsm\tsfsm\tstate\n"
 };
 static const char *ha_desc[] = {
 	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltexp\n",
@@ -526,17 +527,18 @@ main(argc, argv)
 			       ip6_sprintf(&mbu->mbu_haddr.sin6_addr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbu->mbu_coa.sin6_addr));
-			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %-7s %-7s\n",
+			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %-7s %-7s %-7s\n",
 			       mbu->mbu_lifetime,
 			       mbu->mbu_expire - time.tv_sec,
 			       mbu->mbu_refresh,
 			       mbu->mbu_refexpire - time.tv_sec,
 			       mbu->mbu_acktimeout,
-			       (mbu->mbu_ackexpire - time.tv_sec) < 0 ? 0
-			       : (mbu->mbu_ackexpire - time.tv_sec), /* XXX */
+			       (mbu->mbu_retrans - time.tv_sec) < 0 ? 0
+			       : (mbu->mbu_retrans - time.tv_sec), /* XXX */
 			       mbu->mbu_seqno,
 			       buflg_sprintf(mbu->mbu_flags),
-			       bufsmstate_sprintf(mbu->mbu_fsm_state),
+			       bufpsmstate_sprintf(mbu->mbu_pri_fsm_state),
+			       bufssmstate_sprintf(mbu->mbu_sec_fsm_state),
 			       bustate_sprintf(mbu->mbu_state));
 		}
 	}
@@ -840,18 +842,32 @@ buflg_sprintf(flags)
 }
 
 static const char *
-bufsmstate_sprintf(state)
+bufpsmstate_sprintf(state)
 	u_int8_t state;
 {
 	static char *buf[] = {
 		"IDLE",
+		"RRINIT",
+		"RRREDO",
+		"RRDEL",
+		"WAITA",
+		"WAITAR",
+		"WAITD",
+		"BOUND"
+	};
+
+	return buf[state];
+}
+
+static const char *
+bufssmstate_sprintf(state)
+	u_int8_t state;
+{
+	static char *buf[] = {
+		"START",
 		"WAITHC",
 		"WAITH",
-		"WAITC",
-		"WAITA",
-		"BOUND",
-		"WAITD",
-		"WAITDH"
+		"WAITC"
 	};
 
 	return buf[state];

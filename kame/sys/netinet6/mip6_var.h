@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.62 2002/10/22 01:59:22 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.63 2002/10/25 05:11:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -145,7 +145,6 @@ struct mip6_bu {
 	u_int16_t           mbu_refresh;    /* refresh frequency */
 	time_t              mbu_refexpire;  /* expiration time of refresh. */
 	u_int32_t           mbu_acktimeout; /* current ack timo value */
-	time_t              mbu_ackexpire;  /* expiration time of ack. */
 	u_int16_t           mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
 	mip6_cookie_t       mbu_mobile_cookie;
@@ -153,39 +152,75 @@ struct mip6_bu {
 	mip6_home_cookie_t  mbu_home_cookie;
 	u_int16_t           mbu_careof_nonce_index;
         mip6_careof_cookie_t mbu_careof_cookie;
+	u_int8_t            mbu_pri_fsm_state; /* primary fsm state. */
+	u_int8_t            mbu_sec_fsm_state; /* secondary fsm state. */
+	time_t              mbu_retrans;    /* retrans/refresh timo value. */
+	u_int8_t            mbu_retrans_count;
+	time_t              mbu_failure;    /* failure timo value. */
 	u_int8_t            mbu_state;
-	u_int8_t            mbu_fsm_state;  /* registration status */
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
 };
-#define MIP6_BU_FSM_STATE_IDLE		0
-#define MIP6_BU_FSM_STATE_WAITHC	1
-#define MIP6_BU_FSM_STATE_WAITH		2
-#define MIP6_BU_FSM_STATE_WAITC		3
-#define MIP6_BU_FSM_STATE_WAITA		4
-#define MIP6_BU_FSM_STATE_BOUND		5
-#define MIP6_BU_FSM_STATE_WAITD		6
-#define MIP6_BU_FSM_STATE_WAITDH	7
-
-#define MIP6_BU_FSM_EVENT_HOT_RECEIVED			0
-#define MIP6_BU_FSM_EVENT_COT_RECEIVED			1
-#define MIP6_BU_FSM_EVENT_BA_RECEIVED			2
-#define MIP6_BU_FSM_EVENT_BRR_RECEIVED			3
-#define MIP6_BU_FSM_EVENT_ICMP_PARAMPROB_RECEIVED	4
-#define MIP6_BU_FSM_EVENT_BE_1_RECEIVED			5
-#define MIP6_BU_FSM_EVENT_BE_2_RECEIVED			6
-#define MIP6_BU_FSM_EVENT_MOVEMENT			7
-#define MIP6_BU_FSM_EVENT_RO_DESIRED			8
-#define MIP6_BU_FSM_EVENT_RO_NOT_DESIRED		9
-#define MIP6_BU_FSM_EVENT_RETRANS			10
-
 #define MIP6_BU_STATE_WAITSENT    0x01
 #define MIP6_BU_STATE_WAITACK     0x02
 #define MIP6_BU_STATE_BUNOTSUPP   0x04
 #define MIP6_BU_STATE_MIP6NOTSUPP 0x80
 
+/* states for the primary fsm. */
+#define MIP6_BU_PRI_FSM_STATE_IDLE	0
+#define MIP6_BU_PRI_FSM_STATE_RRINIT	1
+#define MIP6_BU_PRI_FSM_STATE_RRREDO	2
+#define MIP6_BU_PRI_FSM_STATE_RRDEL	3
+#define MIP6_BU_PRI_FSM_STATE_WAITA	4
+#define MIP6_BU_PRI_FSM_STATE_WAITAR	5
+#define MIP6_BU_PRI_FSM_STATE_WAITD	6
+#define MIP6_BU_PRI_FSM_STATE_BOUND	7
+#define MIP6_IS_BU_BOUND_STATE(mbu)					\
+	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITAR)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO))
+#define MIP6_IS_BU_RR_STATE(mbu)					\
+	(((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRINIT)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRREDO)	\
+	|| ((mbu)->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_RRDEL))
+
+/* states for the secondary fsm. */
+#define MIP6_BU_SEC_FSM_STATE_START	0
+#define MIP6_BU_SEC_FSM_STATE_WAITHC	1
+#define MIP6_BU_SEC_FSM_STATE_WAITH	2
+#define MIP6_BU_SEC_FSM_STATE_WAITC	3
+
+/* events for the primary fsm. */
+#define MIP6_BU_PRI_FSM_EVENT_MOVEMENT		0
+#define MIP6_BU_PRI_FSM_EVENT_RETURNING_HOME	1
+#define MIP6_BU_PRI_FSM_EVENT_RR_DONE		2
+#define MIP6_BU_PRI_FSM_EVENT_RR_FAILED		3
+#define MIP6_BU_PRI_FSM_EVENT_BRR		4
+#define MIP6_BU_PRI_FSM_EVENT_BA		5
+#define MIP6_BU_PRI_FSM_EVENT_NO_BINDING	6
+#define MIP6_BU_PRI_FSM_EVENT_UNVERIFIED_HAO	7
+#define MIP6_BU_PRI_FSM_EVENT_UNKNOWN_MH_TYPE	8
+#define MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB	9
+#define MIP6_BU_PRI_FSM_EVENT_RETRANS_TIMER	10
+#define MIP6_BU_PRI_FSM_EVENT_REFRESH_TIMER	11
+#define MIP6_BU_PRI_FSM_EVENT_FAILURE_TIMER	12
+#define MIP6_BU_IS_PRI_FSM_EVENT(ev) ((ev) <= MIP6_BU_PRI_FSM_EVENT_FAILURE_TIMER)
+
+/* events for the secondary fsm. */
+#define MIP6_BU_SEC_FSM_EVENT_START_RR		12
+#define MIP6_BU_SEC_FSM_EVENT_START_HOME_RR	13
+#define MIP6_BU_SEC_FSM_EVENT_STOP_RR		14
+#define MIP6_BU_SEC_FSM_EVENT_HOT		15
+#define MIP6_BU_SEC_FSM_EVENT_COT		16
+#define MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER     17
+#define MIP6_BU_IS_SEC_FSM_EVENT(ev) (!MIP6_BU_IS_PRI_FSM_EVENT((ev)))
+
 #define MIP6_BU_TIMEOUT_INTERVAL 1
 #define MIP6_BU_SAWAIT_INTERVAL 4
+
+#define MIP6_HOT_TIMEOUT 5
+
+#define MIP6_MAX_RETRANS 10
 
 /* the binding cache entry. */
 struct mip6_bc {

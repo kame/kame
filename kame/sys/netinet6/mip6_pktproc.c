@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.71 2002/10/23 09:39:59 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.72 2002/10/25 05:11:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -387,7 +387,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		return (EINVAL);
 	}
 
-	error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_HOT_RECEIVED, ip6mh);
+	error = mip6_bu_fsm(mbu, MIP6_BU_SEC_FSM_EVENT_HOT, ip6mh);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: state transition failed. (%d)\n",
@@ -469,7 +469,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		return (EINVAL);
 	}
 
-	error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_COT_RECEIVED, ip6mc);
+	error = mip6_bu_fsm(mbu, MIP6_BU_SEC_FSM_EVENT_COT, ip6mc);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: state transition failed. (%d)\n",
@@ -961,7 +961,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                          __FILE__, __LINE__, ip6ma->ip6ma_status));
 		if (ip6ma->ip6ma_status == IP6MA_STATUS_NOT_HOME_AGENT &&
 		    mbu->mbu_flags & IP6MU_HOME &&
-		    mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_WAITA) {
+		    mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITA) {
 			/* XXX no registration? */
 			goto success;
 		}
@@ -1022,7 +1022,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                 mbu->mbu_refresh = mbu->mbu_expire;
 	if (mbu->mbu_flags & IP6MU_HOME) {
 		/* this is from our home agent. */
-		if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_WAITD) {
+		if (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD) {
 			/* home unregsitration has completed. */
 
 			/* notify all the CNs that we are home. */
@@ -1116,8 +1116,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				 "%s:%d: send a unsolicited na to %s\n",
 				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
 		}
-		} else if (mbu->mbu_fsm_state
-			   == MIP6_BU_FSM_STATE_WAITA) {
+		} else if (mbu->mbu_pri_fsm_state
+			   == MIP6_BU_PRI_FSM_STATE_WAITA) {
 			if (lifetime == 0) {
 				mip6log((LOG_WARNING,
 					 "%s:%d: lifetime are zero.\n",
@@ -1125,7 +1125,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				/* XXX ignored */
 			}
 			/* home registration completed */
-			mbu->mbu_fsm_state = MIP6_BU_FSM_STATE_BOUND;
+			mbu->mbu_pri_fsm_state = MIP6_BU_PRI_FSM_STATE_BOUND;
 
 			/* create tunnel to HA */
 			error = mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
@@ -1149,7 +1149,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				m_freem(m);
 				return (error);
 			}
-		} else if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND) {
+		} else if (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND) {
 			/* nothing to do. */
 		} else {
 			mip6log((LOG_NOTICE,
@@ -1479,7 +1479,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	hrmbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if ((mbu == NULL) &&
 	    (hrmbu != NULL) &&
-	    (hrmbu->mbu_fsm_state == MIP6_BU_FSM_STATE_BOUND)) {
+	    (hrmbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_BOUND)) {
 		/* XXX */
 		/* create a binding update entry and send CoTI/HoTI. */
 		return (0);
@@ -1898,8 +1898,8 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	switch (ip6me->ip6me_status) {
 	case IP6ME_STATUS_NO_BINDING:
 		/* the CN doesn't have a binding cache entry.  start RR. */
-		error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_BE_1_RECEIVED,
-		    ip6me);
+		error = mip6_bu_fsm(mbu,
+		    MIP6_BU_PRI_FSM_EVENT_UNVERIFIED_HAO, ip6me);
 		if (error) {
 			mip6log((LOG_ERR,
 			    "%s:%d: state transition failed. (%d)\n",
@@ -1911,8 +1911,8 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 
 	case IP6ME_STATUS_UNKNOWN_MH_TYPE:
 		/* XXX future extension? */
-		error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_BE_2_RECEIVED,
-		    ip6me);
+		error = mip6_bu_fsm(mbu,
+		    MIP6_BU_PRI_FSM_EVENT_UNKNOWN_MH_TYPE, ip6me);
 		if (error) {
 			mip6log((LOG_ERR,
 			    "%s:%d: state transition failed. (%d)\n",

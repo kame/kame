@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.145 2002/10/22 05:34:03 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.146 2002/10/25 05:11:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -251,17 +251,17 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	if (sc->hif_location == HIF_LOCATION_HOME) {
 		/* un-registration. */
 		mbu->mbu_coa = mpfx->mpfx_haddr;
-		mbu->mbu_fsm_state =
+		mbu->mbu_pri_fsm_state =
 		    (mbu->mbu_flags & IP6MU_HOME)
-		    ? MIP6_BU_FSM_STATE_WAITD
-		    : MIP6_BU_FSM_STATE_IDLE;
+		    ? MIP6_BU_PRI_FSM_STATE_WAITD
+		    : MIP6_BU_PRI_FSM_STATE_IDLE;
 	} else {
 		/* registration. */
 		mbu->mbu_coa = *coa;
-		mbu->mbu_fsm_state =
+		mbu->mbu_pri_fsm_state =
 		    (mbu->mbu_flags & IP6MU_HOME)
-		    ? MIP6_BU_FSM_STATE_WAITA
-		    : MIP6_BU_FSM_STATE_IDLE;
+		    ? MIP6_BU_PRI_FSM_STATE_WAITA
+		    : MIP6_BU_PRI_FSM_STATE_IDLE;
 	}
 	if (coa_lifetime < mpfx->mpfx_pltime) {
 		mbu->mbu_lifetime = coa_lifetime;
@@ -281,7 +281,7 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	if (mbu->mbu_refexpire < time_second)
 		mbu->mbu_refexpire = 0x7fffffff;
 	mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
-	mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
+	mbu->mbu_retrans = time_second + mbu->mbu_acktimeout;
 	/* Sequence Number SHOULD start at a random value */
 	mbu->mbu_seqno = (u_int16_t)arc4random();
 	mbu->mbu_hif = sc;
@@ -427,13 +427,13 @@ mip6_home_registration(sc)
 				if (sc->hif_location == HIF_LOCATION_HOME) {
 					/* un-registration. */
 					mbu->mbu_coa = mbu->mbu_haddr;
-					mbu->mbu_fsm_state
-					    = MIP6_BU_FSM_STATE_WAITD;
+					mbu->mbu_pri_fsm_state
+					    = MIP6_BU_PRI_FSM_STATE_WAITD;
 				} else {
 					/* registration. */
 					mbu->mbu_coa = hif_coa;
-					mbu->mbu_fsm_state
-					    = MIP6_BU_FSM_STATE_WAITA;
+					mbu->mbu_pri_fsm_state
+					    = MIP6_BU_PRI_FSM_STATE_WAITA;
 				}
 
 				/* update lifetime. */
@@ -456,7 +456,7 @@ mip6_home_registration(sc)
 				if (mbu->mbu_refexpire < time_second)
 					mbu->mbu_refexpire = 0x7fffffff;
 				mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
-				mbu->mbu_ackexpire
+				mbu->mbu_retrans
 					= time_second + mbu->mbu_acktimeout;
 				/* mbu->mbu_flags |= IP6MU_DAD ;*/
 			}
@@ -525,7 +525,8 @@ mip6_bu_list_notify_binding_change(sc)
 		/* sanity check for overflow */
 		if (mbu->mbu_refexpire < time_second)
 			mbu->mbu_refexpire = 0x7fffffff;
-		if (mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_MOVEMENT, NULL) != 0) {
+		if (mip6_bu_fsm(mbu,
+			MIP6_BU_PRI_FSM_EVENT_MOVEMENT, NULL) != 0) {
 			mip6log((LOG_ERR,
 			    "%s:%d: "
 			    "state transition failed.\n",
@@ -572,8 +573,12 @@ mip6_bu_timeout(arg)
 	int s;
 	struct hif_softc *sc;
 	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	struct timeval mono_time;
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	mono_time.tv_sec = time_second;
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -588,11 +593,12 @@ mip6_bu_timeout(arg)
 		struct mip6_bu *mbu, *mbu_entry;
 
 		for (mbu = LIST_FIRST(&sc->hif_bu_list);
-		     mbu != NULL; mbu = mbu_entry) {
+		     mbu != NULL;
+		     mbu = mbu_entry) {
 			mbu_entry = LIST_NEXT(mbu, mbu_entry);
 
-			/* check expiration */
-			if (mbu->mbu_expire < time_second) {
+			/* check expiration. */
+			if (mbu->mbu_expire < mono_time.tv_sec) {
 				if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 					/*
 					 * the binding update entry for
@@ -618,33 +624,34 @@ mip6_bu_timeout(arg)
 			if ((mbu->mbu_state & MIP6_BU_STATE_BUNOTSUPP) != 0)
 				continue;
 
+		if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 			/* check ack status */
 			if ((mbu->mbu_flags & IP6MU_ACK)
 			    && ((mbu->mbu_state & MIP6_BU_STATE_WAITACK) != 0)
-			    && (mbu->mbu_ackexpire < time_second)) {
+			    && (mbu->mbu_retrans < mono_time.tv_sec)) {
 				mbu->mbu_acktimeout *= 2;
 				if (mbu->mbu_acktimeout > MIP6_BA_MAX_TIMEOUT)
 					mbu->mbu_acktimeout
 						= MIP6_BA_MAX_TIMEOUT;
-				mbu->mbu_ackexpire
-					= time_second + mbu->mbu_acktimeout;
+				mbu->mbu_retrans
+				    = mono_time.tv_sec + mbu->mbu_acktimeout;
 				mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 			}
 
 			/* refresh check */
-			if (mbu->mbu_refexpire < time_second) {
+			if (mbu->mbu_refexpire < mono_time.tv_sec) {
 				/* refresh binding */
 				mbu->mbu_refexpire
-					= time_second + mbu->mbu_refresh;
+				    = mono_time.tv_sec + mbu->mbu_refresh;
 				/* sanity check for overflow */
-				if (mbu->mbu_refexpire < time_second)
+				if (mbu->mbu_refexpire < mono_time.tv_sec)
 					mbu->mbu_refexpire = 0x7fffffff;
 				if (mbu->mbu_flags & IP6MU_ACK) {
 					mbu->mbu_acktimeout
-						= MIP6_BA_INITIAL_TIMEOUT;
-					mbu->mbu_ackexpire
-						= time_second
-						+ mbu->mbu_acktimeout;
+					    = MIP6_BA_INITIAL_TIMEOUT;
+					mbu->mbu_retrans
+					    = mono_time.tv_sec
+					    + mbu->mbu_acktimeout;
 					mbu->mbu_state
 						|= MIP6_BU_STATE_WAITACK;
 				}
@@ -664,6 +671,34 @@ mip6_bu_timeout(arg)
 						 ip6_sprintf(&mbu->mbu_paddr.sin6_addr)));
 				}
 			}
+		} else {
+			/* check refresh timer. */
+			if (mbu->mbu_refexpire < mono_time.tv_sec) {
+				if (mip6_bu_fsm(mbu,
+					MIP6_BU_PRI_FSM_EVENT_REFRESH_TIMER,
+					NULL)) {
+					mip6log((LOG_ERR,
+					    "%s:%d: "
+					    "primary fsm state transition "
+					    "filed.\n",
+					    __FILE__, __LINE__));
+					/* continue, anyway... */
+				}
+			}
+
+			/* check retransmission timer. */
+			if (mbu->mbu_retrans < mono_time.tv_sec) {
+				if (MIP6_IS_BU_RR_STATE(mbu)) {
+					error = mip6_bu_fsm(mbu,
+					    MIP6_BU_SEC_FSM_EVENT_RETRANS_TIMER,
+					    NULL);
+				} else {
+					error = mip6_bu_fsm(mbu,
+					    MIP6_BU_PRI_FSM_EVENT_RETRANS_TIMER,
+					    NULL);
+				}
+			}
+		}
 		}
 	}
 
@@ -1909,7 +1944,8 @@ mip6_bu_print(mbu)
 		 "flags      0x%x\n"
 		 "state      0x%x\n"
 		 "hif        0x%p\n"
-		 "fsm_state  %u\n",
+		 "pri_fsm    %u\n"
+		 "sec_fsm    %u\n",
 		 ip6_sprintf(&mbu->mbu_paddr.sin6_addr),
 		 ip6_sprintf(&mbu->mbu_haddr.sin6_addr),
 		 ip6_sprintf(&mbu->mbu_coa.sin6_addr),
@@ -1918,12 +1954,13 @@ mip6_bu_print(mbu)
 		 (u_long)mbu->mbu_refresh,
 		 (long long)mbu->mbu_refexpire,
 		 (u_long)mbu->mbu_acktimeout,
-		 (long long)mbu->mbu_ackexpire,
+		 (long long)mbu->mbu_retrans,
 		 mbu->mbu_seqno,
 		 mbu->mbu_flags,
 		 mbu->mbu_state,
 		 mbu->mbu_hif,
-		 mbu->mbu_fsm_state));
+		 mbu->mbu_pri_fsm_state,
+		 mbu->mbu_sec_fsm_state));
 
 }
 #endif /* MIP6_DEBUG */
@@ -2966,7 +3003,7 @@ mip6_route_optimize(m)
 			mbu->mbu_refexpire = 0x7fffffff;
 #endif
 	}
-	mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_RO_DESIRED, NULL);
+	mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_MOVEMENT, NULL);
 
 	return (0);
  bad:
