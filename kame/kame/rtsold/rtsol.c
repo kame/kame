@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.22 2003/04/16 09:48:15 itojun Exp $	*/
+/*	$KAME: rtsol.c,v 1.23 2003/04/16 10:21:47 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -190,7 +190,7 @@ sendpacket(struct ifinfo *ifinfo)
 	dst = sin6_allrouters;
 	dst.sin6_scope_id = ifinfo->linkid;
 	/* get ISATAP router list for later use */
-#ifdef ISTAP
+#ifdef ISATAP
 	if (is_isatap(ifinfo))
 		isatapsiz = get_isatap_router(ifinfo, (void **) &isatap);
 #endif
@@ -217,7 +217,7 @@ sendpacket(struct ifinfo *ifinfo)
 
 	ptr = isatap;
 	do {
-#ifdef ISTAP
+#ifdef ISATAP
 		if (is_isatap(ifinfo)) {
 			if (isatapsiz == 0)
 				break;
