@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.48 2000/06/08 12:39:16 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.49 2000/06/09 00:22:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,6 +192,7 @@ in6_pcbbind(in6p, nam)
 			return(EADDRNOTAVAIL);
 #endif
 
+		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
 			return EINVAL;
 		/* this must be cleared for ifa_ifwithaddr() */
@@ -329,6 +330,7 @@ in6_pcbconnect(in6p, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
+	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, &ifp) != 0)
 		return EINVAL;
 
