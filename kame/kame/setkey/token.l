@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.16 2000/08/28 16:41:10 itojun Exp $	*/
+/*	$KAME: token.l,v 1.17 2000/10/29 12:35:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -46,7 +46,11 @@
 #include <unistd.h>
 #include <errno.h>
 #include "vchar.h"
+#ifdef __NetBSD__
+#include "parse.h"
+#else
 #include "y.tab.h"
+#endif
 
 #define DECHO \
 	if (f_debug) {printf("<%d>", yy_start); ECHO ; printf("\n"); }

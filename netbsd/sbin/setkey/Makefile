@@ -8,7 +8,7 @@ CPPFLAGS+=	-I${.CURDIR}/../../kame/libipsec
 LDADD+=	-ll -ly
 DPADD+=	${LIBL} ${LIBY}
 CLEANFILES+=	y.tab.c y.tab.h key_test.o keytest
-YFLAGS+=-d
+YHEADER=	yes
 
 #SCRIPTS=	scriptdump
 
