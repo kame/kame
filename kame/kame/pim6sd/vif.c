@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.41 2004/06/09 16:24:13 suz Exp $	*/
+/*	$KAME: vif.c,v 1.42 2004/06/09 17:57:10 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -388,7 +388,7 @@ stop_vif(mifi_t vifi)
 	struct uvif *v;
 	struct listaddr *a;
 	register pim_nbr_entry_t *n;
-	register pim_nbr_entry_t *next
+	register pim_nbr_entry_t *next;
 	struct vif_acl *acl;
  
 	/*
