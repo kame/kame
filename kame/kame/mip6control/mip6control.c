@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.53 2003/08/25 11:28:39 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.54 2003/08/26 05:49:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -913,7 +913,7 @@ static struct hif_softc *
 get_hif_softc(ifname)
 	char *ifname;
 {
-	TAILQ_HEAD(hif_softc_list, hif_softc) hif_softc_list;
+	LIST_HEAD(hif_softc_list, hif_softc) hif_softc_list;
 	struct hif_softc *sc;
 	static struct hif_softc hif_softc;
 	u_short ifindex = if_nametoindex(ifname);
@@ -928,9 +928,9 @@ get_hif_softc(ifname)
 		exit(1);
 	}
 	KREAD(nl[N_HIF_SOFTC_LIST].n_value, &hif_softc_list, hif_softc_list);
-	for (sc = TAILQ_FIRST(&hif_softc_list);
+	for (sc = LIST_FIRST(&hif_softc_list);
 	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
+	     sc = LIST_NEXT(sc, hif_entry)) {
 		KREAD(sc, &hif_softc, hif_softc);
 		sc = &hif_softc;
 		if (sc->hif_if.if_index == ifindex)
