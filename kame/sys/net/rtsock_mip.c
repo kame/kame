@@ -39,7 +39,7 @@ rt_mip6msg(cmd, ifp, rt)
 	rtm->rtm_flags |= RTF_DONE;
 
 	route_proto.sp_protocol = sa ? sa->sa_family : 0;
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#ifdef __bsdi__
 	raw_input(m, NULL, &route_proto, &route_src, &route_dst);
 #else
 	raw_input(m, &route_proto, &route_src, &route_dst);
