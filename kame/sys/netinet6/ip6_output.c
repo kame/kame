@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.348 2002/11/06 08:27:46 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.349 2002/11/14 03:17:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -936,7 +936,7 @@ skip_ipsec2:;
 	if (opt && opt->ip6po_rthdr)
 		ro = &opt->ip6po_route;
 #ifdef MIP6
-	else if (exthdrs.ip6e_rthdr) {
+	else if (exthdrs.ip6e_rthdr2) {
 		ro = &mip6_ip6route;
 		bzero((caddr_t)ro, sizeof(*ro));
 		*(struct sockaddr_in6 *)&ro->ro_dst = *src_sa;
@@ -1084,6 +1084,9 @@ skip_ipsec2:;
 	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(__bsdi__) || defined(__FreeBSD__)
+#ifdef MIP6
+	if (ro != &mip6_ip6route)
+#endif
 	if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 		clone = 1;
 #endif
@@ -1632,6 +1635,11 @@ sendorfree:
 		ip6stat.ip6s_fragmented++;
 
 done:
+#ifdef MIP6
+	if (ro == &mip6_ip6route && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+	} else
+#endif
 	if (ro == &ip6route && ro->ro_rt) { /* brace necessary for RTFREE */
 		RTFREE(ro->ro_rt);
 	} else if (ro_pmtu == &ip6route && ro_pmtu->ro_rt) {
@@ -1656,6 +1664,7 @@ freehdrs:
 	m_freem(exthdrs.ip6e_dest2);
 #ifdef MIP6
 	m_freem(exthdrs.ip6e_haddr);
+	m_freem(exthdrs.ip6e_rthdr2);
 	m_freem(exthdrs.ip6e_mobility);
 #endif /* MIP6 */
 	/* FALLTHROUGH */
