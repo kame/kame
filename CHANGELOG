@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1781 2001/07/18 11:28:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.1782 2001/07/18 12:32:22 jinmei Exp $
 
 <200107>
+2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_free): if the reason for the
+	deletion is just garbage collection, and the neighbor is an active
+	default router, do not delete it.  Instead, reset the GC timer
+	using the router's lifetime.  Simply deleting the entry would
+	affect default router selection, which is not necessarily a good
+	thing, especially when we're using router preference values.
+
 2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (pfxlist_onlink_check): mark
 	(autoconfigured) prefixes that do not have a reachable router when
