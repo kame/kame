@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.8,v 1.31 2004/06/19 13:08:48 jinmei Exp $
+.\"	$KAME: dhcp6s.8,v 1.32 2004/07/29 23:39:26 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -87,7 +87,7 @@ Use
 to store the shared secret to authenticate the communication with
 .Nm dhcp6sctl .
 The default file name used when unspecified is
-.Pa /etc/dhcp6sctlkey .
+.Pa /usr/local/v6/etc/dhcp6sctlkey .
 The default name is intentionally same as that for
 .Nm dhcp6sctl
 so that the server and the control command can share the file when
@@ -105,9 +105,9 @@ as the port number listening on to communicate with
 .Bl -tag -width /usr/local/v6/etc/dhcp6s.conf -compact
 .It Pa /usr/local/v6/etc/dhcp6s.conf
 is the default configuration file.
-.It Pa /etc/dhcp6s_duid
+.It Pa /var/db/dhcp6s_duid
 is the default file to store the server's DUID.
-.It Pa /etc/dhcp6sctlkey
+.It Pa /usr/local/v6/etc/dhcp6sctlkey
 is the default key file to communicate with the control command.
 See
 .Xr dhcp6sctl 8

@@ -97,6 +97,14 @@ AC_FUNC_SETPGRP
 AC_TYPE_SIGNAL
 AC_CHECK_FUNCS(mktime select socket)
 
+dnl configure local DB directory
+AC_MSG_CHECKING(for local DB directory)
+AC_ARG_WITH(localdbdir,
+[  --with-localdbdir=VALUE where to put local DB files],
+    localdbdir="$withval", localdbdir="/var/db")
+AC_MSG_RESULT($localdbdir)
+AC_SUBST(localdbdir)
+
 dnl Checks for arc4random
 AC_REPLACE_FUNCS(arc4random)
 

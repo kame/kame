@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.h,v 1.2 2003/04/11 13:11:49 jinmei Exp $	*/
+/*	$KAME: dhcp6c.h,v 1.3 2004/07/29 23:39:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -28,9 +28,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
+#define DHCP6C_CONF SYSCONFDIR "/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
-#define DUID_FILE "/etc/dhcp6c_duid"
+#define DUID_FILE LOCALDBDIR "/dhcp6c_duid"
 
 extern struct dhcp6_timer *client6_timo __P((void *));
 extern int client6_ifinit __P((struct dhcp6_if *));

@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6sctl.8,v 1.1 2004/06/19 13:08:15 jinmei Exp $
+.\"	$KAME: dhcp6sctl.8,v 1.2 2004/07/29 23:39:26 jinmei Exp $
 .\"
 .\" Copyright (C) 2004 WIDE Project.
 .\" All rights reserved.
@@ -63,7 +63,7 @@ Use
 .Ar keyfile
 to provide the shared secret to communicate with the server.
 The default file name used when unspecified is
-.Pa /etc/dhcp6sctlkey .
+.Pa /usr/local/v6/etc/dhcp6sctlkey .
 .It Fl p Ar port
 Specify
 .Ar port
@@ -124,8 +124,8 @@ is the same as that specified in
 .El
 .\"
 .Sh FILES
-.Bl -tag -width /etc/dhcp6sctlkey -compact
-.It Pa /etc/dhcp6sctlkey
+.Bl -tag -width /usr/local/v6/etc/dhcp6sctlkey -compact
+.It Pa /usr/local/v6/etc/dhcp6sctlkey
 is the default key file.
 .El
 .\"

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6sctl.c,v 1.8 2004/06/19 13:09:14 jinmei Exp $	*/
+/*	$KAME: dhcp6sctl.c,v 1.9 2004/07/29 23:39:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -54,7 +54,7 @@
 #include <base64.h>
 
 #define MD5_DIGESTLENGTH 16
-#define DEFAULT_KEYFILE "/etc/dhcp6sctlkey"
+#define DEFAULT_KEYFILE SYSCONFDIR "/dhcp6sctlkey"
 
 static char *ctladdr = DEFAULT_CONTROL_ADDR;
 static char *ctlport = DEFAULT_CONTROL_PORT;

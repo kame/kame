@@ -25,11 +25,16 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.36 2004/07/28 23:02:27 jinmei Exp $
+# $Id: Makefile.in,v 1.37 2004/07/29 23:39:26 jinmei Exp $
 #
 
+prefix=	@prefix@
 srcdir=	@srcdir@
-CFLAGS=	@CFLAGS@ @DEFS@
+sysconfidr= @sysconfdir@
+localdbdir= @localdbdir@
+
+CFLAGS=	@CFLAGS@ @DEFS@ -DSYSCONFDIR=\"${sysconfdir}\" \
+	-DLOCALDBDIR=\"${localdbdir}\"
 LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
 LIBS=	@LIBS@ -ly -ll

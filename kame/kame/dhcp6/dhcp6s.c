@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.131 2004/07/29 16:55:38 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.132 2004/07/29 23:39:26 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -74,10 +74,10 @@
 #include <control.h>
 #include <dhcp6_ctl.h>
 
-#define DUID_FILE "/etc/dhcp6s_duid"
-#define DHCP6S_CONF "/usr/local/v6/etc/dhcp6s.conf"
+#define DUID_FILE LOCALDBDIR "/dhcp6s_duid"
+#define DHCP6S_CONF SYSCONFDIR "/dhcp6s.conf"
 #define MD5_DIGESTLENGTH 16
-#define DEFAULT_KEYFILE "/etc/dhcp6sctlkey"
+#define DEFAULT_KEYFILE SYSCONFDIR "/dhcp6sctlkey"
 
 #define CTLSKEW 300
 
