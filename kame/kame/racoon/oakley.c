@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.73 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.74 2000/12/22 07:23:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1954,6 +1954,7 @@ oakley_skeyid(iph1)
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
 #ifdef HAVE_GSSAPI
 	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+#endif
 		len = iph1->nonce->l + iph1->nonce_p->l;
 		buf = vmalloc(len);
 		if (buf == NULL) {
@@ -1979,7 +1980,6 @@ oakley_skeyid(iph1)
 		if (iph1->skeyid == NULL)
 			goto end;
 		break;
-#endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		plog(LLV_WARNING, LOCATION, NULL,
