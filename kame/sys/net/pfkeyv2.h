@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.23 2000/10/03 21:38:21 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.24 2000/12/27 11:47:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,7 +72,7 @@ you leave this credit intact on any copies of this file.
 #define SADB_X_SPDDUMP    18
 #define SADB_X_SPDFLUSH   19
 #define SADB_X_SPDSETIDX  20
-#define SADB_X_SPDEXPIRE  21	/* not yet */
+#define SADB_X_SPDEXPIRE  21
 #define SADB_X_SPDDELETE2 22	/* by policy id */
 #define SADB_MAX          22
 
