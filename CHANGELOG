@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2502 2003/11/09 16:13:31 itojun Exp $
+$KAME: CHANGELOG,v 1.2503 2003/11/12 22:19:43 keiichi Exp $
 
 <200311>
+Wed Nov 12 16:15:52 CST 2003	keiichi@iij.ad.jp
+	* MIP6
+	changed Mobility Header protocol number and ICMPv6 type numbers
+	related to Mobile IPv6 based on the latest IANA assignmanet.
+
 Mon Nov 10 01:46:40 JST 2003  itojun@iijlab.net
 	* openbsd: upgrade to 3.4.  reboot still unconfirmed so snap kit will
 	  not be generated until reboot is confirmed.
