@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.108 2004/06/10 12:56:12 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.109 2004/06/10 12:56:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2594,7 +2594,7 @@ get_rdvalue(rdm, rdvalue, rdsize)
 	u32 = (u_int32_t)tp.tv_sec;
 	u32 += JAN_1970;
 
-	nsec = (double)tp.tv_nsec / 1e9 * 0x100000000UL;
+	nsec = (double)tp.tv_nsec / 1e9 * 0x100000000ULL;
 	/* nsec should be smaller than 2^32 */
 	l32 = (u_int32_t)nsec;
 
