@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.41 2000/02/24 16:34:50 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.42 2000/03/07 09:51:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -448,6 +448,9 @@ nd6_timer(ignored_arg)
 		/* sanity check */
 		if (!rt)
 			panic("rt=0 in nd6_timer(ln=%p)\n", ln);
+		if (rt->rt_llinfo && rt->rt_llinfo != ln)
+			panic("rt_llinfo(%p) is not equal to ln(%p)\n",
+			      rt->rt_llinfo, ln);
 		if (!dst)
 			panic("dst=0 in nd6_timer(ln=%p)\n", ln);
 
