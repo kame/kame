@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.23 2002/12/06 06:21:01 suz Exp $	*/
+/*	$KAME: vif.h,v 1.24 2002/12/15 04:23:23 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -59,6 +59,7 @@
 #define VIF_H
 
 extern int total_interfaces;
+extern int default_vif_status;
 extern int udp_socket;
 extern struct uvif uvifs[];
 extern mifi_t numvifs;
@@ -283,6 +284,6 @@ extern mifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
 extern int vif_forwarder __P((if_set *p1 ,if_set *p2));
 extern if_set *vif_and __P((if_set *p1, if_set *p2, if_set *result)); 
 extern if_set *vif_xor __P((if_set *p1, if_set *p2, if_set *result));
-extern struct uvif *find_vif __P((char *ifname));
+extern struct uvif *find_vif __P((char *ifname, int, int));
 extern char *mif_name __P((mifi_t));
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.26 2002/04/03 04:12:55 suz Exp $	*/
+/*	$KAME: main.c,v 1.27 2002/12/15 04:23:23 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -422,7 +422,8 @@ usage:
     /* TODO: check the kernel DVMRP/MROUTED/PIM support version */
 
     init_vifs();
-    init_rp6_and_bsr6();	/* Must be after init_vifs() */
+    init_rp6();		/* Must be after init_vifs() */
+    init_bsr6();	/* Must be after init_vifs() */
 
     sa.sa_handler = handler;
     sa.sa_flags = 0;		/* Interrupt system calls */

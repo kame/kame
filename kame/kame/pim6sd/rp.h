@@ -1,4 +1,4 @@
-/*	$KAME: rp.h,v 1.5 2000/12/04 06:45:32 itojun Exp $	*/
+/*	$KAME: rp.h,v 1.6 2002/12/15 04:23:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -53,6 +53,7 @@ extern cand_rp_t				*cand_rp_list;
 extern grp_mask_t       *grp_mask_list;
 extern cand_rp_t        *segmented_cand_rp_list;
 extern grp_mask_t       *segmented_grp_mask_list; 
+extern char *cand_rp_ifname, *cand_bsr_ifname;
 
 extern u_int8					cand_rp_flag;
 extern u_int8					cand_bsr_flag;
@@ -79,7 +80,8 @@ extern struct cand_rp_adv_message_ {
 } cand_rp_adv_message;
 
 
-extern void      init_rp6_and_bsr6         __P((void));
+extern void      init_rp6	__P((void));
+extern void      init_bsr6	__P((void));
 void delete_rp_list( cand_rp_t **used_cand_rp_list , grp_mask_t **used_grp_mask_list );
 u_int16 bootstrap_initial_delay __P((void));
 extern rpentry_t *rp_match      __P((struct sockaddr_in6 *group));

@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.29 2002/10/11 14:26:29 suz Exp $	*/
+/*	$KAME: vif.c,v 1.30 2002/12/15 04:23:23 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -91,6 +91,7 @@ struct uvif	uvifs[MAXMIFS];	/*the list of virtualsinterfaces */
 mifi_t numvifs;				/*total number of interface */
 int vifs_down;
 mifi_t reg_vif_num;		   /*register interface*/
+int default_vif_status;
 int phys_vif; /* An enabled vif that has a global address */
 int udp_socket;
 int total_interfaces;
@@ -146,9 +147,6 @@ void init_vifs()
 	IF_DEBUG(DEBUG_IF)
 		log(LOG_DEBUG,0,"Interfaces world initialized...");
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG,0,"Getting vifs from kernel");
-	config_vifs_from_kernel();
-	IF_DEBUG(DEBUG_IF)
 		log(LOG_DEBUG,0,"Getting vifs from %s",configfilename);
 
 	/* read config from file */
@@ -157,6 +155,14 @@ void init_vifs()
 
 	enabled_vifs = 0;
 	phys_vif = -1;
+
+	IF_DEBUG(DEBUG_IF)
+		log(LOG_DEBUG,0,"Getting vifs from kernel");
+	config_vifs_from_kernel();
+
+	/* IPv6 PIM needs one global unicast address (at least for now) */
+	if (max_global_address() == NULL)
+		log(LOG_ERR, 0, "There's no global address available");
 
 	for( vifi = 0, v = uvifs ; vifi < numvifs ; ++ vifi,++v)
 	{
@@ -884,19 +890,43 @@ stop_all_vifs()
     }
 }
 
+/* 
+ * locate vif from interface name, and allocate a new vif if necessary.
+ * 2nd and 3rd arg controls the "necessity" when there is no matching vif.
+ *   2nd arg: create vif if 3rd arg permits
+ *   3rd arg: default policy to create vif, usually same as 
+ *            default_phyint_status.  Only in configuration phase (i.e.
+ *            prior to the configuration of this variable), it has to be
+ *            specified properly.
+ */
 struct uvif *
-find_vif(ifname)
+find_vif(ifname, create, default_policy)
 	char *ifname;
+	int create;
+	int default_policy;	
 {
+	u_int ifindex;
 	struct uvif *v;
 	mifi_t vifi;
 
+	/* rejects non-existing interface */
+	ifindex = if_nametoindex(ifname);
+	if (ifindex == 0)
+		return NULL; 	
+
+	/* not allocate same interface multiply */
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v) {
-		if (strcasecmp(v->uv_name, ifname) == 0)
-			return(v);
+		if (ifindex == v->uv_ifindex)
+			return v;
 	}
 
-	return(NULL);
+	if (create == DONT_CREATE || default_policy != VIFF_ENABLED)
+		return NULL;
+
+	v = &uvifs[numvifs++];
+	strncpy(v->uv_name, ifname, IFNAMSIZ);
+	v->uv_ifindex = ifindex;
+	return v;
 }
 
 char *

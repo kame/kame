@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.19 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: rp.c,v 1.20 2002/12/15 04:23:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -123,6 +123,8 @@ struct sockaddr_in6		my_bsr_address;
 struct in6_addr         	my_bsr_hash_mask;
 u_int8          		cand_bsr_flag = FALSE;	/* Set to TRUE if I am a candidate
 						 	 * BSR */
+char				*cand_bsr_ifname;
+
 struct sockaddr_in6     	my_cand_rp_address;
 u_int8          		my_cand_rp_priority;
 u_int16         		my_cand_rp_holdtime;
@@ -134,6 +136,7 @@ u_int16         		pim_cand_rp_adv_timer;
 u_int8          		cand_rp_flag = FALSE;	/* Candidate RP flag */
 struct cand_rp_adv_message_ 	cand_rp_adv_message;
 struct in6_addr         	rp_my_ipv6_hashmask;
+char				*cand_rp_ifname;
 
 
 /*
@@ -157,12 +160,100 @@ static void delete_rp_entry __P((cand_rp_t ** used_cand_rp_list,
 
 
 void
-init_rp6_and_bsr6()
+init_rp6()
 {
+    struct sockaddr_in6 *sa6 = NULL;
+    u_int8 *data_ptr;
+
+    /* defines RP address */
+    if (cand_rp_ifname) {
+	sa6 = local_iface(cand_rp_ifname);
+	if (!sa6)
+	    log(LOG_WARNING, 0,
+		"cand_rp '%s' is not configured. "
+		"take the max local address the router..", cand_rp_ifname);
+    }
+    if (!sa6)
+	sa6 = max_global_address(); /* this MUST succeed */
+    my_cand_rp_address = *sa6;
+
+    /*
+     * Note that sizeof(pim6_enocd_uni_addr_t) might be larger than
+     * the length of the Encoded-Unicast-address field(18 byte) due to
+     * some padding put in the compiler. However, it doesn't matter
+     * since we use the space just as a buffer(i.e not as the message).
+     */
+    cand_rp_adv_message.buffer = 
+		(u_int8 *) malloc(4 + sizeof(pim6_encod_uni_addr_t) +
+				  255*sizeof(pim6_encod_grp_addr_t));
+    if (cand_rp_adv_message.buffer == NULL)
+	log(LOG_ERR, 0, "CandRPadv Buffer allocation");
+
+    cand_rp_adv_message.prefix_cnt_ptr = cand_rp_adv_message.buffer;
+
+    /*
+     * By default, if no group_prefix configured, then prefix_cnt == 0
+     * implies group_prefix = ff00::/8 and masklen = 8.
+     */
+    *cand_rp_adv_message.prefix_cnt_ptr = 0;
+    cand_rp_adv_message.insert_data_ptr = cand_rp_adv_message.buffer;
+
+    /* TODO: XXX: HARDCODING!!! */
+    cand_rp_adv_message.insert_data_ptr += (4 + 18);
+    cand_rp_adv_message.message_size =
+	cand_rp_adv_message.insert_data_ptr - cand_rp_adv_message.buffer;
+
+    my_cand_rp_holdtime = 2.5 * my_cand_rp_adv_period;
+
+    /* TODO: HARDCODING! */
+    data_ptr = cand_rp_adv_message.buffer + 1;	/* WARNING */
+    PUT_BYTE(my_cand_rp_priority,data_ptr);
+    PUT_HOSTSHORT(my_cand_rp_holdtime, data_ptr);
+    PUT_EUADDR6(my_cand_rp_address.sin6_addr,data_ptr);
+    IF_DEBUG(DEBUG_PIM_CAND_RP) {
+	log(LOG_DEBUG, 0, "Local Cand-RP address is : %s",
+	    inet6_fmt(&my_cand_rp_address.sin6_addr));
+	log(LOG_DEBUG, 0, "Local Cand-RP priority is : %u",my_cand_rp_priority);
+	log(LOG_DEBUG, 0, "Local Cand-RP advertisement period is : %u sec.",
+	    my_cand_rp_adv_period);
+    }
+
     /* TODO: if the grplist is not NULL, remap all groups ASAP! */
 
     delete_rp_list(&cand_rp_list, &grp_mask_list);
     delete_rp_list(&segmented_cand_rp_list, &segmented_grp_mask_list);
+
+    if (cand_rp_flag != FALSE)
+    {
+	MASKLEN_TO_MASK6(RP_DEFAULT_IPV6_HASHMASKLEN, rp_my_ipv6_hashmask);
+	/* Setup the Cand-RP-Adv-Timer */
+	SET_TIMER(pim_cand_rp_adv_timer, RANDOM() % my_cand_rp_adv_period);
+    }
+}
+
+void
+init_bsr6()
+{
+    struct sockaddr_in6 *sa6 = NULL;
+
+    if (cand_bsr_ifname) {
+	sa6 = local_iface(cand_bsr_ifname);
+	if (!sa6)
+	     log(LOG_WARNING, 0, "bsr '%s' is not configured. "
+	        "take the max local address the router..", cand_bsr_ifname);
+    }
+    if (!sa6)
+	sa6 = max_global_address(); /* this MUST succeed */
+    my_bsr_address = *sa6;
+
+    IF_DEBUG(DEBUG_PIM_BOOTSTRAP) {
+	log(LOG_DEBUG, 0, "Local BSR address: %s",
+		    inet6_fmt(&my_bsr_address.sin6_addr));
+	log(LOG_DEBUG, 0, "Local BSR priority : %u", my_bsr_priority);
+	log(LOG_DEBUG, 0, "Local BSR period is : %u sec.", my_bsr_period);
+	log(LOG_DEBUG, 0, "Local BSR hash mask length: %d", 
+	    inet6_mask2plen(&my_bsr_hash_mask));
+   }
 
     if (cand_bsr_flag == FALSE)
     {
@@ -186,12 +277,6 @@ init_rp6_and_bsr6()
 	SET_TIMER(pim_bootstrap_timer, bootstrap_initial_delay());
     }
 
-    if (cand_rp_flag != FALSE)
-    {
-	MASKLEN_TO_MASK6(RP_DEFAULT_IPV6_HASHMASKLEN, rp_my_ipv6_hashmask);
-	/* Setup the Cand-RP-Adv-Timer */
-	SET_TIMER(pim_cand_rp_adv_timer, RANDOM() % my_cand_rp_adv_period);
-    }
 }
 
 

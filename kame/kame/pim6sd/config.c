@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.31 2002/12/08 17:26:07 suz Exp $	*/
+/*	$KAME: config.c,v 1.32 2002/12/15 04:23:23 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -97,7 +97,6 @@ void
 config_vifs_from_kernel()
 {
 	register struct uvif *v;
-	register mifi_t vifi;
 	int i;
 	struct sockaddr_in6 addr, rmt_addr, *rmt;
 	struct in6_addr mask;
@@ -207,37 +206,25 @@ config_vifs_from_kernel()
 		 * already installed in the uvifs array, just add the address
 		 * to the list of addresses of the uvif.
 		 */
-		for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
-		{
-			if (strlen(v->uv_name) == strlen(ifa->ifa_name) &&
-			    strcmp(v->uv_name, ifa->ifa_name) == 0)
-			{
-				add_phaddr(v, &addr, &mask, rmt);
-				break;
-			}
-		}	
-
-		if (vifi != numvifs)
+		v = find_vif(ifa->ifa_name, DONT_CREATE, default_vif_status);
+		if (v != NULL) {
+			add_phaddr(v, &addr, &mask, rmt);
 			continue;
+		}
+
+		total_interfaces++;
 
 		/*
 		 * If there is room in the uvifs array, install this interface.
 		 */
-		if (numvifs == MAXMIFS)
-		{
-			log(LOG_WARNING, 0,
-			    "too many vifs, ignoring %s", ifa->ifa_name);
+		v = find_vif(ifa->ifa_name, CREATE, default_vif_status);
+		if (v == NULL) {
+			log(LOG_DEBUG, 0,
+			    "ignored implicitly disabled interface %s",
+			     ifa->ifa_name);
 			continue;
 		}
 
-		/*
-		 * Everyone below is a potential vif interface.
-		 * We don't care if it has wrong configuration or not
-		 * configured at all.
-		 */
-		total_interfaces++;
-
-		v  = &uvifs[numvifs];
 		v->uv_dst_addr = allpim6routers_group;
 		v->uv_subnetmask = mask;
 		strncpy(v->uv_name, ifa->ifa_name, IFNAMSIZ);
@@ -270,9 +257,6 @@ config_vifs_from_kernel()
 			    net6name(&v->uv_prefix.sin6_addr,&mask),
 			    numvifs,v->uv_rate_limit);
 
-		++numvifs;
-
-		
 		if( !(flags & IFF_UP)) 
 		{
 			v->uv_flags |= VIFF_DOWN;
@@ -416,37 +400,25 @@ config_vifs_from_kernel()
 		 * already installed in the uvifs array, just add the address
 		 * to the list of addresses of the uvif.
 		 */
-		for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
-		{
-			if (strlen(v->uv_name) == strlen(ifr.ifr_name) &&
-			    strcmp(v->uv_name , ifr.ifr_name) == 0)
-			{
-				add_phaddr(v, &addr, &mask, rmt);
-				break;
-			}
+		v = find_vif(ifr.ifr_name, DONT_CREATE, default_vif_status);
+		if (v != NULL) {
+			add_phaddr(v, &addr, &mask, rmt);
+			continue;
 		}	
 
-		if( vifi != numvifs )
-			continue;
+		total_interfaces++;
 
 		/*
 		 * If there is room in the uvifs array, install this interface.
 		 */
-		if( numvifs == MAXMIFS )
-		{
+		v = find_vif(ifr.ifr_name, CREATE, default_vif_status);
+		if (v == NULL) {
 			log(LOG_WARNING, 0,
-			    "too many vifs, ignoring %s", ifr.ifr_name);	
+			    "ignored implicitly disabled interface %s",
+			    ifr.ifr_name);	
 			continue;
-		}		
+		}
 
-		/*
-		 * Everyone below is a potential vif interface.
-		 * We don't care if it has wrong configuration or not
-		 * configured at all.
-		 */
-		total_interfaces++;
-
-		v  = &uvifs[numvifs];
 		v->uv_dst_addr = allpim6routers_group;
 		v->uv_subnetmask = mask;
 		strncpy(v->uv_name, ifr.ifr_name,IFNAMSIZ);
@@ -478,9 +450,6 @@ config_vifs_from_kernel()
 			    net6name(&v->uv_prefix.sin6_addr,&mask),
 			    numvifs,v->uv_rate_limit);
 
-		++numvifs;
-
-		
 		if( !(flags & IFF_UP)) 
 		{
 			v->uv_flags |= VIFF_DOWN;

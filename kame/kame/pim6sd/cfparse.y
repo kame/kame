@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.24 2002/12/06 06:21:01 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.25 2002/12/15 04:23:23 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -91,7 +91,6 @@ enum {IFA_FLAG, IFA_PREFERENCE, IFA_METRIC, RPA_PRIORITY, RPA_TIME,
 static int strict;		/* flag if the grammer check is strict */
 static struct attr_list *rp_attr, *bsr_attr, *grp_prefix, *regthres_attr,
 	*datathres_attr;
-static char *cand_rp_ifname, *cand_bsr_ifname;
 static int srcmetric, srcpref, helloperiod, jpperiod, granularity,
 	datatimo, regsuptimo, probetime, asserttimo, default_vif_status;
 static double helloperiod_coef, jpperiod_coef;
@@ -167,7 +166,7 @@ phyint_statement:
 	PHYINT IFNAME if_attributes EOS {
 		struct uvif *v;
 
-		v = find_vif($2.v);
+		v = find_vif($2.v, CREATE, VIFF_ENABLED);
 		free($2.v);	/* XXX */
 		if (v == NULL) {
 			yywarn("unknown interface: %s", $2.v);
@@ -841,32 +840,17 @@ phyint_config()
 		}
 	}
 
-	/* IPv6 PIM needs one global unicast address (at least for now) */
-	if (max_global_address() == NULL)
-		log(LOG_ERR, 0, "There's no global address available");
-
 	return(0);
 }
 
 static int
 rp_config()
 {
-	struct sockaddr_in6 *sa6_rp = NULL;
 	struct attr_list *al;
-	u_int8 *data_ptr;
 
 	/* initialization by default values */
 	my_cand_rp_adv_period = PIM_DEFAULT_CAND_RP_ADV_PERIOD;
 	my_cand_rp_priority = PIM_DEFAULT_CAND_RP_PRIORITY;
-
-	if (cand_rp_ifname) {
-		sa6_rp = local_iface(cand_rp_ifname);
-		if (!sa6_rp)
-			log(LOG_WARNING, 0,
-			    "cand_rp '%s' is not configured. "
-			    "take the max local address the router..",
-			    cand_rp_ifname);
-	}
 
 	for (al = rp_attr; al; al = al->next) {
 		switch(al->type) {
@@ -892,65 +876,12 @@ rp_config()
 		}
 	}
 
-	if (!sa6_rp)
-		sa6_rp = max_global_address(); /* this MUST succeed */
-	my_cand_rp_address = *sa6_rp;
-
-	/*
-	 * initialize related parameters
-	 */
-
-	/*
-	 * Note that sizeof(pim6_enocd_uni_addr_t) might be larger than
-	 * the length of the Encoded-Unicast-address field(18 byte) due to
-	 * some padding put in the compiler. However, it doesn't matter
-	 * since we use the space just as a buffer(i.e not as the message).
-	 */
-	cand_rp_adv_message.buffer = (u_int8 *)malloc(4 +
-						      sizeof(pim6_encod_uni_addr_t) +
-						      255*sizeof(pim6_encod_grp_addr_t));
-	if(cand_rp_adv_message.buffer == NULL)
-		log(LOG_ERR, 0, "Candrpadv Buffer allocation");
-
-	cand_rp_adv_message.prefix_cnt_ptr = cand_rp_adv_message.buffer;
-
-	/*
-	 * By default, if no group_prefix configured, then prefix_cnt == 0
-	 * implies group_prefix = ff00::/8 and masklen = 8.
-	 */
-	*cand_rp_adv_message.prefix_cnt_ptr = 0;
-	cand_rp_adv_message.insert_data_ptr = cand_rp_adv_message.buffer;
-
-	/* TODO: XXX: HARDCODING!!! */
-	cand_rp_adv_message.insert_data_ptr += (4 + 18);
-	cand_rp_adv_message.message_size =
-		cand_rp_adv_message.insert_data_ptr - cand_rp_adv_message.buffer;
-
-	my_cand_rp_holdtime = 2.5 * my_cand_rp_adv_period;
-
-	/* TODO: HARDCODING! */
-	data_ptr = cand_rp_adv_message.buffer + 1;	/* WARNING */
-	PUT_BYTE(my_cand_rp_priority,data_ptr);
-	PUT_HOSTSHORT(my_cand_rp_holdtime, data_ptr);
-	PUT_EUADDR6(my_cand_rp_address.sin6_addr,data_ptr);
-	IF_DEBUG(DEBUG_PIM_CAND_RP) {
-		log(LOG_DEBUG, 0,
-		    "Local Cand-RP address is : %s",
-		    inet6_fmt(&my_cand_rp_address.sin6_addr));
-		log(LOG_DEBUG, 0,
-		    "Local Cand-RP priority is : %u",my_cand_rp_priority);
-		log(LOG_DEBUG, 0,
-		    "Local Cand-RP advertisement period is : %u sec.",
-		    my_cand_rp_adv_period);
-	}
-
 	return(0);
 }
 
 static int
 bsr_config()
 {
-	struct sockaddr_in6 *sa6_bsr = NULL;
 	struct attr_list *al;
 	int my_bsr_hash_masklen;
 
@@ -958,15 +889,6 @@ bsr_config()
 	my_bsr_period = PIM_DEFAULT_BOOTSTRAP_PERIOD;
 	my_bsr_priority = PIM_DEFAULT_BSR_PRIORITY;
 	my_bsr_hash_masklen = RP_DEFAULT_IPV6_HASHMASKLEN;
-
-	if (cand_bsr_ifname) {
-		sa6_bsr = local_iface(cand_bsr_ifname);
-		if (!sa6_bsr)
-			log(LOG_WARNING, 0,
-			    "bsr '%s' is not configured. "
-			    "take the max local address the router..",
-			    cand_bsr_ifname);
-	}
 
 	for (al = bsr_attr; al; al = al->next) {
 		switch(al->type) {
@@ -993,20 +915,7 @@ bsr_config()
 		}
 	}
 
-	if (!sa6_bsr)
-		sa6_bsr = max_global_address(); /* this MUST succeed */
-	my_bsr_address = *sa6_bsr;
 	MASKLEN_TO_MASK6(my_bsr_hash_masklen, my_bsr_hash_mask);
-
-	IF_DEBUG(DEBUG_PIM_BOOTSTRAP) {
-		log(LOG_DEBUG, 0, "Local BSR address: %s",
-		    inet6_fmt(&my_bsr_address.sin6_addr));
-		log(LOG_DEBUG, 0, "Local BSR priority : %u", my_bsr_priority);
-		log(LOG_DEBUG, 0, "Local BSR period is : %u sec.",
-		    my_bsr_period);
-		log(LOG_DEBUG, 0, "Local BSR hash mask length: %d",
-		    my_bsr_hash_masklen);
-	}
 
 	return(0);
 }
