@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.137 2003/06/27 07:32:38 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.138 2003/06/30 11:01:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1159,6 +1159,10 @@ pk_recvupdate(mhp)
 
 	/* count up */
 	iph2->ph1->ph2cnt++;
+
+	/* turn off schedule */
+	if (iph2->scr)
+		SCHED_KILL(iph2->scr);
 
 	/*
 	 * since we are going to reuse the phase2 handler, we need to
