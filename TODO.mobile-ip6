@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.22 2001/12/20 02:29:45 k-sugyou Exp $
+$KAME: TODO.mobile-ip6,v 1.23 2001/12/27 02:46:05 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -7,8 +7,7 @@ KAME project
 <<Notice>>
 
 This is the alpha release of KAME/MIP6.  The code is based on
-pre-draft-15 (in the sense of the packet format) with no
-authentication.
+draft-15.
 
 This release supports very basic functions of MIP6.  Current status is
 described below.
@@ -21,38 +20,41 @@ you can be a volunteer, I will appreciate you much.
 
 <<Status>>
 
-todo
+todo/missing features
 - merge nd_prefix/nd_defrouter structure and mip6_prefix/mip6_ha structure.
 - merge home address configuration and stateless auto-configuration.
+- non auto-configured home address support.
 - think again about home/care-of address swap.  at least the current code in
   sys/netinet6/dest6.c is not friendly with (1) icmp6 error generator, (2)
   tunnels used for PIM, and maybe others.
 - define the behavior of the socket API for home addresses.
-- security mechanism.
+- weak authentication mechanisms.
+  - cga?/bu3way?/others?
 - mobile prefix advertisement.
 - complete dynamic home agent discovery. (implement user-land daemon?)
+- rtadvd.
 - rate limit (many places).
 - homeagent info handling.
-- ICMP against tunneled packet handling.
-- registration to the old AR.
-- path mtu discovery when triangle routing.
 - some timeout routines.
 - other OSes support.
-- draft-13/draft-15 (or newer) support.
+- draft-13 support.
+- registration to the old AR.
+- ICMP against tunneled packet handling. (done?)
+- path mtu discovery when triangle routing. (done?)
 - may be others.
 
-MN side
-- movement detection by prefix announce.
+provided mobile node functions
+- movement detection by coa changing.
 - binding update/home registration.
 - dynamic home agent discovery.
 - NA when returning to home.
 
-CN side
+provided correspondent node functions
 - recieving binding update.
 - insertion of a routing header.
 - sending binding requests.
 
-HA side
+provided home agent node functions
 - home registration.
 - encapsulate packets destined to MNs.
 - dynamic home agent discovery.
@@ -64,20 +66,36 @@ HA side
 - build kernel with MIP6 and hif pseudo-if.
 	options MIP6
 	pseudo-device hif 1
-- build rtadvd with -DMIP6 to become a HA.  The easiest way is to add
-  CFLAGS (or CPPFLAGS) in kame/$OS/usr.sbin/rtadvd/Makefile and
+- build rtadvd with -DMIP6 to become a home agent.  The easiest way is
+  to add CFLAGS (or CPPFLAGS) in kame/$OS/usr.sbin/rtadvd/Makefile and
   recompile rtadvd.
 	CFLAGS+=-DMIP6
 - build mip6control in kame/kame/mip6control.
-- to become a HA.
+- to become a home agent.
 	ifconfig de0 inet6 home_agent_address
 	ifconfig de0 inet6 home_prefix:fdff:ffff:ffff:fffe anycast
 	sysctl -w net.inet6.ip6.forwarding=1
 	invoke rtadvd with -m option
 	mip6control -g
-- to become a MN.
+- to become a mobile node.
 	mip6control -H your_home_prefix -P64
 	mip6control -m
+
+
+<<Security mechanisms>>
+
+KAME/MIP6 supports both IPsec and authentication data (appered in
+draft-15) mechanism.  Since we do not provide any key distribution
+mechanism, setting SAs must be done by hand.  If you use IPsec, you
+just set up IPsec spd/sa database as usual.  If you choose authdata
+sub-option, set up spd with protocol number 60(ipv6-opts, this is
+subject to change), and set up sa with protocol AH.  for example,
+
+add mn::host hacn::host ah 1500 -m transport -A hmac-sha1
+	"AH SA configuration!";
+add hacn::host mn::host ah 1600 -m transport -A hmac-sha1
+	"AH SA configuration!";
+spdadd ::/0[any] ::/0[any] ipv6-opts -P out ipsec ah/transport//require;
 
 
 <<Schedule>>
