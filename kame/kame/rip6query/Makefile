@@ -6,17 +6,21 @@
 .endif
 
 PROG=	rip6query
-NOMAN=	yes
+.if (${OPSYS} != "NetBSD")
+MAN8=	rip6query.8
+.else
+MAN=	rip6query.8
+.endif
 
 .if (${OPSYS} == NetBSD)
 CPPFLAGS+=	-DINET6 -I${.CURDIR}/../route6d
 .else
 CFLAGS+=	-DINET6 -I${.CURDIR}/../route6d
 .endif
-LDADD+=	-L${.OBJDIR}/../../src/libinet6 -L${.OBJDIR}/../../src/libinet6/obj \
+LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
-DPADD+= ${.OBJDIR}/../../src/libinet6/libinet6.a \
-	${.OBJDIR}/../../src/libinet6/obj/libinet6.a \
+DPADD+= ${.OBJDIR}/../libinet6/libinet6.a \
+	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>
