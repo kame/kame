@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.3 2000/03/29 22:15:45 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.4 2000/03/30 14:13:29 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -84,7 +84,7 @@ static char rcsid[] = "$Id: res_query.c,v 1.3 2000/03/29 22:15:45 itojun Exp $";
 #endif
 
 const char *hostalias __P((const char *));
-#if 0
+#ifdef USE_EDNS0
 extern int res_opt __P((int, u_char *, int, int));
 #endif
 
@@ -124,7 +124,7 @@ res_query(name, class, type, answer, anslen)
 
 	n = res_mkquery(QUERY, name, class, type, NULL, 0, NULL,
 			buf, sizeof(buf));
-#if 0
+#ifdef USE_EDNS0
 	if (n > 0)
 		n = res_opt(n, buf, sizeof(buf), anslen);
 #endif
