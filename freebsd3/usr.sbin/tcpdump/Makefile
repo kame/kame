@@ -62,6 +62,13 @@ CFLAGS+=-I/usr/local/ssl/include
 LDADD+=	-L/usr/local/ssl/lib -lcrypto
 DPADD+=	/usr/local/ssl/lib/libcrypto.a
 .endif
+# for USA resident
+# I (itojun) don't understand at all why they are required.   In a.out
+# environment they are not necessary as we call no RSA code from tcpdump...
+.if exists(/usr/local/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
+LDADD+=	-L/usr/local/lib -lRSAglue -lrsaref
+DPADD+=	/usr/local/lib/libRSAglue.a /usr/local/lib/librsaref.a
+.endif
 
 version.c: VERSION
 	@rm -f $@
