@@ -980,7 +980,8 @@ nd6_dad_start(ifa, tick)
 	 * - the interface address is anycast
 	 */
 	if (!(ia->ia6_flags & IN6_IFF_TENTATIVE)) {
-		printf("nd6_dad_start: called with non-tentative address "
+		log(LOG_DEBUG,
+			"nd6_dad_start: called with non-tentative address "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
@@ -1005,7 +1006,7 @@ nd6_dad_start(ifa, tick)
 
 	dp = malloc(sizeof(*dp), M_IP6NDP, M_NOWAIT);
 	if (dp == NULL) {
-		printf("nd6_dad_start: memory allocation failed for "
+		log(LOG_ERR, "nd6_dad_start: memory allocation failed for "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
@@ -1014,8 +1015,7 @@ nd6_dad_start(ifa, tick)
 	bzero(dp, sizeof(*dp));
 	TAILQ_INSERT_TAIL(&dadq, (struct dadq *)dp, dad_list);
 
-	/* XXXJRT This is probably a purely debugging message. */
-	printf("%s: starting DAD for %s\n", if_name(ifa->ifa_ifp),
+	log(LOG_DEBUG, "%s: starting DAD for %s\n", if_name(ifa->ifa_ifp),
 	    ip6_sprintf(&ia->ia_addr.sin6_addr));
 
 	/*
@@ -1074,23 +1074,23 @@ nd6_dad_timer(ifa)
 
 	/* Sanity check */
 	if (ia == NULL) {
-		printf("nd6_dad_timer: called with null parameter\n");
+		log(LOG_ERR, "nd6_dad_timer: called with null parameter\n");
 		goto done;
 	}
 	dp = nd6_dad_find(ifa);
 	if (dp == NULL) {
-		printf("nd6_dad_timer: DAD structure not found\n");
+		log(LOG_ERR, "nd6_dad_timer: DAD structure not found\n");
 		goto done;
 	}
 	if (ia->ia6_flags & IN6_IFF_DUPLICATED) {
-		printf("nd6_dad_timer: called with duplicated address "
+		log(LOG_ERR, "nd6_dad_timer: called with duplicated address "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
 		goto done;
 	}
 	if ((ia->ia6_flags & IN6_IFF_TENTATIVE) == 0) {
-		printf("nd6_dad_timer: called with non-tentative address "
+		log(LOG_ERR, "nd6_dad_timer: called with non-tentative address "
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
@@ -1099,7 +1099,7 @@ nd6_dad_timer(ifa)
 
 	/* timeouted with IFF_{RUNNING,UP} check */
 	if (dp->dad_ns_tcount > dad_maxtry) {
-		printf("%s: could not run DAD, driver problem?\n",
+		log(LOG_ERR, "%s: could not run DAD, driver problem?\n",
 		    if_name(ifa->ifa_ifp));
 
 		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
@@ -1178,8 +1178,7 @@ nd6_dad_timer(ifa)
 			 */
 			ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 
-			/* XXXJRT This is probably a purely debugging message */
-			printf("%s: DAD complete for %s - no duplicates "
+			log(LOG_INFO, "%s: DAD complete for %s - no duplicates "
 			    "found\n", if_name(ifa->ifa_ifp),
 			    ip6_sprintf(&ia->ia_addr.sin6_addr));
 
@@ -1203,7 +1202,7 @@ nd6_dad_duplicated(ifa)
 
 	dp = nd6_dad_find(ifa);
 	if (dp == NULL) {
-		printf("nd6_dad_duplicated: DAD structure not found\n");
+		log(LOG_ERR, "nd6_dad_duplicated: DAD structure not found\n");
 		return;
 	}
 
@@ -1222,9 +1221,10 @@ nd6_dad_duplicated(ifa)
 #endif
 		);
 
-	printf("%s: DAD complete for %s - duplicate found\n",
+	log(LOG_ERR, "%s: DAD complete for %s - duplicate found\n",
 	    if_name(ifa->ifa_ifp), ip6_sprintf(&ia->ia_addr.sin6_addr));
-	printf("%s: manual intervention required\n", if_name(ifa->ifa_ifp));
+	log(LOG_ERR, "%s: manual intervention required\n",
+	    if_name(ifa->ifa_ifp));
 
 	TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 	free(dp, M_IP6NDP);
