@@ -1,13 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.876 2000/05/15 06:50:23 itojun Exp $
+$Id: CHANGELOG,v 1.877 2000/05/15 09:28:26 itojun Exp $
 
 <200005>
+Mon May 15 18:25:52 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: support DNS subject name in NI6 query.
+	  receiving node will supress reply, if DNS subject name does not
+	  match gethostname(3).  truncated nodename case is little bit
+	  questionable, see below.
+
 Mon May 15 15:48:44 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c, kame/ping6/ping6.c:
 	  use DNS name encoding for NI6 replies (DNS name).
 	  the kernel code tries to be compatible with 03 draft (will reply
 	  with pascal string to old "ping6 -w" or current "ping6 -W").
+	  truncated nodename case is little bit questionable - many nodes are
+	  configured with  non-FQDN nodename, and we're not sure if we can
+	  treat such name as FQDN for the node.
 
 Mon May 15 02:35:41 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/{libpcap,tcpdump}: use tcpdump.org 2000/5/8
