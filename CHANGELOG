@@ -1,8 +1,23 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.967 2000/06/04 03:32:45 itojun Exp $
+$Id: CHANGELOG,v 1.968 2000/06/04 13:06:35 itojun Exp $
 
 <200006>
+Sun Jun  4 21:57:47 JST 2000  itojun@iijlab.net
+	* sys/netinet6/nd6.c: revise upper-layer reachability confirmation
+	  hint processing.  count hints from upper-layer, and if the count
+	  reaches maximum, try to probe reachability by real ND.
+	  sysctl net.inet6.icmp6.nd6_maxnudhint defines maximum # of subsequent
+	  upper-layer hints to be accepted.
+	  we have removed check against process privilege for IPV6_REACHCONF.
+
+	  we currently have two sources for hints: (1) IPV6_REACHCONF
+	  (2292bis setsockopt), and (2) hints from tcp_input.
+	  it is still questionable if they are really trustworthy.
+	  for example, rogue userland program can use IPV6_REACHCONF to confuse
+	  ND process (which is system-wide cache).   also, tcp_input can be
+	  hosed by hijack attempts.
+
 Sun Jun  4 12:29:41 JST 2000  itojun@iijlab.net
 	* sys/netinet6/mip6*: sync with latest MIPv6 patch from ericsson guys.
 	  - New addition to eager movement detection: now a second level
