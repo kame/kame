@@ -33,7 +33,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.1 2000/02/07 17:22:54 itojun Exp $
+ * $Id: mip6_md.c,v 1.2 2000/02/07 18:17:32 itojun Exp $
  *
  */
 
@@ -101,7 +101,7 @@ int              mip6_nd6_umaxtries = 0;
 mip6_md_init()
 {
 	struct nd_prefix        *pr, *existing_pr = NULL;
-    struct nd_defrouter     *dr;
+	struct nd_defrouter     *dr;
 	struct in6_ifaddr       *ia;
 	struct mip6_esm         *esp; /* Entry in the Event State machine list */
 	int                     i, s;

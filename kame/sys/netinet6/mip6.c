@@ -33,8 +33,13 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.2 2000/02/07 17:48:30 itojun Exp $
+ * $Id: mip6.c,v 1.3 2000/02/07 18:17:32 itojun Exp $
  *
+ */
+
+/*
+ * TODO: nuke calls to in6_control, it is not supposed to be called from
+ * softintr
  */
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -1284,32 +1289,32 @@ struct mbuf *m_in;  /* Mbuf containing the entire IPv6 packet */
 int          off;   /* Offset from start of mbuf to start of dest option */
 int          type;  /* Type of option to look for */
 {
-	int        ii;       /* Internal counter */
-	u_int8_t   opttype;	 /* Option type found in Destination Header*/
-	u_int8_t   optlen;   /* Option length incl type and length */
-	u_int32_t  len;      /* Length of Destination Header in bytes */
-	u_int32_t  offset;   /* Offset to BU option from beginning of m_in */
+    int        ii;       /* Internal counter */
+    u_int8_t   opttype;	 /* Option type found in Destination Header*/
+    u_int8_t   optlen;   /* Option length incl type and length */
+    u_int32_t  len;      /* Length of Destination Header in bytes */
+    u_int32_t  offset;   /* Offset to BU option from beginning of m_in */
 
-	bcopy(mtod(m_in, caddr_t) + off + 1, (caddr_t)&len, 1);
-	len = (len + 1) << 3;
+    bcopy(mtod(m_in, caddr_t) + off + 1, (caddr_t)&len, 1);
+    len = (len + 1) << 3;
 
-	offset = 0;
-	for (ii = 2; ii < len;) {
-		bcopy(mtod(m_in, caddr_t) + off + ii, (caddr_t)&opttype, 1);
-		if (opttype == type) {
-			offset = off + ii;
-			break;
-		} else if (opttype == IP6OPT_PAD1) {
-			ii += 1;
-			continue;
-		} else {
-			ii += 1;
-		}
-		
-		bcopy(mtod(m_in, caddr_t) + off + ii, (caddr_t)&optlen, 1);
-		ii += 1 + optlen;
+    offset = 0;
+    for (ii = 2; ii < len;) {
+	bcopy(mtod(m_in, caddr_t) + off + ii, (caddr_t)&opttype, 1);
+	if (opttype == type) {
+	    offset = off + ii;
+	    break;
+	} else if (opttype == IP6OPT_PAD1) {
+	    ii += 1;
+	    continue;
+	} else {
+	    ii += 1;
 	}
-	return offset;
+	
+	bcopy(mtod(m_in, caddr_t) + off + ii, (caddr_t)&optlen, 1);
+	ii += 1 + optlen;
+    }
+    return offset;
 }
 
 
@@ -1479,7 +1484,7 @@ mip6_add_ifaddr(struct in6_addr *addr,
                 int plen,
                 int flags) /* Note: IN6_IFF_NODAD available flag */
 {
-	struct in6_aliasreq  in6_addreq;
+    struct in6_aliasreq  in6_addreq;
     int s;
 
     bzero(&in6_addreq, sizeof(in6_addreq));
@@ -1503,7 +1508,7 @@ mip6_add_ifaddr(struct in6_addr *addr,
     
     s =splnet();
     if (in6_control(NULL, SIOCAIFADDR_IN6,
-                    (caddr_t)&in6_addreq, ifp, NULL)) {
+                    (caddr_t)&in6_addreq, ifp, NULL)) {		/*XXXXX*/
 #ifdef MIP6_DEBUG
         mip6_debug("%s: failed to add home address with pfxlen = %d.\n",
                    __FUNCTION__, plen);
@@ -1586,7 +1591,7 @@ mip6_gifconfig(struct in6_addr *psrc,
     /* "gifconfig (gifX, inet6, HA_Global_Addr, MN_Care-of_Addr)" */
     s = splnet();
     error = in6_control(NULL, SIOCSIFPHYADDR_IN6,
-                        (caddr_t)&in6_addreq, ifp, NULL);
+                        (caddr_t)&in6_addreq, ifp, NULL);	/*XXXXX*/
     splx(s);
     
 #ifdef MIP6_DEBUG
@@ -1653,13 +1658,13 @@ mip6_ifconfig(struct in6_addr *ha_addr,
         /* "ifconfig gifX inet6 HA_Global_Addr MN_Home_Addr" */
         s = splnet();
         return in6_control(NULL, SIOCAIFADDR_IN6,
-                           (caddr_t)&in6_addreq, ifp, NULL);
+                           (caddr_t)&in6_addreq, ifp, NULL);	/*XXXXX*/
         splx(s);
     }
     else {
         s = splnet();
         return in6_control(NULL, SIOCDIFADDR_IN6,
-                           (caddr_t)&in6_addreq, ifp, NULL);
+                           (caddr_t)&in6_addreq, ifp, NULL);	/*XXXXX*/
         splx(s);
     }
 }
@@ -2471,62 +2476,62 @@ mip6_ioctl(so, cmd, data, ifp)
 
     res = 0;
     switch (cmd) {
-        case SIOCSDEBUG_MIP6:
+    case SIOCSDEBUG_MIP6:
 #ifdef MIP6_DEBUG
-            mip6_enable_debug(*(int *)data);
+	mip6_enable_debug(*(int *)data);
 #else
-            printf("No Mobile IPv6 debug information available!\n");
+	printf("No Mobile IPv6 debug information available!\n");
 #endif
-            return res;
-            
-        case SIOCSBCFLUSH_MIP6:
-        case SIOCSDEFCONFIG_MIP6:
-            res = mip6_clear_config_data(cmd, data);
-            return res;
-            
-        case SIOCSBRUPDATE_MIP6:
-            res = mip6_write_config_data(cmd, data);
-            return res;
+	return res;
+	
+    case SIOCSBCFLUSH_MIP6:
+    case SIOCSDEFCONFIG_MIP6:
+	res = mip6_clear_config_data(cmd, data);
+	return res;
+	
+    case SIOCSBRUPDATE_MIP6:
+	res = mip6_write_config_data(cmd, data);
+	return res;
 
-        case SIOCSENABLEBR_MIP6:
-            res = mip6_enable_func(cmd, data);
-            return res;
+    case SIOCSENABLEBR_MIP6:
+	res = mip6_enable_func(cmd, data);
+	return res;
 
-        case SIOCSATTACH_MIP6:
-            mip6_attach();
-            return res;
+    case SIOCSATTACH_MIP6:
+	mip6_attach();
+	return res;
 
-        case SIOCSRELEASE_MIP6:
-            mip6_release();
-            return res;
+    case SIOCSRELEASE_MIP6:
+	mip6_release();
+	return res;
 
-        default:
-            res = EOPNOTSUPP;
-            break;
+    default:
+	res = EOPNOTSUPP;
+	break;
     }
 
 #if (defined(MIP6_HA) || defined(MIP6_MODULES))
     if (MIP6_IS_HA_ACTIVE) {
         res = 0;
         switch (cmd) {
-            case SIOCSHALISTFLUSH_MIP6:
-                if (mip6_clear_config_data_ha_hook)
-                    res = (*mip6_clear_config_data_ha_hook)(cmd, data);
-                break;
-            case SIOCSHAPREF_MIP6:
-                if (mip6_write_config_data_ha_hook)
-                    res = (*mip6_write_config_data_ha_hook)(cmd, data);
-                break;
+	case SIOCSHALISTFLUSH_MIP6:
+	    if (mip6_clear_config_data_ha_hook)
+		res = (*mip6_clear_config_data_ha_hook)(cmd, data);
+	    break;
+	case SIOCSHAPREF_MIP6:
+	    if (mip6_write_config_data_ha_hook)
+		res = (*mip6_write_config_data_ha_hook)(cmd, data);
+	    break;
 
-            case SIOCSFWDSLUNICAST_MIP6:
-            case SIOCSFWDSLMULTICAST_MIP6:
-                if (mip6_enable_func_ha_hook)
-                    res = (*mip6_enable_func_ha_hook)(cmd, data);
-                break;
+	case SIOCSFWDSLUNICAST_MIP6:
+	case SIOCSFWDSLMULTICAST_MIP6:
+	    if (mip6_enable_func_ha_hook)
+		res = (*mip6_enable_func_ha_hook)(cmd, data);
+	    break;
 
-            default:
-                res = EOPNOTSUPP;
-                break;
+	default:
+	    res = EOPNOTSUPP;
+	    break;
         }
     }
 #endif
@@ -2535,33 +2540,33 @@ mip6_ioctl(so, cmd, data, ifp)
     if (MIP6_IS_MN_ACTIVE) {
         res = 0;
         switch (cmd) {
-            case SIOCSFORADDRFLUSH_MIP6:
-            case SIOCSHADDRFLUSH_MIP6:
-            case SIOCSBULISTFLUSH_MIP6:
-                if (mip6_clear_config_data_mn_hook)
-                    res = (*mip6_clear_config_data_mn_hook)(cmd, data);
-                break;
-            case SIOCACOADDR_MIP6:
-            case SIOCAHOMEADDR_MIP6:
-            case SIOCSBULIFETIME_MIP6:
-            case SIOCSHRLIFETIME_MIP6:
-            case SIOCDCOADDR_MIP6:
-                if (mip6_write_config_data_mn_hook)
-                    res = (*mip6_write_config_data_mn_hook)(cmd, data);
-                break;
+	case SIOCSFORADDRFLUSH_MIP6:
+	case SIOCSHADDRFLUSH_MIP6:
+	case SIOCSBULISTFLUSH_MIP6:
+	    if (mip6_clear_config_data_mn_hook)
+		res = (*mip6_clear_config_data_mn_hook)(cmd, data);
+	    break;
+	case SIOCACOADDR_MIP6:
+	case SIOCAHOMEADDR_MIP6:
+	case SIOCSBULIFETIME_MIP6:
+	case SIOCSHRLIFETIME_MIP6:
+	case SIOCDCOADDR_MIP6:
+	    if (mip6_write_config_data_mn_hook)
+		res = (*mip6_write_config_data_mn_hook)(cmd, data);
+	    break;
 
-            case SIOCSPROMMODE_MIP6:
-            case SIOCSBU2CN_MIP6:
-            case SIOCSREVTUNNEL_MIP6:
-            case SIOCSAUTOCONFIG_MIP6:
-            case SIOCSEAGERMD_MIP6:
-                if (mip6_enable_func_mn_hook)
-                    res = (*mip6_enable_func_mn_hook)(cmd, data);
-                break;
+	case SIOCSPROMMODE_MIP6:
+	case SIOCSBU2CN_MIP6:
+	case SIOCSREVTUNNEL_MIP6:
+	case SIOCSAUTOCONFIG_MIP6:
+	case SIOCSEAGERMD_MIP6:
+	    if (mip6_enable_func_mn_hook)
+		res = (*mip6_enable_func_mn_hook)(cmd, data);
+	    break;
 
-            default:
-                res = EOPNOTSUPP;
-                break;
+	default:
+	    res = EOPNOTSUPP;
+	    break;
         }
     }
 #endif
@@ -2638,26 +2643,26 @@ int mip6_clear_config_data(u_long cmd, caddr_t data)
 {
     int retval = 0;
     int s;
-	struct mip6_bc          *bcp;
+    struct mip6_bc          *bcp;
 
-	s = splnet();
+    s = splnet();
     switch (cmd) {
-        case SIOCSBCFLUSH_MIP6:
-            for (bcp = mip6_bcq; bcp;) {
-                if(!bcp->hr_flag)
-                    bcp = mip6_bc_delete(bcp);
-                else {
-                    bcp = bcp->next;
-                }
-            }
-            break;
+    case SIOCSBCFLUSH_MIP6:
+	for (bcp = mip6_bcq; bcp;) {
+	    if(!bcp->hr_flag)
+		bcp = mip6_bc_delete(bcp);
+	    else {
+		bcp = bcp->next;
+	    }
+	}
+	break;
 
-        case SIOCSDEFCONFIG_MIP6:
-            mip6_config.bu_lifetime = 600;
-            mip6_config.br_update = 60;
-            mip6_config.hr_lifetime = 3600;
-            mip6_config.enable_outq = 1;
-            break;
+    case SIOCSDEFCONFIG_MIP6:
+	mip6_config.bu_lifetime = 600;
+	mip6_config.br_update = 60;
+	mip6_config.hr_lifetime = 3600;
+	mip6_config.enable_outq = 1;
+	break;
     }
     splx(s);
     return retval;
@@ -2678,9 +2683,9 @@ int mip6_enable_func(u_long cmd, caddr_t data)
     int retval = 0;
 
     switch (cmd) {
-        case SIOCSENABLEBR_MIP6:
-            mip6_config.enable_br = *(u_int8_t *)data;
-            break;
+    case SIOCSENABLEBR_MIP6:
+	mip6_config.enable_br = *(u_int8_t *)data;
+	break;
     }
     return retval;
 }
