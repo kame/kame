@@ -1213,6 +1213,7 @@ bgp_config()
 			cprint("IBGP ");
 
 			bnp->rp_mode |= BGPO_IGP;
+			bnp->rp_as = my_as_number;
 			if (info->peertype == BGPPEER_CLIENT) {
 				if (!IamRR) {
 					warnx("%s line %d: a BGP client "
@@ -1227,7 +1228,8 @@ bgp_config()
 			if (info->routerid) {
 				bnp->rp_mode |= BGPO_IDSTATIC;
 				bnp->rp_id = htonl(info->routerid);
-				cprint("routerID: %x ", htonl(info->routerid));
+				cprint("routerID: %x ",
+				       (u_int)(htonl(info->routerid)));
 			}
 		}
 		else {		/* EBGP */
