@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.278 2002/02/03 09:50:53 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.279 2002/02/04 03:07:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2882,8 +2882,10 @@ icmp6_redirect_output(m0, rt)
 	struct rtentry *rt;
 {
 	struct ifnet *ifp;	/* my outgoing interface */
-	struct in6_addr *ifp_ll6;
-	struct in6_addr *router_ll6;
+	struct sockaddr_in6 *src_sa, *dst_sa, *router_ll6, *ifp_ll6;
+#ifndef SCOPEDROUTING
+	struct sockaddr_in6 ifp_ll6_storage;
+#endif
 	struct ip6_hdr *sip6;	/* m0 as struct ip6_hdr */
 	struct mbuf *m = NULL;	/* newly allocated one */
 	struct ip6_hdr *ip6;	/* m as struct ip6_hdr */
@@ -2891,7 +2893,6 @@ icmp6_redirect_output(m0, rt)
 	size_t maxlen;
 	u_char *p;
 	struct in6_ifaddr *ia;
-	struct sockaddr_in6 *src_sa, *dst_sa;
 
 	icmp6_errcount(&icmp6stat.icp6s_outerrhist, ND_REDIRECT, 0);
 
@@ -2950,17 +2951,27 @@ icmp6_redirect_output(m0, rt)
 	    == NULL) {
 		goto fail;
 	}
-	ifp_ll6 = &ia->ia_addr.sin6_addr;
+	ifp_ll6 = &ia->ia_addr;
+#ifndef SCOPEDROUTING
+	/*
+	 * XXX: ifp_ll6 may not have a valid sin6_scope_id in
+	 * the non-SCOPEDROUTING case.
+	 */
+	ifp_ll6_storage = *ifp_ll6;
+	if (in6_addr2zoneid(ifp, &ifp_ll6_storage.sin6_addr,
+			    &ifp_ll6_storage.sin6_scope_id)) {
+			goto fail;
+	}
+	ifp_ll6 = &ifp_ll6_storage;
+#endif
 
 	/* get ip6 linklocal address for the router. */
 	if (rt->rt_gateway && (rt->rt_flags & RTF_GATEWAY)) {
-		struct sockaddr_in6 *sin6;
-		sin6 = (struct sockaddr_in6 *)rt->rt_gateway;
-		router_ll6 = &sin6->sin6_addr;
-		if (!IN6_IS_ADDR_LINKLOCAL(router_ll6))
-			router_ll6 = (struct in6_addr *)NULL;
+		router_ll6 = (struct sockaddr_in6 *)rt->rt_gateway;
+		if (!IN6_IS_ADDR_LINKLOCAL(&router_ll6->sin6_addr))
+			router_ll6 = NULL;
 	} else
-		router_ll6 = (struct in6_addr *)NULL;
+		router_ll6 = NULL;
 
 	/* ip6 */
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -2971,22 +2982,11 @@ icmp6_redirect_output(m0, rt)
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
 	/* ip6->ip6_src must be linklocal addr for my outgoing if. */
-	bcopy(ifp_ll6, &ip6->ip6_src, sizeof(struct in6_addr));
+	bcopy(&ifp_ll6->sin6_addr, &ip6->ip6_src, sizeof(struct in6_addr));
 	bcopy(&src_sa->sin6_addr, &ip6->ip6_dst, sizeof(struct in6_addr));
 	/* set the packet addresses in a sockaddr_in6 form */
-#ifdef SCOPEDROUTING
-	if (ip6_setpktaddrs(m, &ia->ia_addr, src_sa))
+	if (!ip6_setpktaddrs(m, ifp_ll6, src_sa))
 		goto fail;
-#else  /* XXX: ifaddr does not have a valid zone ID as sin6_scope_id */
-	{
-		struct sockaddr_in6 s = ia->ia_addr;
-
-		if (in6_addr2zoneid(ifp, &s.sin6_addr, &s.sin6_scope_id))
-			goto fail;
-		if (ip6_setpktaddrs(m, &s, src_sa))
-			goto fail;
-	}
-#endif
 
 	/* ND Redirect */
 	nd_rd = (struct nd_redirect *)(ip6 + 1);
@@ -3000,7 +3000,7 @@ icmp6_redirect_output(m0, rt)
 		 */
 		if (!router_ll6)
 			goto fail;
-		bcopy(router_ll6, &nd_rd->nd_rd_target,
+		bcopy(&router_ll6->sin6_addr, &nd_rd->nd_rd_target,
 		      sizeof(nd_rd->nd_rd_target));
 		bcopy(&dst_sa->sin6_addr, &nd_rd->nd_rd_dst,
 		      sizeof(nd_rd->nd_rd_dst));
@@ -3025,7 +3025,7 @@ icmp6_redirect_output(m0, rt)
 		struct nd_opt_hdr *nd_opt;
 		char *lladdr;
 
-		rt_router = nd6_lookup(router_ll6, 0, ifp);
+		rt_router = nd6_lookup(&router_ll6->sin6_addr, 0, ifp);
 		if (!rt_router)
 			goto nolladdropt;
 		len = sizeof(*nd_opt) + ifp->if_addrlen;
@@ -3136,10 +3136,6 @@ noredhdropt:;
 	/* XXX: clear embedded link IDs in the inner header */
 	in6_clearscope(&sip6->ip6_src);
 	in6_clearscope(&sip6->ip6_dst);
-#if 0
-	ip6->ip6_src.s6_addr16[1] = 0;
-	ip6->ip6_dst.s6_addr16[1] = 0;
-#endif
 	in6_clearscope(&nd_rd->nd_rd_target);
 	in6_clearscope(&nd_rd->nd_rd_dst);
 
