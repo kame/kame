@@ -11,7 +11,7 @@
  * 2. Absolutely no warranty of function or purpose is made by the author
  *	John S. Dyson.
  *
- * $FreeBSD: src/sys/vm/vm_zone.c,v 1.30 1999/12/11 16:13:02 eivind Exp $
+ * $FreeBSD: src/sys/vm/vm_zone.c,v 1.30.2.2 2000/08/04 18:58:42 peter Exp $
  */
 
 #include <sys/param.h>
@@ -50,7 +50,7 @@ static MALLOC_DEFINE(M_ZONE, "ZONE", "Zone header");
  */
 
 static struct vm_zone *zlist;
-static int sysctl_vm_zone SYSCTL_HANDLER_ARGS;
+static int sysctl_vm_zone(SYSCTL_HANDLER_ARGS);
 static int zone_kmem_pages, zone_kern_pages, zone_kmem_kvaspace;
 
 /*
@@ -334,7 +334,8 @@ _zget(vm_zone_t z)
 #ifdef SMP
 			simple_lock(&z->zlock);
 #endif
-			zone_kmem_pages += z->zalloc;
+			if (item != NULL)
+				zone_kmem_pages += z->zalloc;
 			splx(s);
 		} else {
 #ifdef SMP
@@ -344,9 +345,14 @@ _zget(vm_zone_t z)
 #ifdef SMP
 			simple_lock(&z->zlock);
 #endif
-			zone_kern_pages += z->zalloc;
+			if (item != NULL)
+				zone_kern_pages += z->zalloc;
 		}
-		bzero(item, nbytes);
+		if (item != NULL) {
+			bzero(item, nbytes);
+		} else {
+			nbytes = 0;
+		}
 		nitems = nbytes / z->zsize;
 	}
 	z->ztotal += nitems;
@@ -365,6 +371,7 @@ _zget(vm_zone_t z)
 			(char *) item += z->zsize;
 		}
 		z->zfreecnt += nitems;
+		z->znalloc++;
 	} else if (z->zfreecnt > 0) {
 		item = z->zitems;
 		z->zitems = ((void **) item)[0];
@@ -374,6 +381,7 @@ _zget(vm_zone_t z)
 		((void **) item)[1] = 0;
 #endif
 		z->zfreecnt--;
+		z->znalloc++;
 	} else {
 		item = NULL;
 	}
@@ -382,7 +390,7 @@ _zget(vm_zone_t z)
 }
 
 static int
-sysctl_vm_zone SYSCTL_HANDLER_ARGS
+sysctl_vm_zone(SYSCTL_HANDLER_ARGS)
 {
 	int error=0;
 	vm_zone_t curzone, nextzone;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.1 2000/07/18 16:45:47 sheldonh Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.2 2000/08/16 06:14:23 jayanth Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -94,6 +94,7 @@ struct tcpcb {
 #define	TF_RCVD_CC	0x04000		/* a CC was received in SYN */
 #define	TF_SENDCCNEW	0x08000		/* send CCnew instead of CC in SYN */
 #define	TF_MORETOCOME	0x10000		/* More data to be appended to sock */
+#define	TF_LQ_OVERFLOW	0x20000		/* listen queue overflow */
 	int	t_force;		/* 1 if forcing out a byte */
 
 	tcp_seq	snd_una;		/* send unacknowledged */

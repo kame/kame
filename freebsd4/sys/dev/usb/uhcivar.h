@@ -1,5 +1,5 @@
 /*	$NetBSD: uhcivar.h,v 1.21 2000/01/18 20:11:01 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.16.2.3 2000/07/02 12:42:40 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.16.2.5 2000/10/31 23:23:29 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -154,6 +154,9 @@ typedef struct uhci_softc {
 	u_int8_t sc_addr;		/* device address */
 	u_int8_t sc_conf;		/* device configuration */
 
+	u_int8_t sc_saved_sof;
+	u_int16_t sc_saved_frnum;
+
 	char sc_isreset;
 	char sc_suspend;
 
@@ -178,13 +181,13 @@ typedef struct uhci_softc {
 	device_ptr_t sc_child;		/* /dev/usb device */
 } uhci_softc_t;
 
-usbd_status	uhci_init __P((uhci_softc_t *));
-int		uhci_intr __P((void *));
+usbd_status	uhci_init(uhci_softc_t *);
+int		uhci_intr(void *);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-int		uhci_detach __P((uhci_softc_t *, int));
-int		uhci_activate __P((device_ptr_t, enum devact));
+int		uhci_detach(uhci_softc_t *, int);
+int		uhci_activate(device_ptr_t, enum devact);
 #endif
 
-void		uhci_shutdown __P((void *v));
-void		uhci_power __P((int state, void *priv));
+void		uhci_shutdown(void *v);
+void		uhci_power(int state, void *priv);
 

@@ -8,7 +8,7 @@
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-1995 Darren Reed";
 /*static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.42.2.14 2000/07/18 13:57:55 darrenr Exp $";*/
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_fil.c,v 1.14.2.2 2000/07/19 23:27:55 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_fil.c,v 1.14.2.3 2000/09/21 17:19:13 ru Exp $";
 #endif
 
 #ifndef	SOLARIS
@@ -1364,7 +1364,9 @@ frdest_t *fdp;
 			i = 1;
 # endif
 # ifndef sparc
+#  ifndef __FreeBSD__
 		ip->ip_id = htons(ip->ip_id);
+#  endif
 		ip->ip_len = htons(ip->ip_len);
 		ip->ip_off = htons(ip->ip_off);
 # endif

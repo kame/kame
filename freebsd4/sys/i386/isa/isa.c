@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/isa.c,v 1.132.2.1 2000/04/14 13:08:59 nyan Exp $
+ * $FreeBSD: src/sys/i386/isa/isa.c,v 1.132.2.3 2000/10/29 13:07:56 nyan Exp $
  */
 
 /*
@@ -152,7 +152,7 @@ isa_alloc_resourcev(device_t child, int type, int *rid,
 	linear_cnt = count;
 	ressz = 1;
 	for (i = 1; i < count; ++i) {
-		if (res[i] > res[i - 1] + 1) {
+		if (res[i] != res[i - 1] + 1) {
 			if (i < linear_cnt)
 				linear_cnt = i;
 			++ressz;
@@ -173,7 +173,7 @@ isa_alloc_resourcev(device_t child, int type, int *rid,
 
 	for (i = linear_cnt, k = 1; i < count; i = j, k++) {
 		for (j = i + 1; j < count; j++) {
-			if (res[j] > res[j - 1] + 1)
+			if (res[j] != res[j - 1] + 1)
 				break;
 		}
 		bsrid = *rid + k;
@@ -188,8 +188,8 @@ isa_alloc_resourcev(device_t child, int type, int *rid,
 		}
 	}
 
-	re->r_bushandle.bsh_res = bsre;
-	re->r_bushandle.bsh_ressz = ressz;
+	re->r_bushandle->bsh_res = bsre;
+	re->r_bushandle->bsh_ressz = ressz;
 
 	return re;
 }
@@ -208,8 +208,8 @@ isa_load_resourcev(struct resource *re, bus_addr_t *res, bus_size_t count)
 		addr[i] = rman_get_start(re) + res[i];
 
 	rman_set_bustag(re, I386_BUS_SPACE_IO_IND);
-	re->r_bushandle.bsh_iat = addr;
-	re->r_bushandle.bsh_iatsz = count;
+	re->r_bushandle->bsh_iat = addr;
+	re->r_bushandle->bsh_iatsz = count;
 
 	return 0;
 }
@@ -228,13 +228,13 @@ isa_release_resource(device_t bus, device_t child, int type, int rid,
 	 */
 	int	i;
 
-	for (i = 1; i < r->r_bushandle.bsh_ressz; i++)
+	for (i = 1; i < r->r_bushandle->bsh_ressz; i++)
 		resource_list_release(rl, bus, child, type, rid + i,
-				      r->r_bushandle.bsh_res[i]);
-	if (r->r_bushandle.bsh_res != NULL)
-		free(r->r_bushandle.bsh_res, M_DEVBUF);
-	if (r->r_bushandle.bsh_iat != NULL)
-		free(r->r_bushandle.bsh_iat, M_DEVBUF);
+				      r->r_bushandle->bsh_res[i]);
+	if (r->r_bushandle->bsh_res != NULL)
+		free(r->r_bushandle->bsh_res, M_DEVBUF);
+	if (r->r_bushandle->bsh_iat != NULL)
+		free(r->r_bushandle->bsh_iat, M_DEVBUF);
 #endif
 	return resource_list_release(rl, bus, child, type, rid, r);
 }

@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2000 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 1999 Pierre Beyssac
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -36,7 +38,7 @@
  *
  *	@(#)procfs.h	8.9 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs.h,v 1.2.2.1 2000/06/05 10:14:04 des Exp $
+ * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs.h,v 1.2.2.3 2000/10/30 19:57:04 des Exp $
  */
 
 /*
@@ -48,8 +50,13 @@ typedef enum {
 	Pproc,		/* a process-specific sub-directory */
 	Pexe,		/* the executable file */
 	Pmem,		/* the process's memory image */
-	Pmeminfo,
-	Pcpuinfo
+	Pprocstat,	/* the process's status */
+	Pprocstatus,	/* the process's status (again) */
+	Pmeminfo,	/* memory system statistics */
+	Pcpuinfo,	/* CPU model, speed and features */
+	Pstat,	        /* kernel/system statistics */
+	Puptime,	/* system uptime */
+	Pversion,	/* system version */
 } pfstype;
 
 /*
@@ -120,6 +127,11 @@ int linprocfs_write_dbregs __P((struct proc *, struct dbreg *));
 #endif
 int linprocfs_domeminfo __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
 int linprocfs_docpuinfo __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
+int linprocfs_dostat __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
+int linprocfs_douptime __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
+int linprocfs_doversion __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
+int linprocfs_doprocstat __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
+int linprocfs_doprocstatus __P((struct proc *, struct proc *, struct pfsnode *pfsp, struct uio *uio));
 
 /* functions to check whether or not files should be displayed */
 int linprocfs_validfile __P((struct proc *));

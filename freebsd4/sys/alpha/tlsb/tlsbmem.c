@@ -1,5 +1,4 @@
-/* $NetBSD: tlsbmem.c,v 1.6 1998/01/12 10:21:25 thorpej Exp $ */
-/* $FreeBSD: src/sys/alpha/tlsb/tlsbmem.c,v 1.2.2.1 2000/03/27 18:32:51 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/tlsbmem.c,v 1.2.2.2 2000/08/03 00:48:05 peter Exp $ */
 
 /*
  * Copyright (c) 1997, 2000 by Matthew Jacob

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.3.2.1 2000/05/03 23:54:09 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.3.2.2 2000/07/27 22:27:39 jlemon Exp $
  */
 
 /*
@@ -119,7 +119,8 @@ struct ida_access {
 /*
  * flags for the controller 
  */
-#define IDA_ATTACHED	0x01			/* attached, interrupts okay */
+#define IDA_ATTACHED	0x01		/* attached, interrupts okay */
+#define IDA_FIRMWARE	0x02		/* firmware must be started */
 
 struct ida_softc {
 	device_t	dev;
@@ -169,7 +170,8 @@ struct idad_softc {
 	struct 		ida_softc *controller;
 	struct		disk disk;
 	struct		devstat stats;
-	int		unit;
+	int		drive;			/* per controller */
+	int		unit;			/* global */
 	int		cylinders;
 	int		heads;
 	int		sectors;

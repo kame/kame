@@ -37,7 +37,7 @@
  * Authors: Archie Cobbs <archie@freebsd.org>
  *	    Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.3 2000/07/14 22:36:23 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.c,v 1.2.2.8 2000/09/19 10:11:02 julian Exp $
  */
 
 /*
@@ -73,6 +73,8 @@ struct private {
 	hook_p		upper;		/* upper hook connection */
 	hook_p		lower;		/* lower OR orphan hook connection */
 	u_char		lowerOrphan;	/* whether lower is lower or orphan */
+	u_char		autoSrcAddr;	/* always overwrite source address */
+	u_char		promisc;	/* promiscuous mode enabled */
 };
 typedef struct private *priv_p;
 
@@ -102,6 +104,19 @@ static ng_rcvdata_t	ng_ether_rcvdata;
 static ng_disconnect_t	ng_ether_disconnect;
 static int		ng_ether_mod_event(module_t mod, int event, void *data);
 
+/* Parse type for an Ethernet address */
+static ng_parse_t	ng_enaddr_parse;
+static ng_unparse_t	ng_enaddr_unparse;
+const struct ng_parse_type ng_ether_enaddr_type = {
+	NULL,
+	NULL,
+	NULL,
+	ng_enaddr_parse,
+	ng_enaddr_unparse,
+	NULL,			/* no such thing as a "default" EN address */
+	0
+};
+
 /* List of commands and how to convert arguments to/from ASCII */
 static const struct ng_cmdlist ng_ether_cmdlist[] = {
 	{
@@ -117,6 +132,48 @@ static const struct ng_cmdlist ng_ether_cmdlist[] = {
 	  "getifindex",
 	  NULL,
 	  &ng_parse_int32_type
+	},
+	{
+	  NGM_ETHER_COOKIE,
+	  NGM_ETHER_GET_ENADDR,
+	  "getenaddr",
+	  NULL,
+	  &ng_ether_enaddr_type
+	},
+	{
+	  NGM_ETHER_COOKIE,
+	  NGM_ETHER_SET_ENADDR,
+	  "setenaddr",
+	  &ng_ether_enaddr_type,
+	  NULL
+	},
+	{
+	  NGM_ETHER_COOKIE,
+	  NGM_ETHER_GET_PROMISC,
+	  "getpromisc",
+	  NULL,
+	  &ng_parse_int32_type
+	},
+	{
+	  NGM_ETHER_COOKIE,
+	  NGM_ETHER_SET_PROMISC,
+	  "setpromisc",
+	  &ng_parse_int32_type,
+	  NULL
+	},
+	{
+	  NGM_ETHER_COOKIE,
+	  NGM_ETHER_GET_AUTOSRC,
+	  "getautosrc",
+	  NULL,
+	  &ng_parse_int32_type
+	},
+	{
+	  NGM_ETHER_COOKIE,
+	  NGM_ETHER_SET_AUTOSRC,
+	  "setautosrc",
+	  &ng_parse_int32_type,
+	  NULL
 	},
 	{ 0 }
 };
@@ -261,6 +318,7 @@ ng_ether_attach(struct ifnet *ifp)
 	node->private = priv;
 	priv->ifp = ifp;
 	IFP2NG(ifp) = node;
+	priv->autoSrcAddr = 1;
 
 	/* Try to give the node the same name as the interface */
 	if (ng_name_node(node, name) != 0) {
@@ -283,6 +341,7 @@ ng_ether_detach(struct ifnet *ifp)
 		return;
 	ng_rmnode(node);		/* break all links to other nodes */
 	node->flags |= NG_INVALID;
+	ng_unname(node);		/* free name (and its reference) */
 	IFP2NG(ifp) = NULL;		/* detach node from interface */
 	priv = node->private;		/* free node private info */
 	bzero(priv, sizeof(*priv));
@@ -448,6 +507,64 @@ ng_ether_rcvmsg(node_p node, struct ng_mesg *msg,
 			}
 			*((u_int32_t *)resp->data) = priv->ifp->if_index;
 			break;
+		case NGM_ETHER_GET_ENADDR:
+			NG_MKRESPONSE(resp, msg, ETHER_ADDR_LEN, M_NOWAIT);
+			if (resp == NULL) {
+				error = ENOMEM;
+				break;
+			}
+			bcopy((IFP2AC(priv->ifp))->ac_enaddr,
+			    resp->data, ETHER_ADDR_LEN);
+			break;
+		case NGM_ETHER_SET_ENADDR:
+		    {
+			if (msg->header.arglen != ETHER_ADDR_LEN) {
+				error = EINVAL;
+				break;
+			}
+			error = if_setlladdr(priv->ifp,
+			    (u_char *)msg->data, ETHER_ADDR_LEN);
+			break;
+		    }
+		case NGM_ETHER_GET_PROMISC:
+			NG_MKRESPONSE(resp, msg, sizeof(u_int32_t), M_NOWAIT);
+			if (resp == NULL) {
+				error = ENOMEM;
+				break;
+			}
+			*((u_int32_t *)resp->data) = priv->promisc;
+			break;
+		case NGM_ETHER_SET_PROMISC:
+		    {
+			u_char want;
+
+			if (msg->header.arglen != sizeof(u_int32_t)) {
+				error = EINVAL;
+				break;
+			}
+			want = !!*((u_int32_t *)msg->data);
+			if (want ^ priv->promisc) {
+				if ((error = ifpromisc(priv->ifp, want)) != 0)
+					break;
+				priv->promisc = want;
+			}
+			break;
+		    }
+		case NGM_ETHER_GET_AUTOSRC:
+			NG_MKRESPONSE(resp, msg, sizeof(u_int32_t), M_NOWAIT);
+			if (resp == NULL) {
+				error = ENOMEM;
+				break;
+			}
+			*((u_int32_t *)resp->data) = priv->autoSrcAddr;
+			break;
+		case NGM_ETHER_SET_AUTOSRC:
+			if (msg->header.arglen != sizeof(u_int32_t)) {
+				error = EINVAL;
+				break;
+			}
+			priv->autoSrcAddr = !!*((u_int32_t *)msg->data);
+			break;
 		default:
 			error = EINVAL;
 			break;
@@ -488,7 +605,6 @@ static int
 ng_ether_rcv_lower(node_p node, struct mbuf *m, meta_p meta)
 {
 	const priv_p priv = node->private;
-	struct ether_header *eh;
 
 	/* Make sure header is fully pulled up */
 	if (m->m_pkthdr.len < sizeof(struct ether_header)) {
@@ -501,9 +617,12 @@ ng_ether_rcv_lower(node_p node, struct mbuf *m, meta_p meta)
 		return (ENOBUFS);
 	}
 
-        /* drop in the MAC address */
-	eh = mtod(m, struct ether_header *);
-	bcopy((IFP2AC(priv->ifp))->ac_enaddr, eh->ether_shost, 6);
+	/* Drop in the MAC address if desired */
+	if (priv->autoSrcAddr) {
+		bcopy((IFP2AC(priv->ifp))->ac_enaddr,
+		    mtod(m, struct ether_header *)->ether_shost,
+		    ETHER_ADDR_LEN);
+	}
 
 	/* Send it on its way */
 	NG_FREE_META(meta);
@@ -532,6 +651,7 @@ ng_ether_rcv_upper(node_p node, struct mbuf *m, meta_p meta)
 	m->m_data += sizeof(*eh);
 	m->m_len -= sizeof(*eh);
 	m->m_pkthdr.len -= sizeof(*eh);
+	m->m_pkthdr.rcvif = priv->ifp;
 
 	/* Route packet back in */
 	NG_FREE_META(meta);
@@ -545,8 +665,15 @@ ng_ether_rcv_upper(node_p node, struct mbuf *m, meta_p meta)
 static int
 ng_ether_rmnode(node_p node)
 {
+	const priv_p priv = node->private;
+
 	ng_cutlinks(node);
 	node->flags &= ~NG_INVALID;	/* bounce back to life */
+	if (priv->promisc) {		/* disable promiscuous mode */
+		(void)ifpromisc(priv->ifp, 0);
+		priv->promisc = 0;
+	}
+	priv->autoSrcAddr = 1;		/* reset auto-src-addr flag */
 	return (0);
 }
 
@@ -565,6 +692,48 @@ ng_ether_disconnect(hook_p hook)
 		priv->lowerOrphan = 0;
 	} else
 		panic("%s: weird hook", __FUNCTION__);
+	return (0);
+}
+
+static int
+ng_enaddr_parse(const struct ng_parse_type *type,
+	const char *s, int *const off, const u_char *const start,
+	u_char *const buf, int *const buflen)
+{
+	char *eptr;
+	u_long val;
+	int i;
+
+	if (*buflen < ETHER_ADDR_LEN)
+		return (ERANGE);
+	for (i = 0; i < ETHER_ADDR_LEN; i++) {
+		val = strtoul(s + *off, &eptr, 16);
+		if (val > 0xff || eptr == s + *off)
+			return (EINVAL);
+		buf[i] = (u_char)val;
+		*off = (eptr - s);
+		if (i < ETHER_ADDR_LEN - 1) {
+			if (*eptr != ':')
+				return (EINVAL);
+			(*off)++;
+		}
+	}
+	*buflen = ETHER_ADDR_LEN;
+	return (0);
+}
+
+static int
+ng_enaddr_unparse(const struct ng_parse_type *type,
+	const u_char *data, int *off, char *cbuf, int cbuflen)
+{
+	int len;
+
+	len = snprintf(cbuf, cbuflen, "%02x:%02x:%02x:%02x:%02x:%02x",
+	    data[*off], data[*off + 1], data[*off + 2],
+	    data[*off + 3], data[*off + 4], data[*off + 5]);
+	if (len >= cbuflen)
+		return (ERANGE);
+	*off += ETHER_ADDR_LEN;
 	return (0);
 }
 

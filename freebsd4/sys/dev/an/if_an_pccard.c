@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.1 2000/07/17 21:24:25 archie Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.1.2.2 2000/08/02 22:29:50 peter Exp $
  */
 
 /*
@@ -109,7 +109,6 @@ an_pccard_detach(device_t dev)
 	sc->an_gone = 1;
 	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
 	an_release_resources(dev);
-	device_printf(dev,"unloaded\n");
 	return (0);
 }
 

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.c,v 1.171.2.2 2000/07/13 08:30:31 alc Exp $
+ * $FreeBSD: src/sys/vm/vm_object.c,v 1.171.2.4 2000/08/04 22:31:11 peter Exp $
  */
 
 /*
@@ -833,12 +833,14 @@ shadowlookup:
 
 		/*
 		 * If the page is busy or not in a normal active state,
-		 * we skip it.  Things can break if we mess with pages
-		 * in any of the below states.
+		 * we skip it.  If the page is not managed there are no
+		 * page queues to mess with.  Things can break if we mess
+		 * with pages in any of the below states.
 		 */
 		if (
 		    m->hold_count ||
 		    m->wire_count ||
+		    (m->flags & PG_UNMANAGED) ||
 		    m->valid != VM_PAGE_BITS_ALL
 		) {
 			continue;
@@ -867,7 +869,7 @@ shadowlookup:
 			 * can without actually taking the step of unmapping
 			 * it.
 			 */
-			pmap_clear_modify(VM_PAGE_TO_PHYS(m));
+			pmap_clear_modify(m);
 			m->dirty = 0;
 			m->act_count = 0;
 			vm_page_dontneed(m);
@@ -924,7 +926,7 @@ vm_object_shadow(object, offset, length)
 	 * of reference count.
 	 *
 	 * Try to optimize the result object's page color when shadowing
-	 * in order to maintain page coloring consistancy in the combined 
+	 * in order to maintain page coloring consistency in the combined 
 	 * shadowed object.
 	 */
 	result->backing_object = source;
@@ -974,7 +976,7 @@ vm_object_backing_scan(vm_object_t object, int op)
 
 	if (op & OBSC_TEST_ALL_SHADOWED) {
 		/*
-		 * We do not want to have to test for the existance of
+		 * We do not want to have to test for the existence of
 		 * swap pages in the backing object.  XXX but with the
 		 * new swapper this would be pretty easy to do.
 		 *
@@ -1393,6 +1395,13 @@ vm_object_page_remove(object, start, end, clean_only)
 		return;
 
 	all = ((end == 0) && (start == 0));
+
+	/*
+	 * Since physically-backed objects do not use managed pages, we can't
+	 * remove pages from the object (we must instead remove the page
+	 * references, and then destroy the object).
+	 */
+	KASSERT(object->type != OBJT_PHYS, ("attempt to remove pages from a physical object"));
 
 	vm_object_pip_add(object, 1);
 again:

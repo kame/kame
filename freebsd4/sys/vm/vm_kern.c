@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_kern.c,v 1.61 1999/10/29 18:09:29 phk Exp $
+ * $FreeBSD: src/sys/vm/vm_kern.c,v 1.61.2.1 2000/08/04 22:31:11 peter Exp $
  */
 
 /*
@@ -399,8 +399,7 @@ retry:
 		/*
 		 * Because this is kernel_pmap, this call will not block.
 		 */
-		pmap_enter(kernel_pmap, addr + i, VM_PAGE_TO_PHYS(m),
-			VM_PROT_ALL, 1);
+		pmap_enter(kernel_pmap, addr + i, m, VM_PROT_ALL, 1);
 		vm_page_flag_set(m, PG_MAPPED | PG_WRITEABLE | PG_REFERENCED);
 	}
 	vm_map_unlock(map);

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.2 2000/01/29 15:08:49 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.2.2.1 2000/08/27 12:37:36 yokota Exp $
  */
 
 #include "opt_syscons.h"
@@ -201,9 +201,12 @@ smioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 
 	case MOUSE_SETMODE:	/* set protocol/mode */
 		mode = (mousemode_t *)data;
-		if ((mode->level < 0) || (mode->level > 1))
+		if (mode->level == -1)
+			; 	/* don't change the current setting */
+		else if ((mode->level < 0) || (mode->level > 1))
 			return EINVAL;
-		mouse_level = mode->level;
+		else
+			mouse_level = mode->level;
 		return 0;
 
 	case MOUSE_GETLEVEL:	/* get operation level */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/deflate.c,v 1.18 1999/12/20 20:29:51 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/deflate.c,v 1.18.2.1 2000/08/19 09:30:03 brian Exp $
  */
 
 #include <sys/types.h>
@@ -38,6 +38,8 @@
 #include "log.h"
 #include "timer.h"
 #include "fsm.h"
+#include "lqr.h"
+#include "hdlc.h"
 #include "lcp.h"
 #include "ccp.h"
 #include "deflate.h"

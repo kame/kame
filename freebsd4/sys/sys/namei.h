@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)namei.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/namei.h,v 1.29 2000/01/08 16:20:06 eivind Exp $
+ * $FreeBSD: src/sys/sys/namei.h,v 1.29.2.1 2000/11/03 15:55:40 bp Exp $
  */
 
 #ifndef _SYS_NAMEI_H_
@@ -140,6 +140,7 @@ struct nameidata {
 #define	DOWHITEOUT	0x040000 /* do whiteouts */
 #define	WILLBEDIR	0x080000 /* new files will be dirs; allow trailing / */
 #define	ISUNICODE	0x100000 /* current component name is unicode*/
+#define	PDIRUNLOCK	0x200000 /* file system lookup() unlocked parent dir */
 #define PARAMASK	0x1fff00 /* mask of parameter descriptors */
 /*
  * Initialization of an nameidata structure.

@@ -31,7 +31,7 @@
  * mpboot.s:	FreeBSD machine support for the Intel MP Spec
  *		multiprocessor systems.
  *
- * $FreeBSD: src/sys/i386/i386/mpboot.s,v 1.13.2.1 2000/07/08 23:44:44 obrien Exp $
+ * $FreeBSD: src/sys/i386/i386/mpboot.s,v 1.13.2.3 2000/09/07 01:18:26 tegge Exp $
  */
 
 #include <machine/asmacros.h>		/* miscellaneous asm macros */
@@ -121,6 +121,7 @@ mp_begin:	/* now running relocated at KERNBASE */
 	call	_ap_init
 
 	call	_rel_mplock
+	wbinvd				/* Avoid livelock */
 2:	
 	cmpl	$0, CNAME(smp_started)	/* Wait for last AP to be ready */
 	jz	2b
@@ -133,6 +134,7 @@ NON_GPROF_ENTRY(wait_ap)
 	pushl	%ebp
 	movl	%esp, %ebp
 	call	_rel_mplock
+	wbinvd				/* Avoid livelock */
 	movl	%eax, 8(%ebp)
 1:		
 	cmpl	$0, CNAME(smp_started)

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.7.2.2 2000/05/23 19:30:35 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.7.2.4 2000/11/15 23:01:52 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -141,21 +141,16 @@ static struct ida_access ida_v4_access = {
 };
 
 static struct ida_board board_id[] = {
-	{ 0x4030, "Compaq SMART-2/P array controller",	    &ida_v3_access },
-	{ 0x4031, "Compaq SMART-2SL array controller", 	    &ida_v3_access },
-	{ 0x4032, "Compaq Smart Array 3200 controller",	    &ida_v3_access },
-	{ 0x4033, "Compaq Smart Array 3100ES controller",   &ida_v3_access },
-	{ 0x4034, "Compaq Smart Array 221 controller",	    &ida_v3_access },
+	{ 0x40300E11, "Compaq SMART-2/P array controller",    &ida_v3_access },
+	{ 0x40310E11, "Compaq SMART-2SL array controller",    &ida_v3_access },
+	{ 0x40320E11, "Compaq Smart Array 3200 controller",   &ida_v3_access },
+	{ 0x40330E11, "Compaq Smart Array 3100ES controller", &ida_v3_access },
+	{ 0x40340E11, "Compaq Smart Array 221 controller",    &ida_v3_access },
 
-	{ 0x4040, "Compaq Integrated Array controller",	    &ida_v4_access },
-	{ 0x4050, "Compaq Smart Array 4200 controller",	    &ida_v4_access },
-	{ 0x4051, "Compaq Smart Array 4250ES controller",   &ida_v4_access },
-	{ 0x4058, "Compaq Smart Array 431 controller",      &ida_v4_access },
-
-	{ IDA_DEVICEID_DEC_SMART,
-		  "DEC/Compaq Smart Array 4200 controller", &ida_v4_access },
-	{ IDA_DEVICEID_NCR_53C1510,
-		  "NCR/Compaq Integrated Array controller", &ida_v4_access },
+	{ 0x40400E11, "Compaq Integrated Array controller",   &ida_v4_access },
+	{ 0x40500E11, "Compaq Smart Array 4200 controller",   &ida_v4_access },
+	{ 0x40510E11, "Compaq Smart Array 4250ES controller", &ida_v4_access },
+	{ 0x40580E11, "Compaq Smart Array 431 controller",    &ida_v4_access },
 
 	{ 0, "", 0 },
 };
@@ -182,27 +177,29 @@ static driver_t ida_pci_driver = {
 static devclass_t ida_devclass;
 
 static struct ida_board *
-ida_pci_match(u_int32_t id)
+ida_pci_match(device_t dev)
 {
 	int i;
+	u_int32_t id, sub_id;
 
-	for (i = 0; board_id[i].board; i++)
-		if (board_id[i].board == id)
-			return (&board_id[i]);
+	id = pci_get_devid(dev);
+	sub_id = pci_get_subdevice(dev) << 16 | pci_get_subvendor(dev);
+
+	if (id == IDA_DEVICEID_SMART ||
+	    id == IDA_DEVICEID_DEC_SMART ||
+	    id == IDA_DEVICEID_NCR_53C1510) {
+		for (i = 0; board_id[i].board; i++)
+			if (board_id[i].board == sub_id)
+				return (&board_id[i]);
+	}
 	return (NULL);
 }
 
 static int
 ida_pci_probe(device_t dev)
 {
-	struct ida_board *board = NULL;
-	u_int32_t id = pci_get_devid(dev);
+	struct ida_board *board = ida_pci_match(dev);
 
-	if (id == IDA_DEVICEID_SMART)
-		board = ida_pci_match(pci_get_subdevice(dev));
-	if (id == IDA_DEVICEID_DEC_SMART ||
-	    id == IDA_DEVICEID_NCR_53C1510)
-		board = ida_pci_match(id);
 	if (board != NULL) {
 		device_set_desc(dev, board->desc);
 		return (0);
@@ -213,7 +210,7 @@ ida_pci_probe(device_t dev)
 static int
 ida_pci_attach(device_t dev)
 {
-	struct ida_board *board;
+	struct ida_board *board = ida_pci_match(dev);
 	struct ida_softc *ida;
 	u_int command;
 	int error, rid;
@@ -230,18 +227,17 @@ ida_pci_attach(device_t dev)
 
 	ida = (struct ida_softc *)device_get_softc(dev);
 	ida->dev = dev;
-
-	board = ida_pci_match(pci_get_subdevice(dev));
-	if (board == NULL)
-		board = ida_pci_match(pci_get_devid(dev));
 	ida->cmd = *board->accessor;
 
 	ida->regs_res_type = SYS_RES_MEMORY;
 	ida->regs_res_id = IDA_PCI_MEMADDR;
+	if (board->board == IDA_DEVICEID_DEC_SMART)
+		ida->regs_res_id = PCIR_MAPS;
+
 	ida->regs = bus_alloc_resource(dev, ida->regs_res_type,
 	    &ida->regs_res_id, 0, ~0, 1, RF_ACTIVE);
 	if (ida->regs == NULL) {
-		device_printf(dev, "can't allocate register resources\n");
+		device_printf(dev, "can't allocate memory resources\n");
 		return (ENOMEM);
 	}
 
@@ -273,13 +269,14 @@ ida_pci_attach(device_t dev)
 		return (ENOMEM);
 	}
 
+	ida->flags = 0;
 	error = ida_init(ida);
 	if (error) {
                 ida_free(ida);
                 return (error);
         }
 	ida_attach(ida);
-	ida->flags = IDA_ATTACHED; 
+	ida->flags |= IDA_ATTACHED; 
 
 	return (0);
 }

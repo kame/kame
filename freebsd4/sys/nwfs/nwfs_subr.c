@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_subr.c,v 1.2.2.1 2000/04/17 08:34:20 bp Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_subr.c,v 1.2.2.2 2000/10/25 02:11:10 bp Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -351,8 +351,8 @@ ncp_modify_file_or_subdir_dos_info(struct nwmount *nmp, struct vnode *vp,
 
 int
 ncp_setattr(vp, vap, cred, procp)
-	register struct vnode *vp;
-	register struct vattr *vap;
+	struct vnode *vp;
+	struct vattr *vap;
 	struct ucred *cred;
 	struct proc *procp;
 {

@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/boot/alpha/boot1/boot1.c,v 1.7 1999/11/03 20:18:12 dfr Exp $
+ * $FreeBSD: src/sys/boot/alpha/boot1/boot1.c,v 1.7.2.1 2000/10/28 01:03:33 gallatin Exp $
  * From	$NetBSD: bootxx.c,v 1.4 1997/09/06 14:08:29 drochner Exp $ 
  */
 
@@ -30,6 +30,7 @@
  * rights to redistribute these changes.
  */
 
+#include <string.h>
 #include <sys/param.h>
 
 #include <machine/prom.h>
@@ -153,7 +154,7 @@ devread(char *buf, int block, size_t size)
     prom_read(prom_fd, size, buf, block);
 }
 
-static void
+static inline void
 devclose()
 {
     if (prom_fd) {
@@ -162,7 +163,7 @@ devclose()
     }
 }
 
-static void
+static inline void
 getfilename(char *filename, const char *defname)
 {
     int c;
@@ -188,7 +189,7 @@ getfilename(char *filename, const char *defname)
     return;
 }
 
-static void
+static inline void
 loadfile(char *name, char *addr)
 {
     int n;

@@ -29,13 +29,12 @@
  * not protected against the fact that the bits can be wrong in two
  * directions.  If we only cared about monosity two reads would be enough.
  *
- * $FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.4 1999/11/29 11:27:40 phk Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_clock.c,v 1.4.2.2 2000/09/30 02:49:32 ps Exp $
  *
  */
 
 /* #include "opt_bus.h" */
 /* #include "opt_pci.h" */
-/* #include "opt_smp.h" */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,7 +62,7 @@ SYSCTL_OPAQUE(_debug, OID_AUTO, piix_timecounter, CTLFLAG_RD,
 	&piix_timecounter, sizeof(piix_timecounter), "S,timecounter", "");
 
 static int
-sysctl_machdep_piix_freq SYSCTL_HANDLER_ARGS
+sysctl_machdep_piix_freq(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	u_int freq;

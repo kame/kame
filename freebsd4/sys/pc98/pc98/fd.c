@@ -47,7 +47,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.83 2000/01/09 10:01:20 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/fd.c,v 1.83.2.2 2000/10/21 07:44:26 nyan Exp $
  *
  */
 
@@ -918,7 +918,11 @@ fdc_read_ivar(device_t dev, device_t child, int which, u_long *result)
 static int
 fdc_probe(device_t dev)
 {
+#ifdef PC98
+	int	error;
+#else
 	int	error, ic_type;
+#endif
 	struct	fdc_data *fdc;
 
 	fdc = device_get_softc(dev);
@@ -1105,12 +1109,18 @@ DRIVER_MODULE(fdc, isa, fdc_driver, fdc_devclass, 0, 0);
 static int
 fd_probe(device_t dev)
 {
+#ifdef PC98
+	u_int	fdt;
+#else
 	int	i;
 	u_int	fdt, st0, st3;
+#endif
 	struct	fd_data *fd;
 	struct	fdc_data *fdc;
 	fdsu_t	fdsu;
+#ifndef PC98
 	static int fd_fifo = 0;
+#endif
 
 	fdsu = *(int *)device_get_ivars(dev); /* xxx cheat a bit... */
 	fd = device_get_softc(dev);
@@ -1331,10 +1341,14 @@ fd_attach(device_t dev)
 	int	typemynor;
 	int	typesize;
 #endif
+	static int cdevsw_add_done = 0;
 
 	fd = device_get_softc(dev);
 
-	cdevsw_add(&fd_cdevsw);	/* XXX */
+	if (!cdevsw_add_done) {
+		cdevsw_add(&fd_cdevsw);	/* XXX */
+		cdevsw_add_done++;
+	}
 	make_dev(&fd_cdevsw, (fd->fdu << 6),
 		UID_ROOT, GID_OPERATOR, 0640, "rfd%d", fd->fdu);
 

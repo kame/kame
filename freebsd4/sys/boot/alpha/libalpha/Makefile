@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/alpha/libalpha/Makefile,v 1.7 1999/08/28 00:39:24 peter Exp $
+# $FreeBSD: src/sys/boot/alpha/libalpha/Makefile,v 1.7.2.1 2000/10/28 01:05:39 gallatin Exp $
 
 LIB=		alpha
 NOPIC=		true
@@ -18,7 +18,7 @@ CFLAGS+=	-I${.CURDIR}/../../common -mno-fp-regs \
 #CPPFLAGS+= -DNO_DISKLABEL
 #CPPFLAGS+= -DSAVE_MEMORY
 
-SRCS=	OSFpal.c elf_freebsd.c prom.c prom_disp.S prom_swpal.S start.S \
+SRCS=	OSFpal.c elf_freebsd.c prom.c prom_disp.S prom_swpal.S \
 	pal.S reboot.c delay.c time.c alpha_module.c devicename.c \
 	srmdisk.c srmnet.c getsecs.c alpha_copy.c bootinfo.c
 

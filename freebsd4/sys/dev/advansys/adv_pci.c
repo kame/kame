@@ -57,7 +57,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adv_pci.c,v 1.11.2.1 2000/04/14 13:32:47 nyan Exp $
+ * $FreeBSD: src/sys/dev/advansys/adv_pci.c,v 1.11.2.2 2000/08/02 22:22:40 peter Exp $
  */
 
 #include <sys/param.h>
@@ -75,8 +75,8 @@
 
 #include <dev/advansys/advansys.h>
 
-#define PCI_BASEADR0	PCI_MAP_REG_START	/* I/O Address */
-#define PCI_BASEADR1	PCI_MAP_REG_START + 4	/* Mem I/O Address */
+#define PCI_BASEADR0	PCIR_MAPS		/* I/O Address */
+#define PCI_BASEADR1	PCIR_MAPS + 4		/* Mem I/O Address */
 
 #define	PCI_DEVICE_ID_ADVANSYS_1200A	0x110010CD
 #define	PCI_DEVICE_ID_ADVANSYS_1200B	0x120010CD
@@ -143,7 +143,7 @@ adv_pci_attach(device_t dev)
 	/*
 	 * Determine the chip version.
 	 */
-	id = pci_read_config(dev, PCI_ID_REG, /*bytes*/4);
+	id = pci_read_config(dev, PCIR_DEVVENDOR, /*bytes*/4);
 	command = pci_read_config(dev, PCIR_COMMAND, /*bytes*/1);
 
 	/*

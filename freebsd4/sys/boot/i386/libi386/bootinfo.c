@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.23.2.1 2000/04/15 03:09:44 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.23.2.2 2000/09/22 17:04:46 archie Exp $
  */
 
 #include <stand.h>
@@ -86,6 +86,9 @@ bi_getboothowto(char *kargs)
 		case 'd':
 		    howto |= RB_KDB;
 		    break;
+		case 'm':
+		    howto |= RB_MUTE;
+		    break;
 		case 'g':
 		    howto |= RB_GDB;
 		    break;
@@ -114,6 +117,8 @@ bi_getboothowto(char *kargs)
 	    howto |= howto_names[i].mask;
     if (!strcmp(getenv("console"), "comconsole"))
 	howto |= RB_SERIAL;
+    if (!strcmp(getenv("console"), "nullconsole"))
+	howto |= RB_MUTE;
     return(howto);
 }
 

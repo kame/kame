@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tee.h,v 1.3 2000/01/27 01:32:53 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tee.h,v 1.3.2.2 2000/10/24 18:36:46 julian Exp $
  * $Whistle: ng_tee.h,v 1.2 1999/01/20 00:22:14 archie Exp $
  */
 
@@ -64,10 +64,10 @@ struct ng_tee_hookstat {
 /* Keep this in sync with the above structure definition */
 #define NG_TEE_HOOKSTAT_INFO	{				\
 	{							\
-	  { "inOctets",		&ng_parse_int64_type	},	\
-	  { "inFrames",		&ng_parse_int64_type	},	\
-	  { "outOctets",	&ng_parse_int64_type	},	\
-	  { "outFrames",	&ng_parse_int64_type	},	\
+	  { "inOctets",		&ng_parse_uint64_type	},	\
+	  { "inFrames",		&ng_parse_uint64_type	},	\
+	  { "outOctets",	&ng_parse_uint64_type	},	\
+	  { "outFrames",	&ng_parse_uint64_type	},	\
 	  { NULL },						\
 	}							\
 }
@@ -95,6 +95,7 @@ struct ng_tee_stats {
 enum {
 	NGM_TEE_GET_STATS = 1,		/* get stats */
 	NGM_TEE_CLR_STATS,		/* clear stats */
+	NGM_TEE_GETCLR_STATS,		/* atomically get and clear stats */
 };
 
 #endif /* _NETGRAPH_TEE_H_ */

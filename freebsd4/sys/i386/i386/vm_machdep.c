@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.132.2.1 2000/05/16 06:58:07 dillon Exp $
+ * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.132.2.2 2000/08/26 04:19:26 yokota Exp $
  */
 
 #include "npx.h"
@@ -46,6 +46,7 @@
 #ifdef PC98
 #include "opt_pc98.h"
 #endif
+#include "opt_reset.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>

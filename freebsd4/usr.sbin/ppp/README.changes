@@ -1,4 +1,4 @@
-$FreeBSD: src/usr.sbin/ppp/README.changes,v 1.16.2.2 2000/06/27 16:35:12 ru Exp $
+$FreeBSD: src/usr.sbin/ppp/README.changes,v 1.16.2.3 2000/08/19 09:29:59 brian Exp $
 
 This file summarises changes made to ppp that effect
 its configuration.
@@ -102,3 +102,7 @@ o It is now only necessary to escape the `-' character in chat scripts twice.
   See the example files for details.
 o Environment variables and ~ are expanded on in commands
 o ``nat pptp'' is no longer necessary as this is now done transparently
+o The ``!'' at the start of chat scripts and authkey can be made literal
+  (rather than meaning execute) by doubling it to ``!!''.
+o MP autoload throughput measurements are now based on the maximum of input
+  and output averages rather than on the total.

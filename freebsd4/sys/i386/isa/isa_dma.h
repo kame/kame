@@ -31,13 +31,18 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa_device.h	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/isa/isa_dma.h,v 1.3 1999/12/29 04:33:15 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/isa_dma.h,v 1.3.2.1 2000/08/08 19:49:53 peter Exp $
  */
 
 #ifndef _I386_ISA_ISA_DMA_H_
 #define	_I386_ISA_ISA_DMA_H_
 
 #ifdef _KERNEL
+
+#define ISADMA_READ	0x00100000
+#define ISADMA_WRITE	0
+#define ISADMA_RAW	0x00080000
+
 void	isa_dmacascade __P((int chan));
 void	isa_dmadone __P((int flags, caddr_t addr, int nbytes, int chan));
 void	isa_dmainit __P((int chan, u_int bouncebufsize));

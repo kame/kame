@@ -20,7 +20,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/psm.c,v 1.23.2.3 2000/07/22 04:09:21 yokota Exp $
+ * $FreeBSD: src/sys/isa/psm.c,v 1.23.2.4 2000/08/24 08:50:38 yokota Exp $
  */
 
 /*
@@ -294,7 +294,7 @@ static struct {
     { MOUSE_MODEL_GENERIC,
       0xc0, MOUSE_PS2_PACKETSIZE, NULL, },
 };
-#define GENERIC_MOUSE_ENTRY	7
+#define GENERIC_MOUSE_ENTRY	((sizeof(vendortype) / sizeof(*vendortype)) - 1)
 
 /* device driver declarateion */
 static device_method_t psm_methods[] = {
@@ -1828,9 +1828,11 @@ psmtimeout(void *arg)
 {
     struct psm_softc *sc;
     int unit;
+    int s;
 
     unit = (int)arg;
     sc = devclass_get_softc(psm_devclass, unit);
+    s = spltty();
     if (sc->watchdog && kbdc_lock(sc->kbdc, TRUE)) {
 	if (verbose >= 4)
 	    log(LOG_DEBUG, "psm%d: lost interrupt?\n", unit);
@@ -1838,6 +1840,7 @@ psmtimeout(void *arg)
 	kbdc_lock(sc->kbdc, FALSE);
     }
     sc->watchdog = TRUE;
+    splx(s);
     sc->callout = timeout(psmtimeout, (void *)unit, hz);
 }
 

@@ -4,7 +4,7 @@
  *  Aug 1995, Godmar Back (gback@cs.utah.edu)
  *  University of Utah, Department of Computer Science
  *
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_fs.h,v 1.8 2000/01/02 17:40:01 bde Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_fs.h,v 1.8.2.1 2000/11/05 19:17:40 bde Exp $
  */
 /*
  *  linux/include/linux/ext2_fs.h
@@ -509,7 +509,7 @@ struct ext2_super_block {
 					 EXT2_FEATURE_RO_COMPAT_LARGE_FILE| \
 					 EXT2_FEATURE_RO_COMPAT_BTREE_DIR)
 #else
-#define EXT2_FEATURE_RO_COMPAT_SUPP	0
+#define EXT2_FEATURE_RO_COMPAT_SUPP	EXT2_FEATURE_RO_COMPAT_SPARSE_SUPER
 #endif
 
 /*

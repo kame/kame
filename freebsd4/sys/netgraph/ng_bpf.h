@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bpf.h,v 1.2 1999/12/06 18:43:32 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bpf.h,v 1.2.4.2 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_bpf.h,v 1.3 1999/12/03 20:30:23 archie Exp $
  */
 
@@ -84,12 +84,12 @@ struct ng_bpf_hookstat {
 /* Keep this in sync with the above structure definition */
 #define NG_BPF_HOOKSTAT_TYPE_INFO	{			\
 	{							\
-	  { "recvFrames",	&ng_parse_int64_type	},	\
-	  { "recvOctets",	&ng_parse_int64_type	},	\
-	  { "recvMatchFrames",	&ng_parse_int64_type	},	\
-	  { "recvMatchOctets",	&ng_parse_int64_type	},	\
-	  { "xmitFrames",	&ng_parse_int64_type	},	\
-	  { "xmitOctets",	&ng_parse_int64_type	},	\
+	  { "recvFrames",	&ng_parse_uint64_type	},	\
+	  { "recvOctets",	&ng_parse_uint64_type	},	\
+	  { "recvMatchFrames",	&ng_parse_uint64_type	},	\
+	  { "recvMatchOctets",	&ng_parse_uint64_type	},	\
+	  { "xmitFrames",	&ng_parse_uint64_type	},	\
+	  { "xmitOctets",	&ng_parse_uint64_type	},	\
 	  { NULL },						\
 	}							\
 }

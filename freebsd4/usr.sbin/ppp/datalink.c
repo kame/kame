@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/datalink.c,v 1.57.2.3 2000/06/03 02:53:14 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/datalink.c,v 1.57.2.4 2000/08/19 09:30:00 brian Exp $
  */
 
 #include <sys/param.h>
@@ -45,10 +45,10 @@
 #include "defs.h"
 #include "timer.h"
 #include "fsm.h"
-#include "lcp.h"
 #include "descriptor.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "async.h"
 #include "throughput.h"
 #include "ccp.h"

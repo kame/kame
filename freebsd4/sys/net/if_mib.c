@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_mib.c,v 1.8 1999/08/28 00:48:19 peter Exp $
+ * $FreeBSD: src/sys/net/if_mib.c,v 1.8.2.1 2000/08/03 00:09:34 ps Exp $
  */
 
 #include <sys/param.h>
@@ -68,7 +68,7 @@ SYSCTL_INT(_net_link_generic_system, IFMIB_IFCOUNT, ifcount, CTLFLAG_RD,
 	   &if_index, 0, "Number of configured interfaces");
 
 static int
-sysctl_ifdata SYSCTL_HANDLER_ARGS /* XXX bad syntax! */
+sysctl_ifdata(SYSCTL_HANDLER_ARGS) /* XXX bad syntax! */
 {
 	int *name = (int *)arg1;
 	int error, ifnlen;

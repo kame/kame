@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.1 2000/03/29 06:56:04 cpiazza Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.4 2000/11/01 19:19:36 alc Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -43,7 +43,6 @@
 
 #include "opt_bus.h"
 #include "opt_pci.h"
-#include "opt_smp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -896,6 +895,11 @@ isab_match(device_t dev)
 		if (pci_get_class(dev) == PCIC_BRIDGE
 		    && pci_get_subclass(dev) == PCIS_BRIDGE_ISA)
 			return ("Cypress 82C693 PCI-ISA bridge");
+		break;
+
+	/* ServerWorks -- vendor 0x1166 */
+	case 0x02001166:
+		return ("ServerWorks IB6566 PCI to ISA bridge");
 	}
 
 	if (pci_get_class(dev) == PCIC_BRIDGE

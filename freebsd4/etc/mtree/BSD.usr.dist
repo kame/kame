@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.3 2000/06/30 11:06:17 tg Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.7 2000/10/19 21:30:25 gshapiro Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -238,8 +238,6 @@
                 ..
                 08.sendmailop
                 ..
-                09.sendmail
-                ..
                 10.named
                 ..
                 11.timedop
@@ -326,6 +324,10 @@
                     module
                     ..
                     test
+                    ..
+                ..
+                dyn_sysctl
+                    module
                     ..
                 ..
                 syscall
@@ -555,6 +557,8 @@
             ..
             sv_SE.ISO_8859-1
             ..
+	    tr_TR.ISO_8859-9
+	    ..
             uk_UA.KOI8-U
             ..
             zh_CN.EUC
@@ -795,6 +799,8 @@
             ..
             sv_SE.ISO_8859-1
             ..
+	    tr_TR.ISO_8859-9
+	    ..
             uk_UA.KOI8-U
             ..
             zh_CN.EUC
@@ -813,6 +819,8 @@
                 man3
                 ..
             ..
+        ..
+        sendmail
         ..
         skel
         ..

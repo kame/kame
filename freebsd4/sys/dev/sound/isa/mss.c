@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48.2.3 2000/07/19 21:18:15 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48.2.5 2000/10/05 05:07:49 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -36,6 +36,8 @@
 
 #define MSS_BUFFSIZE (65536 - 256)
 #define	abs(x)	(((x) < 0) ? -(x) : (x))
+#define MSS_INDEXED_REGS 0x20
+#define OPL_INDEXED_REGS 0x19
 
 struct mss_info;
 
@@ -58,8 +60,11 @@ struct mss_info {
     int		     drq1_rid;
     struct resource *drq2; /* rec */
     int		     drq2_rid;
+    void 	    *ih;
     bus_dma_tag_t    parent_dmat;
 
+    char mss_indexed_regs[MSS_INDEXED_REGS];
+    char opl_indexed_regs[OPL_INDEXED_REGS];
     int pdma, rdma;
     int bd_id;      /* used to hold board-id info, eg. sb version,
 		     * mss codec type, etc. etc.
@@ -104,20 +109,22 @@ static int mssmix_init(snd_mixer *m);
 static int mssmix_set(snd_mixer *m, unsigned dev, unsigned left, unsigned right);
 static int mssmix_setrecsrc(snd_mixer *m, u_int32_t src);
 static snd_mixer mss_mixer = {
-    "MSS mixer",
-    mssmix_init,
-    mssmix_set,
-    mssmix_setrecsrc,
+    	"MSS mixer",
+    	mssmix_init,
+	NULL,
+    	mssmix_set,
+    	mssmix_setrecsrc,
 };
 
 static int ymmix_init(snd_mixer *m);
 static int ymmix_set(snd_mixer *m, unsigned dev, unsigned left, unsigned right);
 static int ymmix_setrecsrc(snd_mixer *m, u_int32_t src);
 static snd_mixer yamaha_mixer = {
-    "OPL3-SAx mixer",
-    ymmix_init,
-    ymmix_set,
-    ymmix_setrecsrc,
+    	"OPL3-SAx mixer",
+    	ymmix_init,
+	NULL,
+    	ymmix_set,
+    	ymmix_setrecsrc,
 };
 
 static devclass_t pcm_devclass;
@@ -132,23 +139,38 @@ static int msschan_trigger(void *data, int go);
 static int msschan_getptr(void *data);
 static pcmchan_caps *msschan_getcaps(void *data);
 
-static pcmchan_caps mss_caps = {
-	4000, 48000,
-	AFMT_STEREO | AFMT_U8 | AFMT_S16_LE | AFMT_MU_LAW | AFMT_A_LAW,
-	AFMT_STEREO | AFMT_S16_LE
+static u_int32_t mss_fmt[] = {
+	AFMT_U8,
+	AFMT_STEREO | AFMT_U8,
+	AFMT_S16_LE,
+	AFMT_STEREO | AFMT_S16_LE,
+	AFMT_MU_LAW,
+	AFMT_STEREO | AFMT_MU_LAW,
+	AFMT_A_LAW,
+	AFMT_STEREO | AFMT_A_LAW,
+	0
 };
+static pcmchan_caps mss_caps = {4000, 48000, mss_fmt, 0};
 
-static pcmchan_caps guspnp_caps = {
-	4000, 48000,
-	AFMT_STEREO | AFMT_U8 | AFMT_S16_LE | AFMT_A_LAW,
-	AFMT_STEREO | AFMT_S16_LE
+static u_int32_t guspnp_fmt[] = {
+	AFMT_U8,
+	AFMT_STEREO | AFMT_U8,
+	AFMT_S16_LE,
+	AFMT_STEREO | AFMT_S16_LE,
+	AFMT_A_LAW,
+	AFMT_STEREO | AFMT_A_LAW,
+	0
 };
+static pcmchan_caps guspnp_caps = {4000, 48000, guspnp_fmt, 0};
 
-static pcmchan_caps opti931_caps = {
-	4000, 48000,
-	AFMT_STEREO | AFMT_U8 | AFMT_S16_LE,
-	AFMT_STEREO | AFMT_S16_LE
+static u_int32_t opti931_fmt[] = {
+	AFMT_U8,
+	AFMT_STEREO | AFMT_U8,
+	AFMT_S16_LE,
+	AFMT_STEREO | AFMT_S16_LE,
+	0
 };
+static pcmchan_caps opti931_caps = {4000, 48000, opti931_fmt, 0};
 
 static pcm_channel mss_chantemplate = {
 	msschan_init,
@@ -159,6 +181,14 @@ static pcm_channel mss_chantemplate = {
 	msschan_trigger,
 	msschan_getptr,
 	msschan_getcaps,
+	NULL, 			/* free */
+	NULL, 			/* nop1 */
+	NULL, 			/* nop2 */
+	NULL, 			/* nop3 */
+	NULL, 			/* nop4 */
+	NULL, 			/* nop5 */
+	NULL, 			/* nop6 */
+	NULL, 			/* nop7 */
 };
 
 #define MD_AD1848	0x91
@@ -255,7 +285,9 @@ static void
 mss_release_resources(struct mss_info *mss, device_t dev)
 {
     	if (mss->irq) {
-		bus_release_resource(dev, SYS_RES_IRQ, mss->irq_rid,
+    		if (mss->ih)
+			bus_teardown_intr(dev, mss->irq, mss->ih);
+ 		bus_release_resource(dev, SYS_RES_IRQ, mss->irq_rid,
 				     mss->irq);
 		mss->irq = 0;
     	}
@@ -281,7 +313,11 @@ mss_release_resources(struct mss_info *mss, device_t dev)
 				     mss->conf_base);
 		mss->conf_base = 0;
     	}
-    	free(mss, M_DEVBUF);
+    	if (mss->parent_dmat) {
+		bus_dma_tag_destroy(mss->parent_dmat);
+		mss->parent_dmat = 0;
+    	}
+     	free(mss, M_DEVBUF);
 }
 
 static int
@@ -843,8 +879,6 @@ ymf_test(device_t dev, struct mss_info *mss)
 static int
 mss_doattach(device_t dev, struct mss_info *mss)
 {
-    	snddev_info *d = device_get_softc(dev);
-    	void *ih;
     	int flags = device_get_flags(dev);
     	char status[SND_STATUSLEN];
 
@@ -883,13 +917,13 @@ mss_doattach(device_t dev, struct mss_info *mss)
 		io_wr(mss, 0, bits);
 		printf("drq/irq conf %x\n", io_rd(mss, 0));
     	}
-    	mixer_init(d, (mss->bd_id == MD_YM0020)? &yamaha_mixer : &mss_mixer, mss);
+    	mixer_init(dev, (mss->bd_id == MD_YM0020)? &yamaha_mixer : &mss_mixer, mss);
     	switch (mss->bd_id) {
     	case MD_OPTI931:
-		bus_setup_intr(dev, mss->irq, INTR_TYPE_TTY, opti931_intr, mss, &ih);
+		bus_setup_intr(dev, mss->irq, INTR_TYPE_TTY, opti931_intr, mss, &mss->ih);
 		break;
     	default:
-		bus_setup_intr(dev, mss->irq, INTR_TYPE_TTY, mss_intr, mss, &ih);
+		bus_setup_intr(dev, mss->irq, INTR_TYPE_TTY, mss_intr, mss, &mss->ih);
     	}
     	if (mss->pdma == mss->rdma)
 		pcm_setflags(dev, pcm_getflags(dev) | SD_F_SIMPLEX);
@@ -920,6 +954,22 @@ no:
 }
 
 static int
+mss_detach(device_t dev)
+{
+	int r;
+    	struct mss_info *mss;
+
+	r = pcm_unregister(dev);
+	if (r)
+		return r;
+
+	mss = pcm_getdevinfo(dev);
+    	mss_release_resources(mss, dev);
+
+	return 0;
+}
+
+static int
 mss_attach(device_t dev)
 {
     	struct mss_info *mss;
@@ -944,10 +994,80 @@ mss_attach(device_t dev)
     	return mss_doattach(dev, mss);
 }
 
+/*
+ * mss_resume() is the code to allow a laptop to resume using the sound
+ * card.
+ *
+ * This routine re-sets the state of the board to the state before going
+ * to sleep.  According to the yamaha docs this is the right thing to do,
+ * but getting DMA restarted appears to be a bit of a trick, so the device
+ * has to be closed and re-opened to be re-used, but there is no skipping
+ * problem, and volume, bass/treble and most other things are restored
+ * properly.
+ *
+ */
+
+static int
+mss_resume(device_t dev)
+{
+    	/*
+     	 * Restore the state taken below.
+     	 */
+    	struct mss_info *mss;
+    	int i;
+
+    	mss = pcm_getdevinfo(dev);
+
+    	if (mss->bd_id == MD_YM0020)
+    	{
+		/* This works on a Toshiba Libretto 100CT. */
+		for (i = 0; i < MSS_INDEXED_REGS; i++)
+    			ad_write(mss, i, mss->mss_indexed_regs[i]);
+		for (i = 0; i < OPL_INDEXED_REGS; i++)
+    			conf_wr(mss, i, mss->opl_indexed_regs[i]);
+		mss_intr(mss);
+    	}
+    	return 0;
+
+}
+
+/*
+ * mss_suspend() is the code that gets called right before a laptop
+ * suspends.
+ *
+ * This code saves the state of the sound card right before shutdown
+ * so it can be restored above.
+ *
+ */
+
+static int
+mss_suspend(device_t dev)
+{
+    	int i;
+    	struct mss_info *mss;
+
+    	mss = pcm_getdevinfo(dev);
+
+    	if(mss->bd_id == MD_YM0020)
+    	{
+		/* this stops playback. */
+		conf_wr(mss, 0x12, 0x0c);
+		for(i = 0; i < MSS_INDEXED_REGS; i++)
+    			mss->mss_indexed_regs[i] = ad_read(mss, i);
+		for(i = 0; i < OPL_INDEXED_REGS; i++)
+    			mss->opl_indexed_regs[i] = conf_rd(mss, i);
+		mss->opl_indexed_regs[0x12] = 0x0;
+    	}
+    	return 0;
+}
+
 static device_method_t mss_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		mss_probe),
 	DEVMETHOD(device_attach,	mss_attach),
+	DEVMETHOD(device_detach,	mss_detach),
+	DEVMETHOD(device_suspend,       mss_suspend),
+	DEVMETHOD(device_resume,        mss_resume),
 
 	{ 0, 0 }
 };
@@ -1443,6 +1563,9 @@ static device_method_t pnpmss_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pnpmss_probe),
 	DEVMETHOD(device_attach,	pnpmss_attach),
+	DEVMETHOD(device_detach,	mss_detach),
+	DEVMETHOD(device_suspend,       mss_suspend),
+	DEVMETHOD(device_resume,        mss_resume),
 
 	{ 0, 0 }
 };
@@ -1585,6 +1708,7 @@ skip_setup:
 static device_method_t guspcm_methods[] = {
 	DEVMETHOD(device_probe,		guspcm_probe),
 	DEVMETHOD(device_attach,	guspcm_attach),
+	DEVMETHOD(device_detach,	mss_detach),
 
 	{ 0, 0 }
 };

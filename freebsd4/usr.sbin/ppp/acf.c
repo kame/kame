@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/acf.c,v 1.4 1999/12/20 20:29:40 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/acf.c,v 1.4.2.1 2000/08/19 09:29:59 brian Exp $
  */
 
 #include <sys/types.h>
@@ -39,10 +39,10 @@
 #include "mbuf.h"
 #include "acf.h"
 #include "proto.h"
-#include "lcp.h"
 #include "throughput.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "ccp.h"
 #include "link.h"
 #include "descriptor.h"

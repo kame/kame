@@ -17,7 +17,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/ipcp.c,v 1.90.2.3 2000/06/15 17:08:28 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/ipcp.c,v 1.90.2.4 2000/08/19 09:30:03 brian Exp $
  *
  *	TODO:
  *		o Support IPADDRS properly
@@ -59,12 +59,12 @@
 #include "timer.h"
 #include "fsm.h"
 #include "proto.h"
-#include "lcp.h"
 #include "iplist.h"
 #include "throughput.h"
 #include "slcompress.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "descriptor.h"
@@ -923,8 +923,6 @@ void
 ipcp_CleanInterface(struct ipcp *ipcp)
 {
   struct iface *iface = ipcp->fsm.bundle->iface;
-
-  route_Clean(ipcp->fsm.bundle, ipcp->route);
 
   if (iface->in_addrs && (Enabled(ipcp->fsm.bundle, OPT_PROXY) ||
                           Enabled(ipcp->fsm.bundle, OPT_PROXYALL))) {

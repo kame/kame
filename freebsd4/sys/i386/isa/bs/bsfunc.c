@@ -1,6 +1,6 @@
 /*	$NecBSD: bsfunc.c,v 1.2 1997/10/31 17:43:37 honda Exp $	*/
 /*	$NetBSD$	*/
-/* $FreeBSD: src/sys/i386/isa/bs/bsfunc.c,v 1.7 1999/12/03 11:58:12 nyan Exp $ */
+/* $FreeBSD: src/sys/i386/isa/bs/bsfunc.c,v 1.7.2.1 2000/10/21 07:44:26 nyan Exp $ */
 /*
  * [NetBSD for NEC PC98 series]
  *  Copyright (c) 1994, 1995, 1996 NetBSD/pc98 porting staff.
@@ -631,7 +631,7 @@ bs_check_target(ti)
 	/* inquiry */
 	bzero(&scsi_cmd, sizeof(scsi_cmd));
 	scsi_cmd.opcode = INQUIRY;
-	scsi_cmd.length = sizeof(struct scsi_inquiry_data);
+	scsi_cmd.length = (u_int8_t) sizeof(struct scsi_inquiry_data);
 	cb = bs_make_internal_ccb(ti, 0,
 				   (u_int8_t *) &scsi_cmd, sizeof(scsi_cmd),
 				   (u_int8_t *) &scsi_inquiry_data,

@@ -36,7 +36,7 @@
  *
  *	@(#)procfs_vnops.c	8.18 (Berkeley) 5/21/95
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_vnops.c,v 1.76.2.1 2000/06/21 09:33:43 des Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_vnops.c,v 1.76.2.3 2000/11/07 23:40:07 alfred Exp $
  */
 
 /*
@@ -148,7 +148,7 @@ procfs_open(ap)
 			return (EBUSY);
 
 		p1 = ap->a_p;
-		if (p_trespass(p1, p2) &&
+		if ((!CHECKIO(p1, p2) || p_trespass(p1, p2)) &&
 		    !procfs_kmemaccess(p1))
 			return (EPERM);
 
@@ -240,7 +240,7 @@ procfs_ioctl(ap)
 		return ENOTTY;
 	}
 
-	if (p_trespass(p, procp))
+	if (!CHECKIO(p, procp) || p_trespass(p, procp))
 		return EPERM;
 
 	switch (ap->a_command) {
@@ -901,7 +901,7 @@ procfs_readdir(ap)
 				dp->d_fileno = PROCFS_FILENO(p->p_pid, Pproc);
 				dp->d_namlen = sprintf(dp->d_name, "%ld",
 				    (long)p->p_pid);
-				dp->d_type = DT_REG;
+				dp->d_type = DT_DIR;
 				p = p->p_list.le_next;
 				break;
 			}

@@ -1,5 +1,5 @@
 /*	
- * $FreeBSD: src/sys/boot/common/dev_net.c,v 1.6.2.1 2000/07/07 00:00:26 obrien Exp $
+ * $FreeBSD: src/sys/boot/common/dev_net.c,v 1.6.2.4 2000/09/18 08:09:39 ps Exp $
  * From: $NetBSD: dev_net.c,v 1.12 1997/12/10 20:38:37 gwr Exp $
  */
 
@@ -68,6 +68,7 @@
 #include <string.h>
 #include <net.h>
 #include <netif.h>
+#include <bootp.h>
 #include <bootparam.h>
 
 #include "dev_net.h"
@@ -196,7 +197,6 @@ net_strategy()
  */
 #ifdef	SUPPORT_BOOTP
 int try_bootp = 1;
-int bootp(int sock);
 #endif
 
 extern n_long ip_convertaddr(char *p);
@@ -218,7 +218,7 @@ net_getparams(sock)
      * use RARP and RPC/bootparam (the Sun way) to get them.
      */
     if (try_bootp)
-	bootp(sock);
+	bootp(sock, BOOTP_NONE);
     if (myip.s_addr != 0)
 	goto exit;
     if (debug)

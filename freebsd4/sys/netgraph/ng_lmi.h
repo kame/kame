@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_lmi.h,v 1.1 1999/10/21 09:05:56 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_lmi.h,v 1.1.4.1 2000/10/24 18:36:45 julian Exp $
  * $Whistle: ng_lmi.h,v 1.9 1999/01/20 00:22:13 archie Exp $
  */
 

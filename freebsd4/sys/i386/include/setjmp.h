@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/i386/include/setjmp.h,v 1.4 1999/09/29 15:06:23 marcel Exp $ */
+/* $FreeBSD: src/sys/i386/include/setjmp.h,v 1.4.2.1 2000/10/27 09:16:05 bde Exp $ */
 /*
  * Copyright (c) 1998 John Birrell <jb@cimlogic.com.au>.
  * All rights reserved.
@@ -40,7 +40,7 @@
  * internally to avoid some run-time errors for mismatches.
  */
 #ifndef _ANSI_SOURCE
-typedef struct { int _sjb[_JBLEN + 1]; } sigjmp_buf[1];
+typedef struct _sigjmp_buf { int _sjb[_JBLEN + 1]; } sigjmp_buf[1];
 #endif /* not ANSI */
 
-typedef struct { int _jb[_JBLEN + 1]; } jmp_buf[1];
+typedef struct _jmp_buf { int _jb[_JBLEN + 1]; } jmp_buf[1];

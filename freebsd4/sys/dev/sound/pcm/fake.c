@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/fake.c,v 1.4 2000/01/29 18:48:30 peter Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/fake.c,v 1.4.2.1 2000/10/05 05:05:09 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -38,10 +38,22 @@ static int fkchan_trigger(void *data, int go);
 static int fkchan_getptr(void *data);
 static pcmchan_caps *fkchan_getcaps(void *data);
 
-static pcmchan_caps fk_caps = {
-	4000, 48000,
-	AFMT_STEREO | AFMT_U8 | AFMT_S8 | AFMT_S16_LE | AFMT_S16_BE | AFMT_U16_LE | AFMT_U16_BE
+static u_int32_t fk_fmt[] = {
+	AFMT_U8,
+	AFMT_STEREO | AFMT_U8,
+	AFMT_S8,
+	AFMT_STEREO | AFMT_S8,
+	AFMT_S16_LE,
+	AFMT_STEREO | AFMT_S16_LE,
+	AFMT_U16_LE,
+	AFMT_STEREO | AFMT_U16_LE,
+	AFMT_S16_BE,
+	AFMT_STEREO | AFMT_S16_BE,
+	AFMT_U16_BE,
+	AFMT_STEREO | AFMT_U16_BE,
+	0
 };
+static pcmchan_caps fk_caps = {4000, 48000, fk_fmt, 0};
 
 static pcm_channel fk_chantemplate = {
 	fkchan_init,

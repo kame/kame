@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/reg.h,v 1.7 1999/12/29 04:27:59 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/reg.h,v 1.7.2.1 2000/08/03 21:07:27 peter Exp $ */
 /* From: NetBSD: reg.h,v 1.3 1997/04/06 08:47:40 cgd Exp */
 
 /*
@@ -104,7 +104,7 @@ struct fpreg {
  * Placeholder.
  */
 struct dbreg {
-	unsigned long wankage;
+	unsigned long junk;
 };
 
 #ifdef _KERNEL

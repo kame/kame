@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/setjmp.h,v 1.3 1999/08/28 00:38:51 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/setjmp.h,v 1.3.2.1 2000/10/27 09:16:04 bde Exp $ */
 /* From: NetBSD: setjmp.h,v 1.2 1997/04/06 08:47:41 cgd Exp */
 
 /*
@@ -40,7 +40,7 @@
  * internally to avoid some run-time errors for mismatches.
  */
 #ifndef _ANSI_SOURCE
-typedef struct { long _sjb[_JBLEN + 1]; } sigjmp_buf[1];
+typedef struct _sigjmp_buf { long _sjb[_JBLEN + 1]; } sigjmp_buf[1];
 #endif /* not ANSI */
 
-typedef struct { long _jb[_JBLEN + 1]; } jmp_buf[1];
+typedef struct _jmp_buf { long _jb[_JBLEN + 1]; } jmp_buf[1];

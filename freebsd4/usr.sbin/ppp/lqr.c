@@ -17,7 +17,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/lqr.c,v 1.40.2.1 2000/06/20 09:14:38 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/lqr.c,v 1.40.2.2 2000/08/19 09:30:04 brian Exp $
  *
  *	o LQR based on RFC1333
  *
@@ -40,9 +40,9 @@
 #include "fsm.h"
 #include "acf.h"
 #include "proto.h"
-#include "lcp.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "async.h"
 #include "throughput.h"
 #include "ccp.h"

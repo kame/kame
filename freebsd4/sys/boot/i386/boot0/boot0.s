@@ -13,7 +13,7 @@
 # purpose.
 #
 
-# $FreeBSD: src/sys/boot/i386/boot0/boot0.s,v 1.14.2.2 2000/07/17 21:27:26 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/boot0/boot0.s,v 1.14.2.5 2000/09/21 17:57:50 rnordier Exp $
 
 # A 1024-byte boot manager.
 
@@ -60,7 +60,7 @@
 #
 # Initialise segments and registers to known values.
 # segments start at 0.
-# The stack is immediatly below the address we were loaded to.
+# The stack is immediately below the address we were loaded to.
 #
 # Note that this section of code is used as the first signature check in
 # boot0cfg(8).
@@ -76,12 +76,12 @@ start:		cld				# String ops inc
 # 
 #
 # Set address for variable space beyond code, and clear it.
-# Notice that this is also used to point to the values embedded in in the block,
+# Notice that this is also used to point to the values embedded in the block,
 # by using negative offsets.
 #
 		movw $fake,%bp			# Address variables
 		movw %bp,%di			# %di used in stosw
-		movb $0x8,%cl			# Words to clear
+		movw $0x8,%cx			# Words to clear
 		rep				# Zero
 		stosw				#  them
 		incb -0xe(%di)			# Sector number 1
@@ -118,7 +118,7 @@ main.2: 	movb %dl,_FAKE(%bp)		# Save drive number
 #
 # Start out with a pointer to the 4th byte of the first table entry
 # so that after 4 iterations it's beyond the end of the sector.
-# and beyond a 256 byte boundary and thos overflowed 8 bits (see next comment).
+# and beyond a 256 byte boundary and has overflowed 8 bits (see next comment).
 # (remember that the table starts 2 bytes earlier than you would expect
 # as the bootable flag is after it in the block)
 #
@@ -440,10 +440,10 @@ tables:
 table0:		.byte 0x0, 0x5, 0xf
 table0_end:
 #
-# These valuse indicate botable types we know the names of
+# These values indicate bootable types we know the names of
 #
 table1:		.byte 0x1, 0x4, 0x6, 0x7, 0xb, 0xc, 0xe, 0x63, 0x83
-		.byte 0xa5, 0xa6, 0xa9, 0xb7
+		.byte 0x9f, 0xa5, 0xa6, 0xa9
 table1_end:
 #
 # These are offsets that match the known names above and point to the strings
@@ -459,10 +459,10 @@ table1_end:
 		.byte os_windows-.		# Windows
 		.byte os_unix-. 		# UNIX
 		.byte os_linux-.		# Linux
+		.byte os_bsdos-.		# BSD/OS
 		.byte os_freebsd-.		# FreeBSD
 		.byte os_openbsd-.		# OpenBSD
 		.byte os_netbsd-.		# NetBSD
-		.byte os_bsdos-.		# BSD/OS
 #
 # And here are the strings themselves. 0x80 or'd into a byte indicates 
 # the end of the string. (not so great for Russians but...)

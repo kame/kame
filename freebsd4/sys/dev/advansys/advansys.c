@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/advansys.c,v 1.14.2.2 2000/05/23 10:13:25 nyan Exp $
+ * $FreeBSD: src/sys/dev/advansys/advansys.c,v 1.14.2.3 2000/08/02 22:22:40 peter Exp $
  */
 /*
  * Ported from:
@@ -1309,7 +1309,7 @@ adv_attach(adv)
 		
 	/*
 	 * Create our DMA tags.  These tags define the kinds of device
-	 * accessable memory allocations and memory mappings we will 
+	 * accessible memory allocations and memory mappings we will 
 	 * need to perform during normal operation.
 	 *
 	 * Unless we need to further restrict the allocation, we rely

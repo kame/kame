@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/mpapic.h,v 1.14 2000/01/13 09:09:02 mdodd Exp $
+ * $FreeBSD: src/sys/i386/include/mpapic.h,v 1.14.2.2 2000/09/30 02:49:34 ps Exp $
  */
 
 #ifndef _MACHINE_MPAPIC_H_
@@ -31,17 +31,6 @@
 #include <machine/apic.h>
 
 #include <i386/isa/icu.h>
-
-/* number of busses */
-#if !defined(NBUS)
-# define NBUS		4
-#endif /* NBUS */
-
-/* total number of APIC INTs, including SHARED INTs */
-#if !defined(NINTR)
-#define NINTR		48
-#endif /* NINTR */
-
 
 /*
  * Size of APIC ID list.

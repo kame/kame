@@ -17,7 +17,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/ccp.c,v 1.54.2.1 2000/03/21 10:23:00 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/ccp.c,v 1.54.2.2 2000/08/19 09:29:59 brian Exp $
  *
  *	TODO:
  *		o Support other compression protocols
@@ -41,8 +41,6 @@
 #include "timer.h"
 #include "fsm.h"
 #include "proto.h"
-#include "lcp.h"
-#include "ccp.h"
 #include "pred.h"
 #include "deflate.h"
 #include "throughput.h"
@@ -50,6 +48,8 @@
 #include "slcompress.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
+#include "ccp.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "descriptor.h"

@@ -43,7 +43,7 @@
  *
  *	@(#)ufs_vnops.c 8.27 (Berkeley) 5/27/95
  *	@(#)ext2_vnops.c	8.7 (Berkeley) 2/3/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.51 2000/03/03 08:00:27 bde Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_vnops.c,v 1.51.2.1 2000/11/07 03:09:52 bde Exp $
  */
 
 #include "opt_quota.h"
@@ -263,6 +263,7 @@ ext2_mknod(ap)
 	struct vattr *vap = ap->a_vap;
 	struct vnode **vpp = ap->a_vpp;
 	struct inode *ip;
+	ino_t ino;
 	int error;
 
 	error = ext2_makeinode(MAKEIMODE(vap->va_type, vap->va_mode),
@@ -285,8 +286,9 @@ ext2_mknod(ap)
 	 */
 	vput(*vpp);
 	(*vpp)->v_type = VNON;
+	ino = ip->i_number;	/* Save this before vgone() invalidates ip. */
 	vgone(*vpp);
-	error = VFS_VGET(ap->a_dvp->v_mount, ip->i_ino, vpp);
+	error = VFS_VGET(ap->a_dvp->v_mount, ino, vpp);
 	if (error) {
 		*vpp = NULL;
 		return (error);

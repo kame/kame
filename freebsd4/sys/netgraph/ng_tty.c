@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.7.2.1 2000/03/20 12:52:37 peter Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.7.2.2 2000/10/24 18:36:46 julian Exp $
  * $Whistle: ng_tty.c,v 1.21 1999/11/01 09:24:52 julian Exp $
  */
 

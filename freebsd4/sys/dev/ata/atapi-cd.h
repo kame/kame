@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15.2.2 2000/06/11 17:02:46 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15.2.4 2000/10/25 06:43:02 sos Exp $
  */
 
 /* CDROM Table Of Contents */
@@ -309,14 +309,11 @@ struct acd_track_info {
 /* Structure describing an ATAPI CDROM device */
 struct acd_softc {
     struct atapi_softc		*atp;		/* controller structure */
-    int32_t			lun;		/* logical device unit */
-    int32_t			flags;		/* device state flags */
+    int				lun;		/* logical device unit */
+    int				flags;		/* device state flags */
 #define 	F_LOCKED		0x0001	/* this unit is locked */
-#define 	F_WRITTEN		0x0002	/* medium has been written to */
-#define 	F_DISK_OPEN		0x0004	/* disk open for writing */
-#define 	F_TRACK_OPEN		0x0008	/* track open for writing */
 
-    struct buf_queue_head	buf_queue;	/* Queue of i/o requests */
+    struct buf_queue_head	bio_queue;	/* Queue of i/o requests */
     struct toc			toc;		/* table of disc contents */
     struct {
 	u_int32_t	volsize;		/* volume size in blocks */
@@ -338,9 +335,9 @@ struct acd_softc {
     } subchan;
     struct changer		*changer_info;	/* changer info */
     struct acd_softc		**driver;	/* softc's of changer slots */
-    int32_t			slot;		/* this instance slot number */
+    int				slot;		/* this instance slot number */
     time_t			timestamp;	/* this instance timestamp */
-    u_int32_t			block_size;	/* blocksize currently used */
+    int				block_size;	/* blocksize currently used */
     struct disklabel		disklabel;	/* fake disk label */
     struct devstat		*stats;		/* devstat entry */
     dev_t			dev1, dev2;	/* device place holders */

@@ -23,10 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aic/aicvar.h,v 1.2 1999/12/04 22:15:02 luoqi Exp $
+ * $FreeBSD: src/sys/dev/aic/aicvar.h,v 1.2.2.1 2000/08/08 23:51:23 peter Exp $
  */
-
-#include "aic.h"
 
 struct aic_transinfo {
 	u_int8_t period;

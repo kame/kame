@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/pci/xrpu.c,v 1.19 2000/02/12 07:56:44 peter Exp $
+ * $FreeBSD: src/sys/pci/xrpu.c,v 1.19.2.1 2000/08/02 22:19:57 peter Exp $
  *
  * A very simple device driver for PCI cards based on Xilinx 6200 series
  * FPGA/RPU devices.  Current Functionality is to allow you to open and
@@ -227,7 +227,7 @@ xrpu_attach(device_t self)
 	unit = device_get_unit(self);
 	sc = device_get_softc(self);
 	sc->mode = NORMAL;
-	rid = PCI_MAP_REG_START;
+	rid = PCIR_MAPS;
 	res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
 				 0, ~0, 1, RF_ACTIVE);
 	if (res == NULL) {

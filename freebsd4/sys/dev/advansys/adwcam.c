@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.7 2000/03/02 00:08:34 gibbs Exp $
+ * $FreeBSD: src/sys/dev/advansys/adwcam.c,v 1.7.2.1 2000/10/31 08:09:50 dwmalone Exp $
  */
 /*
  * Ported from:
@@ -826,12 +826,11 @@ adw_alloc(device_t dev, struct resource *regs, int regs_type, int regs_id)
 	/*
 	 * Allocate a storage area for us
 	 */
-	adw = malloc(sizeof(struct adw_softc), M_DEVBUF, M_NOWAIT);
+	adw = malloc(sizeof(struct adw_softc), M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (adw == NULL) {
 		printf("adw%d: cannot malloc!\n", device_get_unit(dev));
 		return NULL;
 	}
-	bzero(adw, sizeof(struct adw_softc));
 	LIST_INIT(&adw->pending_ccbs);
 	SLIST_INIT(&adw->sg_maps);
 	adw->device = dev;

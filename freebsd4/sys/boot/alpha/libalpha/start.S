@@ -1,5 +1,5 @@
 /* 
- * $FreeBSD: src/sys/boot/alpha/libalpha/start.S,v 1.6 1999/09/03 19:42:16 msmith Exp $ 
+ * $FreeBSD: src/sys/boot/alpha/libalpha/start.S,v 1.6.2.1 2000/10/28 01:08:52 gallatin Exp $ 
  * From: $NetBSD: start.S,v 1.4 1998/03/28 00:54:15 cgd Exp $ 
  */
 
@@ -51,6 +51,10 @@ NESTED(start, 1, ENTRY_FRAME, ra, 0, 0)
 	br	pv,Lstartgp
 Lstartgp:
 	LDGP(pv)
+
+#ifndef BOOT1
+	CALL(extend_heap)
+#endif
 
 	lda	a0,_edata
 	lda	a1,_end

@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55.2.1 2000/06/29 07:39:14 asami Exp $
+# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55.2.2 2000/09/16 22:26:07 ache Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -285,6 +285,8 @@
             ..
             sv_SE.ISO_8859-1
             ..
+	    tr_TR.ISO_8859-9
+	    ..
             uk_UA.KOI8-U
             ..
             zh_CN.EUC

@@ -64,7 +64,7 @@
  *
  *	@(#)swap_pager.c	8.9 (Berkeley) 3/21/94
  *
- * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.2 2000/03/27 21:34:43 dillon Exp $
+ * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.5 2000/10/13 07:13:22 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -167,7 +167,7 @@ struct pagerops swappagerops = {
 
 /*
  * dmmax is in page-sized chunks with the new swap system.  It was
- * dev-bsized chunks in the old.
+ * dev-bsized chunks in the old.  dmmax is always a power of 2.
  *
  * swap_*() routines are externally accessible.  swp_*() routines are
  * internal.
@@ -682,7 +682,7 @@ swap_pager_copy(srcobject, dstobject, offset, destroysource)
 		/*
 		 * Reverting the type is not necessary, the caller is going
 		 * to destroy srcobject directly, but I'm doing it here
-		 * for consistancy since we've removed the object from its
+		 * for consistency since we've removed the object from its
 		 * queues.
 		 */
 		srcobject->type = OBJT_DEFAULT;
@@ -1539,7 +1539,7 @@ swp_pager_async_iodone(bp)
 				 * someone may be waiting for that.
 				 *
 				 * NOTE: for reads, m->dirty will probably
-				 * be overriden by the original caller of
+				 * be overridden by the original caller of
 				 * getpages so don't play cute tricks here.
 				 *
 				 * XXX it may not be legal to free the page
@@ -1574,7 +1574,7 @@ swp_pager_async_iodone(bp)
 			 * make sure the pmap modify bits are also cleared.
 			 *
 			 * NOTE: for reads, m->dirty will probably be 
-			 * overriden by the original caller of getpages so
+			 * overridden by the original caller of getpages so
 			 * we cannot set them in order to free the underlying
 			 * swap in a low-swap situation.  I don't think we'd
 			 * want to do that anyway, but it was an optimization
@@ -1592,7 +1592,7 @@ swp_pager_async_iodone(bp)
 			 * valid bits here, it is up to the caller.
 			 */
 
-			pmap_clear_modify(VM_PAGE_TO_PHYS(m));
+			pmap_clear_modify(m);
 			m->valid = VM_PAGE_BITS_ALL;
 			vm_page_undirty(m);
 			vm_page_flag_clear(m, PG_ZERO);
@@ -1618,7 +1618,7 @@ swp_pager_async_iodone(bp)
 			 * busy count and possibly wakes waiter's up ).
 			 */
 			vm_page_protect(m, VM_PROT_READ);
-			pmap_clear_modify(VM_PAGE_TO_PHYS(m));
+			pmap_clear_modify(m);
 			vm_page_undirty(m);
 			vm_page_io_finish(m);
 		}

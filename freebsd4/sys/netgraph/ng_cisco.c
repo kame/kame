@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Julian Elischer <julian@whistle.com>
+ * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.4.2.2 2000/05/24 21:36:40 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.4.2.4 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_cisco.c,v 1.25 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -196,7 +196,7 @@ cisco_constructor(node_p *nodep)
 	sc_p sc;
 	int error = 0;
 
-	MALLOC(sc, sc_p, sizeof(*sc), M_NETGRAPH, M_WAITOK);
+	MALLOC(sc, sc_p, sizeof(*sc), M_NETGRAPH, M_NOWAIT);
 	if (sc == NULL)
 		return (ENOMEM);
 	bzero(sc, sizeof(struct cisco_priv));

@@ -30,13 +30,12 @@
  * SUCH DAMAGE.
  * All rights reserved.
  *
- * $FreeBSD: src/sys/dev/advansys/adwvar.h,v 1.3 2000/02/03 16:34:57 gibbs Exp $
+ * $FreeBSD: src/sys/dev/advansys/adwvar.h,v 1.3.2.1 2000/08/08 23:50:48 peter Exp $
  */
 
 #ifndef _ADWVAR_H_
 #define _ADWVAR_H_
 
-#include "adw.h"
 #include <dev/advansys/adwlib.h>
 
 struct adw_softc *	adw_alloc(device_t dev, struct resource *regs,

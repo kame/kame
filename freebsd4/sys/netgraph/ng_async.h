@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_async.h,v 1.6 1999/11/30 02:45:17 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_async.h,v 1.6.2.2 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_async.h,v 1.5 1999/01/25 01:17:14 archie Exp $
  */
 
@@ -71,14 +71,14 @@ struct ng_async_stat {
 /* Keep this in sync with the above structure definition */
 #define NG_ASYNC_STATS_TYPE_INFO	{			\
 	{							\
-	  { "syncOctets",	&ng_parse_int32_type	},	\
-	  { "syncFrames",	&ng_parse_int32_type	},	\
-	  { "syncOverflows",	&ng_parse_int32_type	},	\
-	  { "asyncOctets",	&ng_parse_int32_type	},	\
-	  { "asyncFrames",	&ng_parse_int32_type	},	\
-	  { "asyncRunts",	&ng_parse_int32_type	},	\
-	  { "asyncOverflows",	&ng_parse_int32_type	},	\
-	  { "asyncBadCheckSums",&ng_parse_int32_type	},	\
+	  { "syncOctets",	&ng_parse_uint32_type	},	\
+	  { "syncFrames",	&ng_parse_uint32_type	},	\
+	  { "syncOverflows",	&ng_parse_uint32_type	},	\
+	  { "asyncOctets",	&ng_parse_uint32_type	},	\
+	  { "asyncFrames",	&ng_parse_uint32_type	},	\
+	  { "asyncRunts",	&ng_parse_uint32_type	},	\
+	  { "asyncOverflows",	&ng_parse_uint32_type	},	\
+	  { "asyncBadCheckSums",&ng_parse_uint32_type	},	\
 	  { NULL },						\
 	}							\
 }
@@ -95,9 +95,9 @@ struct ng_async_cfg {
 #define NG_ASYNC_CONFIG_TYPE_INFO	{			\
 	{							\
 	  { "enabled",		&ng_parse_int8_type	},	\
-	  { "amru",		&ng_parse_int16_type	},	\
-	  { "smru",		&ng_parse_int16_type	},	\
-	  { "accm",		&ng_parse_int32_type	},	\
+	  { "amru",		&ng_parse_uint16_type	},	\
+	  { "smru",		&ng_parse_uint16_type	},	\
+	  { "accm",		&ng_parse_hint32_type	},	\
 	  { NULL },						\
 	}							\
 }

@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.5 2000/07/07 00:29:27 obrien Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.8 2000/11/01 20:06:37 obrien Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -46,6 +46,16 @@ ukbdmap.h			optional	ukbd_dflt_keymap	\
 	no-obj no-implicit-rule before-depend				\
 	clean		"ukbdmap.h"
 #
+compat/linux/linux_file.c	optional	compat_linux
+compat/linux/linux_ioctl.c	optional	compat_linux
+compat/linux/linux_ipc.c	optional	compat_linux
+compat/linux/linux_mib.c	optional	compat_linux
+compat/linux/linux_misc.c	optional	compat_linux
+compat/linux/linux_signal.c	optional	compat_linux
+compat/linux/linux_socket.c	optional	compat_linux
+compat/linux/linux_stats.c	optional	compat_linux
+compat/linux/linux_util.c	optional	compat_linux
+#
 contrib/dev/fla/fla.c		optional	fla
 msysosak.o			optional	fla			\
 	dependency	"$S/contrib/dev/fla/i386/msysosak.o.uu" 		\
@@ -65,6 +75,7 @@ dev/aic/aic_isa.c		optional	aic isa
 dev/ata/ata-all.c		optional	ata 
 dev/ata/ata-dma.c		optional	ata 
 dev/ata/ata-disk.c		optional	atadisk
+dev/ata/ata-raid.c		optional	atadisk
 dev/ata/atapi-all.c		optional	atapicd 
 dev/ata/atapi-all.c		optional	atapifd 
 dev/ata/atapi-all.c		optional	atapist
@@ -79,6 +90,7 @@ dev/fb/fb.c			optional	fb
 dev/fb/fb.c			optional	vga
 dev/fb/splash.c			optional	splash
 dev/fb/vga.c			optional	vga
+dev/fe/if_fe_isa.c		optional	fe isa
 dev/kbd/atkbd.c			optional	atkbd
 dev/kbd/atkbdc.c		optional	atkbdc
 dev/kbd/kbd.c			optional	atkbd
@@ -210,7 +222,6 @@ i386/isa/if_ar.c		optional	ar
 i386/isa/if_cs.c		optional	cs
 i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		optional	el
-i386/isa/if_fe.c		optional	fe
 i386/isa/if_le.c		optional	le
 i386/isa/if_lnc.c		optional	lnc
 i386/isa/if_rdp.c		optional	rdp
@@ -325,19 +336,11 @@ i386/isa/wst.c			optional	wst wdc	\
 i386/isa/wt.c			optional	wt
 i386/linux/imgact_linux.c	optional	compat_linux
 i386/linux/linux_dummy.c	optional	compat_linux
-i386/linux/linux_file.c		optional	compat_linux
-i386/linux/linux_ioctl.c	optional	compat_linux
-i386/linux/linux_ipc.c		optional	compat_linux
 i386/linux/linux_locore.s	optional	compat_linux		   \
 	dependency 	"linux_assym.h"
-i386/linux/linux_mib.c		optional	compat_linux
-i386/linux/linux_misc.c		optional	compat_linux
-i386/linux/linux_signal.c	optional	compat_linux
-i386/linux/linux_socket.c	optional	compat_linux
-i386/linux/linux_stats.c	optional	compat_linux
+i386/linux/linux_machdep.c	optional	compat_linux
 i386/linux/linux_sysent.c	optional	compat_linux
 i386/linux/linux_sysvec.c	optional	compat_linux
-i386/linux/linux_util.c		optional	compat_linux
 svr4/imgact_svr4.c		optional	compat_svr4
 svr4/svr4_fcntl.c		optional	compat_svr4
 svr4/svr4_filio.c		optional	compat_svr4

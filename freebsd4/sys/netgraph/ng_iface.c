@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.7.2.1 2000/04/19 21:27:25 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_iface.c,v 1.7.2.3 2000/10/24 18:36:45 julian Exp $
  * $Whistle: ng_iface.c,v 1.33 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -282,7 +282,7 @@ ng_iface_get_unit(int *unit)
 
 		newlen = (2 * ng_iface_units_len) + 4;
 		MALLOC(newarray, int *, newlen * sizeof(*ng_iface_units),
-		    M_NETGRAPH, M_WAITOK);
+		    M_NETGRAPH, M_NOWAIT);
 		if (newarray == NULL)
 			return (ENOMEM);
 		bcopy(ng_iface_units, newarray,
@@ -531,11 +531,11 @@ ng_iface_constructor(node_p *nodep)
 	int error = 0;
 
 	/* Allocate node and interface private structures */
-	MALLOC(priv, priv_p, sizeof(*priv), M_NETGRAPH, M_WAITOK);
+	MALLOC(priv, priv_p, sizeof(*priv), M_NETGRAPH, M_NOWAIT);
 	if (priv == NULL)
 		return (ENOMEM);
 	bzero(priv, sizeof(*priv));
-	MALLOC(ifp, struct ifnet *, sizeof(*ifp), M_NETGRAPH, M_WAITOK);
+	MALLOC(ifp, struct ifnet *, sizeof(*ifp), M_NETGRAPH, M_NOWAIT);
 	if (ifp == NULL) {
 		FREE(priv, M_NETGRAPH);
 		return (ENOMEM);

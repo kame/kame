@@ -37,7 +37,7 @@
  *	@(#)procfs.h	8.9 (Berkeley) 5/14/95
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs.h,v 1.32 1999/12/29 04:54:46 peter Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs.h,v 1.32.2.1 2000/11/01 20:19:48 sef Exp $
  */
 
 /*
@@ -94,6 +94,13 @@ struct pfsnode {
 	(((type) < Pproc) ? \
 			((type) + 2) : \
 			((((pid)+1) << 4) + ((int) (type))))
+
+#define CHECKIO(p1, p2) \
+     ((((p1)->p_cred->pc_ucred->cr_uid == (p2)->p_cred->p_ruid) && \
+       ((p1)->p_cred->p_ruid == (p2)->p_cred->p_ruid) && \
+       ((p1)->p_cred->p_svuid == (p2)->p_cred->p_ruid) && \
+       ((p2)->p_flag & P_SUGID) == 0) || \
+      (suser_xxx((p1)->p_cred->pc_ucred, (p1), PRISON_ROOT) == 0))
 
 /*
  * Convert between pfsnode vnode

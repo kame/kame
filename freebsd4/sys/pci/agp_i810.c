@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_i810.c,v 1.1.2.1 2000/07/19 09:48:04 ru Exp $
+ *	$FreeBSD: src/sys/pci/agp_i810.c,v 1.1.2.2 2000/10/19 10:36:27 ru Exp $
  */
 
 #include "opt_bus.h"
@@ -84,6 +84,9 @@ agp_i810_match(device_t dev)
 
 	case 0x71258086:
 		return ("Intel 82810E (i810E GMCH) SVGA controller");
+
+	case 0x11328086:
+		return ("Intel 82815 (i815 GMCH) SVGA controller");
 	};
 
 	return NULL;
@@ -100,9 +103,20 @@ agp_i810_find_bridge(device_t dev)
 	u_int32_t devid;
 
 	/*
-	 * XXX assume that the bridge device's ID is one minus the vga ID.
+	 * Calculate bridge device's ID.
 	 */
-	devid = pci_get_devid(dev) - 0x10000;
+	devid = pci_get_devid(dev);
+	switch (devid) {
+	case 0x71218086:
+	case 0x71238086:
+	case 0x71258086:
+		devid -= 0x10000;
+		break;
+
+	case 0x11328086:
+		devid = 0x11308086;
+		break;
+	};
 	if (device_get_children(device_get_parent(dev), &children, &nchildren))
 		return 0;
 

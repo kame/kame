@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sockio.h	8.1 (Berkeley) 3/28/94
- * $FreeBSD: src/sys/sys/sockio.h,v 1.14.2.1 2000/07/15 07:14:44 kris Exp $
+ * $FreeBSD: src/sys/sys/sockio.h,v 1.14.2.2 2000/08/22 18:06:21 archie Exp $
  */
 
 #ifndef	_SYS_SOCKIO_H_
@@ -96,5 +96,6 @@
 #define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */
 
 #define	SIOCGIFSTATUS	_IOWR('i', 59, struct ifstat)	/* get IF status */
+#define	SIOCSIFLLADDR	_IOW('i', 60, struct ifreq)	/* set link level addr */
 
 #endif /* !_SYS_SOCKIO_H_ */

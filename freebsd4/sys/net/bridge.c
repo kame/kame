@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.c,v 1.16.2.3 2000/07/21 04:48:56 nsayer Exp $
+ * $FreeBSD: src/sys/net/bridge.c,v 1.16.2.6 2000/09/25 17:30:01 nsayer Exp $
  */
 
 /*
@@ -224,7 +224,7 @@ bdg_promisc_on()
 }
 
 static int
-sysctl_bdg SYSCTL_HANDLER_ARGS
+sysctl_bdg(SYSCTL_HANDLER_ARGS)
 {
     int error, oldval = do_bridge ;
 
@@ -297,7 +297,7 @@ parse_bdg_cfg()
 }
 
 static int
-sysctl_bdg_cfg SYSCTL_HANDLER_ARGS
+sysctl_bdg_cfg(SYSCTL_HANDLER_ARGS)
 {
     int error = 0 ;
     char oldval[256] ;
@@ -323,7 +323,7 @@ sysctl_bdg_cfg SYSCTL_HANDLER_ARGS
 }
 
 static int
-sysctl_refresh SYSCTL_HANDLER_ARGS
+sysctl_refresh(SYSCTL_HANDLER_ARGS)
 {
     if (req->newptr)
 	    bdgtakeifaces();
@@ -713,7 +713,6 @@ bdg_forward(struct mbuf **m0, struct ether_header *const eh, struct ifnet *dst)
 	 */
 	ip = mtod(m, struct ip *);
 	NTOHS(ip->ip_len);
-	NTOHS(ip->ip_id);
 	NTOHS(ip->ip_off);
 
 	/*
@@ -739,7 +738,6 @@ bdg_forward(struct mbuf **m0, struct ether_header *const eh, struct ifnet *dst)
 	 * Then, if canfree==1, also restore *m0.
 	 */
 	HTONS(ip->ip_len);
-	HTONS(ip->ip_id);
 	HTONS(ip->ip_off);
 	if (canfree) /* m was a reference to *m0, so update *m0 */
 	    *m0 = m ;
@@ -796,10 +794,10 @@ forward:
 	    if (canfree && once ) { /* no need to copy */
 		m = *m0 ;
 		*m0 = NULL ; /* original is gone */
-	    } else /* on a P5-90, m_copypacket takes 540 ticks */
-		m = m_copypacket(*m0, M_DONTWAIT);
+	    } else
+		m = m_dup(*m0, M_DONTWAIT); /* XXX m_copypacket should work */
 	    if (m == NULL) {
-		printf("bdg_forward: sorry, m_copy failed!\n");
+		printf("bdg_forward: sorry, m_dup failed!\n");
 		return ENOBUFS ; /* the original is still there... */
 	    }
 	    /*

@@ -35,7 +35,7 @@
  *
  *	from: @(#)ufs_disksubr.c	7.16 (Berkeley) 5/4/91
  *	from: ufs_disksubr.c,v 1.8 1994/06/07 01:21:39 phk Exp $
- * $FreeBSD: src/sys/pc98/pc98/diskslice_machdep.c,v 1.31 2000/01/29 14:21:04 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/diskslice_machdep.c,v 1.31.2.1 2000/10/18 15:29:31 kato Exp $
  */
 
 /*
@@ -320,8 +320,8 @@ reread_mbr:
 	 */
 	if (((cp[4] != 'I') || (cp[5] != 'P') || (cp[6] != 'L') ||
 		 (cp[7] != '1')) &&
-		((strncmp(devtoname(bp->b_dev), "da", 2) == 0) ||
-	    (strncmp(devtoname(bp->b_dev), "wd", 2) == 0))) {
+		((strncmp(devtoname(bp->b_dev), "rda", 3) == 0) ||
+	    (strncmp(devtoname(bp->b_dev), "rwd", 3) == 0))) {
 		/* IBM-PC HDD */
 		bp->b_flags |= B_INVAL | B_AGE;
 		brelse(bp);

@@ -19,6 +19,8 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
+ * $FreeBSD: src/sys/dev/vx/if_vxreg.h,v 1.5.6.1 2000/08/02 22:42:34 peter Exp $
+ *
  October 2, 1994
 
  Modified by: Andres Vega Garcia

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/throughput.h,v 1.8 1999/08/28 01:18:47 peter Exp $
+ * $FreeBSD: src/usr.sbin/ppp/throughput.h,v 1.8.2.2 2000/09/16 23:09:06 brian Exp $
  */
 
 #define SAMPLE_PERIOD 5		/* Default sample period */
@@ -37,9 +37,13 @@ struct pppThroughput {
   time_t uptime, downtime;
   unsigned long long OctetsIn;
   unsigned long long OctetsOut;
+  unsigned long long PacketsIn;
+  unsigned long long PacketsOut;
   int SamplePeriod;
-  unsigned long long *SampleOctets;
-  unsigned long long OctetsPerSecond;
+  struct {
+    unsigned long long *SampleOctets;
+    unsigned long long OctetsPerSecond;
+  } in, out;
   unsigned long long BestOctetsPerSecond;
   time_t BestOctetsPerSecondTime;
   int nSample;

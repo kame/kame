@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2000 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 1999 Pierre Beyssac
  * Copyright (c) 1993, 1995 Jan-Simon Pendry
  * Copyright (c) 1993, 1995
  *	The Regents of the University of California.  All rights reserved.
@@ -36,7 +38,7 @@
  *
  *	@(#)procfs_vnops.c	8.18 (Berkeley) 5/21/95
  *
- * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_vnops.c,v 1.3.2.1 2000/06/05 10:14:04 des Exp $
+ * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_vnops.c,v 1.3.2.3 2000/10/30 19:57:04 des Exp $
  */
 
 /*
@@ -97,6 +99,8 @@ static struct proc_target {
 	{ DT_DIR, N(".."),	Proot,		NULL },
 	{ DT_REG, N("mem"),	Pmem,		NULL },
 	{ DT_LNK, N("exe"),	Pexe,		NULL },
+	{ DT_REG, N("stat"),	Pprocstat,	NULL },
+	{ DT_REG, N("status"),	Pprocstatus,	NULL },
 #undef N
 };
 static const int nproc_targets = sizeof(proc_targets) / sizeof(proc_targets[0]);
@@ -179,14 +183,6 @@ linprocfs_close(ap)
 		if ((ap->a_fflag & FWRITE) && (pfs->pfs_flags & O_EXCL))
 			pfs->pfs_flags &= ~(FWRITE|O_EXCL);
 		/*
-		 * This rather complicated-looking code is trying to
-		 * determine if this was the last close on this particular
-		 * vnode.  While one would expect v_usecount to be 1 at
-		 * that point, it seems that (according to John Dyson)
-		 * the VM system will bump up the usecount.  So:  if the
-		 * usecount is 2, and VOBJBUF is set, then this is really
-		 * the last close.  Otherwise, if the usecount is < 2
-		 * then it is definitely the last close.
 		 * If this is the last close, then it checks to see if
 		 * the target process has PF_LINGER set in p_pfsflags,
 		 * if this is *not* the case, then the process' stop flags
@@ -530,8 +526,14 @@ linprocfs_getattr(ap)
 
 	case Pmeminfo:
 	case Pcpuinfo:
+	case Pstat:
+	case Puptime:
+	case Pversion:
+		vap->va_bytes = vap->va_size = 0;
+		vap->va_uid = 0;
+		vap->va_gid = 0;
 		break;
-
+		
 	case Pmem:
 		/*
 		 * If we denied owner access earlier, then we have to
@@ -543,6 +545,12 @@ linprocfs_getattr(ap)
 		else
 			vap->va_uid = procp->p_ucred->cr_uid;
 		vap->va_gid = KMEM_GROUP;
+		break;
+
+	case Pprocstat:
+	case Pprocstatus:
+		vap->va_bytes = vap->va_size = 0;
+		/* uid, gid are already set */
 		break;
 
 	default:
@@ -669,7 +677,8 @@ linprocfs_lookup(ap)
 
 	*vpp = NULL;
 
-	if (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME)
+	if (cnp->cn_nameiop == DELETE || cnp->cn_nameiop == RENAME ||
+	    cnp->cn_nameiop == CREATE)
 		return (EROFS);
 
 	if (cnp->cn_namelen == 1 && *pname == '.') {
@@ -691,6 +700,12 @@ linprocfs_lookup(ap)
 			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Pmeminfo));
 		if (CNEQ(cnp, "cpuinfo", 7))
 			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Pcpuinfo));
+		if (CNEQ(cnp, "stat", 4))
+			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Pstat));
+		if (CNEQ(cnp, "uptime", 6))
+			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Puptime));
+		if (CNEQ(cnp, "version", 7))
+			return (linprocfs_allocvp(dvp->v_mount, vpp, 0, Pversion));
 
 		pid = atopid(pname, cnp->cn_namelen);
 		if (pid == NO_PID)
@@ -829,7 +844,7 @@ linprocfs_readdir(ap)
 		int doingzomb = 0;
 #endif
 		int pcnt = 0;
-		volatile struct proc *p = allproc.lh_first;
+		struct proc *p = allproc.lh_first;
 
 		for (; p && uio->uio_resid >= delen; i++, pcnt++) {
 			bzero((char *) dp, delen);
@@ -866,6 +881,27 @@ linprocfs_readdir(ap)
 				dp->d_type = DT_REG;
 				break;
 
+			case 5:
+				dp->d_fileno = PROCFS_FILENO(0, Pstat);
+				dp->d_namlen = 4;
+				bcopy("stat", dp->d_name, 5);
+				dp->d_type = DT_REG;
+				break;
+			    
+			case 6:
+				dp->d_fileno = PROCFS_FILENO(0, Puptime);
+				dp->d_namlen = 6;
+				bcopy("uptime", dp->d_name, 7);
+				dp->d_type = DT_REG;
+				break;
+
+			case 7:
+				dp->d_fileno = PROCFS_FILENO(0, Pversion);
+				dp->d_namlen = 7;
+				bcopy("version", dp->d_name, 8);
+				dp->d_type = DT_REG;
+				break;
+
 			default:
 				while (pcnt < i) {
 					p = p->p_list.le_next;
@@ -883,7 +919,7 @@ linprocfs_readdir(ap)
 				dp->d_fileno = PROCFS_FILENO(p->p_pid, Pproc);
 				dp->d_namlen = sprintf(dp->d_name, "%ld",
 				    (long)p->p_pid);
-				dp->d_type = DT_REG;
+				dp->d_type = DT_DIR;
 				p = p->p_list.le_next;
 				break;
 			}

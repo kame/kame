@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)ffs_softdep.c	9.56 (McKusick) 1/17/00
- * $FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.57.2.1 2000/06/22 19:27:42 peter Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.57.2.4 2000/11/19 22:32:35 dillon Exp $
  */
 
 /*
@@ -1589,6 +1589,7 @@ softdep_setup_freeblocks(ip, length)
 	struct buf *bp;
 	struct fs *fs;
 	int i, error;
+	int delay;
 
 	fs = ip->i_fs;
 	if (length != 0)
@@ -1633,6 +1634,16 @@ softdep_setup_freeblocks(ip, length)
 	if ((inodedep->id_state & IOSTARTED) != 0)
 		panic("softdep_setup_freeblocks: inode busy");
 	/*
+	 * Add the freeblks structure to the list of operations that
+	 * must await the zero'ed inode being written to disk. If we
+	 * still have a bitmap dependency (delay == 0), then the inode
+	 * has never been written to disk, so we can process the
+	 * freeblks below once we have deleted the dependencies.
+	 */
+	delay = (inodedep->id_state & DEPCOMPLETE);
+	if (delay)
+		WORKLIST_INSERT(&inodedep->id_bufwait, &freeblks->fb_list);
+	/*
 	 * Because the file length has been truncated to zero, any
 	 * pending block allocation dependency structures associated
 	 * with this inode are obsolete and can simply be de-allocated.
@@ -1662,23 +1673,16 @@ softdep_setup_freeblocks(ip, length)
 		brelse(bp);
 		ACQUIRE_LOCK(&lk);
 	}
+	if (inodedep_lookup(fs, ip->i_number, 0, &inodedep) != 0)
+		(void)free_inodedep(inodedep);
+	FREE_LOCK(&lk);
 	/*
-	 * Add the freeblks structure to the list of operations that
-	 * must await the zero'ed inode being written to disk. If we
-	 * still have a bitmap dependency, then the inode has never been
-	 * written to disk, so we can process the freeblks immediately.
-	 * If the inodedep does not exist, then the zero'ed inode has
-	 * been written and we can also proceed.
+	 * If the inode has never been written to disk (delay == 0),
+	 * then we can process the freeblks now that we have deleted
+	 * the dependencies.
 	 */
-	if (inodedep_lookup(fs, ip->i_number, 0, &inodedep) == 0 ||
-	    free_inodedep(inodedep) ||
-	    (inodedep->id_state & DEPCOMPLETE) == 0) {
-		FREE_LOCK(&lk);
+	if (!delay)
 		handle_workitem_freeblocks(freeblks);
-	} else {
-		WORKLIST_INSERT(&inodedep->id_bufwait, &freeblks->fb_list);
-		FREE_LOCK(&lk);
-	}
 }
 
 /*
@@ -1891,7 +1895,8 @@ check_inode_unwritten(inodedep)
 	inodedep->id_state |= ALLCOMPLETE;
 	LIST_REMOVE(inodedep, id_deps);
 	inodedep->id_buf = NULL;
-	WORKLIST_REMOVE(&inodedep->id_list);
+	if (inodedep->id_state & ONWORKLIST)
+		WORKLIST_REMOVE(&inodedep->id_list);
 	if (inodedep->id_savedino != NULL) {
 		FREE(inodedep->id_savedino, M_INODEDEP);
 		inodedep->id_savedino = NULL;
@@ -1984,7 +1989,7 @@ handle_workitem_freeblocks(freeblks)
 
 #ifdef DIAGNOSTIC
 	if (freeblks->fb_chkcnt != blocksreleased)
-		panic("handle_workitem_freeblocks: block count");
+		printf("handle_workitem_freeblocks: block count\n");
 	if (allerror)
 		softdep_error("handle_workitem_freeblks", allerror);
 #endif /* DIAGNOSTIC */
@@ -2801,11 +2806,11 @@ softdep_disk_io_initiation(bp)
 			/*
 			 * Replace up-to-date version with safe version.
 			 */
+			MALLOC(indirdep->ir_saveddata, caddr_t, bp->b_bcount,
+			    M_INDIRDEP, M_WAITOK);
 			ACQUIRE_LOCK(&lk);
 			indirdep->ir_state &= ~ATTACHED;
 			indirdep->ir_state |= UNDONE;
-			MALLOC(indirdep->ir_saveddata, caddr_t, bp->b_bcount,
-			    M_INDIRDEP, M_WAITOK);
 			bcopy(bp->b_data, indirdep->ir_saveddata, bp->b_bcount);
 			bcopy(indirdep->ir_savebp->b_data, bp->b_data,
 			    bp->b_bcount);

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/buslogic/bt.c,v 1.25 1999/10/09 06:25:17 mdodd Exp $
+ * $FreeBSD: src/sys/dev/buslogic/bt.c,v 1.25.2.1 2000/08/02 22:32:26 peter Exp $
  */
 
  /*
@@ -699,7 +699,7 @@ bt_init(device_t dev)
 
 	/*
 	 * Create our DMA tags.  These tags define the kinds of device
-	 * accessable memory allocations and memory mappings we will 
+	 * accessible memory allocations and memory mappings we will 
 	 * need to perform during normal operation.
 	 *
 	 * Unless we need to further restrict the allocation, we rely

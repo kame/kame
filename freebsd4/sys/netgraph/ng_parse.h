@@ -34,10 +34,10 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.h,v 1.2 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.2.4.1 2000/04/11 01:07:55 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.h,v 1.2.4.3 2000/10/24 18:36:46 julian Exp $
  */
 
 #ifndef _NETGRAPH_PARSE_H_
@@ -163,12 +163,14 @@
 
     // Super-type info for struct foo
     struct ng_parse_struct_info foo_fields = {
-	    { "ip",		&ng_parse_ipaddr_type	},
+	{
+	    { "ip",	&ng_parse_ipaddr_type	},
 	    { "bar",	&ng_parse_int32_type	},
 	    { "label",	&foo_label_type		},
-	    { "alen",	&ng_parse_int8_type	},
+	    { "alen",	&ng_parse_uint8_type	},
 	    { "ary",	&foo_ary_type		},
 	    { NULL }
+	}
     };
 
     // Parse type for struct foo
@@ -412,6 +414,18 @@ extern const struct ng_parse_type ng_parse_int8_type;
 extern const struct ng_parse_type ng_parse_int16_type;
 extern const struct ng_parse_type ng_parse_int32_type;
 extern const struct ng_parse_type ng_parse_int64_type;
+
+/* Same thing but unparse as unsigned quantities */
+extern const struct ng_parse_type ng_parse_uint8_type;
+extern const struct ng_parse_type ng_parse_uint16_type;
+extern const struct ng_parse_type ng_parse_uint32_type;
+extern const struct ng_parse_type ng_parse_uint64_type;
+
+/* Same thing but unparse as hex quantities, e.g., "0xe7" */
+extern const struct ng_parse_type ng_parse_hint8_type;
+extern const struct ng_parse_type ng_parse_hint16_type;
+extern const struct ng_parse_type ng_parse_hint32_type;
+extern const struct ng_parse_type ng_parse_hint64_type;
 
 /*
  * IP ADDRESS TYPE

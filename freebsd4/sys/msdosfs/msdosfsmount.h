@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfsmount.h,v 1.20.2.1 2000/07/08 14:34:27 bp Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfsmount.h,v 1.20.2.2 2000/10/27 09:45:07 bde Exp $ */
 /*	$NetBSD: msdosfsmount.h,v 1.17 1997/11/17 15:37:07 ws Exp $	*/
 
 /*-
@@ -84,7 +84,7 @@ struct msdosfsmount {
 	u_long pm_fatblocksize;	/* size of fat blocks in bytes */
 	u_long pm_fatblocksec;	/* size of fat blocks in sectors */
 	u_long pm_fatsize;	/* size of fat in bytes */
-	u_long pm_fatmask;	/* mask to use for fat numbers */
+	u_int32_t pm_fatmask;	/* mask to use for fat numbers */
 	u_long pm_fsinfo;	/* fsinfo block number */
 	u_long pm_nxtfree;	/* next free cluster in fsinfo block */
 	u_int pm_fatmult;	/* these 2 values are used in fat */

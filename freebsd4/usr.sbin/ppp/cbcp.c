@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/cbcp.c,v 1.18.2.1 2000/03/21 10:22:59 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/cbcp.c,v 1.18.2.2 2000/08/19 09:29:59 brian Exp $
  */
 
 #include <sys/param.h>
@@ -41,9 +41,9 @@
 #include "lqr.h"
 #include "mbuf.h"
 #include "fsm.h"
-#include "lcp.h"
 #include "throughput.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "ccp.h"
 #include "link.h"
 #include "async.h"

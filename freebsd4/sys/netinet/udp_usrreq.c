@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.2 2000/07/15 07:14:31 kris Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.5 2000/11/01 17:08:50 ru Exp $
  */
 
 #include "opt_ipsec.h"
@@ -220,7 +220,7 @@ udp_input(m, off, proto)
 				uh->uh_sum = m->m_pkthdr.csum_data;
 			else
 	                	uh->uh_sum = in_pseudo(ip->ip_src.s_addr,
-				    ip->ip_dst.s_addr, htonl(ip->ip_len +
+				    ip->ip_dst.s_addr, htonl((u_short)len +
 				    m->m_pkthdr.csum_data + IPPROTO_UDP));
 			uh->uh_sum ^= 0xffff;
 		} else {
@@ -353,15 +353,15 @@ udp_input(m, off, proto)
 			udpstat.udps_noportbcast++;
 			goto bad;
 		}
-		*ip = save_ip;
 #ifdef ICMP_BANDLIM
 		if (badport_bandlim(0) < 0)
 			goto bad;
 #endif
-		if (!blackhole)
-			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0);
-		else
+		if (blackhole)
 			goto bad;
+		*ip = save_ip;
+		ip->ip_len += iphlen;
+		icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0);
 		return;
 	}
 #ifdef IPSEC
@@ -520,7 +520,7 @@ udp_ctlinput(cmd, sa, vip)
 }
 
 static int
-udp_pcblist SYSCTL_HANDLER_ARGS
+udp_pcblist(SYSCTL_HANDLER_ARGS)
 {
 	int error, i, n, s;
 	struct inpcb *inp, **inp_list;
@@ -606,7 +606,7 @@ SYSCTL_PROC(_net_inet_udp, UDPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
 	    udp_pcblist, "S,xinpcb", "List of active UDP sockets");
 
 static int
-udp_getcred SYSCTL_HANDLER_ARGS
+udp_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct sockaddr_in addrs[2];
 	struct inpcb *inp;

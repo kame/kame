@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5 1999/12/07 05:50:47 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.c,v 1.5.2.5 2000/10/24 18:36:45 julian Exp $
  * $Whistle: ng_ksocket.c,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -149,7 +149,7 @@ ng_parse_generic_sockdata_getLength(const struct ng_parse_type *type,
 	const struct sockaddr *sa;
 
 	sa = (const struct sockaddr *)(buf - SADATA_OFFSET);
-	return sa->sa_len - SADATA_OFFSET;
+	return (sa->sa_len < SADATA_OFFSET) ? 0 : sa->sa_len - SADATA_OFFSET;
 }
 
 /* Type for the variable length data portion of a generic struct sockaddr */
@@ -161,8 +161,8 @@ static const struct ng_parse_type ng_ksocket_generic_sockdata_type = {
 /* Type for a generic struct sockaddr */
 static const struct ng_parse_struct_info ng_parse_generic_sockaddr_type_info = {
 	{
-	  { "len",	&ng_parse_int8_type			},
-	  { "family",	&ng_parse_int8_type			},
+	  { "len",	&ng_parse_uint8_type			},
+	  { "family",	&ng_parse_uint8_type			},
 	  { "data",	&ng_ksocket_generic_sockdata_type	},
 	  { NULL }
 	}
@@ -492,7 +492,7 @@ ng_ksocket_constructor(node_p *nodep)
 	int error;
 
 	/* Allocate private structure */
-	MALLOC(priv, priv_p, sizeof(*priv), M_NETGRAPH, M_WAITOK);
+	MALLOC(priv, priv_p, sizeof(*priv), M_NETGRAPH, M_NOWAIT);
 	if (priv == NULL)
 		return (ENOMEM);
 	bzero(priv, sizeof(*priv));
@@ -849,7 +849,6 @@ ng_ksocket_incoming(struct socket *so, void *arg, int waitflag)
 	const node_p node = arg;
 	const priv_p priv = node->private;
 	meta_p meta = NULL;
-	struct sockaddr *nam;
 	struct mbuf *m;
 	struct uio auio;
 	int s, flags, error;
@@ -870,7 +869,8 @@ ng_ksocket_incoming(struct socket *so, void *arg, int waitflag)
 	flags = MSG_DONTWAIT;
 	do {
 		if ((error = (*so->so_proto->pr_usrreqs->pru_soreceive)
-		      (so, &nam, &auio, &m, (struct mbuf **)0, &flags)) == 0
+		      (so, (struct sockaddr **)0, &auio, &m,
+		      (struct mbuf **)0, &flags)) == 0
 		    && m != NULL) {
 			struct mbuf *n;
 

@@ -55,9 +55,7 @@
  *
  * W. Metzenthen   June 1994.
  *
- *
- *     $id:$
- *
+ * $FreeBSD: src/sys/gnu/i386/fpemul/reg_constant.c,v 1.6.8.1 2000/08/03 00:53:55 peter Exp $
  */
 
 

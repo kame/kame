@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/include/link.h,v 1.20 1999/08/27 23:44:50 peter Exp $
+ * $FreeBSD: src/include/link.h,v 1.20.2.1 2000/09/22 02:08:25 jdp Exp $
  */
 
 /*
@@ -58,7 +58,8 @@ struct link_map {
 struct r_debug {
 	int		r_version;		/* not used */
 	struct link_map *r_map;			/* list of loaded images */
-	void		(*r_brk)(void);		/* pointer to break point */
+	void		(*r_brk)(struct r_debug *, struct link_map *);
+						/* pointer to break point */
 	enum {
 	    RT_CONSISTENT,			/* things are stable */
 	    RT_ADD,				/* adding a shared library */

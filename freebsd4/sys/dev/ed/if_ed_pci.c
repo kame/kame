@@ -17,7 +17,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.23 1999/11/20 09:28:01 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.23.2.1 2000/09/10 08:45:11 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -80,11 +80,11 @@ ed_pci_probe (device_t dev)
 static int
 ed_pci_attach(device_t dev)
 {
-        struct ed_softc *sc = device_get_softc(dev);
-        int flags = 0;
-        int error;
+        struct	ed_softc *sc = device_get_softc(dev);
+        int	flags = 0;
+        int	error;
 
-        error = ed_probe_Novell_generic(dev, PCIR_MAPS, flags);
+        error = ed_probe_Novell(dev, PCIR_MAPS, flags);
         if (error)
                 return (error);
 

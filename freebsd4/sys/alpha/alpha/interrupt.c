@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.15.2.1 2000/05/24 14:20:57 gallatin Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.15.2.2 2000/08/08 19:05:17 peter Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
 
 /*
@@ -318,10 +318,7 @@ int alpha_setup_intr(int vector, driver_intr_t *intr, void *arg,
 	i->vector = vector;
 	i->intr = intr;
 	i->arg = arg;
-	if (cntp)
-		i->cntp = cntp;
-	else
-		i->cntp = NULL;
+	i->cntp = cntp;
 
 	s = splhigh();
 	LIST_INSERT_HEAD(&alpha_intr_hash[h], i, list);

@@ -37,7 +37,7 @@
  *	@(#)procfs_regs.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_regs.c,v 1.10 1999/11/21 19:03:19 phk Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_regs.c,v 1.10.2.1 2000/11/01 20:19:48 sef Exp $
  */
 
 #include <sys/param.h>
@@ -60,7 +60,7 @@ procfs_doregs(curp, p, pfs, uio)
 	char *kv;
 	int kl;
 
-	if (p_trespass(curp, p))
+	if (!CHECKIO(curp, p) || p_trespass(curp, p))
 		return EPERM;
 	kl = sizeof(r);
 	kv = (char *) &r;

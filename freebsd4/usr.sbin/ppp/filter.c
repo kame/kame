@@ -17,7 +17,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/filter.c,v 1.39.2.2 2000/04/13 00:14:40 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/filter.c,v 1.39.2.3 2000/08/19 09:30:03 brian Exp $
  *
  *	TODO: Should send ICMP error message when we discard packets.
  */
@@ -468,6 +468,11 @@ Parse(struct ipcp *ipcp, int argc, char const *const *argv,
     argv++;
   }
 
+  if (argc >= 2 && strcmp(argv[argc - 2], "timeout") == 0) {
+    filterdata.timeout = strtoul(argv[argc - 1], NULL, 10);
+    argc -= 2;
+  }
+
   val = 1;
   filterdata.f_proto = proto;
 
@@ -587,6 +592,8 @@ doShowFilter(struct filterent *fp, struct prompt *prompt)
 	if (fp->f_finrst)
 	  prompt_Printf(prompt, " finrst");
       }
+      if (fp->timeout != 0)
+	  prompt_Printf(prompt, " timeout %u", fp->timeout);
       prompt_Printf(prompt, "\n");
     }
   }

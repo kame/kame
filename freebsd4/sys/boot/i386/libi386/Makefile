@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.15.2.1 2000/05/04 13:51:23 ps Exp $
+# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.15.2.2 2000/09/22 17:04:46 archie Exp $
 #
 LIB=			i386
 NOPIC=
@@ -8,7 +8,8 @@ INTERNALSTATICLIB=	true
 
 SRCS=	aout_freebsd.c biosdisk.c biosmem.c biospnp.c biospci.c \
 	bootinfo.c comconsole.c devicename.c elf_freebsd.c gatea20.c \
-	i386_copy.c i386_module.c time.c vidconsole.c pxe.c pxetramp.s
+	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
+	time.c vidconsole.c
 
 CFLAGS+=	-I${.CURDIR}/../../common -I${.CURDIR}/../btx/lib \
 		-I${.CURDIR}/../../.. -I.

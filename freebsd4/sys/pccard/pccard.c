@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard.c,v 1.106.2.1 2000/05/23 03:56:58 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard.c,v 1.106.2.3 2000/10/15 04:12:43 sanpei Exp $
  */
 
 #include "opt_pcic.h"
@@ -41,15 +41,10 @@
 #include <sys/select.h>
 #include <sys/sysctl.h>
 #include <sys/conf.h>
-#include <sys/module.h>
 #include <sys/uio.h>
 #include <sys/poll.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
-
-#include <i386/isa/isa_device.h>
-#include <i386/isa/icu.h>
-#include <i386/isa/intr_machdep.h>
 
 #include <pccard/cardinfo.h>
 #include <pccard/driver.h>
@@ -282,7 +277,7 @@ inserted(void *arg)
 	 *	Enable 5V to the card so that the CIS can be read.
 	 */
 	slt->pwr.vcc = 50;
-	slt->pwr.vpp = 0;
+	slt->pwr.vpp = 50;
 
 	/*
 	 * Disable any pending timeouts for this slot, and explicitly
@@ -318,7 +313,7 @@ pccard_event(struct slot *slt, enum card_event event)
 		 *	The slot and devices are disabled, but the
 		 *	data structures are not unlinked.
 		 */
-		if (slt->state == filled) {
+		if (slt->state == filled || slt->state == inactive) {
 			slt->state = empty;
 			disable_slot_to(slt);
 		}
@@ -460,7 +455,12 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 	struct slot *slt = pccard_slots[minor(dev)];
 	struct mem_desc *mp;
 	struct io_desc *ip;
+	struct pccard_resource *pr;
+	struct resource *r;
+	device_t pcicdev;
 	int s, err;
+	int rid = 1;
+	int i;
 	int	pwval;
 
 	if (slt == 0 && cmd != PIOCRWMEM)
@@ -544,8 +544,10 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 	case PIOCRWFLAG:
 		slt->rwmem = *(int *)data;
 		break;
+#ifndef	__alpha__
 	/*
 	 * Set the memory window to be used for the read/write interface.
+	 * Not available on the alpha.
 	 */
 	case PIOCRWMEM:
 		if (*(unsigned long *)data == 0) {
@@ -571,6 +573,7 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 		    (unsigned char *)(void *)(uintptr_t)
 		    (pccard_mem + atdevbase - IOM_BEGIN);
 		break;
+#endif
 	/*
 	 * Set power values.
 	 */
@@ -597,15 +600,48 @@ crdioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct proc *p)
 		if (!pwval) {
 			if (slt->state != filled)
 				return EINVAL;
+			pccard_event(slt, card_removed);
+			slt->state = inactive;
 		} else {
-			if (slt->state != empty)
+			if (slt->state != empty && slt->state != inactive)
 				return EINVAL;
+			pccard_event(slt, card_inserted);
 		}
-		pccard_event(slt, pwval == 0 ? card_removed : card_inserted);
 		break;
 	case PIOCSBEEP:
 		if (pccard_beep_select(*(int *)data)) {
 			return EINVAL;
+		}
+		break;
+	case PIOCSRESOURCE:
+		pr = (struct pccard_resource *)data;
+		pr->resource_addr = ~0ul;
+		/*
+		 * pccard_devclass does not have soft_c
+		 * so we use pcic_devclass
+		 */
+		pcicdev = devclass_get_device(pcic_devclass, 0);
+		switch(pr->type) {
+		default:
+			return EINVAL;
+		case SYS_RES_IOPORT:
+		case SYS_RES_MEMORY:
+		case SYS_RES_IRQ:
+			for (i = pr->min; i + pr->size - 1 <= pr->max; i++) {
+				/* already allocated to pcic? */
+				if (bus_get_resource_start(pcicdev, pr->type, 0) == i)
+					continue;
+				err = bus_set_resource(pcicdev, pr->type, rid, i, pr->size);
+				if (!err) {
+					r = bus_alloc_resource(pcicdev, pr->type, &rid, 0ul, ~0ul, pr->size, 0);
+					if (r) { 
+						pr->resource_addr = (u_long)rman_get_start(r);
+			                        bus_release_resource(pcicdev, pr->type, rid, r);
+						break;
+					}
+				}
+			}
+			break;
 		}
 		break;
 	}

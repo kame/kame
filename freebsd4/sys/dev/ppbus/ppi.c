@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppi.c,v 1.21.2.1 2000/05/24 00:20:57 n_hibma Exp $
+ * $FreeBSD: src/sys/dev/ppbus/ppi.c,v 1.21.2.3 2000/08/07 18:24:43 peter Exp $
  *
  */
 #include "opt_ppb_1284.h"
@@ -168,10 +168,8 @@ ppi_attach(device_t dev)
 #ifdef PERIPH_1284
 	uintptr_t irq;
 	int zero = 0;
-#endif /* PERIPH_1284 */
 	struct ppi_data *ppi = DEVTOSOFTC(dev);
 
-#ifdef PERIPH_1284
 	/* retrive the irq */
 	BUS_READ_IVAR(device_get_parent(dev), dev, PPBUS_IVAR_IRQ, &irq);
 
@@ -280,9 +278,9 @@ ppiopen(dev_t dev, int flags, int fmt, struct proc *p)
 
 #ifdef PERIPH_1284
 		if (ppi->intr_resource) {
-		/* register our interrupt handler */
-		BUS_SETUP_INTR(device_get_parent(ppidev), ppidev, ppi->intr_resource,
-			       INTR_TYPE_TTY, ppiintr, dev, &ppi->intr_cookie);
+			/* register our interrupt handler */
+			BUS_SETUP_INTR(device_get_parent(ppidev), ppidev, ppi->intr_resource,
+				       INTR_TYPE_TTY, ppiintr, dev, &ppi->intr_cookie);
 		}
 #endif /* PERIPH_1284 */
 	}

@@ -1,5 +1,5 @@
 /*-
- * $FreeBSD: src/sys/sys/kbio.h,v 1.5 1999/12/29 04:24:43 peter Exp $
+ * $FreeBSD: src/sys/sys/kbio.h,v 1.5.2.1 2000/10/29 16:59:32 dwmalone Exp $
  */
 
 #ifndef	_SYS_KBIO_H_
@@ -171,6 +171,8 @@ typedef struct keymap keymap_t;
 #define RCTRA		0x9e		/* right ctrl key / alt lock	*/
 #define LALTA		0x9f		/* left alt key / alt lock	*/
 #define RALTA		0xa0		/* right alt key / alt lock	*/
+#define HALT		0xa1		/* halt machine */
+#define PDWN		0xa2		/* halt machine and power down */
 
 #define F(x)		((x)+F_FN-1)
 #define	S(x)		((x)+F_SCR-1)

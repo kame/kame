@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/i4b.c,v 1.8 1999/11/28 15:50:23 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/i4b.c,v 1.8.2.1 2000/08/19 09:30:03 brian Exp $
  */
 
 #include <sys/param.h>
@@ -246,11 +246,13 @@ static int
 i4b_Speed(struct physical *p)
 {
   struct termios ios;
+  int ret;
 
-  if (tcgetattr(p->fd, &ios) == -1)
-    return 0;
+  if (tcgetattr(p->fd, &ios) == -1 ||
+      (ret = SpeedToInt(cfgetispeed(&ios))) == 0)
+    ret = 64000;
 
-  return SpeedToInt(cfgetispeed(&ios));
+  return ret;
 }
 
 static const char *

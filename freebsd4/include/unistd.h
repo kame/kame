@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.12 (Berkeley) 4/27/95
- * $FreeBSD: src/include/unistd.h,v 1.35.2.1 2000/07/03 18:09:40 joe Exp $
+ * $FreeBSD: src/include/unistd.h,v 1.35.2.3 2000/09/20 11:19:50 green Exp $
  */
 
 #ifndef _UNISTD_H_
@@ -96,6 +96,7 @@ ssize_t	 read __P((int, void *, size_t));
 int	 rmdir __P((const char *));
 int	 setgid __P((gid_t));
 int	 setpgid __P((pid_t, pid_t));
+void	 setproctitle __P((const char *_fmt, ...)) __printf0like(1, 2);
 pid_t	 setsid __P((void));
 int	 setuid __P((uid_t));
 unsigned int	 sleep __P((unsigned int));
@@ -120,6 +121,8 @@ char	*brk __P((const char *));
 int	 chroot __P((const char *));
 size_t	 confstr __P((int, char *, size_t));
 char	*crypt __P((const char *, const char *));
+const char *crypt_get_format __P((void));
+int	 crypt_set_format __P((const char *));
 int	 des_cipher __P((const char *, char *, long, int));
 int	 des_setkey __P((const char *key));
 int	 encrypt __P((char *, int));

@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)resourcevar.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/resourcevar.h,v 1.16 2000/01/28 20:40:19 green Exp $
+ * $FreeBSD: src/sys/sys/resourcevar.h,v 1.16.2.1 2000/09/07 19:13:55 truckman Exp $
  */
 
 #ifndef	_SYS_RESOURCEVAR_H_
 #define	_SYS_RESOURCEVAR_H_
 
 #include <sys/resource.h>
+#include <sys/queue.h>
 
 /*
  * Kernel per-process accounting / statistics
@@ -80,18 +81,37 @@ struct plimit {
 	rlim_t	p_cpulimit;		/* current cpu limit in usec */
 };
 
+/*
+ * Per uid resource consumption
+ */
+struct uidinfo {
+	LIST_ENTRY(uidinfo) ui_hash;
+	rlim_t	ui_sbsize;		/* socket buffer space consumed */
+	long	ui_proccnt;		/* number of processes */
+	uid_t	ui_uid;			/* uid */
+	u_short	ui_ref;			/* reference count */
+};
+
 #ifdef _KERNEL
+#define uihold(uip)	(uip)->ui_ref++
 struct proc;
 
 void	 addupc_intr __P((struct proc *p, u_long pc, u_int ticks));
 void	 addupc_task __P((struct proc *p, u_long pc, u_int ticks));
 void	 calcru __P((struct proc *p, struct timeval *up, struct timeval *sp,
 	    struct timeval *ip));
+int	 chgproccnt __P((struct uidinfo *uip, int diff, int max));
+int	 chgsbsize __P((struct uidinfo *uip, u_long *hiwat, u_long to,
+	    rlim_t max));
 int	 fuswintr __P((void *base));
 struct plimit
 	*limcopy __P((struct plimit *lim));
 void	 ruadd __P((struct rusage *ru, struct rusage *ru2));
 int	 suswintr __P((void *base, int word));
+struct uidinfo
+	*uifind __P((uid_t uid));
+int	 uifree __P((struct uidinfo *uip));
+void	uihashinit __P((void));
 #endif
 
 #endif	/* !_SYS_RESOURCEVAR_H_ */

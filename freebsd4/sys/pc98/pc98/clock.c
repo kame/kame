@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)clock.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/pc98/pc98/clock.c,v 1.81 2000/01/05 12:35:03 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/clock.c,v 1.81.2.2 2000/10/21 07:44:26 nyan Exp $
  */
 
 /*
@@ -1134,6 +1134,8 @@ inittodr(time_t base)
 		  second);
 	/* sec now contains the	number of seconds, since Jan 1 1970,
 	   in the local	time zone */
+
+	s = splhigh();
 #else	/* IBM-PC */
 	/* Look if we have a RTC present and the time is valid */
 	if (!(rtcin(RTC_STATUSD) & RTCSD_PWR))
@@ -1483,7 +1485,7 @@ setstatclockrate(int newhz)
 }
 
 static int
-sysctl_machdep_i8254_freq SYSCTL_HANDLER_ARGS
+sysctl_machdep_i8254_freq(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	u_int freq;
@@ -1508,7 +1510,7 @@ SYSCTL_PROC(_machdep, OID_AUTO, i8254_freq, CTLTYPE_INT | CTLFLAG_RW,
     0, sizeof(u_int), sysctl_machdep_i8254_freq, "I", "");
 
 static int
-sysctl_machdep_tsc_freq SYSCTL_HANDLER_ARGS
+sysctl_machdep_tsc_freq(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	u_int freq;

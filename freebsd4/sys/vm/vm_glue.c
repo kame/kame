@@ -59,7 +59,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_glue.c,v 1.94 1999/12/06 04:53:08 luoqi Exp $
+ * $FreeBSD: src/sys/vm/vm_glue.c,v 1.94.2.1 2000/08/02 22:15:09 peter Exp $
  */
 
 #include "opt_rlimit.h"
@@ -182,14 +182,10 @@ vslock(addr, len)
 }
 
 void
-vsunlock(addr, len, dirtied)
+vsunlock(addr, len)
 	caddr_t addr;
 	u_int len;
-	int dirtied;
 {
-#ifdef	lint
-	dirtied++;
-#endif	/* lint */
 	vm_map_pageable(&curproc->p_vmspace->vm_map, trunc_page((vm_offset_t)addr),
 	    round_page((vm_offset_t)addr + len), TRUE);
 }

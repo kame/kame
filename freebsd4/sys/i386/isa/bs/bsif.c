@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/bs/bsif.c,v 1.10 1999/10/06 07:26:48 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/bs/bsif.c,v 1.10.2.1 2000/08/24 08:06:08 kato Exp $
  */
 
 #if	0
@@ -421,7 +421,7 @@ bs_alloc_buf(ti)
 			ti->bounce_phys = (u_int8_t *) physaddr;
 			return;
 		}
-		free(buf, M_DEVBUF);
+		free(addr, M_DEVBUF);
 	}
 	addr = contigmalloc(ti->bounce_size, M_DEVBUF, M_NOWAIT,
 						0ul, RAM_END, 1ul, 0x10000ul);

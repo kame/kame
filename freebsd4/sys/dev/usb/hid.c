@@ -1,5 +1,5 @@
 /*	$NetBSD: hid.c,v 1.15 2000/04/27 15:26:46 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/hid.c,v 1.11.2.3 2000/07/02 11:27:27 n_hibma Exp $ */
+/*	$FreeBSD: src/sys/dev/usb/hid.c,v 1.11.2.4 2000/10/31 23:23:29 n_hibma Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -59,7 +59,7 @@ extern int usbdebug;
 #define DPRINTFN(n,x)
 #endif
 
-Static void hid_clear_local __P((struct hid_item *));
+Static void hid_clear_local(struct hid_item *);
 
 #define MAXUSAGE 100
 struct hid_data {

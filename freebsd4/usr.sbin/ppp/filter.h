@@ -15,7 +15,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/filter.h,v 1.21.2.1 2000/03/21 10:23:07 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/filter.h,v 1.21.2.3 2000/09/16 23:09:04 brian Exp $
  *
  *	TODO:
  */
@@ -32,6 +32,8 @@
 #ifdef IPPROTO_GRE
 #define P_GRE   6
 #endif
+#define P_ESP   7
+#define P_AH    8
 
 /* Operations - f_srcop, f_dstop */
 #define	OP_NONE	0
@@ -75,6 +77,7 @@ struct filterent {
   struct in_range f_dst;	/* Destination address and mask */
   u_short f_srcport;		/* Source port, compared with f_srcop */
   u_short f_dstport;		/* Destination port, compared with f_dstop */
+  unsigned timeout;		/* Keep alive value for passed packet */
 };
 
 #define	MAXFILTERS	40	/* in each filter set */

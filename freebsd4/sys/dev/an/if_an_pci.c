@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.1 2000/07/17 21:24:25 archie Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.2 2000/08/02 22:29:50 peter Exp $
  */
 
 /*
@@ -82,7 +82,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.1 2000/07/17 21:24:25 archie Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.2 2000/08/02 22:29:50 peter Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -148,10 +148,10 @@ static int an_attach_pci(dev)
 	/*
 	 * Map control/status registers.
  	 */
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 	command |= PCIM_CMD_PORTEN;
-	pci_write_config(dev, PCI_COMMAND_STATUS_REG, command, 4);
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 	if (!(command & PCIM_CMD_PORTEN)) {
 		printf("an%d: failed to enable I/O ports!\n", unit);

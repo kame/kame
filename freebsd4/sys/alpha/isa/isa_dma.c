@@ -35,7 +35,7 @@
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
  *	from: isa_dma.c,v 1.3 1999/05/09 23:56:00 peter Exp $
- * $FreeBSD: src/sys/alpha/isa/isa_dma.c,v 1.2.2.1 2000/07/04 01:55:19 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/isa/isa_dma.c,v 1.2.2.3 2000/08/08 22:19:24 peter Exp $
  */
 
 /*
@@ -50,7 +50,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/buf.h>		/* B_READ and B_RAW */
 #include <sys/malloc.h>
 #include <sys/bus.h>
 #include <vm/vm.h>
@@ -245,7 +244,7 @@ static void isa_dmastart_cb(void *arg, bus_dma_segment_t *segs, int nseg,
 		/* we bounced */
 		dma_bounced |= (1 << chan);
                 /* copy bounce buffer on write */
-                if (!(flags & B_READ)) 
+                if (!(flags & ISADMA_READ)) 
                         bus_dmamap_sync(dma_tag[chan], dma_map[chan], 
 			                  BUS_DMASYNC_PREWRITE);
 	}
@@ -257,15 +256,15 @@ static void isa_dmastart_cb(void *arg, bus_dma_segment_t *segs, int nseg,
 		 */
 		/* set dma channel mode, and reset address ff */
 
-		/* If B_RAW flag is set, then use autoinitialise mode */
-		if (flags & B_RAW) {
-		  if (flags & B_READ)
+		/* If ISADMA_RAW flag is set, then use autoinitialise mode */
+		if (flags & ISADMA_RAW) {
+		  if (flags & ISADMA_READ)
 			outb(DMA1_MODE, DMA37MD_AUTO|DMA37MD_WRITE|chan);
 		  else
 			outb(DMA1_MODE, DMA37MD_AUTO|DMA37MD_READ|chan);
 		}
 		else
-		if (flags & B_READ)
+		if (flags & ISADMA_READ)
 			outb(DMA1_MODE, DMA37MD_SINGLE|DMA37MD_WRITE|chan);
 		else
 			outb(DMA1_MODE, DMA37MD_SINGLE|DMA37MD_READ|chan);
@@ -290,15 +289,15 @@ static void isa_dmastart_cb(void *arg, bus_dma_segment_t *segs, int nseg,
 		 */
 		/* set dma channel mode, and reset address ff */
 
-		/* If B_RAW flag is set, then use autoinitialise mode */
-		if (flags & B_RAW) {
-		  if (flags & B_READ)
+		/* If ISADMA_RAW flag is set, then use autoinitialise mode */
+		if (flags & ISADMA_RAW) {
+		  if (flags & ISADMA_READ)
 			outb(DMA2_MODE, DMA37MD_AUTO|DMA37MD_WRITE|(chan&3));
 		  else
 			outb(DMA2_MODE, DMA37MD_AUTO|DMA37MD_READ|(chan&3));
 		}
 		else
-		if (flags & B_READ)
+		if (flags & ISADMA_READ)
 			outb(DMA2_MODE, DMA37MD_SINGLE|DMA37MD_WRITE|(chan&3));
 		else
 			outb(DMA2_MODE, DMA37MD_SINGLE|DMA37MD_READ|(chan&3));
@@ -352,7 +351,7 @@ isa_dmastart(int flags, caddr_t addr, u_int nbytes, int chan)
 
 	dma_busy |= (1 << chan);
 
-	if (flags & B_RAW) {
+	if (flags & ISADMA_RAW) {
 		dma_auto_mode |= (1 << chan);
 	} else { 
 		dma_auto_mode &= ~(1 << chan);
@@ -387,7 +386,7 @@ isa_dmadone(int flags, caddr_t addr, int nbytes, int chan)
 
 	if (dma_bounced & (1 << chan)) {
 		/* copy bounce buffer on read */
-		if (flags & B_READ) {
+		if (flags & ISADMA_READ) {
 			bus_dmamap_sync(dma_tag[chan], dma_map[chan],
 			                  BUS_DMASYNC_POSTREAD);
 		}

@@ -66,7 +66,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_fault.c,v 1.108 1999/12/12 03:19:28 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_fault.c,v 1.108.2.2 2000/08/04 22:31:11 peter Exp $
  */
 
 /*
@@ -165,7 +165,7 @@ _unlock_things(struct faultstate *fs, int dealloc)
 /*
  *	vm_fault:
  *
- *	Handle a page fault occuring at the given address,
+ *	Handle a page fault occurring at the given address,
  *	requiring the given permissions, in the map specified.
  *	If successful, the page is inserted into the
  *	associated physical map.
@@ -294,7 +294,7 @@ RetryFault:;
 			 * vm_page_t->busy because the vm_pager may be using
 			 * vm_page_t->busy for pageouts ( and even pageins if
 			 * it is the vnode pager ), and we could end up trying
-			 * to pagein and pageout the same page simultaniously.
+			 * to pagein and pageout the same page simultaneously.
 			 *
 			 * We can theoretically allow the busy case on a read
 			 * fault if the page is marked valid, but since such
@@ -423,7 +423,7 @@ readrest:
 					if (mt == NULL || (mt->valid != VM_PAGE_BITS_ALL))
 						break;
 					if (mt->busy ||
-						(mt->flags & (PG_BUSY | PG_FICTITIOUS)) ||
+						(mt->flags & (PG_BUSY | PG_FICTITIOUS | PG_UNMANAGED)) ||
 						mt->hold_count ||
 						mt->wire_count) 
 						continue;
@@ -626,7 +626,7 @@ readrest:
 				 */
 				(fs.object->ref_count == 1) &&
 				/*
-				 * Noone else can look this object up
+				 * No one else can look this object up
 				 */
 				(fs.object->handle == NULL) &&
 				/*
@@ -826,7 +826,7 @@ readrest:
 		printf("Warning: page %p partially invalid on fault\n", fs.m);
 	}
 
-	pmap_enter(fs.map->pmap, vaddr, VM_PAGE_TO_PHYS(fs.m), prot, wired);
+	pmap_enter(fs.map->pmap, vaddr, fs.m, prot, wired);
 
 	if (((fault_flags & VM_FAULT_WIRE_MASK) == 0) && (wired == 0)) {
 		pmap_prefault(fs.map->pmap, vaddr, fs.entry);
@@ -1075,8 +1075,7 @@ vm_fault_copy_entry(dst_map, src_map, dst_entry, src_entry)
 		 */
 
 		vm_page_flag_clear(dst_m, PG_ZERO);
-		pmap_enter(dst_map->pmap, vaddr, VM_PAGE_TO_PHYS(dst_m),
-		    prot, FALSE);
+		pmap_enter(dst_map->pmap, vaddr, dst_m, prot, FALSE);
 		vm_page_flag_set(dst_m, PG_WRITEABLE|PG_MAPPED);
 
 		/*

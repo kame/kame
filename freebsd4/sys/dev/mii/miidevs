@@ -1,4 +1,4 @@
-$FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.1 2000/04/27 14:42:26 wpaul Exp $
+$FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.3 2000/10/03 18:31:47 wpaul Exp $
 /*$NetBSD: miidevs,v 1.6 1999/05/14 11:37:30 drochner Exp $*/
 
 /*-
@@ -49,6 +49,7 @@ $FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.1 2000/04/27 14:42:26 wpaul Exp $
  * mangled accordingly to compensate.
  */
 
+oui ALTIMA			0x0010a9	Altima Communications
 oui AMD				0x00001a	Advanced Micro Devices
 oui BROADCOM			0x001018	Broadcom Corporation
 oui DAVICOM			0x00606e	Davicom Semiconductor
@@ -67,6 +68,7 @@ oui xxAMD			0x00606e	Advanced Micro Devices
 
 /* some vendors have the bits swapped within bytes
 	(ie, ordered as on the wire) */
+oui xxALTIMA			0x000895	Altima Communications
 oui xxBROADCOM			0x000818	Broadcom Corporation
 oui xxICS			0x00057d	Integrated Circuit Systems
 oui xxSEEQ			0x0005be	Seeq
@@ -86,9 +88,13 @@ oui xxDAVICOM			0x006040	Davicom Semiconductor
  * List of known models.  Grouped by oui.
  */
 
+/* Altima Communications PHYs */
+model xxALTIMA AC101		0x0021 AC101 10/100 media interface
+
 /* Advanced Micro Devices PHYs */
 model xxAMD 79C873		0x0000 Am79C873 10/100 media interface
 model AMD 79c973phy		0x0036 Am79c973 internal PHY
+model AMD 79c978		0x0039 Am79c978 HomePNA PHY
 
 /* Broadcom Corp. PHYs. */
 model BROADCOM 3c905Cphy	0x0017 3c905C 10/100 internal PHY

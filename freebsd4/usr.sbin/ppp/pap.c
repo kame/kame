@@ -18,7 +18,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/pap.c,v 1.42 1999/12/27 11:54:57 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/pap.c,v 1.42.2.1 2000/08/19 09:30:05 brian Exp $
  *
  *	TODO:
  */
@@ -38,11 +38,11 @@
 #include "defs.h"
 #include "timer.h"
 #include "fsm.h"
-#include "lcp.h"
 #include "auth.h"
 #include "pap.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "proto.h"
 #include "async.h"
 #include "throughput.h"

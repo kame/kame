@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.2 2000/07/13 02:00:56 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.3 2000/10/15 21:47:28 peter Exp $
  */
 
 #include "npx.h"
@@ -538,6 +538,9 @@ ENTRY(savectx)
 	/* caller's return address - child won't execute this routine */
 	movl	(%esp),%eax
 	movl	%eax,PCB_EIP(%ecx)
+
+	movl	%cr3,%eax
+	movl	%eax,PCB_CR3(%ecx)
 
 	movl	%ebx,PCB_EBX(%ecx)
 	movl	%esp,PCB_ESP(%ecx)

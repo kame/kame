@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/main.c,v 1.17.2.3 2000/05/05 07:26:53 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/main.c,v 1.17.2.4 2000/09/22 17:04:46 archie Exp $
  */
 
 /*
@@ -98,6 +98,8 @@ main(void)
      */
     if (initial_howto & RB_SERIAL)
 	setenv("console", "comconsole", 1);
+    if (initial_howto & RB_MUTE)
+	setenv("console", "nullconsole", 1);
     cons_probe();
 
     /*

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/include/smp.h,v 1.50.2.2 2000/05/31 21:42:22 msmith Exp $
+ * $FreeBSD: src/sys/i386/include/smp.h,v 1.50.2.4 2000/09/30 02:49:34 ps Exp $
  *
  */
 
@@ -18,17 +18,6 @@
 #if defined(SMP) && !defined(APIC_IO)
 # error APIC_IO required for SMP, add "options APIC_IO" to your config file.
 #endif /* SMP && !APIC_IO */
-
-/* Number of CPUs. */
-#if defined(SMP) && !defined(NCPU)
-# define NCPU			2
-#endif /* SMP && NCPU */
-
-/* Number of IO APICs. */
-#if defined(APIC_IO) && !defined(NAPIC)
-# define NAPIC			1
-#endif /* SMP && NAPIC */
-
 
 #if defined(SMP) || defined(APIC_IO)
 
@@ -99,7 +88,7 @@ extern int			boot_cpu_id;
 extern vm_offset_t		cpu_apic_address;
 extern vm_offset_t		io_apic_address[];
 extern u_int32_t		cpu_apic_versions[];
-extern u_int32_t		io_apic_versions[];
+extern u_int32_t		*io_apic_versions;
 extern int			cpu_num_to_apic_id[];
 extern int			io_num_to_apic_id[];
 extern int			apic_id_to_logical[];
@@ -156,7 +145,7 @@ void	smp_rendezvous		__P((void (*)(void *),
 
 /* global data in mpapic.c */
 extern volatile lapic_t		lapic;
-extern volatile ioapic_t	*ioapic[];
+extern volatile ioapic_t	**ioapic;
 
 /* functions in mpapic.c */
 void	apic_dump		__P((char*));
@@ -166,6 +155,7 @@ int	apic_ipi		__P((int, int, int));
 int	selected_apic_ipi	__P((u_int, int, int));
 int	io_apic_setup		__P((int));
 void	io_apic_set_id		__P((int, int));
+int	io_apic_get_id		__P((int));
 int	ext_int_setup		__P((int, int));
 
 #if defined(READY)

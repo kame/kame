@@ -7,7 +7,7 @@
  */
 #if !defined(lint)
 /*static const char rcsid[] = "@(#)$Id: ip_auth.c,v 2.1.2.2 2000/01/16 10:12:14 darrenr Exp $";*/
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_auth.c,v 1.14.2.2 2000/07/19 23:27:54 darrenr Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_auth.c,v 1.14.2.4 2000/09/21 17:19:13 ru Exp $";
 #endif
 
 #include <sys/errno.h>
@@ -47,7 +47,7 @@ static const char rcsid[] = "@(#)$FreeBSD: src/sys/netinet/ip_auth.c,v 1.14.2.2 
 # include <sys/stream.h>
 # include <sys/kmem.h>
 #endif
-#if (_BSDI_VERSION >= 199802) || (__FreeBSD_Version >= 400000)
+#if (_BSDI_VERSION >= 199802) || (__FreeBSD_version >= 400000)
 # include <sys/queue.h>
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(bsdi)
@@ -250,7 +250,7 @@ ip_t *ip;
 
 		bo = ip->ip_len;
 		ip->ip_len = htons(bo);
-# if !SOLARIS && !defined(__NetBSD__)
+# if !SOLARIS && !defined(__NetBSD__) && !defined(__FreeBSD__)
 		/* 4.4BSD converts this ip_input.c, but I don't in solaris.c */
 		bo = ip->ip_id;
 		ip->ip_id = htons(bo);

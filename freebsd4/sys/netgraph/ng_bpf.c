@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_bpf.c,v 1.2 1999/12/06 18:43:32 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_bpf.c,v 1.2.4.3 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_bpf.c,v 1.3 1999/12/03 20:30:23 archie Exp $
  */
 
@@ -94,10 +94,10 @@ static int	ng_bpf_setprog(hook_p hook, const struct ng_bpf_hookprog *hp);
 /* Parse type for one struct bfp_insn */
 static const struct ng_parse_struct_info ng_bpf_insn_type_info = {
     {
-	{ "code",	&ng_parse_int16_type	},
-	{ "jt",		&ng_parse_int8_type	},
-	{ "jf",		&ng_parse_int8_type	},
-	{ "k",		&ng_parse_int32_type	},
+	{ "code",	&ng_parse_hint16_type	},
+	{ "jt",		&ng_parse_uint8_type	},
+	{ "jf",		&ng_parse_uint8_type	},
+	{ "k",		&ng_parse_uint32_type	},
 	{ NULL }
     }
 };
@@ -237,7 +237,7 @@ ng_bpf_newhook(node_p node, hook_p hook, const char *name)
 	int error;
 
 	/* Create hook private structure */
-	MALLOC(hip, hinfo_p, sizeof(*hip), M_NETGRAPH, M_WAITOK);
+	MALLOC(hip, hinfo_p, sizeof(*hip), M_NETGRAPH, M_NOWAIT);
 	if (hip == NULL)
 		return (ENOMEM);
 	bzero(hip, sizeof(*hip));
@@ -488,7 +488,7 @@ ng_bpf_setprog(hook_p hook, const struct ng_bpf_hookprog *hp0)
 
 	/* Make a copy of the program */
 	size = NG_BPF_HOOKPROG_SIZE(hp0->bpf_prog_len);
-	MALLOC(hp, struct ng_bpf_hookprog *, size, M_NETGRAPH, M_WAITOK);
+	MALLOC(hp, struct ng_bpf_hookprog *, size, M_NETGRAPH, M_NOWAIT);
 	if (hp == NULL)
 		return (ENOMEM);
 	bcopy(hp0, hp, size);

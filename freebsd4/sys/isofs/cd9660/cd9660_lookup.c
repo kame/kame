@@ -38,7 +38,7 @@
  *	from: @(#)ufs_lookup.c	7.33 (Berkeley) 5/19/91
  *
  *	@(#)cd9660_lookup.c	8.2 (Berkeley) 1/23/94
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_lookup.c,v 1.23 1999/08/28 00:46:06 peter Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_lookup.c,v 1.23.2.1 2000/11/03 15:55:37 bp Exp $
  */
 
 #include <sys/param.h>
@@ -128,6 +128,7 @@ cd9660_lookup(ap)
 	imp = dp->i_mnt;
 	lockparent = flags & LOCKPARENT;
 	wantparent = flags & (LOCKPARENT|WANTPARENT);
+	cnp->cn_flags &= ~PDIRUNLOCK;
 
 	/*
 	 * We now have a segment name to search for, and a directory to search.
@@ -357,11 +358,14 @@ found:
 			vn_lock(pdp, LK_EXCLUSIVE | LK_RETRY, p);
 			return (error);
 		}
-		if (lockparent && (flags & ISLASTCN) &&
-		    (error = vn_lock(pdp, LK_EXCLUSIVE, p))) {
-			vput(tdp);
-			return (error);
-		}
+		if (lockparent && (flags & ISLASTCN)) {
+			if ((error = vn_lock(pdp, LK_EXCLUSIVE, p)) != 0) {
+				cnp->cn_flags |= PDIRUNLOCK;
+				vput(tdp);
+				return (error);
+			}
+		} else
+			cnp->cn_flags |= PDIRUNLOCK;
 		*vpp = tdp;
 	} else if (dp->i_number == dp->i_ino) {
 		brelse(bp);
@@ -373,8 +377,10 @@ found:
 		brelse(bp);
 		if (error)
 			return (error);
-		if (!lockparent || !(flags & ISLASTCN))
+		if (!lockparent || !(flags & ISLASTCN)) {
+			cnp->cn_flags |= PDIRUNLOCK;
 			VOP_UNLOCK(pdp, 0, p);
+		}
 		*vpp = tdp;
 	}
 

@@ -29,7 +29,7 @@
 
 /*
  * Additional Copyright (c) 1999 by Andrew Gallatin
- * $FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.3 2000/01/29 06:31:27 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.3.2.4 2000/11/02 20:39:45 gallatin Exp $
  */
 
 
@@ -89,6 +89,7 @@
 
 #include <sys/user.h>
 #include <machine/cpu.h>
+#include <machine/cpuconf.h>
 #include <machine/fpu.h>
 
 #include <sys/sysctl.h>
@@ -261,6 +262,7 @@ osf1_open(p, uap)
 	return open(p, &a);
 }
 
+extern int totalphysmem;
 
 int
 osf1_getsysinfo(p, uap)
@@ -268,6 +270,12 @@ osf1_getsysinfo(p, uap)
 	struct osf1_getsysinfo_args *uap;
 {
 	int error, retval;
+	int ncpus = 1; 	       /* XXX until SMP */
+	int ophysmem;
+	int unit;
+	long percpu;
+	long proctype;
+	struct osf1_cpu_info cpuinfo;
 
 	error = retval = 0;
 
@@ -277,16 +285,46 @@ osf1_getsysinfo(p, uap)
 		    sizeof(maxprocperuid));
 		retval = 1;
 		break;
+	case OSF_GET_PHYSMEM:
+		ophysmem = totalphysmem * (PAGE_SIZE >> 10);	
+		error = copyout(&ophysmem, uap->buffer,
+		    sizeof(ophysmem));
+		retval = 1;
+		break;
+	case OSF_GET_MAX_CPU:
+	case OSF_GET_CPUS_IN_BOX:
+		error = copyout(&ncpus, uap->buffer,
+		    sizeof(ncpus));
+		retval = 1;
+		break;
 	case OSF_GET_IEEE_FP_CONTROL:
 		error = copyout(&p->p_addr->u_pcb.pcb_fp_control,uap->buffer,
 		    sizeof(p->p_addr->u_pcb.pcb_fp_control));
 		retval = 1;
 		break;
-	case OSF_GET_PROC_TYPE:	{
-		int unit;
-		long percpu;
-		long proctype;
+	case OSF_GET_CPU_INFO:
 
+		if (uap->nbytes < sizeof(cpuinfo))
+			error = EINVAL;
+		else {
+			bzero(&cpuinfo, sizeof(cpuinfo));
+			unit = alpha_pal_whami();
+			cpuinfo.current_cpu = unit;
+			cpuinfo.cpus_in_box = ncpus;
+			cpuinfo.cpu_type = 
+			    LOCATE_PCS(hwrpb, unit)->pcs_proc_type;
+			cpuinfo.ncpus = ncpus;
+			cpuinfo.cpus_present = ncpus;
+			cpuinfo.cpus_running = ncpus;
+			cpuinfo.cpu_binding = 1;
+			cpuinfo.cpu_ex_binding = 0;
+			cpuinfo.mhz = hwrpb->rpb_cc_freq / 1000000;
+			error = copyout(&cpuinfo, uap->buffer,
+			    sizeof(cpuinfo));
+			retval = 1;
+		}
+		break;
+	case OSF_GET_PROC_TYPE:
 		if(uap->nbytes < sizeof(proctype))
 			error = EINVAL;
 		else {
@@ -296,7 +334,6 @@ osf1_getsysinfo(p, uap)
 			    sizeof(percpu));
 			retval = 1;
 		}
-	}
 	break;
 	case OSF_GET_HWRPB: {  /* note -- osf/1 doesn't have rpb_tbhint[8] */
 		unsigned long rpb_size;
@@ -312,6 +349,11 @@ osf1_getsysinfo(p, uap)
 			retval = 1;
 		}
 	}
+		break;
+	case OSF_GET_PLATFORM_NAME:
+		error = copyout(platform.model, uap->buffer, 
+		    strlen(platform.model));
+		retval = 1;
 		break;
 	default:
 		printf("osf1_getsysinfo called with unknown op=%ld\n", uap->op);
@@ -357,7 +399,7 @@ osf1_getrlimit(p, uap)
 {
 	struct __getrlimit_args /* {
 		syscallarg(u_int) which;
-		syscallarg(struct orlimit *) rlp;
+		syscallarg(struct rlimit *) rlp;
 	} */ a;
 
 	if (SCARG(uap, which) >= OSF1_RLIMIT_NLIMITS)
@@ -369,7 +411,7 @@ osf1_getrlimit(p, uap)
 		SCARG(&a, which) = RLIMIT_NOFILE;
 	else
 		return (0);
-	SCARG(&a, rlp) = (struct orlimit *)SCARG(uap, rlp);
+	SCARG(&a, rlp) = (struct rlimit *)SCARG(uap, rlp);
 
 	return getrlimit(p, &a);
 }
@@ -382,7 +424,7 @@ osf1_setrlimit(p, uap)
 {
 	struct __setrlimit_args /* {
 		syscallarg(u_int) which;
-		syscallarg(struct orlimit *) rlp;
+		syscallarg(struct rlimit *) rlp;
 	} */ a;
 
 	if (SCARG(uap, which) >= OSF1_RLIMIT_NLIMITS)
@@ -394,7 +436,7 @@ osf1_setrlimit(p, uap)
 		SCARG(&a, which) = RLIMIT_NOFILE;
 	else
 		return (0);
-	SCARG(&a, rlp) = (struct orlimit *)SCARG(uap, rlp);
+	SCARG(&a, rlp) = (struct rlimit *)SCARG(uap, rlp);
 
 	return setrlimit(p, &a);
 }
@@ -1028,15 +1070,20 @@ osf1_setuid(p, uap)
 	    uid != pc->p_ruid && uid != pc->p_svuid)
 		return (error);
 
-	pc->pc_ucred = crcopy(pc->pc_ucred);
-	pc->pc_ucred->cr_uid = uid;
 	if (error == 0) {
-		(void)chgproccnt(pc->p_ruid, -1);
-		(void)chgproccnt(uid, 1);
-		pc->p_ruid = uid;
-		pc->p_svuid = uid;
+		if (uid != pc->p_ruid) {
+			change_ruid(p, uid);
+			setsugid(p);
+		}
+		if (pc->p_svuid != uid) {
+			pc->p_svuid = uid;
+			setsugid(p);
+		}
 	}
-	p->p_flag |= P_SUGID;
+	if (pc->pc_ucred->cr_uid != uid) {
+		change_euid(p, uid);
+		setsugid(p);
+	}
 	return (0);
 }
 
@@ -1070,7 +1117,7 @@ osf1_setgid(p, uap)
 		pc->p_rgid = gid;
 		pc->p_svgid = gid;
 	}
-	p->p_flag |= P_SUGID;
+	setsugid(p);
 	return (0);
 }
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/isavar.h,v 1.16 2000/02/21 02:10:10 gj Exp $
+ * $FreeBSD: src/sys/isa/isavar.h,v 1.16.2.2 2000/10/29 13:07:56 nyan Exp $
  */
 
 #ifndef _ISA_ISAVAR_H_
@@ -54,6 +54,9 @@ typedef void isa_config_cb(void *arg, struct isa_config *config, int enable);
 #define	ISA_NIRQ	2
 #define	ISA_NDRQ	2
 
+#define ISADMA_READ	0x00100000
+#define ISADMA_WRITE	0
+#define ISADMA_RAW	0x00080000
 /*
  * Plug and play cards can support a range of resource
  * configurations. This structure is used by the isapnp parser to
@@ -156,6 +159,19 @@ extern int	isa_dma_acquire __P((int chan));
 extern void	isa_dma_release __P((int chan));
 extern int	isa_dmastatus __P((int chan));
 extern int	isa_dmastop __P((int chan));
+
+#ifdef PC98
+#include <machine/bus.h>
+
+/*
+ * Allocate discontinuous resources for ISA bus.
+ */
+struct resource *
+isa_alloc_resourcev(device_t child, int type, int *rid,
+		    bus_addr_t *res, bus_size_t count, u_int flags);
+int
+isa_load_resourcev(struct resource *re, bus_addr_t *res, bus_size_t count);
+#endif
 
 #endif /* _KERNEL */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/isa/pnpparse.c,v 1.2.2.2 2000/03/31 19:41:10 dfr Exp $
+ *	$FreeBSD: src/sys/isa/pnpparse.c,v 1.2.2.3 2000/11/07 05:53:55 msmith Exp $
  */
 
 #include <sys/param.h>
@@ -299,6 +299,13 @@ pnp_parse_resources(device_t dev, u_char *resources, int len)
 				break;
 
 			case PNP_TAG_MEMORY32_RANGE:
+				if (I32(resinfo + 13) == 0) {
+					if (bootverbose) {
+						printf("%s: skipping empty range\n",
+						       pnp_eisaformat(id));
+					}
+					continue;
+				}
 				if (bootverbose) {
 					printf("%s: adding memory32 range "
 					       "%#x-%#x, size=%#x, "

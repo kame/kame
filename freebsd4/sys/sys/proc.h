@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.2 2000/05/16 06:58:05 dillon Exp $
+ * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.5 2000/09/07 19:13:54 truckman Exp $
  */
 
 #ifndef _SYS_PROC_H_
@@ -306,6 +306,7 @@ struct	pcred {
 	gid_t	p_rgid;			/* Real group id. */
 	gid_t	p_svgid;		/* Saved effective group id. */
 	int	p_refcnt;		/* Number of references. */
+	struct	uidinfo *p_uidinfo;	/* Per uid resource consumption */
 };
 
 
@@ -420,8 +421,6 @@ struct pgrp *pgfind __P((pid_t));	/* Find process group by id. */
 struct vm_zone;
 extern struct vm_zone *proc_zone;
 
-int	chgproccnt __P((uid_t uid, int diff));
-rlim_t	chgsbsize __P((uid_t uid, rlim_t diff));
 int	enterpgrp __P((struct proc *p, pid_t pgid, int mksess));
 void	fixjobc __P((struct proc *p, struct pgrp *pgrp, int entering));
 int	inferior __P((struct proc *p));

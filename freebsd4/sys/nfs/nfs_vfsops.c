@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vfsops.c	8.12 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/nfs/nfs_vfsops.c,v 1.91 2000/01/05 05:11:37 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vfsops.c,v 1.91.2.1 2000/09/10 01:45:36 ps Exp $
  */
 
 #include "opt_bootp.h"
@@ -441,6 +441,7 @@ nfs_mountroot(mp)
 		panic("nfs_mountroot: socreate(%04x): %d",
 			nd->myif.ifra_addr.sa_family, error);
 
+#if 0 /* XXX Bad idea */
 	/*
 	 * We might not have been told the right interface, so we pass
 	 * over the first ten interfaces of the same kind, until we get
@@ -455,6 +456,8 @@ nfs_mountroot(mp)
 		if(!error)
 			break;
 	}
+#endif
+	error = ifioctl(so, SIOCAIFADDR, (caddr_t)&nd->myif, p);
 	if (error)
 		panic("nfs_mountroot: SIOCAIFADDR: %d", error);
 	soclose(so);

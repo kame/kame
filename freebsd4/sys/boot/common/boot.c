@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/boot.c,v 1.15.2.3 2000/07/06 23:58:16 obrien Exp $
+ * $FreeBSD: src/sys/boot/common/boot.c,v 1.15.2.4 2000/10/28 01:04:41 gallatin Exp $
  */
 
 /*
@@ -258,7 +258,7 @@ getbootfile(int try)
 	strncpy(name, spec, len);
 	name[len] = 0;
     }
-    if (name[0] == 0) {
+    if (name && name[0] == 0) {
 	free(name);
 	name = NULL;
     }

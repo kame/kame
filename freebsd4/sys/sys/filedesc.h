@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/filedesc.h,v 1.19.2.1 2000/05/05 03:50:02 jlemon Exp $
+ * $FreeBSD: src/sys/sys/filedesc.h,v 1.19.2.2 2000/08/16 19:20:32 alfred Exp $
  */
 
 #ifndef _SYS_FILEDESC_H_
@@ -140,6 +140,7 @@ struct	filedesc *fdcopy __P((struct proc *p));
 void	fdfree __P((struct proc *p));
 int	closef __P((struct file *fp,struct proc *p));
 void	fdcloseexec __P((struct proc *p));
+struct	file *getfp __P((struct filedesc* fdp, int fd, int flag));
 int	getvnode __P((struct filedesc *fdp, int fd, struct file **fpp));
 int	fdissequential __P((struct file *));
 void	fdsequential __P((struct file *, int));

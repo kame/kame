@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98gdc.c,v 1.17.2.3 2000/05/05 09:16:12 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98gdc.c,v 1.17.2.7 2000/10/28 11:28:33 nyan Exp $
  */
 
 #include "opt_gdc.h"
@@ -37,10 +37,11 @@
 #include <sys/kernel.h>
 #include <sys/bus.h>
 
+#include <sys/fbio.h>
+
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
-#include <machine/console.h>
 #include <machine/md_var.h>
 #include <machine/pc/bios.h>
 
@@ -283,7 +284,6 @@ static video_adapter_t	biosadapter[1];
 
 /* video driver declarations */
 static int			gdc_configure(int flags);
-static int			gdc_nop(void);
 static int			gdc_err(video_adapter_t *adp, ...);
 static vi_probe_t		gdc_probe;
 static vi_init_t		gdc_init;
@@ -373,7 +373,6 @@ static int		gdc_init_done = FALSE;
 /* local functions */
 static int map_gen_mode_num(int type, int color, int mode);
 static int probe_adapters(void);
-static void dump_buffer(u_char *buf, size_t len);
 
 #define	prologue(adp, flag, err)			\
 	if (!gdc_init_done || !((adp)->va_flags & (flag)))	\
@@ -452,6 +451,13 @@ probe_adapters(void)
     biosadapter[0].va_mode = 
 	biosadapter[0].va_initial_mode = biosadapter[0].va_initial_bios_mode;
 
+    if ((PC98_SYSTEM_PARAMETER(0x597) & 0x80) ||
+	(PC98_SYSTEM_PARAMETER(0x458) & 0x80)) {
+	gdc_FH = (inb(0x9a8) & 1) ? _31KHZ : _24KHZ;
+    } else {
+	gdc_FH = _24KHZ;
+    }
+
     gdc_get_info(&biosadapter[0], biosadapter[0].va_initial_mode, &info);
     initialize_gdc(T25_G400, info.vi_flags & V_INFO_GRAPHICS);
 
@@ -504,10 +510,12 @@ static void master_gdc_word_prm(unsigned int wpmtr)
     master_gdc_prm((wpmtr >> 8) & 0x00ff);
 }	
 
+#ifdef LINE30
 static void master_gdc_fifo_empty(void)
 {
     while ( (inb(IO_GDC1) & 4) == 0);     
 }
+#endif
 
 static void master_gdc_wait_vsync(void)
 {
@@ -521,6 +529,7 @@ static void gdc_cmd(unsigned int cmd)
     outb( IO_GDC2+2, cmd);
 }
 
+#ifdef LINE30
 static void gdc_prm(unsigned int pmtr)
 {
     while ( (inb(IO_GDC2) & 2) != 0);
@@ -537,6 +546,7 @@ static void gdc_fifo_empty(void)
 {
     while ( (inb(IO_GDC2) & 0x04) == 0);          
 }
+#endif
 
 static void gdc_wait_vsync(void)
 {
@@ -544,6 +554,7 @@ static void gdc_wait_vsync(void)
     while ( (inb(IO_GDC2) & 0x20) == 0);          
 }
 
+#ifdef LINE30
 static int check_gdc_clock(void)
 {
     if ((inb(IO_SYSPORT) & 0x80) == 0){
@@ -552,6 +563,7 @@ static int check_gdc_clock(void)
        	return _2_5MHZ;
     }
 }
+#endif
 
 static void initialize_gdc(unsigned int mode, int isGraph)
 {
@@ -564,14 +576,19 @@ static void initialize_gdc(unsigned int mode, int isGraph)
     s_mode = 2*mode+gdc_clock;
     gdc_INFO = m_mode;
 
+    master_gdc_wait_vsync();
+
     if ((PC98_SYSTEM_PARAMETER(0x597) & 0x80) ||
 	(PC98_SYSTEM_PARAMETER(0x458) & 0x80)) {
-	hsync_clock = (inb(0x9a8) & 1) ? _31KHZ : _24KHZ;
+	if (PC98_SYSTEM_PARAMETER(0x481) & 0x08) {
+	    hsync_clock = (m_mode == _25L) ? gdc_FH : _31KHZ;
+	    outb(0x9a8, (hsync_clock == _31KHZ) ? 1 : 0);
+	} else {
+	    hsync_clock = gdc_FH;
+	}
     } else {
 	hsync_clock = _24KHZ;
     }
-
-    master_gdc_wait_vsync();
 
     if ((gdc_clock == _2_5MHZ) &&
 	(slave_param[hsync_clock][s_mode][GDC_LF] > 400)) {
@@ -748,12 +765,6 @@ gdc_set_origin(video_adapter_t *adp, off_t offset)
 	writew(BIOS_PADDRTOVADDR(0x000e0004), offset >> 15);
     }
 #endif
-    return 0;
-}
-
-static int
-gdc_nop(void)
-{
     return 0;
 }
 
@@ -1080,14 +1091,17 @@ gdc_set_hw_cursor_shape(video_adapter_t *adp, int base, int height,
 
     start = celsize - (base + height);
     end = celsize - base - 1;
+
+#if 0
     /*
      * muPD7220 GDC has anomaly that if end == celsize - 1 then start
      * must be 0, otherwise the cursor won't be correctly shown 
      * in the first row in the screen.  We shall set end to celsize - 2;
      * if end == celsize -1 && start > 0. XXX
      */
-    if ((end == celsize - 1) && (start > 0))
+    if ((end == celsize - 1) && (start > 0) && (start < end))
 	--end;
+#endif
 
     s = spltty();
     master_gdc_cmd(0x4b);			/* _GDC_CSRFORM */
@@ -1095,7 +1109,7 @@ gdc_set_hw_cursor_shape(video_adapter_t *adp, int base, int height,
 	| ((celsize - 1) & 0x1f));		/* cel size */
     master_gdc_word_prm(((end & 0x1f) << 11)	/* end line */
 	| (12 << 6)				/* blink rate */
-	| (blink ? 0x20 : 0)			/* blink on/off */
+	| (blink ? 0 : 0x20)			/* blink on/off */
 	| (start & 0x1f));			/* start line */
     splx(s);
 
@@ -1222,18 +1236,6 @@ gdc_dev_ioctl(video_adapter_t *adp, u_long cmd, caddr_t arg)
 
     default:
 	return fb_commonioctl(adp, cmd, arg);
-    }
-}
-
-static void
-dump_buffer(u_char *buf, size_t len)
-{
-    int i;
-
-    for(i = 0; i < len;) {
-	printf("%02x ", buf[i]);
-	if ((++i % 16) == 0)
-	    printf("\n");
     }
 }
 

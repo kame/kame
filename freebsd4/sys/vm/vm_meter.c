@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_meter.c	8.4 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/vm/vm_meter.c,v 1.34.2.1 2000/07/19 06:24:06 kbyanc Exp $
+ * $FreeBSD: src/sys/vm/vm_meter.c,v 1.34.2.3 2000/08/03 00:09:43 ps Exp $
  */
 
 #include <sys/param.h>
@@ -83,7 +83,7 @@ loadav(struct loadavg *avg)
 		case SSLEEP:
 			if (p->p_priority > PZERO || p->p_slptime != 0)
 				continue;
-			/* fall through */
+			/* FALLTHROUGH */
 		case SRUN:
 		case SIDL:
 			nrun++;
@@ -125,7 +125,7 @@ SYSCTL_STRUCT(_vm, VM_LOADAVG, loadavg, CTLFLAG_RD,
     &averunnable, loadavg, "Machine loadaverage history");
 
 static int
-vmtotal SYSCTL_HANDLER_ARGS
+vmtotal(SYSCTL_HANDLER_ARGS)
 {
 	struct proc *p;
 	struct vmtotal total, *totalp;

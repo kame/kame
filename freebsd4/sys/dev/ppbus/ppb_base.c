@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppb_base.c,v 1.10 2000/01/14 00:17:54 nsouch Exp $
+ * $FreeBSD: src/sys/dev/ppbus/ppb_base.c,v 1.10.2.1 2000/08/01 23:26:26 n_hibma Exp $
  *
  */
 #include <sys/param.h>
@@ -131,10 +131,11 @@ ppb_set_mode(device_t bus, int mode)
 	struct ppb_data *ppb = DEVTOSOFTC(bus);
 	int old_mode = ppb_get_mode(bus);
 
-	if (!PPBUS_SETMODE(device_get_parent(bus), mode)) {
+	if (PPBUS_SETMODE(device_get_parent(bus), mode))
+		return -1;
+
 		/* XXX yet device mode = ppbus mode = chipset mode */
 		ppb->mode = (mode & PPB_MASK);
-	}
 
 	return (old_mode);
 }

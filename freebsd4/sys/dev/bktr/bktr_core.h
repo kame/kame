@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_core.h,v 1.2.2.1 2000/04/18 12:50:32 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_core.h,v 1.2.2.2 2000/09/11 07:59:57 roger Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -67,6 +67,9 @@ void            msp_dpl_write( bktr_ptr_t bktr, int i2c_addr, unsigned char dev,
 #define BKTR_SLEEP  ((caddr_t)bktr    )
 #define VBI_SLEEP   ((caddr_t)bktr + 1)
 
+
+/* device name for printf */
+const char *bktr_name(bktr_ptr_t bktr);
 
 /* Prototypes for attatch and interrupt functions */
 void	common_bktr_attach( bktr_ptr_t bktr, int unit,

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/linker_set.h,v 1.4 1999/08/28 00:51:50 peter Exp $
+ * $FreeBSD: src/sys/sys/linker_set.h,v 1.4.2.1 2000/08/02 21:52:20 peter Exp $
  */
 
 #ifndef _SYS_LINKER_SET_H_
@@ -34,6 +34,13 @@
  * are collected by the linker into a `struct linker_set' as defined below.
  * For ELF, this is done by constructing a separate segment for each set.
  * For a.out, it is done automatically by the linker.
+ *
+ * In the MAKE_SET macros below, the lines:
+ *
+ *   static void const * const __set_##set##_sym_##sym = &sym;
+ *
+ * are present only to prevent the compiler from producing bogus
+ * warnings about unused symbols.
  */
 #ifdef __ELF__
 

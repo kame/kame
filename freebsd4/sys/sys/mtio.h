@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mtio.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/mtio.h,v 1.20 1999/12/29 04:24:45 peter Exp $
+ * $FreeBSD: src/sys/sys/mtio.h,v 1.20.2.1 2000/08/05 08:37:28 ps Exp $
  */
 
 #ifndef	_SYS_MTIO_H_
@@ -225,7 +225,7 @@ union mterrstat {
 #define	MTIOCGETEOTMODEL	_IOR('m', 8, u_int32_t)
 
 #ifndef _KERNEL
-#define	DEFTAPE	"/dev/nrsa0"
+#define	DEFTAPE	"/dev/nsa0"
 #endif
 
 #ifdef	_KERNEL

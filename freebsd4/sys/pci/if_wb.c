@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.2 2000/07/17 21:24:40 archie Exp $
+ * $FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.3 2000/08/04 23:45:28 peter Exp $
  */
 
 /*
@@ -127,7 +127,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.2 2000/07/17 21:24:40 archie Exp $";
+  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.3 2000/08/04 23:45:28 peter Exp $";
 #endif
 
 /*
@@ -850,10 +850,10 @@ static int wb_attach(dev)
 	/*
 	 * Map control/status registers.
 	 */
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 	command |= (PCIM_CMD_PORTEN|PCIM_CMD_MEMEN|PCIM_CMD_BUSMASTEREN);
-	pci_write_config(dev, PCI_COMMAND_STATUS_REG, command, 4);
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef WB_USEIOSPACE
 	if (!(command & PCIM_CMD_PORTEN)) {

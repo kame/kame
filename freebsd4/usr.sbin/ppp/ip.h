@@ -17,7 +17,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/ip.h,v 1.14 1999/12/20 20:29:43 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/ip.h,v 1.14.2.1 2000/08/19 09:30:03 brian Exp $
  *
  */
 
@@ -27,7 +27,8 @@ struct link;
 struct bundle;
 
 extern int ip_PushPacket(struct link *, struct bundle *);
-extern int  PacketCheck(struct bundle *, char *, int, struct filter *);
+extern int PacketCheck(struct bundle *, unsigned char *, int, struct filter *,
+                       const char *, unsigned *secs);
 extern void ip_Enqueue(struct ipcp *, int, char *, int);
 extern struct mbuf *ip_Input(struct bundle *, struct link *, struct mbuf *);
 extern void ip_DeleteQueue(struct ipcp *);

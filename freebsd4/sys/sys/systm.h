@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.2 2000/07/18 21:12:40 dfr Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.4 2000/10/29 16:59:32 dwmalone Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -50,6 +50,7 @@ extern int securelevel;		/* system security level (see init(8)) */
 
 extern int cold;		/* nonzero if we are doing a cold boot */
 extern const char *panicstr;	/* panic message */
+extern int dumping;		/* system is dumping */
 extern int safepri;		/* safe ipl when cold or panicing */
 extern char version[];		/* system version */
 extern char copyright[];	/* system copyright */
@@ -184,7 +185,7 @@ void	usrinfoinit __P((void));
 void	vntblinit __P((void));
 
 /* Finalize the world. */
-void	shutdown_nice __P((void));
+void	shutdown_nice __P((int));
 
 /*
  * Kernel to clock driver interface.

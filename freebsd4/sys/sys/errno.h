@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)errno.h	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/errno.h,v 1.14 1999/12/29 04:24:40 peter Exp $
+ * $FreeBSD: src/sys/sys/errno.h,v 1.14.2.1 2000/08/02 21:50:30 peter Exp $
  */
 
 #ifndef _SYS_ERRNO_H_
@@ -108,6 +108,7 @@ __END_DECLS
 #define	EPROTONOSUPPORT	43		/* Protocol not supported */
 #define	ESOCKTNOSUPPORT	44		/* Socket type not supported */
 #define	EOPNOTSUPP	45		/* Operation not supported */
+#define ENOTSUP		EOPNOTSUPP	/* Operation not supported */
 #define	EPFNOSUPPORT	46		/* Protocol family not supported */
 #define	EAFNOSUPPORT	47		/* Address family not supported by protocol family */
 #define	EADDRINUSE	48		/* Address already in use */

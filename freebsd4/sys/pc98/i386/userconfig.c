@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.2 2000/07/14 12:35:28 nyan Exp $
+ ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.5 2000/10/29 13:10:08 nyan Exp $
  **/
 
 /**
@@ -140,7 +140,7 @@ static void free_devtab(void);
 static void save_resource(struct uc_device *);
 
 static int
-sysctl_machdep_uc_devlist SYSCTL_HANDLER_ARGS
+sysctl_machdep_uc_devlist(SYSCTL_HANDLER_ARGS)
 {
 	struct uc_device *id;
 	int error=0;
@@ -345,6 +345,7 @@ static DEV_INFO device_info[] = {
 {"aic",         "Adaptec 152x SCSI and compatible sound cards",	0,      CLS_STORAGE},
 {"nca",         "ProAudio Spectrum SCSI and compatibles",	0,	CLS_STORAGE},
 {"sea",         "Seagate ST01/ST02 SCSI and compatibles",	0,	CLS_STORAGE},
+{"stg",         "TMC 18C30/18C50 based SCSI cards",	0,		CLS_STORAGE},
 {"wdc",         "IDE/ESDI/MFM disk controller",		0,		CLS_STORAGE},
 {"ata",		"ATA/ATAPI compatible disk controller",	0,		CLS_STORAGE},
 {"fdc",         "Floppy disk controller",		FLG_FIXED,	CLS_STORAGE},
@@ -370,6 +371,7 @@ static DEV_INFO device_info[] = {
 {"le",          "DEC Etherworks 2 and 3 Ethernet adapters",	0,	CLS_NETWORK},
 {"lnc",         "Isolan, Novell NE2100/NE32-VL Ethernet adapters",	0,CLS_NETWORK},
 {"sn",          "SMC/Megahertz Ethernet adapters",			0,CLS_NETWORK},
+{"snc",		"SONIC Ethernet adapters",				0,CLS_NETWORK},
 {"xe",          "Xircom PC Card Ethernet adapter",		0,	CLS_NETWORK},
 {"rdp",		"RealTek RTL8002 Pocket Ethernet",	0,		CLS_NETWORK},
 
@@ -2446,7 +2448,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.2 2000/07/14 12:35:28 nyan Exp $
+ * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.5 2000/10/29 13:10:08 nyan Exp $
  */
 
 #include "scbus.h"
@@ -2829,7 +2831,7 @@ set_device_disable(CmdParm *parms)
 #if NPNP > 0
 
 static int
-sysctl_machdep_uc_pnplist SYSCTL_HANDLER_ARGS
+sysctl_machdep_uc_pnplist(SYSCTL_HANDLER_ARGS)
 {
 	int error=0;
 

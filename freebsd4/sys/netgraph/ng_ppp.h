@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ppp.h,v 1.5.2.1 2000/05/05 02:48:39 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ppp.h,v 1.5.2.3 2000/10/09 00:04:01 archie Exp $
  * $Whistle: ng_ppp.h,v 1.8 1999/01/25 02:40:02 archie Exp $
  */
 
@@ -45,7 +45,7 @@
 
 /* Node type name and magic cookie */
 #define NG_PPP_NODE_TYPE	"ppp"
-#define NGM_PPP_COOKIE		940897794
+#define NGM_PPP_COOKIE		940897795
 
 /* Maximum number of supported links */
 #define NG_PPP_MAX_LINKS	16
@@ -78,10 +78,28 @@
 enum {
 	NGM_PPP_SET_CONFIG = 1,		/* takes struct ng_ppp_node_conf */
 	NGM_PPP_GET_CONFIG,		/* returns ng_ppp_node_conf */
+	NGM_PPP_GET_MP_STATE,		/* returns ng_ppp_mp_state */
 	NGM_PPP_GET_LINK_STATS,		/* takes link #, returns stats struct */
 	NGM_PPP_CLR_LINK_STATS,		/* takes link #, clears link stats */
 	NGM_PPP_GETCLR_LINK_STATS,	/* takes link #, returns & clrs stats */
 };
+
+/* Multi-link sequence number state (for debugging) */
+struct ng_ppp_mp_state {
+	int32_t		rseq[NG_PPP_MAX_LINKS];	/* highest rec'd MP seq # */
+	int32_t		mseq;			/* min rseq[i] */
+	int32_t		xseq;			/* next xmit MP seq # */
+};
+
+/* Keep this in sync with the above structure definition */
+#define NG_PPP_MP_STATE_TYPE_INFO(atype)	{		\
+	{							\
+	  { "rseq",	(atype)			},		\
+	  { "mseq",	&ng_parse_hint32_type	},		\
+	  { "xseq",	&ng_parse_hint32_type	},		\
+	  { NULL },						\
+	}							\
+}
 
 /* Per-link config structure */
 struct ng_ppp_link_conf {
@@ -96,12 +114,12 @@ struct ng_ppp_link_conf {
 /* Keep this in sync with the above structure definition */
 #define NG_PPP_LINK_TYPE_INFO	{				\
 	{							\
-	  { "enableLink",	&ng_parse_int8_type	},	\
-	  { "enableProtoComp",	&ng_parse_int8_type	},	\
-	  { "enableACFComp",	&ng_parse_int8_type	},	\
-	  { "mru",		&ng_parse_int16_type	},	\
-	  { "latency",		&ng_parse_int32_type	},	\
-	  { "bandwidth",	&ng_parse_int32_type	},	\
+	  { "enableLink",	&ng_parse_uint8_type	},	\
+	  { "enableProtoComp",	&ng_parse_uint8_type	},	\
+	  { "enableACFComp",	&ng_parse_uint8_type	},	\
+	  { "mru",		&ng_parse_uint16_type	},	\
+	  { "latency",		&ng_parse_uint32_type	},	\
+	  { "bandwidth",	&ng_parse_uint32_type	},	\
 	  { NULL },						\
 	}							\
 }
@@ -128,21 +146,21 @@ struct ng_ppp_bund_conf {
 /* Keep this in sync with the above structure definition */
 #define NG_PPP_BUND_TYPE_INFO	{					\
 	{								\
-	  { "mrru",			&ng_parse_int16_type	},	\
-	  { "enableMultilink",		&ng_parse_int8_type	},	\
-	  { "recvShortSeq",		&ng_parse_int8_type	},	\
-	  { "xmitShortSeq",		&ng_parse_int8_type	},	\
-	  { "enableRoundRobin",		&ng_parse_int8_type	},	\
-	  { "enableIP",			&ng_parse_int8_type	},	\
-	  { "enableIPv6",		&ng_parse_int8_type	},	\
-	  { "enableAtalk",		&ng_parse_int8_type	},	\
-	  { "enableIPX",		&ng_parse_int8_type	},	\
-	  { "enableCompression",	&ng_parse_int8_type	},	\
-	  { "enableDecompression",	&ng_parse_int8_type	},	\
-	  { "enableEncryption",		&ng_parse_int8_type	},	\
-	  { "enableDecryption",		&ng_parse_int8_type	},	\
-	  { "enableVJCompression",	&ng_parse_int8_type	},	\
-	  { "enableVJDecompression",	&ng_parse_int8_type	},	\
+	  { "mrru",			&ng_parse_uint16_type	},	\
+	  { "enableMultilink",		&ng_parse_uint8_type	},	\
+	  { "recvShortSeq",		&ng_parse_uint8_type	},	\
+	  { "xmitShortSeq",		&ng_parse_uint8_type	},	\
+	  { "enableRoundRobin",		&ng_parse_uint8_type	},	\
+	  { "enableIP",			&ng_parse_uint8_type	},	\
+	  { "enableIPv6",		&ng_parse_uint8_type	},	\
+	  { "enableAtalk",		&ng_parse_uint8_type	},	\
+	  { "enableIPX",		&ng_parse_uint8_type	},	\
+	  { "enableCompression",	&ng_parse_uint8_type	},	\
+	  { "enableDecompression",	&ng_parse_uint8_type	},	\
+	  { "enableEncryption",		&ng_parse_uint8_type	},	\
+	  { "enableDecryption",		&ng_parse_uint8_type	},	\
+	  { "enableVJCompression",	&ng_parse_uint8_type	},	\
+	  { "enableVJDecompression",	&ng_parse_uint8_type	},	\
 	  { NULL }							\
 	}								\
 }
@@ -177,14 +195,14 @@ struct ng_ppp_link_stat {
 /* Keep this in sync with the above structure definition */
 #define NG_PPP_STATS_TYPE_INFO	{				\
 	{							\
-	  { "xmitFrames",	&ng_parse_int32_type	},	\
-	  { "xmitOctets",	&ng_parse_int32_type	},	\
-	  { "recvFrames",	&ng_parse_int32_type	},	\
-	  { "recvOctets",	&ng_parse_int32_type	},	\
-	  { "badProtos",	&ng_parse_int32_type	},	\
-	  { "runts",		&ng_parse_int32_type	},	\
-	  { "dupFragments",	&ng_parse_int32_type	},	\
-	  { "dropFragments",	&ng_parse_int32_type	},	\
+	  { "xmitFrames",	&ng_parse_uint32_type	},	\
+	  { "xmitOctets",	&ng_parse_uint32_type	},	\
+	  { "recvFrames",	&ng_parse_uint32_type	},	\
+	  { "recvOctets",	&ng_parse_uint32_type	},	\
+	  { "badProtos",	&ng_parse_uint32_type	},	\
+	  { "runts",		&ng_parse_uint32_type	},	\
+	  { "dupFragments",	&ng_parse_uint32_type	},	\
+	  { "dropFragments",	&ng_parse_uint32_type	},	\
 	  { NULL }						\
 	}							\
 }

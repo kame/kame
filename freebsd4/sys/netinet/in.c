@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.1 2000/07/15 07:14:30 kris Exp $
+ * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.2 2000/08/19 22:14:05 bde Exp $
  */
 
 #include <sys/param.h>
@@ -796,8 +796,10 @@ in_addmulti(ap, ifp)
 	 * If ifma->ifma_protospec is null, then if_addmulti() created
 	 * a new record.  Otherwise, we are done.
 	 */
-	if (ifma->ifma_protospec != 0)
+	if (ifma->ifma_protospec != 0) {
+		splx(s);
 		return ifma->ifma_protospec;
+	}
 
 	/* XXX - if_addmulti uses M_WAITOK.  Can this really be called
 	   at interrupt time?  If so, need to fix if_addmulti. XXX */

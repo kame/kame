@@ -1,7 +1,7 @@
 /*
  * extensions to ioctl_meteor.h for the bt848 cards
  *
- * $FreeBSD: src/sys/i386/include/ioctl_bt848.h,v 1.25.2.1 2000/04/18 12:53:36 roger Exp $
+ * $FreeBSD: src/sys/i386/include/ioctl_bt848.h,v 1.25.2.3 2000/10/31 14:31:27 roger Exp $
  */
 
 #ifndef  _MACHINE_IOCTL_BT848_H_
@@ -148,6 +148,16 @@ struct eeProm {
  * b31-b24:  1 = write, 0 = read 
  */
 #define BT848_I2CWR     _IOWR('x', 57, u_long)    /* i2c read-write */
+
+struct bktr_msp_control {
+	unsigned char function;
+	unsigned int  address;
+	unsigned int  data;
+};
+
+#define BT848_MSP_RESET _IO('x', 76)				/* MSP chip reset */
+#define BT848_MSP_READ  _IOWR('x', 77, struct bktr_msp_control)	/* MSP chip read */
+#define BT848_MSP_WRITE _IOWR('x', 78, struct bktr_msp_control)	/* MSP chip write */
 
 /* Support for radio tuner */
 #define RADIO_SETMODE	 _IOW('x', 58, unsigned int)  /* set radio modes */

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.1 2000/06/14 13:00:25 kato Exp $
+ * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.4 2000/09/30 03:32:21 ps Exp $
  */
 
 #include "opt_cpu.h"
@@ -103,6 +103,7 @@ static struct cpu_nameclass i386_cpus[] = {
 	{ "Cyrix 486S/DX",	CPUCLASS_486 },		/* CPU_CY486DX */
 	{ "Pentium II",		CPUCLASS_686 },		/* CPU_PII */
 	{ "Pentium III",	CPUCLASS_686 },		/* CPU_PIII */
+	{ "Pentium 4",		CPUCLASS_686 },		/* CPU_P4 */
 };
 
 static void
@@ -207,6 +208,7 @@ printcpuinfo(void)
 					break;
 				case 0x70:
 				case 0x80:
+				case 0xa0:
 				        strcat(cpu_model,
 					"Pentium III/Pentium III Xeon/Celeron");
 					cpu = CPU_PIII;
@@ -215,6 +217,10 @@ printcpuinfo(void)
 				        strcat(cpu_model, "Unknown 80686");
 					break;
 				}
+				break;
+			case 0xf00:
+				strcat(cpu_model, "Pentium 4");
+				cpu = CPU_P4;
 				break;
 			default:
 				strcat(cpu_model, "unknown");
@@ -549,7 +555,7 @@ printcpuinfo(void)
 			"\020"
 			"\001FPU"	/* Integral FPU */
 			"\002VME"	/* Extended VM86 mode support */
-			"\003DE"
+			"\003DE"	/* Debugging Extensions (CR4.DE) */
 			"\004PSE"	/* 4MByte page tables */
 			"\005TSC"	/* Timestamp counter */
 			"\006MSR"	/* Machine specific registers */
@@ -558,25 +564,25 @@ printcpuinfo(void)
 			"\011CX8"	/* CMPEXCH8 instruction */
 			"\012APIC"	/* SMP local APIC */
 			"\013oldMTRR"
-			"\014SEP"
-			"\015MTRR"
+			"\014SEP"	/* Fast System Call */
+			"\015MTRR"	/* Memory Type Range Registers */
 			"\016PGE"	/* PG_G (global bit) support */
-			"\017MCA"
+			"\017MCA"	/* Machine Check Architecture */
 			"\020CMOV"	/* CMOV instruction */
 			"\021PAT"	/* Page attributes table */
 			"\022PSE36"	/* 36 bit address space support */
 			"\023PN"	/* Processor Serial number */
-			"\024<b19>"
+			"\024CLFLUSH"	/* Has the CLFLUSH instruction */
 			"\025<b20>"
-			"\026<b21>"
-			"\027<b22>"
+			"\026DTS"	/* Debug Trace Store */
+			"\027ACPI"	/* ACPI support */
 			"\030MMX"	/* MMX instructions */
 			"\031FXSR"	/* FXSAVE/FXRSTOR */
-			"\032XMM"	/* Katami SIMD/MMX2 instructions */
-			"\033<b26>"
-			"\034<b27>"
+			"\032SSE"	/* Streaming SIMD Extensions */
+			"\033SSE2"	/* Streaming SIMD Extensions #2 */
+			"\034SS"	/* Self snoop */
 			"\035<b28>"
-			"\036<b29>"
+			"\036ACC"	/* Auto Clock Correction (TCC/ACPI) */
 			"\037<b30>"
 			"\040<b31>"
 			);
@@ -954,34 +960,38 @@ print_AMD_info(u_int amd_maxregs)
 static void
 print_AMD_features(u_int *regs)
 {
+	/*
+	 * Values taken from AMD Processor Recognition
+	 * http://www.amd.com/products/cpg/athlon/techdocs/pdf/20734.pdf
+	 */
 	do_cpuid(0x80000001, regs);
 	printf("\n  AMD Features=0x%b", regs[3] &~ cpu_feature,
 		"\020"		/* in hex */
-		"\001FPU"
-		"\002VME"
-		"\003DE"
-		"\004PSE"
-		"\005TSC"
-		"\006MSR"
-		"\007<b6>"
-		"\010MCE"
-		"\011CX8"
-		"\012<b9>"
+		"\001FPU"	/* Integral FPU */
+		"\002VME"	/* Extended VM86 mode support */
+		"\003DE"	/* Debug extensions */
+		"\004PSE"	/* 4MByte page tables */
+		"\005TSC"	/* Timestamp counter */
+		"\006MSR"	/* Machine specific registers */
+		"\007PAE"	/* Physical address extension */
+		"\010MCE"	/* Machine Check support */
+		"\011CX8"	/* CMPEXCH8 instruction */
+		"\012APIC"	/* SMP local APIC */
 		"\013<b10>"
-		"\014SYSCALL"
-		"\015<b12>"
-		"\016PGE"
-		"\017<b14>"
-		"\020ICMOV"
-		"\021FCMOV"
-		"\022<b17>"
+		"\014SYSCALL"	/* SYSENTER/SYSEXIT instructions */
+		"\015MTRR"	/* Memory Type Range Registers */
+		"\016PGE"	/* PG_G (global bit) support */
+		"\017MCA"	/* Machine Check Architecture */
+		"\020ICMOV"	/* CMOV instruction */
+		"\021PAT"	/* Page attributes table */
+		"\022PGE36"	/* 36 bit address space support */
 		"\023<b18>"
 		"\024<b19>"
 		"\025<b20>"
 		"\026<b21>"
 		"\027AMIE"	/* AMD MMX Instruction Extensions */
 		"\030MMX"
-		"\031<b24>"
+		"\031FXSAVE"	/* FXSAVE/FXRSTOR */
 		"\032<b25>"
 		"\033<b26>"
 		"\034<b27>"

@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Julian Elisher <julian@whistle.com>
+ * Author: Julian Elisher <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_echo.c,v 1.4 1999/12/07 05:50:47 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_echo.c,v 1.4.2.1 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_echo.c,v 1.13 1999/11/01 09:24:51 julian Exp $
  */
 

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.3 2000/07/06 23:27:27 obrien Exp $
+# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.5 2000/10/27 18:14:42 dillon Exp $
 
 BASE=		loader
 PROG=		${BASE}
@@ -11,8 +11,11 @@ BINDIR?=	/boot
 SRCS=		main.c conf.c
 
 # Enable PXE TFTP or NFS support, not both.
+.if defined(LOADER_TFTP_SUPPORT)
+CFLAGS+=	-DLOADER_TFTP_SUPPORT
+.else
 CFLAGS+=	-DLOADER_NFS_SUPPORT
-#CFLAGS+=	-DLOADER_TFTP_SUPPORT
+.endif
 
 # Enable PnP and ISA-PnP code.
 HAVE_PNP=	yes
@@ -45,8 +48,14 @@ LIBI386=	${.OBJDIR}/../libi386/libi386.a
 CFLAGS+=	-I${.CURDIR}/..
 
 # where to get libstand from
+#XXX need a better way to do this
+LIBSTAND=	${.CURDIR}/../../../../lib/libstand/libstand.a
+.if !exists(${LIBSTAND})
+LIBSTAND=	${.OBJDIR}/../../../../lib/libstand/libstand.a
+.if !exists(${LIBSTAND})
 LIBSTAND=	-lstand
-#LIBSTAND=	${.CURDIR}/../../../../lib/libstand/libstand.a
+.endif
+.endif
 CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
 
 # BTX components

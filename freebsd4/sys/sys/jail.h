@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/sys/jail.h,v 1.8 2000/02/12 13:41:56 rwatson Exp $
+ * $FreeBSD: src/sys/sys/jail.h,v 1.8.2.2 2000/11/01 17:58:06 rwatson Exp $
  *
  */
 
@@ -47,6 +47,8 @@ struct prison {
  * Sysctl-set variables that determine global jail policy
  */
 extern int	jail_set_hostname_allowed;
+extern int	jail_socket_unixiproute_only;
+extern int	jail_sysvipc_allowed;
 
 #endif /* !_KERNEL */
 #endif /* !_SYS_JAIL_H_ */

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13 1999/12/15 23:02:26 eivind Exp $
+ * $FreeBSD: src/sys/svr4/svr4_misc.c,v 1.13.2.1 2000/08/30 00:01:47 green Exp $
  */
 
 /*
@@ -1261,7 +1261,7 @@ loop:
 			/*
 			 * Decrement the count of procs running with this uid.
 			 */
-			(void)chgproccnt(q->p_cred->p_ruid, -1);
+			(void)chgproccnt(q->p_cred->p_ruid, -1, 0);
 
 			/*
 			 * Free up credentials.

@@ -1,10 +1,10 @@
-/*	$FreeBSD: src/sys/dev/mii/miidevs.h,v 1.4.2.1 2000/04/27 14:42:48 wpaul Exp $	*/
+/*	$FreeBSD: src/sys/dev/mii/miidevs.h,v 1.4.2.3 2000/10/03 18:32:07 wpaul Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.1 2000/04/27 14:42:26 wpaul Exp 
+ *	FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.3 2000/10/03 18:31:47 wpaul Exp 
  */
 /*$NetBSD: miidevs,v 1.6 1999/05/14 11:37:30 drochner Exp $*/
 
@@ -56,6 +56,7 @@
  * mangled accordingly to compensate.
  */
 
+#define	MII_OUI_ALTIMA	0x0010a9	/* Altima Communications */
 #define	MII_OUI_AMD	0x00001a	/* Advanced Micro Devices */
 #define	MII_OUI_BROADCOM	0x001018	/* Broadcom Corporation */
 #define	MII_OUI_DAVICOM	0x00606e	/* Davicom Semiconductor */
@@ -74,6 +75,7 @@
 
 /* some vendors have the bits swapped within bytes
 	(ie, ordered as on the wire) */
+#define	MII_OUI_xxALTIMA	0x000895	/* Altima Communications */
 #define	MII_OUI_xxBROADCOM	0x000818	/* Broadcom Corporation */
 #define	MII_OUI_xxICS	0x00057d	/* Integrated Circuit Systems */
 #define	MII_OUI_xxSEEQ	0x0005be	/* Seeq */
@@ -93,11 +95,17 @@
  * List of known models.  Grouped by oui.
  */
 
+/* Altima Communications PHYs */
+#define	MII_MODEL_xxALTIMA_AC101	0x0021
+#define	MII_STR_xxALTIMA_AC101	"AC101 10/100 media interface"
+
 /* Advanced Micro Devices PHYs */
 #define	MII_MODEL_xxAMD_79C873	0x0000
 #define	MII_STR_xxAMD_79C873	"Am79C873 10/100 media interface"
 #define	MII_MODEL_AMD_79c973phy	0x0036
 #define	MII_STR_AMD_79c973phy	"Am79c973 internal PHY"
+#define	MII_MODEL_AMD_79c978	0x0039
+#define	MII_STR_AMD_79c978	"Am79c978 HomePNA PHY"
 
 /* Broadcom Corp. PHYs. */
 #define	MII_MODEL_BROADCOM_3c905Cphy	0x0017

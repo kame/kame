@@ -14,12 +14,13 @@
  *
  * Ported to run under 386BSD by Julian Elischer (julian@tfs.com) Sept 1992
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.14.2.2 2000/07/14 20:14:19 mjacob Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.14.2.3 2000/08/14 05:42:33 kbyanc Exp $
  */
 
 /*
  * SCSI general  interface description
  */
+
 #ifndef	_SCSI_SCSI_ALL_H
 #define _SCSI_SCSI_ALL_H 1
 
@@ -676,7 +677,13 @@ struct scsi_mode_header_10
 	u_int8_t blk_desc_len[2];
 };
 
-struct	scsi_mode_blk_desc
+struct scsi_mode_page_header
+{
+	u_int8_t page_code;
+	u_int8_t page_length;
+};
+
+struct scsi_mode_blk_desc
 {
 	u_int8_t density;
 	u_int8_t nblocks[3];

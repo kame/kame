@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.1 2000/05/05 13:37:01 jlemon Exp $
+ * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.2 2000/09/30 02:49:34 ps Exp $
  */
 
 #ifndef _MACHINE_PARAM_H_
@@ -65,10 +65,10 @@
 #define OBJFORMAT_DEFAULT	"elf"
 
 #ifdef SMP
-#define NCPUS		2
+#define MAXCPU		16
 #else
-#define NCPUS		1
-#endif
+#define MAXCPU		1
+#endif /* SMP */
 
 /*
  * Round p (pointer or byte index) up to a correctly-aligned value

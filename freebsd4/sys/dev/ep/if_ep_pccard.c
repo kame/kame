@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.12.2.1 2000/07/17 21:24:26 archie Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.12.2.2 2000/08/08 23:55:02 peter Exp $
  */
 
 /*
@@ -232,7 +232,6 @@ ep_pccard_detach(device_t dev)
 	sc->gone = 1;
 	bus_teardown_intr(dev, sc->irq, sc->ep_intrhand);
 	ep_free(dev);
-	device_printf(dev, "unload\n");
 	return (0);
 }
 

@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cputypes.h,v 1.13 1999/08/28 00:44:10 peter Exp $
+ * $FreeBSD: src/sys/i386/include/cputypes.h,v 1.13.2.1 2000/09/30 03:32:20 ps Exp $
  */
 
 #ifndef _MACHINE_CPUTYPES_H_
@@ -56,8 +56,9 @@
 #define	CPU_M2		11	/* Cyrix M2 (aka enhanced 6x86 with MMX */
 #define	CPU_NX586	12	/* NexGen (now AMD) 586 */
 #define	CPU_CY486DX	13	/* Cyrix 486S/DX/DX2/DX4 */
-#define CPU_PII		14	/* Intel Pentium II */
-#define CPU_PIII	15	/* Intel Pentium III */
+#define	CPU_PII		14	/* Intel Pentium II */
+#define	CPU_PIII	15	/* Intel Pentium III */
+#define	CPU_P4		16	/* Intel Pentium 4 */
 
 #ifndef LOCORE
 struct cpu_nameclass {

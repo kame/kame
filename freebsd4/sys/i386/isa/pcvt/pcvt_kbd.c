@@ -47,7 +47,7 @@
  *
  *	Last Edit-Date: [Mon Dec 27 14:01:50 1999]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_kbd.c,v 1.32 1999/12/30 16:17:10 hm Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_kbd.c,v 1.32.2.1 2000/10/29 16:59:28 dwmalone Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -1682,7 +1682,7 @@ scroll_reset:
 
 #if PCVT_CTRL_ALT_DEL		/*   Check for cntl-alt-del	*/
 	if((key == 76) && ctrl_down && (meta_down||altgr_down))
-		shutdown_nice();
+		shutdown_nice(0);
 #endif /* PCVT_CTRL_ALT_DEL */
 
 #if !(PCVT_NETBSD || PCVT_FREEBSD >= 200)

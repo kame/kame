@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.55.2.2 2000/07/06 22:26:41 obrien Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_sysvec.c,v 1.55.2.3 2000/11/01 19:25:31 obrien Exp $
  */
 
 /* XXX we use functions that might not exist. */
@@ -55,7 +55,7 @@
 
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
-#include <i386/linux/linux_util.h>
+#include <compat/linux/linux_util.h>
 
 MALLOC_DEFINE(M_LINUX, "linux", "Linux mode structures");
 

@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Julian Elischer <julian@whistle.com>
+ * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11 1999/12/07 05:50:48 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_socket.c,v 1.11.2.2 2000/10/24 18:36:46 julian Exp $
  * $Whistle: ng_socket.c,v 1.28 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -138,7 +138,7 @@ static struct ng_type typestruct = {
 NETGRAPH_INIT(socket, &typestruct);
 
 /* Buffer space */
-static u_long ngpdg_sendspace = 2 * 1024;	/* really max datagram size */
+static u_long ngpdg_sendspace = 20 * 1024;	/* really max datagram size */
 static u_long ngpdg_recvspace = 20 * 1024;
 
 /* List of all sockets */

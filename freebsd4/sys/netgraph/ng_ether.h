@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ether.h,v 1.2.2.1 2000/07/11 20:46:56 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ether.h,v 1.2.2.5 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_ether.h,v 1.1 1999/02/02 03:17:22 julian Exp $
  */
 
@@ -45,7 +45,7 @@
 
 /* Node type name and magic cookie */
 #define NG_ETHER_NODE_TYPE	"ether"
-#define NGM_ETHER_COOKIE	917786905
+#define NGM_ETHER_COOKIE	917786906
 
 /* Hook names */
 #define NG_ETHER_HOOK_LOWER	"lower"		/* connection to raw device */
@@ -57,7 +57,18 @@
 enum {
 	NGM_ETHER_GET_IFNAME = 1,	/* get the interface name */
 	NGM_ETHER_GET_IFINDEX,		/* get the interface global index # */
+	NGM_ETHER_GET_ENADDR,		/* get Ethernet address */
+	NGM_ETHER_SET_ENADDR,		/* set Ethernet address */
+	NGM_ETHER_GET_PROMISC,		/* get node's promiscuous mode bit */
+	NGM_ETHER_SET_PROMISC,		/* enable/disable promiscuous mode */
+	NGM_ETHER_GET_AUTOSRC,		/* get source address override */
+	NGM_ETHER_SET_AUTOSRC,		/* enable/disable src addr override */
 };
+
+#ifdef _KERNEL
+/* Ethernet address parse type */
+extern	const struct ng_parse_type ng_ether_enaddr_type;
+#endif /* _KERNEL */
 
 #endif /* _NETGRAPH_NG_ETHER_H_ */
 

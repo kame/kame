@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.2 (Berkeley) 1/7/94
- * $FreeBSD: src/sys/sys/unistd.h,v 1.22.2.1 2000/03/18 23:20:12 jasone Exp $
+ * $FreeBSD: src/sys/sys/unistd.h,v 1.22.2.2 2000/08/22 01:46:30 jhb Exp $
  */
 
 #ifndef _SYS_UNISTD_H_
@@ -159,6 +159,10 @@
 #define _POSIX_MEMLOCK
 #define _POSIX_MEMLOCK_RANGE
 #endif
+
+/* ??? #define	_POSIX_FSYNC			1 */
+#define	_POSIX_MAPPED_FILES		1
+#define _POSIX_SHARED_MEMORY_OBJECTS	1
 
 /* POSIX.1B sysconf options */
 #define _SC_ASYNCHRONOUS_IO	28

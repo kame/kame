@@ -37,6 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fs.h	8.7 (Berkeley) 4/19/94
+ * $FreeBSD: src/sys/gnu/ext2fs/fs.h,v 1.5.2.1 2000/11/11 13:12:45 bde Exp $
  */
 
 /*
@@ -177,7 +178,7 @@ extern u_char *fragtbl[];
 	bremfree(bp); \
 	splx(s); \
 	if (flags & B_DIRTY) \
-		bdwrite(bp); \
+		bwrite(bp); \
 	else \
 		brelse(bp); \
 }

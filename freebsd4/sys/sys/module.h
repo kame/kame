@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/module.h,v 1.14 1999/12/29 04:24:44 peter Exp $
+ * $FreeBSD: src/sys/sys/module.h,v 1.14.2.1 2000/08/09 00:00:07 peter Exp $
  */
 
 #ifndef _SYS_MODULE_H_
@@ -62,9 +62,15 @@ typedef union modspecific {
 
 #ifdef _KERNEL
 
+#define MODULE_METADATA(uniquifier, type, data, cval)
+
+#define MODULE_DEPEND(mod, dep, min, pref, max)
+
 #define DECLARE_MODULE(name, data, sub, order) \
     SYSINIT(name##module, sub, order, module_register_init, &data) \
     struct __hack
+
+#define MODULE_VERSION(mod, ver)
 
 void module_register_init(const void *data);
 struct linker_file;

@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/alpha/tlsb/zs_tlsb.c,v 1.25.2.1 2000/03/27 18:32:52 mjacob Exp $ */
 /*-
  * Copyright (c) 1998 Doug Rabson
  * All rights reserved.
@@ -24,6 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * $FreeBSD: src/sys/alpha/tlsb/zs_tlsb.c,v 1.25.2.2 2000/08/03 00:48:06 peter Exp $
  */
 /*
  * This driver is a somewhat hack. A real driver might use the zs driver

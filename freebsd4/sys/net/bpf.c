@@ -37,7 +37,7 @@
  *
  *      @(#)bpf.c	8.2 (Berkeley) 3/28/94
  *
- * $FreeBSD: src/sys/net/bpf.c,v 1.59.2.3 2000/04/27 15:13:43 wpaul Exp $
+ * $FreeBSD: src/sys/net/bpf.c,v 1.59.2.4 2000/09/23 21:00:03 brian Exp $
  */
 
 #include "bpf.h"
@@ -216,6 +216,10 @@ bpf_movein(uio, linktype, mp, sockp, datlen)
 		hlen = 12; 	/* XXX 4(ATM_PH) + 3(LLC) + 5(SNAP) */
 		break;
 #endif
+	case DLT_PPP:
+		sockp->sa_family = AF_UNSPEC;
+		hlen = 4;	/* This should match PPP_HDRLEN */
+		break;
 
 	default:
 		return (EIO);

@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_port.h,v 1.15 1999/11/16 12:04:28 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.3 2000/07/02 11:44:00 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.4 2000/10/31 23:23:30 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -82,10 +82,10 @@ typedef struct device *device_ptr_t;
 #define logprintf printf
 
 #define USB_DECLARE_DRIVER(dname)  \
-int __CONCAT(dname,_match) __P((struct device *, struct cfdata *, void *)); \
-void __CONCAT(dname,_attach) __P((struct device *, struct device *, void *)); \
-int __CONCAT(dname,_detach) __P((struct device *, int)); \
-int __CONCAT(dname,_activate) __P((struct device *, enum devact)); \
+int __CONCAT(dname,_match)(struct device *, struct cfdata *, void *); \
+void __CONCAT(dname,_attach)(struct device *, struct device *, void *); \
+int __CONCAT(dname,_detach)(struct device *, int); \
+int __CONCAT(dname,_activate)(struct device *, enum devact); \
 \
 extern struct cfdriver __CONCAT(dname,_cd); \
 \
@@ -194,10 +194,10 @@ typedef struct device device_ptr_t;
 #define usb_untimeout(f, d, h) untimeout((f), (d))
 
 #define USB_DECLARE_DRIVER(dname)  \
-int __CONCAT(dname,_match) __P((struct device *, void *, void *)); \
-void __CONCAT(dname,_attach) __P((struct device *, struct device *, void *)); \
-int __CONCAT(dname,_detach) __P((struct device *, int)); \
-int __CONCAT(dname,_activate) __P((struct device *, enum devact)); \
+int __CONCAT(dname,_match)(struct device *, void *, void *); \
+void __CONCAT(dname,_attach)(struct device *, struct device *, void *); \
+int __CONCAT(dname,_detach)(struct device *, int); \
+int __CONCAT(dname,_activate)(struct device *, enum devact); \
 \
 struct cfdriver __CONCAT(dname,_cd) = { \
 	NULL, #dname, DV_DULL \

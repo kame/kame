@@ -28,7 +28,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * $FreeBSD: src/sys/netncp/ncp_conn.c,v 1.3.2.1 2000/04/17 08:25:36 bp Exp $
+ * $FreeBSD: src/sys/netncp/ncp_conn.c,v 1.3.2.3 2000/10/25 02:35:42 bp Exp $
  *
  * Connection tables
  */
@@ -57,14 +57,13 @@ struct ncp_handle_head lhlist={NULL};
 static int ncp_next_handle = 1;
 static struct lock lhlock;
 
-static int ncp_sysctl_connstat SYSCTL_HANDLER_ARGS;
+static int ncp_sysctl_connstat(SYSCTL_HANDLER_ARGS);
 static int ncp_conn_lock_any(struct ncp_conn *conn, struct proc *p, 
     struct ucred *cred);
 
 extern struct linker_set sysctl_net_ncp;
 
 SYSCTL_DECL(_net_ncp);
-SYSCTL_NODE(_net, OID_AUTO, ncp, CTLFLAG_RW, NULL, "NetWare requester");
 SYSCTL_INT (_net_ncp, OID_AUTO, burst_enabled, CTLFLAG_RD, &ncp_burst_enabled, 0, "");
 SYSCTL_INT (_net_ncp, OID_AUTO, conn_cnt, CTLFLAG_RD, &ncp_conn_cnt, 0, "");
 SYSCTL_PROC(_net_ncp, OID_AUTO, conn_stat, CTLFLAG_RD|CTLTYPE_OPAQUE,
@@ -512,7 +511,7 @@ ncp_conn_getinfo(struct ncp_conn *ncp, struct ncp_conn_stat *ncs) {
 }
 
 static int
-ncp_sysctl_connstat SYSCTL_HANDLER_ARGS {
+ncp_sysctl_connstat(SYSCTL_HANDLER_ARGS) {
 	int error;
 	struct ncp_conn_stat ncs;
 	struct ncp_conn *ncp;

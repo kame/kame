@@ -39,7 +39,7 @@
  *
  *	$Id: i4b_avm_fritz_pci.c,v 1.3 1999/12/13 21:25:26 hm Exp $
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_avm_fritz_pci.c,v 1.6 1999/12/14 20:48:18 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_avm_fritz_pci.c,v 1.6.2.1 2000/08/02 23:52:55 peter Exp $
  *
  *      last edit-date: [Mon Dec 13 21:59:04 1999]
  *
@@ -504,7 +504,7 @@ isic_attach_avma1pp(device_t dev)
 
 	asc->avma1pp_unit = unit;
 
-	rid = PCI_MAP_REG_START+4;
+	rid = PCIR_MAPS+4;
 	asc->avma1pp_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 		0, ~0, 1, RF_ACTIVE);
 
@@ -523,7 +523,7 @@ isic_attach_avma1pp(device_t dev)
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (asc->avma1pp_irq == NULL) {
-		bus_release_resource(dev, SYS_RES_IOPORT, PCI_MAP_REG_START+4, asc->avma1pp_res);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS+4, asc->avma1pp_res);
 		printf("avma1pp%d: couldn't map interrupt\n", unit);
 		error = ENXIO;
 		goto fail;
@@ -533,7 +533,7 @@ isic_attach_avma1pp(device_t dev)
 
 	if (error) {
 		bus_release_resource(dev, SYS_RES_IRQ, 0, asc->avma1pp_res);
-		bus_release_resource(dev, SYS_RES_IOPORT, PCI_MAP_REG_START+4, asc->avma1pp_res);
+		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS+4, asc->avma1pp_res);
 		printf("avma1pp%d: couldn't set up irq\n", unit);
 		goto fail;
 	}

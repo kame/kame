@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10 2000/02/18 20:57:30 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10.2.1 2000/10/25 06:43:02 sos Exp $
  */
 
 /* MODE SENSE parameter header */ 
@@ -72,9 +72,9 @@ struct afd_cappage {
 
 struct afd_softc {
     struct atapi_softc		*atp;		/* controller structure */
-    int32_t			lun;		/* logical device unit */
-    int32_t			transfersize;	/* max size of each transfer */
-    struct buf_queue_head	buf_queue;	/* queue of i/o requests */
+    int				lun;		/* logical device unit */
+    int				transfersize;	/* max size of each transfer */
+    struct buf_queue_head	bio_queue;	/* queue of i/o requests */
     struct afd_header		header;		/* capabilities page info */
     struct afd_cappage		cap;		/* capabilities page info */
     struct disk			disk;		/* virtual drives */

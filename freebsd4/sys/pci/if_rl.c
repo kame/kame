@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.4 2000/07/17 21:24:39 archie Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.6 2000/11/02 00:04:27 wpaul Exp $
  */
 
 /*
@@ -132,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.4 2000/07/17 21:24:39 archie Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.6 2000/11/02 00:04:27 wpaul Exp $";
 #endif
 
 /*
@@ -820,10 +820,10 @@ static int rl_attach(dev)
 	/*
 	 * Map control/status registers.
 	 */
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 	command |= (PCIM_CMD_PORTEN|PCIM_CMD_MEMEN|PCIM_CMD_BUSMASTEREN);
-	pci_write_config(dev, PCI_COMMAND_STATUS_REG, command, 4);
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef RL_USEIOSPACE
 	if (!(command & PCIM_CMD_PORTEN)) {
@@ -867,7 +867,7 @@ static int rl_attach(dev)
 	    rl_intr, sc, &sc->rl_intrhand);
 
 	if (error) {
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_res);
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
 		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 		printf("rl%d: couldn't set up irq\n", unit);
 		goto fail;
@@ -905,7 +905,7 @@ static int rl_attach(dev)
 	else {
 		printf("rl%d: unknown device ID: %x\n", unit, rl_did);
 		bus_teardown_intr(dev, sc->rl_irq, sc->rl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_res);
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
 		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 		error = ENXIO;
 		goto fail;
@@ -917,7 +917,7 @@ static int rl_attach(dev)
 	if (sc->rl_cdata.rl_rx_buf == NULL) {
 		printf("rl%d: no memory for list buffers!\n", unit);
 		bus_teardown_intr(dev, sc->rl_irq, sc->rl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_res);
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
 		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 		error = ENXIO;
 		goto fail;
@@ -932,7 +932,7 @@ static int rl_attach(dev)
 	    rl_ifmedia_upd, rl_ifmedia_sts)) {
 		printf("rl%d: MII without any phy!\n", sc->rl_unit);
 		bus_teardown_intr(dev, sc->rl_irq, sc->rl_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_res);
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
 		bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 		free(sc->rl_cdata.rl_rx_buf, M_DEVBUF);
 		error = ENXIO;
@@ -982,7 +982,7 @@ static int rl_detach(dev)
 	device_delete_child(dev, sc->rl_miibus);
 
 	bus_teardown_intr(dev, sc->rl_irq, sc->rl_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_res);
+	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->rl_irq);
 	bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
 
 	contigfree(sc->rl_cdata.rl_rx_buf, RL_RXBUFLEN + 32, M_DEVBUF);

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1999, Boris Popov
+ * Copyright (c) 1999, 2000 Boris Popov
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6 2000/01/15 08:35:48 bp Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_vfsops.c,v 1.6.2.2 2000/10/25 02:28:42 bp Exp $
  */
 #include "opt_ncp.h"
 #ifndef NCP
@@ -66,19 +66,16 @@ SYSCTL_NODE(_vfs, OID_AUTO, nwfs, CTLFLAG_RW, 0, "Netware file system");
 SYSCTL_INT(_vfs_nwfs, OID_AUTO, version, CTLFLAG_RD, &nwfs_version, 0, "");
 SYSCTL_INT(_vfs_nwfs, OID_AUTO, debuglevel, CTLFLAG_RW, &nwfs_debuglevel, 0, "");
 
-static int nwfs_mount __P((struct mount *, char *, caddr_t,
-			struct nameidata *, struct proc *));
-static int nwfs_quotactl __P((struct mount *, int, uid_t, caddr_t,
-			struct proc *));
-static int nwfs_root __P((struct mount *, struct vnode **));
-static int nwfs_start __P((struct mount *, int, struct proc *));
-static int nwfs_statfs __P((struct mount *, struct statfs *,
-			struct proc *));
-static int nwfs_sync __P((struct mount *, int, struct ucred *,
-			struct proc *));
-static int nwfs_unmount __P((struct mount *, int, struct proc *));
-static int nwfs_init __P((struct vfsconf *vfsp));
-static int nwfs_uninit __P((struct vfsconf *vfsp));
+static int nwfs_mount(struct mount *, char *, caddr_t,
+			struct nameidata *, struct proc *);
+static int nwfs_quotactl(struct mount *, int, uid_t, caddr_t, struct proc *);
+static int nwfs_root(struct mount *, struct vnode **);
+static int nwfs_start(struct mount *, int, struct proc *);
+static int nwfs_statfs(struct mount *, struct statfs *, struct proc *);
+static int nwfs_sync(struct mount *, int, struct ucred *, struct proc *);
+static int nwfs_unmount(struct mount *, int, struct proc *);
+static int nwfs_init(struct vfsconf *vfsp);
+static int nwfs_uninit(struct vfsconf *vfsp);
 
 static struct vfsops nwfs_vfsops = {
 	nwfs_mount,
@@ -301,7 +298,8 @@ nwfs_root(struct mount *mp, struct vnode **vpp) {
 	conn = NWFSTOCONN(nmp);
 	if (nmp->n_root) {
 		*vpp = NWTOV(nmp->n_root);
-		vget(*vpp, LK_EXCLUSIVE, curproc);
+		while (vget(*vpp, LK_EXCLUSIVE, curproc) != 0)
+			;
 		return 0;
 	}
 	error = ncp_lookup_volume(conn, nmp->m.mounted_vol, &vol, 
@@ -443,7 +441,7 @@ nwfs_uninit(struct vfsconf *vfsp)
 int
 nwfs_statfs(mp, sbp, p)
 	struct mount *mp;
-	register struct statfs *sbp;
+	struct statfs *sbp;
 	struct proc *p;
 {
 	struct nwmount *nmp = VFSTONWFS(mp);
@@ -493,7 +491,7 @@ nwfs_sync(mp, waitfor, cred, p)
 	struct ucred *cred;
 	struct proc *p;
 {
-	register struct vnode *vp;
+	struct vnode *vp;
 	int error, allerror = 0;
 	/*
 	 * Force stale buffer cache information to be flushed.

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/bus.h,v 1.30 1999/12/29 04:24:37 peter Exp $
+ * $FreeBSD: src/sys/sys/bus.h,v 1.30.2.2 2000/08/03 06:36:38 imp Exp $
  */
 
 #ifndef _SYS_BUS_H_
@@ -257,6 +257,8 @@ void	device_set_desc_copy(device_t dev, const char* desc);
 int	device_set_devclass(device_t dev, const char *classname);
 int	device_set_driver(device_t dev, driver_t *driver);
 void	device_set_flags(device_t dev, u_int32_t flags);
+void	device_set_softc(device_t dev, void *softc);
+int	device_set_unit(device_t dev, int unit);	/* XXX DONT USE XXX */
 int	device_shutdown(device_t dev);
 void	device_unbusy(device_t dev);
 void	device_verbose(device_t dev);

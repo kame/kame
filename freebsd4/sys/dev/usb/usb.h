@@ -1,5 +1,5 @@
 /*	$NetBSD: usb.h,v 1.38 1999/10/20 21:02:39 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb.h,v 1.17.2.4 2000/07/02 12:14:44 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb.h,v 1.17.2.5 2000/10/31 22:59:35 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -424,6 +424,9 @@ typedef struct {
 #define USB_MAX_POWER		500 /* mA */
 
 #define USB_BUS_RESET_DELAY	100 /* ms XXX?*/
+
+#define USB_UNCONFIG_NO		0
+#define USB_UNCONFIG_INDEX	(-1)
 
 /*** ioctl() related stuff ***/
 

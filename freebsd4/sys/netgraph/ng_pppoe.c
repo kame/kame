@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Julian Elischer <julian@whistle.com>
+ * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.23 1999/12/07 05:50:47 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.c,v 1.23.2.5 2000/11/04 08:23:16 julian Exp $
  * $Whistle: ng_pppoe.c,v 1.10 1999/11/01 09:24:52 julian Exp $
  */
 #if 0
@@ -134,16 +134,16 @@ typedef struct sess_neg *negp;
 /*
  * Session information that is needed after connection.
  */
-struct session {
+struct sess_con {
 	hook_p  		hook;
 	u_int16_t		Session_ID;
-	struct session		*hash_next; /* not yet uesed */
 	enum state		state;
 	char			creator[NG_NODELEN + 1]; /* who to notify */
 	struct pppoe_full_hdr	pkt_hdr;	/* used when connected */
 	negp			neg;		/* used when negotiating */
+	/*struct sess_con	*hash_next;*/	/* not yet used */
 };
-typedef struct session *sessp;
+typedef struct sess_con *sessp;
 
 /*
  * Information we store for each node
@@ -155,7 +155,7 @@ struct PPPOE {
 	u_int   	packets_in;	/* packets in from ethernet */
 	u_int   	packets_out;	/* packets out towards ethernet */
 	u_int32_t	flags;
-	/*struct session *buckets[HASH_SIZE];*/	/* not yet used */
+	/*struct sess_con *buckets[HASH_SIZE];*/	/* not yet used */
 };
 typedef struct PPPOE *priv_p;
 
@@ -472,7 +472,7 @@ ng_pppoe_constructor(node_p *nodep)
 
 AAA
 	/* Initialize private descriptor */
-	MALLOC(privdata, priv_p, sizeof(*privdata), M_NETGRAPH, M_WAITOK);
+	MALLOC(privdata, priv_p, sizeof(*privdata), M_NETGRAPH, M_NOWAIT);
 	if (privdata == NULL)
 		return (ENOMEM);
 	bzero(privdata, sizeof(*privdata));
@@ -516,7 +516,7 @@ AAA
 		 * The infrastructure has already checked that it's unique,
 		 * so just allocate it and hook it in.
 		 */
-		MALLOC(sp, sessp, sizeof(*sp), M_NETGRAPH, M_WAITOK);
+		MALLOC(sp, sessp, sizeof(*sp), M_NETGRAPH, M_NOWAIT);
 		if (sp == NULL) {
 				return (ENOMEM);
 		}
@@ -591,7 +591,7 @@ AAA
 			/*
 			 * set up prototype header
 			 */
-			MALLOC(neg, negp, sizeof(*neg), M_NETGRAPH, M_WAITOK);
+			MALLOC(neg, negp, sizeof(*neg), M_NETGRAPH, M_NOWAIT);
 
 			if (neg == NULL) {
 				printf("pppoe: Session out of memory\n");
@@ -748,8 +748,8 @@ AAA
 	uniqtag.hdr.tag_len = htons((u_int16_t)sizeof(uniqtag.data));
 	uniqtag.data.pointer = sp;
 	init_tags(sp);
-	insert_tag(sp, &sp->neg->service.hdr);
 	insert_tag(sp, &uniqtag.hdr);
+	insert_tag(sp, &sp->neg->service.hdr);
 	make_packet(sp);
 	sendpacket(sp);
 }
@@ -905,12 +905,12 @@ AAA
 				neg->timeout = 0;
 				neg->pkt->pkt_header.ph.code = PADR_CODE;
 				init_tags(sp);
-				insert_tag(sp, &neg->service.hdr); /* Service */
+				insert_tag(sp, utag);      /* Host Unique */
 				if ((tag = get_tag(ph, PTT_AC_COOKIE)))
 					insert_tag(sp, tag); /* return cookie */
 				if ((tag = get_tag(ph, PTT_AC_NAME)))
 					insert_tag(sp, tag); /* return it */
-				insert_tag(sp, utag);      /* Host Unique */
+				insert_tag(sp, &neg->service.hdr); /* Service */
 				scan_tags(sp, ph);
 				make_packet(sp);
 				sp->state = PPPOE_SREQ;
@@ -1091,9 +1091,12 @@ AAA
 					/*
 					 * Now we have gone to Connected mode, 
 					 * Free all resources needed for 
-					 * negotiation.
+					 * negotiation. Be paranoid about
+					 * whether there may be a timeout.
 					 */
 					m_freem(sp->neg->m);
+					untimeout(pppoe_ticker, sendhook,
+				    		sp->neg->timeout_handle);
 					FREE(sp->neg, M_NETGRAPH);
 					sp->neg = NULL;
 				} else {
@@ -1119,7 +1122,21 @@ AAA
 		switch (sp->state) {
 		case	PPPOE_NEWCONNECTED:
 		case	PPPOE_CONNECTED: {
+			static const u_char addrctrl[] = { 0xff, 0x03 };
 			struct pppoe_full_hdr *wh;
+
+			/*
+			 * Remove PPP address and control fields, if any.
+			 * For example, ng_ppp(4) always sends LCP packets
+			 * with address and control fields as required by
+			 * generic PPP. PPPoE is an exception to the rule.
+			 */
+			if (m->m_pkthdr.len >= 2) {
+				if (m->m_len < 2 && !(m = m_pullup(m, 2)))
+					LEAVE(ENOBUFS);
+				if (bcmp(mtod(m, u_char *), addrctrl, 2) == 0)
+					m_adj(m, 2);
+			}
 			/*
 			 * Bang in a pre-made header, and set the length up
 			 * to be correct. Then send it to the ethernet driver.
@@ -1257,6 +1274,7 @@ ng_pppoe_disconnect(hook_p hook)
 	int 	hooks;
 
 AAA
+	hooks = node->numhooks; /* this one already not counted */
 	if (hook->private == &privp->debug_hook) {
 		privp->debug_hook = NULL;
 	} else if (hook->private == &privp->ethernet_hook) {
@@ -1267,6 +1285,11 @@ AAA
 		if (sp->state != PPPOE_SNONE ) {
 			pppoe_send_event(sp, NGM_PPPOE_CLOSE);
 		}
+		/*
+		 * According to the spec, if we are connected,
+		 * we should send a DISC packet if we are shutting down
+		 * a session.
+		 */
 		if ((privp->ethernet_hook)
 		&& ((sp->state == PPPOE_CONNECTED)
 		 || (sp->state == PPPOE_NEWCONNECTED))) {
@@ -1307,6 +1330,10 @@ AAA
 				    dummy);
 			}
 		}
+		/*
+		 * As long as we have somewhere to store the timeout handle,
+		 * we may have a timeout pending.. get rid of it.
+		 */
 		if (sp->neg) {
 			untimeout(pppoe_ticker, hook, sp->neg->timeout_handle);
 			if (sp->neg->m)
@@ -1317,11 +1344,8 @@ AAA
 		hook->private = NULL;
 		/* work out how many session hooks there are */
 		/* Node goes away on last session hook removal */
-		hooks = node->numhooks; /* this one already not counted */
 		if (privp->ethernet_hook) hooks -= 1;
 		if (privp->debug_hook) hooks -= 1;
-		if (hooks == 0) 
-			ng_rmnode(node);
 	}
 	if (node->numhooks == 0)
 		ng_rmnode(node);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ucred.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/ucred.h,v 1.14 1999/12/29 04:24:49 peter Exp $
+ * $FreeBSD: src/sys/sys/ucred.h,v 1.14.2.3 2000/10/28 02:10:30 gallatin Exp $
  */
 
 #ifndef _SYS_UCRED_H_
@@ -48,6 +48,7 @@ struct ucred {
 	uid_t	cr_uid;			/* effective user id */
 	short	cr_ngroups;		/* number of groups */
 	gid_t	cr_groups[NGROUPS];	/* groups */
+	struct	uidinfo *cr_uidinfo;	/* per uid resource consumption */
 };
 #define cr_gid cr_groups[0]
 #define NOCRED ((struct ucred *)0)	/* no credential available */
@@ -56,6 +57,10 @@ struct ucred {
 #ifdef _KERNEL
 #define	crhold(cr)	(cr)->cr_ref++
 
+struct proc;
+
+void		change_euid __P((struct proc *p, uid_t euid));
+void		change_ruid __P((struct proc *p, uid_t ruid));
 struct ucred	*crcopy __P((struct ucred *cr));
 struct ucred	*crdup __P((struct ucred *cr));
 void		crfree __P((struct ucred *cr));

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.15.2.1 2000/05/23 03:56:58 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard_nbk.c,v 1.15.2.2 2000/10/15 04:12:43 sanpei Exp $
  */
 
 /*
@@ -49,8 +49,6 @@
  * These compatibility nodes are called pccnbk.  PCCard New Bus Kludge.
  */
 
-#include "opt_bus.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>
@@ -61,13 +59,10 @@
 
 #include <sys/bus.h>
 #include <machine/bus.h>
-#include <sys/rman.h>
 #include <machine/resource.h>
 
-#include <i386/isa/isa_device.h>
 #include <pccard/cardinfo.h>
 #include <pccard/slot.h>
-#include <pccard/pccard_nbk.h>
 
 #include <dev/pccard/pccardvar.h>
 #include <net/ethernet.h>

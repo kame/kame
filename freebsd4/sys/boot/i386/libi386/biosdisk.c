@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/biosdisk.c,v 1.26.2.4 2000/07/07 21:12:33 jhb Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/biosdisk.c,v 1.26.2.5 2000/11/07 19:17:08 jhb Exp $
  */
 
 /*
@@ -170,7 +170,7 @@ bd_init(void)
 	for (unit = base; (nbdinfo < MAXBDDEV); unit++) {
 	    /* check the BIOS equipment list for number of fixed disks */
 	    if((base == 0x80) &&
-	       (nfd >= *(unsigned short *)PTOV(BIOS_NUMDRIVES)))
+	       (nfd >= *(unsigned char *)PTOV(BIOS_NUMDRIVES)))
 	        break;
 
 	    bdinfo[nbdinfo].bd_unit = unit;

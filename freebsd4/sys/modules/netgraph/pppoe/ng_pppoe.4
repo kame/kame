@@ -30,9 +30,9 @@
 .\" THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
 .\" OF SUCH DAMAGE.
 .\" 
-.\" Author: Archie Cobbs <archie@whistle.com>
+.\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/pppoe/ng_pppoe.4,v 1.8.2.1 2000/05/04 18:43:39 archie Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/pppoe/ng_pppoe.4,v 1.8.2.3 2000/10/24 22:31:06 julian Exp $
 .\" $Whistle: ng_pppoe.8,v 1.1 1999/01/25 23:46:27 archie Exp $
 .\"
 .Dd October 28, 1999
@@ -220,7 +220,7 @@ setup(char *ethername, char *service, char *sessname,
 	struct nodeinfo *peer;
 	/****message to connect pppoe session*****/
 	struct {
-		struct ngPPPoE_init_data idata;
+		struct ngpppoe_init_data idata;
 		char            service[100];
 	}               message;
 	/********tracking our little graph ********/
@@ -401,4 +401,4 @@ The
 node type was implemented in
 .Fx 4.0 .
 .Sh AUTHORS
-.An Julian Elischer Aq julian@whistle.com
+.An Julian Elischer Aq julian@freebsd.org

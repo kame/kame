@@ -1,5 +1,5 @@
 #	$NetBSD: Makefile,v 1.12 1998/02/19 14:18:36 drochner Exp $
-# $FreeBSD: src/sys/boot/arc/loader/Makefile,v 1.4 1999/12/16 17:24:59 marcel Exp $
+# $FreeBSD: src/sys/boot/arc/loader/Makefile,v 1.4.2.1 2000/08/04 08:31:08 obrien Exp $
 
 BASE= 		loader
 PROG= 		${BASE}.exe
@@ -20,7 +20,7 @@ CFLAGS+=	-I${.CURDIR}/../../.. -I.
 CFLAGS+=	-DLOADER
 
 CLEANFILES+=	setdef0.c setdef0.o setdef1.c setdef1.o setdefs.h start.o \
-		vers.c vers.o ${BASE} ${BASE}.exe ${BASE}.sym ${BASE}.list
+		vers.c vers.o ${BASE}.exe ${BASE}.sym ${BASE}.list
 CLEANFILES+=	loader.help
 CLEANFILES+=	machine
 
@@ -39,10 +39,10 @@ vers.o: ${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version
 	sh ${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version ${NEWVERSWHAT}
 	${CC} -c vers.c
 
-${BASE}.exe: ${BASE} ${BASE}.help
+${BASE}.exe: ${BASE}.sym ${BASE}.help
 	elf2exe ${BASE}.sym ${BASE}.exe
 
-${BASE}: ${OBJS} ${LIBSTAND} ${LIBARC} ${CRT} vers.o setdef0.o setdef1.o
+${BASE}.sym: ${OBJS} ${LIBSTAND} ${LIBARC} ${CRT} vers.o setdef0.o setdef1.o
 	${LD} -o ${BASE}.sym -M -N -Ttext ${LOAD_ADDRESS} \
 	${CRT} setdef0.o ${OBJS} setdef1.o vers.o -L${DESTDIR}${LIBDIR} \
 	${LIBSTAND} ${LIBARC} ${LIBSTAND} >${.OBJDIR}/${BASE}.list

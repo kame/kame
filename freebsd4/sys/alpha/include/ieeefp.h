@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/ieeefp.h,v 1.3 1999/08/28 00:38:44 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/ieeefp.h,v 1.3.2.2 2000/08/22 02:44:19 jhb Exp $ */
 /* From: NetBSD: ieeefp.h,v 1.2 1997/04/06 08:47:28 cgd Exp */
 
 /* 
@@ -9,7 +9,7 @@
 #ifndef _ALPHA_IEEEFP_H_
 #define _ALPHA_IEEEFP_H_
 
-typedef int fp_except;
+typedef int fp_except_t;
 #define	FP_X_INV	(1LL << 1)	/* invalid operation exception */
 #define	FP_X_DZ		(1LL << 2)	/* divide-by-zero exception */
 #define	FP_X_OFL	(1LL << 3)	/* overflow exception */
@@ -24,6 +24,6 @@ typedef enum {
     FP_RM=1,			/* round toward negative infinity */
     FP_RN=2,			/* round to nearest representable number */
     FP_RP=3			/* round toward positive infinity */
-} fp_rnd;
+} fp_rnd_t;
 
 #endif /* _ALPHA_IEEEFP_H_ */

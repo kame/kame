@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.18 2000/01/29 18:22:33 peter Exp $
+ * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.18.2.2 2000/10/31 08:09:50 dwmalone Exp $
  */
 
 #include <stddef.h>	/* For offsetof() */
@@ -292,7 +292,7 @@ ahbattach(device_t dev)
 
 	/*
 	 * Create our DMA tags.  These tags define the kinds of device
-	 * accessable memory allocations and memory mappings we will 
+	 * accessible memory allocations and memory mappings we will 
 	 * need to perform during normal operation.
 	 */
 	/* DMA tag for mapping buffers into device visible space. */
@@ -396,12 +396,11 @@ ahballoc(u_long unit, struct resource *res)
 	/*
 	 * Allocate a storage area for us
 	 */
-	ahb = malloc(sizeof(struct ahb_softc), M_DEVBUF, M_NOWAIT);
+	ahb = malloc(sizeof(struct ahb_softc), M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!ahb) {
 		printf("ahb%ld: cannot malloc!\n", unit);
 		return (NULL);
 	}
-	bzero(ahb, sizeof(struct ahb_softc));
 	SLIST_INIT(&ahb->free_ecbs);
 	LIST_INIT(&ahb->pending_ccbs);
 	ahb->unit = unit;

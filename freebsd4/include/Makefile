@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.109.2.4 2000/07/15 07:24:05 kris Exp $
+# $FreeBSD: src/include/Makefile,v 1.109.2.8 2000/11/12 18:01:51 adrian Exp $
 #
 # Doing a make install builds /usr/include
 #
@@ -11,10 +11,11 @@ SUBDIR= rpcsvc
 FILES=	a.out.h ar.h assert.h bitstring.h ctype.h db.h dirent.h disktab.h \
 	dlfcn.h elf.h err.h fnmatch.h fstab.h \
 	fts.h glob.h grp.h strhash.h histedit.h ieeefp.h ifaddrs.h iso646.h \
-	limits.h link.h locale.h malloc.h memory.h mpool.h \
+	libgen.h limits.h link.h locale.h malloc.h memory.h mpool.h \
 	ndbm.h netdb.h nl_types.h nlist.h objformat.h \
 	paths.h pthread.h pthread_np.h pwd.h \
-	ranlib.h regex.h regexp.h resolv.h rune.h runetype.h setjmp.h sgtty.h \
+	ranlib.h regex.h regexp.h resolv.h rune.h runetype.h \
+	search.h setjmp.h sgtty.h \
 	signal.h stab.h stddef.h stdio.h stdlib.h string.h stringlist.h \
 	strings.h struct.h sysexits.h tar.h time.h timers.h \
 	ttyent.h unistd.h utime.h utmp.h vis.h
@@ -42,7 +43,7 @@ LFILES=	aio.h errno.h fcntl.h inttypes.h linker_set.h poll.h syslog.h \
 	termios.h ucontext.h
 
 LDIRS=	cam msdosfs net netatalk netatm netgraph netinet netinet6 \
-	netipx netkey netncp netns nfs ntfs nwfs pccard posix4 sys vm
+	netipx netkey netnatm netncp netns nfs ntfs nwfs pccard posix4 sys vm
 
 LNOHEADERDIRS=	isofs ufs dev
 LSUBDIRS=	isofs/cd9660 ufs/ffs ufs/mfs ufs/ufs cam/scsi dev/ppbus dev/usb
@@ -100,9 +101,6 @@ copies:
 	if [ -h ${DESTDIR}/usr/include/$i ]; then \
 		rm -f ${DESTDIR}/usr/include/$i; \
 	fi
-.endfor
-.for i in ${LNOHEADERDIRS}
-	rm -rf ${DESTDIR}/usr/include/$i
 .endfor
 	mtree -deU -f ${.CURDIR}/../etc/mtree/BSD.include.dist \
 		-p ${DESTDIR}/usr/include

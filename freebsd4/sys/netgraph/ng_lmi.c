@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Julian Elischer <julian@whistle.com>
+ * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_lmi.c,v 1.5 1999/11/30 02:45:21 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_lmi.c,v 1.5.2.2 2000/10/24 18:36:45 julian Exp $
  * $Whistle: ng_lmi.c,v 1.38 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -190,7 +190,7 @@ nglmi_constructor(node_p *nodep)
 	sc_p sc;
 	int error = 0;
 
-	MALLOC(sc, sc_p, sizeof(*sc), M_NETGRAPH, M_WAITOK);
+	MALLOC(sc, sc_p, sizeof(*sc), M_NETGRAPH, M_NOWAIT);
 	if (sc == NULL)
 		return (ENOMEM);
 	bzero(sc, sizeof(*sc));

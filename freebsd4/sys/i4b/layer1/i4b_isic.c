@@ -29,7 +29,7 @@
  *
  *	$Id: i4b_isic.c,v 1.3 1999/12/13 21:25:26 hm Exp $ 
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_isic.c,v 1.6 1999/12/14 20:48:21 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_isic.c,v 1.6.2.1 2000/09/21 17:19:35 joe Exp $
  *
  *      last edit-date: [Mon Dec 13 22:01:33 1999]
  *
@@ -306,16 +306,17 @@ isic_attach_common(device_t dev)
 
 	if(sc->sc_ipac)
 	{
-		ret = IPAC_READ(IPAC_ID);
+		sc->sc_ipac_version = IPAC_READ(IPAC_ID);
 	
-		switch(ret)
+		switch(sc->sc_ipac_version)
 		{
-			case 0x01: 
+			case IPAC_V11:
+			case IPAC_V12: 
 				break;
 	
 			default:
 				printf("isic%d: Error, IPAC version %d unknown!\n",
-					unit, ret);
+					unit, sc->sc_ipac_version);
 				return ENXIO;
 				break;
 

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.3 2000/06/21 12:22:36 kato Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.5 2000/09/30 15:58:26 nyan Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -19,6 +19,7 @@ CONSPEED		opt_comconsole.h
 I586_PMC_GUPROF		opt_i586_guprof.h
 WLCACHE			opt_wavelan.h
 WLDEBUG			opt_wavelan.h
+BROKEN_KEYBOARD_RESET	opt_reset.h
 
 # Options for emulators.  These should only be used at config time, so
 # they are handled like options for static file systems
@@ -31,8 +32,6 @@ DEBUG_SVR4		opt_svr4.h
 
 # i386 SMP options
 APIC_IO			opt_global.h
-NAPIC			opt_smp.h
-NINTR			opt_smp.h
 
 CLK_CALIBRATION_LOOP		opt_clock.h
 CLK_USE_I8254_CALIBRATION	opt_clock.h

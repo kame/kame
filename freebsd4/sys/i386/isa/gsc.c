@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/gsc.c,v 1.35 2000/01/29 16:17:32 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/gsc.c,v 1.35.2.1 2000/08/08 19:49:53 peter Exp $
  *
  */
 
@@ -327,7 +327,7 @@ buffer_read(struct gsc_unit *scu)
   outb( scu->clrp, 0 );
   stb = inb( scu->stat );
 
-  isa_dmastart(B_READ, scu->sbuf.base, scu->sbuf.size, scu->channel);
+  isa_dmastart(ISADMA_READ, scu->sbuf.base, scu->sbuf.size, scu->channel);
 
   chan_bit = 0x01 << scu->channel;
 
@@ -347,7 +347,7 @@ buffer_read(struct gsc_unit *scu)
 	break;
     }
   splx(sps);
-  isa_dmadone(B_READ, scu->sbuf.base, scu->sbuf.size, scu->channel);
+  isa_dmadone(ISADMA_READ, scu->sbuf.base, scu->sbuf.size, scu->channel);
   outb( scu->clrp, 0 );
 
   if(res != SUCCESS)

@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.6 2000/07/07 00:29:28 obrien Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.11 2000/11/02 01:41:17 nyan Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -43,6 +43,16 @@ ukbdmap.h			optional	ukbd_dflt_keymap	\
 	no-obj no-implicit-rule before-depend				\
 	clean		"ukbdmap.h"
 #
+compat/linux/linux_file.c	optional	compat_linux
+compat/linux/linux_ioctl.c	optional	compat_linux
+compat/linux/linux_ipc.c	optional	compat_linux
+compat/linux/linux_mib.c	optional	compat_linux
+compat/linux/linux_misc.c	optional	compat_linux
+compat/linux/linux_signal.c	optional	compat_linux
+compat/linux/linux_socket.c	optional	compat_linux
+compat/linux/linux_stats.c	optional	compat_linux
+compat/linux/linux_util.c	optional	compat_linux
+#
 contrib/dev/fla/fla.c		optional	fla
 msysosak.o			optional	fla			\
 	dependency	"$S/contrib/dev/fla/i386/msysosak.o.uu" 		\
@@ -62,20 +72,30 @@ dev/aic/aic_cbus.c		optional	aic isa
 dev/ata/ata-all.c		optional	ata 
 dev/ata/ata-dma.c		optional	ata 
 dev/ata/ata-disk.c		optional	atadisk
+dev/ata/ata-raid.c		optional	atadisk
 dev/ata/atapi-all.c		optional	atapicd 
 dev/ata/atapi-all.c		optional	atapifd 
 dev/ata/atapi-all.c		optional	atapist
 dev/ata/atapi-cd.c		optional	atapicd
 dev/ata/atapi-fd.c		optional	atapifd
 dev/ata/atapi-tape.c		optional	atapist
+dev/ed/if_ed.c			optional	ed
+dev/ed/if_ed_cbus.c		optional	ed isa
+dev/ed/if_ed_pccard.c		optional	ed card
 dev/eisa/eisaconf.c		optional	eisa
 dev/fb/fb.c			optional	fb
 dev/fb/fb.c			optional	gdc
 dev/fb/splash.c			optional	splash
+dev/fe/if_fe_cbus.c		optional	fe isa
 dev/kbd/kbd.c			optional	kbd
 dev/kbd/kbd.c			optional	sc
 dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	pckbd
+dev/snc/dp83932.c		optional	snc
+dev/snc/dp83932subr.c		optional	snc
+dev/snc/if_snc.c		optional	snc
+dev/snc/if_snc_cbus.c		optional	snc isa
+dev/snc/if_snc_pccard.c		optional	snc card
 gnu/i386/fpemul/div_small.s	optional	gpl_math_emulate
 gnu/i386/fpemul/errors.c	optional	gpl_math_emulate
 gnu/i386/fpemul/fpu_arith.c	optional	gpl_math_emulate
@@ -193,9 +213,7 @@ i386/isa/gsc.c			optional	gsc
 i386/isa/if_ar.c		optional	ar
 i386/isa/if_cs.c		optional	cs
 i386/isa/if_cx.c		optional	cx
-pc98/pc98/if_ed.c		optional	ed
 i386/isa/if_el.c		optional	el
-i386/isa/if_fe.c		optional	fe
 i386/isa/if_le.c		optional	le
 i386/isa/if_lnc.c		optional	lnc
 i386/isa/if_rdp.c		optional	rdp
@@ -321,19 +339,11 @@ i386/isa/wst.c			optional	wst wdc
 i386/isa/wt.c			optional	wt
 i386/linux/imgact_linux.c	optional	compat_linux
 i386/linux/linux_dummy.c	optional	compat_linux
-i386/linux/linux_file.c		optional	compat_linux
-i386/linux/linux_ioctl.c	optional	compat_linux
-i386/linux/linux_ipc.c		optional	compat_linux
 i386/linux/linux_locore.s	optional	compat_linux		   \
 	dependency 	"linux_assym.h"
-i386/linux/linux_mib.c		optional	compat_linux
-i386/linux/linux_misc.c		optional	compat_linux
-i386/linux/linux_signal.c	optional	compat_linux
-i386/linux/linux_socket.c	optional	compat_linux
-i386/linux/linux_stats.c	optional	compat_linux
+i386/linux/linux_machdep.c	optional	compat_linux
 i386/linux/linux_sysent.c	optional	compat_linux
 i386/linux/linux_sysvec.c	optional	compat_linux
-i386/linux/linux_util.c		optional	compat_linux
 svr4/imgact_svr4.c		optional	compat_svr4
 svr4/svr4_fcntl.c		optional	compat_svr4
 svr4/svr4_filio.c		optional	compat_svr4

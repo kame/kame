@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/syscons_pc98.c,v 1.7.2.2 2000/04/05 11:35:36 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/syscons_pc98.c,v 1.7.2.4 2000/10/21 07:44:28 nyan Exp $
  */
 
 #include "opt_syscons.h"
@@ -33,9 +33,9 @@
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
-
 #include <sys/cons.h>
-#include <machine/console.h>
+#include <sys/consio.h>
+
 #include <machine/clock.h>
 
 #include <pc98/pc98/pc98.h>
@@ -180,7 +180,7 @@ sc_get_cons_priority(int *unit, int *flags)
 void
 sc_get_bios_values(bios_values_t *values)
 {
-	values->cursor_start = 0;
+	values->cursor_start = 15;
 	values->cursor_end = 16;
 	values->shift_state = 0;
 	if (pc98_machine_type & M_8M)

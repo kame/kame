@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/pc98/loader/main.c,v 1.7.2.2 2000/05/05 08:59:06 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/loader/main.c,v 1.7.2.4 2000/10/15 02:57:44 nyan Exp $
  */
 
 /*
@@ -70,11 +70,6 @@ extern	char bootprog_name[], bootprog_rev[], bootprog_date[], bootprog_maker[];
 /* XXX debugging */
 extern char end[];
 
-/* XXX - I dont know why we have to do this, but it helps. */
-#if defined(LOADER_NFS_SUPPORT) || defined(LOADER_TFTP_SUPPORT)
-char	Heap[200*1024];
-#endif
-
 void
 main(void)
 {
@@ -91,12 +86,7 @@ main(void)
      */
     bios_getmem();
 
-    /* XXX - I dont know why we have to do this, but it helps PXE. */
-#if defined(LOADER_NFS_SUPPORT) || defined(LOADER_TFTP_SUPPORT)
-    setheap(Heap, Heap+sizeof(Heap));
-#else
     setheap((void *)end, (void *)bios_basemem);
-#endif
 
     /* 
      * XXX Chicken-and-egg problem; we want to have console output early, but some
@@ -108,6 +98,8 @@ main(void)
      */
     if (initial_howto & RB_SERIAL)
 	setenv("console", "comconsole", 1);
+    if (initial_howto & RB_MUTE)
+	setenv("console", "nullconsole", 1);
     cons_probe();
 
     /*

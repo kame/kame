@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.5 2000/07/17 00:44:25 mjacob Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.10 2000/10/31 22:09:59 gibbs Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -415,6 +415,10 @@ static struct xpt_quirk_entry xpt_quirk_table[] =
 		 * Submitted by:  Parag Patel <parag@cgt.com>
 		 */
 		{ T_WORM, SIP_MEDIA_REMOVABLE, sony, "CD-R   CDU9*", "*" },
+		CAM_QUIRK_NOLUNS, /*mintags*/0, /*maxtags*/0
+	},
+	{
+		{ T_WORM, SIP_MEDIA_REMOVABLE, "YAMAHA", "CDR100*", "*" },
 		CAM_QUIRK_NOLUNS, /*mintags*/0, /*maxtags*/0
 	},
 	{
@@ -957,6 +961,8 @@ xptioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 				break;
 			}
 			/* FALLTHROUGH */
+		case XPT_PATH_INQ:
+		case XPT_ENG_INQ:
 		case XPT_SCAN_LUN:
 
 			ccb = xpt_alloc_ccb();
@@ -1072,7 +1078,7 @@ xptioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 			break;
 		}
 		default:
-			error = EINVAL;
+			error = ENOTSUP;
 			break;
 		}
 		break;
@@ -1321,13 +1327,12 @@ xpt_init(dummy)
 	 */
 	xpt_config_hook =
 	    (struct intr_config_hook *)malloc(sizeof(struct intr_config_hook),
-					      M_TEMP, M_NOWAIT);
+					      M_TEMP, M_NOWAIT | M_ZERO);
 	if (xpt_config_hook == NULL) {
 		printf("xpt_init: Cannot malloc config hook "
 		       "- failing attach\n");
 		return;
 	}
-	bzero(xpt_config_hook, sizeof(*xpt_config_hook));
 
 	xpt_config_hook->ich_func = xpt_config;
 	if (config_intrhook_establish(xpt_config_hook) != 0) {
@@ -5376,10 +5381,10 @@ probestart(struct cam_periph *periph, union ccb *start_ccb)
 
 		if ((device->quirk->quirks & CAM_QUIRK_NOSERIAL) == 0)
 			serial_buf = (struct scsi_vpd_unit_serial_number *)
-				malloc(sizeof(*serial_buf), M_TEMP, M_NOWAIT);
+				malloc(sizeof(*serial_buf), M_TEMP,
+					M_NOWAIT | M_ZERO);
 
 		if (serial_buf != NULL) {
-			bzero(serial_buf, sizeof(*serial_buf));
 			scsi_inquiry(csio,
 				     /*retries*/4,
 				     probedone,
@@ -5786,6 +5791,15 @@ xpt_set_transfer_settings(struct ccb_trans_settings *cts, struct cam_ed *device,
 			cts->sync_offset = 0;
 		}
 
+		/*
+		 * Don't allow DT transmission rates if the
+		 * device does not support it.
+		 */
+		if ((device->flags & CAM_DEV_INQUIRY_DATA_VALID) != 0
+		 && (inq_data->spi3data & SID_SPI_CLOCK_DT) == 0
+		 && cts->sync_period <= 0x9)
+			cts->sync_period = 0xa;
+
 		switch (cts->bus_width) {
 		case MSG_EXT_WDTR_BUS_32_BIT:
 			if (((device->flags & CAM_DEV_INQUIRY_DATA_VALID) == 0
@@ -5829,8 +5843,7 @@ xpt_set_transfer_settings(struct ccb_trans_settings *cts, struct cam_ed *device,
 	}
 
 	qfrozen = FALSE;
-	if ((cts->valid & CCB_TRANS_TQ_VALID) != 0
-	 && (async_update == FALSE)) {
+	if ((cts->valid & CCB_TRANS_TQ_VALID) != 0) {
 		int device_tagenb;
 
 		/*

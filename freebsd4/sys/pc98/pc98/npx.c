@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)npx.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/pc98/pc98/npx.c,v 1.54 2000/02/01 08:54:14 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/npx.c,v 1.54.2.2 2000/10/21 07:44:26 nyan Exp $
  */
 
 #include "opt_debug_npx.h"
@@ -122,8 +122,6 @@ void	stop_emulating	__P((void));
 #endif	/* __GNUC__ */
 
 typedef u_char bool_t;
-
-#define	NPXIRQ	8
 
 static	int	npx_attach	__P((device_t dev));
 	void	npx_intr	__P((void *));
@@ -270,7 +268,7 @@ npx_probe(dev)
 	save_idt_npxintr = idt[npx_intrno];
 	save_idt_npxtrap = idt[16];
 #ifdef PC98
-	outb(IO_ICU1 + 2, ~IRQ_SLAVE);
+	outb(IO_ICU1 + 2, (u_int8_t) ~IRQ_SLAVE);
 	outb(IO_ICU2 + 2, ~(1 << (npx_irq - 8)));
 #else
 	outb(IO_ICU1 + 1, ~IRQ_SLAVE);
@@ -393,8 +391,7 @@ npx_probe1(dev)
 			 * accelerator board.
 			 */
 			npx_ex16 = 1;
-			dvp->id_irq = 0;
-			return (-1);
+			return (0);
 #endif
 			npx_traps_while_probing = npx_intrs_while_probing = 0;
 			fp_divide_by_0();

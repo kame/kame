@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/CHANGELOG.TXT,v 1.8.2.1 2000/04/18 12:50:29 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/CHANGELOG.TXT,v 1.8.2.4 2000/11/01 09:36:14 roger Exp $ */
 /*
  * MAINTAINER = Roger Hardiman <roger@freebsd.org>
  */
@@ -481,6 +481,41 @@
                   Thomas Klausner <wiz@netbsd.org>
                   Fix typo in the new interrupt code.
 
+2.12  20 May 2000 Merge in NetBSD changes from Thomas Klausner <wiz@netbsd.org>
+                  following the import of driver 2.12 into NetBSD
 
+2.13  26 Jun 2000 Merge in more changes from Thomas Klausner <wiz@netbsd.org>
+                  syncing this driver with the NetBSD source at 25th June.
+
+2.14  28 Jun 2000 Add new Hauppauge Tuner Types, supplied by Hauppauge and
+                  required for Josef Karthauser <joe@pavilion.net>
+                  Change the structure of some of the #include files and
+                  merge in more NetBSD changes.
+
+2.15  10 Sep 2000 Add support for bktr_mem, a module to hold onto the bktr
+                  drives's contiguous memory buffers even when it is unloaded
+                  and reloaded.
+                  Simplify the use of the optional SMBUS i2c code by using a new
+                  #define called BKTR_USE_FREEBSD_SMBUS.
+                  Poul-Henning Kamp <phk@freebsd.org> changed the DEVFS code.
+                  Peter Wemm <peter@freebsd.org> fixed an SMBUS warning.
+                  Alexander Langer <alex@cichlids.com> fixed some FreeBSD newbus
+                  resource allocation problems (FreeBSD PR kern/18744).
+
+2.16  19 Sep 2000 Merge in NetBSD changes from Thomas Klausner <wiz@netbsd.org>
+
+2.17  19 Oct 2000 Alexander Langer <alex@big.endian.de> and
+                  Daniel O'Connor <doconnor@gsoft.com.au>
+                  both submitted fixes to devfs code.
+                  Fix PHK's commit so we only include machine/clock.h in
+                  FreeBSD 2.x, 3.x and 4.x systems
+
+2.18  30 Oct 2000 Roger Hardiman - Add new ioctls to allow userland programs
+                  fuller access to the I2C bus, BT848_MSP_READ BT848_MSP_WRITE
+                  and BT848_MSP_RESET.
+                  Add tuner type 0x2a. Remove 0x2c which was incorrect.
+                  Christian Gusenbauer <Christian.Gusenbauer@netway.at> added
+                  support for audio on Hauppauge cards without the audio mux.
+                  The MSP is used for audio selection. (the 44xxx models)
 
 

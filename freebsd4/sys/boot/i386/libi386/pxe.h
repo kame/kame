@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/pxe.h,v 1.4.2.1 2000/04/15 05:48:06 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/pxe.h,v 1.4.2.2 2000/09/10 02:52:18 ps Exp $
  */
 
 /*
@@ -498,7 +498,9 @@ typedef struct {
 		uint8_t		d[BOOTP_DHCPVEND];	/* raw array of vendor/dhcp options */
 		struct {
 			uint8_t		magic[4];	/* DHCP magic cookie */
+#			ifndef		VM_RFC1048
 #			define		VM_RFC1048	0x63825363L	/* ? */
+#			endif
 			uint32_t	flags;		/* bootp flags/opcodes */
 			uint8_t		pad[56];	/* I don't think intel knows what a
 							   union does... */

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.11 2000/01/13 09:13:22 mdodd Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.11.2.1 2000/08/02 22:39:30 peter Exp $
  *
  */
 
@@ -86,6 +86,7 @@ arp_ifinit(
     ifa->ifa_rtrequest = arp_rtrequest;
     ifa->ifa_flags |= RTF_CLONING;
 #endif
+}
 #endif
 
 

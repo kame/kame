@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.4 2000/07/17 21:24:28 archie Exp $
+ * $FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.6 2000/11/01 18:28:22 wpaul Exp $
  */
 
 /*
@@ -97,7 +97,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.4 2000/07/17 21:24:28 archie Exp $";
+  "$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.19.2.6 2000/11/01 18:28:22 wpaul Exp $";
 #endif
 
 /*
@@ -107,6 +107,7 @@ Static struct aue_type aue_devs[] = {
 	{ USB_VENDOR_ADMTEK, USB_PRODUCT_ADMTEK_PEGASUS },
 	{ USB_VENDOR_BILLIONTON, USB_PRODUCT_BILLIONTON_USB100 },
 	{ USB_VENDOR_MELCO, USB_PRODUCT_MELCO_LUATX },
+	{ USB_VENDOR_DLINK, USB_PRODUCT_DLINK_DSB650 },
 	{ USB_VENDOR_DLINK, USB_PRODUCT_DLINK_DSB650TX },
 	{ USB_VENDOR_DLINK, USB_PRODUCT_DLINK_DSB650TX_PNA },
 	{ USB_VENDOR_SMC, USB_PRODUCT_SMC_2202USB },
@@ -400,8 +401,10 @@ Static int aue_miibus_readreg(dev, phy, reg)
 	    sc->aue_info->aue_did == USB_PRODUCT_ADMTEK_PEGASUS) {
 		if (phy == 3)
 			return(0);
+#ifdef notdef
 		if (phy != 1)
 			return(0);
+#endif
 	}
 
 	csr_write_1(sc, AUE_PHY_ADDR, phy);
@@ -486,7 +489,9 @@ Static void aue_miibus_statchg(dev)
 	    (sc->aue_info->aue_vid == USB_VENDOR_LINKSYS &&
 	    sc->aue_info->aue_did == USB_PRODUCT_LINKSYS_USB10TA) ||
 	    (sc->aue_info->aue_vid == USB_VENDOR_DLINK &&
-	    sc->aue_info->aue_did == USB_PRODUCT_DLINK_DSB650TX)) {
+	    sc->aue_info->aue_did == USB_PRODUCT_DLINK_DSB650TX) ||
+	    (sc->aue_info->aue_vid == USB_VENDOR_DLINK &&
+	    sc->aue_info->aue_did == USB_PRODUCT_DLINK_DSB650)) {
 		u_int16_t		auxmode;
 		auxmode = aue_miibus_readreg(dev, 0, 0x1b);
 		aue_miibus_writereg(dev, 0, 0x1b, auxmode | 0x04);
@@ -540,7 +545,7 @@ Static void aue_setmulti(sc)
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		h = aue_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
-		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0xF));
+		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0x7));
 	}
 
 	return;
@@ -579,7 +584,9 @@ Static void aue_reset(sc)
 	    (sc->aue_info->aue_vid == USB_VENDOR_LINKSYS &&
 	    sc->aue_info->aue_did == USB_PRODUCT_LINKSYS_USB10TA) ||
 	    (sc->aue_info->aue_vid == USB_VENDOR_DLINK &&
-	    sc->aue_info->aue_did == USB_PRODUCT_DLINK_DSB650TX)) {
+	    sc->aue_info->aue_did == USB_PRODUCT_DLINK_DSB650TX) ||
+	    (sc->aue_info->aue_vid == USB_VENDOR_DLINK &&
+	    sc->aue_info->aue_did == USB_PRODUCT_DLINK_DSB650)) {
 		csr_write_1(sc, AUE_GPIO0, AUE_GPIO_SEL0|AUE_GPIO_SEL1);
 		csr_write_1(sc, AUE_GPIO0, AUE_GPIO_SEL0|AUE_GPIO_SEL1|
 			AUE_GPIO_OUT0);

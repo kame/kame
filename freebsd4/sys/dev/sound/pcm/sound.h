@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.10.2.3 2000/07/19 20:12:58 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.10.2.6 2000/10/05 05:05:10 cg Exp $
  */
 
 /*
@@ -38,24 +38,12 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ioccom.h>
-
 #include <sys/filio.h>
 #include <sys/sockio.h>
 #include <sys/fcntl.h>
 #include <sys/tty.h>
 #include <sys/proc.h>
-
 #include <sys/kernel.h> /* for DATA_SET */
-
-#if __FreeBSD_version < 500000
-#define MODULE_VERSION(mod, ver)
-#define MODULE_DEPEND(mod, dep, min, pref, max)
-
-#define ISADMA_WRITE B_WRITE
-#define ISADMA_READ B_READ
-#define ISADMA_RAW B_RAW
-#endif
-
 #include <sys/module.h>
 #include <sys/conf.h>
 #include <sys/file.h>
@@ -93,8 +81,15 @@ struct isa_device { int dummy; };
 
 #include <dev/sound/pcm/datatypes.h>
 #include <dev/sound/pcm/channel.h>
+#include <dev/sound/pcm/feeder.h>
 #include <dev/sound/pcm/mixer.h>
 #include <dev/sound/pcm/dsp.h>
+
+#ifndef ISADMA_WRITE
+#define ISADMA_WRITE B_WRITE
+#define ISADMA_READ B_READ
+#define ISADMA_RAW B_RAW
+#endif
 
 #define PCM_MODVER	1
 
@@ -114,13 +109,10 @@ struct isa_device { int dummy; };
 /* many variables should be reduced to a range. Here define a macro */
 #define RANGE(var, low, high) (var) = \
 	(((var)<(low))? (low) : ((var)>(high))? (high) : (var))
-/*
-#define DSP_BUFFSIZE (65536 - 256)
-*/
 #define DSP_BUFFSIZE (8192)
-/* the last 256 bytes are room for buggy soundcard to overflow. */
 
 /* make figuring out what a format is easier. got AFMT_STEREO already */
+#define AFMT_32BIT (AFMT_S32_LE | AFMT_S32_BE | AFMT_U32_LE | AFMT_U32_BE)
 #define AFMT_16BIT (AFMT_S16_LE | AFMT_S16_BE | AFMT_U16_LE | AFMT_U16_BE)
 #define AFMT_SIGNED (AFMT_S16_LE | AFMT_S16_BE | AFMT_S8)
 #define AFMT_BIGENDIAN (AFMT_S16_BE | AFMT_U16_BE)
@@ -170,6 +162,7 @@ int fkchan_setup(pcm_channel *c);
 
 int pcm_addchan(device_t dev, int dir, pcm_channel *templ, void *devinfo);
 int pcm_register(device_t dev, void *devinfo, int numplay, int numrec);
+int pcm_unregister(device_t dev);
 int pcm_setstatus(device_t dev, char *str);
 u_int32_t pcm_getflags(device_t dev);
 void pcm_setflags(device_t dev, u_int32_t val);

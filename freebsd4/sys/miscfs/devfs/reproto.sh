@@ -4,9 +4,12 @@
 # to allow for KNF function definitions.  So rewrote in perl, but wrapped
 # as a shell script.
 #
+# $FreeBSD: src/sys/miscfs/devfs/reproto.sh,v 1.3.10.1 2000/08/03 01:05:05 peter Exp $
+#
 exec /usr/bin/perl << *EOF*
 open(PROTO, ">devfs_proto.h") || die "Cannot open devfs_proto.h\n";
 
+print PROTO "/* \\\$FreeBSD\\\$ */\n";
 print PROTO "/* THIS FILE HAS BEEN PRODUCED AUTOMATICALLY */\n";
 
 while (\$file = <*.c>) {

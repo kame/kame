@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2000 Dag-Erling Coïdan Smørgrav
+ * Copyright (c) 1999 Pierre Beyssac
  * Copyright (c) 1993 Jan-Simon Pendry
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -36,7 +38,7 @@
  *
  *	@(#)procfs_subr.c	8.6 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_subr.c,v 1.3.2.1 2000/06/05 10:14:04 des Exp $
+ * $FreeBSD: src/sys/i386/linux/linprocfs/linprocfs_subr.c,v 1.3.2.3 2000/10/30 19:57:04 des Exp $
  */
 
 #include <sys/param.h>
@@ -173,8 +175,15 @@ loop:
 		vp->v_type = VREG;
 		break;
 
+	case Pprocstat:
+	case Pprocstatus:
+		/* fallthrough */
+		
 	case Pmeminfo:
 	case Pcpuinfo:
+	case Pstat:
+	case Puptime:
+	case Pversion:
 		pfs->pfs_mode = (VREAD) |
 				(VREAD >> 3) |
 				(VREAD >> 6);
@@ -246,11 +255,26 @@ linprocfs_rw(ap)
 	case Pmem:
 		rtval = procfs_domem(curp, p, pfs, uio);
 		break;
+	case Pprocstat:
+		rtval = linprocfs_doprocstat(curp, p, pfs, uio);
+		break;
+	case Pprocstatus:
+		rtval = linprocfs_doprocstatus(curp, p, pfs, uio);
+		break;
 	case Pmeminfo:
 		rtval = linprocfs_domeminfo(curp, p, pfs, uio);
 		break;
 	case Pcpuinfo:
 		rtval = linprocfs_docpuinfo(curp, p, pfs, uio);
+		break;
+	case Pstat:
+		rtval = linprocfs_dostat(curp, p, pfs, uio);
+		break;
+	case Puptime:
+		rtval = linprocfs_douptime(curp, p, pfs, uio);
+		break;
+	case Pversion:
+		rtval = linprocfs_doversion(curp, p, pfs, uio);
 		break;
 	default:
 		rtval = EOPNOTSUPP;

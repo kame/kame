@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Julian Elischer <julian@whistle.com>
+ * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.7 1999/12/01 19:40:37 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_sample.c,v 1.7.2.2 2000/10/24 18:36:46 julian Exp $
  * $Whistle: ng_sample.c,v 1.13 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -152,7 +152,7 @@ ng_xxx_constructor(node_p *nodep)
 	int i, error;
 
 	/* Initialize private descriptor */
-	MALLOC(privdata, xxx_p, sizeof(*privdata), M_NETGRAPH, M_WAITOK);
+	MALLOC(privdata, xxx_p, sizeof(*privdata), M_NETGRAPH, M_NOWAIT);
 	if (privdata == NULL)
 		return (ENOMEM);
 	bzero(privdata, sizeof(struct XXX));

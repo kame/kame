@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/cam/scsi/scsi_sa.c,v 1.45.2.4 2000/07/14 20:15:51 mjacob Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_sa.c,v 1.45.2.6 2000/10/05 17:05:51 mjacob Exp $
  *
  * Implementation of SCSI Sequential Access Peripheral driver for CAM.
  *
@@ -1967,6 +1967,7 @@ samount(struct cam_periph *periph, int oflags, dev_t dev)
 			case SCSI_DENSITY_QIC_24:
 			case SCSI_DENSITY_QIC_120:
 			case SCSI_DENSITY_QIC_150:
+			case SCSI_DENSITY_QIC_525_320:
 			case SCSI_DENSITY_QIC_1320:
 			case SCSI_DENSITY_QIC_3080:
 				softc->quirks &= ~SA_QUIRK_2FM;
@@ -1975,7 +1976,6 @@ samount(struct cam_periph *periph, int oflags, dev_t dev)
 				break;
 			case SCSI_DENSITY_QIC_4GB:
 			case SCSI_DENSITY_QIC_2GB:
-			case SCSI_DENSITY_QIC_525_320:
 				softc->quirks &= ~SA_QUIRK_2FM;
 				softc->quirks |= SA_QUIRK_FIXED|SA_QUIRK_1FM;
 				softc->last_media_blksize = 1024;
@@ -3032,7 +3032,6 @@ sardpos(struct cam_periph *periph, int hard, u_int32_t *blkptr)
 	 * wary about trying to figure out the actual block location value
 	 * if data is in the tape drive buffer.
 	 */
-	ccb = cam_periph_getccb(periph, 1);
 
 	if (softc->flags & SA_FLAG_TAPE_WRITTEN) {
 		error = sawritefilemarks(periph, 0, 0);
@@ -3040,6 +3039,7 @@ sardpos(struct cam_periph *periph, int hard, u_int32_t *blkptr)
 			return (error);
 	}
 
+	ccb = cam_periph_getccb(periph, 1);
 	scsi_read_position(&ccb->csio, 1, sadone, MSG_SIMPLE_Q_TAG,
 	    hard, &loc, SSD_FULL_SIZE, 5000);
 	softc->dsreg = MTIO_DSREG_RBSY;

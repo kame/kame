@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_extern.h	8.2 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_extern.h,v 1.46 1999/12/29 04:55:09 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_extern.h,v 1.46.2.1 2000/08/02 22:15:09 peter Exp $
  */
 
 #ifndef _VM_EXTERN_H_
@@ -92,7 +92,7 @@ void vmspace_unshare __P((struct proc *));
 void vmspace_free __P((struct vmspace *));
 void vnode_pager_setsize __P((struct vnode *, vm_ooffset_t));
 void vslock __P((caddr_t, u_int));
-void vsunlock __P((caddr_t, u_int, int));
+void vsunlock __P((caddr_t, u_int));
 void vm_object_print __P((/* db_expr_t */ long, boolean_t, /* db_expr_t */ long,
 			  char *));
 int vm_fault_quick __P((caddr_t v, int prot));

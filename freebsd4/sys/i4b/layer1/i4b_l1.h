@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 2000 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
  *
  *	$Id: i4b_l1.h,v 1.3 1999/12/13 21:25:26 hm Exp $ 
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_l1.h,v 1.7 1999/12/14 20:48:22 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_l1.h,v 1.7.2.1 2000/09/21 17:19:35 joe Exp $
  *
  *      last edit-date: [Mon Dec 13 22:02:07 1999]
  *
@@ -204,7 +204,8 @@ struct l1_softc
 	
 	int		sc_isac_version;	/* version number of ISAC */
 	int		sc_hscx_version;	/* version number of HSCX */
-
+	int		sc_ipac_version;	/* version number of IPAC */
+	
 	int		sc_I430state;	/* I.430 state F3 .... F8 */
 
 	int		sc_I430T3;	/* I.430 Timer T3 running */	

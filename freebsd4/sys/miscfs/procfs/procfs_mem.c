@@ -37,7 +37,7 @@
  *
  *	@(#)procfs_mem.c	8.5 (Berkeley) 6/15/94
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_mem.c,v 1.46 1999/12/20 18:26:58 eivind Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_mem.c,v 1.46.2.1 2000/11/01 20:19:48 sef Exp $
  */
 
 /*
@@ -256,7 +256,7 @@ procfs_domem(curp, p, pfs, uio)
  	 * All in all, quite yucky.
  	 */
  
- 	if (p_trespass(curp, p) &&
+ 	if ((!CHECKIO(curp, p) || p_trespass(curp, p)) &&
 	    !(uio->uio_rw == UIO_READ &&
 	      procfs_kmemaccess(curp)))
  		return EPERM;

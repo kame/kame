@@ -29,7 +29,7 @@
  *
  *	$Id: i4b_elsa_qs1p.c,v 1.2 1999/12/13 21:25:26 hm Exp $
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_elsa_qs1p.c,v 1.6 1999/12/14 20:48:19 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_elsa_qs1p.c,v 1.6.2.1 2000/08/02 23:52:55 peter Exp $
  *
  *      last edit-date: [Mon Dec 13 21:59:51 1999]
  *
@@ -77,8 +77,8 @@
 #define PORT0_MAPOFF	4
 #define PORT1_MAPOFF	12
 
-#define ELSA_PORT0_MAPOFF	(PCI_MAP_REG_START+PORT0_MAPOFF)
-#define ELSA_PORT1_MAPOFF	(PCI_MAP_REG_START+PORT1_MAPOFF)
+#define ELSA_PORT0_MAPOFF	(PCIR_MAPS+PORT0_MAPOFF)
+#define ELSA_PORT1_MAPOFF	(PCIR_MAPS+PORT1_MAPOFF)
 
 #define PCI_QS1000_DID	0x1000
 #define PCI_QS1000_VID	0x1048

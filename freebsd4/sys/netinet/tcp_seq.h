@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_seq.h	8.3 (Berkeley) 6/21/95
- * $FreeBSD: src/sys/netinet/tcp_seq.h,v 1.11 1999/12/29 04:41:02 peter Exp $
+ * $FreeBSD: src/sys/netinet/tcp_seq.h,v 1.11.2.1 2000/09/29 08:48:45 kris Exp $
  */
 
 #ifndef _NETINET_TCP_SEQ_H_
@@ -91,7 +91,7 @@ extern tcp_cc	tcp_ccgen;		/* global connection count */
  * number in the range [0-0x3ffff] that is hard to predict.
  */
 #ifndef tcp_random18
-#define	tcp_random18()	((random() >> 14) & 0x3ffff)
+#define	tcp_random18()	(arc4random() & 0x3ffff)
 #endif
 #define	TCP_ISSINCR	(122*1024 + tcp_random18())
 

@@ -13,7 +13,7 @@
  * bad that happens because of using this software isn't the responsibility
  * of the author.  This software is distributed AS-IS.
  *
- * $FreeBSD: src/sys/sys/aio.h,v 1.13.2.1 2000/05/05 03:50:01 jlemon Exp $
+ * $FreeBSD: src/sys/sys/aio.h,v 1.13.2.3 2000/10/14 20:19:16 alc Exp $
  */
 
 #ifndef _SYS_AIO_H_
@@ -68,10 +68,6 @@ struct __aiocb_private {
 	int	status;
 	int	error;
 	int	privatemodes;
-	int	active;
-	int	tid;
-	int	threadinfo;
-	void	*userinfo;
 	void	*kernelinfo;
 };
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.2 2000/07/15 07:14:31 kris Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.6 2000/10/31 19:07:09 ume Exp $
  */
 
 #include "opt_compat.h"
@@ -178,7 +178,7 @@ tcp_init()
 {
 	int hashsize;
 	
-	tcp_iss = random();	/* wrong, but better than a constant */
+	tcp_iss = arc4random();	/* wrong, but better than a constant */
 	tcp_ccgen = 1;
 	tcp_cleartaocache();
 
@@ -680,6 +680,18 @@ tcp_close(tp)
 			tcpstat.tcps_cachedssthresh++;
 		}
 	}
+	rt = inp->inp_route.ro_rt;
+	if (rt) {
+		/* 
+		 * mark route for deletion if no information is
+		 * cached.
+		 */
+		if ((tp->t_flags & TF_LQ_OVERFLOW) &&
+		    ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0)){
+			if (rt->rt_rmx.rmx_rtt == 0)
+				rt->rt_flags |= RTF_DELCLONE;
+		}
+	}
     no_valid_rt:
 	/* free the reassembly queue, if any */
 	while((q = LIST_FIRST(&tp->t_segq)) != NULL) {
@@ -768,7 +780,7 @@ tcp_notify(inp, error)
 }
 
 static int
-tcp_pcblist SYSCTL_HANDLER_ARGS
+tcp_pcblist(SYSCTL_HANDLER_ARGS)
 {
 	int error, i, n, s;
 	struct inpcb *inp, **inp_list;
@@ -860,7 +872,7 @@ SYSCTL_PROC(_net_inet_tcp, TCPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
 	    tcp_pcblist, "S,xtcpcb", "List of active TCP connections");
 
 static int
-tcp_getcred SYSCTL_HANDLER_ARGS
+tcp_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct sockaddr_in addrs[2];
 	struct inpcb *inp;
@@ -890,7 +902,7 @@ SYSCTL_PROC(_net_inet_tcp, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
 
 #ifdef INET6
 static int
-tcp6_getcred SYSCTL_HANDLER_ARGS
+tcp6_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct sockaddr_in6 addrs[2];
 	struct inpcb *inp;
@@ -1000,6 +1012,7 @@ tcp6_ctlinput(cmd, sa, d)
 	} else {
 		m = NULL;
 		ip6 = NULL;
+		off = 0;	/* fool gcc */
 	}
 
 	/*
@@ -1024,7 +1037,11 @@ tcp6_ctlinput(cmd, sa, d)
 		    m->m_pkthdr.rcvif != NULL)
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
-		if (m->m_len < off + sizeof(*thp)) {
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(th))
+			return;
+
+		if (m->m_len < off + sizeof(th)) {
 			/*
 			 * this should be rare case
 			 * because now MINCLSIZE is "(MHLEN + 1)",

@@ -44,7 +44,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/adv_isa.c,v 1.14.2.2 2000/07/14 10:28:44 asmodai Exp $
+ * $FreeBSD: src/sys/dev/advansys/adv_isa.c,v 1.14.2.3 2000/08/08 23:50:00 peter Exp $
  */
 
 #include <sys/param.h>
@@ -123,7 +123,8 @@ adv_isa_probe(device_t dev)
 				break;
 		if ((port_index > max_port_index)
 		 || (iobase != adv_isa_ioports[port_index])) {
-			printf("adv%d: Invalid baseport of 0x%lx specified. "
+			if (bootverbose)
+			    printf("adv%d: Invalid baseport of 0x%lx specified. "
 				"Nearest valid baseport is 0x%x.  Failing "
 				"probe.\n", device_get_unit(dev), iobase,
 				(port_index <= max_port_index) ?

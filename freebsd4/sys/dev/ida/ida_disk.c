@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.12.2.2 2000/05/03 23:54:08 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.12.2.3 2000/07/27 22:27:39 jlemon Exp $
  */
 
 /*
@@ -227,9 +227,11 @@ idad_attach(device_t dev)
 	parent = device_get_parent(dev);
 	drv->controller = (struct ida_softc *)device_get_softc(parent);
 	drv->unit = device_get_unit(dev);
+	drv->drive = drv->controller->num_drives;
+	drv->controller->num_drives++;
 
 	error = ida_command(drv->controller, CMD_GET_LOG_DRV_INFO,
-	    &dinfo, sizeof(dinfo), drv->unit, DMA_DATA_IN);
+	    &dinfo, sizeof(dinfo), drv->drive, DMA_DATA_IN);
 	if (error) {
 		device_printf(dev, "CMD_GET_LOG_DRV_INFO failed\n");
 		return (ENXIO);
@@ -238,7 +240,7 @@ idad_attach(device_t dev)
 	drv->cylinders = dinfo.ncylinders;
 	drv->heads = dinfo.nheads;
 	drv->sectors = dinfo.nsectors;
-	drv->secsize = dinfo.secsize;
+	drv->secsize = dinfo.secsize == 0 ? 512 : dinfo.secsize;
 	drv->secperunit = dinfo.secperunit;
 
 	/* XXX

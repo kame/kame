@@ -23,10 +23,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.8 1999/10/12 22:53:05 green Exp $
+ * $FreeBSD: src/sys/i386/i386/i686_mem.c,v 1.8.2.1 2000/09/30 02:49:32 ps Exp $
  */
-
-#include "opt_smp.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>

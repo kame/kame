@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 1997, 1999 Hellmuth Michaelis. All rights reserved.
+ * Copyright (c) 1997, 2000 Hellmuth Michaelis. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
  *
  *	$Id: i4b_ipac.h,v 1.2 1999/12/13 21:25:26 hm Exp $
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_ipac.h,v 1.6 1999/12/14 20:48:20 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_ipac.h,v 1.6.2.1 2000/09/21 17:19:35 joe Exp $
  *
  *      last edit-date: [Mon Dec 13 22:00:58 1999]
  *
@@ -49,6 +49,7 @@
 /* chip version */
 
 #define	IPAC_V11	0x01	/* IPAC Version 1.1 */
+#define	IPAC_V12	0x02	/* IPAC Version 1.2 */
 
 /*
  * definitions of registers and bits for the IPAC ISDN chip.

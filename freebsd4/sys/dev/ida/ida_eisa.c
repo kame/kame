@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.1.2.1 2000/04/16 14:14:29 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.1.2.2 2000/07/27 22:27:39 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -315,6 +315,7 @@ ida_eisa_attach(device_t dev)
 		return (ENOMEM);
 	}
 
+	ida->flags = 0;
 	error = ida_init(ida);
 	if (error) {
 		ida_free(ida);
@@ -322,7 +323,7 @@ ida_eisa_attach(device_t dev)
 	}
 
 	ida_attach(ida);
-	ida->flags = IDA_ATTACHED; 
+	ida->flags |= IDA_ATTACHED; 
 
 	return (0);
 }

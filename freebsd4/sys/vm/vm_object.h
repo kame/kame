@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.h,v 1.63 1999/12/29 04:55:10 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_object.h,v 1.63.2.1 2000/08/04 22:31:11 peter Exp $
  */
 
 /*
@@ -74,7 +74,8 @@
 #include <sys/queue.h>
 #include <machine/atomic.h>
 
-enum obj_type { OBJT_DEFAULT, OBJT_SWAP, OBJT_VNODE, OBJT_DEVICE, OBJT_DEAD };
+enum obj_type { OBJT_DEFAULT, OBJT_SWAP, OBJT_VNODE, OBJT_DEVICE, OBJT_PHYS,
+		OBJT_DEAD };
 typedef u_char objtype_t;
 
 /*

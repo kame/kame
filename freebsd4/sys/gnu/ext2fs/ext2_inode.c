@@ -37,6 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ext2_inode.c	8.5 (Berkeley) 12/30/93
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_inode.c,v 1.24.2.1 2000/08/03 00:52:57 peter Exp $
  */
 
 #include "opt_quota.h"

@@ -34,10 +34,10 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_mppc.c,v 1.4 1999/11/25 00:10:12 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_mppc.c,v 1.1.2.1 2000/04/18 04:48:39 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_mppc.c,v 1.1.2.5 2000/10/24 18:36:45 julian Exp $
  */
 
 /*
@@ -53,7 +53,6 @@
 #include <sys/conf.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
-#include <sys/protosw.h>
 #include <sys/errno.h>
 #include <sys/syslog.h>
 
@@ -180,7 +179,7 @@ ng_mppc_constructor(node_p *nodep)
 	int error;
 
 	/* Allocate private structure */
-	MALLOC(priv, priv_p, sizeof(*priv), M_NETGRAPH, M_WAITOK);
+	MALLOC(priv, priv_p, sizeof(*priv), M_NETGRAPH, M_NOWAIT);
 	if (priv == NULL)
 		return (ENOMEM);
 	bzero(priv, sizeof(*priv));
@@ -483,7 +482,7 @@ ng_mppc_compress(node_p node, struct mbuf *m, struct mbuf **resultp)
 		outlen = MPPC_MAX_BLOWUP(inlen);
 	else
 		outlen = MPPC_HDRLEN + inlen;
-	MALLOC(outbuf, u_char *, outlen, M_NETGRAPH, M_WAITOK);
+	MALLOC(outbuf, u_char *, outlen, M_NETGRAPH, M_NOWAIT);
 	if (outbuf == NULL) {
 		FREE(inbuf, M_NETGRAPH);
 		return (ENOMEM);

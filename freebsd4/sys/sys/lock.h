@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)lock.h	8.12 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/lock.h,v 1.17 1999/12/11 16:13:01 eivind Exp $
+ * $FreeBSD: src/sys/sys/lock.h,v 1.17.2.1 2000/09/30 02:49:37 ps Exp $
  */
 
 #ifndef	_LOCK_H_
@@ -202,13 +202,13 @@ void _simple_lock __P((struct simplelock *alp, const char *, int));
 #define simple_lock(alp) _simple_lock(alp, __FILE__, __LINE__)
 void simple_lock_init __P((struct simplelock *alp));
 #else /* !SIMPLELOCK_DEBUG */
-#if NCPUS == 1 /* no multiprocessor locking is necessary */
+#if MAXCPU == 1 /* no multiprocessor locking is necessary */
 #define	NULL_SIMPLELOCKS
 #define	simple_lock_init(alp)
 #define	simple_lock(alp)
 #define	simple_lock_try(alp)	(1)	/* always succeeds */
 #define	simple_unlock(alp)
-#endif /* NCPUS == 1 */
+#endif /* MAXCPU == 1 */
 #endif /* !SIMPLELOCK_DEBUG */
 
 #endif /* !_LOCK_H_ */

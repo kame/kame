@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/lock.h,v 1.11.2.1 2000/05/16 06:58:10 dillon Exp $
+ * $FreeBSD: src/sys/i386/include/lock.h,v 1.11.2.2 2000/09/30 02:49:34 ps Exp $
  */
 
 
@@ -169,7 +169,7 @@ extern struct simplelock	com_lock;
 extern struct simplelock	mpintr_lock;
 extern struct simplelock	mcount_lock;
 
-#if !defined(SIMPLELOCK_DEBUG) && NCPUS > 1
+#if !defined(SIMPLELOCK_DEBUG) && MAXCPU > 1
 /*
  * This set of defines turns on the real functions in i386/isa/apic_ipl.s.
  */
@@ -178,7 +178,7 @@ extern struct simplelock	mcount_lock;
 #define	simple_lock_try(alp)	s_lock_try(alp)
 #define	simple_unlock(alp)	s_unlock(alp)
 
-#endif /* !SIMPLELOCK_DEBUG && NCPUS > 1 */
+#endif /* !SIMPLELOCK_DEBUG && MAXCPU > 1 */
 
 #endif /* LOCORE */
 

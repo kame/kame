@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.1 2000/07/15 07:29:29 kris Exp $
+ * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.2 2000/08/07 16:45:42 ume Exp $
  */
 
 #ifndef lint
@@ -40,6 +40,7 @@ static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
 */
 #endif /* not lint */
 
+#ifdef INET6
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -1045,3 +1046,4 @@ inet6name(in6p)
 				sizeof(ntop_buf)));
 	return (line);
 }
+#endif /*INET6*/

@@ -36,22 +36,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.c	8.3 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/conf/param.c,v 1.36.2.1 2000/04/02 08:46:42 peter Exp $
+ * $FreeBSD: src/sys/conf/param.c,v 1.36.2.2 2000/08/04 22:31:06 peter Exp $
  */
 
 #include <stddef.h>
 
-#include "opt_sysvipc.h"
 #include "opt_param.h"
 
 #include <sys/param.h>
-
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
 
 /*
  * System parameter formulae.
@@ -85,43 +77,6 @@ int	mbuf_wait = 32;				/* mbuf sleep time in ticks */
 #define	NSFBUFS (512 + MAXUSERS * 16)
 #endif
 int	nsfbufs = NSFBUFS;
-
-/*
- * Values in support of System V compatible semaphores.
- */
-
-#ifdef SYSVSEM
-
-struct seminfo seminfo = {
-                SEMMAP,         /* # of entries in semaphore map */
-                SEMMNI,         /* # of semaphore identifiers */
-                SEMMNS,         /* # of semaphores in system */
-                SEMMNU,         /* # of undo structures in system */
-                SEMMSL,         /* max # of semaphores per id */
-                SEMOPM,         /* max # of operations per semop call */
-                SEMUME,         /* max # of undo entries per process */
-                SEMUSZ,         /* size in bytes of undo structure */
-                SEMVMX,         /* semaphore maximum value */
-                SEMAEM          /* adjust on exit max value */
-};
-#endif
-
-/*
- * Values in support of System V compatible messages.
- */
-
-#ifdef SYSVMSG
-
-struct msginfo msginfo = {
-                MSGMAX,         /* max chars in a message */
-                MSGMNI,         /* # of message queue identifiers */
-                MSGMNB,         /* max chars in a queue */
-                MSGTQL,         /* max messages in system */
-                MSGSSZ,         /* size of a message segment */
-                		/* (must be small power of 2 greater than 4) */
-                MSGSEG          /* number of message segments */
-};
-#endif
 
 /*
  * These may be set to nonzero here or by patching.

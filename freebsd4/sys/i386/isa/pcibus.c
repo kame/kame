@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57 2000/02/23 20:25:06 dfr Exp $
+ * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.2 2000/11/08 11:26:22 msmith Exp $
  *
  */
 
@@ -395,21 +395,21 @@ nexus_pcib_is_host_bridge(pcicfgregs *cfg,
 		s = "OPTi 82C822 host to PCI Bridge";
 		break;
 
-		/* RCC -- vendor 0x1166 */
+		/* ServerWorks -- vendor 0x1166 */
 	case 0x00051166:
-		s = "RCC HE host to PCI bridge";
+		s = "ServerWorks NB6536 2.0HE host to PCI bridge";
 		*busnum = pci_cfgread(cfg, 0x44, 1);
 		break;
 	
 	case 0x00061166:
 		/* FALLTHROUGH */
 	case 0x00081166:
-		s = "RCC host to PCI bridge";
+		s = "ServerWorks host to PCI bridge";
 		*busnum = pci_cfgread(cfg, 0x44, 1);
 		break;
 
 	case 0x00091166:
-		s = "RCC LE host to PCI bridge";
+		s = "ServerWorks NB6635 3.0LE host to PCI bridge";
 		*busnum = pci_cfgread(cfg, 0x44, 1);
 		break;
 
@@ -439,6 +439,7 @@ nexus_pcib_identify(driver_t *driver, device_t parent)
 	int found = 0;
 	int pcifunchigh;
 	int found824xx = 0;
+	int found_orion = 0;
 
 	if (pci_cfgopen() == 0)
 		return;
@@ -448,7 +449,7 @@ nexus_pcib_identify(driver_t *driver, device_t parent)
 	for (probe.slot = 0; probe.slot <= PCI_SLOTMAX; probe.slot++) {
 		probe.func = 0;
 		hdrtype = pci_cfgread(&probe, PCIR_HEADERTYPE, 1);
-		if (hdrtype & PCIM_MFDEV)
+		if (hdrtype & PCIM_MFDEV && (!found_orion || hdrtype != 0xff) )
 			pcifunchigh = 7;
 		else
 			pcifunchigh = 0;
@@ -483,6 +484,8 @@ nexus_pcib_identify(driver_t *driver, device_t parent)
 				found = 1;
 				if (id == 0x12258086)
 					found824xx = 1;
+				if (id == 0x84c48086)
+					found_orion = 1;
 			}
 		}
 	}

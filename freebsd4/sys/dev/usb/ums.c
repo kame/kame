@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/usb/ums.c,v 1.36.2.2 2000/07/02 11:43:59 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ums.c,v 1.36.2.3 2000/10/31 23:23:30 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -123,15 +123,15 @@ struct ums_softc {
 #define MOUSE_FLAGS_MASK (HIO_CONST|HIO_RELATIVE)
 #define MOUSE_FLAGS (HIO_RELATIVE)
 
-Static void ums_intr __P((usbd_xfer_handle xfer,
-			  usbd_private_handle priv, usbd_status status));
+Static void ums_intr(usbd_xfer_handle xfer,
+			  usbd_private_handle priv, usbd_status status);
 
-Static void ums_add_to_queue __P((struct ums_softc *sc,
-				int dx, int dy, int dz, int buttons));
-Static void ums_add_to_queue_timeout __P((void *priv));
+Static void ums_add_to_queue(struct ums_softc *sc,
+				int dx, int dy, int dz, int buttons);
+Static void ums_add_to_queue_timeout(void *priv);
 
-Static int  ums_enable __P((void *));
-Static void ums_disable __P((void *));
+Static int  ums_enable(void *);
+Static void ums_disable(void *);
 
 Static d_open_t  ums_open;
 Static d_close_t ums_close;

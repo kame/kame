@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/defs.c,v 1.31.2.3 2000/04/13 00:14:39 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/defs.c,v 1.31.2.8 2000/11/01 00:19:25 brian Exp $
  */
 
 
@@ -48,10 +48,11 @@
 
 #define	issep(c)	((c) == '\t' || (c) == ' ')
 
+#if defined(__NetBSD__) || __FreeBSD__ < 3
 void
 randinit()
 {
-#if __FreeBSD__ >= 3
+#if defined(__FreeBSD__)
   static int initdone;		/* srandomdev() call is only required once */
 
   if (!initdone) {
@@ -62,6 +63,7 @@ randinit()
   srandom((time(NULL)^getpid())+random());
 #endif
 }
+#endif
 
 ssize_t
 fullread(int fd, void *v, size_t n)
@@ -297,20 +299,25 @@ MakeArgs(char *script, char **pvect, int maxargs, int flags)
   int nargs;
 
   nargs = 0;
-  while (*script && (*script != '#' || (flags & PARSE_NOHASH))) {
+  while (*script) {
     script += strspn(script, " \t");
+    if (*script == '#' && flags & PARSE_NOHASH) {
+      *script = '\0';
+      break;
+    }
     if (*script) {
       if (nargs >= maxargs - 1)
-	break;
+        break;
       *pvect++ = script;
       nargs++;
       script = findblank(script, flags);
       if (script == NULL)
         return -1;
-      else if (!(flags & PARSE_NOHASH) && *script == '#')
-	*script = '\0';
-      else if (*script)
-	*script++ = '\0';
+      else if (!(flags & PARSE_NOHASH) && *script == '#') {
+        *script = '\0';
+        nargs--;
+      } else if (*script)
+        *script++ = '\0';
     }
   }
   *pvect = NULL;
@@ -357,4 +364,27 @@ ex_desc(int ex)
     return desc[ex];
   snprintf(num, sizeof num, "%d", ex);
   return num;
+}
+
+void
+SetTitle(const char *title)
+{
+  if (title == NULL)
+    setproctitle(NULL);
+  else if (title[0] == '-' && title[1] != '\0')
+    setproctitle("-%s", title + 1);
+  else
+    setproctitle("%s", title);
+}
+
+fd_set *
+mkfdset()
+{
+  return (fd_set *)malloc(howmany(getdtablesize(), NFDBITS) * sizeof (fd_mask));
+}
+
+void
+zerofdset(fd_set *s)
+{
+  memset(s, '\0', howmany(getdtablesize(), NFDBITS) * sizeof (fd_mask));
 }

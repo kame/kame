@@ -1,5 +1,5 @@
-/* $FreeBSD: src/sys/alpha/tlsb/kftxxreg.h,v 1.3.2.1 2000/03/27 18:32:50 mjacob Exp $ */
-/* $NetBSD: kftxxreg.h,v 1.4 1997/06/04 01:47:15 cgd Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/kftxxreg.h,v 1.3.2.2 2000/08/03 00:48:05 peter Exp $ */
+/* $NetBSD: kftxxreg.h,v 1.5 1998/07/08 00:45:08 mjacob Exp $ */
 
 /*
  * Copyright (c) 1997, 2000 by Matthew Jacob

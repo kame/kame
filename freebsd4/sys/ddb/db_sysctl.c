@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@whistle.com>
  *
- * $FreeBSD: src/sys/ddb/db_sysctl.c,v 1.1 2000/01/27 22:27:34 archie Exp $
+ * $FreeBSD: src/sys/ddb/db_sysctl.c,v 1.1.4.1 2000/08/03 00:09:27 ps Exp $
  */
 
 #include <sys/param.h>
@@ -51,7 +51,7 @@
 #define MODE_GDB	"gdb"
 
 static int
-sysctl_debug_enter_debugger SYSCTL_HANDLER_ARGS
+sysctl_debug_enter_debugger(SYSCTL_HANDLER_ARGS)
 {
 	char dmode[64];
 	int error;

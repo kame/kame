@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic.h,v 1.5.2.1 2000/05/23 03:56:59 imp Exp $ 
+ * $FreeBSD: src/sys/pccard/pcic.h,v 1.5.2.3 2000/10/15 04:12:44 sanpei Exp $
 */
 
 #define PCIC_RF_IODF_WS		(0x01 << 16)
@@ -41,3 +41,4 @@
 #define PCIC_RF_MDF_WS1		(0x08 << 16)
 #define PCIC_RF_MDF_ATTR	(0x10 << 16)
 #define PCIC_RF_MDF_WP		(0x20 << 16)
+extern devclass_t pcic_devclass;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/exec.c,v 1.18.2.3 2000/07/03 10:23:53 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/exec.c,v 1.18.2.4 2000/08/19 09:30:03 brian Exp $
  */
 
 #include <sys/param.h>
@@ -137,7 +137,9 @@ exec_Create(struct physical *p)
           close(pidpipe[0]);
           close(fids[0]);
           timer_TermService();
+#ifndef NOSUID
           setuid(ID0realuid());
+#endif
 
           child_status = 0;
           switch ((pid = vfork())) {

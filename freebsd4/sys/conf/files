@@ -1,16 +1,16 @@
-# $FreeBSD: src/sys/conf/files,v 1.340.2.17 2000/07/20 05:17:56 ps Exp $
+# $FreeBSD: src/sys/conf/files,v 1.340.2.39 2000/11/16 17:28:30 archie Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
 # dependency lines other than the first are silently ignored.
 #
 aicasm				optional ahc				   \
-	dependency 	"$S/dev/aic7xxx/*.[chyl]"			   \
-	compile-with	"${MAKE} -f $S/dev/aic7xxx/Makefile MAKESRCPATH=$S/dev/aic7xxx" \
+	dependency 	"$S/dev/aic7xxx/aicasm/*.[chyl]"		   \
+	compile-with	"${MAKE} -f $S/dev/aic7xxx/aicasm/Makefile MAKESRCPATH=$S/dev/aic7xxx/aicasm" \
 	no-obj no-implicit-rule						   \
 	clean		"aicasm aicasm_gram.c aicasm_scan.c y.tab.h"
 aic7xxx_{seq,reg}.h		optional ahc				   \
-	compile-with	"./aicasm ${INCLUDES} -o aic7xxx_seq.h -r aic7xxx_reg.h $S/dev/aic7xxx/aic7xxx.seq"   \
+	compile-with	"./aicasm ${INCLUDES} -I$S/cam/scsi -I$S/dev/aic7xxx -o aic7xxx_seq.h -r aic7xxx_reg.h $S/dev/aic7xxx/aic7xxx.seq"   \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"aic7xxx_seq.h aic7xxx_reg.h"			   \
 	dependency	"$S/dev/aic7xxx/aic7xxx.{reg,seq} $S/cam/scsi/scsi_message.h aicasm"
@@ -59,6 +59,12 @@ cam/scsi/scsi_pt.c	optional pt
 cam/scsi/scsi_sa.c	optional sa
 cam/scsi/scsi_cd.c	optional cd
 cam/scsi/scsi_ch.c	optional ch
+cam/scsi/scsi_low.c	optional ncv
+cam/scsi/scsi_low.c	optional nsp
+cam/scsi/scsi_low.c	optional stg
+cam/scsi/scsi_low_pisa.c	optional ncv
+cam/scsi/scsi_low_pisa.c	optional nsp
+cam/scsi/scsi_low_pisa.c	optional stg
 cam/scsi/scsi_pass.c	optional pass
 cam/scsi/scsi_ses.c	optional ses
 cam/scsi/scsi_target.c	optional targ
@@ -107,6 +113,8 @@ dev/an/if_an.c		optional an
 dev/an/if_an_isa.c	optional an isa
 dev/an/if_an_pci.c	optional an pci
 dev/an/if_an_pccard.c	optional an card
+dev/asr/asr.c		optional asr pci
+#dev/amr/amr_cam.c	optional amr
 dev/amr/amr_disk.c	optional amr
 dev/amr/amr_pci.c	optional amr
 dev/amr/amr.c		optional amr
@@ -116,13 +124,14 @@ dev/aha/aha_mca.c	optional aha mca
 dev/ahb/ahb.c		optional ahb eisa
 dev/aic/aic.c		optional aic
 dev/aic/aic_pccard.c	optional aic card
-dev/aic7xxx/ahc_eisa.c	optional ahc eisa	\
-	dependency	"aic7xxx_reg.h $S/dev/aic7xxx/ahc_eisa.c"
-dev/aic7xxx/ahc_pci.c	optional ahc pci	\
-	dependency	"aic7xxx_reg.h $S/dev/aic7xxx/ahc_pci.c"
-dev/aic7xxx/aic7xxx.c	optional ahc		\
-	dependency	"aic7xxx_{reg,seq}.h"
-dev/aic7xxx/93cx6.c	optional ahc
+dev/aic7xxx/aic7770.c	optional ahc eisa
+dev/aic7xxx/ahc_eisa.c	optional ahc eisa
+#dev/aic7xxx/ahc_isa.c	optional ahc isa
+dev/aic7xxx/ahc_pci.c	optional ahc pci
+dev/aic7xxx/aic7xxx.c	optional ahc
+dev/aic7xxx/aic7xxx_93cx6.c	optional ahc
+dev/aic7xxx/aic7xxx_freebsd.c	optional ahc
+dev/aic7xxx/aic7xxx_pci.c	optional ahc pci
 dev/buslogic/bt.c	optional bt
 dev/buslogic/bt_isa.c	optional bt isa
 dev/buslogic/bt_mca.c	optional bt mca
@@ -142,6 +151,8 @@ dev/ep/if_ep_mca.c	optional ep mca
 dev/ep/if_ep_pccard.c	optional ep card
 dev/en/midway.c		optional en
 dev/ex/if_ex.c		optional ex isa
+dev/fe/if_fe.c		optional fe
+dev/fe/if_fe_pccard.c	optional fe card
 dev/hea/eni.c		optional hea
 dev/hea/eni_buffer.c	optional hea
 dev/hea/eni_globals.c	optional hea
@@ -165,6 +176,8 @@ dev/hfa/fore_timer.c	optional hfa
 dev/hfa/fore_transmit.c	optional hfa
 dev/hfa/fore_vcm.c	optional hfa
 dev/ie/if_ie.c		optional ie isa
+dev/ichsmb/ichsmb.c	optional ichsmb
+dev/ichsmb/ichsmb_pci.c	optional ichsmb pci
 dev/ida/ida.c		optional ida
 dev/ida/ida_disk.c	optional ida
 dev/ida/ida_eisa.c	optional ida eisa
@@ -186,6 +199,7 @@ dev/mii/exphy.c		optional miibus
 dev/mii/mlphy.c		optional miibus
 dev/mii/nsphy.c		optional miibus
 dev/mii/pnphy.c		optional miibus
+dev/mii/pnaphy.c	optional miibus
 dev/mii/tlphy.c		optional miibus
 dev/mii/rlphy.c		optional miibus
 dev/mii/xmphy.c		optional miibus
@@ -206,6 +220,13 @@ miibus_if.h		optional miibus					\
 dev/mlx/mlx_disk.c	optional mlx
 dev/mlx/mlx_pci.c	optional mlx
 dev/mlx/mlx.c		optional mlx
+dev/mly/mly.c		optional mly
+dev/mly/mly_cam.c	optional mly
+dev/mly/mly_pci.c	optional mly
+dev/ncv/ncr53c500.c	optional ncv
+dev/ncv/ncr53c500_pccard.c	optional ncv card
+dev/nsp/nsp.c		optional nsp
+dev/nsp/nsp_pccard.c	optional nsp card
 dev/pccard/pccard.c	optional pccard
 dev/pccard/pccard_cis.c	optional pccard
 dev/pccard/pccard_cis_quirks.c optional pccard
@@ -326,6 +347,9 @@ dev/si/si_pci.c		optional si pci
 dev/sn/if_sn.c		optional sn
 dev/sn/if_sn_isa.c	optional sn isa
 dev/sn/if_sn_pccard.c	optional sn card
+dev/stg/tmc18c30.c	optional stg
+dev/stg/tmc18c30_isa.c	optional stg isa
+dev/stg/tmc18c30_pccard.c	optional stg card
 dev/iicbus/iicbb.c	optional iicbb
 iicbb_if.o		optional iicbb					\
 	dependency	"iicbb_if.c"					\
@@ -362,7 +386,7 @@ dev/iicbus/iicbus.c	optional iicbus
 dev/iicbus/if_ic.c	optional ic
 dev/iicbus/iic.c	optional iic
 dev/twe/twe.c			optional twe
-dev/twe/twe_disk.c		optional twe
+dev/twe/twe_freebsd.c		optional twe
 dev/vinum/vinum.c		optional vinum
 dev/vinum/vinumconfig.c		optional vinum
 dev/vinum/vinumdaemon.c		optional vinum
@@ -512,6 +536,7 @@ kern/tty_pty.c		optional pty
 kern/tty_snoop.c	optional snp
 kern/tty_subr.c		standard
 kern/tty_tty.c		standard
+kern/uipc_accf.c	standard
 kern/uipc_domain.c	standard
 kern/uipc_mbuf.c	standard
 kern/uipc_mbuf2.c	standard
@@ -599,6 +624,7 @@ net/if_sl.c		optional sl
 net/if_spppsubr.c	optional sppp
 net/if_stf.c		optional stf
 net/if_tun.c		optional tun
+net/if_tap.c		optional tap
 net/if_vlan.c		optional vlan
 net/net_osdep.c		standard
 net/ppp_deflate.c	optional ppp_deflate
@@ -721,6 +747,7 @@ net/mppcd.c		optional netgraph_mppc_compression
 netgraph/ng_mppc.c	optional netgraph_mppc_encryption
 crypto/rc4/rc4.c	optional netgraph_mppc_encryption
 crypto/sha1.c		optional netgraph_mppc_encryption
+netgraph/ng_one2many.c	optional netgraph_one2many
 netgraph/ng_parse.c	optional netgraph
 netgraph/ng_ppp.c	optional netgraph_ppp
 netgraph/ng_pppoe.c	optional netgraph_pppoe
@@ -732,6 +759,8 @@ netgraph/ng_tty.c	optional netgraph_tty
 netgraph/ng_UI.c	optional netgraph_UI
 netgraph/ng_vjc.c	optional netgraph_vjc
 net/slcompress.c	optional netgraph_vjc
+netinet/accf_data.c	optional accept_filter_data
+netinet/accf_http.c	optional accept_filter_http
 netinet/if_atm.c	optional atm
 netinet/if_ether.c	optional ether
 netinet/in_gif.c	optional gif inet
@@ -902,6 +931,7 @@ pci/if_de.c		optional de
 pci/if_en_pci.c		optional en pci
 pci/if_fxp.c		optional fxp
 pci/if_lnc_p.c		optional lnc pci
+pci/if_pcn.c		optional pcn
 pci/if_mn.c		optional mn
 pci/if_rl.c		optional rl
 pci/if_sf.c		optional sf
@@ -973,6 +1003,7 @@ ufs/ufs/ufs_vfsops.c	standard
 ufs/ufs/ufs_vnops.c	standard
 vm/default_pager.c	standard
 vm/device_pager.c	standard
+vm/phys_pager.c		standard
 vm/swap_pager.c		standard
 vm/vm_fault.c		standard
 vm/vm_glue.c		standard
@@ -1024,7 +1055,9 @@ dev/usb/ums.c		optional ums
 dev/usb/ulpt.c		optional ulpt
 dev/usb/ukbd.c		optional ukbd
 dev/usb/umass.c		optional umass
+dev/usb/umodem.c	optional umodem 
 dev/usb/uhub.c		optional usb
+dev/usb/uscanner.c	optional uscanner
 dev/usb/if_aue.c	optional aue
 dev/usb/if_cue.c	optional cue
 dev/usb/if_kue.c	optional kue
@@ -1063,13 +1096,18 @@ dev/sound/pci/csapcm.c	optional pcm pci
 dev/sound/pci/ds1.c	optional pcm pci
 dev/sound/pci/emu10k1.c	optional pcm pci
 dev/sound/pci/es137x.c	optional pcm pci
+dev/sound/pci/fm801.c	optional pcm pci
+dev/sound/pci/maestro.c optional pcm pci
 dev/sound/pci/neomagic.c optional pcm pci
+dev/sound/pci/solo.c	optional pcm pci
 dev/sound/pci/t4dwave.c	optional pcm pci
+dev/sound/pci/via82c686.c	optional pcm pci
 dev/sound/pcm/ac97.c	optional pcm
 dev/sound/pcm/channel.c	optional pcm
 dev/sound/pcm/dsp.c	optional pcm
 dev/sound/pcm/fake.c	optional pcm
 dev/sound/pcm/feeder.c	optional pcm
+dev/sound/pcm/feeder_fmt.c	optional pcm
 dev/sound/pcm/mixer.c	optional pcm
 dev/sound/pcm/sound.c	optional pcm
 #

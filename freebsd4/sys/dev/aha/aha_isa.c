@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.17 2000/01/24 07:08:39 imp Exp $
+ * $FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.17.2.1 2000/08/02 22:24:40 peter Exp $
  */
 
 #include <sys/param.h>
@@ -49,8 +49,11 @@
 #include <cam/scsi/scsi_all.h>
 
 static struct isa_pnp_id aha_ids[] = {
-	{AHA1542_PNP,		NULL},		/* ADP1542 */
-	{AHA1542_PNPCOMPAT,	NULL},		/* PNP00A0 */
+	{ADP0100_PNP,		"Adaptec 1540/1542 ISA SCSI"},	/* ADP0100 */
+	{AHA1540_PNP,		"Adaptec 1540/aha-1640/aha-1535"},/* ADP1542 */
+	{AHA1542_PNP,		"Adaptec 1542/aha-1535"},	/* ADP1542 */
+	{AHA1542_PNPCOMPAT,	"Adaptec 1542 compatible"},	/* PNP00A0 */
+	{ICU0091_PNP,		"Adaptec AHA-1540/1542 SCSI"},	/* ICU0091 */
 	{0}
 };
 

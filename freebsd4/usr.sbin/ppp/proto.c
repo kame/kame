@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/proto.c,v 1.5 1999/12/20 20:29:46 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/proto.c,v 1.5.2.1 2000/08/19 09:30:08 brian Exp $
  */
 
 #include <sys/types.h>
@@ -39,10 +39,10 @@
 #include "fsm.h"
 #include "mbuf.h"
 #include "proto.h"
-#include "lcp.h"
 #include "throughput.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "ccp.h"
 #include "link.h"
 

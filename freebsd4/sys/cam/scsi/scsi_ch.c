@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.20.2.1 2000/04/22 20:57:24 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.20.2.2 2000/10/31 08:09:49 dwmalone Exp $
  */
 /*
  * Derived from the NetBSD SCSI changer driver.
@@ -1193,8 +1193,7 @@ chgetelemstatus(struct cam_periph *periph,
 
 	user_data = (struct changer_element_status *)
 		malloc(avail * sizeof(struct changer_element_status),
-		       M_DEVBUF, M_WAITOK);
-	bzero(user_data, avail * sizeof(struct changer_element_status));
+		       M_DEVBUF, M_WAITOK | M_ZERO);
 
 	desc = (struct read_element_status_descriptor *)((uintptr_t)data +
 		sizeof(struct read_element_status_header) +

@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Julian Elischer <julian@whistle.com>
+ * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_sample.h,v 1.2 1999/12/01 19:40:37 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_sample.h,v 1.2.2.2 2000/10/24 18:36:46 julian Exp $
  * $Whistle: ng_sample.h,v 1.3 1999/01/20 00:22:14 archie Exp $
  */
 
@@ -68,8 +68,8 @@ enum {
 
 /* This structure is returned by the NGM_XXX_GET_STATUS command */
 struct ngxxxstat {
-	u_int   packets_in;	/* packets in from downstream */
-	u_int   packets_out;	/* packets out towards downstream */
+	u_int32_t   packets_in;		/* packets in from downstream */
+	u_int32_t   packets_out;	/* packets out towards downstream */
 };
 
 /*
@@ -81,8 +81,8 @@ struct ngxxxstat {
  */
 #define NG_XXX_STATS_TYPE_INFO	{				\
 	{							\
-	  { "packets_in",	&ng_parse_int32_type	},	\
-	  { "packets_out",	&ng_parse_int32_type	},	\
+	  { "packets_in",	&ng_parse_uint32_type	},	\
+	  { "packets_out",	&ng_parse_uint32_type	},	\
 	  { NULL },						\
 	}							\
 }

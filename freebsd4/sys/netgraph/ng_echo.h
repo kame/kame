@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_echo.h,v 1.1 1999/10/21 09:05:53 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_echo.h,v 1.1.4.1 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_echo.h,v 1.3 1999/01/20 00:22:12 archie Exp $
  */
 

@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98_machdep.c,v 1.17.2.2 2000/06/23 12:05:24 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98_machdep.c,v 1.17.2.3 2000/10/28 11:18:18 nyan Exp $
  */
 
 #include "opt_pc98.h"
@@ -148,6 +148,7 @@ pc98_getmemsize(unsigned *base, unsigned *ext, unsigned *under16)
 	if (over16 > 0) {
 		*ext = (16 + over16) * 1024;
 	}
+	*ext -= 1024;	/* subtract base memory space */
 }
 
 #include "da.h"

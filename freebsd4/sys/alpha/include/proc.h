@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/proc.h,v 1.7 2000/01/16 07:07:32 gallatin Exp $ */
+/* $FreeBSD: src/sys/alpha/include/proc.h,v 1.7.2.1 2000/08/03 21:10:58 peter Exp $ */
 /* From: NetBSD: proc.h,v 1.3 1997/04/06 08:47:36 cgd Exp */
 
 /*
@@ -53,5 +53,5 @@ struct mdproc {
 #define MDP_UAC_NOPRINT	0x0010		/* Don't print unaligned traps */
 #define MDP_UAC_NOFIX	0x0020		/* Don't fixup unaligned traps */
 #define MDP_UAC_SIGBUS	0x0040		/* Deliver SIGBUS upon
-					   unalinged access */
+					   unaligned access */
 #define MDP_UAC_MASK	(MDP_UAC_NOPRINT | MDP_UAC_NOFIX | MDP_UAC_SIGBUS)

@@ -36,7 +36,7 @@
  *	@(#)null_vfsops.c	8.2 (Berkeley) 1/21/94
  *
  * @(#)lofs_vfsops.c	1.2 (Berkeley) 6/18/92
- * $FreeBSD: src/sys/miscfs/nullfs/null_vfsops.c,v 1.35 2000/01/19 06:07:31 rwatson Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_vfsops.c,v 1.35.2.2 2000/10/25 04:26:30 bp Exp $
  */
 
 /*
@@ -53,29 +53,28 @@
 #include <sys/mount.h>
 #include <sys/namei.h>
 #include <miscfs/nullfs/null.h>
-#include <vm/vm_zone.h>
 
 static MALLOC_DEFINE(M_NULLFSMNT, "NULLFS mount", "NULLFS mount structure");
 
-static int	nullfs_fhtovp __P((struct mount *mp, struct fid *fidp,
-				   struct vnode **vpp));
-static int	nullfs_checkexp __P((struct mount *mp, struct sockaddr *nam,
-				    int *extflagsp, struct ucred **credanonp));
-static int	nullfs_mount __P((struct mount *mp, char *path, caddr_t data,
-				  struct nameidata *ndp, struct proc *p));
-static int	nullfs_quotactl __P((struct mount *mp, int cmd, uid_t uid,
-				     caddr_t arg, struct proc *p));
-static int	nullfs_root __P((struct mount *mp, struct vnode **vpp));
-static int	nullfs_start __P((struct mount *mp, int flags, struct proc *p));
-static int	nullfs_statfs __P((struct mount *mp, struct statfs *sbp,
-				   struct proc *p));
-static int	nullfs_sync __P((struct mount *mp, int waitfor,
-				 struct ucred *cred, struct proc *p));
-static int	nullfs_unmount __P((struct mount *mp, int mntflags,
-				    struct proc *p));
-static int	nullfs_vget __P((struct mount *mp, ino_t ino,
-				 struct vnode **vpp));
-static int	nullfs_vptofh __P((struct vnode *vp, struct fid *fhp));
+static int	nullfs_fhtovp(struct mount *mp, struct fid *fidp,
+				   struct vnode **vpp);
+static int	nullfs_checkexp(struct mount *mp, struct sockaddr *nam,
+				    int *extflagsp, struct ucred **credanonp);
+static int	nullfs_mount(struct mount *mp, char *path, caddr_t data,
+				  struct nameidata *ndp, struct proc *p);
+static int	nullfs_quotactl(struct mount *mp, int cmd, uid_t uid,
+				     caddr_t arg, struct proc *p);
+static int	nullfs_root(struct mount *mp, struct vnode **vpp);
+static int	nullfs_start(struct mount *mp, int flags, struct proc *p);
+static int	nullfs_statfs(struct mount *mp, struct statfs *sbp,
+				   struct proc *p);
+static int	nullfs_sync(struct mount *mp, int waitfor,
+				 struct ucred *cred, struct proc *p);
+static int	nullfs_unmount(struct mount *mp, int mntflags, struct proc *p);
+static int	nullfs_vget(struct mount *mp, ino_t ino, struct vnode **vpp);
+static int	nullfs_vptofh(struct vnode *vp, struct fid *fhp);
+static int	nullfs_extattrctl(struct mount *mp, int cmd,
+			const char *attrname, caddr_t arg, struct proc *p);
 
 /*
  * Mount null layer
@@ -96,9 +95,7 @@ nullfs_mount(mp, path, data, ndp, p)
 	u_int size;
 	int isvnunlocked = 0;
 
-#ifdef DEBUG
-	printf("nullfs_mount(mp = %p)\n", (void *)mp);
-#endif
+	NULLFSDEBUG("nullfs_mount(mp = %p)\n", (void *)mp);
 
 	/*
 	 * Update is a no-op
@@ -152,9 +149,8 @@ nullfs_mount(mp, path, data, ndp, p)
 	 * Check multi null mount to avoid `lock against myself' panic.
 	 */
 	if (lowerrootvp == VTONULL(mp->mnt_vnodecovered)->null_lowervp) {
-#ifdef DEBUG
-		printf("nullfs_mount: multi null mount?\n");
-#endif
+		NULLFSDEBUG("nullfs_mount: multi null mount?\n");
+		vput(lowerrootvp);
 		return (EDEADLK);
 	}
 
@@ -202,10 +198,8 @@ nullfs_mount(mp, path, data, ndp, p)
 	    &size);
 	bzero(mp->mnt_stat.f_mntfromname + size, MNAMELEN - size);
 	(void)nullfs_statfs(mp, &mp->mnt_stat, p);
-#ifdef DEBUG
-	printf("nullfs_mount: lower %s, alias at %s\n",
+	NULLFSDEBUG("nullfs_mount: lower %s, alias at %s\n",
 		mp->mnt_stat.f_mntfromname, mp->mnt_stat.f_mntonname);
-#endif
 	return (0);
 }
 
@@ -233,49 +227,47 @@ nullfs_unmount(mp, mntflags, p)
 	int mntflags;
 	struct proc *p;
 {
-	struct vnode *nullm_rootvp = MOUNTTONULLMOUNT(mp)->nullm_rootvp;
+	struct vnode *vp = MOUNTTONULLMOUNT(mp)->nullm_rootvp;
+	void *mntdata;
 	int error;
 	int flags = 0;
 
-#ifdef DEBUG
-	printf("nullfs_unmount(mp = %p)\n", (void *)mp);
-#endif
+	NULLFSDEBUG("nullfs_unmount: mp = %p\n", (void *)mp);
 
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
 
-	/*
-	 * Clear out buffer cache.  I don't think we
-	 * ever get anything cached at this level at the
-	 * moment, but who knows...
-	 */
-#if 0
-	mntflushbuf(mp, 0);
-	if (mntinvalbuf(mp, 1))
+	error = VFS_ROOT(mp, &vp);
+	if (error)
+		return (error);
+	if (vp->v_usecount > 2) {
+		NULLFSDEBUG("nullfs_unmount: rootvp is busy(%d)\n",
+		    vp->v_usecount);
+		vput(vp);
 		return (EBUSY);
-#endif
-	if (nullm_rootvp->v_usecount > 1)
-		return (EBUSY);
-	error = vflush(mp, nullm_rootvp, flags);
+	}
+	error = vflush(mp, vp, flags);
 	if (error)
 		return (error);
 
-#ifdef DEBUG
-	vprint("alias root of lower", nullm_rootvp);
+#ifdef NULLFS_DEBUG
+	vprint("alias root of lower", vp);
 #endif
+	vput(vp);
 	/*
 	 * Release reference on underlying root vnode
 	 */
-	vrele(nullm_rootvp);
+	vrele(vp);
 	/*
 	 * And blow it away for future re-use
 	 */
-	vgone(nullm_rootvp);
+	vgone(vp);
 	/*
 	 * Finally, throw away the null_mount structure
 	 */
-	free(mp->mnt_data, M_NULLFSMNT);	/* XXX */
+	mntdata = mp->mnt_data;
 	mp->mnt_data = 0;
+	free(mntdata, M_NULLFSMNT);
 	return 0;
 }
 
@@ -287,29 +279,24 @@ nullfs_root(mp, vpp)
 	struct proc *p = curproc;	/* XXX */
 	struct vnode *vp;
 
-#ifdef DEBUG
-	printf("nullfs_root(mp = %p, vp = %p->%p)\n", (void *)mp,
+	NULLFSDEBUG("nullfs_root(mp = %p, vp = %p->%p)\n", (void *)mp,
 	    (void *)MOUNTTONULLMOUNT(mp)->nullm_rootvp,
 	    (void *)NULLVPTOLOWERVP(MOUNTTONULLMOUNT(mp)->nullm_rootvp));
-#endif
 
 	/*
 	 * Return locked reference to root.
 	 */
 	vp = MOUNTTONULLMOUNT(mp)->nullm_rootvp;
 	VREF(vp);
+
+#ifdef NULLFS_DEBUG
 	if (VOP_ISLOCKED(vp, NULL)) {
-		/*
-		 * XXX
-		 * Should we check type of node?
-		 */
-#ifdef DEBUG
-		printf("nullfs_root: multi null mount?\n");
-#endif
+		Debugger("root vnode is locked.\n");
 		vrele(vp);
 		return (EDEADLK);
-	} else
-		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+	}
+#endif
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 	*vpp = vp;
 	return 0;
 }
@@ -334,11 +321,9 @@ nullfs_statfs(mp, sbp, p)
 	int error;
 	struct statfs mstat;
 
-#ifdef DEBUG
-	printf("nullfs_statfs(mp = %p, vp = %p->%p)\n", (void *)mp,
+	NULLFSDEBUG("nullfs_statfs(mp = %p, vp = %p->%p)\n", (void *)mp,
 	    (void *)MOUNTTONULLMOUNT(mp)->nullm_rootvp,
 	    (void *)NULLVPTOLOWERVP(MOUNTTONULLMOUNT(mp)->nullm_rootvp));
-#endif
 
 	bzero(&mstat, sizeof(mstat));
 
@@ -443,7 +428,7 @@ static struct vfsops null_vfsops = {
 	nullfs_checkexp,
 	nullfs_vptofh,
 	nullfs_init,
-	vfs_stduninit,
+	nullfs_uninit,
 	nullfs_extattrctl,
 };
 

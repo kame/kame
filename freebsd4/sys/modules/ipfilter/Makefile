@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/ipfilter/Makefile,v 1.2 1999/12/06 20:33:37 guido Exp $ 
+# $FreeBSD: src/sys/modules/ipfilter/Makefile,v 1.2.2.1 2000/09/04 04:00:13 gshapiro Exp $ 
 
 .PATH:	${.CURDIR}/../../netinet
 KMOD=	ipl
@@ -7,7 +7,7 @@ SRCS=	mlfk_ipl.c ip_nat.c ip_frag.c ip_state.c ip_proxy.c ip_auth.c \
 NOMAN=
 CFLAGS+= -DIPFILTER_LKM -DIPFILTER_LOG
 #
-# If you don't want long functionality remove -DIPFILTER_LOG
+# If you don't want log functionality remove -DIPFILTER_LOG
 #
 
 .include <bsd.kmod.mk>

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/smbus/smbus.c,v 1.12 1999/12/03 08:41:08 mdodd Exp $
+ * $FreeBSD: src/sys/dev/smbus/smbus.c,v 1.12.2.1 2000/10/09 00:52:44 archie Exp $
  *
  */
 #include <sys/param.h>
@@ -149,3 +149,4 @@ DRIVER_MODULE(smbus, iicsmb, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, bti2c, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, intsmb, smbus_driver, smbus_devclass, 0, 0);
 DRIVER_MODULE(smbus, alsmb, smbus_driver, smbus_devclass, 0, 0);
+DRIVER_MODULE(smbus, ichsmb, smbus_driver, smbus_devclass, 0, 0);

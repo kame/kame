@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/param.h,v 1.17 2000/02/29 08:48:10 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/include/param.h,v 1.17.2.1 2000/09/30 02:49:28 ps Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
 /*
@@ -70,7 +70,7 @@
 #define OBJFORMAT_NAMES		"elf"
 #define OBJFORMAT_DEFAULT	"elf"
 
-#define NCPUS		1
+#define MAXCPU		1
 
 /*
  * Round p (pointer or byte index) up to a correctly-aligned value for all

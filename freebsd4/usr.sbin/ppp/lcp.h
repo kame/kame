@@ -15,7 +15,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/lcp.h,v 1.23 1999/08/28 01:18:32 peter Exp $
+ * $FreeBSD: src/usr.sbin/ppp/lcp.h,v 1.23.2.1 2000/08/19 09:30:04 brian Exp $
  *
  *	TODO:
  */
@@ -87,10 +87,11 @@ struct lcp {
     unsigned lqr : 2;		/* Link Quality Report */
     unsigned pap : 2;		/* Password Authentication protocol */
     unsigned protocomp : 2;	/* Protocol field compression */
+    char ident[DEF_MRU - 7];	/* SendIdentification() data */
   } cfg;
 };
 
-#define	LCP_MAXCODE	CODE_DISCREQ
+#define	LCP_MAXCODE	CODE_IDENT
 #define	LCP_MINMPCODE	CODE_CODEREJ
 
 #define	TY_MRU		1	/* Maximum-Receive-Unit */
@@ -135,6 +136,8 @@ extern void lcp_Init(struct lcp *, struct bundle *, struct link *,
 extern void lcp_Setup(struct lcp *, int);
 
 extern void lcp_SendProtoRej(struct lcp *, u_char *, int);
+extern int lcp_SendIdentification(struct lcp *);
+extern void lcp_RecvIdentification(struct lcp *, char *);
 extern int lcp_ReportStatus(struct cmdargs const *);
 extern struct mbuf *lcp_Input(struct bundle *, struct link *, struct mbuf *);
 extern void lcp_SetupCallbacks(struct lcp *);

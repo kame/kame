@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.2 2000/07/01 23:35:48 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.7 2000/10/23 11:51:56 n_hibma Exp $
  */
 
 #ifdef _KERNEL
@@ -134,6 +134,9 @@ struct da_quirk_entry {
 	da_quirks quirks;
 };
 
+static const char quantum[] = "QUANTUM";
+static const char microp[] = "MICROP";
+
 static struct da_quirk_entry da_quirk_table[] =
 {
 	{
@@ -152,7 +155,7 @@ static struct da_quirk_entry da_quirk_table[] =
 		 * either.  Reported by: Matthew Jacob <mjacob@feral.com>
 		 * in NetBSD PR kern/6027, August 24, 1998.
 		 */
-		{T_DIRECT, SIP_MEDIA_FIXED, "MICROP", "2217*", "*"},
+		{T_DIRECT, SIP_MEDIA_FIXED, microp, "2217*", "*"},
 		/*quirks*/ DA_Q_NO_SYNC_CACHE
 	},
 	{
@@ -161,7 +164,7 @@ static struct da_quirk_entry da_quirk_table[] =
 		 * either.  Reported by: Hellmuth Michaelis (hm@kts.org)
 		 * (PR 8882).
 		 */
-		{T_DIRECT, SIP_MEDIA_FIXED, "MICROP", "2112*", "*"},
+		{T_DIRECT, SIP_MEDIA_FIXED, microp, "2112*", "*"},
 		/*quirks*/ DA_Q_NO_SYNC_CACHE
 	},
 	{
@@ -174,21 +177,37 @@ static struct da_quirk_entry da_quirk_table[] =
 	},
 	{
 		/*
+		 * Doesn't like the synchronize cache command.
+		 */
+		{T_DIRECT, SIP_MEDIA_FIXED, quantum, "MAVERICK 540S", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * Doesn't like the synchronize cache command.
+		 */
+		{T_DIRECT, SIP_MEDIA_FIXED, quantum, "LPS525S", "*"},
+		/*quirks*/ DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
 		 * Doesn't work correctly with 6 byte reads/writes.
 		 * Returns illegal request, and points to byte 9 of the
 		 * 6-byte CDB.
 		 * Reported by:  Adam McDougall <bsdx@spawnet.com>
 		 */
-		{T_DIRECT, SIP_MEDIA_FIXED, "QUANTUM", "VIKING 4*", "*"},
+		{T_DIRECT, SIP_MEDIA_FIXED, quantum, "VIKING 4*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
 	},
 	{
 		/*
 		 * See above.
 		 */
-		{T_DIRECT, SIP_MEDIA_FIXED, "QUANTUM", "VIKING 2*", "*"},
+		{T_DIRECT, SIP_MEDIA_FIXED, quantum, "VIKING 2*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
 	},
+
+	/* Below a list of quirks for USB devices supported by umass. */
 	{
 		/*
 		 * This USB floppy drive uses the UFI command set. This
@@ -197,6 +216,28 @@ static struct da_quirk_entry da_quirk_table[] =
 		 * not support sync cache (0x35).
 		 */
 		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Y-E DATA", "USB-FDU", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/* Another USB floppy */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "MATSHITA", "FDD CF-VFDU*","*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * Sony Memory Stick adapter MSAC-US1,
+		 * does not support READ_6 commands only READ_10. It also does
+		 * not support sync cache (0x35).
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "MSAC-US1", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
+	},
+	{
+		/*
+		 * Sony DSC cameras (DSC-S30, DSC-S50, DSC-S70)
+		 * do not support READ_6 commands, only READ_10. 
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Sony", "Sony DSC", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	}
 };
@@ -631,13 +672,12 @@ dadump(dev_t dev)
 	blkcnt = howmany(PAGE_SIZE, secsize);
 
 	while (num > 0) {
+		void *va;
 
 		if (is_physical_memory(addr)) {
-			pmap_enter(kernel_pmap, (vm_offset_t)CADDR1,
-				   trunc_page(addr), VM_PROT_READ, TRUE);
+			va = pmap_kenter_temporary(trunc_page(addr));
 		} else {
-			pmap_enter(kernel_pmap, (vm_offset_t)CADDR1,
-				   trunc_page(0), VM_PROT_READ, TRUE);
+			va = pmap_kenter_temporary(trunc_page(0));
 		}
 
 		xpt_setup_ccb(&csio.ccb_h, periph->path, /*priority*/1);
@@ -651,7 +691,7 @@ dadump(dev_t dev)
 				/*minimum_cmd_size*/ softc->minimum_cmd_size,
 				blknum,
 				blkcnt,
-				/*data_ptr*/CADDR1,
+				/*data_ptr*/(u_int8_t *) va,
 				/*dxfer_len*/blkcnt * secsize,
 				/*sense_len*/SSD_FULL_SIZE,
 				DA_DEFAULT_TIMEOUT * 1000);		

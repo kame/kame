@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14 2000/02/20 04:42:43 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.2 2000/09/22 23:10:54 gibbs Exp $
  */
 
 #include <sys/param.h>
@@ -711,15 +711,7 @@ scsi_op_desc(u_int16_t opcode, struct scsi_inquiry_data *inq_data)
 	asc, asc, action
 #endif 
 
-/*
- * If we're in the kernel, 'quantum' is already defined in cam_xpt.c.
- * Otherwise, we need to define it.
- */
-#ifdef _KERNEL
-extern const char quantum[];
-#else
 static const char quantum[] = "QUANTUM";
-#endif
 
 /*
  * WARNING:  You must update the num_ascs field below for this quirk table 
@@ -2395,16 +2387,15 @@ scsi_print_inquiry(struct scsi_inquiry_data *inq_data)
 /*
  * Table of syncrates that don't follow the "divisible by 4"
  * rule. This table will be expanded in future SCSI specs.
- * I believe that FAST-40 has already been defined...
  */
 static struct {
-        u_int period_factor;
-        u_int period;	/* in 10ths of ns */
+	u_int period_factor;
+	u_int period;	/* in 10ths of ns */
 } scsi_syncrates[] = {
-        { 0x09, 125 },	/* FAST-80 */
-        { 0x0a, 250 },
-        { 0x0b, 303 },
-        { 0x0c, 500 }
+	{ 0x09, 125 },	/* FAST-80 */
+	{ 0x0a, 250 },	/* FAST-40 40MHz */
+	{ 0x0b, 303 },	/* FAST-40 33MHz */
+	{ 0x0c, 500 }	/* FAST-20 */
 };
 
 /*

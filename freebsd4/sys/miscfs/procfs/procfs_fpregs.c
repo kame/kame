@@ -37,7 +37,7 @@
  *	@(#)procfs_fpregs.c	8.2 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_fpregs.c,v 1.11 1999/12/08 08:59:37 phk Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_fpregs.c,v 1.11.2.1 2000/11/01 20:19:48 sef Exp $
  */
 
 #include <sys/param.h>
@@ -59,7 +59,7 @@ procfs_dofpregs(curp, p, pfs, uio)
 	char *kv;
 	int kl;
 
-	if (p_trespass(curp, p))
+	if (!CHECKIO(curp, p) || p_trespass(curp, p))
 		return EPERM;
 	kl = sizeof(r);
 	kv = (char *) &r;

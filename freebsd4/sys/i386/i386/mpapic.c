@@ -22,10 +22,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.37.2.1 2000/05/31 21:42:19 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.37.2.4 2000/09/30 02:49:32 ps Exp $
  */
-
-#include "opt_smp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -46,7 +44,7 @@
  */
 
 #if defined(APIC_IO)
-volatile ioapic_t	*ioapic[NAPIC];
+volatile ioapic_t	**ioapic;
 #endif	/* APIC_IO */
 
 /*
@@ -150,6 +148,9 @@ io_apic_set_id(int apic, int id)
 	
 	ux = io_apic_read(apic, IOAPIC_ID);	/* get current contents */
 	if (((ux & APIC_ID_MASK) >> 24) != id) {
+		printf("Changing APIC ID for IO APIC #%d"
+		       " from %d to %d on chip\n",
+		       apic, ((ux & APIC_ID_MASK) >> 24), id);
 		ux &= ~APIC_ID_MASK;	/* clear the ID field */
 		ux |= (id << 24);
 		io_apic_write(apic, IOAPIC_ID, ux);	/* write new value */
@@ -159,6 +160,14 @@ io_apic_set_id(int apic, int id)
 			      apic, ux);
 	}
 }
+
+
+int
+io_apic_get_id(int apic)
+{
+  return (io_apic_read(apic, IOAPIC_ID) & APIC_ID_MASK) >> 24;
+}
+  
 
 
 /*
@@ -185,6 +194,27 @@ io_apic_setup(int apic)
 	
 	for (pin = 0; pin < maxpin; ++pin) {
 		int bus, bustype, irq;
+		
+		select = pin * 2 + IOAPIC_REDTBL0;	/* register */
+		/* 
+		 * Always disable interrupts, and by default map
+		 * pin X to IRQX because the disable doesn't stick
+		 * and the uninitialize vector will get translated 
+		 * into a panic.
+		 *
+		 * This is correct for IRQs 1 and 3-15.  In the other cases, 
+		 * any robust driver will handle the spurious interrupt, and 
+		 * the effective NOP beats a panic.
+		 *
+		 * A dedicated "bogus interrupt" entry in the IDT would
+		 * be a nicer hack, although some one should find out 
+		 * why some systems are generating interrupts when they
+		 * shouldn't and stop the carnage.
+		 */
+		vector = NRSVIDT + pin;			/* IDT vec */
+		io_apic_write(apic, select,
+			      (io_apic_read(apic, select) & ~IOART_INTMASK 
+			      & ~0xff)|IOART_INTMSET|vector);
 		
 		/* we only deal with vectored INTs here */
 		if (apic_int_type(apic, pin) != 0)
@@ -227,7 +257,6 @@ io_apic_setup(int apic)
 		if (apic != 0 || pin != irq)
 			printf("IOAPIC #%d intpin %d -> irq %d\n",
 			       apic, pin, irq);
-		select = pin * 2 + IOAPIC_REDTBL0;	/* register */
 		vector = NRSVIDT + irq;			/* IDT vec */
 		io_apic_write(apic, select, flags | vector);
 		io_apic_write(apic, select + 1, target);

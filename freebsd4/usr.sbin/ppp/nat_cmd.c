@@ -2,7 +2,7 @@
  * The code in this file was written by Eivind Eklund <perhaps@yes.no>,
  * who places it in the public domain without restriction.
  *
- * $FreeBSD: src/usr.sbin/ppp/nat_cmd.c,v 1.35.2.6 2000/06/27 16:35:12 ru Exp $
+ * $FreeBSD: src/usr.sbin/ppp/nat_cmd.c,v 1.35.2.8 2000/10/30 18:02:28 brian Exp $
  */
 
 #include <sys/param.h>
@@ -421,9 +421,13 @@ nat_LayerPull(struct bundle *bundle, struct link *l, struct mbuf *bp,
       break;
 
     case PKT_ALIAS_IGNORED:
-      if (log_IsKept(LogTCPIP)) {
+      if (PacketAliasSetMode(0, 0) & PKT_ALIAS_DENY_INCOMING) {
+        log_Printf(LogTCPIP, "NAT engine denied data:\n");
+        m_freem(bp);
+        bp = NULL;
+      } else if (log_IsKept(LogTCPIP)) {
         log_Printf(LogTCPIP, "NAT engine ignored data:\n");
-        PacketCheck(bundle, MBUF_CTOP(bp), bp->m_len, NULL);
+        PacketCheck(bundle, MBUF_CTOP(bp), bp->m_len, NULL, NULL, NULL);
       }
       break;
 

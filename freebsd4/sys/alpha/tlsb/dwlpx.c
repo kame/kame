@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/alpha/tlsb/dwlpx.c,v 1.11.2.2 2000/07/10 03:26:19 mjacob Exp $ */
 /*-
  * Copyright (c) 1998 Doug Rabson
  * All rights reserved.
@@ -24,6 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ * $FreeBSD: src/sys/alpha/tlsb/dwlpx.c,v 1.11.2.3 2000/08/03 00:48:05 peter Exp $
  */
 
 /*

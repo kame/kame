@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/kbd.c,v 1.17 2000/01/29 15:08:52 peter Exp $
+ * $FreeBSD: src/sys/dev/kbd/kbd.c,v 1.17.2.1 2000/10/29 16:59:20 dwmalone Exp $
  */
 
 #include "opt_kbd.h"
@@ -1144,6 +1144,7 @@ genkbd_keyaction(keyboard_t *kbd, int keycode, int up, int *shiftstate,
 			/* NON-LOCKING KEYS */
 			case SPSC: case RBT:  case SUSP: case STBY:
 			case DBG:  case NEXT: case PREV: case PNC:
+			case HALT: case PDWN:
 				*accents = 0;
 				break;
 			case BTAB:

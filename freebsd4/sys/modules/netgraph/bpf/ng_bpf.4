@@ -30,9 +30,9 @@
 .\" THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
 .\" OF SUCH DAMAGE.
 .\" 
-.\" Author: Archie Cobbs <archie@whistle.com>
+.\" Author: Archie Cobbs <archie@freebsd.org>
 .\"
-.\" $FreeBSD: src/sys/modules/netgraph/bpf/ng_bpf.4,v 1.3.2.1 2000/05/04 18:42:53 archie Exp $
+.\" $FreeBSD: src/sys/modules/netgraph/bpf/ng_bpf.4,v 1.3.2.3 2000/10/24 22:31:02 julian Exp $
 .\" $Whistle: ng_bpf.8,v 1.2 1999/12/03 01:57:12 archie Exp $
 .\"
 .Dd December 2, 1999
@@ -69,15 +69,15 @@ Either or both destination hooks may be the empty string, or may
 not exist, in which case the packet is dropped.
 .Pp
 New hooks are initially configured to drop all packets.
-A new filter may be installed using the
-.Dv NGM_BPF_SET_FILTER
+A new filter program may be installed using the
+.Dv NGM_BPF_SET_PROGRAM
 control message.
 .Sh HOOKS
 This node type supports any number of hooks having arbitrary names.
 .Sh CONTROL MESSAGES
 This node type supports the generic control messages, plus the following:
 .Bl -tag -width foo
-.It Dv NGM_BPF_SET_FILTER
+.It Dv NGM_BPF_SET_PROGRAM
 This command sets the filter program that will be applied to incoming
 data on a hook.  The following structure must be supplied as an argument:
 .Bd -literal -offset 4n
@@ -106,7 +106,7 @@ respectively.  The program must be a valid
 program or else
 .Er EINVAL
 is returned.
-.It Dv NGM_BPF_GET_FILTER
+.It Dv NGM_BPF_GET_PROGRAM
 This command takes an
 .Tn ASCII
 string argument, the hook name, and returns the
@@ -151,4 +151,4 @@ node type was implemented in
 .Xr bpf 4 ,
 .Xr ngctl 8
 .Sh AUTHORS
-.An Archie Cobbs Aq archie@whistle.com
+.An Archie Cobbs Aq archie@freebsd.org

@@ -37,11 +37,11 @@
  *
  * Ancestors:
  *	@(#)lofs_vnops.c	1.2 (Berkeley) 6/18/92
- * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38 1999/12/11 16:12:56 eivind Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38.2.2 2000/10/25 04:26:30 bp Exp $
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  *
- * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38 1999/12/11 16:12:56 eivind Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_vnops.c,v 1.38.2.2 2000/10/25 04:26:30 bp Exp $
  */
 
 /*
@@ -189,15 +189,15 @@ static int null_bug_bypass = 0;   /* for debugging: enables bypass printf'ing */
 SYSCTL_INT(_debug, OID_AUTO, nullfs_bug_bypass, CTLFLAG_RW, 
 	&null_bug_bypass, 0, "");
 
-static int	null_access __P((struct vop_access_args *ap));
-static int	null_getattr __P((struct vop_getattr_args *ap));
-static int	null_inactive __P((struct vop_inactive_args *ap));
-static int	null_lock __P((struct vop_lock_args *ap));
-static int	null_lookup __P((struct vop_lookup_args *ap));
-static int	null_print __P((struct vop_print_args *ap));
-static int	null_reclaim __P((struct vop_reclaim_args *ap));
-static int	null_setattr __P((struct vop_setattr_args *ap));
-static int	null_unlock __P((struct vop_unlock_args *ap));
+static int	null_access(struct vop_access_args *ap);
+static int	null_getattr(struct vop_getattr_args *ap);
+static int	null_inactive(struct vop_inactive_args *ap);
+static int	null_lock(struct vop_lock_args *ap);
+static int	null_lookup(struct vop_lookup_args *ap);
+static int	null_print(struct vop_print_args *ap);
+static int	null_reclaim(struct vop_reclaim_args *ap);
+static int	null_setattr(struct vop_setattr_args *ap);
+static int	null_unlock(struct vop_unlock_args *ap);
 
 /*
  * This is the 10-Apr-92 bypass routine.
@@ -277,7 +277,7 @@ null_bypass(ap)
 			 * of vrele'ing their vp's.  We must account for
 			 * that.  (This should go away in the future.)
 			 */
-			if (reles & 1)
+			if (reles & VDESC_VP0_WILLRELE)
 				VREF(*this_vp_p);
 		}
 
@@ -287,7 +287,12 @@ null_bypass(ap)
 	 * Call the operation on the lower layer
 	 * with the modified argument structure.
 	 */
-	error = VCALL(*(vps_p[0]), descp->vdesc_offset, ap);
+	if (vps_p[0] && *vps_p[0])
+		error = VCALL(*(vps_p[0]), descp->vdesc_offset, ap);
+	else {
+		printf("null_bypass: no map for %s\n", descp->vdesc_name);
+		error = EINVAL;
+	}
 
 	/*
 	 * Maintain the illusion of call-by-value
@@ -300,7 +305,11 @@ null_bypass(ap)
 			break;   /* bail out at end of list */
 		if (old_vps[i]) {
 			*(vps_p[i]) = old_vps[i];
-			if (reles & 1)
+#if 0
+			if (reles & VDESC_VP0_WILLUNLOCK)
+				VOP_UNLOCK(*(vps_p[i]), LK_THISLAYER, curproc);
+#endif
+			if (reles & VDESC_VP0_WILLRELE)
 				vrele(*(vps_p[i]));
 		}
 	}
@@ -430,6 +439,7 @@ null_setattr(ap)
 				return (EROFS);
 		}
 	}
+
 	return (null_bypass((struct vop_generic_args *)ap));
 }
 
@@ -560,6 +570,7 @@ null_reclaim(ap)
 	} */ *ap;
 {
 	struct vnode *vp = ap->a_vp;
+	struct proc *p = ap->a_p;
 	struct null_node *xp = VTONULL(vp);
 	struct vnode *lowervp = xp->null_lowervp;
 
@@ -569,9 +580,11 @@ null_reclaim(ap)
 	 */
 	/* After this assignment, this node will not be re-used. */
 	xp->null_lowervp = NULLVP;
+	lockmgr(&null_hashlock, LK_EXCLUSIVE, NULL, p);
 	LIST_REMOVE(xp, null_hash);
-	FREE(vp->v_data, M_TEMP);
+	lockmgr(&null_hashlock, LK_RELEASE, NULL, p);
 	vp->v_data = NULL;
+	FREE(xp, M_NULLFSNODE);
 	vrele (lowervp);
 	return (0);
 }

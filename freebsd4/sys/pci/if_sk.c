@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.4 2000/07/17 21:24:39 archie Exp $
+ * $FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.7 2000/11/02 00:04:27 wpaul Exp $
  */
 
 /*
@@ -41,8 +41,10 @@
  *	The SysKonnect GEnesis manual, http://www.syskonnect.com
  *
  * Note: XaQti has been aquired by Vitesse, and Vitesse does not have the
- * XMAC II datasheet online. I have put my copy at www.freebsd.org as a
- * convenience to others until Vitesse corrects this problem.
+ * XMAC II datasheet online. I have put my copy at people.freebsd.org as a
+ * convenience to others until Vitesse corrects this problem:
+ *
+ * http://people.freebsd.org/~wpaul/SysKonnect/xmacii_datasheet_rev_c_9-29.pdf
  *
  * Written by Bill Paul <wpaul@ee.columbia.edu>
  * Department of Electrical Engineering
@@ -110,7 +112,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.4 2000/07/17 21:24:39 archie Exp $";
+  "$FreeBSD: src/sys/pci/if_sk.c,v 1.19.2.7 2000/11/02 00:04:27 wpaul Exp $";
 #endif
 
 static struct sk_type sk_devs[] = {
@@ -1326,7 +1328,7 @@ static int sk_attach(dev)
 	if (error) {
 		printf("skc%d: couldn't set up irq\n", unit);
 		bus_release_resource(dev, SK_RES, SK_RID, sc->sk_res);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sk_res);
+		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->sk_irq);
 		goto fail;
 	}
 
@@ -1407,6 +1409,8 @@ static int sk_attach(dev)
 
 	/* Turn on the 'driver is loaded' LED. */
 	CSR_WRITE_2(sc, SK_LED, SK_LED_GREEN_ON);
+
+	bus_generic_attach(dev);
 
 fail:
 	splx(s);

@@ -23,11 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/tun.h,v 1.8 2000/01/23 01:48:19 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/tun.h,v 1.8.2.1 2000/08/19 09:30:08 brian Exp $
  */
 
 struct tun_data {
-  u_int32_t family;
+  union {
+    u_int32_t family;
+    u_int32_t timeout;
+  } header;
   u_char data[MAX_MRU];
 };
 

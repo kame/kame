@@ -31,12 +31,11 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.47.2.1 2000/05/16 06:58:07 dillon Exp $
+ * $FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.47.2.2 2000/09/30 02:49:33 ps Exp $
  *
  */
 
 #include "opt_user_ldt.h"
-#include "opt_smp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>

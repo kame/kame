@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)clock.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/isa/clock.c,v 1.149 2000/01/04 22:24:59 tegge Exp $
+ * $FreeBSD: src/sys/i386/isa/clock.c,v 1.149.2.1 2000/08/03 00:09:29 ps Exp $
  */
 
 /*
@@ -1141,7 +1141,7 @@ setstatclockrate(int newhz)
 }
 
 static int
-sysctl_machdep_i8254_freq SYSCTL_HANDLER_ARGS
+sysctl_machdep_i8254_freq(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	u_int freq;
@@ -1166,7 +1166,7 @@ SYSCTL_PROC(_machdep, OID_AUTO, i8254_freq, CTLTYPE_INT | CTLFLAG_RW,
     0, sizeof(u_int), sysctl_machdep_i8254_freq, "I", "");
 
 static int
-sysctl_machdep_tsc_freq SYSCTL_HANDLER_ARGS
+sysctl_machdep_tsc_freq(SYSCTL_HANDLER_ARGS)
 {
 	int error;
 	u_int freq;

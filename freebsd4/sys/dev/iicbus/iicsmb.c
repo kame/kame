@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/iicbus/iicsmb.c,v 1.5 1999/08/28 00:41:59 peter Exp $
+ * $FreeBSD: src/sys/dev/iicbus/iicsmb.c,v 1.5.2.2 2000/08/09 00:59:27 peter Exp $
  *
  */
 
@@ -103,6 +103,7 @@ static device_method_t iicsmb_methods[] = {
 	/* device interface */
 	DEVMETHOD(device_probe,		iicsmb_probe),
 	DEVMETHOD(device_attach,	iicsmb_attach),
+	DEVMETHOD(device_detach,	bus_generic_detach),
 
 	/* bus interface */
 	DEVMETHOD(bus_print_child,	bus_generic_print_child),

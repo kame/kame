@@ -33,7 +33,7 @@
  *	pci_isic.c - pcmcia bus frontend for i4b_isic driver
  *	-------------------------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/pci_isic.c,v 1.5 1999/08/28 00:45:44 peter Exp $ 
+ * $FreeBSD: src/sys/i4b/layer1/pci_isic.c,v 1.5.2.1 2000/09/21 17:19:35 joe Exp $ 
  *
  *      last edit-date: [Wed Mar 10 07:22:08 1999]
  *
@@ -220,12 +220,15 @@ isic_pciattach(psc, pa)
 	
 	if(sc->sc_ipac)
 	{
-		u_int ret = IPAC_READ(IPAC_ID);
+		sc->sc_ipac_version = IPAC_READ(IPAC_ID);
 
-		switch(ret)
+		switch(sc->sc_ipac_version)
 		{
-			case 0x01:
-				printf("%s: IPAC PSB2115 Version 1.1\n", sc->sc_dev.dv_xname);
+			case IPAC_V11:
+			case IPAC_V12:
+				printf("%s: IPAC PSB2115 Version 1.%d\n",
+					sc->sc_dev.dv_xname,
+					sc->sc_ipac_versio);
 				break;
 	
 			default:

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.2 2000/05/15 16:48:12 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.3 2000/08/02 22:04:30 peter Exp $
  */
 
 /*
@@ -100,7 +100,7 @@
  *	Maps consist of an ordered doubly-linked list of simple
  *	entries; a single hint is used to speed up lookups.
  *
- *	Since portions of maps are specified by start/end addreses,
+ *	Since portions of maps are specified by start/end addresses,
  *	which may not align with existing map entries, all
  *	routines merely "clip" entries to these start/end values.
  *	[That is, an entry is split into two, bordering at a

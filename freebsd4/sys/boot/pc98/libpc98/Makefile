@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3.2.1 2000/05/05 08:59:03 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3.2.2 2000/09/23 01:42:58 nyan Exp $
 #
 LIB=			pc98
 NOPIC=
@@ -8,7 +8,9 @@ INTERNALSTATICLIB=	true
 
 SRCS=	aout_freebsd.c biosdisk.c biosmem.c biospnp.c biospci.c \
 	bootinfo.c comconsole.c devicename.c elf_freebsd.c gatea20.c \
-	i386_copy.c i386_module.c time.c vidconsole.c pxe.c pxetramp.s
+	i386_copy.c i386_module.c nullconsole.c pxe.c pxetramp.s \
+	time.c vidconsole.c
+
 .PATH:	${.CURDIR}/../../i386/libi386
 
 CFLAGS+=	-DPC98

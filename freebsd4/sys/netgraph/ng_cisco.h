@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.2.2.1 2000/05/24 21:36:40 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.2.2.3 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_cisco.h,v 1.6 1999/01/25 01:21:48 archie Exp $
  */
 
@@ -84,8 +84,8 @@ struct ng_cisco_stats {
 /* Keep this in sync with the above structure definition */
 #define NG_CISCO_STATS_TYPE_INFO	{			\
 	{							\
-	  { "seqRetries",	&ng_parse_int32_type	},	\
-	  { "keepAlivePeriod",	&ng_parse_int32_type	},	\
+	  { "seqRetries",	&ng_parse_uint32_type	},	\
+	  { "keepAlivePeriod",	&ng_parse_uint32_type	},	\
 	  { NULL },						\
 	}							\
 }

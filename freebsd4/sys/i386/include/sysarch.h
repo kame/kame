@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.13 1999/12/29 04:33:08 peter Exp $
+ * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.13.2.1 2000/10/21 01:42:52 bsd Exp $
  */
 
 /*
@@ -68,6 +68,7 @@ struct i386_vm86_args {
 #include <sys/cdefs.h>
 
 union descriptor;
+struct dbreg;
 
 __BEGIN_DECLS
 int i386_get_ldt __P((int, union descriptor *, int));
@@ -75,6 +76,9 @@ int i386_set_ldt __P((int, union descriptor *, int));
 int i386_get_ioperm __P((unsigned int, unsigned int *, int *));
 int i386_set_ioperm __P((unsigned int, unsigned int, int));
 int i386_vm86 __P((int, void *));
+int i386_set_watch __P((int watchnum, unsigned int watchaddr, int size,
+                        int access, struct dbreg * d));
+int i386_clr_watch __P((int watchnum, struct dbreg * d));
 __END_DECLS
 #endif
 

@@ -47,7 +47,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)fd.c	7.4 (Berkeley) 5/25/91
- * $FreeBSD: src/sys/isa/fd.c,v 1.176 2000/01/08 09:33:06 peter Exp $
+ * $FreeBSD: src/sys/isa/fd.c,v 1.176.2.1 2000/08/18 16:20:21 n_hibma Exp $
  *
  */
 
@@ -1048,10 +1048,14 @@ fd_attach(device_t dev)
 	int	typemynor;
 	int	typesize;
 #endif
+	static int cdevsw_add_done = 0;
 
 	fd = device_get_softc(dev);
 
-	cdevsw_add(&fd_cdevsw);	/* XXX */
+	if (!cdevsw_add_done) {
+		cdevsw_add(&fd_cdevsw);	/* XXX */
+		cdevsw_add_done++;
+	}
 	make_dev(&fd_cdevsw, (fd->fdu << 6),
 		UID_ROOT, GID_OPERATOR, 0640, "rfd%d", fd->fdu);
 

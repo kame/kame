@@ -43,7 +43,7 @@
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
  *	from: i386 pmap.h,v 1.54 1997/11/20 19:30:35 bde Exp
- * $FreeBSD: src/sys/alpha/include/pmap.h,v 1.6 1999/12/29 04:27:58 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/pmap.h,v 1.6.2.1 2000/08/04 22:31:05 peter Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -158,12 +158,12 @@ alpha_XXX_dmamap(vm_offset_t va)
  * Pmap stuff
  */
 struct	pv_entry;
-typedef struct {
+
+struct md_page {
 	int pv_list_count;
-	struct vm_page		*pv_vm_page;
 	int			pv_flags;
 	TAILQ_HEAD(,pv_entry)	pv_list;
-} pv_table_t;
+};
 
 #define PV_TABLE_MOD		0x01 /* modified */
 #define PV_TABLE_REF		0x02 /* referenced */

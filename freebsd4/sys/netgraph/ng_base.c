@@ -34,10 +34,10 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Authors: Julian Elischer <julian@whistle.com>
- *          Archie Cobbs <archie@whistle.com>
+ * Authors: Julian Elischer <julian@freebsd.org>
+ *          Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.4 2000/07/21 20:45:58 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.6 2000/10/24 18:36:44 julian Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -1442,7 +1442,7 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 
 	case NGM_BINARY2ASCII:
 	    {
-		int bufSize = 2000;	/* XXX hard coded constant */
+		int bufSize = 20 * 1024;	/* XXX hard coded constant */
 		const struct ng_parse_type *argstype;
 		const struct ng_cmdlist *c;
 		struct ng_mesg *rp, *binary, *ascii;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bktr/bktr_i2c.c,v 1.13.2.1 2000/04/18 12:50:32 roger Exp $
+ * $FreeBSD: src/sys/dev/bktr/bktr_i2c.c,v 1.13.2.3 2000/10/26 16:38:46 roger Exp $
  *
  */
 
@@ -40,13 +40,12 @@
 #include <sys/systm.h>
 #include <sys/module.h>
 #include <sys/bus.h>
-#include <sys/conf.h>
-#include <sys/buf.h>
 #include <sys/uio.h>
-#include <sys/malloc.h>
 #include <sys/select.h>
 
-#include <machine/clock.h>
+#if (__FreeBSD_version < 500000)
+#include <machine/clock.h>              /* for DELAY */
+#endif
 
 #if (__FreeBSD_version >=300000)
 #include <machine/bus_memio.h>          /* for bus space */

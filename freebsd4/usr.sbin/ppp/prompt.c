@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/prompt.c,v 1.20.2.1 2000/03/21 10:23:15 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/prompt.c,v 1.20.2.2 2000/08/19 09:30:06 brian Exp $
  */
 
 #include <sys/param.h>
@@ -49,7 +49,6 @@
 #include "descriptor.h"
 #include "prompt.h"
 #include "fsm.h"
-#include "lcp.h"
 #include "auth.h"
 #include "iplist.h"
 #include "throughput.h"
@@ -57,6 +56,7 @@
 #include "mbuf.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "lcp.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "async.h"

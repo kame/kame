@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfs/nfs.h,v 1.53 2000/01/13 20:18:25 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs.h,v 1.53.2.1 2000/10/28 16:27:27 dwmalone Exp $
  */
 
 #ifndef _NFS_NFS_H_
@@ -616,7 +616,7 @@ int	nfs_request __P((struct vnode *, struct mbuf *, int, struct proc *,
 			 struct ucred *, struct mbuf **, struct mbuf **,
 			 caddr_t *));
 int	nfs_loadattrcache __P((struct vnode **, struct mbuf **, caddr_t *,
-			       struct vattr *));
+			       struct vattr *, int));
 int	nfs_namei __P((struct nameidata *, fhandle_t *, int,
 		       struct nfssvc_sock *, struct sockaddr *, struct mbuf **,
 		       caddr_t *, struct vnode **, struct proc *, int, int));

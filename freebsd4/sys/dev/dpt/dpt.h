@@ -40,7 +40,7 @@
  */
 
 
-#ident "$FreeBSD: src/sys/dev/dpt/dpt.h,v 1.8 1999/12/29 04:35:35 peter Exp $"
+#ident "$FreeBSD: src/sys/dev/dpt/dpt.h,v 1.8.2.1 2000/08/07 18:48:14 peter Exp $"
 
 #ifndef _DPT_H
 #define _DPT_H
@@ -1270,8 +1270,9 @@ extern TAILQ_HEAD(dpt_softc_list, dpt_softc) dpt_softcs;
 
 extern int		dpt_controllers_present;
 
-struct dpt_softc*	dpt_alloc(u_int unit, bus_space_tag_t tag,
-				  bus_space_handle_t bsh);
+#ifdef _KERNEL
+dpt_softc_t *		dpt_alloc(device_t, bus_space_tag_t, bus_space_handle_t);
+#endif
 void			dpt_free(struct dpt_softc *dpt);
 int			dpt_init(struct dpt_softc *dpt);
 int			dpt_attach(dpt_softc_t * dpt);

@@ -15,7 +15,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/defs.h,v 1.52.2.3 2000/06/15 17:08:28 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/defs.h,v 1.52.2.6 2000/11/01 00:19:25 brian Exp $
  *
  *	TODO:
  */
@@ -102,7 +102,13 @@
 
 #define ROUNDUP(x) ((x) ? (1 + (((x) - 1) | (sizeof(long) - 1))) : sizeof(long))
 
+#if defined(__NetBSD__) || __FreeBSD__ < 3
 extern void randinit(void);
+#else
+#define random arc4random
+#define randinit()
+#endif
+
 extern ssize_t fullread(int, void *, size_t);
 extern const char *mode2Nam(int);
 extern int Nam2mode(const char *);
@@ -114,3 +120,6 @@ extern int MakeArgs(char *, char **, int, int);
 extern const char *NumStr(long, char *, size_t);
 extern const char *HexStr(long, char *, size_t);
 extern const char *ex_desc(int);
+extern void SetTitle(const char *);
+extern fd_set *mkfdset(void);
+extern void zerofdset(fd_set *);

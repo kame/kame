@@ -31,13 +31,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/buslogic/btreg.h,v 1.10 1999/10/09 06:25:17 mdodd Exp $
+ * $FreeBSD: src/sys/dev/buslogic/btreg.h,v 1.10.2.1 2000/08/02 22:32:26 peter Exp $
  */
 
 #ifndef _BTREG_H_
 #define _BTREG_H_
-
-#include "bt.h"
 
 #include <sys/queue.h>
 

@@ -34,9 +34,9 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * Author: Archie Cobbs <archie@whistle.com>
+ * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.2 1999/11/30 02:45:21 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.2.2.2 2000/10/24 18:36:45 julian Exp $
  * $Whistle: ng_ksocket.h,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
@@ -49,8 +49,8 @@
 
 /* For NGM_KSOCKET_SETOPT and NGM_KSOCKET_GETOPT control messages */
 struct ng_ksocket_sockopt {
-	u_int32_t	level;		/* second arg of [gs]etsockopt() */
-	u_int32_t	name;		/* third arg of [gs]etsockopt() */
+	int32_t		level;		/* second arg of [gs]etsockopt() */
+	int32_t		name;		/* third arg of [gs]etsockopt() */
 	u_char		value[0];	/* fourth arg of [gs]etsockopt() */
 };
 

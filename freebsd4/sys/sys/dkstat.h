@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)dkstat.h	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/dkstat.h,v 1.12 1999/12/29 04:24:40 peter Exp $
+ * $FreeBSD: src/sys/sys/dkstat.h,v 1.12.2.1 2000/09/22 08:01:00 des Exp $
  */
 
 #ifndef _SYS_DKSTAT_H_
@@ -51,6 +51,7 @@
 
 #ifdef _KERNEL
 
+extern long cp_time[CPUSTATES];
 extern long tk_cancc;
 extern long tk_nin;
 extern long tk_nout;

@@ -11,7 +11,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.47.2.1 2000/06/11 18:39:44 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.47.2.3 2000/08/22 00:33:18 archie Exp $
  */
 
 #ifndef _IP_FW_H
@@ -47,7 +47,6 @@ union ip_fw_if {
  * fw_src, fw_dst, fw_smsk, fw_dmsk are always stored in network byte order.
  * fw_flg and fw_n*p are stored in host byte order (of course).
  * Port numbers are stored in HOST byte order.
- * Warning: setsockopt() will fail if sizeof(struct ip_fw) > MLEN (108)
  */
 
 struct ip_fw {
@@ -64,12 +63,13 @@ struct ip_fw {
 	unsigned fw_icmptypes[IP_FW_ICMPTYPES_DIM]; /* ICMP types bitmap */
 	} fw_uar;
     u_char fw_ipopt,fw_ipnopt;		/* IP options set/unset */
+    u_char fw_tcpopt,fw_tcpnopt;	/* TCP options set/unset */
     u_char fw_tcpf,fw_tcpnf;		/* TCP flags set/unset */
     long timestamp;			/* timestamp (tv_sec) of last match */
     union ip_fw_if fw_in_if, fw_out_if;	/* Incoming and outgoing interfaces */
     union {
 	u_short fu_divert_port;		/* Divert/tee port (options IPDIVERT) */
-	u_short fu_pipe_nr;		/* pipe number (option DUMMYNET) */
+	u_short fu_pipe_nr;		/* queue number (option DUMMYNET) */
 	u_short fu_skipto_rule;		/* SKIPTO command rule number */
 	u_short fu_reject_code;		/* REJECT response code */
 	struct sockaddr_in fu_fwd_ip;
@@ -228,6 +228,15 @@ struct ipfw_dyn_rule {
 #define IP_FW_IPOPT_SSRR	0x02
 #define IP_FW_IPOPT_RR		0x04
 #define IP_FW_IPOPT_TS		0x08
+
+/*
+ * Definitions for TCP option names.
+ */
+#define IP_FW_TCPOPT_MSS	0x01
+#define IP_FW_TCPOPT_WINDOW	0x02
+#define IP_FW_TCPOPT_SACK	0x04
+#define IP_FW_TCPOPT_TS		0x08
+#define IP_FW_TCPOPT_CC		0x10
 
 /*
  * Definitions for TCP flags.

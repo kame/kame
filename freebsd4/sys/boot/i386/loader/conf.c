@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11.2.2 2000/05/04 13:51:31 ps Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11.2.3 2000/09/22 17:04:46 archie Exp $
  */
 
 #include <stand.h>
@@ -90,10 +90,12 @@ struct module_format *module_formats[] = {
  */
 extern struct console vidconsole;
 extern struct console comconsole;
+extern struct console nullconsole;
 
 struct console *consoles[] = {
     &vidconsole,
     &comconsole,
+    &nullconsole,
     NULL
 };
 

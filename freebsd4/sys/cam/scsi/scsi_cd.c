@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_cd.c,v 1.31.2.2 2000/05/31 03:14:32 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_cd.c,v 1.31.2.4 2000/10/31 08:09:49 dwmalone Exp $
  */
 /*
  * Portions of this driver taken from the original FreeBSD cd driver.
@@ -160,6 +160,10 @@ static struct cd_quirk_entry cd_quirk_table[] =
 	{
 		{ T_CDROM, SIP_MEDIA_REMOVABLE, "PIONEER", "CD-ROM DRM*",
 		  "*"}, /* quirks */ CD_Q_CHANGER
+	},
+	{
+		{ T_CDROM, SIP_MEDIA_REMOVABLE, "NAKAMICH", "MJ-*", "*"},
+		 /* quirks */ CD_Q_CHANGER
 	},
 	{
 		{ T_CDROM, SIP_MEDIA_REMOVABLE, "CHINON", "CD-ROM CDS-535","*"},
@@ -3026,8 +3030,7 @@ cdreportkey(struct cam_periph *periph, struct dvd_authinfo *authinfo)
 	}
 
 	if (length != 0) {
-		databuf = malloc(length, M_DEVBUF, M_WAITOK);
-		bzero(databuf, length);
+		databuf = malloc(length, M_DEVBUF, M_WAITOK | M_ZERO);
 	} else
 		databuf = NULL;
 
@@ -3158,11 +3161,9 @@ cdsendkey(struct cam_periph *periph, struct dvd_authinfo *authinfo)
 
 		length = sizeof(*challenge_data);
 
-		challenge_data = malloc(length, M_DEVBUF, M_WAITOK);
+		challenge_data = malloc(length, M_DEVBUF, M_WAITOK | M_ZERO);
 
 		databuf = (u_int8_t *)challenge_data;
-
-		bzero(databuf, length);
 
 		scsi_ulto2b(length - sizeof(challenge_data->data_len),
 			    challenge_data->data_len);
@@ -3177,11 +3178,9 @@ cdsendkey(struct cam_periph *periph, struct dvd_authinfo *authinfo)
 
 		length = sizeof(*key2_data);
 
-		key2_data = malloc(length, M_DEVBUF, M_WAITOK);
+		key2_data = malloc(length, M_DEVBUF, M_WAITOK | M_ZERO);
 
 		databuf = (u_int8_t *)key2_data;
-
-		bzero(databuf, length);
 
 		scsi_ulto2b(length - sizeof(key2_data->data_len),
 			    key2_data->data_len);
@@ -3196,11 +3195,9 @@ cdsendkey(struct cam_periph *periph, struct dvd_authinfo *authinfo)
 
 		length = sizeof(*rpc_data);
 
-		rpc_data = malloc(length, M_DEVBUF, M_WAITOK);
+		rpc_data = malloc(length, M_DEVBUF, M_WAITOK | M_ZERO);
 
 		databuf = (u_int8_t *)rpc_data;
-
-		bzero(databuf, length);
 
 		scsi_ulto2b(length - sizeof(rpc_data->data_len),
 			    rpc_data->data_len);
@@ -3343,8 +3340,7 @@ cdreaddvdstructure(struct cam_periph *periph, struct dvd_struct *dvdstruct)
 	}
 
 	if (length != 0) {
-		databuf = malloc(length, M_DEVBUF, M_WAITOK);
-		bzero(databuf, length);
+		databuf = malloc(length, M_DEVBUF, M_WAITOK | M_ZERO);
 	} else
 		databuf = NULL;
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.14.2.2 2000/04/24 19:40:48 msmith Exp $
+ *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.14.2.3 2000/08/04 06:52:50 msmith Exp $
  */
 
 /*
@@ -43,6 +43,8 @@
 #include <sys/stat.h>
 
 #include <machine/resource.h>
+#include <machine/bus_memio.h>
+#include <machine/bus_pio.h>
 #include <machine/bus.h>
 #include <machine/clock.h>
 #include <sys/rman.h>

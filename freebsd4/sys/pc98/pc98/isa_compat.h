@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.4 2000/04/14 13:32:54 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/isa_compat.h,v 1.13.2.6 2000/09/22 10:01:51 nyan Exp $
  */
 
 #include "vt.h"
@@ -32,8 +32,6 @@
 #include "cs.h"
 #include "cx.h"
 #include "el.h"
-#include "ed.h"
-#include "fe.h"
 #include "le.h"
 #include "lnc.h"
 #include "rdp.h"
@@ -89,9 +87,7 @@ extern struct isa_driver wdcdriver;
 extern struct isa_driver  ardriver;
 extern struct isa_driver  csdriver;
 extern struct isa_driver  cxdriver;
-extern struct isa_driver  eddriver;
 extern struct isa_driver  eldriver;
-extern struct isa_driver  fedriver;
 extern struct isa_driver  ledriver;
 extern struct isa_driver lncdriver;
 extern struct isa_driver rdpdriver;
@@ -144,9 +140,6 @@ static struct old_isa_driver old_drivers[] = {
 /* Sensitive BIO */
 
 /* Sensitive NET */
-#if NFE > 0
-	{ INTR_TYPE_NET, &fedriver },
-#endif
 #if NRDP > 0
 	{ INTR_TYPE_NET, &rdpdriver },
 #endif
@@ -218,9 +211,6 @@ static struct old_isa_driver old_drivers[] = {
 
 /* NET */
 
-#if NED > 0
-	{ INTR_TYPE_NET, &eddriver },
-#endif
 #if NLE > 0
 	{ INTR_TYPE_NET, &ledriver },
 #endif
