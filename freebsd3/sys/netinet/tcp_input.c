@@ -846,15 +846,25 @@ findpcb:
 #endif /* INET6 */
 			inp->inp_options = ip_srcroute();
 #ifdef IPSEC
-			key_freesp(inp->inp_sp_in);
-			inp->inp_sp_in = sotoinpcb(oso)->inp_sp_in;
-			if (inp->inp_sp_in)
-				inp->inp_sp_in->refcnt++;
-			key_freesp(inp->inp_sp_out);
-			inp->inp_sp_out = sotoinpcb(oso)->inp_sp_out;
-			if (inp->inp_sp_out)
-				inp->inp_sp_out->refcnt++;
+			/* copy old policy into new socket's */
+		    {
+			struct secpolicy *sp;
+
+			sp = ipsec_copy_policy(sotoinpcb(oso)->inp_sp_in);
+			if (sp) {
+				key_freesp(inp->inp_sp_in);
+				inp->inp_sp_in = sp;
+			} else
+				printf("tcp_input: could not copy policy \"in\"\n");
+			sp = ipsec_copy_policy(sotoinpcb(oso)->inp_sp_out);
+			if (sp) {
+				key_freesp(inp->inp_sp_out);
+				inp->inp_sp_out = sp;
+			} else
+				printf("tcp_input: could not copy policy \"out\"\n");
+		    }
 #endif
+
 			tp = intotcpcb(inp);
 			tp->t_state = TCPS_LISTEN;
 			tp->t_flags |= tp0->t_flags & (TF_NOPUSH|TF_NOOPT);
