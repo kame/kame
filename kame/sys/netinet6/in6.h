@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.57 2000/08/26 10:00:45 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.58 2000/08/27 00:56:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -450,6 +450,7 @@ struct route_in6 {
 #define IPV6_PKTOPTIONS		52 /* buf/cmsghdr; set/get IPv6 options */
 				   /* obsoleted by 2292bis */
 #endif
+/* to define items, should talk with KAME guys first, for *BSD compatibility */
 
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
 #define IPV6_RTHDR_STRICT    1 /* this hop must be a neighbor. XXX old spec */
