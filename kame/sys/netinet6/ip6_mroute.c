@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.104 2003/10/15 22:27:13 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.105 2003/10/15 22:56:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -810,8 +810,6 @@ add_m6if(mifcp)
 		ifr.ifr_addr.sin6_family = AF_INET6;
 		ifr.ifr_addr.sin6_addr = in6addr_any;
 		error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr);
-		if (error == ENETRESET)
-			error = 0;
 #endif
 		splx(s);
 		if (error)
