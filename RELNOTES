@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/02/10 04:57:07 $
+		     $Date: 2000/02/11 05:39:04 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -48,7 +48,5 @@ those platforms.  Here is a brief list of important differences:
 		(you can enjoy OpenBSD IPsec for IPv4)
 - TCP
 	see IMPLEMENTATION for details.
-- NAT/PT
-	KAME/FreeBSD228 only at this moment.
 
 							<end of RELNOTES>
