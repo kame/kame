@@ -1226,23 +1226,6 @@ findpcb:
 	}
 
 after_listen:
-#ifdef INET6
-	/* save packet options if user wanted */
-	if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS)) {
-		struct ip6_recvpktopts opts;
-
-		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(in6p, ip6, m, &opts);
-		if (in6p->in6p_inputopts)
-			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
-		if (opts.head) {
-			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
-					    NULL, opts.head) == 0)
-				m_freem(opts.head);
-		}
-	}
-#endif
-
 #ifdef DIAGNOSTIC
 	/*
 	 * Should not happen now that all embryonic connections
@@ -3108,40 +3091,13 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 #ifdef INET6
 	if (in6p && in6totcpcb(in6p)->t_family == AF_INET6 && sotoinpcb(oso)) {
 		struct in6pcb *oin6p = sotoin6pcb(oso);
-		/*
-		 * Inherit socket options from the listening socket.
-		 * Note that in6p_inputopts are not (even should not
-		 * be) copied, since it stores previously received
-		 * options and is used to detect if each new option is
-		 * different than the previous one and hence should be
-		 * passed to a user.
-		 * If we copied in6p_inputopts, a user would not be
-		 * able to receive options just after calling the
-		 * accept system call.
-		 */
+
+		/* Inherit socket options from the listening socket. */
 		in6p->in6p_flags |= (oin6p->in6p_flags & IN6P_CONTROLOPTS);
 		if (oin6p->in6p_outputopts)
 			in6p->in6p_outputopts =
 				ip6_copypktopts(oin6p->in6p_outputopts,
 						M_NOWAIT);
-
-		if ((in6p->in6p_flags & IN6P_CONTROLOPTS) &&
-		    hlen > sizeof(struct ip6_hdr)) {
-			struct ip6_recvpktopts newopts;
-			struct ip6_hdr *ip6;
-
-			bzero(&newopts, sizeof(newopts));
-			ip6 = mtod(m, struct ip6_hdr *);
-			ip6_savecontrol(in6p, ip6, m, &newopts);
-			if (in6p->in6p_inputopts)
-				ip6_update_recvpcbopt(in6p->in6p_inputopts,
-						      &newopts);
-			if (newopts.head) {
-				if (sbappendcontrol(&so->so_rcv, NULL,
-						    newopts.head) == 0)
-					m_freem(newopts.head);
-			}
-		}
 	}
 #endif
 
