@@ -528,6 +528,9 @@ crypto/cast128/cast128.c	optional ipsec_esp
 crypto/cast128/cast128_cbc.c	optional ipsec_esp
 #crypto/rc5/rc5.c		optional ipsec_esp
 #crypto/rc5/rc5_cbc.c		optional ipsec_esp
+crypto/rijndael/rijndael-alg-fst.c	optional ipsec_esp
+crypto/rijndael/rijndael-api-fst.c	optional ipsec_esp
+crypto/twofish/twofish2.c	optional ipsec_esp
 netinet6/mip6.c		optional mip6
 netinet6/mip6_hooks.c	optional mip6
 netinet6/mip6_io.c	optional mip6
