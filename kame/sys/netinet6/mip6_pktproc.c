@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.99 2003/01/22 00:34:08 suz Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.100 2003/01/22 09:54:18 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -677,6 +677,9 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	bi.mbc_seqno = ntohs(ip6mu->ip6mu_seqno);
 	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 2;	/* units of 4 secs */
+	/* XXX Should this check be done only when this bu is confirmed with RR ? */
+	if (bi.mbc_lifetime > MIP6_MAX_RR_BINDING_LIFE)
+		bi.mbc_lifetime = MIP6_MAX_RR_BINDING_LIFE;
 
 	if (!bu_safe && 
 	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
@@ -702,10 +705,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi.mbc_phaddr);
-	if (mbc == NULL) {
-		if (bi.mbc_lifetime > MIP6_MAX_RR_BINDING_LIFE)
-			bi.mbc_lifetime = MIP6_MAX_RR_BINDING_LIFE;
-	} else {
+	if (mbc != NULL) {
 		/* check a sequence number. */
 		if (MIP6_LEQ(bi.mbc_seqno, mbc->mbc_seqno)) {
 			mip6log((LOG_NOTICE,
