@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.35 2003/09/03 03:29:46 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.36 2003/09/05 09:53:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -224,7 +224,7 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	int is_home;
 	struct mip6_ha *mha;
 	struct mip6_prefix *mpfx;
-	struct mip6_prefix *prefix_list[IPV6_MINMTU/sizeof(struct nd_opt_prefix_info)];
+	struct mip6_prefix *prefix_list[IPV6_MMTU/sizeof(struct nd_opt_prefix_info)];
 	int nprefix = 0;
 	struct hif_prefix *hpfx;
 	struct sockaddr_in6 haaddr;
