@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: rc.mobileip6,v 1.5 2002/12/04 05:39:05 keiichi Exp $
+# $Id: rc.mobileip6,v 1.6 2003/02/20 06:05:55 keiichi Exp $
 
 # Mobile IPv6 startup
 
@@ -23,6 +23,7 @@ mobileip6_pass1() {
 				setkey -f ${node_dir}/add
 				setkey -f ${node_dir}/spdadd_mobile_node
 			done
+			mip6control -S 1
 			for home_prefix in ${ipv6_mobile_home_prefixes}
 			do
 				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
@@ -52,8 +53,14 @@ mobileip6_pass1() {
 				setkey -f ${node_dir}/add
 				setkey -f ${node_dir}/spdadd_home_agent
 			done
-			# mip6control -S 1
+			mip6control -S 1
 			echo -n ' enable'
+			for home_prefix in ${ipv6_mobile_home_prefixes}
+			do
+				prefix=`expr "${home_prefix}" : "\(.*\)::/.*"`
+				# XXX desribe the case plen != 64
+				ifconfig ${ipv6_mobile_home_link} inet6 ${prefix}:fdff:ffff:ffff:fffe prefixlen 64 anycast alias
+			done
 			mip6control -g
 			echo -n ' rtadvd'
 			rtadvd -m ${ipv6_mobile_home_link}
