@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.119 2002/07/30 04:41:35 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.120 2002/07/30 12:23:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,7 +96,7 @@
 #include <net/if.h>
 #include <net/route.h>
 #ifdef RADIX_MPATH
-#include <net/radix_path.h>
+#include <net/radix_mpath.h>
 #endif
 
 #include <netinet/in.h>
