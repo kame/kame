@@ -150,7 +150,7 @@ struct udp_ip6 {
 
 static void udp_append __P((struct inpcb *last, struct ip *ip,
 			    struct mbuf *n));
-#ifdef INET6
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 static void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
 #endif
 
@@ -420,7 +420,7 @@ bad:
 	return;
 }
 
-#ifdef INET6
+#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 static void
 ip_2_ip6_hdr(ip6, ip)
 	struct ip6_hdr *ip6;
