@@ -1,5 +1,6 @@
 bin/addr
 bin/dig
+bin/named-bootconf.pl
 bin/nslookup
 include/bind/arpa/inet.h
 include/bind/arpa/nameser.h

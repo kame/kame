@@ -2,20 +2,21 @@
 # Date created:		Fri Dec 25 14:47:35 JST 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.6 2001/01/02 10:42:23 jinmei Exp $
+# $Id: Makefile,v 1.7 2001/01/06 17:17:57 jinmei Exp $
 #
 
 PORTNAME=	bind
-PORTVERSION=	8.2.2p7
+PORTVERSION=	8.1.2
 CATEGORIES=	net
-MASTER_SITES=	ftp://ftp.isc.org/isc/bind/src/8.2.2-P7/
-DISTFILES=	bind-src.tar.gz bind-doc.tar.gz
+MASTER_SITES=	ftp://ftp.isc.org/isc/bind/src/8.1.2/
+DISTFILES=	bind-8.1.2-src.tar.gz bind-8.1.2-doc.tar.gz
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	bind8-822p7-v6-20010102a.diff.gz
+PATCHFILES=	bind8-812-v6-20000322a.diff.gz
 PATCH_DIST_STRIP=	-p2
 
-MAINTAINER=	jinmei@kame.net
+# Based on jsager's bind8 port, imported 18 July 1997
+MAINTAINER=	itojun@itojun.org
 
 WRKSRC=		${WRKDIR}/src
 
@@ -28,6 +29,7 @@ MAN8=		named-xfer.8 named.8 ndc.8 nslookup.8
 PATCH_ARGS?=	-d ${WRKDIR} -E ${PATCH_STRIP}
 
 post-install:
+	${INSTALL_SCRIPT} ${WRKSRC}/bin/named/named-bootconf.pl ${PREFIX}/bin/
 	@(cd ${WRKDIR}/doc/man && ${SETENV} ${MAKE_ENV} ${MAKE} ${MAKE_FLAGS} ${MAKEFILE} clean all ${INSTALL_TARGET})
 
 .include <bsd.port.mk>

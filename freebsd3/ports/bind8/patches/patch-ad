@@ -1,0 +1,15 @@
+--- src/lib/irs/getpwent.c.orig	Wed May 20 21:18:51 1998
++++ src/lib/irs/getpwent.c	Wed May 20 21:21:21 1998
+@@ -102,10 +102,12 @@
+ 	(void) setpassent(0);
+ }
+ #else
++#if __FreeBSD__ < 3
+ int 
+ setpwent() {
+ 	return (setpassent(0));
+ }
++#endif
+ #endif
+ 
+ void
