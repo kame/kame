@@ -228,23 +228,25 @@ if_simloop(ifp, m, dst, hlen)
 		m->m_data += sizeof(int);
 	}
 
-	if (ifp->if_bpf && ifp->if_bpf->bif_dlt == DLT_NULL) {
+	if (ifp->if_bpf) {
 		struct mbuf m0, *n = m;
 		u_int af = dst->sa_family;
 
-		/*
-		 * We need to prepend the address family as
-		 * a four byte field.  Cons up a dummy header
-		 * to pacify bpf.  This is safe because bpf
-		 * will only read from the mbuf (i.e., it won't
-		 * try to free it or keep a pointer a to it).
-		 */
-		m0.m_next = m;
-		m0.m_len = 4;
-		m0.m_data = (char *)&af;
-		n = &m0;
+		if (ifp->if_bpf->bif_dlt == DLT_NULL) {
+			/*
+			 * We need to prepend the address family as
+			 * a four byte field.  Cons up a dummy header
+			 * to pacify bpf.  This is safe because bpf
+			 * will only read from the mbuf (i.e., it won't
+			 * try to free it or keep a pointer a to it).
+			 */
+			m0.m_next = m;
+			m0.m_len = 4;
+			m0.m_data = (char *)&af;
+			n = &m0;
+		}
+		bpf_mtap(ifp, n);
 	}
-	bpf_mtap(ifp, n);
 
 	/* Strip away media header */
 	if (hlen > 0) {
