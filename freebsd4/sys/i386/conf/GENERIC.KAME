@@ -255,6 +255,9 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 #options 	ENABLE_DEFAULT_SCOPE
+
+#options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
+
 # these options will become the default behavior soon.
 options 	NEW_STRUCT_ROUTE
 
