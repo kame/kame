@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1211 2000/08/18 05:28:20 suz Exp $
+$KAME: CHANGELOG,v 1.1212 2000/08/18 11:43:35 fujisawa Exp $
 
 <200008>
+Fri Aug 18 20:29:23 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* remove kame/kame/sys/netpm/*.[ch] because this code is obsolete.
+
+	  NOTICE: If you want to cleanup old symlinks,
+	  perform "make TARGET=netbsd clean", in the top directory.
+	  Of course, you should select TARGET name for proper one.
+
 Fri Aug 18 14:22:15 JST 2000	suz@sdl.hitachi.co.jp
 	* kame/sys/netinet6/in6.c: always assign prefixlen 128
 	  for non-linklocal prefix of P2P and loopback I/F.
