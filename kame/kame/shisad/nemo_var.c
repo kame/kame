@@ -1,4 +1,4 @@
-/*      $KAME: nemo_var.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
+/*      $KAME: nemo_var.c,v 1.3 2004/12/24 09:26:34 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -63,6 +63,8 @@
 #include "fsm.h"
 
 #ifdef MIP_NEMO 
+
+static char *parse_blank(char *);
 
 #ifdef MIP_MN
 struct nemo_mptable *
@@ -221,7 +223,7 @@ nemo_parse_conf(filename)
 {
         FILE *file;
         int i=0;
-        char buf[256], *spacer, *head;
+        char buf[256], *head;
 #ifdef MIP_MN
 	struct nemo_mptable *mpt;
 	struct mip6_hoainfo *hoainfo = NULL;
@@ -268,18 +270,13 @@ nemo_parse_conf(filename)
 		for (i = 0; i < NEMO_OPTNUM; i++)
 			option[i] = '\0';
 		head = buf;
-		for (i = 0, head = buf; 
-		     (head != NULL) && (i < NEMO_OPTNUM); 
-		     head = ++spacer, i ++) {
 
-			spacer = strchr(head, ' ');
-			if (spacer) {
-				*spacer = '\0';
-				option[i] = head;
-			} else {
-				option[i] = head;
-				break;
-			}
+                for (i = 0, head = buf; 
+                     (head != NULL) && (i < NEMO_OPTNUM); 
+			head += (strlen(head) + 1), i ++) {
+
+			head = parse_blank(head);
+			option[i] = head;
 		}
 
 		if (debug) {
@@ -288,7 +285,7 @@ nemo_parse_conf(filename)
 				syslog(LOG_INFO, "\t%d=%s\n", i, option[i]);
 #ifdef MIP_MCOA
 			if (option[NEMO_OPTNUM - 2]) /* because of optional one */
-				syslog(LOG_INFO, "\t%d=%s\n", i, option[NEMO_OPTNUM - 1]);
+				syslog(LOG_INFO, "\t%d=%s\n", i++, option[NEMO_OPTNUM - 1]);
 #endif /* MIP_MCOA */
 			if (option[NEMO_OPTNUM - 1]) /* because of optional one */
 				syslog(LOG_INFO, "\t%d=%s\n", i, option[NEMO_OPTNUM - 1]);
@@ -359,5 +356,48 @@ nemo_parse_conf(filename)
 	return;
 }
 
+
+static char *
+parse_blank(char *head) {
+	int w = 0;
+	char *begin = NULL, *end = NULL;
+	
+	begin = head;
+
+	while (begin) {
+		switch (*begin) {
+		case ' ':
+		case '\t':
+			begin ++;
+			break;
+		default:
+			w = 1;
+			break;
+		}
+		if (w)
+			break;
+	}
+
+	w = 0;
+	end = begin;
+	while (end) {
+		switch (*end) {
+		case ' ':
+		case '\t':
+		case '\n':
+			*end = '\0';
+			w = 1;
+			break;
+		default:
+			break;
+		}
+		if (w)
+			break;
+		end ++;
+	}
+
+	return begin;
+
+};
 
 #endif /* MIP_NEMO */
