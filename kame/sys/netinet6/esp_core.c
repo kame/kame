@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.31 2000/08/29 10:40:05 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.32 2000/08/29 10:51:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1408,6 +1408,15 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 	/* assumes blocklen == padbound */
 	blocklen = algo->padbound;
 
+#ifdef DIAGNOSTIC
+	if (blocklen > sizeof(iv)) {
+		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: "
+		    "unsupported blocklen %d\n", algo->name, blocklen));
+		m_freem(m);
+		return EINVAL;
+	}
+#endif
+
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
 		ivoff = off + sizeof(struct esp);
@@ -1539,7 +1548,7 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 
 		/* next iv */
 		if (sp == sbuf) {
-			bcopy(sbuf, iv, sizeof(iv));
+			bcopy(sbuf, iv, blocklen);
 			ivp = NULL;
 		} else
 			ivp = sp;
@@ -1547,6 +1556,7 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 		sn += blocklen;
 		dn += blocklen;
 
+		/* find the next source block */
 		while (s && sn >= s->m_len) {
 			sn -= s->m_len;
 			soff += s->m_len;
@@ -1601,6 +1611,15 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	/* assumes blocklen == padbound */
 	blocklen = algo->padbound;
+
+#ifdef DIAGNOSTIC
+	if (blocklen > sizeof(iv)) {
+		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
+		    "unsupported blocklen %d\n", algo->name, blocklen));
+		m_freem(m);
+		return EINVAL;
+	}
+#endif
 
 	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
@@ -1743,6 +1762,7 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		sn += blocklen;
 		dn += blocklen;
 
+		/* find the next source block */
 		while (s && sn >= s->m_len) {
 			sn -= s->m_len;
 			soff += s->m_len;
