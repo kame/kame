@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.26 2000/03/29 19:26:26 sumikawa Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.27 2000/03/29 23:13:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -973,10 +973,10 @@ init_newprefix(struct in6_rrenumreq *irr, struct ifprefix *ifpr,
 			 min(ifpr->ifpr_plen - irr->irr_u_uselen,
 			     irr->irr_u_keeplen));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	LIST_FOREACH(orap, &(ifpr2rp(ifpr)->rp_addrhead), ra_entry)
+#else
 	for (orap = (ifpr2rp(ifpr)->rp_addrhead).lh_first; orap != NULL;
 	     orap = orap->ra_entry.le_next)
-#else
-	LIST_FOREACH(orap, &(ifpr2rp(ifpr)->rp_addrhead), ra_entry)
 #endif
 	{
 		struct rp_addr *rap;
