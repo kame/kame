@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1051 2000/06/20 19:48:35 itojun Exp $
+$Id: CHANGELOG,v 1.1052 2000/06/21 08:10:10 itojun Exp $
 
 <200006>
+Wed Jun 21 17:07:55 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_src.c: make in6_recoverscope() friendly with
+	  !FAKE_LOOPBACK_IF compilation.  with previous code in6_recoverscope()
+	  may fail to convert kernel internal representation into sockaddr_in6.
+
 Wed Jun 21 03:18:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/leafnode+: IPv6 enabled leafnode+-2.10
 	  From: yoshfuji@ecei.tohoku.ac.jp
