@@ -18,6 +18,7 @@ MAINTAINER=	sumikawa@kame.net
 USE_LIBTOOL=	yes
 USE_BZIP2=	yes
 CONFIGURE_ENV=	CXXFLAGS="${CFLAGS}"
+CONFIGURE_ENV+=	LDFLAGS="-L/usr/local/v6/lib" LIBS="-linet6"
 
 MAN1=		lftp.1
 
