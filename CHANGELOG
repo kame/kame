@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.672 2000/03/09 13:09:03 sakane Exp $
+$Id: CHANGELOG,v 1.673 2000/03/09 13:16:58 sakane Exp $
 
 <200003>
+Thu Mar  9 22:15:33 JST 2000 sakane@ydc.co.jp
+	* kame/sys/netkey,netinet6:
+	implement pfkey function for policy management.
+		key_spdupdate() replace a policy entry.
+		key_spdsetidx() set a policy index.
+		key_spdget() gets a policy entry.
+		key_spdacquire() send request for starting IKE nagotiation.
+	XXX key_spdacquire() is not tested.
+
 Thu Mar  9 22:08:17 JST 2000 sakane@ydc.co.jp
 	* kame/kame/libipsec/pfkey.c:
 	implement pfkey libraries.
