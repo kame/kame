@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.10 2003/04/16 09:51:12 itojun Exp $	*/
+ /*	$KAME: wru.c,v 1.11 2003/05/16 19:51:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -668,7 +668,7 @@ set_zone(dst)
 		err(1, "socket");
 
 	memset(&ndifreq, 0, sizeof(ndifreq));
-	strcpy(ndifreq.ifname, "lo0"); /* dummy */
+	strlcpy(ndifreq.ifname, "lo0", sizeof(ndifreq.ifname)); /* dummy */
 
 	if (ioctl(s, SIOCGDEFIFACE_IN6, (caddr_t)&ndifreq) < 0)
  		err(1, "ioctl(SIOCGDEFIFACE_IN6)");
@@ -748,7 +748,7 @@ sa2str(sa, salen)
 	cp = buf[round];
 
 	if (getnameinfo(sa, salen, cp, NI_MAXHOST, NULL, 0, NI_NUMERICHOST))
-		strcpy(cp, "???");
+		strlcpy(cp, "???", sizeof(buf[round]));
 
 	return(cp);
 }

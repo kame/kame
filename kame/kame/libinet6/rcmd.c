@@ -1,4 +1,4 @@
-/*	$KAME: rcmd.c,v 1.18 2002/06/27 09:52:19 itojun Exp $	*/
+/*	$KAME: rcmd.c,v 1.19 2003/05/16 19:53:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -191,7 +191,7 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 			if (getnameinfo(ai->ai_addr, ai->ai_addrlen,
 				    paddr, sizeof(paddr),
 				    NULL, 0, niflags) != 0) {
-				strcpy(paddr, "?");
+				strlcpy(paddr, "?", sizeof(paddr));
 			}
 			fprintf(stderr, "connect to address %s: ", paddr);
 			errno = oerrno;
@@ -200,7 +200,7 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 			if (getnameinfo(ai->ai_addr, ai->ai_addrlen,
 				    paddr, sizeof(paddr),
 				    NULL, 0, niflags) != 0) {
-				strcpy(paddr, "?");
+				strlcpy(paddr, "?", sizeof(paddr));
 			}
 			fprintf(stderr, "Trying %s...\n", paddr);
 			continue;
@@ -448,8 +448,8 @@ again:
 		first = 0;
 		if ((pwd = getpwnam(luser)) == NULL)
 			return (-1);
-		(void)strcpy(pbuf, pwd->pw_dir);
-		(void)strcat(pbuf, "/.rhosts");
+		(void)strlcpy(pbuf, pwd->pw_dir, sizeof(pbuf));
+		(void)strlcat(pbuf, "/.rhosts", sizeof(pbuf));
 
 		/*
 		 * Change effective uid while opening .rhosts.  If root and
