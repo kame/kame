@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1018 2000/06/14 17:26:49 sumikawa Exp $
+$Id: CHANGELOG,v 1.1019 2000/06/14 17:32:45 itojun Exp $
 <200006>
 Thu Jun 15 02:18:24 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/zebra: upgrade to 0.87.
@@ -23,9 +23,7 @@ Wed Jun 14 23:35:03 JST 2000  itojun@iijlab.net
 	* freebsd4/sys/conf/options, freebsd4/sys/conf/files
 	freebsd4/sys/sys/mbuf.h
 	FreeBSD-4.0 KAME with MIP6 option is available.
-	(In this patch, I used M_PROTO2 for MIP6-specific mbuf
-	 flag just to keep consistency with other platforms,
-	 however it might need be changed)
+	add mbuf flag M_PROTO6 and use it for M_MIP6TUNNEL.
 
 Wed Jun 14 20:14:47 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: pass encryption failure code up to ESP
