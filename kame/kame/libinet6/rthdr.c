@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.18 2003/06/06 06:56:59 suz Exp $	*/
+/*	$KAME: rthdr.c,v 1.19 2003/06/06 10:48:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,6 +38,10 @@
 
 #include <string.h>
 #include <stdio.h>
+
+/*
+ * RFC2292 API
+ */
 
 size_t
 inet6_rthdr_space(type, seg)
@@ -277,8 +281,7 @@ inet6_rthdr_getflags(cmsg, idx)
 }
 
 /*
- * The following functions are defined in a successor of RFC2292, aka
- * rfc2292bis.
+ * RFC3542 (2292bis) API
  */
 
 socklen_t
