@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.387 2003/07/01 05:59:18 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.388 2003/07/10 05:49:53 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4518,12 +4518,11 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		 * in6addr_any and ipi6_ifindex being zero.
 		 * [RFC 3542, Section 6]
 		 */
-		if (optname == IPV6_PKTINFO && opt->ip6po_pktinfo) {
-			if (pktinfo->ipi6_ifindex == 0 &&
-			    IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
-				ip6_clearpktopts(opt, optname);
-				break;
-			}
+		if (optname == IPV6_PKTINFO && opt->ip6po_pktinfo &&
+		    pktinfo->ipi6_ifindex == 0 &&
+		    IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
+			ip6_clearpktopts(opt, optname);
+			break;
 		}
 
 		if (uproto == IPPROTO_TCP && optname == IPV6_PKTINFO &&
