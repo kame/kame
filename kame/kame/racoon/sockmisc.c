@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.13 2000/07/17 01:51:12 sakane Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.14 2000/07/17 10:11:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -326,11 +326,6 @@ recvfromto(s, buf, buflen, flags, from, fromlen, to, tolen)
 			continue;
 		}
 	}
-
-	YIPSDEBUG(DEBUG_NOTIFY,
-		if (!flags)
-			plog(logp, LOCATION, to,
-				"received packets from %s\n", saddr2str(from)));
 
 	return len;
 }
