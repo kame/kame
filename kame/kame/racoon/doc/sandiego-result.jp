@@ -46,6 +46,14 @@ vs ashley laurent
 	userfqdn 入れて再戦しようとしたけど、敵が tunnel mode の client あり
 	しかサポートしてないので、明日再戦予定。
 
+	PC用意して再戦。phase1 はあっさりok.
+	phase2 で pfs を使うと敵がクラッシュする。
+	治りそうも無いのでテストはあきらめ。
+
+	phase1: psk/userfadn/md5/des/dh2
+
+	pfs group だけ事前にprotocol の外でネゴしないとダメなのって変かも
+
 vs ericsson
 	initiator: 既知のDH groupについてはDH group typeをつけてはいけない
 	responder: blowfish、およびkey lengthをちゃんとサポートしないとまずい
