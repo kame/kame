@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.176 2001/02/14 07:13:39 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.177 2001/02/18 20:36:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,13 +66,11 @@
 
 #ifdef __FreeBSD__
 #include "opt_ip6fw.h"
-#if __FreeBSD__ <= 3
-#include "opt_natpt.h"
-#endif
 #if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_natpt.h"
 #endif
 #endif
 #ifdef __NetBSD__
