@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.38 2001/11/26 05:20:31 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.39 2001/11/28 06:27:50 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1564,13 +1564,28 @@ mip6_bc_proxy_control(target, local, cmd)
 #else /* __FreeBSD__ */
 		rt = rtalloc1((struct sockaddr *)&sa6, 0);
 #endif /* __FreeBSD__ */
-		if (rt && (rt->rt_flags & RTF_ANNOUNCE) != 0 &&
-		    rt->rt_gateway->sa_family == AF_LINK) {
-			mip6log((LOG_NOTICE,
-				 "%s:%d: RTM_ADD: we are already proxy for %s\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(target)));
-			return (EEXIST);
+		if (rt) {
+			if ((rt->rt_flags & RTF_ANNOUNCE) != 0 &&
+			    rt->rt_gateway->sa_family == AF_LINK) {
+				mip6log((LOG_NOTICE,
+					 "%s:%d: RTM_ADD: we are already proxy for %s\n",
+					 __FILE__, __LINE__,
+					 ip6_sprintf(target)));
+				return (EEXIST);
+			}
+			if ((rt->rt_flags & RTF_LLINFO) != 0) {
+				/* nd cache exist */
+				rtrequest(RTM_DELETE, rt_key(rt),
+					  (struct sockaddr *)0,
+					  rt_mask(rt), 0, (struct rtentry **)0);
+			} else {
+				/* XXX Path MTU entry? */
+				mip6log((LOG_ERR,
+					 "%s:%d: entry exist %s: rt_flags=0x%x\n",
+					 __FILE__, __LINE__,
+					 ip6_sprintf(target), rt->rt_flags));
+			}
+			rt->rt_refcnt--;
 		}
 
 		/* Create sa6 */
