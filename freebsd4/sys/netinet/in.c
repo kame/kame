@@ -401,8 +401,6 @@ in_control(so, cmd, data, ifp, p)
 
 	case SIOCDIFADDR:
 		in_ifscrub(ifp, ia);
-		in_pcbpurgeif0(LIST_FIRST(ripcbinfo.listhead), ifp);
-		in_pcbpurgeif0(LIST_FIRST(udbinfo.listhead), ifp);
 
 		/*
 		 * Protect from ipintr() traversing address list
