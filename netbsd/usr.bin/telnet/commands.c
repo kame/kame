@@ -2328,7 +2328,10 @@ tn(argc, argv)
 	hints.ai_protocol = 0;
 	hints.ai_flags = AI_CANONNAME;
 	error = getaddrinfo(hostname, portp, &hints, &res0);
-	if (error) {
+	if (error == EAI_SERVICE) {
+	    fprintf(stderr, "tcp/%s: unknown service\n", portp);
+	    return 0;
+	} else if (error) {
 	    fprintf(stderr, "%s: %s\n", hostname, gai_strerror(error));
 	    return 0;
 	}

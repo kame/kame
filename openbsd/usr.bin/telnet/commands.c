@@ -2384,7 +2384,13 @@ tn(argc, argv)
 	    telnetport = 1;
 	}
 	error = getaddrinfo(hostp, portp, &hints, &res0);
-	if (error) {
+	if (error == EAI_SERVICE) {
+	    warn("tcp/%s: unknown service\n", portp);
+	    herror(hostp);
+	    seteuid(getuid());
+	    setuid(getuid());
+	    return 0;
+	} else if (error) {
 	    warn("%s: %s", hostp, gai_strerror(error));
 	    herror(hostp);
 	    seteuid(getuid());
