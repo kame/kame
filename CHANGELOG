@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2375 2003/04/10 12:02:34 jinmei Exp $
+$KAME: CHANGELOG,v 1.2376 2003/04/11 07:34:01 jinmei Exp $
 
 <200304>
+2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported the ability for the client to call a
+	configuration script when the client receives a reply message.  A
+	new configuration statement to specify the script was provided.
+
 2003-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): supported a string
 	notation for flag parameters.  For example, rtflags="o" specifies
