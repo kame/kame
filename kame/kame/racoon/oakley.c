@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.77 2001/01/02 05:06:56 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.78 2001/03/14 11:46:17 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1921,8 +1921,9 @@ oakley_skeyid(iph1)
 				goto end;
 			}
 		}
-		plog(LLV_DEBUG, LOCATION, NULL, "psk found: ");
+		plog(LLV_DEBUG, LOCATION, NULL, "psk found.\n");
 		/* should be secret PSK */
+		plog(LLV_DEBUG2, LOCATION, NULL, "psk: ");
 		plogdump(LLV_DEBUG2, iph1->authstr->v, iph1->authstr->l);
 
 		len = iph1->nonce->l + iph1->nonce_p->l;
