@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.4 1999/12/22 16:01:54 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.5 2000/01/02 11:47:23 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -491,7 +491,7 @@ struct attrmap ipsec_t_map[] = {
 	{ "group desc", 5,	{ NULL, "modp768", "modp1024", "EC2N 2^155",
 				  "EC2N 2^185", }, },
 	{ "enc mode", 3, { NULL, "tunnel", "transport", }, },
-	{ "auth", 5, { NULL, "hmac-md5", "hmac-sha1", "1des-mac", "keyed", }, },
+	{ "auth", 5, { NULL, NULL, "hmac-md5", "hmac-sha1", "1des-mac", "keyed", }, },
 	{ "keylen", 0, },
 	{ "rounds", 0, },
 	{ "dictsize", 0, },
