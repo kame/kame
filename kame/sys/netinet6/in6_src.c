@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.52 2001/08/16 11:41:57 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.53 2001/08/16 11:54:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,6 +85,7 @@
 #endif
 #include <sys/errno.h>
 #include <sys/time.h>
+#include <sys/kernel.h>
 #include <sys/proc.h>
 
 #include <net/if.h>
