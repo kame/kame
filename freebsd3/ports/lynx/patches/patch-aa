@@ -1,0 +1,22 @@
+--- makefile.in.orig	Tue Feb  1 02:31:08 2000
++++ makefile.in	Tue Feb  1 02:34:42 2000
+@@ -19,7 +19,7 @@
+ LINT		= @LINT@
+ 
+ LIBS		= @LIBS@
+-#LIBS+=		-L/usr/local/v6/lib -linet6
++LIBS+=		-L/usr/local/v6/lib -linet6
+ 
+ INSTALL		= @INSTALL@
+ INSTALL_PROGRAM	= @INSTALL_PROGRAM@
+@@ -408,8 +408,8 @@
+ 	PATH=$(srcdir):$$PATH; export PATH; $(SHELL) -c '$(srcdir)/cfg_defs.sh'
+ 
+ install-cfg : $(LIBDIR)
+-	-mv -f $(LIBDIR)/lynx.cfg $(LIBDIR)/lynx.oldcfg
+-	$(INSTALL_DATA) $(srcdir)/lynx.cfg $(LIBDIR)/lynx.cfg
++	$(INSTALL_DATA) $(srcdir)/lynx.cfg $(LIBDIR)/lynx.cfg.default
++	-[ ! -f $(libdir)/lynx.cfg ] && $(INSTALL_DATA) $(srcdir)/lynx.cfg $(libdir)/lynx.cfg
+ 
+ install-lss : $(LIBDIR)
+ 	-mv -f $(LIBDIR)/lynx.lss $(LIBDIR)/lynx.oldlss
