@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.47 2000/01/14 09:36:52 itojun Exp $ */
+/* KAME $Id: key.c,v 1.48 2000/01/14 10:31:09 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -5269,6 +5269,7 @@ key_flush(mhp)
 				nextsav = LIST_NEXT(sav, chain);
 
 				key_sa_chgstate(sav, SADB_SASTATE_DEAD);
+				key_freesav(sav);
 			}
 		}
 
