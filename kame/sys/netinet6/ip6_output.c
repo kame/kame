@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.278 2002/01/23 05:12:25 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.279 2002/01/26 06:12:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2568,18 +2568,6 @@ do { \
 			case IPV6_AUTOFLOWLABEL:
 				switch (optname) {
 
-				case IPV6_UNICAST_HOPS:
-					optval = in6p->in6p_hops;
-					break;
-
-				case IPV6_RECVPKTINFO:
-					optval = OPTBIT(IN6P_PKTINFO);
-					break;
-
-				case IPV6_RECVHOPLIMIT:
-					optval = OPTBIT(IN6P_HOPLIMIT);
-					break;
-
 				case IPV6_RECVHOPOPTS:
 					optval = OPTBIT(IN6P_HOPOPTS);
 					break;
@@ -2592,8 +2580,32 @@ do { \
 					optval = OPTBIT(IN6P_RTHDRDSTOPTS);
 					break;
 
+				case IPV6_UNICAST_HOPS:
+					optval = in6p->in6p_hops;
+					break;
+
+				case IPV6_RECVPKTINFO:
+					optval = OPTBIT(IN6P_PKTINFO);
+					break;
+
+				case IPV6_RECVHOPLIMIT:
+					optval = OPTBIT(IN6P_HOPLIMIT);
+					break;
+
+				case IPV6_RECVRTHDR:
+					optval = OPTBIT(IN6P_RTHDR);
+					break;
+
+				case IPV6_USE_MIN_MTU:
+					optval = OPTBIT(IP6PO_MINMTU);
+					break;
+
 				case IPV6_RECVPATHMTU:
 					optval = OPTBIT(IN6P_MTU);
+					break;
+
+				case IPV6_DONTFRAG:
+					optval = OPTBIT(IP6PO_DONTFRAG);
 					break;
 
 				case IPV6_FAITH:
@@ -2632,13 +2644,6 @@ do { \
 
 #define PKTOPTBIT(bit) ((in6p->in6p_outputopts && \
 		         (in6p->in6p_outputopts->ip6po_flags & (bit))) ? 1 : 0)
-				case IPV6_DONTFRAG:
-					optval = PKTOPTBIT(IP6PO_DONTFRAG);
-					break;
-
-				case IPV6_USE_MIN_MTU:
-					optval = PKTOPTBIT(IP6PO_MINMTU);
-					break;
 #undef PKTOPTBIT
 				}
 				if (error)
