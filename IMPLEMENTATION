@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.234 2001/07/21 05:49:43 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.235 2001/07/21 05:50:52 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -106,10 +106,6 @@ RFC2893: Transition Mechanisms for IPv6 Hosts and Routers
       and it covers "configured tunnel" described in the spec.
       See 1.5 in this document for details.
 RFC2894: Router renumbering for IPv6
-RFC2991: Multipath Issues in Unicast and Multicast Next-Hop Selection
-RFC2992: Analysis of an Equal-Cost Multi-Path Algorithm
-    * Kernel multipath support uses Modulo-N Hash algorithm described in
-      RFC2991.
 RFC3041: Privacy Extensions for Stateless Address Autoconfiguration in IPv6
 RFC3056: Connection of IPv6 Domains via IPv4 Clouds
     * So-called "6to4".
@@ -1918,7 +1914,9 @@ RADIX_ART kernel compilation option conflicts with RADIX_MPATH.
 KAME/NetBSD includes kernel support for multipath routing support.  Users can
 install multiple routing entries toward the same destination address prefix
 (rt_key).  If combined with routing daemons support, it can provide equal
-cost multipath routing, as described in RFC2291/2292.
+cost multipath routing, as described in the following two RFCs:
+	RFC2991: Multipath Issues in Unicast and Multicast Next-Hop Selection
+	RFC2992: Analysis of an Equal-Cost Multi-Path Algorithm
 
 Multipath support will be enabled for inet and inet6 radix table,
 if "options RADIX_MPATH" is specified.  Even with multipath support
