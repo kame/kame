@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.407 2003/12/08 10:05:53 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.408 2003/12/16 10:44:15 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1304,7 +1304,7 @@ skip_ipsec2:;
 	}
 
 	/*
-	 * Fill the outgoing inteface to tell the upper layer
+	 * Fill the outgoing interface to tell the upper layer
 	 * to increment per-interface statistics.
 	 */
 	if (ifpp)
@@ -1950,7 +1950,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 			 * RFC2460 section 5, last paragraph:
 			 * if we record ICMPv6 too big message with
 			 * mtu < IPV6_MMTU, transmit packets sized IPV6_MMTU
-			 * or smaller, with framgent header attached.
+			 * or smaller, with fragment header attached.
 			 * (fragment header is needed regardless from the
 			 * packet size, for translators to identify packets)
 			 */
@@ -4723,7 +4723,7 @@ ip6_setpktopt(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		switch (optname) {
 		case IPV6_2292DSTOPTS:
 			/*
-			 * The old advacned API is ambiguous on this point.
+			 * The old advanced API is ambiguous on this point.
 			 * Our approach is to determine the position based
 			 * according to the existence of a routing header.
 			 * Note, however, that this depends on the order of the
