@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.25 2001/08/16 13:20:41 itojun Exp $	*/
+/*	$KAME: token.l,v 1.26 2001/08/16 16:19:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -45,6 +45,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <netdb.h>
+
 #include "vchar.h"
 #ifdef __NetBSD__
 #include "parse.h"
@@ -149,6 +151,11 @@ spdflush	{ PREPROC; return(SPDFLUSH); }
 		return(PL_REQUESTS);
 }
 <S_PL>{semi}	{ PREPROC; BEGIN INITIAL; return(EOT); }
+
+	/* address resolution flags */
+{hyphen}n	{ PREPROC; yylval.num = AI_NUMERICHOST; return(F_AIFLAGS); }
+{hyphen}4	{ PREPROC; yylval.num = AF_INET; return(F_AIFAMILY); }
+{hyphen}6	{ PREPROC; yylval.num = AF_INET6; return(F_AIFAMILY); }
 
 	/* security protocols */
 ah		{ PREPROC; yylval.num = 0; return(PR_AH); }
@@ -263,19 +270,10 @@ any		{ PREPROC; return(ANY); }
 			return(QUOTEDSTRING);
 		}
 
-[a-z0-9.\-]*	{
+[A-Za-z0-9][A-Za-z0-9:%-\.]* {
 			yylval.val.len = yyleng;
 			yylval.val.buf = strdup(yytext);
 			return(STRING);
-		}
-
-({ipaddress}|{hostname})	{
-			PREPROC;
-
-			yylval.val.len = yyleng;
-			yylval.val.buf = strdup(yytext);
-
-			return(ADDRESS);
 		}
 
 .		{

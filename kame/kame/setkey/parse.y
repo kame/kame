@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.43 2001/08/16 13:20:41 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.44 2001/08/16 16:19:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -65,8 +65,10 @@ u_int p_key_enc_len, p_key_auth_len;
 caddr_t p_key_enc, p_key_auth;
 time_t p_lt_hard, p_lt_soft;
 
-u_int p_policy_len;
-char *p_policy;
+static u_int p_policy_len;
+static char *p_policy;
+
+static int p_aiflags = 0, p_aifamily = PF_UNSPEC;
 
 /* temporary buffer */
 static caddr_t pp_key;
@@ -97,7 +99,7 @@ extern void yyerror __P((const char *));
 
 %token EOT
 %token ADD GET DELETE DELETEALL FLUSH DUMP
-%token ADDRESS PREFIX PORT PORTANY
+%token PREFIX PORT PORTANY
 %token UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
 %token F_MODE MODE F_REQID
@@ -108,14 +110,15 @@ extern void yyerror __P((const char *));
 	/* SPD management */
 %token SPDADD SPDDELETE SPDDUMP SPDFLUSH
 %token F_POLICY PL_REQUESTS
+%token F_AIFAMILY F_AIFLAGS
 
 %type <s> command flush_command dump_command spdflush_command spddump_command
 %type <num> PREFIX EXTENSION MODE
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
-%type <num> DECSTRING
+%type <num> DECSTRING F_AIFAMILY F_AIFLAGS
 %type <intnum> prefix port protocol_spec
-%type <val> PORT ADDRESS PL_REQUESTS
+%type <val> PORT PL_REQUESTS
 %type <val> key_string policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
 %type <sa> ipaddress
@@ -205,11 +208,11 @@ delete_command
 
 	/* deleteall command */
 deleteall_command
-	:	DELETEALL ipaddress ipaddress protocol_spec EOT
+	:	DELETEALL ipaddropts ipaddress ipaddress protocol_spec EOT
 		{
 			p_type = SADB_DELETE;
-			p_src = $2;
-			p_dst = $3;
+			p_src = $3;
+			p_dst = $4;
 			p_no_spi = 1;
 		}
 	;
@@ -248,10 +251,10 @@ dump_command
 
 	/* sa_selector_spec */
 sa_selector_spec
-	:	ipaddress ipaddress protocol_spec spi
+	:	ipaddropts ipaddress ipaddress protocol_spec spi
 		{
-			p_src = $1;
-			p_dst = $2;
+			p_src = $2;
+			p_dst = $3;
 		}
 	;
 
@@ -502,31 +505,31 @@ spdflush_command:
 
 	/* sp_selector_spec */
 sp_selector_spec
-	:	ipaddress prefix port ipaddress prefix port upper_spec
+	:	ipaddropts ipaddress prefix port ipaddress prefix port upper_spec
 		{
-			p_src = $1;
-			p_prefs = $2;
+			p_src = $2;
+			p_prefs = $3;
 			switch (p_src->sa_family) {
 			case AF_INET:
-				((struct sockaddr_in *)p_src)->sin_port = $3;
+				((struct sockaddr_in *)p_src)->sin_port = $4;
 				break;
 #ifdef INET6
 			case AF_INET6:
-				((struct sockaddr_in6 *)p_src)->sin6_port = $3;
+				((struct sockaddr_in6 *)p_src)->sin6_port = $4;
 				break;
 #endif
 			default:
 				exit(1); /*XXX*/
 			}
-			p_dst = $4;
-			p_prefd = $5;
+			p_dst = $5;
+			p_prefd = $6;
 			switch (p_dst->sa_family) {
 			case AF_INET:
-				((struct sockaddr_in *)p_dst)->sin_port = $6;
+				((struct sockaddr_in *)p_dst)->sin_port = $7;
 				break;
 #ifdef INET6
 			case AF_INET6:
-				((struct sockaddr_in6 *)p_dst)->sin6_port = $6;
+				((struct sockaddr_in6 *)p_dst)->sin6_port = $7;
 				break;
 #endif
 			default:
@@ -535,8 +538,25 @@ sp_selector_spec
 		}
 	;
 
+ipaddropts
+	:	/* nothing */
+	|	ipaddropts ipaddropt
+	;
+
+ipaddropt
+	:	/* nothing */
+	|	F_AIFLAGS
+		{
+			p_aiflags = $1;
+		}
+	|	F_AIFAMILY
+		{
+			p_aifamily = $1;
+		}
+	;
+
 ipaddress
-	:	ADDRESS
+	:	STRING
 		{
 			struct addrinfo *res;
 
@@ -920,9 +940,9 @@ parse_addr(host, port)
 	int error;
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_UNSPEC;
+	hints.ai_family = p_aifamily;
 	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = 0;
+	hints.ai_flags = p_aiflags;
 	error = getaddrinfo(host, port, &hints, &res);
 	if (error != 0) {
 		yyerror(gai_strerror(error));
@@ -977,6 +997,9 @@ parse_init()
 
 	p_policy_len = 0;
 	p_policy = NULL;
+
+	p_aiflags = 0;
+	p_aifamily = PF_UNSPEC;
 
 	memset(cmdarg, 0, sizeof(cmdarg));
 

@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.56 2001/08/16 13:20:41 itojun Exp $
+.\"	$KAME: setkey.8,v 1.57 2001/08/16 16:19:19 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -117,6 +117,9 @@ hashmarks ('#') are treated as comment lines.
 .Bl -tag -width Ds
 .It Xo
 .Li add
+.Op Fl 4
+.Op Fl 6
+.Op Fl n
 .Ar src Ar dst Ar protocol Ar spi
 .Op Ar extensions
 .Ar algorithm...
@@ -126,6 +129,9 @@ Add an SAD entry.
 .\"
 .It Xo
 .Li get
+.Op Fl 4
+.Op Fl 6
+.Op Fl n
 .Ar src Ar dst Ar protocol Ar spi
 .Li ;
 .Xc
@@ -133,6 +139,9 @@ Show an SAD entry.
 .\"
 .It Xo
 .Li delete
+.Op Fl 4
+.Op Fl 6
+.Op Fl n
 .Ar src Ar dst Ar protocol Ar spi
 .Li ;
 .Xc
@@ -140,6 +149,9 @@ Remove an SAD entry.
 .\"
 .It Xo
 .Li deleteall
+.Op Fl 4
+.Op Fl 6
+.Op Fl n
 .Ar src Ar dst Ar protocol
 .Li ;
 .Xc
@@ -161,6 +173,9 @@ Dumps all SAD entries matched by the options.
 .\"
 .It Xo
 .Li spdadd
+.Op Fl 4
+.Op Fl 6
+.Op Fl n
 .Ar src_range Ar dst_range Ar upperspec Ar policy
 .Li ;
 .Xc
@@ -168,6 +183,9 @@ Add an SPD entry.
 .\"
 .It Xo
 .Li spddelete
+.Op Fl 4
+.Op Fl 6
+.Op Fl n
 .Ar src_range Ar dst_range Ar upperspec Fl P Ar direction
 .Li ;
 .Xc
@@ -200,6 +218,17 @@ The FQDN must resolve into a single address.
 If there are multiple address registered for the FQDN,
 .Nm
 will raise error.
+.Fl 4 ,
+.Fl 6
+and
+.Fl n
+restricts the address resolution of FQDN in certain ways.
+.Fl 4
+and
+.Fl 6
+restrict results into IPv4/v6 addresses only, respectively.
+.Fl n
+avoids FQDN resolution and requires addresses to be numeric addresses.
 .\"
 .Pp
 .It Ar protocol
@@ -370,13 +399,11 @@ The square bracket around
 .Ar port
 is really necessary.
 They are not manpage metacharacters.
-.Pp
-.Nm
-does not consult hostname-to-address for arguments
+For FQDN resolution, the rules applied to
 .Ar src
 and
-.Ar dst .
-They must be in numeric form.
+.Ar dst
+apply here as well.
 .\"
 .Pp
 .It Ar upperspec
