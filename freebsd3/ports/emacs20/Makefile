@@ -1,12 +1,12 @@
 # New ports collection makefile for:	GNU emacs
-# Version required:	20.5a
+# Version required:	20.6
 # Date created:		29 October 1994
 # Whom:			jkh
 #
-# $Id: Makefile,v 1.2 1999/12/26 14:32:44 sumikawa Exp $
+# $Id: Makefile,v 1.3 2000/03/01 09:23:48 sumikawa Exp $
 #
 
-DISTNAME=	emacs-20.5a
+DISTNAME=	emacs-20.6
 CATEGORIES=	editors
 MASTER_SITES=	${MASTER_SITE_GNU}
 MASTER_SITE_SUBDIR=	emacs
@@ -15,7 +15,7 @@ MAINTAINER=	sumikawa@kame.net
 
 Y2K=            http://www.gnu.org/software/year2000.html
 
-WRKSRC=		${WRKDIR}/emacs-20.5
+WRKSRC=		${WRKDIR}/emacs-20.6
 USE_AUTOCONF=	yes
 USE_GMAKE=	yes
 CONFIGURE_TARGET=	${MACHINE_ARCH}--freebsd
