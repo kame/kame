@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_ktrace.c	8.2 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.35 1999/12/15 23:01:55 eivind Exp $
+ * $FreeBSD: src/sys/kern/kern_ktrace.c,v 1.35.2.5.4.1 2002/07/11 16:47:41 des Exp $
  */
 
 #include "opt_ktrace.h"
@@ -48,16 +48,14 @@
 #include <sys/ktrace.h>
 #include <sys/malloc.h>
 #include <sys/syslog.h>
+#include <sys/sysent.h>
 
 #include <vm/vm_zone.h>
-
-#include <stddef.h>
-
 static MALLOC_DEFINE(M_KTRACE, "KTRACE", "KTRACE");
 
 #ifdef KTRACE
 static struct ktr_header *ktrgetheader __P((int type));
-static void ktrwrite __P((struct vnode *, struct ktr_header *));
+static void ktrwrite __P((struct vnode *, struct ktr_header *, struct uio *));
 static int ktrcanset __P((struct proc *,struct proc *));
 static int ktrsetchildren __P((struct proc *,struct proc *,int,int,struct vnode *));
 static int ktrops __P((struct proc *,struct proc *,int,int,struct vnode *));
@@ -103,7 +101,7 @@ ktrsyscall(vp, code, narg, args)
 		*argp++ = args[i];
 	kth->ktr_buf = (caddr_t)ktp;
 	kth->ktr_len = len;
-	ktrwrite(vp, kth);
+	ktrwrite(vp, kth, NULL);
 	FREE(ktp, M_KTRACE);
 	FREE(kth, M_KTRACE);
 	p->p_traceflag &= ~KTRFAC_ACTIVE;
@@ -128,7 +126,7 @@ ktrsysret(vp, code, error, retval)
 	kth->ktr_buf = (caddr_t)&ktp;
 	kth->ktr_len = sizeof(struct ktr_sysret);
 
-	ktrwrite(vp, kth);
+	ktrwrite(vp, kth, NULL);
 	FREE(kth, M_KTRACE);
 	p->p_traceflag &= ~KTRFAC_ACTIVE;
 }
@@ -141,55 +139,55 @@ ktrnamei(vp, path)
 	struct ktr_header *kth;
 	struct proc *p = curproc;	/* XXX */
 
+	/*
+	 * don't let vp get ripped out from under us
+	 */
+	if (vp)
+		VREF(vp);
 	p->p_traceflag |= KTRFAC_ACTIVE;
 	kth = ktrgetheader(KTR_NAMEI);
 	kth->ktr_len = strlen(path);
 	kth->ktr_buf = path;
 
-	ktrwrite(vp, kth);
+	ktrwrite(vp, kth, NULL);
+	if (vp)
+		vrele(vp);
 	FREE(kth, M_KTRACE);
 	p->p_traceflag &= ~KTRFAC_ACTIVE;
 }
 
 void
-ktrgenio(vp, fd, rw, iov, len, error)
+ktrgenio(vp, fd, rw, uio, error)
 	struct vnode *vp;
 	int fd;
 	enum uio_rw rw;
-	register struct iovec *iov;
-	int len, error;
+	struct uio *uio;
+	int error;
 {
 	struct ktr_header *kth;
-	register struct ktr_genio *ktp;
-	register caddr_t cp;
-	register int resid = len, cnt;
+	struct ktr_genio ktg;
 	struct proc *p = curproc;	/* XXX */
 
 	if (error)
 		return;
+	/*
+	 * don't let p_tracep get ripped out from under us
+	 */
+	if (vp)
+		VREF(vp);
 	p->p_traceflag |= KTRFAC_ACTIVE;
 	kth = ktrgetheader(KTR_GENIO);
-	MALLOC(ktp, struct ktr_genio *, sizeof(struct ktr_genio) + len,
-		M_KTRACE, M_WAITOK);
-	ktp->ktr_fd = fd;
-	ktp->ktr_rw = rw;
-	cp = (caddr_t)((char *)ktp + sizeof (struct ktr_genio));
-	while (resid > 0) {
-		if ((cnt = iov->iov_len) > resid)
-			cnt = resid;
-		if (copyin(iov->iov_base, cp, (unsigned)cnt))
-			goto done;
-		cp += cnt;
-		resid -= cnt;
-		iov++;
-	}
-	kth->ktr_buf = (caddr_t)ktp;
-	kth->ktr_len = sizeof (struct ktr_genio) + len;
+	ktg.ktr_fd = fd;
+	ktg.ktr_rw = rw;
+	kth->ktr_buf = (caddr_t)&ktg;
+	kth->ktr_len = sizeof(struct ktr_genio);
+	uio->uio_offset = 0;
+	uio->uio_rw = UIO_WRITE;
 
-	ktrwrite(vp, kth);
-done:
+	ktrwrite(vp, kth, uio);
+	if (vp)
+		vrele(vp);
 	FREE(kth, M_KTRACE);
-	FREE(ktp, M_KTRACE);
 	p->p_traceflag &= ~KTRFAC_ACTIVE;
 }
 
@@ -205,6 +203,11 @@ ktrpsig(vp, sig, action, mask, code)
 	struct ktr_psig	kp;
 	struct proc *p = curproc;	/* XXX */
 
+	/*
+	 * don't let vp get ripped out from under us
+	 */
+	if (vp)
+		VREF(vp);
 	p->p_traceflag |= KTRFAC_ACTIVE;
 	kth = ktrgetheader(KTR_PSIG);
 	kp.signo = (char)sig;
@@ -214,7 +217,9 @@ ktrpsig(vp, sig, action, mask, code)
 	kth->ktr_buf = (caddr_t)&kp;
 	kth->ktr_len = sizeof (struct ktr_psig);
 
-	ktrwrite(vp, kth);
+	ktrwrite(vp, kth, NULL);
+	if (vp)
+		vrele(vp);
 	FREE(kth, M_KTRACE);
 	p->p_traceflag &= ~KTRFAC_ACTIVE;
 }
@@ -228,6 +233,11 @@ ktrcsw(vp, out, user)
 	struct	ktr_csw kc;
 	struct proc *p = curproc;	/* XXX */
 
+	/*
+	 * don't let vp get ripped out from under us
+	 */
+	if (vp)
+		VREF(vp);
 	p->p_traceflag |= KTRFAC_ACTIVE;
 	kth = ktrgetheader(KTR_CSW);
 	kc.out = out;
@@ -235,7 +245,9 @@ ktrcsw(vp, out, user)
 	kth->ktr_buf = (caddr_t)&kc;
 	kth->ktr_len = sizeof (struct ktr_csw);
 
-	ktrwrite(vp, kth);
+	ktrwrite(vp, kth, NULL);
+	if (vp)
+		vrele(vp);
 	FREE(kth, M_KTRACE);
 	p->p_traceflag &= ~KTRFAC_ACTIVE;
 }
@@ -292,18 +304,20 @@ ktrace(curp, uap)
 		}
 	}
 	/*
-	 * Clear all uses of the tracefile
+	 * Clear all uses of the tracefile.  XXX umm, what happens to the
+	 * loop if vn_close() blocks?
 	 */
 	if (ops == KTROP_CLEARFILE) {
 		LIST_FOREACH(p, &allproc, p_list) {
 			if (p->p_tracep == vp) {
-				if (ktrcanset(curp, p)) {
+				if (ktrcanset(curp, p) && p->p_tracep == vp) {
 					p->p_tracep = NULL;
 					p->p_traceflag = 0;
 					(void) vn_close(vp, FREAD|FWRITE,
 						p->p_ucred, p);
-				} else
+				} else {
 					error = EPERM;
+				}
 			}
 		}
 		goto done;
@@ -371,18 +385,29 @@ utrace(curp, uap)
 #ifdef KTRACE
 	struct ktr_header *kth;
 	struct proc *p = curproc;	/* XXX */
+	struct vnode *vp;
 	register caddr_t cp;
 
 	if (!KTRPOINT(p, KTR_USER))
 		return (0);
+	if (SCARG(uap, len) > KTR_USER_MAXLEN)
+		return (EINVAL);
 	p->p_traceflag |= KTRFAC_ACTIVE;
+	/*
+	 * don't let p_tracep get ripped out from under us while we are
+	 * writing.
+	 */
+	if ((vp = p->p_tracep) != NULL)
+		VREF(vp);
 	kth = ktrgetheader(KTR_USER);
 	MALLOC(cp, caddr_t, uap->len, M_KTRACE, M_WAITOK);
 	if (!copyin(uap->addr, cp, uap->len)) {
 		kth->ktr_buf = cp;
 		kth->ktr_len = uap->len;
-		ktrwrite(p->p_tracep, kth);
+		ktrwrite(vp, kth, NULL);
 	}
+	if (vp)
+		vrele(vp);
 	FREE(kth, M_KTRACE);
 	FREE(cp, M_KTRACE);
 	p->p_traceflag &= ~KTRFAC_ACTIVE;
@@ -405,12 +430,16 @@ ktrops(curp, p, ops, facs, vp)
 		return (0);
 	if (ops == KTROP_SET) {
 		if (p->p_tracep != vp) {
+			struct vnode *vtmp;
+
 			/*
 			 * if trace file already in use, relinquish
 			 */
-			if (p->p_tracep != NULL)
-				vrele(p->p_tracep);
 			VREF(vp);
+			while ((vtmp = p->p_tracep) != NULL) {
+				p->p_tracep = NULL;
+				vrele(vtmp);
+			}
 			p->p_tracep = vp;
 		}
 		p->p_traceflag |= facs;
@@ -419,11 +448,13 @@ ktrops(curp, p, ops, facs, vp)
 	} else {
 		/* KTROP_CLEAR */
 		if (((p->p_traceflag &= ~facs) & KTRFAC_MASK) == 0) {
+			struct vnode *vtmp;
+
 			/* no more tracing */
 			p->p_traceflag = 0;
-			if (p->p_tracep != NULL) {
-				vrele(p->p_tracep);
+			if ((vtmp = p->p_tracep) != NULL) {
 				p->p_tracep = NULL;
+				vrele(vtmp);
 			}
 		}
 	}
@@ -464,9 +495,10 @@ ktrsetchildren(curp, top, ops, facs, vp)
 }
 
 static void
-ktrwrite(vp, kth)
+ktrwrite(vp, kth, uio)
 	struct vnode *vp;
 	register struct ktr_header *kth;
+	struct uio *uio;
 {
 	struct uio auio;
 	struct iovec aiov[2];
@@ -489,14 +521,22 @@ ktrwrite(vp, kth)
 		aiov[1].iov_base = kth->ktr_buf;
 		aiov[1].iov_len = kth->ktr_len;
 		auio.uio_resid += kth->ktr_len;
+		if (uio != NULL)
+			kth->ktr_len += uio->uio_resid;
 	}
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
-	error = VOP_WRITE(vp, &auio, IO_UNIT|IO_APPEND, p->p_ucred);
+	(void)VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
+	error = VOP_WRITE(vp, &auio, IO_UNIT | IO_APPEND, p->p_ucred);
+	if (error == 0 && uio != NULL) {
+		(void)VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
+		error = VOP_WRITE(vp, uio, IO_UNIT | IO_APPEND, p->p_ucred);
+	}
 	VOP_UNLOCK(vp, 0, p);
 	if (!error)
 		return;
 	/*
-	 * If error encountered, give up tracing on this vnode.
+	 * If error encountered, give up tracing on this vnode.  XXX what
+	 * happens to the loop if vrele() blocks?
 	 */
 	log(LOG_NOTICE, "ktrace write failed, errno %d, tracing stopped\n",
 	    error);
@@ -531,7 +571,8 @@ ktrcanset(callp, targetp)
 	     target->p_ruid == target->p_svuid &&
 	     caller->p_rgid == target->p_rgid &&	/* XXX */
 	     target->p_rgid == target->p_svgid &&
-	     (targetp->p_traceflag & KTRFAC_ROOT) == 0) ||
+	     (targetp->p_traceflag & KTRFAC_ROOT) == 0 &&
+	     (targetp->p_flag & P_SUGID) == 0) ||
 	     caller->pc_ucred->cr_uid == 0)
 		return (1);
 

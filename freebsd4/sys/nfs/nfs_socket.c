@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_socket.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/nfs_socket.c,v 1.60 2000/01/09 19:17:30 shin Exp $
+ * $FreeBSD: src/sys/nfs/nfs_socket.c,v 1.60.2.3.2.1 2002/08/01 19:31:55 des Exp $
  */
 
 /*
@@ -119,11 +119,13 @@ static int proct[NFS_NPROCS] = {
 
 static int nfs_realign_test;
 static int nfs_realign_count;
+static int nfs_bufpackets = 4;
 
 SYSCTL_DECL(_vfs_nfs);
 
-SYSCTL_INT(_vfs_nfs, OID_AUTO, realign_test, CTLFLAG_RD, &nfs_realign_test, 0, "");
-SYSCTL_INT(_vfs_nfs, OID_AUTO, realign_count, CTLFLAG_RD, &nfs_realign_count, 0, "");
+SYSCTL_INT(_vfs_nfs, OID_AUTO, realign_test, CTLFLAG_RW, &nfs_realign_test, 0, "");
+SYSCTL_INT(_vfs_nfs, OID_AUTO, realign_count, CTLFLAG_RW, &nfs_realign_count, 0, "");
+SYSCTL_INT(_vfs_nfs, OID_AUTO, bufpackets, CTLFLAG_RW, &nfs_bufpackets, 0, "");
 
 
 /*
@@ -201,6 +203,7 @@ nfs_connect(nmp, rep)
 {
 	register struct socket *so;
 	int s, error, rcvreserve, sndreserve;
+	int pktscale;
 	struct sockaddr *saddr;
 	struct sockaddr_in *sin;
 	struct proc *p = &proc0; /* only used for socreate and sobind */
@@ -294,21 +297,27 @@ nfs_connect(nmp, rep)
 		}
 		splx(s);
 	}
-	if (nmp->nm_flag & (NFSMNT_SOFT | NFSMNT_INT)) {
-		so->so_rcv.sb_timeo = (5 * hz);
-		so->so_snd.sb_timeo = (5 * hz);
-	} else {
-		so->so_rcv.sb_timeo = 0;
-		so->so_snd.sb_timeo = 0;
-	}
+	so->so_rcv.sb_timeo = (5 * hz);
+	so->so_snd.sb_timeo = (5 * hz);
+
+	/*
+	 * Get buffer reservation size from sysctl, but impose reasonable
+	 * limits.
+	 */
+	pktscale = nfs_bufpackets;
+	if (pktscale < 2)
+		pktscale = 2;
+	if (pktscale > 64)
+		pktscale = 64;
+
 	if (nmp->nm_sotype == SOCK_DGRAM) {
-		sndreserve = (nmp->nm_wsize + NFS_MAXPKTHDR) * 2;
+		sndreserve = (nmp->nm_wsize + NFS_MAXPKTHDR) * pktscale;
 		rcvreserve = (max(nmp->nm_rsize, nmp->nm_readdirsize) +
-		    NFS_MAXPKTHDR) * 2;
+		    NFS_MAXPKTHDR) * pktscale;
 	} else if (nmp->nm_sotype == SOCK_SEQPACKET) {
-		sndreserve = (nmp->nm_wsize + NFS_MAXPKTHDR) * 2;
+		sndreserve = (nmp->nm_wsize + NFS_MAXPKTHDR) * pktscale;
 		rcvreserve = (max(nmp->nm_rsize, nmp->nm_readdirsize) +
-		    NFS_MAXPKTHDR) * 2;
+		    NFS_MAXPKTHDR) * pktscale;
 	} else {
 		if (nmp->nm_sotype != SOCK_STREAM)
 			panic("nfscon sotype");
@@ -337,9 +346,9 @@ nfs_connect(nmp, rep)
 			sosetopt(so, &sopt);
 		}
 		sndreserve = (nmp->nm_wsize + NFS_MAXPKTHDR +
-		    sizeof (u_int32_t)) * 2;
+		    sizeof (u_int32_t)) * pktscale;
 		rcvreserve = (nmp->nm_rsize + NFS_MAXPKTHDR +
-		    sizeof (u_int32_t)) * 2;
+		    sizeof (u_int32_t)) * pktscale;
 	}
 	error = soreserve(so, sndreserve, rcvreserve);
 	if (error)
@@ -950,6 +959,11 @@ nfs_request(vp, mrest, procnum, procp, cred, mrp, mdp, dposp)
 	char *auth_str, *verf_str;
 	NFSKERBKEY_T key;		/* save session key */
 
+	/* Reject requests while attempting a forced unmount. */
+	if (vp->v_mount->mnt_kern_flag & MNTK_UNMOUNTF) {
+		m_freem(mrest);
+		return (ESTALE);
+	}
 	nmp = VFSTONFS(vp->v_mount);
 	MALLOC(rep, struct nfsreq *, sizeof(struct nfsreq), M_NFSREQ, M_WAITOK);
 	rep->r_nmp = nmp;
@@ -1495,6 +1509,41 @@ nfs_timer(arg)
 }
 
 /*
+ * Mark all of an nfs mount's outstanding requests with R_SOFTTERM and
+ * wait for all requests to complete. This is used by forced unmounts
+ * to terminate any outstanding RPCs.
+ */
+int
+nfs_nmcancelreqs(nmp)
+	struct nfsmount *nmp;
+{
+	struct nfsreq *req;
+	int i, s;
+
+	s = splnet();
+	TAILQ_FOREACH(req, &nfs_reqq, r_chain) {
+		if (nmp != req->r_nmp || req->r_mrep != NULL ||
+		    (req->r_flags & R_SOFTTERM))
+			continue;
+		nfs_softterm(req);
+	}
+	splx(s);
+
+	for (i = 0; i < 30; i++) {
+		s = splnet();
+		TAILQ_FOREACH(req, &nfs_reqq, r_chain) {
+			if (nmp == req->r_nmp)
+				break;
+		}
+		splx(s);
+		if (req == NULL)
+			return (0);
+		tsleep(&lbolt, PSOCK, "nfscancel", 0);
+	}
+	return (EBUSY);
+}
+
+/*
  * Flag a request as being about to terminate (due to NFSMNT_INT/NFSMNT_SOFT).
  * The nm_send count is decremented now to avoid deadlocks when the process in
  * soreceive() hasn't yet managed to send its own request.
@@ -1525,6 +1574,9 @@ nfs_sigintr(nmp, rep, p)
 	sigset_t tmpset;
 
 	if (rep && (rep->r_flags & R_SOFTTERM))
+		return (EINTR);
+	/* Terminate all requests while attempting a forced unmount. */
+	if (nmp->nm_mountp->mnt_kern_flag & MNTK_UNMOUNTF)
 		return (EINTR);
 	if (!(nmp->nm_flag & NFSMNT_INT))
 		return (0);
@@ -1571,6 +1623,9 @@ nfs_sndlock(rep)
 			slptimeo = 2 * hz;
 		}
 	}
+	/* Always fail if our request has been cancelled. */
+	if (rep != NULL && (rep->r_flags & R_SOFTTERM))
+		return (EINTR);
 	*statep |= NFSSTA_SNDLOCK;
 	return (0);
 }
@@ -2099,7 +2154,7 @@ nfsrv_getstream(slp, waitflag)
 	register struct mbuf *m, **mpp;
 	register char *cp1, *cp2;
 	register int len;
-	struct mbuf *om, *m2, *recm = NULL;
+	struct mbuf *om, *m2, *recm;
 	u_int32_t recmark;
 
 	if (slp->ns_flag & SLP_GETSTREAM)
@@ -2144,7 +2199,11 @@ nfsrv_getstream(slp, waitflag)
 
 	    /*
 	     * Now get the record part.
+	     *
+	     * Note that slp->ns_reclen may be 0.  Linux sometimes
+	     * generates 0-length RPCs
 	     */
+	    recm = NULL;
 	    if (slp->ns_cc == slp->ns_reclen) {
 		recm = slp->ns_raw;
 		slp->ns_raw = slp->ns_rawend = (struct mbuf *)0;

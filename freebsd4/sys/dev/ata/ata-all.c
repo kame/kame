@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.36 2002/04/07 09:54:12 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.36.2.1 2002/07/08 18:43:47 murray Exp $
  */
 
 #include "opt_ata.h"
@@ -710,8 +710,8 @@ ata_start(struct ata_channel *ch)
 	}
     }
 #endif
-    splx(s);
     ATA_UNLOCK_CH(ch);
+    splx(s);
 }
 
 void

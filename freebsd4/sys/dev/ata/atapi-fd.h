@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998,1999,2000 Søren Schmidt
+ * Copyright (c) 1998,1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,11 +25,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10 2000/02/18 20:57:30 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10.2.4.2.1 2002/08/04 11:36:48 murray Exp $
  */
 
-/* MODE SENSE parameter header */ 
-struct afd_header {
+/* ATAPI Rewriteable drive Capabilities and Mechanical Status Page */
+struct afd_cappage {
     u_int16_t	data_length;
     u_int8_t	medium_type;
 #define MFD_2DD_UN		0x10
@@ -48,10 +48,8 @@ struct afd_header {
     u_int8_t	reserved0	:7;
     u_int8_t	wp		:1;		/* write protect */
     u_int8_t	unused[4];
-};
 
-/* ATAPI Rewriteable drive Capabilities and Mechanical Status Page */
-struct afd_cappage {
+    /* capabilities page */
     u_int8_t	page_code	:6;
 #define ATAPI_REWRITEABLE_CAP_PAGE	  0x05
 
@@ -71,11 +69,9 @@ struct afd_cappage {
 };
 
 struct afd_softc {
-    struct atapi_softc		*atp;		/* controller structure */
-    int32_t			lun;		/* logical device unit */
-    int32_t			transfersize;	/* max size of each transfer */
-    struct buf_queue_head	buf_queue;	/* queue of i/o requests */
-    struct afd_header		header;		/* capabilities page info */
+    struct ata_device		*device;	/* device softc */
+    int				lun;		/* logical device unit */
+    struct buf_queue_head	queue;		/* queue of i/o requests */
     struct afd_cappage		cap;		/* capabilities page info */
     struct disk			disk;		/* virtual drives */
     struct devstat		stats;

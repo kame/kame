@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117 2000/01/10 12:04:25 phk Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.9.2.1 2002/07/31 17:54:57 jedgar Exp $
  */
 
 #include "opt_quota.h"
@@ -190,6 +190,14 @@ ffs_mount( mp, path, data, ndp, p)
 		err = 0;
 		ronly = fs->fs_ronly;	/* MNT_RELOAD might change this */
 		if (ronly == 0 && (mp->mnt_flag & MNT_RDONLY)) {
+			/*
+			 * Flush any dirty data.
+			 */
+			VFS_SYNC(mp, MNT_WAIT, p->p_ucred, p);
+			/*
+			 * Check for and optionally get rid of files open
+			 * for writing.
+			 */
 			flags = WRITECLOSE;
 			if (mp->mnt_flag & MNT_FORCE)
 				flags |= FORCECLOSE;
@@ -414,7 +422,7 @@ ffs_reload(mp, cred, p)
 {
 	register struct vnode *vp, *nvp, *devvp;
 	struct inode *ip;
-	struct csum *space;
+	void *space;
 	struct buf *bp;
 	struct fs *fs, *newfs;
 	struct partinfo dpart;
@@ -468,20 +476,26 @@ ffs_reload(mp, cred, p)
 	 * new superblock. These should really be in the ufsmount.	XXX
 	 * Note that important parameters (eg fs_ncg) are unchanged.
 	 */
-	bcopy(&fs->fs_csp[0], &newfs->fs_csp[0], sizeof(fs->fs_csp));
+	newfs->fs_csp = fs->fs_csp;
 	newfs->fs_maxcluster = fs->fs_maxcluster;
+	newfs->fs_contigdirs = fs->fs_contigdirs;
 	bcopy(newfs, fs, (u_int)fs->fs_sbsize);
 	if (fs->fs_sbsize < SBSIZE)
 		bp->b_flags |= B_INVAL;
 	brelse(bp);
 	mp->mnt_maxsymlinklen = fs->fs_maxsymlinklen;
 	ffs_oldfscompat(fs);
+	/* An old fsck may have zeroed these fields, so recheck them. */
+	if (fs->fs_avgfilesize <= 0)		/* XXX */
+		fs->fs_avgfilesize = AVFILESIZ;	/* XXX */
+	if (fs->fs_avgfpdir <= 0)		/* XXX */
+		fs->fs_avgfpdir = AFPDIR;	/* XXX */
 
 	/*
 	 * Step 3: re-read summary information from disk.
 	 */
 	blks = howmany(fs->fs_cssize, fs->fs_fsize);
-	space = fs->fs_csp[0];
+	space = fs->fs_csp;
 	for (i = 0; i < blks; i += fs->fs_frag) {
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
@@ -490,7 +504,8 @@ ffs_reload(mp, cred, p)
 		    NOCRED, &bp);
 		if (error)
 			return (error);
-		bcopy(bp->b_data, fs->fs_csp[fragstoblks(fs, i)], (u_int)size);
+		bcopy(bp->b_data, space, (u_int)size);
+		space = (char *)space + size;
 		brelse(bp);
 	}
 	/*
@@ -504,12 +519,12 @@ ffs_reload(mp, cred, p)
 
 loop:
 	simple_lock(&mntvnode_slock);
-	for (vp = mp->mnt_vnodelist.lh_first; vp != NULL; vp = nvp) {
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		if (vp->v_mount != mp) {
 			simple_unlock(&mntvnode_slock);
 			goto loop;
 		}
-		nvp = vp->v_mntvnodes.le_next;
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		/*
 		 * Step 4: invalidate all inactive vnodes.
 		 */
@@ -562,7 +577,7 @@ ffs_mountfs(devvp, mp, p, malloctype)
 	register struct fs *fs;
 	dev_t dev;
 	struct partinfo dpart;
-	caddr_t base, space;
+	void *space;
 	int error, i, blks, size, ronly;
 	int32_t *lp;
 	struct ucred *cred;
@@ -610,7 +625,7 @@ ffs_mountfs(devvp, mp, p, malloctype)
 	VOP_UNLOCK(devvp, 0, p);
 	if (error)
 		return (error);
-	if (devvp->v_rdev->si_iosize_max > mp->mnt_iosize_max)
+	if (devvp->v_rdev->si_iosize_max != 0)
 		mp->mnt_iosize_max = devvp->v_rdev->si_iosize_max;
 	if (mp->mnt_iosize_max > MAXPHYS)
 		mp->mnt_iosize_max = MAXPHYS;
@@ -673,27 +688,37 @@ ffs_mountfs(devvp, mp, p, malloctype)
 	blks = howmany(size, fs->fs_fsize);
 	if (fs->fs_contigsumsize > 0)
 		size += fs->fs_ncg * sizeof(int32_t);
-	base = space = malloc((u_long)size, M_UFSMNT, M_WAITOK);
+	size += fs->fs_ncg * sizeof(u_int8_t);
+	space = malloc((u_long)size, M_UFSMNT, M_WAITOK);
+	fs->fs_csp = space;
 	for (i = 0; i < blks; i += fs->fs_frag) {
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
 			size = (blks - i) * fs->fs_fsize;
 		if ((error = bread(devvp, fsbtodb(fs, fs->fs_csaddr + i), size,
 		    cred, &bp)) != 0) {
-			free(base, M_UFSMNT);
+			free(fs->fs_csp, M_UFSMNT);
 			goto out;
 		}
 		bcopy(bp->b_data, space, (u_int)size);
-		fs->fs_csp[fragstoblks(fs, i)] = (struct csum *)space;
-		space += size;
+		space = (char *)space + size;
 		brelse(bp);
 		bp = NULL;
 	}
 	if (fs->fs_contigsumsize > 0) {
-		fs->fs_maxcluster = lp = (int32_t *)space;
+		fs->fs_maxcluster = lp = space;
 		for (i = 0; i < fs->fs_ncg; i++)
 			*lp++ = fs->fs_contigsumsize;
+		space = lp;
 	}
+	size = fs->fs_ncg * sizeof(u_int8_t);
+	fs->fs_contigdirs = (u_int8_t *)space;
+	bzero(fs->fs_contigdirs, size);
+	/* Compatibility for old filesystems 	   XXX */
+	if (fs->fs_avgfilesize <= 0)		/* XXX */
+		fs->fs_avgfilesize = AVFILESIZ;	/* XXX */
+	if (fs->fs_avgfpdir <= 0)		/* XXX */
+		fs->fs_avgfpdir = AFPDIR;	/* XXX */
 	mp->mnt_data = (qaddr_t)ump;
 	mp->mnt_stat.f_fsid.val[0] = fs->fs_id[0];
 	mp->mnt_stat.f_fsid.val[1] = fs->fs_id[1];
@@ -733,12 +758,15 @@ ffs_mountfs(devvp, mp, p, malloctype)
 
 	ump->um_savedmaxfilesize = fs->fs_maxfilesize;		/* XXX */
 	maxfilesize = (u_int64_t)0x40000000 * fs->fs_bsize - 1;	/* XXX */
+	/* Enforce limit caused by vm object backing (32 bits vm_pindex_t). */
+	if (maxfilesize > (u_int64_t)0x80000000u * PAGE_SIZE - 1)
+		maxfilesize = (u_int64_t)0x80000000u * PAGE_SIZE - 1;
 	if (fs->fs_maxfilesize > maxfilesize)			/* XXX */
 		fs->fs_maxfilesize = maxfilesize;		/* XXX */
 	if (ronly == 0) {
 		if ((fs->fs_flags & FS_DOSOFTDEP) &&
 		    (error = softdep_mount(devvp, mp, fs, cred)) != 0) {
-			free(base, M_UFSMNT);
+			free(fs->fs_csp, M_UFSMNT);
 			goto out;
 		}
 		fs->fs_fmod = 1;
@@ -833,7 +861,7 @@ ffs_unmount(mp, mntflags, p)
 
 	vrele(ump->um_devvp);
 
-	free(fs->fs_csp[0], M_UFSMNT);
+	free(fs->fs_csp, M_UFSMNT);
 	free(fs, M_UFSMNT);
 	free(ump, M_UFSMNT);
 	mp->mnt_data = (qaddr_t)0;
@@ -857,7 +885,7 @@ ffs_flushfiles(mp, flags, p)
 #ifdef QUOTA
 	if (mp->mnt_flag & MNT_QUOTA) {
 		int i;
-		error = vflush(mp, NULLVP, SKIPSYSTEM|flags);
+		error = vflush(mp, 0, SKIPSYSTEM|flags);
 		if (error)
 			return (error);
 		for (i = 0; i < MAXQUOTAS; i++) {
@@ -874,7 +902,7 @@ ffs_flushfiles(mp, flags, p)
         /*
 	 * Flush all the files.
 	 */
-	if ((error = vflush(mp, NULL, flags)) != 0)
+	if ((error = vflush(mp, 0, flags)) != 0)
 		return (error);
 	/*
 	 * Flush filesystem metadata.
@@ -949,44 +977,57 @@ ffs_sync(mp, waitfor, cred, p)
 	 */
 	simple_lock(&mntvnode_slock);
 loop:
-	for (vp = mp->mnt_vnodelist.lh_first; vp != NULL; vp = nvp) {
+	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp != NULL; vp = nvp) {
 		/*
 		 * If the vnode that we are about to sync is no longer
 		 * associated with this mount point, start over.
 		 */
 		if (vp->v_mount != mp)
 			goto loop;
-		simple_lock(&vp->v_interlock);
-		nvp = vp->v_mntvnodes.le_next;
+
+		/*
+		 * Depend on the mntvnode_slock to keep things stable enough
+		 * for a quick test.  Since there might be hundreds of 
+		 * thousands of vnodes, we cannot afford even a subroutine
+		 * call unless there's a good chance that we have work to do.
+		 */
+		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
 		ip = VTOI(vp);
 		if (vp->v_type == VNON || ((ip->i_flag &
 		     (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) == 0 &&
 		     TAILQ_EMPTY(&vp->v_dirtyblkhd))) {
-			simple_unlock(&vp->v_interlock);
 			continue;
 		}
 		if (vp->v_type != VCHR) {
 			simple_unlock(&mntvnode_slock);
-			error =
-			  vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK, p);
+			error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT, p);
 			if (error) {
 				simple_lock(&mntvnode_slock);
 				if (error == ENOENT)
 					goto loop;
-				continue;
+			} else {
+				if ((error = VOP_FSYNC(vp, cred, waitfor, p)) != 0)
+					allerror = error;
+				VOP_UNLOCK(vp, 0, p);
+				vrele(vp);
+				simple_lock(&mntvnode_slock);
 			}
-			if ((error = VOP_FSYNC(vp, cred, waitfor, p)) != 0)
-				allerror = error;
-			VOP_UNLOCK(vp, 0, p);
-			vrele(vp);
-			simple_lock(&mntvnode_slock);
 		} else {
+			/*
+			 * We must reference the vp to prevent it from
+			 * getting ripped out from under UFS_UPDATE, since
+			 * we are not holding a vnode lock.  XXX why aren't
+			 * we holding a vnode lock?
+			 */
+			VREF(vp);
 			simple_unlock(&mntvnode_slock);
-			simple_unlock(&vp->v_interlock);
 			/* UFS_UPDATE(vp, waitfor == MNT_WAIT); */
 			UFS_UPDATE(vp, 0);
+			vrele(vp);
 			simple_lock(&mntvnode_slock);
 		}
+		if (TAILQ_NEXT(vp, v_nmntvnodes) != nvp)
+			goto loop;
 	}
 	simple_unlock(&mntvnode_slock);
 	/*
@@ -1075,8 +1116,12 @@ restart:
 		return (error);
 	}
 	bzero((caddr_t)ip, sizeof(struct inode));
-	lockinit(&ip->i_lock, PINOD, "inode", 0, LK_CANRECURSE);
+	lockinit(&ip->i_lock, PINOD, "inode", VLKTIMEOUT, LK_CANRECURSE);
 	vp->v_data = ip;
+	/*
+	 * FFS supports lock sharing in the stack of vnodes
+	 */
+	vp->v_vnlock = &ip->i_lock;
 	ip->i_vnode = vp;
 	ip->i_fs = fs = ump->um_fs;
 	ip->i_dev = dev;
@@ -1229,14 +1274,14 @@ ffs_sbupdate(mp, waitfor)
 	register struct fs *dfs, *fs = mp->um_fs;
 	register struct buf *bp;
 	int blks;
-	caddr_t space;
+	void *space;
 	int i, size, error, allerror = 0;
 
 	/*
 	 * First write back the summary information.
 	 */
 	blks = howmany(fs->fs_cssize, fs->fs_fsize);
-	space = (caddr_t)fs->fs_csp[0];
+	space = fs->fs_csp;
 	for (i = 0; i < blks; i += fs->fs_frag) {
 		size = fs->fs_bsize;
 		if (i + fs->fs_frag > blks)
@@ -1244,7 +1289,7 @@ ffs_sbupdate(mp, waitfor)
 		bp = getblk(mp->um_devvp, fsbtodb(fs, fs->fs_csaddr + i),
 		    size, 0, 0);
 		bcopy(space, bp->b_data, (u_int)size);
-		space += size;
+		space = (char *)space + size;
 		if (waitfor != MNT_WAIT)
 			bawrite(bp);
 		else if ((error = bwrite(bp)) != 0)

@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2218 2002/08/21 23:29:12 itojun Exp $
+$KAME: CHANGELOG,v 1.2219 2002/08/23 06:43:09 suz Exp $
 
 <200208>
+Fri Aug 23 14:39:48 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4/sys/*: sync with FreeBSD 4.6.2-RELEASE
+
 Thu Aug 22 08:28:34 JST 2002  itojun@iijlab.net
 	* sys/netinet6/esp_input.c: check packet length before fetching
 	  ESP authentication data.
