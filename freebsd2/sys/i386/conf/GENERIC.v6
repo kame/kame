@@ -11,7 +11,7 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: GENERIC.v6,v 1.8 1999/10/07 11:18:52 itojun Exp $
+#	$Id: GENERIC.v6,v 1.9 1999/10/07 12:18:57 sakane Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -50,26 +50,26 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	"IPV6FIREWALL_DEFAULT_TO_ACCEPT"
 
 # ALTQ
-options		ALTQ		#alternate queueing
-options		CBQ		#class based queueing
-options		WFQ		#weighted fair queueing
-#options	FIFOQ		#fifo queueing
-options		RED		#random early detection
-options		FLOWVALVE	#flowvalve for RED (needs RED)
-options		CBQ_RED		#red for cbq (needs CBQ and RED)
+options 	ALTQ		#alternate queueing
+options 	CBQ		#class based queueing
+options 	WFQ		#weighted fair queueing
+#options 	FIFOQ		#fifo queueing
+options 	RED		#random early detection
+options 	FLOWVALVE	#flowvalve for RED (needs RED)
+options 	CBQ_RED		#red for cbq (needs CBQ and RED)
 options 	RIO		#twin red for diffserv (needs RED)
 options 	CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
 #options	LOCALQ		#local use
 options 	HFSC		#hierarchical fair service curve
 options 	HFSC_RED	#red for hfsc (needs HFSC and RED)
 options 	HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
-options		ALTQ_ACCOUNT	#altq accounting
-#options	ALTQ_ECN	#ecn extention to tcp
+options 	ALTQ_ACCOUNT	#altq accounting
+#options 	ALTQ_ECN	#ecn extention to tcp
 options 	CDNR		#diffserv traffic conditioner
 options 	BLUE		#blue by wu-chang feng
 # you might want to set kernel timer to 1kHz if you use CBQ,
 # especially with 100baseT
-#options	HZ=1000
+#options 	HZ=1000
 
 # Packet Management by SuMiRe
 #options 	PM			# SuMiRe (NAT).
@@ -77,7 +77,7 @@ options 	BLUE		#blue by wu-chang feng
 #options 	PMDEBUG			# Enable debug feature.
 
 # Protocol Translator
-#options	PTR
+#options 	PTR
 
 options		FFS			#Berkeley Fast Filesystem
 options		NFS			#Network Filesystem
