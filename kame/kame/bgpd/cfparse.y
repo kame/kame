@@ -1183,11 +1183,11 @@ param_config()
 		IamRR = yy_rrflag;
 		cprint("act as a route reflector\n");
 	}
-	if (yy_rip >= 0) {
+	if (yy_rip > 0) {
 		ripyes = yy_rip;
 		cprint("Enable RIPng\n");
 	}
-	if (yy_bgp >= 0) {
+	if (yy_bgp > 0) {
 		bgpyes = yy_bgp;
 		cprint("Enable BGP4+\n");
 	}
