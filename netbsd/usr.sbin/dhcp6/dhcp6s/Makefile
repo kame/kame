@@ -27,7 +27,7 @@
 SRCDIR=	${.CURDIR}/../../../kame/dhcp6
 
 PROG=	dhcp6s
-SRCS=	dhcp6s.c common.c config.c if.c timer.c base64.c auth.c \
+SRCS=	dhcp6s.c common.c config.c if.c timer.c base64.c auth.c dhcp6_ctl.c \
 	cfparse.y cftoken.l
 CLEANFILES+= cfparse.h
 CFLAGS+= -g
