@@ -1,4 +1,4 @@
-/*	$NetBSD: ifconfig.c,v 1.123 2002/05/06 20:14:36 thorpej Exp $	*/
+/*	$NetBSD: ifconfig.c,v 1.141 2004/03/01 00:11:33 perry Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -49,11 +49,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -80,7 +76,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1993\n\
 #if 0
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-__RCSID("$NetBSD: ifconfig.c,v 1.123 2002/05/06 20:14:36 thorpej Exp $");
+__RCSID("$NetBSD: ifconfig.c,v 1.141 2004/03/01 00:11:33 perry Exp $");
 #endif
 #endif /* not lint */
 
@@ -92,7 +88,8 @@ __RCSID("$NetBSD: ifconfig.c,v 1.123 2002/05/06 20:14:36 thorpej Exp $");
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_ether.h>
-#include <net/if_ieee80211.h>
+#include <net80211/ieee80211.h>
+#include <net80211/ieee80211_ioctl.h>
 #include <net/if_vlanvar.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -122,6 +119,7 @@ __RCSID("$NetBSD: ifconfig.c,v 1.123 2002/05/06 20:14:36 thorpej Exp $");
 #include <string.h>
 #include <unistd.h>
 #include <ifaddrs.h>
+#include <util.h>
 
 struct	ifreq		ifr, ridreq;
 struct	ifaliasreq	addreq __attribute__((aligned(4)));
@@ -137,13 +135,15 @@ struct	sockaddr_in	netmask;
 struct	netrange	at_nr;		/* AppleTalk net range */
 
 char	name[30];
-int	flags, metric, mtu, setaddr, setipdst, doalias;
+u_short	flags;
+int	setaddr, setipdst, doalias;
+u_long	metric, mtu;
 int	clearaddr, s;
 int	newaddr = -1;
 int	conflicting = 0;
 int	nsellength = 1;
 int	af;
-int	aflag, bflag, Cflag, dflag, lflag, mflag, sflag, uflag;
+int	aflag, bflag, Cflag, dflag, lflag, mflag, sflag, uflag, vflag, zflag;
 #ifdef INET6
 int	Lflag;
 #endif
@@ -166,6 +166,8 @@ void 	setifmetric __P((const char *, int));
 void 	setifmtu __P((const char *, int));
 void	setifnwid __P((const char *, int));
 void	setifnwkey __P((const char *, int));
+void	setifbssid __P((const char *, int));
+void	setifchan __P((const char *, int));
 void	setifpowersave __P((const char *, int));
 void	setifpowersavesleep __P((const char *, int));
 void 	setifnetmask __P((const char *, int));
@@ -181,9 +183,11 @@ void 	setia6flags __P((const char *, int));
 void	setia6pltime __P((const char *, int));
 void	setia6vltime __P((const char *, int));
 void	setia6lifetime __P((const char *, const char *));
+void	setia6eui64 __P((const char *, int));
 #endif
 void	checkatrange __P ((struct sockaddr_at *));
 void	setmedia __P((const char *, int));
+void	setmediamode __P((const char *, int));
 void	setmediaopt __P((const char *, int));
 void	unsetmediaopt __P((const char *, int));
 void	setmediainst __P((const char *, int));
@@ -213,6 +217,7 @@ int	actions;			/* Actions performed */
 #define	A_MEDIAOPTCLR	0x0004		/* -mediaopt command */
 #define	A_MEDIAOPT	(A_MEDIAOPTSET|A_MEDIAOPTCLR)
 #define	A_MEDIAINST	0x0008		/* instance or inst command */
+#define	A_MEDIAMODE	0x0010		/* mode command */
 
 #define	NEXTARG		0xffffff
 #define	NEXTARG2	0xfffffe
@@ -243,6 +248,11 @@ const struct cmd {
 	{ "netmask",	NEXTARG,	0,		setifnetmask },
 	{ "metric",	NEXTARG,	0,		setifmetric },
 	{ "mtu",	NEXTARG,	0,		setifmtu },
+	{ "bssid",	NEXTARG,	0,		setifbssid },
+	{ "-bssid",	-1,		0,		setifbssid },
+	{ "chan",	NEXTARG,	0,		setifchan },
+	{ "-chan",	-1,		0,		setifchan },
+	{ "ssid",	NEXTARG,	0,		setifnwid },
 	{ "nwid",	NEXTARG,	0,		setifnwid },
 	{ "nwkey",	NEXTARG,	0,		setifnwkey },
 	{ "-nwkey",	-1,		0,		setifnwkey },
@@ -261,6 +271,7 @@ const struct cmd {
 	{ "-deprecated", -IN6_IFF_DEPRECATED,	0,	setia6flags },
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
 	{ "vltime",	NEXTARG,	0,		setia6vltime },
+	{ "eui64",	0,		0,		setia6eui64 },
 #endif /*INET6*/
 #ifndef INET_ONLY
 	{ "range",	NEXTARG,	0,		setatrange },
@@ -288,6 +299,7 @@ const struct cmd {
 	{ "media",	NEXTARG,	A_MEDIA,	setmedia },
 	{ "mediaopt",	NEXTARG,	A_MEDIAOPTSET,	setmediaopt },
 	{ "-mediaopt",	NEXTARG,	A_MEDIAOPTCLR,	unsetmediaopt },
+	{ "mode",	NEXTARG,	A_MEDIAMODE,	setmediamode },
 	{ "instance",	NEXTARG,	A_MEDIAINST,	setmediainst },
 	{ "inst",	NEXTARG,	A_MEDIAINST,	setmediainst },
 	{ "ip4csum",	IFCAP_CSUM_IPv4,0,		setifcaps },
@@ -314,7 +326,6 @@ int	carrier __P((void));
 void	getsock __P((int));
 void	printall __P((const char *));
 void	list_cloners __P((void));
-void 	printb __P((const char *, unsigned short, const char *));
 int	prefix __P((void *, int));
 void 	status __P((const struct sockaddr_dl *));
 void 	usage __P((void));
@@ -324,6 +335,7 @@ char	*sec2str __P((time_t));
 
 const char *get_media_type_string __P((int));
 const char *get_media_subtype_string __P((int));
+int	get_media_mode __P((int, const char *));
 int	get_media_subtype __P((int, const char *));
 int	get_media_options __P((int, const char *));
 int	lookup_media_word __P((struct ifmedia_description *, int,
@@ -409,8 +421,8 @@ main(argc, argv)
 	int ch;
 
 	/* Parse command-line options */
-	aflag = mflag = 0;
-	while ((ch = getopt(argc, argv, "AabCdlmsu"
+	aflag = mflag = vflag = zflag = 0;
+	while ((ch = getopt(argc, argv, "AabCdlmsuvz"
 #ifdef INET6
 					"L"
 #endif
@@ -428,7 +440,6 @@ main(argc, argv)
 			bflag = 1;
 			break;
 			
-
 		case 'C':
 			Cflag = 1;
 			break;
@@ -459,6 +470,14 @@ main(argc, argv)
 			uflag = 1;
 			break;
 
+		case 'v':
+			vflag = 1;
+			break;
+
+		case 'z':
+			zflag = 1;
+			break;
+
 			
 		default:
 			usage();
@@ -477,7 +496,7 @@ main(argc, argv)
 	 *
 	 * -a means "print status of all interfaces".
 	 */
-	if ((lflag || Cflag) && (aflag || mflag || argc))
+	if ((lflag || Cflag) && (aflag || mflag || vflag || argc || zflag))
 		usage();
 #ifdef INET6
 	if ((lflag || Cflag) && Lflag)
@@ -510,7 +529,8 @@ main(argc, argv)
 	/* Make sure there's an interface name. */
 	if (argc < 1)
 		usage();
-	(void) strncpy(name, argv[0], sizeof(name));
+	if (strlcpy(name, argv[0], sizeof(name)) >= sizeof(name))
+		errx(1, "interface name '%s' too long", argv[0]);
 	argc--; argv++;
 
 	/*
@@ -578,7 +598,8 @@ main(argc, argv)
 				break;
 		if (p->c_name == 0 && setaddr) {
 			if ((flags & IFF_POINTOPOINT) == 0) {
-				errx(1, "can't set destination address %s",
+				errx(EXIT_FAILURE,
+				    "can't set destination address %s",
 				     "on non-point-to-point link");
 			}
 			p++;	/* got src, do dst */
@@ -586,13 +607,15 @@ main(argc, argv)
 		if (p->c_func != NULL || p->c_func2 != NULL) {
 			if (p->c_parameter == NEXTARG) {
 				if (argc < 2)
-					errx(1, "'%s' requires argument",
+					errx(EXIT_FAILURE,
+					    "'%s' requires argument",
 					    p->c_name);
 				(*p->c_func)(argv[1], 0);
 				argc--, argv++;
 			} else if (p->c_parameter == NEXTARG2) {
 				if (argc < 3)
-					errx(1, "'%s' requires 2 arguments",
+					errx(EXIT_FAILURE,
+					    "'%s' requires 2 arguments",
 					    p->c_name);
 				(*p->c_func2)(argv[1], argv[2]);
 				argc -= 2, argv += 2;
@@ -759,13 +782,13 @@ printall(ifname)
 			sdl = (const struct sockaddr_dl *) ifa->ifa_addr;
 		if (p && strcmp(p, ifa->ifa_name) == 0)
 			continue;
-		(void) strncpy(name, ifa->ifa_name, sizeof(name));
-		name[sizeof(name) - 1] = '\0';
+		if (strlcpy(name, ifa->ifa_name, sizeof(name)) >= sizeof(name))
+			continue;
 		p = ifa->ifa_name;
 
 		if (getinfo(&paifr) < 0)
 			continue;
-		if (bflag && (ifa->ifa_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)))
+		if (bflag && (ifa->ifa_flags & IFF_BROADCAST) == 0)
 			continue;
 		if (dflag && (ifa->ifa_flags & IFF_UP) != 0)
 			continue;
@@ -911,20 +934,20 @@ settunnel(src, dst)
 	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
 
 	if ((ecode = getaddrinfo(src, NULL, &hints, &srcres)) != 0)
-		errx(1, "error in parsing address string: %s",
+		errx(EXIT_FAILURE, "error in parsing address string: %s",
 		    gai_strerror(ecode));
 
 	if ((ecode = getaddrinfo(dst, NULL, &hints, &dstres)) != 0)
-		errx(1, "error in parsing address string: %s",
+		errx(EXIT_FAILURE, "error in parsing address string: %s",
 		    gai_strerror(ecode));
 
 	if (srcres->ai_addr->sa_family != dstres->ai_addr->sa_family)
-		errx(1,
+		errx(EXIT_FAILURE,
 		    "source and destination address families do not match");
 
 	if (srcres->ai_addrlen > sizeof(req.addr) ||
 	    dstres->ai_addrlen > sizeof(req.dstaddr))
-		errx(1, "invalid sockaddr");
+		errx(EXIT_FAILURE, "invalid sockaddr");
 
 	memset(&req, 0, sizeof(req));
 	strncpy(req.iflr_name, name, sizeof(req.iflr_name));
@@ -938,7 +961,7 @@ settunnel(src, dst)
 		s6 = (struct sockaddr_in6 *)&req.addr;
 		d = (struct sockaddr_in6 *)&req.dstaddr;
 		if (s6->sin6_scope_id != d->sin6_scope_id) {
-			errx(1, "scope mismatch");
+			errx(EXIT_FAILURE, "scope mismatch");
 			/* NOTREACHED */
 		}
 #ifdef __KAME__
@@ -1165,6 +1188,7 @@ setia6flags(vname, value)
 	const char *vname;
 	int value;
 {
+
 	if (value < 0) {
 		value = -value;
 		in6_addreq.ifra_flags &= ~value;
@@ -1177,6 +1201,7 @@ setia6pltime(val, d)
 	const char *val;
 	int d;
 {
+
 	setia6lifetime("pltime", val);
 }
 
@@ -1185,6 +1210,7 @@ setia6vltime(val, d)
 	const char *val;
 	int d;
 {
+
 	setia6lifetime("vltime", val);
 }
 
@@ -1199,9 +1225,9 @@ setia6lifetime(cmd, val)
 	t = time(NULL);
 	newval = (time_t)strtoul(val, &ep, 0);
 	if (val == ep)
-		errx(1, "invalid %s", cmd);
+		errx(EXIT_FAILURE, "invalid %s", cmd);
 	if (afp->af_af != AF_INET6)
-		errx(1, "%s not allowed for the AF", cmd);
+		errx(EXIT_FAILURE, "%s not allowed for the AF", cmd);
 	if (strcmp(cmd, "vltime") == 0) {
 		in6_addreq.ifra_lifetime.ia6t_expire = t + newval;
 		in6_addreq.ifra_lifetime.ia6t_vltime = newval;
@@ -1210,6 +1236,41 @@ setia6lifetime(cmd, val)
 		in6_addreq.ifra_lifetime.ia6t_pltime = newval;
 	}
 }
+
+void
+setia6eui64(cmd, val)
+	const char *cmd;
+	int val;
+{
+	struct ifaddrs *ifap, *ifa;
+	const struct sockaddr_in6 *sin6 = NULL;
+	const struct in6_addr *lladdr = NULL;
+	struct in6_addr *in6;
+
+	if (afp->af_af != AF_INET6)
+		errx(EXIT_FAILURE, "%s not allowed for the AF", cmd);
+ 	in6 = (struct in6_addr *)&in6_addreq.ifra_addr.sin6_addr;
+	if (memcmp(&in6addr_any.s6_addr[8], &in6->s6_addr[8], 8) != 0)
+		errx(EXIT_FAILURE, "interface index is already filled");
+	if (getifaddrs(&ifap) != 0)
+		err(EXIT_FAILURE, "getifaddrs");
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family == AF_INET6 &&
+		    strcmp(ifa->ifa_name, name) == 0) {
+			sin6 = (const struct sockaddr_in6 *)ifa->ifa_addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+				lladdr = &sin6->sin6_addr;
+				break;
+			}
+		}
+	}
+	if (!lladdr)
+		errx(EXIT_FAILURE, "could not determine link local address"); 
+
+ 	memcpy(&in6->s6_addr[8], &lladdr->s6_addr[8], 8);
+
+	freeifaddrs(ifap);
+}
 #endif
 
 void
@@ -1217,8 +1278,12 @@ setifmetric(val, d)
 	const char *val;
 	int d;
 {
+	char *ep = NULL;
+
 	(void) strncpy(ifr.ifr_name, name, sizeof (ifr.ifr_name));
-	ifr.ifr_metric = atoi(val);
+	ifr.ifr_metric = strtoul(val, &ep, 10);
+	if (!ep || *ep)
+		errx(EXIT_FAILURE, "%s: invalid metric", val);
 	if (ioctl(s, SIOCSIFMETRIC, (caddr_t)&ifr) == -1)
 		warn("SIOCSIFMETRIC");
 }
@@ -1228,8 +1293,12 @@ setifmtu(val, d)
 	const char *val;
 	int d;
 {
+	char *ep = NULL;
+
 	(void)strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
-	ifr.ifr_mtu = atoi(val);
+	ifr.ifr_mtu = strtoul(val, &ep, 10);
+	if (!ep || *ep)
+		errx(EXIT_FAILURE, "%s: invalid mtu", val);
 	if (ioctl(s, SIOCSIFMTU, (caddr_t)&ifr) == -1)
 		warn("SIOCSIFMTU");
 }
@@ -1332,6 +1401,55 @@ setifnwid(val, d)
 	ifr.ifr_data = (caddr_t)&nwid;
 	if (ioctl(s, SIOCS80211NWID, (caddr_t)&ifr) == -1)
 		warn("SIOCS80211NWID");
+}
+
+void
+setifbssid(val, d)
+	const char *val;
+	int d;
+{
+	struct ieee80211_bssid bssid;
+	struct ether_addr *ea;
+
+	if (d != 0) {
+		/* no BSSID is especially desired */
+		memset(&bssid.i_bssid, 0, sizeof(bssid.i_bssid));
+	} else {
+		ea = ether_aton(val);
+		if (ea == NULL) {
+			warnx("malformed BSSID: %s", val);
+			return;
+		}
+		memcpy(&bssid.i_bssid, ea->ether_addr_octet,
+		    sizeof(bssid.i_bssid));
+	}
+	(void)strncpy(bssid.i_name, name, sizeof(bssid.i_name));
+	if (ioctl(s, SIOCS80211BSSID, (caddr_t)&bssid) == -1)
+		warn("SIOCS80211BSSID");
+}
+
+void
+setifchan(val, d)
+	const char *val;
+	int d;
+{
+	struct ieee80211chanreq channel;
+	int chan;
+
+	if (d != 0)
+		chan = IEEE80211_CHAN_ANY;
+	else {
+		chan = atoi(val);
+		if (chan < 0 || chan > 0xffff) {
+			warnx("invalid channel: %s", val);
+			return;
+		}
+	}
+
+	(void)strncpy(channel.i_name, name, sizeof(channel.i_name));
+	channel.i_channel = (u_int16_t) chan;
+	if (ioctl(s, SIOCS80211CHANNEL, (caddr_t)&channel) == -1)
+		warn("SIOCS80211CHANNEL");
 }
 
 void
@@ -1439,6 +1557,10 @@ ieee80211_status()
 	struct ieee80211_nwkey nwkey;
 	struct ieee80211_power power;
 	u_int8_t keybuf[IEEE80211_WEP_NKID][16];
+	struct ieee80211_bssid bssid;
+	struct ieee80211chanreq channel;
+	struct ether_addr ea;
+	static const u_int8_t zero_macaddr[IEEE80211_ADDR_LEN];
 
 	memset(&ifr, 0, sizeof(ifr));
 	ifr.ifr_data = (caddr_t)&nwid;
@@ -1449,7 +1571,7 @@ ieee80211_status()
 		warnx("SIOCG80211NWID: wrong length of nwid (%d)", nwid.i_len);
 		return;
 	}
-	printf("\tnwid ");
+	printf("\tssid ");
 	print_string(nwid.i_nwid, nwid.i_len);
 	memset(&nwkey, 0, sizeof(nwkey));
 	(void)strncpy(nwkey.i_name, name, sizeof(nwkey.i_name));
@@ -1511,13 +1633,32 @@ ieee80211_status()
  skip_wep:
 	(void)strncpy(power.i_name, name, sizeof(power.i_name));
 	if (ioctl(s, SIOCG80211POWER, &power) == -1)
-		return;
+		goto skip_power;
 	printf("\tpowersave ");
 	if (power.i_enabled)
 		printf("on (%dms sleep)", power.i_maxsleep);
 	else
 		printf("off");
 	printf("\n");
+
+ skip_power:
+	(void)strncpy(bssid.i_name, name, sizeof(bssid.i_name));
+	if (ioctl(s, SIOCG80211BSSID, &bssid) == -1)
+		return;
+	(void)strncpy(channel.i_name, name, sizeof(channel.i_name));
+	if (ioctl(s, SIOCG80211CHANNEL, &channel) == -1)
+		return;
+	if (memcmp(bssid.i_bssid, zero_macaddr, IEEE80211_ADDR_LEN) == 0) {
+		if (channel.i_channel != (u_int16_t)-1)
+			printf("\tchan %d\n", channel.i_channel);
+	} else {
+		memcpy(ea.ether_addr_octet, bssid.i_bssid,
+		    sizeof(ea.ether_addr_octet));
+		printf("\tbssid %s", ether_ntoa(&ea));
+		if (channel.i_channel != IEEE80211_CHAN_ANY)
+			printf(" chan %d", channel.i_channel);
+		printf("\n");
+	}
 }
 
 void
@@ -1529,7 +1670,7 @@ init_current_media()
 	 * If we have not yet done so, grab the currently-selected
 	 * media.
 	 */
-	if ((actions & (A_MEDIA|A_MEDIAOPT)) == 0) {
+	if ((actions & (A_MEDIA|A_MEDIAOPT|A_MEDIAMODE)) == 0) {
 		(void) memset(&ifmr, 0, sizeof(ifmr));
 		(void) strncpy(ifmr.ifm_name, name, sizeof(ifmr.ifm_name));
 
@@ -1547,14 +1688,14 @@ init_current_media()
 
 	/* Sanity. */
 	if (IFM_TYPE(media_current) == 0)
-		errx(1, "%s: no link type?", name);
+		errx(EXIT_FAILURE, "%s: no link type?", name);
 }
 
 void
 process_media_commands()
 {
 
-	if ((actions & (A_MEDIA|A_MEDIAOPT)) == 0) {
+	if ((actions & (A_MEDIA|A_MEDIAOPT|A_MEDIAMODE)) == 0) {
 		/* Nothing to do. */
 		return;
 	}
@@ -1584,11 +1725,17 @@ setmedia(val, d)
 
 	/* Only one media command may be given. */
 	if (actions & A_MEDIA)
-		errx(1, "only one `media' command may be issued");
+		errx(EXIT_FAILURE, "only one `media' command may be issued");
+
+	/* Must not come after mode commands */
+	if (actions & A_MEDIAMODE)
+		errx(EXIT_FAILURE,
+		    "may not issue `media' after `mode' commands");
 
 	/* Must not come after mediaopt commands */
 	if (actions & A_MEDIAOPT)
-		errx(1, "may not issue `media' after `mediaopt' commands");
+		errx(EXIT_FAILURE,
+		    "may not issue `media' after `mediaopt' commands");
 
 	/*
 	 * No need to check if `instance' has been issued; setmediainst()
@@ -1617,11 +1764,11 @@ setmediaopt(val, d)
 
 	/* Can only issue `mediaopt' once. */
 	if (actions & A_MEDIAOPTSET)
-		errx(1, "only one `mediaopt' command may be issued");
+		errx(EXIT_FAILURE, "only one `mediaopt' command may be issued");
 
 	/* Can't issue `mediaopt' if `instance' has already been issued. */
 	if (actions & A_MEDIAINST)
-		errx(1, "may not issue `mediaopt' after `instance'");
+		errx(EXIT_FAILURE, "may not issue `mediaopt' after `instance'");
 
 	mediaopt_set = get_media_options(IFM_TYPE(media_current), val);
 
@@ -1638,11 +1785,13 @@ unsetmediaopt(val, d)
 
 	/* Can only issue `-mediaopt' once. */
 	if (actions & A_MEDIAOPTCLR)
-		errx(1, "only one `-mediaopt' command may be issued");
+		errx(EXIT_FAILURE,
+		    "only one `-mediaopt' command may be issued");
 
 	/* May not issue `media' and `-mediaopt'. */
 	if (actions & A_MEDIA)
-		errx(1, "may not issue both `media' and `-mediaopt'");
+		errx(EXIT_FAILURE,
+		    "may not issue both `media' and `-mediaopt'");
 
 	/*
 	 * No need to check for A_MEDIAINST, since the test for A_MEDIA
@@ -1665,11 +1814,11 @@ setmediainst(val, d)
 
 	/* Can only issue `instance' once. */
 	if (actions & A_MEDIAINST)
-		errx(1, "only one `instance' command may be issued");
+		errx(EXIT_FAILURE, "only one `instance' command may be issued");
 
 	/* Must have already specified `media' */
 	if ((actions & A_MEDIA) == 0)
-		errx(1, "must specify `media' before `instance'");
+		errx(EXIT_FAILURE, "must specify `media' before `instance'");
 
 	type = IFM_TYPE(media_current);
 	subtype = IFM_SUBTYPE(media_current);
@@ -1677,12 +1826,41 @@ setmediainst(val, d)
 
 	inst = atoi(val);
 	if (inst < 0 || inst > IFM_INST_MAX)
-		errx(1, "invalid media instance: %s", val);
+		errx(EXIT_FAILURE, "invalid media instance: %s", val);
 
 	media_current = IFM_MAKEWORD(type, subtype, options, inst);
 
 	/* Media will be set after other processing is complete. */
 }
+
+void
+setmediamode(val, d)
+	const char *val;
+	int d;
+{
+	int type, subtype, options, inst, mode;
+
+	init_current_media();
+
+	/* Can only issue `mode' once. */
+	if (actions & A_MEDIAMODE)
+		errx(EXIT_FAILURE, "only one `mode' command may be issued");
+
+	type = IFM_TYPE(media_current);
+	subtype = IFM_SUBTYPE(media_current);
+	options = IFM_OPTIONS(media_current);
+	inst = IFM_INST(media_current);
+
+	if ((mode = get_media_mode(type, val)) == -1)
+		errx(EXIT_FAILURE, "invalid media mode: %s", val);
+
+	media_current = IFM_MAKEWORD(type, subtype, options, inst) | mode;
+
+	/* Media will be set after other processing is complete. */
+}
+
+struct ifmedia_description ifm_mode_descriptions[] =
+    IFM_MODE_DESCRIPTIONS;
 
 struct ifmedia_description ifm_type_descriptions[] =
     IFM_TYPE_DESCRIPTIONS;
@@ -1723,6 +1901,21 @@ get_media_subtype_string(mword)
 }
 
 int
+get_media_mode(type, val)
+	int type;
+	const char *val;
+{
+	int rval;
+
+	rval = lookup_media_word(ifm_mode_descriptions, type, val);
+	if (rval == -1)
+		errx(EXIT_FAILURE, "unknown %s media mode: %s",
+		    get_media_type_string(type), val);
+
+	return (rval);
+}
+
+int
 get_media_subtype(type, val)
 	int type;
 	const char *val;
@@ -1731,7 +1924,7 @@ get_media_subtype(type, val)
 
 	rval = lookup_media_word(ifm_subtype_descriptions, type, val);
 	if (rval == -1)
-		errx(1, "unknown %s media subtype: %s",
+		errx(EXIT_FAILURE, "unknown %s media subtype: %s",
 		    get_media_type_string(type), val);
 
 	return (rval);
@@ -1757,7 +1950,7 @@ get_media_options(type, val)
 	for (; (str = strtok(str, ",")) != NULL; str = NULL) {
 		option = lookup_media_word(ifm_option_descriptions, type, str);
 		if (option == -1)
-			errx(1, "unknown %s media option: %s",
+			errx(EXIT_FAILURE, "unknown %s media option: %s",
 			    get_media_type_string(type), str);
 		rval |= IFM_OPTIONS(option);
 	}
@@ -1792,6 +1985,18 @@ print_media_word(ifmw, print_type, as_syntax)
 		printf("%s ", get_media_type_string(ifmw));
 	printf("%s%s", as_syntax ? "media " : "",
 	    get_media_subtype_string(ifmw));
+
+	/* Find mode. */
+	if (IFM_MODE(ifmw) != 0) {
+		for (desc = ifm_mode_descriptions; desc->ifmt_string != NULL;
+		     desc++) {
+			if (IFM_TYPE_MATCH(desc->ifmt_word, ifmw) &&
+			    IFM_MODE(ifmw) == IFM_MODE(desc->ifmt_word)) {
+				printf(" mode %s", desc->ifmt_string);
+				break;
+			}
+		}
+	}
 
 	/* Find options. */
 	for (desc = ifm_option_descriptions; desc->ifmt_string != NULL;
@@ -1858,25 +2063,26 @@ status(sdl)
 {
 	struct afswtch *p = afp;
 	struct ifmediareq ifmr;
+	struct ifdatareq ifdr;
 	int *media_list, i;
 	char hbuf[NI_MAXHOST];
+	char fbuf[BUFSIZ];
 
-	printf("%s: ", name);
-	printb("flags", flags, IFFBITS);
+	(void)snprintb(fbuf, sizeof(fbuf), IFFBITS, flags);
+	printf("%s: flags=%s", name, &fbuf[2]);
 	if (metric)
-		printf(" metric %d", metric);
+		printf(" metric %lu", metric);
 	if (mtu)
-		printf(" mtu %d", mtu);
+		printf(" mtu %lu", mtu);
 	putchar('\n');
 
 	if (g_ifcr.ifcr_capabilities) {
-		putchar('\t');
-		printb("capabilities", g_ifcr.ifcr_capabilities, IFCAPBITS);
-		putchar('\n');
-
-		putchar('\t');
-		printb("enabled", g_ifcr.ifcr_capenable, IFCAPBITS);
-		putchar('\n');
+		(void)snprintb(fbuf, sizeof(fbuf), IFCAPBITS,
+		    g_ifcr.ifcr_capabilities);
+		printf("\tcapabilities=%s\n", &fbuf[2]);
+		(void)snprintb(fbuf, sizeof(fbuf), IFCAPBITS,
+		    g_ifcr.ifcr_capenable);
+		printf("\tenabled=%s\n", &fbuf[2]);
 	}
 
 	ieee80211_status();
@@ -1896,12 +2102,12 @@ status(sdl)
 		/*
 		 * Interface doesn't support SIOC{G,S}IFMEDIA.
 		 */
-		goto proto_status;
+		goto iface_stats;
 	}
 
 	if (ifmr.ifm_count == 0) {
 		warnx("%s: no media types?", name);
-		goto proto_status;
+		goto iface_stats;
 	}
 
 	media_list = (int *)malloc(ifmr.ifm_count * sizeof(int));
@@ -1973,6 +2179,58 @@ status(sdl)
 	}
 
 	free(media_list);
+
+ iface_stats:
+	if (!vflag && !zflag)
+		goto proto_status;
+
+	(void) strncpy(ifdr.ifdr_name, name, sizeof(ifdr.ifdr_name));
+
+	if (ioctl(s, zflag ? SIOCZIFDATA:SIOCGIFDATA, (caddr_t)&ifdr) == -1) {
+		err(EXIT_FAILURE, zflag ? "SIOCZIFDATA" : "SIOCGIFDATA");
+	} else {
+		struct if_data * const ifi = &ifdr.ifdr_data;
+#define	PLURAL(n)	((n) == 1 ? "" : "s")
+		printf("\tinput: %llu packet%s, %llu byte%s",
+		    (unsigned long long) ifi->ifi_ipackets,
+		    PLURAL(ifi->ifi_ipackets),
+		    (unsigned long long) ifi->ifi_ibytes,
+		    PLURAL(ifi->ifi_ibytes));
+		if (ifi->ifi_imcasts)
+			printf(", %llu multicast%s",
+			    (unsigned long long) ifi->ifi_imcasts,
+			    PLURAL(ifi->ifi_imcasts));
+		if (ifi->ifi_ierrors)
+			printf(", %llu error%s",
+			    (unsigned long long) ifi->ifi_ierrors,
+			    PLURAL(ifi->ifi_ierrors));
+		if (ifi->ifi_iqdrops)
+			printf(", %llu queue drop%s",
+			    (unsigned long long) ifi->ifi_iqdrops,
+			    PLURAL(ifi->ifi_iqdrops));
+		if (ifi->ifi_noproto)
+			printf(", %llu unknown protocol",
+			    (unsigned long long) ifi->ifi_noproto);
+		printf("\n\toutput: %llu packet%s, %llu byte%s",
+		    (unsigned long long) ifi->ifi_opackets,
+		    PLURAL(ifi->ifi_opackets),
+		    (unsigned long long) ifi->ifi_obytes,
+		    PLURAL(ifi->ifi_obytes));
+		if (ifi->ifi_omcasts)
+			printf(", %llu multicast%s",
+			    (unsigned long long) ifi->ifi_omcasts,
+			    PLURAL(ifi->ifi_omcasts));
+		if (ifi->ifi_oerrors)
+			printf(", %llu error%s",
+			    (unsigned long long) ifi->ifi_oerrors,
+			    PLURAL(ifi->ifi_oerrors));
+		if (ifi->ifi_collisions)
+			printf(", %llu collision%s",
+			    (unsigned long long) ifi->ifi_collisions,
+			    PLURAL(ifi->ifi_collisions));
+		printf("\n");
+#undef PLURAL
+	}
 
  proto_status:
 	if ((p = afp) != NULL) {
@@ -2181,7 +2439,7 @@ in6_alias(creq)
 	scopeid = sin6->sin6_scope_id;
 	if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
 			hbuf, sizeof(hbuf), NULL, 0, niflag))
-		strncpy(hbuf, "", sizeof(hbuf));	/* some message? */
+		strlcpy(hbuf, "", sizeof(hbuf));	/* some message? */
 	printf("\tinet6 %s", hbuf);
 
 	if (flags & IFF_POINTOPOINT) {
@@ -2200,7 +2458,7 @@ in6_alias(creq)
 		hbuf[0] = '\0';
 		if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
 				hbuf, sizeof(hbuf), NULL, 0, niflag))
-			strncpy(hbuf, "", sizeof(hbuf)); /* some message? */
+			strlcpy(hbuf, "", sizeof(hbuf)); /* some message? */
 		printf(" -> %s", hbuf);
 	}
 
@@ -2481,7 +2739,7 @@ in_getaddr(str, which)
 		else if ((np = getnetbyname(str)) != NULL)
 			gasin->sin_addr = inet_makeaddr(np->n_net, INADDR_ANY);
 		else
-			errx(1, "%s: bad value", str);
+			errx(EXIT_FAILURE, "%s: bad value", str);
 	}
 }
 
@@ -2495,7 +2753,7 @@ in_getprefix(plen, which)
 	int len = strtol(plen, (char **)NULL, 10);
 
 	if ((len < 0) || (len > 32))
-		errx(1, "%s: bad value", plen);
+		errx(EXIT_FAILURE, "%s: bad value", plen);
 	igsin->sin_len = sizeof(*igsin);
 	if (which != MASK)
 		igsin->sin_family = AF_INET;
@@ -2508,40 +2766,6 @@ in_getprefix(plen, which)
 		*cp++ = 0xff;
 	if (len)
 		*cp = 0xff << (8 - len);
-}
-
-/*
- * Print a value a la the %b format of the kernel's printf
- */
-void
-printb(str, v, bits)
-	const char *str;
-	unsigned short v;
-	const char *bits;
-{
-	int i, any = 0;
-	char c;
-
-	if (bits && *bits == 8)
-		printf("%s=%o", str, v);
-	else
-		printf("%s=%x", str, v);
-	bits++;
-	if (bits) {
-		putchar('<');
-		while ((i = *bits++) != 0) {
-			if (v & (1 << (i-1))) {
-				if (any)
-					putchar(',');
-				any = 1;
-				for (; (c = *bits) > 32; bits++)
-					putchar(c);
-			} else
-				for (; *bits > 32; bits++)
-					;
-		}
-		putchar('>');
-	}
 }
 
 #ifdef INET6
@@ -2559,6 +2783,12 @@ in6_getaddr(str, which)
 	struct sockaddr_in6 *sin6 = sin6tab[which];
 	struct addrinfo hints, *res;
 	int error;
+	char *slash = NULL;
+
+	if (which == ADDR) {
+		if ((slash = strrchr(str, '/')) != NULL)
+			*slash = '\0';
+	}
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -2567,18 +2797,28 @@ in6_getaddr(str, which)
 	hints.ai_flags = AI_NUMERICHOST;
 #endif
 	error = getaddrinfo(str, "0", &hints, &res);
+	if (error && slash) {
+		/* try again treating the '/' as part of the name */
+		*slash = '/';
+		slash = NULL;
+		error = getaddrinfo(str, "0", &hints, &res);
+	}
 	if (error)
-		errx(1, "%s: %s", str, gai_strerror(error));
+		errx(EXIT_FAILURE, "%s: %s", str, gai_strerror(error));
 	if (res->ai_next)
-		errx(1, "%s: resolved to multiple hosts", str);
+		errx(EXIT_FAILURE, "%s: resolved to multiple addresses", str);
 	if (res->ai_addrlen != sizeof(struct sockaddr_in6))
-		errx(1, "%s: bad value", str);
+		errx(EXIT_FAILURE, "%s: bad value", str);
 	memcpy(sin6, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) && sin6->sin6_scope_id) {
 		*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
 			htons(sin6->sin6_scope_id);
 		sin6->sin6_scope_id = 0;
+	}
+	if (slash) {
+		in6_getprefix(slash + 1, MASK);
+		explicit_prefix = 1;
 	}
 #else
 	struct sockaddr_in6 *gasin = sin6tab[which];
@@ -2597,7 +2837,7 @@ in6_getaddr(str, which)
 	}
 
 	if (inet_pton(AF_INET6, str, &gasin->sin6_addr) != 1)
-		errx(1, "%s: bad value", str);
+		errx(EXIT_FAILURE, "%s: bad value", str);
 #endif
 }
 
@@ -2611,7 +2851,7 @@ in6_getprefix(plen, which)
 	int len = strtol(plen, (char **)NULL, 10);
 
 	if ((len < 0) || (len > 128))
-		errx(1, "%s: bad value", plen);
+		errx(EXIT_FAILURE, "%s: bad value", plen);
 	gpsin->sin6_len = sizeof(*gpsin);
 	if (which != MASK)
 		gpsin->sin6_family = AF_INET6;
@@ -2665,10 +2905,10 @@ at_getaddr(addr, which)
 	sat->sat_family = AF_APPLETALK;
 	sat->sat_len = sizeof(*sat);
 	if (which == MASK)
-		errx(1, "AppleTalk does not use netmasks\n");
+		errx(EXIT_FAILURE, "AppleTalk does not use netmasks");
 	if (sscanf(addr, "%u.%u", &net, &node) != 2
 	    || net == 0 || net > 0xffff || node == 0 || node > 0xfe)
-		errx(1, "%s: illegal address", addr);
+		errx(EXIT_FAILURE, "%s: illegal address", addr);
 	sat->sat_addr.s_net = htons(net);
 	sat->sat_addr.s_node = node;
 }
@@ -2683,7 +2923,8 @@ setatrange(range, d)
 	if (sscanf(range, "%hu-%hu", &first, &last) != 2
 	    || first == 0 /* || first > 0xffff */
 	    || last == 0 /* || last > 0xffff */ || first > last)
-		errx(1, "%s: illegal net range: %u-%u", range, first, last);
+		errx(EXIT_FAILURE, "%s: illegal net range: %u-%u", range,
+		    first, last);
 	at_nr.nr_firstnet = htons(first);
 	at_nr.nr_lastnet = htons(last);
 }
@@ -2698,7 +2939,7 @@ setatphase(phase, d)
 	else if (!strcmp(phase, "2"))
 		at_nr.nr_phase = 2;
 	else
-		errx(1, "%s: illegal phase", phase);
+		errx(EXIT_FAILURE, "%s: illegal phase", phase);
 }
 
 void
@@ -2717,7 +2958,7 @@ checkatrange(sat)
 			(u_short) ntohs(sat->sat_addr.s_net)
 		    || (u_short) ntohs(at_nr.nr_lastnet) <
 			(u_short) ntohs(sat->sat_addr.s_net))
-		errx(1, "AppleTalk address is not in range");
+		errx(EXIT_FAILURE, "AppleTalk address is not in range");
 	*((struct netrange *) &sat->sat_zero) = at_nr;
 }
 
@@ -2777,9 +3018,9 @@ setnsellength(val, d)
 {
 	nsellength = atoi(val);
 	if (nsellength < 0)
-		errx(1, "Negative NSEL length is absurd");
+		errx(EXIT_FAILURE, "Negative NSEL length is absurd");
 	if (afp == 0 || afp->af_af != AF_ISO)
-		errx(1, "Setting NSEL length valid only for iso");
+		errx(EXIT_FAILURE, "Setting NSEL length valid only for iso");
 }
 
 void
@@ -2807,9 +3048,9 @@ usage()
 	const char *progname = getprogname();
 
 	fprintf(stderr,
-	    "usage: %s [ -m ] "
+	    "usage: %s [-m] [-v] [-z] "
 #ifdef INET6
-		"[ -L ] "
+		"[-L] "
 #endif
 		"interface\n"
 		"\t[ af [ address [ dest_addr ] ] [ netmask mask ] [ prefixlen n ]\n"
@@ -2823,10 +3064,10 @@ usage()
 		"[ instance minst ]\n"
 		"\t[ vlan n vlanif i ]\n"
 		"\t[ anycast | -anycast ] [ deprecated | -deprecated ]\n"
-		"\t[ tentative | -tentative ] [ pltime n ] [ vltime n ]\n"
+		"\t[ tentative | -tentative ] [ pltime n ] [ vltime n ] [ eui64 ]\n"
 		"\t[ link0 | -link0 ] [ link1 | -link1 ] [ link2 | -link2 ]\n"
-		"       %s -a [ -m ] [ -d ] [ -u ] [ af ]\n"
-		"       %s -l [ -b ] [ -d ] [ -u ] [ -s ]\n"
+		"       %s -a [-b] [-m] [-d] [-u] [-v] [-z] [ af ]\n"
+		"       %s -l [-b] [-d] [-u] [-s]\n"
 		"       %s -C\n"
 		"       %s interface create\n"
 		"       %s interface destroy\n",
