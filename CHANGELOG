@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1265 2000/09/11 15:53:07 sakane Exp $
+$KAME: CHANGELOG,v 1.1266 2000/09/12 05:23:00 itojun Exp $
 
 <200009>
+Tue Sep 12 14:21:27 JST 2000  itojun@iijlab.net
+	* kame/faithd: change default behavior with no arguments.
+	  old behavior (relay telnet session) does not seem like a sensible
+	  default - the behavior is historical.  now faithd will die with
+	  usage on no argument.
+	  WARNING: you may need to change startup scripts, if you rely upon
+	  old "no argument" behavior.
+
 Tue Sep 12 00:37:48 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Enabled to negotiate unique SAs.  For example, you can configured
