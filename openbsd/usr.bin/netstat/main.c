@@ -275,6 +275,7 @@ struct protox nsprotox[] = {
 	  0,		0 }
 };
 
+#if 0
 struct protox isoprotox[] = {
 	{ ISO_TP,	N_TPSTAT,	1,	iso_protopr,
 	  tp_stats,	"tp" },
@@ -287,6 +288,7 @@ struct protox isoprotox[] = {
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
+#endif
 
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
@@ -297,11 +299,11 @@ struct protox atalkprotox[] = {
 
 #ifndef INET6
 struct protox *protoprotox[] = {
-	protox, ipxprotox, nsprotox, isoprotox, atalkprotox, NULL
+	protox, ipxprotox, nsprotox, atalkprotox, NULL
 };
 #else
 struct protox *protoprotox[] = {
-	protox, ip6protox, ipxprotox, nsprotox, isoprotox, atalkprotox, NULL
+	protox, ip6protox, ipxprotox, nsprotox, atalkprotox, NULL
 };
 #endif
 
@@ -352,8 +354,10 @@ main(int argc, char *argv[])
 				af = AF_IPX;
 			else if (strcmp(optarg, "ns") == 0)
 				af = AF_NS;
+#if 0
 			else if (strcmp(optarg, "iso") == 0)
 				af = AF_ISO;
+#endif
 			else if (strcmp(optarg, "encap") == 0)
 				af = PF_KEY;
 			else if (strcmp(optarg, "atalk") == 0)
@@ -552,9 +556,11 @@ main(int argc, char *argv[])
 	if (af == AF_NS || af == AF_UNSPEC)
 		for (tp = nsprotox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
+#if 0
 	if (af == AF_ISO || af == AF_UNSPEC)
 		for (tp = isoprotox; tp->pr_name; tp++)
 			printproto(tp, tp->pr_name);
+#endif
 	if ((af == AF_UNIX || af == AF_UNSPEC) && !sflag)
 		unixpr(nl[N_UNIXSW].n_value);
 	if (af == AF_APPLETALK || af == AF_UNSPEC)
