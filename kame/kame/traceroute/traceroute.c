@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.18 2002/01/02 11:07:06 jinmei Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.19 2003/05/16 19:45:03 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -245,7 +245,6 @@ static const char rcsid[] =
 #endif
 
 #include "ifaddrlist.h"
-#include "savestr.h"
 
 /* Maximum number of gateways (include room for one noop) */
 #define NGATEWAYS ((int)((MAX_IPOPTLEN - IPOPT_MINOFF - 1) / sizeof(u_int32_t)))
