@@ -384,10 +384,16 @@ getaddrinfo(hostname, servname, hints, res)
 
 		if (pai->ai_family == PF_UNSPEC)
 			pai->ai_family = ex->e_af;
-		if (pai->ai_socktype == ANY)
+		if (pai->ai_socktype == ANY) {
+			if (ex->e_socktype == ANY)
+				continue;
 			pai->ai_socktype = ex->e_socktype;
-		if (pai->ai_protocol == ANY)
+		}
+		if (pai->ai_protocol == ANY) {
+			if (ex->e_protocol == ANY)
+				continue;
 			pai->ai_protocol = ex->e_protocol;
+		}
 
 		if (hostname == NULL)
 			error = explore_null(pai, hostname, servname, &cur->ai_next);
@@ -440,10 +446,16 @@ getaddrinfo(hostname, servname, hints, res)
 
 			if (pai->ai_family == PF_UNSPEC)
 				pai->ai_family = ex->e_af;
-			if (pai->ai_socktype == ANY)
+			if (pai->ai_socktype == ANY) {
+				if (ex->e_socktype == ANY)
+					continue;
 				pai->ai_socktype = ex->e_socktype;
-			if (pai->ai_protocol == ANY)
+			}
+			if (pai->ai_protocol == ANY) {
+				if (ex->e_protocol == ANY)
+					continue;
 				pai->ai_protocol = ex->e_protocol;
+			}
 
 			error = explore_fqdn(pai, hostname, servname,
 				&cur->ai_next);
