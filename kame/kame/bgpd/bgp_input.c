@@ -27,6 +27,7 @@
  * SUCH DAMAGE.
  */
 
+
 #include "include.h"
 #include "bgp.h"
 #include "router.h"
@@ -218,10 +219,31 @@ static int
 bgp_read(struct rpcb *bnp, int total)
 {
 	int cc;
+	u_char rcvmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))]; /* XXX tmp */
+	struct msghdr rcvmh;
+	struct iovec iov[2];
 
 	/* We can safely call read without block only once */
+#ifdef OLDADVAPI
 	cc = read(bnp->rp_socket, &bnp->rp_inpkt[bnp->rp_incc],
 		  total - bnp->rp_incc);
+#else
+	memset(&rcvmh, 0, sizeof(rcvmh));
+	rcvmh.msg_controllen = sizeof(rcvmsgbuf);
+	rcvmh.msg_control = (caddr_t)rcvmsgbuf;
+	iov[0].iov_base = (caddr_t)&bnp->rp_inpkt[bnp->rp_incc];
+	iov[0].iov_len = total - bnp->rp_incc;
+	rcvmh.msg_iov = iov;
+	rcvmh.msg_iovlen = 1;
+	cc = recvmsg(bnp->rp_socket, &rcvmh, 0);
+
+	if (cc == 0 && rcvmh.msg_controllen > 0) {
+		syslog(LOG_INFO, "<%s>: get control data only (ignored)",
+		       __FUNCTION__);
+		return(-1);
+	}
+#endif
+
 	if (cc == 0) {
 		/* This would occur when the peer close the connection */
 		syslog(LOG_NOTICE, "<%s>: connection was reset by %s",
