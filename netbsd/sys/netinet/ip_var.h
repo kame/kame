@@ -237,7 +237,6 @@ struct ipflow {
 
 extern struct ipstat ipstat;		/* ip statistics */
 extern LIST_HEAD(ipqhead, ipq) ipq;	/* ip reass. queue */
-extern u_int16_t ip_id;			/* ip packet ctr, for ids */
 extern int   ip_defttl;			/* default IP ttl */
 extern int   ipforwarding;		/* ip forwarding */
 extern int   ip_mtudisc;		/* mtu discovery */
@@ -297,6 +296,8 @@ void	ipflow_init __P((void));
 struct	ipflow *ipflow_reap __P((int));
 void	ipflow_create __P((const struct route *, struct mbuf *));
 void	ipflow_slowtimo __P((void));
+
+u_int16_t ip_randomid __P((void));
 #endif
 
 #endif /* _NETINET_IP_VAR_H_ */

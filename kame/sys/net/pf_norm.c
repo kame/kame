@@ -1012,7 +1012,7 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 		h->ip_ttl = r->min_ttl;
 
 	if (r->rule_flag & PFRULE_RANDOMID) {
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 		h->ip_id = ip_randomid();
 #else
 		h->ip_id = htons(ip_id++);

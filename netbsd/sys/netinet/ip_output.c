@@ -271,7 +271,7 @@ ip_output(m0, va_alist)
 	if ((flags & (IP_FORWARDING|IP_RAWOUTPUT)) == 0) {
 		ip->ip_v = IPVERSION;
 		ip->ip_off = 0;
-		ip->ip_id = htons(ip_id++);
+		ip->ip_id = htons(ip_randomid());
 		ip->ip_hl = hlen >> 2;
 		ipstat.ips_localout++;
 	} else {

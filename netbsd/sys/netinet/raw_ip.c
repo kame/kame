@@ -355,7 +355,7 @@ rip_output(m, va_alist)
 			return (EINVAL);
 		}
 		if (ip->ip_id == 0)
-			ip->ip_id = htons(ip_id++);
+			ip->ip_id = htons(ip_randomid());
 		opts = NULL;
 		/* XXX prevent ip_output from overwriting header fields */
 		flags |= IP_RAWOUTPUT;

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.202 2003/09/10 21:07:37 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.203 2003/09/17 07:17:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2276,7 +2276,11 @@ ipsec4_encapsulate(m, sav)
 		ipseclog((LOG_ERR, "IPv4 ipsec: size exceeds limit: "
 		    "leave ip_len as is (invalid packet)\n"));
 	}
+#ifdef __NetBSD__
+	ip->ip_id = htons(ip_randomid());
+#else
 	ip->ip_id = htons(ip_id++);
+#endif
 	bcopy(&((struct sockaddr_in *)&sav->sah->saidx.src)->sin_addr,
 		&ip->ip_src, sizeof(ip->ip_src));
 	bcopy(&((struct sockaddr_in *)&sav->sah->saidx.dst)->sin_addr,
