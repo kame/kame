@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.270 2001/12/25 02:24:32 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.271 2001/12/25 08:22:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -177,13 +177,14 @@ struct ip6_exthdrs {
 };
 
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **, int));
-static int ip6_getpcbopt __P((struct ip6_pktopts *, int, void **, int *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
-			    struct socket *, struct sockopt *sopt));
+			    struct socket *, struct sockopt *));
+static int ip6_getpcbopt __P((struct ip6_pktopts *, int, struct sockopt *));
 #else
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 			    struct socket *));
+static int ip6_getpcbopt __P((struct ip6_pktopts *, int, struct mbuf **));
 #endif
 static int ip6_setpktoption __P((int, u_char *, int, struct ip6_pktopts *, int,
 				 int, int));
@@ -2573,7 +2574,6 @@ do { \
 #endif
 			case IPV6_RECVTCLASS:
 			case IPV6_AUTOFLOWLABEL:
-			case IPV6_TCLASS:
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
@@ -2648,19 +2648,6 @@ do { \
 					optval = PKTOPTBIT(IP6PO_MINMTU);
 					break;
 #undef PKTOPTBIT
-
-				case IPV6_TCLASS:
-					error = ip6_getpcbopt(in6p->in6p_outputopts,
-							      optname, &optdata,
-							      &optdatalen);
-					if (error)
-						break;
-					if (optdatalen != sizeof(int)) {
-						error = EINVAL;
-						break;
-					}
-					optval = *((int *)optdata);
-					break;
 				}
 				if (error)
 					break;
@@ -2671,20 +2658,6 @@ do { \
 				*mp = m = m_get(M_WAIT, MT_SOOPTS);
 				m->m_len = sizeof(int);
 				*mtod(m, int *) = optval;
-#endif
-				break;
-
-			case IPV6_OTCLASS:
-				error = ip6_getpcbopt(in6p->in6p_outputopts,
-				    optname, &optdata, &optdatalen);
-				if (error)
-					break;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				error = sooptcopyout(sopt, optdata, optdatalen);
-#else
-				*mp = m = m_get(M_WAIT, MT_SOOPTS);
-				m->m_len = optdatalen;
-				bcopy(optdata, mtod(m, caddr_t), optdatalen);
 #endif
 				break;
 
@@ -2777,25 +2750,15 @@ do { \
 			case IPV6_DSTOPTS:
 			case IPV6_RTHDRDSTOPTS:
 			case IPV6_NEXTHOP:
-				error = ip6_getpcbopt(in6p->in6p_outputopts,
-						      optname, &optdata,
-						      &optdatalen);
-				if (error == 0) {
+			case IPV6_OTCLASS:
+			case IPV6_TCLASS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-					/* note that optdatalen maybe 0 */
-					error = sooptcopyout(sopt, optdata,
-							     optdatalen);
-#else  /* !FreeBSD3 */
-					if (optdatalen > MCLBYTES)
-						return(EMSGSIZE); /* XXX */
-					*mp = m = m_get(M_WAIT, MT_SOOPTS);
-					if (optdatalen > MLEN)
-						MCLGET(m, M_WAIT);
-					m->m_len = optdatalen;
-					bcopy(optdata, mtod(m, void *),
-					      optdatalen);
-#endif /* FreeBSD3 */
-				}
+				error = ip6_getpcbopt(in6p->in6p_outputopts,
+						      optname, sopt);
+#else
+				error = ip6_getpcbopt(in6p->in6p_outputopts,
+						      optname, mp);
+#endif
 				break;
 
 			case IPV6_MULTICAST_IF:
@@ -3178,75 +3141,100 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 	return(ip6_setpktoption(optname, buf, len, opt, priv, 1, 0));
 }
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static int
-ip6_getpcbopt(pktopt, optname, datap, datalenp)
+ip6_getpcbopt(pktopt, optname, sopt)
 	struct ip6_pktopts *pktopt;
-	int optname, *datalenp;
-	void **datap;
+	struct sockopt *sopt;
+	int optname;
+#else
+ip6_getpcbopt(pktopt, optname, mp)
+	struct ip6_pktopts *pktopt;
+	int optname;
+	struct mbuf **mp;
+#endif
 {
 	void *optdata = NULL;
-	struct ip6_ext *ip6e;
 	int optdatalen = 0;
+	struct ip6_ext *ip6e;
 	int error = 0;
-
-	if (pktopt == NULL)
-		goto end;
+	struct in6_pktinfo null_pktinfo;
+	int deftclass = 0;
 
 	switch (optname) {
 	case IPV6_PKTINFO:
-		if (pktopt->ip6po_pktinfo) {
+		if (pktopt && pktopt->ip6po_pktinfo)
 			optdata = (void *)pktopt->ip6po_pktinfo;
-			optdatalen = sizeof(struct in6_pktinfo);
+		else {
+			/* XXX: we don't have to do this every time... */
+			bzero(&null_pktinfo, sizeof(null_pktinfo));
+			optdata = (void *)&null_pktinfo;
 		}
-		break;
-	case IPV6_HOPLIMIT:
-		optdata = (void *)&pktopt->ip6po_hlim;
-		optdatalen = sizeof(int);
+		optdatalen = sizeof(struct in6_pktinfo);
 		break;
 	case IPV6_OTCLASS:
 		/* XXX */
-		error = EINVAL;
-		goto end;
+		return(EINVAL);
 	case IPV6_TCLASS:
-		optdata = (void *)&pktopt->ip6po_tclass;
-		optdatalen = sizeof(pktopt->ip6po_tclass);
+		if (pktopt && pktopt->ip6po_tclass >= 0)
+			optdata = (void *)&pktopt->ip6po_tclass;
+		else
+			optdata = (void *)&deftclass;
+		optdatalen = sizeof(int);
 		break;
 	case IPV6_HOPOPTS:
-		
-		if (pktopt->ip6po_hbh) {
+		if (pktopt && pktopt->ip6po_hbh) {
 			optdata = (void *)pktopt->ip6po_hbh;
 			ip6e = (struct ip6_ext *)pktopt->ip6po_hbh;
 			optdatalen = (ip6e->ip6e_len + 1) << 3;
 		}
 		break;
 	case IPV6_RTHDR:
-		if (pktopt->ip6po_rthdr) {
+		if (pktopt && pktopt->ip6po_rthdr) {
 			optdata = (void *)pktopt->ip6po_rthdr;
 			ip6e = (struct ip6_ext *)pktopt->ip6po_rthdr;
 			optdatalen = (ip6e->ip6e_len + 1) << 3;
 		}
 		break;
 	case IPV6_RTHDRDSTOPTS:
-		if (pktopt->ip6po_dest1) {
+		if (pktopt && pktopt->ip6po_dest1) {
 			optdata = (void *)pktopt->ip6po_dest1;
 			ip6e = (struct ip6_ext *)pktopt->ip6po_dest1;
 			optdatalen = (ip6e->ip6e_len + 1) << 3;
 		}
 		break;
 	case IPV6_DSTOPTS:
-		if (pktopt->ip6po_dest2) {
+		if (pktopt && pktopt->ip6po_dest2) {
 			optdata = (void *)pktopt->ip6po_dest2;
 			ip6e = (struct ip6_ext *)pktopt->ip6po_dest2;
 			optdatalen = (ip6e->ip6e_len + 1) << 3;
 		}
 		break;
+	case IPV6_NEXTHOP:
+		if (pktopt && pktopt->ip6po_nexthop) {
+			optdata = (void *)pktopt->ip6po_nexthop;
+			optdatalen = pktopt->ip6po_nexthop->sa_len;
+		}
+		break;
+	default:		/* should not happen */
+		printf("ip6_getpcbopt: unexpected option: %d\n", optname);
+		return(ENOPROTOOPT);
 	}
 
-  end:
-	*datap = optdata;
-	*datalenp = optdatalen;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	error = sooptcopyout(sopt, optdata, optdatalen);
+#else  /* !FreeBSD3 */
+	if (optdatalen > MCLBYTES)
+		return(EMSGSIZE); /* XXX */
+	*mp = m = m_get(M_WAIT, MT_SOOPTS);
+	if (optdatalen > MLEN)
+		MCLGET(m, M_WAIT);
+	m->m_len = optdatalen;
+	if (optdatalen)
+		bcopy(optdata, mtod(m, void *), optdatalen);
+#endif /* FreeBSD3 */
 
-	return error;
+	return(error);
 }
 
 void
