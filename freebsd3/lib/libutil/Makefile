@@ -34,6 +34,8 @@ MLINKS+=login_auth.3 auth_checknologin.3 login_auth.3 auth_cat.3
 MLINKS+=uucplock.3 uu_lock.3 uucplock.3 uu_lock_txfr.3 \
 	uucplock.3 uu_unlock.3 uucplock.3 uu_lockerr.3
 
+CFLAGS+=-DINET6
+
 beforeinstall:
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ${.CURDIR}/libutil.h \
 		${DESTDIR}/usr/include

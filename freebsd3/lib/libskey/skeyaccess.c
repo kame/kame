@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/param.h>
+#include <netdb.h>
 
 #include "pathnames.h"
 
@@ -45,12 +46,12 @@
   */
 static char *prev_token = 0;		/* push-back buffer */
 static char *line_pointer = NULL;
-static char *first_token __P((char *, int, FILE *));
+static char *first_token();
 static int line_number;
-static void unget_token __P((char *));
-static char *get_token __P((void));
-static char *need_token __P((void));
-static char *need_internet_addr __P((void));
+static void unget_token();
+static char *get_token();
+static char *need_token();
+static char *need_internet_addr();
 
  /*
   * Various forms of token matching.
@@ -58,13 +59,12 @@ static char *need_internet_addr __P((void));
 #define match_host_name(l)	match_token((l)->host_name)
 #define match_port(l)		match_token((l)->port)
 #define match_user(l)		match_token((l)->user)
-struct login_info;
-static int match_internet_addr __P((struct login_info *));
-static int match_group __P((struct login_info *));
-static int match_token __P((char *));
-static int is_internet_addr __P((char *));
-static struct in_addr *convert_internet_addr __P((char *));
-static struct in_addr *lookup_internet_addr __P((char *));
+static int match_internet_addr();
+static int match_group();
+static int match_token();
+static int is_internet_addr();
+static struct sockaddr_storage *convert_internet_addr();
+static struct sockaddr_storage *lookup_internet_addr();
 
 #define MAX_ADDR	32
 #define PERMIT		1
@@ -79,13 +79,133 @@ static struct in_addr *lookup_internet_addr __P((char *));
 
 struct login_info {
     char   *host_name;			/* host name */
-    struct in_addr *internet_addr;	/* null terminated list */
+    struct sockaddr_storage *internet_addr;	/* null terminated list */
     char   *user;			/* user name */
     char   *port;			/* login port */
 };
 
-static int _skeyaccess __P((FILE *, struct login_info *));
-int skeyaccess __P((char *, char *, char *, char *));
+static int _skeyaccess __P(( FILE *, struct login_info * ));
+
+static int
+numstr2addr(addr, name)
+	struct sockaddr *addr;
+	char *name;
+{
+#ifdef HAVE_GETADDRINFO
+	struct addrinfo hints, *res;
+	int error;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_flags = AI_NUMERICHOST;
+	error = getaddrinfo(name, NULL, &hints, &res);
+	if (error)
+		return error;
+	else {
+		memcpy(addr, res->ai_addr, res->ai_addrlen);
+		freeaddrinfo(res);
+		return 0;
+	}
+#else
+	struct in_addr in;
+	struct sockaddr_in *sin;
+#ifdef INET6
+	struct in6_addr in6;
+	struct sockaddr_in6 *sin6;
+#endif
+
+	if (inet_pton(AF_INET, name, &in) == 1) {
+		sin = (struct sockaddr_in *)addr;
+		memset(sin, 0, sizeof(*sin));
+		sin->sin_family = AF_INET;
+		sin->sin_len = sizeof(*sin);
+		memcpy(&sin->sin_addr, &in, sizeof(in));
+		return 0;
+	}
+#ifdef INET6
+	if (inet_pton(AF_INET6, name, &in6) == 1) {
+		sin6 = (struct sockaddr_in6 *)addr;
+		memset(sin6, 0, sizeof(*sin6));
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(*sin6);
+		memcpy(&sin6->sin6_addr, &in6, sizeof(in6));
+		return 0;
+	}
+#endif
+		
+	return -1;
+#endif
+}
+
+static int
+addr2str(addr, name, namelen)
+	struct sockaddr *addr;
+	char *name;
+	int namelen;
+{
+#ifdef HAVE_GETNAMEINFO
+	return getnameinfo(addr, addr->sa_len, name, namelen, NULL, 0, 0);
+#else
+	struct hostent *hp;
+	
+	switch (addr->sa_family) {
+	case AF_INET:
+		hp = gethostbyaddr((char *)&((struct sockaddr_in *)addr)->sin_addr,
+			sizeof(struct in_addr), AF_INET);
+		break;
+#ifdef INET6
+	case AF_INET6:
+		hp = gethostbyaddr((char *)&((struct sockaddr_in6 *)addr)->sin6_addr,
+			sizeof(struct in6_addr), AF_INET6);
+		break;
+#endif
+	default:
+		hp = NULL;
+	}
+
+	if (!hp)
+		return -1;
+	if (namelen <= 0)
+		return -1;
+	strncpy(name, hp->h_name, namelen);
+	name[namelen - 1] = 0;
+	return 0;
+#endif
+}
+
+#ifdef TEST
+static int
+addr2numstr(addr, name, namelen)
+	struct sockaddr *addr;
+	char *name;
+	int namelen;
+{
+#ifdef HAVE_GETNAMEINFO
+	return getnameinfo(addr, addr->sa_len, name, namelen, NULL, 0,
+			NI_NUMERICHOST);
+#else
+	switch (addr->sa_family) {
+	case AF_INET:
+		if (inet_ntop(AF_INET, &((struct sockaddr_in *)addr)->sin_addr,
+				name, namelen) == NULL) {
+			return -1;
+		} else
+			return 0;
+#ifdef INET6
+	case AF_INET6:
+		if (inet_ntop(AF_INET6,
+				&((struct sockaddr_in6 *)addr)->sin6_addr,
+				name, namelen) == NULL) {
+			return -1;
+		} else
+			return 0;
+#endif
+	default:
+		return 0;
+	}
+#endif
+}
+#endif /*TEST*/
 
 /* skeyaccess - find out if UNIX passwords are permitted */
 
@@ -150,11 +270,18 @@ char   *addr;
 	printf("none\n");
     } else {
 	int     i;
+	char hostbuf[MAXHOSTNAMELEN];
 
-	for (i = 0; login_info.internet_addr[i].s_addr; i++)
-	    printf("%s%s", login_info.internet_addr[i].s_addr == -1 ?
-		 "(see error log)" : inet_ntoa(login_info.internet_addr[i]),
-		   login_info.internet_addr[i + 1].s_addr ? " " : "\n");
+	for (i = 0; login_info.internet_addr[i].__ss_len; i++) {
+	    if (login_info.internet_addr[i].__ss_family == 0)
+		strcpy(hostbuf, "(see error log)");
+	    else {
+		addr2numstr((struct sockaddr *)&login_info.internet_addr[i],
+			hostbuf, sizeof(hostbuf));
+	    }
+	    printf("%s%s", hostbuf, 
+		   login_info.internet_addr[i + 1].__ss_len ? " " : "\n");
+	}
     }
 #endif
     result = _skeyaccess(fp, &login_info);
@@ -231,29 +358,128 @@ struct login_info *login_info;
 static int match_internet_addr(login_info)
 struct login_info *login_info;
 {
-    char *     tok;
-    u_int32_t  pattern;
-    u_int32_t  mask;
-    struct in_addr *addrp;
+    char *tok;
+    struct sockaddr_storage pattern;
+    struct sockaddr_storage mask;
+    struct sockaddr_storage *addrp;
 
     if (login_info->internet_addr == 0)
 	return (0);
-    if ((tok = need_internet_addr()) == 0)
+    if ((tok = get_token()) == 0) {
+	syslog(LOG_ERR, "%s: line %d: internet address expected",
+	       _PATH_SKEYACCESS, line_number);
 	return (0);
-    pattern = inet_addr(tok);
-    if ((tok = need_internet_addr()) == 0)
-	return (0);
-    mask = inet_addr(tok);
+    }
+    if (strchr(tok, '/')) {
+	/* addr/masklen */
+	char *a, *p, *q;
+	int masklen, max;
+
+	a = strdup(tok);
+	p = strchr(a, '/');
+	if (!p)
+	    return 0;
+	*p++ = '\0';
+	if (numstr2addr(&pattern, a)) {
+	    syslog(LOG_ERR, "%s: line %d: bad internet address: %s",
+		   _PATH_SKEYACCESS, line_number, a);
+	    return 0;
+	}
+
+	for (q = p; q && *q; q++) {
+	    if (!isdigit(*q))
+		q = NULL;
+	}
+	if (!q || sscanf(p, "%d", &masklen) != 1) {
+	    syslog(LOG_ERR, "%s: line %d: bad mask value: %s",
+		   _PATH_SKEYACCESS, line_number, p);
+	    return 0;
+	}
+
+	memset(&mask, 0, sizeof(mask));
+	mask.__ss_family = pattern.__ss_family;
+	mask.__ss_len = pattern.__ss_len;
+	switch (pattern.__ss_family) {
+	case AF_INET:
+	    p = (char *)&((struct sockaddr_in *)&mask)->sin_addr;
+	    max = 32;
+	    break;
+	case AF_INET6:
+	    p = (char *)&((struct sockaddr_in6 *)&mask)->sin6_addr;
+	    max = 128;
+	    break;
+	default:
+	    return 0;
+	}
+	if (masklen < 0 || max < masklen) {
+	    syslog(LOG_ERR, "%s: line %d: bad mask length: %d (max %d)",
+		   _PATH_SKEYACCESS, line_number, masklen, max);
+	    return 0;
+	}
+	memset(p, 0xff, masklen / 8);
+	if (masklen % 8)
+	    p[masklen / 8] = (0xff00 >> (masklen % 8)) & 0xff;
+    } else {
+	/* addr mask */
+	if (numstr2addr(&pattern, tok)) {
+	    syslog(LOG_ERR, "%s: line %d: bad internet address: %s",
+		   _PATH_SKEYACCESS, line_number, tok);
+	    return 0;
+	}
+
+	if ((tok = need_internet_addr()) == 0)
+	    return (0);
+	if (numstr2addr(&mask, tok))
+	    return 0;
+	if (pattern.__ss_family != mask.__ss_family)
+	    return 0;
+    }
 
     /*
      * See if any of the addresses matches a pattern in the control file. We
      * have already tried to drop addresses that belong to someone else.
      */
 
-    for (addrp = login_info->internet_addr; addrp->s_addr; addrp++)
-	if (addrp->s_addr != INADDR_NONE && (addrp->s_addr & mask) == pattern)
-	    return (1);
-    return (0);
+    for (addrp = login_info->internet_addr; addrp->__ss_len; addrp++) {
+	if (pattern.__ss_family != addrp->__ss_family)
+	    continue;
+	switch (addrp->__ss_family) {
+	case AF_INET:
+	  {
+	    struct sockaddr_in *sin = (struct sockaddr_in *)addrp;
+	    struct in_addr masked;
+	    masked = sin->sin_addr;
+	    masked.s_addr &= ((struct sockaddr_in *)&mask)->sin_addr.s_addr;
+	    if (masked.s_addr == ((struct sockaddr_in *)&pattern)->sin_addr.s_addr)
+		return 1;
+	    break;
+	  }
+#ifdef INET6
+	case AF_INET6:
+	  {
+	    struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addrp;
+	    struct sockaddr_in6 *mask6 = (struct sockaddr_in6 *)&mask;
+	    struct sockaddr_in6 *pattern6 = (struct sockaddr_in6 *)&pattern;
+	    struct in6_addr masked;
+	    masked = sin6->sin6_addr;
+	    masked.s6_addr32[0] &= mask6->sin6_addr.s6_addr32[0];
+	    masked.s6_addr32[1] &= mask6->sin6_addr.s6_addr32[1];
+	    masked.s6_addr32[2] &= mask6->sin6_addr.s6_addr32[2];
+	    masked.s6_addr32[3] &= mask6->sin6_addr.s6_addr32[3];
+	    if (masked.s6_addr32[0] == pattern6->sin6_addr.s6_addr32[0]
+	     && masked.s6_addr32[1] == pattern6->sin6_addr.s6_addr32[1]
+	     && masked.s6_addr32[2] == pattern6->sin6_addr.s6_addr32[2]
+	     && masked.s6_addr32[3] == pattern6->sin6_addr.s6_addr32[3]) {
+		return 1;
+	    }
+	    break;
+	  }
+#endif
+	default:
+	    break;
+	}
+    }
+    return 0;
 }
 
 /* match_group - match username against group */
@@ -369,53 +595,108 @@ static char *need_internet_addr()
 static int is_internet_addr(str)
 char   *str;
 {
-    int     in_run = 0;
-    int     runs = 0;
+#ifdef HAVE_GETADDRINFO
+    struct addrinfo hints, *res;
+    int error;
 
-    /* Count the number of runs of characters between the dots. */
-
-    while (*str) {
-	if (*str == '.') {
-	    in_run = 0;
-	} else {
-	    if (!isdigit(*str))
-		return (0);
-	    if (in_run == 0) {
-		in_run = 1;
-		runs++;
-	    }
-	}
-	str++;
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_flags = AI_NUMERICHOST;
+    error = getaddrinfo(str, NULL, &hints, &res);
+    if (error)
+	return 0;
+    else {
+	freeaddrinfo(res);
+	return 1;
     }
-    return (runs == 4);
+#else
+    struct in_addr in;
+#ifdef INET6
+    struct in6_addr in6;
+#endif
+
+    if (inet_pton(AF_INET, str, &in) == 1)
+	return 1;
+#ifdef INET6
+    if (inet_pton(AF_INET6, str, &in6) == 1)
+	return 1;
+#endif
+    return 0;
+#endif
 }
 
 /* lookup_internet_addr - look up internet addresses with extreme prejudice */
 
-static struct in_addr *lookup_internet_addr(host)
+static struct sockaddr_storage *lookup_internet_addr(host)
 char   *host;
 {
-    struct hostent *hp;
-    static struct in_addr list[MAX_ADDR + 1];
+    static struct sockaddr_storage list[MAX_ADDR + 1];
     char    buf[MAXHOSTNAMELEN + 1];
-    int     length;
     int     i;
+    char hostbuf[MAXHOSTNAMELEN];
+#ifdef HAVE_GETADDRINFO
+    struct addrinfo hints, *res, *res0;
+    int error;
 
-    if ((hp = gethostbyname(host)) == 0 || hp->h_addrtype != AF_INET)
-	return (0);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = PF_UNSPEC;
+    hints.ai_flags = AI_NUMERICHOST|AI_CANONNAME;
+    error = getaddrinfo(host, NULL, &hints, &res0);
+    if (error)
+	return 0;
 
     /*
      * Save a copy of the results before gethostbyaddr() clobbers them.
      */
+    i = 0;
+    for (res = res0; i < MAX_ADDR && res; res = res->ai_next) {
+	memcpy((char *)&list[i], res->ai_addr, res->ai_addrlen);
+	i++;
+    }
+    memset(&list[i], 0, sizeof(list[i]));
 
-    for (i = 0; i < MAX_ADDR && hp->h_addr_list[i]; i++)
-	memcpy((char *) &list[i],
-	       hp->h_addr_list[i], (size_t)hp->h_length);
-    list[i].s_addr = 0;
+    if (res0->ai_canonname)
+	strncpy(buf, res0->ai_canonname, MAXHOSTNAMELEN);
+    else
+	buf[0] = '\0';
+    freeaddrinfo(res0);
+#else
+    struct hostent *hp;
+    struct sockaddr_in *sin;
+#ifdef INET6
+    struct sockaddr_in6 *sin6;
+#endif
+    int j;
 
-    strncpy(buf, hp->h_name, MAXHOSTNAMELEN);
-    buf[MAXHOSTNAMELEN] = 0;
-    length = hp->h_length;
+    i = 0;
+    buf[0] = '\0';
+
+#ifdef INET6
+    hp = gethostbyname2(host, AF_INET6);
+    for (j = 0; hp && i < MAX_ADDR && hp->h_addr_list[j]; j++) {
+	sin6 = (struct sockaddr_in6 *)&list[i];
+	memset(sin6, 0, sizeof(*sin6));
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_len = sizeof(*sin6);
+	memcpy(&sin6->sin6_addr, hp->h_addr_list[j], hp->h_length);
+	i++;
+    }
+    if (hp)
+	strncpy(buf, hp->h_name, sizeof(buf));
+#endif
+    hp = gethostbyname2(host, AF_INET);
+    for (j = 0; hp && i < MAX_ADDR && hp->h_addr_list[j]; j++) {
+	sin = (struct sockaddr_in *)&list[i];
+	memset(sin, 0, sizeof(*sin));
+	sin->sin_family = AF_INET;
+	sin->sin_len = sizeof(*sin);
+	memcpy(&sin->sin_addr, hp->h_addr_list[j], hp->h_length);
+	i++;
+    }
+    if (hp)
+	strncpy(buf, hp->h_name, sizeof(buf));
+#endif
+    buf[MAXHOSTNAMELEN] = 0;	/*for safety*/
 
     /*
      * Wipe addresses that appear to belong to someone else. We will get
@@ -426,15 +707,14 @@ char   *host;
 #define NEQ3(x,y,n)	(strncasecmp((x),(y), (n)) != 0)
 
     while (--i >= 0) {
-	if ((hp = gethostbyaddr((char *) &list[i], length, AF_INET)) == 0) {
-	    syslog(LOG_ERR, "address %s not registered for host %s",
-		   inet_ntoa(list[i]), buf);
-	    list[i].s_addr = (u_int32_t) -1;
+	if (addr2str((struct sockaddr *)&list[i], hostbuf, sizeof(hostbuf))) {
+	    syslog(LOG_ERR, "some of address not registered for host %s", buf);
+	    list[i].__ss_family = 0;
 	}
-	if (NEQ(buf, hp->h_name) && NEQ3(buf, "localhost.", 10)) {
-	    syslog(LOG_ERR, "address %s registered for host %s and %s",
-		   inet_ntoa(list[i]), hp->h_name, buf);
-	    list[i].s_addr = (u_int32_t) -1;
+	if (NEQ(buf, hostbuf) && NEQ3(buf, "localhost.", 10)) {
+	    syslog(LOG_ERR, "address registered for host %s and %s",
+		   hostbuf, buf);
+	    list[i].__ss_family = 0;
 	}
     }
     return (list);
@@ -442,13 +722,16 @@ char   *host;
 
 /* convert_internet_addr - convert string to internet address */
 
-static struct in_addr *convert_internet_addr(string)
+static struct sockaddr_storage *convert_internet_addr(string)
 char   *string;
 {
-    static struct in_addr list[2];
+    static struct sockaddr_storage list[2];
 
-    list[0].s_addr = inet_addr(string);
-    list[1].s_addr = 0;
+    if (numstr2addr(&list[0], string)) {
+	syslog(LOG_ERR, "invalid hostname %s\n", string);
+	exit(1);
+    }
+    memset(&list[1], 0, sizeof(list[1]));
     return (list);
 }
 
@@ -469,7 +752,7 @@ char  **argv;
 	exit(0);
     }
     if (_PATH_SKEYACCESS[0] != '/')
-	printf("Warning: this program uses control file: %s\n", KEYACCESS);
+	printf("Warning: this program uses control file: %s\n", _PATH_SKEYACCESS);
     openlog("login", LOG_PID, LOG_AUTH);
 
     user = argv[1];

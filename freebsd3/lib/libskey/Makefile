@@ -15,11 +15,20 @@ CFLAGS+=-W -Wall
 CFLAGS+=-Werror
 .endif
 
+.if ${OBJFORMAT} == elf
 DPADD+= ${LIBCRYPT} ${LIBMD}
 LDADD+=	-lcrypt -lmd
+.endif
+
+CFLAGS+=-DINET6
+#CFLAGS+=-DHAVE_GETADDRINFO -DHAVE_GETNAMEINFO
 
 beforeinstall:
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ${.CURDIR}/skey.h \
 		${DESTDIR}/usr/include
+
+# must be larger than default /usr/lib/libskey.so
+SHLIB_MAJOR=	2
+SHLIB_MINOR=	1
 
 .include <bsd.lib.mk>
