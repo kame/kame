@@ -179,6 +179,7 @@ struct	ipstat {
 	u_long	ips_rawout;		/* total raw ip packets generated */
 	u_long	ips_toolong;		/* ip length > max ip packet size */
 	u_long	ips_nogif;		/* no match gif found */
+	u_long	ips_badaddr;		/* invalid address on header */
 };
 
 #ifdef KERNEL
