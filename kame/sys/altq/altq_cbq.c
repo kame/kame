@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.16 2003/07/10 12:07:47 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.17 2003/07/11 03:14:38 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -942,7 +942,9 @@ cbq_getstats(gsp)
 		case 2:
 			cl = cbqp->ifnp.ctl_;
 			stats.handle = CTL_CLASS_HANDLE;
-			break;
+			if (cl != NULL)
+				break;
+			/* fall through if there's no ctl_class */
 		default:
 			while ((cl = cbqp->cbq_class_tbl[chandle]) == NULL)
 				if (++chandle >= CBQ_MAX_CLASSES)
