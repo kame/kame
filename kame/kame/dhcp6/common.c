@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.107 2004/06/10 09:43:21 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.108 2004/06/10 12:56:12 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -463,7 +463,7 @@ dhcp6_auth_replaycheck(method, prev, current)
 	current = ntohq(current);
 
 	/* we call the singular point guilty */
-        if (prev == (current ^ 8000000000000000UL)) {
+        if (prev == (current ^ 8000000000000000ULL)) {
 		dprintf(LOG_INFO, FNAME, "detected a singular point");
 		return (1);
 	}
