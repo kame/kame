@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.69 2002/05/08 10:36:16 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.70 2002/05/08 10:54:58 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -104,7 +104,8 @@ static int server6_react_solicit __P((struct dhcp6_if *, char *, size_t,
 				      struct sockaddr *, int));
 static int server6_send_reply __P((struct dhcp6_if *, struct dhcp6 *,
 				   struct dhcp6_optinfo *,
-				   struct sockaddr *, int));
+				   struct sockaddr *, int,
+				   struct dhcp6_optinfo *));
 
 int
 main(argc, argv)
@@ -456,6 +457,8 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 	struct sockaddr *from;
 	int fromlen;
 {
+	struct dhcp6_optinfo roptinfo;
+
 	/*
 	 * Servers MUST discard any Solicit messages that do not include a
 	 * Client Identifier option. [dhcpv6-24 Section 15.2]
@@ -467,15 +470,38 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 	}
 
 	/*
+	 * configure necessary options based on the options in solicit.
+	 */
+	dhcp6_init_options(&roptinfo);
+
+	/* server information option */
+	roptinfo.serverID = server_duid;
+
+	/* copy client information back (if provided) */
+	if (optinfo->clientID.duid_id)
+		roptinfo.clientID = optinfo->clientID;
+
+	/* DNS server */
+	roptinfo.dnslist = dnslist;
+
+	/*
 	 * If the client has included a Rapid Commit option and the server
 	 * has been configured to respond with committed address assignments
 	 * and other resources, responds to the Solicit with a Reply message.
 	 * [dhcpv6-24 Section 17.2.1]
 	 */
 	if (optinfo->rapidcommit && (ifp->allow_flags & DHCIFF_RAPID_COMMIT)) {
+		/*
+		 * if we're reacting to a solicit with a rapid commit option,
+		 * add the option in the reply as well.
+		 */
+		roptinfo.rapidcommit = 1;
+
 		/* notyet: create and record the bindings for the client */
+		;
+
 		return(server6_send_reply(ifp, (struct dhcp6 *)buf, optinfo,
-					  from, fromlen));
+					  from, fromlen, &roptinfo));
 	} else {
 		/* we don't support this case */
 		dprintf(LOG_INFO, "server6_react_solicit: failed to react: "
@@ -495,6 +521,8 @@ server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
 	struct sockaddr *from;
 	int fromlen;
 {
+	struct dhcp6_optinfo roptinfo;
+
 	/* if a server information is included, it must match ours. */
 	if (optinfo->serverID.duid_len &&
 	    (optinfo->serverID.duid_len != server_duid.duid_len ||
@@ -505,25 +533,37 @@ server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
 		return(-1);
 	}
 
+	/*
+	 * configure necessary options based on the options in request.
+	 */
+	dhcp6_init_options(&roptinfo);
+
+	/* server information option */
+	roptinfo.serverID = server_duid;
+
+	/* copy client information back (if provided) */
+	if (optinfo->clientID.duid_id)
+		roptinfo.clientID = optinfo->clientID;
+
+	/* DNS server */
+	roptinfo.dnslist = dnslist;
+
 	return(server6_send_reply(ifp, (struct dhcp6 *)buf, optinfo,
-				  from, fromlen));
+				  from, fromlen, &roptinfo));
 }
 
 static int
-server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
+server6_send_reply(ifp, origmsg, optinfo, from, fromlen, roptinfo)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *origmsg;
-	struct dhcp6_optinfo *optinfo;
+	struct dhcp6_optinfo *optinfo, *roptinfo;
 	struct sockaddr *from;
 	int fromlen;
 {
 	char replybuf[BUFSIZ];
-	char *dnsbuf = NULL, *p;
 	struct sockaddr_in6 dst;
-	int len, ns, optlen;
+	int len, optlen;
 	struct dhcp6 *dh6;
-	struct dhcp6_optinfo roptinfo;
-	struct dnslist *d;
 
 	if (sizeof(struct dhcp6) > sizeof(replybuf)) {
 		dprintf(LOG_ERR, "buffer size assumption failed");
@@ -537,71 +577,27 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 	dh6->dh6_msgtypexid = origmsg->dh6_msgtypexid;
 	dh6->dh6_msgtype = DH6_REPLY;
 
-	/*
-	 * attach necessary options
-	 */
-	dhcp6_init_options(&roptinfo);
-
-	/*
-	 * if we're reacting to a solicit with a rapid commit option,
-	 * add the option in the reply as well.
-	 */
-	if (origmsg->dh6_msgtype == DH6_SOLICIT)
-		roptinfo.rapidcommit = 1;
-
-	/* server information option */
-	roptinfo.serverID = server_duid;
-
-	/* copy client information back (if provided) */
-	if (optinfo->clientID.duid_id)
-		roptinfo.clientID = optinfo->clientID;
-
-	/* DNS server */
-	roptinfo.dnslist = dnslist;
-#ifdef deprecated
-	for (ns = 0, d = TAILQ_FIRST(&dnslist); d; d = TAILQ_NEXT(d, link))
-		ns++;
-	if (ns) {
-		roptinfo.dns.n = ns;
-		if ((dnsbuf = malloc(sizeof(struct in6_addr) * ns)) == NULL) {
-			dprintf(LOG_WARNING, "server6_send_reply: "
-				"malloc failed for DNS list");
-			goto end;
-		}
-		for (p = dnsbuf, d = TAILQ_FIRST(&dnslist); d;
-		     d = TAILQ_NEXT(d, link)) {
-			memcpy(p, &d->addr, sizeof(struct in6_addr));
-			p += sizeof(struct in6_addr);
-		}
-		roptinfo.dns.list = dnsbuf;
-	}
-#endif
-
 	/* set options in the reply message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
 					(struct dhcp6opt *)(replybuf +
 							    sizeof(replybuf)),
-					&roptinfo)) < 0) {
+					roptinfo)) < 0) {
 		dprintf(LOG_INFO, "server6_send_reply: "
 			"failed to construct reply options");
-		goto end;
+		return(-1);
 	}
 	len += optlen;
 
+	/* specify the destination and send the reply */
 	dst = *sa6_any_downstream;
 	dst.sin6_addr = ((struct sockaddr_in6 *)from)->sin6_addr;
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
-
 	if (transmit_sa(outsock, (struct sockaddr *)&dst,
 			replybuf, len) != 0) {
 		dprintf(LOG_ERR, "transmit to %s failed",
 			addr2str((struct sockaddr *)&dst));
-		/* NOTREACHED */
+		return(-1);
 	}
-
-  end:
-	if (dnsbuf)
-		free(dnsbuf);
 
 	return 0;
 }
