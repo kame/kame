@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/04 15:09:05 $
+			$Date: 1999/10/05 09:58:09 $
 
 1. IPv6
 
@@ -22,6 +22,7 @@ in the past, with our past snapshots.
 RFC1639: FTP Operation Over Big Address Records (FOOBAR)
     * RFC2428 is preferred over RFC1639.  ftp clients will first try RFC2428,
       then RFC1639 if failed.
+RFC1886: DNS Extensions to support IPv6
 RFC1933: Transition Mechanisms for IPv6 Hosts and Routers
     * IPv4 compatible address is not supported.
     * automatic tunnelling (4.3) is not supported.
@@ -67,6 +68,7 @@ RFC2467: Transmission of IPv6 Packets over FDDI Networks
 RFC2472: IPv6 over PPP
 RFC2492: IPv6 over ATM Networks
     * only PVC is supported.
+RFC2497: Transmission of IPv6 packet over ARCnet Networks
 RFC2545: Use of BGP-4 Multiprotocol Extensions for IPv6 Inter-Domain Routing
 RFC2553: Basic Socket Interface Extensions for IPv6
     * IPv4 mapped address (3.7) and special behavior of IPv6 wildcard bind
@@ -76,16 +78,13 @@ RFC2553: Basic Socket Interface Extensions for IPv6
 	- supported on KAME/OpenBSD,
 	- not supported on KAME/FreeBSD228 and KAME/BSDI3.
       see 1.12 in this document for details.
+RFC2675: IPv6 Jumbograms
+    * See 1.7 in this document for details.
 draft-ietf-ipngwg-ipv6router-alert-04: IPv6 router alert option
 draft-ietf-ipngwg-router-renum-08: Router renumbering for IPv6
 draft-ietf-ipngwg-icmp-namelookups-02: IPv6 Name Lookups Through ICMP
 draft-ietf-ipngwg-icmp-name-lookups-03: IPv6 Name Lookups Through ICMP
-draft-ietf-ipngwg-aaaa-03: DNS Extensions to support IPv6
 draft-ietf-ipngwg-mld-01: Multicast Listener Discovery for IPv6
-draft-ietf-ipngwg-jumbo-00: The IPv6 Jumbo Payload Option
-    * See 1.7 in this document for details.
-draft-ietf-ipngwg-jumbograms-00: IPv6 Jumbograms
-    * See 1.7 in this document for details.
 draft-ietf-pim-ipv6-01.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
 draft-itojun-ipv6-tcp-to-anycast-00:
