@@ -1,0 +1,86 @@
+# $KAME: racoon.conf.sample,v 1.1 2000/04/25 06:30:08 sakane Exp $
+
+# "path" must be placed before it should be used.
+# You can overwrite which you defined, but it should not use due to confusing.
+path include "/usr/local/v6/etc" ;
+#include "remote.conf" ;
+
+# search this file for pre_shared_key with various ID key.
+path pre_shared_key "/usr/local/v6/etc/psk.txt" ;
+
+# racoon will search this directory if the certificate or certificate request
+# is received.
+path certificate "/usr/local/openssl/certs" ;
+
+# personal information.
+identifier vendor_id "KAME/racoon";
+identifier user_fqdn "foo@kame.net";
+identifier fqdn "foo.kame.net";
+#identifier keyid "/usr/local/v6/etc/keyid.txt";
+
+# "log" specifies logging level.  It is followed by either "info", "notify",
+# "debug" or "debug2".
+log notify;
+
+# "padding" defines some parameter of padding.  You should not touch these.
+padding {
+	maximum_length 20;	# maximum padding length.
+	randomize off;		# enable randomize length.
+	restrict_check off;	# enable restrict check.
+	exclusive_tail off;	# extract last one octet.
+}
+
+# if no listen directive is specified, racoon will listen to all
+# available interface addresses.
+listen {
+	#isakmp ::1 [7000];
+	#isakmp 203.178.141.194 ;
+	#admin [7002];		# administrative's port by kmpstat.
+	#strict_address; 	# required all addresses must be bound.
+}
+
+# Specification of default various timer.
+timer {
+	# These value can be changed per remote node.
+	counter 5;		# maximum trying count to send.
+	interval 20 sec;	# maximum interval to resend.
+	persend 1;		# the number of packets per a send.
+
+	# timer for waiting to complete each phase.
+	phase1 30 sec;
+	phase2 15 sec;
+}
+
+remote anonymous
+{
+	#exchange_mode main,aggressive,base;
+	exchange_mode aggressive,main,base;
+	doi ipsec_doi;
+	situation identity_only;
+
+	#identifier address;
+	identifier user_fqdn;
+	#certificate_type x509;
+
+	nonce_size 16;
+	lifetime time 24 hour ;	# sec,min,hour
+	lifetime byte 100 MB ;	# B,KB,GB
+
+	proposal {
+		encryption_algorithm 3des;
+		hash_algorithm sha1;
+		authentication_method pre_shared_key ;
+		dh_group 2 ;
+	}
+}
+
+sainfo anonymous
+{
+	pfs_group 1;
+	lifetime time 12 hour ;
+	lifetime byte 50 MB ;
+	encryption_algorithm 3des, rc5, cast128, blowfish, des ;
+	authentication_algorithm hmac_sha1, hmac_md5 ;
+	compression_algorithm deflate ;
+}
+
