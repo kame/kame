@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.149 2001/06/04 12:03:43 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.150 2001/06/18 01:32:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -645,7 +645,7 @@ nd6_timer(ignored_arg)
 			/*
 			 * If the expiring address is temporary, try
 			 * regenerating a new one.  This would be useful when
-			 * we suspended a laptop PC, then turned on after a
+			 * we suspended a laptop PC, then turned it on after a
 			 * period that could invalidate all temporary
 			 * addresses.  Although we may have to restart the
 			 * loop (see below), it must be after purging the
@@ -683,8 +683,8 @@ nd6_timer(ignored_arg)
 					 * has changed while we are still in
 					 * the loop.  Although the change
 					 * would not cause disaster (because
-					 * it's not an addition, but a
-					 * deletion,) we'd rather restart the
+					 * it's not a deletion, but an
+					 * addition,) we'd rather restart the
 					 * loop just for safety.  Or does this 
 					 * significantly reduce performance??
 					 */
