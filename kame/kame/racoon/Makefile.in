@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.27 2000/10/04 17:40:58 itojun Exp $
+#	$KAME: Makefile.in,v 1.28 2000/10/05 06:28:20 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -23,7 +23,7 @@ INSTALL=@INSTALL@
 PROG=	racoon eaytest
 #PROG+=	kmpstat
 #PROG+=	pfkey
-OBJS=	main.o session.o isakmp.o handler.o \
+OBJS=	main.o session.o isakmp.o handler.o random.o \
 	isakmp_ident.o isakmp_agg.o isakmp_base.o \
 	isakmp_quick.o isakmp_inf.o isakmp_newg.o \
 	pfkey.o admin.o ipsec_doi.o oakley.o grabmyaddr.o vendorid.o \
