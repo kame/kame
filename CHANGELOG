@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.21 1999/08/16 05:06:37 jinmei Exp $
+$Id: CHANGELOG,v 1.22 1999/08/17 08:46:33 itojun Exp $
 
 <199908>
+Tue Aug 17 13:01:50 JST 1999  itojun@iijlab.net
+	* kame/ndp: fix cases when no link-layer address information is
+	  cached in the kernel.
+
 1999-08-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/libinet6/name6.c (gethostbyname2): reinitilized saved_hp
 	right after freehostent() in order to avoid possible duplicate
