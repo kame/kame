@@ -97,11 +97,11 @@ make_ether(char *name)
 		fprintf(stderr, "v6test: unknown header %s\n", name);
 		exit(1);
 	}
-	if (addr = tgetstr("esrc", &bp, etherbuf)) {
+	if ((addr = tgetstr("esrc", &bp, etherbuf)) != NULL) {
 		copylladdr(addr, srcbuf);
 		srceaddr = srcbuf;
 	}
-	if (addr = tgetstr("edst", &bp, etherbuf)) {
+	if ((addr = tgetstr("edst", &bp, etherbuf)) != NULL) {
 		copylladdr(addr, dstbuf);
 		dsteaddr = dstbuf;
 	}
@@ -226,7 +226,7 @@ make_hbh(char *name)
 		exit(1);
 	}
 	bp = gettest(opts, opttbuf);
-	while(opttype = nextopt(&bp)) {
+	while ((opttype = nextopt(&bp)) != NULL) {
 		if (strncmp("pad1", opttype, 4) == 0) {
 			*pbp = 0;
 			pbp++;
@@ -263,7 +263,7 @@ make_dstopts(char *name)
 		exit(1);
 	}
 	bp = gettest(opts, opttbuf);
-	while(opttype = nextopt(&bp)) {
+	while ((opttype = nextopt(&bp)) != NULL) {
 		if (strncmp("pad1", opttype, 4) == 0) {
 			*pbp = 0;
 			pbp++;
@@ -346,11 +346,11 @@ make_unknownopt(char *name)
 void
 make_rthdr(char *name)
 {
-	char rtbuf[BUFSIZ], area[BUFSIZ], hopstr[16];
+	char rtbuf[BUFSIZ], area[BUFSIZ];
 	char *bp = area, *addr;
 	struct ip6_rthdr *rthdr = (struct ip6_rthdr *)pbp;
 	struct ip6_rthdr0 *rthdr0;
-	int hops, i;
+	int hops;
 	int rthdrlen = 0;
 
 	if (tgetent(rtbuf, name) <= 0) {
@@ -749,7 +749,7 @@ make_ndopt(char *name)
 	char *bp, *opttype;
 
 	bp = gettest(name, ndoptbuf);
-	while(opttype = nextopt(&bp)) {
+	while ((opttype = nextopt(&bp)) != NULL) {
 		if (strncmp("srclladdr", opttype, 9) == 0)
 			make_ndopt_lladdr(opttype, ND_OPT_SOURCE_LINKADDR);
 		else if (strncmp("tgtlladdr", opttype, 9) == 0)
@@ -765,7 +765,8 @@ make_ndopt(char *name)
 		else if (strncmp("ndopt", opttype, 5) == 0)
 			make_ndopt_unknown(opttype);
 		else {
-			fprintf(stderr, "v6test: unknown nd option %s\n");
+			fprintf(stderr, "v6test: unknown nd option %s\n",
+			    opttype);
 			exit(1);
 		}
 	}
@@ -801,6 +802,7 @@ copylladdr(char *eaddr, char *buf)
 	char *bp, *cp;
 	char eaddrbuf[18];
 	int i;
+	unsigned int x;
 
 	bcopy(eaddr, eaddrbuf, 18);
 	eaddrbuf[18] = ':';
@@ -809,7 +811,8 @@ copylladdr(char *eaddr, char *buf)
 		cp = index(bp, ':');
 		if (cp)
 			*cp = '\0';
-		sscanf(bp, "%02x", buf + i);
+		sscanf(bp, "%02x", &x);
+		buf[i] = x;
 		if (cp == 0)
 			break;
 		bp = cp + 1;
@@ -907,8 +910,7 @@ make_ndopt_unknown(char *name)
 void
 make_tcp(char *name)
 {
-    char tcpbuf[BUFSIZ], area[BUFSIZ];
-    char *addr, *bp = area;
+    char tcpbuf[BUFSIZ];
     struct tcphdr *th = (struct tcphdr *)pbp;
     char val8;
     short val16;
@@ -944,12 +946,9 @@ make_tcp(char *name)
 void
 make_udp(char *name)
 {
-    char udpbuf[BUFSIZ], area[BUFSIZ];
-    char *addr, *bp = area;
+    char udpbuf[BUFSIZ];
     struct udphdr *uh = (struct udphdr *)pbp;
-    char val8;
     short val16;
-    int val32;
 
     if (tgetent(udpbuf, name) <= 0) {
 	fprintf(stderr, "v6test: unknown header %s\n", name);
@@ -989,7 +988,7 @@ getconfig(char *testname, u_char *buf)
 	pacbuf = pbp = buf;
 	ip6plenauto = 0;
 	bp = gettest(testname, tbuf);
-	while(hdrtype = nexthdr(&bp)) {
+	while ((hdrtype = nexthdr(&bp)) != NULL) {
 		if (strncmp("interval", hdrtype, 8) == 0) {
 			struct timeval sleeptm;
 			u_long ival;

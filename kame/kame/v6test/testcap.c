@@ -70,12 +70,15 @@ static char sccsid[] = "@(#)remcap.c	5.5 (Berkeley) 2/2/91";
  * derived from termcap
  */
 #include <sys/types.h>
+#include <sys/uio.h>
 #include <fcntl.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <unistd.h>
 #include "pathnames.h"
+#include "testcap.h"
 
 #define	TESTBUFSIZ	2048
 #define MAXHOP		32		/* max number of tc= indirections */
@@ -85,25 +88,29 @@ char	*RM;
 
 static char *tbuf;
 static int hopcount;	/* detect infinite loops in termcap, init 0 */
-static char *tskip();
-static char *tdecode();
 static char *remotefile;
-
 extern char *conffile;
+
+static int getent __P((char *, const char *, char *));
+static char *tskip __P((char *));
+static int tnchktc __P((void));
+static char *tdecode __P((char *, char **));
+static int tnamatch __P((const char *));
 
 /*
  * Get an entry for terminal name in buffer bp,
  * from the termcap file.  Parse is very rudimentary;
  * we just notice escaped newlines.
  */
-tgetent(char *bp, char *name)
+int
+tgetent(char *bp, const char *name)
 {
 	char lbuf[BUFSIZ], *cp;
 	int found;
 	FILE *fp;
 
 	remotefile = cp = conffile ? conffile : _PATH_V6TESTCONF;
-	if (found = getent(bp, name, cp)) {
+	if ((found = getent(bp, name, cp)) != 0) {
 		/* duplicate entry detection */
 		found = 0;
 		if ((fp = fopen(cp, "r")) == NULL) {
@@ -125,8 +132,8 @@ tgetent(char *bp, char *name)
 	return(found);
 }
 
-int
-getent(char *bp, char *name, char *cp)
+static int
+getent(char *bp, const char *name, char *cp)
 {
 	register int c;
 	register int i = 0, cnt = 0;
@@ -192,6 +199,7 @@ getent(char *bp, char *name, char *cp)
  * entries to say "like an HP2621 but doesn't turn on the labels".
  * Note that this works because of the left to right scan.
  */
+static int
 tnchktc()
 {
 	register char *p, *q;
@@ -243,9 +251,10 @@ tnchktc()
  * against each such name.  The normal : terminator after the last
  * name (before the first field) stops us.
  */
-tnamatch(char *np)
+static int
+tnamatch(const char *np)
 {
-	register char *Np, *Bp;
+	const char *Np, *Bp;
 
 	Bp = tbuf;
 	if (*Bp == '#')
@@ -326,10 +335,11 @@ nexthdr(char **bufp)
  * a # character.  If the option is not found we return -1.
  * Note that we handle octal numbers beginning with 0.
  */
-tgetnum(char *id, char *pbuf)
+int
+tgetnum(const char *id, char *pbuf)
 {
 	register long int i;
-	register base;
+	register int base;
 	register char *bp = pbuf;
 
 	for (;;) {
@@ -360,7 +370,8 @@ tgetnum(char *id, char *pbuf)
  * of the buffer.  Return 1 if we find the option, or 0 if it is
  * not given.
  */
-tgetflag(char *id, char *pbuf)
+int
+tgetflag(const char *id, char *pbuf)
 {
 	register char *bp = pbuf;
 
@@ -387,7 +398,7 @@ tgetflag(char *id, char *pbuf)
  * No checking on area overflow.
  */
 char *
-tgetstr(char *id, char **area, char *pbuf)
+tgetstr(const char *id, char **area, char *pbuf)
 {
 	register char *bp = pbuf;
 
