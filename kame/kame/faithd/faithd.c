@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.54 2002/06/24 10:30:52 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.55 2002/06/24 10:33:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -405,13 +405,18 @@ again:
 #endif
 	if (FD_ISSET(s_wld, &rfds)) {
 		len = sizeof(srcaddr);
-		s_src = accept(s_wld, (struct sockaddr *)&srcaddr,
-			&len);
+		s_src = accept(s_wld, (struct sockaddr *)&srcaddr, &len);
 		if (s_src < 0) {
 			if (errno == ECONNABORTED)
 				goto again;
 			exit_failure("socket: %s", strerror(errno));
 			/*NOTREACHED*/
+		}
+		if (srcaddr.ss_family == AF_INET6 &&
+		    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&srcaddr)->sin6_addr)) {
+			close(s_src);
+			syslog(LOG_ERR, "connection from IPv4 mapped address?");
+			goto again;
 		}
 
 		child_pid = fork();
