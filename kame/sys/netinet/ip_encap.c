@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.27 2000/04/17 13:34:32 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.28 2000/04/19 02:25:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,6 +65,7 @@
 # endif
 #else
 # ifdef __NetBSD__
+#  include "opt_mrouting.h"
 #  include "opt_inet.h"
 # endif
 #endif
@@ -99,6 +100,17 @@
 #endif
 
 #include <machine/stdarg.h>
+
+#ifdef __NetBSD__
+# include "ipip.h"
+# if NIPIP > 0
+#  include <netinet/ip_ipip.h>
+# else
+#  ifdef MROUTING
+#   include <netinet/ip_mroute.h>
+#  endif
+# endif
+#endif
 
 #include <net/net_osdep.h>
 
@@ -224,19 +236,31 @@ encap4_input(m, va_alist)
 	}
 
 	/* for backward compatibility */
-	if (proto == IPPROTO_IPV4) {
 #ifdef __OpenBSD__
-#if defined(MROUTING) || defined(IPSEC)
-		ip4_input(m, off, proto);
-		return;
-#endif
+#error baa
+# if defined(MROUTING) || defined(IPSEC)
+#  define COMPATFUNC	ip4_input
+# endif
+#elif defined(__NetBSD__)
+# if NIPIP > 0
+#  define COMPATFUNC	ipip_input
+# else
+#  ifdef MROUTING
+#   define COMPATFUNC	mrt_ipip_input
+#  endif
+# endif
 #else
-#ifdef MROUTING
-		ipip_input(m, off, proto);
-		return;
-#endif /*MROUTING*/
+# ifdef MROUTING
+#  define COMPATFUNC	ipip_input
+# endif /*MROUTING*/
 #endif
+
+#ifdef COMPATFUNC
+	if (proto == IPPROTO_IPV4) {
+		COMPATFUNC(m, off, proto);
+		return;
 	}
+#endif
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
