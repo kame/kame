@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.135 2001/01/22 11:59:29 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.136 2001/01/22 11:59:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -802,7 +802,6 @@ in6_update_ifa(ifp, ifra, ia)
 	 * users to specify a (non 0) prefix length (mask) for a new address.
 	 * We also require the prefix (when specified) mask is valid, and thus
 	 * reject a non-consecutive mask.
-	 * XXX: mask for scoped address?
 	 */
 	if (ia == NULL && ifra->ifra_prefixmask.sin6_len == 0)
 		return(EINVAL);
