@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.54 2005/01/12 06:06:11 suz Exp $	*/
+/*	$KAME: dhcp6.h,v 1.55 2005/03/02 07:20:14 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -104,10 +104,16 @@ struct dhcp6_ia {		/* identity association */
 	u_int32_t t2;
 };
 
-struct dhcp6_prefix {
+struct dhcp6_prefix {		/* IA_PA */
 	u_int32_t pltime;
 	u_int32_t vltime;
+	struct in6_addr addr;
 	int plen;
+};
+
+struct dhcp6_statefuladdr {	/* IA_NA */
+	u_int32_t pltime;
+	u_int32_t vltime;
 	struct in6_addr addr;
 };
 
@@ -129,6 +135,7 @@ struct dhcp6_listval {
 		u_int16_t uv_num16;
 		struct in6_addr uv_addr6;
 		struct dhcp6_prefix uv_prefix6;
+		struct dhcp6_statefuladdr uv_statefuladdr6;
 		struct dhcp6_ia uv_ia;
 		struct dhcp6_vbuf uv_vbuf;
 	} uv;
@@ -140,6 +147,7 @@ struct dhcp6_listval {
 #define val_addr6 uv.uv_addr6
 #define val_ia uv.uv_ia
 #define val_prefix6 uv.uv_prefix6
+#define val_statefuladdr6 uv.uv_statefuladdr6
 #define val_vbuf uv.uv_vbuf
 
 struct dhcp6_optinfo {

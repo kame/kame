@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.42 2005/03/01 03:30:42 suz Exp $
+# $Id: Makefile.in,v 1.43 2005/03/02 07:20:13 suz Exp $
 #
 
 prefix=	@prefix@
@@ -60,7 +60,8 @@ CFLAGS+= @DHCPOPT_DNS@ @DH6OPT_DNSNAME@ \
 
 GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \
-	dhcp6c_script.o if.o base64.o auth.o dhcp6_ctl.o $(GENSRCS:%.c=%.o)
+	dhcp6c_script.o if.o base64.o auth.o dhcp6_ctl.o addrconf.o \
+	$(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o if.o config.o timer.o \
 	base64.o auth.o dhcp6_ctl.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o timer.o

@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.40 2004/11/28 11:29:36 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.41 2005/03/02 07:20:13 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -52,6 +52,7 @@ extern char *device;
 #define MATCHLIST_PREFIXLEN 0x1
 
 /* common.c */
+typedef enum { IFADDRCONF_ADD, IFADDRCONF_REMOVE } ifaddrconf_cmd_t;
 extern int dhcp6_copy_list __P((struct dhcp6_list *, struct dhcp6_list *));
 extern void dhcp6_move_list __P((struct dhcp6_list *, struct dhcp6_list *));
 extern void dhcp6_clear_list __P((struct dhcp6_list *));
@@ -102,6 +103,8 @@ extern int get_rdvalue __P((int, void *, size_t));
 extern int duidcpy __P((struct duid *, struct duid *));
 extern int duidcmp __P((struct duid *, struct duid *));
 extern void duidfree __P((struct duid *));
+extern int ifaddrconf __P((ifaddrconf_cmd_t, char *, struct sockaddr_in6 *,
+			   int, int, int));
 
 /* missing */
 #ifndef HAVE_STRLCAT

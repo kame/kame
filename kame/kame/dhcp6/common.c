@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.123 2005/01/12 06:06:11 suz Exp $	*/
+/*	$KAME: common.c,v 1.124 2005/03/02 07:20:13 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -3148,4 +3148,59 @@ dprintf(int level, const char *fname, const char *fmt, ...)
 		    logbuf);
 	} else
 		syslog(level, "%s%s%s", fname, printfname ? ": " : "", logbuf);
+}
+
+int
+ifaddrconf(cmd, ifname, addr, plen, pltime, vltime)
+	ifaddrconf_cmd_t cmd;
+	char *ifname;
+	struct sockaddr_in6 *addr;
+	int plen;
+	int pltime;
+	int vltime;
+{
+	struct in6_aliasreq req;
+	unsigned long ioctl_cmd;
+	char *cmdstr;
+	int s;			/* XXX overhead */
+
+	switch(cmd) {
+	case IFADDRCONF_ADD:
+		cmdstr = "add";
+		ioctl_cmd = SIOCAIFADDR_IN6;
+		break;
+	case IFADDRCONF_REMOVE:
+		cmdstr = "remove";
+		ioctl_cmd = SIOCDIFADDR_IN6;
+		break;
+	default:
+		return (-1);
+	}
+
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
+		dprintf(LOG_ERR, FNAME, "can't open a temporary socket: %s",
+		    strerror(errno));
+		return (-1);
+	}
+
+	memset(&req, 0, sizeof(req));
+	memcpy(req.ifra_name, ifname, sizeof(req.ifra_name));
+	req.ifra_addr = *addr;
+	(void)sa6_plen2mask(&req.ifra_prefixmask, plen);
+	/* XXX: should lifetimes be calculated based on the lease duration? */
+	req.ifra_lifetime.ia6t_vltime = vltime;
+	req.ifra_lifetime.ia6t_pltime = pltime;
+
+	if (ioctl(s, ioctl_cmd, &req)) {
+		dprintf(LOG_NOTICE, FNAME, "failed to %s an address on %s: %s",
+		    cmdstr, ifname, strerror(errno));
+		close(s);
+		return (-1);
+	}
+
+	dprintf(LOG_DEBUG, FNAME, "%s an address %s/%d on %s", cmdstr,
+	    addr2str((struct sockaddr *)addr), plen, ifname);
+
+	close(s);
+	return (0);
 }

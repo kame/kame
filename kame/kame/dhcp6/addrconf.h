@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.h,v 1.6 2005/03/02 07:20:14 suz Exp $	*/
+/*	$KAME: addrconf.h,v 1.1 2005/03/02 07:20:13 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -29,13 +29,7 @@
  * SUCH DAMAGE.
  */
 
-typedef enum { PREFIX6S_ACTIVE, PREFIX6S_RENEW,
-	       PREFIX6S_REBIND} prefix6state_t;
+typedef enum { ADDR6S_ACTIVE, ADDR6S_RENEW, ADDR6S_REBIND} addr6state_t;
 
-extern int update_prefix __P((struct ia *, struct dhcp6_prefix *,
-    struct pifc_list *, struct dhcp6_if *, struct iactl **,
-    void (*)__P((struct ia *))));
-extern int prefix6_add __P((struct dhcp6_if *, struct dhcp6_prefix *,
-			       struct duid *));
-extern int prefix6_update __P((struct dhcp6_event *, struct dhcp6_list *,
-				  struct duid *));
+extern int update_address __P((struct ia *, struct dhcp6_statefuladdr *,
+    struct dhcp6_if *, struct iactl **, void (*)__P((struct ia *))));
