@@ -1007,7 +1007,7 @@ set_ipsec_proposal(spidx, prspec)
 	for (p = prspec; p && p->next; p = p->next)
 		;
 	while (p) {
-		int proto_id;
+		int proto_id = 0;
 
 		for (s = p->spspec; s && s->next; s = s->next)
 			;
