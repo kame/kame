@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.1 1999/08/08 23:31:23 itojun Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.2 2000/01/01 06:21:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -54,7 +54,7 @@
 #include "pfkey.h"
 #include "session.h"
 
-static char version[] = "@(#)racoon $Revision: 1.1 $ sakane@ydc.co.jp";
+static char version[] = "@(#)racoon $Revision: 1.2 $ sakane@ydc.co.jp";
 
 char *pname;
 
@@ -173,7 +173,6 @@ parse(ac, av)
 			break;
 		case 'a':
 			port_admin = atoi(optarg);
-				return(-1);
 			break;
 		case 'f':
 			racoon_conf = optarg;

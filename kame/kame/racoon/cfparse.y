@@ -15,7 +15,7 @@
 #include <netkey/key_var.h>
 #include <netdb.h>
 #if !defined(HAVE_GETADDRINFO) || !defined(HAVE_GETNAMEINFO)
-#include "gai.h"
+#include "addrinfo.h"
 #endif
 
 #include <errno.h>

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.1 1999/08/08 23:31:19 itojun Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.2 2000/01/01 06:21:40 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -344,16 +344,17 @@ admin_init()
 	int error;
 	int tmp;
 
+	/*
+	 * the admin port may be connected from outer world with
+	 * any authentication.
+	 * Anyhow unix domain socket is not good.
+	 */
 	snprintf(pbuf, sizeof(pbuf), "%d", port_admin);
 	memset(&hints, 0, sizeof(hints));
-#if 0
-	hints.ai_family = PF_INET;
-#else
-	hints.ai_family = PF_UNSPEC;
-#endif
+	hints.ai_family = af;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-	error = getaddrinfo("127.0.0.1", pbuf, &hints, &res);	/*XXX*/
+	error = getaddrinfo(NULL, pbuf, &hints, &res);
 	if (error) {
 		plog(LOCATION, "getaddrinfo (%s)\n", gai_strerror(error));
 		return -1;

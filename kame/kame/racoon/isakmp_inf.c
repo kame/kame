@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.6 1999/12/01 11:16:56 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.7 2000/01/01 06:21:40 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -182,7 +182,6 @@ int isakmp_info_send_d2_pf(msg)
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_sa *sa;
 	struct sadb_address *src, *dst;
-	u_int8_t mode;
 	vchar_t *payload = NULL;
 	int tlen;
 	int error = 0;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.9 1999/12/21 12:17:16 jinmei Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.10 2000/01/01 06:21:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -669,7 +669,6 @@ setsockopt_bypass(so, family)
 {
 	int level;
 	char *buf, *policy;
-	int len;
 
 	switch (family) {
 	case AF_INET:
