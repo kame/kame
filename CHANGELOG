@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1817 2001/07/25 17:13:43 itojun Exp $
+$KAME: CHANGELOG,v 1.1818 2001/07/26 14:15:56 itojun Exp $
 
 <200107>
+Thu Jul 26 23:13:06 JST 2001  itojun@iijlab.net
+	* mdnsd: IPv4 support.  PR 370 from assar@assaris.sics.se
+
 Thu Jul 26 02:12:04 JST 2001  itojun@iijlab.net
 	* *bsd*/sys/netinet*/in*_pcb.c: call ipsec_init_policy() from
 	  within in*_pcballoc(), not from PRU_ATTACH logic.  it is to make
