@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/06/20 03:52:25 $
+			$Date: 2000/06/20 20:03:49 $
 
 1. IPv6
 
@@ -1243,6 +1243,7 @@ Here is a list of OpenBSD 2.x drivers and its conditions:
 	le sbus/sparc	ok		ok		yes
 	ne pci/i386	ok		ok		yes
 	ne pcmcia/i386	ok		ok		yes
+	wi pcmcia/i386	ok		ok		yes
 
 (*) There seem to be some problem in driver, with multicast filter
 configuration.  This happens with certain revision of chipset on the card.
