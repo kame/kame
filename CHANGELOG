@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.575 2000/02/19 02:47:05 fujisawa Exp $
+$Id: CHANGELOG,v 1.576 2000/02/19 10:44:07 jinmei Exp $
 
 <200002>
+2000-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sbin/ifconfig/ifconfig.c: enabled KAME original functions.
+
+2000-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/in.c (in_control): added gif related ioctls.
+
 Sat Feb 19 11:40:58 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* Now, this translator can handle connection from outside v4 (global)
 	  to inside v6 (private).  This translation is done when packet is
