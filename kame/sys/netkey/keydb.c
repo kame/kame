@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.11 1999/09/07 07:26:40 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.12 1999/09/14 03:43:48 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1024,6 +1024,7 @@ key_sp2msg(sp)
 			bcopy(&isr->saidx.src, p, isr->saidx.src.__ss_len);
 			p += isr->saidx.src.__ss_len;
 			bcopy(&isr->saidx.dst, p, isr->saidx.dst.__ss_len);
+			p += isr->saidx.src.__ss_len;
 
 			xisr->sadb_x_ipsecrequest_len =
 				PFKEY_ALIGN8(sizeof(*xisr)
