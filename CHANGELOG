@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1620 2001/03/23 06:15:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1621 2001/03/23 07:52:39 fujisawa Exp $
 
 <200103>
+2001-03-23  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[ch]
+	- Change MALLOC type M_TEMP to M_NATPT.
+	  This causes serious memory leak in FreeBSD4.2 when leave M_TEMP.
+
 2001-03-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (ni6_addrs, ni6_store_addrs):
 	If the 3rd bit of the icmp6_nodeinfo sysctl variable is clear,
