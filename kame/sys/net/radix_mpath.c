@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.3 2001/07/20 21:29:06 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.4 2001/07/20 21:40:20 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -173,8 +173,11 @@ rtalloc_mpath(ro, hash)
 		rn = rn->rn_dupedkey;
 	}
 
-	/* XXX try to fill rt_gwroute and avoid nonexistent routes */
-	/* XXX try to avoid gw with L2 address resolution failures */
+	/* XXX try filling rt_gwroute and avoid unreachable gw  */
+
+	/* if gw selection fails, use the first match (default) */
+	if (!rn)
+		return;
 
 	rtfree(ro->ro_rt);
 	ro->ro_rt = (struct rtentry *)rn;
