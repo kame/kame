@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1153 2000/07/26 02:12:44 itojun Exp $
+$Id: CHANGELOG,v 1.1154 2000/07/26 03:54:39 sakane Exp $
 
 <200007>
+Wed Jul 26 12:52:50 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Fixed to get a destination address when a packet is received from
+	a peer.  It happened when a interface had similar multiple addresses.
+
 Wed Jul 26 11:08:23 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: reject IPv6 packet with IPv4 mapped
 	  address in the header.  this makes more sense as we cannot be
