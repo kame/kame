@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.135 2000/08/29 07:51:21 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.136 2000/08/29 07:59:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1645,7 +1645,7 @@ ni6_addrs(ni6, m, ifpp)
 			 * Node Information proxy, since they represent
 			 * addresses of IPv4-only nodes, which perforce do
 			 * not implement this protocol.
-			 * [icmp-name-lookups-05]
+			 * [icmp-name-lookups-06, Section 5.4]
 			 * So we don't support NI_NODEADDR_FLAG_COMPAT in
 			 * this function at this moment.
 			 */
