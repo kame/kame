@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.12 2003/09/16 00:30:52 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.13 2003/09/16 09:11:19 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -256,7 +256,7 @@ randomid(struct randomtab *p)
 
 	for (i = 0; i <= n; i++) {
 		/* Linear Congruential Generator */
-		p->ru_x = ((u_int64_t)p->ru_a * p->ru_x + p->ru_b) % p->ru_m;
+		p->ru_x = (u_int32_t)((u_int64_t)p->ru_a * p->ru_x + p->ru_b) % p->ru_m;
 	}
 
 	p->ru_counter += i;
