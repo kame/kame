@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2536 2004/01/26 09:43:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.2537 2004/02/01 04:33:23 jinmei Exp $
+
+<200402>
+2004-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/mcastread/mcastread.c (get_socket): set the
+	SO_REUSEPORT option for the receiving socket so that multiple
+	processes on a node can run this program for the same group and
+	port.
 
 <200401>
 2004-01-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
