@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.45 2001/02/21 05:19:42 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.46 2001/02/21 05:28:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -446,11 +446,8 @@ gif_input(m, af, gifp)
 #endif
 #if defined(__NetBSD__) && defined(ISO)
 	case AF_ISO:
-		if (gif_eon_decap(gifp, &m)) {
-			if (m)
-			       m_freem(m);
+		if (gif_eon_decap(gifp, &m) != 0)
 			return;
-		}
 		ifq = &clnlintrq;
 		isr = NETISR_ISO;
 		break;
@@ -859,8 +856,11 @@ gif_eon_decap(struct ifnet *gifp, struct mbuf **m)
 		gifp->if_ierrors++;
 		return (EINVAL);
 	}
-	if (iso_check_csum(*m, sizeof(struct eonhdr)))
+	if (iso_check_csum(*m, sizeof(struct eonhdr))) {
+		m_freem(*m);
+		*m = NULL;
 		return (EINVAL);
+	}
 	m_adj(*m, sizeof(*ehdr));
 	return (0);
 }
