@@ -97,7 +97,7 @@
 
 struct inpcbtable rawcbtable;
 
-int	rip_pcbnotify __P((struct inpcbtable *, struct in_addr,
+int	 rip_pcbnotify __P((struct inpcbtable *, struct in_addr,
     struct in_addr, int, int, void (*) __P((struct inpcb *, int))));
 int	 rip_bind __P((struct inpcb *, struct mbuf *));
 int	 rip_connect __P((struct inpcb *, struct mbuf *));
