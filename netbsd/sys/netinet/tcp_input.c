@@ -3981,7 +3981,7 @@ syn_cache_respond(sc, m)
 		ip6->ip6_vfc |= IPV6_VERSION;
 		ip6->ip6_plen = htons(tlen - hlen);
 		/* ip6_hlim will be initialized afterwards */
-		/* XXX flowlabel? */
+		/* leave flowlabel = 0, it is legal and require no state mgmt */
 		break;
 #endif
 	}
