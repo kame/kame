@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.201 2003/09/06 21:11:49 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.202 2003/09/10 21:07:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1288,11 +1288,13 @@ ipsec_init_pcbpolicy(so, pcb_sp)
 		in->policy = IPSEC_POLICY_ENTRUST;
 		in->dir = IPSEC_DIR_INBOUND;
 		in->readonly = 1;
+		in->so = so;
 
 		out->state = IPSEC_SPSTATE_ALIVE;
 		out->policy = IPSEC_POLICY_ENTRUST;
 		out->dir = IPSEC_DIR_OUTBOUND;
 		out->readonly = 1;
+		out->so = so;
 
 		initialized++;
 	}
@@ -1436,6 +1438,7 @@ ipsec_deepcopy_policy(src)
 	dst->state = src->state;
 	dst->policy = src->policy;
 	dst->dir = src->dir;
+	dst->so = src->so;
 	/* do not touch the refcnt fields */
 
 	return dst;
