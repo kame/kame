@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.72 2001/10/19 01:43:37 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.73 2001/10/31 00:00:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -360,7 +360,7 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	n = (struct isakmp_pl_n *)payload->v;
 	n->h.np = ISAKMP_NPTYPE_NONE;
 	n->h.len = htons(tlen);
-	n->doi = IPSEC_DOI;
+	n->doi = htonl(IPSEC_DOI);
 	n->proto_id = IPSECDOI_KEY_IKE;
 	n->spi_size = spisiz;
 	n->type = htons(type);
