@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/26 15:50:24 $
+			$Date: 2000/05/27 08:13:45 $
 
 1. IPv6
 
@@ -962,7 +962,9 @@ source/dstination address, or IPv6 routing header.
 
 1.15 Node's required addresses
 
-RFC2373 section 2.8 talks about required addresses for the node.  The section talks about how KAME stack assignes, or manages those required addresses.
+RFC2373 section 2.8 talks about required addresses for an IPv6
+node.  The section talks about how KAME stack manages those required
+addresses.
 
 1.15.1 Host case
 
