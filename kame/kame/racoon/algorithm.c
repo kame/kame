@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.6 2000/09/13 04:50:24 itojun Exp $	*/
+/*	$KAME: algorithm.c,v 1.7 2000/09/22 00:27:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.c,v 1.6 2000/09/13 04:50:24 itojun Exp $ */
+/* YIPS @(#)$Id: algorithm.c,v 1.7 2000/09/22 00:27:24 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -103,9 +103,9 @@ static int isakmpdh2doi[] = {
 	ALGTYPE_NOTHING,
 	OAKLEY_ATTR_GRP_DESC_MODP768,
 	OAKLEY_ATTR_GRP_DESC_MODP1024,
-	OAKLEY_ATTR_GRP_DESC_MODP1536,
 	OAKLEY_ATTR_GRP_DESC_EC2N155,
 	OAKLEY_ATTR_GRP_DESC_EC2N185,
+	OAKLEY_ATTR_GRP_DESC_MODP1536,
 };
 
 /*
