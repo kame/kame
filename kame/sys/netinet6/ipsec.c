@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.79 2000/09/25 15:00:43 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.80 2000/10/01 12:37:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,11 +219,15 @@ static int ipsec_get_policy __P((struct secpolicy *pcb_sp, struct mbuf **mp));
 static void vshiftl __P((unsigned char *, int, int));
 static int ipsec_in_reject __P((struct secpolicy *, struct mbuf *));
 static size_t ipsec_hdrsiz __P((struct secpolicy *));
+#ifdef INET
 static struct mbuf *ipsec4_splithdr __P((struct mbuf *));
+#endif
 #ifdef INET6
 static struct mbuf *ipsec6_splithdr __P((struct mbuf *));
 #endif
+#ifdef INET
 static int ipsec4_encapsulate __P((struct mbuf *, struct secasvar *));
+#endif
 #ifdef INET6
 static int ipsec6_encapsulate __P((struct mbuf *, struct secasvar *));
 #endif
@@ -2481,6 +2485,7 @@ ipsec_dumpmbuf(m)
 	printf("---\n");
 }
 
+#ifdef INET
 /*
  * IPsec output logic for IPv4.
  */
@@ -2714,6 +2719,7 @@ bad:
 	state->m = NULL;
 	return error;
 }
+#endif
 
 #ifdef INET6
 /*
@@ -3100,6 +3106,7 @@ bad:
 }
 #endif /*INET6*/
 
+#ifdef INET
 /*
  * Chop IP header and option off from the payload.
  */
@@ -3141,6 +3148,7 @@ ipsec4_splithdr(m)
 	}
 	return m;
 }
+#endif
 
 #ifdef INET6
 static struct mbuf *

@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.33 2000/09/12 08:51:49 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.34 2000/10/01 12:37:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,6 +87,10 @@
 
 #define IPLEN_FLIPPED
 
+#define ESPMAXLEN \
+	(sizeof(struct esp) < sizeof(struct newesp) \
+		? sizeof(struct newesp) : sizeof(struct esp))
+
 #ifdef INET
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #include <netinet/ipprotosw.h>
@@ -97,10 +101,6 @@ extern struct protosw inetsw[];
 #if defined(__bsdi__) || defined(__NetBSD__)
 extern u_char ip_protox[];
 #endif
-
-#define ESPMAXLEN \
-	(sizeof(struct esp) < sizeof(struct newesp) \
-		? sizeof(struct newesp) : sizeof(struct esp))
 
 void
 #if __STDC__
@@ -662,7 +662,7 @@ noreplaycheck:
 	 * pre-compute and cache intermediate key
 	 */
 	if (esp_schedule(algo, sav) != 0) {
-		ipsecstat.in_inval++;
+		ipsec6stat.in_inval++;
 		goto bad;
 	}
 

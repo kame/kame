@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.c,v 1.7 2000/05/05 11:00:56 sumikawa Exp $	*/
+/*	$KAME: ip_ecn.c,v 1.8 2000/10/01 12:37:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -48,11 +48,9 @@
 #include <sys/mbuf.h>
 #include <sys/errno.h>
 
-#ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#endif
 
 #ifdef INET6
 #ifndef INET

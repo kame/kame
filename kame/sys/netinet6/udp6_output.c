@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.14 2000/06/13 10:31:23 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.15 2000/10/01 12:37:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,8 +175,10 @@ udp6_output(in6p, m, addr6, control)
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
 	int priv;
 	int af, hlen;
+#ifdef INET
 #ifdef __NetBSD__
 	struct ip *ip;
+#endif
 #endif
 	int flags;
 	struct sockaddr_in6 tmp;

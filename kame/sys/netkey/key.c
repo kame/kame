@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.161 2000/09/26 07:55:15 itojun Exp $	*/
+/*	$KAME: key.c,v 1.162 2000/10/01 12:37:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5598,7 +5598,7 @@ key_getprop(saidx)
 /*
  * SADB_ACQUIRE processing called by key_checkrequest() and key_acquire2().
  * send
- *   <base, SA, address(SD), (address(P)),
+ *   <base, SA, address(SD), (address(P)), x_policy,
  *       (identity(SD),) (sensitivity,) proposal>
  * to KMD, and expect to receive
  *   <base> with SADB_ACQUIRE if error occured,
@@ -5606,9 +5606,10 @@ key_getprop(saidx)
  *   <base, src address, dst address, (SPI range)> with SADB_GETSPI
  * from KMD by PF_KEY.
  *
+ * XXX x_policy is outside of RFC2367 (KAME extension).
  * XXX sensitivity is not supported.
- * XXX proposal is considered to be optional for now, due to the lack of
- * ipcomp support in RFC2367.
+ * XXX for ipcomp, RFC2367 does not define how to fill in proposal.
+ * see comment for key_getcomb_ipcomp().
  *
  * OUT:
  *    0     : succeed
@@ -7122,8 +7123,10 @@ key_init()
 	LIST_INIT(&spacqtree);
 
 	/* system default */
+#ifdef INET
 	ip4_def_policy.policy = IPSEC_POLICY_NONE;
 	ip4_def_policy.refcnt++;	/*never reclaim this*/
+#endif
 #ifdef INET6
 	ip6_def_policy.policy = IPSEC_POLICY_NONE;
 	ip6_def_policy.refcnt++;	/*never reclaim this*/

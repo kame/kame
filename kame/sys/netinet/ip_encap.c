@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.38 2000/07/24 13:27:22 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.39 2000/10/01 12:37:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,6 +146,7 @@ encap_init()
 #endif
 }
 
+#ifdef INET
 void
 #if __STDC__
 encap4_input(struct mbuf *m, ...)
@@ -278,6 +279,7 @@ encap4_input(m, va_alist)
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 }
+#endif
 
 #ifdef INET6
 int

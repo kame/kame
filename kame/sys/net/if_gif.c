@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.28 2000/06/20 12:30:03 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.29 2000/10/01 12:37:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,11 +63,11 @@
 #include <net/route.h>
 #include <net/bpf.h>
 
-#ifdef	INET
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
-#include <netinet/in_var.h>
 #include <netinet/ip.h>
+#ifdef	INET
+#include <netinet/in_var.h>
 #include <netinet/in_gif.h>
 #endif	/* INET */
 
@@ -508,12 +508,14 @@ gif_ioctl(ifp, cmd, data)
 	case SIOCSIFPHYADDR_IN6:
 #endif /* INET6 */
 		switch (cmd) {
+#ifdef INET
 		case SIOCSIFPHYADDR:
 			src = (struct sockaddr *)
 				&(((struct in_aliasreq *)data)->ifra_addr);
 			dst = (struct sockaddr *)
 				&(((struct in_aliasreq *)data)->ifra_dstaddr);
 			break;
+#endif
 #ifdef INET6
 		case SIOCSIFPHYADDR_IN6:
 			src = (struct sockaddr *)

@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.62 2000/07/12 14:10:48 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.63 2000/08/26 10:00:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -313,7 +313,9 @@ in6_pcbconnect(in6p, nam)
 	struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
+#ifdef INET
 	struct in6_addr mapped;
+#endif
 	struct sockaddr_in6 tmp;
 
 	(void)&in6a;				/* XXX fool gcc */
@@ -347,6 +349,7 @@ in6_pcbconnect(in6p, nam)
 	/* Source address selection. */
 	if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
 	 && in6p->in6p_laddr.s6_addr32[3] == 0) {
+#ifdef INET
 		struct sockaddr_in sin, *sinp;
 
 		bzero(&sin, sizeof(sin));
@@ -365,6 +368,9 @@ in6_pcbconnect(in6p, nam)
 		mapped.s6_addr16[5] = htons(0xffff);
 		bcopy(&sinp->sin_addr, &mapped.s6_addr32[3], sizeof(sinp->sin_addr));
 		in6a = &mapped;
+#else
+		return EADDRNOTAVAIL;
+#endif
 	} else {
 		/*
 		 * XXX: in6_selectsrc might replace the bound local address
