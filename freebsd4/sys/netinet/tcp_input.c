@@ -2852,13 +2852,13 @@ tcp_mssopt(tp)
 	if (rt == NULL)
 		return (isipv6 ? tcp_v6mssdflt : tcp_mssdflt);
 
-	return
 #ifdef INET6
-		isipv6 ? IN6_LINKMTU(rt->rt_ifp) :
+	if (isipv6)
+		return (IN6_LINKMTU(rt->rt_ifp) - min_protoh);
+	else
 #endif
-		rt->rt_ifp->if_mtu - min_protoh;
+		return (rt->rt_ifp->if_mtu - min_protoh);
 }
-
 
 /*
  * When a partial ack arrives, force the retransmission of the
