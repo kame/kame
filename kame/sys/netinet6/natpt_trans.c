@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.29 2001/05/28 16:12:07 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.30 2001/05/29 03:21:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -913,13 +913,13 @@ translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
     struct _tSlot	*ats;
     struct _tcpstate	*ts;
     struct sockaddr_in	 sin;
-    struct ftpparam	 ftp6;
+    struct ftpparam	 ftp4;
     char		 Wow[128];
 
     kb = (caddr_t)th6 + (th6->th_off << 2);
     kk = (caddr_t)ip6 + sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen);
     if (((kk - kb) < FTPMINCMDLEN)
-	|| (parseFTPdialogue(kb, kk, &ftp6) == NULL))
+	|| (parseFTPdialogue(kb, kk, &ftp4) == NULL))
 	return (0);
 
     ats = cv6->ats;
@@ -927,13 +927,13 @@ translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
     switch (ts->ftpstate)
     {
       case FTP6_EPSV:
-	if (ftp6.cmd != 227)
+	if (ftp4.cmd != 227)
 	    return (0);
 
 	/* getting:   227 Entering Passive Mode (h1,h2,h3,h4,p1,p2).	*/
 	/* expecting: 229 Entering Extended Passive Mode (|||6446|)	*/
 
-	if (parse227(ftp6.arg, kk, &sin) == NULL)
+	if (parse227(ftp4.arg, kk, &sin) == NULL)
 	    return (0);
 	snprintf(Wow, sizeof(Wow), 
 		 "229 Entering Extended Passive Mode (|||%d|)\r\n", sin.sin_port);
