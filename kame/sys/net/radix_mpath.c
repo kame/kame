@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.14 2004/04/24 20:01:20 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.15 2004/04/25 02:21:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -60,7 +60,7 @@ rn_mpath_capable(rnh)
 	struct radix_node_head *rnh;
 {
 
-	return rnh->rnh_lookup == rn_mpath_lookup;
+	return rnh->rnh_multipath;
 }
 
 struct radix_node *
@@ -269,20 +269,7 @@ rtalloc_mpath(ro, hash)
 	ro->ro_rt->rt_refcnt++;
 }
 
-/*
- * HACK! the function is overloaded just to indicate that the address family
- * is capable of doing multipath
- */
-struct radix_node *
-rn_mpath_lookup(v_arg, m_arg, head)
-	void *v_arg, *m_arg;
-	struct radix_node_head *head;
-{
-
-	return rn_lookup(v_arg, m_arg, head);
-}
 #ifdef __FreeBSD__
-
 extern int	in6_inithead __P((void **head, int off));
 extern int	in_inithead __P((void **head, int off));
 
@@ -296,7 +283,7 @@ rn4_mpath_inithead(head, off)
 	hashjitter = arc4random();
 	if (in_inithead(head, off) == 1) {
 		rnh = (struct radix_node_head *)*head;
-		rnh->rnh_lookup = rn_mpath_lookup;
+		rnh->rnh_multipath = 1;
 		return 1;
 	} else
 		return 0;
@@ -312,7 +299,7 @@ rn6_mpath_inithead(head, off)
 	hashjitter = arc4random();
 	if (in6_inithead(head, off) == 1) {
 		rnh = (struct radix_node_head *)*head;
-		rnh->rnh_lookup = rn_mpath_lookup;
+		rnh->rnh_multipath = 1;
 		return 1;
 	} else
 		return 0;
@@ -329,7 +316,7 @@ rn_mpath_inithead(head, off)
 	hashjitter = arc4random();
 	if (rn_inithead(head, off) == 1) {
 		rnh = (struct radix_node_head *)*head;
-		rnh->rnh_lookup = rn_mpath_lookup;
+		rnh->rnh_multipath = 1;
 		return 1;
 	} else
 		return 0;

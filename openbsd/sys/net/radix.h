@@ -131,6 +131,7 @@ struct radix_node_head {
 	int	(*rnh_walktree)(struct radix_node_head *,
 		     int (*)(struct radix_node *, void *), void *);
 	struct	radix_node rnh_nodes[3];/* empty tree for common case */
+	int	rnh_multipath;			/* multipath? */
 };
 
 
