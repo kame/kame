@@ -358,6 +358,9 @@ if_attachdomain1(ifp)
 	struct ifnet *ifp;
 {
 	struct domain *dp;
+	int s;
+
+	s = splnet();
 
 	/* address family dependent data region */
 	memset(ifp->if_afdata, 0, sizeof(ifp->if_afdata));
@@ -366,6 +369,8 @@ if_attachdomain1(ifp)
 			ifp->if_afdata[dp->dom_family] =
 			    (*dp->dom_ifattach)(ifp);
 	}
+
+	splx(s);
 }
 
 /*
