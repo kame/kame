@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.21 1999/10/28 12:22:39 sakane Exp $ */
+/* KAME $Id: key.c,v 1.22 1999/11/01 00:53:56 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -618,10 +618,10 @@ key_allocsa(family, src, dst, proto, spi)
 
 				if (key_bbcmp(src,
 				     _INADDRBYSA(&sav->sah->saidx.src),
-				     _INALENBYAF(sav->sah->saidx.src.__ss_family))
+				     _INALENBYAF(sav->sah->saidx.src.__ss_family) << 3)
 				 && key_bbcmp(dst,
 				     _INADDRBYSA(&sav->sah->saidx.dst),
-				     _INALENBYAF(sav->sah->saidx.dst.__ss_family)))
+				     _INALENBYAF(sav->sah->saidx.dst.__ss_family) << 3))
 					goto found;
 			}
 		}
