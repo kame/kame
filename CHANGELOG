@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2199 2002/07/17 14:10:15 itojun Exp $
+$KAME: CHANGELOG,v 1.2200 2002/07/18 00:00:16 sakane Exp $
 
 <200207>
+Thu Jul 18 08:53:47 JST 2002 sakane@kame.net
+	* sys/netinet6/esp_input:
+	fixed re-making mbuf chain after decrypting ipv6 esp packet
+	in case of a kernel without PULLDOWN_TEST.
+	that was only kame-snap on both fbsd3 and fbsd4 had this problem.
+
 Wed Jul 17 23:07:36 JST 2002  itojun@iijlab.net
 	* ndp: update message for per-interface ND flags (-i) to be in sync
 	  with command line args.
