@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.20 2001/11/27 07:19:16 suz Exp $	*/
+/*	$KAME: vif.c,v 1.21 2001/11/27 07:51:39 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -402,6 +402,9 @@ void stop_vif( mifi_t vifi )
 	{
 		k_leave( mld6_socket , &allpim6routers_group.sin6_addr , v->uv_ifindex );
 		k_leave( mld6_socket , &allrouters_group.sin6_addr , v->uv_ifindex );
+		if (v->uv_mld_version == MLDv2)
+		    k_leave(mld6_socket, &allmldv2routers_group.sin6_addr,
+		    	    v->uv_ifindex);
     /*
      * Discard all group addresses.  (No need to tell kernel;
      * the k_del_vif() call will clean up kernel state.)
@@ -409,10 +412,28 @@ void stop_vif( mifi_t vifi )
 
 		while( v->uv_groups!=NULL )
 		{
+			/* reset all the timers */
+			if (a->al_query) {
+			    timer_clearTimer(a->al_query);
+			}
+			if (a->al_timerid) {
+			    timer_clearTimer(a->al_timerid);
+			}
+
+			/* frees all the related sources */
+			while (v->uv_groups->sources != NULL) {
+			    a = v->uv_groups->sources;
+			    v->uv_groups->sources = a->al_next;
+			    free((char *)a);
+			}
+			v->uv_groups->sources = NULL;
+
+			/* discard the group */
 			a=v->uv_groups;
 			v->uv_groups=a->al_next;
 			free((char *)a);
 		}
+		v->uv_groups = NULL;
 	}
 
     /*
@@ -437,10 +458,26 @@ void stop_vif( mifi_t vifi )
 		for( n=v->uv_pim_neighbors ; n!=NULL ; n = next )
 		{
 			next=n->next;			/* Free the space for each neighbour */
-			free((char *)n);
+			delete_pim6_nbr(n);
 		}
 		v->uv_pim_neighbors=NULL;
 	}
+	if (v->uv_querier != NULL) {
+	    free(v->uv_querier);
+	    v->uv_querier = NULL;
+	}
+
+	/* I/F address list */
+	{
+	    struct phaddr *pa, *pa_next;
+	    for (pa = v->uv_addrs; pa; pa = pa_next) {
+		pa_next = pa->pa_next;
+		free(pa);
+	    }
+	}
+	v->uv_addrs = NULL;
+	v->uv_linklocal = NULL; /* uv_linklocal must be in uv_addrs */
+
 
 	
    /* TODO: currently not used */
