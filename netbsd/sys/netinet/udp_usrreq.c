@@ -187,6 +187,7 @@ udp_input(m, va_alist)
 	 * Get IP and UDP header together in first mbuf.
 	 */
 	ip = mtod(m, struct ip *);
+#if 0
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
 		if ((m = m_pullup(m, iphlen + sizeof(struct udphdr))) == 0) {
 			udpstat.udps_hdrops++;
@@ -195,6 +196,25 @@ udp_input(m, va_alist)
 		ip = mtod(m, struct ip *);
 	}
 	uh = (struct udphdr *)((caddr_t)ip + iphlen);
+#else
+    {
+	struct mbuf *n;
+	int off;
+#if 1
+	n = m_pulldown(m, iphlen, sizeof(struct udphdr), &off);
+#else
+	n = m_pulldown(m, iphlen, sizeof(struct udphdr), NULL);
+	off = 0;
+#endif
+	if (n == NULL) {
+		udpstat.udps_hdrops++;
+		return;
+	}
+	if (n->m_len < off + sizeof(struct udphdr))
+		panic("m_pulldown malfunction");
+	uh = (struct udphdr *)(mtod(n, caddr_t) + off);
+    }
+#endif
 
 	/*
 	 * Make mbuf data length reflect UDP length.
