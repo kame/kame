@@ -23,6 +23,7 @@
 #include	<sys/cdefs.h>
 #include	<sys/param.h>
 #include	<sys/types.h>
+#include	<sys/systm.h>
 #include	<machine/endian.h>
 
 #if BYTE_ORDER == LITTLE_ENDIAN
@@ -787,7 +788,7 @@ int twofish_makeKey(keyInstance *key, BYTE direction, int keyLen,CONST char *key
 	key->direction	= direction;/* set our cipher direction */
 	key->keyLen		= (keyLen+63) & ~63;		/* round up to multiple of 64 */
 	key->numRounds	= numRounds[(keyLen-1)/64];
-	memset(key->key32,0,sizeof(key->key32));	/* zero unused bits */
+	bzero(key->key32,sizeof(key->key32));	/* zero unused bits */
 	key->keyMaterial[MAX_KEY_SIZE]=0;	/* terminate ASCII string */
 
 	if ((keyMaterial == NULL) || (keyMaterial[0]==0))
