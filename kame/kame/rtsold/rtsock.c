@@ -1,4 +1,4 @@
-/*	$KAME: rtsock.c,v 1.5 2002/06/10 20:00:36 itojun Exp $	*/
+/*	$KAME: rtsock.c,v 1.6 2003/10/05 00:09:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -85,15 +85,14 @@ static struct {
 };
 
 int
-rtsock_open()
+rtsock_open(void)
 {
 
 	return socket(PF_ROUTE, SOCK_RAW, 0);
 }
 
 int
-rtsock_input(s)
-	int s;
+rtsock_input(int s)
 {
 	ssize_t n;
 	char msg[2048];
@@ -141,10 +140,7 @@ rtsock_input(s)
 
 #ifdef RTM_IFANNOUNCE	/*NetBSD 1.5 or later*/
 static int
-rtsock_input_ifannounce(s, rtm, lim)
-	int s;
-	struct rt_msghdr *rtm;
-	char *lim;
+rtsock_input_ifannounce(int s, struct rt_msghdr *rtm, char *lim)
 {
 	struct if_announcemsghdr *ifan;
 	struct ifinfo *ifinfo;
@@ -185,10 +181,7 @@ rtsock_input_ifannounce(s, rtm, lim)
 
 #if defined(__FreeBSD__)
 static int
-rtsock_ifprobe(s, rtm, lim)
-	int s;
-	struct rt_msghdr *rtm;
-	char *lim;
+rtsock_ifprobe(int s, struct rt_msghdr *rtm, char *lim)
 {
 	char **argv;
 

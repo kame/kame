@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.26 2003/05/15 14:38:56 itojun Exp $	*/
+/*	$KAME: if.c,v 1.27 2003/10/05 00:09:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,7 +82,7 @@ static int get_isatap_mode __P((struct ifinfo *ifinfo));
 #endif
 
 int
-ifinit()
+ifinit(void)
 {
 	ifsock = rssock;
 

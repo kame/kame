@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.67 2003/05/17 18:16:15 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.68 2003/10/05 00:09:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,9 +117,7 @@ static void rtsold_set_dump_file __P((int));
 static void usage __P((char *));
 
 int
-main(argc, argv)
-	int argc;
-	char **argv;
+main(int argc, char **argv)
 {
 	int s, ch, once = 0;
 	struct timeval *timeout;
@@ -480,7 +478,7 @@ bad:
 }
 
 void
-iflist_init()
+iflist_init(void)
 {
 	struct ifinfo *ifi, *next;
 
@@ -571,7 +569,7 @@ make_packet(struct ifinfo *ifinfo)
 }
 
 static struct timeval *
-rtsol_check_timer()
+rtsol_check_timer(void)
 {
 	static struct timeval returnval;
 	struct timeval now, rtsol_timer;
@@ -796,8 +794,7 @@ TIMEVAL_SUB(struct timeval *a, struct timeval *b, struct timeval *result)
 }
 
 static void
-rtsold_set_dump_file(sig)
-	int sig;
+rtsold_set_dump_file(int sig)
 {
 	do_dump = 1;
 }
@@ -847,7 +844,7 @@ warnmsg(priority, func, msg, va_alist)
  * return a list of interfaces which is suitable to sending an RS.
  */
 char **
-autoifprobe()
+autoifprobe(void)
 {
 	static char **argv = NULL;
 	static int n = 0;
