@@ -602,9 +602,6 @@ defrouter_select()
 		printf("Default router list becomes empty\n");
 	}
 
-#if 0
-  done:
-#endif
 	splx(s);
 	return;
 }
