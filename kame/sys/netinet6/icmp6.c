@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.141 2000/09/15 07:36:18 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.142 2000/09/15 07:40:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2272,7 +2272,17 @@ icmp6_redirect_input(m, off)
 		      , 0UL
 #endif
 		      );
-	if (rt && rt->rt_gateway && rt->rt_gateway->sa_family == AF_INET6) {
+	if (rt) {
+		if (rt->rt_gateway == NULL ||
+		    rt->rt_gateway->sa_family == AF_INET6) {
+			log(LOG_ERR,
+			    "ICMP6 redirect rejected; no route "
+			    "with inet6 gateway found for redirect dst: %s\n",
+			    icmp6_redirect_diag(&src6, &reddst6, &redtgt6));
+			RTFREE(rt);
+			goto freeit;
+		}
+
 		gw6 = &(((struct sockaddr_in6 *)rt->rt_gateway)->sin6_addr);
 		if (bcmp(&src6, gw6, sizeof(struct in6_addr)) != 0) {
 			log(LOG_ERR,
