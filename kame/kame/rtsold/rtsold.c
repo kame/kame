@@ -79,7 +79,7 @@ int main __P((int argc, char *argv[]));
 /* static variables and functions */
 static int mobile_node = 0;
 static int do_dump;
-static char *dumpfilename = "/var/tmp/rtsold.dump"; /* XXX: should be configurable */
+static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurable */
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
 
 static int ifconfig __P((char *ifname));

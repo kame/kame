@@ -68,15 +68,15 @@ fi
 if [ X"${dumpfile}" = X ]; then
     if [ X"${statmode}" = X"YES" ]; then
 	if [ X"${densemode}" = X"YES" ]; then
-	    dumpfile=/var/tmp/pim6dd.stat
+	    dumpfile=/var/run/pim6dd.stat
 	else
-	    dumpfile=/var/tmp/pim6sd.stat
+	    dumpfile=/var/run/pim6sd.stat
 	fi
     else
 	if [ X"${densemode}" = X"YES" ]; then
-	    dumpfile=/var/tmp/pim6dd.dump
+	    dumpfile=/var/run/pim6dd.dump
 	else
-	    dumpfile=/var/tmp/pim6sd.dump
+	    dumpfile=/var/run/pim6sd.dump
 	fi
     fi
 fi

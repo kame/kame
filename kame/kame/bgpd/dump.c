@@ -44,7 +44,7 @@ extern struct ifinfo *ifentry;
 extern struct ripif *ripifs;	/* defined in ripng.c */
 
 char *dumpfile;
-#define DUMPFILE "/var/tmp/bgpd.dump"
+#define DUMPFILE "/var/run/bgpd.dump"
 
 static char *aspath2str(struct aspath *);
 static char *cll2str(struct clstrlist *);
