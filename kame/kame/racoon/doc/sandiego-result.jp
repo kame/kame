@@ -130,8 +130,12 @@ vs ire
 	ipcomp over ikeのテスト
 	spiまわりなどたくさん直した。2byte spiが来たときの対処等。
 	現状のcodeはwell-known cpiをつっこまれると困る。
+	phase 1: 3des/sha1/dh1/600s
+	phase 2: esp/transport/3des/sha1/300s, ipcomp/deflate/300s
 
 	いちおう動きそう。再試験予定。
+
+vs cisco
 
 テストするには
 	psk.txtにエントリ追加。
