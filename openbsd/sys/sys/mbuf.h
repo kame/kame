@@ -161,7 +161,7 @@ struct mbuf {
 #define M_LOOP		0x0040	/* for Mbuf statistics */
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_COMP|M_AUX|M_LOOP|M_NOTIFICATION)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_COMP|M_LOOP|M_NOTIFICATION)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */
