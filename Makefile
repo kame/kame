@@ -15,7 +15,7 @@ bsdi4:
 
 DOC=	CHANGELOG COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL \
 	INSTALL.anoncvs Makefile PORTABILITY VERSION prepare.pl \
-	TODO.new-repository
+	TODO.new-repository RELNOTES
 PLAT=	freebsd2 freebsd3 kame netbsd openbsd bsdi3 bsdi4
 
 update: update-doc update-plat

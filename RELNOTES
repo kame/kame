@@ -1,0 +1,54 @@
+			 RELNOTES of KAME kit
+
+			     KAME Project
+
+		     $Date: 1999/10/05 10:09:55 $
+
+
+Here is a summary of differences between KAME STABLE 19990809 and STABLE
+199910xx.
+
+<<IPv4>>
+<<IPv6>>
+<<IPv6 API>>
+<<IPsec>>
+<<Userland>>
+<<Others>>
+	(to be written)
+
+KNOWN BUGS/TWISTS
+=================
+All the following problems will be fixed in near-future SNAP releases,
+and the next STABLE release,
+
+- "faithd" sometimes fail to relay rsh/rlogin connection properly.  Some part
+  of data connection seems to be lost.  rlogin session may fail to propagate
+  screen size information to the peer.
+- Some of the userland tool may not work properly, if you configure more than
+  500 interfaces.  (libinet6 is fixed for this, but there are some places
+  where max # of interfaces is hardcoded)
+- Notebooks/laptops problem: multicast hardware filter on ethernet card will
+  not be properly initialized after suspend/resume session, and this makes
+  trouble with IPv6 commuincation (which heavily uses multicast).
+  This is not a KAME problem (*BSD problem), but please be warned.
+  Workaround: perform "ifconfig down", then "ifconfig up" after resume.
+- racoon daemon may not work correctly due to code synchronization problem
+  between userland and the kernel.  Because of STABLE cut-off date we do not
+  supply fixes for this.  If you would like to use racoon, please use more
+  recent SNAP kit instead.
+
+PLATFORM DIFFERENCES
+====================
+As we support various platforms, there are several differences between
+those platforms.  Here is a brief list of important differences:
+- ALTQ
+	ALTQ 1.2 is merged into:	KAME/FreeBSD228, KAME/FreeBSD33,
+					KAME/NetBSD141
+	No ALTQ support in:		KAME/BSDI31, KAME/OpenBSD25
+- IPsec
+	No KAME IPsec support in:	KAME/OpenBSD25
+		(you can enjoy OpenBSD IPsec for IPv4)
+- TCP
+	see kit/IMPLEMENTATION for details.
+
+							<end of RELNOTES>
