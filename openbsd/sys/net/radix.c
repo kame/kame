@@ -715,7 +715,6 @@ rn_delete(v_arg, netmask_arg, head, rn)
 		tt = rn;
 		/* 
 		 * Is this route(rn) a rn->dupedkey chain? 
-		 * Only default route is an exception. (rn_mask)
 		 */
 		if (rn_mpath_next(tt->rn_p))
 			mpath_enable = 1;
