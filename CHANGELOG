@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.211 1999/10/25 13:38:36 sakane Exp $
+$Id: CHANGELOG,v 1.212 1999/10/25 18:17:46 sakane Exp $
 
 <199910>
+Tue Oct 26 02:58:19 JST 1999 sakane@ydc.co.jp
+	* freebsd3/sys/netinet tcp_input.c udp_usrreq.c
+	Modify m_len before and after calling ipsec_in_reject().
+	FreeBSD3 cuts out IP header from mbuf before pcb lookupping.
+
+Tue Oct 26 02:44:51 JST 1999 sakane@ydc.co.jp
+	* kame/sys/netinet6/ipsec.c:
+	Fixed a bug that sa_len wasn't updated in spidx.
+	Improved to make spidx which is used as key to search SPD.
+
 Mon Oct 25 22:30:47 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	* kame/kame/libipsec:
