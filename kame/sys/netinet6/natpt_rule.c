@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.34 2001/11/02 12:21:47 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.35 2001/11/14 07:18:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -95,15 +95,22 @@ natpt_lookForRule6(struct pcv *cv6)
 			continue;
 
 		if (csl->proto != 0) {
-			if ((cv6->ip_p == IPPROTO_ICMPV6)
-			    && ((csl->proto & NATPT_ICMP) == 0))
-				continue;
-			if ((cv6->ip_p == IPPROTO_TCP)
-			    && ((csl->proto & NATPT_TCP) == 0))
-				continue;
-			if ((cv6->ip_p == IPPROTO_UDP)
-			    && ((csl->proto & NATPT_UDP) == 0))
-				continue;
+			switch (cv6->ip_p) {
+			case IPPROTO_ICMPV6:
+				if ((csl->proto & NATPT_ICMP) == 0)
+					continue;
+				break;
+
+			case IPPROTO_TCP:
+				if ((csl->proto & NATPT_TCP) == 0)
+					continue;
+				break;
+
+			case IPPROTO_UDP:
+				if ((csl->proto & NATPT_UDP) == 0)
+					continue;
+				break;
+			}
 		}
 
 		if (natpt_matchIn6addr(cv6, csl, &csl->local) != 0) {
@@ -135,15 +142,22 @@ natpt_lookForRule4(struct pcv *cv4)
 			continue;
 
 		if (csl->proto != 0) {
-			if ((cv4->ip_p == IPPROTO_ICMP)
-			    && ((csl->proto & NATPT_ICMP) == 0))
-				continue;
-			if ((cv4->ip_p == IPPROTO_TCP)
-			    && ((csl->proto & NATPT_TCP) == 0))
-				continue;
-			if ((cv4->ip_p == IPPROTO_UDP)
-			    && ((csl->proto & NATPT_UDP) == 0))
-				continue;
+			switch (cv4->ip_p) {
+			case IPPROTO_ICMP:
+				if ((csl->proto & NATPT_ICMP) == 0)
+					continue;
+				break;
+
+			case IPPROTO_TCP:
+				if ((csl->proto & NATPT_TCP) == 0)
+					continue;
+				break;
+
+			case IPPROTO_UDP:
+				if ((csl->proto & NATPT_UDP) == 0)
+					continue;
+				break;
+			}
 		}
 
 		if (natpt_matchIn4addr(cv4, csl, &csl->local) != 0) {
