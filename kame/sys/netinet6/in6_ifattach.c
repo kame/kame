@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.186 2004/02/03 07:25:22 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.187 2004/02/04 05:07:43 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -846,6 +846,7 @@ in6_nigroup(ifp, name, namelen, sa6)
 	if (in6_addr2zoneid(ifp, &sa6->sin6_addr, &sa6->sin6_scope_id)) {
 		return -1; /* XXX: should not fail */
 	}
+	in6_embedscope(&sa6->sin6_addr, sa6);
 
 	return 0;
 }
