@@ -2125,11 +2125,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	} else
 		level = op = optname = optlen = 0;
 #else
-#ifdef __OpenBSD__
-	register struct inpcb *inp = sotoinpcb(so);
-#else
 	register struct in6pcb *in6p = sotoin6pcb(so);
-#endif
 	register struct mbuf *m = *mp;
 
 	optlen = m ? m->m_len : 0;
@@ -2161,15 +2157,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			}
 			error = sooptcopyin(sopt, inp->in6p_icmp6filt, optlen,
 				optlen);
-#elif defined(__OpenBSD__)
-			p = mtod(m, struct icmp6_filter *);
-			if (!p || !inp->inp_icmp6filt) {
-				error = EINVAL;
-				break;
-			}
-			bcopy(p, inp->inp_icmp6filt,
-				sizeof(struct icmp6_filter));
-			error = 0;
 #else
 			p = mtod(m, struct icmp6_filter *);
 			if (!p || !in6p->in6p_icmp6filt) {
@@ -2204,19 +2191,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			}
 			error = sooptcopyout(sopt, inp->in6p_icmp6filt,
 				sizeof(struct icmp6_filter));
-#elif defined(__OpenBSD__)
-			struct icmp6_filter *p;
-
-			if (!inp->inp_icmp6filt) {
-				error = EINVAL;
-				break;
-			}
-			*mp = m = m_get(M_WAIT, MT_SOOPTS);
-			m->m_len = sizeof(struct icmp6_filter);
-			p = mtod(m, struct icmp6_filter *);
-			bcopy(inp->inp_icmp6filt, p,
-				sizeof(struct icmp6_filter));
-			error = 0;
 #else
 			struct icmp6_filter *p;
 
