@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.260 2002/09/25 11:41:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.261 2002/10/04 05:45:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1677,7 +1677,7 @@ key_spdadd(so, m, mhp)
 	struct sadb_lifetime *lft = NULL;
 	struct secpolicyindex spidx;
 	struct secpolicy *newsp;
-	struct ipsecrequest *req;
+	struct ipsecrequest *isr;
 	int error;
 
 	/* sanity check */
@@ -1790,25 +1790,69 @@ key_spdadd(so, m, mhp)
 		return key_senderror(so, m, EINVAL);
 	}
 
+	for (isr = newsp->req; isr; isr = isr->next) {
+		struct sockaddr *sa;
+
+		/*
+		 * port spec is not permitted for tunnel mode
+		 */
+		if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
+			sa = (struct sockaddr *)(src0 + 1);
+			switch (sa->sa_family) {
+			case AF_INET:
+				if (((struct sockaddr_in *)sa)->sin_port) {
+					keydb_delsecpolicy(newsp);
+					return key_senderror(so, m, EINVAL);
+				}
+				break;
+			case AF_INET6:
+				if (((struct sockaddr_in6 *)sa)->sin6_port) {
+					keydb_delsecpolicy(newsp);
+					return key_senderror(so, m, EINVAL);
+				}
+				break;
+			default:
+				break;
+			}
+			sa = (struct sockaddr *)(src0 + 1);
+			switch (sa->sa_family) {
+			case AF_INET:
+				if (((struct sockaddr_in *)sa)->sin_port) {
+					keydb_delsecpolicy(newsp);
+					return key_senderror(so, m, EINVAL);
+				}
+				break;
+			case AF_INET6:
+				if (((struct sockaddr_in6 *)sa)->sin6_port) {
+					keydb_delsecpolicy(newsp);
+					return key_senderror(so, m, EINVAL);
+				}
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
 	/*
 	 * bark if we have different address family on tunnel address
-	 * specification.  applies only if we decapsulate in RFC2401 IPsec
-	 * (implementation limitation).
+	 * specification.  applies only if we decapsulate in RFC2401
+	 * IPsec (implementation limitation).
 	 */
 	if (!ipsec_tunnel_device) {
-		for (req = newsp->req; req; req = req->next) {
-			if (req->saidx.src.ss_family) {
-				struct sockaddr *sa;
+		for (isr = newsp->req; isr; isr = isr->next) {
+			struct sockaddr *sa;
+
+			if (isr->saidx.src.ss_family) {
 				sa = (struct sockaddr *)(src0 + 1);
-				if (sa->sa_family != req->saidx.src.ss_family) {
+				if (sa->sa_family != isr->saidx.src.ss_family) {
 					keydb_delsecpolicy(newsp);
 					return key_senderror(so, m, EINVAL);
 				}
 			}
-			if (req->saidx.dst.ss_family) {
-				struct sockaddr *sa;
+			if (isr->saidx.dst.ss_family) {
 				sa = (struct sockaddr *)(dst0 + 1);
-				if (sa->sa_family != req->saidx.dst.ss_family) {
+				if (sa->sa_family != isr->saidx.dst.ss_family) {
 					keydb_delsecpolicy(newsp);
 					return key_senderror(so, m, EINVAL);
 				}
@@ -1823,20 +1867,20 @@ key_spdadd(so, m, mhp)
 	 * TODO: conflicting devices
 	 */
 	if (ipsec_tunnel_device) {
-		for (req = newsp->req; req; req = req->next) {
+		for (isr = newsp->req; isr; isr = isr->next) {
 			struct ifnet *ifp;
 			int s;
 			struct sockaddr *me, *you;
 
-			if (req->saidx.mode != IPSEC_MODE_TUNNEL)
+			if (isr->saidx.mode != IPSEC_MODE_TUNNEL)
 				continue;
 
 			if (newsp->spidx.dir == IPSEC_DIR_OUTBOUND) {
-				me = (struct sockaddr *)&req->saidx.src;
-				you = (struct sockaddr *)&req->saidx.dst;
+				me = (struct sockaddr *)&isr->saidx.src;
+				you = (struct sockaddr *)&isr->saidx.dst;
 			} else {
-				me = (struct sockaddr *)&req->saidx.dst;
-				you = (struct sockaddr *)&req->saidx.src;
+				me = (struct sockaddr *)&isr->saidx.dst;
+				you = (struct sockaddr *)&isr->saidx.src;
 			}
 
 			s = splimp();
@@ -1850,7 +1894,7 @@ key_spdadd(so, m, mhp)
 				return key_senderror(so, m, EINVAL);
 			}
 
-			req->tunifp = ifp;
+			isr->tunifp = ifp;
 		}
 	}
 #endif
