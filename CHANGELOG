@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.9 1999/08/13 02:48:41 jinmei Exp $
+$Id: CHANGELOG,v 1.10 1999/08/13 06:49:34 jinmei Exp $
 
 <199908>
+1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* pim6dd/pim6_proto.c (receive_pim6_assert): added a sanity check
+	in order prevent core dump when receiving an assert message from a
+	router that the receiving node doesn't regard as a PIM neighbor.
+
 1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/bgpd: made sure to transit an optional transitive path
 	attribute even if it's unrecognized(not tested)
