@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.93 2001/05/21 11:11:46 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.94 2001/05/21 11:28:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -724,16 +724,17 @@ in6_losing(in6p)
 		info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 		info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 		rt_missmsg(RTM_LOSING, &info, rt->rt_flags, 0);
-		if (rt->rt_flags & RTF_DYNAMIC)
+		if (rt->rt_flags & RTF_DYNAMIC) {
 			(void)rtrequest(RTM_DELETE, rt_key(rt),
 					rt->rt_gateway, rt_mask(rt), rt->rt_flags,
 					(struct rtentry **)0);
-		else
-		/*
-		 * A new route can be allocated
-		 * the next time output is attempted.
-		 */
+		} else {
+			/*
+			 * A new route can be allocated
+			 * the next time output is attempted.
+			 */
 			rtfree(rt);
+		}
 	}
 }
 
