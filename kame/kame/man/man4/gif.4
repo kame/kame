@@ -1,4 +1,4 @@
-.\"	$KAME: gif.4,v 1.20 2000/11/24 08:41:18 itojun Exp $
+.\"	$KAME: gif.4,v 1.21 2000/11/24 10:05:16 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -258,6 +258,9 @@ makes sense.
 Make sure to configure an address which belongs to your node.
 Otherwise, your node will not be able to receive packets from the peer,
 and your node will generate packets with a spoofed source address.
+.Pp
+If the outer protocol is IPv6, path MTU discovery for encapsulated packet
+may affect communication over the interface.
 .Pp
 .Xr gif 4
 is an
