@@ -727,7 +727,7 @@ bgp_send_update(bnp, rte, headrte)
       goto next_rte;
 
     /* generic filter */
-    if (bgp_output_filter(bnp, rte))
+    if (bgp_output_filter(bnp, rt))
       goto next_rte;
 
     agg = rt->rt_aggr.ag_agg;  /* (1998/06/12) */
