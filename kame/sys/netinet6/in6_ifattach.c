@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.49 2000/04/12 09:40:45 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.50 2000/04/13 16:19:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -200,7 +200,7 @@ found:
 			in6->s6_addr[9] = addr[1];
 			in6->s6_addr[10] = addr[2];
 			in6->s6_addr[11] = 0xff;
-			in6->s6_addr[12] = 0xff;
+			in6->s6_addr[12] = 0xfe;
 			in6->s6_addr[13] = addr[3];
 			in6->s6_addr[14] = addr[4];
 			in6->s6_addr[15] = addr[5];
