@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.200 2002/06/07 02:46:23 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.201 2002/06/07 03:03:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -492,10 +492,9 @@ nd6_ra_input(m, off, icmp6len)
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
 		nd6log((LOG_INFO,
-			"nd6_ra_input: lladdrlen mismatch for %s "
-			"(if %d, RA packet %d)\n",
-			ip6_sprintf(&src_sa6->sin6_addr),
-			ifp->if_addrlen, lladdrlen - 2));
+		    "nd6_ra_input: lladdrlen mismatch for %s "
+		    "(if %d, RA packet %d)\n", ip6_sprintf(&src_sa6->sin6_addr),
+		    ifp->if_addrlen, lladdrlen - 2));
 		goto bad;
 	}
 
