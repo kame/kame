@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.82 2001/10/01 10:42:13 keiichi Exp $	*/
+/*	$KAME: if_gif.c,v 1.83 2001/10/02 03:34:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1024,12 +1024,15 @@ gif_set_tunnel(ifp, src, dst)
 #endif
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	for (i = 0; i < ngif; i++) {
-		sc2 = gif_softc + i;
+	for (i = 0; i < ngif; i++)
 #else
 	for (sc2 = TAILQ_FIRST(&gifs);
 	     sc2;
-	     sc2 = TAILQ_NEXT(sc2, gif_link)) {
+	     sc2 = TAILQ_NEXT(sc2, gif_link))
+#endif
+	{
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+		sc2 = gif_softc + i;
 #endif
 		if (sc2 == sc)
 			continue;
