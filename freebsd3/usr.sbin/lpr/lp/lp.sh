@@ -36,7 +36,7 @@
 #
 # Posix 1003.2 compliant print spooler interface.
 #
-# $FreeBSD: src/usr.sbin/lpr/lp/lp.sh,v 1.5.2.1 1999/08/29 15:43:16 peter Exp $
+# $FreeBSD: src/usr.sbin/lpr/lp/lp.sh,v 1.5.2.2 2000/03/08 10:18:11 sheldonh Exp $
 #
 
 ncopies=""
@@ -48,8 +48,10 @@ dest=${LPDEST:-${PRINTER:-lp}}
 #
 # XXX We include the -o flag as a dummy.  Posix 1003.2 does not require
 # it, but the rationale mentions it as a possible future extension.
+# XXX We include the -s flag as a dummy.  SUSv2 requires it,
+# although we do not yet emit the affected messages.
 #
-while getopts "cd:n:o:" option
+while getopts "cd:n:o:s" option
 do
 	case $option in
 
@@ -60,6 +62,8 @@ do
 	n)			# number of copies
 		ncopies="-#${OPTARG}";;
 	o)			# (printer option)
+		: ;;
+	s)			# (silent option)
 		: ;;
 	*)			# (error msg printed by getopts)
 		exit 2;;

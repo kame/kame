@@ -31,7 +31,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/usr.sbin/lpr/lp/lp.1,v 1.7.2.1 1999/08/29 15:43:16 peter Exp $
+.\" $FreeBSD: src/usr.sbin/lpr/lp/lp.1,v 1.7.2.3 2000/03/08 10:18:10 sheldonh Exp $
 .\"
 .Dd January 22, 1995
 .Dt LP 1
@@ -41,7 +41,8 @@
 .Nd front-end to the print spooler
 .Sh SYNOPSIS
 .Nm lp
-.Op Fl c
+.Op Fl cs
+.Op Fl o Ar option
 .Op Fl d Ar printer
 .Op Fl n Ar num
 .Op Ar name ...
@@ -52,7 +53,7 @@ is a front-end to the print spooler as required by the
 specification.  It effectively invokes
 .Xr lpr 1
 with the proper set of arguments.
-
+.Pp
 It generally prints the named files on the destination printer.
 .Pp
 The following options are available:
@@ -64,7 +65,8 @@ command exit only after further access to any of the input files is no
 longer required.  The application can then safely delete or modify the
 files without affecting the output operation.
 .It Fl d Ar dest
-Specify a particular printer. If no
+Specify a particular printer.
+If no
 .Fl d
 is provided on the command line, the contents of the environment
 variables
@@ -77,6 +79,15 @@ are taken as the destination printer.
 Specify that
 .Ar num
 copies of each of the named files shall be printed.
+.It Fl o Ar option
+Printer specific options.
+Not supported, provided only as a compatibility
+option for SVR.
+.It Fl s
+Silent operation.
+Not supported,
+provided only as a compatibility option for
+.St -susv2 .
 .El
 .Sh ENVIRONMENT
 As described above, the variables
@@ -84,7 +95,6 @@ As described above, the variables
 and
 .Ev PRINTER
 are examined to select the destination printer.
-
 .Sh SEE ALSO
 .Xr lpr 1
 .Sh STANDARDS

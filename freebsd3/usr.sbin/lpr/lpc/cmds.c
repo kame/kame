@@ -43,7 +43,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)cmds.c	8.2 (Berkeley) 4/28/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/lpc/cmds.c,v 1.12.2.1 1999/08/29 15:43:18 peter Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/lpc/cmds.c,v 1.12.2.2 2000/01/24 23:35:10 dillon Exp $";
 #endif /* not lint */
 
 /*
@@ -587,12 +587,13 @@ startpr(pp, enable)
 	printf("%s:\n", pp->printer);
 
 	/*
-	 * Turn off the owner execute bit of the lock file to enable printing.
+	 * For enable==1 ('start'), turn off the LFM_PRINT_DIS bit of the
+	 * lock file to re-enable printing.  For enable==2 ('up'), also
+	 * turn off the LFM_QUEUE_DIS bit to re-enable queueing.
 	 */
 	seteuid(euid);
 	if (enable && stat(lf, &stbuf) >= 0) {
-		mode_t bits = (enable == 2 ? 0
-			       : (LFM_PRINT_DIS | LFM_QUEUE_DIS));
+		mode_t bits = (enable == 2 ? 0 : LFM_QUEUE_DIS);
 		if (chmod(lf, stbuf.st_mode & (LOCK_FILE_MODE | bits)) < 0)
 			printf("\tcannot enable printing\n");
 		else

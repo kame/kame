@@ -48,7 +48,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)from: lpr.c	8.4 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/lpr/lpr.c,v 1.27.2.2 1999/08/29 15:43:29 peter Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/lpr/lpr.c,v 1.27.2.3 2000/01/26 23:35:12 joe Exp $";
 #endif /* not lint */
 
 /*
@@ -314,7 +314,7 @@ main(argc, argv)
 	seteuid(uid);
 	card('H', host);
 	card('P', person);
-	if (hdr) {
+	if (hdr && !pp->no_header) {
 		if (jobname == NULL) {
 			if (argc == 0)
 				jobname = "stdin";

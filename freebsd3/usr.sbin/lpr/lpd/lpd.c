@@ -43,7 +43,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)lpd.c	8.7 (Berkeley) 5/10/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.sbin/lpr/lpd/lpd.c,v 1.10.2.1 1999/08/29 15:43:22 peter Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/lpd/lpd.c,v 1.10.2.2 2000/01/25 02:05:56 dillon Exp $";
 #endif /* not lint */
 
 /*
@@ -590,7 +590,7 @@ chkhost(f)
 			inet_ntoa(f->sin_addr));
 
 	(void) strncpy(fromb, hp->h_name, sizeof(fromb) - 1);
-	from[sizeof(fromb) - 1] = '\0';
+	fromb[sizeof(fromb) - 1] = '\0';
 	from = fromb;
 
 	/* Check for spoof, ala rlogind */
