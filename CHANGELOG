@@ -1,9 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.171 1999/10/07 16:39:11 itojun Exp $
+$Id: CHANGELOG,v 1.172 1999/10/07 16:54:10 itojun Exp $
 
 <199910>
 Fri Oct  8 01:40:23 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.1.1.
 	* openbsd/ports/security/ssh: ssh 1.2.27 with IPv6 patch.
 
 Thu Oct  7 22:05:10 JST 1999  itojun@iijlab.net
