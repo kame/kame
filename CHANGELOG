@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.70 1999/08/26 09:03:34 sumikawa Exp $
+$Id: CHANGELOG,v 1.71 1999/08/26 12:39:02 jinmei Exp $
 
 <199908>
+1999-08-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/vif.c: changed the return value of
+	vif_forwarder() from if_set * to int.
+	Also, introduced a new function vif_and(), which is inteded to be
+	called from age_routes() instead of vif_forwarder(). The new
+	function is added in order to prevent bcopy from a NULL pointer,
+	which causes pim6sdd hang up.
+
 Thu Aug 26 18:01:27 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* kame/sys/netinet6/frag6.c (frag6_init): changed ip6_id setting
 	algorhytm. it is borrowed from ip6_init(). ip6_id(initialized
