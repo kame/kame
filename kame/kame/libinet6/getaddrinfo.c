@@ -244,6 +244,9 @@ do { \
 	goto bad; \
 } while (0)
 
+#define MATCH_FAMILY(x, y)	((x) == PF_UNSPEC || (x) == (y))
+#define MATCH(x, y)		((x) == ANY || (x) == (y))
+
 char *
 gai_strerror(ecode)
 	int ecode;
@@ -360,22 +363,34 @@ getaddrinfo(hostname, servname, hints, res)
 		}
 	}
 
+	/* check for special cases */
+	if (MATCH_FAMILY(pai->ai_family, PF_INET)
+	 || MATCH_FAMILY(pai->ai_family, PF_INET6)) {
+		ai0 = *pai;
+
+		if (pai->ai_family == PF_UNSPEC)
+			pai->ai_family = PF_INET6;
+		error = get_portmatch(pai, servname);
+		if (error)
+			ERR(error);
+
+		*pai = ai0;
+	}
+
 	ai0 = *pai;
 
 	/* NULL hostname, or numeric hostname */
 	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
-		if (pai->ai_family != ANY && pai->ai_family != ex->e_af)
+		if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
 			continue;
-		if (pai->ai_socktype != ANY
-		 && pai->ai_socktype != ex->e_socktype)
+		if (!MATCH(pai->ai_socktype, ex->e_socktype))
 			continue;
-		if (pai->ai_protocol != ANY
-		 && pai->ai_protocol != ex->e_protocol)
+		if (!MATCH(pai->ai_protocol, ex->e_protocol))
 			continue;
 
-		if (pai->ai_family == ANY)
+		if (pai->ai_family == PF_UNSPEC)
 			pai->ai_family = ex->e_af;
 		if (pai->ai_socktype == ANY)
 			pai->ai_socktype = ex->e_socktype;
@@ -416,16 +431,14 @@ getaddrinfo(hostname, servname, hints, res)
 	{
 		*pai = ai0;
 
-		if (pai->ai_family != ANY && pai->ai_family != ex->e_af)
+		if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
 			continue;
-		if (pai->ai_socktype != ANY
-		 && pai->ai_socktype != ex->e_socktype)
+		if (!MATCH(pai->ai_socktype, ex->e_socktype))
 			continue;
-		if (pai->ai_protocol != ANY
-		 && pai->ai_protocol != ex->e_protocol)
+		if (!MATCH(pai->ai_protocol, ex->e_protocol))
 			continue;
 
-		if (pai->ai_family == ANY)
+		if (pai->ai_family == PF_UNSPEC)
 			pai->ai_family = ex->e_af;
 		if (pai->ai_socktype == ANY)
 			pai->ai_socktype = ex->e_socktype;
@@ -979,34 +992,55 @@ get_port(ai, servname, matchonly)
 	const char *servname;
 	int matchonly;
 {
+	const char *proto;
+	struct servent *sp;
+	int port;
+	int allownumeric;
+
 	if (servname == NULL)
 		return 0;
 	if (ai->ai_family != AF_INET && ai->ai_family != AF_INET6)
 		return 0;
 
-	if (ai->ai_socktype == SOCK_DGRAM || ai->ai_socktype == SOCK_STREAM) {
-		const char *proto;
-		struct servent *sp;
-		u_short port;
+	switch (ai->ai_socktype) {
+	case SOCK_RAW:
+		return EAI_SERVICE;
+	case SOCK_DGRAM:
+	case SOCK_STREAM:
+		allownumeric = 1;
+		break;
+	case ANY:
+		allownumeric = 0;
+		break;
+	default:
+		return EAI_SOCKTYPE;
+	}
 
-		if (str_isnumber(servname))
-			port = htons(atoi(servname));
-		else {
-			switch (ai->ai_socktype) {
-			case SOCK_DGRAM:
-				proto = "udp";
-				break;
-			case SOCK_STREAM:
-				proto = "tcp";
-				break;
-			}
-
-			if ((sp = getservbyname(servname, proto)) == NULL)
-				return EAI_SERVICE;
-			port = sp->s_port;
+	if (str_isnumber(servname)) {
+		if (!allownumeric)
+			return EAI_SOCKTYPE;
+		port = htons(atoi(servname));
+		if (port < 0 || port > 65535)
+			return EAI_SERVICE;
+	} else {
+		switch (ai->ai_socktype) {
+		case SOCK_DGRAM:
+			proto = "udp";
+			break;
+		case SOCK_STREAM:
+			proto = "tcp";
+			break;
+		default:
+			proto = NULL;
+			break;
 		}
-		if (matchonly)
-			return 0;
+
+		if ((sp = getservbyname(servname, proto)) == NULL)
+			return EAI_SERVICE;
+		port = sp->s_port;
+	}
+
+	if (!matchonly) {
 		switch (ai->ai_family) {
 		case AF_INET:
 			((struct sockaddr_in *)ai->ai_addr)->sin_port = port;
@@ -1017,10 +1051,7 @@ get_port(ai, servname, matchonly)
 			break;
 #endif
 		}
-	} else if (ai->ai_socktype == SOCK_RAW)
-		return EAI_SERVICE;
-	else
-		return EAI_SOCKTYPE;
+	}
 
 	return 0;
 }
