@@ -128,6 +128,8 @@ struct inpcb {
 	struct {
 		/* IP options */
 		struct	mbuf *inp6_options;
+		/* IP6 options for incoming packets */
+		struct	ip6_recvpktopts *inp6_inputopts;
 		/* IP6 options for outgoing packets */
 		struct	ip6_pktopts *inp6_outputopts;
 		/* IP multicast options */
@@ -138,7 +140,6 @@ struct inpcb {
 		int	inp6_cksum;
 		u_short	inp6_ifindex;
 		short	inp6_hops;
-		u_int8_t	inp6_hlim;
 	} inp_depend6;
 	LIST_ENTRY(inpcb) inp_portlist;
 	struct	inpcbport *inp_phd;	/* head of this list */
@@ -146,12 +147,12 @@ struct inpcb {
 #define	in6p_faddr	inp_dependfaddr.inp6_foreign
 #define	in6p_laddr	inp_dependladdr.inp6_local
 #define	in6p_route	inp_dependroute.inp6_route
-#define	in6p_ip6_hlim	inp_depend6.inp6_hlim
 #define	in6p_hops	inp_depend6.inp6_hops	/* default hop limit */
 #define	in6p_ip6_nxt	inp_ip_p
 #define	in6p_flowinfo	inp_flow
 #define	in6p_vflag	inp_vflag
 #define	in6p_options	inp_depend6.inp6_options
+#define	in6p_inputopts	inp_depend6.inp6_inputopts
 #define	in6p_outputopts	inp_depend6.inp6_outputopts
 #define	in6p_moptions	inp_depend6.inp6_moptions
 #define	in6p_icmp6filt	inp_depend6.inp6_icmp6filt
@@ -226,25 +227,21 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	INP_RECVIF		0x80	/* receive incoming interface */
 #define	INP_MTUDISC		0x100	/* user can do MTU discovery */
 #define	INP_FAITH		0x200	/* accept FAITH'ed connections */
-#define	IN6P_PKTINFO		0x010000
-#define	IN6P_HOPLIMIT		0x020000
-#define	IN6P_NEXTHOP		0x040000
-#define	IN6P_HOPOPTS		0x080000
-#define	IN6P_DSTOPTS		0x100000
-#define	IN6P_RTHDR		0x200000
+
+#define	IN6P_PKTINFO		0x010000 /* receive IP6 dst and I/F */
+#define	IN6P_HOPLIMIT		0x020000 /* receive hoplimit */
+#define	IN6P_HOPOPTS		0x040000 /* receive hop-by-hop options */
+#define	IN6P_DSTOPTS		0x080000 /* receive dst options after rthdr */
+#define	IN6P_RTHDR		0x100000 /* receive routing header */
+#define	IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
 #define	IN6P_BINDV6ONLY		0x400000
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
 					INP_RECVIF|\
-				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_NEXTHOP|\
-				 IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR)
-
+				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
+				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS)
 #define	INP_UNMAPPABLEOPTS	(IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR)
 
  /* for KAME src sync over BSD*'s */
-#define	IN6P_RECVOPTS		INP_RECVOPTS
-#define	IN6P_RECVRETOPTS	INP_RECVRETOPTS
-#define	IN6P_RECVDSTADDR	INP_RECVDSTADDR
-#define	IN6P_HDRINCL		INP_HDRINCL
 #define	IN6P_HIGHPORT		INP_HIGHPORT
 #define	IN6P_LOWPORT		INP_LOWPORT
 #define	IN6P_ANONPORT		INP_ANONPORT
