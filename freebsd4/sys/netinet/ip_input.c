@@ -569,7 +569,6 @@ pass:
 	 */
 	if (natpt_enable) {
 		struct mbuf *m1 = NULL;
-		struct sockaddr_in6 sa6_src, sa6_dst;
 
 		switch (natpt_in4(m, &m1)) {
 		case IPPROTO_IP:	/* this packet is not changed */
@@ -591,9 +590,7 @@ pass:
 			break;
 		}
 
-		if (m != m1)
-			m_freem(m);
-
+		m_freem(m);
 		return;
 	}
 checkaddresses:;
