@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 4.0
 KAME project
-$Id: INSTALL,v 1.2 2000/04/21 10:08:14 itojun Exp $
+$Id: INSTALL,v 1.3 2000/04/21 10:20:38 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -40,8 +40,8 @@ B-1. Go down to sys/i386/conf.
 	% cd sys/i386/conf
 
 B-2. Make a kernel configuration file, and invoke "/usr/sbin/config CONFIGFILE".
-     GENERIC should have commonly used IPv6 definitions, so you may want to
-     copy the file to begin with.
+     GENERIC.KAME includes KAME extensions as well as common FreeBSD
+     definitions, so you may want to copy the file to begin with.
 	% /usr/sbin/config CONFIGFILE
 
 B-3. Build the kernel.  The process will make kernel file named "kernel".
