@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.203 2003/04/01 12:18:07 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.204 2003/04/03 04:44:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -181,8 +181,6 @@ struct callout mip6_nonce_upd_ch;
 
 static int mip6_prelist_update_sub(struct hif_softc *, struct sockaddr_in6 *,
     union nd_opts *, struct nd_defrouter *, struct mbuf *);
-static int mip6_prefix_list_update_sub(struct hif_softc *,
-    struct sockaddr_in6 *, struct nd_prefixctl *, struct nd_defrouter *);
 static int mip6_register_current_location(void);
 static int mip6_haddr_config(struct hif_softc *);
 static int mip6_attach_haddrs(struct hif_softc *);
@@ -342,6 +340,9 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	struct mip6_subnet_ha *msha = NULL;
 	struct mip6_subnet *ms = NULL;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	/* sanity check. */
 	if ((sc == NULL) || (rtaddr == NULL) || (dr == NULL)
