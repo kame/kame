@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.108 2004/08/11 08:10:06 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.109 2004/10/27 08:08:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -239,7 +239,7 @@ mld_starttimer(in6m)
 #else
 	timeout_set(in6m->in6m_timer_ch,
 	    (void (*) __P((void *)))mld_timeo, in6m);
-	timeout_add(in6m->in6m_timer_ch, in6m->timer);
+	timeout_add(in6m->in6m_timer_ch, in6m->in6m_timer);
 #endif
 }
 
