@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.47 2001/08/17 12:18:02 sakane Exp $
+$KAME: helsinki-result.jp,v 1.48 2001/08/17 13:18:53 sakane Exp $
 
 
 generic
@@ -31,6 +31,9 @@ generic
 	長いKEYMATの計算のとき、必要鍵長の計算にbugあり (修正済)
 
 	DH公開情報は事前に計算しとく方がいいかも
+
+	subjectAltNameとID payload比較についてよく考えないと証明書は使えない。
+	証明書を送る前に、どのIDをsubjectAltNameに使うか決めないといけないから。
 
 	ndpをbypassさせるフラグかポリシがあった方がいいかも。
 	一応ipsec_setsocket(NULL)はしている。ip6_output()にフラグ渡す?
@@ -393,7 +396,9 @@ SSH
 
 	AES phase1 がうまくいかない。間違いなくracoonの問題。
 	key expantino問題。
-	
+
+	phase1 proposalのパースに虫がいるかも。要確認
+
 freeswan
 	IPv4, IPComp + ESP, transport mode
 	phase 1 3DES + SHA1, group 5, lifetime = 10min
