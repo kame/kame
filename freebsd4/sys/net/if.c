@@ -330,7 +330,7 @@ if_detach(ifp)
 	}
 
 	for (dp = domains; dp; dp = dp->dom_next) {
-		if (dp->dom_ifdetach)
+		if (dp->dom_ifdetach && ifp->if_afdata[dp->dom_family])
 			(*dp->dom_ifdetach)(ifp,
 			    ifp->if_afdata[dp->dom_family]);
 	}
