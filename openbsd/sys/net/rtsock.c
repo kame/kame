@@ -235,7 +235,7 @@ route_output(m, va_alist)
 	if (genmask) {
 		struct radix_node *t;
 		t = rn_addmask((caddr_t)genmask, 0, 1);
-		if (t && genmask->sa_len == ((struct sockaddr *)t->rn_key)->sa_len &&
+		if (t && genmask->sa_len >= ((struct sockaddr *)t->rn_key)->sa_len &&
 		    Bcmp((caddr_t *)genmask + 1, (caddr_t *)t->rn_key + 1,
 		    ((struct sockaddr *)t->rn_key)->sa_len))
 			genmask = (struct sockaddr *)(t->rn_key);
