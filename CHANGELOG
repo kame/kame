@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2630 2004/06/21 05:01:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.2631 2004/06/30 02:12:42 jinmei Exp $
 
 <200406>
+2004-06-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/name6.c (_dns_ghbyaddr): plugged a memory
+	leak.  All KAME snaps need this fix, and it is recommended to
+	update libinet6 and all snap applications with this fix.
+
 2004-06-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_update_ifa): do not attempt to join
 	multicast groups or to perform DAD when an existing address is
