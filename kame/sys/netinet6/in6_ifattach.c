@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.123 2001/07/10 09:59:37 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.124 2001/07/18 08:32:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -907,6 +907,11 @@ in6_ifattach(ifp, altifp)
 
 	/* initialize scope identifiers */
 	scope6_ifattach(ifp);
+
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	/* create a multicast kludge storage (if we have not had one) */
+	in6_createmkludge(ifp);
+#endif
 
 	/*
 	 * quirks based on interface type

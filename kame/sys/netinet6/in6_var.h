@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.58 2001/07/02 08:56:39 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.59 2001/07/18 08:32:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -694,6 +694,7 @@ void	in6_purgeif __P((struct ifnet *));
 void	in6_savemkludge __P((struct in6_ifaddr *));
 void	in6_setmaxmtu   __P((void));
 void	in6_restoremkludge __P((struct in6_ifaddr *, struct ifnet *));
+void	in6_createmkludge __P((struct ifnet *));
 void	in6_purgemkludge __P((struct ifnet *));
 struct in6_ifaddr *in6ifa_ifpforlinklocal __P((struct ifnet *, int));
 struct in6_ifaddr *in6ifa_ifpwithaddr __P((struct ifnet *,

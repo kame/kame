@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.195 2001/07/18 04:52:36 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.196 2001/07/18 08:32:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,9 +109,9 @@
 #endif
 #endif
 
-#include <netinet6/nd6.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/nd6.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_ifattach.h>
@@ -1889,22 +1889,18 @@ in6_savemkludge(oia)
 	} else {	/* last address on this if deleted, save */
 		struct multi6_kludge *mk;
 
-		mk = malloc(sizeof(*mk), M_IPMADDR, M_WAITOK);
-
-		LIST_INIT(&mk->mk_head);
-		mk->mk_ifp = oia->ia_ifp;
+		for (mk = in6_mk.lh_first; mk; mk = mk->mk_entry.le_next) {
+			if (mk->mk_ifp == oia->ia_ifp)
+				break;
+		}
+		if (mk == NULL) /* this should not happen! */
+			panic("in6_savemkludge: no kludge space");
 
 		for (in6m = oia->ia6_multiaddrs.lh_first; in6m; in6m = next){
 			next = in6m->in6m_entry.le_next;
 			IFAFREE(&in6m->in6m_ia->ia_ifa); /* release reference */
 			in6m->in6m_ia = NULL;
 			LIST_INSERT_HEAD(&mk->mk_head, in6m, in6m_entry);
-		}
-
-		if (mk->mk_head.lh_first != NULL) {
-			LIST_INSERT_HEAD(&in6_mk, mk, mk_entry);
-		} else {
-			FREE(mk, M_IPMADDR);
 		}
 	}
 }
@@ -1932,11 +1928,41 @@ in6_restoremkludge(ia, ifp)
 				LIST_INSERT_HEAD(&ia->ia6_multiaddrs,
 						 in6m, in6m_entry);
 			}
-			LIST_REMOVE(mk, mk_entry);
-			free(mk, M_IPMADDR);
+			LIST_INIT(&mk->mk_head);
 			break;
 		}
 	}
+}
+
+/*
+ * Allocate space for the kludge at interface initialization time.
+ * Formerly, we dynamically allocated the space in in6_savemkludge() with
+ * malloc(M_WAITOK).  However, it was wrong since the function can be called
+ * under an interrupt context (software timer on address lifetime expiration).
+ * Also, we cannot just give up allocating the strucutre, since the group
+ * membership structure is very complex and we need to keep it anyway.
+ * Of course, this function MUST NOT be called under an interrupt context.
+ * Specifically, it is expected to be called only from in6_ifattach(), though
+ * it is a global function.
+ */
+void
+in6_createmkludge(ifp)
+	struct ifnet *ifp;
+{
+	struct multi6_kludge *mk;
+
+	for (mk = in6_mk.lh_first; mk; mk = mk->mk_entry.le_next) {
+		/* If we've already had one, do not allocate. */
+		if (mk->mk_ifp == ifp)
+			return;
+	}
+
+	mk = malloc(sizeof(*mk), M_IPMADDR, M_WAITOK);
+
+	bzero(mk, sizeof(*mk));
+	LIST_INIT(&mk->mk_head);
+	mk->mk_ifp = ifp;
+	LIST_INSERT_HEAD(&in6_mk, mk, mk_entry);
 }
 
 void
@@ -1952,7 +1978,8 @@ in6_purgemkludge(ifp)
 
 		/* leave from all multicast groups joined */
 		while ((in6m = LIST_FIRST(&mk->mk_head)) != NULL) {
-printf("purgemkludge: %s\n", ip6_sprintf(&in6m->in6m_addr));
+			printf("in6_purgemkludge: %s\n",
+			       ip6_sprintf(&in6m->in6m_addr));
 			in6_delmulti(in6m);
 		}
 		LIST_REMOVE(mk, mk_entry);
