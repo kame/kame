@@ -1975,9 +1975,110 @@ fi
 done
 
 
+echo $ac_n "checking for IPv6 resolver type""... $ac_c" 1>&6
+echo "configure:1980: checking for IPv6 resolver type" >&5
+cat > conftest.$ac_ext <<EOF
+#line 1982 "configure"
+#include "confdefs.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>
+int main() {
+_res_ext.nsaddr_list[0].__ss_family = 1;
+; return 0; }
+EOF
+if { (eval echo configure:1992: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  cat >> confdefs.h <<\EOF
+#define RESOLVER_KAME 1
+EOF
+
+	resolver=kame
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  cat > conftest.$ac_ext <<EOF
+#line 2004 "configure"
+#include "confdefs.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>
+int main() {
+_res_ext.nsaddr_list[0].ss_family = 1;
+; return 0; }
+EOF
+if { (eval echo configure:2014: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  cat >> confdefs.h <<\EOF
+#define RESOLVER_KAME 1
+EOF
+
+	resolver=kame
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  cat > conftest.$ac_ext <<EOF
+#line 2026 "configure"
+#include "confdefs.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>
+int main() {
+_res.nsaddr_list_un[0].sin6.sin6_family = 1;
+; return 0; }
+EOF
+if { (eval echo configure:2036: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  cat >> confdefs.h <<\EOF
+#define RESOLVER_OLDKAME 1
+EOF
+
+	resolver=oldkame
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  cat > conftest.$ac_ext <<EOF
+#line 2048 "configure"
+#include "confdefs.h"
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>
+int main() {
+_res.nsaddr_list[0].sin_family = 1;
+; return 0; }
+EOF
+if { (eval echo configure:2058: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  cat >> confdefs.h <<\EOF
+#define RESOLVER_V4 1
+EOF
+
+	resolver=normal
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  resolver=unknown
+fi
+rm -f conftest*
+fi
+rm -f conftest*
+fi
+rm -f conftest*
+fi
+rm -f conftest*
+echo "$ac_t""$resolver" 1>&6
+
 
 echo $ac_n "checking if --enable-pedant option is specified""... $ac_c" 1>&6
-echo "configure:1981: checking if --enable-pedant option is specified" >&5
+echo "configure:2082: checking if --enable-pedant option is specified" >&5
 # Check whether --enable-pedant or --disable-pedant was given.
 if test "${enable_pedant+set}" = set; then
   enableval="$enable_pedant"

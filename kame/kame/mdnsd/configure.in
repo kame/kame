@@ -94,6 +94,37 @@ AC_FUNC_SETPGRP
 AC_TYPE_SIGNAL
 AC_CHECK_FUNCS(mktime select socket)
 
+AC_MSG_CHECKING(for IPv6 resolver type)
+AC_TRY_COMPILE(dnl
+[#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>], [_res_ext.nsaddr_list[0].__ss_family = 1;],
+	[AC_DEFINE(RESOLVER_KAME)
+	resolver=kame],
+	[AC_TRY_COMPILE(dnl
+[#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>], [_res_ext.nsaddr_list[0].ss_family = 1;],
+	[AC_DEFINE(RESOLVER_KAME)
+	resolver=kame],
+	[AC_TRY_COMPILE(dnl
+[#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>], [_res.nsaddr_list_un[0].sin6.sin6_family = 1;],
+	[AC_DEFINE(RESOLVER_OLDKAME)
+	resolver=oldkame],
+	[AC_TRY_COMPILE(dnl
+[#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <resolv.h>], [_res.nsaddr_list[0].sin_family = 1;],
+	[AC_DEFINE(RESOLVER_V4)
+	resolver=normal], [resolver=unknown])])])])
+AC_MSG_RESULT($resolver)
+
 dnl Checks for optinal parameters
 dnl AC_MSG_CHECKING(if --enable-mediator option is specified)
 dnl AC_ARG_WITH(mediator, [  --with-mediator         build with mediator],
