@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.371 2003/06/10 05:06:00 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.372 2003/06/17 11:11:15 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4482,7 +4482,6 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 	 * IPV6_2292xxx is for backward compatibility to RFC2292, and should
 	 * not be specified in the context of rfc2292bis.  Conversely,
 	 * rfc2292bis types should not be specified in the context of RFC2292.
-	 *
 	 */
 	if (!cmsg) {
 		switch (optname) {
