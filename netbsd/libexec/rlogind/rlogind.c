@@ -183,6 +183,37 @@ main(argc, argv)
 		syslog(LOG_ERR,"Can't get peer name of remote host: %m");
 		fatal(STDERR_FILENO, "Can't get peer name of remote host", 1);
 	}
+#ifdef INET6
+	if (((struct sockaddr *)&from)->sa_family == AF_INET6 &&
+	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&from)->sin6_addr) &&
+	    sizeof(struct sockaddr_in) <= sizeof(from)) {
+		struct sockaddr_in sin;
+		struct sockaddr_in6 *sin6;
+		const int off = sizeof(struct sockaddr_in6) -
+		    sizeof(struct sockaddr_in);
+
+		sin6 = (struct sockaddr_in6 *)&from;
+		memset(&sin, 0, sizeof(sin));
+		sin.sin_family = AF_INET;
+		sin.sin_len = sizeof(struct sockaddr_in);
+		memcpy(&sin.sin_addr, &sin6->sin6_addr.s6_addr[off],
+		    sizeof(sin.sin_addr));
+		memcpy(&from, &sin, sizeof(sin));
+		fromlen = sin.sin_len;
+	}
+#else
+	if (((struct sockaddr *)&from)->sa_family == AF_INET6 &&
+	    IN6_IS_ADDR_V4MAPPED(&((struct sockaddr_in6 *)&from)->sin6_addr)) {
+		char hbuf[NI_MAXHOST];
+		if (getnameinfo((struct sockaddr *)&from, fromlen, hbuf,
+				sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0) {
+			strncpy(hbuf, "invalid", sizeof(hbuf));
+		}
+		syslog(LOG_ERR, "malformed \"from\" address (v4 mapped, %s)\n",
+		    hbuf);
+		exit(1);
+	}
+#endif
 	on = 1;
 	if (keepalive &&
 	    setsockopt(0, SOL_SOCKET, SO_KEEPALIVE, &on, sizeof (on)) < 0)
