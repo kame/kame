@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.7 2003/11/11 19:05:26 keiichi Exp $
+# $Id: mip6makeconfig.sh,v 1.8 2003/11/28 07:43:43 t-momose Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -14,17 +14,36 @@ fi
 
 ipv6_mobile_config_dir=${ipv6_mobile_config_dir:-/usr/local/v6/etc/mobileip6}
 
-if [ $# -ne 1 ]; then
+args=`getopt l $*`
+if [ $? -ne 0 ]; then
 	${cat} <<EOF
-Usage: ${0} node_dir
+Usage: ${0} [-l] node_dir
 
 	The default config directory is ${ipv6_mobile_config_dir}.
 	each node_dir must reside in this directory.  This value can
 	be changed by modifing ipv6_mobile_config_dir variable in
 	/etc/rc.conf.
+
+	-l	This option should be used when you use a mobile node 
+		that is a recent USAGI derived Mobile IPv6 implementation.
 EOF
 	exit 1
 fi
+
+tunnel_upperspec='135'
+
+set -- $args
+for i do
+	case "$i"
+	in
+		-l)
+			tunnel_upperspec='any'
+			shift;;
+		--)
+			shift;
+			break;;
+	esac
+done
 
 #
 # check node_dir
@@ -156,10 +175,10 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spdadd_home_agent
 spdadd ::/0 ${mobile_node}
-	135 -P out ipsec
+	${tunnel_upperspec} -P out ipsec
 	esp/tunnel/${home_agent}-${mobile_node}/unique:${tunnel_uid_ha_to_mn};
 spdadd ${mobile_node} ::/0
-	135 -P in ipsec
+	${tunnel_upperspec} -P in ipsec
 	esp/tunnel/${mobile_node}-${home_agent}/unique:${tunnel_uid_mn_to_ha};
 EOF
 
@@ -168,9 +187,9 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spddelete_home_agent
 spddelete ::/0 ${mobile_node}
-	135 -P out ipsec;
+	${tunnel_upperspec} -P out ipsec;
 spddelete ${mobile_node} ::/0
-	135 -P in ipsec;
+	${tunnel_upperspec} -P in ipsec;
 EOF
 
 #
