@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.30 2002/09/27 05:55:53 itojun Exp $	*/
+/*	$KAME: session.c,v 1.31 2002/11/20 02:06:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,12 +204,24 @@ initfds()
 	FD_ZERO(&mask0);
 
 #ifdef ENABLE_ADMINPORT
+	if (lcconf->sock_admin >= FD_SETSIZE) {
+		plog(LLV_ERROR, LOCATION, NULL, "fd_set overrun\n");
+		exit(1);
+	}
 	FD_SET(lcconf->sock_admin, &mask0);
 	nfds = (nfds > lcconf->sock_admin ? nfds : lcconf->sock_admin);
 #endif
+	if (lcconf->sock_pfkey >= FD_SETSIZE) {
+		plog(LLV_ERROR, LOCATION, NULL, "fd_set overrun\n");
+		exit(1);
+	}
 	FD_SET(lcconf->sock_pfkey, &mask0);
 	nfds = (nfds > lcconf->sock_pfkey ? nfds : lcconf->sock_pfkey);
 	if (lcconf->rtsock >= 0) {
+		if (lcconf->rtsock >= FD_SETSIZE) {
+			plog(LLV_ERROR, LOCATION, NULL, "fd_set overrun\n");
+			exit(1);
+		}
 		FD_SET(lcconf->rtsock, &mask0);
 		nfds = (nfds > lcconf->rtsock ? nfds : lcconf->rtsock);
 	}
@@ -217,6 +229,10 @@ initfds()
 	for (p = lcconf->myaddrs; p; p = p->next) {
 		if (!p->addr)
 			continue;
+		if (p->sock >= FD_SETSIZE) {
+			plog(LLV_ERROR, LOCATION, NULL, "fd_set overrun\n");
+			exit(1);
+		}
 		FD_SET(p->sock, &mask0);
 		nfds = (nfds > p->sock ? nfds : p->sock);
 	}
