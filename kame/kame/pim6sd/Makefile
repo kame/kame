@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.13 2002/04/03 05:32:18 itojun Exp $
+#	$KAME: Makefile,v 1.14 2002/06/26 18:09:20 itojun Exp $
 #
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
@@ -87,7 +87,7 @@ SRCS=	mld6.c mld6_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
 	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c\
 	cfparse.y cftoken.l
-CLEANFILES+= lex.yy.c y.tab.c y.tab.h
+CLEANFILES+= lex.yy.c y.tab.c y.tab.h cfparse.h
 
 .if (${OPSYS} == "BSD/OS")
 CC=	gcc
