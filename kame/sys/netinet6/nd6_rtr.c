@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.119 2001/06/04 09:07:28 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.120 2001/06/18 03:00:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1903,6 +1903,7 @@ in6_ifadd(pr, ifid)
 int
 in6_tmpifadd(ia0, forcegen)
 	const struct in6_ifaddr *ia0; /* corresponding public address */
+	int forcegen;
 {
 	struct ifnet *ifp = ia0->ia_ifa.ifa_ifp;
 	struct in6_ifaddr *newia;
@@ -1986,7 +1987,7 @@ in6_tmpifadd(ia0, forcegen)
 
 	/* XXX: scope zone ID? */
 
-	ifra.ifra_flags |= (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY);
+	ifra.ifra_flags = (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY);
 
 	/* allocate ifaddr structure, link into chain, etc. */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0)
@@ -2001,6 +2002,16 @@ in6_tmpifadd(ia0, forcegen)
 	}
 	newia->ia6_ndpr = ia0->ia6_ndpr;
 	newia->ia6_ndpr->ndpr_refcnt++;
+
+	/*
+	 * A newly added address might affect the status of other addresses.
+	 * XXX: when the temporary address is generated with a new public
+	 * address, the onlink check is redundant.  However, it would be safe
+	 * to do the check explicitly everywhere a new address is generated,
+	 * and, in fact, we surely need the check when we create a new
+	 * temporary address due to deprecation of an old temporary address.
+	 */
+	pfxlist_onlink_check();
 
 	return(0);
 }	    
