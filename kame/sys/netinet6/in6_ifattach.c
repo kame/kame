@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.48 2000/04/12 03:51:29 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.49 2000/04/12 09:40:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,7 +221,9 @@ found:
 		break;
 
 	case IFT_GIF:
+#ifdef IFT_STF
 	case IFT_STF:
+#endif
 		/*
 		 * mech-05/6to4-05: use IPv4 address as ifid source.
 		 * the specification does not survive IPv4 renumbering.
