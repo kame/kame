@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.246 2002/06/12 03:42:46 itojun Exp $	*/
+/*	$KAME: key.c,v 1.247 2002/06/12 03:45:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -445,6 +445,7 @@ static int key_cmpsaidx
 static int key_sockaddrcmp __P((struct sockaddr *, struct sockaddr *, int));
 static int key_bbcmp __P((caddr_t, caddr_t, u_int));
 static void key_srandom __P((void));
+static u_long key_random __P((void));
 static u_int16_t key_satype2proto __P((u_int8_t));
 static u_int8_t key_proto2satype __P((u_int16_t));
 
@@ -4540,7 +4541,7 @@ key_srandom()
 	return;
 }
 
-u_long
+static u_long
 key_random()
 {
 	u_long value;
