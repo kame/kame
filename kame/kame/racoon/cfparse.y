@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.88 2001/02/26 06:19:16 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.89 2001/02/26 06:58:53 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -93,27 +93,15 @@ static int cur_algclass;
 
 static struct proposalspec *prhead;	/* the head is always current. */
 
-#if 0
-static struct policyindex * parse_spidx __P((caddr_t, int, int,
-		caddr_t, int, int, int, int));
-#endif
 static struct proposalspec *newprspec __P((void));
 static void cleanprhead __P((void));
 static void insprspec __P((struct proposalspec *, struct proposalspec **));
 static struct secprotospec *newspspec __P((void));
 static void insspspec __P((struct secprotospec *, struct proposalspec **));
 
-#if 0
-static int set_ipsec_proposal __P((struct policyindex *, struct proposalspec *));
-#endif
 static int set_isakmp_proposal
 	__P((struct remoteconf *, struct proposalspec *));
 static void clean_tmpalgtype __P((void));
-#if 0
-static u_int32_t set_algtypes __P((struct secprotospec *, int));
-static int expand_ipsecspec __P((int, int, int *, int, int,
-	struct proposalspec *, struct secprotospec *, struct ipsecpolicy *));
-#endif
 static int expand_isakmpspec __P((int, int, int *,
 	int, int, time_t, int, int, char *, struct remoteconf *));
 %}
@@ -1299,89 +1287,6 @@ isakmpproposal_spec
 
 %%
 
-#if 0
-static struct policyindex *
-parse_spidx(src, prefs, ports, dst, prefd, portd, ul_proto, dir)
-	caddr_t src, dst;
-	int prefs, ports, prefd, portd, ul_proto, dir;
-{
-	struct policyindex *spidx;
-	char portbuf[10];
-	struct sockaddr *saddr;
-
-	if ((ul_proto == IPPROTO_ICMP || ul_proto == IPPROTO_ICMPV6)
-	 && (ports != IPSEC_PORT_ANY || portd != IPSEC_PORT_ANY)) {
-		yyerror("port number must be \"any\".");
-		return NULL;
-	}
-
-	spidx = newspidx();
-	if (spidx == NULL) {
-		yyerror("failed to allocate policy index");
-		return NULL;
-	}
-
-	spidx->dir = dir;
-	spidx->ul_proto = ul_proto;
-
-	snprintf(portbuf, sizeof(portbuf), "%d", ports);
-	saddr = str2saddr(src, portbuf);
-	if (saddr == NULL) {
-		delspidx(spidx);
-		return NULL;
-	}
-	switch (saddr->sa_family) {
-	case AF_INET:
-		spidx->prefs = prefs == ~0
-			? (sizeof(struct in_addr) << 3)
-			: prefs;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		spidx->prefs = prefs == ~0
-			? (sizeof(struct in6_addr) << 3)
-			: prefs;
-		break;
-#endif
-	default:
-		yyerror("invalid family: %d", saddr->sa_family);
-		return NULL;
-		break;
-	}
-	memcpy(&spidx->src, saddr, saddr->sa_len);
-	free(saddr);
-
-	snprintf(portbuf, sizeof(portbuf), "%d", portd);
-	saddr = str2saddr(dst, portbuf);
-	if (saddr == NULL) {
-		delspidx(spidx);
-		return NULL;
-	}
-	switch (saddr->sa_family) {
-	case AF_INET:
-		spidx->prefd = prefd == ~0
-			? (sizeof(struct in_addr) << 3)
-			: prefd;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		spidx->prefd = prefd == ~0
-			? (sizeof(struct in6_addr) << 3)
-			: prefd;
-		break;
-#endif
-	default:
-		yyerror("invalid family: %d", saddr->sa_family);
-		return NULL;
-		break;
-	}
-	memcpy(&spidx->dst, saddr, saddr->sa_addrlen);
-	free(saddr);
-
-	return spidx;
-}
-#endif
-
 static struct proposalspec *
 newprspec()
 {
@@ -1456,202 +1361,6 @@ insspspec(spspec, head)
 	(*head)->spspec = spspec;
 }
 
-#if 0
-/* set final acceptable proposal */
-static int
-set_ipsec_proposal(spidx, prspec)
-	struct policyindex *spidx;
-	struct proposalspec *prspec;
-{
-	struct proposalspec *p;
-	struct secprotospec *s;
-	struct proposalspec *new;
-	int prop_no; 
-	int trns_no;
-	u_int32_t types[MAXALGCLASS];
-
-	if (spidx->policy == NULL)
-		return -1;
-
-	/*
-	 * first, try to assign proposal/transform numbers to the table.
-	 */
-	for (p = prspec; p->next; p = p->next)
-		;
-	prop_no = 1;
-	while (p) {
-		for (s = p->spspec; s && s->next; s = s->next)
-			;
-		trns_no = 1;
-		while (s) {
-			s->prop_no = prop_no;
-			s->trns_no = trns_no;
-			trns_no++;
-			s = s->prev;
-		}
-
-		prop_no++;
-		p = p->prev;
-	}
-
-	/* split up proposals if necessary */
-	for (p = prspec; p && p->next; p = p->next)
-		;
-	while (p) {
-		int proto_id = 0;
-
-		for (s = p->spspec; s && s->next; s = s->next)
-			;
-		if (s)
-			proto_id = s->proto_id;
-		new = NULL;
-		while (s) {
-			if (proto_id != s->proto_id) {
-				if (!new)
-					new = newprspec();
-				if (!new)
-					return -1;
-				new->lifetime = p->lifetime;
-				new->lifebyte = p->lifebyte;
-
-				/* detach it from old list */
-				if (s->prev)
-					s->prev->next = s->next;
-				else
-					p->spspec = s->next;
-				if (s->next)
-					s->next->prev = s->prev;
-				s->next = s->prev = NULL;
-
-				/* insert to new list */
-				insspspec(s, &new);
-			}
-			s = s->prev;
-		}
-
-		if (new) {
-			new->prev = p->prev;
-			if (p->prev)
-				p->prev->next = new;
-			new->next = p;
-			p->prev = new;
-			new = NULL;
-		}
-
-		p = p->prev;
-	}
-
-#if 0
-	for (p = prspec; p; p = p->next) {
-		fprintf(stderr, "prspec: %p next=%p prev=%p\n", p, p->next, p->prev);
-		for (s = p->spspec; s; s = s->next) {
-			fprintf(stderr, "    spspec: %p next=%p prev=%p prop:%d trns:%d\n", s, s->next, s->prev, s->prop_no, s->trns_no);
-		}
-	}
-#endif
-
-	for (p = prspec; p->next != NULL; p = p->next)
-		;
-	while (p != NULL) {
-		for (s = p->spspec; s->next != NULL; s = s->next)
-			;
-		while (s != NULL) {
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"lifetime = %ld\n", (long)p->lifetime);
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"lifebyte = %d\n", p->lifebyte);
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"level=%s\n", s_ipsec_level(s->ipsec_level));
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"mode=%s\n", s_ipsecdoi_encmode(s->encmode));
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"remote=%s\n", saddrwop2str(s->remote));
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"proto=%s\n", s_ipsecdoi_proto(s->proto_id));
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"strength=%s\n", s_algstrength(s->strength));
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"encklen=%d\n", s->encklen);
-
-			switch (s->proto_id) {
-			case IPSECDOI_PROTO_IPSEC_ESP:
-				types[algclass_ipsec_enc] =
-					set_algtypes(s, algclass_ipsec_enc);
-				types[algclass_ipsec_auth] =
-					set_algtypes(s, algclass_ipsec_auth);
-				types[algclass_ipsec_comp] = 0;
-
-				/* expanding spspec */
-				clean_tmpalgtype();
-				trns_no = expand_ipsecspec(s->prop_no,
-						s->trns_no, types,
-						algclass_ipsec_enc,
-						algclass_ipsec_auth + 1,
-						p, s, spidx->policy);
-				if (trns_no == -1) {
-					plog(LLV_ERROR, LOCATION, NULL,
-						"failed to expand "
-						"ipsec proposal.\n");
-					return -1;
-				}
-				break;
-			case IPSECDOI_PROTO_IPSEC_AH:
-				types[algclass_ipsec_enc] = 0;
-				types[algclass_ipsec_auth] =
-					set_algtypes(s, algclass_ipsec_auth);
-				types[algclass_ipsec_comp] = 0;
-
-				/* expanding spspec */
-				clean_tmpalgtype();
-				trns_no = expand_ipsecspec(s->prop_no,
-						s->trns_no, types,
-						algclass_ipsec_auth,
-						algclass_ipsec_auth + 1,
-						p, s, spidx->policy);
-				if (trns_no == -1) {
-					plog(LLV_ERROR, LOCATION, NULL,
-						"failed to expand "
-						"ipsec proposal.\n");
-					return -1;
-				}
-				break;
-			case IPSECDOI_PROTO_IPCOMP:
-				types[algclass_ipsec_comp] =
-					set_algtypes(s, algclass_ipsec_comp);
-				types[algclass_ipsec_enc] = 0;
-				types[algclass_ipsec_auth] = 0;
-
-				/* expanding spspec */
-				clean_tmpalgtype();
-				trns_no = expand_ipsecspec(s->prop_no,
-						s->trns_no, types,
-						algclass_ipsec_comp,
-						algclass_ipsec_comp + 1,
-						p, s, spidx->policy);
-				if (trns_no == -1) {
-					plog(LLV_ERROR, LOCATION, NULL,
-						"failed to expand "
-						"ipsec proposal.\n");
-					return -1;
-				}
-				break;
-			default:
-				yyerror("Invaled ipsec protocol %d\n",
-					s->proto_id);
-				return -1;
-			}
-
-			s = s->prev;
-		}
-		prop_no++; 
-		trns_no = 1;	/* reset */
-		p = p->prev;
-	}
-
-	return 0;
-}
-#endif
-
 /* set final acceptable proposal */
 static int
 set_isakmp_proposal(rmconf, prspec)
@@ -1713,23 +1422,12 @@ set_isakmp_proposal(rmconf, prspec)
 		plog(LLV_DEBUG2, LOCATION, NULL,
 			"encklen=%d\n", s->encklen);
 
-#if 0
-		types[algclass_isakmp_enc] =
-			set_algtypes(s, algclass_isakmp_enc);
-		types[algclass_isakmp_hash] =
-			set_algtypes(s, algclass_isakmp_hash);
-		types[algclass_isakmp_dh] =
-			set_algtypes(s, algclass_isakmp_dh);
-		types[algclass_isakmp_ameth] =
-			set_algtypes(s, algclass_isakmp_ameth);
-#else
 		memset(types, 0, ARRAYLEN(types));
 		types[algclass_isakmp_enc] = s->algclass[algclass_isakmp_enc];
 		types[algclass_isakmp_hash] = s->algclass[algclass_isakmp_hash];
 		types[algclass_isakmp_dh] = s->algclass[algclass_isakmp_dh];
 		types[algclass_isakmp_ameth] =
 		    s->algclass[algclass_isakmp_ameth];
-#endif
 
 		/* expanding spspec */
 		clean_tmpalgtype();
@@ -1757,26 +1455,6 @@ set_isakmp_proposal(rmconf, prspec)
 	return 0;
 }
 
-#if 0
-static u_int32_t
-set_algtypes(s, class)
-	struct secprotospec *s;
-	int class;
-{
-	u_int32_t algtype = 0;
-
-	if (s->algclass[class])
-		algtype = (1 << s->algclass[class]) >> 1;
-	else
-		algtype = lcconf->algstrength[class]->algtype[s->strength];
-
-	plog(LLV_DEBUG2, LOCATION, NULL,
-		"%s=\t%s\n", s_algclass(class), BIT2STR(algtype));
-
-	return algtype;
-}
-#endif
-
 static void
 clean_tmpalgtype()
 {
@@ -1784,96 +1462,6 @@ clean_tmpalgtype()
 	for (i = 0; i < MAXALGCLASS; i++)
 		tmpalgtype[i] = 0;	/* means algorithm undefined. */
 }
-
-#if 0
-static int
-expand_ipsecspec(prop_no, trns_no, types,
-		class, last, p, s, ipsp)
-	int prop_no, trns_no;
-	int *types, class, last;
-	struct proposalspec *p;
-	struct secprotospec *s;
-	struct ipsecpolicy *ipsp;
-{
-	int b = types[class];
-	int bl = sizeof(lcconf->algstrength[0]->algtype[0]) << 3;
-	int i;
-
-	if (class == last) {
-		struct ipsecsa *new = NULL;
-
-		{
-			int j;
-			char tb[4];
-			plog(LLV_DEBUG2, LOCATION, NULL,
-				"p:%d t:%d ", prop_no, trns_no);
-			for (j = 0; j < MAXALGCLASS; j++) {
-				snprintf(tb, sizeof(tb), "%d", tmpalgtype[j]);
-				plog(LLV_DEBUG2, LOCATION, NULL,
-					"%s%s%s%s%s",
-					s_algtype(j, tmpalgtype[j]),
-					tmpalgtype[j] ? "(" : "",
-					tb[0] == '0' ? "" : tb,
-					tmpalgtype[j] ? ")" : "",
-					j == MAXALGCLASS ? "\n", " ");
-			}
-		}
-
-		/* check mandatory values */
-		if (ipsecdoi_checkalgtypes(s->proto_id, 
-			tmpalgtype[algclass_ipsec_enc],
-			tmpalgtype[algclass_ipsec_auth],
-			tmpalgtype[algclass_ipsec_comp]) == -1) {
-			return -1;
-		}
-
-		/* set new sa */
-		new = newipsa();
-		if (new == NULL) {
-			yyerror("failed to allocate ipsec sa");
-			return -1;
-		}
-		new->prop_no = prop_no;
-		new->trns_no = trns_no;
-		new->lifetime = p->lifetime;
-		new->lifebyte = p->lifebyte;
-		new->proto_id = s->proto_id;
-		new->ipsec_level = s->ipsec_level;
-		new->encmode = s->encmode;
-		new->enctype = tmpalgtype[algclass_ipsec_enc];
-		new->encklen = s->encklen;
-		new->authtype = tmpalgtype[algclass_ipsec_auth];
-		new->comptype = tmpalgtype[algclass_ipsec_comp];
-
-#if 0
-		insipsa(new, ipsp);
-#endif
-
-		return trns_no + 1;
-	}
-
-	if (b != 0) {
-		for (i = 0; i < bl; i++) {
-			if (b & 1) {
-				tmpalgtype[class] = i + 1;
-				trns_no = expand_ipsecspec(prop_no, trns_no,
-				    types, class + 1, last, p, s, ipsp);
-				if (trns_no == -1)
-					return -1;
-			}
-			b >>= 1;
-		}
-	} else {
-		tmpalgtype[class] = 0;
-		trns_no = expand_ipsecspec(prop_no, trns_no, types, class + 1,
-		    last, p, s, ipsp);
-		if (trns_no == -1)
-			return -1;
-	}
-
-	return trns_no;
-}
-#endif
 
 static int
 expand_isakmpspec(prop_no, trns_no, types,
