@@ -357,10 +357,6 @@ getmsg(rtm, msglen, rpfinfop)
 	   inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
 	rpfinfop->rpfneighbor = *sin6;
 
-	/*
-	 * Copy embedded interface index to sin6_scope_id field. XXX: This is
-	 * a KAME-specific hack.
-	 */
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 	{
 #if 0
