@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/05/16 01:16:18 $
+		     $Date: 2000/05/25 06:58:32 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -57,15 +57,16 @@ Many of old ones have been solved.
   be warned.  Workaround: perform "ifconfig down", then "ifconfig up"
   after resume.
 
-- Intel EtherExpress Pro (fxp driver) has some problem with the
-  initialization sequence KAME is using (a set of ioctl calls).  The
-  driver will become unusable if consequtive calls to fxp_init() are
-  made, or consequtive multicast configurations are made.  This
-  problem occurs only with specific revision of the card, and with
-  specific operating system platform (openbsd, and maybe freebsd[23]).
-  It is not KAME problem, it is problem in fxp driver.  KAME/OpenBSD
-  contains workaround for this.  KAME/NetBSD has no problem due to the
-  way driver initializes the card.
+- Intel EtherExpress Pro ("fxp" driver for freebsd, "exp" driver for bsdi)
+  has some problem with the initialization sequence KAME is using
+  (a set of ioctl calls).  The driver will become unusable if
+  consequtive calls to fxp_init() are made, or consequtive multicast
+  configurations are made.  This problem occurs only with specific
+  revision of the card, and with specific operating system platform
+  (openbsd, bsdi4 and maybe freebsd[23]).  It is not KAME problem, it is
+  problem in fxp driver.  KAME/OpenBSD contains workaround for
+  this.  KAME/NetBSD has no problem due to the way driver initializes
+  the card.
 
 - Alignment constraints were changed in couple of places.  Namely: 
 	(1) SIOCGIFCONF: due to introduction of sockaddr_in6. 
