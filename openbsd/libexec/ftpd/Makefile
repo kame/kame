@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.14 1999/02/26 00:15:54 art Exp $
+#	$OpenBSD: Makefile,v 1.16 2000/03/01 17:27:28 deraadt Exp $
 #	$NetBSD: Makefile,v 1.13 1996/02/16 02:07:41 cgd Exp $
 #	@(#)Makefile	8.2 (Berkeley) 4/4/94
 
@@ -17,6 +17,9 @@ LSDIR	= ${.CURDIR}/../../bin/ls
 SRCS	+= ls.c cmp.c print.c stat_flags.c util.c
 CFLAGS	+= -I${LSDIR}
 
+# not really used
+CPPFLAGS+=-DINET6
+
 .if (${SKEY} == "yes")
 CFLAGS+=-DSKEY
 LDADD+= -lskey
@@ -27,7 +30,7 @@ DPADD+= ${LIBSKEY}
 SRCS+= klogin.c
 .PATH:	${.CURDIR}/../../usr.bin/login
 CFLAGS+= -DKERBEROS
-LDADD+= -lkrb -ldes -lkafs
+LDADD+= -lkafs -lkrb -ldes
 DPADD+= ${LIBKRB} ${LIBKRB} ${LIBKAFS}
 .endif
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: fetch.c,v 1.24 1999/02/09 03:43:48 deraadt Exp $	*/
+/*	$OpenBSD: fetch.c,v 1.30 2000/05/03 19:50:41 deraadt Exp $	*/
 /*	$NetBSD: fetch.c,v 1.14 1997/08/18 10:20:20 lukem Exp $	*/
 
 /*-
@@ -38,7 +38,7 @@
  */
 
 #ifndef lint
-static char rcsid[] = "$OpenBSD: fetch.c,v 1.24 1999/02/09 03:43:48 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: fetch.c,v 1.30 2000/05/03 19:50:41 deraadt Exp $";
 #endif /* not lint */
 
 /*
@@ -96,17 +96,19 @@ url_get(origline, proxyenv, outfile)
 	const char *proxyenv;
 	const char *outfile;
 {
-	struct sockaddr_in sin;
+	struct addrinfo hints, *res0, *res;
+	int error;
 	int i, out, isftpurl, isfileurl;
-	in_port_t port;
 	volatile int s;
 	size_t len;
 	char c, *cp, *ep, *portnum, *path, buf[4096];
+	char pbuf[NI_MAXSERV];
 	const char *savefile;
-	char *line, *proxy, *host;
+	char *line, *proxy, *host, *port;
+	char *hosttail;
 	volatile sig_t oldintr;
 	off_t hashbytes;
-	struct hostent *hp = NULL;
+	char *cause = "unknown";
 
 	s = -1;
 	proxy = NULL;
@@ -268,7 +270,14 @@ url_get(origline, proxyenv, outfile)
 		return (0);
 	}
 
-	portnum = strchr(host, ':');			/* find portnum */
+	if (*host == '[' && (hosttail = strrchr(host, ']')) != NULL &&
+	    (hosttail[1] == '\0' || hosttail[1] == ':')) {
+		host++;
+		*hosttail++ = '\0';
+	} else
+		hosttail = host;
+
+	portnum = strrchr(hosttail, ':');		/* find portnum */
 	if (portnum != NULL)
 		*portnum++ = '\0';
 
@@ -276,71 +285,60 @@ url_get(origline, proxyenv, outfile)
 		fprintf(ttyout, "host %s, port %s, path %s, save as %s.\n",
 		    host, portnum, path, savefile);
 
-	memset(&sin, 0, sizeof(sin));
-	sin.sin_family = AF_INET;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	port = portnum ? portnum : httpport;
+	error = getaddrinfo(host, port, &hints, &res0);
+	if (error == EAI_SERVICE && port == httpport) {
+		/*
+		 * If the services file is corrupt/missing, fall back
+		 * on our hard-coded defines.
+		 */
+		char pbuf[NI_MAXSERV];
 
-	if (isdigit(host[0])) {
-		if (inet_aton(host, &sin.sin_addr) == 0) {
-			warnx("Invalid IP address: %s", host);
-			goto cleanup_url_get;
-		}
-	} else {
-		hp = gethostbyname(host);
-		if (hp == NULL) {
-			warnx("%s: %s", host, hstrerror(h_errno));
-			goto cleanup_url_get;
-		}
-		if (hp->h_addrtype != AF_INET) {
-			warnx("%s: not an Internet address?", host);
-			goto cleanup_url_get;
-		}
-		memcpy(&sin.sin_addr, hp->h_addr, (size_t)hp->h_length);
+		snprintf(pbuf, sizeof(pbuf), "%d", HTTP_PORT);
+		error = getaddrinfo(host, pbuf, &hints, &res0);
 	}
-
-	if (! EMPTYSTRING(portnum)) {
-		char *ep;
-		long nport;
-
-		nport = strtol(portnum, &ep, 10);
-		if (nport < 1 || nport > USHRT_MAX || *ep != '\0') {
-			warnx("Invalid port: %s", portnum);
-			goto cleanup_url_get;
-		}
-		port = htons((in_port_t)nport);
-	} else
-		port = httpport;
-	sin.sin_port = port;
-
-	s = socket(AF_INET, SOCK_STREAM, 0);
-	if (s == -1) {
-		warn("Can't create socket");
+	if (error) {
+		warnx("%s: %s", gai_strerror(error), host);
 		goto cleanup_url_get;
 	}
 
-	while (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-		if (errno == EINTR)
-			continue;
-		if (hp && hp->h_addr_list[1]) {
-			int oerrno = errno;
-			char *ia;
+	s = -1;
+	for (res = res0; res; res = res->ai_next) {
+		getnameinfo(res->ai_addr, res->ai_addrlen, buf, sizeof(buf),
+			NULL, 0, NI_NUMERICHOST);
+		fprintf(ttyout, "Trying %s...\n", buf);
 
-			ia = inet_ntoa(sin.sin_addr);
-			errno = oerrno;
-			warn("connect to address %s", ia);
-			hp->h_addr_list++;
-			memcpy(&sin.sin_addr, hp->h_addr_list[0],
-			    (size_t)hp->h_length);
-			fprintf(ttyout, "Trying %s...\n",
-			    inet_ntoa(sin.sin_addr));
-			(void)close(s);
-			s = socket(AF_INET, SOCK_STREAM, 0);
-			if (s < 0) {
-				warn("socket");
-				goto cleanup_url_get;
-			}
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s == -1) {
+			cause = "socket";
 			continue;
 		}
-		warn("connect");
+
+again:
+		if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+			if (errno == EINTR)
+				goto again;
+			close(s);
+			s = -1;
+			cause = "connect";
+			continue;
+		}
+
+		/* get port in numeric */
+		if (getnameinfo(res->ai_addr, res->ai_addrlen, NULL, 0,
+		    pbuf, sizeof(pbuf), NI_NUMERICSERV) == 0)
+			port = pbuf;
+		else
+			port = NULL;
+
+		break;
+	}
+	freeaddrinfo(res0);
+	if (s < 0) {
+		warn(cause);
 		goto cleanup_url_get;
 	}
 
@@ -355,8 +353,17 @@ url_get(origline, proxyenv, outfile)
 			fprintf(ttyout, "Requesting %s (via %s)\n",
 			    origline, proxyenv);
 	}
-	snprintf(buf, sizeof(buf), "GET %s%s HTTP/1.0\r\nHost: %s\r\n\r\n",
-	    proxy ? "" : "/", path, host);
+	if (strchr(host, ':')) {
+		snprintf(buf, sizeof(buf),
+		    "GET %s%s HTTP/1.0\r\nHost: [%s]%s%s\r\n\r\n",
+		    proxy ? "" : "/", path, host,
+		    port ? ":" : "", port ? port : "");
+	} else {
+		snprintf(buf, sizeof(buf),
+		    "GET %s%s HTTP/1.0\r\nHost: %s%s%s\r\n\r\n",
+		    proxy ? "" : "/", path, host,
+		    port ? ":" : "", port ? port : "");
+	}
 	len = strlen(buf);
 	if (write(s, buf, len) < len) {
 		warn("Writing HTTP request");
@@ -648,7 +655,17 @@ bad_ftp_url:
 			if (EMPTYSTRING(user))
 				goto bad_ftp_url;
 			host = cp;
-			portnum = strchr(host, ':');
+
+#if 0
+			/* look for IPv6 address URL */
+			if (host == '[' && (cp = strrchr(host, ']'))) {
+				host++;
+				*cp++ = '\0';
+			} else
+				cp = host;
+#endif
+		
+			portnum = strrchr(cp, ':');
 			if (portnum != NULL)
 				*portnum++ = '\0';
 		} else {			/* classic style `host:file' */
@@ -791,4 +808,17 @@ parsed_url:
 	if (connected && rval != -1)
 		disconnect(0, NULL);
 	return (rval);
+}
+
+int
+isurl(p)
+	const char *p;
+{
+
+	if (strncasecmp(p, FTP_URL, sizeof(FTP_URL) - 1) == 0 ||
+	    strncasecmp(p, HTTP_URL, sizeof(HTTP_URL) - 1) == 0 ||
+	    strncasecmp(p, FILE_URL, sizeof(FILE_URL) - 1) == 0 ||
+	    strstr(p, ":/"))
+		return (1);
+	return (0);
 }

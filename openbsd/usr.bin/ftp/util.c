@@ -1,4 +1,4 @@
-/*	$OpenBSD: util.c,v 1.21 1998/09/22 04:42:49 deraadt Exp $	*/
+/*	$OpenBSD: util.c,v 1.23 2000/02/01 20:53:06 espie Exp $	*/
 /*	$NetBSD: util.c,v 1.12 1997/08/18 10:20:27 lukem Exp $	*/
 
 /*
@@ -35,7 +35,7 @@
  */
 
 #ifndef lint
-static char rcsid[] = "$OpenBSD: util.c,v 1.21 1998/09/22 04:42:49 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: util.c,v 1.23 2000/02/01 20:53:06 espie Exp $";
 #endif /* not lint */
 
 /*
@@ -75,7 +75,7 @@ setpeer(argc, argv)
 	char *argv[];
 {
 	char *host;
-	in_port_t port;
+	char *port;
 
 	if (connected) {
 		fprintf(ttyout, "Already connected to %s, use close first.\n",
@@ -94,6 +94,7 @@ setpeer(argc, argv)
 		port = gateport;
 	else
 		port = ftpport;
+#if 0
 	if (argc > 2) {
 		char *ep;
 		long nport;
@@ -109,6 +110,10 @@ setpeer(argc, argv)
 		}
 		port = htons((in_port_t)nport);
 	}
+#else
+	if (argc > 2)
+		port = argv[2];
+#endif
 
 	if (gatemode) {
 		if (gateserver == NULL || *gateserver == '\0')
@@ -560,6 +565,26 @@ remotemodtime(file, noisy)
 	if (command("MDTM %s", file) == COMPLETE) {
 		struct tm timebuf;
 		int yy, mo, day, hour, min, sec;
+ 		/*
+ 		 * time-val = 14DIGIT [ "." 1*DIGIT ]
+ 		 *		YYYYMMDDHHMMSS[.sss]
+ 		 * mdtm-response = "213" SP time-val CRLF / error-response
+ 		 */
+		/* TODO: parse .sss as well, use timespecs. */
+		char *timestr = reply_string;
+
+		/* Repair `19%02d' bug on server side */
+		while (!isspace(*timestr))
+			timestr++;
+		while (isspace(*timestr))
+			timestr++;
+		if (strncmp(timestr, "191", 3) == 0) {
+ 			fprintf(ttyout,
+ 	    "Y2K warning! Fixed incorrect time-val received from server.\n");
+	    		timestr[0] = ' ';
+			timestr[1] = '2';
+			timestr[2] = '0';
+		}
 		sscanf(reply_string, "%*s %04d%02d%02d%02d%02d%02d", &yy, &mo,
 			&day, &hour, &min, &sec);
 		memset(&timebuf, 0, sizeof(timebuf));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: inetd.c,v 1.56 1999/02/24 12:31:30 deraadt Exp $	*/
+/*	$OpenBSD: inetd.c,v 1.61 2000/03/04 01:10:06 deraadt Exp $	*/
 /*	$NetBSD: inetd.c,v 1.11 1996/02/22 11:14:41 mycroft Exp $	*/
 /*
  * Copyright (c) 1983,1991 The Regents of the University of California.
@@ -41,7 +41,7 @@ char copyright[] =
 
 #ifndef lint
 /*static char sccsid[] = "from: @(#)inetd.c	5.30 (Berkeley) 6/3/91";*/
-static char rcsid[] = "$OpenBSD: inetd.c,v 1.56 1999/02/24 12:31:30 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: inetd.c,v 1.61 2000/03/04 01:10:06 deraadt Exp $";
 #endif /* not lint */
 
 /*
@@ -173,7 +173,6 @@ static char rcsid[] = "$OpenBSD: inetd.c,v 1.56 1999/02/24 12:31:30 deraadt Exp 
 
 #define	SIGBLOCK	(sigmask(SIGCHLD)|sigmask(SIGHUP)|sigmask(SIGALRM))
 
-extern	int errno;
 
 void	config __P((int));
 void	reapchild __P((int));
@@ -224,10 +223,12 @@ struct	servtab {
 	union {
 		struct	sockaddr se_un_ctrladdr;
 		struct	sockaddr_in se_un_ctrladdr_in;
+		struct	sockaddr_in6 se_un_ctrladdr_in6;
 		struct	sockaddr_un se_un_ctrladdr_un;
 	} se_un;			/* bound address */
 #define se_ctrladdr	se_un.se_un_ctrladdr
 #define se_ctrladdr_in	se_un.se_un_ctrladdr_in
+#define se_ctrladdr_in6	se_un.se_un_ctrladdr_in6
 #define se_ctrladdr_un	se_un.se_un_ctrladdr_un
 	int	se_ctrladdr_size;
 	int	se_max;			/* max # of instances of this service */
@@ -331,7 +332,7 @@ main(argc, argv, envp)
 				break;
 			}
 			syslog(LOG_ERR,
-		            "-R %s: bad value for service invocation rate",
+			    "-R %s: bad value for service invocation rate",
 			    optarg);
 			break;
 		}
@@ -670,7 +671,8 @@ config(sig)
 {
 	register struct servtab *sep, *cp, **sepp;
 	int omask;
-	int n;
+	int n, add;
+	char protoname[10];
 
 	if (!setconfig()) {
 		syslog(LOG_ERR, "%s: %m", CONFIG);
@@ -683,6 +685,7 @@ config(sig)
 		for (sep = servtab; sep; sep = sep->se_next)
 			if (matchconf(sep, cp))
 				break;
+		add = 0;
 		if (sep != 0) {
 			int i;
 
@@ -711,12 +714,9 @@ config(sig)
 			sep->se_rpcversh = cp->se_rpcversh;
 			sigsetmask(omask);
 			freeconfig(cp);
-			if (debug)
-				print_service("REDO", sep);
+			add = 1;
 		} else {
 			sep = enter(cp);
-			if (debug)
-				print_service("ADD ", sep);
 		}
 		sep->se_checked = 1;
 
@@ -763,8 +763,13 @@ config(sig)
 				u_short port = htons(atoi(sep->se_service));
 
 				if (!port) {
+					/*XXX*/
+					strncpy(protoname, sep->se_proto,
+						sizeof(protoname));
+					if (isdigit(protoname[strlen(protoname) - 1]))
+						protoname[strlen(protoname) - 1] = '\0';
 					sp = getservbyname(sep->se_service,
-					    sep->se_proto);
+					    protoname);
 					if (sp == 0) {
 						syslog(LOG_ERR,
 						    "%s/%s: unknown service",
@@ -785,6 +790,62 @@ config(sig)
 				if (sep->se_fd == -1)
 					setup(sep);
 			}
+			break;
+		case AF_INET6:
+			sep->se_ctrladdr_in6.sin6_family = AF_INET6;
+			/* se_ctrladdr_in was set in getconfigent */
+			sep->se_ctrladdr_size = sizeof sep->se_ctrladdr_in6;
+
+			if (isrpcservice(sep)) {
+				struct rpcent *rp;
+
+				sep->se_rpcprog = atoi(sep->se_service);
+				if (sep->se_rpcprog == 0) {
+					rp = getrpcbyname(sep->se_service);
+					if (rp == 0) {
+						syslog(LOG_ERR,
+						    "%s: unknown rpc service",
+						    sep->se_service);
+						goto serv_unknown;
+					}
+					sep->se_rpcprog = rp->r_number;
+				}
+				if (sep->se_fd == -1)
+					setup(sep);
+				if (sep->se_fd != -1)
+					register_rpc(sep);
+			} else {
+				u_short port = htons(atoi(sep->se_service));
+
+				if (!port) {
+					/*XXX*/
+					strncpy(protoname, sep->se_proto,
+						sizeof(protoname));
+					if (isdigit(protoname[strlen(protoname) - 1]))
+						protoname[strlen(protoname) - 1] = '\0';
+					sp = getservbyname(sep->se_service,
+					    protoname);
+					if (sp == 0) {
+						syslog(LOG_ERR,
+						    "%s/%s: unknown service",
+						    sep->se_service, sep->se_proto);
+						goto serv_unknown;
+					}
+					port = sp->s_port;
+				}
+				if (port != sep->se_ctrladdr_in6.sin6_port) {
+					sep->se_ctrladdr_in6.sin6_port = port;
+					if (sep->se_fd != -1) {
+						FD_CLR(sep->se_fd, &allsock);
+						nsock--;
+						(void) close(sep->se_fd);
+					}
+					sep->se_fd = -1;
+				}
+				if (sep->se_fd == -1)
+					setup(sep);
+			}
+			break;
 		}
 	serv_unknown:
 		if (cp->se_next != NULL) {
@@ -793,9 +854,11 @@ config(sig)
 			cp = cp->se_next;
 			free(tmp);
 		} else {
-			free (cp);
+			free(cp);
 			cp = getconfigent();
 		}
+		if (debug)
+			print_service(add ? "REDO" : "ADD", sep);
 	}
 	endconfig();
 	/*
@@ -838,6 +901,7 @@ retry(sig)
 			switch (sep->se_family) {
 			case AF_UNIX:
 			case AF_INET:
+			case AF_INET6:
 				setup(sep);
 				if (sep->se_fd != -1 && isrpcservice(sep))
 					register_rpc(sep);
@@ -862,6 +926,7 @@ goaway(sig)
 			(void)unlink(sep->se_service);
 			break;
 		case AF_INET:
+		case AF_INET6:
 			if (sep->se_wait == 1 && isrpcservice(sep))
 				unregister_rpc(sep);
 			break;
@@ -888,7 +953,7 @@ setup(sep)
 	}
 #define	turnon(fd, opt) \
 setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
-	if (strcmp(sep->se_proto, "tcp") == 0 && (options & SO_DEBUG) &&
+	if (strncmp(sep->se_proto, "tcp", 3) == 0 && (options & SO_DEBUG) &&
 	    turnon(sep->se_fd, SO_DEBUG) < 0)
 		syslog(LOG_ERR, "setsockopt (SO_DEBUG): %m");
 	if (turnon(sep->se_fd, SO_REUSEADDR) < 0)
@@ -1041,13 +1106,17 @@ matchconf (old, new)
 	 * is sufficient.
 	 */
 
-	if ((old->se_family == AF_INET) &&
-		(new->se_family == AF_INET) &&
-		(bcmp(&old->se_ctrladdr_in.sin_addr,
-		    &new->se_ctrladdr_in.sin_addr,
-		    sizeof(new->se_ctrladdr_in.sin_addr)) != 0)) {
-			return (0);
-	}
+	if (old->se_family == AF_INET && new->se_family == AF_INET &&
+	    bcmp(&old->se_ctrladdr_in.sin_addr,
+	    &new->se_ctrladdr_in.sin_addr,
+	    sizeof(new->se_ctrladdr_in.sin_addr)) != 0)
+		return (0);
+
+	if (old->se_family == AF_INET6 && new->se_family == AF_INET6 &&
+	    bcmp(&old->se_ctrladdr_in6.sin6_addr,
+	    &new->se_ctrladdr_in6.sin6_addr,
+	    sizeof(new->se_ctrladdr_in6.sin6_addr)) != 0)
+		return (0);
 
 	return (1);
 }
@@ -1055,7 +1124,7 @@ matchconf (old, new)
 FILE		*fconfig = NULL;
 char		line[1024];
 char		*defhost;
-char		*skip __P((char **));
+char		*skip __P((char **, int));
 char		*nextline __P((FILE *));
 char		*newstr __P((char *));
 struct servtab	*dupconfig __P((struct servtab *));
@@ -1091,7 +1160,7 @@ getconfigent()
 {
 	register struct servtab *sep;
 	int argc;
-	char *cp, *arg;
+	char *cp, *arg, *s;
 	char *hostdelim;
 	struct servtab *nsep;
 	struct servtab *psep;
@@ -1102,7 +1171,10 @@ getconfigent()
 		exit(-1);
 	}
 
+	memset(sep, 0, sizeof *sep);
 more:
+	freeconfig(sep);
+	
 #ifdef MULOG
 	while ((cp = nextline(fconfig)) && *cp == '#') {
 		/* Avoid use of `skip' if there is a danger of it looking
@@ -1113,7 +1185,7 @@ more:
 		} while (*cp == ' ' || *cp == '\t');
 		if (*cp == '\0')
 			continue;
-		if ((arg = skip(&cp)) == NULL)
+		if ((arg = skip(&cp, 0)) == NULL)
 			continue;
 		if (strcmp(arg, "DOMAIN"))
 			continue;
@@ -1135,10 +1207,13 @@ more:
 	while ((cp = nextline(fconfig)) && *cp == '#')
 		;
 #endif
-	if (cp == NULL)
+	if (cp == NULL) {
+		free(sep);
 		return (NULL);
+	}
+	
 	memset((char *)sep, 0, sizeof *sep);
-	arg = skip(&cp);
+	arg = skip(&cp, 0);
 	if (arg == NULL) {
 		/* A blank line. */
 		goto more;
@@ -1155,10 +1230,10 @@ more:
 		 * default host for the following lines.
 		 */
 		if (*arg == '\0') {
-			arg = skip(&cp);
+			arg = skip(&cp, 0);
 			if (cp == NULL) {
 				free(defhost);
-				defhost = sep->se_hostaddr;
+				defhost = newstr(sep->se_hostaddr);
 				goto more;
 			}
 		}
@@ -1166,7 +1241,8 @@ more:
 		sep->se_hostaddr = newstr(defhost);
 
 	sep->se_service = newstr(arg);
-	arg = skip(&cp);
+	if ((arg = skip(&cp, 1)) == NULL)
+		goto more;
 
 	if (strcmp(arg, "stream") == 0)
 		sep->se_socktype = SOCK_STREAM;
@@ -1181,11 +1257,17 @@ more:
 	else
 		sep->se_socktype = -1;
 
-	sep->se_proto = newstr(skip(&cp));
+	if ((arg = skip(&cp, 1)) == NULL)
+		goto more;
+	
+	sep->se_proto = newstr(arg);
+
 	if (strcmp(sep->se_proto, "unix") == 0) {
 		sep->se_family = AF_UNIX;
 	} else {
 		sep->se_family = AF_INET;
+		if (sep->se_proto[strlen(sep->se_proto) - 1] == '6')
+			sep->se_family = AF_INET6;
 		if (strncmp(sep->se_proto, "rpc/", 4) == 0) {
 			char *cp, *ccp;
 			long l;
@@ -1216,19 +1298,21 @@ more:
 				goto badafterall;
 		}
 	}
-	arg = skip(&cp);
+	arg = skip(&cp, 1);
 	if (arg == NULL)
 		goto more;
-	{
-		char	*s = strchr(arg, '.');
-		if (s) {
-			*s++ = '\0';
-			sep->se_max = atoi(s);
-		} else
-			sep->se_max = toomany;
-	}
+
+	s = strchr(arg, '.');
+	if (s) {
+		*s++ = '\0';
+		sep->se_max = atoi(s);
+	} else
+		sep->se_max = toomany;
+
 	sep->se_wait = strcmp(arg, "wait") == 0;
-	sep->se_user = newstr(skip(&cp));
+	if ((arg = skip(&cp, 1)) == NULL)
+		goto more;
+	sep->se_user = newstr(arg);
 	arg = strchr(sep->se_user, '.');
 	if (arg == NULL)
 		arg = strchr(sep->se_user, ':');
@@ -1236,9 +1320,12 @@ more:
 		*arg++ = '\0';
 		sep->se_group = newstr(arg);
 	}
-	sep->se_server = newstr(skip(&cp));
+	if ((arg = skip(&cp, 1)) == NULL)
+		goto more;
+	
+	sep->se_server = newstr(arg);
 	if (strcmp(sep->se_server, "internal") == 0) {
-		register struct biltin *bi;
+		struct biltin *bi;
 
 		for (bi = biltins; bi->bi_service; bi++)
 			if (bi->bi_socktype == sep->se_socktype &&
@@ -1254,7 +1341,7 @@ more:
 	} else
 		sep->se_bi = NULL;
 	argc = 0;
-	for (arg = skip(&cp); cp; arg = skip(&cp)) {
+	for (arg = skip(&cp, 0); cp; arg = skip(&cp, 0)) {
 #if MULOG
 		char *colon;
 
@@ -1420,15 +1507,20 @@ freeconfig(cp)
 }
 
 char *
-skip(cpp)
+skip(cpp, report)
 	char **cpp;
+	int report;
 {
-	register char *cp = *cpp;
+	char *cp = *cpp;
 	char *start;
 
-	if (*cpp == NULL)
-			return (NULL);
-
+erp:
+	if (*cpp == NULL) {
+		if (report)
+			syslog(LOG_ERR, "syntax error in inetd config file");
+		return (NULL);
+	}
+	
 again:
 	while (*cp == ' ' || *cp == '\t')
 		cp++;
@@ -1441,14 +1533,16 @@ again:
 			if ((cp = nextline(fconfig)))
 				goto again;
 		*cpp = NULL;
-		return (NULL);
+		goto erp;
 	}
 	start = cp;
 	while (*cp && *cp != ' ' && *cp != '\t')
 		cp++;
 	if (*cp != '\0')
 		*cp++ = '\0';
-	*cpp = cp;
+	if ((*cpp = cp) == NULL)
+		goto erp;
+
 	return (start);
 }
 
@@ -1857,7 +1951,8 @@ print_service(action, sep)
 
 	fprintf(stderr,
 	    " wait.max=%hd.%d user:group=%s.%s builtin=%lx server=%s\n",
-	    sep->se_wait, sep->se_max, sep->se_user, sep->se_group,
+	    sep->se_wait, sep->se_max, sep->se_user,
+	    sep->se_group ? sep->se_group : "wheel",
 	    (long)sep->se_bi, sep->se_server);
 }
 

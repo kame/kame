@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ftpd.8,v 1.25 1999/09/30 08:28:52 downsj Exp $
+.\"	$OpenBSD: ftpd.8,v 1.29 2000/04/15 11:46:05 aaron Exp $
 .\"	$NetBSD: ftpd.8,v 1.8 1996/01/14 20:55:23 thorpej Exp $
 .\"
 .\" Copyright (c) 1985, 1988, 1991, 1993
@@ -63,7 +63,7 @@ Available options:
 .Bl -tag -width Ds
 .It Fl A
 Permit only anonymous ftp connections or accounts listed in
-.Pa /etc/ftpchroot.
+.Pa /etc/ftpchroot .
 Other connection attempts are refused.
 .It Fl d
 Debugging information is written to the syslog using LOG_FTP.
@@ -219,9 +219,9 @@ SITE request.
 .Pp
 .Bl -column Request -offset indent
 .It Sy Request Ta Sy Description
-.It UMASK Ta change umask, e.g. ``SITE UMASK 002''
-.It IDLE Ta set idle-timer, e.g. ``SITE IDLE 60''
-.It CHMOD Ta change mode of a file, e.g. ``SITE CHMOD 755 filename''
+.It UMASK Ta change umask, e.g., ``SITE UMASK 002''
+.It IDLE Ta set idle-timer, e.g., ``SITE IDLE 60''
+.It CHMOD Ta change mode of a file, e.g., ``SITE CHMOD 755 filename''
 .It HELP Ta give help information.
 .El
 .Pp
@@ -410,7 +410,7 @@ with other
 .Nm ftpd
 implementations.
 .Sh FILES
-.Bl -tag -width /etc/ftpwelcome -compact
+.Bl -tag -width /var/run/ftpd.pid -compact
 .It Pa /etc/ftpusers
 List of unwelcome/restricted users.
 .It Pa /etc/ftpchroot
@@ -423,6 +423,8 @@ Welcome notice after login.
 Displayed and access refused.
 .It Pa /var/run/utmp
 List of users on the system.
+.It Pa /var/run/ftpd.pid
+Process id if running in daemon mode.
 .It Pa /var/log/ftpd
 Log file for anonymous downloads.
 .El
@@ -433,10 +435,10 @@ Log file for anonymous downloads.
 .Xr getusershell 3 ,
 .Xr syslogd 8
 .Sh BUGS
-The server must run as the super-user
+The server must run as the superuser
 to create sockets with privileged port numbers.  It maintains
 an effective user ID of the logged in user, reverting to
-the super-user only when binding addresses to sockets.  The
+the superuser only when binding addresses to sockets.  The
 possible security holes have been extensively
 scrutinized, but are possibly incomplete.
 .Sh HISTORY
