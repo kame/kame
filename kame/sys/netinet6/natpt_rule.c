@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.18 2001/06/20 04:59:26 sumikawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.19 2001/07/12 07:58:08 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,14 +96,6 @@ lookingForIncomingV4Rule(struct ifBox *ifb, struct _cv *cv)
 {
     Cell		*p;
     struct _cSlot	*acs;
-
-    /*
-     * If incoming IPv4 packet is addressed to oneself,
-     * this packet is not subject to translate.
-     */
-    if ((natpt_gotoOneself == TRUE)
-	&& toOneself4(ifb, cv))
-	return (NULL);					/* goto ours	*/
 
     for (p = natptStatic; p; p = CDR(p))
     {
@@ -260,13 +252,8 @@ lookingForOutgoingV6Rule(struct ifBox *ifb, struct _cv *cv)
 int
 matchIn4addr(struct _cv *cv4, struct pAddr *from)
 {
-    struct in_addr	in4from;
+    struct in_addr	in4from = cv4->_ip._ip4->ip_src;
     struct in_addr	in4masked;
-
-    if (cv4->inout == NATPT_OUTBOUND)
-	in4from = cv4->_ip._ip4->ip_src;
-    else
-	in4from = cv4->_ip._ip4->ip_dst;
 
     if (from->sa_family != AF_INET)
 	return (0);
@@ -295,7 +282,9 @@ matchIn4addr(struct _cv *cv4, struct pAddr *from)
 
 port:;
     if ((cv4->ip_payload != IPPROTO_UDP)
-	&& (cv4->ip_payload != IPPROTO_TCP))			return (1);
+	&& (cv4->ip_payload != IPPROTO_TCP)
+	&& (from->_port0 == 0)
+	&& (from->_port1 == 0))					return (1);
 
     if (from->_port0 == 0)					return (1);
 

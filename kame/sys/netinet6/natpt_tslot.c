@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.21 2001/06/13 04:31:18 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.22 2001/07/12 07:58:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -273,7 +273,6 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     bzero(ats, sizeof(struct _tSlot));
 
     local  = &ats->local;
-    remote = &ats->remote;
 
 #ifdef NATPT_NAT
     if (acs->local.sa_family == AF_INET)
@@ -317,12 +316,8 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     remote = &ats->remote;
     remote->ip_p = IPPROTO_IPV4;
     remote->sa_family = AF_INET;
-    remote->in4src = acs->remote.in4src;
+    remote->in4src = cv4->_ip._ip4->ip_dst;
     remote->in4dst = cv4->_ip._ip4->ip_src;
-    if (acs->remote.ad.type == ADDR_ANY)
-    {
-	remote->in4src = cv4->_ip._ip4->ip_dst;
-    }
 
     if ((cv4->ip_payload == IPPROTO_TCP)
 	|| (cv4->ip_payload == IPPROTO_UDP))
