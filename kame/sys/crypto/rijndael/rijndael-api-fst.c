@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-api-fst.c,v 1.9 2001/05/27 01:38:30 itojun Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.10 2001/05/27 09:34:18 itojun Exp $	*/
 
 /*
  * rijndael-api-fst.c   v2.3   April '2000
@@ -48,7 +48,7 @@ int rijndael_makeKey(keyInstance *key, BYTE direction, int keyLen, char *keyMate
 	}
 
 	if (keyMaterial != NULL) {
-		memcpy(key->keyMaterial, keyMaterial, keyLen/8);
+		bcopy(keyMaterial, key->keyMaterial, keyLen/8);
 	}
 
 	key->ROUNDS = keyLen/32 + 6;
