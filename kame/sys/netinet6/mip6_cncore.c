@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.33 2003/08/26 04:42:27 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.34 2003/08/27 06:38:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -916,8 +916,6 @@ mip6_bc_list_remove(mbc_list, mbc)
 	if ((mbc_list == NULL) || (mbc == NULL)) {
 		return (EINVAL);
 	}
-	if (mbc->mbc_dad != NULL)
-		panic("mbc->mbc_dad is !NULL\n");
 
 	id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr);
 	if (mip6_bc_hash[id] == mbc) {
