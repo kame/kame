@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1984 2001/11/19 05:35:50 itojun Exp $
+$KAME: CHANGELOG,v 1.1985 2001/11/21 05:21:57 itojun Exp $
 
 <200111>
+Wed Nov 21 14:17:10 JST 2001  itojun@iijlab.net
+	* sys/netinet/ip_output.c: update outgoing interface only if ipsec
+	  tunnel mode encapsulation is applied.  the change is necessary to
+	  use IPsec over multicast (like IP_MULTICAST_IF).
+
 Mon Nov 19 14:34:06 JST 2001  itojun@iijlab.net
 	* sys/netinet6/udp6_output.c: initialize IPv4 source address on packet
 	  correctly, when IPv4 mapped address is used on AF_INET6 socket.
