@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.13 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_red.c,v 1.14 2003/01/07 07:33:38 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -132,7 +132,7 @@
  * for a slow link like dial-up, 500 packets takes more than 1 minute!
  * when q_weight is 0.008, N is about 127 packets.
  * when q_weight is 0.016, N is about 63 packets.
- * bursts of 50 packets are allowd for 0.002, bursts of 25 packets
+ * bursts of 50 packets are allowed for 0.002, bursts of 25 packets
  * are allowed for 0.016.
  * see Sally's paper for more details.
  */

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.12 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.13 2003/01/07 07:33:38 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -286,7 +286,7 @@ cbq_class_create(cbqp, acp, parent, borrow)
 /*
  * int
  * cbq_class_destroy(cbq_mod_state_t *, struct rm_class *) - This
- *	function destroys a given traffic class.  Before destorying
+ *	function destroys a given traffic class.  Before destroying
  *	the class, all traffic for that class is released.
  */
 static int
@@ -704,7 +704,7 @@ cbq_ifdetach(ifacep)
  *
  *	Assumptions:	called in splimp
  *	Returns:	0 if the queueing is successful.
- *			ENOBUFS if a packet dropping occured as a result of
+ *			ENOBUFS if a packet dropping occurred as a result of
  *			the queueing.
  */
 

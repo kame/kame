@@ -1,4 +1,4 @@
-/*	$KAME: altq_classq.h,v 1.5 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_classq.h,v 1.6 2003/01/07 07:33:38 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -53,7 +53,7 @@ extern "C" {
 #ifdef _KERNEL
 
 /*
- * Packet Queue strcutures and macros to manipulate them.
+ * Packet Queue structures and macros to manipulate them.
  */
 struct _class_queue_ {
 	struct mbuf	*tail_;	/* Tail of packet queue */

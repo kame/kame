@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.13 2002/11/29 07:48:33 kjc Exp $	*/
+/*	$KAME: altq_rio.c,v 1.14 2003/01/07 07:33:38 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -513,7 +513,7 @@ rio_alloc(weight, params, flags, pkttime)
 	if (weight != 0)
 		rp->rio_weight = weight;
 	else {
-		/* use derfault */
+		/* use default */
 		rp->rio_weight = W_WEIGHT;
 
 		/* when the link is very slow, adjust red parameters */
