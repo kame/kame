@@ -3,7 +3,6 @@
 .endif
 
 PROG=	bindtest
-NOMAN=	yes
 
 CFLAGS+=-Wall -Werror
 
