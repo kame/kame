@@ -230,9 +230,9 @@ main(argc, argv)
 	/* record the current PID */
 	pid = getpid();
 	if ((pidfp = fopen(pidfilename, "w")) == NULL)
-		syslog(LOG_ERR, __FUNCTION__,
-		       "failed to open a log file(%s), run anyway.",
-		       pidfilename, strerror(errno));
+		syslog(LOG_ERR,
+		       "<%s> failed to open a log file(%s), run anyway.",
+		       __FUNCTION__, pidfilename);
 	else {
 		fprintf(pidfp, "%d\n", pid);
 		fclose(pidfp);

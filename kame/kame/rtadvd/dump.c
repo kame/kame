@@ -193,7 +193,7 @@ rtadvd_dump_file(dumpfile)
 {
 	if ((fp = fopen(dumpfile, "w")) == NULL) {
 		syslog(LOG_WARNING, "<%s> open a dump file(%s)",
-		       __FUNCTION__, dumpfile, strerror(errno));
+		       __FUNCTION__, dumpfile);
 		return;
 	}
 
