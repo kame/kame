@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.16 2002/10/04 11:09:10 suz Exp $	*/
+/*	$KAME: cftoken.l,v 1.17 2002/12/06 06:21:01 suz Exp $	*/
 
 %{
 /*
@@ -532,6 +532,7 @@ slash		\/
 }
 <S_PHYINT>{semi} { yyerror("phyint was specified without interface."); return(EOS); }
 <S_IFCONF>disable { YYD_ECHO; return(DISABLE); }
+<S_IFCONF>enable { YYD_ECHO; return(ENABLE); }
 <S_IFCONF>preference { YYD_ECHO; return(PREFERENCE); }
 <S_IFCONF>metric { YYD_ECHO; return(METRIC); }
 <S_IFCONF>robustness { YYD_ECHO; return(ROBUST); }
@@ -593,6 +594,9 @@ slash		\/
 <S_CNF>register_suppression_timeout { YYD_ECHO; return(REGSUPTIME); }
 <S_CNF>probe_time { YYD_ECHO; return(PROBETIME); }
 <S_CNF>assert_timeout { YYD_ECHO; return(ASSERTTIME); }
+<S_CNF>default_phyint_status { YYD_ECHO; return(DEFVIFSTAT); }
+<S_CNF>disable { YYD_ECHO; return(DISABLE); }
+<S_CNF>enable { YYD_ECHO; return(ENABLE); }
 
 	/* misc */
 {ws}		{ ; }

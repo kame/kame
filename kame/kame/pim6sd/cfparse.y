@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.23 2002/10/04 11:09:10 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.24 2002/12/06 06:21:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -93,7 +93,7 @@ static struct attr_list *rp_attr, *bsr_attr, *grp_prefix, *regthres_attr,
 	*datathres_attr;
 static char *cand_rp_ifname, *cand_bsr_ifname;
 static int srcmetric, srcpref, helloperiod, jpperiod, granularity,
-	datatimo, regsuptimo, probetime, asserttimo;
+	datatimo, regsuptimo, probetime, asserttimo, default_vif_status;
 static double helloperiod_coef, jpperiod_coef;
 
 static int debugonly;
@@ -112,14 +112,14 @@ extern int yylex __P((void));
 %token LOGGING LOGLEV NOLOGLEV
 %token YES NO
 %token REVERSELOOKUP
-%token PHYINT IFNAME DISABLE PREFERENCE METRIC NOLISTENER
+%token PHYINT IFNAME ENABLE DISABLE PREFERENCE METRIC NOLISTENER
 %token ROBUST QUERY_INT QUERY_INT_RESP MLD_VERSION LLQI
 %token GRPPFX
 %token CANDRP CANDBSR TIME PRIORITY MASKLEN
 %token NUMBER STRING SLASH ANY
 %token REGTHRES DATATHRES RATE INTERVAL
 %token SRCMETRIC SRCPREF HELLOPERIOD GRANULARITY JPPERIOD
-%token DATATIME REGSUPTIME PROBETIME ASSERTTIME
+%token DATATIME REGSUPTIME PROBETIME ASSERTTIME DEFVIFSTAT
 
 %type <num> LOGLEV NOLOGLEV
 %type <fl> NUMBER
@@ -191,6 +191,12 @@ phyint_statement:
 
 if_attributes:
 		{ $$ = NULL; }
+	|	if_attributes ENABLE
+		{
+			if (($$ = add_attribute_flag($1, IFA_FLAG,
+						     VIFF_ENABLED)) == NULL)
+				return(-1);
+		}
 	|	if_attributes DISABLE
 		{
 			if (($$ = add_attribute_flag($1, IFA_FLAG,
@@ -502,6 +508,16 @@ param_statement:
 		{
 			set_param(asserttimo, $2, "assert_timeout");
 		}
+	|	DEFVIFSTAT ENABLE EOS
+		{
+			set_param(default_vif_status, VIFF_ENABLED,
+				 "default_phyint_status");
+		}
+	|	DEFVIFSTAT DISABLE EOS
+		{
+			set_param(default_vif_status, VIFF_DISABLED,
+				 "default_phyint_status");
+		}
 	;
 %%
 
@@ -589,6 +605,7 @@ param_config()
 	if (regsuptimo == -1) regsuptimo = PIM_REGISTER_SUPPRESSION_TIMEOUT;
 	if (probetime == -1) probetime = PIM_REGISTER_PROBE_TIME;
 	if (asserttimo == -1) asserttimo = PIM_ASSERT_TIMEOUT;
+	if (default_vif_status == -1) default_vif_status = VIFF_ENABLED;
 
 	/* set protocol parameters using the configuration variables */
 	for (vifi = 0, v = uvifs; vifi < MAXMIFS; ++vifi, ++v) {
@@ -807,6 +824,20 @@ phyint_config()
 					    v->uv_mld_llqi);
 				break;
 			}
+		}
+
+		/* determines enable/disable if necessary */
+		if ((v->uv_flags & (VIFF_ENABLED | VIFF_DISABLED)) ==
+		    (VIFF_ENABLED | VIFF_DISABLED)) {
+			yywarn("inconsistenet configuration for %s:"
+			       "enables and disables PIM simulteneously."
+			       "use default behavior", v->uv_name);
+			v->uv_flags &= ~(VIFF_ENABLED | VIFF_DISABLED);
+			v->uv_flags |= default_vif_status;
+		}
+		
+		if ((v->uv_flags & (VIFF_ENABLED | VIFF_DISABLED)) == 0) {
+			v->uv_flags |= default_vif_status;
 		}
 	}
 
@@ -1187,7 +1218,7 @@ cf_init(s, d)
 	srcmetric = srcpref = helloperiod = jpperiod = jpperiod_coef
 		= granularity = datatimo = regsuptimo = probetime
 		= asserttimo = -1;
-	helloperiod_coef = jpperiod_coef = -1;
+	helloperiod_coef = jpperiod_coef = default_vif_status = -1;
 
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v)
 		v->config_attr = NULL;

@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.22 2002/10/30 06:27:34 suz Exp $	*/
+/*	$KAME: vif.h,v 1.23 2002/12/06 06:21:01 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -76,6 +76,7 @@ extern mifi_t reg_vif_num;
 #define VIFF_NONBRS		0x080000
 #define VIFF_PIM_NBR            0x200000
 #define VIFF_POINT_TO_POINT	0x400000	
+#define VIFF_ENABLED       	0x800000
 #define NBRTYPE 		u_long
 #define NBRBITS			sizeof(NBRTYPE) *8
 

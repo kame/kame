@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.conf.5,v 1.19 2002/11/11 02:52:16 suz Exp $
+.\"	$KAME: pim6sd.conf.5,v 1.20 2002/12/06 06:21:01 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -98,14 +98,26 @@ means should not.
 By default, a hostname is not resolved.
 .\"
 .It Xo
-.Ic phyint Ar interface
-.Op disable
-.Ic ;
+.Ic default_phyint_status (disable \(ba enable);
 .Xc
 Specifies
 .Xr pim6sd 8
-to ignore the interface even if the interface is multicast-capable.
-Note that PIM will be activated on all interfaces by default.
+to enable or disable multicast routing, when it is not explicitly
+configured in
+.Ic phyint
+statement.  By default,
+.Ic enable
+is assumed.
+.\"
+.It Xo
+.Ic phyint Ar interface Ic (disable \(ba enable);
+.Xc
+Specifies
+.Xr pim6sd 8
+to enable or disable multicast routing on the interface.
+If none of them are specified,
+.Ic default_phyint_status
+statement determines whether multicast routing is enabled or disabled.
 Interfaces are specified in the form of "name unit", such as
 .Ar gif0
 and
@@ -326,7 +338,7 @@ specifies the threshold in bits per second, and
 .Ic interval
 specifies the interval of checking the rate in seconds.
 The default values are 50000 and 20, respectively.
-\"
+.\"
 .It Xo
 .Ic switch_data_threshold Ic rate Ar rate Ic interval Ar interval;
 .Xc
