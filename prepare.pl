@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $Id: prepare.pl,v 1.11 1999/08/19 13:24:42 itojun Exp $
+# $Id: prepare.pl,v 1.12 1999/10/04 15:21:43 itojun Exp $
 #
 
 $debug = 1;
@@ -22,6 +22,7 @@ sub dig {
 	local(%exclude);
 	local(%linkdir);
 	local(%conflict);
+	local(%rename);
 
 	print "start: $curdir, $src, $dst\n";
 
@@ -33,6 +34,7 @@ sub dig {
 		%exclude = ();
 		%linkdir = ();
 		%conflict = ();
+		%rename = ();
 		open(IN, "< $dst/.prepare");
 		while (<IN>) {
 			s/\s*\n$//;
@@ -46,6 +48,9 @@ sub dig {
 			}
 			if (/^conflict\s+(\S+)$/) {
 				$conflict{$1}++;
+			}
+			if (/^rename\s+(\S+)\s+(\S+)$/) {
+				$rename{$1} = $2;
 			}
 		}
 		close(IN);
@@ -65,6 +70,12 @@ sub dig {
 			next;
 		}
 
+		if ($rename{$i}) {
+			$j = $rename{$i};
+		} else {
+			$j = $i;
+		}
+
 		if (-d "$curdir/$i" && !$linkdir{$i}) {
 			&dig("$curdir/$i", "../$src/$i", "$dst/$i");
 		} else {
@@ -73,16 +84,16 @@ sub dig {
 				system "mkdir -p $dst" if (!$test);
 			}
 
-			if (-f "$dst/$i" && ! -l "$dst/$i") {
-				print "conflict: $dst/$i\n";
-				exit 1 if (!defined $conflict{$i});
+			if (-f "$dst/$j" && ! -l "$dst/$j") {
+				print "conflict: $dst/$j\n";
+				exit 1 if (!defined $conflict{$j});
 			} else {
-				if (-l "$dst/$i") {
-					print "unlink $dst/$i (symlink)\n" if $debug;
-					unlink "$dst/$i" if (!$test);
+				if (-l "$dst/$j") {
+					print "unlink $dst/$j (symlink)\n" if $debug;
+					unlink "$dst/$j" if (!$test);
 				}
-				print "ln -s $src/$i $dst/$i\n" if $debug;
-				symlink("$src/$i", "$dst/$i") if (!$test);
+				print "ln -s $src/$i $dst/$j\n" if $debug;
+				symlink("$src/$i", "$dst/$j") if (!$test);
 			}
 		}
 	}
