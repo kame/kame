@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.92 2002/09/27 14:42:18 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.93 2002/10/26 20:03:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.92 2002/09/27 14:42:18 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.93 2002/10/26 20:03:05 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -3066,13 +3066,14 @@ void
 filterconfig()
 {
 	int i;
-	char *p, *ap, *iflp, *ifname;
+	char *p, *ap, *iflp, *ifname, *ep;
 	struct iff ftmp, *iff_obj;
 	struct ifc *ifcp;
 	struct riprt *rrt;
 #if 0
 	struct in6_addr gw;
 #endif
+	u_long plen;
 
 	for (i = 0; i < nfilter; i++) {
 		ap = filter[i];
@@ -3095,7 +3096,14 @@ filterconfig()
 			fatal("invalid prefix specified for '%s'", ap);
 			/*NOTREACHED*/
 		}
-		ftmp.iff_plen = atoi(p);
+		errno = 0;
+		ep = NULL;
+		plen = strtoul(p, &ep, 10);
+		if (errno || !*p || *ep || plen > sizeof(ftmp.iff_addr) * 8) {
+			fatal("invalid prefix length specified for '%s'", ap);
+			/*NOTREACHED*/
+		}
+		ftmp.iff_plen = plen;
 		ftmp.iff_next = NULL;
 		applyplen(&ftmp.iff_addr, ftmp.iff_plen);
 ifonly:
