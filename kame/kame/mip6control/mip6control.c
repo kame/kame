@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.32 2002/09/18 05:32:53 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.33 2002/09/25 13:52:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,6 +155,8 @@ main(argc, argv)
 	char *shaarg = NULL, *sllarg = NULL;
 	int gbu = 0;
 	int gbc = 0;
+	int dbc = 0;
+	char *dbcarg = NULL;
 	char kvm_err[_POSIX2_LINE_MAX];
 	int unuseha_s = 0, unuseha_d = 0, unuseha_g = 0;
 	char *uharg = NULL;
@@ -175,7 +177,7 @@ main(argc, argv)
 	else
 		__progname++;
 
-	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcu:v:wD:S:T:I:F:")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcCu:v:wD:S:T:I:F:")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
@@ -222,6 +224,10 @@ main(argc, argv)
 			break;
 		case 'c':
 			gbc = 1;
+			break;
+		case 'C':
+			dbc = 1;
+			dbcarg = optarg;
 			break;
 		case 'u':
 			unuseha_s = 1;
@@ -572,6 +578,16 @@ main(argc, argv)
 			       mbc->mbc_lifetime,
 			       mbc->mbc_expire - time.tv_sec,
 			       bcflg_sprintf(mbc->mbc_state));
+		}
+	}
+
+	if (dbc && dbcarg) {
+		struct mip6_req mr;
+
+		bzero(&mr, sizeof(mr));
+		if (ioctl(s, SIOCDBC, &mr) < 0) {
+			perror("ioctl");
+			exit(-1);
 		}
 	}
 

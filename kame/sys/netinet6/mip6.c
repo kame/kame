@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.170 2002/09/25 13:18:23 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.171 2002/09/25 13:52:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1499,6 +1499,20 @@ mip6_ioctl(cmd, data)
 				rmbc++;
 			}
 			mr->mip6r_count = i;
+		}
+		break;
+
+	case SIOCDBC:
+		if (SA6_IS_ADDR_UNSPECIFIED(&mr->mip6r_ru.mip6r_sin6)) {
+			struct mip6_bc *mbc;
+
+			/* remove all binding cache entries. */
+			while ((mbc = LIST_FIRST(&mip6_bc_list)) != NULL) {
+				(void)mip6_bc_list_remove(&mip6_bc_list, mbc);
+			}
+		} else {
+			/* remove a specified binding cache entry. */
+			mip6log((LOG_INFO, "not implemented yet\n"));
 		}
 		break;
 
