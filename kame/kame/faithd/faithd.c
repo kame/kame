@@ -371,7 +371,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	if (error == -1)
 		exit_failure("getsockname: %s", ERRSTR);
 
-	getnameinfo((struct sockaddr *)&dstaddr6, dstaddr6.__ss_len,
+	getnameinfo((struct sockaddr *)&dstaddr6, dstaddr6.ss_len,
 		dst6, sizeof(dst6), NULL, 0, NI_NUMERICHOST);
 	syslog(LOG_INFO, "the client is connecting to %s", dst6);
 	
@@ -398,7 +398,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	 * Act as a translator
 	 */
 
-	if (dstaddr6.__ss_family == AF_INET6) {
+	if (dstaddr6.ss_family == AF_INET6) {
 		if (!map6to4((struct sockaddr_in6 *)&dstaddr6,
 		    (struct sockaddr_in *)&dstaddr4)) {
 			close(s_src);
@@ -406,7 +406,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 		}
 		syslog(LOG_INFO, "translating from v6 to v4");
 #ifdef FAITH4
-	} else if (dstaddr6.__ss_family == AF_INET) {
+	} else if (dstaddr6.ss_family == AF_INET) {
 		if (!map4to6((struct sockaddr_in *)&dstaddr6,
 		    (struct sockaddr_in6 *)&dstaddr4)) {
 			close(s_src);
@@ -419,13 +419,13 @@ play_child(int s_src, struct sockaddr *srcaddr)
 		exit_error("family not supported");
 	}
 
-	getnameinfo((struct sockaddr *)&dstaddr4, dstaddr4.__ss_len,
+	getnameinfo((struct sockaddr *)&dstaddr4, dstaddr4.ss_len,
 		dst4, sizeof(dst4), NULL, 0, NI_NUMERICHOST);
 	syslog(LOG_INFO, "the translator is connecting to %s", dst4);
 
 	setproctitle("port %s, %s -> %s", service, src, dst4);
 
-	if (dstaddr4.__ss_family == AF_INET6)
+	if (dstaddr4.ss_family == AF_INET6)
 		hport = ntohs(((struct sockaddr_in6 *)&dstaddr4)->sin6_port);
 	else /* AF_INET */
 		hport = ntohs(((struct sockaddr_in *)&dstaddr4)->sin_port);
@@ -433,13 +433,13 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	switch (hport) {
 	case RLOGIN_PORT:
 	case RSH_PORT:
-		s_dst = rresvport_af(&nresvport, dstaddr4.__ss_family);
+		s_dst = rresvport_af(&nresvport, dstaddr4.ss_family);
 		break;
 	default:
 		if (pflag)
-			s_dst = rresvport_af(&nresvport, dstaddr4.__ss_family);
+			s_dst = rresvport_af(&nresvport, dstaddr4.ss_family);
 		else
-			s_dst = socket(dstaddr4.__ss_family, SOCK_STREAM, 0);
+			s_dst = socket(dstaddr4.ss_family, SOCK_STREAM, 0);
 		break;
 	}
 	if (s_dst == -1)
@@ -456,7 +456,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	if (error == -1)
 		exit_error("setsockopt: %s", ERRSTR);
 
-	error = connect(s_dst, (struct sockaddr *)&dstaddr4, dstaddr4.__ss_len);
+	error = connect(s_dst, (struct sockaddr *)&dstaddr4, dstaddr4.ss_len);
 	if (error == -1)
 		exit_failure("connect: %s", ERRSTR);
 

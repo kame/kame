@@ -127,6 +127,7 @@ rsh_dual_relay(int s_src, int s_dst)
 	int port6 = 0, lport, lport6;
 	char *p;
 	struct timeval tv;
+	struct sockaddr *sa;
 
 	half = NO;
 	s_rcv = s_src;
@@ -138,7 +139,7 @@ rsh_dual_relay(int s_src, int s_dst)
 
 	len = sizeof(ctladdr6);
 	getpeername(s_src, (struct sockaddr *)&ctladdr6, &len);
-	if (ctladdr6.__ss_family == AF_INET6)
+	if (((struct sockaddr *)&ctladdr6)->sa_family == AF_INET6)
 		((struct sockaddr_in6 *)&ctladdr6)->sin6_port = htons(port6);
 	else
 		((struct sockaddr_in *)&ctladdr6)->sin_port = htons(port6);
@@ -155,9 +156,10 @@ rsh_dual_relay(int s_src, int s_dst)
 	if (s_ctl == -1) goto bad;
 	close(s_wld);
 	
-	s_ctl6 = rresvport_af(&lport6, ctladdr6.__ss_family);
+	sa = (struct sockaddr *)&ctladdr6;
+	s_ctl6 = rresvport_af(&lport6, sa->sa_family);
 	if (s_ctl6 == -1) goto bad;
-	error = connect(s_ctl6, (struct sockaddr *)&ctladdr6, ctladdr6.__ss_len);
+	error = connect(s_ctl6, sa, sa->sa_len);
 	if (error == -1) goto bad;
 	
 	syslog(LOG_INFO, "starting rsh control connection");
