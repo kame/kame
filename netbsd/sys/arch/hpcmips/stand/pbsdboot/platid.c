@@ -1,0 +1,1 @@
+#include "../../hpcmips/platid.c"
