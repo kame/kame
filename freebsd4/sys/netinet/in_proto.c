@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
- * $FreeBSD: src/sys/netinet/in_proto.c,v 1.53.2.4 2001/07/24 19:10:18 brooks Exp $
+ * $FreeBSD: src/sys/netinet/in_proto.c,v 1.53.2.6 2003/01/24 05:11:34 sam Exp $
  */
 
 #include "opt_ipdivert.h"
@@ -82,6 +82,10 @@
 #endif
 #include <netinet6/ipcomp.h>
 #endif /* IPSEC */
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#endif /* FAST_IPSEC */
 
 #ifdef IPXIP
 #include <netipx/ipx_ip.h>
@@ -201,10 +205,42 @@ struct protosw inetsw[] = {
   &nousrreqs
 },
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+{ SOCK_RAW,	&inetdomain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
+  ipsec4_common_input,	0, 	0,		0,
+  0,	  
+  0,		0,		0,		0,
+  &nousrreqs
+},
+{ SOCK_RAW,	&inetdomain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
+  ipsec4_common_input,	0, 	0,		0,
+  0,	  
+  0,		0,		0,		0,
+  &nousrreqs
+},
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
+  ipsec4_common_input,	0, 	0,		0,
+  0,	  
+  0,		0,		0,		0,
+  &nousrreqs
+},
+#endif /* FAST_IPSEC */
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap4_input,	0,	 	0,		rip_ctloutput,
   0,
   encap_init,		0,		0,		0,
+  &rip_usrreqs
+},
+{ SOCK_RAW,	&inetdomain,	IPPROTO_MOBILE,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
+  encap4_input,	0,		0,		rip_ctloutput,
+  0,
+  encap_init,	0,		0,		0,
+  &rip_usrreqs
+},
+{ SOCK_RAW,	&inetdomain,	IPPROTO_GRE,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
+  encap4_input,	0,		0,		rip_ctloutput,
+  0,
+  encap_init,	0,		0,		0,
   &rip_usrreqs
 },
 # ifdef INET6
@@ -283,9 +319,18 @@ SYSCTL_NODE(_net_inet, IPPROTO_TCP,	tcp,	CTLFLAG_RW, 0,	"TCP");
 SYSCTL_NODE(_net_inet, IPPROTO_SCTP,	sctp,	CTLFLAG_RW, 0,	"SCTP");
 #endif /* SCTP */
 SYSCTL_NODE(_net_inet, IPPROTO_IGMP,	igmp,	CTLFLAG_RW, 0,	"IGMP");
+#ifdef FAST_IPSEC
+/* XXX no protocol # to use, pick something "reserved" */
+SYSCTL_NODE(_net_inet, 253,		ipsec,	CTLFLAG_RW, 0,	"IPSEC");
+SYSCTL_NODE(_net_inet, IPPROTO_AH,	ah,	CTLFLAG_RW, 0,	"AH");
+SYSCTL_NODE(_net_inet, IPPROTO_ESP,	esp,	CTLFLAG_RW, 0,	"ESP");
+SYSCTL_NODE(_net_inet, IPPROTO_IPCOMP,	ipcomp,	CTLFLAG_RW, 0,	"IPCOMP");
+SYSCTL_NODE(_net_inet, IPPROTO_IPIP,	ipip,	CTLFLAG_RW, 0,	"IPIP");
+#else
 #ifdef IPSEC
 SYSCTL_NODE(_net_inet, IPPROTO_AH,	ipsec,	CTLFLAG_RW, 0,	"IPSEC");
 #endif /* IPSEC */
+#endif /* !FAST_IPSEC */
 SYSCTL_NODE(_net_inet, IPPROTO_RAW,	raw,	CTLFLAG_RW, 0,	"RAW");
 #ifdef IPDIVERT
 SYSCTL_NODE(_net_inet, IPPROTO_DIVERT,	divert,	CTLFLAG_RW, 0,	"DIVERT");

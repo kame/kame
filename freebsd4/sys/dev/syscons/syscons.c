@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.14 2002/09/15 22:30:44 dd Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.15 2002/10/24 00:35:31 kbyanc Exp $
  */
 
 #include "splash.h"
@@ -213,8 +213,9 @@ static struct cdevsw sc_cdevsw = {
 	/* maj */	CDEV_MAJOR,
 	/* dump */	nodump,
 	/* psize */	nopsize,
-	/* flags */	D_TTY,
-	/* bmaj */	-1
+	/* flags */	D_TTY | D_KQFILTER,
+	/* bmaj */	-1,
+	/* kqfilter */	ttykqfilter
 };
 
 int

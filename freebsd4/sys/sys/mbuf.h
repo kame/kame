@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.15 2002/08/04 05:36:22 luigi Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.16 2003/01/23 21:06:48 sam Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -50,13 +50,6 @@
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
 #define	MINCLSIZE	(MHLEN + 1)	/* smallest amount to put in cluster */
 #define	M_MAXCOMPRESS	(MHLEN / 2)	/* max amount to copy for compression */
-
-/* Packet tags structure */
-struct m_tag {
-        SLIST_ENTRY(m_tag)      m_tag_link;     /* List of packet tags */
-        u_int16_t               m_tag_id;       /* Tag ID */
-        u_int16_t               m_tag_len;      /* Length of data */
-};
 
 /*
  * Macros for type conversion:
@@ -84,17 +77,27 @@ struct m_hdr {
 };
 
 /*
+ * Packet tag structure (see below for details).
+ */
+struct m_tag {
+	SLIST_ENTRY(m_tag)	m_tag_link;	/* List of packet tags */
+	u_int16_t		m_tag_id;	/* Tag ID */
+	u_int16_t		m_tag_len;	/* Length of data */
+	u_int32_t		m_tag_cookie;	/* ABI/Module ID */
+};
+
+/*
  * Record/packet header in first mbuf of chain; valid only if M_PKTHDR is set.
  */
 struct pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
-	SLIST_HEAD(packet_tags, m_tag) tags; /* list of packet tags */
 	int	len;			/* total packet length */
 	/* variables for ip and tcp reassembly */
 	void	*header;		/* pointer to packet header */
 	/* variables for hardware checksum */
 	int	csum_flags;		/* flags regarding checksum */
 	int	csum_data;		/* data field used by csum routines */
+	SLIST_HEAD(packet_tags, m_tag) tags; /* list of packet tags */
 };
 
 /*
@@ -165,9 +168,9 @@ struct mbuf {
 /*
  * Flags copied when copying m_pkthdr.
  */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3| \
-			    M_PROTO4|M_PROTO5|M_PROTO6|M_BCAST|M_MCAST|M_FRAG| \
-			    M_NOTIFICATION)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
+			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG | \
+			    M_FIRSTFRAG|M_LASTFRAG)
 
 /*
  * Flags indicating hw checksum support and sw checksum requirements.
@@ -370,8 +373,9 @@ union mcluster {
 		_mm->m_nextpkt = NULL;					\
 		_mm->m_data = _mm->m_pktdat;				\
 		_mm->m_flags = M_PKTHDR;				\
-		bzero(&(_mm)->m_pkthdr, sizeof((_mm)->m_pkthdr));	\
-		SLIST_INIT(&(_mm)->m_pkthdr.tags);			\
+		_mm->m_pkthdr.rcvif = NULL;				\
+		SLIST_INIT(&_mm->m_pkthdr.tags); 			\
+		_mm->m_pkthdr.csum_flags = 0;				\
 		(m) = _mm;						\
 		splx(_ms);						\
 	} else {							\
@@ -459,40 +463,15 @@ union mcluster {
 )
 
 /*
- * Move just m_pkthdr from from to to,
- * remove M_PKTHDR and clean the tag for from.
+ * NB: M_COPY_PKTHDR is deprecated; use either M_MOVE_PKTHDR
+ *     or m_dup_pkthdr.
  */
-#define M_MOVE_HDR(to, from) do {					\
-	(to)->m_pkthdr = (from)->m_pkthdr;				\
-	(from)->m_flags &= ~M_PKTHDR;					\
-	SLIST_INIT(&(from)->m_pkthdr.tags);				\
-} while (0)
-
 /*
- * MOVE mbuf pkthdr from from to to.
- * from must have M_PKTHDR set, and to must be empty.
- * aux pointer will be moved to `to'.
+ * Move mbuf pkthdr from "from" to "to".
+ * from should have M_PKTHDR set, and to must be empty.
+ * from no longer has a pkthdr after this operation.
  */
-#define	M_MOVE_PKTHDR(to, from) do {					\
-	(to)->m_flags = (from)->m_flags & M_COPYFLAGS;			\
-	M_MOVE_HDR((to), (from));					\
-	(to)->m_data = (to)->m_pktdat;					\
-} while (0)
-
-/*
- * Copy mbuf pkthdr from "from" to "to".
- * from must have M_PKTHDR set, and to must be empty.
- */
-#define	M_COPY_PKTHDR(to, from) do {					\
-	struct mbuf *_mfrom = (from);					\
-	struct mbuf *_mto = (to);					\
-									\
-	_mto->m_pkthdr = _mfrom->m_pkthdr;				\
-	_mto->m_flags = _mfrom->m_flags & M_COPYFLAGS;			\
-	SLIST_INIT(&(_mto)->m_pkthdr.tags);				\
-	m_tag_copy_chain((_mto), (_mfrom));				\
-	_mto->m_data = _mto->m_pktdat;					\
-} while (0)
+#define	M_MOVE_PKTHDR(_to, _from)	m_move_pkthdr((_to), (_from))
 
 /*
  * Set the m_data pointer of a newly-allocated mbuf (m_get/MGET) to place
@@ -585,51 +564,6 @@ union mcluster {
 /* Compatibility with 4.3 */
 #define	m_copy(m, o, l)	m_copym((m), (o), (l), M_DONTWAIT)
 
-/*
- * Some packet tags to identify different mbuf annotations.
- *
- * Eventually, these annotations will end up in an appropriate chain
- * (struct m_tag or similar, e.g. as in NetBSD) properly managed by
- * the mbuf handling routines.
- *
- * As a temporary and low impact solution to replace the even uglier
- * approach used so far in some parts of the network stack (which relies
- * on global variables), these annotations are stored in MT_TAG
- * mbufs (or lookalikes) prepended to the actual mbuf chain.
- *
- *	m_type	= MT_TAG
- *	m_flags	= _m_tag_id
- *	m_next	= next buffer in chain.
- *
- * BE VERY CAREFUL not to pass these blocks to the mbuf handling routines.
- *
- */
-
-#define	_m_tag_id	m_hdr.mh_flags
-
-/* Packet tag types -- first ones are from NetBSD */
-
-#define PACKET_TAG_NONE				0  /* Nothing */
-#define PACKET_TAG_VLAN				1  /* VLAN ID */
-#define PACKET_TAG_ENCAP			2  /* encapsulation data */
-#define PACKET_TAG_ESP				3  /* ESP information */
-#define PACKET_TAG_GIF				8  /* GIF processing done */
-#define PACKET_TAG_VRRP				10 /* VRRP processing */
-#define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
-#define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
-#define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
-#define PACKET_TAG_PF_QID			14 /* PF queue id */
-
-/* Packet tags used in the FreeBSD network stack */
-#define	PACKET_TAG_DUMMYNET			15 /* dummynet info */
-#define	PACKET_TAG_IPFW				16 /* ipfw classification */
-#define	PACKET_TAG_DIVERT			17 /* divert info */
-#define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
-
-#define PACKET_TAG_INET6			19 /* IPv6 info */
-
-#define	PACKET_TAG_MAX				20
-
 #ifdef _KERNEL
 extern	u_int		 m_clalloc_wid;	/* mbuf cluster wait count */
 extern	u_int		 m_mballoc_wid;	/* mbuf wait count */
@@ -659,6 +593,7 @@ struct	mbuf	*m_copypacket(struct mbuf *, int);
 struct	mbuf	*m_devget(char *, int, int, struct ifnet *,
 		    void (*copy)(char *, caddr_t, u_int));
 struct	mbuf	*m_dup(struct mbuf *, int);
+int		 m_dup_pkthdr(struct mbuf *, struct mbuf *, int);
 struct	mbuf	*m_free(struct mbuf *);
 void		 m_freem(struct mbuf *);
 struct	mbuf	*m_get(int, int);
@@ -668,6 +603,7 @@ struct	mbuf	*m_gethdr(int, int);
 struct	mbuf	*m_getm(struct mbuf *, int, int, int);
 int		 m_mballoc(int, int);
 struct	mbuf	*m_mballoc_wait(int, int);
+void		 m_move_pkthdr(struct mbuf *, struct mbuf *);
 struct	mbuf	*m_prepend(struct mbuf *, int, int);
 void		 m_print(const struct mbuf *m);
 struct	mbuf	*m_pulldown(struct mbuf *, int, int, int *);
@@ -676,19 +612,129 @@ struct	mbuf	*m_retry(int, int);
 struct	mbuf	*m_retryhdr(int, int);
 struct	mbuf	*m_split(struct mbuf *, int, int);
 
+/*
+ * Packets may have annotations attached by affixing a list
+ * of "packet tags" to the pkthdr structure.  Packet tags are
+ * dynamically allocated semi-opaque data structures that have
+ * a fixed header (struct m_tag) that specifies the size of the
+ * memory block and a <cookie,type> pair that identifies it.
+ * The cookie is a 32-bit unique unsigned value used to identify
+ * a module or ABI.  By convention this value is chose as the
+ * date+time that the module is created, expressed as the number of
+ * seconds since the epoch (e.g. using date -u +'%s').  The type value
+ * is an ABI/module-specific value that identifies a particular annotation
+ * and is private to the module.  For compatibility with systems
+ * like openbsd that define packet tags w/o an ABI/module cookie,
+ * the value PACKET_ABI_COMPAT is used to implement m_tag_get and
+ * m_tag_find compatibility shim functions and several tag types are
+ * defined below.  Users that do not require compatibility should use
+ * a private cookie value so that packet tag-related definitions
+ * can be maintained privately.
+ *
+ * Note that the packet tag returned by m_tag_allocate has the default
+ * memory alignment implemented by malloc.  To reference private data
+ * one can use a construct like:
+ *
+ *	struct m_tag *mtag = m_tag_allocate(...);
+ *	struct foo *p = (struct foo *)(mtag+1);
+ *
+ * if the alignment of struct m_tag is sufficient for referencing members
+ * of struct foo.  Otherwise it is necessary to embed struct m_tag within
+ * the private data structure to insure proper alignment; e.g.
+ *
+ *	struct foo {
+ *		struct m_tag	tag;
+ *		...
+ *	};
+ *	struct foo *p = (struct foo *) m_tag_allocate(...);
+ *	struct m_tag *mtag = &p->tag;
+ */
+
+#define PACKET_TAG_NONE				0  /* Nothing */
+#define PACKET_TAG_VLAN				1  /* VLAN ID */
+#define PACKET_TAG_ENCAP			2  /* encapsulation data */
+#define PACKET_TAG_ESP				3  /* ESP information */
+#define PACKET_TAG_GIF				8  /* GIF processing done */
+#define PACKET_TAG_VRRP				10 /* VRRP processing */
+#define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
+#define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
+#define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
+#define PACKET_TAG_PF_QID			14 /* PF queue id */
+
+
+#if 0	/* commmented them out considering the other *BSD's KAME */
+/* Packet tag for use with PACKET_ABI_COMPAT */
+#define	PACKET_TAG_IPSEC_IN_DONE		1  /* IPsec applied, in */
+#define	PACKET_TAG_IPSEC_OUT_DONE		2  /* IPsec applied, out */
+#define	PACKET_TAG_IPSEC_IN_CRYPTO_DONE		3  /* NIC IPsec crypto done */
+#define	PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED	4  /* NIC IPsec crypto req'ed */
+#define	PACKET_TAG_IPSEC_IN_COULD_DO_CRYPTO	5  /* NIC notifies IPsec */
+#define	PACKET_TAG_IPSEC_PENDING_TDB		6  /* Reminder to do IPsec */
+#define	PACKET_TAG_BRIDGE			7  /* Bridge processing done */
+#define	PACKET_TAG_GIF				8  /* GIF processing done */
+#define	PACKET_TAG_GRE				9  /* GRE processing done */
+#define	PACKET_TAG_IN_PACKET_CHECKSUM		10 /* NIC checksumming done */
+#define	PACKET_TAG_ENCAP			11 /* Encap.  processing */
+#define	PACKET_TAG_IPSEC_SOCKET			12 /* IPSEC socket ref */
+#define	PACKET_TAG_IPSEC_HISTORY		13 /* IPSEC history */
+#define	PACKET_TAG_IPV6_INPUT			14 /* IPV6 input processing */
+#endif
+
+/*
+ * As a temporary and low impact solution to replace the even uglier
+ * approach used so far in some parts of the network stack (which relies
+ * on global variables), packet tag-like annotations are stored in MT_TAG
+ * mbufs (or lookalikes) prepended to the actual mbuf chain.
+ *
+ *	m_type	= MT_TAG
+ *	m_flags = m_tag_id
+ *	m_next	= next buffer in chain.
+ *
+ * BE VERY CAREFUL not to pass these blocks to the mbuf handling routines.
+ */
+#define	_m_tag_id	m_hdr.mh_flags
+
+/* Packet tags used in the FreeBSD network stack */
+#define	PACKET_TAG_DUMMYNET			15 /* dummynet info */
+#define	PACKET_TAG_IPFW				16 /* ipfw classification */
+#define	PACKET_TAG_DIVERT			17 /* divert info */
+#define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
+#define PACKET_TAG_INET6			19 /* IPv6 info */
+
+#define	PACKET_TAG_MAX				20
+
+
 /* Packet tag routines */
-struct	m_tag *m_tag_get(int, int, int);
-void	m_tag_free(struct m_tag *);
-void	m_tag_prepend(struct mbuf *, struct m_tag *);
-void	m_tag_unlink(struct mbuf *, struct m_tag *);
-void	m_tag_delete(struct mbuf *, struct m_tag *);
-void	m_tag_delete_chain(struct mbuf *, struct m_tag *);
-struct	m_tag *m_tag_find(struct mbuf *, int, struct m_tag *);
-struct	m_tag *m_tag_copy(struct m_tag *);
-int	m_tag_copy_chain(struct mbuf *, struct mbuf *);
-void	m_tag_init(struct mbuf *);
-struct	m_tag *m_tag_first(struct mbuf *);
-struct	m_tag *m_tag_next(struct mbuf *, struct m_tag *);
+struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);
+void		 m_tag_free(struct m_tag *);
+void		 m_tag_prepend(struct mbuf *, struct m_tag *);
+void		 m_tag_unlink(struct mbuf *, struct m_tag *);
+void		 m_tag_delete(struct mbuf *, struct m_tag *);
+void		 m_tag_delete_chain(struct mbuf *, struct m_tag *);
+struct  m_tag	*m_tag_find(struct mbuf *, int, struct m_tag *);
+struct	m_tag	*m_tag_locate(struct mbuf *, u_int32_t, int, struct m_tag *);
+struct	m_tag	*m_tag_copy(struct m_tag *);
+int		 m_tag_copy_chain(struct mbuf *, struct mbuf *);
+void		 m_tag_init(struct mbuf *);
+struct	m_tag	*m_tag_first(struct mbuf *);
+struct	m_tag	*m_tag_next(struct mbuf *, struct m_tag *);
+
+/* these are for openbsd compatibility */
+#if 0	 /* commmented them out considering the other *BSD's KAME */
+#define	MTAG_ABI_COMPAT		0		/* compatibility ABI */
+
+static __inline struct m_tag *
+m_tag_get(int type, int length, int wait)
+{
+	return m_tag_alloc(MTAG_ABI_COMPAT, type, length, wait);
+}
+
+static __inline struct m_tag *
+m_tag_find(struct mbuf *m, int type, struct m_tag *start)
+{
+	return m_tag_locate(m, MTAG_ABI_COMPAT, type, start);
+}
+#endif
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MBUF_H_ */

@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79.2.8 2001/06/12 13:13:31 markm Exp $
+ * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79.2.9 2003/01/04 22:58:01 njl Exp $
  */
 
 /*
@@ -287,7 +287,7 @@ mmrw(dev, uio, flags)
 			continue;
 
 		default:
-			return (ENXIO);
+			return (ENODEV);
 		}
 		if (error)
 			break;

@@ -68,7 +68,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.31 2002/07/12 22:14:12 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.36 2003/01/30 05:53:28 sam Exp $
  */
 
 #define _IP_VHL
@@ -120,6 +120,12 @@ MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 #endif
 #endif /*IPSEC*/
 
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/xform.h>
+#include <netipsec/key.h>
+#endif /*FAST_IPSEC*/
+
 #include <netinet/ip_fw.h>
 #include <netinet/ip_dummynet.h>
 
@@ -166,12 +172,13 @@ extern	struct protosw inetsw[];
  * The mbuf opt, if present, will not be freed.
  */
 int
-ip_output(m0, opt, ro, flags, imo)
+ip_output(m0, opt, ro, flags, imo, inp)
 	struct mbuf *m0;
 	struct mbuf *opt;
 	struct route *ro;
 	int flags;
 	struct ip_moptions *imo;
+	struct inpcb *inp;
 {
 	struct ip *ip, *mhip;
 	struct ifnet *ifp = NULL;	/* keep compiler happy */
@@ -184,9 +191,16 @@ ip_output(m0, opt, ro, flags, imo)
 	struct in_addr pkt_dst;
 #ifdef IPSEC
 	struct route iproute;
-	struct socket *so = NULL;
 	struct secpolicy *sp = NULL;
+	struct socket *so = inp ? inp->inp_socket : NULL;
 #endif
+#ifdef FAST_IPSEC
+	struct route iproute;
+	struct m_tag *mtag;
+	struct secpolicy *sp = NULL;
+	struct tdb_ident *tdbi;
+	int s;
+#endif /* FAST_IPSEC */
 	struct ip_fw_args args;
 	int src_was_INADDR_ANY = 0;	/* as the name says... */
 
@@ -230,14 +244,11 @@ ip_output(m0, opt, ro, flags, imo)
 	m = m0;
 
 	KASSERT(!m || (m->m_flags & M_PKTHDR) != 0, ("ip_output: no HDR"));
-
+#ifndef FAST_IPSEC
 	KASSERT(ro != NULL, ("ip_output: no route, proto %d",
 	    mtod(m, struct ip *)->ip_p));
-
-#ifdef IPSEC
-	so = ipsec_getsocket(m);
-	(void)ipsec_setsocket(m, NULL);
 #endif
+
 	if (args.rule != NULL) {	/* dummynet already saw us */
 		ip = mtod(m, struct ip *);
 		hlen = IP_VHL_HL(ip->ip_vhl) << 2 ;
@@ -247,8 +258,10 @@ ip_output(m0, opt, ro, flags, imo)
 	}
 
 	if (opt) {
+		len = 0;
 		m = ip_insertoptions(m, opt, &len);
-		hlen = len;
+		if (len != 0)
+			hlen = len;
 	}
 	ip = mtod(m, struct ip *);
 	pkt_dst = args.next_hop ? args.next_hop->sin_addr : ip->ip_dst;
@@ -269,6 +282,12 @@ ip_output(m0, opt, ro, flags, imo)
 		hlen = IP_VHL_HL(ip->ip_vhl) << 2;
 	}
 
+#ifdef FAST_IPSEC
+	if (ro == NULL) {
+		ro = &iproute;
+		bzero(ro, sizeof (*ro));
+	}
+#endif /* FAST_IPSEC */
 	dst = (struct sockaddr_in *)&ro->ro_dst;
 	/*
 	 * If there is a cached route,
@@ -366,7 +385,9 @@ ip_output(m0, opt, ro, flags, imo)
 			ip->ip_ttl = imo->imo_multicast_ttl;
 			if (imo->imo_multicast_vif != -1)
 				ip->ip_src.s_addr =
-				    ip_mcast_src(imo->imo_multicast_vif);
+				    ip_mcast_src ?
+				    ip_mcast_src(imo->imo_multicast_vif) :
+				    INADDR_ANY;
 		} else
 			ip->ip_ttl = IP_DEFAULT_MULTICAST_TTL;
 		/*
@@ -414,14 +435,15 @@ ip_output(m0, opt, ro, flags, imo)
 			 */
 			if (ip_mrouter && (flags & IP_FORWARDING) == 0) {
 				/*
-				 * Check if rsvp daemon is running. If not, don't
+				 * If rsvp daemon is not running, do not
 				 * set ip_moptions. This ensures that the packet
 				 * is multicast and not just sent down one link
 				 * as prescribed by rsvpd.
 				 */
 				if (!rsvp_on)
-				  imo = NULL;
-				if (ip_mforward(ip, ifp, m, imo) != 0) {
+					imo = NULL;
+				if (ip_mforward &&
+				    ip_mforward(ip, ifp, m, imo) != 0) {
 					m_freem(m);
 					goto done;
 				}
@@ -629,7 +651,128 @@ sendit:
 	ip->ip_off = ntohs(ip->ip_off);
 skip_ipsec:
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+	/*
+	 * Check the security policy (SP) for the packet and, if
+	 * required, do IPsec-related processing.  There are two
+	 * cases here; the first time a packet is sent through
+	 * it will be untagged and handled by ipsec4_checkpolicy.
+	 * If the packet is resubmitted to ip_output (e.g. after
+	 * AH, ESP, etc. processing), there will be a tag to bypass
+	 * the lookup and related policy checking.
+	 */
+	mtag = m_tag_find(m, PACKET_TAG_IPSEC_PENDING_TDB, NULL);
+	s = splnet();
+	if (mtag != NULL) {
+		tdbi = (struct tdb_ident *)(mtag + 1);
+		sp = ipsec_getpolicy(tdbi, IPSEC_DIR_OUTBOUND);
+		if (sp == NULL)
+			error = -EINVAL;	/* force silent drop */
+		m_tag_delete(m, mtag);
+	} else {
+		sp = ipsec4_checkpolicy(m, IPSEC_DIR_OUTBOUND, flags,
+					&error, inp);
+	}
+	/*
+	 * There are four return cases:
+	 *    sp != NULL	 	    apply IPsec policy
+	 *    sp == NULL, error == 0	    no IPsec handling needed
+	 *    sp == NULL, error == -EINVAL  discard packet w/o error
+	 *    sp == NULL, error != 0	    discard packet, report error
+	 */
+	if (sp != NULL) {
+		/* Loop detection, check if ipsec processing already done */
+		KASSERT(sp->req != NULL, ("ip_output: no ipsec request"));
+		for (mtag = m_tag_first(m); mtag != NULL;
+		     mtag = m_tag_next(m, mtag)) {
+			if (mtag->m_tag_cookie != MTAG_ABI_COMPAT)
+				continue;
+			if (mtag->m_tag_id != PACKET_TAG_IPSEC_OUT_DONE &&
+			    mtag->m_tag_id != PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED)
+				continue;
+			/*
+			 * Check if policy has an SA associated with it.
+			 * This can happen when an SP has yet to acquire
+			 * an SA; e.g. on first reference.  If it occurs,
+			 * then we let ipsec4_process_packet do its thing.
+			 */
+			if (sp->req->sav == NULL)
+				break;
+			tdbi = (struct tdb_ident *)(mtag + 1);
+			if (tdbi->spi == sp->req->sav->spi &&
+			    tdbi->proto == sp->req->sav->sah->saidx.proto &&
+			    bcmp(&tdbi->dst, &sp->req->sav->sah->saidx.dst,
+				 sizeof (union sockaddr_union)) == 0) {
+				/*
+				 * No IPsec processing is needed, free
+				 * reference to SP.
+				 *
+				 * NB: null pointer to avoid free at
+				 *     done: below.
+				 */
+				KEY_FREESP(&sp), sp = NULL;
+				splx(s);
+				goto spd_done;
+			}
+		}
 
+		/*
+		 * Do delayed checksums now because we send before
+		 * this is done in the normal processing path.
+		 */
+		if (m->m_pkthdr.csum_flags & CSUM_DELAY_DATA) {
+			in_delayed_cksum(m);
+			m->m_pkthdr.csum_flags &= ~CSUM_DELAY_DATA;
+		}
+
+		ip->ip_len = htons(ip->ip_len);
+		ip->ip_off = htons(ip->ip_off);
+
+		/* NB: callee frees mbuf */
+		error = ipsec4_process_packet(m, sp->req, flags, 0);
+		/*
+		 * Preserve KAME behaviour: ENOENT can be returned
+		 * when an SA acquire is in progress.  Don't propagate
+		 * this to user-level; it confuses applications.
+		 *
+		 * XXX this will go away when the SADB is redone.
+		 */
+		if (error == ENOENT)
+			error = 0;
+		splx(s);
+		goto done;
+	} else {
+		splx(s);
+
+		if (error != 0) {
+			/*
+			 * Hack: -EINVAL is used to signal that a packet
+			 * should be silently discarded.  This is typically
+			 * because we asked key management for an SA and
+			 * it was delayed (e.g. kicked up to IKE).
+			 */
+			if (error == -EINVAL)
+				error = 0;
+			goto bad;
+		} else {
+			/* No IPsec processing for this packet. */
+		}
+#ifdef notyet
+		/*
+		 * If deferred crypto processing is needed, check that
+		 * the interface supports it.
+		 */ 
+		mtag = m_tag_find(m, PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED, NULL);
+		if (mtag != NULL && (ifp->if_capenable & IFCAP_IPSEC) == 0) {
+			/* notify IPsec to do its own crypto */
+			ipsp_skipcrypto_unmark((struct tdb_ident *)(mtag + 1));
+			error = EHOSTUNREACH;
+			goto bad;
+		}
+#endif
+	}
+spd_done:
+#endif /* FAST_IPSEC */
 	/*
 	 * IpHack's section.
 	 * - Xlate: translate packet's addr/port (NAT).
@@ -1085,6 +1228,14 @@ done:
 		key_freesp(sp);
 	}
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+	if (ro == &iproute && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = NULL;
+	}
+	if (sp != NULL)
+		KEY_FREESP(&sp);
+#endif /* FAST_IPSEC */
 	return (error);
 bad:
 	m_freem(m);
@@ -1137,14 +1288,18 @@ ip_insertoptions(m, opt, phlen)
 	unsigned optlen;
 
 	optlen = opt->m_len - sizeof(p->ipopt_dst);
-	if (optlen + (u_short)ip->ip_len > IP_MAXPACKET)
+	if (optlen + (u_short)ip->ip_len > IP_MAXPACKET) {
+		*phlen = 0;
 		return (m);		/* XXX should fail */
+	}
 	if (p->ipopt_dst.s_addr)
 		ip->ip_dst = p->ipopt_dst;
 	if (m->m_flags & M_EXT || m->m_data - optlen < m->m_pktdat) {
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
-		if (n == 0)
+		if (n == 0) {
+			*phlen = 0;
 			return (m);
+		}
 		n->m_pkthdr.rcvif = (struct ifnet *)0;
 		n->m_pkthdr.len = m->m_pkthdr.len + optlen;
 		m->m_len -= sizeof(struct ip);
@@ -1352,7 +1507,7 @@ ip_ctloutput(so, sopt)
 			}
 			break;
 
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req;
@@ -1456,7 +1611,7 @@ ip_ctloutput(so, sopt)
 			error = ip_getmoptions(sopt, inp->inp_moptions);
 			break;
 
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req = NULL;

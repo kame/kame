@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.16 2002/08/07 16:14:47 luigi Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.18 2003/01/24 05:11:34 sam Exp $
  */
 
 /*
@@ -111,6 +111,10 @@
 #include <netinet/icmp_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#endif /*FAST_IPSEC*/
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -470,6 +474,12 @@ udp_input(m, off)
 					/* do not inject data to pcb */
 				else
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+				/* check AH/ESP integrity. */
+				if (ipsec4_in_reject(m, last))
+					;
+				else
+#endif /*FAST_IPSEC*/
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL)
 					udp_append(last, ip, n,
 						   iphlen +
@@ -510,6 +520,11 @@ udp_input(m, off)
 			goto bad;
 		}
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+		/* check AH/ESP integrity. */
+		if (ipsec4_in_reject(m, last))
+			goto bad;
+#endif /*FAST_IPSEC*/
 		udp_append(last, ip, m, iphlen + sizeof(struct udphdr));
 		return;
 	}
@@ -550,6 +565,10 @@ udp_input(m, off)
 		goto bad;
 	}
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+	if (ipsec4_in_reject(m, inp))
+		goto bad;
+#endif /*FAST_IPSEC*/
 
 	/*
 	 * Construct sockaddr format source address.
@@ -921,15 +940,9 @@ udp_output(inp, m, addr, control, p)
 	((struct ip *)ui)->ip_tos = inp->inp_ip_tos;	/* XXX */
 	udpstat.udps_opackets++;
 
-#ifdef IPSEC
-	if (ipsec_setsocket(m, inp->inp_socket) != 0) {
-		error = ENOBUFS;
-		goto release;
-	}
-#endif /*IPSEC*/
 	error = ip_output(m, inp->inp_options, &inp->inp_route,
 	    (inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST)),
-	    inp->inp_moptions);
+	    inp->inp_moptions, inp);
 
 	if (addr) {
 		in_pcbdisconnect(inp);

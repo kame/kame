@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.8 2002/04/28 05:40:26 suz Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.54 2002/10/09 10:28:08 suz Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.1.1.6 2003/04/09 04:17:19 suz Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,6 +109,13 @@
 #include <netinet6/ah.h>
 #include <netkey/key.h>
 #endif /* IPSEC */
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/ipsec6.h>
+#include <netipsec/key.h>
+#define	IPSEC
+#endif /* FAST_IPSEC */
 
 struct	in6_addr zeroin6_addr;
 

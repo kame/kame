@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.13 2002/04/19 05:52:15 nsouch Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.14 2002/11/27 18:28:26 imp Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -990,7 +990,7 @@ isab_probe(device_t dev)
 
 		if (!devclass_get_device(devclass_find("isa"), 0))
 			device_add_child(dev, "isa", -1);
-		return 0;
+		return -1000;
 	}
 	return ENXIO;
 }

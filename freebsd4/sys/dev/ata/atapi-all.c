@@ -25,13 +25,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-all.c,v 1.46.2.17 2002/09/16 19:37:53 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-all.c,v 1.46.2.18 2002/10/31 23:10:33 thomas Exp $
  */
 
 #include "opt_ata.h"
 #include "atapicd.h"
 #include "atapifd.h"
 #include "atapist.h"
+#include "atapicam.h"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ata.h>
@@ -51,7 +52,6 @@ static void atapi_read(struct atapi_request *, int);
 static void atapi_write(struct atapi_request *, int);
 static void atapi_finish(struct atapi_request *);
 static void atapi_timeout(struct atapi_request *);
-static char *atapi_type(int);
 static char *atapi_cmd2str(u_int8_t);
 static char *atapi_skey2str(u_int8_t);
 
@@ -115,11 +115,12 @@ atapi_attach(struct ata_device *atadev)
 	break; 
 #endif
     }
-    ata_prtdev(atadev, "<%.40s/%.8s> %s device - NO DRIVER!\n",
-	       atadev->param->model, atadev->param->revision, 
-	       atapi_type(atadev->param->type));
+#if NATAPICAM == 0
+    ata_prtdev(atadev, "<%.40s/%.8s> - NO DRIVER!\n",
+	       atadev->param->model, atadev->param->revision);
     free(atadev->result, M_ATAPI);
     atadev->driver = NULL;
+#endif
 }
 
 void
@@ -641,23 +642,6 @@ atapi_timeout(struct atapi_request *request)
 	wakeup((caddr_t)request);
     } 
     ata_reinit(atadev->channel);
-}
-
-static char *
-atapi_type(int type)
-{
-    switch (type) {
-    case ATAPI_TYPE_CDROM:
-	return "CDROM";
-    case ATAPI_TYPE_DIRECT:
-	return "floppy";
-    case ATAPI_TYPE_TAPE:
-	return "tape";
-    case ATAPI_TYPE_OPTICAL:
-	return "optical";
-    default:
-	return "Unknown";
-    }
 }
 
 static char *

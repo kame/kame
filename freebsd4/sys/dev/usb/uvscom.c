@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/uvscom.c,v 1.1 2002/03/18 18:23:39 joe Exp $
+ * $FreeBSD: src/sys/dev/usb/uvscom.c,v 1.9.2.3 2003/02/13 13:03:25 sanpei Exp $
  */
 
 /*
@@ -203,16 +203,18 @@ struct ucom_callback uvscom_callback = {
 	NULL
 };
 
-static const struct uvscom_product {
-	uint16_t	vendor;
-	uint16_t	product;
-} uvscom_products [] = {
+static const struct usb_devno uvscom_devs [] = {
+	/* SUNTAC U-Cable type D2 */
+	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_DS96L },
+	/* SUNTAC Ir-Trinity */
+	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_IS96U },
 	/* SUNTAC U-Cable type P1 */
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_PS64P1 },
 	/* SUNTAC Slipper U  */
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_VS10U },
 	{ 0, 0 }
 };
+#define uvscom_lookup(v, p) usb_lookup(uvscom_devs, v, p)
 
 Static device_probe_t uvscom_match;
 Static device_attach_t uvscom_attach;
@@ -239,18 +241,12 @@ MODULE_VERSION(uvscom, UVSCOM_MODVER);
 USB_MATCH(uvscom)
 {
 	USB_MATCH_START(uvscom, uaa);
-	int i;
 
 	if (uaa->iface != NULL)
 		return (UMATCH_NONE);
 
-	for (i = 0; uvscom_products[i].vendor != 0; i++) {
-		if (uvscom_products[i].vendor == uaa->vendor &&
-		    uvscom_products[i].product == uaa->product) {
-			return (UMATCH_VENDOR_PRODUCT);
-		}
-	}
-	return (UMATCH_NONE);
+	return (uvscom_lookup(uaa->vendor, uaa->product) != NULL ?
+		UMATCH_VENDOR_PRODUCT : UMATCH_NONE);
 }
 
 USB_ATTACH(uvscom)

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.4 2000/07/17 21:24:28 archie Exp $
+ * $FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.6 2002/11/06 14:23:20 joe Exp $
  */
 
 /*
@@ -79,7 +79,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.4 2000/07/17 21:24:28 archie Exp $";
+  "$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.7.2.6 2002/11/06 14:23:20 joe Exp $";
 #endif
 
 /*
@@ -94,41 +94,37 @@ Static struct cue_type cue_devs[] = {
 
 Static struct usb_qdat cue_qdat;
 
-Static int cue_match		__P((device_t));
-Static int cue_attach		__P((device_t));
-Static int cue_detach		__P((device_t));
+Static int cue_match(device_t);
+Static int cue_attach(device_t);
+Static int cue_detach(device_t);
 
-Static int cue_tx_list_init	__P((struct cue_softc *));
-Static int cue_rx_list_init	__P((struct cue_softc *));
-Static int cue_newbuf		__P((struct cue_softc *, struct cue_chain *,
-				    struct mbuf *));
-Static int cue_encap		__P((struct cue_softc *, struct mbuf *, int));
-Static void cue_rxeof		__P((usbd_xfer_handle,
-				    usbd_private_handle, usbd_status));
-Static void cue_txeof		__P((usbd_xfer_handle,
-				    usbd_private_handle, usbd_status));
-Static void cue_tick		__P((void *));
-Static void cue_rxstart		__P((struct ifnet *));
-Static void cue_start		__P((struct ifnet *));
-Static int cue_ioctl		__P((struct ifnet *, u_long, caddr_t));
-Static void cue_init		__P((void *));
-Static void cue_stop		__P((struct cue_softc *));
-Static void cue_watchdog		__P((struct ifnet *));
-Static void cue_shutdown		__P((device_t));
+Static int cue_tx_list_init(struct cue_softc *);
+Static int cue_rx_list_init(struct cue_softc *);
+Static int cue_newbuf(struct cue_softc *, struct cue_chain *, struct mbuf *);
+Static int cue_encap(struct cue_softc *, struct mbuf *, int);
+Static void cue_rxeof(usbd_xfer_handle, usbd_private_handle, usbd_status);
+Static void cue_txeof(usbd_xfer_handle, usbd_private_handle, usbd_status);
+Static void cue_tick(void *);
+Static void cue_rxstart(struct ifnet *);
+Static void cue_start(struct ifnet *);
+Static int cue_ioctl(struct ifnet *, u_long, caddr_t);
+Static void cue_init(void *);
+Static void cue_stop(struct cue_softc *);
+Static void cue_watchdog(struct ifnet *);
+Static void cue_shutdown(device_t);
 
-Static void cue_setmulti	__P((struct cue_softc *));
-Static u_int32_t cue_crc	__P((caddr_t));
-Static void cue_reset		__P((struct cue_softc *));
+Static void cue_setmulti(struct cue_softc *);
+Static u_int32_t cue_crc(caddr_t);
+Static void cue_reset(struct cue_softc *);
 
-Static int csr_read_1		__P((struct cue_softc *, int));
-Static int csr_write_1		__P((struct cue_softc *, int, int));
-Static int csr_read_2		__P((struct cue_softc *, int));
+Static int csr_read_1(struct cue_softc *, int);
+Static int csr_write_1(struct cue_softc *, int, int);
+Static int csr_read_2(struct cue_softc *, int);
 #ifdef notdef
-Static int csr_write_2		__P((struct cue_softc *, int, int));
+Static int csr_write_2(struct cue_softc *, int, int);
 #endif
-Static int cue_mem		__P((struct cue_softc *, int,
-				    int, void *, int));
-Static int cue_getmac		__P((struct cue_softc *, void *));
+Static int cue_mem(struct cue_softc *, int, int, void *, int);
+Static int cue_getmac(struct cue_softc *, void *);
 
 Static device_method_t cue_methods[] = {
 	/* Device interface */
@@ -156,9 +152,8 @@ DRIVER_MODULE(if_cue, uhub, cue_driver, cue_devclass, usbd_driver_load, 0);
 #define CUE_CLRBIT(sc, reg, x)				\
 	csr_write_1(sc, reg, csr_read_1(sc, reg) & ~(x))
 
-Static int csr_read_1(sc, reg)
-	struct cue_softc	*sc;
-	int			reg;
+Static int
+csr_read_1(struct cue_softc *sc, int reg)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
@@ -187,9 +182,8 @@ Static int csr_read_1(sc, reg)
 	return(val);
 }
 
-Static int csr_read_2(sc, reg)
-	struct cue_softc	*sc;
-	int			reg;
+Static int
+csr_read_2(struct cue_softc *sc, int reg)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
@@ -218,9 +212,8 @@ Static int csr_read_2(sc, reg)
 	return(val);
 }
 
-Static int csr_write_1(sc, reg, val)
-	struct cue_softc	*sc;
-	int			reg, val;
+Static int
+csr_write_1(struct cue_softc *sc, int reg, int val)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
@@ -249,9 +242,8 @@ Static int csr_write_1(sc, reg, val)
 }
 
 #ifdef notdef
-Static int csr_write_2(sc, reg, val)
-	struct cue_softc	*sc;
-	int			reg, val;
+Static int
+csr_write_2(struct cue_softc *sc, int reg, int val)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
@@ -280,12 +272,8 @@ Static int csr_write_2(sc, reg, val)
 }
 #endif
 
-Static int cue_mem(sc, cmd, addr, buf, len)
-	struct cue_softc	*sc;
-	int			cmd;
-	int			addr;
-	void			*buf;
-	int			len;
+Static int
+cue_mem(struct cue_softc *sc, int cmd, int addr, void *buf, int len)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
@@ -316,9 +304,8 @@ Static int cue_mem(sc, cmd, addr, buf, len)
 	return(0);
 }
 
-Static int cue_getmac(sc, buf)
-	struct cue_softc	*sc;
-	void			*buf;
+Static int
+cue_getmac(struct cue_softc *sc, void *buf)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
@@ -351,8 +338,8 @@ Static int cue_getmac(sc, buf)
 #define CUE_POLY	0xEDB88320
 #define CUE_BITS	9
 
-Static u_int32_t cue_crc(addr)
-	caddr_t			addr;
+Static u_int32_t
+cue_crc(caddr_t addr)
 {
 	u_int32_t		idx, bit, data, crc;
 
@@ -367,8 +354,8 @@ Static u_int32_t cue_crc(addr)
 	return (crc & ((1 << CUE_BITS) - 1));
 }
 
-Static void cue_setmulti(sc)
-	struct cue_softc	*sc;
+Static void
+cue_setmulti(struct cue_softc *sc)
 {
 	struct ifnet		*ifp;
 	struct ifmultiaddr	*ifma;
@@ -412,8 +399,8 @@ Static void cue_setmulti(sc)
 	return;
 }
 
-Static void cue_reset(sc)
-	struct cue_softc	*sc;
+Static void
+cue_reset(struct cue_softc *sc)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
@@ -567,8 +554,8 @@ USB_ATTACH(cue)
 	USB_ATTACH_SUCCESS_RETURN;
 }
 
-Static int cue_detach(dev)
-	device_t		dev;
+Static int
+cue_detach(device_ptr_t dev)
 {
 	struct cue_softc	*sc;
 	struct ifnet		*ifp;
@@ -598,10 +585,8 @@ Static int cue_detach(dev)
 /*
  * Initialize an RX descriptor and attach an MBUF cluster.
  */
-Static int cue_newbuf(sc, c, m)
-	struct cue_softc	*sc;
-	struct cue_chain	*c;
-	struct mbuf		*m;
+Static int
+cue_newbuf(struct cue_softc *sc, struct cue_chain *c, struct mbuf *m)
 {
 	struct mbuf		*m_new = NULL;
 
@@ -633,8 +618,8 @@ Static int cue_newbuf(sc, c, m)
 	return(0);
 }
 
-Static int cue_rx_list_init(sc)
-	struct cue_softc	*sc;
+Static int
+cue_rx_list_init(struct cue_softc *sc)
 {
 	struct cue_cdata	*cd;
 	struct cue_chain	*c;
@@ -657,8 +642,8 @@ Static int cue_rx_list_init(sc)
 	return(0);
 }
 
-Static int cue_tx_list_init(sc)
-	struct cue_softc	*sc;
+Static int
+cue_tx_list_init(struct cue_softc *sc)
 {
 	struct cue_cdata	*cd;
 	struct cue_chain	*c;
@@ -683,8 +668,8 @@ Static int cue_tx_list_init(sc)
 	return(0);
 }
 
-Static void cue_rxstart(ifp)
-	struct ifnet		*ifp;
+Static void
+cue_rxstart(struct ifnet *ifp)
 {
 	struct cue_softc	*sc;
 	struct cue_chain	*c;
@@ -710,10 +695,8 @@ Static void cue_rxstart(ifp)
  * A frame has been uploaded: pass the resulting mbuf chain up to
  * the higher level protocols.
  */
-Static void cue_rxeof(xfer, priv, status)
-	usbd_xfer_handle	xfer;
-	usbd_private_handle	priv;
-	usbd_status		status;
+Static void
+cue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 {
 	struct cue_softc	*sc;
 	struct cue_chain	*c;
@@ -776,10 +759,8 @@ done:
  * the list buffers.
  */
 
-Static void cue_txeof(xfer, priv, status)
-	usbd_xfer_handle	xfer;
-	usbd_private_handle	priv;
-	usbd_status		status;
+Static void
+cue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 {
 	struct cue_softc	*sc;
 	struct cue_chain	*c;
@@ -826,8 +807,8 @@ Static void cue_txeof(xfer, priv, status)
 	return;
 }
 
-Static void cue_tick(xsc)
-	void			*xsc;
+Static void
+cue_tick(void *xsc)
 {
 	struct cue_softc	*sc;
 	struct ifnet		*ifp;
@@ -858,10 +839,8 @@ Static void cue_tick(xsc)
 	return;
 }
 
-Static int cue_encap(sc, m, idx)
-	struct cue_softc	*sc;
-	struct mbuf		*m;
-	int			idx;
+Static int
+cue_encap(struct cue_softc *sc, struct mbuf *m, int idx)
 {
 	int			total_len;
 	struct cue_chain	*c;
@@ -897,8 +876,8 @@ Static int cue_encap(sc, m, idx)
 	return(0);
 }
 
-Static void cue_start(ifp)
-	struct ifnet		*ifp;
+Static void
+cue_start(struct ifnet *ifp)
 {
 	struct cue_softc	*sc;
 	struct mbuf		*m_head = NULL;
@@ -936,8 +915,8 @@ Static void cue_start(ifp)
 	return;
 }
 
-Static void cue_init(xsc)
-	void			*xsc;
+Static void
+cue_init(void *xsc)
 {
 	struct cue_softc	*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
@@ -1039,10 +1018,8 @@ Static void cue_init(xsc)
 	return;
 }
 
-Static int cue_ioctl(ifp, command, data)
-	struct ifnet		*ifp;
-	u_long			command;
-	caddr_t			data;
+Static int
+cue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct cue_softc	*sc = ifp->if_softc;
 	int			s, error = 0;
@@ -1091,8 +1068,8 @@ Static int cue_ioctl(ifp, command, data)
 	return(error);
 }
 
-Static void cue_watchdog(ifp)
-	struct ifnet		*ifp;
+Static void
+cue_watchdog(struct ifnet *ifp)
 {
 	struct cue_softc	*sc;
 	struct cue_chain	*c;
@@ -1117,8 +1094,8 @@ Static void cue_watchdog(ifp)
  * Stop the adapter and free any mbufs allocated to the
  * RX and TX lists.
  */
-Static void cue_stop(sc)
-	struct cue_softc	*sc;
+Static void
+cue_stop(struct cue_softc *sc)
 {
 	usbd_status		err;
 	struct ifnet		*ifp;
@@ -1215,8 +1192,8 @@ Static void cue_stop(sc)
  * Stop all chip I/O so that the kernel's probe routines don't
  * get confused by errant DMAs when rebooting.
  */
-Static void cue_shutdown(dev)
-	device_t		dev;
+Static void
+cue_shutdown(device_ptr_t dev)
 {
 	struct cue_softc	*sc;
 

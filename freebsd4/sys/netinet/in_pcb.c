@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.24 2002/08/08 16:44:57 ume Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.26 2003/01/24 05:11:33 sam Exp $
  */
 
 /*
@@ -107,6 +107,16 @@
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #endif /* IPSEC */
+
+#ifdef FAST_IPSEC
+#if defined(IPSEC) || defined(IPSEC_ESP)
+#error "Bad idea: don't compile with both IPSEC and FAST_IPSEC!"
+#endif
+
+#include <netipsec/ipsec.h>
+#include <netipsec/key.h>
+#define	IPSEC
+#endif /* FAST_IPSEC */
 
 struct	in_addr zeroin_addr;
 
@@ -262,6 +272,7 @@ in_pcbbind(inp, nam, p)
 				reuseport = SO_REUSEADDR|SO_REUSEPORT;
 		} else if (sin->sin_addr.s_addr != INADDR_ANY) {
 			sin->sin_port = 0;		/* yech... */
+			bzero(&sin->sin_zero, sizeof(sin->sin_zero));
 			if (ifa_ifwithaddr((struct sockaddr *)sin) == 0)
 				return (EADDRNOTAVAIL);
 		}

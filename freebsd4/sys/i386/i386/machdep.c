@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.25 2002/09/24 08:12:21 mdodd Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.28 2003/01/22 20:14:52 jhb Exp $
  */
 
 #include "apm.h"
@@ -120,7 +120,6 @@ extern void init386 __P((int first));
 extern void dblfault_handler __P((void));
 
 extern void printcpuinfo(void);	/* XXX header file */
-extern void earlysetcpuclass(void);	/* same header file */
 extern void finishidentcpu(void);
 extern void panicifcpuunsupported(void);
 extern void initializecpu(void);
@@ -260,7 +259,6 @@ cpu_startup(dummy)
 	 * Good {morning,afternoon,evening,night}.
 	 */
 	printf("%s", version);
-	earlysetcpuclass();
 	startrtclock();
 	printcpuinfo();
 	panicifcpuunsupported();
@@ -1451,6 +1449,7 @@ static void
 getmemsize(int first)
 {
 	int i, physmap_idx, pa_indx;
+	int hasbrokenint12;
 	u_int basemem, extmem;
 	struct vm86frame vmf;
 	struct vm86context vmc;
@@ -1463,8 +1462,20 @@ getmemsize(int first)
 		u_int32_t type;
 	} *smap;
 
+	hasbrokenint12 = 0;
+	TUNABLE_INT_FETCH("hw.hasbrokenint12", &hasbrokenint12);
 	bzero(&vmf, sizeof(struct vm86frame));
 	bzero(physmap, sizeof(physmap));
+	basemem = 0;
+
+	/*
+	 * Some newer BIOSes has broken INT 12H implementation which cause
+	 * kernel panic immediately. In this case, we need to scan SMAP
+	 * with INT 15:E820 first, then determine base memory size.
+	 */
+	if (hasbrokenint12) {
+		goto int15e820;
+	}
 
 	/*
 	 * Perform "base memory" related probes & setup
@@ -1511,6 +1522,7 @@ getmemsize(int first)
 	for (i = basemem / 4; i < 160; i++)
 		pte[i] = (i << PAGE_SHIFT) | PG_V | PG_RW | PG_U;
 
+int15e820:
 	/*
 	 * map page 1 R/W into the kernel page table so we can use it
 	 * as a buffer.  The kernel will unmap this page later.
@@ -1581,6 +1593,38 @@ getmemsize(int first)
 		physmap[physmap_idx + 1] = smap->base + smap->length;
 next_run:
 	} while (vmf.vmf_ebx != 0);
+
+	/*
+	 * Perform "base memory" related probes & setup based on SMAP
+	 */
+	if (basemem == 0) {
+		for (i = 0; i <= physmap_idx; i += 2) {
+			if (physmap[i] == 0x00000000) {
+				basemem = physmap[i + 1] / 1024;
+				break;
+			}
+		}
+
+		if (basemem == 0) {
+			basemem = 640;
+		}
+
+		if (basemem > 640) {
+			printf("Preposterous BIOS basemem of %uK, truncating to 640K\n",
+				basemem);
+			basemem = 640;
+		}
+
+		for (pa = trunc_page(basemem * 1024);
+		     pa < ISA_HOLE_START; pa += PAGE_SIZE) {
+			pte = (pt_entry_t)vtopte(pa + KERNBASE);
+			*pte = pa | PG_RW | PG_V;
+		}
+
+		pte = (pt_entry_t)vm86paddr;
+		for (i = basemem / 4; i < 160; i++)
+			pte[i] = (i << PAGE_SHIFT) | PG_V | PG_RW | PG_U;
+	}
 
 	if (physmap[1] != 0)
 		goto physmap_done;

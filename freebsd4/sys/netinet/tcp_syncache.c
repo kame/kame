@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.5.2.8 2002/08/18 22:04:47 silby Exp $
+ * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.5.2.14 2003/02/24 04:02:27 silby Exp $
  */
 
 #include "opt_inet6.h"
@@ -78,6 +78,15 @@
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #endif /*IPSEC*/
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#ifdef INET6
+#include <netipsec/ipsec6.h>
+#endif
+#include <netipsec/key.h>
+#define	IPSEC
+#endif /*FAST_IPSEC*/
 
 #include <machine/in_cksum.h>
 #include <vm/vm_zone.h>
@@ -238,7 +247,7 @@ syncache_init(void)
 	/* Allocate the hash table. */
 	MALLOC(tcp_syncache.hashbase, struct syncache_head *,
 	    tcp_syncache.hashsize * sizeof(struct syncache_head),
-	    M_SYNCACHE, M_WAITOK | M_ZERO);
+	    M_SYNCACHE, M_WAITOK);
 
 	/* Initialize the hash buckets. */
 	for (i = 0; i < tcp_syncache.hashsize; i++) {
@@ -923,6 +932,8 @@ syncache_add(inc, to, th, sop, m)
 		sc->sc_route.ro_rt = NULL;
 	}
 	sc->sc_irs = th->th_seq;
+	sc->sc_flags = 0;
+	sc->sc_peer_mss = to->to_flags & TOF_MSS ? to->to_mss : 0;
 	if (tcp_syncookies)
 		sc->sc_iss = syncookie_generate(sc);
 	else
@@ -934,8 +945,6 @@ syncache_add(inc, to, th, sop, m)
 	win = imin(win, TCP_MAXWIN);
 	sc->sc_wnd = win;
 
-	sc->sc_flags = 0;
-	sc->sc_peer_mss = to->to_flags & TOF_MSS ? to->to_mss : 0;
 	if (tcp_do_rfc1323) {
 		/*
 		 * A timestamp received in a SYN makes
@@ -1107,14 +1116,6 @@ syncache_respond(sc, m)
 	m->m_pkthdr.len = tlen;
 	m->m_pkthdr.rcvif = NULL;
 
-#ifdef IPSEC
-	/* use IPsec policy on listening socket to send SYN,ACK */
-	if (ipsec_setsocket(m, sc->sc_tp->t_inpcb->inp_socket) != 0) {
-		m_freem(m);
-		return (ENOBUFS);
-	}
-#endif
-
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
 		ip6 = mtod(m, struct ip6_hdr *);
@@ -1230,7 +1231,8 @@ no_options:
 			m_freem(m);
 			return(ENOBUFS); /* XXX */
 		}
-		error = ip6_output(m, NULL, ro6, 0, NULL, NULL);
+		error = ip6_output(m, NULL, ro6, 0, NULL, NULL,
+				sc->sc_tp->t_inpcb);
 	} else
 #endif
 	{
@@ -1238,7 +1240,8 @@ no_options:
 		    htons(tlen - hlen + IPPROTO_TCP));
 		m->m_pkthdr.csum_flags = CSUM_TCP;
 		m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
-		error = ip_output(m, sc->sc_ipopts, &sc->sc_route, 0, NULL);
+		error = ip_output(m, sc->sc_ipopts, &sc->sc_route, 0, NULL,
+				sc->sc_tp->t_inpcb);
 	}
 	return (error);
 }
@@ -1248,7 +1251,7 @@ no_options:
  *
  *	|. . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .|
  *	| peer iss                                                      |
- *	| MD5(laddr,faddr,lport,fport,secret)             |. . . . . . .|
+ *	| MD5(laddr,faddr,secret,lport,fport)             |. . . . . . .|
  *	|                     0                       |(A)|             |
  * (A): peer mss index
  */

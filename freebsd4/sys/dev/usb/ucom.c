@@ -1,5 +1,5 @@
 /*	$NetBSD: ucom.c,v 1.39 2001/08/16 22:31:24 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.15 2002/03/18 18:23:39 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ucom.c,v 1.24.2.2 2003/01/17 17:32:10 joe Exp $	*/
 
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -201,6 +201,9 @@ ucom_attach(struct ucom_softc *sc)
 int
 ucom_detach(struct ucom_softc *sc)
 {
+	struct tty *tp = sc->sc_tty;
+	int s;
+
 	DPRINTF(("ucom_detach: sc = %p, tp = %p\n", sc, sc->sc_tty));
 
 	sc->sc_dying = 1;
@@ -210,10 +213,27 @@ ucom_detach(struct ucom_softc *sc)
 	if (sc->sc_bulkout_pipe != NULL)
 		usbd_abort_pipe(sc->sc_bulkout_pipe);
 
-	if (sc->sc_tty == NULL) {
+	if (tp != NULL) {
+		if (tp->t_state & TS_ISOPEN) {
+			device_printf(sc->sc_dev,
+				      "still open, forcing close\n");
+			(*linesw[tp->t_line].l_close)(tp, 0);
+			tp->t_gen++;
+			ttyclose(tp);
+			ttwakeup(tp);
+			ttwwakeup(tp);
+		}
+	} else {
 		DPRINTF(("ucom_detach: no tty\n"));
 		return (0);
 	}
+
+	s = splusb();
+	if (--sc->sc_refcnt >= 0) {
+		/* Wait for processes to go away. */
+		usb_detach_wait(USBDEV(sc->sc_dev));
+	}
+	splx(s);
 
 	destroy_dev(sc->dev);
 

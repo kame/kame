@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.12 2002/09/03 19:53:04 jmallett Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.62 2003/02/18 04:29:28 suz Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.63 2003/04/09 07:11:12 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,11 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #endif /* IPSEC */
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/ipsec6.h>
+#endif /* FAST_IPSEC */
 
 /*
  * UDP protocol inplementation.
@@ -419,6 +424,14 @@ udp6_input(mp, offp, proto)
 					/* do not inject data into pcb */
 				else
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+				/*
+				 * Check AH/ESP integrity.
+				 */
+				if (ipsec6_in_reject(m, last))
+					;
+				else
+#endif /* FAST_IPSEC */
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 					/*
 					 * KAME NOTE: do not
@@ -482,6 +495,14 @@ udp6_input(mp, offp, proto)
 			goto bad;
 		}
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+		/*
+		 * Check AH/ESP integrity.
+		 */
+		if (ipsec6_in_reject(m, last)) {
+			goto bad;
+		}
+#endif /* FAST_IPSEC */
 		if (last->in6p_flags & IN6P_CONTROLOPTS
 		    || last->in6p_socket->so_options & SO_TIMESTAMP)
 			ip6_savecontrol(last, ip6, m, &opts);
@@ -530,6 +551,14 @@ udp6_input(mp, offp, proto)
 		goto bad;
 	}
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+	/*
+	 * Check AH/ESP integrity.
+	 */
+	if (ipsec6_in_reject(m, in6p)) {
+		goto bad;
+	}
+#endif /* FAST_IPSEC */
 
 	/*
 	 * Construct sockaddr format source address.

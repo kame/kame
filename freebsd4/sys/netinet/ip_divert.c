@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.42.2.5 2002/07/09 09:11:42 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.42.2.6 2003/01/23 21:06:45 sam Exp $
  */
 
 #include "opt_inet.h"
@@ -304,7 +304,7 @@ div_output(struct socket *so, struct mbuf *m,
 			    inp->inp_options, &inp->inp_route,
 			    (so->so_options & SO_DONTROUTE) |
 			    IP_ALLOWBROADCAST | IP_RAWOUTPUT,
-			    inp->inp_moptions);
+			    inp->inp_moptions, NULL);
 	} else {
 		if (m->m_pkthdr.rcvif == NULL) {
 			/*

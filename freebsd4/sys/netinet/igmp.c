@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
- * $FreeBSD: src/sys/netinet/igmp.c,v 1.29.2.1 2001/09/17 15:17:46 ru Exp $
+ * $FreeBSD: src/sys/netinet/igmp.c,v 1.29.2.2 2003/01/23 21:06:44 sam Exp $
  */
 
 /*
@@ -944,7 +944,7 @@ igmp_sendpkt(inm, type, addr)
 	 * XXX
 	 * Do we have to worry about reentrancy here?  Don't think so.
 	 */
-	ip_output(m, router_alert, &igmprt, 0, &imo);
+	ip_output(m, router_alert, &igmprt, 0, &imo, NULL);
 
 	++igmpstat.igps_snd_v1v2_reports;
 }
@@ -999,7 +999,7 @@ igmp_sendbuf(m, ifp)
 #else
 	imo.imo_multicast_loop = 0;
 #endif
-	ip_output(m, router_alert, &igmprt, 0, &imo);
+	ip_output(m, router_alert, &igmprt, 0, &imo, NULL);
 
 	++igmpstat.igps_snd_v3_reports;
 }
@@ -1484,6 +1484,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	}
 	inm->inm_state = IGMP_OTHERMEMBER;
 	inm->inm_timer = 0;
+        ip_output(m, router_alert, &igmprt, 0, &imo, NULL);
 
 	return 0;
 }

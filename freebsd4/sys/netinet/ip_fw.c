@@ -13,7 +13,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.35 2002/07/29 02:04:25 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.39 2003/01/20 02:23:07 iedowse Exp $
  */
 
 #define        DEB(x)
@@ -72,7 +72,6 @@ static int fw_verbose = 1;
 #else
 static int fw_verbose = 0;
 #endif
-int fw_one_pass = 1 ;
 #ifdef IPFIREWALL_VERBOSE_LIMIT
 static int fw_verbose_limit = IPFIREWALL_VERBOSE_LIMIT;
 #else
@@ -696,11 +695,11 @@ remove_dyn_rule(struct ip_fw *rule, int force)
 	    if (zap)
 		zap = force || TIME_LEQ( q->expire , time_second );
 	    /* do not zap parent in first pass, record we need a second pass */
-	    if (q->dyn_type == DYN_LIMIT_PARENT) {
+	    if (zap && q->dyn_type == DYN_LIMIT_PARENT) {
 		max_pass = 1; /* we need a second pass */
-		if (zap == 1 && (pass == 0 || q->count != 0) ) {
+		if (pass == 0 || q->count != 0) {
 		    zap = 0 ;
-		    if (pass == 1) /* should not happen */
+		    if (pass == 1 && force) /* should not happen */
 			printf("OUCH! cannot remove rule, count %d\n",
 				q->count);
 		}
@@ -987,8 +986,21 @@ install_state(struct ip_fw *rule, struct ip_fw_args *args)
 	}
 	if (parent->count >= conn_limit) {
 	    EXPIRE_DYN_CHAIN(rule); /* try to expire some */
+	    /*
+	     * The expiry might have removed the parent too.
+	     * We lookup again, which will re-create if necessary.
+	     */
+	    parent = lookup_dyn_parent(&id, rule);
+	    if (parent == NULL) {
+		printf("add parent failed\n");
+		return 1;
+	    }
 	    if (parent->count >= conn_limit) {
-		printf("drop session, too many entries\n");
+		if (fw_verbose && last_log != time_second) {
+			last_log = time_second;
+			log(LOG_SECURITY | LOG_DEBUG,
+			    "drop session, too many entries\n");
+		}
 		return 1;
 	    }
 	}
@@ -1531,6 +1543,11 @@ got_match:
 	    && (proto != IPPROTO_ICMP || is_icmp_query(ip))
 	    && !((*m)->m_flags & (M_BCAST|M_MCAST))
 	    && !IN_MULTICAST(ntohl(ip->ip_dst.s_addr))) {
+		/* Must convert to host order for icmp_error() etc. */
+		if (BRIDGED) {
+			ip->ip_len = ntohs(ip->ip_len);
+			ip->ip_off = ntohs(ip->ip_off);
+		}
 		switch (f->fw_reject_code) {
 		case IP_FW_REJECT_RST:
 		  {

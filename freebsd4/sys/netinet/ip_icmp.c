@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.17 2002/05/06 07:29:18 dd Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.19 2003/01/24 05:11:34 sam Exp $
  */
 
 #include "opt_ipsec.h"
@@ -61,6 +61,12 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#endif
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/key.h>
+#define	IPSEC
 #endif
 
 /*
@@ -762,7 +768,7 @@ icmp_send(m, opts, rt)
 		       buf, inet_ntoa(ip->ip_src));
 	}
 #endif
-	(void) ip_output(m, opts, rt, 0, NULL);
+	(void) ip_output(m, opts, rt, 0, NULL, NULL);
 }
 
 n_time

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.4 2001/12/16 15:46:08 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.6 2003/03/05 18:42:34 njl Exp $
  */
 
 /*
@@ -127,7 +127,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.4 2001/12/16 15:46:08 luigi Exp $";
+  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.6 2003/03/05 18:42:34 njl Exp $";
 #endif
 
 /*
@@ -430,9 +430,9 @@ static int wb_mii_readreg(sc, frame)
 	/* Check for ack */
 	SIO_CLR(WB_SIO_MII_CLK);
 	DELAY(1);
+	ack = CSR_READ_4(sc, WB_SIO) & WB_SIO_MII_DATAOUT;
 	SIO_SET(WB_SIO_MII_CLK);
 	DELAY(1);
-	ack = CSR_READ_4(sc, WB_SIO) & WB_SIO_MII_DATAOUT;
 	SIO_CLR(WB_SIO_MII_CLK);
 	DELAY(1);
 	SIO_SET(WB_SIO_MII_CLK);
@@ -957,10 +957,11 @@ static int wb_attach(dev)
 	 */
 	if (mii_phy_probe(dev, &sc->wb_miibus,
 	    wb_ifmedia_upd, wb_ifmedia_sts)) {
+		contigfree(sc->wb_ldata_ptr, sizeof(struct wb_list_data) + 8,
+		    M_DEVBUF);
 		bus_teardown_intr(dev, sc->wb_irq, sc->wb_intrhand);
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
 		bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
-		free(sc->wb_ldata_ptr, M_DEVBUF);
 		error = ENXIO;
 		goto fail;
 	}
@@ -1001,7 +1002,8 @@ static int wb_detach(dev)
 	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->wb_irq);
 	bus_release_resource(dev, WB_RES, WB_RID, sc->wb_res);
 
-	free(sc->wb_ldata_ptr, M_DEVBUF);
+	contigfree(sc->wb_ldata_ptr, sizeof(struct wb_list_data) + 8,
+	    M_DEVBUF);
 
 	splx(s);
 

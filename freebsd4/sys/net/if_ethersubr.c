@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.30 2002/08/30 14:23:38 sobomax Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.32 2002/12/06 05:08:35 cjc Exp $
  */
 
 #include "opt_atalk.h"
@@ -468,8 +468,8 @@ ether_ipfw_chk(struct mbuf **m0, struct ifnet *dst,
 	int i;
 	struct ip_fw_args args;
 
-	if (*rule != NULL) /* dummynet packet, already partially processed */
-		return 1; /* HACK! I should obey the fw_one_pass */
+	if (*rule != NULL && fw_one_pass)
+		return 1; /* dummynet packet, already partially processed */
 
 	/*
 	 * I need some amt of data to be contiguous, and in case others need
@@ -630,8 +630,7 @@ ether_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 				printf("bdg_forward drop MULTICAST PKT\n");
 			    return;
 			}
-			if (m != oldm) /* m changed! */
-			    eh = &save_eh ;
+			eh = &save_eh ;
 		}
 		if (bif == BDG_LOCAL
 		    || bif == BDG_BCAST

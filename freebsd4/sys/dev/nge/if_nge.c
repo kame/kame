@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.11 2002/08/15 16:38:55 ambrisko Exp $
+ * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.13 2003/02/05 22:03:57 mbr Exp $
  */
 
 /*
@@ -132,7 +132,7 @@ MODULE_DEPEND(nge, miibus, 1, 1, 1);
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.11 2002/08/15 16:38:55 ambrisko Exp $";
+  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.13 2003/02/05 22:03:57 mbr Exp $";
 #endif
 
 #define NGE_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
@@ -478,9 +478,9 @@ static int nge_mii_readreg(sc, frame)
 	/* Check for ack */
 	SIO_CLR(NGE_MEAR_MII_CLK);
 	DELAY(1);
+	ack = CSR_READ_4(sc, NGE_MEAR) & NGE_MEAR_MII_DATA;
 	SIO_SET(NGE_MEAR_MII_CLK);
 	DELAY(1);
-	ack = CSR_READ_4(sc, NGE_MEAR) & NGE_MEAR_MII_DATA;
 
 	/*
 	 * Now try reading data bits. If the ack failed, we still
@@ -1381,6 +1381,14 @@ static void nge_rxeof(sc)
 		struct mbuf		*m0 = NULL;
 		u_int32_t		extsts;
 
+#ifdef DEVICE_POLLING
+		if (ifp->if_ipending & IFF_POLLING) {
+			if (sc->rxcycles <= 0)
+				break;
+			sc->rxcycles--;
+		}
+#endif /* DEVICE_POLLING */
+
 		cur_rx = &sc->nge_ldata->nge_rx_list[i];
 		rxstat = cur_rx->nge_rxstat;
 		extsts = cur_rx->nge_extsts;
@@ -1585,6 +1593,52 @@ static void nge_tick(xsc)
 	return;
 }
 
+#ifdef DEVICE_POLLING
+static poll_handler_t nge_poll;
+
+static void
+nge_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+{
+	struct  nge_softc *sc = ifp->if_softc;
+
+	if (cmd == POLL_DEREGISTER) {	/* final call, enable interrupts */
+		CSR_WRITE_4(sc, NGE_IER, 1);
+		return;
+	}
+
+	/*
+	 * On the nge, reading the status register also clears it.
+	 * So before returning to intr mode we must make sure that all
+	 * possible pending sources of interrupts have been served.
+	 * In practice this means run to completion the *eof routines,
+	 * and then call the interrupt routine
+	 */
+	sc->rxcycles = count;
+	nge_rxeof(sc);
+	nge_txeof(sc);
+	if (ifp->if_snd.ifq_head != NULL)
+		nge_start(ifp);
+
+	if (sc->rxcycles > 0 || cmd == POLL_AND_CHECK_STATUS) {
+		u_int32_t	status;
+
+		/* Reading the ISR register clears all interrupts. */
+		status = CSR_READ_4(sc, NGE_ISR);
+
+		if (status & (NGE_ISR_RX_ERR|NGE_ISR_RX_OFLOW))
+			nge_rxeof(sc);
+
+		if (status & (NGE_ISR_RX_IDLE))
+			NGE_SETBIT(sc, NGE_CSR, NGE_CSR_RX_ENABLE);
+
+		if (status & NGE_ISR_SYSERR) {
+			nge_reset(sc);
+			nge_init(sc);
+		}
+	}
+}
+#endif /* DEVICE_POLLING */
+
 static void nge_intr(arg)
 	void			*arg;
 {
@@ -1594,6 +1648,16 @@ static void nge_intr(arg)
 
 	sc = arg;
 	ifp = &sc->arpcom.ac_if;
+
+#ifdef DEVICE_POLLING
+	if (ifp->if_ipending & IFF_POLLING)
+		return;
+	if (ether_poll_register(nge_poll, ifp)) { /* ok, disable interrupts */
+		CSR_WRITE_4(sc, NGE_IER, 0);
+		nge_poll(ifp, 0, 1);
+		return;
+	}
+#endif /* DEVICE_POLLING */
 
 	/* Supress unwanted interrupts */
 	if (!(ifp->if_flags & IFF_UP)) {
@@ -1964,6 +2028,15 @@ static void nge_init(xsc)
 	 * Enable interrupts.
 	 */
 	CSR_WRITE_4(sc, NGE_IMR, NGE_INTRS);
+#ifdef DEVICE_POLLING
+	/*
+	 * ... only enable interrupts if we are not polling, make sure
+	 * they are off otherwise.
+	 */
+	if (ifp->if_ipending & IFF_POLLING)
+		CSR_WRITE_4(sc, NGE_IER, 0);
+	else
+#endif /* DEVICE_POLLING */
 	CSR_WRITE_4(sc, NGE_IER, 1);
 
 	/* Enable receiver and transmitter. */
@@ -2217,6 +2290,9 @@ static void nge_stop(sc)
 	}
 
 	untimeout(nge_tick, sc, sc->nge_stat_ch);
+#ifdef DEVICE_POLLING
+	ether_poll_deregister(ifp);
+#endif
 	CSR_WRITE_4(sc, NGE_IER, 0);
 	CSR_WRITE_4(sc, NGE_IMR, 0);
 	NGE_SETBIT(sc, NGE_CSR, NGE_CSR_TX_DISABLE|NGE_CSR_RX_DISABLE);

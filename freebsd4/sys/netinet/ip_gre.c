@@ -130,7 +130,7 @@ gre_input(m, va_alist)
 	 * we inject it to raw ip socket to see if anyone picks it up.
 	 */
 	if (ret == 0)
-		rip_input(m, off, proto);
+		rip_input(m, off);
 }
 
 /*

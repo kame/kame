@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.c,v 1.16.2.20 2002/07/09 09:11:41 luigi Exp $
+ * $FreeBSD: src/sys/net/bridge.c,v 1.16.2.25 2003/01/23 21:06:44 sam Exp $
  */
 
 /*
@@ -33,7 +33,7 @@
  * A FreeBSD host can implement multiple logical bridges, called
  * "clusters". Each cluster is made of a set of interfaces, and
  * identified by a "cluster-id" which is a number in the range 1..2^16-1.
- * 
+ *
  * Bridging is enabled by the sysctl variable
  *	net.link.ether.bridge
  * the grouping of interfaces into clusters is done with
@@ -91,16 +91,12 @@
 #include <sys/param.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
-#include <sys/protosw.h>
 #include <sys/systm.h>
 #include <sys/socket.h> /* for net/if.h */
 #include <sys/ctype.h>	/* string functions */
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 
-#if 0	/* XXX does not work yet */
-#include <net/pfil.h>	/* for ipfilter */
-#endif
 #include <net/if.h>
 #include <net/if_types.h>
 #ifdef ALTQ
@@ -208,6 +204,11 @@ static void parse_bdg_cfg(void);
 
 static int bdg_ipf;		/* IPFilter enabled in bridge */
 static int bdg_ipfw;
+
+/*
+ * For IPFilter, declared in ip_input.c
+ */
+extern int (*fr_checkp)(struct ip *, int, struct ifnet *, int, struct mbuf **);
 
 #if 0 /* debugging only */
 static char *bdg_dst_names[] = {
@@ -520,7 +521,7 @@ sysctl_refresh(SYSCTL_HANDLER_ARGS)
 {
     if (req->newptr)
 	reconfigure_bridge();
-    
+
     return 0;
 }
 
@@ -586,7 +587,7 @@ static int bdg_loops ;
 static void
 bdg_timeout(void *dummy)
 {
-    static int slowtimer;	/* in BSS so initialized to 0 */
+    static int slowtimer; /* in BSS so initialized to 0 */
 
     if (do_bridge) {
 	static int age_index = 0 ; /* index of table position to age */
@@ -598,16 +599,16 @@ bdg_timeout(void *dummy)
 	if (l > HASH_SIZE)
 	    l = HASH_SIZE ;
 
-    for (i=0; i<n_clusters; i++) {
-	bdg_hash_table *bdg_table = clusters[i].ht;
-	for (; age_index < l ; age_index++)
-	    if (bdg_table[age_index].used)
-		bdg_table[age_index].used = 0 ;
-	    else if (bdg_table[age_index].name) {
-		/* printf("xx flushing stale entry %d\n", age_index); */
-		bdg_table[age_index].name = NULL ;
-	    }
-    }
+	for (i=0; i<n_clusters; i++) {
+	    bdg_hash_table *bdg_table = clusters[i].ht;
+	    for (; age_index < l ; age_index++)
+		if (bdg_table[age_index].used)
+		    bdg_table[age_index].used = 0 ;
+		else if (bdg_table[age_index].name) {
+		    /* printf("xx flushing stale entry %d\n", age_index); */
+		    bdg_table[age_index].name = NULL ;
+		}
+	}
 	if (age_index >= HASH_SIZE)
 	    age_index = 0 ;
 
@@ -806,10 +807,6 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
     struct ifnet *real_dst = dst ; /* real dst from ether_output */
     struct ip_fw_args args;
     int error = 0;
-#ifdef PFIL_HOOKS
-    struct packet_filter_hook *pfh;
-    int rv;
-#endif /* PFIL_HOOKS */
 
     /*
      * XXX eh is usually a pointer within the mbuf (some ethernet drivers
@@ -852,7 +849,7 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
 	ifp = dst ;
 	once = 1 ;
     }
-    if ( (u_int)(ifp) <= (u_int)BDG_FORWARD )
+    if ( (uintptr_t)(ifp) <= (u_int)BDG_FORWARD )
 	panic("bdg_forward: bad dst");
 
     /*
@@ -863,15 +860,13 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
      * and pkts already gone through a pipe.
      */
     if (src != NULL && (
-#ifdef PFIL_HOOKS
-	((pfh = pfil_hook_get(PFIL_IN, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh)) != NULL && bdg_ipf !=0) ||
-#endif
+	(fr_checkp != NULL && bdg_ipf != 0) ||
 	(IPFW_LOADED && bdg_ipfw != 0))) {
 
 	int i;
 
-	if (args.rule != NULL) /* packet already partially processed */
-	    goto forward; /* HACK! I should obey the fw_one_pass */
+	if (args.rule != NULL && fw_one_pass)
+	    goto forward; /* packet already partially processed */
 	/*
 	 * i need some amt of data to be contiguous, and in case others need
 	 * the packet (shared==1) also better be in the first mbuf.
@@ -885,13 +880,12 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
 	    }
 	}
 
-#ifdef PFIL_HOOKS
 	/*
-	 * NetBSD-style generic packet filter, pfil(9), hooks.
-	 * Enables ipf(8) in bridging.
+	 * IP Filter hook.
 	 */
-	if (m0->m_pkthdr.len >= sizeof(struct ip) &&
-		ntohs(save_eh.ether_type) == ETHERTYPE_IP) {
+	if (fr_checkp != NULL && bdg_ipf &&
+	    m0->m_pkthdr.len >= sizeof(struct ip) &&
+	    ntohs(save_eh.ether_type) == ETHERTYPE_IP) {
 	    /*
 	     * before calling the firewall, swap fields the same as IP does.
 	     * here we assume the pkt is an IP one and the header is contiguous
@@ -901,13 +895,9 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
 	    ip->ip_len = ntohs(ip->ip_len);
 	    ip->ip_off = ntohs(ip->ip_off);
 
-	    for (; pfh; pfh = TAILQ_NEXT(pfh, pfil_link))
-		if (pfh->pfil_func) {
-		    rv = pfh->pfil_func(ip, ip->ip_hl << 2, src, 0, &m0);
-		    if (rv != 0 || m0 == NULL)
-			return m0;
-		    ip = mtod(m0, struct ip *);
-		}
+	    if ((*fr_checkp)(ip, ip->ip_hl << 2, src, 0, &m0) || m0 == NULL)
+		return m0;
+
 	    /*
 	     * If we get here, the firewall has passed the pkt, but the mbuf
 	     * pointer might have changed. Restore ip and the fields ntohs()'d.
@@ -916,7 +906,6 @@ bdg_forward(struct mbuf *m0, struct ether_header *const eh, struct ifnet *dst)
 	    ip->ip_len = htons(ip->ip_len);
 	    ip->ip_off = htons(ip->ip_off);
 	}
-#endif /* PFIL_HOOKS */
 
 	/*
 	 * Prepare arguments and call the firewall.

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.9 2002/07/08 22:30:17 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.10 2003/03/05 18:42:33 njl Exp $
  */
 
 /*
@@ -96,7 +96,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.9 2002/07/08 22:30:17 luigi Exp $";
+  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.10 2003/03/05 18:42:33 njl Exp $";
 #endif
 
 /*
@@ -640,6 +640,8 @@ static int pcn_attach(dev)
 	if (mii_phy_probe(dev, &sc->pcn_miibus,
 	    pcn_ifmedia_upd, pcn_ifmedia_sts)) {
 		printf("pcn%d: MII without any PHY!\n", sc->pcn_unit);
+		contigfree(sc->pcn_ldata, sizeof(struct pcn_list_data),
+		    M_DEVBUF);
 		bus_teardown_intr(dev, sc->pcn_irq, sc->pcn_intrhand);
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->pcn_irq);
 		bus_release_resource(dev, PCN_RES, PCN_RID, sc->pcn_res);

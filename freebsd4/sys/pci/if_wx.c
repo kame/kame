@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/pci/if_wx.c,v 1.5.2.11 2001/10/20 17:44:12 mjacob Exp $ */
+/* $FreeBSD: src/sys/pci/if_wx.c,v 1.5.2.12 2003/03/05 18:42:34 njl Exp $ */
 /*
  * Principal Author: Matthew Jacob <mjacob@feral.com>
  * Copyright (c) 1999, 2001 by Traakan Software
@@ -455,7 +455,9 @@ wx_dring_setup(wx_softc_t *sc)
 	if (((intptr_t)sc->tdescriptors) & 0xfff) {
 		contigfree(sc->rdescriptors,
 		    sizeof (wxrd_t) * WX_MAX_RDESC, M_DEVBUF);
+		contigfree(sc->tdescriptors, len, M_DEVBUF);
 		sc->rdescriptors = NULL;
+		sc->tdescriptors = NULL;
 		printf("%s: xmt descriptors not 4KB aligned\n", sc->wx_name);
 		return (-1);
 	}

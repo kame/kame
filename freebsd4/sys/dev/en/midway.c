@@ -32,7 +32,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/en/midway.c,v 1.19 2000/01/29 14:38:04 peter Exp $
+ * $FreeBSD: src/sys/dev/en/midway.c,v 1.19.2.1 2003/01/23 21:06:42 sam Exp $
  */
 
 /*
@@ -2037,7 +2037,7 @@ STATIC int en_makeexclusive(sc, mm, prev)
 		return(0);
 	    }
 	    if (m->m_flags & M_PKTHDR)
-		M_COPY_PKTHDR(new, m);
+		M_MOVE_PKTHDR(new, m);
 	    MCLGET(new, M_DONTWAIT);
 	    if ((new->m_flags & M_EXT) == 0) {
 		m_free(new);

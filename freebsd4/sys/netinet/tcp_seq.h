@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_seq.h	8.3 (Berkeley) 6/21/95
- * $FreeBSD: src/sys/netinet/tcp_seq.h,v 1.11.2.6 2001/12/14 20:16:59 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_seq.h,v 1.11.2.7 2003/02/03 02:33:10 hsu Exp $
  */
 
 #ifndef _NETINET_TCP_SEQ_H_
@@ -74,7 +74,7 @@
 #if 1 /* TCP_ECN */
 #define	tcp_sendseqinit(tp) \
 	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->snd_recover = (tp)->iss
+	    (tp)->snd_recover = (tp)->snd_high = (tp)->iss
 #else
 #define	tcp_sendseqinit(tp) \
 	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \

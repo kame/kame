@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.1.2.1 2000/10/21 03:30:03 nyan Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.1.2.2 2003/02/11 08:52:00 nyan Exp $	*/
 /*	$NecBSD: dp83932.c,v 1.5 1999/07/29 05:08:44 kmatsuda Exp $	*/
 /*	$NetBSD: if_snc.c,v 1.18 1998/04/25 21:27:40 scottr Exp $	*/
 
@@ -268,7 +268,7 @@ sncioctl(ifp, cmd, data)
 {
 	struct ifreq *ifr;
 	struct snc_softc *sc = ifp->if_softc;
-	int	s = splnet(), err = 0;
+	int	s = splhardnet(), err = 0;
 	int	temp;
 
 	switch (cmd) {
@@ -417,7 +417,7 @@ sncinit(xsc)
 		/* already running */
 		return;
 
-	s = splnet();
+	s = splhardnet();
 
 	NIC_PUT(sc, SNCR_CR, CR_RST);	/* DCR only accessable in reset mode! */
 
@@ -482,7 +482,7 @@ sncstop(sc)
 	struct snc_softc *sc;
 {
 	struct mtd *mtd;
-	int	s = splnet();
+	int	s = splhardnet();
 
 	/* stick chip in reset */
 	NIC_PUT(sc, SNCR_CR, CR_RST);

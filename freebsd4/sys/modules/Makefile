@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.58 2002/09/03 16:55:23 gibbs Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.68 2003/02/28 15:57:18 ru Exp $
 
 # XXX present but broken: ip_mroute_mod pcic
 
@@ -14,16 +14,20 @@ SUBDIR=	accf_data \
 	ccd \
 	cd9660 \
 	coda \
+	crypto \
+	cryptodev \
 	cue \
 	dc \
 	dummynet \
 	fdesc \
+	firewire \
 	fxp \
 	gx \
 	if_disc \
 	if_ef \
 	if_faith \
 	if_gif \
+	if_gre \
 	if_ppp \
 	if_sl \
 	if_stf \
@@ -35,7 +39,6 @@ SUBDIR=	accf_data \
 	ipfw \
 	ispfw \
 	joy \
-	kernfs \
 	kue \
 	lge \
 	libiconv \
@@ -46,6 +49,7 @@ SUBDIR=	accf_data \
 	mii \
 	mlx \
 	msdos \
+	my \
 	ncp \
 	pcn \
 	netgraph \
@@ -68,10 +72,13 @@ SUBDIR=	accf_data \
 	syscons \
 	ti \
 	tl \
+	trm \
 	twe \
 	txp \
+	ubsa \
 	ucom \
 	ufm \
+	uftdi \
 	ugen \
 	uhid \
 	ukbd \
@@ -100,18 +107,15 @@ SUBDIR+=ipfilter
 
 # XXX some of these can move to the general case when de-i386'ed
 .if ${MACHINE_ARCH} == "i386"
-SUBDIR+=aac \
-	ar \
-	asr \
+SUBDIR+=ar \
 	bktr \
-	ciss \
 	coff \
 	em \
 	fpu \
 	gnufpu \
+	hifn \
 	ibcs2 \
 	linprocfs \
-	mly \
 	ncv \
 	nsp \
 	ray \
@@ -124,16 +128,25 @@ SUBDIR+=aac \
 	stg \
 	streams \
 	svr4 \
-	vesa \
+	ubsec \
 	wi \
 	xe
-.endif
 
 SUBDIR+=altq
 
-.if ${MACHINE} == "pc98"
-SUBDIR+=pmc \
+.if ${MACHINE} == "i386"
+SUBDIR+=aac \
+	asr \
+	ciss \
+	mly \
+	vesa
+
+.elif ${MACHINE} == "pc98"
+SUBDIR+=canbepm \
+	canbus \
+	pmc \
 	snc
+.endif
 .endif
 
 .if ${MACHINE_ARCH} == "alpha"
