@@ -181,6 +181,24 @@ struct inpcbtable {
 				 * the mapped form of v6 addresses) */
 #define INP_IPV6_MCAST	0x800	/* Set if inp_moptions points to ipv6 ones */
 
+#if 1	/*KAME*/
+/* flags in in6p_flags */
+#define IN6P_RECVOPTS		0x01	/* receive incoming IP6 options */
+#define IN6P_RECVRETOPTS	0x02	/* receive IP6 options for reply */
+#define IN6P_RECVDSTADDR	0x04	/* receive IP6 dst address */
+#define IN6P_HIGHPORT		0x10	/* user wants "high" port binding */
+#define IN6P_LOWPORT		0x20	/* user wants "low" port binding */
+#define IN6P_ANONPORT		0x40	/* port chosen for user */
+#define IN6P_FAITH		0x80	/* accept FAITH'ed connections */
+#define IN6P_PKTINFO		0x010000
+#define IN6P_HOPLIMIT		0x020000
+#define IN6P_NEXTHOP		0x040000
+#define IN6P_HOPOPTS		0x080000
+#define IN6P_DSTOPTS		0x100000
+#define IN6P_RTHDR		0x200000
+#define IN6P_CONTROLOPTS	(0x3f0000 | IN6P_RECVOPTS | IN6P_RECVRETOPTS | IN6P_RECVDSTADDR)
+#endif
+
 #define	INPLOOKUP_WILDCARD	1
 #define	INPLOOKUP_SETLOCAL	2
 #define	INPLOOKUP_IPV6		4
