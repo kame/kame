@@ -1,6 +1,6 @@
 TARGET?=	bogus
 ARCH?=		i386
-.if ${TARGET} == "freebsd4" || ${TARGET} == "openbsd" || ${TARGET} == "netbsd"
+.if ${TARGET} == "freebsd4" || ${TARGET} == "freebsd5" || ${TARGET} == "openbsd" || ${TARGET} == "netbsd"
 KERNCONF?=	GENERIC.KAME
 .elif ${TARGET} == "bsdi4"
 KERNCONF?=	GENERIC.KAME
@@ -86,11 +86,18 @@ autobuild:
 	esac
 	(cd ${.CURDIR}/${TARGET}; ${MAKE})
 	case ${TARGET} in \
-	bsdi*|freebsd*) \
+	bsdi*|freebsd[234]) \
 		for i in ${KERNCONF}; do \
 			(cd ${.CURDIR}/${TARGET}/sys/compile; /bin/rm -fr $$i); \
 			(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/conf; config $$i); \
 			(cd ${.CURDIR}/${TARGET}/sys/compile/$$i; ${MAKE} depend; ${MAKE}); \
+		done; \
+		;; \
+	freebsd5) \
+		for i in ${KERNCONF}; do \
+			(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/compile; /bin/rm -fr $$i); \
+			(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/conf; config $$i); \
+			(cd ${.CURDIR}/${TARGET}/sys/${ARCH}/compile/$$i; ${MAKE} depend; ${MAKE}); \
 		done; \
 		;; \
 	netbsd*|openbsd*) \
