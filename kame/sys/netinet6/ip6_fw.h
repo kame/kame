@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.h,v 1.5 2001/01/21 15:59:36 itojun Exp $	*/
+/*	$KAME: ip6_fw.h,v 1.6 2001/01/22 18:40:06 itojun Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -36,8 +36,8 @@
 union ip6_fw_if {
     struct in6_addr fu_via_ip6;	/* Specified by IPv6 address */
     struct {			/* Specified by interface name */
-#define FW_IFNLEN     IFNAMSIZ
-	    char  name[FW_IFNLEN];
+#define IP6FW_IFNLEN     IFNAMSIZ
+	    char  name[IP6FW_IFNLEN];
 	    short unit;		/* -1 means match any unit */
     } fu_via_if;
 };

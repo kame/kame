@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.19 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.20 2001/01/22 18:40:06 itojun Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -337,7 +337,7 @@ iface_match(struct ifnet *ifp, union ip6_fw_if *ifu, int byname)
 		    && ifp->if_unit != ifu->fu_via_if.unit)
 			return(0);
 		/* Check name */
-		if (strncmp(ifp->if_name, ifu->fu_via_if.name, FW_IFNLEN))
+		if (strncmp(ifp->if_name, ifu->fu_via_if.name, IP6FW_IFNLEN))
 			return(0);
 #endif
 		return(1);
@@ -862,7 +862,7 @@ add_entry6(struct ip6_fw_head *chainptr, struct ip6_fw *frwl)
 	}
 
 	bcopy(frwl, ftmp, sizeof(struct ip6_fw));
-	ftmp->fw_in_if.fu_via_if.name[FW_IFNLEN - 1] = '\0';
+	ftmp->fw_in_if.fu_via_if.name[IP6FW_IFNLEN - 1] = '\0';
 	ftmp->fw_pcnt = 0L;
 	ftmp->fw_bcnt = 0L;
 	fwc->rule = ftmp;
