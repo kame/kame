@@ -333,8 +333,8 @@ iso_pcbconnect(v, nam)
 		 * taken from the i/f, else punt.
 		 */
 		flags = isop->isop_socket->so_options & SO_DONTROUTE;
-		error = clnp_route(&siso->siso_addr, &isop->isop_route, flags,
-				   NULL, &ia);
+		error = clnp_route(&siso->siso_addr,
+		    (struct route_iso *)&isop->isop_route, flags, NULL, &ia);
 		if (error)
 			return error;
 #ifdef ARGO_DEBUG

@@ -467,6 +467,11 @@ struct clnp_optidx;
 struct isopcb;
 struct snpa_hdr;
 struct iso_ifaddr;
+#ifdef NEW_STRUCT_ROUTE
+#ifndef route_iso
+#define route_iso	route
+#endif
+#endif
 struct route_iso;
 
 /* clnp_debug.c */
