@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.34 2002/09/02 06:08:58 k-sugyou Exp $	*/
+/*	$KAME: ip6.h,v 1.35 2002/09/30 10:21:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -416,7 +416,9 @@ struct ip6m_opt {
 #define IP6MOPT_ALTCOA		3	/* Alternate Care-of Address */
 #define IP6MOPT_NONCE		4	/* Nonce Indices */
 #define IP6MOPT_AUTHDATA	5	/* Binding Authorization Data */
-#define IP6MOPT_REFRESH		6	/* Binding Refresh Advice (issue #97) */
+/* XXX MIPv6 Issue 97 */
+/* #define IP6MOPT_REFRESH	6 */
+#define IP6MOPT_REFRESH		7	/* Binding Refresh Advice */
 
 /* Unique Identifier */
 struct ip6m_opt_uid {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.60 2002/09/30 09:54:53 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.61 2002/09/30 10:21:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -623,7 +623,11 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		bi.mbc_pcoa.sin6_addr = mopt.mopt_altcoa;
 
 	bi.mbc_seqno = ntohs(ip6mu->ip6mu_seqno);
+#if 0 /* XXX MIPv6 Issue 58 */
+	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 2;	/* units of 4 secs */
+#else
 	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 4;	/* units of 16secs */
+#endif
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi.mbc_phaddr);
@@ -969,7 +973,11 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	/* binding refresh advice option */
 	if ((mbu->mbu_flags & IP6MU_HOME) &&
 	    (mopt.valid_options & MOPT_REFRESH)) {
+#if 0 /* XXX MIPv6 Issue 86 */
 		refresh = mopt.mopt_refresh << 2;
+#else
+		refresh = mopt.mopt_refresh;
+#endif
 		if (refresh > lifetime || refresh == 0)
 			refresh = lifetime;
 	}
@@ -1561,8 +1569,13 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+#if 0 /* XXX MIPv6 Issue 58 */
 		ip6mu->ip6mu_lifetime =
 		    htons((u_int16_t)(mbu->mbu_lifetime >> 2));	/* units 4 secs */
+#else
+		ip6mu->ip6mu_lifetime =
+		    htons((u_int16_t)(mbu->mbu_lifetime >> 4)); /* units 16 secs */
+#endif
 	}
 
 	if ((pad = bu_size - sizeof(struct ip6m_binding_update)) >= 2) {
@@ -1721,7 +1734,11 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	if (need_refresh) {
 		mopt_refresh->ip6mor_type = IP6MOPT_REFRESH;
 		mopt_refresh->ip6mor_len = sizeof(struct ip6m_opt_refresh) - 2;
+#if 0 /* XXX MIPv6 Issue 86 */
 		SET_NETVAL_S(&mopt_refresh->ip6mor_refresh, refresh >> 2);
+#else
+		SET_NETVAL_S(&mopt_refresh->ip6mor_refresh, refresh);
+#endif
 	}
 
 	/* XXX authorization data processing. */
