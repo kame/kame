@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.54 2001/09/20 06:34:39 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.55 2001/09/20 07:10:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1370,16 +1370,20 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_remain = lifetime;
 	}
-	/*
-	 * XXX BU can handle multiple haddr bindings in one BU.
-	 * we should add that code later.
-	 */
-	IP6_BU_SETPREFIXLEN(&bu_opt, 64);
+	/* set the prefix length of this binding update. */
+	if (mbu->mbu_flags & IP6_BUF_HOME) {
+		/* register all ifid as a home address. */
+		IP6_BU_SETPREFIXLEN(&bu_opt, 64);
+	} else {
+		/* when registering to a CN, the prefixlen must be 0. */ 
+		IP6_BU_SETPREFIXLEN(&bu_opt, 0);
+	}
 	bu_opt.ip6ou_seqno = mbu->mbu_seqno;
 	if ((mbu->mbu_flags & IP6_BUF_ACK) == 0) {
 		/*
-		 * increase sequence number of BU.  the seqno of a BU
-		 * with ack flag will be incremented when BA received.
+		 * increase the sequence number of this BU entry.  the
+		 * seqno of a BU with ack flag will be incremented
+		 * when BA received.
 		 */
 		mbu->mbu_seqno++;
 	}
