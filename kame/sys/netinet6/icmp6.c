@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.217 2001/06/20 15:03:29 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.218 2001/06/22 15:28:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,11 +145,6 @@
 #define in6p_sp		inp_sp
 #define in6p_next	inp_next
 #define in6p_prev	inp_prev
-/* macro names */
-#define sotoin6pcb	sotoinpcb
-/* function names */
-#define in6_pcbdetach	in_pcbdetach
-#define in6_rtchange	in_rtchange
 
 /*
  * for KAME src sync over BSD*'s. XXX: FreeBSD (>=3) are VERY different from
