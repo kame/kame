@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.13 2002/10/09 13:07:07 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.14 2002/10/11 07:01:45 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,7 +202,7 @@ mobility6_input(mp, offp, proto)
 		if (n) {
 			struct ip6aux *ip6a;
 			struct sockaddr_in6 src_sa;
-			struct sockaddr_in6 *home_sa;
+			struct sockaddr_in6 *home_sa, sin6;
 
 			ip6a = mtod(n, struct ip6aux *);
 			src_sa = ip6a->ip6a_src;
@@ -220,7 +220,11 @@ mobility6_input(mp, offp, proto)
 				 * field of the binding error message
 				 * must be an unspecified address.
 				 */
-				home_sa = &in6addr_any;
+				bzero(&sin6, sizeof(sin6));
+				sin6.sin6_family = AF_INET6;
+				sin6.sin6_len = sizeof(sin6);
+				sin6.sin6_addr = in6addr_any;
+				home_sa = &sin6;
 			}
 			(void)mobility6_send_be(&ip6a->ip6a_dst, &src_sa,
 			    IP6ME_STATUS_UNKNOWN_MH_TYPE, home_sa);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.69 2002/10/11 04:58:24 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.70 2002/10/11 07:01:45 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1753,14 +1753,14 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		*(p + 1) = pad - 2;
 	}
 	if (refresh_size && 
-	    (p = (u_int8_t *)ip6ma + ba_size + sizeof(struct ip6m_opt_refresh)),
-	    (pad = refresh_size - sizeof(struct ip6m_opt_refresh)) >= 2) {
+	    ((p = (u_int8_t *)ip6ma + ba_size + sizeof(struct ip6m_opt_refresh)),
+	     (pad = refresh_size - sizeof(struct ip6m_opt_refresh)) >= 2)) {
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
 	if (auth_size && 
-	    (p = (u_int8_t *)ip6ma + ba_size + refresh_size + AUTH_SIZE),
-	    (pad = auth_size - AUTH_SIZE) >= 2) {
+	    ((p = (u_int8_t *)ip6ma + ba_size + refresh_size + AUTH_SIZE),
+	     (pad = auth_size - AUTH_SIZE) >= 2)) {
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
