@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.13 2003/06/06 10:08:20 suz Exp $	*/
+/*	$KAME: ip6opt.c,v 1.14 2003/10/27 04:55:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -509,7 +509,7 @@ inet6_opt_set_val(void *databuf, int offset, void *val, socklen_t vallen)
 
 int
 inet6_opt_next(void *extbuf, socklen_t extlen, int offset, u_int8_t *typep,
-	       size_t *lenp, void **databufp)
+	       socklen_t *lenp, void **databufp)
 {
 	u_int8_t *optp, *lim;
 	int optlen;
