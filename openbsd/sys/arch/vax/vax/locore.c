@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.c,v 1.11 2000/10/10 18:21:28 bjc Exp $	*/
+/*	$OpenBSD: locore.c,v 1.17 2001/04/01 17:15:22 hugh Exp $	*/
 /*	$NetBSD: locore.c,v 1.43 2000/03/26 11:39:45 ragge Exp $	*/
 /*
  * Copyright (c) 1994, 1998 Ludd, University of Lule}, Sweden.
@@ -75,6 +75,7 @@ extern struct cpu_dep ka630_calls;
 extern struct cpu_dep ka650_calls;
 extern struct cpu_dep ka660_calls;
 extern struct cpu_dep ka670_calls;
+extern struct cpu_dep ka680_calls;
 
 /*
  * Start is called from boot; the first routine that is called
@@ -151,10 +152,16 @@ start()
 #if VAX48
 	case VAX_BTYP_48:
 		dep_call = &ka48_calls;
-		if (vax_confdata & 0x80)
+		switch((vax_siedata >> 8) & 0xFF) {
+		case VAX_STYP_45:
 			strcat(cpu_model, "3100/m{30,40}");
-		else
-			strcat(cpu_model, "4000 VLC");
+			break;
+		case VAX_STYP_48:
+			strcpy(cpu_model, "VAXstation 4000/VLC");
+			break;
+		default:
+			strcat(cpu_model, " - Unknown SOC");
+		}
 		break;
 #endif
 #if VAX49
@@ -166,7 +173,22 @@ start()
 #if VAX53
 	case VAX_BTYP_1303:	
 		dep_call = &ka53_calls;
-		strcat(cpu_model, "4000/{100,105A}");
+		switch((vax_siedata >> 8) & 0xFF) {
+		case VAX_STYP_50:
+			strcpy(cpu_model, "MicroVAX 3100 model 85 or 90");
+			break;
+		case VAX_STYP_51:
+			strcpy(cpu_model, "MicroVAX 3100 model 90 or 95");
+			break;
+		case VAX_STYP_52:
+			strcpy(cpu_model, "VAX 4000 100");
+			break;
+		case VAX_STYP_53:
+			strcpy(cpu_model, "VAX 4000 105A");
+			break;
+		default:
+			strcpy(cpu_model, "VAX - Unknown Cheetah Class");
+		}
 		break;
 #endif
 #if VAX630
@@ -208,6 +230,25 @@ start()
 	case VAX_BTYP_670:
 		dep_call = &ka670_calls;
 		strcpy(cpu_model,"VAX 4000/300");
+		break;
+#endif
+#if VAX680
+	case VAX_BTYP_1301:
+		dep_call = &ka680_calls;
+		switch((vax_siedata & 0xff00) >> 8) {
+		case VAX_STYP_675:
+			strcpy(cpu_model,"VAX 4000 400"); break;
+		case VAX_STYP_680:
+			strcpy(cpu_model,"VAX 4000 500"); break;
+		case VAX_STYP_681:
+			strcpy(cpu_model,"VAX 4000 500A"); break;
+		case VAX_STYP_690:
+			strcpy(cpu_model,"VAX 4000 600"); break;
+		case VAX_STYP_691:
+			strcpy(cpu_model,"VAX 4000 605A"); break;
+		default:
+			strcpy(cpu_model,"VAX - Unknown Omega Class");
+		}
 		break;
 #endif
 #if VAX8200

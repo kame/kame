@@ -1,5 +1,5 @@
-/*	$OpenBSD: pciide_pdc202xx_reg.h,v 1.2 2000/01/10 22:54:46 chris Exp $	*/
-/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.1 1999/08/29 17:20:10 bouyer Exp $ */
+/*	$OpenBSD: pciide_pdc202xx_reg.h,v 1.4 2001/04/04 07:02:54 csapuntz Exp $	*/
+/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.4 2001/03/12 09:51:21 bouyer Exp $ */
 
 /*
  * Copyright (c) 1999 Manuel Bouyer.
@@ -20,17 +20,16 @@
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,     
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -73,7 +72,7 @@
 
 /* Ultra-DMA mode 3/4 control (PDC20262 only, 1 byte) */
 #define PDC262_U66	0x11
-#define PDC262_U66_EN(chan) (0x1 << ((chan) *2))
+#define PDC262_U66_EN(chan) (0x2 << ((chan) *2))
 /* primary mode (1 byte) */
 #define PDC2xx_PM	0x1a
 /* secondary mode (1 byte) */
@@ -110,7 +109,7 @@
 
 static int8_t pdc2xx_pa[] = {0x9, 0x5, 0x3, 0x2, 0x1};
 static int8_t pdc2xx_pb[] = {0x13, 0xc, 0x8, 0x6, 0x4};
-static int8_t pdc2xx_dma_mb[] = {0x7, 0x3, 0x3};
-static int8_t pdc2xx_dma_mc[] = {0xf, 0x4, 0x3};
-static int8_t pdc2xx_udma_mb[] = {0x3, 0x2, 0x1, 0x2, 0x1};
-static int8_t pdc2xx_udma_mc[] = {0x3, 0x2, 0x1, 0x2, 0x1};
+static int8_t pdc2xx_dma_mb[] = {0x3, 0x3, 0x3};
+static int8_t pdc2xx_dma_mc[] = {0x5, 0x4, 0x3};
+static int8_t pdc2xx_udma_mb[] = {0x3, 0x2, 0x1, 0x2, 0x1, 0x1};
+static int8_t pdc2xx_udma_mc[] = {0x3, 0x2, 0x1, 0x2, 0x1, 0x1};

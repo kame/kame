@@ -1,6 +1,6 @@
-.\"	$OpenBSD: boot.8,v 1.19 2000/08/07 20:30:34 mickey Exp $
+.\"	$OpenBSD: boot.8,v 1.25 2001/01/16 16:43:14 mickey Exp $
 .\"
-.\" Copyright (c) 1997-2000 Michael Shalayeff
+.\" Copyright (c) 1997-2001 Michael Shalayeff
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -34,15 +34,16 @@
 .Dt BOOT 8 i386
 .Os
 .Sh NAME
-.Nm boot , boot.conf
+.Nm boot ,
+.Nm boot.conf
 .Nd
 i386-specific second-stage bootstrap
 .Sh DESCRIPTION
-The main purpose of this program is to load the system kernel, dealing with
-the downfalls of the PC BIOS architecture.
+The main purpose of this program is to load the system kernel while dealing
+with the downfalls of the PC BIOS architecture.
 .Pp
 As described in
-.Xr boot_i386 8
+.Xr boot_i386 8 ,
 this program is loaded by the
 .Xr biosboot 8
 primary bootstrap loader and provides a convenient way to load the kernel.
@@ -50,6 +51,7 @@ This program acts as an enhanced boot monitor for PC systems, providing
 common interface for the kernel to start from.
 .Pp
 Basic operations include:
+.Pp
 .Bl -bullet -compact
 .It
 Detecting and switching between multiple consoles.
@@ -66,57 +68,66 @@ Providing an interactive command line.
 .Pp
 The sequence of its operation is as follows: initialization,
 parsing the configuration file, then an interactive command line.
-While at the command line you have 5 seconds to type any commands,
-if needed. If time expires, the kernel will be loaded according to
-the current variable settings (See the
+While at the command line you have 5 seconds to type any commands, if needed.
+If time expires, the kernel will be loaded according to
+the current variable settings (see the
 .Nm set
-command).  Each time a kernel load fails, the timeout
-is increased by one second. The sequence of
+command).
+Each time a kernel load fails, the timeout is increased by one second.
+The sequence of
 .Nm
 operations is as follows:
 .Bl -enum
 .It
 Set up a protected mode environment which catches and reports processor
-exceptions, and provides a simple protected-mode BIOS interface.
+exceptions and provides a simple protected-mode BIOS interface.
 .It
 Probe for console devices, which includes the (default) PC VGA+Keyboard
-console (pc0) and up to four serial consoles (com0 through com3) connected
-to the serial ports. Display messages to the default console about the
-devices found.
+console
+.Pq Li pc0
+and up to four serial consoles
+.Pf ( Li com0
+through
+.Li com3 )
+connected to the serial ports.
+Display messages to the default console about the devices found.
 .It
-Detect memory. Conventional memory is detected by quering the BIOS.
+Detect memory.
+Conventional memory is detected by querying the BIOS.
 Extended memory is detected by probing page-by-page through the address
-space, rather than asking the BIOS; many BIOS cannot report larger than
+space, rather than asking the BIOS; many BIOS's cannot report larger than
 64M of memory.
-All the memory found is reported to the default console device.
+All memory found is reported to the default console device.
 .It
-Probe for APM support in the BIOS. Message printed if support is present.
+Probe for APM support in the BIOS.
+Display a message if support is present.
 .It
 If the file
 .Pa /etc/boot.conf
 exists on the filesystem
 .Nm
-was loaded from, open and parse it. This file may contain any commands
+was loaded from, open and parse it.
+This file may contain any commands
 .Nm
 accepts at the interactive prompt.
 Though default settings usually suffice, they can be changed here.
 .It
 The header line
 .Pp
-.Dl OpenBSD BOOT [x.xx]
+.Dl >> OpenBSD/i386 BOOT [x.xx]
 .Pp
 is displayed to the active console, where
 .Ar x.xx
-is a version number of the
+is the version number of the
 .Nm
 program, followed by the
 .Pp
 .Dl boot>
 .Pp
-prompt, which means you are in the interactive mode and may enter
-commands. If you do not,
+prompt, which means you are in the interactive mode and may enter commands.
+If you do not,
 .Nm
-will proceed loading kernel with the current parameters after the
+will proceed to loading the kernel with the current parameters after the
 timeout period has expired.
 .El
 .Sh COMMANDS
@@ -125,11 +136,12 @@ The following commands are accepted at the
 prompt:
 .Bl -tag -width stty_device_speed_____
 .It boot Op Ar image Op Fl abcds
-Boots kernel image specified by
+Boots the kernel image specified by
 .Ar image
-with any options given. Image specification consists of a pair
+with any options given.
+Image specification consists of a pair
 .Em device : filename ,
-either or both of each maybe omitted (':' is not needed if both are omitted),
+either or both can be omitted (':' is not needed if both are omitted),
 in which case values from
 .Nm
 variables will be used.
@@ -141,16 +153,18 @@ on the console device.
 Prints a list of available commands and machine dependent
 commands, if any.
 .It machine Op Ar command
-Issues machine-dependent commands. These are defined for i386 architecture:
+Issues machine-dependent commands.
+These are defined for i386 architecture:
 .Bl -tag -width diskinfo_
 .It Nm diskinfo
-Prints list of hard disks installed on your system including:
+Prints a list of hard disks installed on your system including:
 BIOS device number, and the BIOS geometry.
 .It Nm memory
 If used without any arguments this command will print out
 the memory configuration as determined through BIOS routines.
 Otherwise the arguments would specify the expressions to modify the
-memory configuration. The expression would have a form of:
+memory configuration.
+The expression would have a form of:
 .Pp
 .Dl [+-]<size>@<address>
 .Pp
@@ -161,9 +175,9 @@ amount of memory at the location specified by the
 argument.
 Both size and base address could be specified as octal,
 decimal, or hexadecimal numbers, as accepted by the
-.Xr stroul 3
+.Xr strtoul 3
 routine.
-Memory segments are not required to be adjucent to each other,
+Memory segments are not required to be adjacent to each other,
 the only requirement is that there is real physical memory under
 the range added.
 For example:
@@ -171,10 +185,10 @@ For example:
 machine mem +0x2000000@0x1000000
 .Ed
 .Pp
-would add 32M of memory right after first 16M.
-The other usefull command would be to winthdraw some range
-of memory form OS usage (as might be wrongfully reported as
-usefull by BIOS):
+would add 32M of memory right after the first 16M.
+The other useful command would be to withdraw a range
+of memory from OS usage (might be wrongfully reported as
+useful by the BIOS).
 .Bd -unfilled -offset indent
 machine mem -0x100000@0xf00000
 .Ed
@@ -190,7 +204,7 @@ Prints contents of the specified
 in long format including: attributes and file type, owner, group,
 size, filename.
 .It reboot
-Reboots machine by initiating a warm boot procedure.
+Reboots the machine by initiating a warm boot procedure.
 .It set Op Ar varname Op Ar value
 If invoked without arguments, prints a list of variables and their values.
 If only
@@ -206,39 +220,85 @@ Variables include:
 .Bl -tag -compact -width boothow
 .It Nm addr
 Address at which to load the kernel.
-.It Nm howto
-Options to pass to the loaded kernel.
 .It Nm debug
 Debug flag if
 .Nm
 was compiled with DEBUG defined.
 .It Nm device
-Boot device name (ie: fd0a, sd0a).
-.It Nm tty
-Active console device name (ie: com0, com1, pc0)
+Boot device name (i.e.,
+.Li fd0a ,
+.Li sd0a ) .
+.It Nm howto
+Options to pass to the loaded kernel.
 .It Nm image
 File name containing the kernel image.
+.It Nm timeout
+Number of seconds boot will wait for human intervention before
+booting the default kernel image.
+.It Nm tty
+Active console device name (i.e.,
+.Li com0 ,
+.Li com1 ,
+.Li pc0 ) .
 .El
 .It stty Op Ar device Op Ar speed
 Displays or sets the
 .Ar speed
 for a console
 .Ar device .
-If changing baudrate for the currently
-active console, gives you five seconds of pause
-before changing the baud rate to allow you to change your terminal's
-speed to match.  If changing speed
+If changing the baudrate for the currently active console,
+.Nm
+offers you five seconds of grace time before committing the change
+to allow you to change your terminal's speed to match.
+If changing speed
 .Em not
-for the active console, sets the baudrate value to be used the
+for the active console, the baudrate is set for the
 .Em next
 time you switch to a serial console.
-The baudrate value is not used for the pc0 console.
+The baudrate value is not used for the
+.Li pc0
+console.
 .Pp
-The default baudrate if not specifically
-set is 9600 baud.
+The default baudrate is 9600bps.
 .It time
 Displays system time and date.
 .El
+.Sh EXAMPLES
+.Li boot> boot
+.Pp
+Boot the default kernel.
+.Pp
+.Li # echo \&"boot\&" > /etc/boot.conf
+.Pp
+Remove the 5 second pause at boot-time permanently, causing
+.Nm
+to load the kernel immediately without prompting.
+.Pp
+.Li boot> set tty com0
+.Pp
+Use serial console.
+A null modem cable should connect the specified serial port to a terminal.
+Useful for debugging.
+.Pp
+.Li # echo \&"set tty com0\&" > /etc/boot.conf
+.Pp
+Invoke the serial console at every boot.
+.Pp
+.Li boot> boot wd1a:/bsd -c
+.Pp
+Boot the kernel named
+.Pa /bsd
+from the second IDE disk in
+.Dq User Kernel Configuration
+mode (see
+.Xr config 8 ) .
+This mechanism allows for the explicit enabling and disabling of devices
+during the current boot sequence, as well as the modification
+of device parameters.
+Once booted, such changes can be made permanent by using
+.Xr config 8 Ns 's
+.Fl e
+option.
 .Sh FILES
 .Bl -tag -width /usr/mdec/biosbootxx -compact
 .It Pa /usr/mdec/biosboot
@@ -259,9 +319,7 @@ kernel image
 RFC 1950 describes the zlib library interface.
 .Pp
 The official home page for the version of zlib used in this
-operating system see http://quest.jpl.nasa.gov/zlib/ .
-.Sh BUGS
-Well, nobody is perfect.
+operating system see http://quest.jpl.nasa.gov/zlib/.
 .Sh HISTORY
 This program was written by Michael Shalayeff for
 .Ox 2.1 .

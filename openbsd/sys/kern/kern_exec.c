@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.44 2000/09/28 13:41:39 art Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.48 2001/04/01 21:30:33 art Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -269,8 +269,7 @@ sys_execve(p, v, retval)
 	pack.ep_hdrvalid = 0;
 	pack.ep_ndp = &nid;
 	pack.ep_emul_arg = NULL;
-	pack.ep_vmcmds.evs_cnt = 0;
-	pack.ep_vmcmds.evs_used = 0;
+	VMCMDSET_INIT(&pack.ep_vmcmds);
 	pack.ep_vap = &attr;
 	pack.ep_emul = &emul_native;
 	pack.ep_flags = 0;
@@ -599,6 +598,11 @@ sys_execve(p, v, retval)
 	VOP_CLOSE(pack.ep_vp, FREAD, cred, p);
 	vput(pack.ep_vp);
 
+	/*
+	 * notify others that we exec'd
+	 */
+	KNOTE(&p->p_klist, NOTE_EXEC);
+
 	/* setup new registers and do misc. setup. */
 	if(pack.ep_emul->e_fixup != NULL) {
 		if((*pack.ep_emul->e_fixup)(p, &pack) != 0)
@@ -618,7 +622,7 @@ sys_execve(p, v, retval)
 
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_EMUL))
-		ktremul(p->p_tracep, p->p_emul->e_name);
+		ktremul(p, p->p_emul->e_name);
 #endif
 	return (0);
 

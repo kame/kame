@@ -1,3 +1,5 @@
+/*	$OpenBSD: if_vlan_var.h,v 1.4 2001/03/28 15:22:44 jason Exp $	*/
+
 /*
  * Copyright 1998 Massachusetts Institute of Technology
  *
@@ -47,9 +49,11 @@ struct	ifvlan {
 		u_int16_t ifvm_tag; /* tag to apply on packets leaving if */
 	}	ifv_mib;
 	SLIST_HEAD(__vlan_mchead, vlan_mc_entry)	vlan_mc_listhead;
+	int ifv_flags;
 };
 #define	ifv_if		ifv_ac.ac_if
 #define	ifv_tag		ifv_mib.ifvm_tag
+#define	IFVF_PROMISC	0x01
 #endif /* _KERNEL */
 
 struct	ether_vlan_header {
@@ -82,7 +86,6 @@ struct	vlanreq {
 #define	SIOCGETVLAN	SIOCGIFGENERIC
 
 #ifdef _KERNEL
-extern	u_int vlan_proto;
 extern	int vlan_input(register struct ether_header *eh, struct mbuf *m);
 extern	int vlan_input_tag(struct ether_header *eh,
 			struct mbuf *m, u_int16_t t);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ess_isapnp.c,v 1.1 1999/06/22 16:20:03 niklas Exp $	*/
+/*	$OpenBSD: ess_isapnp.c,v 1.3 2001/04/19 23:33:20 deraadt Exp $	*/
 /*	$NetBSD: ess_isa.c,v 1.4 1999/03/18 20:57:11 mycroft Exp $	*/
 
 /*-
@@ -41,6 +41,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/timeout.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -78,8 +79,6 @@ void ess_isapnp_attach(parent, self, aux)
 	struct ess_softc *sc = (void *)self;
 	struct isa_attach_args *ia = aux;
 
-	printf("\n");
-
 	sc->sc_ic = ia->ia_ic;
 	sc->sc_iot = ia->ia_iot;
 	sc->sc_ioh = ia->ipa_io[0].h;
@@ -95,11 +94,9 @@ void ess_isapnp_attach(parent, self, aux)
 	sc->sc_isa = parent->dv_parent;
 
 	if (!essmatch(sc)) {
-		printf("%s: essmatch failed\n", sc->sc_dev.dv_xname);
+		printf(": essmatch failed\n", sc->sc_dev.dv_xname);
 		return;
 	}
-
-	printf("%s:", sc->sc_dev.dv_xname);
 
 	essattach(sc);
 }

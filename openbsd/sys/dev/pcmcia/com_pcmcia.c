@@ -1,4 +1,4 @@
-/*	$OpenBSD: com_pcmcia.c,v 1.26 2000/04/24 19:43:35 niklas Exp $	*/
+/*	$OpenBSD: com_pcmcia.c,v 1.28 2001/03/28 19:59:48 millert Exp $	*/
 /*	$NetBSD: com_pcmcia.c,v 1.15 1998/08/22 17:47:58 msaitoh Exp $	*/
 
 /*
@@ -225,8 +225,9 @@ com_pcmcia_match(parent, match, aux)
 	    i++) {
 		for (j = 0; j < 4; j++)
 			if (com_pcmcia_prod[i].cis1_info[j] &&
-			    strcmp(com_pcmcia_prod[i].cis1_info[j],
-			    pa->card->cis1_info[j]))
+			    pa->card->cis1_info[j] &&
+			    strcmp(pa->card->cis1_info[j],
+			    com_pcmcia_prod[i].cis1_info[j]))
 				break;
 		if (j == 4)
 			return 1;
@@ -331,10 +332,9 @@ found:
 	sc->sc_iobase = -1;
 	sc->enable = com_pcmcia_enable;
 	sc->disable = com_pcmcia_disable;
-	
-#ifdef notyet
 	sc->sc_frequency = COM_FREQ;
 
+#ifdef notyet
 	com_attach_subr(sc);
 #endif
 	/* establish the interrupt. */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: loadfile.c,v 1.7 1998/09/04 17:03:24 millert Exp $	*/
+/*	$OpenBSD: loadfile.c,v 1.10 2001/01/16 15:34:22 art Exp $	*/
 /*	$NetBSD: loadfile.c,v 1.3 1997/04/06 08:40:59 cgd Exp $	*/
 
 /*
@@ -61,11 +61,12 @@
 static int coff_exec __P((int, struct ecoff_exechdr *, u_int64_t *));
 #endif
 #ifdef ALPHA_BOOT_ELF
-static int elf_exec __P((int, Elf_Ehdr *, u_int64_t *));
+static int elf_exec __P((int, Elf64_Ehdr *, u_int64_t *));
 #endif
 int loadfile __P((char *, u_int64_t *));
 
-vm_offset_t ffp_save, ptbr_save, esym;
+paddr_t ffp_save, ptbr_save;
+vaddr_t ssym, esym;
 
 /*
  * Open 'filename', read in program and return the entry point or -1 if error.
@@ -81,7 +82,7 @@ loadfile(fname, entryp)
 		struct ecoff_exechdr coff;
 #endif
 #ifdef ALPHA_BOOT_ELF
-		Elf_Ehdr elf;
+		Elf64_Ehdr elf;
 #endif
 	} hdr;
 	int fd, rval;
@@ -107,7 +108,7 @@ loadfile(fname, entryp)
 	} else
 #endif
 #ifdef ALPHA_BOOT_ELF
-	if (memcmp(Elf_e_ident, hdr.elf.e_ident, Elf_e_siz) == 0) {
+	if (memcmp(ELFMAG, hdr.elf.e_ident, SELFMAG) == 0) {
 		rval = elf_exec(fd, &hdr.elf, entryp);
 	} else
 #endif
@@ -218,6 +219,7 @@ coff_exec(fd, coff, entryp)
 		ffp_save += symhdr.estrMax;
 		printf("+%d]", symhdr.estrMax);
 		esym = ((ffp_save + sizeof(int) - 1) & ~(sizeof(int) - 1));
+		ssym = (vaddr_t)symtab;
 	}
 
 	ffp_save = ALPHA_K0SEG_TO_PHYS((ffp_save + PGOFSET & ~PGOFSET)) >>
@@ -234,21 +236,24 @@ coff_exec(fd, coff, entryp)
 static int
 elf_exec(fd, elf, entryp)
 	int fd;
-	Elf_Ehdr *elf;
+	Elf64_Ehdr *elf;
 	u_int64_t *entryp;
 {
 	int i;
-	int first = 1;
+	int first = 1, havesyms;
+	Elf64_Shdr *shp;
+	Elf64_Off off;
+	size_t sz;
 
 	for (i = 0; i < elf->e_phnum; i++) {
-		Elf_Phdr phdr;
+		Elf64_Phdr phdr;
 		(void)lseek(fd, elf->e_phoff + sizeof(phdr) * i, SEEK_SET);
 		if (read(fd, (void *)&phdr, sizeof(phdr)) != sizeof(phdr)) {
 			(void)printf("read phdr: %s\n", strerror(errno));
 			return (1);
 		}
-		if (phdr.p_type != Elf_pt_load ||
-		    (phdr.p_flags & (Elf_pf_w|Elf_pf_x)) == 0)
+		if (phdr.p_type != PT_LOAD ||
+		    (phdr.p_flags & (PF_W|PF_X)) == 0)
 			continue;
 
 		/* Read in segment. */
@@ -265,12 +270,78 @@ elf_exec(fd, elf, entryp)
 		/* Zero out bss. */
 		if (phdr.p_filesz < phdr.p_memsz) {
 			(void)printf("+%lu", phdr.p_memsz - phdr.p_filesz);
-			bzero(phdr.p_vaddr + phdr.p_filesz,
+			bzero((caddr_t)phdr.p_vaddr + phdr.p_filesz,
 			    phdr.p_memsz - phdr.p_filesz);
 		}
 		first = 0;
 	}
 
+	ffp_save = roundup(ffp_save, sizeof(long));
+
+	/*
+	 * Retreive symbols.
+	 */
+	ssym = ffp_save;
+	ffp_save += sizeof(Elf64_Ehdr);
+
+	if (lseek(fd, elf->e_shoff, SEEK_SET) == -1)  {
+		printf("seek to section headers: %s\n", strerror(errno));
+		return (1);
+	}
+
+	sz = elf->e_shnum * sizeof(Elf64_Shdr);
+	shp = (Elf64_Shdr *)ffp_save;
+	ffp_save += roundup(sz, sizeof(long));
+
+	if (read(fd, shp, sz) != sz) {
+		printf("read section headers: %d\n", strerror(errno));
+		return (1);
+	}
+
+	/*
+	 * Now load the symbol sections themselves.  Make sure the
+	 * sections are aligned. Don't bother with string tables if
+	 * there are no symbol sections.
+	 */
+	off = roundup((sizeof(Elf64_Ehdr) + sz), sizeof(long));
+
+	for (havesyms = i = 0; i < elf->e_shnum; i++)
+		if (shp[i].sh_type == SHT_SYMTAB)
+			havesyms = 1;
+
+	if (!havesyms)
+		goto no_syms;
+
+	for (first = 1, i = 0; i < elf->e_shnum; i++) {
+		if (shp[i].sh_type == SHT_SYMTAB ||
+		    shp[i].sh_type == SHT_STRTAB) {
+			printf("%s%ld", first ? " [" : "+",
+			       (u_long)shp[i].sh_size);
+			if (lseek(fd, shp[i].sh_offset, SEEK_SET) == -1) {
+				printf("lseek symbols: %s\n", strerror(errno));
+				return (1);
+			}
+			if (read(fd, (void *)ffp_save, shp[i].sh_size) != shp[i].sh_size) {
+				printf("read symbols: %s\n", strerror(errno));
+				return (1);
+			}
+			ffp_save += roundup(shp[i].sh_size, sizeof(long));
+			shp[i].sh_offset = off;
+			off += roundup(shp[i].sh_size, sizeof(long));
+			first = 0;
+		}
+	}
+	if (havesyms && first == 0)
+		printf("]");
+
+	elf->e_phoff = 0;
+	elf->e_shoff = sizeof(Elf64_Ehdr);
+	elf->e_phentsize = 0;
+	elf->e_phnum = 0;
+	bcopy(elf, (void *)ssym, sizeof(*elf));
+
+no_syms:
+	esym = ffp_save;
 	ffp_save = ALPHA_K0SEG_TO_PHYS((ffp_save + PGOFSET & ~PGOFSET)) >> PGSHIFT;
 	ffp_save += 2;		/* XXX OSF/1 does this, no idea why. */
 

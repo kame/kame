@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vrreg.h,v 1.2 1999/01/30 23:15:37 niklas Exp $	*/
+/*	$OpenBSD: if_vrreg.h,v 1.4 2001/02/20 19:12:48 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: if_vrreg.h,v 1.2 1999/01/10 18:51:49 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.10 2001/02/09 06:11:21 bmilekic Exp $
  */
 
 /*
@@ -334,10 +334,9 @@ struct vr_desc {
 #define VR_TXCTL_LASTFRAG	0x00400000
 #define VR_TXCTL_FINT		0x00800000
 
-
 #define VR_MAXFRAGS		16
 #define VR_RX_LIST_CNT		64
-#define VR_TX_LIST_CNT		64
+#define VR_TX_LIST_CNT		128
 #define VR_MIN_FRAMELEN		60
 #define VR_FRAMELEN		1536
 #define VR_RXLEN		1520
@@ -403,18 +402,14 @@ struct vr_softc {
 	struct device		sc_dev;		/* generic device structure */
 	void *			sc_ih;		/* interrupt handler cookie */
 	struct arpcom		arpcom;		/* interface info */
-	struct ifmedia		ifmedia;	/* media info */
 	bus_space_handle_t	vr_bhandle;	/* bus space handle */
 	bus_space_tag_t		vr_btag;	/* bus space tag */
+	bus_dma_tag_t		sc_dmat;
 	struct vr_type		*vr_info;	/* Rhine adapter info */
-	struct vr_type		*vr_pinfo;	/* phy info */
-	u_int8_t		vr_phy_addr;	/* PHY address */
-	u_int8_t		vr_tx_pend;	/* TX pending */
-	u_int8_t		vr_want_auto;
-	u_int8_t		vr_autoneg;
-	caddr_t			vr_ldata_ptr;
 	struct vr_list_data	*vr_ldata;
 	struct vr_chain_data	vr_cdata;
+	struct mii_data		sc_mii;
+	struct timeout		sc_to;
 };
 
 /*
@@ -435,51 +430,41 @@ struct vr_softc {
 	bus_space_read_1(sc->vr_btag, sc->vr_bhandle, reg)
 
 #define VR_TIMEOUT		1000
+#define ETHER_ALIGN		2
 
 /*
  * General constants that are fun to know.
  *
  * VIA vendor ID
  */
-#define	VIA_VENDORID		0x1106
+#define	VIA_VENDORID			0x1106
 
 /*
  * VIA Rhine device IDs.
  */
-#define	VIA_DEVICEID_RHINE	0x3043
-#define VIA_DEVICEID_RHINE_II	0x6100
-
-
-/*
- * Texas Instruments PHY identifiers
- */
-#define TI_PHY_VENDORID		0x4000
-#define TI_PHY_10BT		0x501F
-#define TI_PHY_100VGPMI		0x502F
+#define	VIA_DEVICEID_RHINE		0x3043
+#define VIA_DEVICEID_RHINE_II		0x6100
+#define VIA_DEVICEID_RHINE_II_2		0x3065
 
 /*
- * These ID values are for the NS DP83840A 10/100 PHY
+ * Delta Electronics device ID.
  */
-#define NS_PHY_VENDORID		0x2000
-#define NS_PHY_83840A		0x5C0F
+#define DELTA_VENDORID			0x1500
 
 /*
- * Level 1 10/100 PHY
+ * Delta device IDs.
  */
-#define LEVEL1_PHY_VENDORID	0x7810
-#define LEVEL1_PHY_LXT970	0x000F
+#define DELTA_DEVICEID_RHINE_II		0x1320
 
 /*
- * Intel 82555 10/100 PHY
+ * Addtron vendor ID.
  */
-#define INTEL_PHY_VENDORID	0x0A28
-#define INTEL_PHY_82555		0x015F
+#define ADDTRON_VENDORID		0x4033
 
 /*
- * SEEQ 80220 10/100 PHY
+ * Addtron device IDs.
  */
-#define SEEQ_PHY_VENDORID	0x0016
-#define SEEQ_PHY_80220		0xF83F
+#define ADDTRON_DEVICEID_RHINE_II	0x1320
 
 
 /*
@@ -518,105 +503,11 @@ struct vr_softc {
 #define VR_PME_EN		0x0010
 #define VR_PME_STATUS		0x8000
 
-#define PHY_UNKNOWN		6
-
-#define VR_PHYADDR_MIN		0x00
-#define VR_PHYADDR_MAX		0x1F
-
-#define PHY_BMCR		0x00
-#define PHY_BMSR		0x01
-#define PHY_VENID		0x02
-#define PHY_DEVID		0x03
-#define PHY_ANAR		0x04
-#define PHY_LPAR		0x05
-#define PHY_ANEXP		0x06
-
-#define PHY_ANAR_NEXTPAGE	0x8000
-#define PHY_ANAR_RSVD0		0x4000
-#define PHY_ANAR_TLRFLT		0x2000
-#define PHY_ANAR_RSVD1		0x1000
-#define PHY_ANAR_RSVD2		0x0800
-#define PHY_ANAR_RSVD3		0x0400
-#define PHY_ANAR_100BT4		0x0200
-#define PHY_ANAR_100BTXFULL	0x0100
-#define PHY_ANAR_100BTXHALF	0x0080
-#define PHY_ANAR_10BTFULL	0x0040
-#define PHY_ANAR_10BTHALF	0x0020
-#define PHY_ANAR_PROTO4		0x0010
-#define PHY_ANAR_PROTO3		0x0008
-#define PHY_ANAR_PROTO2		0x0004
-#define PHY_ANAR_PROTO1		0x0002
-#define PHY_ANAR_PROTO0		0x0001
-
-/*
- * These are the register definitions for the PHY (physical layer
- * interface chip).
- */
-/*
- * PHY BMCR Basic Mode Control Register
- */
-#define PHY_BMCR_RESET			0x8000
-#define PHY_BMCR_LOOPBK			0x4000
-#define PHY_BMCR_SPEEDSEL		0x2000
-#define PHY_BMCR_AUTONEGENBL		0x1000
-#define PHY_BMCR_RSVD0			0x0800	/* write as zero */
-#define PHY_BMCR_ISOLATE		0x0400
-#define PHY_BMCR_AUTONEGRSTR		0x0200
-#define PHY_BMCR_DUPLEX			0x0100
-#define PHY_BMCR_COLLTEST		0x0080
-#define PHY_BMCR_RSVD1			0x0040	/* write as zero, don't care */
-#define PHY_BMCR_RSVD2			0x0020	/* write as zero, don't care */
-#define PHY_BMCR_RSVD3			0x0010	/* write as zero, don't care */
-#define PHY_BMCR_RSVD4			0x0008	/* write as zero, don't care */
-#define PHY_BMCR_RSVD5			0x0004	/* write as zero, don't care */
-#define PHY_BMCR_RSVD6			0x0002	/* write as zero, don't care */
-#define PHY_BMCR_RSVD7			0x0001	/* write as zero, don't care */
-/*
- * RESET: 1 == software reset, 0 == normal operation
- * Resets status and control registers to default values.
- * Relatches all hardware config values.
- *
- * LOOPBK: 1 == loopback operation enabled, 0 == normal operation
- *
- * SPEEDSEL: 1 == 100Mb/s, 0 == 10Mb/s
- * Link speed is selected byt his bit or if auto-negotiation if bit
- * 12 (AUTONEGENBL) is set (in which case the value of this register
- * is ignored).
- *
- * AUTONEGENBL: 1 == Autonegotiation enabled, 0 == Autonegotiation disabled
- * Bits 8 and 13 are ignored when autoneg is set, otherwise bits 8 and 13
- * determine speed and mode. Should be cleared and then set if PHY configured
- * for no autoneg on startup.
- *
- * ISOLATE: 1 == isolate PHY from MII, 0 == normal operation
- *
- * AUTONEGRSTR: 1 == restart autonegotiation, 0 = normal operation
- *
- * DUPLEX: 1 == full duplex mode, 0 == half duplex mode
- *
- * COLLTEST: 1 == collision test enabled, 0 == normal operation
- */
-
-/* 
- * PHY, BMSR Basic Mode Status Register 
- */   
-#define PHY_BMSR_100BT4			0x8000
-#define PHY_BMSR_100BTXFULL		0x4000
-#define PHY_BMSR_100BTXHALF		0x2000
-#define PHY_BMSR_10BTFULL		0x1000
-#define PHY_BMSR_10BTHALF		0x0800
-#define PHY_BMSR_RSVD1			0x0400	/* write as zero, don't care */
-#define PHY_BMSR_RSVD2			0x0200	/* write as zero, don't care */
-#define PHY_BMSR_RSVD3			0x0100	/* write as zero, don't care */
-#define PHY_BMSR_RSVD4			0x0080	/* write as zero, don't care */
-#define PHY_BMSR_MFPRESUP		0x0040
-#define PHY_BMSR_AUTONEGCOMP		0x0020
-#define PHY_BMSR_REMFAULT		0x0010
-#define PHY_BMSR_CANAUTONEG		0x0008
-#define PHY_BMSR_LINKSTAT		0x0004
-#define PHY_BMSR_JABBER			0x0002
-#define PHY_BMSR_EXTENDED		0x0001
-
 #ifndef ETHER_CRC_LEN
 #define ETHER_CRC_LEN 4
+#endif
+
+#ifdef __alpha__
+#undef vtophys
+#define vtophys(va)		alpha_XXX_dmamap((vm_offset_t)va)
 #endif

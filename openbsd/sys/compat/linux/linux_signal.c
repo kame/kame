@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_signal.c,v 1.7 2000/06/07 14:11:38 niklas Exp $	*/
+/*	$OpenBSD: linux_signal.c,v 1.9 2001/04/09 06:52:26 tholo Exp $	*/
 /*	$NetBSD: linux_signal.c,v 1.10 1996/04/04 23:51:36 christos Exp $	*/
 
 /*
@@ -73,12 +73,12 @@ int bsd_to_linux_sig[NSIG] = {
 	LINUX_SIGILL,
 	LINUX_SIGTRAP,
 	LINUX_SIGABRT,
-	0,			/* SIGEMT */
+	LINUX_NSIG,		/* XXX Kludge to get RT signal #32 to work */
 	LINUX_SIGFPE,
 	LINUX_SIGKILL,
 	LINUX_SIGBUS,
 	LINUX_SIGSEGV,
-	0,			/* SIGSYS */
+	LINUX_NSIG + 1,			/* XXX Kludge to get RT signal #32 to work */
 	LINUX_SIGPIPE,
 	LINUX_SIGALRM,
 	LINUX_SIGTERM,
@@ -133,8 +133,8 @@ int linux_to_bsd_sig[LINUX__NSIG] = {
 	SIGIO,
 	0,			/* SIGUNUSED */
 	0,
-	0,
-	0,
+	SIGEMT,			/* XXX Gruesome hack for linuxthreads:       */
+	SIGSYS,			/* Map 1st 2 RT signals onto ones we handle. */
 	0,
 	0,
 	0,
@@ -373,7 +373,7 @@ linux_sys_sigaction(p, v, retval)
 	caddr_t sg;
 	int error;
 
-	if (SCARG(uap, signum) < 0 || SCARG(uap, signum) >= LINUX_NSIG)
+	if (SCARG(uap, signum) < 0 || SCARG(uap, signum) >= LINUX__NSIG)
 		return (EINVAL);
 
 	sg = stackgap_init(p->p_emul);
@@ -399,8 +399,18 @@ linux_sys_sigaction(p, v, retval)
 	SCARG(&sa, nsa) = nbsa;
 	SCARG(&sa, osa) = obsa;
 
-	if ((error = sys_sigaction(p, &sa, retval)) != 0)
-		return (error);
+	/* Silently ignore unknown signals */
+	if (SCARG(&sa, signum) == 0) {
+		if (obsa != NULL) {
+			obsa->sa_handler = SIG_IGN;
+			sigemptyset(&obsa->sa_mask);
+			obsa->sa_flags = 0;
+		}
+	}
+	else {
+		if ((error = sys_sigaction(p, &sa, retval)) != 0)
+			return (error);
+	}
 
 	if (olsa != NULL) {
 		if ((error = copyin(obsa, &tmpbsa, sizeof(tmpbsa))) != 0)
@@ -434,7 +444,7 @@ linux_sys_rt_sigaction(p, v, retval)
 	if (SCARG(uap, sigsetsize) != sizeof(linux_sigset_t))
 		return (EINVAL);
 
-	if (SCARG(uap, signum) < 0 || SCARG(uap, signum) >= LINUX_NSIG)
+	if (SCARG(uap, signum) < 0 || SCARG(uap, signum) >= LINUX__NSIG)
 		return (EINVAL);
 
 	sg = stackgap_init(p->p_emul);
@@ -461,8 +471,18 @@ linux_sys_rt_sigaction(p, v, retval)
 	SCARG(&sa, nsa) = nbsa;
 	SCARG(&sa, osa) = obsa;
 
-	if ((error = sys_sigaction(p, &sa, retval)) != 0)
-		return (error);
+	/* Silently ignore unknown signals */
+	if (SCARG(&sa, signum) == 0) {
+		if (obsa != NULL) {
+			obsa->sa_handler = SIG_IGN;
+			sigemptyset(&obsa->sa_mask);
+			obsa->sa_flags = 0;
+		}
+	}
+	else {
+		if ((error = sys_sigaction(p, &sa, retval)) != 0)
+			return (error);
+	}
 
 	if (olsa != NULL) {
 		if ((error = copyin(obsa, &tmpbsa, sizeof(tmpbsa))) != 0)
@@ -496,7 +516,7 @@ linux_sys_signal(p, v, retval)
 	struct sigaction *osa, *nsa, tmpsa;
 	int error;
 
-	if (SCARG(uap, sig) < 0 || SCARG(uap, sig) >= LINUX_NSIG)
+	if (SCARG(uap, sig) < 0 || SCARG(uap, sig) >= LINUX__NSIG)
 		return (EINVAL);
 
 	sg = stackgap_init(p->p_emul);
@@ -512,8 +532,12 @@ linux_sys_signal(p, v, retval)
 	SCARG(&sa_args, signum) = linux_to_bsd_sig[SCARG(uap, sig)];
 	SCARG(&sa_args, osa) = osa;
 	SCARG(&sa_args, nsa) = nsa;
-	if ((error = sys_sigaction(p, &sa_args, retval)))
-		return (error);
+
+	/* Silently ignore unknown signals */
+	if (SCARG(&sa_args, signum) != 0) {
+		if ((error = sys_sigaction(p, &sa_args, retval)))
+			return (error);
+	}
 
 	if ((error = copyin(osa, &tmpsa, sizeof *osa)))
 		return (error);
@@ -855,7 +879,7 @@ linux_sys_kill(p, v, retval)
 	struct sys_kill_args ka;
 
 	SCARG(&ka, pid) = SCARG(uap, pid);
-	if (SCARG(uap, signum) < 0 || SCARG(uap, signum) >= LINUX_NSIG)
+	if (SCARG(uap, signum) < 0 || SCARG(uap, signum) >= LINUX__NSIG)
 		return (EINVAL);
 	SCARG(&ka, signum) = linux_to_bsd_sig[SCARG(uap, signum)];
 	return (sys_kill(p, &ka, retval));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_dc_pci.c,v 1.10 2000/10/30 18:20:18 aaron Exp $	*/
+/*	$OpenBSD: if_dc_pci.c,v 1.13 2001/04/06 17:14:14 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -96,19 +96,24 @@ struct dc_type dc_devs[] = {
 	{ PCI_VENDOR_LITEON, PCI_PRODUCT_LITEON_PNIC },
 	{ PCI_VENDOR_LITEON, PCI_PRODUCT_LITEON_PNICII },
 	{ PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_EN1217 },
+	{ PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_EN2242 },
 	{ 0, 0 }
 };
 
-int dc_pci_probe	__P((struct device *, void *, void *));
-void dc_pci_attach	__P((struct device *, struct device *, void *));
-void dc_pci_acpi	__P((struct device *, void *));
+int dc_pci_match		__P((struct device *, void *, void *));
+void dc_pci_attach		__P((struct device *, struct device *, void *));
+void dc_pci_acpi		__P((struct device *, void *));
+
+extern void dc_eeprom_width	__P((struct dc_softc *));
+extern void dc_read_srom	__P((struct dc_softc *, int));
+extern void dc_parse_21143_srom	__P((struct dc_softc *));
 
 /*
  * Probe for a 21143 or clone chip. Check the PCI vendor and device
  * IDs against our list and return a device name if we find a match.
  */
 int
-dc_pci_probe(parent, match, aux)
+dc_pci_match(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
@@ -262,6 +267,7 @@ void dc_pci_attach(parent, self, aux)
 			sc->dc_type = DC_TYPE_21143;
 			sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
 			sc->dc_flags |= DC_REDUCED_MII_POLL;
+			dc_read_srom(sc, 9);
 		}
 		break;
 	case PCI_VENDOR_DAVICOM:
@@ -298,6 +304,13 @@ void dc_pci_attach(parent, self, aux)
 		break;
 	case PCI_VENDOR_MACRONIX:
 	case PCI_VENDOR_ACCTON:
+		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ACCTON_EN2242) {
+			found = 1;
+			sc->dc_type = DC_TYPE_AN983;
+			sc->dc_flags |= DC_TX_USE_TX_INTR;
+			sc->dc_flags |= DC_TX_ADMTEK_WAR;
+			sc->dc_pmode = DC_PMODE_MII;
+		}
 		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_MACRONIX_MX98713) {
 			found = 1;
 			if (revision < DC_REVISION_98713A) {
@@ -393,7 +406,7 @@ void dc_pci_attach(parent, self, aux)
 	}
 
 	/*
-	 * If we discover later (in dc_attach_common()) that we have an
+	 * If we discover later (in dc_attach) that we have an
 	 * MII with no PHY, we need to have the 21143 drive the LEDs.
 	 * Except there are some systems like the NEC VersaPro NoteBook PC
 	 * which have no LEDs, and twiddling these bits has adverse effects
@@ -416,32 +429,9 @@ void dc_pci_attach(parent, self, aux)
 	 * The tricky ones are the Macronix/PNIC II and the
 	 * Intel 21143.
 	 */
-	if (DC_IS_INTEL(sc)) {
-		u_int32_t		media, cwuc;
-		cwuc = pci_conf_read(pc, pa->pa_tag, DC_PCI_CWUC);
-		cwuc |= DC_CWUC_FORCE_WUL;
-		pci_conf_write(pc, pa->pa_tag, DC_PCI_CWUC, cwuc);
-		DELAY(10000);
-		media = pci_conf_read(pc, pa->pa_tag, DC_PCI_CWUC);
-		cwuc &= ~DC_CWUC_FORCE_WUL;
-		pci_conf_write(pc, pa->pa_tag, DC_PCI_CWUC, cwuc);
-		DELAY(10000);
-		if (media & DC_CWUC_MII_ABILITY)
-			sc->dc_pmode = DC_PMODE_MII;
-		if (media & DC_CWUC_SYM_ABILITY) {
-			sc->dc_pmode = DC_PMODE_SYM;
-			sc->dc_flags |= DC_21143_NWAY;
-		}
-		/*
-		 * If none of the bits are set, then this NIC
-		 * isn't meant to support 'wake up LAN' mode.
-		 * This is usually only the case on multiport
-		 * cards, and these cards almost always have
-		 * MII transceivers.
-		 */
-		if (media == 0)
-			sc->dc_pmode = DC_PMODE_MII;
-	} else if (DC_IS_MACRONIX(sc) || DC_IS_PNICII(sc)) {
+	if (DC_IS_INTEL(sc))
+		dc_parse_21143_srom(sc);
+	else if (DC_IS_MACRONIX(sc) || DC_IS_PNICII(sc)) {
 		if (sc->dc_type == DC_TYPE_98713)
 			sc->dc_pmode = DC_PMODE_MII;
 		else
@@ -449,12 +439,38 @@ void dc_pci_attach(parent, self, aux)
 	} else if (!sc->dc_pmode)
 		sc->dc_pmode = DC_PMODE_MII;
 
-	dc_attach_common(sc);
+#ifdef SRM_MEDIA
+	sc->dc_srm_media = 0;
+
+	/* Remember the SRM console media setting */
+	if (DC_IS_INTEL(sc)) {
+		command = pci_read_config(dev, DC_PCI_CFDD, 4);
+		command &= ~(DC_CFDD_SNOOZE_MODE|DC_CFDD_SLEEP_MODE);
+		switch ((command >> 8) & 0xff) {
+		case 3: 
+			sc->dc_srm_media = IFM_10_T;
+			break;
+		case 4: 
+			sc->dc_srm_media = IFM_10_T | IFM_FDX;
+			break;
+		case 5: 
+			sc->dc_srm_media = IFM_100_TX;
+			break;
+		case 6: 
+			sc->dc_srm_media = IFM_100_TX | IFM_FDX;
+			break;
+		}
+		if (sc->dc_srm_media)
+			sc->dc_srm_media |= IFM_ACTIVE | IFM_ETHER;
+	}
+#endif
+	dc_eeprom_width(sc);
+	dc_attach(sc);
 
 fail:
 	splx(s);
 }
 
 struct cfattach dc_pci_ca = {
-	sizeof(struct dc_softc), dc_pci_probe, dc_pci_attach
+	sizeof(struct dc_softc), dc_pci_match, dc_pci_attach
 };

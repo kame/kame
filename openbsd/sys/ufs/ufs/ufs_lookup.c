@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_lookup.c,v 1.12 1999/02/26 03:35:18 art Exp $	*/
+/*	$OpenBSD: ufs_lookup.c,v 1.15 2001/02/27 09:52:56 art Exp $	*/
 /*	$NetBSD: ufs_lookup.c,v 1.7 1996/02/09 22:36:06 christos Exp $	*/
 
 /*
@@ -238,7 +238,7 @@ ufs_lookup(v)
 	 */
 	bmask = VFSTOUFS(vdp->v_mount)->um_mountp->mnt_stat.f_iosize - 1;
 	if (nameiop != LOOKUP || dp->i_diroff == 0 ||
-	    dp->i_diroff > dp->i_ffs_size) {
+	    dp->i_diroff >= dp->i_ffs_size) {
 		entryoffsetinblock = 0;
 		dp->i_offset = 0;
 		numdirpasses = 1;
@@ -374,7 +374,6 @@ searchloop:
 				}
 				dp->i_ino = ep->d_ino;
 				dp->i_reclen = ep->d_reclen;
-				brelse(bp);
 				goto found;
 			}
 		}
@@ -473,11 +472,12 @@ found:
 	 * Check that directory length properly reflects presence
 	 * of this entry.
 	 */
-	if (entryoffsetinblock + DIRSIZ(FSFMT(vdp), ep) > dp->i_ffs_size) {
+	if (dp->i_offset + DIRSIZ(FSFMT(vdp), ep) > dp->i_ffs_size) {
 		ufs_dirbad(dp, dp->i_offset, "i_ffs_size too small");
-		dp->i_ffs_size = entryoffsetinblock + DIRSIZ(FSFMT(vdp), ep);
+		dp->i_ffs_size = dp->i_offset + DIRSIZ(FSFMT(vdp), ep);
 		dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
+	brelse(bp);
 
 	/*
 	 * Found component in pathname.
@@ -958,19 +958,31 @@ ufs_dirremove(dvp, ip, flags, isrmdir)
  		ep->d_reclen += dp->i_reclen;
 	}
 out:
- 	if (ip) {
- 		ip->i_effnlink--;
- 		ip->i_flag |= IN_CHANGE;
- 	}
  	if (DOINGSOFTDEP(dvp)) {
- 		if (ip)
- 			softdep_setup_remove(bp, dp, ip, isrmdir);
- 		bdwrite(bp);
+		if (ip) {
+			ip->i_effnlink--;
+			softdep_change_linkcnt(ip);
+			softdep_setup_remove(bp, dp, ip, isrmdir);
+		}
+		if (softdep_slowdown(dvp)) {
+			error = bwrite(bp);
+		} else {
+			bdwrite(bp);
+			error = 0;
+		}
  	} else {
- 		if (ip)
- 			ip->i_ffs_nlink--;   /* XXX */
-
-		error = VOP_BWRITE(bp);
+		if (ip) {
+			ip->i_effnlink--;
+			ip->i_ffs_nlink--;
+			ip->i_flag |= IN_CHANGE;
+		}
+		if (flags & DOWHITEOUT)
+			error = bwrite(bp);
+		else if (DOINGASYNC(dvp) && dp->i_count != 0) {
+			bdwrite(bp);
+			error = 0;
+		} else
+			error = bwrite(bp);
 	}
 	dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	return (error);
@@ -1000,13 +1012,19 @@ ufs_dirrewrite(dp, oip, newinum, newtype, isrmdir)
 	if (vdp->v_mount->mnt_maxsymlinklen > 0)
  		ep->d_type = newtype;
  	oip->i_effnlink--;
- 	oip->i_flag |= IN_CHANGE;
  	if (DOINGSOFTDEP(vdp)) {
+		softdep_change_linkcnt(oip);
  		softdep_setup_directory_change(bp, dp, oip, newinum, isrmdir);
  		bdwrite(bp);
  	} else {
- 		oip->i_ffs_nlink--; /* XXX */
- 		error = VOP_BWRITE(bp);
+ 		oip->i_ffs_nlink--;
+		oip->i_flag |= IN_CHANGE;
+		if (DOINGASYNC(vdp)) {
+			bdwrite(bp);
+			error = 0;
+		} else {
+			error = VOP_BWRITE(bp);
+		}
  	}
 	dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	return (error);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: xy.c,v 1.13 1999/07/09 21:34:46 art Exp $	*/
+/*	$OpenBSD: xy.c,v 1.15 2001/03/24 10:07:21 ho Exp $	*/
 /*	$NetBSD: xy.c,v 1.26 1997/07/19 21:43:56 pk Exp $	*/
 
 /*
@@ -74,6 +74,7 @@
 #include <sys/syslog.h>
 #include <sys/dkbad.h>
 #include <sys/conf.h>
+#include <sys/timeout.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -452,7 +453,8 @@ xycattach(parent, self, aux)
 	bootpath_store(1, NULL);
 
 	/* start the watchdog clock */
-	timeout(xyc_tick, xyc, XYC_TICKCNT);
+	timeout_set(&xyc->xyc_tick_tmo, xyc_tick, xyc);
+	timeout_add(&xyc->xyc_tick_tmo, XYC_TICKCNT);
 
 }
 
@@ -1196,7 +1198,7 @@ int del;
 
 /*
  * xyc_cmd: front end for POLL'd and WAIT'd commands.  Returns 0 or error.
- * note that NORM requests are handled seperately.
+ * note that NORM requests are handled separately.
  */
 int
 xyc_cmd(xycsc, cmd, subfn, unit, block, scnt, dptr, fullmode)
@@ -1971,7 +1973,7 @@ xyc_tick(arg)
 
 	/* until next time */
 
-	timeout(xyc_tick, xycsc, XYC_TICKCNT);
+	timeout_add(&xycsc->xyc_tick_tmo, XYC_TICKCNT);
 }
 
 /*

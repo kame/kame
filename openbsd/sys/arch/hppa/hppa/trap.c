@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.21 2000/07/05 22:20:02 mickey Exp $	*/
+/*	$OpenBSD: trap.c,v 1.27 2001/04/01 06:13:40 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2000 Michael Shalayeff
@@ -30,8 +30,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#undef INTRDEBUG
-#undef TRAPDEBUG
+/* #define INTRDEBUG */
+/* #define TRAPDEBUG */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -99,7 +99,7 @@ const char *trap_type[] = {
 int trap_types = sizeof(trap_type)/sizeof(trap_type[0]);
 
 u_int32_t sir;
-int want_resched;
+int want_resched, astpending;
 
 void pmap_hptdump __P((void));
 void cpu_intr __P((struct trapframe *frame));
@@ -163,8 +163,7 @@ trap(type, frame)
 	union sigval sv;
 	int s, si;
 	const char *tts;
-extern db_regs_t ddb_regs;
-ddb_regs = *frame;
+
 	opcode = frame->tf_iir;
 	if (type == T_ITLBMISS || type == T_ITLBMISSNA) {
 		va = frame->tf_iioq_head;
@@ -232,7 +231,6 @@ ddb_regs = *frame;
 		/* these just can't make it to the trap() ever */
 	case T_HPMC:      case T_HPMC | T_USER:
 	case T_EMULATION: case T_EMULATION | T_USER:
-	case T_TLB_DIRTY: case T_TLB_DIRTY | T_USER:
 #endif
 	case T_IBREAK:
 	case T_DATALIGN:
@@ -301,14 +299,13 @@ ddb_regs = *frame;
 		trapsignal(p, SIGSEGV, vftype, SEGV_ACCERR, sv);
 		break;
 
-	case T_DPROT:
-	case T_IPROT:
-	case T_DATACC:   	case T_DATACC   | T_USER:
-	case T_ITLBMISS:	case T_ITLBMISS | T_USER:
-	case T_DTLBMISS:	case T_DTLBMISS | T_USER:
-	case T_ITLBMISSNA:	case T_ITLBMISSNA | T_USER:
-	case T_DTLBMISSNA:	case T_DTLBMISSNA | T_USER:
-		va = trunc_page(va);
+	case T_DATACC:   	case T_USER | T_DATACC:
+	case T_ITLBMISS:	case T_USER | T_ITLBMISS:
+	case T_DTLBMISS:	case T_USER | T_DTLBMISS:
+	case T_ITLBMISSNA:	case T_USER | T_ITLBMISSNA:
+	case T_DTLBMISSNA:	case T_USER | T_DTLBMISSNA:
+	case T_TLB_DIRTY:	case T_USER | T_TLB_DIRTY:
+		va = hppa_trunc_page(va);
 		vm = p->p_vmspace;
 
 		if (!vm) {
@@ -416,50 +413,14 @@ return;
 			__asm __volatile ("ldcws 0(%1), %0"
 					  : "=r" (ni) : "r" (&netisr));
 			splnet();
-#define	DONET(m,c) if (ni & (1 << (m))) c()
-#include "ether.h"
-#if NETHER > 0
-			DONET(NETISR_ARP, arpintr);
-#endif
-#ifdef INET
-			DONET(NETISR_IP, ipintr);
-#endif
-#ifdef INET6
-			DONET(NETISR_IPV6, ip6intr);
-#endif
-#ifdef NETATALK
-			DONET(NETISR_ATALK, atintr);
-#endif
-#ifdef IMP
-			DONET(NETISR_IMP, impintr);
-#endif
-#ifdef IPX
-			DONET(NETISR_IPX, ipxintr);
-#endif
-#ifdef NS
-			DONET(NETISR_NS, nsintr);
-#endif
-#ifdef ISO
-			DONET(NETISR_ISO, clnlintr);
-#endif
-#ifdef CCITT
-			DONET(NETISR_CCITT, ccittintr);
-#endif
-#ifdef NATM
-			DONET(NETISR_NATM, natmintr);
-#endif
-#include "ppp.h"
-#if NPPP > 0
-			DONET(NETISR_PPP, pppintr);
-#endif
-#include "bridge.h"
-#if NBRIDGE > 0
-			DONET(NETISR_BRIDGE, bridgeintr);
-#endif
+#define	DONETISR(m,c) if (ni & (1 << (m))) c()
+#include <net/netisr_dispatch.h>
 		}
 		splx(s);
 		break;
 
+	case T_DPROT:
+	case T_IPROT:
 	case T_OVERFLOW:
 	case T_CONDITION:
 	case T_ILLEGAL:
@@ -492,7 +453,7 @@ child_return(p)
 	userret(p, p->p_md.md_regs->tf_iioq_head, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }
 
@@ -546,7 +507,7 @@ syscall(frame, args)
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p->p_tracep, code, argsize, args);
+		ktrsyscall(p, code, argsize, args);
 #endif
 
 	rval[0] = 0;
@@ -578,7 +539,7 @@ syscall(frame, args)
 	userret(p, frame->tf_iioq_head, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, code, error, rval[0]);
+		ktrsysret(p, code, error, rval[0]);
 #endif
 }
 

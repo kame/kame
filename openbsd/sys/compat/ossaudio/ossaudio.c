@@ -1,4 +1,4 @@
-/*	$OpenBSD: ossaudio.c,v 1.2 1998/04/26 22:15:42 provos Exp $	*/
+/*	$OpenBSD: ossaudio.c,v 1.4 2001/04/11 01:30:24 aaron Exp $	*/
 /*	$NetBSD: ossaudio.c,v 1.23 1997/10/19 07:41:52 augustss Exp $	*/
 
 /*
@@ -313,7 +313,7 @@ oss_ioctl_audio(p, uap, retval)
 		if ((idat & 0xffff) < 4 || (idat & 0xffff) > 17)
 			return EINVAL;
 		tmpinfo.blocksize = 1 << (idat & 0xffff);
-		tmpinfo.hiwat = (idat >> 16) & 0xffff;
+		tmpinfo.hiwat = (idat >> 16) & 0x7fff;
 		DPRINTF(("oss_audio: SETFRAGMENT blksize=%d, hiwat=%d\n",
 			 tmpinfo.blocksize, tmpinfo.hiwat));
 		if (tmpinfo.hiwat == 0)	/* 0 means set to max */
@@ -323,9 +323,9 @@ oss_ioctl_audio(p, uap, retval)
 		if (error)
 			return error;
 		u = tmpinfo.blocksize;
-		for(idat = 0; u; idat++, u >>= 1)
+		for(idat = 0; u > 1; idat++, u >>= 1)
 			;
-		idat |= (tmpinfo.hiwat & 0xffff) << 16;
+		idat |= (tmpinfo.hiwat & 0x7fff) << 16;
 		error = copyout(&idat, SCARG(uap, data), sizeof idat);
 		if (error)
 			return error;
@@ -512,10 +512,10 @@ getdevinfo(fp, p)
 {
 	mixer_devinfo_t mi;
 	int i;
-	static struct {
-		char *name;
+	static const struct oss_devs {
+		const char *name;
 		int code;
-	} *dp, devs[] = {
+	} devs[] = {
 		{ AudioNmicrophone,	OSS_SOUND_MIXER_MIC },
 		{ AudioNline,		OSS_SOUND_MIXER_LINE },
 		{ AudioNcd,		OSS_SOUND_MIXER_CD },
@@ -537,12 +537,13 @@ getdevinfo(fp, p)
 /*		{ AudioNmixerout,	?? },*/
 		{ 0, -1 }
 	};
+	register const struct oss_devs *dp;
 	int (*ioctlf) __P((struct file *, u_long, caddr_t, struct proc *)) =
 	    fp->f_ops->fo_ioctl;
 	struct vnode *vp;
 	struct vattr va;
 	static struct audiodevinfo devcache = { 0 };
-	struct audiodevinfo *di = &devcache;
+	register struct audiodevinfo *di = &devcache;
 
 	/* Figure out what device it is so we can check if the
 	 * cached data is valid.

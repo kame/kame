@@ -1,4 +1,5 @@
-/*	$NetBSD: uvm_pager.h,v 1.9 1999/03/25 18:48:55 mrg Exp $	*/
+/*	$OpenBSD: uvm_pager.h,v 1.7 2001/03/22 03:05:56 smart Exp $	*/
+/*	$NetBSD: uvm_pager.h,v 1.10 1999/06/21 17:25:12 thorpej Exp $	*/
 
 /*
  *
@@ -71,8 +72,7 @@ struct uvm_pagerops {
 				 vm_page_t *, int, int, vm_fault_t,
 				 vm_prot_t, int));
 	boolean_t		(*pgo_flush)	/* flush pages out of obj */
-			 __P((struct uvm_object *, vaddr_t, 
-				vaddr_t, int));
+			 __P((struct uvm_object *, vaddr_t, vaddr_t, int));
 	int			(*pgo_get)	/* get/read page */
 			 __P((struct uvm_object *, vaddr_t, 
 				 vm_page_t *, int *, int, vm_prot_t, int, int));
@@ -116,6 +116,8 @@ struct uvm_pagerops {
 /* page we are not interested in getting */
 #define PGO_DONTCARE ((struct vm_page *) -1)	/* [get only] */
 
+#ifdef _KERNEL
+
 /*
  * handle inline options
  */
@@ -148,5 +150,6 @@ struct vm_page **uvm_mk_pcluster  __P((struct uvm_object *, struct vm_page **,
 				       vaddr_t, vaddr_t));
 void		uvm_shareprot __P((vm_map_entry_t, vm_prot_t));
 
+#endif /* _KERNEL */
 
 #endif /* _UVM_UVM_PAGER_H_ */

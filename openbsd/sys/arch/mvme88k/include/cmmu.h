@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmmu.h,v 1.1 1999/09/27 20:46:17 smurph Exp $ */
+/*	$OpenBSD: cmmu.h,v 1.3 2001/03/09 05:44:40 smurph Exp $ */
 /* 
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -33,7 +33,7 @@
 #ifndef	__MACHINE_CMMU_H__
 #define	__MACHINE_CMMU_H__
 
-#ifndef ASSEMBLER
+#ifndef _LOCORE
 #include <machine/mmu.h>		 /* batc_template_t */
 #endif
 
@@ -61,7 +61,7 @@
 #define FLUSH_ALL       ((vm_offset_t)~0)
 
 
-#ifndef	ASSEMBLER
+#ifndef	_LOCORE
 /*
  * Prototypes and stuff for cmmu.c.
  */
@@ -71,13 +71,19 @@ extern unsigned ncpus;
 extern unsigned cache_policy;
 
 #ifdef CMMU_DEBUG
- void show_apr(unsigned value);
- void show_sctr(unsigned value);
+void show_apr(unsigned value);
+void show_sctr(unsigned value);
 #endif
 
+#if DDB
+void cmmu_show_translation(unsigned, unsigned, unsigned, int);
+void cmmu_cache_state(unsigned, unsigned);
+void show_cmmu_info(unsigned);
+#endif 
 /*
- * Prototypes from "mvme88k/mvme88k/cmmu.c"
+ * Prototypes from "mvme88k/mvme88k/cmmu.c
  */
+
 unsigned cmmu_cpu_number(void);
 #if !DDB
 static
@@ -90,6 +96,12 @@ void cmmu_parity_enable(void);
 #if !DDB
 static
 #endif /* !DDB */
+void setup_board_config(void);
+void setup_cmmu_config(void);
+void cmmu_dump_config(void);
+unsigned cmmu_get_by_mode(int cpu, int mode);
+void cpu_configuration_print(int master);
+void dma_cachectl(vm_offset_t va, int size, int op);
 void cmmu_remote_set(unsigned cpu, unsigned r, unsigned data, unsigned x);
 void cmmu_set_sapr(unsigned ap);
 void cmmu_remote_set_sapr(unsigned cpu, unsigned ap);
@@ -125,6 +137,6 @@ void cmmu_set_pair_batc_entry(
      unsigned entry_no,
      unsigned value);  /* the value to stuff into the batc */
 
-#endif	/* ASSEMBLER */
+#endif	/* _LOCORE */
 
 #endif	/* __MACHINE_CMMU_H__ */

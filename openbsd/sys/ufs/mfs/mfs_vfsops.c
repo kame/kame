@@ -1,4 +1,4 @@
-/*	$OpenBSD: mfs_vfsops.c,v 1.12 2000/02/07 04:57:18 assar Exp $	*/
+/*	$OpenBSD: mfs_vfsops.c,v 1.14 2001/04/12 17:16:52 csapuntz Exp $	*/
 /*	$NetBSD: mfs_vfsops.c,v 1.10 1996/02/09 22:31:28 christos Exp $	*/
 
 /*
@@ -167,7 +167,7 @@ int
 mfs_mount(mp, path, data, ndp, p)
 	register struct mount *mp;
 	const char *path;
-	caddr_t data;
+	void *data;
 	struct nameidata *ndp;
 	struct proc *p;
 {
@@ -313,4 +313,14 @@ mfs_checkexp(mp, nam, exflagsp, credanonp)
 	struct ucred **credanonp;
 {
 	return (EOPNOTSUPP);
+}
+
+/*
+ * Memory based filesystem initialization.
+ */
+int
+mfs_init(vfsp)
+	struct vfsconf *vfsp;
+{
+	return (ffs_init(vfsp));
 }

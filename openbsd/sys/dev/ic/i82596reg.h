@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82596reg.h,v 1.1 1999/08/15 23:49:30 mickey Exp $	*/
+/*	$OpenBSD: i82596reg.h,v 1.3 2001/03/23 00:16:49 mickey Exp $	*/
 /*	$NetBSD: i82586reg.h,v 1.7 1998/02/28 01:07:45 pk Exp $	*/
 
 /*-
@@ -84,6 +84,7 @@
  * We use integer offsets exclusively to access the i82586/596 data structures.
  */
 
+#pragma pack(1)
 
 /*
  * This is the master configuration block.
@@ -96,7 +97,7 @@ struct __ie_sys_conf_ptr {
 	u_int32_t	ie_iscp_ptr;		// 24-bit physaddr of ISCP
 };
  */
-#define IE_SCP_SZ		12
+#define IE_SCP_SZ		12	/* keep paragraph alignment */
 #define IE_SCP_BUS_USE(base)	((base) + 2)
 #define IE_SCP_TEST(base)	((base) + 4)
 #define IE_SCP_ISCP(base)	((base) + 8)
@@ -119,7 +120,7 @@ struct __ie_int_sys_conf_ptr {
 	caddr_t		ie_base;	// 24-bit physaddr for all 16-bit vars
 };
  */
-#define IE_ISCP_SZ		8
+#define IE_ISCP_SZ		16
 #define IE_ISCP_BUSY(base)	((base) + 0)
 #define IE_ISCP_SCB(base)	((base) + 2)
 #define IE_ISCP_BASE(base)	((base) + 4)
@@ -218,7 +219,7 @@ struct __ie_recv_frame_desc {
 };
  */
 #define IE_RFRAME_SZ			24
-#define IE_RFRAME_ADDR(base,i)		((base) + (i) * IE_RFRAME_SZ)
+#define IE_RFRAME_ADDR(base,i)		((base) + (i) * 48)
 #define IE_RFRAME_STATUS(b,i)		(IE_RFRAME_ADDR(b,i) + 0)
 #define IE_RFRAME_LAST(b,i)		(IE_RFRAME_ADDR(b,i) + 2)
 #define IE_RFRAME_NEXT(b,i)		(IE_RFRAME_ADDR(b,i) + 4)
@@ -258,7 +259,7 @@ struct __ie_recv_buf_desc {
 };
  */
 #define IE_RBD_SZ			12
-#define IE_RBD_ADDR(base,i)		((base) + (i) * IE_RBD_SZ)
+#define IE_RBD_ADDR(base,i)		((base) + (i) * 32)
 #define IE_RBD_STATUS(b,i)		(IE_RBD_ADDR(b,i) + 0)
 #define IE_RBD_NEXT(b,i)		(IE_RBD_ADDR(b,i) + 2)
 #define IE_RBD_BUFADDR(b,i)		(IE_RBD_ADDR(b,i) + 4)
@@ -310,7 +311,7 @@ struct __ie_cmd_common {
  * No-op commands; just like COMMON but "indexable"
  */
 #define IE_CMD_NOP_SZ			IE_CMD_COMMON_SZ
-#define IE_CMD_NOP_ADDR(base,i)		((base) + (i) * IE_CMD_NOP_SZ)
+#define IE_CMD_NOP_ADDR(base,i)		((base) + (i) * 32)
 #define IE_CMD_NOP_STATUS(b,i)		(IE_CMD_NOP_ADDR(b,i) + 0)
 #define IE_CMD_NOP_CMD(b,i)		(IE_CMD_NOP_ADDR(b,i) + 2)
 #define IE_CMD_NOP_LINK(b,i)		(IE_CMD_NOP_ADDR(b,i) + 4)
@@ -329,13 +330,10 @@ struct __ie_xmit_cmd {
 };
  */
 #define IE_CMD_XMIT_SZ			(IE_CMD_COMMON_SZ + 10)
-#define IE_CMD_XMIT_ADDR(base,i)	((base) + (i) * IE_CMD_XMIT_SZ)
-#define IE_CMD_XMIT_STATUS(b,i)		\
-	(IE_CMD_XMIT_ADDR(b,i) + 0)	/* == CMD_COMMON_STATUS */
-#define IE_CMD_XMIT_CMD(b,i)		\
-	(IE_CMD_XMIT_ADDR(b,i) + 2)	/* == CMD_COMMON_CMD */
-#define IE_CMD_XMIT_LINK(b,i)		\
-	(IE_CMD_XMIT_ADDR(b,i) + 4)	/* == CMD_COMMON_LINK */
+#define IE_CMD_XMIT_ADDR(base,i)	((base) + (i) * 32)
+#define IE_CMD_XMIT_STATUS(b,i)		(IE_CMD_XMIT_ADDR(b,i) + 0)
+#define IE_CMD_XMIT_CMD(b,i)		(IE_CMD_XMIT_ADDR(b,i) + 2)
+#define IE_CMD_XMIT_LINK(b,i)		(IE_CMD_XMIT_ADDR(b,i) + 4)
 #define IE_CMD_XMIT_DESC(b,i)		\
 	(IE_CMD_XMIT_ADDR(b,i) + IE_CMD_COMMON_SZ + 0)
 #define IE_CMD_XMIT_EADDR(b,i)		\
@@ -365,7 +363,7 @@ struct __ie_xmit_buf {
 };
  */
 #define IE_XBD_SZ			8
-#define IE_XBD_ADDR(base,i)		((base) + (i) * IE_XBD_SZ)
+#define IE_XBD_ADDR(base,i)		((base) + (i) * 32)
 #define IE_XBD_FLAGS(b,i)		(IE_XBD_ADDR(b,i) + 0)
 #define IE_XBD_NEXT(b,i)		(IE_XBD_ADDR(b,i) + 2)
 #define IE_XBD_BUF(b,i)			(IE_XBD_ADDR(b,i) + 4)
@@ -457,3 +455,5 @@ struct __ie_config_cmd {
 #define IE_CMD_CFG_CRSCDT(base)		((base) + IE_CMD_COMMON_SZ + 9)
 #define IE_CMD_CFG_MINLEN(base)		((base) + IE_CMD_COMMON_SZ + 10)
 #define IE_CMD_CFG_JUNK(base)		((base) + IE_CMD_COMMON_SZ + 11)
+
+#pragma pack()

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.7 1997/11/05 02:53:21 mickey Exp $
+#	$OpenBSD: Makefile,v 1.10 2001/01/31 09:58:27 deraadt Exp $
 #	$NetBSD: Makefile,v 1.6 1996/02/01 22:31:28 mycroft Exp $
 #	@(#)Makefile	7.3 (Berkeley) 6/9/91
 
@@ -13,8 +13,7 @@ SUBDIR=	stand isa/pcvt/Util
 
 TI386=	../i386/tags
 SI386=	../i386/eisa/*.[ch] ../i386/i386/*.[ch] ../i386/include/*.h \
-	../i386/include/pc/*.h ../i386/isa/*.[ch] ../i386/isa/pcvt/*.[ch] \
-	../i386/pci/*.[ch]
+	../i386/include/pc/*.h ../i386/isa/*.[ch] ../i386/pci/*.[ch]
 AI386=	../i386/i386/*.s ../i386/isa/*.s
 
 # Directories in which to place i386 tags links

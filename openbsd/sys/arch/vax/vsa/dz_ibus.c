@@ -1,4 +1,4 @@
-/*	$OpenBSD: dz_ibus.c,v 1.1 2000/04/27 02:34:50 bjc Exp $	*/
+/*	$OpenBSD: dz_ibus.c,v 1.4 2001/02/11 06:34:38 hugh Exp $	*/
 /*	$NetBSD: dz_ibus.c,v 1.15 1999/08/27 17:50:42 ragge Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
@@ -103,7 +103,12 @@ dz_vsbus_match(parent, cf, aux)
 	struct vsbus_attach_args *va = aux;
 	struct ss_dz *dzP;
 	short i;
-	unsigned int n;
+
+#if VAX53
+	if (vax_boardtype == VAX_BTYP_1303)
+		if (cf->cf_loc[0] != 0x25000000)
+			return 0; /* Ugly */
+#endif
 
 	dzP = (struct ss_dz *)va->va_addr;
 	i = dzP->tcr;
@@ -112,11 +117,7 @@ dz_vsbus_match(parent, cf, aux)
 	DELAY(1000);
 	dzP->tcr = 1;
 	DELAY(100000);
-	dzP->csr = DZ_CSR_MSE;
-	DELAY(1000);
-	dzP->tcr = 0;
-
-	va->va_ivec = dzxint;
+	dzP->tcr = i;
 
 	/* If the device doesn't exist, no interrupt has been generated */
 	
@@ -129,7 +130,6 @@ dz_vsbus_attach(parent, self, aux)
 	void *aux;
 {
 	struct  dz_softc *sc = (void *)self;
-	struct vsbus_softc *vsc = (struct vsbus_softc *)parent;
 	struct vsbus_attach_args *va = aux;
 
 	/* 
@@ -137,6 +137,10 @@ dz_vsbus_attach(parent, self, aux)
 	 * due to the nature of how bus_space_* works on VAX, this will
 	 * be perfectly good until everything is converted.
 	 */
+
+	if (dz_regs == 0) /* This isn't console */
+		dz_regs = vax_map_physmem(va->va_paddr, 1);
+
 	sc->sc_ioh = dz_regs;
 	sc->sc_dr.dr_csr = 0;
 	sc->sc_dr.dr_rbuf = 4;
@@ -148,9 +152,6 @@ dz_vsbus_attach(parent, self, aux)
 	sc->sc_dr.dr_ring = 13;
 
 	sc->sc_type = DZ_DZV;
-
-	vsc->sc_mask |= 1 << (va->va_maskno);
-	vsc->sc_mask |= (1 << (va->va_maskno-1));
 
 	sc->sc_dsr = 0x0f; /* XXX check if VS has modem ctrl bits */
 	scb_vecalloc(va->va_cvec, dzxint, sc, SCB_ISTACK);
@@ -211,6 +212,7 @@ dzcnprobe(cndev)
 		break;
 
 	case VAX_BTYP_49:
+	case VAX_BTYP_1303:
 		ioaddr = 0x25000000;
 		diagcons = 3;
 		break;

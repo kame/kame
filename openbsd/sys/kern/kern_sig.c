@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sig.c,v 1.38 2000/06/05 11:02:50 art Exp $	*/
+/*	$OpenBSD: kern_sig.c,v 1.42 2001/04/02 21:43:12 niklas Exp $	*/
 /*	$NetBSD: kern_sig.c,v 1.54 1996/04/22 01:38:32 christos Exp $	*/
 
 /*
@@ -46,8 +46,10 @@
 #include <sys/param.h>
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
+#include <sys/queue.h>
 #include <sys/namei.h>
 #include <sys/vnode.h>
+#include <sys/event.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
 #include <sys/timeb.h>
@@ -61,6 +63,8 @@
 #include <sys/syslog.h>
 #include <sys/stat.h>
 #include <sys/core.h>
+#include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/ptrace.h>
 
 #include <sys/mount.h>
@@ -71,13 +75,20 @@
 #include <vm/vm.h>
 #include <sys/user.h>		/* for coredump */
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
+
+int	filt_sigattach(struct knote *kn);
+void	filt_sigdetach(struct knote *kn);
+int	filt_signal(struct knote *kn, long hint);
+
+struct filterops sig_filtops =
+	{ 0, filt_sigattach, filt_sigdetach, filt_signal };
 
 void stop __P((struct proc *p));
 void killproc __P((struct proc *, char *));
 int cansignal __P((struct proc *, struct pcred *, struct proc *, int));
+
+struct pool sigacts_pool;	/* memory pool for sigacts structures */
 
 /*
  * Can process p, with pcred pc, send the signal signum to process q?
@@ -135,6 +146,79 @@ cansignal(p, pc, q, signum)
 	return (0);
 }
 
+
+/*
+ * Initialize signal-related data structures.
+ */
+void
+signal_init()
+{
+	pool_init(&sigacts_pool, sizeof(struct sigacts), 0, 0, 0, "sigapl",
+	    0, pool_page_alloc_nointr, pool_page_free_nointr, M_SUBPROC);
+}
+
+/*
+ * Create an initial sigacts structure, using the same signal state
+ * as p.
+ */
+struct sigacts *
+sigactsinit(p)
+	struct proc *p;
+{
+	struct sigacts *ps;
+
+	ps = pool_get(&sigacts_pool, PR_WAITOK);
+	memcpy(ps, p->p_sigacts, sizeof(struct sigacts));
+	ps->ps_refcnt = 1;
+	return (ps);
+}
+
+/*
+ * Make p2 share p1's sigacts.
+ */
+void
+sigactsshare(p1, p2)
+	struct proc *p1, *p2;
+{
+
+	p2->p_sigacts = p1->p_sigacts;
+	p1->p_sigacts->ps_refcnt++;
+}
+
+/*
+ * Make this process not share its sigacts, maintaining all
+ * signal state.
+ */
+void
+sigactsunshare(p)
+	struct proc *p;
+{
+	struct sigacts *newps;
+
+	if (p->p_sigacts->ps_refcnt == 1)
+		return;
+
+	newps = sigactsinit(p);
+	sigactsfree(p);
+	p->p_sigacts = newps;
+}
+
+/*
+ * Release a sigacts structure.
+ */
+void
+sigactsfree(p)
+	struct proc *p;
+{
+	struct sigacts *ps = p->p_sigacts;
+
+	if (--ps->ps_refcnt > 0)
+		return;
+
+	p->p_sigacts = NULL;
+
+	pool_put(&sigacts_pool, ps);
+}
 
 /* ARGSUSED */
 int
@@ -202,14 +286,15 @@ setsigvec(p, signum, sa)
 	int signum;
 	register struct sigaction *sa;
 {
-	register struct sigacts *ps = p->p_sigacts;
-	register int bit;
+	struct sigacts *ps = p->p_sigacts;
+	int bit;
+	int s;
 
 	bit = sigmask(signum);
 	/*
 	 * Change setting atomically.
 	 */
-	(void) splhigh();
+	s = splhigh();
 	ps->ps_sigact[signum] = sa->sa_handler;
 	if ((sa->sa_flags & SA_NODEFER) == 0)
 		sa->sa_mask |= sigmask(signum);
@@ -277,7 +362,7 @@ setsigvec(p, signum, sa)
 		else
 			p->p_sigcatch |= bit;
 	}
-	(void) spl0();
+	splx(s);
 }
 
 /*
@@ -349,9 +434,10 @@ sys_sigprocmask(p, v, retval)
 		syscallarg(sigset_t) mask;
 	} */ *uap = v;
 	int error = 0;
+	int s;
 
 	*retval = p->p_sigmask;
-	(void) splhigh();
+	s = splhigh();
 
 	switch (SCARG(uap, how)) {
 	case SIG_BLOCK:
@@ -370,7 +456,7 @@ sys_sigprocmask(p, v, retval)
 		error = EINVAL;
 		break;
 	}
-	(void) spl0();
+	splx(s);
 	return (error);
 }
 
@@ -641,7 +727,7 @@ trapsignal(p, signum, code, type, sigval)
 		p->p_stats->p_ru.ru_nsignals++;
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_PSIG))
-			ktrpsig(p->p_tracep, signum, ps->ps_sigact[signum], 
+			ktrpsig(p, signum, ps->ps_sigact[signum], 
 				p->p_sigmask, code);
 #endif
 		(*p->p_emul->e_sendsig)(ps->ps_sigact[signum], signum,
@@ -683,6 +769,9 @@ psignal(p, signum)
 
 	if ((u_int)signum >= NSIG || signum == 0)
 		panic("psignal signal number");
+
+	KNOTE(&p->p_klist, NOTE_SIGNAL | signum);
+
 	mask = sigmask(signum);
 	prop = sigprop[signum];
 
@@ -1046,12 +1135,13 @@ void
 postsig(signum)
 	register int signum;
 {
-	register struct proc *p = curproc;
-	register struct sigacts *ps = p->p_sigacts;
-	register sig_t action;
+	struct proc *p = curproc;
+	struct sigacts *ps = p->p_sigacts;
+	sig_t action;
 	u_long code;
 	int mask, returnmask;
 	union sigval null_sigval;
+	int s;
 
 #ifdef DIAGNOSTIC
 	if (signum == 0)
@@ -1062,8 +1152,7 @@ postsig(signum)
 	action = ps->ps_sigact[signum];
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_PSIG))
-		ktrpsig(p->p_tracep,
-		    signum, action, ps->ps_flags & SAS_OLDMASK ?
+		ktrpsig(p, signum, action, ps->ps_flags & SAS_OLDMASK ?
 		    ps->ps_oldmask : p->p_sigmask, 0);
 #endif
 	if (action == SIG_DFL) {
@@ -1090,7 +1179,7 @@ postsig(signum)
 		 * mask from before the sigpause is what we want
 		 * restored after the signal processing is completed.
 		 */
-		(void) splhigh();
+		s = splhigh();
 		if (ps->ps_flags & SAS_OLDMASK) {
 			returnmask = ps->ps_oldmask;
 			ps->ps_flags &= ~SAS_OLDMASK;
@@ -1103,7 +1192,7 @@ postsig(signum)
 				p->p_sigignore |= mask;
 			ps->ps_sigact[signum] = SIG_DFL;
 		}
-		(void) spl0();
+		splx(s);
 		p->p_stats->p_ru.ru_nsignals++;
 		if (ps->ps_sig != signum) {
 			code = 0;
@@ -1331,4 +1420,45 @@ initsiginfo(si, sig, code, type, val)
 			break;
 		}
 	}
+}
+
+int
+filt_sigattach(struct knote *kn)
+{
+	struct proc *p = curproc;
+
+	kn->kn_ptr.p_proc = p;
+	kn->kn_flags |= EV_CLEAR;		/* automatically set */
+
+	/* XXX lock the proc here while adding to the list? */
+	SLIST_INSERT_HEAD(&p->p_klist, kn, kn_selnext);
+
+	return (0);
+}
+
+void
+filt_sigdetach(struct knote *kn)
+{
+	struct proc *p = kn->kn_ptr.p_proc;
+
+	SLIST_REMOVE(&p->p_klist, kn, knote, kn_selnext);
+}
+
+/*
+ * signal knotes are shared with proc knotes, so we apply a mask to 
+ * the hint in order to differentiate them from process hints.  This
+ * could be avoided by using a signal-specific knote list, but probably
+ * isn't worth the trouble.
+ */
+int
+filt_signal(struct knote *kn, long hint)
+{
+
+	if (hint & NOTE_SIGNAL) {
+		hint &= ~NOTE_SIGNAL;
+
+		if (kn->kn_id == hint)
+			kn->kn_data++;
+	}
+	return (kn->kn_data != 0);
 }

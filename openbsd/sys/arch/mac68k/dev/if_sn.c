@@ -258,9 +258,6 @@ snsetup(sc, lladdr)
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
 	ifp->if_watchdog = snwatchdog;
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
@@ -713,7 +710,7 @@ camprogram(sc)
 			 * addresses. It has no way to specify a range.
 			 * (Well, thats not exactly true. If the
 			 * range is small one could program each addr
-			 * within the range as a seperate CAM entry)
+			 * within the range as a separate CAM entry)
 			 */
 			ifp->if_flags |= IFF_ALLMULTI;
 			break;

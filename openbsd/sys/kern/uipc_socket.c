@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket.c,v 1.27 1999/10/14 08:18:49 cmetz Exp $	*/
+/*	$OpenBSD: uipc_socket.c,v 1.33 2001/03/06 19:42:43 provos Exp $	*/
 /*	$NetBSD: uipc_socket.c,v 1.21 1996/02/04 02:17:52 christos Exp $	*/
 
 /*
@@ -44,11 +44,26 @@
 #include <sys/mbuf.h>
 #include <sys/domain.h>
 #include <sys/kernel.h>
+#include <sys/event.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/signalvar.h>
 #include <sys/resourcevar.h>
+
+void 	filt_sordetach(struct knote *kn);
+int 	filt_soread(struct knote *kn, long hint);
+void 	filt_sowdetach(struct knote *kn);
+int	filt_sowrite(struct knote *kn, long hint);
+int	filt_solisten(struct knote *kn, long hint);
+
+struct filterops solisten_filtops = 
+	{ 1, NULL, filt_sordetach, filt_solisten };
+struct filterops soread_filtops =
+	{ 1, NULL, filt_sordetach, filt_soread };
+struct filterops sowrite_filtops = 
+	{ 1, NULL, filt_sowdetach, filt_sowrite };
+
 
 #ifndef SOMINCONN
 #define SOMINCONN 80
@@ -254,6 +269,8 @@ soaccept(so, nam)
 	if ((so->so_state & SS_ISDISCONNECTED) == 0)
 		error = (*so->so_proto->pr_usrreq)(so, PRU_ACCEPT, NULL,
 		    nam, NULL);
+	else
+		error = ECONNABORTED;
 	splx(s);
 	return (error);
 }
@@ -869,6 +886,11 @@ sorflush(so)
 	sbunlock(sb);
 	asb = *sb;
 	bzero((caddr_t)sb, sizeof (*sb));
+	/* XXX - the bzero stumps all over so_rcv */
+	if (asb.sb_flags & SB_KNOTE) {
+		sb->sb_sel.si_note = asb.sb_sel.si_note;
+		sb->sb_flags = SB_KNOTE;
+	}
 	splx(s);
 	if (pr->pr_flags & PR_RIGHTS && pr->pr_domain->dom_dispose)
 		(*pr->pr_domain->dom_dispose)(asb.sb_mb);
@@ -1092,4 +1114,109 @@ sohasoutofband(so)
 {
 	csignal(so->so_pgid, SIGURG, so->so_siguid, so->so_sigeuid);
 	selwakeup(&so->so_rcv.sb_sel);
+}
+
+int
+soo_kqfilter(struct file *fp, struct knote *kn)
+{
+	struct socket *so = (struct socket *)kn->kn_fp->f_data;
+	struct sockbuf *sb;
+	int s;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		if (so->so_options & SO_ACCEPTCONN)
+			kn->kn_fop = &solisten_filtops;
+		else
+			kn->kn_fop = &soread_filtops;
+		sb = &so->so_rcv;
+		break;
+	case EVFILT_WRITE:
+		kn->kn_fop = &sowrite_filtops;
+		sb = &so->so_snd;
+		break;
+	default:
+		return (1);
+	}
+
+	s = splnet();
+	SLIST_INSERT_HEAD(&sb->sb_sel.si_note, kn, kn_selnext);
+	sb->sb_flags |= SB_KNOTE;
+	splx(s);
+	return (0);
+}
+
+void
+filt_sordetach(struct knote *kn)
+{
+	struct socket *so = (struct socket *)kn->kn_fp->f_data;
+	int s = splnet();
+
+	SLIST_REMOVE(&so->so_rcv.sb_sel.si_note, kn, knote, kn_selnext);
+	if (SLIST_EMPTY(&so->so_rcv.sb_sel.si_note))
+		so->so_rcv.sb_flags &= ~SB_KNOTE;
+	splx(s);
+}
+
+/*ARGSUSED*/
+int
+filt_soread(struct knote *kn, long hint)
+{
+	struct socket *so = (struct socket *)kn->kn_fp->f_data;
+
+	kn->kn_data = so->so_rcv.sb_cc;
+	if (so->so_state & SS_CANTRCVMORE) {
+		kn->kn_flags |= EV_EOF; 
+		kn->kn_fflags = so->so_error;
+		return (1);
+	}
+	if (so->so_error)	/* temporary udp error */
+		return (1);
+	if (kn->kn_sfflags & NOTE_LOWAT)
+		return (kn->kn_data >= kn->kn_sdata);
+	return (kn->kn_data >= so->so_rcv.sb_lowat);
+}
+
+void
+filt_sowdetach(struct knote *kn)
+{
+	struct socket *so = (struct socket *)kn->kn_fp->f_data;
+	int s = splnet();
+
+	SLIST_REMOVE(&so->so_snd.sb_sel.si_note, kn, knote, kn_selnext);
+	if (SLIST_EMPTY(&so->so_snd.sb_sel.si_note))
+		so->so_snd.sb_flags &= ~SB_KNOTE;
+	splx(s);
+}
+
+/*ARGSUSED*/
+int
+filt_sowrite(struct knote *kn, long hint)
+{
+	struct socket *so = (struct socket *)kn->kn_fp->f_data;
+
+	kn->kn_data = sbspace(&so->so_snd);
+	if (so->so_state & SS_CANTSENDMORE) {
+		kn->kn_flags |= EV_EOF; 
+		kn->kn_fflags = so->so_error;
+		return (1);
+	}
+	if (so->so_error)	/* temporary udp error */
+		return (1);
+	if (((so->so_state & SS_ISCONNECTED) == 0) &&
+	    (so->so_proto->pr_flags & PR_CONNREQUIRED))
+		return (0);
+	if (kn->kn_sfflags & NOTE_LOWAT)
+		return (kn->kn_data >= kn->kn_sdata);
+	return (kn->kn_data >= so->so_snd.sb_lowat);
+}
+
+/*ARGSUSED*/
+int
+filt_solisten(struct knote *kn, long hint)
+{
+	struct socket *so = (struct socket *)kn->kn_fp->f_data;
+
+	kn->kn_data = so->so_qlen;
+	return (so->so_qlen != 0);
 }

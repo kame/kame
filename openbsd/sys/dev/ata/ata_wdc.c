@@ -218,14 +218,15 @@ _wdc_ata_bio_start(chp, xfer)
 	}
 
 	if (xfer->c_flags & C_DMA) {
+		if (drvp->n_xfers <= NXFER)
+			drvp->n_xfers++;
 		dma_flags = (ata_bio->flags & ATA_READ) ?  WDC_DMA_READ : 0;
-		dma_flags |= (ata_bio->flags & ATA_POLL) ?  WDC_DMA_POLL : 0;
 	}
 	if (ata_bio->flags & ATA_SINGLE)
 		ata_delay = ATA_DELAY;
 	else
 		ata_delay = ATA_DELAY;
- again:
+again:
 	/*
 	 *
 	 * When starting a multi-sector transfer, or doing single-sector
@@ -280,7 +281,6 @@ _wdc_ata_bio_start(chp, xfer)
 			ata_bio->nbytes = xfer->c_bcount;
 			cmd = (ata_bio->flags & ATA_READ) ?
 			    WDCC_READDMA : WDCC_WRITEDMA;
-			nblks = ata_bio->nblks;
 	    		/* Init the DMA channel. */
 			if ((*chp->wdc->dma_init)(chp->wdc->dma_arg,
 			    chp->channel, xfer->drive,
@@ -300,7 +300,7 @@ _wdc_ata_bio_start(chp, xfer)
 			    head, sect, nblks, 0);
 			/* start the DMA channel */
 			(*chp->wdc->dma_start)(chp->wdc->dma_arg,
-			    chp->channel, xfer->drive, dma_flags);
+			    chp->channel, xfer->drive);
 			/* wait for irq */
 			goto intr;
 		} /* else not DMA */
@@ -349,7 +349,7 @@ _wdc_ata_bio_start(chp, xfer)
 		    ata_bio->nbytes);
 	}
 
- intr:	/* Wait for IRQ (either real or polled) */
+intr:	/* Wait for IRQ (either real or polled) */
 	if ((ata_bio->flags & ATA_POLL) == 0) {
 		chp->ch_flags |= WDCF_IRQ_WAIT;
 	} else {
@@ -360,7 +360,7 @@ _wdc_ata_bio_start(chp, xfer)
 			goto again;
 	}
 	return;
- timeout:
+timeout:
 	printf("%s:%d:%d: not ready, st=0x%02x, err=0x%02x\n",
 	    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive,
 	    chp->ch_status, chp->ch_error);
@@ -379,7 +379,6 @@ wdc_ata_bio_intr(chp, xfer, irq)
 	struct ata_bio *ata_bio = xfer->cmd;
 	struct ata_drive_datas *drvp = &chp->ch_drive[xfer->drive];
 	int drv_err;
-	int dma_flags = 0;
 
 	WDCDEBUG_PRINT(("wdc_ata_bio_intr %s:%d:%d\n",
 	    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive),
@@ -392,11 +391,6 @@ wdc_ata_bio_intr(chp, xfer, irq)
 		    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive,
 		    drvp->state);
 		panic("wdc_ata_bio_intr: bad state\n");
-	}
-
-	if (xfer->c_flags & C_DMA) {
-		dma_flags = (ata_bio->flags & ATA_READ) ?  WDC_DMA_READ : 0;
-		dma_flags |= (ata_bio->flags & ATA_POLL) ?  WDC_DMA_POLL : 0;
 	}
 
 	/*
@@ -417,17 +411,21 @@ wdc_ata_bio_intr(chp, xfer, irq)
 		printf("%s:%d:%d: device timeout, c_bcount=%d, c_skip%d\n",
 		    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive,
 		    xfer->c_bcount, xfer->c_skip);
-		/* if we were using DMA, turn off DMA channel */
+
+		/* if we were using DMA, stop channel and deal with error */
 		if (xfer->c_flags & C_DMA) {
-			(*chp->wdc->dma_finish)(chp->wdc->dma_arg,
-			    chp->channel, xfer->drive, dma_flags);
-			drvp->n_dmaerrs++;
+			chp->wdc->dma_status =
+			    (*chp->wdc->dma_finish)(chp->wdc->dma_arg, 
+				chp->channel,
+				xfer->drive);
+			ata_dmaerr(drvp);
 		}
+
 		ata_bio->error = TIMEOUT;
 		wdc_ata_bio_done(chp, xfer);
 		return 1;
 	}
-	
+
 	drv_err = wdc_ata_err(drvp, ata_bio);
 
 	/* If we were using DMA, Turn off the DMA channel and check for error */
@@ -448,8 +446,11 @@ wdc_ata_bio_intr(chp, xfer, irq)
 				drv_err = WDC_ATA_ERR;
 			}
 		}
-		if ((*chp->wdc->dma_finish)(chp->wdc->dma_arg,
-		    chp->channel, xfer->drive, dma_flags) != 0) {
+
+		chp->wdc->dma_status =
+		    (*chp->wdc->dma_finish)(chp->wdc->dma_arg, chp->channel,
+			xfer->drive);
+		if (chp->wdc->dma_status != 0) {
 			if (drv_err != WDC_ATA_ERR) {
 				ata_bio->error = ERR_DMA;
 				drv_err = WDC_ATA_ERR;
@@ -466,8 +467,11 @@ wdc_ata_bio_intr(chp, xfer, irq)
 		}
 		if (drv_err != WDC_ATA_ERR)
 			goto end;
-		drvp->n_dmaerrs++;
+		ata_dmaerr(drvp);
 	}
+
+	if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
+		chp->wdc->irqack(chp);
 
 	/* if we had an error, end */
 	if (drv_err == WDC_ATA_ERR) {
@@ -509,7 +513,6 @@ end:
 	return 1;
 }
 
-
 void
 wdc_ata_bio_kill_xfer(chp, xfer)
 	struct channel_softc *chp;
@@ -536,8 +539,6 @@ wdc_ata_bio_done(chp, xfer)
 	struct wdc_xfer *xfer;
 {
 	struct ata_bio *ata_bio = xfer->cmd;
-	int drive = xfer->drive;
-	struct ata_drive_datas *drvp = &chp->ch_drive[drive];
 
 	WDCDEBUG_PRINT(("wdc_ata_bio_done %s:%d:%d: flags 0x%x\n",
 	    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive, 
@@ -545,11 +546,6 @@ wdc_ata_bio_done(chp, xfer)
 	    DEBUG_XFERS);
 
 	timeout_del(&chp->ch_timo);
-	if (ata_bio->error == NOERROR)
-		drvp->n_dmaerrs = 0;
-	else if (drvp->n_dmaerrs >= NERRS_MAX) {
-		wdc_downgrade_mode(drvp);
-	}
 
 	/* feed back residual bcount to our caller */
 	ata_bio->bcount = xfer->c_bcount;
@@ -594,6 +590,8 @@ again:
 		errstring = "recal";
 		if (wdcwait(chp, WDCS_DRDY, WDCS_DRDY, delay))
 			goto timeout;
+		if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
+			chp->wdc->irqack(chp);
 		if (chp->ch_status & (WDCS_ERR | WDCS_DWF))
 			goto error;
 	/* fall through */
@@ -614,6 +612,8 @@ again:
 		errstring = "piomode";
 		if (wdcwait(chp, WDCS_DRDY, WDCS_DRDY, delay))
 			goto timeout;
+		if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
+			chp->wdc->irqack(chp);
 		if (chp->ch_status & (WDCS_ERR | WDCS_DWF))
 			goto error;
 	/* fall through */
@@ -634,6 +634,8 @@ again:
 		errstring = "dmamode";
 		if (wdcwait(chp, WDCS_DRDY, WDCS_DRDY, delay))
 			goto timeout;
+		if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
+			chp->wdc->irqack(chp);
 		if (chp->ch_status & (WDCS_ERR | WDCS_DWF))
 			goto error;
 	/* fall through */
@@ -654,6 +656,8 @@ again:
 		errstring = "geometry";
 		if (wdcwait(chp, WDCS_DRDY, WDCS_DRDY, delay))
 			goto timeout;
+		if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
+			chp->wdc->irqack(chp);
 		if (chp->ch_status & (WDCS_ERR | WDCS_DWF))
 			goto error;
 		/* fall through */
@@ -671,6 +675,8 @@ again:
 		errstring = "setmulti";
 		if (wdcwait(chp, WDCS_DRDY, WDCS_DRDY, delay))
 			goto timeout;
+		if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
+			chp->wdc->irqack(chp);
 		if (chp->ch_status & (WDCS_ERR | WDCS_DWF))
 			goto error;
 		/* fall through */

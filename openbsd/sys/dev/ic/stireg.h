@@ -1,4 +1,4 @@
-/*	$OpenBSD: stireg.h,v 1.1 2000/05/30 19:39:38 mickey Exp $	*/
+/*	$OpenBSD: stireg.h,v 1.3 2001/01/11 21:30:30 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Shalayeff
@@ -31,10 +31,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _STI_H_
-#define _STI_H_
+#ifndef _IC_STIREG_H_
+#define _IC_STIREG_H_
 
-#define	STIDEBUG
+/* #define	STIDEBUG */
 
 #define	STI_REGION_MAX	8
 #define	STI_MONITOR_MAX	256
@@ -108,6 +108,8 @@
 #define	STI_COLOUR_BLUE		6
 #define	STI_COLOUR_MAGENTA	7
 
+#pragma pack(1)
+
 	/* LSB high */
 struct	sti_dd {
 	u_int32_t	dd_type;	/* 0x00 device type */
@@ -129,7 +131,7 @@ struct	sti_dd {
 	u_int32_t	dd_udaddr;	/* 0x28 user data address */
 	u_int32_t	dd_stimemreq;	/* 0x2c sti memory request */
 	u_int32_t	dd_udsize;	/* 0x30 user data size */
-	u_int32_t	dd_pwruse;	/* 0x34 power usage */
+	u_int16_t	dd_pwruse;	/* 0x34 power usage */
 	u_int8_t	dd_bussup;	/* 0x36 bus support */
 #define	STI_BUSSUPPORT_GSCINTL	0x01	/*	supports pulling INTL for int */
 #define	STI_BUSSUPPORT_GSC15X	0x02	/*	supports GSC 1.5X */
@@ -206,7 +208,7 @@ typedef struct sti_cfg {
 	u_int16_t	oscr_height;
 	u_int16_t	fb_width;
 	u_int16_t	fb_height;
-	u_int32_t	*regions[STI_REGION_MAX];
+	u_int32_t	regions[STI_REGION_MAX];
 	u_int32_t	reent_level;
 	u_int32_t	*save_addr;
 	sti_ecfg_t	ext_cfg;
@@ -580,4 +582,6 @@ typedef struct sti_utilout {
 
 STI_DEP(util);
 
-#endif /* _STI_H_ */
+#pragma pack()
+
+#endif /* _IC_STIREG_H_ */

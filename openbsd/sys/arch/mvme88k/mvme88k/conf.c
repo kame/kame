@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.13 2000/09/26 14:03:54 art Exp $	*/
+/*	$OpenBSD: conf.c,v 1.15 2001/03/12 22:57:30 miod Exp $	*/
 
 /*-
  * Copyright (c) 1991 The Regents of the University of California.
@@ -186,6 +186,9 @@ cdev_decl(tun);
 #cdev_decl(xfs_dev);
 #endif
 
+#include "ksyms.h"
+cdev_decl(ksyms);
+
 #ifdef LKM
 #define NLKM 1
 #else
@@ -256,10 +259,10 @@ struct cdevsw	cdevsw[] =
 	cdev_lkm_dummy(),                /* 37 */
 	cdev_lkm_dummy(),                /* 38 */
 	cdev_gen_ipf(NIPF,ipl),          /* 39: IP filter */
-	cdev_notdef(),                   /* 40 */
+	cdev_random_init(1,random),	 /* 40: random data source */
 	cdev_notdef(),                   /* 41 */
 	cdev_notdef(),                   /* 42 */
-	cdev_notdef(),                   /* 43 */
+	cdev_ksyms_init(NKSYMS,ksyms),	 /* 43: Kernel symbols device */
 	cdev_notdef(),                   /* 44 */
 	cdev_notdef(),                   /* 45 */
 	cdev_notdef(),                   /* 46 */
@@ -291,6 +294,7 @@ dev_t	swapdev = makedev(3, 0);
 /*
  * Returns true if dev is /dev/mem or /dev/kmem.
  */
+int
 iskmemdev(dev)
 	dev_t dev;
 {
@@ -301,6 +305,7 @@ iskmemdev(dev)
 /*
  * Returns true if dev is /dev/zero.
  */
+int
 iszerodev(dev)
 	dev_t dev;
 {
@@ -349,6 +354,7 @@ static int chrtoblktbl[] = {
 /*
  * Convert a character device number to a block device number.
  */
+int
 chrtoblk(dev)
 	dev_t dev;
 {

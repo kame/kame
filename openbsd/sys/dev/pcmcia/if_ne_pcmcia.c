@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ne_pcmcia.c,v 1.31 2000/08/30 20:51:35 fgsch Exp $	*/
+/*	$OpenBSD: if_ne_pcmcia.c,v 1.43 2001/04/19 05:32:39 fgsch Exp $	*/
 /*	$NetBSD: if_ne_pcmcia.c,v 1.17 1998/08/15 19:00:04 thorpej Exp $	*/
 
 /*
@@ -49,11 +49,17 @@
 #include <dev/pcmcia/pcmciavar.h>
 #include <dev/pcmcia/pcmciadevs.h>
 
+#include <dev/mii/miivar.h>
+#include <dev/mii/mii_bitbang.h>
+
 #include <dev/ic/dp8390reg.h>
 #include <dev/ic/dp8390var.h>
 
 #include <dev/ic/ne2000reg.h>
 #include <dev/ic/ne2000var.h>
+
+#include <dev/ic/dl10019reg.h>
+#include <dev/ic/dl10019var.h>
 
 #include <dev/ic/rtl80x9reg.h>
 #include <dev/ic/rtl80x9var.h>
@@ -90,7 +96,7 @@ struct cfattach ne_pcmcia_ca = {
 	ne_pcmcia_detach, ne_pcmcia_activate
 };
 
-struct ne2000dev {
+const struct ne2000dev {
     u_int16_t manufacturer;
     u_int16_t product;
     char *cis_info[4];
@@ -98,8 +104,8 @@ struct ne2000dev {
     int enet_maddr;
     unsigned char enet_vendor[3];
     int flags;
-#define	NE2000DVF_DL10019	0x0001		/* chip is D-Link DL10019 */
-#define	NE2000DVF_AX88190	0x0002		/* chip is ASIX AX88190 */
+#define NE2000DVF_DL10019	0x0001		/* chip is D-Link DL10019 */
+#define NE2000DVF_AX88190	0x0002		/* chip is ASIX AX88190 */
 } ne2000devs[] = {
     { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
       PCMCIA_CIS_AMBICOM_AMB8002T,
@@ -161,9 +167,21 @@ struct ne2000dev {
       PCMCIA_CIS_NDC_ND5100_E,
       0, -1, { 0x00, 0x80, 0xc6 } },
 
+    { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
+      PCMCIA_CIS_NETGEAR_FA410TX,
+      0, -1, { 0x00, 0xe0, 0x98 } },
+
+    { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
+      PCMCIA_CIS_TAMARACK_NE2000,
+      0, -1, { 0x00, 0x47, 0x43 } },
+
+    { PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
+      PCMCIA_CIS_GVC_NIC2000P,
+      0, 0x0ff0, { 0x00, 0x00, 0xe8 } },
+
     /*
      * You have to add new entries which contains
-     * PCMCIA_VENDOR_INVALID and/or PCMCIA_PRODUCT_INVALID 
+     * PCMCIA_VENDOR_INVALID and/or PCMCIA_PRODUCT_INVALID
      * in front of this comment.
      *
      * There are cards which use a generic vendor and product id but needs
@@ -171,6 +189,10 @@ struct ne2000dev {
      * needs a table where the exceptions comes first and then the normal
      * product and vendor entries.
      */
+
+    { PCMCIA_VENDOR_GREYCELL, PCMCIA_PRODUCT_GREYCELL_GCS2000,
+      PCMCIA_CIS_GREYCELL_GCS2000,
+      0, -1, { 0x00, 0x47, 0x43 } },
 
     { PCMCIA_VENDOR_IBM, PCMCIA_PRODUCT_IBM_INFOMOVER,
       PCMCIA_CIS_IBM_INFOMOVER,
@@ -210,11 +232,15 @@ struct ne2000dev {
       0, -1, { 0x00, 0x80, 0xc8 } },
 
     { PCMCIA_VENDOR_LINKSYS, PCMCIA_PRODUCT_LINKSYS_ETHERFAST,
+      PCMCIA_CIS_LINKSYS_ETHERFAST,
+      0, -1, { 0x00, 0x50, 0xba } },
+
+    { PCMCIA_VENDOR_LINKSYS, PCMCIA_PRODUCT_LINKSYS_ETHERFAST,
       PCMCIA_CIS_DLINK_DE650,
       0, -1, { 0x00, 0xe0, 0x98 } },
 
     { PCMCIA_VENDOR_LINKSYS, PCMCIA_PRODUCT_LINKSYS_COMBO_ECARD,
-      PCMCIA_CIS_LINKSYS_COMBO_ECARD, 
+      PCMCIA_CIS_LINKSYS_COMBO_ECARD,
       0, -1, { 0x00, 0x80, 0xc8 } },
 
     { PCMCIA_VENDOR_LINKSYS, PCMCIA_PRODUCT_LINKSYS_TRUST_COMBO_ECARD,
@@ -262,7 +288,7 @@ struct ne2000dev {
     { PCMCIA_VENDOR_IODATA, PCMCIA_PRODUCT_IODATA_PCLATE,
       PCMCIA_CIS_IODATA_PCLATE,
       0, -1, { 0x00, 0xa0, 0xb0 } },
- 
+
     /*
      * This entry should be placed after above PCLA-TE entry.
      * See above comments for detail.
@@ -291,6 +317,10 @@ struct ne2000dev {
       PCMCIA_CIS_COREGA_FAST_ETHER_PCC_TX,
       0, -1, { 0x00, 0x00, 0xf4 } },
 
+    { PCMCIA_VENDOR_COREGA, PCMCIA_PRODUCT_COREGA_FAST_ETHER_PCC_TXF,
+      PCMCIA_CIS_COREGA_FAST_ETHER_PCC_TXF,
+      0, -1, { 0x00, 0x90, 0x99 } },
+
     { PCMCIA_VENDOR_COMPEX, PCMCIA_PRODUCT_COMPEX_LINKPORT_ENET_B,
       PCMCIA_CIS_COMPEX_LINKPORT_ENET_B,
       0, 0x01c0, { 0x00, 0xa0, 0x0c } },
@@ -308,7 +338,7 @@ struct ne2000dev {
       0, -1, { 0x00, 0x10, 0xa4 } },
 
     { PCMCIA_VENDOR_MELCO, PCMCIA_PRODUCT_MELCO_LPC3_TX,
-      PCMCIA_CIS_MELCO_LPC3_TX, 
+      PCMCIA_CIS_MELCO_LPC3_TX,
       0, -1, { 0x00, 0x40, 0x26 }, NE2000DVF_AX88190 },
 
     { PCMCIA_VENDOR_DUAL, PCMCIA_PRODUCT_DUAL_NE2000,
@@ -322,7 +352,6 @@ struct ne2000dev {
     { PCMCIA_VENDOR_KINGSTON, PCMCIA_PRODUCT_KINGSTON_KNE_PC2,
       PCMCIA_CIS_KINGSTON_KNE_PC2,
       0, 0x0180, { 0x00, 0xc0, 0xf0 } },
-
 #if 0
     /* the rest of these are stolen from the linux pcnet pcmcia device
        driver.  Since I don't know the manfid or cis info strings for
@@ -401,6 +430,7 @@ struct ne2000dev {
     ((card)->product != PCMCIA_PRODUCT_INVALID) && \
     ((card)->product == ne2000devs[(n)].product)) || \
    ((ne2000devs[(n)].cis_info[0]) && (ne2000devs[(n)].cis_info[1]) && \
+    ((card)->cis1_info[0]) && ((card)->cis1_info[1]) && \
     (strcmp((card)->cis1_info[0], ne2000devs[(n)].cis_info[0]) == 0) && \
     (strcmp((card)->cis1_info[1], ne2000devs[(n)].cis_info[1]) == 0))) && \
   ((fct) == ne2000devs[(n)].function))? \
@@ -432,16 +462,9 @@ ne_pcmcia_attach(parent, self, aux)
 	struct dp8390_softc *dsc = &nsc->sc_dp8390;
 	struct pcmcia_attach_args *pa = aux;
 	struct pcmcia_config_entry *cfe;
-	struct ne2000dev *ne_dev;
+	const struct ne2000dev *ne_dev;
 	int i;
 	u_int8_t myea[6], *enaddr;
-	void (*npp_init_media) __P((struct dp8390_softc *, int **,
-	    int *, int *));
-	int *media, nmedia, defmedia;
-
-	npp_init_media = NULL;
-	media = NULL;
-	nmedia = defmedia = 0;
 
 	psc->sc_pf = pa->pf;
 
@@ -543,7 +566,7 @@ ne_pcmcia_attach(parent, self, aux)
 		goto fail_4;
 	}
 
-	printf(" port 0x%lx/%d", psc->sc_pcioh.addr, NE2000_NIC_NPORTS);
+	printf(" port 0x%lx/%d", psc->sc_pcioh.addr, NE2000_NPORTS);
 
 	/*
 	 * Read the station address from the board.
@@ -555,7 +578,7 @@ again:
 		ne_dev = ne2000_match(pa->card, pa->pf->number, i);
 		if (ne_dev != NULL) {
 			if (ne_dev->enet_maddr >= 0) {
-				enaddr = ne_pcmcia_get_enaddr(psc, 
+				enaddr = ne_pcmcia_get_enaddr(psc,
 				    ne_dev->enet_maddr, myea);
 				if (enaddr == NULL)
 					continue;
@@ -567,8 +590,7 @@ again:
 		}
 	}
 	if (i == NE2000_NDEVS) {
-		printf("%s: can't match ethernet vendor code\n",
-		    dsc->sc_dev.dv_xname);
+		printf(": can't match ethernet vendor code\n");
 		goto fail_5;
 	}
 
@@ -602,10 +624,19 @@ again:
 		== RTL0_8019ID0 &&
 	    bus_space_read_1(dsc->sc_regt, dsc->sc_regh, NERTL_RTL0_8019ID1)
 		== RTL0_8019ID1) {
-		npp_init_media = rtl80x9_init_media;
 		dsc->sc_mediachange = rtl80x9_mediachange;
 		dsc->sc_mediastatus = rtl80x9_mediastatus;
 		dsc->init_card = rtl80x9_init_card;
+		dsc->sc_media_init = rtl80x9_media_init;
+	}
+
+	if (nsc->sc_type == NE2000_TYPE_DL10019 ||
+	    nsc->sc_type == NE2000_TYPE_DL10022) {
+		dsc->sc_mediachange = dl10019_mediachange;
+		dsc->sc_mediastatus = dl10019_mediastatus;
+		dsc->init_card = dl10019_init_card;
+		dsc->sc_media_init = dl10019_media_init;
+		dsc->sc_media_fini = dl10019_media_fini;
 	}
 
 	/* set up the interrupt */
@@ -616,11 +647,7 @@ again:
 
 	printf("\n");
 
-	/* Initialize media, if we have it. */
-	if (npp_init_media != NULL)
-		(*npp_init_media)(dsc, &media, &nmedia, &defmedia);
-
-	if (ne2000_attach(nsc, enaddr, media, nmedia, defmedia))
+	if (ne2000_attach(nsc, enaddr))
 		goto fail_5;
 
 #if notyet
@@ -653,22 +680,24 @@ ne_pcmcia_detach(dev, flags)
 	int flags;
 {
 	struct ne_pcmcia_softc *psc = (struct ne_pcmcia_softc *)dev;
-	struct dp8390_softc *dsc = &psc->sc_ne2000.sc_dp8390;
-	struct ifnet *ifp = &dsc->sc_arpcom.ac_if;
-	int rv = 0;
+	int error;
 
 	if (psc->sc_nic_io_window == -1)
 		/* Nothing to detach. */
 		return (0);
 
+	error = ne2000_detach(&psc->sc_ne2000, flags);
+	if (error != 0)
+		return (error);
+
+	/* Unmap our i/o windows. */
 	pcmcia_io_unmap(psc->sc_pf, psc->sc_asic_io_window);
 	pcmcia_io_unmap(psc->sc_pf, psc->sc_nic_io_window);
+
+	/* Free our i/o space. */
 	pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
 
-	ether_ifdetach(ifp);
-	if_detach(ifp);
-
-	return (rv);
+	return (0);
 }
 
 int
@@ -778,17 +807,27 @@ ne_pcmcia_dl10019_get_enaddr(psc, myea)
 {
 	struct ne2000_softc *nsc = &psc->sc_ne2000;
 	u_int8_t sum;
-	int j;
+	int j, type;
 
-	for (j = 0, sum = 0; j < 8; j++)
+	for (j = 0, sum = 0; j < 8; j++) {
 		sum += bus_space_read_1(nsc->sc_asict, nsc->sc_asich,
 		    0x04 + j);
+	}
 	if (sum != 0xff)
 		return (NULL);
-	for (j = 0; j < ETHER_ADDR_LEN; j++)
+
+	for (j = 0; j < ETHER_ADDR_LEN; j++) {
 		myea[j] = bus_space_read_1(nsc->sc_asict,
 		    nsc->sc_asich, 0x04 + j);
-	nsc->sc_type = NE2000_TYPE_DL10019;
+	}
+
+	/* XXX - magic values from Linux */
+	type = bus_space_read_1(nsc->sc_asict, nsc->sc_asich, 0x0f);
+	if (type == 0x91 || type == 0x99)
+		nsc->sc_type = NE2000_TYPE_DL10022;
+	else
+		nsc->sc_type = NE2000_TYPE_DL10019;
+
 	return (myea);
 }
 

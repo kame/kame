@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_misc.c,v 1.33 2000/09/10 07:04:20 jasoni Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.35 2001/04/02 21:43:11 niklas Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
 /*
@@ -71,24 +71,27 @@
 
 #include <compat/linux/linux_types.h>
 #include <compat/linux/linux_fcntl.h>
+#include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_mmap.h>
+#include <compat/linux/linux_sched.h>
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_syscallargs.h>
 #include <compat/linux/linux_util.h>
 #include <compat/linux/linux_dirent.h>
 
+#include <compat/common/compat_dir.h>
+
 /* linux_misc.c */
-static void bsd_to_linux_wstat __P((int *));
 static void bsd_to_linux_statfs __P((struct statfs *, struct linux_statfs *));
-int linux_select1 __P((struct proc *, register_t *, int, fd_set *, fd_set *,
-		       fd_set *, struct timeval *));
+int	linux_select1 __P((struct proc *, register_t *, int, fd_set *,
+     fd_set *, fd_set *, struct timeval *));
 
 /*
  * The information on a terminated (or stopped) process needs
  * to be converted in order for Linux binaries to get a valid signal
  * number out of it.
  */
-static void
+void
 bsd_to_linux_wstat(status)
 	int *status;
 {
@@ -164,7 +167,7 @@ linux_sys_wait4(p, v, retval)
 		syscallarg(struct rusage *) rusage;
 	} */ *uap = v;
 	struct sys_wait4_args w4a;
-	int error, *status, tstat;
+	int error, *status, tstat, linux_options, options;
 	caddr_t sg;
 
 	if (SCARG(uap, status) != NULL) {
@@ -173,9 +176,22 @@ linux_sys_wait4(p, v, retval)
 	} else
 		status = NULL;
 
+	linux_options = SCARG(uap, options);
+	options = 0;
+	if (linux_options &
+	    ~(LINUX_WAIT4_WNOHANG|LINUX_WAIT4_WUNTRACED|LINUX_WAIT4_WCLONE))
+		return (EINVAL);
+
+	if (linux_options & LINUX_WAIT4_WNOHANG)
+		options |= WNOHANG;
+	if (linux_options & LINUX_WAIT4_WUNTRACED)
+		options |= WUNTRACED;
+	if (linux_options & LINUX_WAIT4_WCLONE)
+		options |= WALTSIG;
+
 	SCARG(&w4a, pid) = SCARG(uap, pid);
 	SCARG(&w4a, status) = status;
-	SCARG(&w4a, options) = SCARG(uap, options);
+	SCARG(&w4a, options) = options;
 	SCARG(&w4a, rusage) = SCARG(uap, rusage);
 
 	if ((error = sys_wait4(p, &w4a, retval)))
@@ -902,6 +918,7 @@ linux_sys_readdir(p, v, retval)
 	} */ *uap = v;
 
 	SCARG(uap, count) = 1;
+
 	return linux_sys_getdents(p, uap, retval);
 }
 
@@ -919,151 +936,101 @@ linux_sys_readdir(p, v, retval)
  *
  * Note that this doesn't handle union-mounted filesystems.
  */
+int linux_readdir_callback __P((void *, struct dirent *, off_t));
+
+struct linux_readdir_callback_args {
+	caddr_t outp;
+	int     resid;
+	int     oldcall;
+};
+
+int
+linux_readdir_callback(arg, bdp, cookie)
+	void *arg;
+	struct dirent *bdp;
+	off_t cookie;
+{
+	struct linux_dirent idb;
+	struct linux_readdir_callback_args *cb = arg;
+	int linux_reclen;
+	int error;
+
+	if (cb->oldcall == 2) 
+		return (ENOMEM);
+
+	linux_reclen = LINUX_RECLEN(&idb, bdp->d_namlen);
+	if (cb->resid < linux_reclen)
+		return (ENOMEM);
+
+	/*
+	 * Massage in place to make a Linux-shaped dirent (otherwise
+	 * we have to worry about touching user memory outside of
+	 * the copyout() call).
+	 */
+	idb.d_ino = (linux_ino_t)bdp->d_fileno;
+	
+	/*
+	 * The old readdir() call misuses the offset and reclen fields.
+	 */
+	if (cb->oldcall) {
+		idb.d_off = (linux_off_t)linux_reclen;
+		idb.d_reclen = (u_short)bdp->d_namlen;
+	} else {
+		idb.d_off = (linux_off_t)cookie;
+		idb.d_reclen = (u_short)linux_reclen;
+	}
+	
+	strlcpy(idb.d_name, bdp->d_name, sizeof(idb.d_name));
+	if ((error = copyout((caddr_t)&idb, cb->outp, linux_reclen)))
+		return (error);
+
+	/* advance output past Linux-shaped entry */
+	cb->outp += linux_reclen;
+	cb->resid -= linux_reclen;
+
+	if (cb->oldcall == 1)
+		++cb->oldcall;
+	
+	return (0);
+}
+
 int
 linux_sys_getdents(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_readdir_args /* {
+	struct linux_sys_getdents_args /* {
 		syscallarg(int) fd;
-		syscallarg(caddr_t) dent;
-		syscallarg(unsigned int) count;
+		syscallarg(void *) dirent;
+		syscallarg(unsigned) count;
 	} */ *uap = v;
-	register struct dirent *bdp;
-	struct vnode *vp;
-	caddr_t	inp, buf;		/* BSD-format */
-	int len, reclen;		/* BSD-format */
-	caddr_t outp;			/* Linux-format */
-	int resid, linux_reclen = 0;	/* Linux-format */
+	struct linux_readdir_callback_args args;
 	struct file *fp;
-	struct uio auio;
-	struct iovec aiov;
-	struct linux_dirent idb;
-	off_t off;		/* true file offset */
-	int buflen, error, eofflag, nbytes, oldcall;
-	struct vattr va;
-	u_long *cookiebuf = NULL, *cookie;
-	int ncookies = 0;
+	int error;
+	int nbytes = SCARG(uap, count);
 
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
 
-	if ((fp->f_flag & FREAD) == 0)
-		return (EBADF);
-
-	vp = (struct vnode *)fp->f_data;
-
-	if (vp->v_type != VDIR)	/* XXX  vnode readdir op should do this */
-		return (EINVAL);
-
-	if ((error = VOP_GETATTR(vp, &va, p->p_ucred, p)))
-		return error;
-
-	nbytes = SCARG(uap, count);
 	if (nbytes == 1) {	/* emulating old, broken behaviour */
-		nbytes = sizeof (struct linux_dirent);
-		buflen = max(va.va_blocksize, nbytes);
-		oldcall = 1;
+		nbytes = sizeof(struct linux_dirent);
+		args.oldcall = 1;
 	} else {
-		buflen = min(MAXBSIZE, nbytes);
-		oldcall = 0;
-	}
-	buf = malloc(buflen, M_TEMP, M_WAITOK);
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
-	off = fp->f_offset;
-again:
-	aiov.iov_base = buf;
-	aiov.iov_len = buflen;
-	auio.uio_iov = &aiov;
-	auio.uio_iovcnt = 1;
-	auio.uio_rw = UIO_READ;
-	auio.uio_segflg = UIO_SYSSPACE;
-	auio.uio_procp = p;
-	auio.uio_resid = buflen;
-	auio.uio_offset = off;
-	/*
-	 * First we read into the malloc'ed buffer, then
-	 * we massage it into user space, one record at a time.
-	 */
-	error = VOP_READDIR(vp, &auio, fp->f_cred, &eofflag, &ncookies,
-	    &cookiebuf);
-	if (error)
-		goto out;
-
-	if (!error && !cookiebuf)
-		goto out;
-
-	inp = buf;
-	outp = SCARG(uap, dent);
-	resid = nbytes;
-	if ((len = buflen - auio.uio_resid) == 0)
-		goto eof;
-
-	for (cookie = cookiebuf; len > 0; len -= reclen) {
-		bdp = (struct dirent *)inp;
-		reclen = bdp->d_reclen;
-		if (reclen & 3)
-			panic("linux_readdir: bad reclen");
-		if (bdp->d_fileno == 0) {
-			inp += reclen;	/* it is a hole; squish it out */
-			off = *cookie++;
-			continue;
-		}
-		linux_reclen = LINUX_RECLEN(&idb, bdp->d_namlen);
-		if (reclen > len || resid < linux_reclen) {
-			/* entry too big for buffer, so just stop */
-			outp++;
-			break;
-		}
-
-		/*
-		 * Massage in place to make a Linux-shaped dirent (otherwise
-		 * we have to worry about touching user memory outside of
-		 * the copyout() call).
-		 */
-		idb.d_ino = (linux_ino_t)bdp->d_fileno;
-
-		/*
-		 * The old readdir() call misuses the offset and reclen fields.
-		 */
-		if (oldcall) {
-			idb.d_off = (linux_off_t)linux_reclen;
-			idb.d_reclen = (u_short)bdp->d_namlen;
-		} else {
-			idb.d_off = (linux_off_t)off;
-			idb.d_reclen = (u_short)linux_reclen;
-		}
-		strncpy(idb.d_name, bdp->d_name, sizeof(idb.d_name) - 1);
-		idb.d_name[sizeof(idb.d_name) - 1] = '\0';
-		if ((error = copyout((caddr_t)&idb, outp, linux_reclen)))
-			goto out;
-		/* advance past this real entry */
-		inp += reclen;
-		off = *cookie++;	/* each entry points to itself */
-		/* advance output past Linux-shaped entry */
-		outp += linux_reclen;
-		resid -= linux_reclen;
-		if (oldcall)
-			break;
+		args.oldcall = 0;
 	}
 
-	/* if we squished out the whole block, try again */
-	if (outp == SCARG(uap, dent))
-		goto again;
-	fp->f_offset = off;	/* update the vnode offset */
+	args.resid = nbytes;
+	args.outp = (caddr_t)SCARG(uap, dirent);
 
-	if (oldcall)
-		nbytes = resid + linux_reclen;
+	if ((error = readdir_with_callback(fp, &fp->f_offset, nbytes,
+	    linux_readdir_callback, &args)) != 0)
+		goto exit;
 
-eof:
-	*retval = nbytes - resid;
-out:
-	VOP_UNLOCK(vp, 0, p);
-	if (cookiebuf)
-		free(cookiebuf, M_TEMP);
-	free(buf, M_TEMP);
-	return error;
+	*retval = nbytes - args.resid;
+
+ exit:
+	return (error);
 }
 
 /*

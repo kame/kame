@@ -1,4 +1,4 @@
-#	$OpenBSD: files.i386,v 1.71 2000/09/01 05:46:01 aaron Exp $
+#	$OpenBSD: files.i386,v 1.82 2001/04/09 07:14:14 tholo Exp $
 #	$NetBSD: files.i386,v 1.73 1996/05/07 00:58:36 thorpej Exp $
 #
 # new style config file for i386 architecture
@@ -15,7 +15,7 @@ file	arch/i386/i386/autoconf.c
 file	arch/i386/i386/conf.c
 file	arch/i386/i386/db_disasm.c	ddb
 file	arch/i386/i386/db_interface.c	ddb
-file	arch/i386/i386/db_memrw.c	ddb
+file	arch/i386/i386/db_memrw.c	ddb | kgdb
 file	arch/i386/i386/db_trace.c	ddb
 file	arch/i386/i386/db_magic.s	ddb
 file	arch/i386/i386/disksubr.c	disk
@@ -23,14 +23,17 @@ file	arch/i386/i386/gdt.c
 file	arch/i386/i386/in_cksum.s	inet
 file	arch/i386/i386/ipx_cksum.c	ipx
 file	arch/i386/i386/machdep.c
+file	arch/i386/i386/kgdb_machdep.c	kgdb
 file	arch/i386/i386/math_emulate.c	math_emulate
 file	arch/i386/i386/mem.c
 file	arch/i386/i386/i686_mem.c	mtrr
 file	arch/i386/i386/k6_mem.c		mtrr
 file	arch/i386/i386/microtime.s
 file	arch/i386/i386/ns_cksum.c	ns
-file	arch/i386/i386/pmap.c
+file	arch/i386/i386/pmap.c		!pmap_old & uvm
+file	arch/i386/i386/pmap.old.c	pmap_old | !uvm
 file	arch/i386/i386/process_machdep.c
+file	arch/i386/i386/procfs_machdep.c	procfs
 file	arch/i386/i386/random.s
 file	arch/i386/i386/sys_machdep.c
 file	arch/i386/i386/trap.c
@@ -39,6 +42,7 @@ file	arch/i386/i386/dkcsum.c		bios
 file	lib/libz/adler32.c		!ppp_deflate
 file	dev/cons.c
 file	dev/cninit.c
+file	arch/i386/i386/wscons_machdep.c
 major	{vnd = 14}
 
 #
@@ -125,7 +129,7 @@ include "../../../gnu/arch/i386/fpemul/files.fpemul"
 
 # attribute used to represent the "keyboard controller"
 # XXX should be a real device
-define pckbd { [irq = -1], [port = -1] }
+define pckbcport { [irq = -1], [port = -1] }
 
 # 8250/16[45]50-based "com" ports, optimized for the i386 interrupt system
 device	pccom: tty
@@ -134,12 +138,14 @@ attach	pccom at commulti with pccom_commulti
 file	arch/i386/isa/pccom.c		pccom & (pccom_isa | pccom_isapnp | pccom_commulti | pccom_pcmcia | pccom_cardbus | pccom_puc) needs-flag
 
 # PC console support a la "pccons"
-device	pc: tty, pckbd
+device	pc: tty, pckbcport
 attach	pc at isa
-file	arch/i386/isa/pccons.c		pc needs-flag
+device	pcconskbd
+attach	pcconskbd at pckbc
+file	arch/i386/isa/pccons.c		pc | pcconskbd needs-flag
 
 # PC console support a la "pcvt"
-device	vt: tty, pckbd
+device	vt: tty, pckbcport
 attach	vt at isa
 file	arch/i386/isa/pcvt/pcvt_drv.c	vt needs-flag
 file	arch/i386/isa/pcvt/pcvt_ext.c	vt needs-flag
@@ -150,15 +156,15 @@ file	arch/i386/isa/pcvt/pcvt_sup.c	vt needs-flag
 file	arch/i386/isa/pcvt/pcvt_vtf.c	vt needs-flag
 
 # PC Mice; Logitech-style, Microsoft-style, and PS/2-style
-device	lms
+device	lms: wsmousedev
 attach	lms at isa
 file	arch/i386/isa/lms.c		lms needs-flag
-device	mms
+device	mms: wsmousedev
 attach	mms at isa
 file	arch/i386/isa/mms.c		mms needs-flag
-device	pms
-attach	pms at pckbd
-file	arch/i386/isa/pms.c		pms needs-flag
+
+include	"dev/wscons/files.wscons"
+include	"dev/pckbc/files.pckbc"
 
 device sysbeep
 attach sysbeep at pcppi
@@ -258,6 +264,7 @@ file	arch/i386/pci/opti82c700.c	pcibios
 file	arch/i386/pci/piix.c		pcibios
 file	arch/i386/pci/sis85c503.c	pcibios
 file	arch/i386/pci/via82c586.c	pcibios
+file	arch/i386/pci/amd756.c		pcibios
 
 #
 # CARDBUS
@@ -286,8 +293,8 @@ attach	pcic at pci with pcic_pci
 file	dev/pci/i82365_pci.c		pcic_pci
 
 # PCIC pcmcia controller on PnP board
-#attach	pcic at isapnp with pcic_isapnp
-#file	dev/isa/i82365_isapnp.c	pcic_isapnp
+attach	pcic at isapnp with pcic_isapnp
+file	dev/isa/i82365_isapnp.c	pcic_isapnp
 
 # Code common to ISA and ISAPnP attachments
 file	dev/isa/i82365_isasubr.c	pcic_isa | pcic_isapnp

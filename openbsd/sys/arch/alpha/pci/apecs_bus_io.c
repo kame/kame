@@ -1,5 +1,5 @@
-/*	$OpenBSD: apecs_bus_io.c,v 1.2 1997/11/10 15:53:11 niklas Exp $	*/
-/*	$NetBSD: apecs_bus_io.c,v 1.1 1996/11/25 03:42:09 cgd Exp $	*/
+/*	$OpenBSD: apecs_bus_io.c,v 1.5 2001/02/16 09:07:19 jason Exp $	*/
+/* $NetBSD: apecs_bus_io.c,v 1.8 1997/09/02 13:19:10 thorpej Exp $ */
 
 /*
  * Copyright (c) 1996 Carnegie-Mellon University.
@@ -33,6 +33,7 @@
 #include <sys/malloc.h>
 #include <sys/syslog.h>
 #include <sys/device.h>
+
 #include <vm/vm.h>
 
 #include <machine/bus.h>
@@ -61,4 +62,4 @@
 #define	CHIP_IO_W2_SYS_START(v)	(APECS_PCI_SIO + (0x00040000UL << 5))
 #define	CHIP_IO_W2_SYS_END(v)	(APECS_PCI_SIO + (0x01000000UL << 5) - 1)
 
-#include "pcs_bus_io_common.c"
+#include <alpha/pci/pci_swiz_bus_io_chipdep.c>

@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.11 2000/10/18 21:00:38 mickey Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.15 2001/04/14 00:11:45 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1995 Dale Rahn.
@@ -31,9 +31,10 @@
  */
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/device.h>
-#define DKTYPENAMES
+#undef DKTYPENAMES
 #include <sys/disklabel.h>
 #include <sys/disk.h>
 
@@ -52,6 +53,7 @@ static void bsdtocpulabel __P((struct disklabel *lp,
 	struct cpu_disklabel *clp));
 static void cputobsdlabel __P((struct disklabel *lp,
 	struct cpu_disklabel *clp));
+int get_target __P((void));
 
 #ifdef DEBUG
 static void printlp __P((struct disklabel *lp, char *str));
@@ -59,34 +61,34 @@ static void printclp __P((struct cpu_disklabel *clp, char *str));
 #endif
 
 /* 
- * Returns the ID of the SCSI disk based on Motorala's CLUN/DLUN stuff
+ * Returns the ID of the SCSI disk based on Motorola's CLUN/DLUN stuff
  * bootdev == CLUN << 8 | DLUN.
- * This handels SBC SCSI and MVME328.  It will need to be modified for 
- * MVME327.  We do not handel MVME328 daughter cards.  smurph
+ * This handles SBC SCSI and MVME328.  It will need to be modified for 
+ * MVME327.  We do not handle MVME328 daughter cards.  smurph
  */
 int
-get_target(void)
+get_target()
 {
-   extern int bootdev;
-   switch (bootdev)
-   {
-   case 0x0000: case 0x0600: case 0x0700: case 0x1600: case 0x1700: case 0x1800: case 0x1900:
-      return 0;
-   case 0x0010: case 0x0608: case 0x0708: case 0x1608: case 0x1708: case 0x1808: case 0x1908:
-      return 1;
-   case 0x0020: case 0x0610: case 0x0710: case 0x1610: case 0x1710: case 0x1810: case 0x1910:
-      return 2;
-   case 0x0030: case 0x0618: case 0x0718: case 0x1618: case 0x1718: case 0x1818: case 0x1918:
-      return 3;
-   case 0x0040: case 0x0620: case 0x0720: case 0x1620: case 0x1720: case 0x1820: case 0x1920:
-      return 4;
-   case 0x0050: case 0x0628: case 0x0728: case 0x1628: case 0x1728: case 0x1828: case 0x1928:
-      return 5;
-   case 0x0060: case 0x0630: case 0x0730: case 0x1630: case 0x1730: case 0x1830: case 0x1930:
-      return 6;
-   default:
-      return 0;
-   }
+	extern int bootdev;
+
+	switch (bootdev) {
+	case 0x0000: case 0x0600: case 0x0700: case 0x1600: case 0x1700: case 0x1800: case 0x1900:
+		return 0;
+	case 0x0010: case 0x0608: case 0x0708: case 0x1608: case 0x1708: case 0x1808: case 0x1908:
+		return 1;
+	case 0x0020: case 0x0610: case 0x0710: case 0x1610: case 0x1710: case 0x1810: case 0x1910:
+		return 2;
+	case 0x0030: case 0x0618: case 0x0718: case 0x1618: case 0x1718: case 0x1818: case 0x1918:
+		return 3;
+	case 0x0040: case 0x0620: case 0x0720: case 0x1620: case 0x1720: case 0x1820: case 0x1920:
+		return 4;
+	case 0x0050: case 0x0628: case 0x0728: case 0x1628: case 0x1728: case 0x1828: case 0x1928:
+		return 5;
+	case 0x0060: case 0x0630: case 0x0730: case 0x1630: case 0x1730: case 0x1830: case 0x1930:
+		return 6;
+	default:
+		return 0;
+	}
 }
 
 void
@@ -132,13 +134,13 @@ dk_establish(dk, dev)
 char *
 readdisklabel(dev, strat, lp, clp, spoofonly)
 	dev_t dev;
-	void (*strat)();
+	void (*strat) __P((struct buf *));
 	struct disklabel *lp;
 	struct cpu_disklabel *clp;
 	int spoofonly;
 {
 	struct buf *bp;
-	char *msg = NULL;
+	int error, i;
 
 	/* minimal requirements for archetypal disk label */
 	if (lp->d_secsize == 0)
@@ -146,9 +148,12 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 	if (lp->d_secperunit == 0)
 		lp->d_secperunit = 0x1fffffff;
 	lp->d_npartitions = RAW_PART + 1;
-	if (lp->d_partitions[RAW_PART].p_size == 0)
-		lp->d_partitions[RAW_PART].p_size = lp->d_secperunit;
-	lp->d_partitions[RAW_PART].p_offset = 0;
+	for (i = 0; i < RAW_PART ; i++) {
+		lp->d_partitions[i].p_size = 0;
+		lp->d_partitions[i].p_offset = 0;
+	}
+	if (lp->d_partitions[i].p_size == 0)
+		lp->d_partitions[i].p_size = lp->d_secperunit;
 
 	/* don't read the on-disk label if we are in spoofed-only mode */
 	if (spoofonly)
@@ -159,36 +164,40 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 
 	/* request no partition relocation by driver on I/O operations */
 	bp->b_dev = dev;
-	bp->b_blkno = 0; /* contained in block 0 */
+	bp->b_blkno = LABELSECTOR;
 	bp->b_bcount = lp->d_secsize;
 	bp->b_flags = B_BUSY | B_READ;
 	bp->b_cylin = 0; /* contained in block 0 */
 	(*strat)(bp);
 
-	if (biowait(bp)) {
-		msg = "cpu_disklabel read error\n";
-	} else {
+	error = biowait(bp);
+	if (error == 0)
 		bcopy(bp->b_data, clp, sizeof (struct cpu_disklabel));
-	}
-
 	bp->b_flags = B_INVAL | B_AGE | B_READ;
 	brelse(bp);
 
-	if (msg) {
+	if (error)
+		return ("disk label read error");
+
 #if defined(CD9660)
-		if (iso_disklabelspoof(dev, strat, lp) == 0)
-			msg = NULL;
+	if (iso_disklabelspoof(dev, strat, lp) == 0)
+		return (NULL);
 #endif
-		return (msg); 
-	}
+	if (clp->magic1 != DISKMAGIC || clp->magic2 != DISKMAGIC)
+		return ("no disk label");
+
 	cputobsdlabel(lp, clp);
+
+	if (dkcksum(lp) != 0)
+		return ("disk label corrupted");
+
 #ifdef DEBUG
 	if (disksubr_debug > 0) {
 		printlp(lp, "readdisklabel:bsd label");
 		printclp(clp, "readdisklabel:cpu label");
 	}
 #endif
-	return (msg);
+	return (NULL);
 }
 
 #if 0
@@ -251,7 +260,7 @@ setdisklabel(olp, nlp, openmask, clp)
 	u_long openmask;
 	struct cpu_disklabel *clp;
 {
-	register i;
+	register int i;
 	register struct partition *opp, *npp;
 
 #ifdef DEBUG
@@ -313,6 +322,7 @@ setdisklabel(olp, nlp, openmask, clp)
 /*
  * Write disk label back to device after modification.
  */
+int
 writedisklabel(dev, strat, lp, clp)
 	dev_t dev;
 	void (*strat)();
@@ -333,13 +343,13 @@ writedisklabel(dev, strat, lp, clp)
 
 	/* request no partition relocation by driver on I/O operations */
 	bp->b_dev = dev;
-	bp->b_blkno = 0; /* contained in block 0 */
+	bp->b_blkno = LABELSECTOR;
 	bp->b_bcount = lp->d_secsize;
 	bp->b_flags = B_BUSY | B_READ;
 	bp->b_cylin = 0; /* contained in block 0 */
 	(*strat)(bp);
 
-	if (error = biowait(bp)) {
+	if ((error = biowait(bp)) != 0 ) {
 		/* nothing */
 	} else {
 		bcopy(bp->b_data, clp, sizeof(struct cpu_disklabel));
@@ -584,7 +594,6 @@ cputobsdlabel(lp, clp)
 	int i;
 
 	if (clp->version == 0) {
-		struct cpu_disklabel_old *clpo = (void *) clp;
 #ifdef DEBUG
 		if (disksubr_debug > 0) {
 			printf("Reading old disklabel\n");
@@ -713,7 +722,7 @@ cputobsdlabel(lp, clp)
 		lp->d_checksum = 0;
 		lp->d_checksum = dkcksum(lp);
 	}
-#if DEBUG
+#if defined(DEBUG)
 	if (disksubr_debug > 0) {
 		printlp(lp, "translated label read from disk\n");
 	}

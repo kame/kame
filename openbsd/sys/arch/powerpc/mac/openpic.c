@@ -85,7 +85,7 @@ extern u_int32_t *heathrow_FCR;
 
 static __inline u_int openpic_read __P((int));
 static __inline void openpic_write __P((int, u_int));
-void openpic_enable_irq __P((int));
+void openpic_enable_irq __P((int, int));
 void openpic_disable_irq __P((int));
 void openpic_init();
 void openpic_set_priority __P((int, int));
@@ -222,6 +222,8 @@ fakeintr(arg)
 	return 0;
 }
 
+void nameinterrupt( int replace, char *newstr);
+
 /*
  * Register an interrupt handler.
  */
@@ -246,6 +248,7 @@ openpic_intr_establish(lcv, irq, type, level, ih_fun, ih_arg, name)
 printf("mac_intr_establish, hI %d L %d ", irq, type);
 #endif
 
+	nameinterrupt(irq, name);
 	irq = mapirq(irq);
 #if 0
 printf("vI %d ", irq);
@@ -425,7 +428,7 @@ intr_calculatemasks()
 		for (irq = 0; irq < ICU_LEN; irq++) {
 			if (intrhand[irq]) {
 				irqs |= 1 << irq;
-				openpic_enable_irq(hwirq[irq]);
+				openpic_enable_irq(hwirq[irq], intrtype[irq]);
 			} else {
 				openpic_disable_irq(hwirq[irq]);
 			}
@@ -555,20 +558,26 @@ int irq_mask;
 	int irq;
 	for ( irq = 0; irq <= virq_max; irq++) {
 		if (irq_mask & (1 << irq)) {
-			openpic_enable_irq(hwirq[irq]);
+			openpic_enable_irq(hwirq[irq], intrtype[irq]);
 		} else {
 			openpic_disable_irq(hwirq[irq]);
 		}
 	}
 }
 void
-openpic_enable_irq(irq)
+openpic_enable_irq(irq, type)
 	int irq;
+	int type;
 {
 	u_int x;
 
 	x = openpic_read(OPENPIC_SRC_VECTOR(irq));
-	x &= ~OPENPIC_IMASK;
+	x &= ~(OPENPIC_IMASK|OPENPIC_SENSE_LEVEL|OPENPIC_SENSE_EDGE);
+	if (type == IST_LEVEL) {
+		x |= OPENPIC_SENSE_LEVEL;
+	} else {
+		x |= OPENPIC_SENSE_EDGE;
+	}
 	openpic_write(OPENPIC_SRC_VECTOR(irq), x);
 }
 

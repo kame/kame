@@ -1,4 +1,4 @@
-	$OpenBSD: syscalls.master,v 1.25 2000/07/07 02:13:40 jasoni Exp $
+	$OpenBSD: syscalls.master,v 1.28 2001/04/02 21:43:11 niklas Exp $
 ;	$NetBSD: syscalls.master,v 1.15 1995/12/18 14:35:10 fvdl Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
@@ -200,7 +200,7 @@
 			    caddr_t ptr); }
 118	NOARGS		{ int sys_fsync(int fd); }
 119	STD		{ int linux_sys_sigreturn(struct linux_sigcontext *scp); }
-120	STD		{ int linux_sys_clone(void); }
+120	STD		{ int linux_sys_clone(int flags, void *stack); }
 121	NOARGS		{ int compat_09_sys_setdomainname(char *name, \
 			    int len); }
 122	STD		{ int linux_sys_uname(struct linux_utsname *up); }
@@ -247,13 +247,16 @@
 151	NOARGS		{ int sys_munlock(caddr_t addr, size_t len); }
 152	STD		{ int linux_sys_mlockall(void); }
 153	STD		{ int linux_sys_munlockall(void); }
-154	STD		{ int linux_sys_sched_setparam(void); }
-155	STD		{ int linux_sys_sched_getparam(void); }
-156	STD		{ int linux_sys_sched_setscheduler(void); }
-157	STD		{ int linux_sys_sched_getscheduler(void); }
+154	STD		{ int linux_sys_sched_setparam(linux_pid_t pid, \
+			    const struct linux_sched_param *sp); }
+155	STD		{ int linux_sys_sched_getparam(linux_pid_t pid, \
+			    struct linux_sched_param *sp); }
+156	STD		{ int linux_sys_sched_setscheduler(linux_pid_t pid, \
+			    int policy, const struct linux_sched_param *sp); }
+157	STD		{ int linux_sys_sched_getscheduler(linux_pid_t pid); }
 158	STD		{ int linux_sys_sched_yield(void); }
-159	STD		{ int linux_sys_sched_get_priority_max(void); }
-160	STD		{ int linux_sys_sched_get_priority_min(void); }
+159	STD		{ int linux_sys_sched_get_priority_max(int policy); }
+160	STD		{ int linux_sys_sched_get_priority_min(int policy); }
 161	STD		{ int linux_sys_sched_rr_get_interval(void); }
 162	NOARGS		{ int sys_nanosleep(const struct timespec *rqtp, \
 				struct timespec *rmtp); }
@@ -306,9 +309,13 @@
 191	STD		{ int linux_sys_ugetrlimit(u_int which, \
 			    struct linux_rlimit *rlp); }
 192     STD		{ int linux_sys_mmap2(void); }
-193     STD        	{ int linux_sys_truncate64(void); }
-194     STD        	{ int linux_sys_ftruncate64(void); }
-195     STD        	{ int linux_sys_stat64(void); }
-196     STD        	{ int linux_sys_lstat64(void); }
-197     STD        	{ int linux_sys_fstat64(void); }
+193     STD        	{ int linux_sys_truncate64(char *path, \
+			    off_t length); }
+194	NOARGS		linux_ftruncate64 { int sys_ftruncate(int fd, off_t length); }
+195     STD        	{ int linux_sys_stat64(char *path, \
+			    struct linux_stat64 *sp); }
+196     STD        	{ int linux_sys_lstat64(char *path, \
+			    struct linux_stat64 *sp); }
+197     STD        	{ int linux_sys_fstat64(int fd, \
+			    struct linux_stat64 *sp); }
 

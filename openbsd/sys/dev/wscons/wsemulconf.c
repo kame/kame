@@ -1,4 +1,4 @@
-/* $OpenBSD: wsemulconf.c,v 1.1 2000/05/16 23:49:11 mickey Exp $ */
+/* $OpenBSD: wsemulconf.c,v 1.3 2001/03/14 02:49:23 mickey Exp $ */
 /* $NetBSD: wsemulconf.c,v 1.4 2000/01/05 11:19:37 drochner Exp $ */
 
 /*
@@ -36,6 +36,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 
+#include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsdisplayvar.h>
 #include <dev/wscons/wsksymvar.h>
 #include <dev/wscons/wsemulvar.h>		/* pulls in opt_wsemul.h */
@@ -45,7 +46,7 @@ static const struct wsemul_ops *wsemul_conf[] = {
 #ifdef WSEMUL_SUN
 	&wsemul_sun_ops,
 #endif
-#ifdef WSEMUL_VT100
+#ifndef WSEMUL_NO_VT100
 	&wsemul_vt100_ops,
 #endif
 #ifndef WSEMUL_NO_DUMB
@@ -60,7 +61,7 @@ wsemul_pick(name)
 {
 	const struct wsemul_ops **ops;
 
-	if (name == NULL) {
+	if (name == NULL || *name == '\0') {
 		/* default */
 #ifdef WSEMUL_DEFAULT
 		name = WSEMUL_DEFAULT;
@@ -70,7 +71,7 @@ wsemul_pick(name)
 	}
 
 	for (ops = &wsemul_conf[0]; *ops != NULL; ops++)
-		if (strcmp(name, (*ops)->name) == 0)
+		if (strncmp(name, (*ops)->name, WSEMUL_NAME_SIZE) == 0)
 			break;
 
 	return (*ops);

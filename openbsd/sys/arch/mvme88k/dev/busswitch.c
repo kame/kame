@@ -1,4 +1,4 @@
-/*	$OpenBSD: busswitch.c,v 1.1 1999/09/27 18:43:22 smurph Exp $ */
+/*	$OpenBSD: busswitch.c,v 1.4 2001/03/09 05:44:38 smurph Exp $ */
 
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
@@ -66,19 +66,21 @@ struct cfdriver busswitch_cd = {
         NULL, "busswitch", DV_DULL, 0
 };
 
+int busswitch_print __P((void *args, const char *bus));
+int busswitch_scan __P((struct device *parent, void *child, void *args));
+
 int
 busswitchmatch(parent, vcf, args)
 	struct device *parent;
 	void *vcf, *args;
 {
-	struct cfdata *cf = vcf;
 	struct confargs *ca = args;
    struct busswitchreg *busswitch;
    /* Don't match if wrong cpu */
 	if (cputyp != CPU_197) return (0);
 	
    busswitch = (struct busswitchreg *)(IIOV(ca->ca_paddr));
-	if (badvaddr(busswitch, 4) <= 0){
+	if (badvaddr((vm_offset_t)busswitch, 4) <= 0){
 	    printf("==> busswitch: failed address check.\n");
 	    return (0);
 	}
@@ -123,18 +125,17 @@ busswitch_scan(parent, child, args)
 {
 	struct cfdata *cf = child;
 	struct busswitchsoftc *sc = (struct busswitchsoftc *)parent;
-	struct confargs *ca = args;
 	struct confargs oca;
 
 	if (parent->dv_cfdata->cf_driver->cd_indirect) {
-      printf(" indirect devices not supported\n");
-      return 0;
-   }
+		printf(" indirect devices not supported\n");
+		return 0;
+	}
 
 	bzero(&oca, sizeof oca);
 	oca.ca_offset = cf->cf_loc[0];
 	oca.ca_ipl = cf->cf_loc[1];
-	if ((oca.ca_offset != (void*)-1) && ISIIOVA(sc->sc_vaddr + oca.ca_offset)) {
+	if (((int)oca.ca_offset != -1) && ISIIOVA(sc->sc_vaddr + oca.ca_offset)) {
 		oca.ca_vaddr = sc->sc_vaddr + oca.ca_offset;
 		oca.ca_paddr = sc->sc_paddr + oca.ca_offset;
 	} else {

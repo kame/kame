@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_pos_io.c,v 1.5 2000/04/19 08:34:57 csapuntz Exp $	*/
+/*	$OpenBSD: netbsd_pos_io.c,v 1.7 2001/01/15 11:43:13 art Exp $	*/
 
 /*	$NetBSD: vfs_syscalls.c,v 1.71 1996/04/23 10:29:02 mycroft Exp $	*/
 
@@ -65,7 +65,7 @@ static int netbsd_check_set_pos __P((struct proc *, int, off_t));
  * sys_lseek trimmed down
  */
 static int
-netbsd_check_set_pos(p, fd)
+netbsd_check_set_pos(p, fd, offset)
 	struct proc *p;
 	int fd;
 	off_t offset;
@@ -124,7 +124,7 @@ netbsd_sys_pread(p, v, retval)
 
 	offset = SCARG(uap, offset);
 
-	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset) != 0)
+	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset)) != 0)
 		return (error);
 	fp = fdp->fd_ofiles[SCARG(uap, fd)];
 	aiov.iov_base = (caddr_t)SCARG(uap, buf);
@@ -151,7 +151,7 @@ netbsd_sys_pread(p, v, retval)
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_GENIO) && error == 0)
-		ktrgenio(p->p_tracep, SCARG(uap, fd), UIO_READ, &ktriov,
+		ktrgenio(p, SCARG(uap, fd), UIO_READ, &ktriov,
 		    cnt, error);
 #endif
 	*retval = cnt;
@@ -192,7 +192,7 @@ netbsd_sys_preadv(p, v, retval)
 
 	offset = SCARG(uap, offset);
 
-	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset) != 0)
+	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset)) != 0)
 		return (error);
 	fp = fdp->fd_ofiles[SCARG(uap, fd)];
 	/* note: can't use iovlen until iovcnt is validated */
@@ -243,7 +243,7 @@ netbsd_sys_preadv(p, v, retval)
 #ifdef KTRACE
 	if (ktriov != NULL) {
 		if (error == 0)
-			ktrgenio(p->p_tracep, SCARG(uap, fd), UIO_READ, ktriov,
+			ktrgenio(p, SCARG(uap, fd), UIO_READ, ktriov,
 			    cnt, error);
 		FREE(ktriov, M_TEMP);
 	}
@@ -287,7 +287,7 @@ netbsd_sys_pwrite(p, v, retval)
 
 	offset = SCARG(uap, offset);
 
-	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset) != 0)
+	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset)) != 0)
 		return (error);
 	fp = fdp->fd_ofiles[SCARG(uap, fd)];
 	if ((fp->f_flag & FWRITE) == 0)
@@ -320,7 +320,7 @@ netbsd_sys_pwrite(p, v, retval)
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_GENIO) && error == 0)
-		ktrgenio(p->p_tracep, SCARG(uap, fd), UIO_WRITE,
+		ktrgenio(p, SCARG(uap, fd), UIO_WRITE,
 		    &ktriov, cnt, error);
 #endif
 	*retval = cnt;
@@ -361,7 +361,7 @@ netbsd_sys_pwritev(p, v, retval)
 
 	offset = SCARG(uap, offset);
 
-	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset) != 0)
+	if ((error = netbsd_check_set_pos(p, SCARG(uap, fd), offset)) != 0)
 		return (error);
 	fp = fdp->fd_ofiles[SCARG(uap, fd)];
 	if ((fp->f_flag & FWRITE) == 0) {
@@ -420,7 +420,7 @@ netbsd_sys_pwritev(p, v, retval)
 #ifdef KTRACE
 	if (ktriov != NULL) {
 		if (error == 0)
-			ktrgenio(p->p_tracep, SCARG(uap, fd), UIO_WRITE,
+			ktrgenio(p, SCARG(uap, fd), UIO_WRITE,
 				ktriov, cnt, error);
 		FREE(ktriov, M_TEMP);
 	}

@@ -1,4 +1,4 @@
-/*       $OpenBSD: vfs_sync.c,v 1.12 2000/03/23 15:57:33 art Exp $  */
+/*       $OpenBSD: vfs_sync.c,v 1.18 2001/03/16 15:51:58 art Exp $  */
 
 /*
  *  Portions of this code are:
@@ -55,6 +55,10 @@
 
 #include <sys/kernel.h>
 
+#ifdef FFS_SOFTUPDATES
+int   softdep_process_worklist __P((struct mount *));
+#endif
+
 /*
  * The workitem queue.
  */ 
@@ -67,11 +71,9 @@ int rushjob = 0;			/* number of slots to run ASAP */
 int stat_rush_requests = 0;		/* number of rush requests */
  
 static int syncer_delayno = 0;
-static long syncer_last;
+static long syncer_mask;
 LIST_HEAD(synclist, vnode);
 static struct synclist *syncer_workitem_pending;
-
-extern struct simplelock mountlist_slock;
 
 struct proc *syncerproc;
 
@@ -105,16 +107,9 @@ void
 vn_initialize_syncerd()
 
 {
-	int i;
-
-	syncer_last = SYNCER_MAXDELAY + 2;
-
-	syncer_workitem_pending =
-		malloc(syncer_last * sizeof(struct synclist), 
-		       M_VNODE, M_WAITOK);
-
-	for (i = 0; i < syncer_last; i++)
-		LIST_INIT(&syncer_workitem_pending[i]);
+	syncer_workitem_pending = hashinit(syncer_maxdelay, M_VNODE, M_WAITOK,
+	    &syncer_mask);
+	syncer_maxdelay = syncer_mask + 1;
 }
 
 /*
@@ -127,16 +122,16 @@ vn_syncer_add_to_worklist(vp, delay)
 {
 	int s, slot;
 
-	s = splbio();
+	if (delay > syncer_maxdelay - 2)
+		delay = syncer_maxdelay - 2;
+	slot = (syncer_delayno + delay) & syncer_mask;
 
-	if (vp->v_flag & VONSYNCLIST)
+	s = splbio();
+	if (vp->v_bioflag & VBIOONSYNCLIST)
 		LIST_REMOVE(vp, v_synclist);
 
-	if (delay > syncer_maxdelay)
-		delay = syncer_maxdelay;
-	slot = (syncer_delayno + delay) % syncer_last;
 	LIST_INSERT_HEAD(&syncer_workitem_pending[slot], vp, v_synclist);
-	vp->v_flag |= VONSYNCLIST;
+	vp->v_bioflag |= VBIOONSYNCLIST;
 	splx(s);
 }
 
@@ -161,32 +156,53 @@ sched_sync(p)
 		/*
 		 * Push files whose dirty time has expired.
 		 */
-		s = splbio();
 		slp = &syncer_workitem_pending[syncer_delayno];
 		syncer_delayno += 1;
-		if (syncer_delayno >= syncer_last)
+		if (syncer_delayno == syncer_maxdelay)
 			syncer_delayno = 0;
-		splx(s);
+		s = splbio();
 		while ((vp = LIST_FIRST(slp)) != NULL) {
-			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+			if (vn_lock(vp, LK_EXCLUSIVE | LK_NOWAIT, p) != 0) {
+				/*
+				 * If we fail to get the lock, we move this
+				 * vnode one second ahead in time.
+				 * XXX - no good, but the best we can do.
+				 */
+				vn_syncer_add_to_worklist(vp, 1);
+				continue;
+			}
+			splx(s);
 			(void) VOP_FSYNC(vp, p->p_ucred, MNT_LAZY, p);
 			VOP_UNLOCK(vp, 0, p);
+			s = splbio();
 			if (LIST_FIRST(slp) == vp) {
+				/*
+				 * Note: disk vps can remain on the
+				 * worklist too with no dirty blocks, but 
+				 * since sync_fsync() moves it to a different 
+				 * slot we are safe.
+				 */
 				if (LIST_FIRST(&vp->v_dirtyblkhd) == NULL &&
 				    vp->v_type != VBLK)
 					panic("sched_sync: fsync failed");
 				/*
-				 * Move ourselves to the back of the sync list.
+				 * Put us back on the worklist.  The worklist
+				 * routine will remove us from our current
+				 * position and then add us back in at a later
+				 * position.
 				 */
 				vn_syncer_add_to_worklist(vp, syncdelay);
 			}
 		}
 
+		splx(s);
+
+#ifdef FFS_SOFTUPDATES
 		/*
 		 * Do soft update processing.
 		 */
-		if (bioops.io_sync)
-			(*bioops.io_sync)(NULL);
+		softdep_process_worklist(NULL);
+#endif
 
 		/*
 		 * The variable rushjob allows the kernel to speed up the

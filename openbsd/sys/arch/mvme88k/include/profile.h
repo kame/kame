@@ -1,4 +1,4 @@
-/*	$OpenBSD: profile.h,v 1.7 1999/02/09 06:36:27 smurph Exp $ */
+/*	$OpenBSD: profile.h,v 1.10 2001/03/07 23:38:22 miod Exp $ */
 /*
  * Copyright (c) 1996 Nivas Madhur
  * Copyright (c) 1992, 1993
@@ -33,13 +33,14 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)profile.h	8.1 (Berkeley) 6/11/93
- *	$Id: profile.h,v 1.7 1999/02/09 06:36:27 smurph Exp $
+ *	$Id: profile.h,v 1.10 2001/03/07 23:38:22 miod Exp $
  */
-
+#ifndef __MACHINE_PROFILE_H__
+#define __MACHINE_PROFILE_H__
 #define	_MCOUNT_DECL static inline void _mcount
 
 #define	MCOUNT \
-extern void mcount() asm("mcount");					\
+extern void mcount() __asm__ ("mcount");					\
 void									\
 mcount()								\
 {									\
@@ -51,7 +52,7 @@ mcount()								\
 	 *								\
 	 * selfret = ret pushed by mcount call				\
 	 */								\
-	asm volatile("or %0,r1,0" : "=r" (selfret));			\
+	__asm__ __volatile__ ("or %0,r1,0" : "=r" (selfret));		\
 	/*								\
 	 * callerret = ret pushed by call into self.			\
 	 */								\
@@ -59,16 +60,17 @@ mcount()								\
 	 * This may not be right. It all depends on where the		\
 	 * caller stores the return address. XXX			\
 	 */								\
-	asm volatile("addu	 r10,r31,48");				\
-	asm volatile("ld %0,r10,36" : "=r" (callerret));		\
+	__asm__ __volatile__("addu	 r10,r31,48");			\
+	__asm__ __volatile__("ld %0,r10,36" : "=r" (callerret));	\
 	_mcount(callerret, selfret);					\
 }
 
-#ifdef KERNEL
+#ifdef _KERNEL
 /*
  * Note that we assume splhigh() and splx() cannot call mcount()
  * recursively.
  */
 #define	MCOUNT_ENTER	s = splhigh()
 #define	MCOUNT_EXIT	splx(s)
-#endif /* KERNEL */
+#endif /* _KERNEL */
+#endif __MACHINE_PROFILE_H__

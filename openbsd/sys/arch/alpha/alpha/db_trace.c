@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_trace.c,v 1.4 1997/07/23 23:29:45 niklas Exp $	*/
+/*	$OpenBSD: db_trace.c,v 1.7 2001/03/04 19:19:42 niklas Exp $	*/
 
 /*
  * Copyright (c) 1997 Niklas Hallqvist.  All rights reserverd.
@@ -49,6 +49,73 @@
 #include <ddb/db_interface.h>
 
 extern int	etext;
+
+struct opcode opcode[] = {
+	{ OPC_PAL, "call_pal", 0 },	/* 00 */
+	{ OPC_RES, "opc01", 0 },	/* 01 */
+	{ OPC_RES, "opc02", 0 },	/* 02 */
+	{ OPC_RES, "opc03", 0 },	/* 03 */
+	{ OPC_RES, "opc04", 0 },	/* 04 */
+	{ OPC_RES, "opc05", 0 },	/* 05 */
+	{ OPC_RES, "opc06", 0 },	/* 06 */
+	{ OPC_RES, "opc07", 0 },	/* 07 */
+	{ OPC_MEM, "lda", 1 },		/* 08 */
+	{ OPC_MEM, "ldah", 1 },		/* 09 */
+	{ OPC_RES, "opc0a", 0 },	/* 0A */
+	{ OPC_MEM, "ldq_u", 1 },	/* 0B */
+	{ OPC_RES, "opc0c", 0 },	/* 0C */
+	{ OPC_RES, "opc0d", 0 },	/* 0D */
+	{ OPC_RES, "opc0e", 0 },	/* 0E */
+	{ OPC_MEM, "stq_u", 1 },	/* 0F */
+	{ OPC_OP, "inta", 0 },		/* 10 */
+	{ OPC_OP, "intl", 0 },		/* 11 */
+	{ OPC_OP, "ints", 0 },		/* 12 */
+	{ OPC_OP, "intm", 0 },		/* 13 */
+	{ OPC_RES, "opc14", 0 },	/* 14 */
+	{ OPC_OP, "fltv", 1 },		/* 15 */
+	{ OPC_OP, "flti", 1 },		/* 16 */
+	{ OPC_OP, "fltl", 1 },		/* 17 */
+	{ OPC_MEM, "misc", 0 },		/* 18 */
+	{ OPC_PAL, "pal19", 0 },	/* 19 */
+	{ OPC_MEM, "jsr", 0 },		/* 1A */
+	{ OPC_PAL, "pal1b", 0 },	/* 1B */
+	{ OPC_RES, "opc1c", 0 },	/* 1C */
+	{ OPC_PAL, "pal1d", 0 },	/* 1D */
+	{ OPC_PAL, "pal1e", 0 },	/* 1E */
+	{ OPC_PAL, "pal1f", 0 },	/* 1F */
+	{ OPC_MEM, "ldf", 1 },		/* 20 */
+	{ OPC_MEM, "ldg", 1 },		/* 21 */
+	{ OPC_MEM, "lds", 1 },		/* 22 */
+	{ OPC_MEM, "ldt", 1 },		/* 23 */
+	{ OPC_MEM, "stf", 1 },		/* 24 */
+	{ OPC_MEM, "stg", 1 },		/* 25 */
+	{ OPC_MEM, "sts", 1 },		/* 26 */
+	{ OPC_MEM, "stt", 1 },		/* 27 */
+	{ OPC_MEM, "ldl", 1 },		/* 28 */
+	{ OPC_MEM, "ldq", 1 },		/* 29 */
+	{ OPC_MEM, "ldl_l", 1 },	/* 2A */
+	{ OPC_MEM, "ldq_l", 1 },	/* 2B */
+	{ OPC_MEM, "stl", 1 },		/* 2C */
+	{ OPC_MEM, "stq", 1 },		/* 2D */
+	{ OPC_MEM, "stl_c", 1 },	/* 2E */
+	{ OPC_MEM, "stq_c", 1 },	/* 2F */
+	{ OPC_BR, "br", 1 },		/* 30 */
+	{ OPC_BR, "fbeq", 1 },		/* 31 */
+	{ OPC_BR, "fblt", 1 },		/* 32 */
+	{ OPC_BR, "fble", 1 },		/* 33 */
+	{ OPC_BR, "bsr", 1 },		/* 34 */
+	{ OPC_BR, "fbne", 1 },		/* 35 */
+	{ OPC_BR, "fbge", 1 },		/* 36 */
+	{ OPC_BR, "fbgt", 1 },		/* 37 */
+	{ OPC_BR, "blbc", 1 },		/* 38 */
+	{ OPC_BR, "beq", 1 },		/* 39 */
+	{ OPC_BR, "blt", 1 },		/* 3A */
+	{ OPC_BR, "ble", 1 },		/* 3B */
+	{ OPC_BR, "blbs", 1 },		/* 3C */
+	{ OPC_BR, "bne", 1 },		/* 3D */
+	{ OPC_BR, "bge", 1 },		/* 3E */
+	{ OPC_BR, "bgt", 1 },		/* 3F */
+};
 
 static __inline int sext __P((u_int));
 static __inline int rega __P((u_int));
@@ -241,6 +308,8 @@ trapframe:
 		/* Look for the return address if recorded.  */
 		if (slot[26])
 			ra = *(db_addr_t *)slot[26];
+		else
+			break;
 
 		/* Advance to the next frame.  */
 		frame += framesize;

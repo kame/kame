@@ -1,10 +1,10 @@
-/*	$OpenBSD: miidevs.h,v 1.15 2000/08/28 13:22:34 jason Exp $	*/
+/*	$OpenBSD: miidevs.h,v 1.21 2001/04/13 00:42:09 brad Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: miidevs,v 1.13 2000/08/28 13:22:09 jason Exp 
+ *	OpenBSD: miidevs,v 1.18 2001/04/13 00:25:02 mjacob Exp 
  */
 /* $NetBSD: miidevs,v 1.3 1998/11/05 03:43:43 thorpej Exp $ */
 
@@ -49,10 +49,12 @@
  * List of known MII OUIs
  */
 
+#define	MII_OUI_ALTIMA	0x0010a9	/* Altima Communications */
 #define	MII_OUI_AMD	0x00001a	/* Advanced Micro Devices */
 #define	MII_OUI_BROADCOM	0x001018	/* Broadcom Corporation */
 #define	MII_OUI_ENABLESEMI	0x0010dd	/* Enable Semiconductor */
 #define	MII_OUI_DAVICOM	0x00606e	/* Davicom Semiconductor */
+#define	MII_OUI_MARVELL	0x005043	/* Marvell Semiconductor */
 #define	MII_OUI_ICS	0x00a0be	/* Integrated Circuit Systems */
 #define	MII_OUI_INTEL	0x00aa00	/* Intel */
 #define	MII_OUI_LEVEL1	0x00207b	/* Level 1 */
@@ -66,6 +68,7 @@
 #define	MII_OUI_XAQTI	0x00e0ae	/* XaQti Corp. */
 
 /* in the 79c873, AMD uses another OUI (which matches Davicom!) */
+#define	MII_OUI_xxALTIMA	0x000895	/* Altima Communications */
 #define	MII_OUI_xxAMD	0x00606e	/* Advanced Micro Devices */
 
 #define	MII_OUI_xxINTEL	0x00f800	/* Intel (alt) */
@@ -99,6 +102,10 @@
 #define	MII_MODEL_AMD_79C873phy	0x0036
 #define	MII_STR_AMD_79C873phy	"Am79C873 internal PHY"
 
+/* Altima Communications PHYs */
+#define	MII_MODEL_xxALTIMA_AC101	0x0021
+#define	MII_STR_xxALTIMA_AC101	"AC101 10/100 media interface"
+
 /* Broadcom Corp. PHYs */
 #define	MII_MODEL_BROADCOM_3C905C	0x0017
 #define	MII_STR_BROADCOM_3C905C	"Broadcom 3C905C internal PHY"
@@ -106,10 +113,20 @@
 #define	MII_STR_BROADCOM_BCM5201	"BCM5201 10/100 media interface"
 #define	MII_MODEL_xxBROADCOM_BCM5400	0x0004
 #define	MII_STR_xxBROADCOM_BCM5400	"BCM5400 1000baseTX PHY"
+#define	MII_MODEL_BROADCOM_BCM5400	0x0004
+#define	MII_STR_BROADCOM_BCM5400	"BCM5400 1000baseTX PHY"
+#define	MII_MODEL_BROADCOM_BCM5401	0x0005
+#define	MII_STR_BROADCOM_BCM5401	"BCM5401 1000baseTX PHY"
+#define	MII_MODEL_BROADCOM_BCM5411	0x0007
+#define	MII_STR_BROADCOM_BCM5411	"BCM5411 1000baseTX PHY"
 
 /* Davicom Semiconductor PHYs */
 #define	MII_MODEL_xxDAVICOM_DM9101	0x0000
 #define	MII_STR_xxDAVICOM_DM9101	"DM9101 10/100 media interface"
+
+/* Marvell Semiconductor PHYs */
+#define	MII_MODEL_MARVELL_E1000	0x0000
+#define	MII_STR_MARVELL_E1000	"Marvell Semiconductor 88E1000* Gigabit"
 
 /* Contrived vendor/model for dcphy */
 #define	MII_MODEL_xxDEC_xxDC	0x0001
@@ -124,6 +141,10 @@
 #define	MII_STR_xxINTEL_I82553	"i82553 10/100 media interface"
 #define	MII_MODEL_INTEL_I82555	0x0015
 #define	MII_STR_INTEL_I82555	"i82555 10/100 media interface"
+#define	MII_MODEL_INTEL_I82562EM	0x0032
+#define	MII_STR_INTEL_I82562EM	"i82562EM 10/100 media interface"
+#define	MII_MODEL_INTEL_I82562ET	0x0033
+#define	MII_STR_INTEL_I82562ET	"i82562ET 10/100 media interface"
 #define	MII_MODEL_INTEL_I82553	0x0035
 #define	MII_STR_INTEL_I82553	"i82553 10/100 media interface"
 
@@ -140,6 +161,8 @@
 #define	MII_STR_NATSEMI_DP83840	"DP83840 10/100 media interface"
 #define	MII_MODEL_NATSEMI_DP83843	0x0001
 #define	MII_STR_NATSEMI_DP83843	"DP83843 10/100 media interface"
+#define	MII_MODEL_NATSEMI_DP83815	0x0002
+#define	MII_STR_NATSEMI_DP83815	"DP83815 10/100 integrated"
 
 /* Quality Semiconductor PHYs */
 #define	MII_MODEL_QUALSEMI_QS6612	0x0000

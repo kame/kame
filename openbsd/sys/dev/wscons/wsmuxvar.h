@@ -1,4 +1,4 @@
-/*	$OpenBSD: wsmuxvar.h,v 1.2 2000/08/01 13:51:19 mickey Exp $	*/
+/*	$OpenBSD: wsmuxvar.h,v 1.4 2001/03/30 16:38:14 aaron Exp $	*/
 /*	$NetBSD: wsmuxvar.h,v 1.1 1999/07/29 18:20:43 augustss Exp $	*/
 
 /*
@@ -61,13 +61,16 @@ struct wsmuxops {
 	int (*ddispioctl) __P((struct device *, u_long, caddr_t, int, 
 			       struct proc *));
 	int (*dsetdisplay) __P((struct device *, struct wsmux_softc *));
+	int (*dissetdisplay) __P((struct device *));
 };
 
 
 /*
  * configure defines
  */
-#define	WSKBDDEVCF_MUX_DEFAULT	-1
+#define	WSKBDDEVCF_MUX_DEFAULT		-1
+#define WSMOUSEDEVCF_MUX		0
+#define WSMOUSEDEVCF_MUX_DEFAULT	-1
 
 struct wsmux_softc *wsmux_create __P((const char *name, int no));
 int	wsmux_attach_sc __P((

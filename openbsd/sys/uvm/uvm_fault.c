@@ -1,4 +1,5 @@
-/*	$NetBSD: uvm_fault.c,v 1.33 1999/06/04 23:38:41 thorpej Exp $	*/
+/*	$OpenBSD: uvm_fault.c,v 1.10 2001/03/22 23:36:52 niklas Exp $	*/
+/*	$NetBSD: uvm_fault.c,v 1.35 1999/06/16 18:43:28 thorpej Exp $	*/
 
 /*
  *
@@ -435,7 +436,7 @@ int uvmfault_anonget(ufi, amap, anon)
 
 			if (pg->flags & PG_WANTED) {
 				/* still holding object lock */
-				thread_wakeup(pg);	
+				wakeup(pg);	
 			}
 			/* un-busy! */
 			pg->flags &= ~(PG_WANTED|PG_BUSY|PG_FAKE);
@@ -645,7 +646,7 @@ ReFault:
 	 */
 
 	enter_prot = ufi.entry->protection;
-	wired = (ufi.entry->wired_count != 0) || (fault_type == VM_FAULT_WIRE);
+	wired = VM_MAPENT_ISWIRED(ufi.entry) || (fault_type == VM_FAULT_WIRE);
 	if (wired)
 		access_type = enter_prot; /* full access for wired */
 
@@ -843,9 +844,9 @@ ReFault:
 			uvmexp.fltnamap++;
 			pmap_enter(ufi.orig_map->pmap, currva,
 			    VM_PAGE_TO_PHYS(anon->u.an_page),
-			    (anon->an_ref > 1) ? (enter_prot & ~VM_PROT_WRITE) :
-			    enter_prot, 
-			    (ufi.entry->wired_count != 0), 0);
+			    (anon->an_ref > 1) ?
+			    (enter_prot & ~VM_PROT_WRITE) : enter_prot, 
+			    VM_MAPENT_ISWIRED(ufi.entry), 0);
 		}
 		simple_unlock(&anon->an_lock);
 	}
@@ -1382,7 +1383,7 @@ Case2:
 			    0,0,0,0);
 			if (uobjpage->flags & PG_WANTED)
 				/* still holding object lock */
-				thread_wakeup(uobjpage);
+				wakeup(uobjpage);
 
 			if (uobjpage->flags & PG_RELEASED) {
 				uvmexp.fltpgrele++;
@@ -1472,7 +1473,7 @@ Case2:
 					 * be released
 					 * */
 					if (uobjpage->flags & PG_WANTED)
-						thread_wakeup(uobjpage);
+						wakeup(uobjpage);
 					uobjpage->flags &= ~(PG_BUSY|PG_WANTED);
 					UVM_PAGE_OWN(uobjpage, NULL);
 
@@ -1504,7 +1505,7 @@ Case2:
 				pmap_page_protect(PMAP_PGARG(uobjpage),
 				    VM_PROT_NONE); 
 				if (uobjpage->flags & PG_WANTED)
-					thread_wakeup(uobjpage);
+					wakeup(uobjpage);
 				/* uobj still locked */
 				uobjpage->flags &= ~(PG_WANTED|PG_BUSY);
 				UVM_PAGE_OWN(uobjpage, NULL);
@@ -1562,7 +1563,7 @@ Case2:
 			if (uobjpage != PGO_DONTCARE) {
 				if (uobjpage->flags & PG_WANTED)
 					/* still holding object lock */
-					thread_wakeup(uobjpage);
+					wakeup(uobjpage);
 
 				uvm_lock_pageq();
 				/* make sure it is in queues */
@@ -1621,7 +1622,7 @@ Case2:
 
 			if (uobjpage->flags & PG_WANTED)
 				/* still have the obj lock */
-				thread_wakeup(uobjpage);
+				wakeup(uobjpage);
 			uobjpage->flags &= ~(PG_BUSY|PG_WANTED);
 			UVM_PAGE_OWN(uobjpage, NULL);
 			uvm_lock_pageq();
@@ -1687,7 +1688,7 @@ Case2:
 	uvm_unlock_pageq();
 
 	if (pg->flags & PG_WANTED)
-		thread_wakeup(pg);		/* lock still held */
+		wakeup(pg);		/* lock still held */
 
 	/* 
 	 * note that pg can't be PG_RELEASED since we did not drop the object 
@@ -1724,17 +1725,18 @@ uvm_fault_wire(map, start, end, access_type)
 
 	pmap = vm_map_pmap(map);
 
+#ifndef PMAP_NEW
 	/*
 	 * call pmap pageable: this tells the pmap layer to lock down these
 	 * page tables.
 	 */
 
 	pmap_pageable(pmap, start, end, FALSE);
+#endif
 
 	/*
 	 * now fault it in page at a time.   if the fault fails then we have
-	 * to undo what we have done.   note that in uvm_fault VM_PROT_NONE 
-	 * is replaced with the max protection if fault_type is VM_FAULT_WIRE.
+	 * to undo what we have done.
 	 */
 
 	for (va = start ; va < end ; va += PAGE_SIZE) {
@@ -1775,7 +1777,7 @@ uvm_fault_unwire(map, start, end)
 	 * the PAs from the pmap.   we also lock out the page daemon so that
 	 * we can call uvm_pageunwire.
 	 */
-	
+
 	uvm_lock_pageq();
 
 	for (va = start; va < end ; va += PAGE_SIZE) {
@@ -1785,7 +1787,9 @@ uvm_fault_unwire(map, start, end)
 		if (pa == (paddr_t) 0) {
 			panic("uvm_fault_unwire: unwiring non-wired memory");
 		}
+
 		pmap_change_wiring(pmap, va, FALSE);  /* tell the pmap */
+
 		pg = PHYS_TO_VM_PAGE(pa);
 		if (pg)
 			uvm_pageunwire(pg);
@@ -1793,11 +1797,12 @@ uvm_fault_unwire(map, start, end)
 
 	uvm_unlock_pageq();
 
+#ifndef PMAP_NEW
 	/*
 	 * now we call pmap_pageable to let the pmap know that the page tables
 	 * in this space no longer need to be wired.
 	 */
 
 	pmap_pageable(pmap, start, end, TRUE);
-
+#endif
 }

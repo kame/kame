@@ -1,4 +1,4 @@
-/*	$OpenBSD: via82c586.c,v 1.4 2000/08/02 02:42:50 mickey Exp $	*/
+/*	$OpenBSD: via82c586.c,v 1.7 2001/04/23 02:40:51 deraadt Exp $	*/
 /*	$NetBSD: via82c586.c,v 1.2 2000/07/18 11:24:09 soda Exp $	*/
 
 /*-
@@ -78,7 +78,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcidevs.h>
 
-#include <i386/pci/pci_intr_fixup.h>
+#include <i386/pci/pcibiosvar.h>
 #include <i386/pci/via82c586reg.h>
 #include <i386/pci/piixvar.h>
 
@@ -113,7 +113,7 @@ const int vp3_cfg_intr_shift[] = {
 	VP3_CFG_INTR_SHIFT_PIRQD,
 };
 
-#define	VP3_PIRQ(req, pirq)	(((reg) >> vp3_cfg_intr_shift[(pirq)]) & \
+#define	VP3_PIRQ(reg, pirq)	(((reg) >> vp3_cfg_intr_shift[(pirq)]) & \
 				 VP3_CFG_INTR_MASK)
 
 int
@@ -171,7 +171,8 @@ via82c586_get_intr(v, clink, irqp)
 
 	reg = pci_conf_read(ph->ph_pc, ph->ph_tag, VP3_CFG_PIRQ_REG);
 	val = VP3_PIRQ(reg, clink);
-	*irqp = (val == VP3_PIRQ_NONE) ? 0xff : val;
+	*irqp = (val == VP3_PIRQ_NONE)?
+	    I386_PCI_INTERRUPT_LINE_NO_CONNECTION : val;
 
 	return (0);
 }
@@ -252,10 +253,9 @@ via82c586_set_trigger(v, irq, trigger)
 			reg = pci_conf_read(ph->ph_pc, ph->ph_tag,
 			    VP3_CFG_PIRQ_REG);
 			shift = vp3_cfg_trigger_shift[i];
+			/* XXX we only upgrade the trigger here */
 			if (trigger == IST_LEVEL)
 				reg &= ~(VP3_CFG_TRIGGER_MASK << shift);
-			else
-				reg |= (VP3_CFG_TRIGGER_EDGE << shift);
 			pci_conf_write(ph->ph_pc, ph->ph_tag,
 			    VP3_CFG_PIRQ_REG, reg);
 			break;

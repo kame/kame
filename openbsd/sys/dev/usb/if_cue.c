@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_cue.c,v 1.5 2000/07/04 11:44:21 fgsch Exp $ */
+/*	$OpenBSD: if_cue.c,v 1.7 2001/02/20 19:39:47 mickey Exp $ */
 /*	$NetBSD: if_cue.c,v 1.21 2000/04/02 21:25:41 augustss Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
@@ -48,7 +48,7 @@
  * RX filter uses a 512-bit multicast hash table, single perfect entry
  * for the station address, and promiscuous mode. Unlike the ADMtek
  * and KLSI chips, the CATC ASIC supports read and write combining
- * mode where multiple packets can be transfered using a single bulk
+ * mode where multiple packets can be transferred using a single bulk
  * transaction, which helps performance a great deal.
  */
 
@@ -732,10 +732,6 @@ USB_ATTACH(cue)
 	if_attach(ifp);
 	Ether_ifattach(ifp, eaddr);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB,
-		  sizeof(struct ether_header));
-#endif
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, USBDEVNAME(sc->cue_dev),
 	    RND_TYPE_NET, 0);

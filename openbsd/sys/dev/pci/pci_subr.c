@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_subr.c,v 1.8 1998/02/03 19:47:13 deraadt Exp $	*/
+/*	$OpenBSD: pci_subr.c,v 1.11 2001/01/27 01:19:10 deraadt Exp $	*/
 /*	$NetBSD: pci_subr.c,v 1.19 1996/10/13 01:38:29 christos Exp $	*/
 
 /*
@@ -52,18 +52,18 @@
  * NULL subclass pointer.
  */
 struct pci_class {
-	char		*name;
+	const char	*name;
 	int		val;		/* as wide as pci_{,sub}class_t */
-	struct pci_class *subclasses;
+	const struct pci_class *subclasses;
 };
 
-struct pci_class pci_subclass_prehistoric[] = {
+const struct pci_class pci_subclass_prehistoric[] = {
 	{ "miscellaneous",	PCI_SUBCLASS_PREHISTORIC_MISC,		},
 	{ "VGA",		PCI_SUBCLASS_PREHISTORIC_VGA,		},
 	{ 0 }
 };
 
-struct pci_class pci_subclass_mass_storage[] = {
+const struct pci_class pci_subclass_mass_storage[] = {
 	{ "SCSI",		PCI_SUBCLASS_MASS_STORAGE_SCSI,		},
 	{ "IDE",		PCI_SUBCLASS_MASS_STORAGE_IDE,		},
 	{ "floppy",		PCI_SUBCLASS_MASS_STORAGE_FLOPPY,	},
@@ -73,7 +73,7 @@ struct pci_class pci_subclass_mass_storage[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_network[] = {
+const struct pci_class pci_subclass_network[] = {
 	{ "ethernet",		PCI_SUBCLASS_NETWORK_ETHERNET,		},
 	{ "token ring",		PCI_SUBCLASS_NETWORK_TOKENRING,		},
 	{ "FDDI",		PCI_SUBCLASS_NETWORK_FDDI,		},
@@ -82,28 +82,28 @@ struct pci_class pci_subclass_network[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_display[] = {
+const struct pci_class pci_subclass_display[] = {
 	{ "VGA",		PCI_SUBCLASS_DISPLAY_VGA,		},
 	{ "XGA",		PCI_SUBCLASS_DISPLAY_XGA,		},
 	{ "miscellaneous",	PCI_SUBCLASS_DISPLAY_MISC,		},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_multimedia[] = {
+const struct pci_class pci_subclass_multimedia[] = {
 	{ "video",		PCI_SUBCLASS_MULTIMEDIA_VIDEO,		},
 	{ "audio",		PCI_SUBCLASS_MULTIMEDIA_AUDIO,		},
 	{ "miscellaneous",	PCI_SUBCLASS_MULTIMEDIA_MISC,		},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_memory[] = {
+const struct pci_class pci_subclass_memory[] = {
 	{ "RAM",		PCI_SUBCLASS_MEMORY_RAM,		},
 	{ "flash",		PCI_SUBCLASS_MEMORY_FLASH,		},
 	{ "miscellaneous",	PCI_SUBCLASS_MEMORY_MISC,		},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_bridge[] = {
+const struct pci_class pci_subclass_bridge[] = {
 	{ "host",		PCI_SUBCLASS_BRIDGE_HOST,		},
 	{ "ISA",		PCI_SUBCLASS_BRIDGE_ISA,		},
 	{ "EISA",		PCI_SUBCLASS_BRIDGE_EISA,		},
@@ -116,14 +116,14 @@ struct pci_class pci_subclass_bridge[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_communications[] = {
+const struct pci_class pci_subclass_communications[] = {
 	{ "serial",		PCI_SUBCLASS_COMMUNICATIONS_SERIAL,	},
 	{ "parallel",		PCI_SUBCLASS_COMMUNICATIONS_PARALLEL,	},
 	{ "miscellaneous",	PCI_SUBCLASS_COMMUNICATIONS_MISC,	},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_system[] = {
+const struct pci_class pci_subclass_system[] = {
 	{ "8259 PIC",		PCI_SUBCLASS_SYSTEM_PIC,		},
 	{ "8237 DMA",		PCI_SUBCLASS_SYSTEM_DMA,		},
 	{ "8254 timer",		PCI_SUBCLASS_SYSTEM_TIMER,		},
@@ -132,7 +132,7 @@ struct pci_class pci_subclass_system[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_input[] = {
+const struct pci_class pci_subclass_input[] = {
 	{ "keyboard",		PCI_SUBCLASS_INPUT_KEYBOARD,		},
 	{ "digitizer",		PCI_SUBCLASS_INPUT_DIGITIZER,		},
 	{ "mouse",		PCI_SUBCLASS_INPUT_MOUSE,		},
@@ -140,13 +140,13 @@ struct pci_class pci_subclass_input[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_dock[] = {
+const struct pci_class pci_subclass_dock[] = {
 	{ "generic",		PCI_SUBCLASS_DOCK_GENERIC,		},
 	{ "miscellaneous",	PCI_SUBCLASS_DOCK_MISC,			},
 	{ 0 },
 };
 
-struct pci_class pci_subclass_processor[] = {
+const struct pci_class pci_subclass_processor[] = {
 	{ "386",		PCI_SUBCLASS_PROCESSOR_386,		},
 	{ "486",		PCI_SUBCLASS_PROCESSOR_486,		},
 	{ "Pentium",		PCI_SUBCLASS_PROCESSOR_PENTIUM,		},
@@ -156,7 +156,7 @@ struct pci_class pci_subclass_processor[] = {
 	{ 0 },
 };
 
-struct pci_class pci_subclass_serialbus[] = {
+const struct pci_class pci_subclass_serialbus[] = {
 	{ "Firewire",		PCI_SUBCLASS_SERIALBUS_FIREWIRE,	},
 	{ "ACCESS.bus",		PCI_SUBCLASS_SERIALBUS_ACCESS,		},
 	{ "SSA",		PCI_SUBCLASS_SERIALBUS_SSA,		},
@@ -165,7 +165,7 @@ struct pci_class pci_subclass_serialbus[] = {
 	{ 0 },
 };
 
-struct pci_class pci_class[] = {
+const struct pci_class pci_class[] = {
 	{ "prehistoric",	PCI_CLASS_PREHISTORIC,
 	    pci_subclass_prehistoric,				},
 	{ "mass storage",	PCI_CLASS_MASS_STORAGE,
@@ -201,13 +201,16 @@ struct pci_class pci_class[] = {
 /*
  * Descriptions of of known vendors and devices ("products").
  */
-struct pci_knowndev {
+struct pci_known_vendor {
+	pci_vendor_id_t		vendor;
+	const char		*vendorname;
+};
+
+struct pci_known_product {
 	pci_vendor_id_t		vendor;
 	pci_product_id_t	product;
-	int			flags;
-	char			*vendorname, *productname;
+	const char		*productname;
 };
-#define	PCI_KNOWNDEV_NOPROD	0x01		/* match on vendor only */
 
 #include <dev/pci/pcidevs_data.h>
 #endif /* PCIVERBOSE */
@@ -224,10 +227,11 @@ pci_devinfo(id_reg, class_reg, showclass, cp)
 	pci_subclass_t subclass;
 	pci_interface_t interface;
 	pci_revision_t revision;
-	char *vendor_namep, *product_namep;
-	struct pci_class *classp, *subclassp;
+	const char *vendor_namep = NULL, *product_namep = NULL;
+	const struct pci_class *classp, *subclassp;
 #ifdef PCIVERBOSE
-	struct pci_knowndev *kdp;
+	const struct pci_known_vendor *pkv;
+	const struct pci_known_product *pkp;
 	const char *unmatched = "unknown ";
 #else
 	const char *unmatched = "";
@@ -242,22 +246,24 @@ pci_devinfo(id_reg, class_reg, showclass, cp)
 	revision = PCI_REVISION(class_reg);
 
 #ifdef PCIVERBOSE
-	kdp = pci_knowndevs;
-        while (kdp->vendorname != NULL) {	/* all have vendor name */
-                if (kdp->vendor == vendor && (kdp->product == product ||
-		    (kdp->flags & PCI_KNOWNDEV_NOPROD) != 0))
-                        break;
-		kdp++;
+	pkv = pci_known_vendors;
+	while (pkv->vendorname != NULL) {	/* all have vendor name */
+		if (pkv->vendor == vendor) {
+			vendor_namep = pkv->vendorname;
+			break;
+		}
+		pkv++;
 	}
-        if (kdp->vendorname == NULL)
-		vendor_namep = product_namep = NULL;
-	else {
-		vendor_namep = kdp->vendorname;
-		product_namep = (kdp->flags & PCI_KNOWNDEV_NOPROD) == 0 ?
-		    kdp->productname : NULL;
-        }
-#else /* PCIVERBOSE */
-	vendor_namep = product_namep = NULL;
+	if (vendor_namep) {
+		pkp = pci_known_products;
+		while (pkp->productname != NULL) {	/* all have product name */
+			if (pkp->vendor == vendor && pkp->product == product) {
+				product_namep = pkp->productname;
+				break;
+			}
+			pkp++;
+		}
+	}
 #endif /* PCIVERBOSE */
 
 	classp = pci_class;
@@ -286,7 +292,7 @@ pci_devinfo(id_reg, class_reg, showclass, cp)
 		cp += sprintf(cp, " (");
 		if (classp->name == NULL)
 			cp += sprintf(cp,
-			    "unknown class 0x%2x, subclass 0x%02x",
+			    "unknown class 0x%02x, subclass 0x%02x",
 			    class, subclass);
 		else {
 			cp += sprintf(cp, "class %s, ", classp->name);

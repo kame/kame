@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.7 2000/03/03 00:54:53 todd Exp $ */
+/*	$OpenBSD: if_ie.c,v 1.10 2001/03/09 05:44:38 smurph Exp $ */
 
 /*-
  * Copyright (c) 1998 Steve Murphree, Jr. 
@@ -181,7 +181,7 @@ struct ie_softc {
 	void (*run_596)();      /* card depenent "go on-line" function */
 	void (*memcopy) __P((const void *, void *, u_int));
 	                        /* card dependent memory copy function */
-   void (*memzero) __P((void *, u_int));
+	void (*memzero) __P((void *, u_int));
 	                        /* card dependent memory zero function */
 	int want_mcsetup;       /* mcsetup flag */
 	int promisc;            /* are we in promisc mode? */
@@ -209,7 +209,7 @@ struct ie_softc {
 	volatile struct ie_recv_frame_desc *rframes[MXFRAMES];
 	volatile struct ie_recv_buf_desc *rbuffs[MXRXBUF];
 	volatile char *cbuffs[MXRXBUF];
-   int rfhead, rftail, rbhead, rbtail;
+	int rfhead, rftail, rbhead, rbtail;
 
 	volatile struct ie_xmit_cmd *xmit_cmds[NTXBUF];
 	volatile struct ie_xmit_buf *xmit_buffs[NTXBUF];
@@ -238,6 +238,7 @@ struct ie_softc {
 static void ie_obreset __P((struct ie_softc *));
 static void ie_obattend __P((struct ie_softc *));
 static void ie_obrun __P((struct ie_softc *));
+int ie_setupram __P((struct ie_softc *sc));
 
 void iewatchdog __P((struct ifnet *));
 int ieintr __P((void *));
@@ -267,6 +268,7 @@ int in_ietint = 0;
 
 int iematch();
 void ieattach();
+extern void pcctwointr_establish();
 
 struct cfattach ie_ca = {
 	sizeof(struct ie_softc), iematch, ieattach
@@ -334,11 +336,10 @@ iematch(parent, vcf, args)
 	struct device *parent;
 	void	*vcf, *args;
 {
-	struct cfdata *cf = vcf;
 	struct confargs *ca = args;
 	int ret;
 
-	if ((ret = badvaddr(IIOV(ca->ca_vaddr), 1)) <=0){
+	if ((ret = badvaddr((unsigned)IIOV(ca->ca_vaddr), 1)) <=0){
 		return(0);
 	}
 	return(1);                      
@@ -396,7 +397,6 @@ ieattach(parent, self, aux)
 	struct confargs *ca = aux;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	extern void myetheraddr(u_char *);	/* should be elsewhere */
-	register struct bootpath *bp;
 	int     pri = ca->ca_ipl;
 	volatile struct ieob *ieo;
 	vm_offset_t pa;
@@ -461,17 +461,15 @@ ieattach(parent, self, aux)
 
 	printf(": address %s\n", ether_sprintf(sc->sc_arpcom.ac_enaddr));
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
-
 	sc->sc_bustype = ca->ca_bustype;
 
 	sc->sc_ih.ih_fn = ieintr;
 	sc->sc_ih.ih_arg = sc;
+	sc->sc_ih.ih_wantframe = 0;
 	sc->sc_ih.ih_ipl = pri;
 	sc->sc_failih.ih_fn = iefailintr;
 	sc->sc_failih.ih_arg = sc;
+	sc->sc_failih.ih_wantframe = 0;
 	sc->sc_failih.ih_ipl = pri;
 
 	pcctwointr_establish(PCC2V_IE, &sc->sc_ih);
@@ -520,7 +518,7 @@ void *v;
  */
 int
 ieintr(v)
-void *v;
+	void *v;
 {
 	struct ie_softc *sc = v;
 	register u_short status;
@@ -1340,6 +1338,7 @@ iereset(sc)
 	splx(s);
 }
 
+#if 0
 /*
  * This is called if we time out.
  */
@@ -1350,6 +1349,7 @@ chan_attn_timeout(rock)
 
 	*(int *)rock = 1;
 }
+#endif
 
 /*
  * Send a command to the controller and wait for it to either complete
@@ -1370,7 +1370,9 @@ command_and_wait(sc, cmd, pcmd, mask)
 	volatile struct ie_cmd_common *cc = pcmd;
 	volatile struct ie_sys_ctl_block *scb = sc->scb;
 	volatile int timedout = 0;
+#if 0
 	extern int hz;
+#endif
 
 	scb->ie_command = (u_short)cmd;
 
@@ -1497,8 +1499,6 @@ setup_bufs(sc)
 	struct ie_softc *sc;
 {
 	caddr_t ptr = sc->buf_area;	/* memory pool */
-	volatile struct ie_recv_frame_desc *rfd = (void *) ptr;
-	volatile struct ie_recv_buf_desc *rbd;
 	int     n, r;
 
 	/*
@@ -1663,7 +1663,6 @@ ieinit(sc)
 {
 	volatile struct ie_sys_ctl_block *scb = sc->scb;
 	void *ptr;
-	int n;
 
 	ptr = sc->buf_area;
 

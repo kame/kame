@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.13 2000/06/30 02:37:21 rahnds Exp $	*/
+/*	$OpenBSD: locore.S,v 1.15 2001/04/08 05:00:27 drahn Exp $	*/
 /*	$NetBSD: locore.S,v 1.2 1996/10/16 19:33:09 ws Exp $	*/
 
 /*
@@ -180,6 +180,12 @@ _C_LABEL(idle):
 	bne-	_C_LABEL(sw1)			/* at least one queue non-empty */
 	
 	ori	3,3,PSL_EE		/* reenable ints again */
+	mtmsr	3
+	isync
+	sync
+	/* low power mode */
+	mfmsr	3
+	oris	3, 3, PSL_POW@h
 	mtmsr	3
 	isync
 	
@@ -1250,6 +1256,7 @@ _C_LABEL(esigcode):
 
 
 
+	.data
 	.globl   _C_LABEL(intrnames)
 	.type   _C_LABEL(intrnames),@object
 	.globl   _C_LABEL(eintrnames)
@@ -1272,6 +1279,7 @@ _C_LABEL(intrnames):
 	.string "irq56" "irq57" "irq58" "irq59"
 	.string "irq60" "irq61" "irq62" "irq63"
 	.string "clock" 
+	.space 512
 _C_LABEL(eintrnames):
 	.align 4
 	.globl   _C_LABEL(intrcnt)

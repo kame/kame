@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_extern.h,v 1.9 2000/02/07 04:57:18 assar Exp $	*/
+/*	$OpenBSD: ffs_extern.h,v 1.12 2001/03/22 00:11:36 art Exp $	*/
 /*	$NetBSD: ffs_extern.h,v 1.4 1996/02/09 22:22:22 christos Exp $	*/
 
 /*-
@@ -105,7 +105,7 @@ void ffs_setblock __P((struct fs *, unsigned char *, daddr_t));
 
 /* ffs_vfsops.c */
 int ffs_mountroot __P((void));
-int ffs_mount __P((struct mount *, const char *, caddr_t, struct nameidata *,
+int ffs_mount __P((struct mount *, const char *, void *, struct nameidata *,
 		   struct proc *));
 int ffs_reload __P((struct mount *, struct ucred *, struct proc *));
 int ffs_mountfs __P((struct vnode *, struct mount *, struct proc *));
@@ -140,25 +140,23 @@ void  softdep_initialize __P((void));
 int   softdep_process_worklist __P((struct mount *));
 int   softdep_mount __P((struct vnode *, struct mount *, struct fs *,
           struct ucred *));
+int   softdep_flushworklist __P((struct mount *, int *, struct proc *));
 int   softdep_flushfiles __P((struct mount *, int, struct proc *));
 void  softdep_update_inodeblock __P((struct inode *, struct buf *, int));
 void  softdep_load_inodeblock __P((struct inode *));
-int   softdep_fsync __P((struct vnode *));
-void  softdep_freefile __P((struct vop_vfree_args *));
+void  softdep_freefile __P((struct vnode *, ino_t, int));
 void  softdep_setup_freeblocks __P((struct inode *, off_t));
-void  softdep_deallocate_dependencies __P((struct buf *));
 void  softdep_setup_inomapdep __P((struct buf *, struct inode *, ino_t));
-void  softdep_setup_blkmapdep __P((struct buf *, struct fs *, daddr_t));
-void  softdep_setup_allocdirect __P((struct inode *, ufs_lbn_t, daddr_t,
-          daddr_t, long, long, struct buf *));
+void  softdep_setup_blkmapdep __P((struct buf *, struct fs *, ufs_daddr_t));
+void  softdep_setup_allocdirect __P((struct inode *, ufs_lbn_t, ufs_daddr_t,
+            ufs_daddr_t, long, long, struct buf *));
 void  softdep_setup_allocindir_meta __P((struct buf *, struct inode *,
-          struct buf *, int, daddr_t));
+            struct buf *, int, ufs_daddr_t));
 void  softdep_setup_allocindir_page __P((struct inode *, ufs_lbn_t,
-          struct buf *, int, daddr_t, daddr_t, struct buf *));
-void  softdep_disk_io_initiation __P((struct buf *));
-void  softdep_disk_write_complete __P((struct buf *));
-int   softdep_sync_metadata __P((struct vop_fsync_args *));
+            struct buf *, int, ufs_daddr_t, ufs_daddr_t, struct buf *));
 void  softdep_fsync_mountdev __P((struct vnode *));
+int   softdep_sync_metadata __P((struct vop_fsync_args *));
+int   softdep_fsync __P((struct vnode *vp));
 __END_DECLS
 
 extern int (**ffs_vnodeop_p) __P((void *));
@@ -169,3 +167,5 @@ extern int (**ffs_fifoop_p) __P((void *));
 #else
 #define FFS_FIFOOPS NULL
 #endif
+
+extern struct pool ffs_ino_pool;

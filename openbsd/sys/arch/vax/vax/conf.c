@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.22 2000/10/31 02:30:57 hugh Exp $ */
+/*	$OpenBSD: conf.c,v 1.25 2001/04/18 16:15:20 hugh Exp $ */
 /*	$NetBSD: conf.c,v 1.44 1999/10/27 16:38:54 ragge Exp $	*/
 
 /*-
@@ -93,8 +93,10 @@ bdev_decl(idc);
 #include "uu.h"
 bdev_decl(uu);
 
+#if 0
 #include "rl.h"
 bdev_decl(rl);
+#endif
 
 #include "ccd.h"
 bdev_decl(ccd);
@@ -143,7 +145,7 @@ struct bdevsw	bdevsw[] =
 	bdev_disk_init(NRB,idc),	/* 11: IDC (RB730) */
 	bdev_disk_init(NRX,rx),		/* 12: RX?? on MSCP */
 	bdev_disk_init(NUU,uu),		/* 13: TU58 on DL11 */
-	bdev_disk_init(NRL,rl),		/* 14: RL01/02 */
+	bdev_notdef(),			/* 14: RL01/02 */
 	bdev_tape_init(NMT,mt),		/* 15: MSCP tape */
 	bdev_notdef(),			/* 16: was: KDB50/RA?? */
 	bdev_disk_init(NCCD,ccd),	/* 17: concatenated disk driver */
@@ -221,7 +223,8 @@ cons_decl(smg);
 #include "smg.h"
 
 struct	consdev constab[]={
-#if VAX8600 || VAX8200 || VAX780 || VAX750 || VAX650 || VAX630 || VAX670
+#if VAX8600 || VAX8200 || VAX780 || VAX750 || VAX650 || VAX630 || VAX660 || \
+    VAX670 || VAX680
 #define NGEN	1
 	cons_init(gen), /* Generic console type; mtpr/mfpr */
 #else
@@ -283,13 +286,6 @@ struct	consdev constab[]={
 	(dev_type_stop((*))) nullop, 0, (dev_type_select((*))) nullop, \
 	(dev_type_mmap((*))) enodev }
 
-/* open, close, read, write, ioctl, stop, tty, select, mmap */
-#define cdev_wscons_init(c,n) { \
-        dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-        dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
-        dev_init(c,n,tty), ttselect, dev_init(c,n,mmap), D_TTY }
-
-
 cdev_decl(cn);
 cdev_decl(ctty);
 #define mmread	mmrw
@@ -318,7 +314,9 @@ cdev_decl(idc);
 cdev_decl(fd);
 cdev_decl(gencn);
 cdev_decl(rx);
+#if 0
 cdev_decl(rl);
+#endif
 cdev_decl(ccd);
 cdev_decl(raid);
 cdev_decl(hd);
@@ -435,8 +433,9 @@ cdev_decl(xfs_dev);
 
 dev_decl(filedesc,open);
 
-#include "wscons.h"
-cdev_decl(wscons);
+#include "wsdisplay.h"
+#include "wskbd.h"
+#include "wsmouse.h"
 
 struct cdevsw	cdevsw[] =
 {
@@ -472,7 +471,7 @@ struct cdevsw	cdevsw[] =
 	cdev_ch_init(NAD,ad),		/* 29: DT A/D converter */
 	cdev_disk_init(NRX,rx),		/* 30: RX?? on MSCP */
 	cdev_graph_init(NIK,ik),	/* 31: Ikonas frame buffer */
-	cdev_disk_init(NRL,rl),		/* 32: RL01/02 on unibus */
+	cdev_notdef(),			/* 32: RL01/02 on unibus */
 	cdev_log_init(1,log),		/* 33: /dev/klog */
 	cdev_tty_init(NDHU,dhu),	/* 34: DHU-11 */
 	cdev_cnstore_init(NCRL,crl),	/* 35: Console RL02 on 8600 */
@@ -508,7 +507,7 @@ struct cdevsw	cdevsw[] =
 	cdev_uk_init(NUK,uk),		/* 65: SCSI unknown */
 	cdev_tty_init(NDL,dl),		/* 66: DL11 */
     cdev_random_init(1,random), /* 67: random data source */
-	cdev_wscons_init(NWSCONS, wscons),	/* 68: workstation console */
+	cdev_wsdisplay_init(NWSDISPLAY, wsdisplay),	/* 68: workstation console */
 	cdev_disk_init(NRY,ry),		/* 71: VS floppy */
 	cdev_notdef(),		/* 72: was: SCSI bus */
 	cdev_disk_init(NRAID,raid),	/* 73: RAIDframe disk driver */

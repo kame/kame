@@ -1,4 +1,4 @@
-/*	$OpenBSD: mmu.h,v 1.4 1999/02/09 06:36:27 smurph Exp $ */
+/*	$OpenBSD: mmu.h,v 1.7 2001/03/09 05:44:40 smurph Exp $ */
 /*
  * Ashura Project
  */
@@ -9,8 +9,8 @@
  * @(#)mmu.h 1.22		 90/09/20 19:13:34
  */
 
-#ifndef	_MACHINE_MMU_
-#define	_MACHINE_MMU_
+#ifndef	__MACHINE_MMU_H__
+#define	__MACHINE_MMU_H__
 
 /* for m88k_pgbytes, m8kk_pgshift */
 #include <machine/vmparam.h> 
@@ -206,7 +206,12 @@ typedef union batc_template {
 #define LOG2_PDT_SIZE			(PDT_BITS + 2)
 #define LOG2_PDT_TABLE_GROUP_SIZE	(PAGE_SHIFT - LOG2_PDT_SIZE)
 #define PDT_TABLE_GROUP_SIZE		(1 << LOG2_PDT_TABLE_GROUP_SIZE)
-#define PT_FREE(tbl)		kmem_free(kernel_map, (vm_offset_t)tbl, PAGE_SIZE)
+#if defined(UVM)
+#define PT_FREE(tbl)	uvm_km_free(kernel_map, (vaddr_t)tbl, PAGE_SIZE)
+#else
+#define PT_FREE(tbl)	kmem_free(kernel_map, (vm_offset_t)tbl, PAGE_SIZE)
+#endif
+
 
 /*
  * Va spaces mapped by tables and PDT table group.
@@ -302,12 +307,12 @@ extern vm_offset_t kmapva;
 	sdt = (sdt_entry_t *)kmapva + SDTIDX(va) + SDT_ENTRIES;		\
 	(pte_template_t *)(sdt->table_addr << PDT_SHIFT) + PDTIDX(va);	\
 })
-
+u_int kvtop( );
 
 #define DMA_CACHE_SYNC		0x1
 #define DMA_CACHE_SYNC_INVAL	0x2
 #define DMA_CACHE_INV		0x3
 extern void dma_cachectl(vm_offset_t, int, int);
 
-#endif
-/* endif _MACHINE_MMU_ */
+#endif __MACHINE_MMU_H__
+

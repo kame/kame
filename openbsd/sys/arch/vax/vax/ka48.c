@@ -1,4 +1,4 @@
-/*	$OpenBSD: ka48.c,v 1.1 2000/04/27 01:10:10 bjc Exp $	*/
+/*	$OpenBSD: ka48.c,v 1.3 2001/04/01 19:17:38 hugh Exp $	*/
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -86,7 +86,18 @@ struct	cpu_dep ka48_calls = {
 void
 ka48_conf()
 {
-	printf("cpu: KA48\n");
+	char *cpuname;
+	switch((vax_siedata >> 8) & 0xFF) {
+	case VAX_STYP_45:
+		cpuname = "KA45";
+		break;
+	case VAX_STYP_48:
+		cpuname = "KA48";
+		break;
+	default:
+		cpuname = "unknown SOC";
+	}
+	printf("cpu: %s\n", cpuname);
 	ka48_cpu = (void *)vax_map_physmem(VS_REGS, 1);
 	printf("cpu: turning on floating point chip\n");
 	mtpr(2, PR_ACCS); /* Enable floating points */
@@ -102,33 +113,22 @@ void
 ka48_cache_enable()
 {
 	int i, *tmp;
-	return; /*** not yet MK-990306 ***/
+	long *par_ctl = (long *)KA48_PARCTL;
 
-	/* Disable caches */
-	*(int *)KA48_CCR &= ~CCR_SPECIO;/* secondary */
-	mtpr(PCSTS_FLUSH, PR_PCSTS);	/* primary */
-	*(int *)KA48_BWF0 &= ~BWF0_FEN; /* invalidate filter */
+	/* Disable cache */
+	mtpr(0, PR_CADR);		/* disable */
+	*par_ctl &= ~KA48_PARCTL_INVENA;	/* clear ? invalid enable */
+	mtpr(2, PR_CADR);		/* flush */
 
 	/* Clear caches */
 	tmp = (void *)KA48_INVFLT;	/* inv filter */
-	for (i = 0; i < 32768; i++)
+	for (i = 0; i < KA48_INVFLTSZ / sizeof(int); i++)
 		tmp[i] = 0;
-
-	/* Write valid parity to all primary cache entries */
-	for (i = 0; i < 256; i++) {
-		mtpr(i << 3, PR_PCIDX);
-		mtpr(PCTAG_PARITY, PR_PCTAG);
-	}
-
-	/* Secondary cache */
-	tmp = (void *)KA48_TAGST;
-	for (i = 0; i < KA48_TAGSZ*2; i+=2)
-		tmp[i] = 0;
-
-	/* Enable cache */
-	*(int *)KA48_BWF0 |= BWF0_FEN; /* invalidate filter */
-	mtpr(PCSTS_ENABLE, PR_PCSTS);
-	*(int *)KA48_CCR = CCR_SPECIO | CCR_CENA;
+	*par_ctl |= KA48_PARCTL_INVENA;	/* Enable ???? */
+	mtpr(4, PR_CADR);		/* enable cache */
+	*par_ctl |= (KA48_PARCTL_AGS |	/* AGS? */
+	    KA48_PARCTL_NPEN |		/* N? Parity Enable */
+	    KA48_PARCTL_CPEN);		/* Cpu parity enable */
 }
 
 void

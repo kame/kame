@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpus.h,v 1.5 1999/09/27 20:46:17 smurph Exp $ */
+/*	$OpenBSD: cpus.h,v 1.7 2001/03/07 23:37:16 miod Exp $ */
 /* 
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -32,13 +32,13 @@
   Versions Idents for 88k family chips 
  */
 
-#ifndef _M88K_CPUS_
-#define _M88K_CPUS_
+#ifndef __MACHINE_CPUS_H__
+#define __MACHINE_CPUS_H__
 
 /*
  * cpu Processor Identification Register (PID).
  */
-#ifndef ASSEMBLER
+#ifndef _LOCORE
 union cpupid {
    unsigned cpupid;
    struct {
@@ -56,10 +56,10 @@ union cpupid {
       /*empty*/:16;
    } m88200;
 };
-#endif ASSEMBLER
+#endif _LOCORE
 
 #define M88100 0
 #define M88200 5
 #define M88204 6
 
-#endif  _M88K_CPUS_
+#endif __MACHINE_CPUS_H__

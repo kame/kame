@@ -1,4 +1,4 @@
-/*	$OpenBSD: anvar.h,v 1.1 2000/04/03 01:01:59 mickey Exp $	*/
+/*	$OpenBSD: anvar.h,v 1.3 2001/02/27 06:43:10 tholo Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -162,6 +162,15 @@ struct an_sigcache {
 #endif
 
 #ifndef _KERNEL
+struct an_ltv_key {
+	u_int16_t		an_len;
+	u_int16_t		an_type;
+	u_int16_t		kindex;
+	u_int8_t		mac[6];
+	u_int16_t		klen;
+	u_int8_t		key[16];
+};
+
 struct an_ltv_stats {
 	u_int16_t		an_fudge;
 	u_int16_t		an_len;			/* 0x00 */
@@ -322,7 +331,10 @@ struct an_ltv_genconfig {
 	u_int16_t		an_diversity;		/* 0x72 */
 	u_int16_t		an_tx_power;		/* 0x74 */
 	u_int16_t		an_rss_thresh;		/* 0x76 */
-	u_int16_t		an_rsvd6[4];		/* 0x78 */
+	u_int16_t		an_modulation_type;	/* 0x78 */
+	u_int16_t		an_short_preamble;	/* 0x7A */
+	u_int16_t		an_home_product;	/* 0x7C */
+	u_int16_t		an_rsvd6;		/* 0x7E */
 	/* Aironet extensions. */
 	u_int8_t		an_nodename[16];	/* 0x80 */
 	u_int16_t		an_arl_thresh;		/* 0x90 */
@@ -366,7 +378,9 @@ struct an_ltv_genconfig {
 #define AN_AUTHTYPE_NONE			0x0000
 #define AN_AUTHTYPE_OPEN			0x0001
 #define AN_AUTHTYPE_SHAREDKEY			0x0002
-#define AN_AUTHTYPE_EXCLUDE_UNENCRYPTED		0x0004
+#define AN_AUTHTYPE_MASK			0x00FF
+#define AN_AUTHTYPE_PRIVACY_IN_USE		0x0100
+#define AN_AUTHTYPE_ALLOW_UNENCRYPTED		0x0200
 
 #define AN_PSAVE_NONE				0x0000
 #define AN_PSAVE_CAM				0x0001
@@ -469,6 +483,7 @@ struct an_ltv_caps {
 	u_int16_t		an_ifacerev;		/* 0x7A */
 	u_int16_t		an_softcaps;		/* 0x7C */
 	u_int16_t		an_bootblockrev;	/* 0x7E */
+	u_int16_t		an_req_hw_support;	/* 0x80 */
 };
 
 struct an_ltv_apinfo {
@@ -490,7 +505,7 @@ struct an_ltv_status {
 	u_int8_t		an_macaddr[6];		/* 0x02 */
 	u_int16_t		an_opmode;		/* 0x08 */
 	u_int16_t		an_errcode;		/* 0x0A */
-	u_int16_t		an_cur_signal_quality;	/* 0x0C */
+	u_int16_t		an_cur_signal_strength;	/* 0x0C */
 	u_int16_t		an_ssidlen;		/* 0x0E */
 	u_int8_t		an_ssid[32];		/* 0x10 */
 	u_int8_t		an_ap_name[16];		/* 0x30 */
@@ -508,7 +523,16 @@ struct an_ltv_status {
 	u_int16_t		an_ap_total_load;	/* 0x66 */
 	u_int16_t		an_our_generated_load;	/* 0x68 */
 	u_int16_t		an_accumulated_arl;	/* 0x6A */
-	u_int16_t		an_rsvd0;		/* 0x6C */
+	u_int16_t		an_cur_signal_quality;	/* 0x6C */
+	u_int16_t		an_current_tx_rate;	/* 0x6E */
+	u_int16_t		an_ap_device;		/* 0x70 */
+	u_int16_t		an_normalized_rssi;	/* 0x72 */
+	u_int16_t		an_short_pre_in_use;	/* 0x74 */
+	u_int8_t		an_ap_ip_addr[4];	/* 0x76 */
+	u_int16_t		an_max_noise_prev_sec;	/* 0x7A */
+	u_int16_t		an_avg_noise_prev_min;	/* 0x7C */
+	u_int16_t		an_max_noise_prev_min;	/* 0x7E */
+	u_int16_t		an_spare[3];		/* 0x80 */
 };
 
 #define AN_STATUS_OPMODE_CONFIGURED		0x0001
@@ -518,6 +542,14 @@ struct an_ltv_status {
 #define AN_STATUS_OPMODE_ASSOCIATED		0x0020
 #define AN_STATUS_OPMODE_ERROR			0x8000
 
+struct an_ltv_wepkey {
+	u_int16_t		an_len;			/* 0x00 */
+	u_int16_t		an_type;		/* 0xXX */
+	u_int16_t		an_key_index;		/* 0x02 */
+	u_int8_t		an_mac_addr[6];		/* 0x04 */
+	u_int16_t		an_key_len;		/* 0x0A */
+	u_int8_t		an_key[13];		/* 0x0C */
+};
 
 /*
  * These are all the LTV record types that we can read or write
@@ -533,6 +565,8 @@ struct an_ltv_status {
 #define AN_RID_APLIST		0xFF12	/* Valid AP list */
 #define AN_RID_DRVNAME		0xFF13	/* ID name of this node for diag */
 #define AN_RID_ENCAPPROTO	0xFF14	/* Payload encapsulation type */
+#define AN_RID_WEP_VOLATILE	0xFF15	/* Temporary WEP key configuration */
+#define AN_RID_WEP_PERMANENT	0xFF16	/* Permanent WEP key configuration */
 #define AN_RID_ACTUALCFG	0xFF20	/* Current configuration settings */
 
 /*

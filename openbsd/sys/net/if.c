@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.38 2000/10/07 03:43:16 itojun Exp $	*/
+/*	$OpenBSD: if.c,v 1.43 2001/02/20 13:50:53 itojun Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -123,6 +123,10 @@ int	if_mark_ignore __P((struct radix_node *, void *));
 int	if_mark_unignore __P((struct radix_node *, void *));
 
 int	ifqmaxlen = IFQ_MAXLEN;
+
+void	if_detached_start __P((struct ifnet *));
+int	if_detached_ioctl __P((struct ifnet *, u_long, caddr_t));
+void	if_detached_watchdog __P((struct ifnet *));
 
 #ifdef INET6
 /*
@@ -330,6 +334,11 @@ if_detach(ifp)
 	int i, s = splimp();
 	struct radix_node_head *rnh;
 
+	ifp->if_flags &= ~IFF_OACTIVE;
+	ifp->if_start = if_detached_start;
+	ifp->if_ioctl = if_detached_ioctl;
+	ifp->if_watchdog = if_detached_watchdog;
+
 #if NBRIDGE > 0
 	/* Remove the interface from any bridge it is part of.  */
 	if (ifp->if_bridge)
@@ -374,7 +383,7 @@ if_detach(ifp)
 
 #ifdef IPFILTER
 	/* XXX More ipf & ipnat cleanup needed.  */
-	nat_ifdetach(ifp);
+	nat_clearlist();
 #endif
 
 	/* Deallocate private resources.  */
@@ -547,10 +556,10 @@ ifaof_ifpforaddr(addr, ifp)
  * This should be moved to /sys/net/link.c eventually.
  */
 void
-link_rtrequest(cmd, rt, sa)
+link_rtrequest(cmd, rt, info)
 	int cmd;
 	register struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	register struct ifaddr *ifa;
 	struct sockaddr *dst;
@@ -564,7 +573,7 @@ link_rtrequest(cmd, rt, sa)
 		rt->rt_ifa = ifa;
 		ifa->ifa_refcnt++;
 		if (ifa->ifa_rtrequest && ifa->ifa_rtrequest != link_rtrequest)
-			ifa->ifa_rtrequest(cmd, rt, sa);
+			ifa->ifa_rtrequest(cmd, rt, info);
 	}
 }
 
@@ -788,9 +797,11 @@ ifioctl(so, cmd, data, p)
 	}
 
 	case SIOCSIFPHYADDR:
+	case SIOCDIFPHYADDR:
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif
+	case SIOCSLIFPHYADDR:
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 	case SIOCSIFMEDIA:
@@ -799,6 +810,7 @@ ifioctl(so, cmd, data, p)
 		/* FALLTHROUGH */
 	case SIOCGIFPSRCADDR:
 	case SIOCGIFPDSTADDR:
+	case SIOCGLIFPHYADDR:
 	case SIOCGIFMEDIA:
 		if (ifp->if_ioctl == 0)
 			return (EOPNOTSUPP);
@@ -970,4 +982,34 @@ ifconf(cmd, data)
 	}
 	ifc->ifc_len -= space;
 	return (error);
+}
+
+/*
+ * Dummy functions replaced in ifnet during detach (if protocols decide to
+ * fiddle with the if during detach.
+ */
+void
+if_detached_start(struct ifnet *ifp)
+{
+	struct mbuf *m;
+
+	while (1) {
+		IF_DEQUEUE(&ifp->if_snd, m);
+
+		if (m == NULL)
+			return;
+		m_freem(m);
+	}
+}
+
+int
+if_detached_ioctl(struct ifnet *ifp, u_long a, caddr_t b)
+{
+	return ENODEV;
+}
+
+void
+if_detached_watchdog(struct ifnet *ifp)
+{
+	/* nothing */
 }

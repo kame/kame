@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_kue.c,v 1.5 2000/04/23 17:33:47 maja Exp $ */
+/*	$OpenBSD: if_kue.c,v 1.9 2001/02/20 19:39:46 mickey Exp $ */
 /*	$NetBSD: if_kue.c,v 1.28 2000/04/02 21:25:41 augustss Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
@@ -173,7 +173,7 @@ int	kuedebug = 0;
 /*
  * Various supported device vendors/products.
  */
-Static struct kue_type kue_devs[] = {
+Static const struct kue_type kue_devs[] = {
 	{ USB_VENDOR_AOX, USB_PRODUCT_AOX_USB101 },
 	{ USB_VENDOR_ADS, USB_PRODUCT_ADS_UBS10BT },
 	{ USB_VENDOR_ATEN, USB_PRODUCT_ATEN_UC10T },
@@ -188,6 +188,8 @@ Static struct kue_type kue_devs[] = {
 	{ USB_VENDOR_SMC, USB_PRODUCT_SMC_2102USB },
 	{ USB_VENDOR_LINKSYS, USB_PRODUCT_LINKSYS_USB10T },
 	{ USB_VENDOR_KLSI, USB_PRODUCT_KLSI_DUH3E10BT },
+	{ USB_VENDOR_IODATA, USB_PRODUCT_IODATA_USBETT },
+	{ USB_VENDOR_ABOCOM, USB_PRODUCT_ABOCOM_URE450 },
 	{ 0, 0 }
 };
 
@@ -306,7 +308,7 @@ kue_ctl(sc, rw, breq, val, data, len)
 	USETW(req.wLength, len);
 
 	s = splusb();
-	err = KUE_DO_REQUEST(sc->kue_udev, &req, data);
+	err = KUE_DO_REQUEST(sc->kue_udev, &req, (void *)data);
 	splx(s);
 
 	return (err);
@@ -364,7 +366,7 @@ kue_load_fw(sc)
 	DPRINTFN(1,("%s: kue_load_fw: download code_seg\n", 
 		    USBDEVNAME(sc->kue_dev)));
 	err = kue_ctl(sc, KUE_CTL_WRITE, KUE_CMD_SEND_SCAN,
-	    0, kue_code_seg, sizeof(kue_code_seg));
+	    0, (void *)kue_code_seg, sizeof(kue_code_seg));
 	if (err) {
 		printf("%s: failed to load code segment: %s\n",
 		    USBDEVNAME(sc->kue_dev), usbd_errstr(err));
@@ -375,7 +377,7 @@ kue_load_fw(sc)
 	DPRINTFN(1,("%s: kue_load_fw: download fix_seg\n", 
 		    USBDEVNAME(sc->kue_dev)));
 	err = kue_ctl(sc, KUE_CTL_WRITE, KUE_CMD_SEND_SCAN,
-	    0, kue_fix_seg, sizeof(kue_fix_seg));
+	    0, (void *)kue_fix_seg, sizeof(kue_fix_seg));
 	if (err) {
 		printf("%s: failed to load fixup segment: %s\n",
 		    USBDEVNAME(sc->kue_dev), usbd_errstr(err));
@@ -386,7 +388,7 @@ kue_load_fw(sc)
 	DPRINTFN(1,("%s: kue_load_fw: download trig_seg\n", 
 		    USBDEVNAME(sc->kue_dev)));
 	err = kue_ctl(sc, KUE_CTL_WRITE, KUE_CMD_SEND_SCAN,
-	    0, kue_trig_seg, sizeof(kue_trig_seg));
+	    0, (void *)kue_trig_seg, sizeof(kue_trig_seg));
 	if (err) {
 		printf("%s: failed to load trigger segment: %s\n",
 		    USBDEVNAME(sc->kue_dev), usbd_errstr(err));
@@ -514,7 +516,7 @@ kue_reset(sc)
 USB_MATCH(kue)
 {
 	USB_MATCH_START(kue, uaa);
-	struct kue_type			*t;
+	const struct kue_type		*t;
 
 	DPRINTFN(25,("kue_match: enter\n"));
 
@@ -688,10 +690,6 @@ USB_ATTACH(kue)
 	if_attach(ifp);
 	Ether_ifattach(ifp, sc->kue_desc.kue_macaddr);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB,
-		  sizeof(struct ether_header));
-#endif
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, USBDEVNAME(sc->kue_dev),
 	    RND_TYPE_NET, 0);

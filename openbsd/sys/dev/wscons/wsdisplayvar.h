@@ -1,4 +1,4 @@
-/* $OpenBSD: wsdisplayvar.h,v 1.2 2000/08/01 13:51:18 mickey Exp $ */
+/* $OpenBSD: wsdisplayvar.h,v 1.9 2001/04/14 04:44:02 aaron Exp $ */
 /* $NetBSD: wsdisplayvar.h,v 1.14.4.1 2000/06/30 16:27:53 simonb Exp $ */
 
 /*
@@ -80,8 +80,10 @@ struct wsdisplay_emulops {
 	/* XXX need a free_attr() ??? */
 };
 
+#define	WSSCREEN_NAME_SIZE	16
+
 struct wsscreen_descr {
-	char *name;
+	char name[WSSCREEN_NAME_SIZE];
 	int ncols, nrows;
 	const struct wsdisplay_emulops *textops;
 	int fontwidth, fontheight;
@@ -104,13 +106,16 @@ struct wsdisplay_font;
 struct wsdisplay_accessops {
 	int	(*ioctl) __P((void *v, u_long cmd, caddr_t data, int flag,
 		    struct proc *p));
-	int	(*mmap) __P((void *v, off_t off, int prot));
+	paddr_t	(*mmap) __P((void *v, off_t off, int prot));
 	int	(*alloc_screen) __P((void *, const struct wsscreen_descr *,
 				     void **, int *, int *, long *));
 	void	(*free_screen) __P((void *, void *));
 	int	(*show_screen) __P((void *, void *, int,
 				    void (*) (void *, int, int), void *));
 	int	(*load_font) __P((void *, void *, struct wsdisplay_font *));
+	void	(*scrollback) __P((void *, void *, int));
+	u_int16_t (*getchar) __P((void *, int, int));
+	void	(*pollc) __P((void *, int));
 };
 
 /*
@@ -197,4 +202,16 @@ int wsdisplay_cfg_ioctl __P((struct wsdisplay_softc *sc,
 /*
  * for general use
  */
+#define WSDISPLAY_NULLSCREEN	-1
 void wsdisplay_switchtoconsole __P((void));
+const struct wsscreen_descr *
+    wsdisplay_screentype_pick __P((const struct wsscreen_list *, const char *));
+
+/*
+ * for use by wskbd
+ */
+void wsscrollback __P((void *, int op));
+
+#define WSDISPLAY_SCROLL_BACKWARD	0
+#define WSDISPLAY_SCROLL_FORWARD	1
+#define WSDISPLAY_SCROLL_RESET		2

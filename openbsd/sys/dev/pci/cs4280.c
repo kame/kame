@@ -1,4 +1,4 @@
-/*	$OpenBSD: cs4280.c,v 1.5 2000/09/17 20:31:20 marc Exp $	*/
+/*	$OpenBSD: cs4280.c,v 1.7 2001/03/14 12:15:11 mickey Exp $	*/
 /*	$NetBSD: cs4280.c,v 1.5 2000/06/26 04:56:23 simonb Exp $	*/
 
 /*
@@ -176,7 +176,7 @@ int	cs4280_intr __P((void *));
 void	cs4280_reset __P((void *));
 int	cs4280_download_image __P((struct cs4280_softc *));
 
-int cs4280_download(struct cs4280_softc *, u_int32_t *, u_int32_t, u_int32_t);
+int cs4280_download(struct cs4280_softc *, const u_int32_t *, u_int32_t, u_int32_t);
 int cs4280_allocmem __P((struct cs4280_softc *, size_t, size_t,
 			 struct cs4280_dma *));
 int cs4280_freemem __P((struct cs4280_softc *, struct cs4280_dma *));
@@ -334,7 +334,7 @@ cs4280_read_codec(sc_, add, data)
 	    ACCTL_RSTN | ACCTL_ESYN | ACCTL_VFRM | ACCTL_CRW  | ACCTL_DCV );
 
 	if (cs4280_src_wait(sc) < 0) {
-		printf("%s: AC97 read prob. (DCV!=0) for add=0x%0x\n",
+		printf("%s: AC97 read prob. (DCV!=0) for add=0x%02x\n",
 		       sc->sc_dev.dv_xname, add);
 		return (1);
 	}
@@ -344,7 +344,7 @@ cs4280_read_codec(sc_, add, data)
 	while (!(BA0READ4(sc, CS4280_ACSTS) & ACSTS_VSTS)) {
 		delay(1);
 		while (++n > 1000) {
-			printf("%s: AC97 read fail (VSTS==0) for add=0x%0x\n", 
+			printf("%s: AC97 read fail (VSTS==0) for add=0x%02x\n", 
 			       sc->sc_dev.dv_xname, add);
 			return (1);
 		}
@@ -827,7 +827,7 @@ cs4280_intr(p)
 int
 cs4280_download(sc, src, offset, len)
 	struct cs4280_softc *sc;
-	u_int32_t *src;
+	const u_int32_t *src;
 	u_int32_t offset, len;
 {
 	u_int32_t ctr;

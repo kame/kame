@@ -1,4 +1,4 @@
-/*	$OpenBSD: xl.c,v 1.17 2000/10/19 16:33:51 jason Exp $	*/
+/*	$OpenBSD: xl.c,v 1.23 2001/04/08 01:05:12 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -1394,8 +1394,10 @@ void xl_txeoc(sc)
 		if (txstat & XL_TXSTATUS_UNDERRUN ||
 			txstat & XL_TXSTATUS_JABBER ||
 			txstat & XL_TXSTATUS_RECLAIM) {
-			printf("xl%d: transmission error: %x\n",
-						sc->xl_unit, txstat);
+			if (txstat != 0x90) {
+				printf("xl%d: transmission error: %x\n",
+				    sc->xl_unit, txstat);
+			}
 			CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_TX_RESET);
 			xl_wait(sc);
 			if (sc->xl_type == XL_TYPE_905B) {
@@ -1418,9 +1420,11 @@ void xl_txeoc(sc)
 			if (txstat & XL_TXSTATUS_UNDERRUN &&
 			    sc->xl_tx_thresh < XL_PACKET_SIZE) {
 				sc->xl_tx_thresh += XL_MIN_FRAMELEN;
+#ifdef notdef
 				printf("xl%d: tx underrun, increasing tx start"
 				    " threshold to %d\n", sc->xl_unit,
 				    sc->xl_tx_thresh);
+#endif
 			}
 			CSR_WRITE_2(sc, XL_COMMAND,
 			    XL_CMD_TX_SET_START|sc->xl_tx_thresh);
@@ -1552,7 +1556,7 @@ void xl_stats_update(xsc)
 	XL_SEL_WIN(7);
 
 	if (!sc->xl_stats_no_timeout)
-		timeout(xl_stats_update, sc, hz);
+		timeout_add(&sc->xl_stsup_tmo, hz);
 
 	return;
 }
@@ -1920,6 +1924,7 @@ void xl_init(xsc)
 		printf("xl%d: initialization failed: no "
 			"memory for rx buffers\n", sc->xl_unit);
 		xl_stop(sc);
+		splx(s);
 		return;
 	}
 
@@ -2075,7 +2080,7 @@ void xl_init(xsc)
 
 	(void)splx(s);
 
-	timeout(xl_stats_update, sc, hz);
+	timeout_add(&sc->xl_stsup_tmo, hz);
 
 	return;
 }
@@ -2223,6 +2228,15 @@ xl_ioctl(ifp, command, data)
 			break;
 		}
 		break;
+
+	case SIOCSIFMTU:
+		if(ifr->ifr_mtu > ETHERMTU || ifr->ifr_mtu < ETHERMIN) {
+			error = EINVAL;
+		} else if (ifp->if_mtu != ifr->ifr_mtu) {
+			ifp->if_mtu = ifr->ifr_mtu;
+		}
+		break;
+
 	case SIOCSIFFLAGS:
 		XL_SEL_WIN(5);
 		rxfilt = CSR_READ_1(sc, XL_W5_RX_FILTER);
@@ -2383,7 +2397,7 @@ void xl_stop(sc)
 		(*sc->intr_ack)(sc);
 
 	/* Stop the stats updater. */
-	untimeout(xl_stats_update, sc);
+	timeout_del(&sc->xl_stsup_tmo);
 
 	xl_freetxrx(sc);
 
@@ -2467,6 +2481,8 @@ xl_attach(sc)
 		sc->xl_type = XL_TYPE_905B;
 	else
 		sc->xl_type = XL_TYPE_90X;
+
+	timeout_set(&sc->xl_stsup_tmo, xl_stats_update, sc);
 
 	ifp->if_softc = sc;
 	ifp->if_mtu = ETHERMTU;
@@ -2621,10 +2637,6 @@ xl_attach(sc)
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
-#if NBPFILTER > 0
-	bpfattach(&sc->arpcom.ac_if.if_bpf, ifp,
-	    DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	sc->sc_sdhook = shutdownhook_establish(xl_shutdown, sc);
 }
 
@@ -2635,7 +2647,7 @@ xl_detach(sc)
 	struct ifnet *ifp = &sc->arpcom.ac_if;
 
 	/* Unhook our tick handler. */
-	untimeout(xl_stats_update, sc);
+	timeout_del(&sc->xl_stsup_tmo);
 
 	xl_freetxrx(sc);
 

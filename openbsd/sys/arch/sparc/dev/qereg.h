@@ -1,7 +1,7 @@
-/*	$OpenBSD: qereg.h,v 1.4 1999/03/12 18:56:18 jason Exp $	*/
+/*	$OpenBSD: qereg.h,v 1.6 2001/01/30 07:17:07 jason Exp $	*/
 
 /*
- * Copyright (c) 1998 Jason L. Wright.
+ * Copyright (c) 1998, 2000 Jason L. Wright.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -255,6 +255,7 @@ struct qe_mregs {
 
 /* qe_mregs.plscc: pls config control. */
 #define	QE_MR_PLSCC_XMTSEL	0x08		/* tx mode select */
+#define	QE_MR_PLSCC_PORTMASK	0x06		/* media mask */
 #define	QE_MR_PLSCC_GPSI	0x06		/* use gpsi connector */
 #define	QE_MR_PLSCC_DAI		0x04		/* use dai connector */
 #define	QE_MR_PLSCC_TP		0x02		/* use twistedpair connector */
@@ -316,9 +317,14 @@ struct qe_txd {
 /* Buffer and Ring sizes: fixed ring size */
 #define	QE_TX_RING_MAXSIZE	256		/* maximum tx ring size */
 #define	QE_RX_RING_MAXSIZE	256		/* maximum rx ring size */
-#define	QE_TX_RING_SIZE		16
-#define	QE_RX_RING_SIZE		16
+#define	QE_TX_RING_SIZE		16		/* power of 2, <= MAXSIZE */
+#define	QE_RX_RING_SIZE		16		/* power of 2, <= MAXSIZE */
 #define	QE_PKT_BUF_SZ		2048
+
+#define	QE_TX_RING_MAXMASK	(QE_TX_RING_MAXSIZE-1)
+#define	QE_RX_RING_MAXMASK	(QE_RX_RING_MAXSIZE-1)
+#define	QE_TX_RING_MASK		(QE_TX_RING_SIZE-1)
+#define	QE_RX_RING_MASK		(QE_RX_RING_SIZE-1)
 
 /*
  * QE descriptor rings

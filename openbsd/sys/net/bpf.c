@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.c,v 1.22 2000/06/19 03:00:51 jason Exp $	*/
+/*	$OpenBSD: bpf.c,v 1.25 2001/04/04 02:39:17 jason Exp $	*/
 /*	$NetBSD: bpf.c,v 1.33 1997/02/21 23:59:35 thorpej Exp $	*/
 
 /*
@@ -87,7 +87,8 @@ int bpf_bufsize = BPF_BUFSIZE;
  *  bpf_dtab holds the descriptors, indexed by minor device #
  */
 struct bpf_if	*bpf_iflist;
-struct bpf_d	bpf_dtab[NBPFILTER];
+struct bpf_d	*bpf_dtab;
+int nbpfilter;
 
 int	bpf_allocbufs __P((struct bpf_d *));
 void	bpf_freed __P((struct bpf_d *));
@@ -241,7 +242,7 @@ bpf_detachd(d)
 
 		d->bd_promisc = 0;
 		error = ifpromisc(bp->bif_ifp, 0);
-		if (error && error != EINVAL)
+		if (error && !(error == EINVAL || error == ENODEV))
 			/*
 			 * Something is really wrong if we were able to put
 			 * the driver into promiscuous mode, but can't
@@ -286,11 +287,16 @@ bpfilterattach(n)
 {
 	int i;
 
+	bpf_dtab = malloc(n * sizeof(*bpf_dtab), M_DEVBUF, M_NOWAIT);
+	if (!bpf_dtab)
+		return;
+	nbpfilter = n;
+	bzero(bpf_dtab, n * sizeof(*bpf_dtab));
 	/*
 	 * Mark all the descriptors free if this hasn't been done.
 	 */
 	if (!D_ISFREE(&bpf_dtab[0]))
-		for (i = 0; i < NBPFILTER; ++i)
+		for (i = 0; i < nbpfilter; ++i)
 			D_MARKFREE(&bpf_dtab[i]);
 }
 
@@ -308,7 +314,7 @@ bpfopen(dev, flag, mode, p)
 {
 	register struct bpf_d *d;
 
-	if (minor(dev) >= NBPFILTER)
+	if (minor(dev) >= nbpfilter)
 		return (ENXIO);
 	/*
 	 * Each minor can be opened by only one process.  If the requested
@@ -1238,15 +1244,15 @@ bpfdetach(ifp)
 				 * Locate the minor number and nuke the vnode
 				 * for any open instance.
 				 */
-				for (mn = 0; mn < NBPFILTER; mn++)
+				for (mn = 0; mn < nbpfilter; mn++)
 					if (&bpf_dtab[mn] == bd) {
 						vdevgone(maj, mn, mn, VCHR);
 						break;
 					}
 
 			free(bp, M_DEVBUF);
-		}
-		pbp = &bp->bif_next;
+		} else
+			pbp = &bp->bif_next;
 	}
 	ifp->if_bpf = NULL;
 }

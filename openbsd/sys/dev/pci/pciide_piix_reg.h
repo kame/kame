@@ -1,5 +1,5 @@
-/*	$OpenBSD: pciide_piix_reg.h,v 1.2 1999/10/04 22:54:18 deraadt Exp $	*/
-/*	$NetBSD: pciide_piix_reg.h,v 1.2 1998/10/12 16:09:21 bouyer Exp $	*/
+/*	$OpenBSD: pciide_piix_reg.h,v 1.4 2001/04/04 07:02:54 csapuntz Exp $	*/
+/*	$NetBSD: pciide_piix_reg.h,v 1.5 2001/01/05 15:29:40 bouyer Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -20,25 +20,25 @@
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,     
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
 /*
  * Registers definitions for Intel's PIIX series PCI IDE controllers.
  * See Intel's
- * "82371FB (PIIX) and 82371SB (PIIX3) PCI ISA IDE XCELERATOR" and
- * "82371AB PCI-TO-ISA / IDE XCELERATOR (PIIX4)"
+ * "82371FB (PIIX) and 82371SB (PIIX3) PCI ISA IDE XCELERATOR"
+ * "82371AB PCI-TO-ISA / IDE XCELERATOR (PIIX4)" and
+ * "Intel 82801AA (ICH) and Intel 82801AB (ICH0) I/O Controller Hub"
  * available from http://developers.intel.com/
  */
 
@@ -100,13 +100,15 @@
 	(((x) << ((channel * 8) + (drive * 4))) << PIIX_UDMATIM_SHIFT)
 
 /*
- * IDE config register (ICH/ICH0 only)
+ * IDE config register (ICH/ICH0/ICH2 only)
  */
 #define PIIX_CONFIG	0x54
 #define PIIX_CONFIG_PINGPONG	0x0400
-/* The following are only for 82801AA (ICH) */
+/* The following are only for the 82801AA (ICH) and 82801BA (ICH2) */
 #define PIIX_CONFIG_CR(channel, drive) (0x0010 << ((channel) * 2 + (drive)))
 #define PIIX_CONFIG_UDMA66(channel, drive) (0x0001 << ((channel) * 2 + (drive)))
+/* The following are only for the 82801BA (ICH2) */
+#define PIIX_CONFIG_UDMA100(channel, drive) (0x1000 << ((channel) * 2 + (drive)))
 
 /*
  * these tables define the differents values to upload to the
@@ -117,5 +119,5 @@ static int8_t piix_isp_pio[] = {0x00, 0x00, 0x01, 0x02, 0x02};
 static int8_t piix_rtc_pio[] = {0x00, 0x00, 0x00, 0x01, 0x03};
 static int8_t piix_isp_dma[] = {0x00, 0x02, 0x02};
 static int8_t piix_rtc_dma[] = {0x00, 0x02, 0x03};
-static int8_t piix4_sct_udma[] = {0x00, 0x01, 0x02, 0x01, 0x02};
+static int8_t piix4_sct_udma[] = {0x00, 0x01, 0x02, 0x01, 0x02, 0x01};
 

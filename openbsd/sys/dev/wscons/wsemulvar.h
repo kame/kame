@@ -1,4 +1,4 @@
-/* $OpenBSD: wsemulvar.h,v 1.1 2000/05/16 23:49:11 mickey Exp $ */
+/* $OpenBSD: wsemulvar.h,v 1.3 2001/03/14 02:49:23 mickey Exp $ */
 /* $NetBSD: wsemulvar.h,v 1.6 1999/01/17 15:46:15 drochner Exp $ */
 
 /*
@@ -41,7 +41,7 @@ enum wsemul_resetops {
 };
 
 struct wsemul_ops {
-	const char *name;
+	char name[WSEMUL_NAME_SIZE];
 
 	void	*(*cnattach) __P((const struct wsscreen_descr *, void *,
 				  int, int, long));
@@ -60,7 +60,7 @@ extern const struct wsemul_ops wsemul_dumb_ops;
 #ifdef WSEMUL_SUN
 extern const struct wsemul_ops wsemul_sun_ops;
 #endif
-#ifdef WSEMUL_VT100
+#ifndef WSEMUL_NO_VT100
 extern const struct wsemul_ops wsemul_vt100_ops;
 #endif
 

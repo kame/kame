@@ -1,5 +1,5 @@
-/*	$OpenBSD: pciide_apollo_reg.h,v 1.2 2000/06/05 09:18:10 chris Exp $	*/
-/*	$NetBSD: pciide_apollo_reg.h,v 1.4 1998/12/16 12:48:46 bouyer Exp $	*/
+/*	$OpenBSD: pciide_apollo_reg.h,v 1.4 2001/04/04 07:02:54 csapuntz Exp $	*/
+/*	$NetBSD: pciide_apollo_reg.h,v 1.8 2001/01/05 18:04:43 bouyer Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -20,17 +20,16 @@
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,     
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -86,9 +85,9 @@
 /* misc timings control */
 #define APO_MISCTIM 0x4c
 
-/* Ultra-DMA/33 control (586A/B only) */
+/* UltraDMA control (586A/B and higher only) */
 #define APO_UDMA 0x50
-#define AP0_UDMA_MASK(channel) (0xffff << ((1 - (channel)) << 4))
+#define APO_UDMA_MASK(channel) (0xffff << ((1 - (channel)) << 4))
 #define APO_UDMA_TIME(channel, drive, x) (((x) & 0x3) << \
 	(((1 - (channel)) << 4) + ((1 - (drive)) << 3)))
 #define APO_UDMA_PIO_MODE(channel, drive) (0x20 << \
@@ -97,7 +96,8 @@
 	(((1 - (channel)) << 4) + ((1 - (drive)) << 3)))
 #define APO_UDMA_EN_MTH(channel, drive) (0x80 << \
 	(((1 - (channel)) << 4) + ((1 - (drive)) << 3)))
+#define APO_UDMA_CLK66(channel) (0x08 << ((1 - (channel)) << 4))
 
-static int8_t apollo_udma_tim[] = {0x03, 0x02, 0x00};
+static int8_t apollo_udma_tim[] = {0x03, 0x02, 0x00, 0x02, 0x00};
 static int8_t apollo_pio_set[] = {0x0a, 0x0a, 0x0a, 0x02, 0x02};
 static int8_t apollo_pio_rec[] = {0x08, 0x08, 0x08, 0x02, 0x00};

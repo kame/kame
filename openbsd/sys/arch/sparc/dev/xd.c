@@ -1,4 +1,4 @@
-/*	$OpenBSD: xd.c,v 1.15 2000/07/04 13:15:12 art Exp $	*/
+/*	$OpenBSD: xd.c,v 1.18 2001/03/24 10:07:20 ho Exp $	*/
 /*	$NetBSD: xd.c,v 1.37 1997/07/29 09:58:16 fair Exp $	*/
 
 /*
@@ -74,6 +74,7 @@
 #include <sys/syslog.h>
 #include <sys/dkbad.h>
 #include <sys/conf.h>
+#include <sys/timeout.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -509,7 +510,8 @@ xdcattach(parent, self, aux)
 	bootpath_store(1, NULL);
 
 	/* start the watchdog clock */
-	timeout(xdc_tick, xdc, XDC_TICKCNT);
+	timeout_set(&xdc->xdc_tick_tmo, xdc_tick, xdc);
+	timeout_add(&xdc->xdc_tick_tmo, XDC_TICKCNT);
 
 }
 
@@ -1231,7 +1233,7 @@ xdc_rqtopb(iorq, iopb, cmd, subfun)
 			ctrl->param_c = XDPC_OVS | XDPC_COP | XDPC_ASR |
 					XDPC_RBC | XDPC_ECC2;
 			ctrl->throttle = XDC_THROTTLE;
-#ifdef sparc
+#ifdef __sparc__
 			if (CPU_ISSUN4 && cpuinfo.cpu_type == CPUTYP_4_300)
 				ctrl->delay = XDC_DELAY_4_300;
 			else
@@ -1309,7 +1311,7 @@ xdc_rqtopb(iorq, iopb, cmd, subfun)
 /*
  * xdc_cmd: front end for POLL'd and WAIT'd commands.  Returns rqno.
  * If you've already got an IORQ, you can call submit directly (currently
- * there is no need to do this).    NORM requests are handled seperately.
+ * there is no need to do this).    NORM requests are handled separately.
  */
 int
 xdc_cmd(xdcsc, cmd, subfn, unit, block, scnt, dptr, fullmode)
@@ -2156,7 +2158,7 @@ xdc_tick(arg)
 
 	/* until next time */
 
-	timeout(xdc_tick, xdcsc, XDC_TICKCNT);
+	timeout_add(&xdcsc->xdc_tick_tmo, XDC_TICKCNT);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: genassym.c,v 1.5 1999/09/27 19:13:22 smurph Exp $	*/
+/*	$OpenBSD: genassym.c,v 1.8 2001/04/10 01:12:39 miod Exp $	*/
 /*
  * Copyright (c) 1982, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -32,12 +32,8 @@
  * SUCH DAMAGE.
  *
  *	@(#)genassym.c	7.8 (Berkeley) 5/7/91
- *	$Id: genassym.c,v 1.5 1999/09/27 19:13:22 smurph Exp $
+ *	$Id: genassym.c,v 1.8 2001/04/10 01:12:39 miod Exp $
  */
-
-#ifndef KERNEL
-#define KERNEL
-#endif /* KERNEL */
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -50,7 +46,6 @@
 #include <machine/psl.h>
 #include <machine/vmparam.h>
 #include <sys/syscall.h>
-#include <vm/vm.h>
 #include <sys/user.h>
 
 #define pair(TOKEN, ELEMENT) \
@@ -62,45 +57,27 @@ main()
 {
 	register struct proc *p = (struct proc *)0;
 	struct m88100_saved_state *ss = (struct m88100_saved_state *) 0;
-	register struct vmmeter *vm = (struct vmmeter *)0;
-	register struct user *up = (struct user *)0;
-	register struct rusage *rup = (struct rusage *)0;
-	struct vmspace *vms = (struct vmspace *)0;
-	pmap_t pmap = (pmap_t)0;
 	struct pcb *pcb = (struct pcb *)0;
 	struct m88100_pcb *ks = (struct m88100_pcb *)0;
-
-	register unsigned i;
 
 	printf("#ifndef __GENASSYM_INCLUDED\n");
 	printf("#define __GENASSYM_INCLUDED 1\n\n");
 
 	printf("#define\tP_FORW %d\n", &p->p_forw);
 	printf("#define\tP_BACK %d\n", &p->p_back);
-	printf("#define\tP_VMSPACE %d\n", &p->p_vmspace);
 	printf("#define\tP_ADDR %d\n", &p->p_addr);
-	printf("#define\tP_PRIORITY %d\n", &p->p_priority);
 	printf("#define\tP_STAT %d\n", &p->p_stat);
 	printf("#define\tP_WCHAN %d\n", &p->p_wchan);
 	printf("#define\tSRUN %d\n", SRUN);
-	
-	printf("#define\tVM_PMAP %d\n", &vms->vm_pmap);
-	printf("#define\tV_INTR %d\n", &vm->v_intr);
-	
 	printf("#define\tUPAGES %d\n", UPAGES);
-	printf("#define\tPGSHIFT %d\n", PGSHIFT);
 	printf("#define\tUSIZE %d\n", USPACE);
 	printf("#define\tNBPG %d\n", NBPG);
 
-	printf("#define\tU_PROF %d\n", &up->u_stats.p_prof);
-	printf("#define\tU_PROFSCALE %d\n", &up->u_stats.p_prof.pr_scale);
 	printf("#define\tPCB_ONFAULT %d\n", &pcb->pcb_onfault);
-	printf("#define\tSIZEOF_PCB %d\n", sizeof(struct pcb));
 
 	printf("#define\tPCB_USER_STATE %d\n", &pcb->user_state);
 
 	printf("#define\tSYS_exit %d\n", SYS_exit);
-	printf("#define\tSYS_execve %d\n", SYS_execve);
 	printf("#define\tSYS_sigreturn %d\n", SYS_sigreturn);
 	
 	pair("EF_R0",	int_offset_of_element(ss->r[0]));
@@ -123,32 +100,33 @@ main()
 	pair("EF_DMT2",	int_offset_of_element(ss->dmt2));
 	pair("EF_DMD2",	int_offset_of_element(ss->dmd2));
 	pair("EF_DMA2",	int_offset_of_element(ss->dma2));
-	pair("EF_FPECR",	int_offset_of_element(ss->fpecr));
+	pair("EF_FPECR",int_offset_of_element(ss->fpecr));
 	pair("EF_FPCR",	int_offset_of_element(ss->fpcr)); /* MVME197 */
 	pair("EF_FPSR",	int_offset_of_element(ss->fpsr)); /* MVME197 */
-	pair("EF_FPHS1",	int_offset_of_element(ss->fphs1));
-	pair("EF_FPLS1",	int_offset_of_element(ss->fpls1));
-	pair("EF_FPHS2",	int_offset_of_element(ss->fphs2));
-	pair("EF_FPLS2",	int_offset_of_element(ss->fpls2));
+	pair("EF_FPHS1",int_offset_of_element(ss->fphs1));
+	pair("EF_FPLS1",int_offset_of_element(ss->fpls1));
+	pair("EF_FPHS2",int_offset_of_element(ss->fphs2));
+	pair("EF_FPLS2",int_offset_of_element(ss->fpls2));
 	pair("EF_FPPT",	int_offset_of_element(ss->fppt));
 	pair("EF_FPRH",	int_offset_of_element(ss->fprh));
 	pair("EF_FPRL",	int_offset_of_element(ss->fprl));
 	pair("EF_FPIT",	int_offset_of_element(ss->fpit));
-	pair("EF_VECTOR",	int_offset_of_element(ss->vector));
+	pair("EF_VECTOR",int_offset_of_element(ss->vector));
 	pair("EF_MASK",	int_offset_of_element(ss->mask));
 	pair("EF_MODE",	int_offset_of_element(ss->mode));
 
 	pair("EF_RET",	int_offset_of_element(ss->scratch1));
 	pair("EF_IPFSR",int_offset_of_element(ss->ipfsr));
 	pair("EF_DPFSR",int_offset_of_element(ss->dpfsr));
-	pair("EF_DSR",int_offset_of_element(ss->dsr)); /* MVME197 */
-	pair("EF_DLAR",int_offset_of_element(ss->dlar)); /* MVME197 */
-	pair("EF_DPAR",int_offset_of_element(ss->dpar)); /* MVME197 */
-	pair("EF_ISR",int_offset_of_element(ss->dsr)); /* MVME197 */
-	pair("EF_ILAR",int_offset_of_element(ss->ilar)); /* MVME197 */
-	pair("EF_IPAR",int_offset_of_element(ss->ipar)); /* MVME197 */
-	pair("EF_SRX",int_offset_of_element(ss->dpfsr));
-	pair("EF_NREGS",	sizeof(*ss)/sizeof(int));
+	pair("EF_DSR",  int_offset_of_element(ss->dsr)); /* MVME197 */
+	pair("EF_DLAR", int_offset_of_element(ss->dlar)); /* MVME197 */
+	pair("EF_DPAR", int_offset_of_element(ss->dpar)); /* MVME197 */
+	pair("EF_ISR",  int_offset_of_element(ss->dsr)); /* MVME197 */
+	pair("EF_ILAR", int_offset_of_element(ss->ilar)); /* MVME197 */
+	pair("EF_IPAR", int_offset_of_element(ss->ipar)); /* MVME197 */
+	pair("EF_SRX",  int_offset_of_element(ss->dpfsr));
+	pair("EF_CPU",  int_offset_of_element(ss->cpu)); /* cpu number */
+	pair("EF_NREGS",sizeof(*ss)/sizeof(int));
 
 /* end MVME197 only */
 

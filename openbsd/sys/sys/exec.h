@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec.h,v 1.8 1999/11/05 01:18:01 mickey Exp $	*/
+/*	$OpenBSD: exec.h,v 1.11 2001/04/07 22:02:20 tholo Exp $	*/
 /*	$NetBSD: exec.h,v 1.59 1996/02/09 18:25:09 christos Exp $	*/
 
 /*-
@@ -79,7 +79,7 @@ struct ps_strings {
     defined(COMPAT_IBCS2) || defined(COMPAT_SVR4) || defined(COMPAT_OSF1) || \
     defined(COMPAT_LINUX) || defined(COMPAT_FREEBSD) || \
     defined(COMPAT_HPUX)  || defined(COMPAT_NETBSD)
-#define	STACKGAPLEN	400	/* plenty enough for now */
+#define	STACKGAPLEN	512	/* plenty enough for now */
 #else
 #define	STACKGAPLEN	0
 #endif
@@ -116,14 +116,25 @@ struct execsw {
 	exec_makecmds_fcn es_check;	/* function to check exec format */
 };
 
+struct exec_vmcmd {
+	int	(*ev_proc) __P((struct proc *p, struct exec_vmcmd *cmd));
+				/* procedure to run for region of vmspace */
+	u_long	ev_len;		/* length of the segment to map */
+	u_long	ev_addr;	/* address in the vmspace to place it at */
+	struct	vnode *ev_vp;	/* vnode pointer for the file w/the data */
+	u_long	ev_offset;	/* offset in the file for the data */
+	u_int	ev_prot;	/* protections for segment */
+};
+
+#define	EXEC_DEFAULT_VMCMD_SETSIZE	8	/* # of cmds in set to start */
+
 /* exec vmspace-creation command set; see below */
 struct exec_vmcmd_set {
 	u_int	evs_cnt;
 	u_int	evs_used;
 	struct	exec_vmcmd *evs_cmds;
+	struct	exec_vmcmd evs_start[EXEC_DEFAULT_VMCMD_SETSIZE];
 };
-
-#define	EXEC_DEFAULT_VMCMD_SETSIZE	5	/* # of cmds in set to start */
 
 struct exec_package {
 	char	*ep_name;		/* file's name */
@@ -156,16 +167,6 @@ struct exec_package {
 #define	EXEC_HASARGL	0x0004		/* has fake args vector */
 #define	EXEC_SKIPARG	0x0008		/* don't copy user-supplied argv[0] */
 #define	EXEC_DESTR	0x0010		/* destructive ops performed */
-
-struct exec_vmcmd {
-	int	(*ev_proc) __P((struct proc *p, struct exec_vmcmd *cmd));
-				/* procedure to run for region of vmspace */
-	u_long	ev_len;		/* length of the segment to map */
-	u_long	ev_addr;	/* address in the vmspace to place it at */
-	struct	vnode *ev_vp;	/* vnode pointer for the file w/the data */
-	u_long	ev_offset;	/* offset in the file for the data */
-	u_int	ev_prot;	/* protections for segment */
-};
 
 #ifdef _KERNEL
 /*
@@ -208,7 +209,14 @@ void	new_vmcmd __P((struct exec_vmcmd_set *evsp,
         vcp->ev_offset = (offset); \
         vcp->ev_prot = (prot); \
 }
-#endif /* EXEC_DEBUG */
+#endif /* DEBUG */
+
+/* Initialize an empty vmcmd set */
+#define VMCMDSET_INIT(vmc) do { \
+	(vmc)->evs_cnt = EXEC_DEFAULT_VMCMD_SETSIZE; \
+	(vmc)->evs_cmds = (vmc)->evs_start; \
+	(vmc)->evs_used = 0; \
+} while (0)	
 
 /*
  * Exec function switch:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rbus_machdep.c,v 1.4 2000/10/31 18:56:40 deraadt Exp $ */
+/*	$OpenBSD: rbus_machdep.c,v 1.7 2001/01/25 01:00:52 mickey Exp $ */
 /*	$NetBSD: rbus_machdep.c,v 1.2 1999/10/15 06:43:06 haya Exp $	*/
 
 /*
@@ -54,7 +54,6 @@
 
 #include <dev/pci/pcivar.h>
 #include <arch/i386/pci/pcibiosvar.h>
-#include <arch/i386/pci/pci_addr_fixup.h>
 
 
 
@@ -112,7 +111,11 @@ _bus_space_unmap(t, bsh, size, adrp)
       /*
        * Free the kernel virtual mapping.
        */
+#if defined(UVM)
       uvm_km_free(kernel_map, va, endva - va);
+#else
+      kmem_free(kernel_map, va, endva - va);
+#endif
     }
   } else {
     panic("_i386_memio_unmap: bad bus space tag");
@@ -144,33 +147,9 @@ rbus_pccbb_parent_mem(pa)
 	struct extent *ex;
 
 #if NPCIBIOS > 0
-	if (!(pcibios_flags & PCIBIOS_ADDR_FIXUP)) {
-		struct extent_region *rp;
-		ex = pciaddr.extent_mem;
-		
-		/* This size is the maximum size that would be
-		   requested by a cardbus/pcmcia device */
-		size = RBUS_MEM_SIZE;
-		start = RBUS_MEM_START;
-		
-		/* Search the PCI I/O memory space extent for free
-		   space that will accomidate size.  Remember that the
-		   extent stores allocated space and we're searching
-		   for the gaps. */
-		rp = ex->ex_regions.lh_first;
-
-		/* If we're at the end or the gap between this region
-		   and the next region big enough, then we're done */
-		while (rp && start + size > rp->er_start) {
-			bus_addr_t new_start;
-
-			new_start = (rp->er_end - 1 + size) & ~(size - 1);
-			if (new_start > start)
-				start = new_start;
-
-			rp = rp->er_link.le_next;
-		}
-	} else
+	size = RBUS_MEM_SIZE;
+	start = RBUS_MEM_START;
+	if ((ex = pciaddr_search(PCIADDR_SEARCH_MEM, &start, size)) == NULL)
 #endif
 	{
 		extern struct extent *iomem_ex;
@@ -185,7 +164,7 @@ rbus_pccbb_parent_mem(pa)
 		 * address region.
 		 *
 		 * if defined PCIBIOS_ADDR_FIXUP, PCI device using
-		 * area which do not recognised by the kernel are
+		 * area which is not recognised by the kernel are
 		 * already reserved.
 		 */
 		
@@ -214,37 +193,14 @@ rbus_pccbb_parent_io(pa)
 	bus_addr_t start;
 	bus_size_t size;
 
+	size =  RBUS_IO_SIZE;
+	start = RBUS_IO_START;
 #if NPCIBIOS > 0
-	if (!(pcibios_flags & PCIBIOS_ADDR_FIXUP)) {
-		struct extent_region *rp;
-		ex = pciaddr.extent_port;
-		size =  RBUS_IO_SIZE;
-		start = RBUS_IO_START;
-		
-		/* Search the PCI I/O port space extent for free space
-		   that will accomidate size.  Remember that the
-		   extent stores allocated space and we're searching
-		   for the gaps. */
-		rp = ex->ex_regions.lh_first;
-
-		/* If we're at the end or the gap between this region
-		   and the next region big enough, then we're done */
-		while (rp && start + size > rp->er_start) {
-			bus_addr_t new_start;
-
-			new_start = (rp->er_end - 1 + size) & ~(size - 1);
-			if (new_start > start)
-				start = new_start;
-
-			rp = rp->er_link.le_next;
-		}
-	} else
+	if ((ex = pciaddr_search(PCIADDR_SEARCH_IO, &start, size)) == NULL)
 #endif
 	{
 		extern struct extent *ioport_ex;
 		ex = ioport_ex;
-		start = RBUS_IO_START;
-		size =  RBUS_IO_START;
 	}
 
 	return rbus_new_root_share(pa->pa_iot, ex, start, size, 0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.6 1999/09/27 20:46:17 smurph Exp $ */
+/*	$OpenBSD: cpu.h,v 1.9 2001/03/09 05:44:40 smurph Exp $ */
 /*
  * Copyright (c) 1996 Nivas Madhur
  * Copyright (c) 1992, 1993
@@ -42,8 +42,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _CPU_H_
-#define _CPU_H_
+#ifndef __MACHINE_CPU_H__
+#define __MACHINE_CPU_H__
 
 /*
  * CTL_MACHDEP definitinos.
@@ -81,12 +81,17 @@ struct clockframe {
 	struct trapframe tf;
 };
 
-extern intstack;
+extern int intstack;
 
 #define	CLKF_USERMODE(framep)	((((struct trapframe *)(framep))->epsr & 80000000) == 0)
 #define	CLKF_BASEPRI(framep)	(((struct trapframe *)(framep))->mask == 0)
 #define	CLKF_PC(framep)		(((struct trapframe *)(framep))->sxip & ~3)
 #define	CLKF_INTR(framep)	(((struct trapframe *)(framep))->r[31] > intstack)
+
+/*
+ * Get interrupt glue.
+ */
+#include <machine/intr.h>
 
 /*
  * Internal IO space (iiomapsize).
@@ -146,7 +151,7 @@ int	want_resched;		/* resched() was called */
 #define	signotify(p)		(want_ast = 1)
 
 struct intrhand {
-	int	(*ih_fn)();
+	int	(*ih_fn) __P((void *));
 	void	*ih_arg;
 	int	ih_ipl;
 	int	ih_wantframe;
@@ -183,15 +188,18 @@ struct switchframe {
 /* This struct defines the machine dependant function pointers */
 
 struct funcp {
-	void (*clock_init_func)();      /* interval clock init function */
-	void (*statclock_init_func)();  /* statistics clock init function */
-	void (*delayclock_init_func)(); /* delay clock init function */
-	void (*delay_func)();           /* delay clock function */
-   void (*interrupt_func)();       /* interrupt func */
-   void (*fp_precise_func)();      /* floating point precise function */
+	void (*clock_init_func) __P((void));      /* interval clock init function */
+	void (*statclock_init_func) __P((void));  /* statistics clock init function */
+	void (*delayclock_init_func) __P((void)); /* delay clock init function */
+	void (*delay_func) __P((void));           /* delay clock function */
+   void (*interrupt_func) __P((u_int, struct m88100_saved_state *));       /* interrupt func */
+   void (*fp_precise_func) __P((void));      /* floating point precise function */
 };
 
 extern struct funcp mdfp;
 
+int badvaddr __P((vm_offset_t va, int size));
+void nmihand __P((void *framep));
+
 #endif /* _KERNEL */
-#endif /* _CPU_H_ */
+#endif __MACHINE_CPU_H__

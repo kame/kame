@@ -1,4 +1,4 @@
-/*	$OpenBSD: cy82c693.c,v 1.1 2000/06/09 17:10:58 chris Exp $	*/
+/*	$OpenBSD: cy82c693.c,v 1.4 2001/02/26 16:21:46 art Exp $	*/
 /* $NetBSD: cy82c693.c,v 1.1 2000/06/06 03:07:39 thorpej Exp $ */
 
 /*-
@@ -60,9 +60,7 @@
 static struct cy82c693_handle cyhc_handle;
 static int cyhc_initialized;
 
-#if 0 /* SMP */
-static struct simplelock cyhc_slock = SIMPLELOCK_INITIALIZER;
-#endif
+struct simplelock cyhc_slock = SLOCK_INITIALIZER;
 
 #define	CYHC_LOCK(s)							\
 do {									\
@@ -81,6 +79,7 @@ cy82c693_init(bus_space_tag_t iot)
 {
 	bus_space_handle_t ioh;
 	int s;
+	int error;
 
 	CYHC_LOCK(s);
 
@@ -91,8 +90,9 @@ cy82c693_init(bus_space_tag_t iot)
 		return (&cyhc_handle);
 	}
 
-	if (bus_space_map(iot, CYHC_CONFIG_ADDR, 2, 0, &ioh) != 0) {
+	if ((error = bus_space_map(iot, CYHC_CONFIG_ADDR, 2, 0, &ioh)) != 0) {
 		CYHC_UNLOCK(s);
+		printf("cy82c693_init: bus_space_map failed (%d)", error);
 		return (NULL);
 	}
 

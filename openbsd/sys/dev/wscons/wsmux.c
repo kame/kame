@@ -1,4 +1,4 @@
-/*	$OpenBSD: wsmux.c,v 1.2 2000/08/01 13:51:18 mickey Exp $	*/
+/*	$OpenBSD: wsmux.c,v 1.6 2001/03/30 16:38:14 aaron Exp $	*/
 /*	$NetBSD: wsmux.c,v 1.9 2000/05/28 10:33:14 takemura Exp $	*/
 
 /*
@@ -89,6 +89,7 @@ struct wsplink {
 
 int wsmuxdoclose __P((struct device *, int, int, struct proc *));
 int wsmux_set_display __P((struct device *, struct wsmux_softc *));
+int wsmux_isset_display __P((struct device *));
 
 #if NWSMUX > 0
 cdev_decl(wsmux);
@@ -97,34 +98,44 @@ void wsmuxattach __P((int));
 
 struct wsmuxops wsmux_muxops = {
 	wsmuxopen, wsmuxdoclose, wsmuxdoioctl, wsmux_displayioctl,
-	wsmux_set_display
+	wsmux_set_display, wsmux_isset_display
 };
 
 void wsmux_setmax __P((int n));
 
 int nwsmux = 0;
-struct wsmux_softc **wsmuxdevs;
+struct wsmux_softc **wsmuxdevs = NULL;
 
 void
 wsmux_setmax(n)
 	int n;
 {
-	int i;
+	int i = 0;
+	struct wsmux_softc **wsmuxdevs_tmp = NULL;
 
 	if (n >= nwsmux) {
-		i = nwsmux;
-		nwsmux = n + 1;
-		if (nwsmux != 0)
-			wsmuxdevs = realloc(wsmuxdevs, 
-					    nwsmux * sizeof (*wsmuxdevs), 
-					    M_DEVBUF, M_NOWAIT);
-		else
-			wsmuxdevs = malloc(nwsmux * sizeof (*wsmuxdevs), 
-					   M_DEVBUF, M_NOWAIT);
+		if (wsmuxdevs != NULL) {
+			wsmuxdevs_tmp = malloc(nwsmux * sizeof(*wsmuxdevs_tmp),
+			    M_DEVBUF, M_NOWAIT);
+			if (wsmuxdevs_tmp == 0)
+				panic("wsmux_setmax: no mem\n");
+			for (; i < nwsmux; i++)
+				wsmuxdevs_tmp[i] = wsmuxdevs[i];
+			free(wsmuxdevs, M_DEVBUF);
+		}
+
+		wsmuxdevs = malloc(n + 1 * sizeof(*wsmuxdevs), 
+		    M_DEVBUF, M_NOWAIT);
 		if (wsmuxdevs == 0)
 			panic("wsmux_setmax: no memory\n");
-		for (; i < nwsmux; i++)
+		for (; i < n + 1; i++)
 			wsmuxdevs[i] = 0;
+		if (wsmuxdevs_tmp != NULL) {
+			for (i = 0; i < nwsmux; i++)
+				wsmuxdevs[i] = wsmuxdevs_tmp[i];
+			free(wsmuxdevs_tmp, M_DEVBUF);
+		}
+		nwsmux = n + 1;
 	}
 }
 
@@ -286,7 +297,7 @@ wsmuxioctl(dev, cmd, data, flag, p)
 }
 
 int
-wsmuxpoll(dev, events, p)
+wsmuxselect(dev, events, p)
 	dev_t dev;
 	int events;
 	struct proc *p;
@@ -454,7 +465,8 @@ wsmux_detach_sc(sc, dsc)
 		return (ENXIO);
 	}
 #endif
-	if (sc->sc_displaydv) {
+	if (sc->sc_displaydv ||
+	    (m->sc_ops->dissetdisplay && m->sc_ops->dissetdisplay(m->sc))) {
 		if (m->sc_ops->dsetdisplay)
 			error = m->sc_ops->dsetdisplay(m->sc, 0);
 		if (error)
@@ -741,6 +753,18 @@ wsmux_set_display(dv, muxsc)
 		       sc->sc_dv.dv_xname, odisplaydv->dv_xname);
 
 	return (error);
+}
+
+int
+wsmux_isset_display(dv)
+	struct device *dv;
+{
+	struct wsmux_softc *sc = (struct wsmux_softc *)dv;
+
+	if (sc->sc_displaydv != NULL)
+		return (1);
+
+	return (0);
 }
 
 #endif /* NWSMUX > 0 || (NWSDISPLAY > 0 && NWSKBD > 0) */

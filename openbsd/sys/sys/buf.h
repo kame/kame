@@ -1,4 +1,4 @@
-/*	$OpenBSD: buf.h,v 1.15 1999/02/26 02:15:41 art Exp $	*/
+/*	$OpenBSD: buf.h,v 1.22 2001/04/06 18:59:17 gluk Exp $	*/
 /*	$NetBSD: buf.h,v 1.25 1997/04/09 21:12:17 mycroft Exp $	*/
 
 /*
@@ -62,13 +62,12 @@ LIST_HEAD(workhead, worklist);
  * to use these hooks, a pointer to a set of bio_ops could be added
  * to each buffer.
  */
-struct mount;
 extern struct bio_ops {
 	void	(*io_start) __P((struct buf *));
 	void	(*io_complete) __P((struct buf *));
- 	void	(*io_deallocate) __P((struct buf *));
-	int     (*io_fsync) __P((struct vnode *));
- 	int	(*io_sync) __P((struct mount *));
+	void	(*io_deallocate) __P((struct buf *));
+	void	(*io_movedeps) __P((struct buf *, struct buf *));
+	int	(*io_countdeps) __P((struct buf *, int, int));
 } bioops;
  
 
@@ -151,6 +150,7 @@ struct buf {
 #define	B_WRITEINPROG	0x01000000	/* Write in progress. */
 #define	B_XXX		0x02000000	/* Debugging flag. */
 #define	B_VFLUSH	0x04000000	/* Buffer is being synced. */
+#define	B_SCANNED	0x08000000	/* Block already pushed during sync */
 
 /*
  * This structure describes a clustered I/O.  It is stored in the b_saveaddr
@@ -174,9 +174,20 @@ struct cluster_save {
 	(bp)->b_resid = 0;						\
 }
 
+
 /* Flags to low-level allocation routines. */
 #define B_CLRBUF	0x01	/* Request allocated buffer be cleared. */
 #define B_SYNC		0x02	/* Do all allocations synchronously. */
+
+struct cluster_info {
+	daddr_t	ci_lastr;			/* last read (read-ahead) */
+	daddr_t	ci_lastw;			/* last write (write cluster) */
+	daddr_t	ci_cstart;			/* start block of cluster */
+	daddr_t	ci_lasta;			/* last allocation */
+	int	ci_clen;			/* length of current cluster */
+	int	ci_ralen;			/* Read-ahead length */
+	daddr_t	ci_maxra;			/* last readahead block */
+};
 
 #ifdef _KERNEL
 int	nbuf;			/* The number of buffer headers */
@@ -204,12 +215,9 @@ int	breadn __P((struct vnode *, daddr_t, int, daddr_t *, int *, int,
 void	brelse __P((struct buf *));
 void	bremfree __P((struct buf *));
 void	bufinit __P((void));
-void	bdirty __P((struct buf *));
+void	buf_dirty __P((struct buf *));
+void    buf_undirty __P((struct buf *));
 int	bwrite __P((struct buf *));
-void	cluster_callback __P((struct buf *));
-int	cluster_read __P((struct vnode *, u_quad_t, daddr_t, long,
-			  struct ucred *, struct buf **));
-void	cluster_write __P((struct buf *, u_quad_t));
 struct buf *getblk __P((struct vnode *, daddr_t, int, int, int));
 struct buf *geteblk __P((int));
 struct buf *getnewbuf __P((int slpflag, int slptimeo));
@@ -219,8 +227,53 @@ void	minphys __P((struct buf *bp));
 int	physio __P((void (*strategy)(struct buf *), struct buf *bp, dev_t dev,
 		    int flags, void (*minphys)(struct buf *), struct uio *uio));
 void  brelvp __P((struct buf *));
-void  reassignbuf __P((struct buf *, struct vnode *));
+void  reassignbuf __P((struct buf *));
 void  bgetvp __P((struct vnode *, struct buf *));
+
+void  buf_replacevnode __P((struct buf *, struct vnode *));
+
+static __inline void
+buf_start(struct buf *bp)
+{
+        if (bioops.io_start)
+                (*bioops.io_start)(bp);
+}
+
+static __inline void
+buf_complete(struct buf *bp)
+{
+        if (bioops.io_complete)
+                (*bioops.io_complete)(bp);
+}
+
+static __inline void
+buf_deallocate(struct buf *bp)
+{
+        if (bioops.io_deallocate)
+                (*bioops.io_deallocate)(bp);
+}
+
+static __inline void
+buf_movedeps(struct buf *bp, struct buf *bp2)
+{
+        if (bioops.io_movedeps)
+                (*bioops.io_movedeps)(bp, bp2);
+}
+
+static __inline int
+buf_countdeps(struct buf *bp, int i, int islocked)
+{
+        if (bioops.io_countdeps)
+                return ((*bioops.io_countdeps)(bp, i, islocked));
+        else
+                return (0);
+}
+
+int	cluster_read __P((struct vnode *, struct cluster_info *,
+			  u_quad_t, daddr_t, long,
+			  struct ucred *, struct buf **));
+void	cluster_write __P((struct buf *, struct cluster_info *, u_quad_t));
+
 __END_DECLS
 #endif
 #endif /* !_SYS_BUF_H_ */

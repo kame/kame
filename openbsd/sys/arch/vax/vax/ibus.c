@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibus.c,v 1.1 2000/04/27 01:10:10 bjc Exp $	*/
+/*	$OpenBSD: ibus.c,v 1.3 2001/02/11 06:34:37 hugh Exp $	*/
 /*	$NetBSD: ibus.c,v 1.2 1999/08/14 18:42:46 ragge Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden.
@@ -89,6 +89,7 @@ ibus_attach(parent, self, aux)
 	vaddr_t va;
 
 	printf("\n");
+
 	/*
 	 * There may be a SGEC. Is badaddr() enough here?
 	 */
@@ -115,6 +116,7 @@ ibus_attach(parent, self, aux)
 	if (badaddr((caddr_t)va + 0x48, 4) == 0)
 		config_found(self, &bp, ibus_print);
 	vax_unmap_physmem(va, 1);
+
 	/*
 	 * All MV's have a Qbus.
 	 */

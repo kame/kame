@@ -1,4 +1,4 @@
-/*	$OpenBSD: spec_vnops.c,v 1.15 1998/02/23 17:40:58 niklas Exp $	*/
+/*	$OpenBSD: spec_vnops.c,v 1.19 2001/03/15 16:44:15 csapuntz Exp $	*/
 /*	$NetBSD: spec_vnops.c,v 1.29 1996/04/22 01:42:38 christos Exp $	*/
 
 /*
@@ -54,6 +54,8 @@
 
 #include <miscfs/specfs/specdev.h>
 
+#define v_lastr v_specinfo->si_lastr
+
 /* symbolic sleep message strings for devices */
 char	devopn[] = "devopn";
 char	devio[] = "devio";
@@ -79,6 +81,7 @@ struct vnodeopv_entry_desc spec_vnodeop_entries[] = {
 	{ &vop_lease_desc, spec_lease_check },		/* lease */
 	{ &vop_ioctl_desc, spec_ioctl },		/* ioctl */
 	{ &vop_select_desc, spec_select },		/* select */
+	{ &vop_kqfilter_desc, spec_kqfilter },		/* kqfilter */
 	{ &vop_revoke_desc, spec_revoke },              /* revoke */
 	{ &vop_mmap_desc, spec_mmap },			/* mmap */
 	{ &vop_fsync_desc, spec_fsync },		/* fsync */
@@ -470,6 +473,24 @@ spec_select(v)
 		return (*cdevsw[major(dev)].d_select)(dev, ap->a_which, ap->a_p);
 	}
 }
+/* ARGSUSED */
+int
+spec_kqfilter(v)
+	void *v;
+{
+	struct vop_kqfilter_args /* {
+		struct vnode *a_vp;
+		struct knote *a_kn;
+	} */ *ap = v;
+
+	dev_t dev;
+
+	dev = ap->a_vp->v_rdev;
+	if (cdevsw[major(dev)].d_type & D_KQFILTER)
+		return (*cdevsw[major(dev)].d_kqfilter)(dev, ap->a_kn);
+	return (1);
+}
+
 /*
  * Synch buffers associated with a block device
  */
@@ -509,10 +530,8 @@ loop:
 		goto loop;
 	}
 	if (ap->a_waitfor == MNT_WAIT) {
-		while (vp->v_numoutput) {
-			vp->v_flag |= VBWAIT;
-			sleep((caddr_t)&vp->v_numoutput, PRIBIO + 1);
-		}
+		vwaitforio (vp, 0, "spec_fsync", 0);
+
 #ifdef DIAGNOSTIC
 		if (vp->v_dirtyblkhd.lh_first) {
 			splx(s);
@@ -535,8 +554,8 @@ spec_strategy(v)
 	struct buf *bp = ap->a_bp;
 	int maj = major(bp->b_dev);
 	
-	if (LIST_FIRST(&bp->b_dep) != NULL && bioops.io_start)
-		(*bioops.io_start)(bp);
+	if (LIST_FIRST(&bp->b_dep) != NULL)
+		buf_start(bp);
 
 	(*bdevsw[maj].d_strategy)(bp);
 	return (0);

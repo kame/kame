@@ -1,5 +1,4 @@
-
-/*	$OpenBSD: syscon.c,v 1.2 2000/03/26 23:32:00 deraadt Exp $ */
+/*	$OpenBSD: syscon.c,v 1.5 2001/03/09 05:44:39 smurph Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * All rights reserved.
@@ -47,12 +46,15 @@
 #include <sys/syslog.h>
 #include <sys/fcntl.h>
 #include <sys/device.h>
-#include <machine/cpu.h>
+
 #include <machine/autoconf.h>
-#include <machine/frame.h>
+#include <machine/cpu.h>
 #include <machine/board.h>
+#include <machine/frame.h>
+
 #include <dev/cons.h>
 
+#include <mvme88k/dev/sysconfunc.h>
 #include <mvme88k/dev/sysconreg.h>
 
 struct sysconreg syscon_reg = {
@@ -79,17 +81,19 @@ struct sysconsoftc {
 	void		*sc_vaddr;	/* Utility I/O space */
 	void		*sc_paddr;
 	struct sysconreg *sc_syscon;	/* the actual registers */
-   struct intrhand sc_abih;       /* `abort' switch */
-   struct intrhand sc_acih;       /* `ac fial' */
-   struct intrhand sc_sfih;       /* `sys fial' */
+	struct intrhand sc_abih;	/* `abort' switch */
+	struct intrhand sc_acih;	/* `ac fial' */
+	struct intrhand sc_sfih;	/* `sys fial' */
+	struct intrhand sc_m188ih;	/* `m188 interrupt' */
 };
 
 void sysconattach __P((struct device *, struct device *, void *));
 int  sysconmatch __P((struct device *, void *, void *));
 void setupiackvectors __P((void));
-int  sysconabort __P((struct frame *frame));
-int  sysconacfail __P((struct frame *frame));
-int  sysconsysfail __P((struct frame *frame));
+int  sysconabort __P((void *));
+int  sysconacfail __P((void *));
+int  sysconsysfail __P((void *));
+int  sysconm188 __P((void *));
 
 struct cfattach syscon_ca = {
 	sizeof(struct sysconsoftc), sysconmatch, sysconattach
@@ -101,20 +105,22 @@ struct cfdriver syscon_cd = {
 
 struct sysconreg *sys_syscon = NULL;
 
+int syscon_print __P((void *args, const char *bus));
+int syscon_scan __P((struct device *parent, void *child, void *args));
+
 int
 sysconmatch(parent, vcf, args)
 	struct device *parent;
 	void *vcf, *args;
 {
-	struct cfdata *cf = vcf;
 	struct confargs *ca = args;
 	struct sysconreg *syscon;
 
 	/* Don't match if wrong cpu */
 	if (cputyp != CPU_188) return (0);
-   /* Uh, MVME188 better have on of these, so always match if it 
-    * is a MVME188... */	
-   syscon = (struct sysconreg *)(IIOV(ca->ca_paddr));
+	/* Uh, MVME188 better have on of these, so always match if it 
+	 * is a MVME188... */
+	syscon = (struct sysconreg *)(IIOV(ca->ca_paddr));
 	return (1);
 }
 
@@ -139,18 +145,17 @@ syscon_scan(parent, child, args)
 {
 	struct cfdata *cf = child;
 	struct sysconsoftc *sc = (struct sysconsoftc *)parent;
-	struct confargs *ca = args;
 	struct confargs oca;
 
 	if (parent->dv_cfdata->cf_driver->cd_indirect) {
-      printf(" indirect devices not supported\n");
-      return 0;
-   }
+		printf(" indirect devices not supported\n");
+		return 0;
+	}
 
 	bzero(&oca, sizeof oca);
 	oca.ca_offset = cf->cf_loc[0];
 	oca.ca_ipl = cf->cf_loc[1];
-	if ((oca.ca_offset != (void*)-1) && ISIIOVA(sc->sc_vaddr + oca.ca_offset)) {
+	if (((int)oca.ca_offset != -1) && ISIIOVA(sc->sc_vaddr + oca.ca_offset)) {
 		oca.ca_vaddr = sc->sc_vaddr + oca.ca_offset;
 		oca.ca_paddr = sc->sc_paddr + oca.ca_offset;
 	} else {
@@ -167,13 +172,13 @@ syscon_scan(parent, child, args)
 }
 
 void
+
 sysconattach(parent, self, args)
 	struct device *parent, *self;
 	void *args;
 {
 	struct confargs *ca = args;
 	struct sysconsoftc *sc = (struct sysconsoftc *)self;
-	int i;
 
 	if (sys_syscon)
 		panic("syscon already attached!");
@@ -189,25 +194,30 @@ sysconattach(parent, self, args)
 
 	printf(": rev %d\n", 1);
 
-   /* 
-    * pseudo driver, abort interrupt handler
-    */
-   sc->sc_abih.ih_fn = sysconabort;
-   sc->sc_abih.ih_arg = 0;
-   sc->sc_abih.ih_ipl = IPL_ABORT;
-   sc->sc_abih.ih_wantframe = 1;
-   sc->sc_acih.ih_fn = sysconacfail;
-   sc->sc_acih.ih_arg = 0;
-   sc->sc_acih.ih_ipl = IPL_ABORT;
-   sc->sc_acih.ih_wantframe = 1;
-   sc->sc_sfih.ih_fn = sysconsysfail;
-   sc->sc_sfih.ih_arg = 0;
-   sc->sc_sfih.ih_ipl = IPL_ABORT;
-   sc->sc_sfih.ih_wantframe = 1;
-   
-   intr_establish(SYSCV_ABRT, &sc->sc_abih);
-   intr_establish(SYSCV_ACF, &sc->sc_acih);
-   intr_establish(SYSCV_SYSF, &sc->sc_sfih);
+	/* 
+	 * pseudo driver, abort interrupt handler
+	 */
+	sc->sc_abih.ih_fn = sysconabort;
+	sc->sc_abih.ih_arg = 0;
+	sc->sc_abih.ih_wantframe = 1;
+	sc->sc_abih.ih_ipl = IPL_ABORT;
+	sc->sc_acih.ih_fn = sysconacfail;
+	sc->sc_acih.ih_arg = 0;
+	sc->sc_abih.ih_wantframe = 1;
+	sc->sc_acih.ih_ipl = IPL_ABORT;
+	sc->sc_sfih.ih_fn = sysconsysfail;
+	sc->sc_sfih.ih_arg = 0;
+	sc->sc_abih.ih_wantframe = 1;
+	sc->sc_sfih.ih_ipl = IPL_ABORT;
+	sc->sc_m188ih.ih_fn = sysconm188;
+	sc->sc_m188ih.ih_arg = 0;
+	sc->sc_abih.ih_wantframe = 1;
+	sc->sc_m188ih.ih_ipl = IPL_ABORT;
+
+	intr_establish(SYSCV_ABRT, &sc->sc_abih);
+	intr_establish(SYSCV_ACF, &sc->sc_acih);
+	intr_establish(SYSCV_SYSF, &sc->sc_sfih);
+	intr_establish(M188_IVEC, &sc->sc_m188ih);
 
 	config_search(syscon_scan, self, args);
 }
@@ -221,29 +231,37 @@ sysconintr_establish(vec, ih)
 }
 
 int
-sysconabort(frame)
-	struct frame *frame;
+sysconabort(eframe)
+	void *eframe;
 {
-   ISR_RESET_NMI;
-   nmihand(frame);
+	ISR_RESET_NMI;
+	nmihand((struct frame *)eframe);
 	return (1);
 }
 
 int
-sysconsysfail(frame)
-	struct frame *frame;
+sysconsysfail(eframe)
+	void *eframe;
 {
-   ISR_RESET_SYSFAIL;
-   nmihand(frame);
+	ISR_RESET_SYSFAIL;
+	nmihand((struct frame *)eframe);
 	return (1);
 }
 
 int
-sysconacfail(frame)
-	struct frame *frame;
+sysconacfail(eframe)
+	void *eframe;
 {
-   ISR_RESET_ACFAIL;
-   nmihand(frame);
+	ISR_RESET_ACFAIL;
+	nmihand((struct frame *)eframe);
+	return (1);
+}
+
+int
+sysconm188(eframe)
+	void *eframe;
+{
+	printf("MVME188 interrupting?\n");
 	return (1);
 }
 

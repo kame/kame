@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ti.c,v 1.13 2000/09/19 08:44:46 niklas Exp $	*/
+/*	$OpenBSD: if_ti.c,v 1.18 2001/03/28 04:11:34 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -917,7 +917,7 @@ int ti_init_rx_ring_jumbo(sc)
 	register int		i;
 	struct ti_cmd_desc	cmd;
 
-	for (i = 0; i < (TI_JSLOTS - 20); i++) {
+	for (i = 0; i < TI_JUMBO_RX_RING_CNT; i++) {
 		if (ti_newbuf_jumbo(sc, i, NULL) == ENOBUFS)
 			return(ENOBUFS);
 	};
@@ -1127,6 +1127,7 @@ void ti_setmulti(sc)
 		bcopy(enm->enm_addrlo, (char *)&mc->mc_addr, ETHER_ADDR_LEN);
 		LIST_INSERT_HEAD(&sc->ti_mc_listhead, mc, mc_entries);
 		ti_add_mcast(sc, &mc->mc_addr);
+		ETHER_NEXT_MULTI(step, enm);
 	}
 
 	/* Re-enable interrupts. */
@@ -1488,11 +1489,13 @@ ti_probe(parent, match, aux)
 	struct pci_attach_args *pa = (struct pci_attach_args *)aux;
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_NETGEAR &&
-	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620)
+	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620 ||
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620T))
 		return (1);
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_ALTEON &&
-	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENIC)
+	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENIC ||
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENICT))
 		return (1);
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_3COM &&
@@ -1591,7 +1594,7 @@ ti_attach(parent, self, aux)
 	 * Get station address from the EEPROM. Note: the manual states
 	 * that the MAC address is at offset 0x8c, however the data is
 	 * stored as two longwords (since that's how it's loaded into
-	 * the NIC). This means the MAC address is actually preceeded
+	 * the NIC). This means the MAC address is actually preceded
 	 * by two zero bytes. We need to skip over those.
 	 */
 	if (ti_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
@@ -1648,6 +1651,21 @@ ti_attach(parent, self, aux)
 		goto fail;
 	}
 
+	/*
+	 * We really need a better way to tell a 1000baseTX card
+	 * from a 1000baseSX one, since in theory there could be
+	 * OEMed 1000baseTX cards from lame vendors who aren't
+	 * clever enough to change the PCI ID. For the moment
+	 * though, the AceNIC is the only copper card available.
+	 */
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_ALTEON &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENICT)
+		sc->ti_copper = 1;
+	/* Ok, it's not the only copper card available */
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_NETGEAR &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620T)
+		sc->ti_copper = 1;
+
 	/* Set default tuneable values. */
 	sc->ti_stat_ticks = 2 * TI_TICKS_PER_SEC;
 	sc->ti_rx_coal_ticks = TI_TICKS_PER_SEC / 5000;
@@ -1670,12 +1688,30 @@ ti_attach(parent, self, aux)
 
 	/* Set up ifmedia support. */
 	ifmedia_init(&sc->ifmedia, IFM_IMASK, ti_ifmedia_upd, ti_ifmedia_sts);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_FL, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_FL|IFM_FDX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_FX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_FX|IFM_FDX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX|IFM_FDX, 0, NULL);
+	if (sc->ti_copper) {
+		/*
+		 * Copper cards allow manual 10/100 mode selection,
+		 * but not manual 1000baseTX mode selection. Why?
+		 * Becuase currently there's no way to specify the
+		 * master/slave setting through the firmware interface,
+		 * so Alteon decided to just bag it and handle it
+		 * via autonegotiation.
+		 */
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_T, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_10_T|IFM_FDX, 0, NULL);
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_TX, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_100_TX|IFM_FDX, 0, NULL);
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_TX, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_1000_TX|IFM_FDX, 0, NULL);
+	} else {
+		/* Fiber cards don't support 10/100 modes. */
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX, 0, NULL);
+		ifmedia_add(&sc->ifmedia,
+		    IFM_ETHER|IFM_1000_SX|IFM_FDX, 0, NULL);
+	}
 	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_AUTO, 0, NULL);
 	ifmedia_set(&sc->ifmedia, IFM_ETHER|IFM_AUTO);
 
@@ -1684,11 +1720,6 @@ ti_attach(parent, self, aux)
 	 */
 	if_attach(ifp);
 	ether_ifattach(ifp);
-
-#if NBPFILTER > 0
-	bpfattach(&sc->arpcom.ac_if.if_bpf, ifp,
-	    DLT_EN10MB, sizeof(struct ether_header));
-#endif
 
 	shutdownhook_establish(ti_shutdown, sc);
 
@@ -1890,24 +1921,19 @@ int ti_intr(xsc)
 {
 	struct ti_softc		*sc;
 	struct ifnet		*ifp;
-	int			claimed = 0;
 
 	sc = xsc;
 	ifp = &sc->arpcom.ac_if;
 
-#ifdef notdef
-	/* Avoid this for now -- checking this register is expensive. */
+	/* XXX checking this register is expensive. */
 	/* Make sure this is really our interrupt. */
 	if (!(CSR_READ_4(sc, TI_MISC_HOST_CTL) & TI_MHC_INTSTATE))
-		return;
-#endif
+		return (0);
 
 	/* Ack interrupt and stop others from occuring. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 1);
 
 	if (ifp->if_flags & IFF_RUNNING) {
-		claimed = 1;
-
 		/* Check RX return ring producer/consumer */
 		ti_rxeof(sc);
 
@@ -1923,7 +1949,7 @@ int ti_intr(xsc)
 	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
 		ti_start(ifp);
 
-	return (claimed);
+	return (1);
 }
 
 void ti_stats_update(sc)
@@ -2222,17 +2248,24 @@ int ti_ifmedia_upd(ifp)
 		    TI_CMD_CODE_NEGOTIATE_BOTH, 0);
 		break;
 	case IFM_1000_SX:
+	case IFM_1000_TX:
 		CSR_WRITE_4(sc, TI_GCR_GLINK, TI_GLNK_PREF|TI_GLNK_1000MB|
-		    TI_GLNK_FULL_DUPLEX|TI_GLNK_RX_FLOWCTL_Y|TI_GLNK_ENB);
+		    TI_GLNK_RX_FLOWCTL_Y|TI_GLNK_ENB);
 		CSR_WRITE_4(sc, TI_GCR_LINK, 0);
+		if ((ifm->ifm_media & IFM_GMASK) == IFM_FDX) {
+			TI_SETBIT(sc, TI_GCR_GLINK, TI_GLNK_FULL_DUPLEX);
+		}
 		TI_DO_CMD(TI_CMD_LINK_NEGOTIATION,
 		    TI_CMD_CODE_NEGOTIATE_GIGABIT, 0);
 		break;
 	case IFM_100_FX:
 	case IFM_10_FL:
+	case IFM_100_TX:
+	case IFM_10_T:
 		CSR_WRITE_4(sc, TI_GCR_GLINK, 0);
 		CSR_WRITE_4(sc, TI_GCR_LINK, TI_LNK_ENB|TI_LNK_PREF);
-		if (IFM_SUBTYPE(ifm->ifm_media) == IFM_100_FX) {
+		if (IFM_SUBTYPE(ifm->ifm_media) == IFM_100_FX ||
+		    IFM_SUBTYPE(ifm->ifm_media) == IFM_100_TX) {
 			TI_SETBIT(sc, TI_GCR_LINK, TI_LNK_100MB);
 		} else {
 			TI_SETBIT(sc, TI_GCR_LINK, TI_LNK_10MB);
@@ -2258,6 +2291,7 @@ void ti_ifmedia_sts(ifp, ifmr)
 	struct ifmediareq	*ifmr;
 {
 	struct ti_softc		*sc;
+	u_int32_t		media = 0;
 
 	sc = ifp->if_softc;
 
@@ -2269,15 +2303,29 @@ void ti_ifmedia_sts(ifp, ifmr)
 
 	ifmr->ifm_status |= IFM_ACTIVE;
 
-	if (sc->ti_linkstat == TI_EV_CODE_GIG_LINK_UP)
-		ifmr->ifm_active |= IFM_1000_SX|IFM_FDX;
-	else if (sc->ti_linkstat == TI_EV_CODE_LINK_UP) {
-		u_int32_t		media;
+	if (sc->ti_linkstat == TI_EV_CODE_GIG_LINK_UP) {
+		media = CSR_READ_4(sc, TI_GCR_GLINK_STAT);
+		if (sc->ti_copper)
+			ifmr->ifm_active |= IFM_1000_TX;
+		else
+			ifmr->ifm_active |= IFM_1000_SX;
+		if (media & TI_GLNK_FULL_DUPLEX)
+			ifmr->ifm_active |= IFM_FDX;
+		else
+			ifmr->ifm_active |= IFM_HDX;
+	} else if (sc->ti_linkstat == TI_EV_CODE_LINK_UP) {
 		media = CSR_READ_4(sc, TI_GCR_LINK_STAT);
-		if (media & TI_LNK_100MB)
-			ifmr->ifm_active |= IFM_100_FX;
-		if (media & TI_LNK_10MB)
-			ifmr->ifm_active |= IFM_10_FL;
+		if (sc->ti_copper) {
+			if (media & TI_LNK_100MB)
+				ifmr->ifm_active |= IFM_100_TX;
+			if (media & TI_LNK_10MB)
+				ifmr->ifm_active |= IFM_10_T;
+		} else {
+			if (media & TI_LNK_100MB)
+				ifmr->ifm_active |= IFM_100_FX;
+			if (media & TI_LNK_10MB)
+				ifmr->ifm_active |= IFM_10_FL;
+		}
 		if (media & TI_LNK_FULL_DUPLEX)
 			ifmr->ifm_active |= IFM_FDX;
 		if (media & TI_LNK_HALF_DUPLEX)
@@ -2352,8 +2400,13 @@ int ti_ioctl(ifp, command, data)
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		if (ifp->if_flags & IFF_RUNNING) {
-			ti_setmulti(sc);
+		error = (command == SIOCADDMULTI) ?
+		    ether_addmulti(ifr, &sc->arpcom) :
+		    ether_delmulti(ifr, &sc->arpcom);
+
+		if (error == ENETRESET) {
+			if (ifp->if_flags & IFF_RUNNING)
+				ti_setmulti(sc);
 			error = 0;
 		}
 		break;

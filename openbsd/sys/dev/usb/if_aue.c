@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_aue.c,v 1.9 2000/10/13 04:42:10 aaron Exp $ */
+/*	$OpenBSD: if_aue.c,v 1.12 2001/02/20 19:39:47 mickey Exp $ */
 /*	$NetBSD: if_aue.c,v 1.38 2000/04/04 20:16:19 augustss Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
@@ -187,7 +187,8 @@ struct aue_type {
 
 Static struct aue_type aue_devs[] = {
   { USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USB100,	0 },
-  { USB_VENDOR_MELCO, 		USB_PRODUCT_MELCO_LUATX, 	0 },
+  { USB_VENDOR_MELCO, 		USB_PRODUCT_MELCO_LUATX1, 	0 },
+  { USB_VENDOR_MELCO, 		USB_PRODUCT_MELCO_LUATX5, 	0 },
   { USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB100TX,	1 },
   { USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB100H1,	1 },
   { USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10TA,	1 },
@@ -657,7 +658,7 @@ aue_setmulti(sc)
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		h = aue_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
-		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0xF));
+		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0x7));
 	}
 #elif defined(__NetBSD__) || defined(__OpenBSD__)
 #if defined(__NetBSD__)
@@ -675,7 +676,7 @@ aue_setmulti(sc)
 		}
 #endif
 		h = aue_crc(enm->enm_addrlo);
-		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0xF));
+		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0x7));
 		ETHER_NEXT_MULTI(step, enm);
 	}
 #endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
@@ -933,10 +934,6 @@ USB_ATTACH(aue)
 	if_attach(ifp);
 	Ether_ifattach(ifp, eaddr);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB,
-		  sizeof(struct ether_header));
-#endif
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, USBDEVNAME(sc->aue_dev),
 	    RND_TYPE_NET, 0);

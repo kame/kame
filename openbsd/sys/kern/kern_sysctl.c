@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.36 2000/06/18 17:59:55 niklas Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.41 2001/04/06 23:41:02 art Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -59,6 +59,7 @@
 #include <vm/vm.h>
 #include <sys/sysctl.h>
 #include <sys/msgbuf.h>
+#include <sys/dkstat.h>
 
 #if defined(UVM)
 #include <uvm/uvm_extern.h>
@@ -73,13 +74,16 @@
 #endif
 
 /*
- * Locking and stats
+ * Lock to avoid too many processes vslocking a large amount of memory
+ * at the same time.
  */
-static struct sysctl_lock {
-	int	sl_lock;
-	int	sl_want;
-	int	sl_locked;
-} memlock;
+struct lock sysctl_lock;
+
+void
+sysctl_init()
+{
+	lockinit(&sysctl_lock, PLOCK|PCATCH, "sysctl", 0, 0);
+}
 
 int
 sys___sysctl(p, v, retval)
@@ -165,12 +169,8 @@ sys___sysctl(p, v, retval)
 		if (!useracc(SCARG(uap, old), oldlen, B_WRITE))
 #endif
 			return (EFAULT);
-		while (memlock.sl_lock) {
-			memlock.sl_want = 1;
-			sleep((caddr_t)&memlock, PRIBIO+1);
-			memlock.sl_locked++;
-		}
-		memlock.sl_lock = 1;
+		if ((error = lockmgr(&sysctl_lock, LK_EXCLUSIVE, NULL, p)) != 0)
+			return (error);
 		if (dolock)
 #if defined(UVM)
 			uvm_vslock(p, SCARG(uap, old), oldlen, VM_PROT_NONE);
@@ -188,11 +188,7 @@ sys___sysctl(p, v, retval)
 #else
 			vsunlock(SCARG(uap, old), savelen);
 #endif
-		memlock.sl_lock = 0;
-		if (memlock.sl_want) {
-			memlock.sl_want = 0;
-			wakeup((caddr_t)&memlock);
-		}
+		lockmgr(&sysctl_lock, LK_RELEASE, NULL, p);
 	}
 	if (error)
 		return (error);
@@ -232,9 +228,11 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	extern char ostype[], osrelease[], osversion[], version[];
 	extern int somaxconn, sominconn;
 	extern int usermount, nosuidcoredump;
+	extern long cp_time[CPUSTATES];
 
 	/* all sysctl names at this level are terminal */
-	if (namelen != 1 && !(name[0] == KERN_PROC || name[0] == KERN_PROF))
+	if (namelen != 1 && !(name[0] == KERN_PROC || name[0] == KERN_PROF ||
+	    name[0] == KERN_MALLOCSTATS))
 		return (ENOTDIR);		/* overloaded */
 
 	switch (name[0]) {
@@ -358,6 +356,12 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		if (!msgbufp || msgbufp->msg_magic != MSG_MAGIC)
 			return (ENXIO);
 		return (sysctl_rdint(oldp, oldlenp, newp, msgbufp->msg_bufs));
+	case KERN_MALLOCSTATS:
+		return (sysctl_malloc(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
+	case KERN_CPTIME:
+		return (sysctl_rdstruct(oldp, oldlenp, newp, &cp_time,
+		    sizeof(cp_time)));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -499,6 +503,54 @@ sysctl_rdint(oldp, oldlenp, newp, val)
 	*oldlenp = sizeof(int);
 	if (oldp)
 		error = copyout((caddr_t)&val, oldp, sizeof(int));
+	return (error);
+}
+
+/*
+ * Validate parameters and get old / set new parameters
+ * for an integer-valued sysctl function.
+ */
+int
+sysctl_quad(oldp, oldlenp, newp, newlen, valp)
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+	int64_t *valp;
+{
+	int error = 0;
+
+	if (oldp && *oldlenp < sizeof(int64_t))
+		return (ENOMEM);
+	if (newp && newlen != sizeof(int64_t))
+		return (EINVAL);
+	*oldlenp = sizeof(int64_t);
+	if (oldp)
+		error = copyout(valp, oldp, sizeof(int64_t));
+	if (error == 0 && newp)
+		error = copyin(newp, valp, sizeof(int64_t));
+	return (error);
+}
+
+/*
+ * As above, but read-only.
+ */
+int
+sysctl_rdquad(oldp, oldlenp, newp, val)
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	int64_t val;
+{
+	int error = 0;
+
+	if (oldp && *oldlenp < sizeof(int64_t))
+		return (ENOMEM);
+	if (newp)
+		return (EPERM);
+	*oldlenp = sizeof(int64_t);
+	if (oldp)
+		error = copyout((caddr_t)&val, oldp, sizeof(int64_t));
 	return (error);
 }
 
@@ -817,7 +869,6 @@ fill_eproc(p, ep)
 		ep->e_vm.vm_tsize = 0;
 		ep->e_vm.vm_dsize = 0;
 		ep->e_vm.vm_ssize = 0;
-		/* ep->e_vm.vm_pmap = XXX; */
 	} else {
 		register struct vmspace *vm = p->p_vmspace;
 
@@ -825,7 +876,6 @@ fill_eproc(p, ep)
 		ep->e_vm.vm_tsize = vm->vm_tsize;
 		ep->e_vm.vm_dsize = vm->vm_dsize;
 		ep->e_vm.vm_ssize = vm->vm_ssize;
-		ep->e_vm.vm_pmap = *vm->vm_map.pmap;
 	}
 	if (p->p_pptr)
 		ep->e_ppid = p->p_pptr->p_pid;

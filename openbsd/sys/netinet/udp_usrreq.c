@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.51 2000/10/13 17:58:37 itojun Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.56 2001/03/28 20:03:07 angelos Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -94,8 +94,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 extern int ip6_defhlim;
 #endif /* INET6 */
 
-#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
-
 /*
  * UDP protocol implementation.
  * Per RFC 768, August, 1980.
@@ -122,7 +120,7 @@ udp_init()
 	in_pcbinit(&udbtable, udbhashsize);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 int
 udp6_input(mp, offp, proto)
 	struct mbuf **mp;
@@ -177,10 +175,6 @@ udp_input(m, va_alist)
 	struct tdb_ident *tdbi;
 	struct tdb *tdb;
 	int error, s;
-
-	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
-	if (tdbi == (void *) PI_MAGIC)
-	        tdbi = NULL;
 #endif /* IPSEC */
 
 	va_start(ap, m);
@@ -231,10 +225,6 @@ udp_input(m, va_alist)
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
 		if ((m = m_pullup2(m, iphlen + sizeof(struct udphdr))) == 0) {
 			udpstat.udps_hdrops++;
-#ifdef IPSEC
-			if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			return;
 		}
 #ifdef INET6
@@ -303,10 +293,6 @@ udp_input(m, va_alist)
 		if ((uh->uh_sum = in_cksum(m, len + sizeof (struct ip))) != 0) {
 			udpstat.udps_badsum++;
 			m_freem(m);
-#ifdef IPSEC
-			if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			return;
 		}
 	} else
@@ -480,10 +466,6 @@ udp_input(m, va_alist)
 			goto bad;
 		}
 		sorwakeup(last);
-#ifdef IPSEC
-		if (tdbi)
-		        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 		return;
 	}
 	/*
@@ -528,19 +510,12 @@ udp_input(m, va_alist)
 				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT,
 					0, 0);
 			}
-#ifdef IPSEC
-			if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			return;
 		}
 	}
 
 #ifdef IPSEC
-#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
 	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
-	if (tdbi == (void *) PI_MAGIC)
-	        tdbi = NULL;
 
         s = splnet();
         if (tdbi == NULL)
@@ -552,9 +527,7 @@ udp_input(m, va_alist)
 			IPSP_DIRECTION_IN, tdb, inp);
         splx(s);
 
-	if (tdbi)
-	        free(tdbi, M_TEMP);
-	tdbi = NULL;
+	/* No SA latching done for UDP */
 
 	/* Error or otherwise drop-packet indication */
 	if (error)
@@ -602,10 +575,6 @@ udp_input(m, va_alist)
 	sorwakeup(inp->inp_socket);
 	return;
 bad:
-#ifdef IPSEC
-	if (tdbi)
-	        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 	m_freem(m);
 	if (opts)
 		m_freem(opts);
@@ -650,39 +619,175 @@ udp_notify(inp, errno)
 	sowwakeup(inp->inp_socket);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void
 udp6_ctlinput(cmd, sa, d)
 	int cmd;
 	struct sockaddr *sa;
 	void *d;
 {
+	struct udphdr uh;
 	struct sockaddr_in6 sa6;
-	struct ip6_hdr *ip6;
+	register struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
+	void *cmdarg;
+	struct ip6ctlparam *ip6cp = NULL;
+	struct in6_addr finaldst;
+	struct udp_portonly {
+		u_int16_t uh_sport;
+		u_int16_t uh_dport;
+	} *uhp;
+	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 
 	if (sa == NULL)
 		return;
-	if (sa->sa_family != AF_INET6)
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
 
-	/* decode parameter from icmp6. */
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+	if (PRC_IS_REDIRECT(cmd))
+		notify = in_rtchange, d = NULL;
+	else if (cmd == PRC_HOSTDEAD)
+		d = NULL;
+	else if (cmd == PRC_MSGSIZE)
+		; /* special code is present, see below */
+	else if (inet6ctlerrmap[cmd] == 0)
+		return;
+
+	/* if the parameter is from icmp6, decode it. */
 	if (d != NULL) {
-		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
-		ip6 = ip6cp->ip6c_ip6;
+		ip6cp = (struct ip6ctlparam *)d;
 		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
-	} else
-		return;
+		cmdarg = ip6cp->ip6c_cmdarg;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+		cmdarg = NULL;
+		/* XXX: translate addresses into internal form */
+		sa6 = *(struct sockaddr_in6 *)sa;
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+	}
 
-	/* translate addresses into internal form */
-	sa6 = *(struct sockaddr_in6 *)sa;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
-		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
-	sa = (struct sockaddr *)&sa6;
+	if (ip6cp && ip6cp->ip6c_finaldst) {
+		bzero(&sa6, sizeof(sa6));
+		sa6.sin6_family = AF_INET6;
+		sa6.sin6_len = sizeof(sa6);
+		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
+		/* XXX: assuming M is valid in this case */
+		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+						     ip6cp->ip6c_finaldst);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+	} else {
+		/* XXX: translate addresses into internal form */
+		sa6 = *(struct sockaddr_in6 *)sa;
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+	}
 
-	(void)udp_ctlinput(cmd, sa, (void *)ip6);
+	if (ip6) {
+		/*
+		 * XXX: We assume that when IPV6 is non NULL,
+		 * M and OFF are valid.
+		 */
+		struct sockaddr_in6 sa6_src;
+
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(*uhp))
+			return;
+
+		bzero(&uh, sizeof(uh));
+		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
+
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+
+		if (cmd == PRC_MSGSIZE) {
+			int valid = 0;
+
+			/*
+			 * Check to see if we have a valid UDP socket
+			 * corresponding to the address in the ICMPv6 message
+			 * payload.
+			 */
+			if (in6_pcbhashlookup(&udbtable, &finaldst,
+			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport))
+				valid = 1;
+			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
+			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
+			    INPLOOKUP_IPV6))
+				valid = 1;
+#if 0
+			/*
+			 * As the use of sendto(2) is fairly popular,
+			 * we may want to allow non-connected pcb too.
+			 * But it could be too weak against attacks...
+			 * We should at least check if the local address (= s)
+			 * is really ours.
+			 */
+			else if (in_pcblookup(&udbtable, &sa6.sin6_addr,
+			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
+			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6))
+				valid = 1;
+#endif
+
+			/*
+			 * Depending on the value of "valid" and routing table
+			 * size (mtudisc_{hi,lo}wat), we will:
+			 * - recalcurate the new MTU and create the
+			 *   corresponding routing entry, or
+			 * - ignore the MTU change notification.
+			 */
+			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+
+			/*
+			 * regardless of if we called icmp6_mtudisc_update(),
+			 * we need to call in6_pcbnotify(), to notify path
+			 * MTU change to the userland (2292bis-02), because
+			 * some unconnected sockets may share the same
+			 * destination and want to know the path MTU.
+			 */
+		}
+
+		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6,
+		     uh.uh_dport, (struct sockaddr *)&sa6_src,
+		     uh.uh_sport, cmd, cmdarg, notify);
+	} else {
+		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6, 0,
+		     (struct sockaddr *)&sa6_any, 0, cmd, cmdarg, notify);
+	}
 }
 #endif
 
@@ -698,6 +803,12 @@ udp_ctlinput(cmd, sa, v)
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	int errno;
 
+	if (sa == NULL)
+		return NULL;
+	if (sa->sa_family != AF_INET ||
+	    sa->sa_len != sizeof(struct sockaddr_in))
+		return NULL;
+
 	if ((unsigned)cmd >= PRC_NCMDS)
 		return NULL;
 	errno = inetctlerrmap[cmd];
@@ -707,28 +818,6 @@ udp_ctlinput(cmd, sa, v)
 		ip = 0;
 	else if (errno == 0)
 		return NULL;
-	if (sa == NULL)
-		return NULL;
-#ifdef INET6
-	if (sa->sa_family == AF_INET6) {
-		if (ip) {
-			struct ip6_hdr *ip6 = (struct ip6_hdr *)ip;
-		
-			/* XXX we assume that the mbuf is sane enough */
-
-			uhp = (struct udphdr *)((caddr_t)ip6 + sizeof(*ip6));
-#if 0 /*XXX*/
-			in6_pcbnotify(&udbtable, sa, uhp->uh_dport,
-			    &(ip6->ip6_src), uhp->uh_sport, cmd, udp_notify);
-#endif
-		} else {
-#if 0 /*XXX*/
-			in6_pcbnotify(&udbtable, sa, 0,
-			    (struct in6_addr *)&in6addr_any, 0, cmd, udp_notify);
-#endif
-		}
-	} else
-#endif /* INET6 */
 	if (ip) {
 		uhp = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
 		in_pcbnotify(&udbtable, sa, uhp->uh_dport, ip->ip_src,
@@ -754,12 +843,6 @@ udp_output(m, va_alist)
 	struct in_addr laddr;
 	int s = 0, error = 0;
 	va_list ap;
-#ifdef INET6
-	register struct in6_addr laddr6;
-	int v6packet = 0;
-	struct sockaddr_in6 *sin6 = NULL;
-	struct ip6_pktopts opt, *stickyopt = NULL;
-#endif /* INET6 */
 	int pcbflags = 0;
 
 	va_start(ap, m);
@@ -768,46 +851,29 @@ udp_output(m, va_alist)
 	control = va_arg(ap, struct mbuf *);
 	va_end(ap);
 
-#ifdef INET6
-	v6packet = (inp->inp_flags & INP_IPV6);
+#ifdef DIAGNOSTIC
+	if ((inp->inp_flags & INP_IPV6) != 0)
+		panic("IPv6 inpcb to udp_output");
 #endif
 
-#ifdef INET6
-	stickyopt = inp->inp_outputopts6;
-	if (control && v6packet) {
-		error = ip6_setpktoptions(control, &opt,
-		    ((inp->inp_socket->so_state & SS_PRIV) != 0));
-		if (error != 0)
-			goto release;
-		inp->inp_outputopts6 = &opt;
+	/*
+	 * Compute the packet length of the IP header, and
+	 * punt if the length looks bogus.
+	 */
+	if ((len + sizeof(struct udpiphdr)) > IP_MAXPACKET) {
+		error = EMSGSIZE;
+		goto release;
 	}
-#endif
 
 	if (addr) {
-#ifdef INET6
-		sin6 = mtod(addr, struct sockaddr_in6 *);
-#endif
-
 	        /*
 		 * Save current PCB flags because they may change during
 		 * temporary connection.
 		 */
                 pcbflags = inp->inp_flags;
 
-#ifdef INET6
-	        if (inp->inp_flags & INP_IPV6)
-			laddr6 = inp->inp_laddr6;
-		else
-#endif /* INET6 */
 			laddr = inp->inp_laddr;
-#ifdef INET6
-		if (((inp->inp_flags & INP_IPV6) &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) ||
-		    (inp->inp_faddr.s_addr != INADDR_ANY))
-#else /* INET6 */
-		if (inp->inp_faddr.s_addr != INADDR_ANY)
-#endif /* INET6 */
-		{
+		if (inp->inp_faddr.s_addr != INADDR_ANY) {
 			error = EISCONN;
 			goto release;
 		}
@@ -821,14 +887,7 @@ udp_output(m, va_alist)
 			goto release;
 		}
 	} else {
-#ifdef INET6
-	        if (((inp->inp_flags & INP_IPV6) && 
-		    IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) ||
-		    (inp->inp_faddr.s_addr == INADDR_ANY))
-#else /* INET6 */
-		if (inp->inp_faddr.s_addr == INADDR_ANY)
-#endif /* INET6 */
-		{
+		if (inp->inp_faddr.s_addr == INADDR_ANY) {
 			error = ENOTCONN;
 			goto release;
 		}
@@ -837,176 +896,61 @@ udp_output(m, va_alist)
 	 * Calculate data length and get a mbuf
 	 * for UDP and IP headers.
 	 */
-#ifdef INET6
-	/*
-	 * Handles IPv4-mapped IPv6 address because temporary connect sets
-	 * the right flag.
-	 */
-	M_PREPEND(m, v6packet ? (sizeof(struct udphdr) +
-	    sizeof(struct ip6_hdr)) : sizeof(struct udpiphdr), M_DONTWAIT);
-#else /* INET6 */
 	M_PREPEND(m, sizeof(struct udpiphdr), M_DONTWAIT);
-#endif /* INET6 */
 	if (m == 0) {
 		error = ENOBUFS;
 		goto bail;
 	}
 
 	/*
-	 * Compute the packet length of the IP header, and
-	 * punt if the length looks bogus.
-	 */
-	if ((len + sizeof(struct udpiphdr)) > IP_MAXPACKET) {
-		error = EMSGSIZE;
-		goto release;
-	}
-
-	/*
 	 * Fill in mbuf with extended UDP header
 	 * and addresses and length put into network format.
 	 */
-#ifdef INET6
-	if (v6packet) {
-		struct ip6_hdr *ipv6 = mtod(m, struct ip6_hdr *);
-		struct udphdr *uh = (struct udphdr *)(mtod(m, caddr_t) +
-		    sizeof(struct ip6_hdr));
-		int payload = sizeof(struct ip6_hdr);
-		struct in6_addr *laddr;
-		struct ifnet *oifp = NULL;
-		struct sockaddr_in6 tmp;
+	ui = mtod(m, struct udpiphdr *);
+	bzero(ui->ui_x1, sizeof ui->ui_x1);
+	ui->ui_pr = IPPROTO_UDP;
+	ui->ui_len = htons((u_int16_t)len + sizeof (struct udphdr));
+	ui->ui_src = inp->inp_laddr;
+	ui->ui_dst = inp->inp_faddr;
+	ui->ui_sport = inp->inp_lport;
+	ui->ui_dport = inp->inp_fport;
+	ui->ui_ulen = ui->ui_len;
 
-		ipv6->ip6_flow = htonl(0x60000000) |
-		    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff)); 
-	  
-		ipv6->ip6_nxt = IPPROTO_UDP;
-		if (sin6)
-			tmp = *sin6;
-		else {
-			bzero(&tmp, sizeof(tmp));
-			tmp.sin6_family = AF_INET6;
-			tmp.sin6_len = sizeof(struct sockaddr_in6);
-			tmp.sin6_addr = inp->inp_faddr6;
-		}
-		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&ipv6->ip6_dst, &tmp, inp, &oifp) != 0) {
-			error = EINVAL;
-			goto release;
-		}
+	/*
+	 * Stuff checksum and output datagram.
+	 */
 
-		ipv6->ip6_hlim = in6_selecthlim(inp, oifp);
-		if (sin6) {	/*XXX*/
-			laddr = in6_selectsrc(sin6, inp->inp_outputopts6,
-					      inp->inp_moptions6,
-					      &inp->inp_route6,
-					      &inp->inp_laddr6, &error);
-			if (laddr == NULL) {
-				if (error == 0)
-					error = EADDRNOTAVAIL;
-				goto release;
-			}
-		} else
-			laddr = &inp->inp_laddr6;
-
-		ipv6->ip6_src = *laddr;
-
-		ipv6->ip6_plen = (u_short)len + sizeof(struct udphdr);
-
-		uh->uh_sport = inp->inp_lport;
-		uh->uh_dport = inp->inp_fport;
-		uh->uh_ulen = htons(ipv6->ip6_plen);
-		uh->uh_sum = 0;
-
-		/* 
-		 * Always calculate udp checksum for IPv6 datagrams
-		 */
-		if (!(uh->uh_sum = in6_cksum(m, IPPROTO_UDP,
-		    payload, len + sizeof(struct udphdr))))
-			uh->uh_sum = 0xffff;
-
-		error = ip6_output(m, inp->inp_outputopts6, &inp->inp_route6, 
-		    inp->inp_socket->so_options & SO_DONTROUTE,
-		    inp->inp_moptions6, NULL);
-	} else
-#endif /* INET6 */
-	{
-		ui = mtod(m, struct udpiphdr *);
-		bzero(ui->ui_x1, sizeof ui->ui_x1);
-		ui->ui_pr = IPPROTO_UDP;
-		ui->ui_len = htons((u_int16_t)len + sizeof (struct udphdr));
-		ui->ui_src = inp->inp_laddr;
-		ui->ui_dst = inp->inp_faddr;
-		ui->ui_sport = inp->inp_lport;
-		ui->ui_dport = inp->inp_fport;
-		ui->ui_ulen = ui->ui_len;
-
-		/*
-		 * Stuff checksum and output datagram.
-		 */
-
-		ui->ui_sum = 0;
-		if (udpcksum) {
-			if ((ui->ui_sum = in_cksum(m, sizeof (struct udpiphdr) +
-			    len)) == 0)
-				ui->ui_sum = 0xffff;
-		}
-		((struct ip *)ui)->ip_len = sizeof (struct udpiphdr) + len;
-#ifdef INET6
-		/*
-		 *  For now, we use the default values for ttl and tos for 
-		 *  v4 packets sent using a v6 pcb.  We probably want to
-		 *  later allow v4 setsockopt operations on a v6 socket to 
-		 *  modify the ttl and tos for v4 packets sent using
-		 *  the mapped address format.  We really ought to
-		 *  save the v4 ttl and v6 hoplimit in separate places 
-		 *  instead of craming both in the inp_hu union.
-		 */
-		if (inp->inp_flags & INP_IPV6) {
-			((struct ip *)ui)->ip_ttl = ip_defttl;
-			((struct ip *)ui)->ip_tos = 0;	  
-		} else
-#endif /* INET6 */
-		{
-			((struct ip *)ui)->ip_ttl = inp->inp_ip.ip_ttl;	
-			((struct ip *)ui)->ip_tos = inp->inp_ip.ip_tos;
-		}
-
-		udpstat.udps_opackets++;
-		error = ip_output(m, inp->inp_options, &inp->inp_route,
-			inp->inp_socket->so_options &
-			(SO_DONTROUTE | SO_BROADCAST),
-			inp->inp_moptions, inp, NULL);
+	ui->ui_sum = 0;
+	if (udpcksum) {
+		if ((ui->ui_sum = in_cksum(m, sizeof (struct udpiphdr) +
+		    len)) == 0)
+			ui->ui_sum = 0xffff;
 	}
+	((struct ip *)ui)->ip_len = sizeof (struct udpiphdr) + len;
+	((struct ip *)ui)->ip_ttl = inp->inp_ip.ip_ttl;	
+	((struct ip *)ui)->ip_tos = inp->inp_ip.ip_tos;
+
+	udpstat.udps_opackets++;
+	error = ip_output(m, inp->inp_options, &inp->inp_route,
+		inp->inp_socket->so_options &
+		(SO_DONTROUTE | SO_BROADCAST),
+		inp->inp_moptions, inp, NULL);
 
 bail:
 	if (addr) {
 		in_pcbdisconnect(inp);
                 inp->inp_flags = pcbflags;
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			inp->inp_laddr6 = laddr6;
-	        else
-#endif
 			inp->inp_laddr = laddr;
 		splx(s);
 	}
-	if (control) {
-#ifdef INET6
-		if (v6packet)
-			inp->inp_outputopts6 = stickyopt;
-#endif
+	if (control)
 		m_freem(control);
-	}
 	return (error);
 
 release:
 	m_freem(m);
-	if (control) {
-#ifdef INET6
-		if (v6packet)
-			inp->inp_outputopts6 = stickyopt;
-#endif
+	if (control)
 		m_freem(control);
-	}
 	return (error);
 }
 
@@ -1014,7 +958,7 @@ u_int	udp_sendspace = 9216;		/* really max datagram size */
 u_int	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
 					/* 40 1K datagrams */
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 /*ARGSUSED*/
 int
 udp6_usrreq(so, req, m, addr, control, p)
@@ -1023,6 +967,7 @@ udp6_usrreq(so, req, m, addr, control, p)
 	struct mbuf *m, *addr, *control;
 	struct proc *p;
 {
+
 	return udp_usrreq(so, req, m, addr, control);
 }
 #endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.9 1999/11/22 19:22:00 matthieu Exp $ */
+/*	$OpenBSD: mem.c,v 1.11 2001/04/05 20:39:39 deraadt Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt

@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsi_all.h,v 1.7 2000/02/21 08:18:31 mjacob Exp $	*/
+/*	$OpenBSD: scsi_all.h,v 1.10 2001/04/08 03:16:10 krw Exp $	*/
 /*	$NetBSD: scsi_all.h,v 1.10 1996/09/12 01:57:17 thorpej Exp $	*/
 
 /*
@@ -30,7 +30,7 @@
  */
 
 /*
- * Define dome bits that are in ALL (or a lot of) scsi commands
+ * Define some bits that are in ALL (or a lot of) scsi commands
  */
 #define SCSI_CTL_LINK		0x01
 #define SCSI_CTL_FLAG		0x02
@@ -237,7 +237,12 @@ struct scsi_inquiry_data {
 	char	vendor[8];
 	char	product[16];
 	char	revision[4];
-	u_int8_t extra[14];
+	u_int8_t extra[20];
+	u_int8_t flags2;
+#define SID_IUS		0x01
+#define SID_QAS		0x02
+#define SID_CLOCKING	0x0c /* 0 == ST only, 1 == DT only, 3 == both */
+	u_int8_t reserved;
 };
 
 struct scsi_sense_data_unextended {

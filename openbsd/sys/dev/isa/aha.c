@@ -1,4 +1,4 @@
-/*	$OpenBSD: aha.c,v 1.35 2000/04/19 02:17:49 niklas Exp $	*/
+/*	$OpenBSD: aha.c,v 1.38 2001/04/02 23:12:50 niklas Exp $	*/
 /*	$NetBSD: aha.c,v 1.11 1996/05/12 23:51:23 mycroft Exp $	*/
 
 #undef AHADIAG
@@ -59,6 +59,7 @@
 #include <sys/buf.h>
 #include <sys/proc.h>
 #include <sys/user.h>
+#include <sys/timeout.h>
 
 #include <machine/intr.h>
 #include <machine/pio.h>
@@ -486,7 +487,8 @@ AGAIN:
 			goto next;
 		}
 
-		untimeout(aha_timeout, ccb);
+		if ((ccb->xs->flags & SCSI_POLL) == 0)
+			timeout_del(&ccb->xs->stimeout);
 		isadma_copyfrombuf((caddr_t)ccb, CCB_PHYS_SIZE,
 		    1, ccb->ccb_phys);
 		aha_done(sc, ccb);
@@ -783,8 +785,10 @@ aha_start_ccbs(sc)
 		/* Tell the card to poll immediately. */
 		outb(iobase + AHA_CMD_PORT, AHA_START_SCSI);
 
-		if ((ccb->xs->flags & SCSI_POLL) == 0)
-			timeout(aha_timeout, ccb, (ccb->timeout * hz) / 1000);
+		if ((ccb->xs->flags & SCSI_POLL) == 0) {
+			timeout_set(&ccb->xs->stimeout, aha_timeout, ccb);
+			timeout_add(&ccb->xs->stimeout, (ccb->timeout * hz) / 1000);
+		}
 
 		++sc->sc_mbofull;
 		aha_nextmbx(wmbo, wmbx, mbo);
@@ -1083,7 +1087,7 @@ aha_init(sc)
 	wmbx = (struct aha_mbx *)uvm_pagealloc_contig(sizeof(struct aha_mbx),
 	    0, 0xffffff, PAGE_SIZE);
 #else
-	wmbx = (struct aha_mbx *)vm_pagealloc_contig(sizeof(struct aha_mbx),
+	wmbx = (struct aha_mbx *)vm_page_alloc_contig(sizeof(struct aha_mbx),
 	    0, 0xffffff, PAGE_SIZE);
 #endif
 	if (wmbx == NULL)

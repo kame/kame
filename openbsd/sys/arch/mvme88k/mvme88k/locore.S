@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.9 1999/09/27 19:13:22 smurph Exp $	*/
+/*	$OpenBSD: locore.S,v 1.14 2001/03/12 22:56:17 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -58,15 +58,16 @@
  */
 
 #ifndef ASSEMBLER
-#define ASSEMBLER
-#endif
+#define	ASSEMBLER
+#endif /* ASSEMBLER */
 
 #include "assym.s"
-#include "machine/asm.h"
-#include "machine/trap.h"
-#include "machine/m88100.h"
-#include "machine/psl.h"
-#include "machine/vmparam.h"      /* INTSTACK_SIZE */
+#include "ksyms.h"
+#include <machine/asm.h>
+#include <machine/trap.h>
+#include <machine/m88100.h>
+#include <machine/psl.h>
+#include <machine/vmparam.h>      /* INTSTACK_SIZE */
 
 /***********************************************************************/
 
@@ -153,8 +154,10 @@ LABEL(_start_text)	/* This is the *real* start upon poweron or reset */
 	st	r3,  r13, lo16(_bootaddr)
 	or.u	r13, r0,  hi16(_first_addr)
 	st	r4,  r13, lo16(_first_addr)
+#if defined(DDB) || NKSYMS > 0
 	or.u	r13, r0,  hi16(_esym)
 	st	r4,  r13, lo16(_esym)
+#endif
 	or.u	r13, r0,  hi16(_miniroot)
 	st	r5,  r13, lo16(_miniroot)
 	or.u	r13, r0,  hi16(_bootdev)
@@ -331,7 +334,7 @@ _LABEL(master_start)
 	 * can set interrupt_stack[cpu_number()] = _intstack
 	 */
 	ldcr  	r10, SR1
-	mak   	r10, r10, FLAG_CPU_FIELD_WIDTH<0>    /* r10 <-- CPU# */
+	extu   	r10, r10, FLAG_CPU_FIELD_WIDTH<0>    /* r10 <-- CPU# */
 	
 	/* figure interrupt_stack[cpu_number()] */
 	or.u	r11,  r0, hi16(_interrupt_stack)  
@@ -410,10 +413,6 @@ _m197_vector_list:     		  /* references memory BELOW this line */
 _m197_vector_list_end:
 	word END_OF_VECTOR_LIST
 #endif /* MVME197 */	
-	.align 4096		  /* Vector table is a page aligned list */
-LABEL(_vector_table)		  /* new vector table location, was addr 0 */
-	space	(0x1000)	  /* 16K */
-	
 	.align 4096		  /* SDT (segment descriptor table */
 	global _kernel_sdt
 _kernel_sdt:	
@@ -478,11 +477,11 @@ estack0:
 _kstack:
 	word	UADDR
 
-#ifdef DDB
+#if defined(DDB) || NKSYMS > 0
 	global	_esym
 _esym:
 	word 	0
-#endif /* DDB */
+#endif /* DDB || NKSYMS > 0 */
 
 	global	_intiobase, _intiolimit, _extiobase
 _intiobase:
@@ -534,3 +533,26 @@ _sigcode:
 	or	r0, r0, 0
 	global	_esigcode
 _esigcode:
+
+/* interrupt counters */
+	global	_intrcnt,_eintrcnt,_intrnames,_eintrnames
+_intrnames:
+	string	"spur\0"
+	string	"lev1\0"
+	string	"lev2\0"
+	string	"lev3\0"
+	string	"lev4\0"
+	string	"lev5\0"
+	string	"lev6\0"
+	string	"lev7\0"
+	string	"clk\0"
+	string	"sclk\0"
+	string	"pclk\0"
+	string	"nmi\0"
+_eintrnames:
+	.align	8
+_intrcnt:
+	word	0,0,0,0,0,0,0,0,0,0,0,0
+_eintrcnt:
+
+

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.5 1997/05/05 06:01:53 millert Exp $
+#	$OpenBSD: Makefile,v 1.7 2001/01/16 15:36:36 art Exp $
 #	$NetBSD: Makefile,v 1.12 1997/04/17 07:27:49 thorpej Exp $
 
 S=	${.CURDIR}/../../../..
@@ -15,9 +15,10 @@ BINMODE= 444
 BOOT_RELOC = ${PRIMARY_LOAD_ADDRESS}
 HEADERSIZE_PROG = headersize
 
-CLEANFILES+= ${PROG}.sym ${PROG}.nosym ${HEADERSIZE_PROG}
+CLEANFILES+= ${PROG}.sym ${PROG}.nosym ${PROG}.trunc ${HEADERSIZE_PROG}
 
 DEFNS= -DPRIMARY_BOOTBLOCK
+DEFNS+= -DALPHA_BOOT_ECOFF -DALPHA_BOOT_ELF
 
 AFLAGS += -DASSEMBLER ${DEFNS}
 CPPFLAGS += -I${.CURDIR}/../.. -I${S} ${DEFNS}
@@ -27,10 +28,12 @@ ${PROG}.nosym: ${PROG}.sym
 	cp ${PROG}.sym ${PROG}.nosym
 	strip ${PROG}.nosym
 
-${PROG}: ${PROG}.nosym ${HEADERSIZE_PROG}
-	dd if=${PROG}.nosym of=${PROG} \
-	    ibs=`./${HEADERSIZE_PROG} ${BOOT_RELOC} ${PROG}.nosym` skip=1 \
-	    obs=`expr 15 \* 512` conv=osync
+${PROG}: ${PROG}.nosym #${HEADERSIZE_PROG}
+	objcopy --output-target=binary ${PROG}.nosym ${PROG}.trunc
+	dd if=${PROG}.trunc of=${PROG} obs=`expr 15 \* 512` conv=osync
+#	dd if=${PROG}.nosym of=${PROG} \
+#	    ibs=`./${HEADERSIZE_PROG} ${BOOT_RELOC} ${PROG}.nosym` skip=1 \
+#	    obs=`expr 15 \* 512` conv=osync
 
 # no lint here (yet?)
 lint:

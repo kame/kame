@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_eg.c,v 1.16 2000/06/05 20:56:20 niklas Exp $	*/
+/*	$OpenBSD: if_eg.c,v 1.18 2001/04/06 08:04:05 fgsch Exp $	*/
 /*	$NetBSD: if_eg.c,v 1.26 1996/05/12 23:52:27 mycroft Exp $	*/
 
 /*
@@ -332,7 +332,7 @@ egprobe(parent, match, aux)
 	}
 	
 	if (bus_space_map(bst, ia->ia_iobase, EG_IO_PORTS, 0, &bsh)) {
-		printf("%s: can't map I/O space\n", sc->sc_dev.dv_xname);
+		dprintf(("%s: can't map I/O space\n", sc->sc_dev.dv_xname));
 		return (0);
 	}
 	sc->sc_bsh = bsh;
@@ -392,8 +392,10 @@ egattach(parent, self, aux)
 	bus_space_handle_t bsh;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	
-	if (bus_space_map(bst, ia->ia_iobase, EG_IO_PORTS, 0, &bsh))
-		panic("%s: can't map I/O space", sc->sc_dev.dv_xname);
+	if (bus_space_map(bst, ia->ia_iobase, EG_IO_PORTS, 0, &bsh)) {
+		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
+		return;
+	}
 	sc->sc_bsh = bsh;
 
 	egstop(sc);
@@ -451,10 +453,6 @@ egattach(parent, self, aux)
 	if_attach(ifp);
 	ether_ifattach(ifp);
 	
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
-
 	sc->sc_ih = isa_intr_establish(ia->ia_ic, ia->ia_irq, IST_EDGE,
 	    IPL_NET, egintr, sc, sc->sc_dev.dv_xname);
 }

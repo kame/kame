@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_misc.c,v 1.8 2000/01/31 19:57:21 deraadt Exp $	*/
+/*	$OpenBSD: netbsd_misc.c,v 1.11 2001/04/03 20:37:16 niklas Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1991, 1993
@@ -53,7 +53,6 @@
 #include <compat/netbsd/netbsd_signal.h>
 #include <compat/netbsd/netbsd_syscallargs.h>
 
-/* XXX doesn't do shared address space */
 /*ARGSUSED*/
 int
 netbsd_sys___vfork14(p, v, retval)
@@ -61,8 +60,7 @@ netbsd_sys___vfork14(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	/* XXX - should add FORK_SHAREVM */
-	return (fork1(p, FORK_VFORK|FORK_PPWAIT, NULL, 0, retval));
+	return (fork1(p, SIGCHLD, FORK_PPWAIT|FORK_SHAREVM, NULL, 0, retval));
 }
 
 /* XXX syncs whole file */
@@ -76,20 +74,8 @@ netbsd_sys_fdatasync(p, v, retval)
 	struct netbsd_sys_fdatasync_args /* {
 		syscallarg(int) fd;
 	} */ *uap = v;
-	register struct vnode *vp;
-	struct file *fp;
-	int error;
 
-	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
-		return (error);
-	vp = (struct vnode *)fp->f_data;
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
-	if ((error = VOP_FSYNC(vp, fp->f_cred, MNT_WAIT, p)) == 0 &&
-	    bioops.io_fsync != NULL)
-		error = (*bioops.io_fsync)(vp);
-
-	VOP_UNLOCK(vp, 0, p);
-	return (error);
+	return sys_fsync(p, uap, retval);
 }
 
 /*ARGSUSED*/

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.18 2000/10/24 01:50:19 hugh Exp $
+#	$OpenBSD: GENERIC,v 1.24 2001/04/09 20:40:52 deraadt Exp $
 #	$NetBSD: GENERIC,v 1.61 2000/04/19 06:50:36 itojun Exp $
 
 machine 	vax			# machine type; required
@@ -7,39 +7,42 @@ include "../../../conf/GENERIC"
 
 # Here are all different supported CPU types listed.
 # One of these is required.
-#option 		VAX8600
-#option 		VAX8200
-#option 		VAX780		# 11/780
-#option 		VAX750		# 11/750
-option 		VAX630		# MV II
-option 		VAX650		# MV III, 3300, 3600, 3800, 3900
-option	 	VAX670		# VAX 4000/300
-option	 	VAX410		# VS 2000, 3100/{30,}
-option 		VAX43		# VS 3100/76
-option 		VAX46		# VS 4000/60
+#option		VAX8600
+#option		VAX8200
+#option		VAX780		# 11/780
+#option		VAX750		# 11/750
+option		VAX630		# MV II
+option		VAX650		# MV III, 3300, 3600, 3800, 3900
+option		VAX660		# VAX 4000/200
+option		VAX670		# VAX 4000/300
+option		VAX680		# VAX 4000/[45]00
+option		VAX410		# VS 2000, 3100/{30,}
+option		VAX43		# VS 3100/76
+option		VAX46		# VS 4000/60
 option		VAX48		# VS 4000 VLC
-option 		VAX49		# VS 4000/90
+option		VAX49		# VS 4000/90
+option		VAX53		# VAX 4000 10X, MicroVAX 3100m9X
 
-option		UVM			# VAX uses UVM; REQUIRED
+option		UVM		# VAX uses UVM; REQUIRED
 
 # Max users on system; this is just a hint
 maxusers	8	
 
-option 		SCSIVERBOSE		# Verbose SCSI errors
+option		SCSIVERBOSE	# Verbose SCSI errors
 
 # WS console uses VT100 terminal emulation
-option 		WSEMUL_VT100
-option 		WSDISPLAY_DEFAULTSCREENS=8
+option		WSEMUL_VT100
+option		WSDISPLAY_DEFAULTSCREENS=8
 
 # Old compat stuff; needed to run 4.3BSD Reno programs.
 # Note that if COMPAT_ULTRIX is set, you lose compatibility with
 # 4.3BSD Reno programs and get Ultrix compatibility instead.
 # (They cannot coexist).
-option 		COMPAT_VAX1K	# Must be present to run pre-1.4 binaries.
-option 		COMPAT_12
-#option 	COMPAT_13
-#option 	COMPAT_14
-#option 	COMPAT_ULTRIX
+#option		COMPAT_VAX1K	# Must be present to run pre-1.4 binaries.
+option		COMPAT_12
+#option		COMPAT_13
+#option		COMPAT_14
+#option		COMPAT_ULTRIX
 
 option		INSN_EMULATE	# CPU lacks some hardware instructions.
 
@@ -63,12 +66,12 @@ ibus0		at mainbus0		# All Microvax
 le0		at vsbus0 csr 0x200e0000 # LANCE ethernet
 ze0		at vsbus0 csr 0x20008000 # SGEC ethernet
 dz0		at vsbus0 csr 0x200a0000 # DC-367 DZ-11 lookalike ctlr
-dz0		at vsbus0 csr 0x25000000 # VS4000/90 serial line
+dz0		at vsbus0 csr 0x25000000 # VS4000/90 4000/10X MV3100/9X serial
 #hdc0		at vsbus0 csr 0x200c0000 # HDC9224 MFM/floppy ctlr
 ncr0		at vsbus0 csr 0x200c0080 # VS2000/3100 SCSI-ctlr
 ncr1		at vsbus0 csr 0x200c0180 # VS2000/3100 SCSI-ctlr
 asc0		at vsbus0 csr 0x200c0080 # VS4000/60 (or VLC) SCSI-ctlr
-asc0		at vsbus0 csr 0x26000080 # VS4000/90 SCSI-ctlr
+asc0		at vsbus0 csr 0x26000080 # VS4000/90 4000/10X MV3100/9X SCSI
 #smg0		at vsbus0 csr 0x200f0000 # Small monochrome display ctlr.
 #clr0		at vsbus0 csr 0x30000000 # 4- or 8-bitplans color graphics
 
@@ -78,8 +81,8 @@ asc0		at vsbus0 csr 0x26000080 # VS4000/90 SCSI-ctlr
 # Ibus, the internal bus on most Microvaxen
 uba0		at ibus0 		# Qbus adapter
 ze0		at ibus0 		# SGEC on-board ethernet
+le0		at ibus0		# LANCE ethernet (MV3400)
 #shac0		at ibus0 		# DSSI controller
-le0			at ibus0		# LANCE ethernet
 
 # Devices connected at VAXBI
 #cpu*		at bi? node?		# KA820/KA825 cpu

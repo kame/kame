@@ -1,4 +1,4 @@
-/*	$OpenBSD: pccbb.c,v 1.8 2000/10/09 17:31:04 aaron Exp $ */
+/*	$OpenBSD: pccbb.c,v 1.17 2001/02/01 03:38:08 aaron Exp $ */
 /*	$NetBSD: pccbb.c,v 1.42 2000/06/16 23:41:35 cgd Exp $	*/
 
 /*
@@ -361,6 +361,10 @@ pccbb_shutdown(void *arg)
 	pcireg_t command;
 
 	DPRINTF(("%s: shutdown\n", sc->sc_dev.dv_xname));
+
+	/* turn off power */
+	pccbb_power((cardbus_chipset_tag_t)sc, CARDBUS_VCC_0V | CARDBUS_VPP_0V);
+
 	bus_space_write_4(sc->sc_base_memt, sc->sc_base_memh, CB_SOCKET_MASK,
 	    0);
 
@@ -369,11 +373,6 @@ pccbb_shutdown(void *arg)
 	command &= ~(PCI_COMMAND_IO_ENABLE | PCI_COMMAND_MEM_ENABLE |
 	    PCI_COMMAND_MASTER_ENABLE);
 	pci_conf_write(sc->sc_pc, sc->sc_tag, PCI_COMMAND_STATUS_REG, command);
-
-	if (sc->sc_chipset == CB_TOPIC95B) {
-		pci_conf_write(sc->sc_pc, sc->sc_tag, TOPIC_SOCKET_CTRL, 0);
-		pci_conf_write(sc->sc_pc, sc->sc_tag, TOPIC_SLOT_CTRL, 0);
-	}
 }
 
 void
@@ -386,6 +385,8 @@ pccbbattach(parent, self, aux)
 	struct pci_attach_args *pa = aux;
 	pci_chipset_tag_t pc = pa->pa_pc;
 	pcireg_t busreg, reg, sock_base;
+	pci_intr_handle_t ih;
+	const char *intrstr = NULL;
 	bus_addr_t sockbase;
 	int flags;
 
@@ -442,18 +443,6 @@ pccbbattach(parent, self, aux)
 	sc->sc_mem_start = 0;	       /* XXX */
 	sc->sc_mem_end = 0xffffffff;   /* XXX */
 
-	printf("\n");
-
-	/* 
-	 * When interrupt isn't routed correctly, give up probing cbb and do
-	 * not kill pcic-compatible port.
-	 */
-	if ((0 == pa->pa_intrline) || (255 == pa->pa_intrline)) {
-    		printf("%s: NOT USED because of unconfigured interrupt\n",
-		    sc->sc_dev.dv_xname);
-		return;
-	}
-
 	/* 
 	 * When bus number isn't set correctly, give up using 32-bit CardBus
 	 * mode.
@@ -461,8 +450,7 @@ pccbbattach(parent, self, aux)
 	busreg = pci_conf_read(pc, pa->pa_tag, PCI_BUSNUM);
 #if notyet
 	if (((busreg >> 8) & 0xff) == 0) {
-    		printf("%s: CardBus support disabled because of unconfigured bus number\n",
-		    sc->sc_dev.dv_xname);
+    		printf(": CardBus support disabled because of unconfigured bus number\n");
 		flags |= PCCBB_PCMCIA_16BITONLY;
 	}
 #endif
@@ -472,7 +460,7 @@ pccbbattach(parent, self, aux)
 #if defined CBB_DEBUG
 	{
 		static char *intrname[5] = { "NON", "A", "B", "C", "D" };
-		printf("%s: intrpin %s, intrtag %d\n", sc->sc_dev.dv_xname,
+		printf(": intrpin %s, intrtag %d\n",
 		    intrname[pa->pa_intrpin], pa->pa_intrline);
 	}
 #endif
@@ -491,19 +479,45 @@ pccbbattach(parent, self, aux)
 
 	sc->sc_pcmcia_flags = flags;   /* set PCMCIA facility */
 
+	/* Map and establish the interrupt. */
+	if (pci_intr_map(pc, sc->sc_intrtag, sc->sc_intrpin,
+	    sc->sc_intrline, &ih)) {
+		printf(": couldn't map interrupt\n");
+		return;
+	}
+	intrstr = pci_intr_string(pc, ih);
+
+	/*
+	 * XXX pccbbintr should be called under the priority lower
+	 * than any other hard interrputs.
+	 */
+	sc->sc_ih = pci_intr_establish(pc, ih, IPL_BIO, pccbbintr, sc,
+	    sc->sc_dev.dv_xname);
+
+	if (sc->sc_ih == NULL) {
+		printf(": couldn't establish interrupt");
+		if (intrstr != NULL) {
+			printf(" at %s", intrstr);
+		}
+		printf("\n");
+		return;
+	}
+	printf(": %s\n", intrstr);
+
 	shutdownhook_establish(pccbb_shutdown, sc);
 
 	/* Disable legacy register mapping. */
 	switch (sc->sc_chipset) {
 	case CB_RX5C46X:	       /* fallthrough */
 #if 0
+	/* The RX5C47X-series requires writes to the PCI_LEGACY register. */
 	case CB_RX5C47X:
 #endif
 		/* 
-		 * The legacy pcic io-port on Ricoh CardBus bridges cannot be
-		 * disabled by substituting 0 into PCI_LEGACY register.  Ricoh
-		 * CardBus bridges have special bits on Bridge control reg (addr
-		 * 0x3e on PCI config space).
+		 * The legacy pcic io-port on Ricoh RX5C46X CardBus bridges
+		 * cannot be disabled by substituting 0 into PCI_LEGACY
+		 * register.  Ricoh CardBus bridges have special bits on Bridge
+		 * control reg (addr 0x3e on PCI config space).
 		 */
 		reg = pci_conf_read(pc, pa->pa_tag, PCI_BCR_INTR);
 		reg &= ~(CB_BCRI_RL_3E0_ENA | CB_BCRI_RL_3E2_ENA);
@@ -544,8 +558,6 @@ pccbb_pci_callback(self)
 	bus_space_tag_t base_memt;
 	bus_space_handle_t base_memh;
 	u_int32_t maskreg;
-	pci_intr_handle_t ih;
-	const char *intrstr = NULL;
 	bus_addr_t sockbase;
 	struct cbslot_attach_args cba;
 	struct pcmciabus_attach_args paa;
@@ -592,32 +604,6 @@ pccbb_pci_callback(self)
 	/* clear data structure for child device interrupt handlers */
 	sc->sc_pil = NULL;
 	sc->sc_pil_intr_enable = 1;
-
-	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, sc->sc_intrtag, sc->sc_intrpin,
-	    sc->sc_intrline, &ih)) {
-		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
-		return;
-	}
-	intrstr = pci_intr_string(pc, ih);
-
-	/*
-	 * XXX pccbbintr should be called under the priority lower
-	 * than any other hard interrputs.
-	 */
-	sc->sc_ih = pci_intr_establish(pc, ih, IPL_BIO, pccbbintr, sc,
-	    sc->sc_dev.dv_xname);
-
-	if (sc->sc_ih == NULL) {
-		printf("%s: couldn't establish interrupt",
-		    sc->sc_dev.dv_xname);
-		if (intrstr != NULL) {
-			printf(" at %s", intrstr);
-		}
-		printf("\n");
-		return;
-	}
-	printf("%s: %s\n", sc->sc_dev.dv_xname, intrstr);
 
 	powerhook_establish(pccbb_powerhook, sc);
 
@@ -678,6 +664,8 @@ pccbb_pci_callback(self)
 		DPRINTF(("pccbbattach: found cardslot\n"));
 		sc->sc_csc = csc;
 	}
+
+	sc->sc_ints_on = 1;
 
 	/* CSC Interrupt: Card detect interrupt on */
 	maskreg = bus_space_read_4(base_memt, base_memh, CB_SOCKET_MASK);
@@ -747,8 +735,9 @@ pccbb_chipinit(sc)
 
 	/* Route functional interrupts to PCI. */
 	reg = pci_conf_read(pc, tag, PCI_BCR_INTR);
-	reg &= ~CB_BCR_INTR_IREQ_ENABLE;	/* use PCI Intr */
+	reg |= CB_BCR_INTR_IREQ_ENABLE;		/* disable PCI Intr */
 	reg |= CB_BCR_WRITE_POST_ENABLE;	/* enable write post */
+	reg |= CB_BCR_RESET_ENABLE;		/* assert reset */
 	pci_conf_write(pc, tag, PCI_BCR_INTR, reg);
 
 	switch (sc->sc_chipset) {
@@ -759,8 +748,8 @@ pccbb_chipinit(sc)
 		reg |= PCI113X_CBCTRL_PCI_IRQ_ENA;
 		/* CSC intr enable */
 		reg |= PCI113X_CBCTRL_PCI_CSC;
-		/* functional intr prohibit */
-		reg &= ~PCI113X_CBCTRL_PCI_INTR;
+		/* functional intr prohibit | prohibit ISA routing */
+		reg &= ~(PCI113X_CBCTRL_PCI_INTR | PCI113X_CBCTRL_INT_MASK);
 		pci_conf_write(pc, tag, PCI_CBCTRL, reg);
 		break;
 
@@ -789,6 +778,15 @@ pccbb_chipinit(sc)
 	pci_conf_write(pc, tag, PCI_CB_IOLIMIT0, 0);
 	pci_conf_write(pc, tag, PCI_CB_IOBASE1, 0xffffffff);
 	pci_conf_write(pc, tag, PCI_CB_IOLIMIT1, 0);
+
+	/* reset 16-bit pcmcia bus */
+	bus_space_write_1(sc->sc_base_memt, sc->sc_base_memh,
+	    0x800 + PCIC_INTR,
+	    bus_space_read_1(sc->sc_base_memt, sc->sc_base_memh,
+		0x800 + PCIC_INTR) & ~PCIC_INTR_RESET);
+
+	/* turn off power */
+	pccbb_power((cardbus_chipset_tag_t)sc, CARDBUS_VCC_0V | CARDBUS_VPP_0V);
 }
 
 
@@ -834,8 +832,12 @@ pccbb_pcmcia_attach_setup(sc, paa)
 	 * 4) Clear any pending CSC interrupt.
 	 */
 	Pcic_write(ph, PCIC_INTR, PCIC_INTR_ENABLE | PCIC_INTR_RESET);
-	Pcic_write(ph, PCIC_CSC_INTR, PCIC_CSC_INTR_CD_ENABLE);
-	Pcic_read(ph, PCIC_CSC);
+	if (sc->sc_chipset == CB_TI113X) {
+		Pcic_write(ph, PCIC_CSC_INTR, 0);
+	} else {
+		Pcic_write(ph, PCIC_CSC_INTR, PCIC_CSC_INTR_CD_ENABLE);
+		Pcic_read(ph, PCIC_CSC);
+	}
 
 	/* initialize pcmcia bus attachment */
 	paa->paa_busname = "pcmcia";
@@ -898,6 +900,9 @@ pccbbintr(arg)
 	bus_space_tag_t memt = sc->sc_base_memt;
 	bus_space_handle_t memh = sc->sc_base_memh;
 	struct pcic_handle *ph = &sc->sc_pcmcia_h;
+
+	if (!sc->sc_ints_on)
+		return 0;
 
 	sockevent = bus_space_read_4(memt, memh, CB_SOCKET_EVENT);
 	bus_space_write_4(memt, memh, CB_SOCKET_EVENT, sockevent);
@@ -1062,6 +1067,9 @@ pccbb_pcmcia_read(ph, reg)
 	struct pcic_handle *ph;
 	int reg;
 {
+	bus_space_barrier(ph->ph_bus_t, ph->ph_bus_h,
+	    PCCBB_PCMCIA_OFFSET + reg, 1, BUS_SPACE_BARRIER_READ);
+
 	return bus_space_read_1(ph->ph_bus_t, ph->ph_bus_h,
 	    PCCBB_PCMCIA_OFFSET + reg);
 }
@@ -1072,6 +1080,9 @@ pccbb_pcmcia_write(ph, reg, val)
 	int reg;
 	u_int8_t val;
 {
+	bus_space_barrier(ph->ph_bus_t, ph->ph_bus_h,
+	    PCCBB_PCMCIA_OFFSET + reg, 1, BUS_SPACE_BARRIER_WRITE);
+
 	bus_space_write_1(ph->ph_bus_t, ph->ph_bus_h, PCCBB_PCMCIA_OFFSET + reg,
 	    val);
 }
@@ -1208,13 +1219,6 @@ pccbb_power(ct, command)
 	bus_space_write_4(memt, memh, CB_SOCKET_CTRL, sock_ctrl);
 	status = bus_space_read_4(memt, memh, CB_SOCKET_STAT);
 
-	delay(20 * 1000);	       /* wait 20 ms: Vcc setup time */
-	/*
-	 * XXX delay 200 ms: though the standard defines that the Vcc set-up
-	 * time is 20 ms, some PC-Card bridge requires longer duration.
-	 */
-	delay(200 * 1000);
-
 	if (status & CB_SOCKET_STAT_BADVCC) {	/* bad Vcc request */
 		printf
 		    ("%s: bad Vcc request. sock_ctrl 0x%x, sock_status 0x%x\n",
@@ -1254,6 +1258,13 @@ pccbb_power(ct, command)
 #endif
 		return 0;
 	}
+
+	/*
+	 * XXX delay 300 ms: though the standard defines that the Vcc set-up
+	 * time is 20 ms, some PC-Card bridge requires longer duration.
+	 */
+	delay(300 * 1000);
+
 	return 1;		       /* power changed correctly */
 }
 
@@ -1332,6 +1343,15 @@ pccbb_detect_card(sc)
 	u_int32_t sockstat =
 	    bus_space_read_4(base_memt, base_memh, CB_SOCKET_STAT);
 	int retval = 0;
+
+	/*
+	 * The SCM Microsystems TI1225-based PCI-CardBus dock card that
+	 * ships with some Lucent WaveLAN cards has only one physical slot
+	 * but OpenBSD probes two. The phantom card in the second slot can
+	 * be ignored by punting on unsupported voltages.
+	 */
+	if (sockstat & CB_SOCKET_STAT_XVCARD)
+		return 0;
 
 	/* CD1 and CD2 asserted */
 	if (0x00 == (sockstat & CB_SOCKET_STAT_CD)) {
@@ -1641,24 +1661,23 @@ pccbb_intr_establish(sc, irq, level, func, arg)
 	void *arg;
 {
 	struct pccbb_intrhand_list *pil, *newpil;
+	pcireg_t reg;
 
 	DPRINTF(("pccbb_intr_establish start. %p\n", sc->sc_pil));
 
 	if (sc->sc_pil == NULL) {
 		/* initialize bridge intr routing */
+		reg = pci_conf_read(sc->sc_pc, sc->sc_tag, PCI_BCR_INTR);
+		reg &= ~CB_BCR_INTR_IREQ_ENABLE;
+		pci_conf_write(sc->sc_pc, sc->sc_tag, PCI_BCR_INTR, reg);
 
 		switch (sc->sc_chipset) {
 		case CB_TI113X:
-			{
-				pcireg_t cbctrl =
-				    pci_conf_read(sc->sc_pc, sc->sc_tag,
-				    PCI_CBCTRL);
-				/* functional intr enabled */
-				cbctrl |= PCI113X_CBCTRL_PCI_INTR;
-				pci_conf_write(sc->sc_pc, sc->sc_tag,
-				    PCI_CBCTRL, cbctrl);
-				break;
-			}
+			reg = pci_conf_read(sc->sc_pc, sc->sc_tag, PCI_CBCTRL);
+			/* functional intr enabled */
+			reg |= PCI113X_CBCTRL_PCI_INTR;
+			pci_conf_write(sc->sc_pc, sc->sc_tag, PCI_CBCTRL, reg);
+			break;
 		default:
 			break;
 		}
@@ -1703,6 +1722,7 @@ pccbb_intr_disestablish(sc, ih)
 	void *ih;
 {
 	struct pccbb_intrhand_list *pil, **pil_prev;
+	pcireg_t reg;
 
 	DPRINTF(("pccbb_intr_disestablish start. %p\n", sc->sc_pil));
 
@@ -1723,18 +1743,18 @@ pccbb_intr_disestablish(sc, ih)
 
 		DPRINTF(("pccbb_intr_disestablish: no interrupt handler\n"));
 
+		/* stop routing PCI intr */
+		reg = pci_conf_read(sc->sc_pc, sc->sc_tag, PCI_BCR_INTR);
+		reg |= CB_BCR_INTR_IREQ_ENABLE;
+		pci_conf_write(sc->sc_pc, sc->sc_tag, PCI_BCR_INTR, reg);
+
 		switch (sc->sc_chipset) {
 		case CB_TI113X:
-			{
-				pcireg_t cbctrl =
-				    pci_conf_read(sc->sc_pc, sc->sc_tag,
-				    PCI_CBCTRL);
-				/* functional intr disabled */
-				cbctrl &= ~PCI113X_CBCTRL_PCI_INTR;
-				pci_conf_write(sc->sc_pc, sc->sc_tag,
-				    PCI_CBCTRL, cbctrl);
-				break;
-			}
+			reg = pci_conf_read(sc->sc_pc, sc->sc_tag, PCI_CBCTRL);
+			/* functional intr disabled */
+			reg &= ~PCI113X_CBCTRL_PCI_INTR;
+			pci_conf_write(sc->sc_pc, sc->sc_tag, PCI_CBCTRL, reg);
+			break;
 		default:
 			break;
 		}
@@ -2207,15 +2227,9 @@ pccbb_pcmcia_socket_enable(pch)
 		return;
 	}
 
-	/* assert reset bit */
-	intr = Pcic_read(ph, PCIC_INTR);
-	intr &= ~(PCIC_INTR_RESET | PCIC_INTR_CARDTYPE_MASK);
-	Pcic_write(ph, PCIC_INTR, intr);
-
 	/* disable socket i/o: negate output enable bit */
 
-	power = Pcic_read(ph, PCIC_PWRCTL);
-	power &= ~PCIC_PWRCTL_OE;
+	power = 0;
 	Pcic_write(ph, PCIC_PWRCTL, power);
 
 	/* power down the socket to reset it, clear the card reset pin */
@@ -2228,21 +2242,16 @@ pccbb_pcmcia_socket_enable(pch)
 	 */
 	/* delay(300*1000); too much */
 
-	/* power up the socket */
-	pccbb_power(sc, voltage);
-
-	/* 
-	 * wait 100ms until power raise (Tpr) and 20ms to become
-	 * stable (Tsu(Vcc)).
-	 *
-	 * some machines require some more time to be settled
-	 * (another 200ms is added here).
-	 */
-	/* delay((100 + 20 + 200)*1000); too much */
-
+	/* assert reset bit */
+	intr = Pcic_read(ph, PCIC_INTR);
+	intr &= ~(PCIC_INTR_RESET | PCIC_INTR_CARDTYPE_MASK);
+	Pcic_write(ph, PCIC_INTR, intr);
+ 
+	/* power up the socket and output enable */
 	power = Pcic_read(ph, PCIC_PWRCTL);
 	power |= PCIC_PWRCTL_OE;
 	Pcic_write(ph, PCIC_PWRCTL, power);
+	pccbb_power(sc, voltage);
 
 	/* 
 	 * hold RESET at least 10us.

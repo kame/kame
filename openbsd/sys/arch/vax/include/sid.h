@@ -1,4 +1,4 @@
-/*	$OpenBSD: sid.h,v 1.6 2000/04/26 03:08:42 bjc Exp $	*/
+/*	$OpenBSD: sid.h,v 1.10 2001/03/16 22:46:25 hugh Exp $	*/
 /*	$NetBSD: sid.h,v 1.12 1999/12/11 17:55:13 ragge Exp $	*/
 
 /*
@@ -33,6 +33,7 @@
 
 /*
  * Board-Type (?_BTYP_?) and Sub-Type (?_STYP_?) are synonima.
+ * Michael Kukat changed this 01/27/2001, STYP is relly a subtype now.
  * other synonima are:
  */
 #define cpudata	    vax_cpudata
@@ -156,11 +157,23 @@
 #define VAX_TYP_NVAX	19
 #define VAX_TYP_V13	19
  
-#define VAX_BTYP_69D	0x13000001	/* VAX 4000 model 500 */
-#define VAX_BTYP_1301	0x13000001	/* VAX 4000 model 100 */
+#define VAX_BTYP_1301	0x13000001	/* VAX 4000 model [4-6]00 */
+#define VAX_STYP_675	0x00000c	/* VAX 4000 model 400 */
+#define VAX_STYP_680	0x000006	/* VAX 4000 model 500 */
+#define VAX_STYP_681	0x00000e	/* VAX 4000 model 500A */
+#define VAX_STYP_690	0x000007	/* VAX 4000 model 600 */
+#define VAX_STYP_691	0x00000f	/* VAX 4000 model 605A */
+#define VAX_STYP_692	0x000010	/* VAX 4000 model 700? */
+
 #define VAX_BTYP_1302	0x13000002
-#define VAX_BTYP_1303	0x13000003
-#define VAX_BTYP_49	0x13000004	/* MicroVAX 3100 model 90 */
+
+#define VAX_BTYP_1303	0x13000003	/* Cheetah machines */
+#define VAX_STYP_50	0x000008	/* KA50 or KA55 */
+#define VAX_STYP_51	0x000009	/* MicroVAX 3100 model 90 / 95 */
+#define VAX_STYP_52	0x00000a	/* VAX 4000 model 100 */
+#define VAX_STYP_53	0x00000b	/* VAX 4000 model 105A */
+
+#define VAX_BTYP_49	0x13000004	/* VaxStation 4000 model 90 */
 
 /*
  * SOC chip series (1991)
@@ -169,7 +182,11 @@
 #define VAX_TYP_V14	20
  
 #define VAX_BTYP_660	0x14000001	/* VAX 4000 model 200 */
-#define VAX_BTYP_48	0x14000004	/* VAXstation 4000 VLC */
+#define VAX_BTYP_48	0x14000004	/* VS4000/VLC and MV3100/{30,40} */
+#define VAX_STYP_45	0x000000	/* MicroVAX 3100 {30,40} */
+#define VAX_VTYP_45	0x00000001	/* MicroVAX 3100 {30,40} */
+#define VAX_STYP_48	0x000001	/* VAXstation 4000 VLC */
+#define VAX_VTYP_48	0x00000002	/* VAXstation 4000 VLC */
 #define VAX_BTYP_550	0x14000007	/* VAXft model 410, 610 */
  
 /*

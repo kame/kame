@@ -1,7 +1,7 @@
-/*	$OpenBSD: autoconf.c,v 1.10 2000/04/06 20:05:39 todd Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.13 2001/04/01 06:25:33 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998-2000 Michael Shalayeff
+ * Copyright (c) 1998-2001 Michael Shalayeff
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -60,7 +60,6 @@
 #include <dev/cons.h>
 
 #include <hppa/dev/cpudevs.h>
-#include <hppa/dev/cpudevs_data.h>
 
 void	setroot __P((void));
 void	swapconf __P((void));
@@ -212,8 +211,8 @@ bad:
 	return;
 }
 
-struct nam2blk {
-	char *name;
+static const struct nam2blk {
+	char name[4];
 	int maj;
 } nam2blk[] = {
 	{ "st",		2 },
@@ -221,7 +220,6 @@ struct nam2blk {
 	{ "rd",		6 },
 	{ "sd",		8 },
 #if 0
-	{ "acd",	4 },
 	{ "wd",		0 },
 	{ "fd",		XXX },
 #endif
@@ -397,6 +395,10 @@ pdc_scanbus(self, ca, bus, maxmod)
 		config_found_sm(self, &nca, mbprint, mbsubmatch);
 	}
 }
+
+static const struct hppa_mod_info hppa_knownmods[] = {
+#include <hppa/dev/cpudevs_data.h>
+};
 
 const char *
 hppa_mod_info(type, sv)

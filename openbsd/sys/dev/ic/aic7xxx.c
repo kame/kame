@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.40 2000/01/07 23:08:17 gibbs Exp $
- * $OpenBSD: aic7xxx.c,v 1.23 2000/08/02 18:50:17 aaron Exp $
+ * $OpenBSD: aic7xxx.c,v 1.27 2001/04/24 18:22:31 deraadt Exp $
  */
 /*
  * A few notes on features of the driver.
@@ -122,7 +122,6 @@
 #define AHC_TMODE_ENABLE 0
 #endif
 #include <sys/kernel.h>
-#define offsetof(s, e) ((char *)&((s *)0)->e - (char *)((s *)0))
 
 #ifndef le32toh
 #define le32toh	letoh32  /* to match Free/Net macros */
@@ -662,6 +661,7 @@ ahcfreescb(ahc, scb)
 	scb->flags = SCB_FREE;
 	hscb->control = 0;
 	hscb->status = 0;
+	timeout_del(&scb->xs->stimeout);
 
 	SLIST_INSERT_HEAD(&ahc->scb_data->free_scbs, scb, links);
 
@@ -1975,11 +1975,8 @@ ahc_handle_seqint(ahc, intstat)
 				 * Ensure we have enough time to actually
 				 * retrieve the sense.
 				 */
-				if (!(scb->xs->flags & SCSI_POLL)) {
-				untimeout(ahc_timeout, (caddr_t)scb);
-					timeout(ahc_timeout, (caddr_t)scb,
-					    5 * hz);
-				}
+				if (!(scb->xs->flags & SCSI_POLL))
+					timeout_add(&scb->xs->stimeout, 5 * hz);
 			}
 			break;
 		case SCSI_BUSY:
@@ -3439,7 +3436,7 @@ ahc_done(ahc, scb)
 	
 	LIST_REMOVE(scb, pend_links);
 
-	untimeout(ahc_timeout, (caddr_t)scb);
+	timeout_del(&scb->xs->stimeout);
 
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOWCMDS) {
@@ -3487,10 +3484,9 @@ ahc_done(ahc, scb)
 		while (scbp != NULL) {
 			struct scsi_xfer *txs = scbp->xs;
 
-			if (!(txs->flags & SCSI_POLL)) {
-				timeout(ahc_timeout, scbp,
+			if (!(txs->flags & SCSI_POLL))
+				timeout_add(&scbp->xs->stimeout,
 				    (scbp->xs->timeout * hz)/1000);
-			}
 			scbp = LIST_NEXT(scbp, pend_links);
 		}
 
@@ -4219,6 +4215,7 @@ get_scb:
 	scb->xs = xs;
 	hscb = scb->hscb;
 	hscb->tcl = tcl;
+	timeout_set(&xs->stimeout, ahc_timeout, scb);
 
 	if (ahc_istagged_device(ahc, xs, 0))
 		scb->hscb->control |= MSG_SIMPLE_Q_TAG;
@@ -4356,8 +4353,7 @@ ahc_execute_scb(arg, dm_segs, nsegments)
 	scb->flags |= SCB_ACTIVE;
 
 	if (!(xs->flags & SCSI_POLL))
-	timeout(ahc_timeout, (caddr_t)scb, 
-		    (xs->timeout * hz) / 1000);
+		timeout_add(&xs->stimeout, (xs->timeout * hz) / 1000);
 
 	if ((scb->flags & SCB_TARGET_IMMEDIATE) != 0) {
 #if 0
@@ -4818,7 +4814,7 @@ ahc_set_recoveryscb(ahc, scb)
 		 */
 		scbp = ahc->pending_scbs.lh_first;
 		while (scbp != NULL) {
-			untimeout(ahc_timeout, scbp);
+			timeout_del(&scbp->xs->stimeout);
 			scbp = scbp->pend_links.le_next;
 		}
 	}
@@ -4967,8 +4963,8 @@ bus_reset:
 				scb->flags |= SCB_OTHERTCL_TIMEOUT;
 				newtimeout = MAX(active_scb->xs->timeout,
 						 scb->xs->timeout);
-				timeout(ahc_timeout, scb,
-					    (newtimeout * hz) / 1000);
+				timeout_add(&scb->xs->stimeout,
+				    (newtimeout * hz) / 1000);
 				splx(s);
 				return;
 			} 
@@ -4987,6 +4983,7 @@ bus_reset:
 
 				/* Will clear us from the bus */
 				restart_sequencer(ahc);
+				splx(s);
 				return;
 			} 
 
@@ -4996,7 +4993,7 @@ bus_reset:
 			sc_print_addr(active_scb->xs->sc_link);
 			printf("BDR message in message buffer\n");
 			active_scb->flags |=  SCB_DEVICE_RESET;
-			    timeout(ahc_timeout, (caddr_t)active_scb, 2 * hz);
+			    timeout_add(&active_scb->xs->stimeout, 2 * hz);
 			unpause_sequencer(ahc);
 		} else {
 			int	 disconnected;
@@ -5012,6 +5009,7 @@ bus_reset:
 				printf("%s: Hung target selection\n",
 				       ahc_name(ahc));
 				restart_sequencer(ahc);
+				splx(s);
 				return;
 			}
 
@@ -5085,7 +5083,7 @@ bus_reset:
 					ahc_outb(ahc, KERNEL_QINPOS,
 						 ahc->qinfifonext);
 				}
-				timeout(ahc_timeout, (caddr_t)scb, 2 * hz);
+				timeout_add(&scb->xs->stimeout, 2 * hz);
 				unpause_sequencer(ahc);
 			} else {
 				/* Go "immediatly" to the bus reset */

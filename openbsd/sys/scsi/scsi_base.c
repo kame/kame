@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsi_base.c,v 1.26 2000/03/01 18:12:04 millert Exp $	*/
+/*	$OpenBSD: scsi_base.c,v 1.28 2001/02/18 22:38:44 fgsch Exp $	*/
 /*	$NetBSD: scsi_base.c,v 1.43 1997/04/02 02:29:36 mycroft Exp $	*/
 
 /*
@@ -239,7 +239,7 @@ scsi_test_unit_ready(sc_link, flags)
 	scsi_cmd.opcode = TEST_UNIT_READY;
 
 	return scsi_scsi_cmd(sc_link, (struct scsi_generic *) &scsi_cmd,
-			     sizeof(scsi_cmd), 0, 0, 50, 10000, NULL, flags);
+			     sizeof(scsi_cmd), 0, 0, 5, 10000, NULL, flags);
 }
 
 /*
@@ -308,6 +308,9 @@ scsi_start(sc_link, type, flags)
 	int type, flags;
 {
 	struct scsi_start_stop scsi_cmd;
+
+	if ((sc_link->quirks & SDEV_NOSTARTUNIT) == SDEV_NOSTARTUNIT)
+		return 0;
 
 	bzero(&scsi_cmd, sizeof(scsi_cmd));
 	scsi_cmd.opcode = START_STOP;
@@ -1035,7 +1038,7 @@ scsi_print_sense(xs, verbosity)
 
 	sc_print_addr(xs->sc_link);
 	s = (char *) &xs->sense;
-	printf("Check Condition on opcode %x\n", xs->cmd->opcode);
+	printf("Check Condition on opcode 0x%x\n", xs->cmd->opcode);
 
 	/*
 	 * Basics- print out SENSE KEY

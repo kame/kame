@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_extern.h,v 1.9 2000/02/07 04:57:19 assar Exp $	*/
+/*	$OpenBSD: ufs_extern.h,v 1.11 2001/03/01 20:54:36 provos Exp $	*/
 /*	$NetBSD: ufs_extern.h,v 1.5 1996/02/09 22:36:03 christos Exp $	*/
 
 /*-
@@ -90,6 +90,7 @@ int	 ufs_rename	__P((void *));
 int	 ufs_rmdir	__P((void *));
 int	 ufs_seek	__P((void *));
 int	 ufs_select	__P((void *));
+int	 ufs_kqfilter	__P((void *));
 int	 ufs_setattr	__P((void *));
 int	 ufs_strategy	__P((void *));
 int	 ufs_symlink	__P((void *));
@@ -180,6 +181,7 @@ void  softdep_setup_remove __P((struct buf *,struct inode *, struct inode *,
           int));
 void  softdep_setup_directory_change __P((struct buf *, struct inode *,
           struct inode *, long, int));
-void  softdep_increase_linkcnt __P((struct inode *));
+void  softdep_change_linkcnt __P((struct inode *));
+int   softdep_slowdown __P((struct vnode *));
 
 __END_DECLS

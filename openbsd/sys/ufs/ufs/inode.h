@@ -1,4 +1,4 @@
-/*	$OpenBSD: inode.h,v 1.11 1999/09/10 23:39:10 art Exp $	*/
+/*	$OpenBSD: inode.h,v 1.14 2001/02/24 10:37:09 deraadt Exp $	*/
 /*	$NetBSD: inode.h,v 1.8 1995/06/15 23:22:50 cgd Exp $	*/
 
 /*
@@ -41,6 +41,7 @@
  *	@(#)inode.h	8.5 (Berkeley) 7/8/94
  */
 
+#include <sys/buf.h>
 #include <ufs/ufs/dinode.h>
 #include <ufs/ufs/dir.h>
 #include <ufs/ext2fs/ext2fs_dinode.h>
@@ -82,6 +83,7 @@ struct inode {
 #define	i_lfs	inode_u.lfs
 #define i_e2fs  inode_u.e2fs
 
+	struct   cluster_info i_ci;
 	struct	 dquot *i_dquot[MAXQUOTAS]; /* Dquot structures. */
 	u_quad_t i_modrev;	/* Revision level for NFS lease. */
 	struct	 lockf *i_lockf;/* Head of byte-level lock list. */
@@ -247,6 +249,7 @@ struct indir {
 #else
 #define DOINGSOFTDEP(vp)      (0)
 #endif
+#define DOINGASYNC(vp)        ((vp)->v_mount->mnt_flag & MNT_ASYNC)
 
 /* This overlays the fid structure (see mount.h). */
 struct ufid {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: gencons.c,v 1.8 2000/10/10 18:21:28 bjc Exp $	*/
+/*	$OpenBSD: gencons.c,v 1.10 2001/03/12 11:45:38 hugh Exp $	*/
 /*	$NetBSD: gencons.c,v 1.22 2000/01/24 02:40:33 matt Exp $	*/
 
 /*
@@ -271,9 +271,11 @@ gencnprobe(cndev)
 {
 	if ((vax_cputype < VAX_TYP_UV1) || /* All older has MTPR console */
 	    (vax_boardtype == VAX_BTYP_630) ||
+	    (vax_boardtype == VAX_BTYP_650) ||
+	    (vax_boardtype == VAX_BTYP_660) ||
 	    (vax_boardtype == VAX_BTYP_670) ||
-		(vax_boardtype == VAX_BTYP_1303) ||
-	    (vax_boardtype == VAX_BTYP_650)) {
+	    (vax_boardtype == VAX_BTYP_1301) ||
+	    (vax_boardtype == VAX_BTYP_1303)) {
 		cndev->cn_dev = makedev(25, 0);
 		cndev->cn_pri = CN_NORMAL;
 	} else

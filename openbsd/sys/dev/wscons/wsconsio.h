@@ -1,4 +1,4 @@
-/* $OpenBSD: wsconsio.h,v 1.3 2000/08/01 13:51:17 mickey Exp $ */
+/* $OpenBSD: wsconsio.h,v 1.9 2001/04/14 04:44:01 aaron Exp $ */
 /* $NetBSD: wsconsio.h,v 1.31.2.1 2000/07/07 09:49:17 hannken Exp $ */
 
 /*
@@ -48,6 +48,9 @@
 #include <sys/ioccom.h>
 #include <dev/wscons/wsksymvar.h>
 
+#define	WSSCREEN_NAME_SIZE	16
+#define	WSEMUL_NAME_SIZE	16
+#define	WSFONT_NAME_SIZE	16
 
 /*
  * Common event structure (used by keyboard and mouse)
@@ -70,8 +73,16 @@ struct wscons_event {
 #define	WSCONS_EVENT_MOUSE_ABSOLUTE_Y	9	/* Y location */
 #define	WSCONS_EVENT_MOUSE_DELTA_Z	10	/* Z delta amount */
 #define	WSCONS_EVENT_MOUSE_ABSOLUTE_Z	11	/* Z location */
+#define WSCONS_EVENT_WSMOUSED_ON	12	/* wsmoused(8) active */
+#define WSCONS_EVENT_WSMOUSED_OFF	13	/* wsmoused(8) inactive */
 
-
+#define IS_MOTION_EVENT(type) (((type) == WSCONS_EVENT_MOUSE_DELTA_X) || \
+			       ((type) == WSCONS_EVENT_MOUSE_DELTA_Y) || \
+			       ((type) == WSCONS_EVENT_MOUSE_DELTA_Z))
+#define IS_BUTTON_EVENT(type) (((type) == WSCONS_EVENT_MOUSE_UP) || \
+			       ((type) == WSCONS_EVENT_MOUSE_DOWN))
+#define IS_CTRL_EVENT(type) ((type == WSCONS_EVENT_WSMOUSED_ON) || \
+			     (type == WSCONS_EVENT_WSMOUSED_OFF))
 /*
  * Keyboard ioctls (0 - 31)
  */
@@ -87,6 +98,7 @@ struct wscons_event {
 #define		WSKBD_TYPE_HPC_KBD	7	/* HPC bultin keyboard */
 #define		WSKBD_TYPE_HPC_BTN	8	/* HPC/PsPC buttons */
 #define		WSKBD_TYPE_ARCHIMEDES	9	/* Archimedes keyboard */
+#define		WSKBD_TYPE_ADB		10	/* Apple ADB keyboard */
 
 /* Manipulate the keyboard bell. */
 struct wskbd_bell_data {
@@ -165,16 +177,16 @@ struct wskbd_map_data {
 #define		WSMOUSE_TYPE_ARCHIMEDES	8	/* Archimedes mouse */
 
 /* Set resolution.  Not applicable to all mouse types. */
-#define	WSMOUSEIO_SRES		_IOR('W', 33, u_int)
+#define	WSMOUSEIO_SRES		_IOW('W', 33, u_int)
 #define		WSMOUSE_RES_MIN		0
 #define		WSMOUSE_RES_DEFAULT	75
 #define		WSMOUSE_RES_MAX		100
 
 /* Set scale factor (num / den).  Not applicable to all mouse types. */
-#define	WSMOUSEIO_SSCALE	_IOR('W', 34, u_int[2])
+#define	WSMOUSEIO_SSCALE	_IOW('W', 34, u_int[2])
 
 /* Set sample rate.  Not applicable to all mouse types. */
-#define	WSMOUSEIO_SRATE		_IOR('W', 35, u_int)
+#define	WSMOUSEIO_SRATE		_IOW('W', 35, u_int)
 #define		WSMOUSE_RATE_MIN	0
 #define		WSMOUSE_RATE_DEFAULT	50
 #define		WSMOUSE_RATE_MAX	100
@@ -225,6 +237,7 @@ struct wsmouse_calibcoords {
 #define		WSDISPLAY_TYPE_VAX_MONO	21	/* DEC VS2K/VS3100 mono */
 #define		WSDISPLAY_TYPE_SB_P9100	22	/* Tadpole SPARCbook P9100 */
 #define		WSDISPLAY_TYPE_EGA	23	/* (generic) EGA */
+#define		WSDISPLAY_TYPE_DCPVR	24	/* Dreamcast PowerVR */
 
 /* Basic display information.  Not applicable to all display types. */
 struct wsdisplay_fbinfo {
@@ -297,39 +310,45 @@ struct wsdisplay_cursor {
  * XXX to be changed without care about backwards compatibility!
  */
 struct wsdisplay_font {
-	char *name;
+	char name[WSFONT_NAME_SIZE];
+	int index;
 	int firstchar, numchars;
 	int encoding;
 #define WSDISPLAY_FONTENC_ISO 0
 #define WSDISPLAY_FONTENC_IBM 1
 #define WSDISPLAY_FONTENC_PCVT 2
+#define WSDISPLAY_FONTENC_ISO7 3 /* greek */
+#define WSDISPLAY_FONTENC_SONY 4
 	int fontwidth, fontheight, stride;
 	int bitorder, byteorder;
 #define	WSDISPLAY_FONTORDER_KNOWN	0	/* i.e, no need to convert */
 #define	WSDISPLAY_FONTORDER_L2R		1
 #define	WSDISPLAY_FONTORDER_R2L		2
+	void *cookie;
 	void *data;
 };
-#define WSDISPLAYIO_LDFONT	_IOW('W', 77, struct wsdisplay_font)
+#define WSDISPLAYIO_LDFONT	_IOW ('W', 77, struct wsdisplay_font)
+#define	WSDISPLAYIO_LSFONT	_IOWR('W', 78, struct wsdisplay_font)
+#define	WSDISPLAYIO_DELFONT	_IOW ('W', 79, struct wsdisplay_font)
+#define WSDISPLAYIO_USEFONT	_IOW ('W', 80, struct wsdisplay_font)
 
 struct wsdisplay_addscreendata {
 	int idx; /* screen index */
-	char *screentype;
-	char *emul;
+	char screentype[WSSCREEN_NAME_SIZE];
+	char emul[WSEMUL_NAME_SIZE];
 };
-#define WSDISPLAYIO_ADDSCREEN _IOW('W', 78, struct wsdisplay_addscreendata)
+#define WSDISPLAYIO_ADDSCREEN _IOW('W', 82, struct wsdisplay_addscreendata)
 
 struct wsdisplay_delscreendata {
 	int idx; /* screen index */
 	int flags;
 #define WSDISPLAY_DELSCR_FORCE 1
 };
-#define WSDISPLAYIO_DELSCREEN _IOW('W', 79, struct wsdisplay_delscreendata)
+#define WSDISPLAYIO_DELSCREEN _IOW('W', 83, struct wsdisplay_delscreendata)
 
-struct wsdisplay_usefontdata {
-	char *name;
-};
-#define WSDISPLAYIO_USEFONT	_IOW('W', 80, struct wsdisplay_usefontdata)
+/* Display information: number of bytes per row, may be same as pixels */
+#define	WSDISPLAYIO_LINEBYTES	_IOR('W', 95, u_int)
+
 
 /* Replaced by WSMUX_{ADD,REMOVE}_DEVICE */
 struct wsdisplay_kbddata {
@@ -339,6 +358,21 @@ struct wsdisplay_kbddata {
 	int idx;
 };
 #define _O_WSDISPLAYIO_SETKEYBOARD _IOWR('W', 81, struct wsdisplay_kbddata)
+
+/* Mouse console support */
+#define WSDISPLAYIO_WSMOUSED	_IOW('W', 82, struct wscons_event)
+
+/* Misc control.  Not applicable to all display types. */
+struct wsdisplay_param {
+        int param;
+#define	WSDISPLAYIO_PARAM_BACKLIGHT	1
+#define	WSDISPLAYIO_PARAM_BRIGHTNESS	2
+#define	WSDISPLAYIO_PARAM_CONTRAST	3
+        int min, max, curval;
+        int reserved[4];
+};
+#define	WSDISPLAYIO_GETPARAM	_IOWR('W', 82, struct wsdisplay_param)
+#define	WSDISPLAYIO_SETPARAM	_IOWR('W', 83, struct wsdisplay_param)
 
 /* XXX NOT YET DEFINED */
 /* Mapping information retrieval. */

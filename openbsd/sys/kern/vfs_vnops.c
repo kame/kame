@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_vnops.c,v 1.26 2000/04/25 02:10:04 deraadt Exp $	*/
+/*	$OpenBSD: vfs_vnops.c,v 1.28 2001/03/01 20:54:34 provos Exp $	*/
 /*	$NetBSD: vfs_vnops.c,v 1.20 1996/02/04 02:18:41 christos Exp $	*/
 
 /*
@@ -66,12 +66,13 @@ int	vn_read __P((struct file *fp, off_t *off, struct uio *uio,
 int	vn_write __P((struct file *fp, off_t *off, struct uio *uio, 
             struct ucred *cred));
 int	vn_select __P((struct file *fp, int which, struct proc *p));
+int	vn_kqfilter __P((struct file *fp, struct knote *kn));
 int 	vn_closefile __P((struct file *fp, struct proc *p));
 int	vn_ioctl __P((struct file *fp, u_long com, caddr_t data,
 	    struct proc *p));
 
 struct 	fileops vnops =
-	{ vn_read, vn_write, vn_ioctl, vn_select, vn_closefile };
+	{ vn_read, vn_write, vn_ioctl, vn_select, vn_kqfilter, vn_closefile };
 
 /*
  * Common code for vnode open operations.
@@ -507,4 +508,11 @@ vn_closefile(fp, p)
 
 	return (vn_close(((struct vnode *)fp->f_data), fp->f_flag,
 		fp->f_cred, p));
+}
+
+/*ARGSUSED*/
+int
+vn_kqfilter(struct file *fp, struct knote *kn)
+{
+	return (VOP_KQFILTER(((struct vnode *)fp->f_data), kn));
 }

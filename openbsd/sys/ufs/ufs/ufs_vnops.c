@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_vnops.c,v 1.27 1999/03/09 21:16:28 art Exp $	*/
+/*	$OpenBSD: ufs_vnops.c,v 1.31 2001/04/25 21:31:17 csapuntz Exp $	*/
 /*	$NetBSD: ufs_vnops.c,v 1.18 1996/05/11 18:28:04 mycroft Exp $	*/
 
 /*
@@ -56,6 +56,7 @@
 #include <sys/malloc.h>
 #include <sys/dirent.h>
 #include <sys/lockf.h>
+#include <sys/event.h>
 
 #include <vm/vm.h>
 
@@ -76,6 +77,9 @@
 static int ufs_chmod __P((struct vnode *, int, struct ucred *, struct proc *));
 static int ufs_chown
 	__P((struct vnode *, uid_t, gid_t, struct ucred *, struct proc *));
+int filt_ufsread __P((struct knote *kn, long hint));
+int filt_ufsvnode __P((struct knote *kn, long hint));
+void filt_ufsdetach __P((struct knote *kn));
 
 union _qcvt {
 	int64_t	qcvt;
@@ -93,6 +97,8 @@ union _qcvt {
 	tmp.val[_QUAD_LOWWORD] = (l); \
 	(q) = tmp.qcvt; \
 }
+#define VN_KNOTE(vp, b) \
+	KNOTE(&vp->v_selectinfo.vsi_selinfo.si_note, (b))
 
 
 /*
@@ -120,9 +126,15 @@ ufs_create(v)
 		struct componentname *a_cnp;
 		struct vattr *a_vap;
 	} */ *ap = v;
-	return
+	int error;
+
+	error =
 	    ufs_makeinode(MAKEIMODE(ap->a_vap->va_type, ap->a_vap->va_mode),
 			  ap->a_dvp, ap->a_vpp, ap->a_cnp);
+	if (error)
+		return (error);
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
+	return (0);
 }
 
 /*
@@ -148,6 +160,7 @@ ufs_mknod(v)
 	     ufs_makeinode(MAKEIMODE(vap->va_type, vap->va_mode),
 			   ap->a_dvp, vpp, ap->a_cnp)) != 0)
 		return (error);
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
 	ip = VTOI(*vpp);
 	ip->i_flag |= IN_ACCESS | IN_CHANGE | IN_UPDATE;
 	if (vap->va_rdev != VNOVAL) {
@@ -433,6 +446,7 @@ ufs_setattr(v)
 			return (EROFS);
 		error = ufs_chmod(vp, (int)vap->va_mode, cred, p);
 	}
+	VN_KNOTE(vp, NOTE_ATTRIB);
 	return (error);
 }
 
@@ -677,11 +691,14 @@ ufs_remove(v)
 
 	ip = VTOI(vp);
 	if (vp->v_type == VDIR || (ip->i_ffs_flags & (IMMUTABLE | APPEND)) ||
-	    (VTOI(dvp)->i_ffs_flags & APPEND))
+	    (VTOI(dvp)->i_ffs_flags & APPEND)) {
 		error = EPERM;
-	else
-		error = ufs_dirremove(dvp, ip, ap->a_cnp->cn_flags, 0);
-
+		goto out;
+	}
+	error = ufs_dirremove(dvp, ip, ap->a_cnp->cn_flags, 0);
+	VN_KNOTE(vp, NOTE_DELETE);
+	VN_KNOTE(dvp, NOTE_WRITE);
+ out:
 	if (dvp == vp)
 		vrele(vp);
 	else
@@ -744,7 +761,7 @@ ufs_link(v)
 	ip->i_ffs_nlink++;
 	ip->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(vp))
-		softdep_increase_linkcnt(ip);
+		softdep_change_linkcnt(ip);
 	TIMEVAL_TO_TIMESPEC(&time, &ts);
 	if ((error = VOP_UPDATE(vp, &ts, &ts, !DOINGSOFTDEP(vp))) == 0) {
 		ufs_makedirentry(ip, cnp, &newdir);
@@ -754,8 +771,12 @@ ufs_link(v)
 		ip->i_effnlink--;
 		ip->i_ffs_nlink--;
 		ip->i_flag |= IN_CHANGE;
+		if (DOINGSOFTDEP(vp))
+			softdep_change_linkcnt(ip);
 	}
 	FREE(cnp->cn_pnbuf, M_NAMEI);
+	VN_KNOTE(vp, NOTE_LINK);
+	VN_KNOTE(dvp, NOTE_WRITE);
 out1:
 	if (dvp != vp)
 		VOP_UNLOCK(vp, 0, p);
@@ -900,17 +921,27 @@ abortit:
 		return (error);
 	}
 
-	/*
-	 * Check if just deleting a link name.
-	 */
 	if (tvp && ((VTOI(tvp)->i_ffs_flags & (IMMUTABLE | APPEND)) ||
 	    (VTOI(tdvp)->i_ffs_flags & APPEND))) {
 		error = EPERM;
 		goto abortit;
 	}
+
+	/*
+	 * Check if just deleting a link name or if we've lost a race.
+	 * If another process completes the same rename after we've looked
+	 * up the source and have blocked looking up the target, then the
+	 * source and target inodes may be identical now although the
+	 * names were never linked.
+	 */
 	if (fvp == tvp) {
 		if (fvp->v_type == VDIR) {
-			error = EINVAL;
+			/*
+			 * Linked directories are impossible, so we must
+			 * have lost the race.  Pretend that the rename
+			 * completed before the lookup.
+			 */
+			error = ENOENT;
 			goto abortit;
 		}
 
@@ -919,7 +950,12 @@ abortit:
 		vput(tdvp);
 		vput(tvp);
 
-		/* Delete source. */
+		/*
+		 * Delete source.  There is another race now that everything
+		 * is unlocked, but this doesn't cause any new complications.
+		 * Relookup() may find a file that is unrelated to the
+		 * original one, or it may fail.  Too bad.
+		 */
 		vrele(fdvp);
 		vrele(fvp);
 		fcnp->cn_flags &= ~MODMASK;
@@ -928,6 +964,9 @@ abortit:
 			panic("ufs_rename: lost from startdir");
 		fcnp->cn_nameiop = DELETE;
 		(void) relookup(fdvp, &fvp, fcnp);
+		if (fvp == NULL) {
+			return (ENOENT);
+		}
 		return (VOP_REMOVE(fdvp, fvp, fcnp));
 	}
 
@@ -973,6 +1012,7 @@ abortit:
 		oldparent = dp->i_number;
 		doingdirectory = 1;
 	}
+	VN_KNOTE(fdvp, NOTE_WRITE);		/* XXX right place? */
 	/* Why? */
 	vrele(fdvp);
 
@@ -995,7 +1035,7 @@ abortit:
 	ip->i_ffs_nlink++;
 	ip->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(fvp))
-		softdep_increase_linkcnt(ip);
+		softdep_change_linkcnt(ip);
 	TIMEVAL_TO_TIMESPEC(&time, &ts);
 	if ((error = VOP_UPDATE(fvp, &ts, &ts, !DOINGSOFTDEP(fvp))) != 0) {
 		VOP_UNLOCK(fvp, 0, p);
@@ -1060,12 +1100,14 @@ abortit:
 			dp->i_ffs_nlink++;
 			dp->i_flag |= IN_CHANGE;
 			if (DOINGSOFTDEP(tdvp))
-                               softdep_increase_linkcnt(dp);
+                               softdep_change_linkcnt(dp);
 			if ((error = VOP_UPDATE(tdvp, &ts, &ts,
 						!DOINGSOFTDEP(tdvp))) != 0) {
 				dp->i_effnlink--;
 				dp->i_ffs_nlink--;
 				dp->i_flag |= IN_CHANGE;
+				if (DOINGSOFTDEP(tdvp))
+					softdep_change_linkcnt(dp);
 				goto bad;
 			}
 		}
@@ -1075,10 +1117,13 @@ abortit:
 				dp->i_effnlink--;
 				dp->i_ffs_nlink--;
 				dp->i_flag |= IN_CHANGE;
+				if (DOINGSOFTDEP(tdvp))
+					softdep_change_linkcnt(dp);
 				(void)VOP_UPDATE(tdvp, &ts, &ts, 1);
 			}
 			goto bad;
 		}
+		VN_KNOTE(tdvp, NOTE_WRITE);
 		vput(tdvp);
 	} else {
 		if (xp->i_dev != dp->i_dev || xp->i_dev != ip->i_dev)
@@ -1087,7 +1132,7 @@ abortit:
 		 * Short circuit rename(foo, foo).
 		 */
 		if (xp->i_number == ip->i_number)
-			panic("rename: same file");
+			panic("ufs_rename: same file");
 		/*
 		 * If the parent directory is "sticky", then the user must
 		 * own the parent directory, or the destination of the rename,
@@ -1128,10 +1173,12 @@ abortit:
 		if (doingdirectory) {
 			if (!newparent) {
 				dp->i_effnlink--;
-				dp->i_flag |= IN_CHANGE;
+				if (DOINGSOFTDEP(tdvp))
+					softdep_change_linkcnt(dp);
 			}
 			xp->i_effnlink--;
-			xp->i_flag |= IN_CHANGE;
+			if (DOINGSOFTDEP(tvp))
+				softdep_change_linkcnt(xp);
 		}
 		if (doingdirectory && !DOINGSOFTDEP(tvp)) {
 		       /*
@@ -1145,15 +1192,20 @@ abortit:
                         * disk, so when running with that code we avoid doing
                         * them now.
                         */
-			if (!newparent)
+			if (!newparent) {
 				dp->i_ffs_nlink--;
+				dp->i_flag |= IN_CHANGE;
+			}
 
 			xp->i_ffs_nlink--;
+			xp->i_flag |= IN_CHANGE;
 			if ((error = VOP_TRUNCATE(tvp, (off_t)0, IO_SYNC,
 			        tcnp->cn_cred, tcnp->cn_proc)) != 0)
 				goto bad;
                 }
+		VN_KNOTE(tdvp, NOTE_WRITE);
 	        vput(tdvp);
+		VN_KNOTE(tvp, NOTE_DELETE);
 		vput(tvp);
 		xp = NULL;
 	}
@@ -1174,7 +1226,7 @@ abortit:
 		 * From name has disappeared.
 		 */
 		if (doingdirectory)
-			panic("rename: lost dir entry");
+			panic("ufs_rename: lost dir entry");
 		vrele(ap->a_fvp);
 		return (0);
 	}
@@ -1189,7 +1241,7 @@ abortit:
 	 */
 	if (xp != ip) {
 		if (doingdirectory)
-			panic("rename: lost dir entry");
+			panic("ufs_rename: lost dir entry");
 	} else {
 		/*
 		 * If the source is a directory with a
@@ -1205,6 +1257,7 @@ abortit:
 		error = ufs_dirremove(fdvp, xp, fcnp->cn_flags, 0);
 		xp->i_flag &= ~IN_RENAME;
 	}
+	VN_KNOTE(fvp, NOTE_RENAME);
 	if (dp)
 		vput(fdvp);
 	if (xp)
@@ -1223,6 +1276,9 @@ out:
 		ip->i_effnlink--;
 		ip->i_ffs_nlink--;
 		ip->i_flag |= IN_CHANGE;
+		ip->i_flag &= ~IN_RENAME;
+		if (DOINGSOFTDEP(fvp))
+			softdep_change_linkcnt(ip);
 		vput(fvp);
 	} else
 		vrele(fvp);
@@ -1290,7 +1346,7 @@ ufs_mkdir(v)
 	ip->i_effnlink = 2;
 	ip->i_ffs_nlink = 2;
 	if (DOINGSOFTDEP(tvp))
-		softdep_increase_linkcnt(ip);
+		softdep_change_linkcnt(ip);
 
 	if (cnp->cn_flags & ISWHITEOUT)
 		ip->i_ffs_flags |= UF_OPAQUE;
@@ -1304,7 +1360,7 @@ ufs_mkdir(v)
 	dp->i_ffs_nlink++;
 	dp->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(dvp))
-		softdep_increase_linkcnt(dp);
+		softdep_change_linkcnt(dp);
 	TIMEVAL_TO_TIMESPEC(&time, &ts);
 	if ((error = VOP_UPDATE(dvp, &ts, &ts, !DOINGSOFTDEP(dvp))) != 0)
 		goto bad;
@@ -1368,11 +1424,14 @@ ufs_mkdir(v)
   
 bad:
         if (error == 0) {
+		VN_KNOTE(dvp, NOTE_WRITE);
                 *ap->a_vpp = tvp;
         } else {
                 dp->i_effnlink--;
                 dp->i_ffs_nlink--;
                 dp->i_flag |= IN_CHANGE;
+		if (DOINGSOFTDEP(dvp))
+			softdep_change_linkcnt(dp);
                 /*
                  * No need to do an explicit VOP_TRUNCATE here, vrele will
                  * do this for us because we set the link count to 0.
@@ -1380,7 +1439,8 @@ bad:
                 ip->i_effnlink = 0;
                 ip->i_ffs_nlink = 0;
                 ip->i_flag |= IN_CHANGE;
-
+		if (DOINGSOFTDEP(tvp))
+			softdep_change_linkcnt(ip);
 		vput(tvp);
 	}
 out:
@@ -1447,30 +1507,45 @@ ufs_rmdir(v)
 	 * inode.  If we crash in between, the directory
 	 * will be reattached to lost+found,
 	 */
-	if ((error = ufs_dirremove(dvp, ip, cnp->cn_flags, 1)) != 0)
+	dp->i_effnlink--;
+	ip->i_effnlink--;
+	if (DOINGSOFTDEP(vp)) {
+		softdep_change_linkcnt(dp);
+		softdep_change_linkcnt(ip);
+	}
+	if ((error = ufs_dirremove(dvp, ip, cnp->cn_flags, 1)) != 0) {
+		dp->i_effnlink++;
+		ip->i_effnlink++;
+		if (DOINGSOFTDEP(vp)) {
+			softdep_change_linkcnt(dp);
+			softdep_change_linkcnt(ip);
+		}
 		goto out;
+	}
+
+	VN_KNOTE(dvp, NOTE_WRITE | NOTE_LINK);
 	cache_purge(dvp);
         /*
 	 * Truncate inode. The only stuff left in the directory is "." and
 	 * "..". The "." reference is inconsequential since we are quashing
-	 * it. We have removed the "." reference and the reference in the
-	 * parent directory, but there may be other hard links. The soft
-	 * update code will arange to do these operations after the parent
-	 * directory has been deleted on disk, so when running with
-	 * that code we avoid doing them now.
+	 * it. The soft dependency code will arrange to do these operations
+	 * after the parent directory entry has been deleted on disk, so
+	 * when running with that code we avoid doing them now.
 	 */
-	dp->i_effnlink--;
-	dp->i_flag |= IN_CHANGE;
-	ip->i_effnlink--;
-	ip->i_flag |= IN_CHANGE;
 	if (!DOINGSOFTDEP(vp)) {
+		int ioflag;
+
 		dp->i_ffs_nlink--;
+		dp->i_flag |= IN_CHANGE;
 		ip->i_ffs_nlink--;
-		error = VOP_TRUNCATE(vp, (off_t)0, IO_SYNC, cnp->cn_cred,
-		   cnp->cn_proc);
+		ip->i_flag |= IN_CHANGE;
+		ioflag = DOINGASYNC(vp) ? 0 : IO_SYNC;
+		error = VOP_TRUNCATE(vp, (off_t)0, ioflag, cnp->cn_cred,
+		    cnp->cn_proc);
 	}
 	cache_purge(vp);
 out:
+	VN_KNOTE(vp, NOTE_DELETE);
         vput(dvp);
 	vput(vp);
 	return (error);
@@ -1498,6 +1573,7 @@ ufs_symlink(v)
 			      vpp, ap->a_cnp);
 	if (error)
 		return (error);
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
 	vp = *vpp;
 	len = strlen(ap->a_target);
 	if (len < vp->v_mount->mnt_maxsymlinklen) {
@@ -2089,7 +2165,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 	ip->i_effnlink = 1;
 	ip->i_ffs_nlink = 1;
 	if (DOINGSOFTDEP(tvp))
-		softdep_increase_linkcnt(ip);
+		softdep_change_linkcnt(ip);
 	if ((ip->i_ffs_mode & ISGID) &&
 		!groupmember(ip->i_ffs_gid, cnp->cn_cred) &&
 	    suser(cnp->cn_cred, NULL))
@@ -2125,9 +2201,92 @@ bad:
 	ip->i_effnlink = 0;
 	ip->i_ffs_nlink = 0;
 	ip->i_flag |= IN_CHANGE;
+	if (DOINGSOFTDEP(tvp))
+		softdep_change_linkcnt(ip);
 	vput(tvp);
 
 	return (error);
 }
+
+struct filterops ufsread_filtops = 
+	{ 1, NULL, filt_ufsdetach, filt_ufsread };
+struct filterops ufsvnode_filtops = 
+	{ 1, NULL, filt_ufsdetach, filt_ufsvnode };
+
+int
+ufs_kqfilter(v)
+	void *v;
+{
+	struct vop_kqfilter_args /* {
+		struct vnode *a_vp;
+		struct knote *a_kn;
+	} */ *ap = v;
+	struct vnode *vp = ap->a_vp;
+	struct knote *kn = ap->a_kn;
+
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		kn->kn_fop = &ufsread_filtops;
+		break;
+	case EVFILT_VNODE:
+		kn->kn_fop = &ufsvnode_filtops;
+		break;
+	default:
+		return (1);
+	}
+
+	kn->kn_hook = (caddr_t)vp;
+
+	simple_lock(&vp->v_selectinfo.vsi_lock);
+	SLIST_INSERT_HEAD(&vp->v_selectinfo.vsi_selinfo.si_note, kn, kn_selnext);
+	simple_unlock(&vp->v_selectinfo.vsi_lock);
+
+	return (0);
+}
+
+void
+filt_ufsdetach(struct knote *kn)
+{
+	struct vnode *vp = (struct vnode *)kn->kn_hook;
+
+	simple_lock(&vp->v_selectinfo.vsi_lock);
+	SLIST_REMOVE(&vp->v_selectinfo.vsi_selinfo.si_note,
+	    kn, knote, kn_selnext);
+	simple_unlock(&vp->v_selectinfo.vsi_lock);
+}
+
+/*ARGSUSED*/
+int
+filt_ufsread(struct knote *kn, long hint)
+{
+	struct vnode *vp = (struct vnode *)kn->kn_hook;
+	struct inode *ip = VTOI(vp);
+
+	/*
+	 * filesystem is gone, so set the EOF flag and schedule 
+	 * the knote for deletion.
+	 */
+	if (hint == NOTE_REVOKE) {
+		kn->kn_flags |= (EV_EOF | EV_ONESHOT);
+		return (1);
+	}
+
+        kn->kn_data = ip->i_ffs_size - kn->kn_fp->f_offset;
+        return (kn->kn_data != 0);
+}
+
+int
+filt_ufsvnode(struct knote *kn, long hint)
+{
+
+	if (kn->kn_sfflags & hint)
+		kn->kn_fflags |= hint;
+	if (hint == NOTE_REVOKE) {
+		kn->kn_flags |= EV_EOF;
+		return (1);
+	}
+	return (kn->kn_fflags != 0);
+}
+
 
 

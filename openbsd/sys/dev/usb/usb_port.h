@@ -1,5 +1,5 @@
-/*	$OpenBSD: usb_port.h,v 1.18 2000/09/06 22:42:10 rahnds Exp $ */
-/*	$NetBSD: usb_port.h,v 1.28 2000/03/30 08:53:31 augustss Exp $	*/
+/*	$OpenBSD: usb_port.h,v 1.24 2001/02/03 07:46:11 mickey Exp $ */
+/*	$NetBSD: usb_port.h,v 1.35 2000/09/23 04:32:23 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.21 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
@@ -52,6 +52,7 @@
 #include "opt_usbverbose.h"
 
 #ifdef USB_DEBUG
+#define UKBD_DEBUG 1
 #define UHID_DEBUG 1
 #define OHCI_DEBUG 1
 #define UGEN_DEBUG 1
@@ -69,6 +70,8 @@
 #define UZCOM_DEBUG 1
 #define URIO_DEBUG 1
 #define UFTDI_DEBUG 1
+#define USCANNER_DEBUG 1
+#define USSCANNER_DEBUG 1
 #define Static
 #else
 #define Static static
@@ -105,10 +108,10 @@ typedef int usb_malloc_type;
 #define logprintf printf
 
 #define USB_DECLARE_DRIVER(dname)  \
-int __CONCAT(dname,_match) __P((struct device *, struct cfdata *, void *)); \
-void __CONCAT(dname,_attach) __P((struct device *, struct device *, void *)); \
-int __CONCAT(dname,_detach) __P((struct device *, int)); \
-int __CONCAT(dname,_activate) __P((struct device *, enum devact)); \
+int __CONCAT(dname,_match)(struct device *, struct cfdata *, void *); \
+void __CONCAT(dname,_attach)(struct device *, struct device *, void *); \
+int __CONCAT(dname,_detach)(struct device *, int); \
+int __CONCAT(dname,_activate)(struct device *, enum devact); \
 \
 extern struct cfdriver __CONCAT(dname,_cd); \
 \
@@ -162,7 +165,7 @@ __CONCAT(dname,_detach)(self, flags) \
 	if (unit >= __CONCAT(dname,_cd).cd_ndevs) \
 		return (ENXIO); \
 	sc = __CONCAT(dname,_cd).cd_devs[unit]; \
-	if (!sc) \
+	if (sc == NULL) \
 		return (ENXIO)
 
 #define USB_GET_SC(dname, unit, sc) \
@@ -172,10 +175,12 @@ __CONCAT(dname,_detach)(self, flags) \
 	(config_found_sm(parent, args, print, sub))
 
 #elif defined(__OpenBSD__)
+#include <sys/timeout.h>
 /*
  * OpenBSD
  */
 #ifdef USB_DEBUG
+#define UKBD_DEBUG 1
 #define UHID_DEBUG 1
 #define OHCI_DEBUG 1
 #define UGEN_DEBUG 1
@@ -194,6 +199,8 @@ __CONCAT(dname,_detach)(self, flags) \
 #define UZCOM_DEBUG 1
 #define URIO_DEBUG 1
 #define UFTDI_DEBUG 1
+#define USCANNER_DEBUG 1
+#define USSCANNER_DEBUG 1
 #endif
 
 #define Static
@@ -254,6 +261,7 @@ typedef int usb_malloc_type;
 #define	uhidpoll		uhidselect
 #define	ugenpoll		ugenselect
 #define	uriopoll		urioselect
+#define uscannerpoll		uscannerselect
 
 #define powerhook_establish(fn, sc) (fn)
 #define powerhook_disestablish(hdl)
@@ -266,7 +274,7 @@ typedef int usb_malloc_type;
 #define change_sign16_le change_sign16
 
 #define realloc usb_realloc
-void *usb_realloc __P((void *, u_int, int, int));
+void *usb_realloc(void *, u_int, int, int);
 
 extern int cold;
 
@@ -285,16 +293,17 @@ typedef struct device *device_ptr_t;
 		u_int offs; \
 	} usb_dma_t
 
-typedef char usb_callout_t;
+typedef struct timeout usb_callout_t;
 #define usb_callout_init(h)
-#define usb_callout(h, t, f, d) timeout((f), (d), (t))
-#define usb_uncallout(h, f, d) untimeout((f), (d))
+#define usb_callout(h, t, f, d) \
+	{ timeout_set(&(h), (f), (d)); timeout_add(&(h), (t)); }
+#define usb_uncallout(h, f, d) timeout_del(&(h))
 
 #define USB_DECLARE_DRIVER(dname)  \
-int __CONCAT(dname,_match) __P((struct device *, void *, void *)); \
-void __CONCAT(dname,_attach) __P((struct device *, struct device *, void *)); \
-int __CONCAT(dname,_detach) __P((struct device *, int)); \
-int __CONCAT(dname,_activate) __P((struct device *, enum devact)); \
+int __CONCAT(dname,_match)(struct device *, void *, void *); \
+void __CONCAT(dname,_attach)(struct device *, struct device *, void *); \
+int __CONCAT(dname,_detach)(struct device *, int); \
+int __CONCAT(dname,_activate)(struct device *, enum devact); \
 \
 struct cfdriver __CONCAT(dname,_cd) = { \
 	NULL, #dname, DV_DULL \
@@ -350,7 +359,7 @@ __CONCAT(dname,_detach)(self, flags) \
 	if (unit >= __CONCAT(dname,_cd).cd_ndevs) \
 		return (ENXIO); \
 	sc = __CONCAT(dname,_cd).cd_devs[unit]; \
-	if (!sc) \
+	if (sc == NULL) \
 		return (ENXIO)
 
 #define USB_GET_SC(dname, unit, sc) \
@@ -459,7 +468,7 @@ __CONCAT(dname,_detach)(device_t self)
 
 #define USB_GET_SC_OPEN(dname, unit, sc) \
 	sc = devclass_get_softc(__CONCAT(dname,_devclass), unit); \
-	if (!sc) \
+	if (sc == NULL) \
 		return (ENXIO)
 
 #define USB_GET_SC(dname, unit, sc) \

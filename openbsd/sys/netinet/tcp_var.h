@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_var.h,v 1.33 2000/10/14 01:04:11 itojun Exp $	*/
+/*	$OpenBSD: tcp_var.h,v 1.35 2000/12/13 09:47:08 provos Exp $	*/
 /*	$NetBSD: tcp_var.h,v 1.17 1996/02/13 23:44:24 christos Exp $	*/
 
 /*
@@ -349,6 +349,10 @@ int	 tcp_mss __P((struct tcpcb *, int));
 void	 tcp_mss_update __P((struct tcpcb *));
 void	 tcp_mtudisc __P((struct inpcb *, int));
 void	 tcp_mtudisc_increase __P((struct inpcb *, int));
+#ifdef INET6
+void	tcp6_mtudisc __P((struct inpcb *, int));
+void	tcp6_mtudisc_callback __P((struct in6_addr *));
+#endif
 struct tcpcb *
 	 tcp_newtcpcb __P((struct inpcb *));
 void	 tcp_notify __P((struct inpcb *, int));
@@ -397,5 +401,9 @@ u_long	 tcp_seq_subtract  __P((u_long, u_long ));
 #ifdef TCP_SIGNATURE
 int	tcp_signature_apply __P((caddr_t, caddr_t, unsigned int));
 #endif /* TCP_SIGNATURE */
+void	tcp_rndiss_init __P((void));
+tcp_seq	tcp_rndiss_next __P((void));
+u_int16_t
+	tcp_rndiss_encrypt __P((u_int16_t));
 
 #endif /* _KERNEL */

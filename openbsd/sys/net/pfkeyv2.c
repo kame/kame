@@ -1,4 +1,4 @@
-/* $OpenBSD: pfkeyv2.c,v 1.48 2000/10/14 06:23:51 angelos Exp $ */
+/* $OpenBSD: pfkeyv2.c,v 1.58 2001/03/28 20:03:01 angelos Exp $ */
 /*
 %%% copyright-nrl-97
 This software is Copyright 1997-1998 by Randall Atkinson, Ronald Lee,
@@ -58,14 +58,15 @@ static struct sadb_alg ealgs[] =
 
 static struct sadb_alg aalgs[] =
 {
-    { SADB_AALG_SHA1HMAC96, 0, 160, 160 },
-    { SADB_AALG_MD5HMAC96, 0, 128, 128 },
-    { SADB_X_AALG_RIPEMD160HMAC96, 0, 160, 160 }
+    { SADB_AALG_SHA1HMAC, 0, 160, 160 },
+    { SADB_AALG_MD5HMAC, 0, 128, 128 },
+    { SADB_AALG_RIPEMD160HMAC, 0, 160, 160 }
 };
 
 void export_address(void **, struct sockaddr *);
 void export_identity(void **, struct tdb *, int);
 void export_lifetime(void **, struct tdb *, int);
+void export_credentials(void **, struct tdb *, int);
 void export_sa(void **, struct tdb *);
 void export_key(void **, struct tdb *, int);
 
@@ -73,6 +74,7 @@ void import_address(struct sockaddr *, struct sadb_address *);
 void import_identity(struct tdb *, struct sadb_ident *, int);
 void import_key(struct ipsecinit *, struct sadb_key *, int);
 void import_lifetime(struct tdb *, struct sadb_lifetime *, int);
+void import_credentials(struct tdb *, struct sadb_cred *, int);
 void import_sa(struct tdb *, struct sadb_sa *, struct ipsecinit *);
 
 int pfkeyv2_create(struct socket *);
@@ -81,8 +83,8 @@ int pfkeyv2_policy(struct ipsec_acquire *, void **, void **);
 int pfkeyv2_release(struct socket *);
 int pfkeyv2_send(struct socket *, void *, int);
 int pfkeyv2_sendmessage(void **, int, struct socket *, u_int8_t, int);
-int pfkeyv2_dump_walker(struct tdb *, void *);
-int pfkeyv2_flush_walker(struct tdb *, void *);
+int pfkeyv2_dump_walker(struct tdb *, void *, int);
+int pfkeyv2_flush_walker(struct tdb *, void *, int);
 int pfkeyv2_get_proto_alg(u_int8_t, u_int8_t *, int *);
 
 int pfdatatopacket(void *, int, struct mbuf **);
@@ -210,7 +212,7 @@ export_sa(void **p, struct tdb *tdb)
 
     sadb_sa->sadb_sa_spi = tdb->tdb_spi;
     sadb_sa->sadb_sa_replay = tdb->tdb_wnd;
-  
+
     if (tdb->tdb_flags & TDBF_INVALID)
       sadb_sa->sadb_sa_state = SADB_SASTATE_LARVAL;
 
@@ -218,16 +220,16 @@ export_sa(void **p, struct tdb *tdb)
     {
 	switch (tdb->tdb_authalgxform->type)
 	{
-	    case CRYPTO_MD5_HMAC96:
-		sadb_sa->sadb_sa_auth = SADB_AALG_MD5HMAC96;
+	    case CRYPTO_MD5_HMAC:
+		sadb_sa->sadb_sa_auth = SADB_AALG_MD5HMAC;
 		break;
 
-	    case CRYPTO_SHA1_HMAC96:
-		sadb_sa->sadb_sa_auth = SADB_AALG_SHA1HMAC96;
+	    case CRYPTO_SHA1_HMAC:
+		sadb_sa->sadb_sa_auth = SADB_AALG_SHA1HMAC;
 		break;
 
-	    case CRYPTO_RIPEMD160_HMAC96:
-		sadb_sa->sadb_sa_auth = SADB_X_AALG_RIPEMD160HMAC96;
+	    case CRYPTO_RIPEMD160_HMAC:
+		sadb_sa->sadb_sa_auth = SADB_AALG_RIPEMD160HMAC;
 		break;
 
 	    case CRYPTO_MD5_KPDK:
@@ -306,57 +308,62 @@ import_lifetime(struct tdb *tdb, struct sadb_lifetime *sadb_lifetime, int type)
 	      tdb->tdb_flags |= TDBF_ALLOCATIONS;
 	    else
 	      tdb->tdb_flags &= ~TDBF_ALLOCATIONS;
-      
+
 	    if ((tdb->tdb_exp_bytes = sadb_lifetime->sadb_lifetime_bytes) != 0)
 	      tdb->tdb_flags |= TDBF_BYTES;
 	    else
 	      tdb->tdb_flags &= ~TDBF_BYTES;
-      
+
 	    if ((tdb->tdb_exp_timeout =
 		 sadb_lifetime->sadb_lifetime_addtime) != 0)
 	    {
 		tdb->tdb_flags |= TDBF_TIMER;
-		tdb->tdb_exp_timeout += time.tv_sec;
-	    }
-	    else
-	      tdb->tdb_flags &= ~TDBF_TIMER;
-      
+		timeout_add(&tdb->tdb_timer_tmo, hz * tdb->tdb_exp_timeout);
+	    } else
+	        tdb->tdb_flags &= ~TDBF_TIMER;
+
 	    if ((tdb->tdb_exp_first_use =
 		 sadb_lifetime->sadb_lifetime_usetime) != 0)
-	      tdb->tdb_flags |= TDBF_FIRSTUSE;
+	    {
+	        tdb->tdb_flags |= TDBF_FIRSTUSE;
+	        timeout_add(&tdb->tdb_first_tmo, hz * tdb->tdb_exp_first_use);
+	    }
 	    else
-	      tdb->tdb_flags &= ~TDBF_FIRSTUSE;
+	        tdb->tdb_flags &= ~TDBF_FIRSTUSE;
 	    break;
-      
+
 	case PFKEYV2_LIFETIME_SOFT:
 	    if ((tdb->tdb_soft_allocations =
 		 sadb_lifetime->sadb_lifetime_allocations) != 0)
 	      tdb->tdb_flags |= TDBF_SOFT_ALLOCATIONS;
 	    else
 	      tdb->tdb_flags &= ~TDBF_SOFT_ALLOCATIONS;
-      
+
 	    if ((tdb->tdb_soft_bytes =
 		 sadb_lifetime->sadb_lifetime_bytes) != 0)
 	      tdb->tdb_flags |= TDBF_SOFT_BYTES;
 	    else
 	      tdb->tdb_flags &= ~TDBF_SOFT_BYTES;
-      
+
 	    if ((tdb->tdb_soft_timeout =
 		 sadb_lifetime->sadb_lifetime_addtime) != 0)
 	    {
 		tdb->tdb_flags |= TDBF_SOFT_TIMER;
-		tdb->tdb_soft_timeout += time.tv_sec;
+		timeout_add(&tdb->tdb_stimer_tmo, hz * tdb->tdb_soft_timeout);
 	    }
 	    else
 	      tdb->tdb_flags &= ~TDBF_SOFT_TIMER;
-      
+
 	    if ((tdb->tdb_soft_first_use =
 		 sadb_lifetime->sadb_lifetime_usetime) != 0)
-	      tdb->tdb_flags |= TDBF_SOFT_FIRSTUSE;
+	    {
+	        tdb->tdb_flags |= TDBF_SOFT_FIRSTUSE;
+	        timeout_add(&tdb->tdb_sfirst_tmo, hz * tdb->tdb_soft_first_use);
+	    }
 	    else
-	      tdb->tdb_flags &= ~TDBF_SOFT_FIRSTUSE;
+	        tdb->tdb_flags &= ~TDBF_SOFT_FIRSTUSE;
 	    break;
-      
+
 	case PFKEYV2_LIFETIME_CURRENT:  /* Nothing fancy here */
 	    tdb->tdb_cur_allocations =
 				      sadb_lifetime->sadb_lifetime_allocations;
@@ -364,9 +371,6 @@ import_lifetime(struct tdb *tdb, struct sadb_lifetime *sadb_lifetime, int type)
 	    tdb->tdb_established = sadb_lifetime->sadb_lifetime_addtime;
 	    tdb->tdb_first_use = sadb_lifetime->sadb_lifetime_usetime;
     }
-
-    /* Setup/update our position in the expiration queue.  */
-    tdb_expiration(tdb, TDBEXP_TIMEOUT);
 }
 
 /*
@@ -391,12 +395,10 @@ export_lifetime(void **p, struct tdb *tdb, int type)
 	      sadb_lifetime->sadb_lifetime_bytes = tdb->tdb_exp_bytes;
 
 	    if (tdb->tdb_flags & TDBF_TIMER)
-	      sadb_lifetime->sadb_lifetime_addtime = tdb->tdb_exp_timeout -
-						     tdb->tdb_established;
+	      sadb_lifetime->sadb_lifetime_addtime = tdb->tdb_exp_timeout;
 
 	    if (tdb->tdb_flags & TDBF_FIRSTUSE)
-	      sadb_lifetime->sadb_lifetime_usetime = tdb->tdb_exp_first_use -
-						     tdb->tdb_first_use;
+	      sadb_lifetime->sadb_lifetime_usetime = tdb->tdb_exp_first_use;
 	    break;
 
 	case PFKEYV2_LIFETIME_SOFT:
@@ -408,14 +410,12 @@ export_lifetime(void **p, struct tdb *tdb, int type)
 	      sadb_lifetime->sadb_lifetime_bytes = tdb->tdb_soft_bytes;
 
 	    if (tdb->tdb_flags & TDBF_SOFT_TIMER)
-	      sadb_lifetime->sadb_lifetime_addtime = tdb->tdb_soft_timeout -
-						     tdb->tdb_established;
+	      sadb_lifetime->sadb_lifetime_addtime = tdb->tdb_soft_timeout;
 
 	    if (tdb->tdb_flags & TDBF_SOFT_FIRSTUSE)
-	      sadb_lifetime->sadb_lifetime_usetime = tdb->tdb_soft_first_use -
-						     tdb->tdb_first_use;
+	      sadb_lifetime->sadb_lifetime_usetime = tdb->tdb_soft_first_use;
 	    break;
-      
+
 	case PFKEYV2_LIFETIME_CURRENT:
 	    sadb_lifetime->sadb_lifetime_allocations =
 						      tdb->tdb_cur_allocations;
@@ -484,6 +484,35 @@ export_address(void **p, struct sockaddr *sa)
 }
 
 /*
+ * Import a set of credentials into the TDB.
+ */
+void
+import_credentials(struct tdb *tdb, struct sadb_cred *sadb_cred, int dstcred)
+{
+    if (!sadb_cred)
+      return;
+
+    if (dstcred)
+    {
+	tdb->tdb_dst_cred_len = EXTLEN(sadb_cred) - sizeof(struct sadb_cred);
+	tdb->tdb_dst_cred_type = sadb_cred->sadb_cred_type;
+	MALLOC(tdb->tdb_dst_credentials, caddr_t, tdb->tdb_dst_cred_len,
+	       M_XDATA, M_WAITOK);
+	bcopy((void *) sadb_cred + sizeof(struct sadb_cred),
+	      tdb->tdb_dst_credentials, tdb->tdb_dst_cred_len);
+    }
+    else
+    {
+	tdb->tdb_src_cred_len = EXTLEN(sadb_cred) - sizeof(struct sadb_cred);
+	tdb->tdb_src_cred_type = sadb_cred->sadb_cred_type;
+	MALLOC(tdb->tdb_src_credentials, caddr_t, tdb->tdb_src_cred_len,
+	       M_XDATA, M_WAITOK);
+	bcopy((void *) sadb_cred + sizeof(struct sadb_cred),
+	      tdb->tdb_src_credentials, tdb->tdb_src_cred_len);
+    }
+}
+
+/*
  * Import an identity payload into the TDB.
  */
 void
@@ -511,6 +540,33 @@ import_identity(struct tdb *tdb, struct sadb_ident *sadb_ident, int type)
 	       M_WAITOK);
 	bcopy((void *) sadb_ident + sizeof(struct sadb_ident),
 	      tdb->tdb_dstid, tdb->tdb_dstid_len);
+    }
+}
+
+void
+export_credentials(void **p, struct tdb *tdb, int dstcred)
+{
+    struct sadb_cred *sadb_cred = (struct sadb_cred *) *p;
+
+    if (dstcred)
+    {
+	sadb_cred->sadb_cred_len = (sizeof(struct sadb_cred) +
+				    PADUP(tdb->tdb_dst_cred_len)) /
+				   sizeof(uint64_t);
+	sadb_cred->sadb_cred_type = tdb->tdb_dst_cred_type;
+	*p += sizeof(struct sadb_cred);
+	bcopy(tdb->tdb_dst_credentials, *p, tdb->tdb_dst_cred_len);
+	*p += PADUP(tdb->tdb_dst_cred_len);
+    }
+    else
+    {
+	sadb_cred->sadb_cred_len = (sizeof(struct sadb_cred) +
+				    PADUP(tdb->tdb_src_cred_len)) /
+				   sizeof(uint64_t);
+	sadb_cred->sadb_cred_type = tdb->tdb_src_cred_type;
+	*p += sizeof(struct sadb_cred);
+	bcopy(tdb->tdb_src_credentials, *p, tdb->tdb_src_cred_len);
+	*p += PADUP(tdb->tdb_src_cred_len);
     }
 }
 
@@ -547,7 +603,7 @@ import_key(struct ipsecinit *ii, struct sadb_key *sadb_key, int type)
 {
     if (!sadb_key)
       return;
-        
+
     if (type == PFKEYV2_ENCRYPTION_KEY)
     { /* Encryption key */
 	ii->ii_enckeylen = sadb_key->sadb_key_bits / 8;
@@ -660,7 +716,7 @@ pfkeyv2_sendmessage(void **headers, int mode, struct socket *socket,
 				       &packet)) != 0)
 	      goto ret;
 
-	    /* 
+	    /*
 	     * Search for promiscuous listeners, skipping the
 	     * original destination.
 	     */
@@ -688,10 +744,7 @@ pfkeyv2_sendmessage(void **headers, int mode, struct socket *socket,
 		  {
 		       /* Check for specified satype */
 		      if ((1 << satype) & s->registration)
-		      {   /* Done */
 		          pfkey_sendup(s->socket, packet, 1);
-		          break;
-		      }
 		  }
 	      }
 
@@ -715,7 +768,7 @@ pfkeyv2_sendmessage(void **headers, int mode, struct socket *socket,
 	    /* Send to all registered promiscuous listeners */
 	    for (s = pfkeyv2_sockets; s; s = s->next)
 	      if ((s->flags & PFKEYV2_SOCKETFLAGS_PROMISC) &&
-		  (s->flags & PFKEYV2_SOCKETFLAGS_REGISTERED))
+		  !(s->flags & PFKEYV2_SOCKETFLAGS_REGISTERED))
 		pfkey_sendup(s->socket, packet, 1);
 
 	    m_freem(packet);
@@ -1005,6 +1058,19 @@ pfkeyv2_get(struct tdb *sa, void **headers, void **buffer)
 	export_identity(&p, sa, PFKEYV2_IDENTITY_DST);
     }
 
+    /* Export credentials, if present */
+    if (sa->tdb_src_credentials)
+    {
+	headers[SADB_X_EXT_SRC_CREDENTIALS] = p;
+	export_credentials(&p, sa, 0);
+    }
+
+    if (sa->tdb_dst_credentials)
+    {
+	headers[SADB_X_EXT_DST_CREDENTIALS] = p;
+	export_credentials(&p, sa, 1);
+    }
+
     /* Export authentication key, if present */
     if (sa->tdb_amxkey)
     {
@@ -1029,7 +1095,7 @@ pfkeyv2_get(struct tdb *sa, void **headers, void **buffer)
  * Dump a TDB.
  */
 int
-pfkeyv2_dump_walker(struct tdb *sa, void *state)
+pfkeyv2_dump_walker(struct tdb *sa, void *state, int last)
 {
     struct dump_state *dump_state = (struct dump_state *) state;
     void *headers[SADB_EXT_MAX+1], *buffer;
@@ -1046,6 +1112,9 @@ pfkeyv2_dump_walker(struct tdb *sa, void *state)
 	if ((rval = pfkeyv2_get(sa, headers, &buffer)) != 0)
 	  return rval;
 
+	if (last)
+	  ((struct sadb_msg *)headers[0])->sadb_msg_seq = 0;
+
 	/* Send the message to the specified socket */
 	rval = pfkeyv2_sendmessage(headers, PFKEYV2_SENDMESSAGE_UNICAST,
 				   dump_state->socket, 0, 0);
@@ -1061,12 +1130,12 @@ pfkeyv2_dump_walker(struct tdb *sa, void *state)
 /*
  * Delete an SA.
  */
-int 
-pfkeyv2_flush_walker(struct tdb *sa, void *satype_vp)
+int
+pfkeyv2_flush_walker(struct tdb *sa, void *satype_vp, int last)
 {
     if (!(*((u_int8_t *) satype_vp)) ||
 	sa->tdb_satype == *((u_int8_t *) satype_vp))
-      tdb_delete(sa, 0);
+      tdb_delete(sa);
 
     return 0;
 }
@@ -1098,7 +1167,7 @@ pfkeyv2_get_proto_alg(u_int8_t satype, u_int8_t *sproto, int *alg)
 
 	    *sproto = IPPROTO_ESP;
 
-	    if(alg != NULL) 
+	    if(alg != NULL)
 	      *alg = satype = XF_ESP;
 
 	    break;
@@ -1215,7 +1284,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
     /* Validate message format */
     if ((rval = pfkeyv2_parsemessage(message, len, headers)) != 0)
       goto ret;
- 
+
     smsg = (struct sadb_msg *) headers[0];
     switch(smsg->sadb_msg_type)
     {
@@ -1283,15 +1352,13 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		int alg;
 
 		/* Create new TDB */
-		MALLOC(freeme, struct tdb *, sizeof(struct tdb),
-		       M_TDB, M_WAITOK);
-		bzero(freeme, sizeof(struct tdb));
+		freeme = tdb_alloc();
 		bzero(&ii, sizeof(struct ipsecinit));
 
 		newsa = (struct tdb *) freeme;
 		newsa->tdb_satype = smsg->sadb_msg_satype;
 
-		if ((rval = pfkeyv2_get_proto_alg(newsa->tdb_satype, 
+		if ((rval = pfkeyv2_get_proto_alg(newsa->tdb_satype,
 						  &newsa->tdb_sproto, &alg)))
 		  goto splxret;
 
@@ -1317,6 +1384,10 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 				PFKEYV2_IDENTITY_SRC);
 		import_identity(newsa, headers[SADB_EXT_IDENTITY_DST],
 				PFKEYV2_IDENTITY_DST);
+		import_credentials(newsa, headers[SADB_X_EXT_SRC_CREDENTIALS],
+				   0);
+		import_credentials(newsa, headers[SADB_X_EXT_DST_CREDENTIALS],
+				   1);
 
 		headers[SADB_EXT_KEY_AUTH] = NULL;
 		headers[SADB_EXT_KEY_ENCRYPT] = NULL;
@@ -1325,7 +1396,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		if (rval)
 		{
 		    rval = EINVAL;
-		    tdb_delete(freeme, TDBEXP_TIMEOUT);
+		    tdb_delete(freeme);
 		    freeme = NULL;
 		    goto splxret;
 		}
@@ -1333,7 +1404,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		newsa->tdb_cur_allocations = sa2->tdb_cur_allocations;
 
 		/* Delete old version of the SA, insert new one */
-		tdb_delete(sa2, TDBEXP_TIMEOUT);
+		tdb_delete(sa2);
 		puttdb((struct tdb *) freeme);
 		sa2 = freeme = NULL;
 	    }
@@ -1392,8 +1463,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 	    }
 
 	    /* Allocate and initialize new TDB */
-	    MALLOC(freeme, struct tdb *, sizeof(struct tdb), M_TDB, M_WAITOK);
-	    bzero(freeme, sizeof(struct tdb));
+	    freeme = tdb_alloc();
 
 	    {
 		struct tdb *newsa = (struct tdb *) freeme;
@@ -1403,7 +1473,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		bzero(&ii, sizeof(struct ipsecinit));
 
 		newsa->tdb_satype = smsg->sadb_msg_satype;
-		if ((rval = pfkeyv2_get_proto_alg(newsa->tdb_satype, 
+		if ((rval = pfkeyv2_get_proto_alg(newsa->tdb_satype,
 						  &newsa->tdb_sproto, &alg)))
 		  goto splxret;
 
@@ -1432,6 +1502,11 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		import_identity(newsa, headers[SADB_EXT_IDENTITY_DST],
 				PFKEYV2_IDENTITY_DST);
 
+		import_credentials(newsa, headers[SADB_X_EXT_SRC_CREDENTIALS],
+				   0);
+		import_credentials(newsa, headers[SADB_X_EXT_DST_CREDENTIALS],
+				   1);
+
 		headers[SADB_EXT_KEY_AUTH] = NULL;
 		headers[SADB_EXT_KEY_ENCRYPT] = NULL;
 
@@ -1439,7 +1514,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		if (rval)
 		{
 		    rval = EINVAL;
-		    tdb_delete(freeme, TDBEXP_TIMEOUT);
+		    tdb_delete(freeme);
 		    freeme = NULL;
 		    goto splxret;
 		}
@@ -1466,8 +1541,8 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		rval = ESRCH;
 		goto splxret;
 	    }
-      
-	    tdb_delete(sa2, TDBEXP_TIMEOUT);
+
+	    tdb_delete(sa2);
 
 	    splx(s);
 
@@ -1502,7 +1577,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 		rval = ESRCH;
 		goto splxret;
 	    }
-      
+
 	    rval = pfkeyv2_get(sa2, headers, &freeme);
 	    if (rval)
 	      mode = PFKEYV2_SENDMESSAGE_UNICAST;
@@ -1515,36 +1590,52 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 	    pfkeyv2_socket->flags |= PFKEYV2_SOCKETFLAGS_REGISTERED;
 	    nregistered++;
 
-	    i = sizeof(struct sadb_supported) + sizeof(ealgs) + sizeof(aalgs);
+	    i = sizeof(struct sadb_supported) + sizeof(ealgs);
 
 	    if (!(freeme = malloc(i, M_PFKEY, M_DONTWAIT)))
 	    {
 		rval = ENOMEM;
 		goto ret;
 	    }
-      
-	    /* Keep track what this socket has registered for */
-	    pfkeyv2_socket->registration |= (1 << ((struct sadb_msg *)message)->sadb_msg_satype);
-      
+
 	    bzero(freeme, i);
 
 	    ssup = (struct sadb_supported *) freeme;
 	    ssup->sadb_supported_len = i / sizeof(uint64_t);
-	    ssup->sadb_supported_nauth = sizeof(aalgs) /
-					 sizeof(struct sadb_alg);
-	    ssup->sadb_supported_nencrypt = sizeof(ealgs) /
-					    sizeof(struct sadb_alg);
+
+	    {
+		void *p = freeme + sizeof(struct sadb_supported);
+
+		bcopy(&ealgs[0], p, sizeof(ealgs));
+	    }
+
+	    headers[SADB_EXT_SUPPORTED_ENCRYPT] = freeme;
+
+	    i = sizeof(struct sadb_supported) + sizeof(aalgs);
+
+	    if (!(freeme = malloc(i, M_PFKEY, M_DONTWAIT)))
+	    {
+		rval = ENOMEM;
+		goto ret;
+	    }
+
+	    /* Keep track what this socket has registered for */
+	    pfkeyv2_socket->registration |= (1 << ((struct sadb_msg *)message)->sadb_msg_satype);
+
+	    bzero(freeme, i);
+
+	    ssup = (struct sadb_supported *) freeme;
+	    ssup->sadb_supported_len = i / sizeof(uint64_t);
 
 	    {
 		void *p = freeme + sizeof(struct sadb_supported);
 
 		bcopy(&aalgs[0], p, sizeof(aalgs));
-		p += sizeof(aalgs);
-		bcopy(&ealgs[0], p, sizeof(ealgs));
 	    }
 
-	     headers[SADB_EXT_SUPPORTED] = freeme;
-	     break;
+	    headers[SADB_EXT_SUPPORTED_AUTH] = freeme;
+
+	    break;
 
 	case SADB_ACQUIRE:
 	case SADB_EXPIRE:
@@ -1562,7 +1653,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 
 	    switch(smsg->sadb_msg_satype)
 	    {
-		case SADB_SATYPE_UNSPEC:  
+		case SADB_SATYPE_UNSPEC:
 		case SADB_SATYPE_AH:
 		case SADB_SATYPE_ESP:
 		case SADB_X_SATYPE_IPIP:
@@ -1571,7 +1662,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 #endif /* TCP_SIGNATURE */
 		    s = spltdb();
 
-		    tdb_walk(pfkeyv2_flush_walker, 
+		    tdb_walk(pfkeyv2_flush_walker,
 			     (u_int8_t *) &(smsg->sadb_msg_satype));
 
 		    splx(s);
@@ -1654,10 +1745,10 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 	    splx(s);
 	}
 	 break;
-	 
+
 	case SADB_X_DELFLOW:
 	    delflag = 1;   /* fall through */
-	
+
 	case SADB_X_ADDFLOW:
 	{
 	    union sockaddr_union *src, *dst, *srcmask, *dstmask, *ssrc;
@@ -2002,7 +2093,7 @@ pfkeyv2_send(struct socket *socket, void *message, int len)
 	    }
          }
 	 break;
-	
+
 	case SADB_X_PROMISC:
 	    if (len >= 2 * sizeof(struct sadb_msg))
 	    {
@@ -2277,7 +2368,7 @@ pfkeyv2_acquire(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	/* Set the authentication algorithm */
 	if (!strncasecmp(ipsec_def_auth, "hmac-sha1", sizeof("hmac-sha1")))
 	{
-	    sadb_comb->sadb_comb_auth = SADB_AALG_SHA1HMAC96;
+	    sadb_comb->sadb_comb_auth = SADB_AALG_SHA1HMAC;
 	    sadb_comb->sadb_comb_auth_minbits = 160;
 	    sadb_comb->sadb_comb_auth_maxbits = 160;
 	}
@@ -2285,18 +2376,18 @@ pfkeyv2_acquire(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	  if (!strncasecmp(ipsec_def_auth, "hmac-ripemd160",
 			   sizeof("hmac_ripemd160")))
 	  {
-	      sadb_comb->sadb_comb_auth = SADB_X_AALG_RIPEMD160HMAC96;
+	      sadb_comb->sadb_comb_auth = SADB_AALG_RIPEMD160HMAC;
 	      sadb_comb->sadb_comb_auth_minbits = 160;
 	      sadb_comb->sadb_comb_auth_maxbits = 160;
 	  }
 	  else
 	    if (!strncasecmp(ipsec_def_auth, "hmac-md5", sizeof("hmac-md5")))
 	    {
-		sadb_comb->sadb_comb_auth = SADB_AALG_MD5HMAC96;
+		sadb_comb->sadb_comb_auth = SADB_AALG_MD5HMAC;
 		sadb_comb->sadb_comb_auth_minbits = 128;
 		sadb_comb->sadb_comb_auth_maxbits = 128;
 	    }
-	
+
 	sadb_comb->sadb_comb_soft_allocations = ipsec_soft_allocations;
 	sadb_comb->sadb_comb_hard_allocations = ipsec_exp_allocations;
 

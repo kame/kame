@@ -1,7 +1,7 @@
-/*	$OpenBSD: qe.c,v 1.9 2000/06/18 17:36:59 jason Exp $	*/
+/*	$OpenBSD: qe.c,v 1.15 2001/02/20 19:39:34 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998 Jason L. Wright.
+ * Copyright (c) 1998, 2000 Jason L. Wright.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -50,6 +50,7 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <net/if_media.h>
 #include <net/netisr.h>
 
 #ifdef INET
@@ -92,10 +93,10 @@ int		qeintr __P((void *));
 int		qe_eint __P((struct qesoftc *, u_int32_t));
 int		qe_rint __P((struct qesoftc *));
 int		qe_tint __P((struct qesoftc *));
-int		qe_put __P((struct qesoftc *, int, struct mbuf *));
 void		qe_read __P((struct qesoftc *, int, int));
-struct mbuf *	qe_get __P((struct qesoftc *, int, int));
 void		qe_mcreset __P((struct qesoftc *));
+void		qe_ifmedia_sts __P((struct ifnet *, struct ifmediareq *));
+int		qe_ifmedia_upd __P((struct ifnet *));
 
 struct cfdriver qe_cd = {
 	NULL, "qe", DV_IFNET
@@ -163,17 +164,18 @@ qeattach(parent, self, aux)
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS |
 	    IFF_MULTICAST;
 
+	ifmedia_init(&sc->sc_ifmedia, IFM_IMASK,
+	    qe_ifmedia_upd, qe_ifmedia_sts);
+	ifmedia_add(&sc->sc_ifmedia,
+	    IFM_MAKEWORD(IFM_ETHER, IFM_10_T, 0, 0), 0, NULL);
+	ifmedia_set(&sc->sc_ifmedia, IFM_ETHER | IFM_10_T);
+
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
 	printf(" pri %d: rev %x address %s\n", pri, sc->sc_rev,
 	    ether_sprintf(sc->sc_arpcom.ac_enaddr));
-
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_arpcom.ac_if.if_bpf, ifp, DLT_EN10MB,
-	    sizeof(struct ether_header));
-#endif
 
 	bp = ca->ca_ra.ra_bp;
 	if (bp != NULL && strcmp(bp->name, "qe") == 0 &&
@@ -220,7 +222,7 @@ qestart(ifp)
 		/*
 		 * Copy the mbuf chain into the transmit buffer.
 		 */
-		len = qe_put(sc, bix, m);
+		len = qec_put(sc->sc_bufs->tx_buf[bix & QE_TX_RING_MASK], m);
 
 		/*
 		 * Initialize transmit registers and start transmission
@@ -248,17 +250,21 @@ qestop(sc)
 {	
 	struct qe_cregs *cr = sc->sc_cr;
 	struct qe_mregs *mr = sc->sc_mr;
-	int tries;
+	int n;
 
-	tries = 200;
 	mr->biucc = QE_MR_BIUCC_SWRST;
-	while ((mr->biucc & QE_MR_BIUCC_SWRST) && --tries)
+	for (n = 200; n > 0; n--) {
+		if ((mr->biucc & QE_MR_BIUCC_SWRST) == 0)
+			break;
 		DELAY(20);
+	}
 
-	tries = 200;
 	cr->ctrl = QE_CR_CTRL_RESET;
-	while ((cr->ctrl & QE_CR_CTRL_RESET) && --tries)
+	for (n = 200; n > 0; n--) {
+		if ((cr->ctrl & QE_CR_CTRL_RESET) == 0)
+			break;
 		DELAY(20);
+	}
 }
 
 /*
@@ -268,12 +274,8 @@ void
 qereset(sc)
 	struct qesoftc *sc;
 {
-	int s;
-
-	s = splnet();
 	qestop(sc);
 	qeinit(sc);
-	splx(s);
 }
 
 void
@@ -281,11 +283,14 @@ qewatchdog(ifp)
 	struct ifnet *ifp;
 {
 	struct qesoftc *sc = ifp->if_softc;
+	int s;
 
 	log(LOG_ERR, "%s: device timeout\n", sc->sc_dev.dv_xname);
 	++sc->sc_arpcom.ac_if.if_oerrors;
 
+	s = splnet();
 	qereset(sc);
+	splx(s);
 }
 
 /*
@@ -380,7 +385,7 @@ qe_rint(sc)
 
 		len = (sc->sc_desc->qe_rxd[bix].rx_flags & QE_RXD_LENGTH) - 4;
 		qe_read(sc, bix, len);
-		sc->sc_desc->qe_rxd[(bix + QE_RX_RING_SIZE) % QE_RX_RING_MAXSIZE].rx_flags =
+		sc->sc_desc->qe_rxd[(bix + QE_RX_RING_SIZE) & QE_RX_RING_MAXMASK].rx_flags =
 		    QE_RXD_OWN | QE_RXD_LENGTH;
 
 		if (++bix == QE_RX_RING_MAXSIZE)
@@ -421,7 +426,6 @@ qe_eint(sc, why)
 		r |= 1;
 		rst = 1;
 	}
-
 
 	if (why & QE_CR_STAT_LCOLL) {
 		printf("%s: late tx transmission\n", sc->sc_dev.dv_xname);
@@ -650,9 +654,14 @@ qeioctl(ifp, cmd, data)
 			 * Multicast list has changed; set the hardware filter
 			 * accordingly.
 			 */
-			qe_mcreset(sc);
+			if (ifp->if_flags & IFF_UP)
+				qeinit(sc);
 			error = 0;
 		}
+		break;
+	case SIOCGIFMEDIA:
+	case SIOCSIFMEDIA:
+		error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, cmd);
 		break;
 	default:
 		if ((error = ether_ioctl(ifp, &sc->sc_arpcom, cmd, data)) > 0) {
@@ -677,109 +686,88 @@ qeinit(sc)
 	int s = splimp();
 	int i;
 
+	qestop(sc);
+
 	/*
 	 * Allocate descriptor ring and buffers, if not already done
 	 */
 	if (sc->sc_desc == NULL)
 		sc->sc_desc_dva = (struct qe_desc *) dvma_malloc(
 			sizeof(struct qe_desc), &sc->sc_desc, M_NOWAIT);
+	bzero(sc->sc_desc, sizeof(struct qe_desc));
+
 	if (sc->sc_bufs == NULL)
 		sc->sc_bufs_dva = (struct qe_bufs *) dvma_malloc(
 			sizeof(struct qe_bufs), &sc->sc_bufs, M_NOWAIT);
-	
-	for (i = 0; i < QE_TX_RING_MAXSIZE; i++) {
+	bzero(sc->sc_bufs, sizeof(struct qe_bufs));
+
+	for (i = 0; i < QE_TX_RING_MAXSIZE; i++)
 		sc->sc_desc->qe_txd[i].tx_addr =
-			(u_int32_t) &sc->sc_bufs_dva->tx_buf[i % QE_TX_RING_SIZE][0];
-		sc->sc_desc->qe_txd[i].tx_flags = 0;
-	}
+			(u_int32_t)sc->sc_bufs_dva->tx_buf[i & QE_TX_RING_MASK];
 	for (i = 0; i < QE_RX_RING_MAXSIZE; i++) {
 		sc->sc_desc->qe_rxd[i].rx_addr =
-			(u_int32_t) &sc->sc_bufs_dva->rx_buf[i % QE_RX_RING_SIZE][0];
-		if ((i / QE_RX_RING_SIZE) == 0)
+			(u_int32_t)sc->sc_bufs_dva->rx_buf[i & QE_RX_RING_MASK];
+		if (i < QE_RX_RING_SIZE)
 			sc->sc_desc->qe_rxd[i].rx_flags =
 				QE_RXD_OWN | QE_RXD_LENGTH;
-		else
-			sc->sc_desc->qe_rxd[i].rx_flags = 0;
 	}
 
-	cr->rxds = (u_int32_t) &sc->sc_desc_dva->qe_rxd[0];
-	cr->txds = (u_int32_t) &sc->sc_desc_dva->qe_txd[0];
+	cr->rxds = (u_int32_t)sc->sc_desc_dva->qe_rxd;
+	cr->txds = (u_int32_t)sc->sc_desc_dva->qe_txd;
 
 	sc->sc_first_td = sc->sc_last_td = sc->sc_no_td = 0;
 	sc->sc_last_rd = 0;
 
-	qestop(sc);
-
 	cr->rimask = 0;
 	cr->timask = 0;
 	cr->qmask = 0;
-	cr->mmask = QE_CR_MMASK_RXCOLL;
-	cr->rxwbufptr = cr->rxrbufptr = sc->sc_channel * qec->sc_msize;
-	cr->txwbufptr = cr->txrbufptr = cr->rxrbufptr + qec->sc_rsize;
+	cr->mmask = QE_CR_MMASK_RXCOLL | QE_CR_MMASK_CLOSS;
 	cr->ccnt = 0;
 	cr->pipg = 0;
+	cr->rxwbufptr = cr->rxrbufptr = sc->sc_channel * qec->sc_msize;
+	cr->txwbufptr = cr->txrbufptr = cr->rxrbufptr + qec->sc_rsize;
 
-	mr->phycc = QE_MR_PHYCC_ASEL;
-	mr->xmtfc = QE_MR_XMTFC_APADXMT;
-	mr->rcvfc = 0;
-	mr->imr = QE_MR_IMR_CERRM | QE_MR_IMR_RCVINTM;
+	/*
+	 * When switching from mace<->qec always guarantee an sbus
+	 * turnaround (if last op was read, perform a dummy write, and
+	 * vice versa).
+	 */
+	i = cr->qmask;		/* dummy */
+
 	mr->biucc = QE_MR_BIUCC_BSWAP | QE_MR_BIUCC_64TS;
 	mr->fifofc = QE_MR_FIFOCC_TXF16 | QE_MR_FIFOCC_RXF32 |
 	    QE_MR_FIFOCC_RFWU | QE_MR_FIFOCC_TFWU;
+	mr->xmtfc = QE_MR_XMTFC_APADXMT;
+	mr->rcvfc = 0;
+	mr->imr = QE_MR_IMR_CERRM | QE_MR_IMR_RCVINTM;
+	mr->phycc = QE_MR_PHYCC_ASEL;
 	mr->plscc = QE_MR_PLSCC_TP;
 
+	qe_ifmedia_upd(ifp);
+
 	mr->iac = QE_MR_IAC_ADDRCHG | QE_MR_IAC_PHYADDR;
+	for (i = 100; i > 0; i--) {
+		if ((mr->iac & QE_MR_IAC_ADDRCHG) == 0)
+			break;
+		DELAY(2);
+	}
 	mr->padr = sc->sc_arpcom.ac_enaddr[0];
 	mr->padr = sc->sc_arpcom.ac_enaddr[1];
 	mr->padr = sc->sc_arpcom.ac_enaddr[2];
 	mr->padr = sc->sc_arpcom.ac_enaddr[3];
 	mr->padr = sc->sc_arpcom.ac_enaddr[4];
 	mr->padr = sc->sc_arpcom.ac_enaddr[5];
-
-	mr->iac = QE_MR_IAC_ADDRCHG | QE_MR_IAC_LOGADDR;
-	for (i = 0; i < 8; i++)
-		mr->ladrf = 0;
+	qe_mcreset(sc);
 	mr->iac = 0;
-
-	delay(50000);
-	if ((mr->phycc & QE_MR_PHYCC_LNKFL) == QE_MR_PHYCC_LNKFL)
-		printf("%s: no carrier\n", sc->sc_dev.dv_xname);
 
 	i = mr->mpc;	/* cleared on read */
 
-	qe_mcreset(sc);
-
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
+
+	mr->maccc = QE_MR_MACCC_ENXMT | QE_MR_MACCC_ENRCV |
+	    ((ifp->if_flags & IFF_PROMISC) ? QE_MR_MACCC_PROM : 0);
 	splx(s);
-}
-
-/*
- * Routine to copy from mbuf chain to transmit buffer in
- * network buffer memory.
- */
-int
-qe_put(sc, idx, m)
-	struct qesoftc *sc;
-	int idx;
-	struct mbuf *m;
-{
-	struct mbuf *n;
-	int len, tlen = 0, boff = 0;
-
-	for (; m; m = n) {
-		len = m->m_len;
-		if (len == 0) {
-			MFREE(m, n);
-			continue;
-		}
-		bcopy(mtod(m, caddr_t),
-		      &sc->sc_bufs->tx_buf[idx % QE_TX_RING_SIZE][boff], len);
-		boff += len;
-		tlen += len;
-		MFREE(m, n);
-	}
-	return tlen;
 }
 
 /*
@@ -807,7 +795,7 @@ qe_read(sc, idx, len)
 	/*
 	 * Pull packet off interface.
 	 */
-	m = qe_get(sc, idx, len);
+	m = qec_get(ifp, sc->sc_bufs->rx_buf[idx & QE_RX_RING_MASK], len);
 	if (m == NULL) {
 		ifp->if_ierrors++;
 		return;
@@ -831,65 +819,6 @@ qe_read(sc, idx, len)
 }
 
 /*
- * Pull data off an interface.
- * Len is the length of data, with local net header stripped.
- * We copy the data into mbufs.  When full cluster sized units are present,
- * we copy into clusters.
- */
-struct mbuf *
-qe_get(sc, idx, totlen)
-	struct qesoftc *sc;
-	int idx, totlen;
-{
-	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	struct mbuf *m;
-	struct mbuf *top, **mp;
-	int len, pad, boff = 0;
-
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
-	if (m == NULL)
-		return (NULL);
-	m->m_pkthdr.rcvif = ifp;
-	m->m_pkthdr.len = totlen;
-	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
-	len = MHLEN;
-	if (totlen >= MINCLSIZE) {
-		MCLGET(m, M_DONTWAIT);
-		if (m->m_flags & M_EXT)
-			len = MCLBYTES;
-	}
-	m->m_data += pad;
-	len -= pad;
-	top = NULL;
-	mp = &top;
-
-	while (totlen > 0) {
-		if (top) {
-			MGET(m, M_DONTWAIT, MT_DATA);
-			if (m == NULL) {
-				m_freem(top);
-				return NULL;
-			}
-			len = MLEN;
-		}
-		if (top && totlen >= MINCLSIZE) {
-			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT)
-				len = MCLBYTES;
-		}
-		m->m_len = len = min(totlen, len);
-		bcopy(&sc->sc_bufs->rx_buf[idx % QE_RX_RING_SIZE][boff],
-		      mtod(m, caddr_t), len);
-		boff += len;
-		totlen -= len;
-		*mp = m;
-		mp = &m->m_next;
-	}
-
-	return (top);
-}
-
-/*
  * Reset multicast filter.
  */
 void
@@ -906,18 +835,16 @@ qe_mcreset(sc)
 	u_int8_t octet, *ladrp = (u_int8_t *)&hash[0];
 	int i, j;
 
-	if (ifp->if_flags & IFF_PROMISC) {
-		mr->maccc = QE_MR_MACCC_PROM | QE_MR_MACCC_ENXMT |
-		    QE_MR_MACCC_ENRCV;
-		return;
-	}
-
+allmulti:
 	if (ifp->if_flags & IFF_ALLMULTI) {
 		mr->iac = QE_MR_IAC_ADDRCHG | QE_MR_IAC_LOGADDR;
+		for (i = 100; i > 0; i--) {
+			if ((mr->iac & QE_MR_IAC_ADDRCHG) == 0)
+				break;
+			DELAY(2);
+		}
 		for (i = 0; i < 8; i++)
 			mr->ladrf = 0xff;
-		mr->iac = 0;
-		mr->maccc = QE_MR_MACCC_ENXMT | QE_MR_MACCC_ENRCV;
 		return;
 	}
 
@@ -937,12 +864,8 @@ qe_mcreset(sc)
 			 * which the range is big enough to require
 			 * all bits set.)
 			 */
-			mr->iac = QE_MR_IAC_ADDRCHG | QE_MR_IAC_LOGADDR;
-			for (i = 0; i < 8; i++)
-				mr->ladrf = 0xff;
-			mr->iac = 0;
 			ifp->if_flags |= IFF_ALLMULTI;
-			break;
+			goto allmulti;
 		}
 
 		crc = 0xffffffff;
@@ -967,9 +890,46 @@ qe_mcreset(sc)
 	}
 
 	mr->iac = QE_MR_IAC_ADDRCHG | QE_MR_IAC_LOGADDR;
+	for (i = 100; i > 0; i--) {
+		if ((mr->iac & QE_MR_IAC_ADDRCHG) == 0)
+			break;
+		DELAY(2);
+	}
 	for (i = 0; i < 8; i++)
 		mr->ladrf = ladrp[i];
-	mr->iac = 0;
+}
 
-	mr->maccc = QE_MR_MACCC_ENXMT | QE_MR_MACCC_ENRCV;
+void
+qe_ifmedia_sts(ifp, ifmr)
+	struct ifnet *ifp;
+	struct ifmediareq *ifmr;
+{
+	struct qesoftc *sc = (struct qesoftc *)ifp->if_softc;
+	u_int8_t phycc;
+
+	ifmr->ifm_active = IFM_ETHER | IFM_10_T;
+	phycc = sc->sc_mr->phycc;
+	if ((phycc & QE_MR_PHYCC_DLNKTST) == 0) {
+		ifmr->ifm_status |= IFM_AVALID;
+		if (phycc & QE_MR_PHYCC_LNKFL)
+			ifmr->ifm_status &= ~IFM_ACTIVE;
+		else
+			ifmr->ifm_status |= IFM_ACTIVE;
+	}
+}
+
+int
+qe_ifmedia_upd(ifp)
+	struct ifnet *ifp;
+{
+	struct qesoftc *sc = (struct qesoftc *)ifp->if_softc;
+	int media = sc->sc_ifmedia.ifm_media;
+
+	if (IFM_TYPE(media) != IFM_ETHER)
+		return (EINVAL);
+
+	if (IFM_SUBTYPE(media) != IFM_10_T)
+		return (EINVAL);
+
+	return (0);
 }

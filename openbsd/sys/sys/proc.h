@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.32 2000/07/07 15:57:01 art Exp $	*/
+/*	$OpenBSD: proc.h,v 1.40 2001/04/02 21:43:12 niklas Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -48,6 +48,7 @@
 #include <sys/select.h>			/* For struct selinfo. */
 #include <sys/queue.h>
 #include <sys/timeout.h>		/* For struct timeout. */
+#include <sys/event.h>			/* For struct klist */
 
 /*
  * One structure allocated per session.
@@ -173,7 +174,8 @@ struct	proc {
 	int	p_holdcnt;		/* If non-zero, don't swap. */
 	struct	emul *p_emul;		/* Emulation information */
 
-	long	p_spare[1];		/* pad to 256, avoid shifting eproc. */
+	struct	klist p_klist;		/* knotes attached to this process */
+					/* pad to 256, avoid shifting eproc. */
 
 
 /* End area that is zeroed on creation. */
@@ -246,6 +248,10 @@ struct	proc {
 #define	P_NOCLDWAIT	0x080000	/* Let pid 1 wait for my children */
 #define	P_NOZOMBIE	0x100000	/* Pid 1 waits for me instead of dad */
 
+/* Macro to compute the exit signal to be delivered. */
+#define P_EXITSIG(p) \
+    (((p)->p_flag & (P_TRACED | P_FSTRACE)) ? SIGCHLD : (p)->p_exitsig)
+
 /*
  * These flags are kept in p_schedflags.  p_schedflags may be modified
  * only at splstatclock().
@@ -312,6 +318,7 @@ struct	pcred {
 #define FORK_NOZOMBIE	0x00000040
 #define FORK_SHAREVM	0x00000080
 #define FORK_VMNOSTACK	0x00000100
+#define FORK_SIGHAND	0x00000200
 
 #define	PIDHASH(pid)	(&pidhashtbl[(pid) & pidhash])
 extern LIST_HEAD(pidhashhead, proc) *pidhashtbl;
@@ -321,7 +328,9 @@ extern u_long pidhash;
 extern LIST_HEAD(pgrphashhead, pgrp) *pgrphashtbl;
 extern u_long pgrphash;
 
+#ifndef curproc
 extern struct proc *curproc;		/* Current running proc. */
+#endif
 extern struct proc proc0;		/* Process slot for swapper. */
 extern int nprocs, maxproc;		/* Current and max number of procs. */
 extern int randompid;			/* fork() should create random pid's */
@@ -333,7 +342,10 @@ extern struct proclist zombproc;	/* List of zombie processes. */
 extern struct proclist deadproc;	/* List of dead processes. */
 extern struct simplelock deadproc_slock;
 
-struct proc *initproc;			/* Process slots for init, pager. */
+extern struct proc *initproc;		/* Process slots for init, pager. */
+extern struct proc *syncerproc;		/* filesystem syncer daemon */
+
+extern struct pool proc_pool;		/* memory pool for procs */
 
 #define	NQS	32			/* 32 run queues. */
 int	whichqs;			/* Bit mask summary of non-empty Q's. */
@@ -367,11 +379,13 @@ void	swapin __P((struct proc *));
 #endif
 int	tsleep __P((void *chan, int pri, char *wmesg, int timo));
 void	unsleep __P((struct proc *));
-void	wakeup __P((void *chan));
+void    wakeup_n __P((void *chan, int));
+void    wakeup __P((void *chan));
+#define wakeup_one(c) wakeup_n((c), 1)
 void	reaper __P((void));
 void	exit1 __P((struct proc *, int));
 void	exit2 __P((struct proc *));
-int	fork1 __P((struct proc *, int, void *, size_t, register_t *));
+int	fork1 __P((struct proc *, int, int, void *, size_t, register_t *));
 void	kmeminit __P((void));
 void	rqinit __P((void));
 int	groupmember __P((gid_t, struct ucred *));

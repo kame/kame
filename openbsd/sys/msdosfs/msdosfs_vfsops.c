@@ -1,4 +1,4 @@
-/*	$OpenBSD: msdosfs_vfsops.c,v 1.20 2000/03/15 03:18:02 aaron Exp $	*/
+/*	$OpenBSD: msdosfs_vfsops.c,v 1.23 2001/03/04 06:32:40 csapuntz Exp $	*/
 /*	$NetBSD: msdosfs_vfsops.c,v 1.48 1997/10/18 02:54:57 briggs Exp $	*/
 
 /*-
@@ -70,7 +70,7 @@
 #include <msdosfs/msdosfsmount.h>
 #include <msdosfs/fat.h>
 
-int msdosfs_mount __P((struct mount *, const char *, caddr_t, struct nameidata *,
+int msdosfs_mount __P((struct mount *, const char *, void *, struct nameidata *,
 		       struct proc *));
 int msdosfs_start __P((struct mount *, int, struct proc *));
 int msdosfs_unmount __P((struct mount *, int, struct proc *));
@@ -94,7 +94,7 @@ int
 msdosfs_mount(mp, path, data, ndp, p)
 	struct mount *mp;
 	const char *path;
-	caddr_t data;
+	void *data;
 	struct nameidata *ndp;
 	struct proc *p;
 {
@@ -106,7 +106,7 @@ msdosfs_mount(mp, path, data, ndp, p)
 	int error, flags;
 	mode_t accessmode;
 
-	error = copyin(data, (caddr_t)&args, sizeof(struct msdosfs_args));
+	error = copyin(data, &args, sizeof(struct msdosfs_args));
 	if (error)
 		return (error);
 	/*
@@ -664,12 +664,14 @@ msdosfs_root(mp, vpp)
 	struct denode *ndep;
 	int error;
 
+	if ((error = deget(pmp, MSDOSFSROOT, MSDOSFSROOT_OFS, &ndep)) != 0)
+		return (error);
+
 #ifdef MSDOSFS_DEBUG
 	printf("msdosfs_root(); mp %08x, pmp %08x, ndep %08x, vp %08x\n",
 	    mp, pmp, ndep, DETOV(ndep));
 #endif
-	if ((error = deget(pmp, MSDOSFSROOT, MSDOSFSROOT_OFS, &ndep)) != 0)
-		return (error);
+
 	*vpp = DETOV(ndep);
 	return (0);
 }
@@ -767,8 +769,6 @@ loop:
 	 * Force stale file system control information to be flushed.
 	 */
 	if (waitfor != MNT_LAZY) {
-		if (pmp->pm_mountp->mnt_flag & MNT_SOFTDEP)
-			waitfor = MNT_NOWAIT;
 		vn_lock(pmp->pm_devvp, LK_EXCLUSIVE | LK_RETRY, p);
 		if ((error = VOP_FSYNC(pmp->pm_devvp, cred, waitfor, p)) != 0)
 			allerror = error;

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.pci,v 1.85 2000/10/17 15:47:12 jason Exp $
+#	$OpenBSD: files.pci,v 1.105 2001/04/13 00:27:57 mjacob Exp $
 #	$NetBSD: files.pci,v 1.20 1996/09/24 17:47:15 christos Exp $
 #
 # Config file and device description for machine-independent PCI code.
@@ -16,7 +16,7 @@ file	dev/pci/pci_subr.c		pci
 attach	vga at pci with vga_pci
 file	dev/pci/vga_pci.c		vga_pci		needs-flag
 
-device	tga: wsemuldisplaydev, wsrasteremulops
+device	tga: wsemuldisplaydev, rasops8, rasops32
 attach	tga at pci
 file	dev/pci/tga.c			tga		needs-flag
 file	dev/pci/tga_conf.c		tga
@@ -56,7 +56,7 @@ file	dev/ic/advmcode.c		adv_pci
 attach	adw at pci with adw_pci
 file	dev/pci/adw_pci.c		adw_pci
 file	dev/ic/adwlib.c			adw_pci
-file	dev/ic/adwmcode.c		adw_pci
+file	dev/microcode/adw/adwmcode.c	adw_pci
 
 # BusLogic BT-9xx PCI family
 # device declaration in sys/dev/isa/files.isa
@@ -66,6 +66,10 @@ file	dev/pci/bha_pci.c		bha_pci
 # 3ware 5x000/6x000 RAID controllers
 attach	twe at pci with twe_pci
 file	dev/pci/twe_pci.c		twe_pci
+
+# AMI MegaRAID Express x00/Elite 1500/Express 1x00 RAID Controllers
+attach	ami at pci with ami_pci
+file	dev/pci/ami_pci.c		ami_pci
 
 # Ensoniq AudioPCI S5016, 1371
 device	eap: audio, auconv, mulaw, ac97
@@ -80,15 +84,33 @@ file	dev/pci/eso.c			eso
 attach	opl at eso with opl_eso
 file	dev/pci/opl_eso.c		opl_eso
 
-# Intel 810/820/440MX ICH AC'97
-device	ich: audio, auconv, mulaw, ac97
-attach	ich at pci
-file	dev/pci/ich.c			ich
+# Intel 810/820/440MX ICH audio with AC'97
+device	auich: audio, auconv, mulaw, ac97
+attach	auich at pci
+file	dev/pci/auich.c			auich
 
 # CS4280 CrystalClear Audio
 device	clcs: audio, auconv, mulaw, ac97
 attach	clcs at pci
 file	dev/pci/cs4280.c		clcs
+
+# CS4281 CrystalClear Audio
+device	clct: audio, auconv, mulaw, ac97
+attach	clct at pci
+file	dev/pci/cs4281.c		clct
+
+# ESS Maestro
+device	maestro: audio, auconv, mulaw, ac97
+attach	maestro at pci
+file	dev/pci/maestro.c		maestro
+
+# Yamaha YMF Audio
+device	yds { }: audio, auconv, mulaw, ac97
+attach	yds at pci
+file	dev/pci/yds.c			yds
+
+attach	opl at yds with opl_yds
+file	dev/pci/opl_yds.c		opl_yds
 
 # Forte Media FM801
 device	fms: audio, auconv, mulaw, ac97, midibus
@@ -104,6 +126,16 @@ file	dev/pci/auvia.c			auvia
 # device declaration in sys/conf/files
 attach	gdt at pci with gdt_pci
 file	dev/pci/gdt_pci.c		gdt_pci
+
+# Adaptec FSA (file system accelerators) RAID adapters
+device	aac: scsi
+attach	aac at pci with aac_pci
+file	dev/pci/aac_pci.c		aac_pci
+file	dev/ic/aac.c			aac
+
+# Compaq Array Controllers
+attach	cac at pci with cac_pci
+file	dev/pci/cac_pci.c		cac_pci
 
 # Qlogic ISP 10x0 (PCI) family
 # device declaration in sys/conf/files
@@ -141,6 +173,15 @@ device	ncr: scsi
 attach	ncr at pci
 file	dev/pci/ncr.c			ncr
 
+# common code for siop/esiop pci front end
+define siop_pci_common
+file	dev/pci/siop_pci_common.c	siop_pci_common
+
+# Symbios 53c8xx SCSI chips
+# device declaration in sys/conf/files
+attach	siop at pci with siop_pci: siop_pci_common
+file	dev/pci/siop_pci.c	siop_pci
+
 # NeoMagic 256AV and 256ZX
 device	neo: audio, auconv, mulaw, ac97
 attach	neo at pci
@@ -169,9 +210,8 @@ file	dev/pci/if_lmc_media.c		lmc
 file	dev/pci/if_lmc_obsd.c		lmc
 
 # RealTek 8129/8139
-device	rl: ether, ifnet, mii, ifmedia
-attach	rl at pci
-file	dev/pci/if_rl.c			rl
+attach	rl at pci with rl_pci
+file	dev/pci/if_rl_pci.c		rl_pci
 
 # Macronix
 device	mx: ether, ifnet, ifmedia
@@ -179,7 +219,7 @@ attach	mx at pci
 file	dev/pci/if_mx.c			mx
 
 # Via Rhine
-device	vr: ether, ifnet, ifmedia
+device	vr: ether, ifnet, mii, ifmedia
 attach	vr at pci
 file	dev/pci/if_vr.c			vr
 
@@ -187,6 +227,11 @@ file	dev/pci/if_vr.c			vr
 device	tl: ether, ifnet, mii, ifmedia
 attach	tl at pci
 file	dev/pci/if_tl.c			tl
+
+# 3Com 3c990
+device	txp: ether, ifnet, ifmedia
+attach	txp at pci
+file	dev/pci/if_txp.c		txp
 
 # S3 SonicVibes (S3 617)
 device	sv: audio, auconv, mulaw
@@ -196,7 +241,11 @@ file	dev/pci/sv.c			sv
 # Brooktree Bt848 video capture
 device	bktr: pcibus
 attach	bktr at pci
-file	dev/pci/brooktree848.c		bktr	needs-count
+file	dev/pci/bktr/bktr_audio.c	bktr	needs-count
+file	dev/pci/bktr/bktr_card.c	bktr
+file	dev/pci/bktr/bktr_core.c	bktr
+file	dev/pci/bktr/bktr_os.c		bktr
+file	dev/pci/bktr/bktr_tuner.c	bktr
 
 # 3C90x
 attach	xl at pci with xl_pci
@@ -233,6 +282,11 @@ file	dev/pci/hifn7751.c		hifn
 device	ubsec: crypto
 attach	ubsec at pci
 file	dev/pci/ubsec.c			ubsec
+
+# Pijnenburg PCC-ISES
+device	ises: crypto
+attach	ises at pci
+file	dev/pci/ises.c			ises
 
 # Winbond W89C840F ethernet
 device	wb: ether, ifnet, mii, ifmedia, mii_phy
@@ -281,7 +335,7 @@ attach	sk at skc
 file	dev/pci/if_sk.c			skc | sk
 
 # Intel 82452 (Pro/1000 gigabit server adapter)
-device wx: ether, ifnet, ifmedia
+device wx: ether, ifnet, mii, ifmedia, mii_phy
 attach wx at pci
 file	dev/pci/if_wx.c			wx
 
@@ -301,3 +355,12 @@ file	dev/pci/if_an_pci.c		an_pci
 device	cmpci: audio, auconv, mulaw
 attach	cmpci at pci
 file	dev/pci/cmpci.c			cmpci
+
+# Initio ULTRA WIDE/ULTRA2 WIDE SCSI Controllers
+attach	iha at pci with iha_pci
+file	dev/pci/iha_pci.c		iha_pci
+
+# AMD Am53c974 PCscsi-PCI SCSI controllers
+device	pcscp: scsi, ncr53c9x
+attach	pcscp at pci
+file	dev/pci/pcscp.c			pcscp

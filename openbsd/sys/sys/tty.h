@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.h,v 1.6 2000/08/13 03:38:45 ericj Exp $	*/
+/*	$OpenBSD: tty.h,v 1.8 2001/03/01 20:54:35 provos Exp $	*/
 /*	$NetBSD: tty.h,v 1.30.4.1 1996/06/02 09:08:13 mrg Exp $	*/
 
 /*-
@@ -42,8 +42,8 @@
  */
 
 #include <sys/termios.h>
-#include <sys/select.h>		/* For struct selinfo. */
 #include <sys/queue.h>
+#include <sys/select.h>		/* For struct selinfo. */
 #include <sys/timeout.h>
 
 #ifndef REAL_CLISTS
@@ -227,6 +227,7 @@ int	 ttioctl __P((struct tty *tp, u_long com, caddr_t data, int flag,
 int	 ttread __P((struct tty *tp, struct uio *uio, int flag));
 void	 ttrstrt __P((void *tp));
 int	 ttselect __P((dev_t device, int rw, struct proc *p));
+int	 ttkqfilter __P((dev_t dev, struct knote *kn));
 void	 ttsetwater __P((struct tty *tp));
 int	 ttspeedtab __P((int speed, struct speedtab *table));
 int	 ttstart __P((struct tty *tp));

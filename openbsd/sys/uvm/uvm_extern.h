@@ -1,4 +1,5 @@
-/*	$NetBSD: uvm_extern.h,v 1.27 1999/05/26 19:16:36 thorpej Exp $	*/
+/*	$OpenBSD: uvm_extern.h,v 1.10 2001/03/09 14:20:50 art Exp $	*/
+/*	$NetBSD: uvm_extern.h,v 1.28 1999/06/15 23:27:47 thorpej Exp $	*/
 
 /*
  *
@@ -242,6 +243,7 @@ struct uvmexp {
 	struct uvm_object *mb_object;
 };
 
+#ifdef _KERNEL
 
 extern struct uvmexp uvmexp;
 
@@ -253,12 +255,16 @@ extern struct uvmexp uvmexp;
 #define uvm_km_zalloc(MAP,SIZE) uvm_km_alloc1(MAP,SIZE,TRUE)
 #define uvm_km_alloc(MAP,SIZE)  uvm_km_alloc1(MAP,SIZE,FALSE)
 
+#endif /* _KERNEL */
+
 /*
  * typedefs 
  */
 
 typedef unsigned int  uvm_flag_t;
 typedef int vm_fault_t;
+
+#ifdef _KERNEL
 
 /* uvm_aobj.c */
 struct uvm_object	*uao_create __P((vsize_t, int));
@@ -279,7 +285,7 @@ void			uvm_fork __P((struct proc *, struct proc *, boolean_t,
 void			uvm_exit __P((struct proc *));
 void			uvm_init_limits __P((struct proc *));
 boolean_t		uvm_kernacc __P((caddr_t, size_t, int));
-__dead void		uvm_scheduler __P((void)) __attribute__((noreturn));
+__dead void		uvm_scheduler __P((void)) __attribute__((__noreturn__));
 void			uvm_swapin __P((struct proc *));
 boolean_t		uvm_useracc __P((caddr_t, size_t, int));
 void			uvm_vslock __P((struct proc *, caddr_t, size_t,
@@ -319,6 +325,7 @@ int			uvm_map __P((vm_map_t, vaddr_t *, vsize_t,
 				struct uvm_object *, vaddr_t, uvm_flag_t));
 int			uvm_map_pageable __P((vm_map_t, vaddr_t, 
 				vaddr_t, boolean_t));
+int			uvm_map_pageable_all __P((vm_map_t, int, vsize_t));
 boolean_t		uvm_map_checkprot __P((vm_map_t, vaddr_t,
 				vaddr_t, vm_prot_t));
 int			uvm_map_protect __P((vm_map_t, vaddr_t, 
@@ -388,5 +395,6 @@ void 			uvm_vnp_terminate __P((struct vnode *));
 boolean_t		uvm_vnp_uncache __P((struct vnode *));
 struct uvm_object	*uvn_attach __P((void *, vm_prot_t));
 
-#endif /* _UVM_UVM_EXTERN_H_ */
+#endif /* _KERNEL */
 
+#endif /* _UVM_UVM_EXTERN_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.20 2000/09/06 22:48:13 rahnds Exp $	*/
+/*	$OpenBSD: trap.c,v 1.24 2001/03/30 05:13:46 drahn Exp $	*/
 /*	$NetBSD: trap.c,v 1.3 1996/10/13 03:31:37 christos Exp $	*/
 
 /*
@@ -181,7 +181,9 @@ printf("kern dsi on addr %x iar %x\n", frame->dar, frame->srr0);
 			{
 				break;
 			}
+#if 0
 printf("dsi on addr %x iar %x lr %x\n", frame->dar, frame->srr0,frame->lr);
+#endif
 /*
  * keep this for later in case we want it later.
 */
@@ -207,7 +209,9 @@ printf("dsi on addr %x iar %x lr %x\n", frame->dar, frame->srr0,frame->lr);
 				break;
 			}
 		}
+#if 0
 printf("isi iar %x\n", frame->srr0);
+#endif
 	case EXC_MCHK|EXC_USER:
 /* XXX Likely that returning from this trap is bogus... */
 /* XXX Have to make sure that sigreturn does the right thing. */
@@ -271,7 +275,7 @@ printf("isi iar %x\n", frame->srr0);
 #ifdef	KTRACE
 					/* Can't get all the arguments! */
 					if (KTRPOINT(p, KTR_SYSCALL))
-						ktrsyscall(p->p_tracep, code,
+						ktrsyscall(p, code,
 							   argsize, args);
 #endif
 					goto syscall_bad;
@@ -280,7 +284,7 @@ printf("isi iar %x\n", frame->srr0);
 			}
 #ifdef	KTRACE
 			if (KTRPOINT(p, KTR_SYSCALL))
-				ktrsyscall(p->p_tracep, code, argsize, params);
+				ktrsyscall(p, code, argsize, params);
 #endif
 			rval[0] = 0;
 			rval[1] = frame->fixreg[FIRSTARG + 1];
@@ -312,6 +316,7 @@ syscall_bad:
 					error = p->p_emul->e_errno[error];
 				frame->fixreg[0] = error;
 				frame->fixreg[FIRSTARG] = error;
+				frame->fixreg[FIRSTARG + 1] = rval[1];
 				frame->cr |= 0x10000000;
 				break;
 			}
@@ -320,7 +325,7 @@ syscall_bad:
 #endif  
 #ifdef	KTRACE
 			if (KTRPOINT(p, KTR_SYSRET))
-				ktrsysret(p->p_tracep, code, error, rval[0]);
+				ktrsysret(p, code, error, rval[0]);
 #endif
 		}
 		break;
@@ -389,10 +394,12 @@ mpc_print_pci_stat();
 			errstr[errnum] = "previous address";
 			errnum++;
 		}
+#if 0
 printf("pgm iar %x srr1 %x\n", frame->srr0, frame->srr1);
 for (i = 0; i < errnum; i++) {
 	printf("\t[%s]\n", errstr[i]);
 }
+#endif
 		sv.sival_int = frame->srr0;
 		trapsignal(p, SIGILL, 0, ILL_ILLOPC, sv);
 		break;
@@ -484,7 +491,7 @@ child_return(p)
 	tf->srr1 &= ~PSL_FP;	/* Disable FPU, as we can't be fpuproc */
 #ifdef	KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 	/* Profiling?							XXX */
 	curpriority = p->p_priority;

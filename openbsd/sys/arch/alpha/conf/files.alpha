@@ -1,4 +1,4 @@
-#	$OpenBSD: files.alpha,v 1.34 2000/08/12 20:11:32 ericj Exp $
+#	$OpenBSD: files.alpha,v 1.47 2001/04/14 17:51:41 art Exp $
 #	$NetBSD: files.alpha,v 1.32 1996/11/25 04:03:21 cgd Exp $
 #
 # alpha-specific configuration info
@@ -11,7 +11,10 @@ maxusers 2 8 64
 # this loses, but there's no way to define attributes which have attributes
 define	alpha_shared_intr
 file	arch/alpha/dev/shared_intr.c	alpha_shared_intr | dec_eb164 |
-					dec_kn20aa
+					dec_kn20aa | dec_6600 | dec_550
+
+define	alpha_sgmap
+file	arch/alpha/dev/sgmap_common.c alpha_sgmap | dec_3000_500
 
 #
 # Bus-independent devices
@@ -45,8 +48,12 @@ major { sd = 8 }
 file	arch/alpha/alpha/rd_root.c	ramdisk_hooks
 major { rd = 6 }
 
+# Raster operations
+include "dev/rasops/files.rasops"
+include "dev/wsfont/files.wsfont"
+
 #
-# "wprkstation cpnsole" routines
+# "workstation console" routines
 #
 
 include "dev/wscons/files.wscons"
@@ -120,31 +127,13 @@ include "dev/pci/files.pci"	# XXX some ISA devs are 'at pci' too.
 include "dev/isa/files.isa"
 major { wd = 0 }
 
-#file	arch/alpha/isa/isafcns_jensen.c	dec_2000_300
-
-
 #
 # ISA Bus devices
 #
 
-#device	ibus at mainbus { }
-#device	jcombo at ibus: isabus
-#device	jeisa at ibus: eisabus
-
 file	arch/alpha/isa/isa_machdep.c	isa
-file    arch/alpha/pci/pciide_machdep.c  pci
 
-device	pckbc { }
-attach	pckbc at isa
-file	arch/alpha/isa/pckbc.c		pckbc
-
-device	pckbd
-attach	pckbd at pckbc
-file	arch/alpha/isa/pckbd.c		pckbd
-
-device	pms
-attach	pms at pckbc
-file	arch/alpha/isa/pms.c		pms
+include "dev/pckbc/files.pckbc"
 
 # National Semiconductor DS8390/WD83C690-based boards
 # (WD/SMC 80x3 family, SMC Ultra [8216], 3Com 3C503, NE[12]000, and clones)
@@ -168,33 +157,64 @@ include "dev/eisa/files.eisa"
 
 # include "dev/pci/files.pci" XXX SEE ABOVE
 
-device	apecs: pcibus
+file    arch/alpha/pci/pciide_machdep.c  pci
+
+define	alpha_pci_sgmap_pte64
+file	arch/alpha/pci/pci_sgmap_pte64.c	alpha_pci_sgmap_pte64
+
+device	apecs: pcibus, alpha_sgmap, alpha_pci_sgmap_pte64
 attach	apecs at mainbus
 file	arch/alpha/pci/apecs.c		apecs
 file	arch/alpha/pci/apecs_bus_io.c	apecs
 file	arch/alpha/pci/apecs_bus_mem.c	apecs
 file	arch/alpha/pci/apecs_pci.c	apecs
+file	arch/alpha/pci/apecs_dma.c	apecs
 
-device	lca: pcibus
+device	lca: pcibus, alpha_sgmap, alpha_pci_sgmap_pte64
 attach	lca at mainbus
 file	arch/alpha/pci/lca.c		lca
 file	arch/alpha/pci/lca_bus_io.c	lca
 file	arch/alpha/pci/lca_bus_mem.c	lca
 file	arch/alpha/pci/lca_pci.c	lca
+file	arch/alpha/pci/lca_dma.c	lca
 
-device	cia: pcibus
+device	cia: pcibus, alpha_sgmap, alpha_pci_sgmap_pte64
 attach	cia at mainbus
 file	arch/alpha/pci/cia.c		cia
+file	arch/alpha/pci/cia_dma.c	cia
+file	arch/alpha/pci/cia_pci.c	cia
 file	arch/alpha/pci/cia_bus_io.c	cia
 file	arch/alpha/pci/cia_bus_mem.c	cia
-file	arch/alpha/pci/cia_pci.c	cia
+file	arch/alpha/pci/cia_bwx_bus_io.c	cia
+file	arch/alpha/pci/cia_bwx_bus_mem.c	cia
+
+device	irongate: pcibus
+attach	irongate at mainbus
+file	arch/alpha/pci/irongate.c		irongate
+file	arch/alpha/pci/irongate_bus_io.c	irongate
+file	arch/alpha/pci/irongate_bus_mem.c	irongate
+file	arch/alpha/pci/irongate_dma.c		irongate
+file	arch/alpha/pci/irongate_pci.c		irongate
+
+device  tsc { }
+attach  tsc at mainbus
+file    arch/alpha/pci/tsc.c            dec_6600
+
+device  tsp: pcibus, alpha_sgmap, alpha_pci_sgmap_pte64
+attach  tsp at tsc
+file    arch/alpha/pci/tsp_dma.c        tsp
+file    arch/alpha/pci/tsp_pci.c        tsp
+file    arch/alpha/pci/tsp_bus_io.c     tsp
+file    arch/alpha/pci/tsp_bus_mem.c    tsp
 
 file	arch/alpha/pci/pci_2100_a50.c	dec_2100_a50
 file	arch/alpha/pci/pci_axppci_33.c	dec_axppci_33
 file	arch/alpha/pci/pci_eb164.c	dec_eb164
 file	arch/alpha/pci/pci_eb164_intr.s	dec_eb164
 file	arch/alpha/pci/pci_kn20aa.c	dec_kn20aa
-
+file	arch/alpha/pci/pci_550.c	dec_550
+file	arch/alpha/pci/pci_6600.c	dec_6600
+file	arch/alpha/pci/pci_up1000.c	api_up1000
 
 #
 # PCI Bus devices
@@ -202,9 +222,9 @@ file	arch/alpha/pci/pci_kn20aa.c	dec_kn20aa
 
 file	arch/alpha/pci/pci_machdep.c	pci
 
-device	sio: isabus, alpha_shared_intr
+device	sio: isabus, alpha_shared_intr, cy82c693
 attach	sio at pci
-device	pceb: isabus, eisabus
+device	pceb: isabus, eisabus, cy82c693
 attach	pceb at pci
 file	arch/alpha/pci/sio.c		sio | pceb	needs-flag
 file	arch/alpha/pci/sio_pic.c	sio | pceb
@@ -243,8 +263,7 @@ file	arch/alpha/alpha/interrupt.c
 file	arch/alpha/alpha/machdep.c
 file	arch/alpha/alpha/mainbus.c
 file	arch/alpha/alpha/mem.c
-file	arch/alpha/alpha/pmap.c			new_pmap
-file	arch/alpha/alpha/pmap.old.c		!new_pmap
+file	arch/alpha/alpha/pmap.c
 file	arch/alpha/alpha/process_machdep.c
 file	arch/alpha/alpha/prom.c
 file	arch/alpha/alpha/support.c
@@ -252,6 +271,8 @@ file	arch/alpha/alpha/sys_machdep.c
 file	arch/alpha/alpha/trap.c
 file	arch/alpha/alpha/vm_machdep.c
 file	arch/alpha/alpha/disksubr.c
+file	arch/alpha/dev/bus_dma.c
+file	dev/clock_subr.c
 file	dev/cons.c
 
 
@@ -275,6 +296,9 @@ file	arch/alpha/alpha/dec_3000_500.c		dec_3000_500	needs-flag
 file	arch/alpha/alpha/dec_axppci_33.c	dec_axppci_33	needs-flag
 file	arch/alpha/alpha/dec_eb164.c		dec_eb164	needs-flag
 file	arch/alpha/alpha/dec_kn20aa.c		dec_kn20aa	needs-flag
+file	arch/alpha/alpha/dec_550.c		dec_550		needs-flag
+file    arch/alpha/alpha/dec_6600.c             dec_6600	needs-flag
+file	arch/alpha/alpha/api_up1000.c		api_up1000	needs-flag
 
 # OSF/1 Binary Compatibility (COMPAT_OSF1)
 include "compat/osf1/files.osf1"
@@ -283,3 +307,8 @@ file	arch/alpha/alpha/osf1_locore.s		compat_osf1
 # NetBSD binary compatibility (COMPAT_NETBSD)
 include "../../../compat/netbsd/files.netbsd"
 file	arch/alpha/alpha/netbsd_machdep.c	compat_netbsd
+
+#
+# Machine-independent USB drivers
+#
+include "dev/usb/files.usb"

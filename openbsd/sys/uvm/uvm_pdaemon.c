@@ -1,4 +1,5 @@
-/*	$NetBSD: uvm_pdaemon.c,v 1.16 1999/05/24 19:10:57 thorpej Exp $	*/
+/*	$OpenBSD: uvm_pdaemon.c,v 1.9 2001/03/22 03:05:56 smart Exp $	*/
+/*	$NetBSD: uvm_pdaemon.c,v 1.17 1999/07/22 22:58:39 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -108,7 +109,8 @@ static void		uvmpd_tune __P((void));
  * => should _not_ be called by the page daemon (to avoid deadlock)
  */
 
-void uvm_wait(wmsg)
+void
+uvm_wait(wmsg)
 	char *wmsg;
 {
 	int timo = 0;
@@ -145,7 +147,7 @@ void uvm_wait(wmsg)
 	}
 
 	simple_lock(&uvm.pagedaemon_lock);
-	thread_wakeup(&uvm.pagedaemon);		/* wake the daemon! */
+	wakeup(&uvm.pagedaemon);		/* wake the daemon! */
 	UVM_UNLOCK_AND_WAIT(&uvmexp.free, &uvm.pagedaemon_lock, FALSE, wmsg,
 	    timo);
 
@@ -301,7 +303,7 @@ uvm_pageout()
 		 */
 		if (uvmexp.free > uvmexp.reserve_kernel ||
 		    uvmexp.paging == 0)
-			thread_wakeup(&uvmexp.free);
+			wakeup(&uvmexp.free);
 	}
 	/*NOTREACHED*/
 }
@@ -337,7 +339,7 @@ uvmpd_scan_inactive(pglst)
 	UVMHIST_FUNC("uvmpd_scan_inactive"); UVMHIST_CALLED(pdhist);
 
 	/*
-	 * note: we currently keep swap-backed pages on a seperate inactive
+	 * note: we currently keep swap-backed pages on a separate inactive
 	 * list from object-backed pages.   however, merging the two lists
 	 * back together again hasn't been ruled out.   thus, we keep our
 	 * swap cluster in "swpps" rather than in pps (allows us to mix
@@ -818,7 +820,7 @@ uvmpd_scan_inactive(pglst)
 			/* handle PG_WANTED now */
 			if (p->flags & PG_WANTED)
 				/* still holding object lock */
-				thread_wakeup(p);
+				wakeup(p);
 
 			p->flags &= ~(PG_BUSY|PG_WANTED);
 			UVM_PAGE_OWN(p, NULL);

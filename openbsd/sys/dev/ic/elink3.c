@@ -1,4 +1,4 @@
-/*	$OpenBSD: elink3.c,v 1.45 2000/10/16 17:08:07 aaron Exp $	*/
+/*	$OpenBSD: elink3.c,v 1.47 2001/02/20 19:39:36 mickey Exp $	*/
 /*	$NetBSD: elink3.c,v 1.32 1997/05/14 00:22:00 thorpej Exp $	*/
 
 /*
@@ -335,10 +335,12 @@ epconfig(sc, chipset, enaddr)
 		break;
 
 	default:
-		printf("wrote %d to TX_AVAIL_THRESH, read back %d. "
+		printf("wrote %x to TX_AVAIL_THRESH, read back %x. "
 		    "Interface disabled\n", EP_THRESH_DISABLE, (int) i);
 		return;
 	}
+
+	timeout_set(&sc->sc_epmbuffill_tmo, epmbuffill, sc);
 
 	/*
 	 * Ensure Tx-available interrupts are enabled for 
@@ -435,11 +437,6 @@ epconfig(sc, chipset, enaddr)
 	}
 
 	GO_WINDOW(1);		/* Window 1 is operating window */
-
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_arpcom.ac_if.if_bpf, ifp, DLT_EN10MB,
-	    sizeof(struct ether_header));
-#endif
 
 	sc->tx_start_thresh = 20;	/* probably a good starting point. */
 
@@ -1403,7 +1400,7 @@ epget(sc, totlen)
 	} else {
 		/* If the queue is no longer full, refill. */
 		if (sc->last_mb == sc->next_mb)
-			timeout(epmbuffill, sc, 1);
+			timeout_add(&sc->sc_epmbuffill_tmo, 1);
 		/* Convert one of our saved mbuf's. */
 		sc->next_mb = (sc->next_mb + 1) % MAX_MBS;
 		m->m_data = m->m_pktdat;
@@ -1753,7 +1750,7 @@ epmbuffill(v)
 	sc->last_mb = i;
 	/* If the queue was not filled, try again. */
 	if (sc->last_mb != sc->next_mb)
-		timeout(epmbuffill, sc, 1);
+		timeout_add(&sc->sc_epmbuffill_tmo, 1);
 	splx(s);
 }
 
@@ -1771,7 +1768,7 @@ epmbufempty(sc)
 		}
 	}
 	sc->last_mb = sc->next_mb = 0;
-	untimeout(epmbuffill, sc);
+	timeout_del(&sc->sc_epmbuffill_tmo);
 	splx(s);
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82596var.h,v 1.2 1999/11/26 17:45:57 mickey Exp $	*/
+/*	$OpenBSD: i82596var.h,v 1.4 2001/03/23 00:16:49 mickey Exp $	*/
 /*	$NetBSD: i82586var.h,v 1.10 1998/08/15 04:42:42 mycroft Exp $	*/
 
 /*-

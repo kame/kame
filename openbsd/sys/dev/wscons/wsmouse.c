@@ -1,4 +1,4 @@
-/* $OpenBSD: wsmouse.c,v 1.2 2000/08/01 13:51:18 mickey Exp $ */
+/* $OpenBSD: wsmouse.c,v 1.5 2001/03/30 16:38:14 aaron Exp $ */
 /* $NetBSD: wsmouse.c,v 1.12 2000/05/01 07:36:58 takemura Exp $ */
 
 /*
@@ -166,7 +166,7 @@ cdev_decl(wsmouse);
 
 #if NWSMUX > 0
 struct wsmuxops wsmouse_muxops = {
-	wsmouseopen, wsmousedoclose, wsmousedoioctl, 0, 0
+	wsmouseopen, wsmousedoclose, wsmousedoioctl, 0, 0, 0
 };
 #endif
 
@@ -326,6 +326,7 @@ wsmouse_input(wsmousedev, btns, x, y, z, flags)
 	 * of changes or out of room.  As events get delivered,
 	 * mark them `unchanged'.
 	 */
+	ub = sc->sc_ub;
 	any = 0;
 	get = evar->get;
 	put = evar->put;
@@ -413,7 +414,6 @@ wsmouse_input(wsmousedev, btns, x, y, z, flags)
 	}
 
 	mb = sc->sc_mb;
-	ub = sc->sc_ub;
 	while ((d = mb ^ ub) != 0) {
 		/*
 		 * Mouse button change.  Find the first change and drop
@@ -658,7 +658,7 @@ wsmouse_add_mux(unit, muxsc)
 	if (sc->sc_mux || sc->sc_events.io)
 		return (EBUSY);
 
-	return (wsmux_attach_sc(muxsc, WSMUX_KBD, &sc->sc_dv, &sc->sc_events, 
+	return (wsmux_attach_sc(muxsc, WSMUX_MOUSE, &sc->sc_dv, &sc->sc_events, 
 				&sc->sc_mux, &wsmouse_muxops));
 }
 

@@ -1,8 +1,8 @@
-/*	$OpenBSD: ip_ah.c,v 1.44 2000/09/19 03:20:58 angelos Exp $ */
+/*	$OpenBSD: ip_ah.c,v 1.50 2001/04/14 00:30:58 angelos Exp $ */
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
- * Angelos D. Keromytis (kermit@csd.uch.gr) and 
+ * Angelos D. Keromytis (kermit@csd.uch.gr) and
  * Niels Provos (provos@physnet.uni-hamburg.de).
  *
  * The original version of this code was written by John Ioannidis
@@ -23,7 +23,7 @@
  * Permission to use, copy, and modify this software without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
- * modification of this software. 
+ * modification of this software.
  * You may use this code under the GNU public license if you so wish. Please
  * contribute changes back to the authors under this freer than GPL license
  * so that we may further the use of strong encryption without limitations to
@@ -83,10 +83,6 @@
 #define DPRINTF(x)
 #endif
 
-#ifndef offsetof
-#define offsetof(s, e) ((int)&((s *)0)->e)
-#endif
-
 /*
  * ah_attach() is called from the transformation initialization code
  */
@@ -108,15 +104,15 @@ ah_init(struct tdb *tdbp, struct xformsw *xsp, struct ipsecinit *ii)
     /* Authentication operation */
     switch (ii->ii_authalg)
     {
-	case SADB_AALG_MD5HMAC96:
+	case SADB_AALG_MD5HMAC:
 	    thash = &auth_hash_hmac_md5_96;
 	    break;
 
-	case SADB_AALG_SHA1HMAC96:
+	case SADB_AALG_SHA1HMAC:
 	    thash = &auth_hash_hmac_sha1_96;
 	    break;
 
-	case SADB_X_AALG_RIPEMD160HMAC96:
+	case SADB_AALG_RIPEMD160HMAC:
 	    thash = &auth_hash_hmac_ripemd_160_96;
 	    break;
 
@@ -253,6 +249,17 @@ ah_massage_headers(struct mbuf **m0, int proto, int skip, int alg, int out)
 	    /* IPv4 option processing */
 	    for (off = sizeof(struct ip); off < skip;)
 	    {
+		if (ptr[off] == IPOPT_EOL || ptr[off] == IPOPT_NOP ||
+		    off + 1 < skip)
+		    ;
+		else
+		{
+		    DPRINTF(("ah_massage_headers(): illegal IPv4 option length for option %d\n", ptr[off]));
+		    ahstat.ahs_hdrops++;
+		    m_freem(m);
+		    return EINVAL;
+		}
+
 		switch (ptr[off])
 		{
 		    case IPOPT_EOL:
@@ -268,10 +275,10 @@ ah_massage_headers(struct mbuf **m0, int proto, int skip, int alg, int out)
 		    case 0x86:	/* Commercial security */
 		    case 0x94:	/* Router alert */
 		    case 0x95:	/* RFC1770 */
-			/* Sanity check for zero-length options */
-			if (ptr[off + 1] == 0)
+			/* Sanity check for option length */
+			if (ptr[off + 1] < 2)
 			{
-			    DPRINTF(("ah_massage_headers(): illegal zero-length IPv4 option %d\n", ptr[off]));
+			    DPRINTF(("ah_massage_headers(): illegal IPv4 option length for option %d\n", ptr[off]));
 			    ahstat.ahs_hdrops++;
 			    m_freem(m);
 			    return EINVAL;
@@ -282,6 +289,15 @@ ah_massage_headers(struct mbuf **m0, int proto, int skip, int alg, int out)
 
 		    case IPOPT_LSRR:
 		    case IPOPT_SSRR:
+			/* Sanity check for option length */
+			if (ptr[off + 1] < 2)
+			{
+			    DPRINTF(("ah_massage_headers(): illegal IPv4 option length for option %d\n", ptr[off]));
+			    ahstat.ahs_hdrops++;
+			    m_freem(m);
+			    return EINVAL;
+			}
+
 			/*
 			 * On output, if we have either of the source routing
 			 * options, we should swap the destination address of
@@ -296,10 +312,10 @@ ah_massage_headers(struct mbuf **m0, int proto, int skip, int alg, int out)
 
 			/* Fall through */
 		    default:
-			/* Sanity check for zero-length options */
-			if (ptr[off + 1] == 0)
+			/* Sanity check for option length */
+			if (ptr[off + 1] < 2)
 			{
-			    DPRINTF(("ah_massage_headers(): illegal zero-length IPv4 option %d\n", ptr[off]));
+			    DPRINTF(("ah_massage_headers(): illegal IPv4 option length for option %d\n", ptr[off]));
 			    ahstat.ahs_hdrops++;
 			    m_freem(m);
 			    return EINVAL;
@@ -352,7 +368,7 @@ ah_massage_headers(struct mbuf **m0, int proto, int skip, int alg, int out)
 
 	    /* Done with IPv6 header */
 	    m_copyback(m, 0, sizeof(struct ip6_hdr), (caddr_t) &ip6);
-	    
+
 	    /* Let's deal with the remaining headers (if any) */
 	    if (skip - sizeof(struct ip6_hdr) > 0)
 	    {
@@ -554,7 +570,7 @@ ah_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	(tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes))
       {
 	  pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
-	  tdb_delete(tdb, TDBEXP_TIMEOUT);
+	  tdb_delete(tdb);
 	  m_freem(m);
 	  return ENXIO;
       }
@@ -591,6 +607,7 @@ ah_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
     /* Allocate IPsec-specific opaque crypto info */
     MALLOC(tc, struct tdb_crypto *, sizeof(struct tdb_crypto),
 	   M_XDATA, M_NOWAIT);
+    bzero(tc, sizeof(struct tdb_crypto));
     if (tc == NULL)
     {
 	m_freem(m);
@@ -656,7 +673,7 @@ ah_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
  */
 int
 ah_input_cb(void *op)
-{ 
+{
     int roff, rplen, error, skip, protoff;
     unsigned char calc[AH_ALEN_MAX];
     struct mbuf *m1, *m0, *m;
@@ -758,7 +775,7 @@ ah_input_cb(void *op)
     }
 
     /* Remove the AH header from the mbuf */
-    if (roff == 0) 
+    if (roff == 0)
     {
 	/* The AH header was conveniently at the beginning of the mbuf */
 	m_adj(m1, rplen + ahx->authsize);
@@ -796,7 +813,7 @@ ah_input_cb(void *op)
       }
       else
       {
-	  /* 
+	  /*
 	   * The AH header lies in the "middle" of the mbuf...do an
 	   * overlapping copy of the remainder of the mbuf over the ESP
 	   * header.
@@ -832,7 +849,7 @@ ah_input_cb(void *op)
  */
 int
 ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
-	  int protoff)
+	  int protoff, struct tdb *tdb2)
 {
     struct auth_hash *ahx = (struct auth_hash *) tdb->tdb_authalgxform;
     struct cryptodesc *crda;
@@ -860,10 +877,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	m1.m_len = ENC_HDRLEN;
 	m1.m_data = (char *) &hdr;
 
-	if (tdb->tdb_interface)
-	  ifn = (struct ifnet *) tdb->tdb_interface;
-	else
-	  ifn = &(encif[0].sc_if);
+	ifn = &(encif[0].sc_if);
 
 	if (ifn->if_bpf)
 	  bpf_mtap(ifn->if_bpf, &m1);
@@ -934,7 +948,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	(tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes))
       {
 	  pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
-	  tdb_delete(tdb, TDBEXP_TIMEOUT);
+	  tdb_delete(tdb);
 	  m_freem(m);
 	  return EINVAL;
       }
@@ -948,24 +962,24 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
     }
 
     /*
-     * Loop through mbuf chain; if we find an M_EXT mbuf with 
+     * Loop through mbuf chain; if we find an M_EXT mbuf with
      * more than one reference, replace the rest of the chain.
      */
     mi = m;
-    while (mi != NULL && 
-	   (!(mi->m_flags & M_EXT) || 
+    while (mi != NULL &&
+	   (!(mi->m_flags & M_EXT) ||
 	    (mi->m_ext.ext_ref == NULL &&
 	     mclrefcnt[mtocl(mi->m_ext.ext_buf)] <= 1)))
     {
         mo = mi;
         mi = mi->m_next;
     }
-     
+
     if (mi != NULL)
     {
         /* Replace the rest of the mbuf chain. */
         struct mbuf *n = m_copym2(mi, 0, M_COPYALL, M_DONTWAIT);
-      
+
         if (n == NULL)
         {
 	    ahstat.ahs_hdrops++;
@@ -997,7 +1011,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
      * at the beginning of the returned mbuf.
      */
     ah = mtod(mi, struct ah *);
-    
+
     /* Initialize the AH header */
     m_copydata(m, protoff, sizeof(u_int8_t), (caddr_t) &ah->ah_nh);
     ah->ah_hl = (rplen + ahx->authsize - AH_FLENGTH) / sizeof(u_int32_t);
@@ -1034,6 +1048,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
     /* Allocate IPsec-specific opaque crypto info */
     MALLOC(tc, struct tdb_crypto *, sizeof(struct tdb_crypto), M_XDATA,
 	   M_NOWAIT);
+    bzero(tc, sizeof(struct tdb_crypto));
     if (tc == NULL)
     {
 	m_freem(m);
@@ -1116,6 +1131,13 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
     tc->tc_proto = tdb->tdb_sproto;
     bcopy(&tdb->tdb_dst, &tc->tc_dst, sizeof(union sockaddr_union));
 
+    if (tdb2)
+    {
+	tc->tc_spi2 = tdb2->tdb_spi;
+	tc->tc_proto2 = tdb2->tdb_sproto;
+	bcopy(&tdb2->tdb_dst, &tc->tc_dst2, sizeof(union sockaddr_union));
+    }
+
     return crypto_dispatch(crp);
 }
 
@@ -1125,10 +1147,10 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 int
 ah_output_cb(void *op)
 {
+    struct tdb *tdb, *tdb2 = NULL;
     int skip, protoff, error;
     struct tdb_crypto *tc;
     struct cryptop *crp;
-    struct tdb *tdb;
     caddr_t ptr = 0;
     struct mbuf *m;
     int err, s;
@@ -1143,6 +1165,9 @@ ah_output_cb(void *op)
     s = spltdb();
 
     tdb = gettdb(tc->tc_spi, &tc->tc_dst, tc->tc_proto);
+    if (tc->tc_spi2)
+      tdb2 = gettdb(tc->tc_spi2, &tc->tc_dst2, tc->tc_proto2);
+
     FREE(tc, M_XDATA);
     if (tdb == NULL)
     {
@@ -1185,7 +1210,7 @@ ah_output_cb(void *op)
     FREE(ptr, M_XDATA);
     crypto_freereq(crp);
 
-    err =  ipsp_process_done(m, tdb);
+    err =  ipsp_process_done(m, tdb, tdb2);
     splx(s);
     return err;
 

@@ -130,13 +130,11 @@ struct sadb_comb {
 struct sadb_supported {
   uint16_t sadb_supported_len;
   uint16_t sadb_supported_exttype;
-  uint8_t sadb_supported_nauth;
-  uint8_t sadb_supported_nencrypt;
-  uint16_t sadb_supported_reserved;
+  uint32_t sadb_supported_reserved;
 };
 
 struct sadb_alg {
-  uint8_t sadb_alg_type;
+  uint8_t sadb_alg_id;
   uint8_t sadb_alg_ivlen;
   uint16_t sadb_alg_minbits;
   uint16_t sadb_alg_maxbits;
@@ -165,6 +163,13 @@ struct sadb_policy {
   u_int32_t sadb_policy_seq;
 };
 
+struct sadb_cred {
+  uint16_t sadb_cred_len;
+  uint16_t sadb_cred_exttype;
+  uint16_t sadb_cred_type;
+  uint16_t sadb_cred_reserved;
+};
+
 #define SADB_GETSPROTO(x) ( (x) == SADB_SATYPE_AH ? IPPROTO_AH :\
                                 (x) == SADB_SATYPE_ESP ? IPPROTO_ESP :\
                                                          IPPROTO_IPIP )
@@ -183,18 +188,21 @@ struct sadb_policy {
 #define SADB_EXT_IDENTITY_DST         11
 #define SADB_EXT_SENSITIVITY          12
 #define SADB_EXT_PROPOSAL             13
-#define SADB_EXT_SUPPORTED            14
-#define SADB_EXT_SPIRANGE             15
-#define SADB_X_EXT_SRC_MASK           16
-#define SADB_X_EXT_DST_MASK           17
-#define SADB_X_EXT_PROTOCOL           18
-#define SADB_X_EXT_FLOW_TYPE          19
-#define SADB_X_EXT_SRC_FLOW           20
-#define SADB_X_EXT_DST_FLOW           21
-#define SADB_X_EXT_SA2                22
-#define SADB_X_EXT_DST2               23
-#define SADB_X_EXT_POLICY             24
-#define SADB_EXT_MAX                  24
+#define SADB_EXT_SUPPORTED_AUTH	      14
+#define SADB_EXT_SUPPORTED_ENCRYPT    15
+#define SADB_EXT_SPIRANGE             16
+#define SADB_X_EXT_SRC_MASK           17
+#define SADB_X_EXT_DST_MASK           18
+#define SADB_X_EXT_PROTOCOL           19
+#define SADB_X_EXT_FLOW_TYPE          20
+#define SADB_X_EXT_SRC_FLOW           21
+#define SADB_X_EXT_DST_FLOW           22
+#define SADB_X_EXT_SA2                23
+#define SADB_X_EXT_DST2               24
+#define SADB_X_EXT_POLICY             25
+#define SADB_X_EXT_SRC_CREDENTIALS    26
+#define SADB_X_EXT_DST_CREDENTIALS    27
+#define SADB_EXT_MAX                  27
 
 /* Fix pfkeyv2.c struct pfkeyv2_socket if SATYPE_MAX > 31 */
 #define SADB_SATYPE_UNSPEC		 0
@@ -215,23 +223,32 @@ struct sadb_policy {
 #define SADB_SASTATE_MAX      3
 
 #define SADB_AALG_NONE               0
-#define SADB_AALG_MD5HMAC            1
-#define SADB_AALG_SHA1HMAC           2
-#define SADB_AALG_MD5HMAC96          3
-#define SADB_AALG_SHA1HMAC96         4
-#define SADB_X_AALG_RIPEMD160HMAC96  5
-#define SADB_X_AALG_MD5              6
-#define SADB_X_AALG_SHA1             7
-#define SADB_AALG_MAX                7
+#define SADB_AALG_MD5HMAC            2
+#define SADB_AALG_SHA1HMAC           3
+#define SADB_AALG_DES                4
+#define SADB_AALG_SHA2_256           5
+#define SADB_AALG_SHA2_384           6
+#define SADB_AALG_SHA2_512           7
+#define SADB_AALG_RIPEMD160HMAC      8
+#define SADB_X_AALG_MD5              249
+#define SADB_X_AALG_SHA1             250
+#define SADB_AALG_MAX                250
 
 #define SADB_EALG_NONE        0
-#define SADB_EALG_DESCBC      1
-#define SADB_EALG_3DESCBC     2
-#define SADB_X_EALG_BLF       3
-#define SADB_X_EALG_CAST      4
-#define SADB_X_EALG_SKIPJACK  5
-#define SADB_X_EALG_AES       6
-#define SADB_EALG_MAX         6
+#define SADB_X_EALG_DES_IV64  1
+#define SADB_EALG_DESCBC      2
+#define SADB_EALG_3DESCBC     3
+#define SADB_X_EALG_RC5       4
+#define SADB_X_EALG_IDEA      5
+#define SADB_X_EALG_CAST      6
+#define SADB_X_EALG_BLF       7
+#define SADB_X_EALG_3IDEA     8
+#define SADB_X_EALG_DES_IV32  9
+#define SADB_X_EALG_RC4       10
+#define SADB_X_EALG_NULL      11
+#define SADB_X_EALG_AES       12
+#define SADB_X_EALG_SKIPJACK  249
+#define SADB_EALG_MAX         249
 
 #define SADB_SAFLAGS_PFS         	0x001    /* perfect forward secrecy */
 #define SADB_X_SAFLAGS_HALFIV    	0x002    /* Used for ESP-old */
@@ -265,6 +282,11 @@ struct sadb_policy {
 #define PFKEYV2_SENDMESSAGE_UNICAST    1
 #define PFKEYV2_SENDMESSAGE_REGISTERED 2
 #define PFKEYV2_SENDMESSAGE_BROADCAST  3
+
+#define SADB_CREDTYPE_NONE           0
+#define SADB_CREDTYPE_X509           1
+#define SADB_CREDTYPE_KEYNOTE        2
+#define SADB_CREDTYPE_MAX            3
 
 #define FLOW_X_TYPE_USE                1
 #define FLOW_X_TYPE_ACQUIRE            2

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exit.c,v 1.27 2000/06/06 18:50:32 art Exp $	*/
+/*	$OpenBSD: kern_exit.c,v 1.30 2001/04/02 21:43:11 niklas Exp $	*/
 /*	$NetBSD: kern_exit.c,v 1.39 1996/04/22 01:38:25 christos Exp $	*/
 
 /*
@@ -64,6 +64,7 @@
 #include <sys/signalvar.h>
 #include <sys/sched.h>
 #include <sys/ktrace.h>
+#include <sys/pool.h>
 #ifdef SYSVSHM
 #include <sys/shm.h>
 #endif
@@ -264,6 +265,11 @@ exit1(p, rv)
 	p->p_pctcpu = 0;
 
 	/*
+	 * notify interested parties of our demise.
+	 */
+	KNOTE(&p->p_klist, NOTE_EXIT);
+
+	/*
 	 * Notify parent that we're gone.  If we have P_NOZOMBIE or parent has
 	 * the P_NOCLDWAIT flag set, notify process 1 instead (and hope it
 	 * will handle this situation).
@@ -280,11 +286,20 @@ exit1(p, rv)
 			wakeup((caddr_t)pp);
 	}
 
+	if ((p->p_flag & P_FSTRACE) == 0 && p->p_exitsig != 0)
+		psignal(p->p_pptr, P_EXITSIG(p));
+	wakeup((caddr_t)p->p_pptr);
+
 	/*
 	 * Notify procfs debugger
 	 */
 	if (p->p_flag & P_FSTRACE)
 		wakeup((caddr_t)p);
+
+	/*
+	 * Release the process's signal state.
+	 */
+	sigactsfree(p);
 
 	/*
 	 * Clear curproc after we've done all operations
@@ -427,6 +442,16 @@ loop:
 		    p->p_pid != SCARG(uap, pid) &&
 		    p->p_pgid != -SCARG(uap, pid)))
 			continue;
+
+		/*
+		 * Wait for processes with p_exitsig != SIGCHLD processes only
+		 * if WALTSIG is set; wait for processes with pexitsig ==
+		 * SIGCHLD only if WALTSIG is clear.
+		 */
+		if ((SCARG(uap, options) & WALTSIG) ?
+		    (p->p_exitsig == SIGCHLD) : (P_EXITSIG(p) != SIGCHLD))
+			continue;
+
 		nfound++;
 		if (p->p_stat == SZOMB) {
 			retval[0] = p->p_pid;
@@ -452,7 +477,8 @@ loop:
 			if (p->p_oppid && (t = pfind(p->p_oppid))) {
 				p->p_oppid = 0;
 				proc_reparent(p, t);
-				psignal(t, SIGCHLD);
+				if (p->p_exitsig != 0)
+					psignal(t, P_EXITSIG(p));
 				wakeup((caddr_t)t);
 				return (0);
 			}
@@ -503,6 +529,9 @@ proc_reparent(child, parent)
 	if (child->p_pptr == parent)
 		return;
 
+	if (parent == initproc)
+		child->p_exitsig = SIGCHLD;
+
 	LIST_REMOVE(child, p_sibling);
 	LIST_INSERT_HEAD(&parent->p_children, child, p_sibling);
 	child->p_pptr = parent;
@@ -542,7 +571,7 @@ proc_zap(p)
 	if (p->p_textvp)
 		vrele(p->p_textvp);
 
-	FREE(p, M_PROC);
+	pool_put(&proc_pool, p);
 	nprocs--;
 }
 

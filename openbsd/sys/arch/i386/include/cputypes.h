@@ -1,4 +1,4 @@
-/*	$OpenBSD: cputypes.h,v 1.5 1999/08/20 10:33:35 deraadt Exp $	*/
+/*	$OpenBSD: cputypes.h,v 1.7 2001/01/25 04:39:45 deraadt Exp $	*/
 /*	$NetBSD: cputypes.h,v 1.10 1997/10/18 04:51:03 mikel Exp $	*/
 
 /*
@@ -66,6 +66,7 @@
 #define CPUVENDOR_AMD		3
 #define CPUVENDOR_IDT		4
 #define CPUVENDOR_RISE		5
+#define CPUVENDOR_TRANSMETA	6
 
 /*
  * Some other defines, dealing with values returned by cpuid.
@@ -74,4 +75,4 @@
 #define CPU_MAXMODEL	15	/* Models within family range 0-15 */
 #define CPU_DEFMODEL	16	/* Value for unknown model -> default  */
 #define CPU_MINFAMILY	 4	/* Lowest that cpuid can return (486) */
-#define CPU_MAXFAMILY	 6	/* Highest we know (686) */
+#define CPU_MAXFAMILY  0xf	/* Highest we know (686) */

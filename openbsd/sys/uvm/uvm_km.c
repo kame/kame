@@ -1,3 +1,4 @@
+/*	$OpenBSD: uvm_km.c,v 1.9 2001/03/22 03:05:55 smart Exp $	*/
 /*	$NetBSD: uvm_km.c,v 1.27 1999/06/04 23:38:41 thorpej Exp $	*/
 
 /* 
@@ -356,8 +357,8 @@ uvm_km_get(uobj, offset, pps, npagesp, centeridx, access_type, advice, flags)
 			/* page is there, see if we need to wait on it */
 			if ((ptmp->flags & (PG_BUSY|PG_RELEASED)) != 0) {
 				ptmp->flags |= PG_WANTED;
-				UVM_UNLOCK_AND_WAIT(ptmp,&uobj->vmobjlock, 0,
-				    "uvn_get",0);
+				UVM_UNLOCK_AND_WAIT(ptmp,&uobj->vmobjlock,
+				    FALSE, "uvn_get",0);
 				simple_lock(&uobj->vmobjlock);
 				continue;	/* goto top of pps while loop */
 			}
@@ -880,7 +881,7 @@ uvm_km_free_wakeup(map, addr, size)
 	vm_map_lock(map);
 	(void)uvm_unmap_remove(map, trunc_page(addr), round_page(addr+size), 
 			 &dead_entries);
-	thread_wakeup(map);
+	wakeup(map);
 	vm_map_unlock(map);
 
 	if (dead_entries != NULL)
@@ -949,7 +950,7 @@ uvm_km_alloc1(map, size, zeroit)
 				panic("uvm_km_alloc1: non-released page");
 			pg->flags |= PG_WANTED;
 			UVM_UNLOCK_AND_WAIT(pg, &uvm.kernel_object->vmobjlock,
-			    0, "km_alloc", 0);
+			    FALSE, "km_alloc", 0);
 			continue;   /* retry */
 		}
 		

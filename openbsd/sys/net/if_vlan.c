@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vlan.c,v 1.6 2000/10/18 15:55:48 chris Exp $ */
+/*	$OpenBSD: if_vlan.c,v 1.16 2001/03/30 16:02:13 jason Exp $ */
 /*
  * Copyright 1998 Massachusetts Institute of Technology
  *
@@ -48,7 +48,7 @@
  * one can change the behavior of the vlan interface by setting
  * the LINK0 flag on it (that is setting the vlan interface's LINK0
  * flag, _not_ the parent's LINK0 flag; we try to leave the parent
- * alone). If the interface as the LINK0 flag set, then it will
+ * alone). If the interface has the LINK0 flag set, then it will
  * not modify the ethernet header on output because the parent
  * can do that for itself. On input, the parent can call vlan_input_tag()
  * directly in order to supply us with an incoming mbuf and the vlan
@@ -87,8 +87,6 @@
 
 struct	ifaddr	**ifnet_addrs;
 
-u_int	vlan_proto = ETHERTYPE_8021Q;
-
 struct ifvlan ifv_softc[NVLAN];
 
 extern int ifqmaxlen;
@@ -99,6 +97,7 @@ int	vlan_setmulti (struct ifnet *ifp);
 int	vlan_unconfig (struct ifnet *ifp);
 int	vlan_config (struct ifvlan *ifv, struct ifnet *p);
 void	vlanattach (void *dummy);
+int	vlan_set_promisc (struct ifnet *ifp);
 
 /*
  * Program our multicast filter. What we're actually doing is
@@ -169,9 +168,7 @@ vlanattach(void *dummy)
 		ifp->if_snd.ifq_maxlen = ifqmaxlen;
 		if_attach(ifp);
 		ether_ifattach(ifp);
-#if NBPFILTER > 0
-		bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
+
 		/* Now undo some of the damage... */
 		ifp->if_data.ifi_type = IFT_8021_VLAN;
 		ifp->if_data.ifi_hdrlen = EVL_ENCAPLEN;
@@ -184,7 +181,7 @@ vlan_start(struct ifnet *ifp)
 	struct ifvlan *ifv;
 	struct ifnet *p;
 	struct ether_vlan_header *evl;
-	struct mbuf *m;
+	struct mbuf *m, *m0;
 
 	ifv = ifp->if_softc;
 	p = ifv->ifv_p;
@@ -192,8 +189,18 @@ vlan_start(struct ifnet *ifp)
 	ifp->if_flags |= IFF_OACTIVE;
 	for (;;) {
 		IF_DEQUEUE(&ifp->if_snd, m);
-		if (m == 0)
+		if (m == NULL)
 			break;
+
+		if ((p->if_flags & (IFF_UP|IFF_RUNNING)) !=
+		    (IFF_UP|IFF_RUNNING)) {
+			IF_DROP(&p->if_snd);
+				/* XXX stats */
+			ifp->if_oerrors++;
+			m_freem(m);
+			continue;
+		}
+
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
@@ -221,35 +228,44 @@ vlan_start(struct ifnet *ifp)
 			m->m_pkthdr.rcvif = ifp;
 			m->m_flags |= M_PROTO1;
 		} else {
-			M_PREPEND(m, EVL_ENCAPLEN, M_DONTWAIT);
-			if (m == NULL) {
-				printf("%s: M_PREPEND failed", ifv->ifv_p->if_xname);
-				ifp->if_ierrors++;
-				continue;
-			}
-			/* M_PREPEND takes care of m_len, m_pkthdr.len for us */
-
-			m = m_pullup(m, ETHER_HDR_LEN + EVL_ENCAPLEN);
-			if (m == NULL) {
-				printf("%s: m_pullup failed", ifv->ifv_p->if_xname);
+			if (m->m_len < sizeof(struct ether_header) &&
+			    (m = m_pullup(m, sizeof(struct ether_header)))
+			    == NULL) {
 				ifp->if_ierrors++;
 				continue;
 			}
 
-			/*
-			 * Transform the Ethernet header into an Ethernet header
-			 * with 802.1Q encapsulation.
-			 */
-			bcopy(mtod(m, char *) + EVL_ENCAPLEN, mtod(m, char *),
-			      sizeof(struct ether_header));
-			evl = mtod(m, struct ether_vlan_header *);
+			if (m->m_flags & M_PKTHDR) {
+				MGETHDR(m0, MT_DATA, M_DONTWAIT);
+			} else {
+				MGET(m0, MT_DATA, M_DONTWAIT);
+			}
+
+			if (m0 == NULL) {
+				ifp->if_ierrors++;
+				m_freem(m);
+				continue;
+			}
+
+			if (m0->m_flags & M_PKTHDR) {
+				M_COPY_PKTHDR(m0, m);
+				m->m_flags &= ~M_PKTHDR;
+			}
+			m0->m_flags &= ~M_PROTO1;
+			m0->m_next = m;
+			m0->m_len = sizeof(struct ether_vlan_header);
+
+			evl = mtod(m0, struct ether_vlan_header *);
+			bcopy(mtod(m, char *),
+			    evl, sizeof(struct ether_header));
 			evl->evl_proto = evl->evl_encap_proto;
-			evl->evl_encap_proto = htons(vlan_proto);
+			evl->evl_encap_proto = htons(ETHERTYPE_8021Q);
 			evl->evl_tag = htons(ifv->ifv_tag);
-#ifdef DEBUG
-			printf("vlan_start: %*D\n", sizeof *evl,
-			    (char *)evl, ":");
-#endif
+
+			m->m_len -= sizeof(struct ether_header);
+			m->m_data += sizeof(struct ether_header);
+
+			m = m0;
 		}
 
 		/*
@@ -267,10 +283,9 @@ vlan_start(struct ifnet *ifp)
 		if (m->m_flags & M_MCAST)
 			p->if_omcasts++;
 		IF_ENQUEUE(&p->if_snd, m);
-		if ((p->if_flags & IFF_OACTIVE) == 0) {
+		ifp->if_opackets++;
+		if ((p->if_flags & IFF_OACTIVE) == 0)
 			p->if_start(p);
-			ifp->if_opackets++;
-		}
 	}
 	ifp->if_flags &= ~IFF_OACTIVE;
 
@@ -285,13 +300,13 @@ vlan_input_tag(struct ether_header *eh, struct mbuf *m, u_int16_t t)
 
 	for (i = 0; i < NVLAN; i++) {
 		ifv = &ifv_softc[i];
-		if (ifv->ifv_tag == t)
+		if (m->m_pkthdr.rcvif == ifv->ifv_p && t == ifv->ifv_tag)
 			break;
 	}
 
 	if (i >= NVLAN || (ifv->ifv_if.if_flags & (IFF_UP|IFF_RUNNING)) !=
 	    (IFF_UP|IFF_RUNNING)) {
-		m_free(m);
+		m_freem(m);
 		return -1;	/* so the parent can take note */
 	}
 
@@ -331,6 +346,12 @@ vlan_input(eh, m)
 	struct ifvlan *ifv;
 	u_int tag;
 
+	if (m->m_len < EVL_ENCAPLEN &&
+	    (m = m_pullup(m, EVL_ENCAPLEN)) == NULL) {
+		m->m_pkthdr.rcvif->if_ierrors++;
+		return (0);
+	}
+
 	tag = EVL_VLANOFTAG(ntohs(*mtod(m, u_int16_t *)));
 
 	for (i = 0; i < NVLAN; i++) {
@@ -354,8 +375,8 @@ vlan_input(eh, m)
 	 */
 	m->m_pkthdr.rcvif = &ifv->ifv_if;
 	eh->ether_type = mtod(m, u_int16_t *)[1];
-	m->m_data += EVL_ENCAPLEN;
 	m->m_len -= EVL_ENCAPLEN;
+	m->m_data += EVL_ENCAPLEN;
 	m->m_pkthdr.len -= EVL_ENCAPLEN;
 
 #if NBPFILTER > 0
@@ -391,11 +412,14 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 		return EBUSY;
 	ifv->ifv_p = p;
 	ifv->ifv_if.if_mtu = p->if_data.ifi_mtu;
+	ifv->ifv_if.if_flags = p->if_flags &
+	    (IFF_UP | IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
 
 	/*
-	 * Preserve the state of the LINK0 flag for ourselves.
+	 * Inherit the if_type from the parent.  This allows us to
+	 * participate in bridges of that type.
 	 */
-	ifv->ifv_if.if_flags = (p->if_flags & ~(IFF_LINK0));
+	ifv->ifv_if.if_type = p->if_type;
 
 	/*
 	 * Set up our ``Ethernet address'' to reflect the underlying
@@ -458,6 +482,29 @@ vlan_unconfig(struct ifnet *ifp)
 	bzero(ifv->ifv_ac.ac_enaddr, ETHER_ADDR_LEN);
 
 	return 0;
+}
+
+int
+vlan_set_promisc(struct ifnet *ifp)
+{
+	struct ifvlan *ifv = ifp->if_softc;
+	int error = 0;
+
+	if ((ifp->if_flags & IFF_PROMISC) != 0) {
+		if ((ifv->ifv_flags & IFVF_PROMISC) == 0) {
+			error = ifpromisc(ifv->ifv_p, 1);
+			if (error == 0)
+				ifv->ifv_flags |= IFVF_PROMISC;
+		}
+	} else {
+		if ((ifv->ifv_flags & IFVF_PROMISC) != 0) {
+			error = ifpromisc(ifv->ifv_p, 0);
+			if (error == 0)
+				ifv->ifv_flags &= ~IFVF_PROMISC;
+		}
+	}
+
+	return (0);
 }
 
 int
@@ -534,7 +581,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 		pr = ifunit(vlr.vlr_parent);
-		if (pr == 0) {
+		if (pr == NULL) {
 			error = ENOENT;
 			break;
 		}
@@ -543,6 +590,9 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		ifv->ifv_tag = vlr.vlr_tag;
 		ifp->if_flags |= IFF_RUNNING;
+
+		/* Update promiscuous mode, if necessary. */
+		vlan_set_promisc(ifp);
 		break;
 		
 	case SIOCGETVLAN:
@@ -557,14 +607,11 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		
 	case SIOCSIFFLAGS:
 		/*
-		 * We don't support promiscuous mode
-		 * right now because it would require help from the
-		 * underlying drivers, which hasn't been implemented.
+		 * For promiscuous mode, we enable promiscuous mode on
+		 * the parent if we need promiscuous on the VLAN interface.
 		 */
-		if (ifr->ifr_flags & (IFF_PROMISC)) {
-			ifp->if_flags &= ~(IFF_PROMISC);
-			error = EINVAL;
-		}
+		if (ifv->ifv_p != NULL)
+			error = vlan_set_promisc(ifp);
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_swap.c,v 1.12 1999/10/11 18:04:08 deraadt Exp $	*/
+/*	$OpenBSD: vm_swap.c,v 1.15 2001/03/09 03:13:48 deraadt Exp $	*/
 /*	$NetBSD: vm_swap.c,v 1.64 1998/11/08 19:45:17 mycroft Exp $	*/
 
 /*
@@ -335,7 +335,7 @@ sys_swapctl(p, v, retval)
 	struct swappri *spp;
 	struct swapdev *sdp;
 	struct swapent *sep;
-	char	userpath[PATH_MAX + 1];
+	char	userpath[MAXPATHLEN];
 	int	count, error, misc;
 	size_t	len;
 	int	priority;
@@ -860,8 +860,8 @@ swstrategy(bp)
 	struct buf *bp;
 {
 	struct swapdev *sdp;
-	struct vnode *vp;
 	daddr_t	bn;
+	int s;
 
 	bn = bp->b_blkno;
 	sdp = swap_getsdpfromaddr(bn);
@@ -883,21 +883,10 @@ swstrategy(bp)
 	default:
 		panic("swstrategy: vnode type %x", sdp->swd_vp->v_type);
 	case VBLK:
+		s = splbio();
+		buf_replacevnode(bp, sdp->swd_vp);
 		bp->b_blkno = bn + ctod(CLSIZE);
-		vp = sdp->swd_vp;
-		bp->b_dev = sdp->swd_dev;
-		VHOLD(vp);
-		if ((bp->b_flags & B_READ) == 0) {
-			int s = splbio();
-			vwakeup(bp);
-			vp->v_numoutput++;
-			splx(s);
-		}
-
-		if (bp->b_vp != NULL)
-			brelvp(bp);
-
-		bp->b_vp = vp;
+		splx(s);
 		VOP_STRATEGY(bp);
 		return;
 #ifdef SWAP_TO_FILES

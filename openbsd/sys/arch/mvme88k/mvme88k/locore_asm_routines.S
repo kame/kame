@@ -1,4 +1,4 @@
-/* $OpenBSD: locore_asm_routines.S,v 1.7 1999/09/27 19:13:22 smurph Exp $	*/
+/* $OpenBSD: locore_asm_routines.S,v 1.13 2001/03/09 05:44:41 smurph Exp $	*/
 /*
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -37,8 +37,8 @@
  **************************************************************RCS*****/
 
 #ifndef ASSEMBLER
-# define ASSEMBLER
-#endif
+#define	ASSEMBLER
+#endif /* ASSEMBLER */
 
 #include "assym.s"
 #include <machine/trap.h>
@@ -179,11 +179,6 @@ ENTRY(do_xmem_byte)	/* do_xmem_byte(address, data, supervisor) */
 1:	xmem.bu	r3,r2,r0
 2:	jmp	r1
 
-ENTRY(ff1)
-	jmp.n	r1
-	ff1	r2, r2
-
-
    .data
 
 /*
@@ -223,9 +218,10 @@ LABEL(lockpause)
 #undef simple_unlock
 ENTRY(simple_lock_init)
 	st      r0, r2, 0               /* init */
-        ldcr    r2, SR1                               /* extract cpu number*/
-        clr     r2, r2, 0<FLAG_CPU_FIELD_WIDTH>
-        mask    r2, r2, 3               /* play it safe */
+        
+	ldcr	r2, SR1
+	extu	r2, r2, FLAG_CPU_FIELD_WIDTH<0>	/* r2 = cpu# */
+	mask  	r2, r2, 3			/* play it safe */
         or.u    r3, r0, hi16(lockinit)
         or      r3, r3, lo16(lockinit)
         ld      r4, r3[r2]
@@ -256,9 +252,9 @@ ENTRY(simple_lock)
    xmem  r3, r2, r0
    bcnd  ne0, r3, 1f
 #if 0
-   ldcr  r5, SR1                               /* extract cpu number */
-   clr   r5, r5, 0<FLAG_CPU_FIELD_WIDTH>
-   mask  r5, r5, 3               /* play it safe */
+   ldcr  r5, SR1
+   extu  r5, r5, FLAG_CPU_FIELD_WIDTH<0>	/* r5 = cpu# */
+   mask  r5, r5, 3				/* play it safe */
    or.u  r3, r0, hi16(lockuse)
    or    r3, r3, lo16(lockuse)
    ld    r4, r3[r5]
@@ -309,9 +305,10 @@ ENTRY(db_simple_lock)
    or    r10, r0, 1
    xmem  r10, r2, r0
    bcnd  ne0, r10, db_simple_lock_watch
-   ldcr  r2, SR1                               /* extract cpu number*/
-   clr   r2, r2, 0<FLAG_CPU_FIELD_WIDTH>
-   mask  r2, r2, 3               /* play it safe*/
+   
+   ldcr  r2, SR1
+   extu  r2, r2, FLAG_CPU_FIELD_WIDTH<0>	/* r2 = cpu# */
+   mask  r2, r2, 3				/* play it safe */
    or.u  r3, r0, hi16(lockuse)
    or    r3, r3, lo16(lockuse)
    ld    r4, r3[r2]
@@ -380,9 +377,9 @@ ENTRY(db_simple_lock_held)
  */
 
 ENTRY(simple_lock_pause)
-        ldcr    r2, SR1                         /* extract cpu number*/
-        clr     r2, r2, FLAG_CPU_FIELD_WIDTH
-        mask    r2, r2, 3                       /* play it safe */
+	ldcr	r2, SR1
+	extu	r2, r2, FLAG_CPU_FIELD_WIDTH<0>	/* r2 = cpu# */
+	mask	r2, r2, 3				/* play it safe */
         or.u    r3, r0, hi16(lockpause)
         or      r3, r3, lo16(lockpause)
         ld      r4, r3[r2]
@@ -735,7 +732,7 @@ ENTRY(copyin)
 	/*bcnd	ne0,  LEN,  1f ; XXX optimize len = 0 case */
 	/*;or	r2,   r0,   0 */
 	/*;br	.Lcidone */
-    /*;1: ;bcnd		lt0,  LEN,  .Lciflt ; EFAULT if len < 0  */
+	/*;1: ;bcnd	lt0,  LEN,  .Lciflt ; EFAULT if len < 0  */
         
 	/* If it's a small length (less than 8), then do byte-by-byte */
 	cmp	r9,   LEN,  8
@@ -1138,10 +1135,10 @@ _LABEL(copyout_byte_only)
 	NOP
 	NOP
 	bcnd	ne0, LEN, 1b
-#   else
+#else
 	bcnd.n	ne0, LEN, 1b
 	st.b.usr r5, DEST, LEN
-#   endif
+#endif
 
    2:	or	r2, r0, r0	/* successful return */
 	br	.Lcodone
@@ -1228,6 +1225,335 @@ ENTRY(copyoutstr)
 /*word 0	*/ /* to separate from routine below */
 /*######################################################################*/
 
+#if defined(UVM)
+/*
+ * kcopy(const void *src, void *dst, size_t len);
+ *
+ * Copy len bytes from src to dst, aborting if we encounter a page fault.
+ */
+ENTRY(kcopy)
+	or.u	r5,   r0,   hi16(_curpcb)	
+	ld	r6,   r5,   lo16(_curpcb)
+	or.u	r5,   r0,   hi16(kcopy_fault)
+	or	r5,   r5,   lo16(kcopy_fault)
+	st	r5,   r6,   PCB_ONFAULT	/* pcb_onfault = kcopy_fault */
+	bcnd	le0,r4,kcopy_out /* nothing to do if count <= 0 */
+/*
+ *	check position of source and destination data
+ */
+	cmp 	r9,r2,r3	/* compare source address to destination */
+	bb1	eq,r9,kcopy_out	/* nothing to do if addresses are equal */	
+	bb1	lo,r9,kcopy_reverse /* copy in reverse if src < destination */ 
+/*
+ *	source address is greater than destination address, copy forward 
+ */
+	cmp 	r9,r4,16	/* see if we have at least 16 bytes */
+	bb1	lt,r9,kf_byte_copy /* copy bytes for small data length */ 
+/*
+ *	determine copy strategy based on alignment of source and destination
+ */
+	mask	r6,r2,3		/* get 2 low order bits of source address */
+	mask	r7,r3,3		/* get 2 low order bits of destintation addr */
+	mak	r6,r6,0<4>	/* convert source bits to table offset */
+	mak	r7,r7,0<2>	/* convert destination bits to table offset */
+	or.u	r12,r0,hi16(kf_strat) /* forward strategy table address (high) */
+	or	r12,r12,lo16(kf_strat) /* forward strategy table address (low) */
+	addu	r6,r6,r7	/* compute final table offset for strategy */
+	ld	r12,r12,r6	/* load the strategy routine */
+	jmp	r12		/* branch to strategy routine */
+
+/*
+ * Copy three bytes from src to destination then copy words
+ */
+_LABEL(kf_3byte_word_copy)
+	ld.bu	r6,r2,0		/* load byte from source */
+	ld.bu	r7,r2,1		/* load byte from source */
+	ld.bu	r8,r2,2		/* load byte from source */
+	st.b	r6,r3,0		/* store byte to destination */
+	st.b	r7,r3,1		/* store byte to destination */
+	st.b	r8,r3,2		/* store byte to destination */
+	addu	r2,r2,3		/* increment source pointer */
+	addu	r3,r3,3		/* increment destination pointer */
+	br.n	kf_word_copy	/* copy full words */
+	subu	r4,r4,3		/* decrement length */
+
+/*
+ * Copy 1 halfword from src to destination then copy words
+ */
+_LABEL(kf_1half_word_copy)
+	ld.hu	r6,r2,0		/* load half-word from source */
+	st.h	r6,r3,0		/* store half-word to destination */
+	addu	r2,r2,2		/* increment source pointer */
+	addu	r3,r3,2		/* increment destination pointer */
+	br.n	kf_word_copy	/* copy full words */
+	subu	r4,r4,2		/* decrement remaining length */
+
+/* 
+ * Copy 1 byte from src to destination then copy words
+ */
+_LABEL(kf_1byte_word_copy)
+	ld.bu	r6,r2,0		/* load 1 byte from source */
+	st.b	r6,r3,0		/* store 1 byte to destination */
+	addu	r2,r2,1		/* increment source pointer */
+	addu	r3,r3,1		/* increment destination pointer */
+	subu	r4,r4,1		/* decrement remaining length */
+	/* fall through to word copy */
+/*
+ * Copy as many full words as possible, 4 words per loop
+ */	
+_LABEL(kf_word_copy)
+	cmp	r10,r4,16	/* see if we have 16 bytes remaining */	
+	bb1	lo,r10,kf_byte_copy 	/* not enough left, copy bytes */
+	ld	r6,r2,0		/* load first word */
+	ld	r7,r2,4		/* load second word */
+	ld	r8,r2,8		/* load third word */
+	ld	r9,r2,12	/* load fourth word */
+	st	r6,r3,0		/* store first word */
+	st	r7,r3,4		/* store second word */
+	st 	r8,r3,8		/* store third word */
+	st 	r9,r3,12	/* store fourth word */
+	addu	r2,r2,16	/* increment source pointer */
+	addu	r3,r3,16	/* increment destination pointer */
+	br.n	kf_word_copy	/* branch to copy another block */
+	subu	r4,r4,16	/* decrement remaining length */
+	
+_LABEL(kf_1byte_half_copy)
+	ld.bu	r6,r2,0		/* load 1 byte from source */
+	st.b	r6,r3,0		/* store 1 byte to destination */
+	addu	r2,r2,1		/* increment source pointer */
+	addu	r3,r3,1		/* increment destination pointer */
+	subu	r4,r4,1		/* decrement remaining length */
+	/* fall through to half copy */
+
+_LABEL(kf_half_copy)
+	cmp	r10,r4,16	/* see if we have 16 bytes remaining */	
+	bb1	lo,r10,kf_byte_copy /* not enough left, copy bytes */
+	ld.hu	r6,r2,0		/* load first half-word */
+	ld.hu	r7,r2,2		/* load second half-word */
+	ld.hu	r8,r2,4		/* load third half-word */
+	ld.hu	r9,r2,6		/* load fourth half-word */
+	ld.hu	r10,r2,8	/* load fifth half-word */
+	ld.hu	r11,r2,10	/* load sixth half-word */
+	ld.hu	r12,r2,12	/* load seventh half-word */
+	ld.hu	r13,r2,14	/* load eighth half-word */
+	st.h	r6,r3,0		/* store first half-word */
+	st.h	r7,r3,2		/* store second half-word */
+	st.h 	r8,r3,4		/* store third half-word */
+	st.h 	r9,r3,6		/* store fourth half-word */
+	st.h	r10,r3,8	/* store fifth half-word */
+	st.h	r11,r3,10	/* store sixth half-word */
+	st.h 	r12,r3,12	/* store seventh half-word */
+	st.h 	r13,r3,14	/* store eighth half-word */
+	addu	r2,r2,16	/* increment source pointer */
+	addu	r3,r3,16	/* increment destination pointer */
+	br.n	kf_half_copy	/* branch to copy another block */
+	subu	r4,r4,16	/* decrement remaining length */
+	
+_LABEL(kf_byte_copy)
+	bcnd	eq0,r4,kcopy_out /* branch if nothing left to copy */ 
+	ld.bu	r6,r2,0		/* load byte from source */
+	st.b	r6,r3,0		/* store byte in destination */
+	addu	r2,r2,1		/* increment source pointer */
+	addu	r3,r3,1		/* increment destination pointer */
+	br.n	kf_byte_copy	/* branch for next byte */ 
+	subu	r4,r4,1		/* decrement remaining length */
+
+/*
+ *	source address is less than destination address, copy in reverse
+ */
+_LABEL(kcopy_reverse)
+/*
+ * start copy pointers at end of data 
+ */
+	addu	r2,r2,r4	/* start source at end of data */
+	addu	r3,r3,r4	/* start destination at end of data */
+/*
+ * check for short data
+ */
+	cmp 	r9,r4,16	/* see if we have at least 16 bytes */
+	bb1	lt,r9,kr_byte_copy /* copy bytes for small data length */ 
+/*
+ *	determine copy strategy based on alignment of source and destination
+ */
+	mask	r6,r2,3		/* get 2 low order bits of source address */
+	mask	r7,r3,3		/* get 2 low order bits of destintation addr */
+	mak	r6,r6,0<4>	/* convert source bits to table offset */
+	mak	r7,r7,0<2>	/* convert destination bits to table offset */
+	or.u	r12,r0,hi16(kr_strat) /* reverse strategy table address (high) */
+	or	r12,r12,lo16(kr_strat) /* reverse strategy table address (low) */
+	addu	r6,r6,r7	/* compute final table offset for strategy */
+	ld	r12,r12,r6	/* load the strategy routine */
+	jmp	r12		/* branch to strategy routine */
+
+/*
+ * Copy three bytes from src to destination then copy words
+ */
+_LABEL(kr_3byte_word_copy)
+	subu	r2,r2,3		/* decrement source pointer */
+	subu	r3,r3,3		/* decrement destination pointer */
+	ld.bu	r6,r2,0		/* load byte from source */
+	ld.bu	r7,r2,1		/* load byte from source */
+	ld.bu	r8,r2,2		/* load byte from source */
+	st.b	r6,r3,0		/* store byte to destination */
+	st.b	r7,r3,1		/* store byte to destination */
+	st.b	r8,r3,2		/* store byte to destination */
+	br.n	kr_word_copy	/* copy full words */
+	subu	r4,r4,3		/* decrement length */
+
+/*
+ * Copy 1 halfword from src to destination then copy words
+ */
+_LABEL(kr_1half_word_copy)
+	subu	r2,r2,2		/* decrement source pointer */
+	subu	r3,r3,2		/* decrement destination pointer */
+	ld.hu	r6,r2,0		/* load half-word from source */
+	st.h	r6,r3,0		/* store half-word to destination */
+	br.n	kr_word_copy	/* copy full words */
+	subu	r4,r4,2		/* decrement remaining length */
+
+/* 
+ * Copy 1 byte from src to destination then copy words
+ */
+_LABEL(kr_1byte_word_copy)
+	subu	r2,r2,1		/* decrement source pointer */
+	subu	r3,r3,1		/* decrement destination pointer */
+	ld.bu	r6,r2,0		/* load 1 byte from source */
+	st.b	r6,r3,0		/* store 1 byte to destination */
+	subu	r4,r4,1		/* decrement remaining length */
+	/* fall through to word copy */
+/*
+ * Copy as many full words as possible, 4 words per loop
+ */	
+_LABEL(kr_word_copy)
+	cmp	r10,r4,16	/* see if we have 16 bytes remaining */	
+	bb1	lo,r10,kr_byte_copy 	/* not enough left, copy bytes */
+	subu	r2,r2,16	/* decrement source pointer */
+	subu	r3,r3,16	/* decrement destination pointer */
+	ld	r6,r2,0		/* load first word */
+	ld	r7,r2,4		/* load second word */
+	ld	r8,r2,8		/* load third word */
+	ld	r9,r2,12	/* load fourth word */
+	st	r6,r3,0		/* store first word */
+	st	r7,r3,4		/* store second word */
+	st 	r8,r3,8		/* store third word */
+	st 	r9,r3,12	/* store fourth word */
+	br.n	kr_word_copy	/* branch to copy another block */
+	subu	r4,r4,16	/* decrement remaining length */
+	
+_LABEL(kr_1byte_half_copy)
+	subu	r2,r2,1		/* decrement source pointer */
+	subu	r3,r3,1		/* decrement destination pointer */
+	ld.bu	r6,r2,0		/* load 1 byte from source */
+	st.b	r6,r3,0		/* store 1 byte to destination */
+	subu	r4,r4,1		/* decrement remaining length */
+	/* fall through to half copy */
+
+_LABEL(kr_half_copy)
+	cmp	r10,r4,16	/* see if we have 16 bytes remaining */	
+	bb1	lo,r10,kr_byte_copy /* not enough left, copy bytes */
+	subu	r2,r2,16	/* decrement source pointer */
+	subu	r3,r3,16	/* decrement destination pointer */
+	ld.hu	r6,r2,0		/* load first half-word */
+	ld.hu	r7,r2,2		/* load second half-word */
+	ld.hu	r8,r2,4		/* load third half-word */
+	ld.hu	r9,r2,6		/* load fourth half-word */
+	ld.hu	r10,r2,8	/* load fifth half-word */
+	ld.hu	r11,r2,10	/* load sixth half-word */
+	ld.hu	r12,r2,12	/* load seventh half-word */
+	ld.hu	r13,r2,14	/* load eighth half-word */
+	st.h	r6,r3,0		/* store first half-word */
+	st.h	r7,r3,2		/* store second half-word */
+	st.h 	r8,r3,4		/* store third half-word */
+	st.h 	r9,r3,6		/* store fourth half-word */
+	st.h	r10,r3,8	/* store fifth half-word */
+	st.h	r11,r3,10	/* store sixth half-word */
+	st.h 	r12,r3,12	/* store seventh half-word */
+	st.h 	r13,r3,14	/* store eighth half-word */
+	br.n	kr_half_copy	/* branch to copy another block */
+	subu	r4,r4,16	/* decrement remaining length */
+	
+_LABEL(kr_byte_copy)
+	bcnd	eq0,r4,kcopy_out /* branch if nothing left to copy */ 
+	subu	r2,r2,1		/* decrement source pointer */
+	subu	r3,r3,1		/* decrement destination pointer */
+	ld.bu	r6,r2,0		/* load byte from source */
+	st.b	r6,r3,0		/* store byte in destination */
+	br.n	kr_byte_copy	/* branch for next byte */ 
+	subu	r4,r4,1		/* decrement remaining length */
+
+_LABEL(kcopy_out)
+	or	r2,   r0,   0		/* return success */
+_LABEL(kcopy_out_fault)	
+	or.u	r5,r0,hi16(_curpcb)
+	ld	r6,r5,lo16(_curpcb)
+	st	r0,r6,PCB_ONFAULT	/* clear the handler */
+	jmp	r1		/* all done, return to caller */
+
+_LABEL(kcopy_fault)
+	or	r2,   r0,   EFAULT	/* return fault */
+	br     kcopy_out_fault
+	
+	data
+	align	4
+_LABEL(kf_strat)
+	word	kf_word_copy
+	word	kf_byte_copy
+	word	kf_half_copy
+	word	kf_byte_copy
+	word	kf_byte_copy
+	word	kf_3byte_word_copy
+	word	kf_byte_copy
+	word	kf_1byte_half_copy
+	word	kf_half_copy
+	word	kf_byte_copy
+	word	kf_1half_word_copy
+	word	kf_byte_copy
+	word	kf_byte_copy
+	word	kf_1byte_half_copy
+	word	kf_byte_copy
+	word	kf_1byte_word_copy
+
+_LABEL(kr_strat)
+	word	kr_word_copy
+	word	kr_byte_copy
+	word	kr_half_copy
+	word	kr_byte_copy
+	word	kr_byte_copy
+	word	kr_1byte_word_copy
+	word	kr_byte_copy
+	word	kr_1byte_half_copy
+	word	kr_half_copy
+	word	kr_byte_copy
+	word	kr_1half_word_copy
+	word	kr_byte_copy
+	word	kr_byte_copy
+	word	kr_1byte_half_copy
+	word	kr_byte_copy
+	word	kr_3byte_word_copy
+
+	text
+#ifdef notyet  /* This give a stack problem.  For now, use the above */
+ENTRY(kcopy)
+	or.u	r5,   r0,   hi16(_curpcb)	
+	ld	r6,   r5,   lo16(_curpcb)
+	or.u	r5,   r0,   hi16(kcfault)
+	or	r5,   r5,   lo16(kcfault)
+	st	r5,   r6,   PCB_ONFAULT	/* pcb_onfault = kcfault */
+	subu	r31,  r31,  40
+	bsr	_ovbcopy      /* call ovbcopy */
+	addu	r31,  r31,  40
+	or	r2,   r0,   0		/* return success */
+kcdone:
+	or.u	r5,r0,hi16(_curpcb)
+	ld	r6,r5,lo16(_curpcb)
+	st	r0,r6,PCB_ONFAULT	/* clear the handler */
+	jmp	r1			/* return */
+kcfault:
+	or	r2,   r0,   EFAULT	/* return fault */
+	br     kcdone
+#endif /* 0 */
+#endif /* UVM */
+
 /*
  * Gcc 2 generates calls to memcpy for bcopies of unknown size. memcpy
  * can simply be implemented as ovbcopy but the src (r2, r3) and dst args need to
@@ -1242,7 +1568,6 @@ ENTRY(memcpy)
 	or	r2, r0, r3    /* src -> 1st arg */
 	br.n	_ovbcopy      /* call ovbcopy */
        	or	r3, r0, r5    /* dst -> 2nd arg */
-	
        
 /*
  * void bcopy(source, destination, count)
@@ -1843,13 +2168,17 @@ ENTRY(spln)
 	cmp	r4, r3, 0x188
 	bb1	ne, r4, 2f
 	or.u	r2, r0, hi16(IEN0_REG)
-	bsr.n	_m188_get_mask
 	or	r2, r2, lo16(IEN0_REG)
+	bsr.n	_m188_get_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r4,r2,r0 /* old mask in r4 */
 	or	r3,r5,r0 /* new mask in r3 */
 	or.u	r2, r0, hi16(IEN0_REG)
-	bsr.n	_m188_set_mask
 	or	r2, r2, lo16(IEN0_REG)
+	bsr.n	_m188_set_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r2,r4,r0 /* old mask in r2 */
 	br	m188_spln_done
 #endif /* MVME188 */    
@@ -1882,8 +2211,11 @@ ENTRY(spl)
 	bb1	ne, r4, 2f
 	/* get the current mask value mvme188 */
 	or.u	r2, r0, hi16(IEN0_REG)
-	bsr.n	_m188_get_mask
 	or	r2, r2, lo16(IEN0_REG)
+	bsr.n	_m188_get_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
+	
 	br 	m188_spl_done
 #endif	/* MVME188 */
       2:	
@@ -1919,12 +2251,16 @@ ENTRY(setipl)
 	or	r3, r0, r2 			/* r3 now new mask value */
 	/* get the current mask value mvme188 */
 	or.u	r2,r0,hi16(IEN0_REG)
-	bsr.n	_m188_get_mask
 	or	r2,r2,lo16(IEN0_REG)
+	bsr.n	_m188_get_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r4, r0, r2 			/* r4 now current mask value */
 	or.u	r2,r0,hi16(IEN0_REG)
-	bsr.n	_m188_set_mask
 	or	r2,r2,lo16(IEN0_REG)
+	bsr.n	_m188_set_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r2, r0, r4			/* r2 now the old value */
 	br	m188_setipl_done     
 #endif	/* MVME188 */
@@ -1956,13 +2292,17 @@ ENTRY(db_spln)
 	cmp	r4, r3, 0x188
 	bb1	ne, r4, 2f
 	or.u	r2,r0,hi16(IEN0_REG)
-	bsr.n	_m188_get_mask
 	or	r2,r2,lo16(IEN0_REG)
+	bsr.n	_m188_get_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r4,r2,r0 /* old mask in r4 */
 	or	r3,r5,r0 /* new mask in r3 */
 	or.u	r2,r0,hi16(IEN0_REG)
-	bsr.n	_m188_set_mask
 	or	r2,r2,lo16(IEN0_REG)
+	bsr.n	_m188_set_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r2,r4,r0 /* old mask in r2 */
 	br	m188_db_spln_done
 #endif /* MVME188 */    
@@ -1995,8 +2335,10 @@ ENTRY(db_spl)
 	bb1	ne, r4, 2f
 	/* get the current mask value mvme188 */
 	or.u	r2,r0,hi16(IEN0_REG)
-	bsr.n	_m188_get_mask
 	or	r2,r2,lo16(IEN0_REG)
+	bsr.n	_m188_get_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	br 	m188_db_spl_done
 #endif /* MVME188 */      
       2:	
@@ -2025,12 +2367,16 @@ ENTRY(db_setipl)
 	or	r3, r0, r2 			/* r3 now new mask value */
 	/* get the current mask value mvme188 */
 	or.u	r2,r0,hi16(IEN0_REG)
-	bsr.n	_m188_get_mask
 	or	r2,r2,lo16(IEN0_REG)
+	bsr.n	_m188_get_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r4, r0, r2 			/* r4 now current mask value */
 	or.u	r2,r0,hi16(IEN0_REG)
-	bsr.n	_m188_set_mask
 	or	r2,r2,lo16(IEN0_REG)
+	bsr.n	_m188_set_mask
+	subu	r31, r31, 40
+	addu	r31, r31, 40
 	or	r2, r0, r4			/* r2 now the old value */
 	br	m188_db_setipl_done     
 #endif /* MVME188 */	
@@ -2122,7 +2468,7 @@ ENTRY(cpu_number)
 #endif /* MVME188 */	
 1:    
         jmp.n   r1
-        clr	r2, r2, 28<FLAG_CPU_FIELD_WIDTH>/* clears all but the CPU num */
+	extu	r2, r2, FLAG_CPU_FIELD_WIDTH<0>	/* r2 = cpu# */
 #endif
 	
 /*************************************************************************
@@ -2165,12 +2511,11 @@ ENTRY(set_cpu_number)
 	stcr	r4, PSR
 	jmp	r1
 
-     1: /* bad cpu number*/
+1: /* bad cpu number*/
 	or.u	r2, r0, hi16(1f)
 	bsr.n	_panic
 	or	r2, r2, lo16(1f)
-	1: string "bad CPU number\0"
+1:	string "set_cpu_number: bad CPU number\0"
 	align   4
 	/* will not return */
-
 

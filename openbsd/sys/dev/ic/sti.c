@@ -1,7 +1,7 @@
-/*	$OpenBSD: sti.c,v 1.2 2000/09/03 22:50:01 mickey Exp $	*/
+/*	$OpenBSD: sti.c,v 1.5 2001/03/20 08:32:20 mickey Exp $	*/
 
 /*
- * Copyright (c) 2000 Michael Shalayeff
+ * Copyright (c) 2000-2001 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,12 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
+ */
+/*
+ * TODO:
+ *	call sti procs asynchronously;
+ *	implement console scroll-back;
+ *	X11 support.
  */
 
 #include <sys/param.h>
@@ -75,7 +81,7 @@ struct wsdisplay_emulops sti_emulops = {
 };
 
 int sti_ioctl __P((void *v, u_long cmd, caddr_t data, int flag, struct proc *p));
-int sti_mmap __P((void *v, off_t offset, int prot));
+paddr_t sti_mmap __P((void *v, off_t offset, int prot));
 int sti_alloc_screen __P((void *v, const struct wsscreen_descr *type,
 	void **cookiep, int *cxp, int *cyp, long *defattr));
 	void sti_free_screen __P((void *v, void *cookie));
@@ -92,6 +98,22 @@ const struct wsdisplay_accessops sti_accessops = {
 	sti_load_font
 };
 
+struct wsscreen_descr sti_default_screen = {
+	"default", 0, 0,
+	&sti_emulops,
+	0, 0,
+	WSSCREEN_REVERSE | WSSCREEN_UNDERLINE
+};
+
+const struct wsscreen_descr *sti_default_scrlist[] = {
+	&sti_default_screen
+};
+
+struct wsscreen_list sti_default_screenlist = {
+	sizeof(sti_default_scrlist) / sizeof(sti_default_scrlist[0]),
+	sti_default_scrlist
+};
+
 enum sti_bmove_funcs {
 	bmf_clear, bmf_copy, bmf_invert, bmf_underline
 };
@@ -106,7 +128,7 @@ sti_attach_common(sc)
 	struct sti_softc *sc;
 {
 	struct sti_inqconfout cfg;
-	struct wsscreen_descr **sl;
+	bus_space_handle_t fbh;
 	struct wsemuldisplaydev_attach_args waa;
 	struct sti_dd *dd;
 	struct sti_cfg *cc;
@@ -238,22 +260,22 @@ sti_attach_common(sc)
 	bzero(cc, sizeof (*cc));
 	{
 		register int i = dd->dd_reglst;
-		register u_int *p;
+		register u_int32_t *p;
 		struct sti_region r;
 
 #ifdef STIDEBUG
 		printf ("stiregions @%p:\n", i);
 #endif
 		r.last = 0;
-		for (p = (u_int *)cc->regions; !r.last &&
-		     p < (u_int *)&cc->regions[STI_REGION_MAX]; p++) {
+		for (p = cc->regions; !r.last &&
+		     p < &cc->regions[STI_REGION_MAX]; p++) {
 
 			if (sc->sc_devtype == STI_DEVTYPE1)
 				*(u_int *)&r = parseword(i), i+= 16;
 			else
 				*(u_int *)&r = bus_space_read_4(sc->memt, sc->romh, i), i += 4;
 
-			*p = (p == (u_int *)cc->regions? sc->romh : sc->ioh) +
+			*p = (p == cc->regions? sc->romh : sc->ioh) +
 			    (r.offset << PGSHIFT);
 #ifdef STIDEBUG
 			printf("%x @ 0x%x %s%s%s%s\n",
@@ -263,14 +285,15 @@ sti_attach_common(sc)
 #endif
 
 			/* rom was already mapped */
-			if (p != (u_int *)cc->regions) {
+			if (p != cc->regions) {
 				if (bus_space_map(sc->memt, *p,
-				    r.length << PGSHIFT, 0, &sc->fbh)) {
+				    r.length << PGSHIFT, 0, &fbh)) {
 #ifdef STIDEBUG
 					printf("cannot map region\n");
 #endif
 					/* who cares: return; */
-				}
+				} else if (p - cc->regions == 1)
+					sc->fbh = fbh;
 			}
 		}
 	}
@@ -321,26 +344,14 @@ sti_attach_common(sc)
 	 *	calculate dimentions.
 	 */
 
-	MALLOC(sc->sc_screens, struct wsscreen_descr *,
-	    1*sizeof(*sc->sc_screens), M_DEVBUF, M_NOWAIT);
-	MALLOC(sl, struct wsscreen_descr **,
-	    1*sizeof(sc->sc_screens), M_DEVBUF, M_NOWAIT);
-
-	sl[0] = &sc->sc_screens[0];
-	sc->sc_screens[0].name = "default";
-	sc->sc_screens[0].ncols = cfg.width / ff->width;
-	sc->sc_screens[0].nrows = cfg.height / ff->height;
-	sc->sc_screens[0].textops = &sti_emulops;
-	sc->sc_screens[0].fontwidth = ff->width;
-	sc->sc_screens[0].fontheight = ff->height;
-	sc->sc_screens[0].capabilities = WSSCREEN_REVERSE | WSSCREEN_UNDERLINE;
-
-	sc->sti_screenlist.nscreens = 1;
-	sc->sti_screenlist.screens = (const struct wsscreen_descr **)sl;
+	sti_default_screen.ncols = cfg.width / ff->width;
+	sti_default_screen.nrows = cfg.height / ff->height;
+	sti_default_screen.fontwidth = ff->width;
+	sti_default_screen.fontheight = ff->height;
 
 	/* attach WSDISPLAY */
 	waa.console = sc->sc_dev.dv_unit;
-	waa.scrdata = &sc->sti_screenlist;
+	waa.scrdata = &sti_default_screenlist;
 	waa.accessops = &sti_accessops;
 	waa.accesscookie = sc;
 
@@ -364,7 +375,11 @@ sti_init(sc, mode)
 	    (mode & STI_TEXTMODE? STI_INITF_TEXT | STI_INITF_PBET |
 	     STI_INITF_PBETI | STI_INITF_ICMT : 0);
 	a.in.text_planes = 1;
-	sc->init(&a.flags, &a.in, &a.out, &sc->sc_cfg);
+#ifdef STIDEBUG
+	printf("%s: init,%p(%x, %p, %p, %p)\n", sc->sc_dev.dv_xname,
+	    sc->init, a.flags.flags, &a.in, &a.out, &sc->sc_cfg);
+#endif
+	(*sc->init)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
 	return (a.out.text_planes != a.in.text_planes || a.out.errno);
 }
 
@@ -382,7 +397,7 @@ sti_inqcfg(sc, out)
 	bzero(out, sizeof(*out));
 
 	a.flags.flags = STI_INQCONFF_WAIT;
-	sc->inqconf(&a.flags, &a.in, out, &sc->sc_cfg);
+	(*sc->inqconf)(&a.flags, &a.in, out, &sc->sc_cfg);
 
 	return out->errno;
 }
@@ -424,7 +439,7 @@ sti_bmove(sc, x1, y1, x2, y2, h, w, f)
 	a.in.height = h;
 	a.in.width = w;
 
-	sc->blkmv(&a.flags, &a.in, &a.out, &sc->sc_cfg);
+	(*sc->blkmv)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
 #ifdef STIDEBUG
 	if (a.out.errno)
 		printf ("%s: blkmv returned %d\n",
@@ -445,7 +460,7 @@ sti_ioctl(v, cmd, data, flag, p)
 	return -1;
 }
 
-int
+paddr_t
 sti_mmap(v, offset, prot)
 	void *v;
 	off_t offset;
@@ -541,7 +556,7 @@ sti_putchar(v, row, col, uc, attr)
 	a.in.y = row * sc->sc_fontcfg.height;
 	a.in.font_addr = 0/*STI_FONTAD(sc->sc_devtype, sc->sc_rom)*/;
 	a.in.index = uc;
-	sc->unpmv(&a.flags, &a.in, &a.out, &sc->sc_cfg);
+	(*sc->unpmv)(&a.flags, &a.in, &a.out, &sc->sc_cfg);
 }
 
 void

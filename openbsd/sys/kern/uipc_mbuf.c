@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_mbuf.c,v 1.22 2000/03/03 11:15:43 angelos Exp $	*/
+/*	$OpenBSD: uipc_mbuf.c,v 1.26 2001/04/05 10:52:45 art Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.15.4.1 1996/06/13 17:11:44 cgd Exp $	*/
 
 /*
@@ -84,6 +84,7 @@ mbinit()
 	splx(s);
 	return;
 bad:
+	splx(s);
 	panic("mbinit");
 }
 
@@ -278,6 +279,7 @@ m_prepend(m, len, how)
 	if (m->m_flags & M_PKTHDR) {
 		M_COPY_PKTHDR(mn, m);
 		m->m_flags &= ~M_PKTHDR;
+		m->m_pkthdr.tdbi = NULL;
 	}
 	mn->m_next = m;
 	m = mn;
@@ -332,7 +334,7 @@ m_copym(m, off0, len, wait)
 		if (n == NULL)
 			goto nospace;
 		if (copyhdr) {
-			M_COPY_PKTHDR(n, m);
+			M_DUP_PKTHDR(n, m);
 			if (len == M_COPYALL)
 				n->m_pkthdr.len -= off0;
 			else
@@ -408,7 +410,7 @@ m_copym2(m, off0, len, wait)
 		if (n == NULL)
 			goto nospace;
 		if (copyhdr) {
-			M_COPY_PKTHDR(n, m);
+			M_DUP_PKTHDR(n, m);
 			if (len == M_COPYALL)
 				n->m_pkthdr.len -= off0;
 			else
@@ -620,6 +622,7 @@ m_pullup(n, len)
 		if (n->m_flags & M_PKTHDR) {
 			M_COPY_PKTHDR(m, n);
 			n->m_flags &= ~M_PKTHDR;
+			n->m_pkthdr.tdbi = NULL;
 		}
 	}
 	space = &m->m_dat[MLEN] - (m->m_data + m->m_len);
@@ -690,6 +693,7 @@ m_pullup2(n, len)
 			m->m_pkthdr = n->m_pkthdr;
 			m->m_flags = (n->m_flags & M_COPYFLAGS) | M_EXT;
 			n->m_flags &= ~M_PKTHDR;
+			n->m_pkthdr.tdbi = NULL;
 			/* n->m_data is cool. */
 		}
 	}
@@ -781,9 +785,10 @@ m_inject(m0, len0, siz, wait)
 		return (NULL);
 	remain = m->m_len - len;
 	if (remain == 0) {
-	        if ((m->m_next) &&  (M_LEADINGSPACE(m->m_next) >= siz)) {
+	        if ((m->m_next) && (M_LEADINGSPACE(m->m_next) >= siz)) {
 		        m->m_next->m_len += siz;
-			m0->m_pkthdr.len += siz;
+			if (m0->m_flags & M_PKTHDR)
+				m0->m_pkthdr.len += siz;
 			m->m_next->m_data -= siz;
 			return m->m_next;
 		}
@@ -801,7 +806,8 @@ m_inject(m0, len0, siz, wait)
 	}
 
 	n->m_len = siz;
-	m0->m_pkthdr.len += siz;
+	if (m0->m_flags & M_PKTHDR)
+		m0->m_pkthdr.len += siz;
 	m->m_len -= remain; /* Trim */
 	if (n2)	{
 	        for (n3 = n; n3->m_next != NULL; n3 = n3->m_next)
@@ -838,7 +844,7 @@ m_split(m0, len0, wait)
 		MGETHDR(n, wait, m0->m_type);
 		if (n == NULL)
 			return (NULL);
-		n->m_pkthdr = m0->m_pkthdr;
+		M_DUP_PKTHDR(n, m0);
 		n->m_pkthdr.len -= len0;
 		olen = m0->m_pkthdr.len;
 		m0->m_pkthdr.len = len0;
@@ -885,6 +891,7 @@ extpacket:
 	m->m_next = NULL;
 	return (n);
 }
+
 /*
  * Routine to copy from device local memory into mbufs.
  */

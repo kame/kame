@@ -1,3 +1,4 @@
+/* $OpenBSD: bt485.c,v 1.5 2001/04/21 20:03:54 aaron Exp $ */
 /* $NetBSD: bt485.c,v 1.2 2000/04/02 18:55:01 nathanw Exp $ */
 
 /*
@@ -46,6 +47,8 @@
 #include <dev/ic/ramdac.h>
 
 #include <dev/wscons/wsconsio.h>
+#include <dev/wscons/wsdisplayvar.h>
+#include <dev/rasops/rasops.h>
 
 /*
  * Functions exported via the RAMDAC configuration table.
@@ -247,8 +250,11 @@ bt485_init(rc)
 
 	/* Initial colormap: 0 is black, everything else is white */
 	data->cmap_r[0] = data->cmap_g[0] = data->cmap_b[0] = 0;
-	for (i = 1; i < 256; i++)
-		data->cmap_r[i] = data->cmap_g[i] = data->cmap_b[i] = 255;
+	for (i = 0; i < 256; i++) {
+		data->cmap_r[i] = rasops_cmap[3*i + 0];
+		data->cmap_g[i] = rasops_cmap[3*i + 1];
+		data->cmap_b[i] = rasops_cmap[3*i + 2];
+	}
 
 	bt485_update((void *)data);
 }
@@ -261,6 +267,12 @@ bt485_set_cmap(rc, cmapp)
 	struct bt485data *data = (struct bt485data *)rc;
 	int count, index, s;
 
+#ifdef DIAGNOSTIC
+	if (rc == NULL)
+		panic("bt485_set_cmap: rc");
+	if (cmapp == NULL)
+		panic("bt485_set_cmap: cmapp");
+#endif
 	if ((u_int)cmapp->index >= 256 ||
 	    ((u_int)cmapp->index + (u_int)cmapp->count) > 256)
 		return (EINVAL);
@@ -287,6 +299,9 @@ bt485_set_cmap(rc, cmapp)
 	data->changed |= DATA_CMAP_CHANGED;
 
 	data->ramdac_sched_update(data->cookie, bt485_update);
+#ifdef __alpha__
+	alpha_mb();
+#endif
 	splx(s);
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: isp_pci.c,v 1.14 2000/10/16 22:45:01 mjacob Exp $	*/
+/*	$OpenBSD: isp_pci.c,v 1.18 2001/04/04 22:05:37 mjacob Exp $	*/
 /*
  * PCI specific probe and attach routines for Qlogic ISP SCSI adapters.
  *
@@ -40,24 +40,20 @@
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
 
-static u_int16_t isp_pci_rd_reg __P((struct ispsoftc *, int));
-static void isp_pci_wr_reg __P((struct ispsoftc *, int, u_int16_t));
+static u_int16_t isp_pci_rd_reg(struct ispsoftc *, int);
+static void isp_pci_wr_reg(struct ispsoftc *, int, u_int16_t);
 #if !(defined(ISP_DISABLE_1080_SUPPORT) && defined(ISP_DISABLE_12160_SUPPORT))
-static u_int16_t isp_pci_rd_reg_1080 __P((struct ispsoftc *, int));
-static void isp_pci_wr_reg_1080 __P((struct ispsoftc *, int, u_int16_t));
+static u_int16_t isp_pci_rd_reg_1080(struct ispsoftc *, int);
+static void isp_pci_wr_reg_1080(struct ispsoftc *, int, u_int16_t);
 #endif
-static int isp_pci_mbxdma __P((struct ispsoftc *));
-static int isp_pci_dmasetup __P((struct ispsoftc *, struct scsi_xfer *,
-	ispreq_t *, u_int16_t *, u_int16_t));
+static int isp_pci_mbxdma(struct ispsoftc *);
+static int isp_pci_dmasetup(struct ispsoftc *, struct scsi_xfer *,
+	ispreq_t *, u_int16_t *, u_int16_t);
 static void
-isp_pci_dmateardown __P((struct ispsoftc *, struct scsi_xfer *, u_int32_t));
-static void isp_pci_reset1 __P((struct ispsoftc *));
-static void isp_pci_dumpregs __P((struct ispsoftc *, const char *));
-static int isp_pci_intr __P((void *));
-
-#ifndef	ISP_CODE_ORG
-#define	ISP_CODE_ORG		0x1000
-#endif
+isp_pci_dmateardown (struct ispsoftc *, struct scsi_xfer *, u_int16_t);
+static void isp_pci_reset1 (struct ispsoftc *);
+static void isp_pci_dumpregs (struct ispsoftc *, const char *);
+static int isp_pci_intr (void *);
 
 #ifdef	ISP_COMPILE_FW
 #define	ISP_COMPILE_1040_FW	1
@@ -67,7 +63,7 @@ static int isp_pci_intr __P((void *));
 #define	ISP_COMPILE_2200_FW	1
 #endif
 
-#if	defined(ISP_DISABLE_1020_SUPPORT) || !defined(ISP_COMPILE_1020_FW)
+#if	defined(ISP_DISABLE_1040_SUPPORT) || !defined(ISP_COMPILE_1040_FW)
 #define	ISP_1040_RISC_CODE	NULL
 #else
 #define	ISP_1040_RISC_CODE	isp_1040_risc_code
@@ -235,7 +231,11 @@ static struct ispmdvec mdvec_2200 = {
 #define	PCI_DFLT_LNSZ	0x10
 
 #ifndef SCSI_ISP_PREFER_MEM_MAP
+#ifdef __alpha__
+#define SCSI_ISP_PREFER_MEM_MAP 1
+#else
 #define SCSI_ISP_PREFER_MEM_MAP 0
+#endif
 #endif
 
 #ifndef	BUS_DMA_COHERENT
@@ -243,8 +243,8 @@ static struct ispmdvec mdvec_2200 = {
 #endif
 
 
-static int isp_pci_probe __P((struct device *, void *, void *));
-static void isp_pci_attach __P((struct device *, struct device *, void *));
+static int isp_pci_probe (struct device *, void *, void *);
+static void isp_pci_attach (struct device *, struct device *, void *);
 
 struct isp_pcisoftc {
 	struct ispsoftc		pci_isp;
@@ -265,11 +265,13 @@ struct cfattach isp_pci_ca = {
 	sizeof (struct isp_pcisoftc), isp_pci_probe, isp_pci_attach
 };
 
+#ifdef  DEBUG
+const char vstring[] =
+    "Qlogic ISP Driver, NetBSD (pci) Platform Version %d.%d Core Version %d.%d";
+#endif
+
 static int
-isp_pci_probe(parent, match, aux)
-        struct device *parent;
-        void *match;
-	void *aux; 
+isp_pci_probe(struct device *parent, void *match, void *aux)
 {
         struct pci_attach_args *pa = aux;
 
@@ -303,13 +305,12 @@ isp_pci_probe(parent, match, aux)
 
 
 static void    
-isp_pci_attach(parent, self, aux)
-        struct device *parent, *self;
-        void *aux;
+isp_pci_attach(struct device *parent, struct device *self, void *aux)
 {
 #ifdef	DEBUG
 	static char oneshot = 1;
 #endif
+	static const char nomem[] = ": no mem for sdparam table\n";
 	u_int32_t data, rev, linesz = PCI_DFLT_LNSZ;
 	struct pci_attach_args *pa = aux;
 	struct isp_pcisoftc *pcs = (struct isp_pcisoftc *) self;
@@ -378,7 +379,9 @@ isp_pci_attach(parent, self, aux)
 		printf(": unable to map device registers\n");
 		return;
 	}
+#if 0
 	printf("\n");
+#endif
 
 	pcs->pci_st = st;
 	pcs->pci_sh = sh;
@@ -397,8 +400,7 @@ isp_pci_attach(parent, self, aux)
 		isp->isp_type = ISP_HA_SCSI_UNKNOWN;
 		isp->isp_param = malloc(sizeof (sdparam), M_DEVBUF, M_NOWAIT);
 		if (isp->isp_param == NULL) {
-			printf("%s: couldn't allocate sdparam table\n",
-			       isp->isp_name);
+			printf(nomem);
 			return;
 		}
 		bzero(isp->isp_param, sizeof (sdparam));
@@ -410,8 +412,7 @@ isp_pci_attach(parent, self, aux)
 		isp->isp_type = ISP_HA_SCSI_1080;
 		isp->isp_param = malloc(sizeof (sdparam), M_DEVBUF, M_NOWAIT);
 		if (isp->isp_param == NULL) {
-			printf("%s: couldn't allocate sdparam table\n",
-			       isp->isp_name);
+			printf(nomem);
 			return;
 		}
 		bzero(isp->isp_param, sizeof (sdparam));
@@ -424,8 +425,7 @@ isp_pci_attach(parent, self, aux)
 		isp->isp_param = malloc(2 * sizeof (sdparam),
 		    M_DEVBUF, M_NOWAIT);
 		if (isp->isp_param == NULL) {
-			printf("%s: couldn't allocate sdparam table\n",
-			       isp->isp_name);
+			printf(nomem);
 			return;
 		}
 		bzero(isp->isp_param, sizeof (sdparam));
@@ -438,8 +438,7 @@ isp_pci_attach(parent, self, aux)
 		isp->isp_param = malloc(2 * sizeof (sdparam),
 		    M_DEVBUF, M_NOWAIT);
 		if (isp->isp_param == NULL) {
-			printf("%s: couldn't allocate sdparam table\n",
-			       isp->isp_name);
+			printf(nomem);
 			return;
 		}
 		bzero(isp->isp_param, sizeof (sdparam));
@@ -454,8 +453,7 @@ isp_pci_attach(parent, self, aux)
 		isp->isp_param = malloc(2 * sizeof (sdparam),
 		    M_DEVBUF, M_NOWAIT);
 		if (isp->isp_param == NULL) {
-			printf("%s: couldn't allocate sdparam table\n",
-			       isp->isp_name);
+			printf(nomem);
 			return;
 		}
 		bzero(isp->isp_param, sizeof (sdparam));
@@ -469,14 +467,12 @@ isp_pci_attach(parent, self, aux)
 		isp->isp_type = ISP_HA_FC_2100;
 		isp->isp_param = malloc(sizeof (fcparam), M_DEVBUF, M_NOWAIT);
 		if (isp->isp_param == NULL) {
-			printf("%s: couldn't allocate fcparam table\n",
-			       isp->isp_name);
+			printf(nomem);
 			return;
 		}
 		bzero(isp->isp_param, sizeof (fcparam));
 		pcs->pci_poff[MBOX_BLOCK >> _BLK_REG_SHFT] =
 		    PCI_MBOX_REGS2100_OFF;
-
 		if (rev < 3) {
 			/*
 			 * XXX: Need to get the actual revision
@@ -494,8 +490,7 @@ isp_pci_attach(parent, self, aux)
 		isp->isp_type = ISP_HA_FC_2200;
 		isp->isp_param = malloc(sizeof (fcparam), M_DEVBUF, M_NOWAIT);
 		if (isp->isp_param == NULL) {
-			printf("%s: couldn't allocate fcparam table\n",
-			       isp->isp_name);
+			printf(nomem);
 			return;
 		}
 		bzero(isp->isp_param, sizeof (fcparam));
@@ -504,6 +499,30 @@ isp_pci_attach(parent, self, aux)
 		data = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_CLASS_REG);
 	}
 #endif
+	/*
+	 * Set up logging levels.
+	 */
+#ifdef	ISP_LOGDEFAULT
+	isp->isp_dblev = ISP_LOGDEFAULT;
+#else
+	isp->isp_dblev = ISP_LOGWARN|ISP_LOGERR;
+#ifdef	SCSIDEBUG
+	isp->isp_dblev |= ISP_LOGDEBUG1|ISP_LOGDEBUG2;
+#endif
+#ifdef	DEBUG
+	isp->isp_dblev |= ISP_LOGDEBUG0|ISP_LOGCONFIG|ISP_LOGINFO;
+#endif
+#endif
+
+#ifdef	DEBUG
+	if (oneshot) {
+		oneshot = 0;
+		isp_prt(isp, ISP_LOGCONFIG, vstring,
+		    ISP_PLATFORM_VERSION_MAJOR, ISP_PLATFORM_VERSION_MINOR,
+		    ISP_CORE_VERSION_MAJOR, ISP_CORE_VERSION_MINOR);
+	}
+#endif
+
 	isp->isp_revision = rev;
 
 	/*
@@ -533,33 +552,10 @@ isp_pci_attach(parent, self, aux)
 	data = pci_conf_read(pa->pa_pc, pa->pa_tag, PCIR_ROMADDR);
 	data &= ~1;
 	pci_conf_write(pa->pa_pc, pa->pa_tag, PCIR_ROMADDR, data);
-	/*
-	 * Set up logging levels.
-	 */
-#ifdef	ISP_LOGDEFAULT
-	isp->isp_dblev = ISP_LOGDEFAULT;
-#else
-	isp->isp_dblev = ISP_LOGWARN|ISP_LOGERR;
-#ifdef	SCSIDEBUG
-	isp->isp_dblev |= ISP_LOGDEBUG1|ISP_LOGDEBUG2;
-#endif
-#ifdef	DEBUG
-	isp->isp_dblev |= ISP_LOGDEBUG0|ISP_LOGCONFIG|ISP_LOGINFO;
-#endif
-#endif
 
-#ifdef DEBUG
-	if (oneshot) {
-		oneshot = 0;
-		printf("Qlogic ISP Driver, OpenBSD (pci) Platform Version "
-		    "%d.%d Core Version %d.%d\n",
-		    ISP_PLATFORM_VERSION_MAJOR, ISP_PLATFORM_VERSION_MINOR,
-		    ISP_CORE_VERSION_MAJOR, ISP_CORE_VERSION_MINOR);
-	}
-#endif
 	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
 	    pa->pa_intrline, &ih)) {
-		printf("%s: couldn't map interrupt\n", isp->isp_name);
+		printf(": couldn't map interrupt\n");
 		free(isp->isp_param, M_DEVBUF);
 		return;
 	}
@@ -569,24 +565,27 @@ isp_pci_attach(parent, self, aux)
 	pcs->pci_ih = pci_intr_establish(pa->pa_pc, ih, IPL_BIO, isp_pci_intr,
 	    isp, isp->isp_name);
 	if (pcs->pci_ih == NULL) {
-		printf("%s: couldn't establish interrupt at %s\n",
-			isp->isp_name, intrstr);
+		printf(": couldn't establish interrupt at %s\n",
+			intrstr);
 		free(isp->isp_param, M_DEVBUF);
 		return;
 	}
-	isp_prt(isp, ISP_LOGCONFIG, "interrupting at %s", intrstr);
+
+	printf(": %s\n", intrstr);
 
 	if (IS_FC(isp)) {
-		DEFAULT_NODEWWN(isp) = 0x400000007F000002;
-		DEFAULT_PORTWWN(isp) = 0x400000007F000002;
+		DEFAULT_NODEWWN(isp) = 0x400000007F000003;
+		DEFAULT_PORTWWN(isp) = 0x400000007F000003;
 	}
 
-	isp->isp_osinfo.no_mbox_ints = 1;
+	isp->isp_confopts = self->dv_cfdata->cf_flags;
+	isp->isp_role = ISP_DEFAULT_ROLES;
 	ISP_LOCK(isp);
+	isp->isp_osinfo.no_mbox_ints = 1;
 	isp_reset(isp);
 	if (isp->isp_state != ISP_RESETSTATE) {
-		free(isp->isp_param, M_DEVBUF);
 		ISP_UNLOCK(isp);
+		free(isp->isp_param, M_DEVBUF);
 		return;
 	}
 	ENABLE_INTS(isp);
@@ -628,9 +627,7 @@ isp_pci_attach(parent, self, aux)
 }
 
 static u_int16_t
-isp_pci_rd_reg(isp, regoff)
-	struct ispsoftc *isp;
-	int regoff;
+isp_pci_rd_reg(struct ispsoftc *isp, int regoff)
 {
 	u_int16_t rv;
 	struct isp_pcisoftc *pcs = (struct isp_pcisoftc *) isp;
@@ -655,10 +652,7 @@ isp_pci_rd_reg(isp, regoff)
 }
 
 static void
-isp_pci_wr_reg(isp, regoff, val)
-	struct ispsoftc *isp;
-	int regoff;
-	u_int16_t val;
+isp_pci_wr_reg(struct ispsoftc *isp, int regoff, u_int16_t val)
 {
 	struct isp_pcisoftc *pcs = (struct isp_pcisoftc *) isp;
 	int offset, oldconf = 0;
@@ -682,9 +676,7 @@ isp_pci_wr_reg(isp, regoff, val)
 
 #if !(defined(ISP_DISABLE_1080_SUPPORT) && defined(ISP_DISABLE_12160_SUPPORT))
 static u_int16_t
-isp_pci_rd_reg_1080(isp, regoff)
-	struct ispsoftc *isp;
-	int regoff;
+isp_pci_rd_reg_1080(struct ispsoftc *isp, int regoff)
 {
 	u_int16_t rv, oc = 0;
 	struct isp_pcisoftc *pcs = (struct isp_pcisoftc *) isp;
@@ -724,10 +716,7 @@ isp_pci_rd_reg_1080(isp, regoff)
 }
 
 static void
-isp_pci_wr_reg_1080(isp, regoff, val)
-	struct ispsoftc *isp;
-	int regoff;
-	u_int16_t val;
+isp_pci_wr_reg_1080(struct ispsoftc *isp, int regoff, u_int16_t val)
 {
 	u_int16_t oc = 0;
 	struct isp_pcisoftc *pcs = (struct isp_pcisoftc *) isp;
@@ -767,8 +756,7 @@ isp_pci_wr_reg_1080(isp, regoff, val)
 #endif
 
 static int
-isp_pci_mbxdma(isp)
-	struct ispsoftc *isp;
+isp_pci_mbxdma(struct ispsoftc *isp)
 {
 	struct isp_pcisoftc *pci = (struct isp_pcisoftc *)isp;
 	bus_dma_segment_t seg;
@@ -844,12 +832,8 @@ isp_pci_mbxdma(isp)
 }
 
 static int
-isp_pci_dmasetup(isp, xs, rq, iptrp, optr)
-	struct ispsoftc *isp;
-	struct scsi_xfer *xs;
-	ispreq_t *rq;
-	u_int16_t *iptrp;
-	u_int16_t optr;
+isp_pci_dmasetup(struct ispsoftc *isp, XS_T *xs, ispreq_t *rq, u_int16_t *iptrp,
+	u_int16_t optr)
 {
 	struct isp_pcisoftc *pci = (struct isp_pcisoftc *)isp;
 	bus_dmamap_t dmap;
@@ -913,7 +897,7 @@ isp_pci_dmasetup(isp, xs, rq, iptrp, optr)
 		crq = (ispcontreq_t *) ISP_QUEUE_ENTRY(isp->isp_rquest, *iptrp);
 		*iptrp = ISP_NXT_QENTRY(*iptrp, RQUEST_QUEUE_LEN(isp));
 		if (*iptrp == optr) {
-			printf("%s: Request Queue Overflow++\n", isp->isp_name);
+			isp_prt(isp, ISP_LOGDEBUG0, "Request Queue Overflow++");
 			bus_dmamap_unload(pci->pci_dmat, dmap);
 			XS_SETERR(xs, HBA_BOTCH);
 			return (CMD_EAGAIN);
@@ -944,8 +928,7 @@ mbxsync:
 }
 
 static int
-isp_pci_intr(arg)
-	void *arg;
+isp_pci_intr(void *arg)
 {
 	int r;
 	struct ispsoftc *isp = (struct ispsoftc *)arg;
@@ -960,10 +943,7 @@ isp_pci_intr(arg)
 }
 
 static void
-isp_pci_dmateardown(isp, xs, handle)
-	struct ispsoftc *isp;
-	struct scsi_xfer *xs;
-	u_int32_t handle;
+isp_pci_dmateardown(struct ispsoftc *isp, XS_T *xs, u_int16_t handle)
 {
 	struct isp_pcisoftc *pci = (struct isp_pcisoftc *)isp;
 	bus_dmamap_t dmap = pci->pci_xfer_dmap[isp_handle_index(handle)];
@@ -973,17 +953,14 @@ isp_pci_dmateardown(isp, xs, handle)
 }
 
 static void
-isp_pci_reset1(isp)
-	struct ispsoftc *isp;
+isp_pci_reset1(struct ispsoftc *isp)
 {
 	/* Make sure the BIOS is disabled */
 	isp_pci_wr_reg(isp, HCCR, PCI_HCCR_CMD_BIOS);
 }
 
 static void
-isp_pci_dumpregs(isp, msg)
-	struct ispsoftc *isp;
-	const char *msg;
+isp_pci_dumpregs(struct ispsoftc *isp, const char *msg)
 {
 	struct isp_pcisoftc *pci = (struct isp_pcisoftc *)isp;
 	if (msg)

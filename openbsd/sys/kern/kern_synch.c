@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.28 2000/08/03 14:36:36 mickey Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.33 2001/03/25 18:09:17 csapuntz Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*-
@@ -229,6 +229,7 @@ schedcpu(arg)
 	 * clock available)
 	 */
 	phz = stathz ? stathz : profhz;
+	KASSERT(phz);
 
 	for (p = LIST_FIRST(&allproc); p != 0; p = LIST_NEXT(p, p_list)) {
 		/*
@@ -250,7 +251,6 @@ schedcpu(arg)
 		/*
 		 * p_pctcpu is only for ps.
 		 */
-		KASSERT(phz);
 #if	(FSHIFT >= CCPU_SHIFT)
 		p->p_pctcpu += (phz == 100)?
 			((fixpt_t) p->p_cpticks) << (FSHIFT - CCPU_SHIFT):
@@ -357,7 +357,7 @@ tsleep(ident, priority, wmesg, timo)
 
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_CSW))
-		ktrcsw(p->p_tracep, 1, 0);
+		ktrcsw(p, 1, 0);
 #endif
 	s = splhigh();
 	if (cold || panicstr) {
@@ -426,7 +426,7 @@ resume:
 		if (sig == 0) {
 #ifdef KTRACE
 			if (KTRPOINT(p, KTR_CSW))
-				ktrcsw(p->p_tracep, 0, 0);
+				ktrcsw(p, 0, 0);
 #endif
 			return (EWOULDBLOCK);
 		}
@@ -435,7 +435,7 @@ resume:
 	if (catch && (sig != 0 || (sig = CURSIG(p)) != 0)) {
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_CSW))
-			ktrcsw(p->p_tracep, 0, 0);
+			ktrcsw(p, 0, 0);
 #endif
 		if (p->p_sigacts->ps_sigintr & sigmask(sig))
 			return (EINTR);
@@ -443,7 +443,7 @@ resume:
 	}
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_CSW))
-		ktrcsw(p->p_tracep, 0, 0);
+		ktrcsw(p, 0, 0);
 #endif
 	return (0);
 }
@@ -523,7 +523,7 @@ sleep(ident, priority)
 	p->p_stats->p_ru.ru_nvcsw++;
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_CSW))
-		ktrcsw(p->p_tracep, 1, 0);
+		ktrcsw(p, 1, 0);
 #endif
 	mi_switch();
 #ifdef	DDB
@@ -532,7 +532,7 @@ sleep(ident, priority)
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_CSW))
-		ktrcsw(p->p_tracep, 0, 0);
+		ktrcsw(p, 0, 0);
 #endif
 	curpriority = p->p_usrpri;
 	splx(s);
@@ -566,8 +566,9 @@ unsleep(p)
  * Make all processes sleeping on the specified identifier runnable.
  */
 void
-wakeup(ident)
+wakeup_n(ident, n)
 	void *ident;
+	int n;
 {
 	struct slpque *qp;
 	struct proc *p, **q;
@@ -582,6 +583,7 @@ restart:
 			panic("wakeup");
 #endif
 		if (p->p_wchan == ident) {
+			--n;
 			p->p_wchan = 0;
 			*q = p->p_forw;
 			if (qp->sq_tailp == &p->p_forw)
@@ -607,12 +609,22 @@ restart:
 				}
 				/* END INLINE EXPANSION */
 
-				goto restart;
+				if (n != 0)
+					goto restart;
+				else
+					break;
 			}
 		} else
 			q = &p->p_forw;
 	}
 	splx(s);
+}
+
+void
+wakeup(chan)
+	void *chan;
+{
+	wakeup_n(chan, -1);
 }
 
 /*
@@ -884,7 +896,8 @@ db_show_all_procs(addr, haddr, count, modif)
 		pp = p->p_pptr;
 		if (p->p_stat) {
 
-			db_printf("%5d  ", p->p_pid);
+			db_printf("%c%5d  ", p == curproc ? '*' : ' ',
+				p->p_pid);
 
 			switch (*mode) {
 

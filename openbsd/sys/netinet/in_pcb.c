@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.48 2000/10/11 09:14:10 itojun Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.50 2001/03/28 20:03:02 angelos Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -179,7 +179,7 @@ in_pcballoc(so, v)
 	 */
 	if (sotopf(so) == PF_INET6)
 		inp->inp_flags = INP_IPV6;
-	inp->inp_csumoffset = -1;
+	inp->in6p_cksum = -1;
 #endif /* INET6 */
 	return (0);
 }
@@ -554,8 +554,12 @@ in_pcbdetach(v)
 #ifdef IPSEC
 	/* XXX IPsec cleanup here */
 	s = spltdb();
-	if (inp->inp_tdb)
-		TAILQ_REMOVE(&inp->inp_tdb->tdb_inp, inp, inp_tdb_next);
+	if (inp->inp_tdb_in)
+		TAILQ_REMOVE(&inp->inp_tdb_in->tdb_inp_in,
+			     inp, inp_tdb_in_next);
+	if (inp->inp_tdb_out)
+	        TAILQ_REMOVE(&inp->inp_tdb_out->tdb_inp_out, inp,
+			     inp_tdb_out_next);
 	splx(s);
 #endif
 	s = splnet();

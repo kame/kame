@@ -1,4 +1,4 @@
-/*	$OpenBSD: bus.h,v 1.8 2000/08/03 03:02:50 rahnds Exp $	*/
+/*	$OpenBSD: bus.h,v 1.11 2001/03/29 18:50:11 drahn Exp $	*/
 
 /*
  * Copyright (c) 1997 Per Fogelstrom.  All rights reserved.
@@ -54,6 +54,7 @@ typedef struct ppc_bus_space *bus_space_tag_t;
 
 struct ppc_bus_space {
 	u_int32_t	bus_base;
+	u_int32_t	bus_size;
 	u_int8_t	bus_reverse;	/* Reverse bytes */
 };
 #define POWERPC_BUS_TAG_BASE(x)  ((x)->bus_base)
@@ -137,32 +138,178 @@ bus_space_write_multi(4,32)
 
 #define	bus_space_write_multi_8	!!! bus_space_write_multi_8 not implemented !!!
 
+/*
+ *	void bus_space_read_region_N __P((bus_space_tag_t tag,
+ *	    bus_space_handle_t bsh, bus_size_t offset,
+ *	    u_intN_t *addr, size_t count));
+ *
+ * Read `count' 1, 2, 4, or 8 byte quantities from bus space
+ * described by tag/handle and starting at `offset' and copy into
+ * buffer provided.
+ */
+#define __BA(t, h, o) ((void *)((h) + (o)))
+
+static __inline void
+bus_space_read_region_1(tag, bsh, offset, addr, count)
+	bus_space_tag_t tag;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int8_t *addr;
+	size_t count;
+{
+	volatile u_int8_t *s = __BA(tag, bsh, offset);
+
+	while (count--)
+		*addr++ = *s++;
+	__asm __volatile("eieio; sync");
+}
+
+static __inline void
+bus_space_read_region_2(tag, bsh, offset, addr, count)
+	bus_space_tag_t tag;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int16_t *addr;
+	size_t count;
+{
+	volatile u_int16_t *s = __BA(tag, bsh, offset);
+
+	while (count--)
+		__asm __volatile("lhbrx %0, 0, %1" :
+			"=r"(*addr++) : "r"(s++));
+	__asm __volatile("eieio; sync");
+}
+
+static __inline void
+bus_space_read_region_4(tag, bsh, offset, addr, count)
+	bus_space_tag_t tag;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	u_int32_t *addr;
+	size_t count;
+{
+	volatile u_int32_t *s = __BA(tag, bsh, offset);
+
+	while (count--)
+		__asm __volatile("lwbrx %0, 0, %1" :
+			"=r"(*addr++) : "r"(s++));
+	__asm __volatile("eieio; sync");
+}
+
+#if 0	/* Cause a link error for bus_space_read_region_8 */
+#define	bus_space_read_region_8		!!! unimplemented !!!
+#endif
+
+
+/*
+ *	void bus_space_write_region_N __P((bus_space_tag_t tag,
+ *	    bus_space_handle_t bsh, bus_size_t offset,
+ *	    const u_intN_t *addr, size_t count));
+ *
+ * Write `count' 1, 2, 4, or 8 byte quantities from the buffer provided
+ * to bus space described by tag/handle starting at `offset'.
+ */
+
+static __inline void
+bus_space_write_region_1(tag, bsh, offset, addr, count)
+	bus_space_tag_t tag;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	const u_int8_t *addr;
+	size_t count;
+{
+	volatile u_int8_t *d = __BA(tag, bsh, offset);
+
+	while (count--)
+		*d++ = *addr++;
+	__asm __volatile("eieio; sync");
+}
+
+static __inline void
+bus_space_write_region_2(tag, bsh, offset, addr, count)
+	bus_space_tag_t tag;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	const u_int16_t *addr;
+	size_t count;
+{
+	volatile u_int16_t *d = __BA(tag, bsh, offset);
+
+	while (count--)
+		__asm __volatile("sthbrx %0, 0, %1" ::
+			"r"(*addr++), "r"(d++));
+	__asm __volatile("eieio; sync");
+}
+
+static __inline void
+bus_space_write_region_4(tag, bsh, offset, addr, count)
+	bus_space_tag_t tag;
+	bus_space_handle_t bsh;
+	bus_size_t offset;
+	const u_int32_t *addr;
+	size_t count;
+{
+	volatile u_int32_t *d = __BA(tag, bsh, offset);
+
+	while (count--)
+		__asm __volatile("stwbrx %0, 0, %1" ::
+			"r"(*addr++), "r"(d++));
+	__asm __volatile("eieio; sync");
+}
+
+#if 0
+#define	bus_space_write_region_8 !!! bus_space_write_region_8 unimplemented !!!
+#endif
+
+
 /* These are OpenBSD extensions to the general NetBSD bus interface.  */
 void
 bus_space_read_raw_multi_1(bus_space_tag_t bst, bus_space_handle_t bsh,
 	bus_addr_t ba, u_int8_t *dst, bus_size_t size);
 void
 bus_space_read_raw_multi_2(bus_space_tag_t bst, bus_space_handle_t bsh,
-	bus_addr_t ba, u_int16_t *dst, bus_size_t size);
+	bus_addr_t ba, u_int8_t *dst, bus_size_t size);
 void
 bus_space_read_raw_multi_4(bus_space_tag_t bst, bus_space_handle_t bsh,
-	bus_addr_t ba, u_int32_t *dst, bus_size_t size);
+	bus_addr_t ba, u_int8_t *dst, bus_size_t size);
 
 void
 bus_space_write_raw_multi_1(bus_space_tag_t bst, bus_space_handle_t bsh,
 	bus_addr_t ba, const u_int8_t *src, bus_size_t size);
 void
 bus_space_write_raw_multi_2(bus_space_tag_t bst, bus_space_handle_t bsh,
-	bus_addr_t ba, const u_int16_t *src, bus_size_t size);
+	bus_addr_t ba, const u_int8_t *src, bus_size_t size);
 void
 bus_space_write_raw_multi_4(bus_space_tag_t bst, bus_space_handle_t bsh,
-	bus_addr_t ba, const u_int32_t *src, bus_size_t size);
+	bus_addr_t ba, const u_int8_t *src, bus_size_t size);
 
 #define	bus_space_read_raw_multi_8 \
     !!! bus_space_read_raw_multi_8 not implemented !!!
 
 #define	bus_space_write_raw_multi_8 \
     !!! bus_space_write_raw_multi_8 not implemented !!!
+
+/*
+ * Bus read/write barrier methods.
+ *
+ *	void bus_space_barrier __P((bus_space_tag_t tag,
+ *	    bus_space_handle_t bsh, bus_size_t offset,
+ *	    bus_size_t len, int flags));
+ * 
+ * Note: powerpc does not currently implement barriers, but we must
+ * provide the flags to MI code.
+ * the processor does have eieio which is effectively the barrier
+ * operator, however due to how memory is mapped this should? not
+ * be required.
+ */
+#define bus_space_barrier(t, h, o, l, f)	\
+	((void)((void)(t), (void)(h), (void)(o), (void)(l), (void)(f)))  
+#define BUS_SPACE_BARRIER_READ  0x01		/* force read barrier */ 
+#define BUS_SPACE_BARRIER_WRITE 0x02		/* force write barrier */
+/* Compatibility defines */
+#define BUS_BARRIER_READ        BUS_SPACE_BARRIER_READ
+#define BUS_BARRIER_WRITE       BUS_SPACE_BARRIER_WRITE
+
 
 #define	BUS_DMA_WAITOK		0x00
 #define	BUS_DMA_NOWAIT		0x01

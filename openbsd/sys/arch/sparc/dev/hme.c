@@ -1,4 +1,4 @@
-/*	$OpenBSD: hme.c,v 1.23 2000/06/18 17:42:18 jason Exp $	*/
+/*	$OpenBSD: hme.c,v 1.31 2001/02/20 19:39:34 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Jason L. Wright (jason@thought.net)
@@ -93,37 +93,36 @@ void	hmestop		__P((struct hme_softc *));
 void	hmeinit		__P((struct hme_softc *));
 void	hme_meminit	__P((struct hme_softc *));
 
-static void	hme_tcvr_bb_writeb  __P((struct hme_softc *, int));
-static int	hme_tcvr_bb_readb   __P((struct hme_softc *, int));
+void	hme_tcvr_bb_writeb  __P((struct hme_softc *, int));
+int	hme_tcvr_bb_readb   __P((struct hme_softc *, int));
 
-static void	hme_poll_stop	__P((struct hme_softc *sc));
+void	hme_poll_stop	__P((struct hme_softc *sc));
 
-static int	hme_rint	__P((struct hme_softc *));
-static int	hme_tint	__P((struct hme_softc *));
-static int	hme_mint	__P((struct hme_softc *, u_int32_t));
-static int	hme_eint	__P((struct hme_softc *, u_int32_t));
+int	hme_rint	__P((struct hme_softc *));
+int	hme_tint	__P((struct hme_softc *));
+int	hme_mint	__P((struct hme_softc *, u_int32_t));
+int	hme_eint	__P((struct hme_softc *, u_int32_t));
 
-static void	hme_reset_rx		__P((struct hme_softc *));
-static void	hme_reset_tx		__P((struct hme_softc *));
+void	hme_reset_rx	__P((struct hme_softc *));
+void	hme_reset_tx	__P((struct hme_softc *));
 
-static struct mbuf *	hme_get __P((struct hme_softc *, int, int));
-static void		hme_read __P((struct hme_softc *, int, int));
-static int		hme_put __P((struct hme_softc *, int, struct mbuf *));
+void		hme_read __P((struct hme_softc *, int, int));
+int		hme_put __P((struct hme_softc *, int, struct mbuf *));
 
 /*
  * ifmedia glue
  */
-static int	hme_mediachange __P((struct ifnet *));
-static void	hme_mediastatus __P((struct ifnet *, struct ifmediareq *));
+int	hme_mediachange __P((struct ifnet *));
+void	hme_mediastatus __P((struct ifnet *, struct ifmediareq *));
 
 /*
  * mii glue
  */
-static int	hme_mii_read __P((struct device *, int, int));
-static void	hme_mii_write __P((struct device *, int, int, int));
-static void	hme_mii_statchg __P((struct device *));
+int	hme_mii_read __P((struct device *, int, int));
+void	hme_mii_write __P((struct device *, int, int, int));
+void	hme_mii_statchg __P((struct device *));
 
-static void	hme_mcreset __P((struct hme_softc *));
+void	hme_mcreset __P((struct hme_softc *));
 
 struct cfattach hme_ca = {
 	sizeof (struct hme_softc), hmematch, hmeattach
@@ -152,7 +151,7 @@ hmematch(parent, vcf, aux)
 	return (1);
 }
 
-void    
+void
 hmeattach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
@@ -201,7 +200,7 @@ hmeattach(parent, self, aux)
 	if (sc->sc_burst == -1)
 		sc->sc_burst = ((struct sbus_softc *)parent)->sc_burst;
 
-        /* Clamp at parent's burst sizes */
+	/* Clamp at parent's burst sizes */
 	sc->sc_burst &= ((struct sbus_softc *)parent)->sc_burst;
 
 	hme_meminit(sc);
@@ -251,10 +250,6 @@ hmeattach(parent, self, aux)
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 }
 
 /*
@@ -326,7 +321,7 @@ hmestop(sc)
 	int tries = 0;
 
 	sc->sc_gr->reset = GR_RESET_ALL;
-	while (sc->sc_gr->reset && (tries != MAX_STOP_TRIES))
+	while (sc->sc_gr->reset && (++tries != MAX_STOP_TRIES))
 		DELAY(20);
 	if (tries == MAX_STOP_TRIES)
 		printf("%s: stop failed\n", sc->sc_dev.dv_xname);
@@ -490,7 +485,7 @@ hme_meminit(sc)
 	sc->sc_first_td = sc->sc_last_td = sc->sc_no_td = 0;
 	for (i = 0; i < HME_TX_RING_SIZE; i++) {
 		desc->hme_txd[i].tx_addr =
-		    (u_int32_t) &sc->sc_bufs_dva->tx_buf[i][0];
+		    (u_int32_t)sc->sc_bufs_dva->tx_buf[i];
 		desc->hme_txd[i].tx_flags = 0;
 	}
 
@@ -500,7 +495,7 @@ hme_meminit(sc)
 	sc->sc_last_rd = 0;
 	for (i = 0; i < HME_RX_RING_SIZE; i++) {
 		desc->hme_rxd[i].rx_addr =
-		    (u_int32_t) &sc->sc_bufs_dva->rx_buf[i][0];
+		    (u_int32_t)sc->sc_bufs_dva->rx_buf[i];
 		desc->hme_rxd[i].rx_flags = HME_RXD_OWN |
 		    ((HME_RX_PKT_BUF_SZ - HME_RX_OFFSET) << 16);
 	}
@@ -547,8 +542,8 @@ hmeinit(sc)
 	cr->ipkt_gap1 = HME_DEFAULT_IPKT_GAP1;
 	cr->ipkt_gap2 = HME_DEFAULT_IPKT_GAP2;
 
-	rxr->rx_ring = (u_int32_t)&sc->sc_desc_dva->hme_rxd[0];
-	txr->tx_ring = (u_int32_t)&sc->sc_desc_dva->hme_txd[0];
+	rxr->rx_ring = (u_int32_t)sc->sc_desc_dva->hme_rxd;
+	txr->tx_ring = (u_int32_t)sc->sc_desc_dva->hme_txd;
 
 	if (sc->sc_burst & SBUS_BURST_64)
 		gr->cfg = GR_CFG_BURST64;
@@ -582,7 +577,7 @@ hmeinit(sc)
 	rxr->cfg = c;
 	DELAY(20);
 	if (c != rxr->cfg)	/* the receiver sometimes misses bits */
-	    printf("%s: setting rxreg->cfg failed.\n", sc->sc_dev.dv_xname);
+		printf("%s: setting rxreg->cfg failed.\n", sc->sc_dev.dv_xname);
 
 	cr->rx_cfg = 0;
 	hme_mcreset(sc);
@@ -605,7 +600,7 @@ hmeinit(sc)
 	ifp->if_timer = 0;
 }
 
-static void
+void
 hme_poll_stop(sc)
 	struct hme_softc *sc;
 {
@@ -618,14 +613,14 @@ hme_poll_stop(sc)
 
 	/* Turn off MIF interrupts, and diable polling */
 	tcvr->int_mask = 0xffff;
-        tcvr->cfg &= ~(TCVR_CFG_PENABLE);
+	tcvr->cfg &= ~(TCVR_CFG_PENABLE);
 	sc->sc_flags &= ~(HME_FLAG_POLL);
 	DELAY(200);
 }
 
 #define RESET_TRIES	32
 
-static void
+void
 hme_reset_tx(sc)
 	struct hme_softc *sc;
 {
@@ -633,14 +628,14 @@ hme_reset_tx(sc)
 	struct hme_cr *cr = sc->sc_cr;
 
 	cr->tx_swreset = 0;
-	while (tries-- && (cr->tx_swreset & 1))
+	while (--tries && (cr->tx_swreset & 1))
 		DELAY(20);
 
 	if (!tries)
 		printf("%s: reset tx failed\n", sc->sc_dev.dv_xname);
 }
 
-static void
+void
 hme_reset_rx(sc)
 	struct hme_softc *sc;
 {
@@ -648,7 +643,7 @@ hme_reset_rx(sc)
 	struct hme_cr *cr = sc->sc_cr;
 
 	cr->rx_swreset = 0;
-	while (tries-- && (cr->rx_swreset & 1))
+	while (--tries && (cr->rx_swreset & 1))
 		DELAY(20);
 
 	if (!tries)
@@ -658,7 +653,7 @@ hme_reset_rx(sc)
 /*
  * mif interrupt
  */
-static int
+int
 hme_mint(sc, why)
 	struct hme_softc *sc;
 	u_int32_t why;
@@ -671,7 +666,7 @@ hme_mint(sc, why)
 /*
  * transmit interrupt
  */
-static int
+int
 hme_tint(sc)
 	struct hme_softc *sc;
 {
@@ -719,7 +714,7 @@ hme_tint(sc)
 	return 1;
 }
 
-static int
+int
 hme_rint(sc)
 	struct hme_softc *sc;
 {
@@ -757,7 +752,7 @@ hme_rint(sc)
 /*
  * error interrupt
  */
-static int
+int
 hme_eint(sc, why)
 	struct hme_softc *sc;
 	u_int32_t why;
@@ -803,67 +798,15 @@ hmeintr(v)
 	return (r);
 }
 
-static struct mbuf *
-hme_get(sc, idx, totlen)
-	struct hme_softc *sc;
-	int idx, totlen;
-{
-	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	struct mbuf *m;
-	struct mbuf *top, **mp;
-	int len, pad, boff = 0;
-
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
-	if (m == NULL)
-		return NULL;
-	m->m_pkthdr.rcvif = ifp;
-	m->m_pkthdr.len = totlen;
-	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
-	len = MHLEN;
-	if (totlen >= MINCLSIZE) {
-		MCLGET(m, M_DONTWAIT);
-		if (m->m_flags & M_EXT)
-			len = MCLBYTES;
-	}
-	m->m_data += pad;
-	len -= pad;
-	top = NULL;
-	mp = &top;
-
-	while (totlen > 0) {
-		if (top) {
-			MGET(m, M_DONTWAIT, MT_DATA);
-			if (m == NULL) {
-				m_freem(top);
-				return NULL;
-			}
-			len = MLEN;
-		}
-		if (top && totlen >= MINCLSIZE) {
-			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT)
-				len = MCLBYTES;
-		}
-		m->m_len = len = min(totlen, len);
-		bcopy(&sc->sc_bufs->rx_buf[idx][boff + HME_RX_OFFSET],
-		    mtod(m, caddr_t), len);
-		boff += len;
-		totlen -= len;
-		*mp = m;
-		mp = &m->m_next;
-	}
-
-	return top;
-}
-
-static int
+int
 hme_put(sc, idx, m)
 	struct hme_softc *sc;
 	int idx;
 	struct mbuf *m;
 {
 	struct mbuf *n;
-	int len, tlen = 0, boff = 0;
+	u_int8_t *buf = sc->sc_bufs->tx_buf[idx];
+	int len, tlen = 0;
 
 	for (; m; m = n) {
 		len = m->m_len;
@@ -871,15 +814,15 @@ hme_put(sc, idx, m)
 			MFREE(m, n);
 			continue;
 		}
-		bcopy(mtod(m, caddr_t), &sc->sc_bufs->tx_buf[idx][boff], len);
-		boff += len;
+		bcopy(mtod(m, caddr_t), buf, len);
+		buf += len;
 		tlen += len;
 		MFREE(m, n);
 	}
 	return tlen;
 }
 
-static void
+void
 hme_read(sc, idx, len)
 	struct hme_softc *sc;
 	int idx, len;
@@ -897,11 +840,13 @@ hme_read(sc, idx, len)
 	}
 
 	/* Pull packet off interface. */
-	m = hme_get(sc, idx, len);
+	m = m_devget(sc->sc_bufs->rx_buf[idx], len + HME_RX_OFFSET, 0,
+	    &sc->sc_arpcom.ac_if, NULL);
 	if (m == NULL) {
 		ifp->if_ierrors++;
 		return;
 	}
+	m_adj(m, HME_RX_OFFSET);
 
 	ifp->if_ipackets++;
 
@@ -924,7 +869,7 @@ hme_read(sc, idx, len)
 /*
  * Program the multicast receive filter.
  */
-static void
+void
 hme_mcreset(sc)
 	struct hme_softc *sc;
 {
@@ -1010,7 +955,7 @@ hme_mcreset(sc)
  * Writing to the serial BitBang, is a matter of putting the bit
  * into the data register, then strobing the clock.
  */
-static void
+void
 hme_tcvr_bb_writeb(sc, b)
 	struct hme_softc *sc;
 	int b;
@@ -1024,7 +969,7 @@ hme_tcvr_bb_writeb(sc, b)
  * Read a bit from a PHY, if the PHY is not our internal or external
  * phy addr, just return all zero's.
  */
-static int
+int
 hme_tcvr_bb_readb(sc, phy)
 	struct hme_softc *sc;
 	int phy;
@@ -1046,7 +991,7 @@ hme_tcvr_bb_readb(sc, phy)
 	return ((ret) ? 1 : 0);
 }
 
-static void
+void
 hme_mii_write(self, phy, reg, val)
 	struct device *self;
 	int phy, reg, val;
@@ -1057,8 +1002,7 @@ hme_mii_write(self, phy, reg, val)
 
 	if (sc->sc_flags & HME_FLAG_FENABLE) {
 		tcvr->frame = (FRAME_WRITE | phy << 23) |
-			      ((reg & 0xff) << 18) |
-			      (val & 0xffff);
+		    ((reg & 0xff) << 18) | (val & 0xffff);
 		while (!(tcvr->frame & 0x10000) && (tries != 0)) {
 			tries--;
 			DELAY(200);
@@ -1090,7 +1034,7 @@ hme_mii_write(self, phy, reg, val)
 	tcvr->bb_oenab = 0;
 }
 
-static int
+int
 hme_mii_read(self, phy, reg)
 	struct device *self;
 	int phy, reg;
@@ -1102,7 +1046,7 @@ hme_mii_read(self, phy, reg)
 	/* Use the frame if possible */
 	if (sc->sc_flags & HME_FLAG_FENABLE) {
 		tcvr->frame = (FRAME_READ | phy << 23) |
-			      ((reg & 0xff) << 18);
+		    ((reg & 0xff) << 18);
 		while (!(tcvr->frame & 0x10000) && (tries != 0)) {
 			tries--;
 			DELAY(20);
@@ -1130,7 +1074,7 @@ hme_mii_read(self, phy, reg)
 	for (i = 4; i >= 0; i--)
 		hme_tcvr_bb_writeb(sc, (reg >> i) & 1);
 
-	tcvr->bb_oenab = 0;	                /* turn off bitbang intrs */
+	tcvr->bb_oenab = 0;			/* turn off bitbang intrs */
 
 	hme_tcvr_bb_readb(sc, phy);		/* ignore... */
 
@@ -1144,7 +1088,7 @@ hme_mii_read(self, phy, reg)
 	return ret;
 }
 
-static int
+int
 hme_mediachange(ifp)
 	struct ifnet *ifp;
 {
@@ -1153,7 +1097,7 @@ hme_mediachange(ifp)
 	return (0);
 }
 
-static void
+void
 hme_mediastatus(ifp, ifmr)
 	struct ifnet *ifp;
 	struct ifmediareq *ifmr;
@@ -1165,11 +1109,11 @@ hme_mediastatus(ifp, ifmr)
 	ifmr->ifm_status = sc->sc_mii.mii_media_status;
 }
 
-static void
+void
 hme_mii_statchg(self)
 	struct device *self;
 {
-	struct hme_softc *sc = (struct hme_softc *)sc;
+	struct hme_softc *sc = (struct hme_softc *)self;
 	struct hme_cr *cr = sc->sc_cr;
 
 	if (sc->sc_mii.mii_media_active & IFM_FDX)

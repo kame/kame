@@ -673,9 +673,6 @@ ray_attach(parent, self, aux)
 	else
 		ifmedia_set(&sc->sc_media, IFM_INFRA);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	/* disable the card */
 	pcmcia_function_disable(sc->sc_pf);
 
@@ -1286,8 +1283,8 @@ ray_intr_start(sc)
 			m_freem(m0);
 			continue;
 		}
-		RAY_DPRINTF(("%s: mbuf.m_pkthdr.len %d\n", ifp->if_xname,
-		    (int)pktlen));
+		RAY_DPRINTF(("%s: mbuf.m_pkthdr.len %lu\n", ifp->if_xname,
+		    (u_long)pktlen));
 
 		/* we need the ether_header now for pktlen adjustments */
 		M_PULLUP(m0, sizeof(struct ether_header));
@@ -1358,8 +1355,8 @@ ray_intr_start(sc)
 		previ = hinti = i;
 		i = RAY_CCS_LINK_NULL;
 
-		RAY_DPRINTF(("%s: bufp 0x%lx new pktlen %d\n",
-		    ifp->if_xname, (long)bufp, (int)pktlen));
+		RAY_DPRINTF(("%s: bufp 0x%lx new pktlen %lu\n",
+		    ifp->if_xname, (long)bufp, (u_long)pktlen));
 
 		/* copy out mbuf */
 		for (m = m0; m; m = m->m_next) {
@@ -1625,8 +1622,8 @@ done:
 
 	if (pktlen < sizeof(struct ieee80211_frame) + sizeof(struct llc))
 	{
-		RAY_DPRINTF(("%s: pkt not big enough to contain llc (%d)\n",
-			sc->sc_xname, pktlen));
+		RAY_DPRINTF(("%s: pkt not big enough to contain llc (%lu)\n",
+			sc->sc_xname, (u_long)pktlen));
 		m_freem(m);
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_bio.c,v 1.27 2000/06/23 02:14:38 mickey Exp $	*/
+/*	$OpenBSD: vfs_bio.c,v 1.37 2001/04/06 19:10:49 gluk Exp $	*/
 /*	$NetBSD: vfs_bio.c,v 1.44 1996/06/11 11:15:36 pk Exp $	*/
 
 /*-
@@ -95,6 +95,7 @@ u_long	bufhash;
 
 TAILQ_HEAD(bqueues, buf) bufqueues[BQUEUES];
 int needbuffer;
+int syncer_needbuffer;
 struct bio_ops bioops;
 
 /*
@@ -106,6 +107,28 @@ struct bio_ops bioops;
 static __inline struct buf *bio_doread __P((struct vnode *, daddr_t, int,
 					    struct ucred *, int));
 int count_lock_queue __P((void));
+
+/*
+ * We keep a few counters to monitor the utilization of the buffer cache
+ *
+ *  numdirtybufs - number of dirty (B_DELWRI) buffers. unused.
+ *  lodirtybufs  - ? unused.
+ *  hidirtybufs  - ? unused.
+ *  numfreebufs  - number of buffers on BQ_LRU and BQ_AGE. unused.
+ *  numcleanbufs - number of clean (!B_DELWRI) buffers on BQ_LRU and BQ_AGE.
+ *    Used to track the need to speedup the syncer and for the syncer reserve.
+ *  numemptybufs - number of buffers on BQ_EMPTY. unused.
+ *  mincleanbufs - the lowest number of clean buffers this far.
+ */
+int numdirtybufs;	/* number of all dirty buffers */
+int lodirtybufs, hidirtybufs;
+int numfreebufs;	/* number of buffers on LRU+AGE free lists */
+int numcleanbufs;	/* number of clean buffers on LRU+AGE free lists */
+int numemptybufs;	/* number of buffers on EMPTY list */
+int locleanbufs;
+#ifdef DEBUG
+int mincleanbufs;
+#endif
 
 void
 bremfree(bp)
@@ -127,6 +150,18 @@ bremfree(bp)
 		if (dp == &bufqueues[BQUEUES])
 			panic("bremfree: lost tail");
 	}
+	if (bp->b_bufsize <= 0) {
+		numemptybufs--;
+	} else if (!ISSET(bp->b_flags, B_LOCKED)) {
+		numfreebufs--;
+		if (!ISSET(bp->b_flags, B_DELWRI)) {
+			numcleanbufs--;
+#ifdef DEBUG
+			if (mincleanbufs > numcleanbufs)
+				mincleanbufs = numcleanbufs;
+#endif
+		}
+	}
 	TAILQ_REMOVE(dp, bp, b_freelist);
 }
 
@@ -141,6 +176,9 @@ bufinit()
 	register int i;
 	int base, residual;
 
+	numfreebufs = 0;
+	numcleanbufs = 0;
+	numemptybufs = 0;
 	for (dp = bufqueues; dp < &bufqueues[BQUEUES]; dp++)
 		TAILQ_INIT(dp);
 	bufhashtbl = hashinit(nbuf, M_CACHE, M_WAITOK, &bufhash);
@@ -160,10 +198,37 @@ bufinit()
 		else
 			bp->b_bufsize = base * CLBYTES;
 		bp->b_flags = B_INVAL;
-		dp = bp->b_bufsize ? &bufqueues[BQ_AGE] : &bufqueues[BQ_EMPTY];
+		if (bp->b_bufsize) {
+			dp = &bufqueues[BQ_AGE];
+			numfreebufs++;
+			numcleanbufs++;
+		} else {
+			dp = &bufqueues[BQ_EMPTY];
+			numemptybufs++;
+		}
 		binsheadfree(bp, dp);
 		binshash(bp, &invalhash);
 	}
+
+	hidirtybufs = nbuf / 4 + 20;
+	numdirtybufs = 0;
+	lodirtybufs = hidirtybufs / 2;
+
+	/*
+	 * Reserve 5% of bufs for syncer's needs,
+	 * but not more than 25% and if possible
+	 * not less then 16 bufs. locleanbufs
+	 * value must be not too small, but probably
+	 * there are no reason to set it more than 32.
+	 */
+	locleanbufs = nbuf / 20;
+	if (locleanbufs < 16)
+		locleanbufs = 16;
+	if (locleanbufs > nbuf/4)
+		locleanbufs = nbuf / 4;
+#ifdef DEBUG
+	mincleanbufs = locleanbufs;
+#endif
 }
 
 static __inline struct buf *
@@ -287,7 +352,7 @@ bwrite(bp)
 	/*
 	 * Remember buffer type, to switch on it later.  If the write was
 	 * synchronous, but the file system was mounted with MNT_ASYNC,
-	 * convert it to a delayed write.  
+	 * convert it to a delayed write.
 	 * XXX note that this relies on delayed tape writes being converted
 	 * to async, not sync writes (which is safe, but ugly).
 	 */
@@ -327,9 +392,10 @@ bwrite(bp)
 	 * to do this now, because if we don't, the vnode may not
 	 * be properly notified that its I/O has completed.
 	 */
-	if (wasdelayed)
-		reassignbuf(bp, bp->b_vp);
-	else
+	if (wasdelayed) {
+		--numdirtybufs;
+		reassignbuf(bp);
+	} else
 		curproc->p_stats->p_ru.ru_oublock++;
 	
 
@@ -383,7 +449,8 @@ bdwrite(bp)
 	if (!ISSET(bp->b_flags, B_DELWRI)) {
 		SET(bp->b_flags, B_DELWRI);
 		s = splbio();
-		reassignbuf(bp, bp->b_vp);
+		reassignbuf(bp);
+		++numdirtybufs;
 		splx(s);
 		curproc->p_stats->p_ru.ru_oublock++;	/* XXX */
 	}
@@ -413,20 +480,39 @@ bawrite(bp)
 	VOP_BWRITE(bp);
 }
 
+/*
+ * Must be called at splbio()
+ */
 void
-bdirty(bp)
+buf_dirty(bp)
 	struct buf *bp;
 {
-	struct proc *p = curproc;       /* XXX */
-	int s;
-
 	if (ISSET(bp->b_flags, B_DELWRI) == 0) {
 		SET(bp->b_flags, B_DELWRI);
-		s = splbio();
-		reassignbuf(bp, bp->b_vp);
-		splx(s);
-		if (p)
-			p->p_stats->p_ru.ru_oublock++;
+		reassignbuf(bp);
+		++numdirtybufs;
+#ifdef DIAGNOSTIC
+		if (numdirtybufs > nbuf)
+			panic("buf_dirty: incorrect number of dirty bufs");
+#endif
+	}
+}
+
+/*
+ * Must be called at splbio()
+ */
+void
+buf_undirty(bp)
+	struct buf *bp;
+{
+	if (ISSET(bp->b_flags, B_DELWRI)) {
+		CLR(bp->b_flags, B_DELWRI);
+		reassignbuf(bp);
+		--numdirtybufs;
+#ifdef DIAGNOSTIC
+		if (numdirtybufs < 0)
+			panic("buf_undirty: incorrect number of dirty bufs");
+#endif
 	}
 }
 
@@ -475,35 +561,53 @@ brelse(bp)
 		 * If it's invalid or empty, dissociate it from its vnode
 		 * and put on the head of the appropriate queue.
 		 */
-		if (LIST_FIRST(&bp->b_dep) != NULL && bioops.io_deallocate) {
-			(*bioops.io_deallocate)(bp);
+		if (LIST_FIRST(&bp->b_dep) != NULL)
+			buf_deallocate(bp);
+
+		if (ISSET(bp->b_flags, B_DELWRI)) {
+			--numdirtybufs;
+			CLR(bp->b_flags, B_DELWRI);
 		}
-		CLR(bp->b_flags, B_DELWRI);
+
 		if (bp->b_vp) {
-			reassignbuf(bp, bp->b_vp);
+			reassignbuf(bp);
 			brelvp(bp);
 		}
-		if (bp->b_bufsize <= 0)
+		if (bp->b_bufsize <= 0) {
 			/* no data */
 			bufq = &bufqueues[BQ_EMPTY];
-		else
+			numemptybufs++;
+		} else {
 			/* invalid data */
 			bufq = &bufqueues[BQ_AGE];
+			numfreebufs++;
+			numcleanbufs++;
+		}
 		binsheadfree(bp, bufq);
 	} else {
 		/*
 		 * It has valid data.  Put it on the end of the appropriate
 		 * queue, so that it'll stick around for as long as possible.
+		 * If buf is AGE, but has dependencies, must put it on last
+		 * bufqueue to be scanned, ie LRU. This protects against the
+		 * livelock where BQ_AGE only has buffers with dependencies,
+		 * and we thus never get to the dependent buffers in BQ_LRU.
 		 */
 		if (ISSET(bp->b_flags, B_LOCKED))
 			/* locked in core */
 			bufq = &bufqueues[BQ_LOCKED];
-		else if (ISSET(bp->b_flags, B_AGE))
-			/* stale but valid data */
-			bufq = &bufqueues[BQ_AGE];
-		else
-			/* valid data */
-			bufq = &bufqueues[BQ_LRU];
+		else {
+			numfreebufs++;
+			if (!ISSET(bp->b_flags, B_DELWRI))
+				numcleanbufs++;
+			if (ISSET(bp->b_flags, B_AGE))
+				/* stale but valid data */
+				bufq = buf_countdeps(bp, 0, 1) ?
+				    &bufqueues[BQ_LRU] : &bufqueues[BQ_AGE];
+			else
+				/* valid data */
+				bufq = &bufqueues[BQ_LRU];
+		}
 		binstailfree(bp, bufq);
 	}
 
@@ -514,10 +618,16 @@ already_queued:
 	/* Allow disk interrupts. */
 	splx(s);
 
+	/* Wake up syncer process waiting for buffers */
+	if (syncer_needbuffer) {
+		wakeup(&syncer_needbuffer);
+		syncer_needbuffer = 0;
+	}
+
 	/* Wake up any processes waiting for any buffer to become free. */
-	if (needbuffer) {
-		needbuffer = 0;
-		wakeup(&needbuffer);
+	if (needbuffer && (numcleanbufs > locleanbufs)) {
+		needbuffer--;
+		wakeup_one(&needbuffer);
 	}
 
 	/* Wake up any proceeses waiting for _this_ buffer to become free. */
@@ -576,16 +686,16 @@ getblk(vp, blkno, size, slpflag, slptimeo)
 	 * The following is an inlined version of 'incore()', but with
 	 * the 'invalid' test moved to after the 'busy' test.  It's
 	 * necessary because there are some cases in which the NFS
-	 * code sets B_INVAL prior to writing data to the server, but 
+	 * code sets B_INVAL prior to writing data to the server, but
 	 * in which the buffers actually contain valid data.  In this
 	 * case, we can't allow the system to allocate a new buffer for
 	 * the block until the write is finished.
 	 */
 	bh = BUFHASH(vp, blkno);
 start:
-        bp = bh->lh_first;
-        for (; bp != NULL; bp = bp->b_hash.le_next) {
-                if (bp->b_lblkno != blkno || bp->b_vp != vp)
+	bp = bh->lh_first;
+	for (; bp != NULL; bp = bp->b_hash.le_next) {
+		if (bp->b_lblkno != blkno || bp->b_vp != vp)
 			continue;
 
 		s = splbio();
@@ -606,7 +716,7 @@ start:
 			break;
 		}
 		splx(s);
-        }
+	}
 
 	if (bp == NULL) {
 		if ((bp = getnewbuf(slpflag, slptimeo)) == NULL)
@@ -618,6 +728,7 @@ start:
 		splx(s);
 	}
 	allocbuf(bp, size);
+
 	return (bp);
 }
 
@@ -628,7 +739,7 @@ struct buf *
 geteblk(size)
 	int size;
 {
-	struct buf *bp; 
+	struct buf *bp;
 
 	while ((bp = getnewbuf(0, 0)) == 0)
 		;
@@ -678,7 +789,7 @@ allocbuf(bp, size)
 		binshash(nbp, &invalhash);
 
 		/* and steal its pages, up to the amount we need */
-		amt = min(nbp->b_bufsize, (desired_size - bp->b_bufsize));
+		amt = MIN(nbp->b_bufsize, (desired_size - bp->b_bufsize));
 		pagemove((nbp->b_data + nbp->b_bufsize - amt),
 			 bp->b_data + bp->b_bufsize, amt);
 		bp->b_bufsize += amt;
@@ -732,7 +843,7 @@ out:
 /*
  * Find a buffer which is available for use.
  * Select something from a free list.
- * Preference is to AGE list, then LRU list.    
+ * Preference is to AGE list, then LRU list.
  */
 struct buf *
 getnewbuf(slpflag, slptimeo)
@@ -743,14 +854,28 @@ getnewbuf(slpflag, slptimeo)
 
 start:
 	s = splbio();
-	if ((bp = bufqueues[BQ_AGE].tqh_first) == NULL &&
-	    (bp = bufqueues[BQ_LRU].tqh_first) == NULL) {
+	/*
+	 * If we're getting low on buffers kick the syncer to work harder.
+	 */
+	if (numcleanbufs < locleanbufs + min(locleanbufs, 4))
+		speedup_syncer();
+
+	if ((numcleanbufs <= locleanbufs) && curproc != syncerproc) {
 		/* wait for a free buffer of any kind */
-		needbuffer = 1;
+		needbuffer++;
 		tsleep(&needbuffer, slpflag|(PRIBIO+1), "getnewbuf", slptimeo);
 		splx(s);
 		return (0);
-	} 
+	}
+	if ((bp = bufqueues[BQ_AGE].tqh_first) == NULL &&
+	    (bp = bufqueues[BQ_LRU].tqh_first) == NULL) {
+		/* wait for a free buffer of any kind */
+		syncer_needbuffer = 1;
+		tsleep(&syncer_needbuffer, slpflag|(PRIBIO-3), "getnewbuf",
+			slptimeo);
+		splx(s);
+		return (0);
+	}
 
 	bremfree(bp);
 
@@ -778,7 +903,7 @@ start:
 		 */
 		SET(bp->b_flags, B_AGE);
 		bawrite(bp);
-		goto start;
+		return (0);
 	}
 
 	/* disassociate us from our vnode, if we had one... */
@@ -787,8 +912,8 @@ start:
 
 	splx(s);
 
-	if (LIST_FIRST(&bp->b_dep) != NULL && bioops.io_deallocate)
-		(*bioops.io_deallocate)(bp);
+	if (LIST_FIRST(&bp->b_dep) != NULL)
+		buf_deallocate(bp);
 
 	/* clear out various other fields */
 	bp->b_flags = B_BUSY;
@@ -804,15 +929,15 @@ start:
 	/* nuke any credentials we were holding */
 	if (bp->b_rcred != NOCRED) {
 		crfree(bp->b_rcred);
-		bp->b_rcred = NOCRED; 
+		bp->b_rcred = NOCRED;
 	}
 	if (bp->b_wcred != NOCRED) {
 		crfree(bp->b_wcred);
 		bp->b_wcred = NOCRED;
 	}
-	
+
 	bremhash(bp);
-	return (bp); 
+	return (bp);
 }
 
 /*
@@ -834,7 +959,7 @@ biowait(bp)
 	if (ISSET(bp->b_flags, B_EINTR)) {
 		CLR(bp->b_flags, B_EINTR);
 		return (EINTR);
-	} 
+	}
 
 	if (ISSET(bp->b_flags, B_ERROR))
 		return (bp->b_error ? bp->b_error : EIO);
@@ -866,11 +991,13 @@ biodone(bp)
 		panic("biodone already");
 	SET(bp->b_flags, B_DONE);		/* note that it's done */
 
-	if (LIST_FIRST(&bp->b_dep) != NULL && bioops.io_complete)
-		(*bioops.io_complete)(bp);
+	if (LIST_FIRST(&bp->b_dep) != NULL)
+		buf_complete(bp);
 
-	if (!ISSET(bp->b_flags, B_READ))	/* wake up reader */
-		vwakeup(bp);
+	if (!ISSET(bp->b_flags, B_READ)) {
+		CLR(bp->b_flags, B_WRITEINPROG);
+		vwakeup(bp->b_vp);
+	}
 
 	if (ISSET(bp->b_flags, B_CALL)) {	/* if necessary, call out */
 		CLR(bp->b_flags, B_CALL);	/* but note callout done */
@@ -885,6 +1012,7 @@ biodone(bp)
 	}
 }
 
+#ifdef DEBUG
 /*
  * Return a count of buffers on the "locked" queue.
  */
@@ -899,6 +1027,7 @@ count_lock_queue()
 		n++;
 	return (n);
 }
+#endif /* DEBUG */
 
 #ifdef DEBUG
 /*
@@ -913,23 +1042,39 @@ vfs_bufstats()
 	register struct buf *bp;
 	register struct bqueues *dp;
 	int counts[MAXBSIZE/CLBYTES+1];
+	int totals[BQUEUES];
 	static char *bname[BQUEUES] = { "LOCKED", "LRU", "AGE", "EMPTY" };
 
+	s = splbio();
 	for (dp = bufqueues, i = 0; dp < &bufqueues[BQUEUES]; dp++, i++) {
 		count = 0;
 		for (j = 0; j <= MAXBSIZE/CLBYTES; j++)
 			counts[j] = 0;
-		s = splbio();
 		for (bp = dp->tqh_first; bp; bp = bp->b_freelist.tqe_next) {
 			counts[bp->b_bufsize/CLBYTES]++;
 			count++;
 		}
-		splx(s);
+		totals[i] = count;
 		printf("%s: total-%d", bname[i], count);
 		for (j = 0; j <= MAXBSIZE/CLBYTES; j++)
 			if (counts[j] != 0)
 				printf(", %d-%d", j * CLBYTES, counts[j]);
 		printf("\n");
 	}
+	if (totals[BQ_EMPTY] != numemptybufs)
+		printf("numemptybufs counter wrong: %d != %d\n",
+			totals[BQ_EMPTY], numemptybufs);
+	if ((totals[BQ_LRU] + totals[BQ_AGE]) != numfreebufs)
+		printf("numfreebufs counter wrong: %d != %d\n",
+			totals[BQ_LRU] + totals[BQ_AGE], numemptybufs);
+	if ((totals[BQ_LRU] + totals[BQ_AGE]) < numcleanbufs ||
+	    (numcleanbufs < 0))
+		printf("numcleanbufs counter wrong: %d < %d\n",
+			totals[BQ_LRU] + totals[BQ_AGE], numcleanbufs);
+	printf("numcleanbufs: %d\n", numcleanbufs);
+	printf("syncer eating up to %d bufs from %d reserved\n",
+			locleanbufs - mincleanbufs, locleanbufs);
+	printf("numdirtybufs: %d\n", numdirtybufs);
+	splx(s);
 }
 #endif /* DEBUG */

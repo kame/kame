@@ -344,10 +344,6 @@ gmac_attach(parent, self, aux)
 #else /* !__NetBSD__ */
 	ether_ifattach(ifp);
 #endif /* !__NetBSD__ */
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 }
 
 u_int

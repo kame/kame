@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.h,v 1.8 2000/05/17 00:21:12 deraadt Exp $	*/
+/*	$OpenBSD: route.h,v 1.11 2001/01/19 06:37:36 itojun Exp $	*/
 /*	$NetBSD: route.h,v 1.9 1996/02/13 22:00:49 christos Exp $	*/
 
 /*
@@ -141,12 +141,10 @@ struct ortentry {
 #define RTF_PROTO2	0x4000		/* protocol specific routing flag */
 #define RTF_PROTO1	0x8000		/* protocol specific routing flag */
 
-/*
- * New IPv6 routing flags.
- *
- * PROTO1 and PROTO2 are used, and defined in netinet6/ipv6_var.h.
- */
+#ifndef _KERNEL
+/* obsoleted */
 #define	RTF_TUNNEL	0x100000	/* Tunnelling bit. */
+#endif
 
 /*
  * Routing statistics.
@@ -231,6 +229,10 @@ struct rt_msghdr {
 struct rt_addrinfo {
 	int	rti_addrs;
 	struct	sockaddr *rti_info[RTAX_MAX];
+	int	rti_flags;
+	struct	ifaddr *rti_ifa;
+	struct	ifnet *rti_ifp;
+	struct	rt_msghdr *rti_rtm;
 };
 
 struct route_cb {
@@ -259,6 +261,7 @@ struct rttimer {
 
 struct rttimer_queue {
 	long				rtq_timeout;
+	unsigned long			rtq_count;
 	TAILQ_HEAD(, rttimer)		rtq_head;
 	LIST_ENTRY(rttimer_queue)	rtq_link;
 };
@@ -304,6 +307,7 @@ struct rttimer_queue *
 void	 rt_timer_queue_change __P((struct rttimer_queue *, long));
 void	 rt_timer_queue_destroy __P((struct rttimer_queue *, int));
 void	 rt_timer_remove_all __P((struct rtentry *));
+unsigned long	rt_timer_count __P((struct rttimer_queue *));
 void	 rt_timer_timer __P((void *));
 void	 rtable_init __P((void **));
 void	 rtalloc __P((struct route *));
@@ -313,6 +317,7 @@ void	 rtalloc_noclone __P((struct route *, int));
 struct rtentry *
 	 rtalloc2 __P((struct sockaddr *, int, int));
 void	 rtfree __P((struct rtentry *));
+int	 rt_getifa __P((struct rt_addrinfo *));
 int	 rtinit __P((struct ifaddr *, int, int));
 int	 rtioctl __P((u_long, caddr_t, struct proc *));
 void	 rtredirect __P((struct sockaddr *, struct sockaddr *,
@@ -321,5 +326,5 @@ void	 rtredirect __P((struct sockaddr *, struct sockaddr *,
 int	 rtrequest __P((int, struct sockaddr *,
 			struct sockaddr *, struct sockaddr *, int,
 			struct rtentry **));
-void	 ipv4_tunnelsetup __P((struct rtentry *));
+int	 rtrequest1 __P((int, struct rt_addrinfo *, struct rtentry **));
 #endif /* _KERNEL */

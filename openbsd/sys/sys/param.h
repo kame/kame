@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.30 2000/08/21 21:13:37 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.36 2001/04/15 02:35:09 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.23 1996/03/17 01:02:29 thorpej Exp $	*/
 
 /*-
@@ -45,8 +45,8 @@
 #define BSD4_3	1
 #define BSD4_4	1
 
-#define OpenBSD	200012		/* OpenBSD version (year & month). */
-#define OpenBSD2_8 1		/* OpenBSD 2.8 */
+#define OpenBSD	200105		/* OpenBSD version (year & month). */
+#define OpenBSD2_9 1		/* OpenBSD 2.9 */
 
 #ifndef NULL
 #ifdef 	__GNUG__
@@ -72,7 +72,7 @@
 
 #define	MAXCOMLEN	16		/* max command name remembered */
 #define	MAXINTERP	64		/* max interpreter file name length */
-#define	MAXLOGNAME	12		/* max login name length */
+#define	MAXLOGNAME	32		/* max login name length */
 #define	MAXUPRC		CHILD_MAX	/* max simultaneous processes */
 #define	NCARGS		ARG_MAX		/* max bytes for an exec function */
 #define	NGROUPS		NGROUPS_MAX	/* max number groups */
@@ -193,6 +193,11 @@
 /* Macros for min/max. */
 #define	MIN(a,b) (((a)<(b))?(a):(b))
 #define	MAX(a,b) (((a)>(b))?(a):(b))
+
+/* Macros for calculating the offset of a field */
+#if !defined(offsetof) && defined(_KERNEL)
+#define offsetof(s, e) ((size_t)&((s *)0)->e)
+#endif
 
 /*
  * Constants for setting the parameters of the kernel memory allocator.

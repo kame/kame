@@ -1,4 +1,4 @@
-/*	$OpenBSD: sclock.c,v 1.1 1999/09/27 18:43:25 smurph Exp $ */
+/*	$OpenBSD: sclock.c,v 1.5 2001/03/09 05:44:39 smurph Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * 
@@ -82,20 +82,24 @@
 #include <sys/simplelock.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+#include <sys/systm.h>
 #ifdef GPROF
 #include <sys/gmon.h>
 #endif
 
+#include <machine/board.h>
 #include <machine/psl.h>
 #include <machine/autoconf.h>
 #include <machine/bugio.h>
 #include <machine/cpu.h>
 #include "pcctwo.h"
 #if NPCCTWO > 0 
+#include <mvme88k/dev/pcctwofunc.h>
 #include <mvme88k/dev/pcctworeg.h>
 #endif
 #include "syscon.h"
 #if NSYSCON > 0 
+#include <mvme88k/dev/sysconfunc.h>
 #include <mvme88k/dev/sysconreg.h>
 #endif
 #include <mvme88k/dev/vme.h>
@@ -113,13 +117,13 @@ struct simplelock cio_lock;
 int statvar = 8192;
 int statmin;			/* statclock interval - 1/2*variance */
 
-static int	sclockmatch __P((struct device *, void *, void *));
-static void	sclockattach __P((struct device *, struct device *, void *));
+static int	sclockmatch	__P((struct device *, void *, void *));
+static void	sclockattach	__P((struct device *, struct device *, void *));
 
-void sbc_initstatclock __P((void));
-void m188_initstatclock __P((void));
-void m188_cio_init __P((unsigned));
-void write_cio __P((unsigned, unsigned));
+void	sbc_initstatclock	__P((void));
+void	m188_initstatclock	__P((void));
+void	m188_cio_init		__P((unsigned));
+void	write_cio		__P((unsigned, unsigned));
 
 struct sclocksoftc {
 	struct device			sc_dev;
@@ -134,8 +138,8 @@ struct cfdriver sclock_cd = {
         NULL, "sclock", DV_DULL, 0
 }; 
 
-int	sbc_statintr __P((void *));
-int   m188_statintr __P((void *));
+int	sbc_statintr	__P((void *));
+int	m188_statintr	__P((void *));
 
 int	sclockbus;
 u_char	stat_reset;
@@ -176,33 +180,33 @@ sclockattach(parent, self, args)
 	struct sclocksoftc *sc = (struct sclocksoftc *)self;
 
 	sclockbus = ca->ca_bustype;
-   
-   switch (sclockbus) {
+
+	switch (sclockbus) {
 #if NPCCTWO > 0 
-   case BUS_PCCTWO:
-	   sc->sc_statih.ih_fn = sbc_statintr;
-      sc->sc_statih.ih_arg = 0;
-      sc->sc_statih.ih_wantframe = 1;
-      sc->sc_statih.ih_ipl = ca->ca_ipl;
-      stat_reset = ca->ca_ipl | PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
-   	pcctwointr_establish(PCC2V_TIMER2, &sc->sc_statih);
-      mdfp.statclock_init_func = &sbc_initstatclock;
-      printf(": VME1x7");
-      break;
+	case BUS_PCCTWO:
+		sc->sc_statih.ih_fn = sbc_statintr;
+		sc->sc_statih.ih_arg = 0;
+		sc->sc_statih.ih_wantframe = 1;
+		sc->sc_statih.ih_ipl = ca->ca_ipl;
+		stat_reset = ca->ca_ipl | PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
+		pcctwointr_establish(PCC2V_TIMER2, &sc->sc_statih);
+		mdfp.statclock_init_func = &sbc_initstatclock;
+		printf(": VME1x7");
+		break;
 #endif /* NPCCTWO */
 #if NSYSCON > 0 
-   case BUS_SYSCON:
-      sc->sc_statih.ih_fn = m188_statintr;
-      sc->sc_statih.ih_arg = 0;
-      sc->sc_statih.ih_wantframe = 1;
-      sc->sc_statih.ih_ipl = ca->ca_ipl;
-      sysconintr_establish(SYSCV_TIMER2, &sc->sc_statih);
-      mdfp.statclock_init_func = &m188_initstatclock;
-      printf(": VME188");
-      break;
+	case BUS_SYSCON:
+		sc->sc_statih.ih_fn = m188_statintr;
+		sc->sc_statih.ih_arg = 0;
+		sc->sc_statih.ih_wantframe = 1;
+		sc->sc_statih.ih_ipl = ca->ca_ipl;
+		sysconintr_establish(SYSCV_TIMER2, &sc->sc_statih);
+		mdfp.statclock_init_func = &m188_initstatclock;
+		printf(": VME188");
+		break;
 #endif /* NSYSCON */
-   }         
-   printf("\n");
+	}         
+	printf("\n");
 }
 
 #if NPCCTWO > 0 
@@ -211,8 +215,8 @@ sbc_initstatclock(void)
 {
 	register int statint, minint;
 
-#ifdef DEBUG
-   printf("SBC statclock init\n");
+#ifdef CLOCK_DEBUG
+	printf("SBC statclock init\n");
 #endif 
 	if (stathz == 0)
 		stathz = hz;
@@ -232,21 +236,24 @@ sbc_initstatclock(void)
 	sys_pcc2->pcc2_t2cmp = pcc2_timer_us2lim(statint);
 	sys_pcc2->pcc2_t2count = 0;
 	sys_pcc2->pcc2_t2ctl = PCC2_TCTL_CEN | PCC2_TCTL_COC |
-	    PCC2_TCTL_COVF;
+			       PCC2_TCTL_COVF;
 	sys_pcc2->pcc2_t2irq = stat_reset;
 
 	statmin = statint - (statvar >> 1);
 }
 
 int
-sbc_statintr(cap)
-	void *cap;
+sbc_statintr(eframe)
+	void *eframe;
 {
 	register u_long newint, r, var;
 
 	sys_pcc2->pcc2_t2irq = stat_reset;
 
-	statclock((struct clockframe *)cap);
+	/* increment intr counter */
+	intrcnt[M88K_SCLK_IRQ]++; 
+	
+	statclock((struct clockframe *)eframe);
 
 	/*
 	 * Compute new randomized interval.  The intervals are uniformly
@@ -273,14 +280,18 @@ sbc_statintr(cap)
 #define CIO_UNLOCK simple_unlock(&cio_lock)
 
 int
-m188_statintr(cap)
-	void *cap;
+m188_statintr(eframe)
+	void *eframe;
 {
 	register u_long newint, r, var;
 
-   CIO_LOCK;
-	statclock((struct clockframe *)cap);
-   write_cio(CIO_CSR1, CIO_GCB|CIO_CIP);  /* Ack the interrupt */
+	CIO_LOCK;
+	
+	/* increment intr counter */
+	intrcnt[M88K_SCLK_IRQ]++; 
+
+	statclock((struct clockframe *)eframe);
+	write_cio(CIO_CSR1, CIO_GCB|CIO_CIP);  /* Ack the interrupt */
 
 	/*
 	 * Compute new randomized interval.  The intervals are uniformly
@@ -292,12 +303,19 @@ m188_statintr(cap)
 		r = random() & (var - 1);
 	} while (r == 0);
 	newint = statmin + r;
-/*   printf("newint = %d, 0x%x\n", newint, newint);*/
+	/*
+	printf("newint = %d, 0x%x\n", newint, newint);
+	*/
 	write_cio(CIO_CT1MSB, (newint & 0xFF00) >> 8);	/* Load time constant CTC #1 */
 	write_cio(CIO_CT1LSB, newint & 0xFF);
-   /* force a trigger event */
-   write_cio(CIO_CSR1, CIO_GCB|CIO_TCB|CIO_IE);  /* Start CTC #1 running */
-   CIO_UNLOCK;
+	
+	write_cio(CIO_CSR1, CIO_GCB|CIO_CIP);  /* Start CTC #1 running */
+#if 0
+	if (*ist & CIOI_BIT) {
+		printf("CIOI not clearing!\n");
+	}
+#endif 
+	CIO_UNLOCK;
 	return (1);
 }
 
@@ -306,8 +324,8 @@ m188_initstatclock(void)
 {
 	register int statint, minint;
 
-#ifdef DEBUG
-   printf("VME188 clock init\n");
+#ifdef CLOCK_DEBUG
+	printf("VME188 clock init\n");
 #endif
 	simple_lock_init(&cio_lock);
 	if (stathz == 0)
@@ -322,8 +340,8 @@ m188_initstatclock(void)
 	minint = statint / 2 + 100;
 	while (statvar > minint)
 		statvar >>= 1;
-   m188_cio_init(statint);  
-   statmin = statint - (statvar >> 1);  
+	m188_cio_init(statint);  
+	statmin = statint - (statvar >> 1);  
 }
 
 #define CIO_CNTRL 0xFFF8300C
@@ -331,35 +349,46 @@ m188_initstatclock(void)
 /* Write CIO register */
 void
 write_cio(reg, val)
-unsigned reg,val;
+	unsigned reg,val;
 {
 	int s, i;
+	volatile int *cio_ctrl = (volatile int *)CIO_CNTRL;
+	
 	s = splclock();
-	/* Select register */
-   *((volatile int *) CIO_CTRL) = (reg & 0xFF);
-   /* Write the value */
-   *((volatile int *) CIO_CTRL) = (val & 0xFF);
+	CIO_LOCK;
+	
+	i = *cio_ctrl;				/* goto state 1 */
+	*cio_ctrl = 0;				/* take CIO out of RESET */
+	i = *cio_ctrl;				/* reset CIO state machine */
+
+	*cio_ctrl = (reg & 0xFF);		/* Select register */
+	*cio_ctrl = (val & 0xFF);		/* Write the value */
+	
+	CIO_UNLOCK;
 	splx(s);
 }
 
 /* Read CIO register */
 static u_char
 read_cio(reg)
-unsigned reg;
+	unsigned reg;
 {
 	int c;
-   int s, i;
-   volatile int *port = (volatile int *)CIO_CNTRL;
-	
+	int s, i;
+	volatile int *cio_ctrl = (volatile int *)CIO_CNTRL;
+
 	s = splclock();
+	CIO_LOCK;
+	
 	/* Select register */
-   *port = (char)(reg&0xFF);
+	*cio_ctrl = (char)(reg&0xFF);
 	/* Delay for a short time to allow 8536 to settle */
-	for(i=0;i<100;i++);
+	for (i=0;i<100;i++);
 	/* read the value */
-   c = *port;
+	c = *cio_ctrl;
+	CIO_UNLOCK;
 	splx(s);
-	return((u_char)c&0xFF);
+	return ((u_char)c&0xFF);
 }
 
 /*
@@ -369,44 +398,45 @@ unsigned reg;
  */
 
 void
-m188_cio_init(unsigned p)
+m188_cio_init(p)
+	unsigned p;
 {
 	long i;
-   short period;
+	short period;
 
-   CIO_LOCK;
+	CIO_LOCK;
 
-   period = p & 0xFFFF;
-	
-   /* Initialize 8536 CTC */
+	period = p & 0xFFFF;
+
+	/* Initialize 8536 CTC */
 	/* Start by forcing chip into known state */
 	(void) read_cio(CIO_MICR);
 
 	write_cio(CIO_MICR, CIO_MICR_RESET);	/* Reset the CTC */
-	for(i=0;i < 1000L; i++)		/* Loop to delay */
+	for (i=0;i < 1000L; i++)	 /* Loop to delay */
 		;
 	/* Clear reset and start init seq. */
-   write_cio(CIO_MICR, 0x00);
+	write_cio(CIO_MICR, 0x00);
 
 	/* Wait for chip to come ready */
-	while((read_cio(CIO_MICR)) != (char) CIO_MICR_RJA)
+	while ((read_cio(CIO_MICR)) != (char) CIO_MICR_RJA)
 		;
-   /* init Z8036 */
+	/* init Z8036 */
 	write_cio(CIO_MICR, CIO_MICR_MIE | CIO_MICR_NV | CIO_MICR_RJA | CIO_MICR_DLC);
 	write_cio(CIO_CTMS1, CIO_CTMS_CSC);	/* Continuous count */
-   write_cio(CIO_PDCB, 0xFF);    /* set port B to input */
-	
-   write_cio(CIO_CT1MSB, (period & 0xFF00) >> 8);	/* Load time constant CTC #1 */
+	write_cio(CIO_PDCB, 0xFF);		/* set port B to input */
+
+	/* Load time constant CTC #1 */
+	write_cio(CIO_CT1MSB, (period & 0xFF00) >> 8);
 	write_cio(CIO_CT1LSB, period & 0xFF);
-	
-   /* enable counter 1 */
-   write_cio(CIO_MCCR, CIO_MCCR_CT1E | CIO_MCCR_PBE);	
 
-   /* enable interrupts and start */
+	/* enable counter 1 */
+	write_cio(CIO_MCCR, CIO_MCCR_CT1E | CIO_MCCR_PBE);   
+
+	/* enable interrupts and start */
 	/*write_cio(CIO_IVR, SYSCV_TIMER2);*/
-   write_cio(CIO_CSR1, CIO_GCB|CIO_TCB|CIO_IE);  /* Start CTC #1 running */
-   
-   CIO_UNLOCK;
-}
+	write_cio(CIO_CSR1, CIO_GCB|CIO_TCB|CIO_IE);	/* Start CTC #1 running */
 
+	CIO_UNLOCK;
+}
 #endif /* NSYSCON */

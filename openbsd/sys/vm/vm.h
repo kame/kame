@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm.h,v 1.9 2000/03/13 16:08:28 art Exp $	*/
+/*	$OpenBSD: vm.h,v 1.12 2001/04/06 23:41:01 art Exp $	*/
 /*	$NetBSD: vm.h,v 1.13 1994/06/29 06:47:52 cgd Exp $	*/
 
 /*
@@ -74,9 +74,11 @@ typedef struct lock		*lock_t;
 #include <vm/vm_param.h>
 #include <sys/lock.h>
 #include <vm/vm_prot.h>
-#include <vm/pmap.h>
 #include <vm/vm_inherit.h>
 #include <vm/vm_map.h>
+#include <vm/vm_page.h>
+#include <vm/vm_pager.h>
+#include <vm/pmap.h>
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
@@ -87,7 +89,6 @@ typedef struct lock		*lock_t;
  */
 struct vmspace {
 	struct	vm_map vm_map;	/* VM address map */
-	struct	pmap vm_pmap;	/* private physical map */
 	int	vm_refcnt;	/* number of references */
 	caddr_t	vm_shm;		/* SYS5 shared memory private data XXX */
 /* we copy from vm_startcopy to the end of the structure on fork */

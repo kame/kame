@@ -1,4 +1,4 @@
-/*	$OpenBSD: sio.c,v 1.15 1999/02/08 18:17:21 millert Exp $	*/
+/*	$OpenBSD: sio.c,v 1.22 2001/03/07 01:03:51 ericj Exp $	*/
 /*	$NetBSD: sio.c,v 1.15 1996/12/05 01:39:36 cgd Exp $	*/
 
 /*
@@ -74,7 +74,7 @@ int	pcebmatch __P((struct device *, struct cfdata *, void *));
 #endif
 
 struct cfattach pceb_ca = {
-	sizeof(struct device), pcebmatch, sioattach,
+	sizeof(struct sio_softc), pcebmatch, sioattach,
 };
 
 struct cfdriver pceb_cd = {
@@ -94,8 +94,6 @@ void	sio_eisa_attach_hook __P((struct device *, struct device *,
 	    struct eisabus_attach_args *));
 int	sio_eisa_maxslots __P((void *));
 int	sio_eisa_intr_map __P((void *, u_int, eisa_intr_handle_t *));
-void	siocfiddle __P((struct isabus_attach_args *iba));
-
 void	sio_bridge_callback __P((void *));
 
 int
@@ -119,6 +117,9 @@ siomatch(parent, match, aux)
 	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_INTEL_SIO)
 		return (1);
 
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_ALI &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALI_M1543)
+		return(1);
 	return (0);
 }
 
@@ -134,11 +135,11 @@ pcebmatch(parent, match, aux)
 {
 	struct pci_attach_args *pa = aux;
 
-	if (PCI_VENDOR(pa->pa_id) != PCI_VENDOR_INTEL ||
-	    PCI_PRODUCT(pa->pa_id) != PCI_PRODUCT_INTEL_PCEB)
-		return (0);
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_INTEL &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_INTEL_PCEB)
+		return (1);
 
-	return (1);
+	return (0);
 }
 
 void
@@ -153,7 +154,8 @@ sioattach(parent, self, aux)
 
 	sc->sc_iot = pa->pa_iot;
 	sc->sc_memt = pa->pa_memt;
-	sc->sc_haseisa = (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_INTEL_PCEB);
+	sc->sc_haseisa = (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_INTEL &&
+		PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_INTEL_PCEB);
 
 #ifdef EVCNT_COUNTERS
 	evcnt_attach(&sc->sc_dv, "intr", &sio_intr_evcnt);
@@ -191,7 +193,6 @@ sio_bridge_callback(v)
 	ic.ic_attach_hook = sio_isa_attach_hook;
 	ic.ic_intr_establish = sio_intr_establish;
 	ic.ic_intr_disestablish = sio_intr_disestablish;
-	ic.ic_intr_check = sio_intr_check;
 
 	sa.sa_iba.iba_busname = "isa";
 	sa.sa_iba.iba_iot = sc->sc_iot;
@@ -217,7 +218,7 @@ sio_isa_attach_hook(parent, self, iba)
 	struct device *parent, *self;
 	struct isabus_attach_args *iba;
 {
-	siocfiddle(iba);
+	/* Nothing to do. */
 }
 
 void
@@ -258,49 +259,4 @@ sio_eisa_intr_map(v, irq, ihp)
 
 	*ihp = irq;
 	return 0;
-}
-
-
-/*
- * Look for and gently fondle the 87312 Super I/O chip.
- */
-
-#define SIOC_IDE_ENABLE	0x40
-#define	SIOC_NPORTS	2
-void
-siocfiddle(iba)
-	struct isabus_attach_args *iba;
-{
-	bus_space_tag_t iot = iba->iba_iot;
-	bus_space_handle_t ioh;
-	extern int cputype;
-	int addr;
-	u_int8_t reg0;
-
-	/* Decide based on machine type */
-	switch (cputype) {
-	case 11:			/* DEC AXPpci */
-	case 12:			/* DEC 2100 A50 */
-		addr = 0x26e;
-		break;
-	case 26:			/* DEC EB164 */
-		addr = 0x398;
-		break;
-	default:
-		return;
-	}
-
-	if (bus_space_map(iot, addr, SIOC_NPORTS, 0, &ioh))
-		return;
-
-	/* select and read register 0 */
-	bus_space_write_1(iot, ioh, 0, 0);
-	reg0 = bus_space_read_1(iot, ioh, 1);
-
-	/* write back with IDE enabled flag set, and do it twice!  */
-	bus_space_write_1(iot, ioh, 0, 0);
-	bus_space_write_1(iot, ioh, 1, reg0 | SIOC_IDE_ENABLE);
-	bus_space_write_1(iot, ioh, 1, reg0 | SIOC_IDE_ENABLE);
-
-	bus_space_unmap(iot, ioh, SIOC_NPORTS);
 }

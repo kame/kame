@@ -1,5 +1,41 @@
-/*	$OpenBSD: lca.c,v 1.7 1997/01/24 19:57:41 niklas Exp $	*/
+/*	$OpenBSD: lca.c,v 1.10 2001/02/16 16:02:52 jason Exp $	*/
 /*	$NetBSD: lca.c,v 1.14 1996/12/05 01:39:35 cgd Exp $	*/
+
+/*-
+ * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Jason R. Thorpe.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -33,6 +69,7 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
+
 #include <vm/vm.h>
 
 #include <machine/autoconf.h>
@@ -45,15 +82,17 @@
 #include <dev/pci/pcivar.h>
 #include <alpha/pci/lcareg.h>
 #include <alpha/pci/lcavar.h>
-#if defined(DEC_AXPPCI_33)
+#ifdef DEC_AXPPCI_33
 #include <alpha/pci/pci_axppci_33.h>
 #endif
-
-#ifdef __BROKEN_INDIRECT_CONFIG
-int	lcamatch __P((struct device *, void *, void *));
-#else
-int	lcamatch __P((struct device *, struct cfdata *, void *));
+#ifdef DEC_ALPHABOOK1
+#include <alpha/pci/pci_alphabook1.h>
 #endif
+#ifdef DEC_EB66
+#include <alpha/pci/pci_eb66.h>
+#endif
+
+int	lcamatch __P((struct device *, void *, void *));
 void	lcaattach __P((struct device *, struct device *, void *));
 
 struct cfattach lca_ca = {
@@ -66,6 +105,11 @@ struct cfdriver lca_cd = {
 
 int	lcaprint __P((void *, const char *pnp));
 
+#if 0
+int	lca_bus_get_window __P((int, int,
+	    struct alpha_bus_space_translation *));
+#endif
+
 /* There can be only one. */
 int lcafound;
 struct lca_config lca_configuration;
@@ -73,17 +117,13 @@ struct lca_config lca_configuration;
 int
 lcamatch(parent, match, aux)
 	struct device *parent;
-#ifdef __BROKEN_INDIRECT_CONFIG
 	void *match;
-#else
-	struct cfdata *match;
-#endif
 	void *aux;
 {
-	struct confargs *ca = aux;
+	struct mainbus_attach_args *ma = aux;
 
 	/* Make sure that we're looking for a LCA. */
-	if (strcmp(ca->ca_name, lca_cd.cd_name) != 0)
+	if (strcmp(ma->ma_name, lca_cd.cd_name) != 0)
 		return (0);
 
 	if (lcafound)
@@ -102,10 +142,6 @@ lca_init(lcp, mallocsafe)
 {
 
 	/*
-	 * Can't set up SGMAP data here; can be called before malloc().
-	 */
-
-	/*
 	 * The LCA HAE register is WRITE-ONLY, so we can't tell where
 	 * the second sparse window is actually mapped.  Therefore,
 	 * we have to guess where it is.  This seems to be the normal
@@ -117,6 +153,15 @@ lca_init(lcp, mallocsafe)
 		/* don't do these twice since they set up extents */
 		lcp->lc_iot = lca_bus_io_init(lcp);
 		lcp->lc_memt = lca_bus_mem_init(lcp);
+
+#if 0
+		/*
+		 * We have 1 I/O window and 3 MEM windows.
+		 */
+		alpha_bus_window_count[ALPHA_BUS_TYPE_PCI_IO] = 1;
+		alpha_bus_window_count[ALPHA_BUS_TYPE_PCI_MEM] = 3;
+		alpha_bus_get_window = lca_bus_get_window;
+#endif
 	}
 	lcp->lc_mallocsafe = mallocsafe;
 
@@ -145,48 +190,10 @@ lca_init(lcp, mallocsafe)
 	 *
 	 *	IOC_CONF set to ZERO.
 	 */
-	REGVAL(LCA_IOC_CONF) = 0;
-
-	/* Turn off DMA window enables in Window Base Registers */
-/*	REGVAL(LCA_IOC_W_BASE0) = 0;
-	REGVAL(LCA_IOC_W_BASE1) = 0; */
-	alpha_mb();
-
-	/* XXX XXX BEGIN XXX XXX */
-	{							/* XXX */
-		extern vm_offset_t alpha_XXX_dmamap_or;		/* XXX */
-		alpha_XXX_dmamap_or = 0x40000000;		/* XXX */
-	}							/* XXX */
-	/* XXX XXX END XXX XXX */
+	REGVAL64(LCA_IOC_CONF) = 0;
 
 	lcp->lc_initted = 1;
 }
-
-#ifdef notdef
-void
-lca_init_sgmap(lcp)
-	struct lca_config *lcp;
-{
-
-	/* XXX */
-	lcp->lc_sgmap = malloc(1024 * 8, M_DEVBUF, M_WAITOK);
-	bzero(lcp->lc_sgmap, 1024 * 8);		/* clear all entries. */
-
-	REGVAL(LCA_IOC_W_BASE0) = 0;
-	alpha_mb();
-
-	/* Set up Translated Base Register 1; translate to sybBus addr 0. */
-	/* check size against APEC XXX JH */
-	REGVAL(LCA_IOC_T_BASE_0) = vtophys(lcp->lc_sgmap) >> 1;
-
-	/* Set up PCI mask register 1; map 8MB space. */
-	REGVAL(LCA_IOC_W_MASK0) = 0x00700000;
-
-	/* Enable window 1; from PCI address 8MB, direct mapped. */
-	REGVAL(LCA_IOC_W_BASE0) = 0x300800000;
-	alpha_mb();
-}
-#endif
 
 void
 lcaattach(parent, self, aux)
@@ -203,21 +210,31 @@ lcaattach(parent, self, aux)
 
 	/*
 	 * set up the chipset's info; done once at console init time
-	 * (maybe), but doesn't hurt to do twice.
+	 * (maybe), but we must do it twice to take care of things
+	 * that need to use memory allocation.
 	 */
 	lcp = sc->sc_lcp = &lca_configuration;
 	lca_init(lcp, 1);
-#ifdef notdef
-	lca_init_sgmap(lcp);
-#endif
 
 	/* XXX print chipset information */
 	printf("\n");
 
-	switch (hwrpb->rpb_type) {
-#if defined(DEC_AXPPCI_33)
+	lca_dma_init(lcp);
+
+	switch (cputype) {
+#ifdef DEC_AXPPCI_33
 	case ST_DEC_AXPPCI_33:
 		pci_axppci_33_pickintr(lcp);
+		break;
+#endif
+#ifdef DEC_ALPHABOOK1
+	case ST_ALPHABOOK1:
+		pci_alphabook1_pickintr(lcp);
+		break;
+#endif
+#ifdef DEC_EB66
+	case ST_EB66:
+		pci_eb66_pickintr(lcp);
 		break;
 #endif
 
@@ -228,8 +245,14 @@ lcaattach(parent, self, aux)
 	pba.pba_busname = "pci";
 	pba.pba_iot = lcp->lc_iot;
 	pba.pba_memt = lcp->lc_memt;
+	pba.pba_dmat =
+	    alphabus_dma_get_tag(&lcp->lc_dmat_direct, ALPHA_BUS_PCI);
 	pba.pba_pc = &lcp->lc_pc;
 	pba.pba_bus = 0;
+#ifdef notyet
+	pba.pba_flags = PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED |
+	    PCI_FLAGS_MRL_OKAY | PCI_FLAGS_MRM_OKAY | PCI_FLAGS_MWI_OKAY;
+#endif
 	config_found(self, &pba, lcaprint);
 }
 
@@ -246,3 +269,29 @@ lcaprint(aux, pnp)
 	printf(" bus %d", pba->pba_bus);
 	return (UNCONF);
 }
+
+#if 0
+int
+lca_bus_get_window(type, window, abst)
+	int type, window;
+	struct alpha_bus_space_translation *abst;
+{
+	struct lca_config *lcp = &lca_configuration;
+	bus_space_tag_t st;
+
+	switch (type) {
+	case ALPHA_BUS_TYPE_PCI_IO:
+		st = &lcp->lc_iot;
+		break;
+
+	case ALPHA_BUS_TYPE_PCI_MEM:
+		st = &lcp->lc_memt;
+		break;
+
+	default:
+		panic("lca_bus_get_window");
+	}
+
+	return (alpha_bus_space_get_window(st, window, abst));
+}
+#endif

@@ -1,8 +1,4 @@
-#	$OpenBSD: RAMDISK,v 1.95 2000/10/17 15:59:06 jason Exp $
-#	from: OpenBSD: INST,v 1.19 1996/11/05 03:49:13 tholo Exp 
-#
-#	Install kernels no longer support X.
-#
+#	$OpenBSD: RAMDISK,v 1.102 2001/04/13 05:43:03 deraadt Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -81,8 +77,14 @@ npx0	at isa? port 0xf0 irq 13	# math coprocessor
 isadma0	at isa?
 isapnp0	at isa?
 
-#pc0	at isa? port 0x60 irq 1		# generic PC console device
-vt0	at isa? port 0x60 irq 1
+pckbc0		at isa?			# PC keyboard controller
+pckbd*		at pckbc?		# PC keyboard
+wskbd*		at pckbd? console ?
+vga0		at isa?
+vga*		at pci? dev ? function ?
+pcdisplay0	at isa?			# CGA, MDA, EGA, HGA
+wsdisplay*	at vga? console ?
+wsdisplay*	at pcdisplay? console ?
 
 pccom0	at isa? port 0x3f8 irq 4	# standard PC serial ports
 pccom1	at isa? port 0x2f8 irq 3
@@ -128,8 +130,10 @@ scsibus* at ahc?
 aic0	at isa? port 0x340 irq 11	# Adaptec 152[02] SCSI controllers
 aic*	at pcmcia? function ?		# PCMCIA based aic SCSI controllers
 scsibus* at aic?
-ncr*	at pci? dev ? function ?	# NCR 538XX SCSI controllers
-scsibus* at ncr?
+#ncr*	at pci? dev ? function ?	# NCR 538XX SCSI controllers(old)
+#scsibus* at ncr?
+siop*	at pci? dev ? function ?	# NCR 538XX SCSI controllers(new)
+scsibus* at siop?
 adv*	at pci? dev ? function ?	# AdvanSys 1200A/B and ULTRA SCSI
 scsibus* at adv?
 #adw*	at pci? dev ? function ?	# AdvanSys ULTRA WIDE SCSI
@@ -215,6 +219,7 @@ tl*	at pci? dev ? function ?		# Compaq Thunderlan ethernet cards
 vr*	at pci? dev ? function ?		# VIA Rhine ethernet
 wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
 dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
+sis*	at pci? dev ? function ?		# SiS 900/7016 ethernet
 
 # Wireless network cards
 wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
@@ -230,6 +235,7 @@ iophy*	at mii? phy ?				# Intel 82553 PHYs
 icsphy*	at mii? phy ?				# ICS 1890 PHYs
 #lxtphy*	at mii? phy ?			# Level1 LXT970 PHYs
 nsphy*	at mii? phy ?				# NS and compatible PHYs
+nsphyter*	at mii? phy ?			# NS and compatible PHYs
 #qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
 #sqphy*	at mii? phy ?				# Seeq 8x220 PHYs
 rlphy* at mii? phy ?				# RealTek 8139 internal PHYs
@@ -237,6 +243,7 @@ rlphy* at mii? phy ?				# RealTek 8139 internal PHYs
 dcphy*	at mii? phy ?				# Digital Clone PHYs
 amphy*	at mii? phy ?				# AMD 79C873 PHYs
 tqphy*	at mii? phy ?				# TDK 78Q212x PHYs
+bmtphy* at mii? phy ?				# Broadcom 10/100 PHYs
 ukphy*	at mii? phy ?				# "unknown" PHYs
 
 pseudo-device	loop	1		# network loopback

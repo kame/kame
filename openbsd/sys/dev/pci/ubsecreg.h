@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubsecreg.h,v 1.7 2000/08/13 22:06:48 deraadt Exp $	*/
+/*	$OpenBSD: ubsecreg.h,v 1.10 2001/02/02 01:00:07 jason Exp $	*/
 
 /*
  * Copyright (c) 2000 Theo de Raadt
@@ -67,7 +67,8 @@
 #define	BS_STAT_MCR2_DONE	0x04000000	/* MCR2 is done */
 
 /* BS_ERR - DMA Error Address */
-#define	BS_ERR_READ		0x00000001	/* fault was on read */
+#define	BS_ERR_ADDR		0xfffffffc	/* error address mask */
+#define	BS_ERR_READ		0x00000002	/* fault was on read */
 
 #define	UBSEC_CARD(sid)		(((sid) & 0xf0000000) >> 28)
 #define	UBSEC_SESSION(sid)	( (sid) & 0x0fffffff)
@@ -120,3 +121,36 @@ struct ubsec_mcr_add {
 #define	UBS_MCR_DONE		0x0001		/* mcr has been processed */
 #define	UBS_MCR_ERROR		0x0002		/* error in processing */
 #define	UBS_MCR_ERRORCODE	0xff00		/* error type */
+
+struct ubsec_keyctx {
+	volatile u_int16_t	ctx_len;	/* command length */
+	volatile u_int16_t	ctx_op;		/* operation code */
+	volatile u_int8_t	ctx_pad[60];	/* padding */
+};
+#define	UBS_CTXOP_DHPKGEN	0x01		/* dh public key generation */
+#define	UBS_CTXOP_DHSSGEN	0x02		/* dh shared secret gen. */
+#define	UBS_CTXOP_RSAPUB	0x03		/* rsa public key op */
+#define	UBS_CTXOP_RSAPRIV	0x04		/* rsa private key op */
+#define	UBS_CTXOP_DSASIGN	0x05		/* dsa signing op */
+#define	UBS_CTXOP_DSAVRFY	0x06		/* dsa verification */
+#define	UBS_CTXOP_RNGBYPASS	0x41		/* rng direct test mode */
+#define	UBS_CTXOP_RNGSHA1	0x42		/* rng sha1 test mode */
+#define	UBS_CTXOP_MODADD	0x43		/* modular addition */
+#define	UBS_CTXOP_MODSUB	0x44		/* modular subtraction */
+#define	UBS_CTXOP_MODMUL	0x45		/* modular multiplication */
+#define	UBS_CTXOP_MODRED	0x46		/* modular reduction */
+#define	UBS_CTXOP_MODEXP	0x47		/* modular exponentiation */
+#define	UBS_CTXOP_MODINV	0x48		/* modular inverse */
+
+struct ubsec_rngbypass_ctx {
+	volatile u_int16_t	rbp_len;	/* command length, 64 */
+	volatile u_int16_t	rbp_op;		/* rng bypass, 0x41 */
+	volatile u_int8_t	rbp_pad[60];	/* padding */
+};
+
+#define UBS_RNGBUFSZ		16
+struct ubsec_rng {
+	struct ubsec_mcr		rng_mcr;
+	struct ubsec_rngbypass_ctx	rng_ctx;
+	volatile u_int32_t		rng_buf[UBS_RNGBUFSZ];
+};

@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxp.c,v 1.10 2000/10/16 17:08:07 aaron Exp $	*/
+/*	$OpenBSD: fxp.c,v 1.13 2001/04/06 04:42:05 csapuntz Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -97,8 +97,6 @@
 #undef vtophys
 #define	vtophys(va)	alpha_XXX_dmamap((vm_offset_t)(va))
 #endif /* __alpha__ */
-
-#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 
 /*
  * NOTE!  On the Alpha, we have an alignment constraint.  The
@@ -403,10 +401,6 @@ fxp_attach_common(sc, enaddr, intrstr)
 	 */
 	ifp->if_snd.ifq_maxlen = FXP_NTXCB - 1;
 	ether_ifattach(ifp);
-#if NBPFILTER > 0
-	bpfattach(&sc->arpcom.ac_if.if_bpf, ifp, DLT_EN10MB,
-	    sizeof(struct ether_header));
-#endif
 
 	/*
 	 * Add shutdown hook so that DMA is disabled prior to reboot. Not
@@ -669,7 +663,8 @@ tbdinit:
 
 			/*
 			 * We ran out of segments. We have to recopy this mbuf
-			 * chain first. Bail out if we can't get the new buffers.
+			 * chain first. Bail out if we can't get the new
+			 * buffers.
 			 */
 			MGETHDR(mn, M_DONTWAIT, MT_DATA);
 			if (mn == NULL) {

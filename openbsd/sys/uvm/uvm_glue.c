@@ -1,3 +1,4 @@
+/*	$OpenBSD: uvm_glue.c,v 1.11 2001/04/03 15:28:06 aaron Exp $	*/
 /*	$NetBSD: uvm_glue.c,v 1.23 1999/05/28 20:49:51 thorpej Exp $	*/
 
 /* 
@@ -294,13 +295,10 @@ uvm_fork(p1, p2, shared, stack, stacksize)
 		panic("uvm_fork: uvm_fault_wire failed: %d", rv);
 
 	/*
-	 * p_stats and p_sigacts currently point at fields in the user
-	 * struct but not at &u, instead at p_addr.  Copy p_sigacts and
-	 * parts of p_stats; zero the rest of p_stats (statistics).
+	 * p_stats currently point at fields in the user struct.  Copy
+	 * parts of p_stats, and zero out the rest.
 	 */
 	p2->p_stats = &up->u_stats;
-	p2->p_sigacts = &up->u_sigacts;
-	up->u_sigacts = *p1->p_sigacts;
 	memset(&up->u_stats.pstat_startzero, 0,
 	(unsigned) ((caddr_t)&up->u_stats.pstat_endzero -
 		    (caddr_t)&up->u_stats.pstat_startzero));
@@ -331,6 +329,7 @@ uvm_exit(p)
 
 	uvmspace_free(p->p_vmspace);
 	uvm_km_free(kernel_map, (vaddr_t)p->p_addr, USPACE);
+	p->p_addr = NULL;
 }
 
 /*
@@ -469,9 +468,7 @@ loop:
 		printf("scheduler: no room for pid %d(%s), free %d\n",
 	   p->p_pid, p->p_comm, uvmexp.free);
 #endif
-	(void) splhigh();
 	uvm_wait("schedpwait");
-	(void) spl0();
 #ifdef DEBUG
 	if (swapdebug & SDB_FOLLOW)
 		printf("scheduler: room again, free %d\n", uvmexp.free);

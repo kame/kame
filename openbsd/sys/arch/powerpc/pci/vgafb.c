@@ -1,4 +1,4 @@
-/*	$OpenBSD: vgafb.c,v 1.6 2000/10/19 03:18:00 drahn Exp $	*/
+/*	$OpenBSD: vgafb.c,v 1.9 2001/02/28 19:12:40 drahn Exp $	*/
 /*	$NetBSD: vga.c,v 1.3 1996/12/02 22:24:54 cgd Exp $	*/
 
 /*
@@ -32,6 +32,7 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+#include <sys/buf.h>
 #include <machine/bus.h>
 #include <dev/cons.h>
 
@@ -108,7 +109,7 @@ struct wsdisplay_emulops vgafb_emulops = {
 };
 
 int vgafb_ioctl __P((void *, u_long, caddr_t, int, struct proc *));
-int vgafb_mmap __P((void *, off_t, int));
+paddr_t vgafb_mmap __P((void *, off_t, int));
 int vgafb_alloc_screen __P((void *, const struct wsscreen_descr *,
 				      void **, int *, int *, long *));
 void vgafb_free_screen __P((void *, void *));
@@ -368,6 +369,10 @@ vgafb_ioctl(v, cmd, data, flag, p)
 		wdf->cmsize = 256;
 		return 0;
 
+	case WSDISPLAYIO_LINEBYTES:
+		*(u_int *)data = cons_linebytes;
+		return 0;
+
 	case WSDISPLAYIO_GETCMAP:
 		return vgafb_getcmap(vc, (struct wsdisplay_cmap *)data);
 
@@ -388,7 +393,7 @@ vgafb_ioctl(v, cmd, data, flag, p)
         return -1;
 }
 
-int
+paddr_t
 vgafb_mmap(v, offset, prot)
 	void *v;
 	off_t offset;

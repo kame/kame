@@ -1,4 +1,4 @@
-/* $OpenBSD: ip_spd.c,v 1.6 2000/10/18 20:35:21 chris Exp $ */
+/* $OpenBSD: ip_spd.c,v 1.18 2001/04/23 10:00:09 art Exp $ */
 
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -30,14 +30,18 @@
 #include <sys/kernel.h>
 #include <sys/queue.h>
 
+#include <machine/cpu.h>
+
 #include <net/if.h>
 #include <net/route.h>
+#include <net/netisr.h>
 
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
+#include <netinet/in_var.h>
 #endif /* INET */
 
 #ifdef INET6
@@ -55,10 +59,6 @@
 #define DPRINTF(x)	if (encdebug) printf x
 #else
 #define DPRINTF(x)
-#endif
-
-#ifndef offsetof
-#define offsetof(s, e) ((int)&((s *)0)->e)
 #endif
 
 /*
@@ -90,7 +90,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
      * If there are no flows in place, there's no point
      * continuing with the SPD lookup.
      */
-    if (!ipsec_in_use)
+    if (!ipsec_in_use && inp == NULL)
     {
 	*error = 0;
 	return NULL;
@@ -278,7 +278,8 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
     {
 #ifdef INET
 	case AF_INET:
-	    if (ipo->ipo_dst.sin.sin_addr.s_addr != INADDR_ANY)
+	    if ((ipo->ipo_dst.sin.sin_addr.s_addr != INADDR_ANY) &&
+		(ipo->ipo_dst.sin.sin_addr.s_addr != INADDR_BROADCAST))
 	    {
 		if (direction == IPSP_DIRECTION_OUT)
 		  bcopy(&ipo->ipo_dst, &sdst, sizeof(union sockaddr_union));
@@ -292,7 +293,9 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 
 #ifdef INET6
 	case AF_INET6:
-	    if (!IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6.sin6_addr))
+	    if ((!IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6.sin6_addr)) &&
+		(!bcmp(&ipo->ipo_dst.sin6.sin6_addr, &in6mask128,
+		       sizeof(in6mask128))))
 	    {
 		if (direction == IPSP_DIRECTION_OUT)
 		  bcopy(&ipo->ipo_dst, &sdst, sizeof(union sockaddr_union));
@@ -367,7 +370,8 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 	    {
 #ifdef INET
 		case AF_INET:
-		    if (ipo->ipo_dst.sin.sin_addr.s_addr == INADDR_ANY)
+		    if ((ipo->ipo_dst.sin.sin_addr.s_addr == INADDR_ANY) ||
+			(ipo->ipo_dst.sin.sin_addr.s_addr == INADDR_BROADCAST))
 		    {
 			*error = 0;
 			return NULL;
@@ -377,7 +381,9 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 
 #ifdef INET6
 		case AF_INET6:
-		    if (IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6.sin6_addr))
+		    if (IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6.sin6_addr) ||
+			!bcmp(&ipo->ipo_dst.sin6.sin6_addr, &in6mask128,
+			      sizeof(in6mask128)))
 		    {
 			*error = 0;
 			return NULL;
@@ -390,23 +396,61 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 	/* Check that the cached TDB (if present), is appropriate */
 	if (ipo->ipo_tdb)
 	{
-	    if (bcmp(&sdst, &ipo->ipo_tdb->tdb_dst, sdst.sa.sa_len))
+	    if (bcmp(&sdst, &ipo->ipo_tdb->tdb_dst, sdst.sa.sa_len) ||
+		(ipo->ipo_last_searched <= ipsec_last_added))
 	    {
 		TAILQ_REMOVE(&ipo->ipo_tdb->tdb_policy_head, ipo,
 			     ipo_tdb_next);
 		ipo->ipo_tdb = NULL;
+		ipo->ipo_last_searched = 0;
 
 		/* Fall through to acquisition of TDB */
 	    }
 	    else
-	      return ipo->ipo_tdb; /* Cached entry is good, we're done */
+	    {
+		return ipo->ipo_tdb; /* Cached entry is good, we're done */
+	    }
 	}
 
 	/*
-	 * If no SA has been added since the last time we did a lookup,
-	 * there's no point searching for one.
+	 * If no SA has been added since the last time we did a
+	 * lookup, there's no point searching for one. However, if the
+	 * destination gateway is left unspecified (or is all-1's),
+	 * always lookup since this is a generic-match rule
+	 * (otherwise, we can have situations where SAs to some
+	 * destinations exist but are not used, possibly leading to an
+	 * explosion in the number of acquired SAs).
 	 */
-	if (ipo->ipo_last_searched <= ipsec_last_added)
+	if (
+#ifdef INET
+	    ((ipo->ipo_dst.sa.sa_family == AF_INET) &&
+	     (ipo->ipo_dst.sin.sin_addr.s_addr != INADDR_ANY) &&
+	     (ipo->ipo_dst.sin.sin_addr.s_addr != INADDR_BROADCAST)) ||
+#endif /* INET */
+#ifdef INET6
+	    ((ipo->ipo_dst.sa.sa_family == AF_INET6) &&
+	     !IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6.sin6_addr) &&
+	     bcmp(&ipo->ipo_dst.sin6.sin6_addr, &in6mask128,
+		  sizeof(in6mask128))) ||
+#endif /* INET6 */
+	    0)
+	{
+	    if (ipo->ipo_last_searched <= ipsec_last_added)
+	    {
+		ipo->ipo_last_searched = time.tv_sec; /* "touch" the entry */
+
+		/* Find an appropriate SA from among the existing SAs */
+		ipo->ipo_tdb = gettdbbyaddr(&sdst, ipo->ipo_sproto, m, af);
+		if (ipo->ipo_tdb)
+		{
+		    TAILQ_INSERT_TAIL(&ipo->ipo_tdb->tdb_policy_head, ipo,
+				      ipo_tdb_next);
+		    *error = 0;
+		    return ipo->ipo_tdb;
+		}
+	    }
+	}
+	else
 	{
 	    ipo->ipo_last_searched = time.tv_sec; /* "touch" the entry */
 
@@ -417,7 +461,6 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		TAILQ_INSERT_TAIL(&ipo->ipo_tdb->tdb_policy_head, ipo,
 				  ipo_tdb_next);
 		*error = 0;
-		ipo->ipo_last_searched = 0;
 		return ipo->ipo_tdb;
 	    }
 	}
@@ -428,7 +471,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 	    case IPSP_IPSEC_REQUIRE:
 		/* Acquire SA through key management */
 		if (ipsp_acquire_sa(ipo, &sdst, signore ? NULL : &ssrc,
-				    ddst) != 0)
+				    ddst, m) != 0)
                 {
                     *error = EACCES;
 		    return NULL;
@@ -443,7 +486,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 	    case IPSP_IPSEC_ACQUIRE:
 		/* Acquire SA through key management */
 		if (ipsp_acquire_sa(ipo, &sdst, signore ? NULL : &ssrc,
-				    ddst) != 0)
+				    ddst, NULL) != 0)
                 {
                     *error = EACCES;
 		    return NULL;
@@ -459,11 +502,14 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
     else /* IPSP_DIRECTION_IN */
     {
 	/* Check the cached entry */
-	if ((ipo->ipo_tdb) && (ipo->ipo_tdb->tdb_src.sa.sa_family != 0) &&
-	    bcmp(&ssrc, &ipo->ipo_tdb->tdb_src, ssrc.sa.sa_len))
+	if ((ipo->ipo_tdb) &&
+	    (((ipo->ipo_tdb->tdb_src.sa.sa_family != 0) &&
+	      bcmp(&ssrc, &ipo->ipo_tdb->tdb_src, ssrc.sa.sa_len)) ||
+	     (ipo->ipo_last_searched <= ipsec_last_added)))
 	{
 	    TAILQ_REMOVE(&ipo->ipo_tdb->tdb_policy_head, ipo, ipo_tdb_next);
 	    ipo->ipo_tdb = NULL;
+	    ipo->ipo_last_searched = 0;
 	}
 
 	switch (ipo->ipo_type)
@@ -512,7 +558,6 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		    {
 			TAILQ_INSERT_TAIL(&ipo->ipo_tdb->tdb_policy_head, ipo,
 					  ipo_tdb_next);
-			ipo->ipo_last_searched = 0;
 			*error = EHOSTUNREACH;
 			return NULL;
 		    }
@@ -521,7 +566,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		/* Acquire SA through key management */
 		if ((*error = ipsp_acquire_sa(ipo, &ssrc,
 					      dignore ? NULL : &sdst,
-					      ddst)) != 0)
+					      ddst, m)) != 0)
 		  return NULL;
 
 		*error = -EINVAL;
@@ -567,7 +612,6 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		    {
 			TAILQ_INSERT_TAIL(&ipo->ipo_tdb->tdb_policy_head, ipo,
 					  ipo_tdb_next);
-			ipo->ipo_last_searched = 0;
 			*error = 0;
 			return NULL;
 		    }
@@ -576,7 +620,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 		/* Acquire SA through key management */
 		if ((*error = ipsp_acquire_sa(ipo, &ssrc,
                                               dignore ? NULL : &sdst,
-					      ddst)) != 0)
+					      ddst, NULL)) != 0)
 		  return NULL;
 
 		/* Just accept the packet */
@@ -608,13 +652,20 @@ ipsp_match_policy(struct tdb *tdb, struct ipsec_policy *ipo,
 	case AF_INET:
 	    if (ipo->ipo_dst.sin.sin_addr.s_addr == INADDR_ANY)
 	      pflag = 1;
+	    else
+	      if (ipo->ipo_dst.sin.sin_addr.s_addr == INADDR_BROADCAST)
+		pflag = 2;
 	    break;
 #endif /* INET */
 
 #ifdef INET6
 	case AF_INET6:
 	    if (IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6.sin6_addr))
-	      pflag = 1;
+		pflag = 1;
+	    else
+	      if (!bcmp(&ipo->ipo_dst.sin6.sin6_addr, &in6mask128,
+			sizeof(in6mask128)))
+		pflag = 2;
 	    break;
 #endif /* INET6 */
 
@@ -631,36 +682,37 @@ ipsp_match_policy(struct tdb *tdb, struct ipsec_policy *ipo,
         bcopy(&ipo->ipo_dst, &peer, sizeof(union sockaddr_union));
     }
     else
-    {
-	bzero(&peer, sizeof(union sockaddr_union));
+      if (pflag == 1)
+      {
+	  bzero(&peer, sizeof(union sockaddr_union));
 
-	/* Need to copy the source address from the packet */
-	switch (af)
-	{
+	  /* Need to copy the source address from the packet */
+	  switch (af)
+	  {
 #ifdef INET
-	    case AF_INET:
-		peer.sin.sin_family = AF_INET;
-		peer.sin.sin_len = sizeof(struct sockaddr_in);
-		m_copydata(m, offsetof(struct ip, ip_src),
-			   sizeof(struct in_addr),
-			   (caddr_t) &peer.sin.sin_addr);
-		break;
+	      case AF_INET:
+		  peer.sin.sin_family = AF_INET;
+		  peer.sin.sin_len = sizeof(struct sockaddr_in);
+		  m_copydata(m, offsetof(struct ip, ip_src),
+			     sizeof(struct in_addr),
+			     (caddr_t) &peer.sin.sin_addr);
+		  break;
 #endif /* INET */
 
 #ifdef INET6
-	    case AF_INET6:
-		peer.sin6.sin6_family = AF_INET6;
-		peer.sin6.sin6_len = sizeof(struct sockaddr_in6);
-		m_copydata(m, offsetof(struct ip6_hdr, ip6_src),
-			   sizeof(struct in6_addr),
-			   (caddr_t) &peer.sin6.sin6_addr);
-		break;
+	      case AF_INET6:
+		  peer.sin6.sin6_family = AF_INET6;
+		  peer.sin6.sin6_len = sizeof(struct sockaddr_in6);
+		  m_copydata(m, offsetof(struct ip6_hdr, ip6_src),
+			     sizeof(struct in6_addr),
+			     (caddr_t) &peer.sin6.sin6_addr);
+		  break;
 #endif /* INET6 */
 
-	    default:
-	        return 0; /* Unknown/unsupported network protocol */
-	}
-    }
+	      default:
+		  return 0; /* Unknown/unsupported network protocol */
+	  }
+      }
 
     /*
      * Does the packet use the right security protocol and is coming from
@@ -668,6 +720,14 @@ ipsp_match_policy(struct tdb *tdb, struct ipsec_policy *ipo,
      */
     if (tdb->tdb_sproto == ipo->ipo_sproto)
     {
+	/*
+	 * We accept any peer that has a valid SA with us -- this means
+	 * we depend on the higher-level (key mgmt.) protocol to enforce
+	 * policy.
+	 */
+	if (pflag == 2)
+	  return 1;
+
 	if (bcmp(&tdb->tdb_src, &peer, tdb->tdb_src.sa.sa_len))
 	{
 	    switch (tdb->tdb_src.sa.sa_family)
@@ -776,6 +836,112 @@ ipsec_add_policy(struct sockaddr_encap *dst, struct sockaddr_encap *mask,
 }
 
 /*
+ * Delete a pending ACQUIRE record.
+ */
+void
+ipsp_delete_acquire(struct ipsec_acquire *ipa)
+{
+    TAILQ_REMOVE(&ipsec_acquire_head, ipa, ipa_next);
+    if (ipa->ipa_packet)
+      m_freem(ipa->ipa_packet);
+    FREE(ipa, M_TDB);
+}
+
+/*
+ * Clear possibly pending ACQUIRE records.
+ */
+void
+ipsp_clear_acquire(struct tdb *tdb)
+{
+    struct ipsec_acquire *ipa;
+    struct ifqueue *ifq;
+    int s;
+
+    while ((ipa = ipsp_pending_acquire(&tdb->tdb_dst)) != NULL)
+    {
+
+	/* Retransmit */
+	if (ipa->ipa_packet)
+	{
+	    switch (ipa->ipa_info.sen_type)
+	    {
+#ifdef INET
+		case SENT_IP4:
+		{
+		    struct ip *ip;
+
+		    switch (ipa->ipa_info.sen_direction)
+		    {
+			case IPSP_DIRECTION_OUT:
+			    ip = mtod(ipa->ipa_packet, struct ip *);
+			    if (ipa->ipa_packet->m_len < sizeof(struct ip))
+			      break;
+
+			    /* Same as in ip_output() -- massage the header */
+			    ip->ip_len = htons((u_short) ip->ip_len);
+			    ip->ip_off = htons((u_short) ip->ip_off);
+			    ipa->ipa_packet->m_flags &= ~(M_MCAST | M_BCAST);
+
+			    ipsp_process_packet(ipa->ipa_packet, tdb,
+						AF_INET, 0, NULL);
+			    ipa->ipa_packet = NULL;
+			    break;
+
+			case IPSP_DIRECTION_IN:
+			    ifq = &ipintrq;
+			    s = splimp();
+			    if (IF_QFULL(ifq))
+			    {
+				IF_DROP(ifq);
+				splx(s);
+				break;
+			    }
+			    IF_ENQUEUE(ifq, ipa->ipa_packet);
+			    ipa->ipa_packet = NULL;
+			    schednetisr(NETISR_IP);
+			    splx(s);
+			    break;
+		    }
+		}
+		 break;
+#endif /* INET */
+
+#ifdef INET6
+		case SENT_IP6:
+		    switch (ipa->ipa_info.sen_ip6_direction)
+		    {
+			case IPSP_DIRECTION_OUT:
+			    ipa->ipa_packet->m_flags &= ~(M_BCAST | M_MCAST);
+			    ipsp_process_packet(ipa->ipa_packet, tdb,
+						AF_INET6, 0, NULL);
+			    ipa->ipa_packet = NULL;
+			    break;
+
+			case IPSP_DIRECTION_IN:
+			    ifq = &ip6intrq;
+			    s = splimp();
+			    if (IF_QFULL(ifq))
+			    {
+				IF_DROP(ifq);
+				splx(s);
+				break;
+			    }
+			    IF_ENQUEUE(ifq, ipa->ipa_packet);
+			    ipa->ipa_packet = NULL;
+			    schednetisr(NETISR_IPV6);
+			    splx(s);
+			    break;
+		    }
+		    break;
+#endif /* INET6 */
+	    }
+	}
+
+	ipsp_delete_acquire(ipa);
+    }
+}
+
+/*
  * Expire old acquire requests to key management.
  */
 void
@@ -788,11 +954,7 @@ ipsp_acquire_expirations(void *arg)
 	 ipa = TAILQ_FIRST(&ipsec_acquire_head))
     {
 	if (ipa->ipa_expire <= time.tv_sec)
-	{
-	    /* Remove from the list and free */
-	    TAILQ_REMOVE(&ipsec_acquire_head, ipa, ipa_next);
-	    FREE(ipa, M_TDB);
-	}
+	  ipsp_delete_acquire(ipa); /* Delete */
 	else
 	{
 	    /* Schedule us for another expiration */
@@ -808,28 +970,49 @@ ipsp_acquire_expirations(void *arg)
 }
 
 /*
- * Signal key management that we need an SA.
+ * Find out if there's an ACQUIRE pending.
+ * XXX Need a better structure.
+ */
+struct ipsec_acquire *
+ipsp_pending_acquire(union sockaddr_union *gw)
+{
+    struct ipsec_acquire *ipa;
+
+    for (ipa = TAILQ_FIRST(&ipsec_acquire_head);
+	 ipa;
+	 ipa = TAILQ_NEXT(ipa, ipa_next))
+    {
+	if (!bcmp(gw, &ipa->ipa_addr, gw->sa.sa_len))
+	  return ipa;
+    }
+
+    return NULL;
+}
+
+/*
+ * Signal key management that we need an SA. If we're given an mbuf, store
+ * it and retransmit the packet if/when we have an SA in place.
  */
 int
 ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
-		union sockaddr_union *laddr, struct sockaddr_encap *ddst)
+		union sockaddr_union *laddr, struct sockaddr_encap *ddst,
+		struct mbuf *m)
 {
     struct ipsec_acquire *ipa;
 #ifdef INET6
     int i;
 #endif
 
-    /*
-     * Check whether request has been made already.
-     * XXX We need a more scalable data structure instead of a list.
-     */
-    for (ipa = TAILQ_FIRST(&ipsec_acquire_head);
-	 ipa;
-	 ipa = TAILQ_NEXT(ipa, ipa_next))
+    /* Check whether request has been made already. */
+    if ((ipa = ipsp_pending_acquire(gw)) != NULL)
     {
-	/* Already in process */
-	if (!bcmp(gw, &ipa->ipa_addr, gw->sa.sa_len))
-	  return 0;
+	if (ipa->ipa_packet && m)
+	{
+	    m_freem(ipa->ipa_packet);
+	    ipa->ipa_packet = m_copym2(m, 0, M_COPYALL, M_DONTWAIT);
+	}
+
+	return 0;
     }
 
     /* Add request in cache and proceed */
@@ -837,10 +1020,13 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	   M_TDB, M_DONTWAIT);
     if (ipa == NULL)
       return ENOMEM;
+
+    bzero(ipa, sizeof(struct ipsec_acquire));
     bcopy(gw, &ipa->ipa_addr, sizeof(union sockaddr_union));
 
     ipa->ipa_info.sen_len = ipa->ipa_mask.sen_len = SENT_LEN;
     ipa->ipa_info.sen_family = ipa->ipa_mask.sen_family = PF_KEY;
+
     /* Just copy the right information */
     switch (ipo->ipo_addr.sen_type)
     {
@@ -851,7 +1037,8 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	    ipa->ipa_mask.sen_direction = ipo->ipo_mask.sen_direction;
 
 	    if (ipo->ipo_mask.sen_ip_src.s_addr == INADDR_ANY ||
-		ipo->ipo_addr.sen_ip_src.s_addr == INADDR_ANY)
+		ipo->ipo_addr.sen_ip_src.s_addr == INADDR_ANY ||
+		ipo->ipo_dst.sa.sa_family == 0)
 	    {
 		ipa->ipa_info.sen_ip_src = ddst->sen_ip_src;
 		ipa->ipa_mask.sen_ip_src.s_addr = INADDR_BROADCAST;
@@ -863,7 +1050,8 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	    }
 
 	    if (ipo->ipo_mask.sen_ip_dst.s_addr == INADDR_ANY ||
-		ipo->ipo_addr.sen_ip_dst.s_addr == INADDR_ANY)
+		ipo->ipo_addr.sen_ip_dst.s_addr == INADDR_ANY ||
+		ipo->ipo_dst.sa.sa_family == 0)
 	    {
 		ipa->ipa_info.sen_ip_dst = ddst->sen_ip_dst;
 		ipa->ipa_mask.sen_ip_dst.s_addr = INADDR_BROADCAST;
@@ -874,42 +1062,17 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 		ipa->ipa_mask.sen_ip_dst = ipo->ipo_mask.sen_ip_dst;
 	    }
 
-	    if (ipo->ipo_mask.sen_proto)
-	    {
-		ipa->ipa_info.sen_proto = ipo->ipo_addr.sen_proto;
-		ipa->ipa_mask.sen_proto = ipo->ipo_mask.sen_proto;
-	    }
-	    else
-	    {
-		ipa->ipa_info.sen_proto = ddst->sen_proto;
-		if (ddst->sen_proto)
-		  ipa->ipa_mask.sen_proto = 0xff;
-	    }
+	    ipa->ipa_info.sen_proto = ipo->ipo_addr.sen_proto;
+	    ipa->ipa_mask.sen_proto = ipo->ipo_mask.sen_proto;
 
-	    if (ipo->ipo_mask.sen_sport)
+	    if (ipo->ipo_addr.sen_proto)
 	    {
 		ipa->ipa_info.sen_sport = ipo->ipo_addr.sen_sport;
 		ipa->ipa_mask.sen_sport = ipo->ipo_mask.sen_sport;
-	    }
-	    else
-	    {
-		ipa->ipa_info.sen_sport = ddst->sen_sport;
-		if (ddst->sen_sport)
-		  ipa->ipa_mask.sen_sport = 0xffff;
-	    }
 
-	    if (ipo->ipo_mask.sen_dport)
-	    {
 		ipa->ipa_info.sen_dport = ipo->ipo_addr.sen_dport;
 		ipa->ipa_mask.sen_dport = ipo->ipo_mask.sen_dport;
 	    }
-	    else
-	    {
-		ipa->ipa_info.sen_dport = ddst->sen_dport;
-		if (ddst->sen_dport)
-		  ipa->ipa_mask.sen_dport = 0xffff;
-	    }
-	    
 	    break;
 #endif /* INET */
 
@@ -920,7 +1083,8 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	    ipa->ipa_mask.sen_ip6_direction = ipo->ipo_mask.sen_ip6_direction;
 
 	    if (IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_mask.sen_ip6_src) ||
-		IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_addr.sen_ip6_src))
+		IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_addr.sen_ip6_src) ||
+		ipo->ipo_dst.sa.sa_family == 0)
 	    {
 		ipa->ipa_info.sen_ip6_src = ddst->sen_ip6_src;
 		for (i = 0; i < 16; i++)
@@ -933,7 +1097,8 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	    }
 
 	    if (IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_mask.sen_ip6_dst) ||
-		IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_addr.sen_ip6_dst))
+		IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_addr.sen_ip6_dst) ||
+		ipo->ipo_dst.sa.sa_family == 0)
 	    {
 		ipa->ipa_info.sen_ip6_dst = ddst->sen_ip6_dst;
 		for (i = 0; i < 16; i++)
@@ -945,42 +1110,16 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 		ipa->ipa_mask.sen_ip6_dst = ipo->ipo_mask.sen_ip6_dst;
 	    }
 
-	    if (ipo->ipo_mask.sen_ip6_proto)
-	    {
-		ipa->ipa_info.sen_ip6_proto = ipo->ipo_addr.sen_ip6_proto;
-		ipa->ipa_mask.sen_ip6_proto = ipo->ipo_mask.sen_ip6_proto;
-	    }
-	    else
-	    {
-		ipa->ipa_info.sen_ip6_proto = ddst->sen_ip6_proto;
-		if (ddst->sen_ip6_proto)
-		  ipa->ipa_mask.sen_ip6_proto = 0xff;
-	    }
+	    ipa->ipa_info.sen_ip6_proto = ipo->ipo_addr.sen_ip6_proto;
+	    ipa->ipa_mask.sen_ip6_proto = ipo->ipo_mask.sen_ip6_proto;
 
-	    if (ipo->ipo_mask.sen_ip6_sport)
+	    if (ipo->ipo_mask.sen_ip6_proto)
 	    {
 		ipa->ipa_info.sen_ip6_sport = ipo->ipo_addr.sen_ip6_sport;
 		ipa->ipa_mask.sen_ip6_sport = ipo->ipo_mask.sen_ip6_sport;
-	    }
-	    else
-	    {
-		ipa->ipa_info.sen_ip6_sport = ddst->sen_ip6_sport;
-		if (ddst->sen_ip6_sport)
-		  ipa->ipa_mask.sen_ip6_sport = 0xffff;
-	    }
-
-	    if (ipo->ipo_mask.sen_ip6_dport)
-	    {
 		ipa->ipa_info.sen_ip6_dport = ipo->ipo_addr.sen_ip6_dport;
 		ipa->ipa_mask.sen_ip6_dport = ipo->ipo_mask.sen_ip6_dport;
 	    }
-	    else
-	    {
-		ipa->ipa_info.sen_ip6_dport = ddst->sen_ip6_dport;
-		if (ddst->sen_ip6_dport)
-		  ipa->ipa_mask.sen_ip6_dport = 0xffff;
-	    }
-
 	    break;
 #endif /* INET6 */
 
@@ -988,6 +1127,13 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
 	    FREE(ipa, M_TDB);
 	    return 0;
     }
+
+    /*
+     * Store the packet for eventual retransmission -- failure is not
+     * catastrophic.
+     */
+    if (m)
+      ipa->ipa_packet = m_copym2(m, 0, M_COPYALL, M_DONTWAIT);
 
     ipa->ipa_expire = time.tv_sec + ipsec_expire_acquire;
     TAILQ_INSERT_TAIL(&ipsec_acquire_head, ipa, ipa_next);
@@ -1000,6 +1146,10 @@ ipsp_acquire_sa(struct ipsec_policy *ipo, union sockaddr_union *gw,
     return pfkeyv2_acquire(ipo, gw, laddr, &ipa->ipa_seq, ddst);
 }
 
+/*
+ * Find a pending ACQUIRE record based on its sequence number.
+ * XXX Need to use a better data structure.
+ */
 struct ipsec_acquire *
 ipsec_get_acquire(u_int32_t seq)
 {

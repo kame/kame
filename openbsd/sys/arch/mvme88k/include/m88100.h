@@ -1,4 +1,4 @@
-/*	$OpenBSD: m88100.h,v 1.4 1999/02/09 06:36:26 smurph Exp $ */
+/*	$OpenBSD: m88100.h,v 1.7 2001/03/07 23:37:16 miod Exp $ */
 /* 
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -31,8 +31,8 @@
  * M88100 flags
  */
 
-#ifndef _M88100_H_
-#define _M88100_H_
+#ifndef __MACHINE_M88100_H__
+#define __MACHINE_M88100_H__
 
 
 /*
@@ -40,6 +40,7 @@
  */
 
 /* DMT0, DMT1, DMT2 */
+#define DMT_SKIP	0x00010000	/* skip this dmt in data_access_emulation */
 #define DMT_BO		0x00008000	/* Byte-Ordering */
 #define DMT_DAS		0x00004000	/* Data Access Space */
 #define DMT_DOUB1	0x00002000	/* Double Word */
@@ -50,21 +51,26 @@
 #define DMT_WRITE	0x00000002	/* Read/Write Transaction Bit */
 #define	DMT_VALID	0x00000001	/* Valid Transaction Bit */
 
-#ifndef	ASSEMBLER
+#ifndef	_LOCORE
 #include "sys/types.h"
 
+/* dmt_skip is never set by the cpu.  It is used to 
+ * mark 'known' transactions so that they don't get 
+ * prosessed by data_access_emulation().  XXX smurph 
+ */
 struct dmt_reg {
-    unsigned int :16,
-	  dmt_bo:1,
-          dmt_das:1,
-	  dmt_doub1:1,
-	  dmt_lockbar:1,
-	  dmt_dreg:5,
-	  dmt_signed:1,
-	  dmt_en:4,
-	  dmt_write:1,
-	  dmt_valid:1;
+	unsigned int :15,
+	dmt_skip:1,   
+	dmt_bo:1,
+	dmt_das:1,
+	dmt_doub1:1,
+	dmt_lockbar:1,
+	dmt_dreg:5,
+	dmt_signed:1,
+	dmt_en:4,
+	dmt_write:1,
+	dmt_valid:1;
 };
 #endif 
 
-#endif  _M88100_H_
+#endif __MACHINE_M88100_H__

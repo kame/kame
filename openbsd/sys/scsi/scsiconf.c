@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.c,v 1.52 2000/04/18 05:53:17 csapuntz Exp $	*/
+/*	$OpenBSD: scsiconf.c,v 1.55 2001/01/22 19:11:48 csapuntz Exp $	*/
 /*	$NetBSD: scsiconf.c,v 1.57 1996/05/02 01:09:01 neil Exp $	*/
 
 /*
@@ -163,6 +163,8 @@ scsibusattach(parent, self, aux)
 	if (sb->adapter_link->adapter_buswidth == 0)
 		sb->adapter_link->adapter_buswidth = 8;
 	sb->sc_buswidth = sb->adapter_link->adapter_buswidth;
+	if (sb->adapter_link->luns == 0)
+		sb->adapter_link->luns = 8;
 
 	printf(": %d targets\n", sb->sc_buswidth);
 
@@ -292,7 +294,7 @@ scsi_probe_bus(bus, target, lun)
 	}
 
 	if (lun == -1) {
-		maxlun = 7;
+		maxlun = scsi->adapter_link->luns - 1;
 		minlun = 0;
 	} else {
 		if (lun < 0 || lun > 7)
@@ -571,9 +573,9 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
         {{T_CDROM, T_REMOV,
          "ALPS ELECTRIC CO.,LTD. DC544C", "", "SW03D"}, ADEV_NOTUR},
         {{T_CDROM, T_REMOV,
-         "BCD-16X 1997-04-25", "", "VER 2.2"},  SDEV_NOSTARTUNIT},
+         "BCD-16X", "", ""},                    SDEV_NOSTARTUNIT},
         {{T_CDROM, T_REMOV,
-         "BCD-24X 1997-06-27", "", "VER 2.0"},  SDEV_NOSTARTUNIT},
+         "BCD-24X", "", ""},                    SDEV_NOSTARTUNIT},
         {{T_CDROM, T_REMOV,
          "CR-2801TE", "", "1.07"},              ADEV_NOSENSE},
         {{T_CDROM, T_REMOV,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.21 2000/06/08 09:46:27 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.23 2001/04/03 20:25:35 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.50 1996/10/13 21:37:49 jonathan Exp $	*/
 
 /*
@@ -561,7 +561,7 @@ trap(statusReg, causeReg, vadr, pc, args)
 		rv = vm_fault(map, va, ftype, FALSE);
 #ifdef VMFAULT_TRACE
 		printf("vm_fault(%x (pmap %x), %x (%x), %x, %d) -> %x at pc %x\n",
-		       map, &vm->vm_pmap, va, vadr, ftype, FALSE, rv, pc);
+		       map, vm->vm_map.pmap, va, vadr, ftype, FALSE, rv, pc);
 #endif
 		/*
 		 * If this was a stack access we keep track of the maximum
@@ -658,7 +658,7 @@ trap(statusReg, causeReg, vadr, pc, args)
 #endif
 #ifdef KTRACE
 					if (KTRPOINT(p, KTR_SYSCALL))
-						ktrsyscall(p->p_tracep, code,
+						ktrsyscall(p, code,
 							callp->sy_argsize,
 							args.i);
 #endif
@@ -693,7 +693,7 @@ trap(statusReg, causeReg, vadr, pc, args)
 #endif
 #ifdef KTRACE
 					if (KTRPOINT(p, KTR_SYSCALL))
-						ktrsyscall(p->p_tracep, code,
+						ktrsyscall(p, code,
 							callp->sy_argsize,
 							args.i);
 #endif
@@ -725,7 +725,7 @@ trap(statusReg, causeReg, vadr, pc, args)
 #endif
 #ifdef KTRACE
 					if (KTRPOINT(p, KTR_SYSCALL))
-						ktrsyscall(p->p_tracep, code,
+						ktrsyscall(p, code,
 							callp->sy_argsize,
 							args.i);
 #endif
@@ -738,7 +738,7 @@ trap(statusReg, causeReg, vadr, pc, args)
 #endif
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_SYSCALL))
-			ktrsyscall(p->p_tracep, code, callp->sy_argsize, args.i);
+			ktrsyscall(p, code, callp->sy_argsize, args.i);
 #endif
 		rval[0] = 0;
 		rval[1] = locr0[V1];
@@ -801,7 +801,7 @@ trap(statusReg, causeReg, vadr, pc, args)
 #endif
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_SYSRET))
-			ktrsysret(p->p_tracep, code, i, rval[0]); /*XXX*/
+			ktrsysret(p, code, i, rval[0]); /*XXX*/
 #endif
 		goto out;
 	    }

@@ -1,8 +1,11 @@
+#ifndef __MACHINE_VID_H__
+#define __MACHINE_VID_H__
+
 #define START_BLOCK 1
 #define LOADER_SIZE 2
 #define LOADER_ADDRESS 0x1F0000
 
-#ifndef __ASSEMBLER__
+#ifndef _LOCORE
 struct vid {
 	unsigned char	vid_id[4];
 	unsigned char	vid_0[16];
@@ -54,3 +57,4 @@ struct cfg {
 	unsigned char	cfg_4[196];
 };
 #endif
+#endif __MACHINE_VID_H__

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_page.h,v 1.10 1999/12/30 18:21:56 provos Exp $	*/
+/*	$OpenBSD: vm_page.h,v 1.12 2001/04/07 17:13:44 niklas Exp $	*/
 /*	$NetBSD: vm_page.h,v 1.24 1998/02/10 14:09:03 mrg Exp $	*/
 
 /* 
@@ -104,16 +104,14 @@
  * fields were dumped and all the flags were lumped into one short.
  * that is fine for a single threaded uniprocessor OS, but bad if you
  * want to actual make use of locking (simple_lock's).  so, we've
- * seperated things back out again.
+ * separated things back out again.
  *
  * note the page structure has no lock of its own.
  */
 
 #include <uvm/uvm_extern.h>
-#include <vm/pglist.h>
-#else
-TAILQ_HEAD(pglist, vm_page);
 #endif /* UVM */
+#include <vm/pglist.h>
 
 struct vm_page {
   TAILQ_ENTRY(vm_page)	pageq;		/* queue info for FIFO

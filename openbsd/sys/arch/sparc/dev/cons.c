@@ -1,4 +1,4 @@
-/*	$OpenBSD: cons.c,v 1.9 2000/07/06 15:42:48 ho Exp $	*/
+/*	$OpenBSD: cons.c,v 1.11 2001/03/03 23:36:05 provos Exp $	*/
 /*	$NetBSD: cons.c,v 1.30 1997/07/07 23:30:23 pk Exp $	*/
 
 /*
@@ -297,41 +297,43 @@ cnopen(dev, flag, mode, p)
 		/*
 		 * get the console struct winsize.
 		 */
-#ifdef RASTERCONSOLE
 		if (fbconstty) {
+#ifdef RASTERCONSOLE
 			rows = fbrcons_rows();
 			cols = fbrcons_cols();
-		}
+#else
+			if (CPU_ISSUN4COR4M) {
+				int i;
+				char *prop;
+
+				if (rows == 0 &&
+				    (prop = getpropstring(optionsnode,
+				    "screen-#rows"))) {
+					i = 0;
+					while (*prop != '\0')
+						i = i * 10 + *prop++ - '0';
+					rows = (unsigned short)i;
+				}
+				if (cols == 0 &&
+				    (prop = getpropstring(optionsnode,
+				    "screen-#columns"))) {
+					i = 0;
+					while (*prop != '\0')
+						i = i * 10 + *prop++ - '0';
+					cols = (unsigned short)i;
+				}
+			}
+			if (CPU_ISSUN4) {
+				struct eeprom *ep = (struct eeprom *)eeprom_va;
+
+				if (ep) {
+					if (rows == 0)
+						rows = (u_short)ep->eeTtyRows;
+					if (cols == 0)
+						cols = (u_short)ep->eeTtyCols;
+				}
+			}
 #endif
-
-		if (CPU_ISSUN4COR4M) {
-			int i;
-			char *prop;
-
-			if (rows == 0 &&
-			    (prop = getpropstring(optionsnode, "screen-#rows"))) {
-				i = 0;
-				while (*prop != '\0')
-					i = i * 10 + *prop++ - '0';
-				rows = (unsigned short)i;
-			}
-			if (cols == 0 &&
-			    (prop = getpropstring(optionsnode, "screen-#columns"))) {
-				i = 0;
-				while (*prop != '\0')
-					i = i * 10 + *prop++ - '0';
-				cols = (unsigned short)i;
-			}
-		}
-		if (CPU_ISSUN4) {
-			struct eeprom *ep = (struct eeprom *)eeprom_va;
-
-			if (ep) {
-				if (rows == 0)
-					rows = (u_short)ep->eeTtyRows;
-				if (cols == 0)
-					cols = (u_short)ep->eeTtyCols;
-			}
 		}
 		firstopen = 0;
 	}
@@ -434,6 +436,16 @@ cnselect(dev, which, p)
 {
 
 	return (ttselect(makedev(major(dev), 0), which, p));
+}
+
+int
+cnkqfilter(dev, kn)
+	dev_t dev;
+	struct knote *kn;
+{
+	if (cdevsw[major(dev)].d_type & D_KQFILTER)
+		return ((*cdevsw[major(dev)].d_kqfilter)(makedev(major(dev), 0), kn));
+	return (1);
 }
 
 /*

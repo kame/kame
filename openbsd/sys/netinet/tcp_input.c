@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.79 2000/10/14 01:04:10 itojun Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.84 2001/04/04 05:42:57 itojun Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -81,8 +81,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #ifdef IPSEC
 #include <netinet/ip_ipsp.h>
 #endif /* IPSEC */
-
-#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
 
 #ifdef INET6
 #include <netinet6/in6_var.h>
@@ -319,7 +317,7 @@ done:
 	splx(s);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 int
 tcp6_input(mp, offp, proto)
 	struct mbuf **mp;
@@ -400,12 +398,6 @@ tcp_input(m, va_alist)
 #endif /* IPSEC */
 	int af;
 
-#ifdef IPSEC
-	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
-	if (tdbi == (void *) PI_MAGIC)
-	        tdbi = NULL;
-#endif /* IPSEC */
-
 	va_start(ap, m);
 	iphlen = va_arg(ap, int);
 	va_end(ap);
@@ -426,10 +418,6 @@ tcp_input(m, va_alist)
 		af = AF_INET;
 		break;
 	default:
-#ifdef IPSEC
-	        if (tdbi)
-		        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 		m_freem(m);
 		return;	/*EAFNOSUPPORT*/
 	}
@@ -442,10 +430,6 @@ tcp_input(m, va_alist)
 	case AF_INET:
 #ifdef DIAGNOSTIC
 		if (iphlen < sizeof(struct ip)) {
-#ifdef IPSEC
-		        if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			m_freem(m);
 			return;
 		}
@@ -456,10 +440,6 @@ tcp_input(m, va_alist)
 			iphlen = sizeof(struct ip);
 #else
 			printf("extension headers are not allowed\n");
-#ifdef IPSEC
-		        if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			m_freem(m);
 			return;
 #endif
@@ -470,10 +450,6 @@ tcp_input(m, va_alist)
 #ifdef DIAGNOSTIC
 		if (iphlen < sizeof(struct ip6_hdr)) {
 			m_freem(m);
-#ifdef IPSEC
-			if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			return;
 		}
 #endif /* DIAGNOSTIC */
@@ -483,10 +459,6 @@ tcp_input(m, va_alist)
 			iphlen = sizeof(struct ip6_hdr);
 #else
 			printf("extension headers are not allowed\n");
-#ifdef IPSEC
-		        if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			m_freem(m);
 			return;
 #endif
@@ -494,10 +466,6 @@ tcp_input(m, va_alist)
 		break;
 #endif
 	default:
-#ifdef IPSEC
-	        if (tdbi)
-		        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 		m_freem(m);
 		return;
 	}
@@ -506,10 +474,6 @@ tcp_input(m, va_alist)
 		m = m_pullup2(m, iphlen + sizeof(struct tcphdr));
 		if (m == 0) {
 			tcpstat.tcps_rcvshort++;
-#ifdef IPSEC
-		        if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			return;
 		}
 	}
@@ -597,10 +561,6 @@ tcp_input(m, va_alist)
 		if (m->m_len < iphlen + off) {
 			if ((m = m_pullup2(m, iphlen + off)) == 0) {
 				tcpstat.tcps_rcvshort++;
-#ifdef IPSEC
-				if (tdbi)
-			                free(tdbi, M_TEMP);
-#endif /* IPSEC */
 				return;
 			}
 			switch (af) {
@@ -781,8 +741,6 @@ findpcb:
 #ifdef INET6
 			case AF_INET6:
 				inp->inp_laddr6 = ipv6->ip6_dst;
-				inp->inp_fflowinfo =
-				    htonl(0x0fffffff) & ipv6->ip6_flow;
 				
 				/*inp->inp_options = ip6_srcroute();*/ /* soon. */
 				/*
@@ -803,14 +761,14 @@ findpcb:
 			tp = intotcpcb(inp);
 			tp->t_state = TCPS_LISTEN;
 
-			/* Compute proper scaling value from buffer space
-			 */
+			/* Compute proper scaling value from buffer space */
 			tcp_rscale(tp, so->so_rcv.sb_hiwat);
 		}
 	}
 
 #ifdef IPSEC
         s = splnet();
+	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
         if (tdbi == NULL)
                 tdb = NULL;
         else
@@ -818,11 +776,18 @@ findpcb:
 
 	ipsp_spd_lookup(m, af, iphlen, &error, IPSP_DIRECTION_IN,
 			tdb, inp);
-        splx(s);
 
-	if (tdbi)
-	        free(tdbi, M_TEMP);
-	tdbi = NULL;
+	/* Latch SA */
+	if (inp->inp_tdb_in != tdb) {
+		if (tdb)
+		        tdb_add_inp(tdb, inp, 1);
+		else { /* Just reset */
+		        TAILQ_REMOVE(&inp->inp_tdb_in->tdb_inp_in, inp,
+				     inp_tdb_in_next);
+			inp->inp_tdb_in = NULL;
+		}
+	}
+        splx(s);
 
 	/* Error or otherwise drop-packet indication */
 	if (error)
@@ -1140,13 +1105,14 @@ findpcb:
 
 		if (iss)
 			tp->iss = iss;
-		else
-			tp->iss = tcp_iss;
+		else {
 #ifdef TCP_COMPAT_42
-		tcp_iss += TCP_ISSINCR/2;
+			tcp_iss += TCP_ISSINCR/2;
+			tp->iss = tcp_iss;
 #else /* TCP_COMPAT_42 */
-		tcp_iss += arc4random() % TCP_ISSINCR + 1;
+			tp->iss = tcp_rndiss_next();
 #endif /* !TCP_COMPAT_42 */
+		}
 		tp->irs = th->th_seq;
 		tcp_sendseqinit(tp);
 #if defined (TCP_SACK)
@@ -2119,11 +2085,6 @@ dropwithreset:
 	return;
 
 drop:
-#ifdef IPSEC
-	if (tdbi)
-	        free(tdbi, M_TEMP);
-#endif
-
 	/*
 	 * Drop space held by incoming segment and return.
 	 */
@@ -2800,9 +2761,7 @@ tcp_mss(tp, offer)
 	struct ifnet *ifp;
 	int mss, mssopt;
 	int iphlen;
-#ifdef INET6
 	int is_ipv6 = 0;
-#endif
 	struct inpcb *inp;
 
 	inp = tp->t_inpcb;
@@ -2851,24 +2810,31 @@ tcp_mss(tp, offer)
 		 * destination host.
 		 */
 		goto out;
-	else if (ip_mtudisc || ifp->if_flags & IFF_LOOPBACK)
+	else if (ifp->if_flags & IFF_LOOPBACK)
 		mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+	else if (!is_ipv6) {
+		if (ip_mtudisc)
+			mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+		else if (inp && in_localaddr(inp->inp_faddr))
+			mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+	}
 #ifdef INET6
 	else if (is_ipv6) {
-		if (IN6_IS_ADDR_V4MAPPED(&inp->inp_faddr6)) {
+		if (inp && IN6_IS_ADDR_V4MAPPED(&inp->inp_faddr6)) {
 			/* mapped addr case */
 			struct in_addr d;
 			bcopy(&inp->inp_faddr6.s6_addr32[3], &d, sizeof(d));
-			if (in_localaddr(d))
+			if (ip_mtudisc || in_localaddr(d))
 				mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 		} else {
-			if (in6_localaddr(&inp->inp_faddr6))
-				mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+			/*
+			 * for IPv6, path MTU discovery is always turned on,
+			 * or the node must use packet size <= 1280.
+			 */
+			mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 		}
 	}
 #endif /* INET6 */
-	else if (inp && in_localaddr(inp->inp_faddr))
-		mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 
 	/* Calculate the value that we offer in TCPOPT_MAXSEG */
 	if (offer != -1) {

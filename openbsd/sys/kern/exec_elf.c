@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.c,v 1.29 2000/01/01 21:11:18 mickey Exp $	*/
+/*	$OpenBSD: exec_elf.c,v 1.31 2001/01/22 14:25:03 art Exp $	*/
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
@@ -536,10 +536,10 @@ exec_elf_makecmds(p, epp)
 			    0;
 	if (!error)
 		p->p_os = os;
-#ifndef NATIVE_ELF
+#ifndef NATIVE_EXEC_ELF
 	else
 		goto bad;
-#endif /* NATIVE_ELF */
+#endif /* NATIVE_EXEC_ELF */
 
 	/*
 	 * Load all the necessary sections
@@ -700,7 +700,7 @@ exec_elf_fixup(p, epp)
 	 * Push extra arguments on the stack needed by dynamically
 	 * linked binaries
 	 */
-	if(error == 0) {
+	if (error == 0) {
 		a = ai;
 
 		a->au_id = AUX_phdr;

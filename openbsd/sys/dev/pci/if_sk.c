@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sk.c,v 1.9 2000/10/16 17:08:08 aaron Exp $	*/
+/*	$OpenBSD: if_sk.c,v 1.12 2001/03/29 16:02:18 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
@@ -43,8 +43,10 @@
  *	The SysKonnect GEnesis manual, http://www.syskonnect.com
  *
  * Note: XaQti has been aquired by Vitesse, and Vitesse does not have the
- * XMAC II datasheet online. I have put my copy at www.freebsd.org as a
- * convience to others until Vitesse corrects this problem.
+ * XMAC II datasheet online. I have put my copy at people.freebsd.org as a
+ * convience to others until Vitesse corrects this problem:
+ *
+ * http://people.freebsd.org/~wpaul/SysKonnect/xmacii_datasheet_rev_c_9-29.pdf
  *
  * Written by Bill Paul <wpaul@ee.columbia.edu>
  * Department of Electrical Engineering
@@ -989,10 +991,6 @@ sk_attach(parent, self, aux)
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
-#if NBPFILTER > 0
-	bpfattach(&sc_if->arpcom.ac_if.if_bpf, ifp,
-	    DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	return;
 
 fail:
@@ -1086,11 +1084,11 @@ skc_attach(parent, self, aux)
 	 */
 	if (pci_io_find(pc, pa->pa_tag, SK_PCI_LOIO, &iobase, &iosize)) {
 		printf(": can't find i/o space\n");
-		return;
+		goto fail;
 	}
 	if (bus_space_map(pa->pa_iot, iobase, iosize, 0, &sc->sk_bhandle)) {
 		printf(": can't map i/o space\n");
-		return;
+		goto fail;
 	}
 	sc->sk_btag = pa->pa_iot;
 #else
@@ -1114,7 +1112,7 @@ skc_attach(parent, self, aux)
 	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
 	    pa->pa_intrline, &ih)) {
 		printf(": couldn't map interrupt\n");
-		return;
+		goto fail;
 	}
 
 	intrstr = pci_intr_string(pc, ih);
@@ -1124,7 +1122,7 @@ skc_attach(parent, self, aux)
 		printf(": couldn't establish interrupt");
 		if (intrstr != NULL)
 			printf(" at %s", intrstr);
-		return;
+		goto fail;
 	}
 	printf(": %s\n", intrstr);
 
@@ -1517,7 +1515,8 @@ sk_intr_bcom(sc_if)
 		if (!(lstat & BRGPHY_AUXSTS_LINK) && sc_if->sk_link) {
 			mii_mediachg(mii);
 			/* Turn off the link LED. */
-			SK_IF_WRITE_1(sc_if, 0, SK_LINKLED1_CTL, SK_LINKLED_OFF);
+			SK_IF_WRITE_1(sc_if, 0,
+			    SK_LINKLED1_CTL, SK_LINKLED_OFF);
 			sc_if->sk_link = 0;
 		} else if (status & BRGPHY_ISR_LNK_CHG) {
 			sk_miibus_writereg((struct device *)sc_if,
@@ -1528,6 +1527,7 @@ sk_intr_bcom(sc_if)
 			SK_IF_WRITE_1(sc_if, 0, SK_LINKLED1_CTL,
 			    SK_LINKLED_ON|SK_LINKLED_LINKSYNC_OFF|
 			    SK_LINKLED_BLINK_OFF);
+			mii_pollstat(mii);
 		} else {
 			mii_tick(mii);
 			timeout_add(&sc_if->sk_tick_ch, hz);
@@ -1912,6 +1912,7 @@ void sk_init(xsc)
 	SK_IF_WRITE_4(sc_if, 0, SK_RXQ1_BMU_CSR, SK_RXBMU_RX_START);
 
 	/* Enable XMACs TX and RX state machines */
+	SK_XM_CLRBIT_2(sc_if, XM_MMUCMD, XM_MMUCMD_IGNPAUSE);
 	SK_XM_SETBIT_2(sc_if, XM_MMUCMD, XM_MMUCMD_TX_ENB|XM_MMUCMD_RX_ENB);
 
 	ifp->if_flags |= IFF_RUNNING;

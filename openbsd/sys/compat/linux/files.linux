@@ -1,4 +1,4 @@
-#	$OpenBSD: files.linux,v 1.10 2000/07/07 02:13:40 jasoni Exp $
+#	$OpenBSD: files.linux,v 1.13 2001/04/09 06:53:44 tholo Exp $
 #	$NetBSD: files.linux,v 1.4 1996/03/08 04:55:59 mycroft Exp $
 #
 # Config.new file description for machine-independent Linux compat code.
@@ -7,16 +7,21 @@
 # ports should define any machine-specific files they need in their
 # own file lists.
 
+file	compat/linux/linux_blkio.c		compat_linux
 file	compat/linux/linux_cdrom.c		compat_linux
 file	compat/linux/linux_error.c		compat_linux
 file	compat/linux/linux_exec.c		compat_linux
+file	compat/linux/linux_fdio.c		compat_linux
 file	compat/linux/linux_file.c		compat_linux
+file	compat/linux/linux_file64.c		compat_linux
 file	compat/linux/linux_getcwd.c		compat_linux
+file	compat/linux/linux_hdio.c		compat_linux
 file	compat/linux/linux_ioctl.c		compat_linux
 file	compat/linux/linux_ipc.c		compat_linux
 file	compat/linux/linux_misc.c		compat_linux
 file	compat/linux/linux_mount.c		compat_linux
 file	compat/linux/linux_resource.c		compat_linux
+file	compat/linux/linux_sched.c		compat_linux
 file	compat/linux/linux_signal.c		compat_linux
 file	compat/linux/linux_socket.c		compat_linux
 file	compat/linux/linux_syscalls.c		compat_linux & syscall_debug

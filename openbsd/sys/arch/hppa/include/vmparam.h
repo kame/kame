@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.9 1999/09/18 20:05:55 mickey Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.11 2001/03/22 23:50:53 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -74,7 +74,7 @@
 #define	DMMAX	4096			/* largest potential swap allocation */
 
 #ifndef USRIOSIZE
-#define	USRIOSIZE	128
+#define	USRIOSIZE	((2*HPPA_PGALIAS)/CLBYTES)	/* 2mb */
 #endif
 
 /*
@@ -141,4 +141,11 @@
 #define	MACHINE_NEW_NONCONTIG	1	/* defined this until we rely on vm */
 #define	PMAP_NEW
 
+#ifdef _KERNEL
+struct pmap_physseg {
+	struct pv_entry *pvent;
+};
+#endif
+
 #endif	/* _MACHINE_VMPARAM_H_ */
+

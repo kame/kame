@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.5 2000/10/20 15:18:27 drahn Exp $ */
+/*	$OpenBSD: cpu.c,v 1.9 2001/03/11 04:48:12 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -41,9 +41,24 @@
 
 #include <machine/autoconf.h>
 
+#define MPC601          1
+#define MPC603          3
+#define MPC604          4
+#define MPC603e         6
+#define MPC603ev        7
+#define MPC750          8
+#define MPC604ev        9
+#define MPC7400         12
+#define MPC7400v         0x800c
+
+/* only valid on 603(e,ev) and G3, G4 */
+#define HID0_DOZE	(1 << (31-8))
+#define HID0_NAP	(1 << (31-9))
+#define HID0_SLEEP	(1 << (31-10))
+#define HID0_DPM	(1 << (31-11))
+
 char cpu_model[80];
 char machine[] = "powerpc";	/* cpu architecture */
-
 
 /* Definition of the driver for autoconfig. */
 static int	cpumatch(struct device *, void *, void *);
@@ -70,6 +85,7 @@ cpumatch(parent, cfdata, aux)
 
 	return (1);
 }
+void config_l2cr();
 
 static void
 cpuattach(parent, dev, aux)
@@ -77,7 +93,7 @@ cpuattach(parent, dev, aux)
 	struct device *dev;
 	void *aux;
 {
-	int cpu, pvr;
+	unsigned int cpu, pvr, hid0;
 	char name[32];
 	int qhandle, phandle;
 	unsigned int clock_freq = 0;
@@ -85,35 +101,32 @@ cpuattach(parent, dev, aux)
 	__asm__ ("mfpvr %0" : "=r"(pvr));
 	cpu = pvr >> 16;
 	switch (cpu) {
-	case 1:
+	case MPC601:
 		sprintf(cpu_model, "601");
 		break;
-	case 3:
+	case MPC603:
 		sprintf(cpu_model, "603");
 		break;
-	case 4:
+	case MPC604:
 		sprintf(cpu_model, "604");
 		break;
-	case 5:
-		sprintf(cpu_model, "602");
-		break;
-	case 6:
+	case MPC603e:
 		sprintf(cpu_model, "603e");
 		break;
-	case 7:
+	case MPC603ev:
 		sprintf(cpu_model, "603ev");
 		break;
-	case 8:
+	case MPC750:
 		sprintf(cpu_model, "750");
 		break;
-	case 9:
+	case MPC604ev:
 		sprintf(cpu_model, "604ev");
 		break;
-	case 12:
+	case MPC7400:
 		sprintf(cpu_model, "7400(G4)");
 		break;
-	case 20:
-		sprintf(cpu_model, "620");
+	case MPC7400v:
+		sprintf(cpu_model, "7400v(G4?)");
 		break;
 	default:
 		sprintf(cpu_model, "Version %x", cpu);
@@ -142,13 +155,141 @@ cpuattach(parent, dev, aux)
 	}
 
 	if (clock_freq != 0) {
-		/* Openfirmware  stores clock in HZ, not Mhz */
+		/* Openfirmware stores clock in HZ, not Mhz */
 		clock_freq /= 1000000;
 		printf(": %d Mhz", clock_freq);
 
+	}
+	/* power savings mode */
+	asm ("mfspr %0,1008" : "=r" (hid0));
+	switch (cpu) {
+	case MPC603:
+	case MPC603e:
+	case MPC750:
+	case MPC7400:
+	case MPC7400v:
+		/* select DOZE mode */
+		hid0 &= ~(HID0_NAP | HID0_SLEEP);
+		hid0 |= HID0_DOZE | HID0_DPM; 
+	}
+	asm ("mtspr %0,1008" : "=r" (hid0));
+
+	/* if processor is G3 or G4, configure l2 cache */ 
+	if  ( (cpu == MPC750) || (cpu == MPC7400) 
+		|| (cpu == MPC7400v) )
+	{
+		config_l2cr();
 	}
 	printf("\n");
 
 
 }
 
+#define L2CR 1017
+
+#define L2CR_L2E        0x80000000 /* 0: L2 enable */
+#define L2CR_L2PE       0x40000000 /* 1: L2 data parity enable */
+#define L2CR_L2SIZ      0x30000000 /* 2-3: L2 size */
+#define  L2SIZ_RESERVED         0x00000000
+#define  L2SIZ_256K             0x10000000
+#define  L2SIZ_512K             0x20000000
+#define  L2SIZ_1M       0x30000000
+#define L2CR_L2CLK      0x0e000000 /* 4-6: L2 clock ratio */
+#define  L2CLK_DIS              0x00000000 /* disable L2 clock */
+#define  L2CLK_10               0x02000000 /* core clock / 1   */
+#define  L2CLK_15               0x04000000 /*            / 1.5 */
+#define  L2CLK_20               0x08000000 /*            / 2   */
+#define  L2CLK_25               0x0a000000 /*            / 2.5 */
+#define  L2CLK_30               0x0c000000 /*            / 3   */
+#define L2CR_L2RAM      0x01800000 /* 7-8: L2 RAM type */
+#define  L2RAM_FLOWTHRU_BURST   0x00000000
+#define  L2RAM_PIPELINE_BURST   0x01000000
+#define  L2RAM_PIPELINE_LATE    0x01800000
+#define L2CR_L2DO       0x00400000 /* 9: L2 data-only.
+                                      Setting this bit disables instruction
+                                      caching. */
+#define L2CR_L2I        0x00200000 /* 10: L2 global invalidate. */
+#define L2CR_L2CTL      0x00100000 /* 11: L2 RAM control (ZZ enable).
+                                      Enables automatic operation of the
+                                      L2ZZ (low-power mode) signal. */
+#define L2CR_L2WT       0x00080000 /* 12: L2 write-through. */
+#define L2CR_L2TS       0x00040000 /* 13: L2 test support. */
+#define L2CR_L2OH       0x00030000 /* 14-15: L2 output hold. */
+#define L2CR_L2SL       0x00008000 /* 16: L2 DLL slow. */
+#define L2CR_L2DF       0x00004000 /* 17: L2 differential clock. */
+#define L2CR_L2BYP      0x00002000 /* 18: L2 DLL bypass. */
+#define L2CR_L2IP       0x00000001 /* 31: L2 global invalidate in progress
+                                      (read only). */
+#ifdef L2CR_CONFIG
+u_int l2cr_config = L2CR_CONFIG;
+#else
+u_int l2cr_config = 0;
+#endif
+
+void
+config_l2cr()
+{
+	u_int l2cr, x;
+
+	__asm __volatile ("mfspr %0, 1017" : "=r"(l2cr));
+
+	/*
+	 * Configure L2 cache if not enabled.
+	 */
+	if ((l2cr & L2CR_L2E) == 0 && l2cr_config != 0) {
+		l2cr = l2cr_config;
+		asm volatile ("mtspr 1017,%0" :: "r"(l2cr));
+
+		/* Wait for L2 clock to be stable (640 L2 clocks). */
+		delay(100);
+
+		/* Invalidate all L2 contents. */
+		l2cr |= L2CR_L2I;
+		asm volatile ("mtspr 1017,%0" :: "r"(l2cr));
+		do {
+			asm volatile ("mfspr %0, 1017" : "=r"(x));
+		} while (x & L2CR_L2IP);
+				      
+		/* Enable L2 cache. */
+		l2cr &= ~L2CR_L2I;
+		l2cr |= L2CR_L2E;
+		asm volatile ("mtspr 1017,%0" :: "r"(l2cr));
+	}
+
+	if (l2cr & L2CR_L2E) {
+		switch (l2cr & L2CR_L2SIZ) {
+		case L2SIZ_256K:
+			printf(": 256KB");
+			break;
+		case L2SIZ_512K:
+			printf(": 512KB");
+			break;
+		case L2SIZ_1M:  
+			printf(": 1MB");
+			break;
+		default:
+			printf(": unknown size");
+		}
+#if 0
+		switch (l2cr & L2CR_L2RAM) {
+		case L2RAM_FLOWTHRU_BURST:
+			printf(" Flow-through synchronous burst SRAM");
+			break;
+		case L2RAM_PIPELINE_BURST:
+			printf(" Pipelined synchronous burst SRAM");
+			break;
+		case L2RAM_PIPELINE_LATE:
+			printf(" Pipelined synchronous late-write SRAM");
+			break;
+		default:
+			printf(" unknown type");
+		}
+		
+		if (l2cr & L2CR_L2PE)
+			printf(" with parity");  
+#endif
+		printf(" backside cache");
+	} else
+		printf(": L2 cache not enabled");
+		
+}

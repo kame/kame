@@ -1,8 +1,8 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.101 2000/09/19 08:38:59 angelos Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.113 2001/04/06 04:42:08 csapuntz Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
- * Angelos D. Keromytis (kermit@csd.uch.gr), 
+ * Angelos D. Keromytis (kermit@csd.uch.gr),
  * Niels Provos (provos@physnet.uni-hamburg.de) and
  * Niklas Hallqvist (niklas@appli.se).
  *
@@ -24,7 +24,7 @@
  * Permission to use, copy, and modify this software without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
- * modification of this software. 
+ * modification of this software.
  * You may use this code under the GNU public license if you so wish. Please
  * contribute changes back to the authors under this freer than GPL license
  * so that we may further the use of strong encryption without limitations to
@@ -83,10 +83,6 @@ void tdb_hashstats(void);
 #define DPRINTF(x)
 #endif
 
-#ifndef offsetof
-#define offsetof(s, e) ((int)&((s *)0)->e)
-#endif
-
 #ifdef __GNUC__
 #define INLINE static __inline
 #endif
@@ -94,6 +90,10 @@ void tdb_hashstats(void);
 int		ipsp_kern __P((int, char **, int));
 u_int8_t       	get_sa_require  __P((struct inpcb *));
 void		tdb_rehash __P((void));
+void		tdb_timeout __P((void *v));
+void		tdb_firstuse __P((void *v));
+void		tdb_soft_timeout __P((void *v));
+void		tdb_soft_firstuse __P((void *v));
 
 extern int	ipsec_auth_default_level;
 extern int	ipsec_esp_trans_default_level;
@@ -104,9 +104,6 @@ int ipsec_in_use = 0;
 u_int64_t ipsec_last_added = 0;
 u_int32_t kernfs_epoch = 0;
 
-struct expclusterlist_head expclusterlist =
-    TAILQ_HEAD_INITIALIZER(expclusterlist);
-struct explist_head explist = TAILQ_HEAD_INITIALIZER(explist);
 struct ipsec_policy_head ipsec_policy_head =
     TAILQ_HEAD_INITIALIZER(ipsec_policy_head);
 struct ipsec_acquire_head ipsec_acquire_head =
@@ -119,7 +116,7 @@ struct ipsec_acquire_head ipsec_acquire_head =
 struct xformsw xformsw[] = {
     { XF_IP4,	         0,               "IPv4 Simple Encapsulation",
       ipe4_attach,       ipe4_init,       ipe4_zeroize,
-      (int (*)(struct mbuf *, struct tdb *, int, int))ipe4_input, 
+      (int (*)(struct mbuf *, struct tdb *, int, int))ipe4_input,
       ipip_output, },
     { XF_AH,	 XFT_AUTH,	    "IPsec AH",
       ah_attach,	ah_init,   ah_zeroize,
@@ -137,7 +134,7 @@ struct xformsw xformsw[] = {
 
 struct xformsw *xformswNXFORMSW = &xformsw[sizeof(xformsw)/sizeof(xformsw[0])];
 
-unsigned char ipseczeroes[IPSEC_ZEROES_SIZE]; /* zeroes! */ 
+unsigned char ipseczeroes[IPSEC_ZEROES_SIZE]; /* zeroes! */
 
 #define TDB_HASHSIZE_INIT 32
 static struct tdb **tdbh = NULL;
@@ -222,7 +219,7 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 	    get_random_bytes((void *) &spi, sizeof(spi));
 	    spi = sspi + (spi % (tspi - sspi));
 	}
-	  
+
 	/* Don't allocate reserved SPIs.  */
 	if (spi >= SPI_RESERVED_MIN && spi <= SPI_RESERVED_MAX)
 	  continue;
@@ -237,25 +234,22 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 	if (tdbp != (struct tdb *) NULL)
 	  continue;
 
-	MALLOC(tdbp, struct tdb *, sizeof(struct tdb), M_TDB, M_WAITOK);
-	bzero((caddr_t) tdbp, sizeof(struct tdb));
-	
+	tdbp = tdb_alloc();
+
 	tdbp->tdb_spi = spi;
 	bcopy(&dst->sa, &tdbp->tdb_dst.sa, SA_LEN(&dst->sa));
 	bcopy(&src->sa, &tdbp->tdb_src.sa, SA_LEN(&src->sa));
 	tdbp->tdb_sproto = sproto;
 	tdbp->tdb_flags |= TDBF_INVALID;       /* Mark SA as invalid for now */
 	tdbp->tdb_satype = SADB_SATYPE_UNSPEC;
-	tdbp->tdb_established = time.tv_sec;
-	tdbp->tdb_epoch = kernfs_epoch - 1;
 	puttdb(tdbp);
 
 	/* Setup a "silent" expiration (since TDBF_INVALID's set) */
 	if (ipsec_keep_invalid > 0)
 	{
 		tdbp->tdb_flags |= TDBF_TIMER;
-		tdbp->tdb_exp_timeout = time.tv_sec + ipsec_keep_invalid;
-		tdb_expiration(tdbp, TDBEXP_EARLY | TDBEXP_TIMEOUT);
+		tdbp->tdb_exp_timeout = ipsec_keep_invalid;
+		timeout_add(&tdbp->tdb_timer_tmo, hz * ipsec_keep_invalid);
 	}
 
 	return spi;
@@ -266,7 +260,7 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 }
 
 /*
- * An IPSP SAID is really the concatenation of the SPI found in the 
+ * An IPSP SAID is really the concatenation of the SPI found in the
  * packet, the destination address of the packet and the IPsec protocol.
  * When we receive an IPSP packet, we need to look up its tunnel descriptor
  * block, based on the SPI in the packet and the destination address (which
@@ -286,7 +280,7 @@ gettdb(u_int32_t spi, union sockaddr_union *dst, u_int8_t proto)
     hashval = tdb_hash(spi, dst, proto);
 
     for (tdbp = tdbh[hashval]; tdbp != NULL; tdbp = tdbp->tdb_hnext)
-      if ((tdbp->tdb_spi == spi) && 
+      if ((tdbp->tdb_spi == spi) &&
 	  !bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa)) &&
 	  (tdbp->tdb_sproto == proto))
 	break;
@@ -321,15 +315,8 @@ gettdbbyaddr(union sockaddr_union *dst, u_int8_t proto, struct mbuf *m, int af)
 	  if ((tdbp->tdb_srcid == NULL) && (tdbp->tdb_dstid == NULL))
 	    break;
 
-	  /* Not sure how to deal with half-set IDs...just skip the SA */
-	  if ((tdbp->tdb_srcid == NULL) || (tdbp->tdb_dstid == NULL))
-	    continue;
-
-	  /* We only grok addresses */
-	  if (((tdbp->tdb_srcid_type != SADB_IDENTTYPE_PREFIX) &&
-	       (tdbp->tdb_dstid_type != SADB_IDENTTYPE_CONNECTION)) ||
-	      ((tdbp->tdb_dstid_type != SADB_IDENTTYPE_PREFIX) &&
-	       (tdbp->tdb_dstid_type != SADB_IDENTTYPE_CONNECTION)))
+	  /* Sanity */
+	  if ((m == NULL) || (af == 0))
 	    continue;
 
 	  /* XXX Check the IDs ? */
@@ -365,17 +352,6 @@ gettdbbysrc(union sockaddr_union *src, u_int8_t proto, struct mbuf *m, int af)
 	   */
 	  if ((tdbp->tdb_srcid == NULL) && (tdbp->tdb_dstid == NULL))
 	    break;
-
-	  /* Not sure how to deal with half-set IDs...just skip the SA */
-	  if ((tdbp->tdb_srcid == NULL) || (tdbp->tdb_dstid == NULL))
-	    continue;
-
-	  /* We only grok addresses */
-	  if (((tdbp->tdb_srcid_type != SADB_IDENTTYPE_PREFIX) &&
-	       (tdbp->tdb_dstid_type != SADB_IDENTTYPE_CONNECTION)) ||
-	      ((tdbp->tdb_dstid_type != SADB_IDENTTYPE_PREFIX) &&
-	       (tdbp->tdb_dstid_type != SADB_IDENTTYPE_CONNECTION)))
-	    continue;
 
 	  /* XXX Check the IDs ? */
 	  break;
@@ -417,7 +393,7 @@ tdb_hashstats(void)
  * Caller is responsible for setting at least spltdb().
  */
 int
-tdb_walk(int (*walker)(struct tdb *, void *), void *arg)
+tdb_walk(int (*walker)(struct tdb *, void *, int), void *arg)
 {
     int i, rval = 0;
     struct tdb *tdbp, *next;
@@ -429,7 +405,10 @@ tdb_walk(int (*walker)(struct tdb *, void *), void *arg)
       for (tdbp = tdbh[i]; rval == 0 && tdbp != NULL; tdbp = next)
       {
 	  next = tdbp->tdb_hnext;
-	  rval = walker(tdbp, (void *)arg);
+	  if (i == tdb_hashmask && next == NULL)
+	    rval = walker(tdbp, (void *)arg, 1);
+	  else
+	    rval = walker(tdbp, (void *)arg, 0);
       }
 
     return rval;
@@ -439,251 +418,58 @@ tdb_walk(int (*walker)(struct tdb *, void *), void *arg)
  * Called at splsoftclock().
  */
 void
-handle_expirations(void *arg)
+tdb_timeout(void *v)
 {
-    struct tdb *tdb;
+	struct tdb *tdb = v;
 
-    for (tdb = TAILQ_FIRST(&explist);
-	 tdb && tdb->tdb_timeout <= time.tv_sec;
-	 tdb = TAILQ_FIRST(&explist))
-    {
-	/* Hard expirations first */
-	if ((tdb->tdb_flags & TDBF_TIMER) &&
-	    (tdb->tdb_exp_timeout <= time.tv_sec))
-	{
-	    /*
-             * If it's an "invalid" TDB or one that hasn't been used
-             * before, do a silent expiration.
-             */
-	    if ((!(tdb->tdb_flags & TDBF_INVALID)) && tdb->tdb_first_use)
-	      pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
-	    tdb_delete(tdb, 0);
-	    continue;
-	}
-	else
-	  if ((tdb->tdb_flags & TDBF_FIRSTUSE) &&
-	      (tdb->tdb_first_use + tdb->tdb_exp_first_use <= time.tv_sec))
-	  {
-              /* If the TDB hasn't been used, don't renew it */
-              if (tdb->tdb_first_use != 0)
-	        pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
-	      tdb_delete(tdb, 0);
-	      continue;
-	  }
+	if (!(tdb->tdb_flags & TDBF_TIMER))
+		return;
 
-	/* Soft expirations */
-	if ((tdb->tdb_flags & TDBF_SOFT_TIMER) &&
-	    (tdb->tdb_soft_timeout <= time.tv_sec))
-	{
-            /* If the TDB hasn't been used, don't renew it */
-            if (tdb->tdb_first_use != 0)
-	      pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-	    tdb->tdb_flags &= ~TDBF_SOFT_TIMER;
-	    tdb_expiration(tdb, TDBEXP_EARLY);
-	}
-	else
-	  if ((tdb->tdb_flags & TDBF_SOFT_FIRSTUSE) &&
-	      (tdb->tdb_first_use + tdb->tdb_soft_first_use <=
-	       time.tv_sec))
-	  {
-              /* If the TDB hasn't been used, don't renew it */
-              if (tdb->tdb_first_use != 0)
-	        pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-	      tdb->tdb_flags &= ~TDBF_SOFT_FIRSTUSE;
-	      tdb_expiration(tdb, TDBEXP_EARLY);
-	  }
-    }
-
-    /* If any tdb is left on the expiration queue, set the timer.  */
-    if (tdb)
-      timeout(handle_expirations, (void *) NULL, 
-	      hz * (tdb->tdb_timeout - time.tv_sec));
+	/* If it's an "invalid" TDB do a silent expiration. */
+	if (!(tdb->tdb_flags & TDBF_INVALID))
+		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
+	tdb_delete(tdb);
 }
 
-/*
- * Ensure the tdb is in the right place in the expiration list.
- */
 void
-tdb_expiration(struct tdb *tdb, int flags)
+tdb_firstuse(void *v)
 {
-    struct tdb *t, *former_expirer, *next_expirer;
-    int will_be_first, sole_reason, early;
-    u_int64_t next_timeout = 0;
-    int s = spltdb();
+	struct tdb *tdb = v;
 
-    /* Find the earliest expiration.  */
-    if ((tdb->tdb_flags & TDBF_FIRSTUSE) && tdb->tdb_first_use != 0 &&
-	(next_timeout == 0 ||
-	 next_timeout > tdb->tdb_first_use + tdb->tdb_exp_first_use))
-      next_timeout = tdb->tdb_first_use + tdb->tdb_exp_first_use;
-    if ((tdb->tdb_flags & TDBF_SOFT_FIRSTUSE) && tdb->tdb_first_use != 0 &&
-	(next_timeout == 0 ||
-	 next_timeout > tdb->tdb_first_use + tdb->tdb_soft_first_use))
-      next_timeout = tdb->tdb_first_use + tdb->tdb_soft_first_use;
-    if ((tdb->tdb_flags & TDBF_TIMER) &&
-	(next_timeout == 0 || next_timeout > tdb->tdb_exp_timeout))
-      next_timeout = tdb->tdb_exp_timeout;
-    if ((tdb->tdb_flags & TDBF_SOFT_TIMER) &&
-	(next_timeout == 0 || next_timeout > tdb->tdb_soft_timeout))
-      next_timeout = tdb->tdb_soft_timeout;
+	if (!(tdb->tdb_flags & TDBF_SOFT_FIRSTUSE))
+		return;
 
-    /* No change?  */
-    if (next_timeout == tdb->tdb_timeout)
-    {
-	splx(s);
-	return;
-    }
+        /* If the TDB hasn't been used, don't renew it */
+	if (tdb->tdb_first_use != 0)
+		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
+	tdb_delete(tdb);
+}
 
-    /*
-     * Find out some useful facts: Will our tdb be first to expire?
-     * Was our tdb the sole reason for the old timeout?
-     */
-    former_expirer = TAILQ_FIRST(&expclusterlist);
-    next_expirer = TAILQ_NEXT(tdb, tdb_explink);
-    will_be_first = (next_timeout != 0 &&
-		     (former_expirer == NULL ||
-		      next_timeout < former_expirer->tdb_timeout));
-    sole_reason = (tdb == former_expirer &&
-		   (next_expirer == NULL ||
-		    tdb->tdb_timeout != next_expirer->tdb_timeout));
+void
+tdb_soft_timeout(void *v)
+{
+	struct tdb *tdb = v;
 
-    /*
-     * We need to untimeout if either:
-     * - there is an expiration pending and the new timeout is earlier than
-     *   what already exists or
-     * - the existing first expiration is due to our old timeout value solely
-     */
-    if ((former_expirer != NULL && will_be_first) || sole_reason)
-      untimeout(handle_expirations, (void *) NULL);
+	if (!(tdb->tdb_flags & TDBF_SOFT_TIMER))
+		return;
 
-    /*
-     * We need to timeout if we've been asked to and if either
-     * - our tdb has a timeout and no former expiration exist or
-     * - the new timeout is earlier than what already exists or
-     * - the existing first expiration is due to our old timeout value solely
-     *   and another expiration is in the pipe.
-     */
-    if ((flags & TDBEXP_TIMEOUT) &&
-	(will_be_first || (sole_reason && next_expirer != NULL)))
-      timeout(handle_expirations, (void *) NULL,
-	      hz * ((will_be_first ? next_timeout :
-		     next_expirer->tdb_timeout) - time.tv_sec));
+	/* Soft expirations */
+	pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
+	tdb->tdb_flags &= ~TDBF_SOFT_TIMER;
+}
 
-    /* Our old position, if any, is not relevant anymore.  */
-    if (tdb->tdb_timeout != 0)
-    {
-        if (tdb->tdb_expnext.tqe_prev != NULL)
-	{
-	    if (next_expirer && tdb->tdb_timeout == next_expirer->tdb_timeout)
-	      TAILQ_INSERT_BEFORE(tdb, next_expirer, tdb_expnext);
-	    TAILQ_REMOVE(&expclusterlist, tdb, tdb_expnext);
-	    tdb->tdb_expnext.tqe_prev = NULL;
-	}
+void
+tdb_soft_firstuse(void *v)
+{
+	struct tdb *tdb = v;
 
-	TAILQ_REMOVE(&explist, tdb, tdb_explink);
-    }
+	if (!(tdb->tdb_flags & TDBF_SOFT_FIRSTUSE))
+		return;
 
-    tdb->tdb_timeout = next_timeout;
-
-    if (next_timeout == 0)
-    {
-	splx(s);
-	return;
-    }
-
-    /*
-     * Search front-to-back if we believe we will end up early, otherwise
-     * back-to-front.
-     */
-    early = will_be_first || (flags & TDBEXP_EARLY);
-    for (t = (early ? TAILQ_FIRST(&expclusterlist) :
-	      TAILQ_LAST(&expclusterlist, expclusterlist_head));
-	 t != NULL && (early ? (t->tdb_timeout <= next_timeout) : 
-		       (t->tdb_timeout > next_timeout));
-	 t = (early ? TAILQ_NEXT(t, tdb_expnext) :
-	      TAILQ_PREV(t, expclusterlist_head, tdb_expnext)))
-      ;
-    if (t == (early ? TAILQ_FIRST(&expclusterlist) : NULL))
-    {
-	/* We are to become the first expiration.  */
-	TAILQ_INSERT_HEAD(&expclusterlist, tdb, tdb_expnext);
-	TAILQ_INSERT_HEAD(&explist, tdb, tdb_explink);
-    }
-    else
-    {
-	if (early)
-	  t = (t ? TAILQ_PREV(t, expclusterlist_head, tdb_expnext) :
-	       TAILQ_LAST(&expclusterlist, expclusterlist_head));
-	if (TAILQ_NEXT(t, tdb_expnext))
-	  TAILQ_INSERT_BEFORE(TAILQ_NEXT(t, tdb_expnext), tdb, tdb_explink);
-	else
-	  TAILQ_INSERT_TAIL(&explist, tdb, tdb_explink);
-	if (t->tdb_timeout < next_timeout)
-	  TAILQ_INSERT_AFTER(&expclusterlist, t, tdb, tdb_expnext);
-    }
-
-#ifdef DIAGNOSTIC
-    /*
-     * Check various invariants.
-     */
-    if (tdb->tdb_expnext.tqe_prev != NULL)
-    {
-	t = TAILQ_FIRST(&expclusterlist);
-	if (t != tdb && t->tdb_timeout >= tdb->tdb_timeout)
-	  panic("tdb_expiration: "
-		"expclusterlist first link out of order (%p, %p)",
-		tdb, t);
-	t = TAILQ_PREV(tdb, expclusterlist_head, tdb_expnext);
-	if (t != NULL && t->tdb_timeout >= tdb->tdb_timeout)
-	  panic("tdb_expiration: "
-		"expclusterlist prev link out of order (%p, %p)",
-		tdb, t);
-	else if (t == NULL && tdb != TAILQ_FIRST(&expclusterlist))
-	  panic("tdb_expiration: "
-		"expclusterlist first link out of order (%p, %p)",
-		tdb, TAILQ_FIRST(&expclusterlist));
-	t = TAILQ_NEXT(tdb, tdb_expnext);
-	if (t != NULL && t->tdb_timeout <= tdb->tdb_timeout)
-	  panic("tdb_expiration: "
-		"expclusterlist next link out of order (%p, %p)",
-		tdb, t);
-	else if (t == NULL &&
-		 tdb != TAILQ_LAST(&expclusterlist, expclusterlist_head))
-	  panic("tdb_expiration: "
-		"expclusterlist last link out of order (%p, %p)",
-		tdb, TAILQ_LAST(&expclusterlist, expclusterlist_head));
-	t = TAILQ_LAST(&expclusterlist, expclusterlist_head);
-	if (t != tdb && t->tdb_timeout <= tdb->tdb_timeout)
-	  panic("tdb_expiration: "
-		"expclusterlist last link out of order (%p, %p)",
-		tdb, t);
-    }
-
-    t = TAILQ_FIRST(&explist);
-    if (t != NULL && t->tdb_timeout > tdb->tdb_timeout)
-      panic("tdb_expiration: explist first link out of order (%p, %p)", tdb,
-	    t);
-
-    t = TAILQ_PREV(tdb, explist_head, tdb_explink);
-    if (t != NULL && t->tdb_timeout > tdb->tdb_timeout)
-      panic("tdb_expiration: explist prev link out of order (%p, %p)", tdb, t);
-    else if (t == NULL && tdb != TAILQ_FIRST(&explist))
-      panic("tdb_expiration: explist first link out of order (%p, %p)", tdb,
-	    TAILQ_FIRST(&explist));
-
-    t = TAILQ_NEXT(tdb, tdb_explink);
-    if (t != NULL && t->tdb_timeout < tdb->tdb_timeout)
-      panic("tdb_expiration: explist next link out of order (%p, %p)", tdb, t);
-    else if (t == NULL && tdb != TAILQ_LAST(&explist, explist_head))
-      panic("tdb_expiration: explist last link out of order (%p, %p)", tdb,
-	    TAILQ_LAST(&explist, explist_head));
-
-    t = TAILQ_LAST(&explist, explist_head);
-    if (t != tdb && t->tdb_timeout < tdb->tdb_timeout)
-      panic("tdb_expiration: explist last link out of order (%p, %p)", tdb, t);
-#endif
-
-    splx(s);
+	/* If the TDB hasn't been used, don't renew it */
+	if (tdb->tdb_first_use != 0)
+		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
+	tdb->tdb_flags &= ~TDBF_SOFT_FIRSTUSE;
 }
 
 /*
@@ -773,7 +559,7 @@ puttdb(struct tdb *tdbp)
     }
 
     hashval = tdb_hash(tdbp->tdb_spi, &tdbp->tdb_dst, tdbp->tdb_sproto);
-    
+
     /*
      * Rehash if this tdb would cause a bucket to have more than two items
      * and if the number of tdbs exceed 10% of the bucket count.  This
@@ -810,7 +596,7 @@ puttdb(struct tdb *tdbp)
  * Caller is responsible to set at least spltdb().
  */
 void
-tdb_delete(struct tdb *tdbp, int expflags)
+tdb_delete(struct tdb *tdbp)
 {
     struct ipsec_policy *ipo;
     struct tdb *tdbpp;
@@ -881,11 +667,18 @@ tdb_delete(struct tdb *tdbp, int expflags)
     }
 
     /* Cleanup inp references */
-    for (inp = TAILQ_FIRST(&tdbp->tdb_inp); inp;
-	 inp = TAILQ_FIRST(&tdbp->tdb_inp))
+    for (inp = TAILQ_FIRST(&tdbp->tdb_inp_in); inp;
+	 inp = TAILQ_FIRST(&tdbp->tdb_inp_in))
     {
-        TAILQ_REMOVE(&tdbp->tdb_inp, inp, inp_tdb_next);
-	inp->inp_tdb = NULL;
+        TAILQ_REMOVE(&tdbp->tdb_inp_in, inp, inp_tdb_in_next);
+	inp->inp_tdb_in = NULL;
+    }
+
+    for (inp = TAILQ_FIRST(&tdbp->tdb_inp_out); inp;
+	 inp = TAILQ_FIRST(&tdbp->tdb_inp_out))
+    {
+        TAILQ_REMOVE(&tdbp->tdb_inp_out, inp, inp_tdb_out_next);
+	inp->inp_tdb_out = NULL;
     }
 
     /* Cleanup SPD references */
@@ -894,15 +687,16 @@ tdb_delete(struct tdb *tdbp, int expflags)
     {
 	TAILQ_REMOVE(&tdbp->tdb_policy_head, ipo, ipo_tdb_next);
 	ipo->ipo_tdb = NULL;
+	ipo->ipo_last_searched = 0; /* Force a re-search */
     }
 
-    /* Remove us from the expiration lists.  */
-    if (tdbp->tdb_timeout != 0)
-    {
-        tdbp->tdb_flags &= ~(TDBF_FIRSTUSE | TDBF_SOFT_FIRSTUSE | TDBF_TIMER |
-			     TDBF_SOFT_TIMER);
-	tdb_expiration(tdbp, expflags);
-    }
+    /* Remove expiration timeouts.  */
+    tdbp->tdb_flags &= ~(TDBF_FIRSTUSE | TDBF_SOFT_FIRSTUSE | TDBF_TIMER |
+			 TDBF_SOFT_TIMER);
+    timeout_del(&tdbp->tdb_timer_tmo);
+    timeout_del(&tdbp->tdb_first_tmo);
+    timeout_del(&tdbp->tdb_stimer_tmo);
+    timeout_del(&tdbp->tdb_sfirst_tmo);
 
     if (tdbp->tdb_srcid)
     {
@@ -914,6 +708,18 @@ tdb_delete(struct tdb *tdbp, int expflags)
     {
       	FREE(tdbp->tdb_dstid, M_XDATA);
 	tdbp->tdb_dstid = NULL;
+    }
+
+    if (tdbp->tdb_src_credentials)
+    {
+	FREE(tdbp->tdb_src_credentials, M_XDATA);
+	tdbp->tdb_src_credentials = NULL;
+    }
+
+    if (tdbp->tdb_dst_credentials)
+    {
+	FREE(tdbp->tdb_dst_credentials, M_XDATA);
+	tdbp->tdb_dst_credentials = NULL;
     }
 
     if ((tdbp->tdb_onext) && (tdbp->tdb_onext->tdb_inext == tdbp))
@@ -929,27 +735,56 @@ tdb_delete(struct tdb *tdbp, int expflags)
 }
 
 /*
- * Initialize a TDB structure.
+ * Allocate a TDB and initialize a few basic fields.
+ */
+struct tdb *
+tdb_alloc(void)
+{
+	struct tdb *tdbp;
+
+	MALLOC(tdbp, struct tdb *, sizeof(struct tdb), M_TDB, M_WAITOK);
+	bzero((caddr_t) tdbp, sizeof(struct tdb));
+
+	/* Init Incoming SA-Binding Queues */
+	TAILQ_INIT(&tdbp->tdb_inp_out);
+	TAILQ_INIT(&tdbp->tdb_inp_in);
+
+	TAILQ_INIT(&tdbp->tdb_policy_head);
+
+	/* Record establishment time */
+	tdbp->tdb_established = time.tv_sec;
+	tdbp->tdb_epoch = kernfs_epoch - 1;
+
+	/* Initialize timeouts */
+	timeout_set(&tdbp->tdb_timer_tmo, tdb_timeout, tdbp);
+	timeout_set(&tdbp->tdb_first_tmo, tdb_firstuse, tdbp);
+	timeout_set(&tdbp->tdb_stimer_tmo, tdb_soft_timeout, tdbp);
+	timeout_set(&tdbp->tdb_sfirst_tmo, tdb_soft_firstuse, tdbp);
+
+	return tdbp;
+}
+
+/*
+ * Do further initializations of a TDB.
  */
 int
 tdb_init(struct tdb *tdbp, u_int16_t alg, struct ipsecinit *ii)
 {
     struct xformsw *xsp;
-
-    /* Record establishment time */
-    tdbp->tdb_established = time.tv_sec;
-    tdbp->tdb_epoch = kernfs_epoch - 1;
-
-    /* Init Incoming SA-Binding Queues */
-    TAILQ_INIT(&tdbp->tdb_inp);
-
-    TAILQ_INIT(&tdbp->tdb_policy_head);
+    int err;
 
     for (xsp = xformsw; xsp < xformswNXFORMSW; xsp++)
       if (xsp->xf_type == alg)
-	return (*(xsp->xf_init))(tdbp, xsp, ii);
+      {
+	  err = (*(xsp->xf_init))(tdbp, xsp, ii);
 
-    DPRINTF(("tdb_init(): no alg %d for spi %08x, addr %s, proto %d\n", 
+	  /* Clear possible pending acquires */
+	  ipsp_clear_acquire(tdbp);
+
+	  return err;
+      }
+
+    DPRINTF(("tdb_init(): no alg %d for spi %08x, addr %s, proto %d\n",
 	     alg, ntohl(tdbp->tdb_spi), ipsp_address(tdbp->tdb_dst),
 	     tdbp->tdb_sproto));
 
@@ -979,7 +814,7 @@ ipsp_kern(int off, char **bufp, int len)
                     ipsec_in_use);
        return l;
     }
-    
+
     if (tdbh == NULL)
       return 0;
 
@@ -1098,7 +933,7 @@ ipsp_kern(int off, char **bufp, int len)
 	      l += sprintf(buffer + l, "\tCrypto ID: %qu\n", tdb->tdb_cryptoid);
 
 	      if (tdb->tdb_xform)
-		l += sprintf(buffer + l, "\txform = <%s>\n", 
+		l += sprintf(buffer + l, "\txform = <%s>\n",
 			     tdb->tdb_xform->xf_name);
 
 	      if (tdb->tdb_encalgxform)
@@ -1125,33 +960,28 @@ ipsp_kern(int off, char **bufp, int len)
 			     ipsp_address(tdb->tdb_inext->tdb_dst),
 			     tdb->tdb_inext->tdb_sproto);
 
-	      if (tdb->tdb_interface)
-		l += sprintf(buffer + l, "\tAssociated interface = <%s>\n",
-			     ((struct ifnet *) tdb->tdb_interface)->if_xname);
-
-	      l += sprintf(buffer + l, "\t%u flows have used this SA\n",
-			   tdb->tdb_cur_allocations);
-	    
 	      l += sprintf(buffer + l, "\t%qu bytes processed by this SA\n",
 			 tdb->tdb_cur_bytes);
-	    
+
 	      l += sprintf(buffer + l, "\tExpirations:\n");
 
 	      if (tdb->tdb_flags & TDBF_TIMER)
 		l += sprintf(buffer + l,
 			     "\t\tHard expiration(1) in %qu seconds\n",
-			     tdb->tdb_exp_timeout - time.tv_sec);
-	    
+			     tdb->tdb_established + tdb->tdb_exp_timeout -
+			     time.tv_sec);
+
 	      if (tdb->tdb_flags & TDBF_SOFT_TIMER)
 		l += sprintf(buffer + l,
 			     "\t\tSoft expiration(1) in %qu seconds\n",
-			     tdb->tdb_soft_timeout - time.tv_sec);
-	    
+			     tdb->tdb_established + tdb->tdb_soft_timeout -
+			     time.tv_sec);
+
 	      if (tdb->tdb_flags & TDBF_BYTES)
 		l += sprintf(buffer + l,
 			     "\t\tHard expiration after %qu bytes\n",
 			     tdb->tdb_exp_bytes);
-	    
+
 	      if (tdb->tdb_flags & TDBF_SOFT_BYTES)
 		l += sprintf(buffer + l,
 			     "\t\tSoft expiration after %qu bytes\n",
@@ -1161,7 +991,7 @@ ipsp_kern(int off, char **bufp, int len)
 		l += sprintf(buffer + l,
 			     "\t\tHard expiration after %u flows\n",
 			     tdb->tdb_exp_allocations);
-	    
+
 	      if (tdb->tdb_flags & TDBF_SOFT_ALLOCATIONS)
 		l += sprintf(buffer + l,
 			     "\t\tSoft expiration after %u flows\n",
@@ -1218,10 +1048,10 @@ u_int8_t
 get_sa_require(struct inpcb *inp)
 {
     u_int8_t sareq = 0;
-       
+
     if (inp != NULL)
     {
-	sareq |= inp->inp_seclevel[SL_AUTH] >= IPSEC_LEVEL_USE ? 
+	sareq |= inp->inp_seclevel[SL_AUTH] >= IPSEC_LEVEL_USE ?
 		 NOTIFY_SATYPE_AUTH : 0;
 	sareq |= inp->inp_seclevel[SL_ESP_TRANS] >= IPSEC_LEVEL_USE ?
 		 NOTIFY_SATYPE_CONF : 0;
@@ -1230,14 +1060,14 @@ get_sa_require(struct inpcb *inp)
     }
     else
     {
-	sareq |= ipsec_auth_default_level >= IPSEC_LEVEL_USE ? 
+	sareq |= ipsec_auth_default_level >= IPSEC_LEVEL_USE ?
 		 NOTIFY_SATYPE_AUTH : 0;
-	sareq |= ipsec_esp_trans_default_level >= IPSEC_LEVEL_USE ? 
+	sareq |= ipsec_esp_trans_default_level >= IPSEC_LEVEL_USE ?
 		 NOTIFY_SATYPE_CONF : 0;
-	sareq |= ipsec_esp_network_default_level >= IPSEC_LEVEL_USE ? 
+	sareq |= ipsec_esp_network_default_level >= IPSEC_LEVEL_USE ?
 		 NOTIFY_SATYPE_TUNNEL : 0;
     }
-    
+
     return (sareq);
 }
 
@@ -1245,20 +1075,38 @@ get_sa_require(struct inpcb *inp)
  * Add an inpcb to the list of inpcb which reference this tdb directly.
  */
 void
-tdb_add_inp(struct tdb *tdb, struct inpcb *inp)
+tdb_add_inp(struct tdb *tdb, struct inpcb *inp, int inout)
 {
-    if (inp->inp_tdb)
+    if (inout)
     {
-	if (inp->inp_tdb == tdb)
-          return;
+        if (inp->inp_tdb_in)
+        {
+	    if (inp->inp_tdb_in == tdb)
+              return;
 
-	TAILQ_REMOVE(&inp->inp_tdb->tdb_inp, inp, inp_tdb_next);
+	    TAILQ_REMOVE(&inp->inp_tdb_in->tdb_inp_in, inp, inp_tdb_in_next);
+        }
+
+        inp->inp_tdb_in = tdb;
+        TAILQ_INSERT_TAIL(&tdb->tdb_inp_in, inp, inp_tdb_in_next);
+    }
+    else
+    {
+        if (inp->inp_tdb_out)
+        {
+	    if (inp->inp_tdb_out == tdb)
+              return;
+
+	    TAILQ_REMOVE(&inp->inp_tdb_out->tdb_inp_out, inp,
+			 inp_tdb_out_next);
+        }
+
+        inp->inp_tdb_out = tdb;
+        TAILQ_INSERT_TAIL(&tdb->tdb_inp_out, inp, inp_tdb_out_next);
     }
 
-    inp->inp_tdb = tdb;
-    TAILQ_INSERT_TAIL(&tdb->tdb_inp, inp, inp_tdb_next);
-
-    DPRINTF(("tdb_add_inp: tdb: %p, inp: %p\n", tdb, inp));
+    DPRINTF(("tdb_add_inp: tdb: %p, inp: %p, direction: %s\n", tdb, inp,
+	     inout ? "in" : "out"));
 }
 
 /* Return a printable string for the IPv4 address. */
@@ -1268,7 +1116,7 @@ inet_ntoa4(struct in_addr ina)
     static char buf[4][4 * sizeof "123" + 4];
     unsigned char *ucp = (unsigned char *) &ina;
     static int i = 3;
- 
+
     i = (i + 1) % 4;
     sprintf(buf[i], "%d.%d.%d.%d", ucp[0] & 0xff, ucp[1] & 0xff,
             ucp[2] & 0xff, ucp[3] & 0xff);
@@ -1294,4 +1142,26 @@ ipsp_address(union sockaddr_union sa)
 	default:
 	    return "(unknown address family)";
     }
+}
+
+/* Copy a struct tdb_ident structure */
+void *
+ipsp_copy_ident(void *arg)
+{
+    struct tdb_ident *tdbii, *tdbi;
+
+    tdbi = (struct tdb_ident *) arg;
+
+    /*
+     * Allocate new structure. If we fail, just return NULL -- the
+     * new packet will be treated as if it was not protected.
+     */
+    MALLOC(tdbii, struct tdb_ident *, sizeof(struct tdb_ident), M_TEMP,
+	   M_NOWAIT);
+    if (tdbii == NULL)
+      return NULL;
+    bcopy(&tdbi->dst, &tdbii->dst, sizeof(union sockaddr_union));
+    tdbii->proto = tdbi->proto;
+    tdbii->spi = tdbi->spi;
+    return (void *) tdbii;
 }

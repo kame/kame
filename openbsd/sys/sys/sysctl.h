@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.h,v 1.32 2000/09/17 22:00:01 pjanzen Exp $	*/
+/*	$OpenBSD: sysctl.h,v 1.35 2001/03/16 08:49:08 art Exp $	*/
 /*	$NetBSD: sysctl.h,v 1.16 1996/04/09 20:55:36 cgd Exp $	*/
 
 /*
@@ -152,7 +152,9 @@ struct ctlname {
 #define	KERN_SYSVSHM		36	/* int: SysV shared memory support */
 #define	KERN_ARND		37	/* int: random integer from arc4rnd */
 #define	KERN_MSGBUFSIZE		38	/* int: size of message buffer */
-#define	KERN_MAXID		39	/* number of valid kern ids */
+#define KERN_MALLOCSTATS	39	/* node: malloc statistics */
+#define KERN_CPTIME		40	/* array: cp_time */
+#define	KERN_MAXID		41	/* number of valid kern ids */
 
 #define	CTL_KERN_NAMES { \
 	{ 0, 0 }, \
@@ -194,6 +196,8 @@ struct ctlname {
 	{ "sysvshm", CTLTYPE_INT }, \
 	{ "arandom", CTLTYPE_INT }, \
 	{ "msgbufsize", CTLTYPE_INT }, \
+	{ "malloc", CTLTYPE_NODE }, \
+	{ "cp_time", CTLTYPE_STRUCT }, \
 }
 
 /*
@@ -387,6 +391,8 @@ typedef int (sysctlfn)
 
 int sysctl_int __P((void *, size_t *, void *, size_t, int *));
 int sysctl_rdint __P((void *, size_t *, void *, int));
+int sysctl_quad __P((void *, size_t *, void *, size_t, int64_t *));
+int sysctl_rdquad __P((void *, size_t *, void *, int64_t));
 int sysctl_string __P((void *, size_t *, void *, size_t, char *, int));
 int sysctl_tstring __P((void *, size_t *, void *, size_t, char *, int));
 int sysctl__string __P((void *, size_t *, void *, size_t, char *, int, int));
@@ -431,6 +437,9 @@ int cpu_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 		    struct proc *));
 int vfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 		    struct proc *));
+
+void sysctl_init __P((void));
+
 #else	/* !_KERNEL */
 #include <sys/cdefs.h>
 

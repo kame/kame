@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_gre.c,v 1.6 2000/01/16 00:34:39 angelos Exp $ */
+/*      $OpenBSD: if_gre.c,v 1.9 2001/03/25 07:10:47 csapuntz Exp $ */
 /*	$NetBSD: if_gre.c,v 1.9 1999/10/25 19:18:11 drochner Exp $ */
 
 /*
@@ -160,7 +160,6 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	struct gre_softc *sc = (struct gre_softc *) (ifp->if_softc);
 	struct greip *gh = NULL;
 	struct ip *inp = NULL;
-	u_char ttl = 255;
 	u_short etype = 0;
 	struct mobile_h mob_h;
 	static int recursions = 0;	/* XXX MUTEX */
@@ -301,7 +300,6 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 			}
 
 			inp = mtod(m, struct ip *);
-			ttl = inp->ip_ttl;
 			etype = ETHERTYPE_IP;
 			break;
 #ifdef NETATALK
@@ -349,7 +347,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		gh->gi_src = sc->g_src;
 		gh->gi_dst = sc->g_dst;
 		((struct ip *) gh)->ip_hl = (sizeof(struct ip)) >> 2; 
-		((struct ip *) gh)->ip_ttl = ttl;
+		((struct ip *) gh)->ip_ttl = ip_defttl;
 		((struct ip *) gh)->ip_tos = inp->ip_tos;
 		gh->gi_len = m->m_pkthdr.len;
 	}
@@ -404,6 +402,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				if (sc->route.ro_rt == 0) {
 					sc->g_src.s_addr = INADDR_ANY;
 					sc->g_dst.s_addr = INADDR_ANY;
+					splx(s);
 					return EIO; /* Is this is good ? */
 				}
 
@@ -495,6 +494,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			{
 				sc->g_src.s_addr = INADDR_ANY;
 				sc->g_dst.s_addr = INADDR_ANY;
+				splx(s);
 				return EIO; /* Is this is good ? */
 			}
 			ifp->if_flags |= IFF_UP;

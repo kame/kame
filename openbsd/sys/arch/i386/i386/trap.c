@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.33 2000/06/26 22:45:53 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.37 2001/04/02 21:43:10 niklas Exp $	*/
 /*	$NetBSD: trap.c,v 1.95 1996/05/05 06:50:02 mycroft Exp $	*/
 
 #undef DEBUG
@@ -74,6 +74,10 @@
 #include <machine/trap.h>
 #ifdef DDB
 #include <machine/db_machdep.h>
+#endif
+
+#ifdef KGDB
+#include <sys/kgdb.h>
 #endif
 
 #ifdef COMPAT_IBCS2
@@ -231,7 +235,7 @@ trap(frame)
 
 	/* trace trap */
 	case T_TRCTRAP: {
-#ifdef DDB
+#if defined(DDB) || defined(KGDB)
 		/* Make sure nobody is single stepping into kernel land.
 		 * The syscall has to turn off the trace bit itself.  The
 		 * easiest way, is to simply not call the debugger, until
@@ -251,6 +255,21 @@ trap(frame)
 
 	default:
 	we_re_toast:
+#ifdef KGDB
+		if (kgdb_trap(type, &frame))
+			return;
+		else {
+			/*
+			 * If this is a breakpoint, don't panic
+			 * if we're not connected.
+			 */
+			if (type == T_BPTFLT) {
+				printf("kgdb: ignored %s\n", trap_type[type]);
+				return;
+			}
+		}
+#endif
+
 #ifdef DDB
 		if (kdb_trap(type, 0, &frame))
 			return;
@@ -426,7 +445,10 @@ trap(frame)
 		register vm_map_t map;
 		int rv;
 		extern vm_map_t kernel_map;
-		unsigned nss, v;
+		unsigned nss;
+#ifndef PMAP_NEW
+		unsigned v;
+#endif
 
 		if (vm == NULL)
 			goto we_re_toast;
@@ -457,11 +479,20 @@ trap(frame)
 		    && map != kernel_map) {
 			nss = clrnd(btoc(USRSTACK-(unsigned)va));
 			if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
-				rv = KERN_FAILURE;
-				goto nogo;
+				/*
+				 * We used to fail here. However, it may
+				 * just have been an mmap()ed page low
+				 * in the stack, which is legal. If it
+				 * wasn't, uvm_fault() will fail below.
+				 *
+				 * Set nss to 0, since this case is not
+				 * a "stack extension".
+				 */
+				nss = 0;
 			}
 		}
 
+#ifndef PMAP_NEW
 		/* check if page table is mapped, if not, fault it first */
 		if ((PTD[pdei(va)] & PG_V) == 0) {
 			v = trunc_page(vtopte(va));
@@ -480,6 +511,7 @@ trap(frame)
 #endif
 		} else
 			v = 0;
+#endif
 
 #if defined(UVM)
 		rv = uvm_fault(map, va, 0, ftype);
@@ -494,7 +526,9 @@ trap(frame)
 			goto out;
 		}
 
+#ifndef PMAP_NEW
 	nogo:
+#endif
 		if (type == T_PAGEFLT) {
 			if (pcb->pcb_onfault != 0)
 				goto copyfault;
@@ -512,6 +546,15 @@ trap(frame)
 		break;
 	}
 
+#if 0  /* Should this be left out?  */
+#if !defined(DDB) && !defined(KGDB)
+	/* XXX need to deal with this when DDB is present, too */
+	case T_TRCTRAP: /* kernel trace trap; someone single stepping lcall's */
+			/* syscall has to turn off the trace bit itself */
+		return;
+#endif
+#endif
+
 	case T_BPTFLT|T_USER:		/* bpt instruction fault */
 		sv.sival_int = rcr2();
 		trapsignal(p, SIGTRAP, type &~ T_USER, TRAP_BRKPT, sv);
@@ -524,16 +567,22 @@ trap(frame)
 		trapsignal(p, SIGTRAP, type &~ T_USER, TRAP_TRACE, sv);
 		break;
 
-#include "isa.h"
 #if	NISA > 0
 	case T_NMI:
 	case T_NMI|T_USER:
-#ifdef DDB
+#if defined(DDB) || defined(KGDB)
 		/* NMI can be hooked up to a pushbutton for debugging */
 		printf ("NMI ... going to debugger\n");
-		if (kdb_trap (type, 0, &frame))
+#ifdef KGDB
+		if (kgdb_trap(type, &frame))
 			return;
 #endif
+#ifdef DDB
+		if (kdb_trap(type, 0, &frame))
+			return;
+#endif
+			return;
+#endif /* DDB || KGDB */
 		/* machine/parity/power fail/"kitchen sink" faults */
 		if (isa_nmi() == 0)
 			return;
@@ -570,7 +619,7 @@ trapwrite(addr)
 	if ((caddr_t)va >= vm->vm_maxsaddr) {
 		nss = clrnd(btoc(USRSTACK-(unsigned)va));
 		if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur))
-			return 1;
+			nss = 0;
 	}
 
 #if defined(UVM)
@@ -602,7 +651,7 @@ syscall(frame)
 	register caddr_t params;
 	register struct sysent *callp;
 	register struct proc *p;
-	int error, opc, nsys;
+	int orig_error, error, opc, nsys;
 	size_t argsize;
 	register_t code, args[8], rval[2];
 	u_quad_t sticks;
@@ -716,18 +765,19 @@ syscall(frame)
 		error = copyin(params, (caddr_t)args, argsize);
 	else
 		error = 0;
+	orig_error = error;
 #ifdef SYSCALL_DEBUG
 	scdebug_call(p, code, args);
 #endif
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSCALL))
-		ktrsyscall(p->p_tracep, code, argsize, args);
+		ktrsyscall(p, code, argsize, args);
 #endif
 	if (error)
 		goto bad;
 	rval[0] = 0;
 	rval[1] = frame.tf_edx;
-	error = (*callp->sy_call)(p, args, rval);
+	orig_error = error = (*callp->sy_call)(p, args, rval);
 	switch (error) {
 	case 0:
 		/*
@@ -760,12 +810,12 @@ syscall(frame)
 	}
 
 #ifdef SYSCALL_DEBUG
-	scdebug_ret(p, code, error, rval);
+	scdebug_ret(p, code, orig_error, rval);
 #endif
 	userret(p, frame.tf_eip, sticks);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, code, error, rval[0]);
+		ktrsysret(p, code, orig_error, rval[0]);
 #endif
 }
 
@@ -781,6 +831,6 @@ child_return(p, frame)
 	userret(p, frame.tf_eip, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
-		ktrsysret(p->p_tracep, SYS_fork, 0, 0);
+		ktrsysret(p, SYS_fork, 0, 0);
 #endif
 }

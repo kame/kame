@@ -1,4 +1,4 @@
-/*	$OpenBSD: specdev.h,v 1.7 1998/08/06 19:34:48 csapuntz Exp $	*/
+/*	$OpenBSD: specdev.h,v 1.9 2001/03/01 20:54:35 provos Exp $	*/
 /*	$NetBSD: specdev.h,v 1.12 1996/02/13 13:13:01 mycroft Exp $	*/
 
 /*
@@ -47,6 +47,7 @@ struct specinfo {
 	struct  mount *si_mountpoint;
 	dev_t	si_rdev;
 	struct	lockf *si_lockf;
+	daddr_t si_lastr;
 };
 /*
  * Exported shorthand
@@ -96,6 +97,7 @@ int	spec_write	__P((void *));
 #define	spec_lease_check nullop
 int	spec_ioctl	__P((void *));
 int	spec_select	__P((void *));
+int	spec_kqfilter	__P((void *));
 #define	spec_mmap	spec_badop
 int	spec_fsync	__P((void *));
 #define	spec_seek	spec_badop

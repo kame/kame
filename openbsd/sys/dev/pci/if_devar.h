@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_devar.h,v 1.9 1999/01/11 04:31:14 jason Exp $	*/
+/*	$OpenBSD: if_devar.h,v 1.11 2001/02/20 19:39:42 mickey Exp $	*/
 /*	$NetBSD: if_devar.h,v 1.13 1997/06/08 18:46:36 thorpej Exp $	*/
 
 /*-
@@ -534,6 +534,7 @@ struct _tulip_softc_t {
 #endif
 #if !defined(__NetBSD__)
     struct arpcom tulip_ac;
+    struct timeout tulip_ftmo, tulip_stmo;
 #endif
     tulip_regfile_t tulip_csrs;
     u_int32_t tulip_flags;
@@ -951,6 +952,11 @@ extern struct cfdriver de_cd;
 #define	tulip_xname			tulip_if.if_xname
 #endif
 
+#if NBPFILTER > 0
+#define	TULIP_BPF_MTAP(sc, m)	bpf_mtap((sc)->tulip_if.if_bpf, m)
+#define	TULIP_BPF_TAP(sc, p, l)	bpf_tap((sc)->tulip_if.if_bpf, p, l)
+#define	TULIP_BPF_ATTACH(sc)
+#endif
 #define	TULIP_RAISESPL()		splnet()
 #define	TULIP_RAISESOFTSPL()		splsoftnet()
 #define	TULIP_RESTORESPL(s)		splx(s)

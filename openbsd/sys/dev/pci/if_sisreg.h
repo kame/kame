@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sisreg.h,v 1.3 2000/08/25 17:39:25 aaron Exp $ */
+/*	$OpenBSD: if_sisreg.h,v 1.6 2001/03/14 15:17:31 aaron Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -76,6 +76,7 @@
 #define SIS_GPIO		0xB8
 
 /* NS DP83815 registers */
+#define NS_CLKRUN		0x3C
 #define NS_BMCR			0x80
 #define NS_BMSR			0x84
 #define NS_PHYIDR1		0x88
@@ -92,6 +93,10 @@
 #define NS_PHY_DSPCFG		0xF4
 #define NS_PHY_SDCFG		0xF8
 #define NS_PHY_TDATA		0xFC
+
+#define NS_CLKRUN_PMESTS	0x00008000
+#define NS_CLKRUN_PMEENB	0x00000100
+#define NS_CLNRUN_CLKRUN_ENB	0x00000001
 
 #define SIS_CSR_TX_ENABLE	0x00000001
 #define SIS_CSR_TX_DISABLE	0x00000002
@@ -356,6 +361,14 @@ struct sis_ring_data {
 #define SIS_DEVICEID_900	0x0900
 #define SIS_DEVICEID_7016	0x7016
 
+
+/*
+ * SiS 900 PCI revision codes.
+ */
+#define SIS_REV_630E		0x0081
+#define SIS_REV_630S		0x0082
+#define SIS_REV_630EA1		0x0083
+
 struct sis_type {
 	u_int16_t		sis_vid;
 	u_int16_t		sis_did;
@@ -379,6 +392,7 @@ struct sis_softc {
 	struct sis_list_data	*sis_ldata;
 	caddr_t			sis_ldata_ptr;
 	struct sis_ring_data	sis_cdata;
+	struct timeout		sis_timeout;
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sis.c,v 1.7 2000/10/16 17:08:08 aaron Exp $ */
+/*	$OpenBSD: if_sis.c,v 1.12 2001/03/14 15:17:31 aaron Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.21 2000/08/22 23:26:51 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.30 2001/02/06 10:11:47 phk Exp $
  */
 
 /*
@@ -69,6 +69,7 @@
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/timeout.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -128,6 +129,9 @@ void sis_delay		__P((struct sis_softc *));
 void sis_eeprom_idle	__P((struct sis_softc *));
 void sis_eeprom_putbyte	__P((struct sis_softc *, int));
 void sis_eeprom_getword	__P((struct sis_softc *, int, u_int16_t *));
+#ifdef __i386__
+void sis_read_cmos	__P((struct sis_softc *, struct pci_attach_args *, caddr_t, int, int));
+#endif
 void sis_read_eeprom	__P((struct sis_softc *, caddr_t, int, int, int));
 
 int sis_miibus_readreg	__P((struct device *, int, int));
@@ -308,6 +312,31 @@ void sis_read_eeprom(sc, dest, off, cnt, swap)
 
 	return;
 }
+
+#ifdef __i386__
+void sis_read_cmos(sc, pa, dest, off, cnt)
+	struct sis_softc *sc;
+	struct pci_attach_args *pa;
+	caddr_t dest;
+	int off, cnt;
+{
+	bus_space_tag_t btag;
+	u_int32_t reg;
+	int i;
+
+	reg = pci_conf_read(pa->pa_pc, pa->pa_tag, 0x48);
+	pci_conf_write(pa->pa_pc, pa->pa_tag, 0x48, reg | 0x40);
+
+	btag = I386_BUS_SPACE_IO;
+
+	for (i = 0; i < cnt; i++) {
+		bus_space_write_1(btag, 0x0, 0x70, i + off);
+		*(dest + i) = bus_space_read_1(btag, 0x0, 0x71);
+	}
+
+	pci_conf_write(pa->pa_pc, pa->pa_tag, 0x48, reg & ~0x40);
+}
+#endif
 
 int sis_miibus_readreg(self, phy, reg)
 	struct device		*self;
@@ -542,6 +571,16 @@ void sis_reset(sc)
 
 	/* Wait a little while for the chip to get its brains in order. */
 	DELAY(1000);
+
+	/*
+	 * If this is a NetSemi chip, make sure to clear
+	 * PME mode.
+	 */
+	if (sc->sis_type == SIS_TYPE_83815) {
+		CSR_WRITE_4(sc, NS_CLKRUN, NS_CLKRUN_PMESTS);
+		CSR_WRITE_4(sc, NS_CLKRUN, 0);
+	}
+
         return;
 }
 
@@ -592,7 +631,7 @@ void sis_attach(parent, self, aux)
 	bus_addr_t		iobase;
 	bus_size_t		iosize;
 
-	s = splimp();
+	s = splnet();
 	sc->sis_unit = sc->sc_dev.dv_unit;
 
 	switch (PCI_PRODUCT(pa->pa_id)) {
@@ -738,8 +777,33 @@ void sis_attach(parent, self, aux)
 		break;
 	case PCI_VENDOR_SIS:
 	default:
-		sis_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
-		    SIS_EE_NODEADDR, 3, 0);
+#ifdef __i386__
+		/*
+		 * If this is a SiS 630E chipset with an embedded
+		 * SiS 900 controller, we have to read the MAC address
+		 * from the APC CMOS RAM. Our method for doing this
+		 * is very ugly since we have to reach out and grab
+		 * ahold of hardware for which we cannot properly
+		 * allocate resources. This code is only compiled on
+		 * the i386 architecture since the SiS 630E chipset
+		 * is for x86 motherboards only. Note that there are
+		 * a lot of magic numbers in this hack. These are
+		 * taken from SiS's Linux driver. I'd like to replace
+		 * them with proper symbolic definitions, but that
+		 * requires some datasheets that I don't have access
+		 * to at the moment.
+		 */
+		command = pci_conf_read(pc, pa->pa_tag,
+		    PCI_CLASS_REG) & 0x000000ff;
+		if (command == SIS_REV_630S ||
+		    command == SIS_REV_630E ||
+		    command == SIS_REV_630EA1)
+		        sis_read_cmos(sc, pa, (caddr_t)&sc->arpcom.ac_enaddr,
+			    0x9, 6);
+		else
+#endif
+			sis_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
+			    SIS_EE_NODEADDR, 3, 0);
 		break;
 	}
 
@@ -786,10 +850,6 @@ void sis_attach(parent, self, aux)
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
-#if NBPFILTER > 0
-	bpfattach(&sc->arpcom.ac_if.if_bpf, ifp, DLT_EN10MB,
-		  sizeof(struct ether_header));
-#endif
 	shutdownhook_establish(sis_shutdown, sc);
 
 fail:
@@ -1060,7 +1120,7 @@ void sis_tick(xsc)
 	struct ifnet		*ifp;
 	int			s;
 
-	s = splimp();
+	s = splnet();
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -1075,7 +1135,7 @@ void sis_tick(xsc)
 			if (ifp->if_snd.ifq_head != NULL)
 				sis_start(ifp);
 	}
-	timeout(sis_tick, sc, hz);
+	timeout_add(&sc->sis_timeout, hz);
 
 	splx(s);
 
@@ -1203,6 +1263,7 @@ void sis_start(ifp)
 	struct sis_softc	*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		idx;
+	int			s;
 
 	sc = ifp->if_softc;
 
@@ -1215,12 +1276,16 @@ void sis_start(ifp)
 		return;
 
 	while(sc->sis_ldata->sis_tx_list[idx].sis_mbuf == NULL) {
+		s = splimp();
 		IF_DEQUEUE(&ifp->if_snd, m_head);
+		splx(s);
 		if (m_head == NULL)
 			break;
 
 		if (sis_encap(sc, m_head, &idx)) {
+			s = splimp();
 			IF_PREPEND(&ifp->if_snd, m_head);
+			splx(s);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
@@ -1255,7 +1320,7 @@ void sis_init(xsc)
 	struct mii_data		*mii;
 	int			s;
 
-	s = splimp();
+	s = splnet();
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
@@ -1401,7 +1466,8 @@ void sis_init(xsc)
 
 	(void)splx(s);
 
-	timeout(sis_tick, sc, hz);
+	timeout_set(&sc->sis_timeout, sis_tick, sc);
+	timeout_add(&sc->sis_timeout, hz);
 
 	return;
 }
@@ -1421,8 +1487,7 @@ int sis_ifmedia_upd(ifp)
 	sc->sis_link = 0;
 	if (mii->mii_instance) {
 		struct mii_softc	*miisc;
-		for (miisc = LIST_FIRST(&mii->mii_phys); miisc != NULL;
-		    miisc = LIST_NEXT(miisc, mii_list))
+		LIST_FOREACH(miisc, &mii->mii_phys, mii_list)
 			mii_phy_reset(miisc);
 	}
 	mii_mediachg(mii);
@@ -1461,7 +1526,7 @@ int sis_ioctl(ifp, command, data)
 	struct mii_data		*mii;
 	int			s, error = 0;
 
-	s = splimp();
+	s = splnet();
 
 	if ((error = ether_ioctl(ifp, &sc->arpcom, command, data)) > 0) {
 		splx(s);
@@ -1527,12 +1592,14 @@ void sis_watchdog(ifp)
 	struct ifnet		*ifp;
 {
 	struct sis_softc	*sc;
+	int			s;
 
 	sc = ifp->if_softc;
 
 	ifp->if_oerrors++;
 	printf("sis%d: watchdog timeout\n", sc->sis_unit);
 
+	s = splnet();
 	sis_stop(sc);
 	sis_reset(sc);
 	sis_init(sc);
@@ -1540,6 +1607,7 @@ void sis_watchdog(ifp)
 	if (ifp->if_snd.ifq_head != NULL)
 		sis_start(ifp);
 
+	splx(s);
 	return;
 }
 
@@ -1556,7 +1624,7 @@ void sis_stop(sc)
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_timer = 0;
 
-	untimeout(sis_tick, sc);
+	timeout_del(&sc->sis_timeout);
 	CSR_WRITE_4(sc, SIS_IER, 0);
 	CSR_WRITE_4(sc, SIS_IMR, 0);
 	SIS_SETBIT(sc, SIS_CSR, SIS_CSR_TX_DISABLE|SIS_CSR_RX_DISABLE);

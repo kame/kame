@@ -1,4 +1,4 @@
-/*	$OpenBSD: an.c,v 1.9 2000/06/20 20:35:14 todd Exp $	*/
+/*	$OpenBSD: an.c,v 1.15 2001/04/17 04:34:08 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -132,7 +132,7 @@
 #define TIMEOUT(handle,func,sc,time) timeout_add(&(handle), (time))
 #define UNTIMEOUT(func,sc,handle) timeout_del(&(handle))
 #define BPF_MTAP(if,mbuf) bpf_mtap((if)->if_bpf, (mbuf))
-#define BPFATTACH(if_bpf,if,dlt,sz) bpfattach((if_bpf), (if), (dlt), (sz))
+#define BPFATTACH(if_bpf,if,dlt,sz)
 
 struct cfdriver an_cd = {
 	NULL, "an", DV_IFNET
@@ -220,7 +220,7 @@ an_attach(sc)
 	bcopy((char *)&sc->an_caps.an_oemaddr,
 	   (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
-	printf(": address: %6s\n", ether_sprintf(sc->arpcom.ac_enaddr));
+	printf(": address %6s\n", ether_sprintf(sc->arpcom.ac_enaddr));
 
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 	ifp->if_softc = sc;
@@ -241,7 +241,7 @@ an_attach(sc)
 	    sizeof(AN_DEFAULT_NETNAME) - 1);
 	sc->an_ssidlist.an_ssid1_len = strlen(AN_DEFAULT_NETNAME);
 
-	sc->an_config.an_opmode = AN_OPMODE_IBSS_ADHOC;
+	sc->an_config.an_opmode = AN_OPMODE_INFRASTRUCTURE_STATION;
 
 	sc->an_tx_rate = 0;
 	bzero((char *)&sc->an_stats, sizeof(sc->an_stats));
@@ -262,6 +262,7 @@ an_attach(sc)
 
 	shutdownhook_establish(an_shutdown, sc);
 
+	an_reset(sc);
 	an_init(sc);
 
 	return(0);
@@ -503,7 +504,13 @@ an_cmd(sc, cmd, val)
 	int cmd;
 	int val;
 {
-	int i;
+	int i, stat;
+
+	/* make sure previous command completed */
+	if (CSR_READ_2(sc, AN_COMMAND) & AN_CMD_BUSY) {
+		printf("%s: command busy\n", sc->sc_dev.dv_xname);
+		CSR_WRITE_2(sc, AN_EVENT_ACK, AN_EV_CLR_STUCK_BUSY);
+	}
 
 	CSR_WRITE_2(sc, AN_PARAM0, val);
 	CSR_WRITE_2(sc, AN_PARAM1, 0);
@@ -522,29 +529,22 @@ an_cmd(sc, cmd, val)
 			}
 		}
 	}
-/* printf("<<cmd %x,%d>>", cmd, i); */
-#if 0
-	DELAY(100);
-	for (i = AN_TIMEOUT; i--; DELAY(100)) {
-		int s = CSR_READ_2(sc, AN_STATUS);
-		CSR_READ_2(sc, AN_RESP0);
-		CSR_READ_2(sc, AN_RESP1);
-		CSR_READ_2(sc, AN_RESP2);
-		if ((s & AN_STAT_CMD_CODE) == (cmd & AN_STAT_CMD_CODE))
-			break;
-	}
-/*printf("<<resp %d, %x>>", i, s);*/
-#endif
-	/* Ack the command */
-	CSR_WRITE_2(sc, AN_EVENT_ACK, AN_EV_CMD);
 
+	stat = CSR_READ_2(sc, AN_STATUS);
+
+	/* clear stuck command busy if needed */
 	if (CSR_READ_2(sc, AN_COMMAND) & AN_CMD_BUSY) {
-/*printf("busy");*/
 		CSR_WRITE_2(sc, AN_EVENT_ACK, AN_EV_CLR_STUCK_BUSY);
 	}
 
+	/* Ack the command */
+	CSR_WRITE_2(sc, AN_EVENT_ACK, AN_EV_CMD);
+
 	if (i <= 0)
 		return(ETIMEDOUT);
+
+	if (stat & AN_STAT_CMD_RESULT)
+		return(EIO);
 
 	return(0);
 }
@@ -591,13 +591,15 @@ an_read_record(sc, ltv)
 
 	/* Tell the NIC to enter record read mode. */
 	if (an_cmd(sc, AN_CMD_ACCESS|AN_ACCESS_READ, ltv->an_type)) {
-		printf("%s: RID access failed\n", sc->sc_dev.dv_xname);
+		printf("%s: RID 0x%04x access failed\n",
+		    sc->sc_dev.dv_xname, ltv->an_type);
 		return(EIO);
 	}
 
 	/* Seek to the record. */
 	if (an_seek(sc, ltv->an_type, 0, AN_BAP1)) {
-		printf("%s: seek to record failed\n", sc->sc_dev.dv_xname);
+		printf("%s: RID 0x%04x seek to record failed\n",
+		    sc->sc_dev.dv_xname, ltv->an_type);
 		return(EIO);
 	}
 
@@ -608,8 +610,9 @@ an_read_record(sc, ltv)
 	 */
 	len = CSR_READ_2(sc, AN_DATA1);
 	if (len > ltv->an_len) {
-		printf("%s: record length mismatch -- expected %d, got %d\n",
-		    sc->sc_dev.dv_xname, ltv->an_len, len);
+		printf("%s: RID 0x%04x record length mismatch -- expected %d, "
+		    "got %d\n", sc->sc_dev.dv_xname, ltv->an_type,
+		    ltv->an_len, len);
 		return(ENOSPC);
 	}
 
@@ -826,6 +829,28 @@ an_setdef(sc, areq)
 		sp = (struct an_ltv_gen *)areq;
 		sc->an_tx_rate = sp->an_val;
 		break;
+	case AN_RID_WEP_VOLATILE:
+		/* Disable the MAC */
+		an_cmd(sc, AN_CMD_DISABLE, 0);
+
+		/* Just write the key, we dont' want to save it */
+		an_write_record(sc, (struct an_ltv_gen *)areq);
+
+		/* Turn the MAC back on */
+		an_cmd(sc, AN_CMD_ENABLE, 0);
+
+		break;
+	case AN_RID_WEP_PERMANENT:
+		/* Disable the MAC */
+		an_cmd(sc, AN_CMD_DISABLE, 0);
+
+		/* Just write the key, the card will save it in this mode */
+		an_write_record(sc, (struct an_ltv_gen *)areq);
+
+		/* Turn the MAC back on */
+		an_cmd(sc, AN_CMD_ENABLE, 0);
+
+		break;
 	default:
 		printf("%s: unknown RID: %x\n",
 		    sc->sc_dev.dv_xname, areq->an_type);
@@ -930,6 +955,7 @@ an_ioctl(ifp, command, data)
 			    !(ifp->if_flags & IFF_PROMISC) &&
 			    sc->an_if_flags & IFF_PROMISC) {
 				an_promisc(sc, 0);
+				an_reset(sc);
 			}
 			an_init(sc);
 		} else {
@@ -1034,13 +1060,10 @@ an_init(sc)
 
 	/* Allocate the TX buffers */
 	if (an_init_tx_ring(sc)) {
-		an_reset(sc);
-		if (an_init_tx_ring(sc)) {
-			printf("%s: tx buffer allocation failed\n",
-			    sc->sc_dev.dv_xname);
-			splx(s);
-			return;
-		}
+		printf("%s: tx buffer allocation failed\n",
+		    sc->sc_dev.dv_xname);
+		splx(s);
+		return;
 	}
 
 	/* Set our MAC address. */

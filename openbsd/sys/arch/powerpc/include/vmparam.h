@@ -1,3 +1,4 @@
+/*	$OpenBSD: vmparam.h,v 1.8 2001/03/29 18:52:19 drahn Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.1 1996/09/30 16:34:38 ws Exp $	*/
 
 /*-
@@ -97,17 +98,13 @@
 /* ppc_kvm_size is so that vm space can be stolen before vm is fully
  * initialized.
  */
-#define VM_KERN_ADDR_SIZE_DEF	SEGMENT_LENGTH
+#define VM_KERN_ADDR_SIZE_DEF SEGMENT_LENGTH
 extern vm_offset_t ppc_kvm_size;
-#define VM_KERN_ADDRESS_SIZE	(ppc_kvm_size)
+#define VM_KERN_ADDRESS_SIZE  (ppc_kvm_size)
 #define	VM_MAX_KERNEL_ADDRESS	((vm_offset_t)((KERNEL_SR << ADDR_SR_SHFT) \
 						+ VM_KERN_ADDRESS_SIZE))
 
-#ifdef UVM
 #define	MACHINE_NEW_NONCONTIG	/* VM <=> pmap interface modifier */
-#else
-#define	MACHINE_NONCONTIG	/* VM <=> pmap interface modifier */
-#endif
 
 #define	VM_KMEM_SIZE		(NKMEMCLUSTERS * CLBYTES)
 #define	VM_MBUF_SIZE		(NMBCLUSTERS * CLBYTES)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf64.c,v 1.8 1999/11/25 13:41:30 art Exp $	*/
+/*	$OpenBSD: exec_elf64.c,v 1.14 2001/03/29 13:25:34 art Exp $	*/
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
@@ -94,7 +94,7 @@ struct elf64_probe_entry {
 #ifdef COMPAT_NETBSD
 	{ netbsd_elf64_probe, 1 << OOS_NETBSD },
 #endif
-#ifdef NATIVE_ELF
+#ifdef NATIVE_EXEC_ELF
 	{ 0, 1 << OOS_OPENBSD }
 #endif
 };
@@ -142,7 +142,6 @@ struct emul emul_elf64 = {
 	sigcode,
 	esigcode,
 };
-
 
 /*
  * Copy arguments onto the stack in the normal way, but add some
@@ -269,7 +268,7 @@ elf64_load_psection(vcset, vp, ph, addr, size, prot)
 	 */
 	if (*addr != ELF64_NO_ADDR) {
 		if (ph->p_align > 1) {
-			*addr = ELF_ROUND(*addr + ph->p_align, ph->p_align);
+			*addr = ELF_ROUND(*addr, ph->p_align);
 			uaddr = ELF_TRUNC(ph->p_vaddr, ph->p_align);
 		} else
 			uaddr = ph->p_vaddr;
@@ -298,7 +297,7 @@ elf64_load_psection(vcset, vp, ph, addr, size, prot)
 		psize = trunc_page(*size);
 		NEW_VMCMD(vcset, vmcmd_map_pagedvn, psize, *addr, vp,
 		    offset, *prot);
-		if(psize != *size) {
+		if (psize != *size) {
 			NEW_VMCMD(vcset, vmcmd_map_readvn, *size - psize,
 			    *addr + psize, vp, offset + psize, *prot);
 		}
@@ -384,6 +383,10 @@ elf64_load_file(p, path, epp, ap, last)
 	}
 	if ((error = VOP_GETATTR(vp, epp->ep_vap, p->p_ucred, p)) != 0)
 		goto bad;
+	if (vp->v_mount->mnt_flag & MNT_NOEXEC) {
+		error = EACCES;
+		goto bad;
+	}
 	if ((error = VOP_ACCESS(vp, VREAD, p->p_ucred, p)) != 0)
 		goto bad1;
 	if ((error = elf64_read_from(p, nd.ni_vp, 0,
@@ -397,6 +400,11 @@ elf64_load_file(p, path, epp, ap, last)
 	}
 
 	phsize = eh.e_phnum * sizeof(Elf64_Phdr);
+	if (phsize > 8192) {
+		/* XXX - this is not the way we want to fix this, but ... */
+		error = EINVAL;
+		goto bad1;
+	}
 	ph = (Elf64_Phdr *)malloc(phsize, M_TEMP, M_WAITOK);
 
 	if ((error = elf64_read_from(p, nd.ni_vp, eh.e_phoff, (caddr_t)ph,
@@ -537,6 +545,12 @@ exec_elf64_makecmds(p, epp)
 	 */
 	error = ENOEXEC;
 	p->p_os = OOS_OPENBSD;
+
+#ifdef NATIVE_EXEC_ELF
+	if (elf64_os_pt_note(p, epp, epp->ep_hdr, "OpenBSD", 8, 4) == 0) {
+		goto native;
+	}
+#endif
 	for (i = 0; i < sizeof elf64_probes / sizeof elf64_probes[0] && error;
 	     i++)
 		if (os == OOS_NULL || ((1 << os) & elf64_probes[i].os_mask))
@@ -545,11 +559,12 @@ exec_elf64_makecmds(p, epp)
 			    0;
 	if (!error)
 		p->p_os = os;
-#ifndef NATIVE_ELF
+#ifndef NATIVE_EXEC_ELF
 	else
 		goto bad;
-#endif /* NATIVE_ELF */
+#endif /* NATIVE_EXEC_ELF */
 
+native:
 	/*
 	 * Load all the necessary sections
 	 */
@@ -779,6 +794,10 @@ elf64_os_pt_note(p, epp, eh, os_name, name_size, desc_size)
 	int error;
 
 	phsize = eh->e_phnum * sizeof(Elf64_Phdr);
+	if (phsize > 8192) {
+		/* XXX - this is not the way we want to fix this, but ... */
+		return EINVAL;
+	}
 	hph = (Elf64_Phdr *)malloc(phsize, M_TEMP, M_WAITOK);
 	if ((error = elf64_read_from(p, epp->ep_vp, eh->e_phoff,
 	    (caddr_t)hph, phsize)) != 0)
