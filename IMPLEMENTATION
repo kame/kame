@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/24 14:52:46 $
+			$Date: 1999/08/30 18:19:11 $
 
 1. IPv6
 
@@ -58,6 +58,12 @@ RFC2462: IPv6 Stateless Address Autoconfiguration
 RFC2463: ICMPv6 for IPv6 specification
     * See 1.8 in this document for details.
 RFC2464: Transmission of IPv6 Packets over Ethernet Networks
+RFC2465: MIB for IPv6: Textual Conventions and General Group
+    * Necessary statistics are gathered by the kernel.  Actual IPv6 MIB
+      support is provided as patchkit for ucd-snmp.
+RFC2466: MIB for IPv6: ICMPv6 group
+    * Necessary statistics are gathered by the kernel.  Actual IPv6 MIB
+      support is provided as patchkit for ucd-snmp.
 RFC2467: Transmission of IPv6 Packets over FDDI Networks
 RFC2472: IPv6 over PPP
 RFC2492: IPv6 over ATM Networks
