@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1739 2001/06/21 07:49:04 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1740 2001/06/22 18:14:48 itojun Exp $
 
 <200106>
+Sat Jun 23 03:10:50 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: disallow setsockopt(IPV6_V6ONLY)
+	  for sockets that are already bound.  per discussions on ipngwg
+	  mailing list.
+
 2001-06-21 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_dispatch.c (foundFinalPayload):
 	- Fix a bug that offset of the payload is calculated
