@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.128 2000/08/02 11:02:26 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.129 2000/08/02 18:55:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1143,7 +1143,6 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * - IPv6 Subject address handling
  * - IPv4 Subject address handling support missing
  * - Proxy reply (answer even if it's not for me)
- * - "Supported Qtypes" support missing
  * - joins NI group address at in6_ifattach() time only, does not cope
  *   with hostname changes by sethostname(3)
  */
@@ -1207,7 +1206,7 @@ ni6_input(m, off)
 	case NI_QTYPE_NOOP:
 		break;		/* no reply data */
 	case NI_QTYPE_SUPTYPES:
-		goto bad;	/* xxx: to be implemented */
+		replylen += sizeof(u_int32_t);
 		break;
 	case NI_QTYPE_FQDN:
 		/* XXX will append a mbuf */
@@ -1344,10 +1343,6 @@ ni6_input(m, off)
 			goto bad;
 		}
 		break;
-
-	default:
-		/* should never be here due to "switch (qtype)" above */
-		goto bad;
 	}
 
 	/* allocate a mbuf to reply. */
@@ -1380,13 +1375,17 @@ ni6_input(m, off)
 	/* qtype dependent procedure */
 	switch (qtype) {
 	case NI_QTYPE_NOOP:
-		nni6->ni_code = 0;	/* 06 draft: "success" */
+		nni6->ni_code = ICMP6_NI_SUCESS;
 		nni6->ni_flags = 0;
 		break;
 	case NI_QTYPE_SUPTYPES:
-		goto bad;	/* xxx: to be implemented */
+		nni6->ni_code = ICMP6_NI_SUCESS;
+		nni6->ni_flags = htons(0x0000);	/* raw bitmap */
+		/* supports NOOP, SUPTYPES, FQDN, and NODEADDR */
+		*(u_int32_t *)(nni6 + 1) = htonl(0x000f);
 		break;
 	case NI_QTYPE_FQDN:
+		nni6->ni_code = ICMP6_NI_SUCESS;
 		fqdn = (struct ni_reply_fqdn *)(mtod(n, caddr_t) +
 						sizeof(struct ip6_hdr) +
 						sizeof(struct icmp6_nodeinfo));
@@ -1407,6 +1406,7 @@ ni6_input(m, off)
 	{
 		int lenlim, copied;
 
+		nni6->ni_code = ICMP6_NI_SUCESS;
 		if (n->m_flags & M_EXT)
 			lenlim = MCLBYTES - sizeof(struct ip6_hdr) -
 				sizeof(struct icmp6_nodeinfo);
@@ -1424,7 +1424,6 @@ ni6_input(m, off)
 	}
 
 	nni6->ni_type = ICMP6_NI_REPLY;
-	nni6->ni_code = ICMP6_NI_SUCESS;
 	m_freem(m);
 	return(n);
 
