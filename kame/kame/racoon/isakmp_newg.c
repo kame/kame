@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_newg.c,v 1.8 2000/12/15 13:43:55 sakane Exp $	*/
+/*	$KAME: isakmp_newg.c,v 1.9 2000/12/17 23:06:28 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,7 +157,7 @@ isakmp_newgroup_r(iph1, msg)
 	memcpy(buf->v + sizeof(isakmp->msgid), sa, ntohs(sa->h.len));
 
 	plog(LLV_DEBUG, LOCATION, NULL, "hash source\n");
-	hexdump(LLV_DEBUG, buf->v, buf->l);
+	plogdump(LLV_DEBUG, buf->v, buf->l);
 
 	my_hash = isakmp_prf(iph1->skeyid_a, buf, iph1);
 	vfree(buf);
@@ -165,12 +165,12 @@ isakmp_newgroup_r(iph1, msg)
 		goto end;
 
 	plog(LLV_DEBUG, LOCATION, NULL, "hash result\n");
-	hexdump(LLV_DEBUG, my_hash->v, my_hash->l);
+	plogdump(LLV_DEBUG, my_hash->v, my_hash->l);
 
 	r_hash = (char *)hash + sizeof(*hash);
 
 	plog(LLV_DEBUG, LOCATION, NULL, "original hash\n"));
-	hexdump(LLV_DEBUG, r_hash, ntohs(hash->h.len) - sizeof(*hash)));
+	plogdump(LLV_DEBUG, r_hash, ntohs(hash->h.len) - sizeof(*hash)));
 
 	result = memcmp(my_hash->v, r_hash, my_hash->l);
 	vfree(my_hash);
