@@ -345,7 +345,7 @@ get_next_msg(char *buf, char *lim, int ifindex, size_t *lenp, int filter)
 			*lenp = ifam->ifam_msglen;
 			return (char *)rtm;
 			/* NOTREACHED */
-		case RTM_IFINFO:
+		case RTM_IFCHANGE:
 			/* found */
 			*lenp = rtm->rtm_msglen;
 			return (char *)rtm;
@@ -384,7 +384,7 @@ get_rtm_ifindex(char *buf)
 int
 get_ifm_ifindex(char *buf)
 {
-	struct if_msghdr *ifm = (struct if_msghdr *)buf;
+	struct ifc_msghdr *ifm = (struct ifc_msghdr *)buf;
 
 	return ((int)ifm->ifm_index);
 }
@@ -400,7 +400,7 @@ get_ifam_ifindex(char *buf)
 int
 get_ifm_flags(char *buf)
 {
-	struct if_msghdr *ifm = (struct if_msghdr *)buf;
+	struct ifc_msghdr *ifm = (struct ifc_msghdr *)buf;
 
 	return (ifm->ifm_flags);
 }

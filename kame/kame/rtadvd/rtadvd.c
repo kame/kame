@@ -275,7 +275,7 @@ rtmsg_input()
 				    RTADV_TYPE2BITMASK(RTM_DELETE) |
 				    RTADV_TYPE2BITMASK(RTM_NEWADDR) |
 				    RTADV_TYPE2BITMASK(RTM_DELADDR) |
-				    RTADV_TYPE2BITMASK(RTM_IFINFO));
+				    RTADV_TYPE2BITMASK(RTM_IFCHANGE));
 		if (len == 0)
 			break;
 		type = rtmsg_type(next);
@@ -288,7 +288,7 @@ rtmsg_input()
 		case RTM_DELADDR:
 			ifindex = get_ifam_ifindex(next);
 			break;
-		case RTM_IFINFO:
+		case RTM_IFCHANGE:
 			ifindex = get_ifm_ifindex(next);
 			break;
 		default:
@@ -390,7 +390,7 @@ rtmsg_input()
 			 	if_getflags(ifindex,
 					    iflist[ifindex]->ifm_flags);
 			 break;
-		case RTM_IFINFO:
+		case RTM_IFCHANGE:
 			 iflist[ifindex]->ifm_flags = get_ifm_flags(next);
 			 break;
 		default:
