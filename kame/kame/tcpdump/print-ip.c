@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: print-ip.c,v 1.66 97/05/28 12:51:43 leres Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-ip.c,v 1.1.1.1 1999/08/08 23:32:05 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -335,7 +335,7 @@ void
 ip_print(register const u_char *bp, register u_int length)
 {
 	register const struct ip *ip;
-	register u_int hlen, len, off;
+	register u_int hlen, len, len0, off;
 	register const u_char *cp;
 	u_char nh;
 	int advance;
@@ -382,6 +382,7 @@ ip_print(register const u_char *bp, register u_int length)
 		(void)printf("truncated-ip - %d bytes missing!",
 			len - length);
 	len -= hlen;
+	len0 = len;
 
 	/*
 	 * If this is fragment zero, hand it to the next higher
@@ -554,11 +555,13 @@ again:
 			break;
 		}
 	}
+
 	/*
 	 * for fragmented datagrams, print id:size@offset.  On all
 	 * but the last stick a "+".  For unfragmented datagrams, note
 	 * the don't fragment flag.
 	 */
+	len = len0;	/* get the original length */
 	if (off & 0x3fff) {
 		/*
 		 * if this isn't the first frag, we're missing the
@@ -567,7 +570,7 @@ again:
 		if (off & 0x1fff)
 			(void)printf("%s > %s:", ipaddr_string(&ip->ip_src),
 				      ipaddr_string(&ip->ip_dst));
-		(void)printf(" (frag %d:%d@%d%s)", ntohs(ip->ip_id), len,
+		(void)printf(" (frag %d:%u@%d%s)", ntohs(ip->ip_id), len,
 			(off & 0x1fff) * 8,
 			(off & IP_MF)? "+" : "");
 	} else if (off & IP_DF)
