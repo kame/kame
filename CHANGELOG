@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1214 2000/08/20 11:26:53 itojun Exp $
+$KAME: CHANGELOG,v 1.1215 2000/08/20 12:15:33 sumikawa Exp $
 
 <200008>
+Sun Aug 20 20:14:36 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/zebra: upgrade to 0.88.
+
 Sun Aug 20 20:23:03 JST 2000  itojun@iijlab.net
 	* freebsd3/ports/rsync, netbsd/pkgsrc/net/rsync: upgrade to 2.4.5.
 
