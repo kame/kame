@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1045.2.11 2000/06/29 01:37:41 itojun Exp $
+$Id: CHANGELOG,v 1.1045.2.12 2000/06/29 02:19:31 itojun Exp $
 
 <200006>
 Thu Jun 29 10:14:47 JST 2000  itojun@iijlab.net
@@ -21,7 +21,7 @@ Wed Jun 28 01:12:59 JST 2000  itojun@iijlab.net
 
 Thu Jun 22 03:45:41 JST 2000  itojun@iijlab.net
 	* {bsdi4,openbsd}/sys/netinet6/raw_ipv6.c:
-	  correct multicast RFC2292bis interface selection support for
+	  correct RFC2292bis interface selection support for
 	  multicast packets.  KAME PR261.
 	  (NOTE: for 2000/6 stable branch, kame/sys/netinet6/raw_ip6.c is not
 	  affected)
