@@ -93,9 +93,6 @@
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
-#ifdef ENABLE_DEFAULT_SCOPE
-#include <netinet6/scope6_var.h> 
-#endif
 
 #include "faith.h"
 
@@ -136,42 +133,11 @@ in6_pcbbind(inp, nam, p)
 			return(EAFNOSUPPORT);
 		sin6 = (struct sockaddr_in6 *)nam;
 
-#ifdef ENABLE_DEFAULT_SCOPE
-		if (sin6->sin6_scope_id == 0)
-			sin6->sin6_scope_id =
-				scope6_addr2default(&sin6->sin6_addr);
-#endif
-
-		/*
-		 * If the scope of the destination is link-local, embed the
-		 * interface index in the address.
-		 */
-		if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr)) {
-			/* XXX boundary check is assumed to be already done. */
-			/* XXX sin6_scope_id is weaker than advanced-api. */
-			struct in6_pktinfo *pi;
-			if (inp->in6p_outputopts &&
-			    (pi = inp->in6p_outputopts->ip6po_pktinfo) &&
-			    pi->ipi6_ifindex) {
-				sin6->sin6_addr.s6_addr16[1]
-					= htons(pi->ipi6_ifindex);
-			} else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)
-				&& inp->in6p_moptions
-				&& inp->in6p_moptions->im6o_multicast_ifp) {
-				sin6->sin6_addr.s6_addr16[1] =
-					htons(inp->in6p_moptions->im6o_multicast_ifp->if_index);
-			} else if (sin6->sin6_scope_id) {
-				/* boundary check */
-				if (sin6->sin6_scope_id < 0 
-				 || if_index < sin6->sin6_scope_id) {
-					return ENXIO;  /* XXX EINVAL? */
-				}
-				sin6->sin6_addr.s6_addr16[1]
-					= htons(sin6->sin6_scope_id & 0xffff);/*XXX*/
-				/* this must be cleared for ifa_ifwithaddr() */
-				sin6->sin6_scope_id = 0;
-			}
-		}
+		/* KAME hack: embed scopeid */
+		if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
+			return EINVAL;
+		/* this must be cleared for ifa_ifwithaddr() */
+		sin6->sin6_scope_id = 0;
 
 		lport = sin6->sin6_port;
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
@@ -279,41 +245,9 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (sin6->sin6_port == 0)
 		return (EADDRNOTAVAIL);
 
-#ifdef ENABLE_DEFAULT_SCOPE
-      if (sin6->sin6_scope_id == 0) /* do not override if already specified */
-	      sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
-#endif
-
-	/*
-	 * If the scope of the destination is link-local, embed the interface
-	 * index in the address.
-	 */
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr)) {
-		/* XXX boundary check is assumed to be already done. */
-		/* XXX sin6_scope_id is weaker than advanced-api. */
-		if (inp->in6p_outputopts &&
-		    (pi = inp->in6p_outputopts->ip6po_pktinfo) &&
-		    pi->ipi6_ifindex) {
-			sin6->sin6_addr.s6_addr16[1] = htons(pi->ipi6_ifindex);
-			ifp = ifindex2ifnet[pi->ipi6_ifindex];
-		}
-		else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) &&
-			 inp->in6p_moptions &&
-			 inp->in6p_moptions->im6o_multicast_ifp) {
-			sin6->sin6_addr.s6_addr16[1] =
-				htons(inp->in6p_moptions->im6o_multicast_ifp->if_index);
-			ifp = ifindex2ifnet[inp->in6p_moptions->im6o_multicast_ifp->if_index];
-		} else if (sin6->sin6_scope_id) {
-			/* boundary check */
-			if (sin6->sin6_scope_id < 0 
-			 || if_index < sin6->sin6_scope_id) {
-				return ENXIO;  /* XXX EINVAL? */
-			}
-			sin6->sin6_addr.s6_addr16[1]
-				= htons(sin6->sin6_scope_id & 0xffff);/*XXX*/
-			ifp = ifindex2ifnet[sin6->sin6_scope_id];
-		}
-	}
+	/* KAME hack: embed scopeid */
+	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, &ifp) != 0)
+		return EINVAL;
 
 	if (in6_ifaddr) {
 		/*
