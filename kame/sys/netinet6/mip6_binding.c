@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.171 2003/02/07 09:51:37 jinmei Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.172 2003/02/07 10:53:03 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2132,6 +2132,7 @@ mip6_timeoutentry_insert_with_mtoe(expire, mtoe)
 		} else if (mto->mto_expire > expire) {
 			TAILQ_INSERT_BEFORE(mto, newmto, mto_entry);
 		}
+		newmto->mto_expire = expire;
 		mto = newmto;
 	}
 
@@ -2332,7 +2333,7 @@ mip6_bc_timeout(dummy)
 		for (mtoe = LIST_FIRST(&mto->mto_timelist); mtoe; mtoe = mtoe_next) {
 			mtoe_next = LIST_NEXT(mtoe, mtoe_entry);
 			mbc = (struct mip6_bc *)mtoe->mtoe_ptr;
-			if (mbc->mbc_expire < time_second) {
+			if (mbc->mbc_expire <= time_second) {
 				mip6_bc_list_remove(&mip6_bc_list, 
 					(struct mip6_bc *)mtoe->mtoe_ptr);
 			} else {
