@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.32 1999/08/19 09:02:22 itojun Exp $
+$Id: CHANGELOG,v 1.33 1999/08/19 11:36:03 jinmei Exp $
 
 <199908>
+1999-08-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{ip6_output.c, nd6.c}: use nd6_output by
+	default. Note that some files under sys/net must be updated,
+	too. I believe the behavior is now quite stable, but if not,
+	please let me know.
+
 Thu Aug 19 15:02:35 JST 1999  itojun@iijlab.net
 	* lib/libinet6: compile inet_pton() into libinet6.  The code
 	  is from ISC BIND821.  This is to avoid bugs in OS-supplied
