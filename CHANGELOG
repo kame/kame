@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.656 2000/03/06 07:56:00 itojun Exp $
+$Id: CHANGELOG,v 1.657 2000/03/06 18:04:48 sakane Exp $
 
 <200003>
 Mon Mar  6 16:54:29 JST 2000  itojun@iijlab.net
@@ -280,6 +280,11 @@ Thu Feb 24 JST 2000  itojun@iijlab.net
 	* kame/kame/traceroute/traceroute.c (send_probe): 
 	* bsdi4/usr.sbin/traceroute/Makefile: 
 	changed a bit to calculate a UDP checksum correctly on bsdi4.
+
+Wed Feb 24 08:49:50 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	 enbale to define DH group by a number of group.
+	 old way to define like "modp768" is kept.
 
 Wed Feb 23 21:26:21 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
