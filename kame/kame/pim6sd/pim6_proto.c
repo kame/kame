@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.68 2003/10/17 04:03:16 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.69 2003/12/24 10:21:10 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -665,7 +665,8 @@ parse_pim6_hello(pim_message, datalen, src, opts)
 	    }
 	    break;
 	default:
-	    /* Ignore any unknown options */
+	    /* skip any unknown options */
+	    data_ptr += option_length;
 	    break;
 	}
     }

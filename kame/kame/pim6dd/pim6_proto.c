@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.8 2003/09/02 09:57:04 itojun Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.9 2003/12/24 10:21:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -381,7 +381,8 @@ parse_pim6_hello(pim_message, datalen, src, holdtime)
 			 holdtime_received_ok = TRUE;
 			 break;
 		 default:
-			 /* Ignore any unknown options */
+			 /* skip any unknown options */
+			 data_ptr += option_length;
 			 break;
 		}
 
