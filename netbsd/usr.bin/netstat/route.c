@@ -230,13 +230,13 @@ pr_family(af)
 #else
 /* width of destination/gateway column */
 #ifdef KAME_SCOPEID
-/* strlen("fe80::aaaa:bbbb:cccc:dddd@gif0") == 30 */
-#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 32 : 18) : 18)
+/* strlen("fe80::aaaa:bbbb:cccc:dddd@gif0") == 30, strlen("/128") == 4 */
+#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 34 : 18) : 18)
 #define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 30 : 18) : 18)
 #else
-/* strlen("fe80::aaaa:bbbb:cccc:dddd") == 25 */
-#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 28 : 18) : 18)
-#define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 26 : 18) : 18)
+/* strlen("fe80::aaaa:bbbb:cccc:dddd") == 25, strlen("/128") == 4 */
+#define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 29 : 18) : 18)
+#define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 25 : 18) : 18)
 #endif
 #endif /* INET6 */
 
