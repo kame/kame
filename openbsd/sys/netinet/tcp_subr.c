@@ -394,8 +394,13 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		th->th_sum = in6_cksum(m, IPPROTO_TCP,
 		   sizeof(struct ip6_hdr), ((struct ip6_hdr *)ti)->ip6_plen);
 		HTONS(((struct ip6_hdr *)ti)->ip6_plen);
+#ifdef NEW_STRUCT_ROUTE
 		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
-			(struct route_in6 *)ro, 0, NULL, NULL);
+			   ro, 0, NULL, NULL);
+#else
+		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
+			   (struct route_in6 *)ro, 0, NULL, NULL);
+#endif
 	} else
 #endif /* INET6 */
 	{

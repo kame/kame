@@ -2784,7 +2784,11 @@ tcp_mss(tp, offer)
 	if ((rt = ro->ro_rt) == (struct rtentry *)0) {
 		/* No route yet, so try to acquire one */
 #ifdef INET6
-		bzero(ro, sizeof(struct route_in6));
+#ifdef NEW_STRUCT_ROUTE
+		bzero(ro, sizeof(*ro));
+#else
+		bzero(ro, sizeof(struct route_in6));		
+#endif
 #else
 		bzero(ro, sizeof(struct route));
 #endif
