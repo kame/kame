@@ -3857,13 +3857,13 @@ match_msf4_per_if(inm, src, dst)
 	LIST_FOREACH(ias, inms->ims_cur->head, ias_list) {
 		if (ias->ias_addr.sin_family != AF_INET)
 			continue;
+		if (ias->ias_addr.sin_addr.s_addr != src->s_addr)
+			continue;
 
-		/* matching src address found */
-		if (ias->ias_addr.sin_addr.s_addr == src->s_addr) {
-			if (inms->ims_mode == MCAST_INCLUDE)
-				return 1;
+		if (inms->ims_mode == MCAST_INCLUDE)
+			return 1;
+		else
 			return 0;
-		}
 	}
 	
 	/* no source-filter matched */
