@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.12 (Berkeley) 4/27/95
- * $FreeBSD: src/include/unistd.h,v 1.35.2.6 2001/03/05 12:45:48 obrien Exp $
+ * $FreeBSD: src/include/unistd.h,v 1.35.2.7 2001/12/27 20:35:34 mike Exp $
  */
 
 #ifndef _UNISTD_H_
@@ -121,7 +121,8 @@ char	*brk __P((const char *));
 int	 chroot __P((const char *));
 size_t	 confstr __P((int, char *, size_t));
 char	*crypt __P((const char *, const char *));
-const char *crypt_get_format __P((void));
+__const char *
+	 crypt_get_format __P((void));
 int	 crypt_set_format __P((const char *));
 int	 des_cipher __P((const char *, char *, long, int));
 int	 des_setkey __P((const char *key));

@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.109.2.13 2001/07/11 23:59:09 obrien Exp $
+# $FreeBSD: src/include/Makefile,v 1.109.2.17 2001/12/18 13:29:59 sheldonh Exp $
 #
 # Doing a make install builds /usr/include
 #
@@ -8,7 +8,8 @@
 
 CLEANFILES= osreldate.h version vers.c
 SUBDIR= rpcsvc
-FILES=	a.out.h ar.h assert.h bitstring.h ctype.h db.h dirent.h disktab.h \
+FILES=	a.out.h ar.h assert.h bitstring.h complex.h ctype.h db.h \
+	dirent.h disktab.h \
 	dlfcn.h elf.h elf-hints.h err.h fnmatch.h fstab.h \
 	fts.h glob.h grp.h strhash.h histedit.h ieeefp.h ifaddrs.h iso646.h \
 	libgen.h limits.h link.h locale.h malloc.h memory.h mpool.h \
@@ -16,12 +17,9 @@ FILES=	a.out.h ar.h assert.h bitstring.h ctype.h db.h dirent.h disktab.h \
 	paths.h pthread.h pthread_np.h pwd.h \
 	ranlib.h regex.h regexp.h resolv.h rune.h runetype.h \
 	search.h setjmp.h sgtty.h \
-	signal.h stab.h stddef.h stdio.h stdlib.h string.h stringlist.h \
-	strings.h struct.h sysexits.h tar.h time.h timers.h \
-	ttyent.h unistd.h utime.h utmp.h vis.h wchar.h wctype.h
-.if defined(WANT_CSRG_LIBM)
-FILES+=	math.h
-.endif
+	signal.h stab.h stdbool.h stddef.h stdio.h stdlib.h \
+	string.h stringlist.h strings.h struct.h sysexits.h tar.h time.h \
+	timers.h ttyent.h unistd.h utime.h utmp.h vis.h wchar.h wctype.h
 
 ARPAFILES=	ftp.h inet.h nameser.h nameser_compat.h telnet.h tftp.h
 
@@ -30,6 +28,8 @@ PROTOFILES=	dumprestore.h routed.h rwhod.h talkd.h timed.h
 RPCFILES=	auth.h auth_unix.h clnt.h pmap_clnt.h pmap_prot.h pmap_rmt.h \
 		rpc.h rpc_com.h rpc_msg.h svc.h svc_auth.h types.h xdr.h \
 		auth_des.h des.h des_crypt.h
+
+NETSMBFILES=	nb_lib.h smb_lib.h smb_rap.h
 
 MFILES=	float.h floatingpoint.h stdarg.h varargs.h
 
@@ -119,6 +119,11 @@ copies:
 	cd ${.CURDIR}/../sys/contrib/ipfilter/netinet; \
 		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 *.h \
 		${DESTDIR}/usr/include/netinet
+.endif
+.if exists(${.CURDIR}/../sys/contrib/netsmb/include/netsmb)
+	cd ${.CURDIR}/../sys/contrib/netsmb/include/netsmb; \
+		${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ${NETSMBFILES} \
+		${DESTDIR}/usr/include/netsmb
 .endif
 .if exists(${.CURDIR}/../sys/${MACHINE_ARCH}/include)
 	cd ${.CURDIR}/../sys/${MACHINE_ARCH}/include; \

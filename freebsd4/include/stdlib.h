@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdlib.h	8.5 (Berkeley) 5/19/95
- * $FreeBSD: src/include/stdlib.h,v 1.16.2.2 2001/06/14 00:06:10 dd Exp $
+ * $FreeBSD: src/include/stdlib.h,v 1.16.2.3 2001/12/27 20:35:34 mike Exp $
  */
 
 #ifndef _STDLIB_H_
@@ -154,7 +154,7 @@ int	 cgetustr __P((char *, char *, char **));
 int	 daemon __P((int, int));
 char	*devname __P((int, int));
 int	 getloadavg __P((double [], int));
-const char *
+__const char *
 	getprogname __P((void));
 
 char	*group_from_gid __P((unsigned long, int));

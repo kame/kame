@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdio.h	8.5 (Berkeley) 4/29/95
- * $FreeBSD: src/include/stdio.h,v 1.24.2.1 2001/07/05 07:43:46 kris Exp $
+ * $FreeBSD: src/include/stdio.h,v 1.24.2.2 2001/12/05 20:48:07 obrien Exp $
  */
 
 #ifndef	_STDIO_H_
@@ -295,9 +295,13 @@ __END_DECLS
 __BEGIN_DECLS
 int	 asprintf __P((char **, const char *, ...)) __printflike(2, 3);
 char	*ctermid_r __P((char *));
-__const char *fmtcheck __P((const char *, const char *))
-	__attribute__((__format_arg__(2)));
 char	*fgetln __P((FILE *, size_t *));
+#if __GNUC__ == 2 && __GNUC_MINOR__ >= 7 || __GNUC__ >= 3
+#define	__ATTR_FORMAT_ARG	__attribute__((__format_arg__(2)))
+#else
+#define	__ATTR_FORMAT_ARG
+#endif
+__const char *fmtcheck __P((const char *, const char *)) __ATTR_FORMAT_ARG;
 int	 fpurge __P((FILE *));
 int	 fseeko __P((FILE *, _BSD_OFF_T_, int));
 _BSD_OFF_T_ ftello __P((FILE *));

@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)string.h	8.1 (Berkeley) 6/2/93
+ * $FreeBSD: src/include/string.h,v 1.6.2.3 2001/12/25 00:36:57 ache Exp $
  */
 
 #ifndef _STRING_H_
@@ -82,11 +83,14 @@ char	*index __P((const char *, int));
 void	*memccpy __P((void *, const void *, int, size_t));
 char	*rindex __P((const char *, int));
 int	 strcasecmp __P((const char *, const char *));
+char	*strcasestr __P((const char *, const char *));
 char	*strdup __P((const char *));
+int	 strerror_r __P((int, char *, size_t));
 size_t	 strlcat __P((char *, const char *, size_t));
-size_t   strlcpy __P((char *, const char *, size_t));
+size_t	 strlcpy __P((char *, const char *, size_t));
 void	 strmode __P((int, char *));
 int	 strncasecmp __P((const char *, const char *, size_t));
+char	*strnstr __P((const char *, const char *, size_t));
 char	*strsep __P((char **, const char *));
 char	*strsignal __P((int));
 char	*strtok_r __P((char *, const char *, char **));
