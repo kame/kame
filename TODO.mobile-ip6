@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.26 2002/01/21 12:25:53 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.27 2002/03/14 09:02:14 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -31,7 +31,6 @@ todo/missing features
 - weak authentication mechanisms.
   - cga?/bu3way?/others?
 - mobile prefix advertisement.
-- complete dynamic home agent discovery. (implement user-land daemon?)
 - rtadvd.
 - rate limit (many places).
 - homeagent info handling.
@@ -111,7 +110,6 @@ man page of mip6control(8).
 - Beta release at the end of this year.
   - More stable.
   - Draft-13/Draft-15 (or newer) support.
-  - NetBSD support.
 
 
 <<Old MIP6 code>>
