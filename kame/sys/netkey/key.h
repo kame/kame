@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.28 2003/06/29 07:00:54 sakane Exp $	*/
+/*	$KAME: key.h,v 1.29 2003/07/01 05:59:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -45,7 +45,8 @@ struct socket;
 struct sadb_msg;
 struct sadb_x_policy;
 
-extern struct secpolicy *key_allocsp __P((struct secpolicyindex *, u_int));
+extern struct secpolicy *key_allocsp __P((u_int16_t, struct secpolicyindex *,
+	u_int));
 extern struct secpolicy *key_allocspbytag __P((u_int16_t, u_int));
 extern struct secpolicy *key_gettunnel __P((struct sockaddr *,
 	struct sockaddr *, struct sockaddr *, struct sockaddr *));

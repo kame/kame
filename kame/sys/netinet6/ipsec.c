@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.194 2003/06/30 05:39:29 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.195 2003/07/01 05:59:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -537,7 +537,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
 			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
-			    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
+			    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
 				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 					printf("DP ipsec4_getpolicybysock called "
@@ -571,7 +571,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 	/* when non-privilieged socket */
 	/* look for a policy in SPD */
 	if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
-	    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
+	    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
 		/* SP found */
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 			printf("DP ipsec4_getpolicybysock called "
@@ -629,6 +629,10 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 	int *error;
 {
 	struct secpolicy *sp = NULL;
+#if NPF > 0
+	struct pf_tag *t;
+#endif
+	u_int16_t tag;
 
 	/* sanity check */
 	if (m == NULL || error == NULL)
@@ -647,7 +651,14 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 	if (*error != 0)
 		return NULL;
 
-	sp = key_allocsp(&spidx, dir);
+#if NPF > 0
+	t = ipsec_get_tag(m);
+	tag = t ? t->tag : 0;
+#else
+	tag = 0;
+#endif
+
+	sp = key_allocsp(tag, &spidx, dir);
     }
 
 	/* SP found */
@@ -663,37 +674,6 @@ ipsec4_getpolicybyaddr(m, dir, flag, error)
 	ip4_def_policy->refcnt++;
 	*error = 0;
 	return ip4_def_policy;
-}
-
-struct secpolicy *
-ipsec4_getpolicybytag(m, dir, error)
-	struct mbuf *m;
-	u_int dir;
-	int *error;
-{
-#if NPF > 0
-	struct pf_tag *t;
-	struct secpolicy *sp = NULL;
-
-	t = ipsec_get_tag(m);
-	if (!t) {
-		*error = ENOENT;
-		return NULL;
-	}
-	sp = key_allocspbytag(t->tag, dir);
-
-	if (sp != NULL) {
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ipsec4_getpolicybytag called "
-			       "to allocate SP:%p\n", sp));
-		*error = 0;
-		return sp;
-	}
-#endif
-
-	/* no SP found */
-	*error = ENOENT;
-	return NULL;
 }
 
 #ifdef INET6
@@ -771,7 +751,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
 			if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
-			    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
+			    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
 				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 					printf("DP ipsec6_getpolicybysock called "
@@ -805,7 +785,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 	/* when non-privilieged socket */
 	/* look for a policy in SPD */
 	if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
-	    (kernsp = key_allocsp(&spidx, dir)) != NULL) {
+	    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
 		/* SP found */
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 			printf("DP ipsec6_getpolicybysock called "
@@ -870,6 +850,10 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 	int *error;
 {
 	struct secpolicy *sp = NULL;
+#if NPF > 0
+	struct pf_tag *t;
+#endif
+	u_int16_t tag;
 
 	/* sanity check */
 	if (m == NULL || error == NULL)
@@ -888,7 +872,14 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 	if (*error != 0)
 		return NULL;
 
-	sp = key_allocsp(&spidx, dir);
+#if NPF > 0
+	t = ipsec_get_tag(m);
+	tag = t ? t->tag : 0;
+#else
+	tag = 0;
+#endif
+
+	sp = key_allocsp(tag, &spidx, dir);
     }
 
 	/* SP found */
@@ -904,37 +895,6 @@ ipsec6_getpolicybyaddr(m, dir, flag, error)
 	ip6_def_policy->refcnt++;
 	*error = 0;
 	return ip6_def_policy;
-}
-
-struct secpolicy *
-ipsec6_getpolicybytag(m, dir, error)
-	struct mbuf *m;
-	u_int dir;
-	int *error;
-{
-#if NPF > 0
-	struct pf_tag *t;
-	struct secpolicy *sp = NULL;
-
-	t = ipsec_get_tag(m);
-	if (!t) {
-		*error = ENOENT;
-		return NULL;
-	}
-	sp = key_allocspbytag(t->tag, dir);
-
-	if (sp != NULL) {
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ipsec6_getpolicybytag called "
-			       "to allocate SP:%p\n", sp));
-		*error = 0;
-		return sp;
-	}
-#endif
-
-	/* no SP found */
-	*error = ENOENT;
-	return NULL;
 }
 #endif /* INET6 */
 
@@ -1942,7 +1902,8 @@ ipsec4_in_reject_so(m, so)
 	 * ipsec4_getpolicybyaddr() with IP_FORWARDING flag.
 	 */
 	if (so == NULL)
-		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_INBOUND, IP_FORWARDING, &error);
+		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_INBOUND,
+		    IP_FORWARDING, &error);
 	else
 		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_INBOUND, so, &error);
 
@@ -1995,7 +1956,8 @@ ipsec6_in_reject_so(m, so)
 	 * ipsec6_getpolicybyaddr() with IP_FORWARDING flag.
 	 */
 	if (so == NULL)
-		sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_INBOUND, IP_FORWARDING, &error);
+		sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_INBOUND,
+		    IP_FORWARDING, &error);
 	else
 		sp = ipsec6_getpolicybysock(m, IPSEC_DIR_INBOUND, so, &error);
 

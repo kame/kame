@@ -513,15 +513,11 @@ sendit:
 
 #ifdef IPSEC
 	/* get SP for this packet */
-	sp = ipsec4_getpolicybytag(m, IPSEC_DIR_OUTBOUND, &error);
-	if (!sp) {
-		if (so == NULL)
-			sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND,
-			    flags, &error);
-		else
-			sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND,
-			    so, &error);
-	}
+	if (so == NULL)
+		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND,
+		    flags, &error);
+	else
+		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
 
 	if (sp == NULL) {
 		ipsecstat.out_inval++;

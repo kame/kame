@@ -1773,12 +1773,9 @@ ip_forward(m, srcrt)
 			size_t ipsechdr;
 			struct route *ro;
 
-			sp = ipsec4_getpolicybytag(mcopy, IPSEC_DIR_OUTBOUND,
+			sp = ipsec4_getpolicybyaddr(mcopy,
+			    IPSEC_DIR_OUTBOUND, IP_FORWARDING,
 			    &ipsecerror);
-			if (!sp)
-				sp = ipsec4_getpolicybyaddr(mcopy,
-				    IPSEC_DIR_OUTBOUND, IP_FORWARDING,
-				    &ipsecerror);
 
 			if (sp == NULL)
 				destifp = ipforward_rt.ro_rt->rt_ifp;

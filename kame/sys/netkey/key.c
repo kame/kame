@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.289 2003/07/01 03:20:00 itojun Exp $	*/
+/*	$KAME: key.c,v 1.290 2003/07/01 05:59:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -533,16 +533,13 @@ static struct secpolicy *key_mip6_find_sp(int,
  *	others:	found and return the pointer.
  */
 struct secpolicy *
-key_allocsp(spidx, dir)
+key_allocsp(tag, spidx, dir)
+	u_int16_t tag;
 	struct secpolicyindex *spidx;
 	u_int dir;
 {
 	struct secpolicy *sp;
 	int s;
-
-	/* sanity check */
-	if (spidx == NULL)
-		panic("key_allocsp: NULL pointer is passed.");
 
 	/* check direction */
 	switch (dir) {
@@ -559,21 +556,31 @@ key_allocsp(spidx, dir)
 #else
 	s = splnet();	/*called from softclock()*/
 #endif
-	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
-		printf("*** objects\n");
-		kdebug_secpolicyindex(spidx));
+	if (spidx) {
+		KEYDEBUG(KEYDEBUG_IPSEC_DATA,
+			printf("*** objects\n");
+			kdebug_secpolicyindex(spidx));
+	}
 
 	LIST_FOREACH(sp, &sptree[dir], chain) {
-		if (!sp->spidx)
-			continue;
-		KEYDEBUG(KEYDEBUG_IPSEC_DATA,
-			printf("*** in SPD\n");
-			kdebug_secpolicyindex(sp->spidx));
-
 		if (sp->state == IPSEC_SPSTATE_DEAD)
 			continue;
-		if (key_cmpspidx_withmask(sp->spidx, spidx))
-			goto found;
+		if (!sp->spidx) {
+			if (!tag)
+				continue;
+			if (sp->tag == tag)
+				goto found;
+		} else {
+			if (!spidx)
+				continue;
+
+			KEYDEBUG(KEYDEBUG_IPSEC_DATA,
+				printf("*** in SPD\n");
+				kdebug_secpolicyindex(sp->spidx));
+
+			if (key_cmpspidx_withmask(sp->spidx, spidx))
+				goto found;
+		}
 	}
 
 	splx(s);
