@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.38 2000/12/22 13:12:29 jinmei Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.39 2001/05/17 07:50:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -751,7 +751,7 @@ receive_pim6_register(reg_src, reg_dst, pim_message, datalen)
 
     /*
      * Message length validation.
-     * This is almost done in the kernel, but the kernel does not pefrome
+     * This is almost done in the kernel, but the kernel does not perform
      * the check for NULL register messages. Thus, we always check this for
      * safety.
      */
