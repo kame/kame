@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.98 2002/11/05 03:48:33 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.99 2002/12/10 11:58:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -441,8 +441,6 @@ void defrouter_reset __P((void));
 void defrouter_select __P((void));
 void defrtrlist_del __P((struct nd_defrouter *));
 void prelist_remove __P((struct nd_prefix *));
-int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
-	struct mbuf *));
 int nd6_prelist_add __P((struct nd_prefix *, struct nd_defrouter *,
 	struct nd_prefix **));
 int nd6_prefix_onlink __P((struct nd_prefix *));

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.217 2002/12/10 11:45:51 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.218 2002/12/10 11:58:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,6 +83,8 @@
 
 static int rtpref __P((struct nd_defrouter *));
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
+static int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
+    struct mbuf *));
 static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *));
 static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
 	struct nd_defrouter *));
@@ -1264,7 +1266,7 @@ prelist_remove(pr)
 	pfxlist_onlink_check();
 }
 
-int
+static int
 prelist_update(new, dr, m)
 	struct nd_prefix *new;
 	struct nd_defrouter *dr; /* may be NULL */
