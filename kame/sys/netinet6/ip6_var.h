@@ -201,9 +201,11 @@ struct	ip6stat {
 	u_quad_t ip6s_pulldown;		/* # of calls to m_pulldown */
 	u_quad_t ip6s_pulldown_copy;	/* # of mbuf copies in m_pulldown */
 	u_quad_t ip6s_pulldown_alloc;	/* # of mbuf allocs in m_pulldown */
+	u_quad_t ip6s_pullup;		/* # of calls to m_pullup */
 	u_quad_t ip6s_pullup_copy;	/* # of possible m_pullup copies */
 	u_quad_t ip6s_pullup_alloc;	/* # of possible m_pullup mallocs */
 	u_quad_t ip6s_pullup_fail;	/* # of possible m_pullup failures */
+	u_quad_t ip6s_pullup2;		/* # of calls to m_pullup2 */
 	u_quad_t ip6s_pullup2_copy;	/* # of possible m_pullup2 copies */
 	u_quad_t ip6s_pullup2_alloc;	/* # of possible m_pullup2 mallocs */
 	u_quad_t ip6s_pullup2_fail;	/* # of possible m_pullup2 failures */

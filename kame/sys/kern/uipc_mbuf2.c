@@ -122,6 +122,7 @@ m_pulldown(m, off, len, offp)
 
 #if defined(PULLDOWN_STAT) && defined(INET6)
 	/* statistics for m_pullup */
+	ip6stat.ip6s_pullup++;
 	if (off + len > MHLEN)
 		ip6stat.ip6s_pullup_fail++;
 	else {
@@ -130,12 +131,12 @@ m_pulldown(m, off, len, offp)
 		dlen = (prev == m) ? prevlen : m->m_len;
 		mlen = (prev == m) ? prevmlen : m->m_len + M_TRAILINGSPACE(m);
 
-		if ((m->m_flags & M_EXT) != 0) {
+		if (dlen >= off + len)
+			ip6stat.ip6s_pullup--; /* call will not be made! */
+		else if ((m->m_flags & M_EXT) != 0) {
 			ip6stat.ip6s_pullup_alloc++;
 			ip6stat.ip6s_pullup_copy++;
 		} else {
-			if (dlen >= off + len)
-				;
 			if (mlen >= off + len)
 				ip6stat.ip6s_pullup_copy++;
 			else {
@@ -149,6 +150,7 @@ m_pulldown(m, off, len, offp)
 	}
 
 	/* statistics for m_pullup2 */
+	ip6stat.ip6s_pullup2++;
 	if (off + len > MCLBYTES)
 		ip6stat.ip6s_pullup2_fail++;
 	else {
@@ -159,14 +161,14 @@ m_pulldown(m, off, len, offp)
 		prevlen = off + len;
 		prevmlen = mlen;
 
-		if ((m->m_flags & M_EXT) != 0) {
+		if (dlen >= off + len)
+			ip6stat.ip6s_pullup2--; /* call will not be made! */
+		else if ((m->m_flags & M_EXT) != 0) {
 			ip6stat.ip6s_pullup2_alloc++;
 			ip6stat.ip6s_pullup2_copy++;
 			prevmlen = (off + len > MHLEN) ? MCLBYTES : MHLEN;
 		} else {
-			if (dlen >= off + len)
-				;
-			else if (mlen >= off + len)
+			if (mlen >= off + len)
 				ip6stat.ip6s_pullup2_copy++;
 			else {
 				ip6stat.ip6s_pullup2_alloc++;
