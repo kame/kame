@@ -1,16 +1,30 @@
-$KAME: TODO.mobile-ip6,v 1.29 2002/04/15 07:44:08 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.30 2002/12/06 06:35:25 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
 
 
-**********************************************************************
+<<Current status>>
 
-KAME/MIP6 is under reconstruction to support a new draft.  Please wait
-for a while.  We will announce when the basic function of the new
-draft starts working.
+- Known bugs
 
-For those who are using ID-13 and ID-15, please use the 20020415 snap.
-The snap is the last working set for the old drafts.
+	- Processing a binding update with S=0 doesn't work as
+	  described in the spec.
+	- Simultaniously use with the privacy extention doesn't work.
 
-**********************************************************************
+- Missing features
+	- The mobile prefix sol/adv.
+	- Processing the advertisement intervap ND option.
+		- Sending is supported by rtadvd.
+	- The rapid router solicitation by a mobile node
+	  and the rapid router advertisement by a home agent.
+	- Sending a binding update with A=1 to correspondent nodes.
+	- Sending a binding update with S=0.
+	- Sending/receiving the binding refresh request message.
+	- Multicast
+
+
+<<Usage>>
+
+We will write a newsletter which describes the configuration of Mobile
+IPv6.  Please see it.
