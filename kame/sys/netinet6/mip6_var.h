@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.60 2002/10/02 11:16:00 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.61 2002/10/05 18:33:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -276,7 +276,7 @@ struct mip6_mobility_options {
 #define MOPT_AUTHDATA	0x0008
 #define MOPT_REFRESH	0x0010
 
-#define MOPT_AUTH_LEN(mopt)	(int)(*(mopt->mopt_auth + 1))
+#define MOPT_AUTH_LEN(mopts)	(int)(*((mopts)->mopt_auth + 1))
 
 /*
  * the list entry to hold the destination addresses which do not use a

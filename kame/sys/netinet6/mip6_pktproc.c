@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.65 2002/10/04 08:58:23 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.66 2002/10/05 18:33:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -868,6 +868,30 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		m_freem(m);
 		mip6stat.mip6s_nobue++;
                 return (EINVAL);
+	}
+
+	if (mopt.valid_options & MOPT_AUTHDATA) {
+		/* Check Autheticator */
+		u_int8_t key_bu[MIP6_KBU_LEN];
+		u_int8_t authdata[MIP6_AUTHENTICATOR_LEN];
+		u_int16_t cksum_backup;
+
+		cksum_backup = ip6ma->ip6ma_cksum;
+		ip6ma->ip6ma_cksum = 0;
+		/* Calculate K_bu */
+		mip6_calculate_kbu(&mbu->mbu_home_cookie,
+				   &mbu->mbu_careof_cookie, key_bu);
+		/* Calculate Authenticator */
+		mip6_calculate_authenticator(key_bu, authdata,
+			&mbu->mbu_coa.sin6_addr, &ip6->ip6_dst,
+			(caddr_t)ip6ma, ip6malen,
+			(caddr_t)mopt.mopt_auth + 2 - (caddr_t)ip6ma,
+			min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN));
+		ip6ma->ip6ma_cksum = cksum_backup;
+		if (bcmp(authdata, mopt.mopt_auth + 2,
+			 min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN))
+			 == 0)
+			goto accept_binding_ack;
 	}
 
 	if (!mip6_config.mcfg_use_ipsec && (mbu->mbu_flags & IP6MU_HOME)) {
