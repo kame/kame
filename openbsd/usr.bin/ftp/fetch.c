@@ -104,6 +104,7 @@ url_get(origline, proxyenv, outfile)
 	char c, *cp, *ep, *portnum, *path, buf[4096];
 	const char *savefile;
 	char *line, *proxy, *host, *port;
+	char *hosttail;
 	volatile sig_t oldintr;
 	off_t hashbytes;
 	char *cause = "unknown";
@@ -268,7 +269,14 @@ url_get(origline, proxyenv, outfile)
 		return (0);
 	}
 
-	portnum = strchr(host, ':');			/* find portnum */
+	if (*host == '[' && (hosttail = strrchr(host, ']')) != NULL &&
+	    (hosttail[1] == '\0' || hosttail[1] == ':')) {
+		host++;
+		*hosttail++ = '\0';
+	} else
+		hosttail = host;
+
+	portnum = strrchr(hosttail, ':');		/* find portnum */
 	if (portnum != NULL)
 		*portnum++ = '\0';
 
@@ -327,8 +335,15 @@ again:
 			fprintf(ttyout, "Requesting %s (via %s)\n",
 			    origline, proxyenv);
 	}
-	snprintf(buf, sizeof(buf), "GET %s%s HTTP/1.0\r\nHost: %s\r\n\r\n",
-	    proxy ? "" : "/", path, host);
+	if (strchr(host, ':')) {
+		snprintf(buf, sizeof(buf),
+		    "GET %s%s HTTP/1.0\r\nHost: [%s]:%s\r\n\r\n",
+		    proxy ? "" : "/", path, host, port);
+	} else {
+		snprintf(buf, sizeof(buf),
+		    "GET %s%s HTTP/1.0\r\nHost: %s:%s\r\n\r\n",
+		    proxy ? "" : "/", path, host, port);
+	}
 	len = strlen(buf);
 	if (write(s, buf, len) < len) {
 		warn("Writing HTTP request");
