@@ -1,4 +1,4 @@
-.\"	$KAME: dns6conv.1,v 1.1 2001/01/13 06:26:17 jinmei Exp $
+.\"	$KAME: dns6conv.1,v 1.2 2001/01/13 16:41:56 jinmei Exp $
 .\"
 .\" Copyright (C) 2001 WIDE Project.
 .\" All rights reserved.
@@ -33,7 +33,7 @@
 .\"
 .Sh NAME
 .Nm dns6conv
-.Nd converts an IPv6 textual address into a DNS RR
+.Nd converts an IPv6 textual address for a DNS RR
 .\"
 .Sh SYNOPSIS
 .Nm
@@ -50,9 +50,8 @@ It first separates a portion of the given address from
 .Ar beginbit
 bit to
 .Ar endbit ,
-with these bit values themselves exclusive
-.
-The default value of theses bits are 64 and 128,
+with these bit values themselves exclusive.
+The default values of theses bits are 64 and 128,
 and can be specified by the
 .Fl b
 and
@@ -66,8 +65,8 @@ must be smaller than
 .Ar endbit .
 .Pp
 Then the command prints the separated address in an appropriate format
-to use
-.Pq as a part of
+to be used as
+.Pq a part of
 a DNS resource record.
 The
 .Fl f
@@ -81,11 +80,10 @@ record. This is the default format type of this command.
 .It Ic bit
 specifies to print the address as a hex string with the length of the
 significant bits separated by the slash character.
-The output can be used as a bitstring label to construct a reverse map
+The output can be used as a bitstring label to construct reverse map
 database.
 .It Ic nibble
 specifies to print the address as nibble DNS labels.
-Currently not implemented.
 .El
 .Sh RETURN VALUES
 .Nm
