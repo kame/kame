@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.8 2000/11/21 09:09:38 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.9 2000/11/21 09:33:16 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -235,9 +235,14 @@ main(argc, argv)
 		msg.msg_namelen = sizeof(ss_from);
 		msg.msg_control = (caddr_t)cbuf;
 		msg.msg_controllen = sizeof(cbuf);
+		msgiov.iov_base = (void *)databuf;
+		msgiov.iov_len = datalen;
+		msg.msg_iov = &msgiov;
+		msg.msg_iovlen = 1;
 
 		if ((cc = recvmsg(s, &msg, 0)) < 0)
 			err(1, "recvmsg");
+
 		print_options(&msg);
 	}
 
