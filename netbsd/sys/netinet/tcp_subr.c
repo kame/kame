@@ -485,7 +485,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		else
 			tlen = th0->th_off << 2;
 
-		if (m->m_len > hlen + tlen &&
+		if (m->m_len > hlen + tlen && (m->m_flags & M_EXT) == 0 &&
 		    mtod(m, caddr_t) + hlen == (caddr_t)th0) {
 			m->m_len = hlen + tlen;
 			m_freem(m->m_next);
@@ -493,9 +493,14 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		} else {
 			struct mbuf *n;
 
-			/* XXX optimize: avoid MCLGET if possible */
+#ifdef DIAGNOSTIC
+			if (max_linkhdr + hlen + tlen > MCLBYTES) {
+				m_freem(m);
+				return EMSGSIZE;
+			}
+#endif
 			MGETHDR(n, M_DONTWAIT, MT_HEADER);
-			if (n) {
+			if (n && max_linkhdr + hlen + tlen > MHLEN) {
 				MCLGET(n, M_DONTWAIT);
 				if ((n->m_flags & M_EXT) == 0) {
 					m_freem(n);
@@ -544,7 +549,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		}
 		xchg(th->th_dport, th->th_sport, u_int16_t);
 #undef xchg
-		tlen = 0;
+		tlen = 0;	/*be friendly with the following code*/
 	}
 	th->th_seq = htonl(seq);
 	th->th_ack = htonl(ack);

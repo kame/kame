@@ -930,14 +930,31 @@ findpcb:
 
 		if (so->so_options & SO_DEBUG) {
 			ostate = tp->t_state;
-			tcp_saveti = m_copym(m, 0, iphlen, M_DONTWAIT);
+
+			tcp_saveti = NULL;
+			if (iphlen + sizeof(struct tcphdr) > MHLEN)
+				goto nosave;
+
+			if (m->m_len > iphlen && (m->m_flags & M_EXT) == 0) {
+				tcp_saveti = m_copym(m, 0, iphlen, M_DONTWAIT);
+				if (!tcp_saveti)
+					goto nosave;
+			} else {
+				MGETHDR(tcp_saveti, M_DONTWAIT, MT_HEADER);
+				if (!tcp_saveti)
+					goto nosave;
+				tcp_saveti->m_len = iphlen;
+				m_copydata(m, 0, iphlen,
+				    mtod(tcp_saveti, caddr_t));
+			}
+
 			if (M_TRAILINGSPACE(tcp_saveti) < sizeof(struct tcphdr)) {
 				m_freem(tcp_saveti);
 				tcp_saveti = NULL;
 			} else {
 				tcp_saveti->m_len += sizeof(struct tcphdr);
 				bcopy(th, mtod(tcp_saveti, caddr_t) + iphlen,
-					sizeof(struct tcphdr));
+				    sizeof(struct tcphdr));
 			}
 			if (tcp_saveti) {
 				/*
@@ -957,6 +974,7 @@ findpcb:
 #endif
 				}
 			}
+	nosave:;
 		}
 		if (so->so_options & SO_ACCEPTCONN) {
   			if ((tiflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
