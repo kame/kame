@@ -1167,16 +1167,19 @@ pr_pack(buf, cc, mhdr)
 			}
 			if (options & F_VERBOSE) {
 				long ttl;
+				int comma = 0;
 
 				(void)printf(" (");
 
 				switch(ni->ni_code) {
-				 case ICMP6_NI_REFUSED:
-					 (void)printf("refused,");
-					 break;
-				 case ICMP6_NI_UNKNOWN:
-					 (void)printf("unknwon qtype,");
-					 break;
+				case ICMP6_NI_REFUSED:
+					(void)printf("refused");
+					comma++;
+					break;
+				case ICMP6_NI_UNKNOWN:
+					(void)printf("unknwon qtype");
+					comma++;
+					break;
 				}
 
 				if ((end - (u_char *)ni) < ICMP6_NIRLEN) {
@@ -1184,6 +1187,8 @@ pr_pack(buf, cc, mhdr)
 					goto fqdnend;
 				}
 				ttl = ntohl(*(u_long *)&buf[off+ICMP6ECHOLEN+8]);
+				if (comma)
+					printf(",");
 				if (!(ni->ni_flags & NI_FQDN_FLAG_VALIDTTL))
 					(void)printf("TTL=%d:meaningless",
 						     (int)ttl);
@@ -1195,12 +1200,23 @@ pr_pack(buf, cc, mhdr)
 						(void)printf("TTL=%d",
 							     (int)ttl);
 				}
+				comma++;
+
+				if (oldfqdn) {
+					if (comma)
+						printf(",");
+					printf("03 draft");
+					comma++;
+				}
 
 				if (buf[off + ICMP6_NIRLEN] !=
 				    cc - off - ICMP6_NIRLEN - 1 && oldfqdn) {
-					(void)printf(",invalid namelen:%d/%lu",
+					if (comma)
+						printf(",");
+					(void)printf("invalid namelen:%d/%lu",
 						     buf[off + ICMP6_NIRLEN],
 						     (u_long)cc - off - ICMP6_NIRLEN - 1);
+					comma++;
 				}
 				putchar(')');
 			}
