@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.4 2000/04/17 10:46:58 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.5 2000/05/07 06:29:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -35,16 +35,16 @@
  * LBL code modified by speer@eng.sun.com, May 1977.
  * For questions and/or comments, please send mail to cbq@ee.lbl.gov
  *
- * $Id: altq_rmclass.c,v 1.4 2000/04/17 10:46:58 kjc Exp $
+ * $Id: altq_rmclass.c,v 1.5 2000/05/07 06:29:23 kjc Exp $
  */
 
 #ident "@(#)rm_class.c  1.48     97/12/05 SMI"
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
+#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
-#if (__FreeBSD__ > 3)
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #endif
 #endif

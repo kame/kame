@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.4 2000/04/17 10:46:58 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.5 2000/05/07 06:29:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -32,7 +32,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.c,v 1.4 2000/04/17 10:46:58 kjc Exp $
+ * $Id: altq_hfsc.c,v 1.5 2000/05/07 06:29:23 kjc Exp $
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,
@@ -43,9 +43,9 @@
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
+#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
-#if (__FreeBSD__ > 3)
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #endif
 #endif

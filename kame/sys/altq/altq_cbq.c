@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.3 2000/04/17 10:46:57 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.4 2000/05/07 06:29:23 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -29,14 +29,14 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.3 2000/04/17 10:46:57 kjc Exp $
+ * $Id: altq_cbq.c,v 1.4 2000/05/07 06:29:23 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
-#if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
+#if (__FreeBSD__ != 2)
 #include "opt_inet.h"
-#if (__FreeBSD__ > 3)
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #endif
 #endif
