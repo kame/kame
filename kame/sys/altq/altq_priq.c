@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.c,v 1.4 2002/09/25 11:41:19 itojun Exp $	*/
+/*	$KAME: altq_priq.c,v 1.5 2002/11/29 04:36:24 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -128,7 +128,7 @@ priq_detach(pif)
 		pif_list = pif->pif_next;
 	else {
 		struct priq_if *p;
-	
+
 		for (p = pif_list; p != NULL; p = p->pif_next)
 			if (p->pif_next == pif) {
 				p->pif_next = pif->pif_next;
@@ -279,7 +279,7 @@ priq_class_create(pif, pri, qlimit, flags)
 						red_flags, red_pkttime);
 			if (cl->cl_red != NULL)
 				qtype(cl->cl_q) = Q_RIO;
-		} else 
+		} else
 #endif
 		if (flags & PRCF_RED) {
 			cl->cl_red = red_alloc(0, 0, 0, 0,
@@ -360,7 +360,7 @@ priq_class_destroy(cl)
  * priq_enqueue is an enqueue function to be registered to
  * (*altq_enqueue) in struct ifaltq.
  */
-static int 
+static int
 priq_enqueue(ifq, m, pktattr)
 	struct ifaltq *ifq;
 	struct mbuf *m;
@@ -448,7 +448,7 @@ priq_addq(cl, m)
 		m_freem(m);
 		return (-1);
 	}
-	
+
 	if (cl->cl_flags & PRCF_CLEARDSCP)
 		write_dsfield(m, cl->cl_pktattr, 0);
 
@@ -558,7 +558,7 @@ priqioctl(dev, cmd, addr, flag, p)
 #endif
 		break;
 	}
-    
+
 	switch (cmd) {
 
 	case PRIQ_IF_ATTACH:
@@ -639,13 +639,13 @@ priqcmd_if_attach(ap)
 	struct priq_if *pif;
 	struct ifnet *ifp;
 	int error;
-	
+
 	if ((ifp = ifunit(ap->ifname)) == NULL)
 		return (ENXIO);
 
 	if ((pif = priq_attach(&ifp->if_snd, ap->arg)) == NULL)
 		return (ENOMEM);
-	
+
 	/*
 	 * set PRIQ to this ifnet structure.
 	 */
@@ -666,7 +666,7 @@ priqcmd_if_detach(ap)
 
 	if ((pif = altq_lookup(ap->ifname, ALTQT_PRIQ)) == NULL)
 		return (EBADF);
-	
+
 	if (ALTQ_IS_ENABLED(pif->pif_ifq))
 		altq_disable(pif->pif_ifq);
 
@@ -692,7 +692,7 @@ priqcmd_add_class(ap)
 	if ((cl = priq_class_create(pif, ap->pri,
 				    ap->qlimit, ap->flags)) == NULL)
 		return (ENOMEM);
-		
+
 	/* return a class handle to the user */
 	ap->class_handle = clp_to_clh(cl);
 	return (0);
@@ -710,7 +710,7 @@ priqcmd_delete_class(ap)
 
 	if ((cl = clh_to_clp(pif, ap->class_handle)) == NULL)
 		return (EINVAL);
-	
+
 	return priq_class_destroy(cl);
 }
 
@@ -786,7 +786,7 @@ priqcmd_class_stats(ap)
 	struct priq_class *cl;
 	struct class_stats stats, *usp;
 	int	pri, error;
-	
+
 	if ((pif = altq_lookup(ap->iface.ifname, ALTQT_PRIQ)) == NULL)
 		return (EBADF);
 

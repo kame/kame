@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.h,v 1.8 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_rmclass.h,v 1.9 2002/11/29 04:36:24 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -136,7 +136,7 @@ typedef struct _rm_class_stats_ {
  */
 struct rm_class {
 	class_queue_t	*q_;		/* Queue of packets */
-	rm_ifdat_t	*ifdat_;			
+	rm_ifdat_t	*ifdat_;
 	int		pri_;		/* Class priority. */
 	int		depth_;		/* Class depth */
 	u_int		ns_per_byte_;	/* NanoSeconds per byte. */

@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.16 2002/10/25 05:08:07 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.17 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -195,14 +195,14 @@ void	altqattach(int);
 
 #if defined(__FreeBSD__)
 #if (__FreeBSD_version < 400000)
-static struct cdevsw altq_cdevsw = 
+static struct cdevsw altq_cdevsw =
         { altqopen,	altqclose,	noread,	        nowrite,
 	  altqioctl,	nostop,		nullreset,	nodevtotty,
  	  seltrue,	nommap,		NULL,	"altq",	NULL,	  -1 };
 #else
-static struct cdevsw altq_cdevsw = 
+static struct cdevsw altq_cdevsw =
         { altqopen,	altqclose,	noread,	        nowrite,
-	  altqioctl,	seltrue,	nommap,		nostrategy,	
+	  altqioctl,	seltrue,	nommap,		nostrategy,
 	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0,  -1 };
 #endif
 #elif defined(__NetBSD__)
@@ -407,7 +407,7 @@ void altq_module_declref(type)
 	altq_modules[type]->ref--;
 }
 
-static int 
+static int
 altq_module_register(mdata)
 	struct altq_module_data *mdata;
 {
@@ -422,7 +422,7 @@ altq_module_register(mdata)
 	return (0);
 }
 
-static int 
+static int
 altq_module_deregister(mdata)
 	struct altq_module_data *mdata;
 {
@@ -464,5 +464,5 @@ altq_module_handler(mod, cmd, arg)
 
 	return(error);
 }
-	
+
 #endif  /* ALTQ_KLD */

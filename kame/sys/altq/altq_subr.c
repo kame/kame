@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.15 2002/09/25 11:41:20 itojun Exp $	*/
+/*	$KAME: altq_subr.c,v 1.16 2002/11/29 04:36:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -193,7 +193,7 @@ altq_enable(ifq)
 	struct ifaltq *ifq;
 {
 	int s;
-    
+
 	if (!ALTQ_IS_READY(ifq))
 		return ENXIO;
 	if (ALTQ_IS_ENABLED(ifq))
@@ -219,7 +219,7 @@ altq_disable(ifq)
 	struct ifaltq *ifq;
 {
 	int s;
-    
+
 	if (!ALTQ_IS_ENABLED(ifq))
 		return 0;
 
@@ -321,7 +321,7 @@ tbr_set(ifq, profile)
 		printf("tbr_set: no cpu clock available!\n");
 		return (ENXIO);
 	}
-	
+
 	if (profile->rate == 0) {
 		/* delete this tbr */
 		if ((tbr = ifq->altq_tbr) == NULL)
@@ -444,13 +444,13 @@ tbr_get(ifq, profile)
 #define	IPPROTO_AH	51		/* authentication header */
 #endif
 
-/* 
+/*
  * extract flow information from a given packet.
  * filt_mask shows flowinfo fields required.
  * we assume the ip header is in one mbuf, and addresses and ports are
  * in network byte order.
  */
-int 
+int
 altq_extractflow(m, af, flow, filt_bmask)
 	struct mbuf *m;
 	int af;
@@ -1526,7 +1526,7 @@ extern u_int64_t cpu_tsc_freq;
 #endif
 
 void
-init_machclk(void) 
+init_machclk(void)
 {
 	/* sanity check */
 #ifdef __i386__

@@ -1,4 +1,4 @@
-/*	$KAME: altq_localq.c,v 1.4 2001/08/16 11:28:25 kjc Exp $	*/
+/*	$KAME: altq_localq.c,v 1.5 2002/11/29 04:36:23 kjc Exp $	*/
 /*
  * a skeleton file for implementing a new queueing discipline.
  * this file is in the public domain.
@@ -55,7 +55,7 @@ localqioctl(dev, cmd, addr, flag, p)
 	struct proc *p;
 {
 	int error = 0;
-	
+
 	return error;
 }
 

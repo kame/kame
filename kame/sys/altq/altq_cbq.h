@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.7 2002/07/18 12:22:29 itojun Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.8 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -26,7 +26,7 @@
  * SUN MICROSYSTEMS DOES NOT CLAIM MERCHANTABILITY OF THIS SOFTWARE OR THE
  * SUITABILITY OF THIS SOFTWARE FOR ANY PARTICULAR PURPOSE.  The software is
  * provided "as is" without express or implied warranty of any kind.
- *  
+ *
  * These notices must be retained in any copies of any part of this software.
  */
 
@@ -43,7 +43,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 /*
  * Define a well known class handles
@@ -71,7 +71,7 @@ typedef struct cbq_class_spec {
 	u_int		nano_sec_per_byte;
 	u_int		maxq;
 	u_int		maxidle;
-	int		minidle;	
+	int		minidle;
 	u_int		offtime;
 	u_long		parent_class_handle;
 	u_long		borrow_class_handle;
@@ -102,7 +102,7 @@ typedef struct cbq_class_spec {
 struct cbq_add_class {
 	struct cbq_interface	cbq_iface;
 
-	cbq_class_spec_t	cbq_class;	
+	cbq_class_spec_t	cbq_class;
 	u_long			cbq_class_handle;
 };
 
@@ -114,7 +114,7 @@ struct cbq_delete_class {
 struct cbq_modify_class {
 	struct cbq_interface	cbq_iface;
 
-	cbq_class_spec_t	cbq_class;	
+	cbq_class_spec_t	cbq_class;
 	u_long			cbq_class_handle;
 };
 
@@ -166,7 +166,7 @@ struct cbq_getstats {
 	class_stats_t		*stats;
 };
 
-/* 
+/*
  * Define IOCTLs for CBQ.
  */
 #define	CBQ_IF_ATTACH		_IOW('Q', 1, struct cbq_interface)
@@ -214,6 +214,6 @@ typedef struct cbqstate {
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
 #endif /* !_ALTQ_ALTQ_CBQ_H_ */

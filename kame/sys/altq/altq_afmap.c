@@ -1,4 +1,4 @@
-/*	$KAME: altq_afmap.c,v 1.8 2002/04/03 05:38:49 kjc Exp $	*/
+/*	$KAME: altq_afmap.c,v 1.9 2002/11/29 04:36:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -81,7 +81,7 @@ afm_alloc(ifp)
 	struct ifnet *ifp;
 {
 	struct afm_head *head;
-    
+
 	MALLOC(head, struct afm_head *, sizeof(struct afm_head),
 	       M_DEVBUF, M_WAITOK);
 	if (head == NULL)
@@ -92,10 +92,10 @@ afm_alloc(ifp)
 	LIST_INIT(&head->afh_head);
 
 	head->afh_ifp = ifp;
-    
+
 	/* add this afm_head to the chain */
 	LIST_INSERT_HEAD(&afhead_chain, head, afh_chain);
-    
+
 	return (0);
 }
 
@@ -132,7 +132,7 @@ afm_top(ifp)
 			break;
 	if (head == NULL)
 		return NULL;
-    
+
 	return (head->afh_head.lh_first);
 }
 
@@ -176,7 +176,7 @@ int afm_add(ifp, flowmap)
 	return 0;
 }
 
-int 
+int
 afm_remove(afm)
 	struct afm *afm;
 {
@@ -185,7 +185,7 @@ afm_remove(afm)
 	return (0);
 }
 
-int 
+int
 afm_removeall(ifp)
 	struct ifnet *ifp;
 {
@@ -397,7 +397,7 @@ afmioctl(dev, cmd, addr, flag, p)
 
 	/* lookup interface */
 	flowmap = (struct atm_flowmap *)addr;
-	flowmap->af_ifname[IFNAMSIZ-1] = '\0'; 	  
+	flowmap->af_ifname[IFNAMSIZ-1] = '\0';
 	ifp = ifunit(flowmap->af_ifname);
 	if (ifp == NULL || ifp->if_ioctl == NULL ||
 	    (ifp->if_flags & IFF_RUNNING) == 0)

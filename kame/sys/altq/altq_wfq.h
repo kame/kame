@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.h,v 1.6 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_wfq.h,v 1.7 2002/11/29 04:36:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -27,7 +27,7 @@
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University
- *  (kyu@mt.cs.keio.ac.jp). 
+ *  (kyu@mt.cs.keio.ac.jp).
  */
 
 #ifndef _ALTQ_ALTQ_WFQ_H_

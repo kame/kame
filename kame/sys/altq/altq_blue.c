@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.c,v 1.10 2002/11/05 03:48:30 itojun Exp $	*/
+/*	$KAME: altq_blue.c,v 1.11 2002/11/29 04:36:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -177,7 +177,7 @@ blueioctl(dev, cmd, addr, flag, p)
 #endif
 		break;
 	}
-    
+
 	switch (cmd) {
 
 	case BLUE_ENABLE:
@@ -213,7 +213,7 @@ blueioctl(dev, cmd, addr, flag, p)
 		       M_DEVBUF, M_WAITOK);
 		bzero(rqp->rq_q, sizeof(class_queue_t));
 
-		MALLOC(rqp->rq_blue, blue_t *, sizeof(blue_t), M_DEVBUF, M_WAITOK); 
+		MALLOC(rqp->rq_blue, blue_t *, sizeof(blue_t), M_DEVBUF, M_WAITOK);
 		bzero(rqp->rq_blue, sizeof(blue_t));
 
 		rqp->rq_ifq = &ifp->if_snd;
@@ -300,7 +300,7 @@ blueioctl(dev, cmd, addr, flag, p)
 			if (fc->blue_hold_time > 0)
 				rqp->rq_blue->blue_hold_time = fc->blue_hold_time;
 			rqp->rq_blue->blue_flags = fc->blue_flags;
-			
+
 			blue_init(rqp->rq_blue, rqp->rq_blue->blue_flags,
 				  rqp->rq_blue->blue_pkttime,
 				  rqp->rq_blue->blue_max_pmark,
@@ -349,7 +349,7 @@ static int blue_detach(rqp)
  * blue support routines
  */
 
-int 
+int
 blue_init(rp, flags, pkttime, blue_max_pmark, blue_hold_time)
 	blue_t 	*rp;
 	int	flags;
@@ -358,7 +358,7 @@ blue_init(rp, flags, pkttime, blue_max_pmark, blue_hold_time)
 	int	blue_hold_time;
 {
 	int npkts_per_sec;
-	
+
 	rp->blue_idle = 1;
 	rp->blue_flags = flags;
 	rp->blue_pkttime = pkttime;
@@ -412,11 +412,11 @@ blue_addq(rp, q, m, pktattr)
 	struct altq_pktattr *pktattr;
 {
 	int droptype;
-    
+
 	/*
 	 * if we were idle, this is an enqueue onto an empty queue
 	 * and we should decrement marking probability
-	 * 
+	 *
 	 */
 	if (rp->blue_idle) {
 		struct timeval now;
@@ -447,7 +447,7 @@ blue_addq(rp, q, m, pktattr)
 #ifdef BLUE_STATS
 			rp->blue_stats.marked_packets++;
 #endif
-		} else { 
+		} else {
 			/* unforced drop by blue */
 			droptype = DTYPE_EARLY;
 		}
@@ -547,7 +547,7 @@ mark_ecn(m, pktattr, flags)
 			struct ip *ip = (struct ip *)pktattr->pattr_hdr;
 			u_int8_t otos;
 			int sum;
-	    
+
 			if (ip->ip_v != 4)
 				return (0);	/* version mismatch! */
 			if ((ip->ip_tos & IPTOS_ECN_MASK) == IPTOS_ECN_NOTECT)
@@ -621,7 +621,7 @@ blue_dequeue(ifq, op)
 
 	if (op == ALTDQ_POLL)
 		return (qhead(rqp->rq_q));
-	
+
 	m = blue_getq(rqp->rq_blue, rqp->rq_q);
 	if (m != NULL)
 		ifq->ifq_len--;
@@ -633,7 +633,7 @@ struct mbuf *blue_getq(rp, q)
 	class_queue_t *q;
 {
 	struct mbuf *m;
-	
+
 	if ((m = _getq(q)) == NULL) {
 		if (rp->blue_idle == 0) {
 			rp->blue_idle = 1;

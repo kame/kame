@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.h,v 1.6 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_red.h,v 1.7 2002/11/29 04:36:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -98,7 +98,7 @@ struct redstats {
 };
 
 
-/* 
+/*
  * IOCTLs for RED
  */
 #define	RED_IF_ATTACH		_IOW('Q', 1, struct red_interface)

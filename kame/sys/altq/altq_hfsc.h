@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.h,v 1.7 2002/11/08 06:33:32 kjc Exp $	*/
+/*	$KAME: altq_hfsc.h,v 1.8 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -42,7 +42,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 struct hfsc_interface {
 	char	hfsc_ifname[IFNAMSIZ];  /* interface name (e.g., fxp0) */
@@ -310,6 +310,6 @@ struct hfsc_if {
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
 #endif /* _ALTQ_ALTQ_HFSC_H_ */

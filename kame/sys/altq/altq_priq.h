@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.h,v 1.2 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_priq.h,v 1.3 2002/11/29 04:36:24 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -35,7 +35,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 #define	PRIQ_MAXPRI	16	/* upper limit of the number of priorities */
 
@@ -155,6 +155,6 @@ struct priq_if {
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
 #endif /* _ALTQ_ALTQ_PRIQ_H_ */

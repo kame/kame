@@ -1,4 +1,4 @@
-/*	$KAME: if_altq.h,v 1.8 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: if_altq.h,v 1.9 2002/11/29 04:36:25 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -150,7 +150,7 @@ struct tb_regulator {
 extern int altq_attach(struct ifaltq *, int, void *,
 		       int (*)(struct ifaltq *, struct mbuf *,
 			       struct altq_pktattr *),
-		       struct mbuf *(*)(struct ifaltq *, int), 
+		       struct mbuf *(*)(struct ifaltq *, int),
 		       int (*)(struct ifaltq *, int, void *),
 		       void *,
 		       void *(*)(void *, struct mbuf *, int));

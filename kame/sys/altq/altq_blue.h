@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.h,v 1.6 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_blue.h,v 1.7 2002/11/29 04:36:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -63,7 +63,7 @@ struct blue_conf {
 #define	BLUEF_ECN6	0x02	/* use packet marking for IPv6 packets */
 #define	BLUEF_ECN	(BLUEF_ECN4 | BLUEF_ECN6)
 
-/* 
+/*
  * IOCTLs for BLUE
  */
 #define	BLUE_IF_ATTACH		_IOW('Q', 1, struct blue_interface)

@@ -1,4 +1,4 @@
-/*	$KAME: altq_classq.h,v 1.4 2001/02/09 07:20:40 kjc Exp $	*/
+/*	$KAME: altq_classq.h,v 1.5 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -88,11 +88,11 @@ extern void		_flushq(class_queue_t *);
 /*
  * inlined versions
  */
-static __inline void 
+static __inline void
 _addq(class_queue_t *q, struct mbuf *m)
 {
         struct mbuf *m0;
-	
+
 	if ((m0 = qtail(q)) != NULL)
 		m->m_nextpkt = m0->m_nextpkt;
 	else
@@ -106,7 +106,7 @@ static __inline struct mbuf *
 _getq(class_queue_t *q)
 {
 	struct mbuf  *m, *m0;
-	
+
 	if ((m = qtail(q)) == NULL)
 		return (NULL);
 	if ((m0 = m->m_nextpkt) != m)
@@ -115,7 +115,7 @@ _getq(class_queue_t *q)
 		qtail(q) = NULL;
 	qlen(q)--;
 	m0->m_nextpkt = NULL;
-	return (m0); 
+	return (m0);
 }
 
 /* drop a packet at the tail of the queue */
@@ -131,7 +131,7 @@ _getq_tail(class_queue_t *q)
 		m0 = m0->m_nextpkt;
 	} while (m0 != m);
 	prev->m_nextpkt = m->m_nextpkt;
-	if (prev == m) 
+	if (prev == m)
 		qtail(q) = NULL;
 	else
 		qtail(q) = prev;
@@ -153,7 +153,7 @@ _getq_random(class_queue_t *q)
 		qtail(q) = NULL;
 	else {
 		struct mbuf *prev = NULL;
-		
+
 		n = random() % qlen(q) + 1;
 		for (i = 0; i < n; i++) {
 			prev = m;
@@ -172,14 +172,14 @@ static __inline void
 _removeq(class_queue_t *q, struct mbuf *m)
 {
 	struct mbuf *m0, *prev;
-	
+
 	m0 = qtail(q);
 	do {
 		prev = m0;
 		m0 = m0->m_nextpkt;
 	} while (m0 != m);
 	prev->m_nextpkt = m->m_nextpkt;
-	if (prev == m) 
+	if (prev == m)
 		qtail(q) = NULL;
 	else if (qtail(q) == m)
 		qtail(q) = prev;

@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.c,v 1.9 2002/09/25 11:41:20 itojun Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.10 2002/11/29 04:36:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -27,7 +27,7 @@
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University
- *  (kyu@mt.cs.keio.ac.jp). 
+ *  (kyu@mt.cs.keio.ac.jp).
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -197,7 +197,7 @@ wfq_ifdetach(ifacep)
 	/* remove WFQ from the ifnet structure. */
 	(void)altq_disable(wfqp->ifq);
 	(void)altq_detach(wfqp->ifq);
-    
+
 	/* remove from the wfqstate list */
 	if (wfq_list == wfqp)
 		wfq_list = wfqp->next;
@@ -210,7 +210,7 @@ wfq_ifdetach(ifacep)
 			}
 		} while ((wp = wp->next) != NULL);
 	}
-    
+
 	/* deallocate wfq_state_t */
 	FREE(wfqp->queue, M_DEVBUF);
 	FREE(wfqp, M_DEVBUF);
@@ -326,7 +326,7 @@ wfq_ifenqueue(ifq, mp, pktattr)
 	}
 	return error;
 }
-	
+
 
 static u_long wfq_hash(flow, n)
 	struct flowinfo *flow;
@@ -443,14 +443,14 @@ wfq_ifdequeue(ifq, op)
 	if ((wfqp->bytes == 0) || ((queue = wfqp->rrp) == NULL))
 		/* no packet in the queues */
 		return NULL;
-	
+
 	while (1) {
 		if (queue->quota > 0) {
 			if (queue->bytes <= 0) {
 				/* this queue no longer has packet.
 				   remove the queue from the active list. */
 				if (queue->next == queue){
-					/* no other active queue 
+					/* no other active queue
 					   -- this case never happens in
 					   this algorithm. */
 					queue->next = queue->prev = NULL;
@@ -489,7 +489,7 @@ wfq_ifdequeue(ifq, op)
 			   the queue will be removed from the active list
 			   at the next round */
 		}
-	
+
 		/* advance the round-robin pointer */
 		queue = wfqp->rrp = queue->next;
 		WFQ_ADDQUOTA(queue);
@@ -505,7 +505,7 @@ wfq_getqid(gqidp)
 	if ((wfqp = altq_lookup(gqidp->iface.wfq_ifacename, ALTQT_WFQ))
 	    == NULL)
 		return (EBADF);
-	
+
 	gqidp->qid = (*wfqp->hash_func)(&gqidp->flow, wfqp->nums);
 	return 0;
 }
@@ -654,7 +654,7 @@ wfqclose(dev, flag, fmt, p)
 	struct wfq_interface iface;
 	wfq_state_t *wfqp;
 	int s;
-    
+
 #ifdef __NetBSD__
 	s = splnet();
 #else
@@ -706,7 +706,7 @@ wfqioctl(dev, cmd, addr, flag, p)
 	s = splimp();
 #endif
 	switch (cmd) {
-		
+
 	case WFQ_ENABLE:
 		error = wfq_setenable((struct wfq_interface *)addr, ENABLE);
 		break;

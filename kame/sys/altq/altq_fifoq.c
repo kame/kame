@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.c,v 1.9 2002/11/05 03:48:30 itojun Exp $	*/
+/*	$KAME: altq_fifoq.c,v 1.10 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -141,7 +141,7 @@ fifoqioctl(dev, cmd, addr, flag, p)
 #endif
 		break;
 	}
-    
+
 	switch (cmd) {
 	case FIFOQ_ENABLE:
 		ifacep = (struct fifoq_interface *)addr;
@@ -319,7 +319,7 @@ fifoq_dequeue(ifq, op)
 
 	if (op == ALTDQ_POLL)
 		return (q->q_head);
-		
+
 	if ((m = q->q_head) == NULL)
 		return (NULL);
 

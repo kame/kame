@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.h,v 1.7 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_fifoq.h,v 1.8 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -66,7 +66,7 @@ struct fifoq_conf {
 
 #define	FIFOQ_LIMIT	50	/* default max queue lenght */
 
-/* 
+/*
  * IOCTLs for FIFOQ
  */
 #define	FIFOQ_IF_ATTACH		_IOW('Q', 1, struct fifoq_interface)

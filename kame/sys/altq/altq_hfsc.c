@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.15 2002/11/08 06:33:32 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.16 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -34,7 +34,7 @@
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,
- * "A Hierarchical Fair Service Curve Algorithm for Link-Sharing, 
+ * "A Hierarchical Fair Service Curve Algorithm for Link-Sharing,
  * Real-Time and Priority Service"
  * by Ion Stoica, Hui Zhang, and T. S. Eugene Ng.
  *
@@ -213,7 +213,7 @@ hfsc_detach(hif)
 		hif_list = hif->hif_next;
 	else {
 		struct hfsc_if *h;
-	
+
 		for (h = hif_list; h != NULL; h = h->hif_next)
 			if (h->hif_next == hif) {
 				h->hif_next = hif->hif_next;
@@ -255,7 +255,7 @@ hfsc_clear_interface(hif)
 			}
 		}
 	}
-	
+
 	return (0);
 }
 
@@ -630,7 +630,7 @@ hfsc_nextclass(cl)
  * hfsc_enqueue is an enqueue function to be registered to
  * (*altq_enqueue) in struct ifaltq.
  */
-static int 
+static int
 hfsc_enqueue(ifq, m, pktattr)
 	struct ifaltq *ifq;
 	struct mbuf *m;
@@ -689,7 +689,7 @@ hfsc_dequeue(ifq, op)
 	cur_time = read_machclk();
 
 	if (op == ALTDQ_REMOVE && hif->hif_pollcache != NULL) {
-		
+
 		cl = hif->hif_pollcache;
 		hif->hif_pollcache = NULL;
 		/* check if the class was scheduled by real-time criteria */
@@ -839,7 +839,7 @@ hfsc_purgeq(cl)
 	set_passive(cl);
 }
 
-static void 
+static void
 set_active(cl, len)
 	struct hfsc_class *cl;
 	int len;
@@ -852,7 +852,7 @@ set_active(cl, len)
 	cl->cl_stats.period++;
 }
 
-static void 
+static void
 set_passive(cl)
 	struct hfsc_class *cl;
 {
@@ -865,7 +865,7 @@ set_passive(cl)
 	 */
 }
 
-static void 
+static void
 init_ed(cl, next_len)
 	struct hfsc_class *cl;
 	int next_len;
@@ -895,7 +895,7 @@ init_ed(cl, next_len)
 	ellist_insert(cl);
 }
 
-static void 
+static void
 update_ed(cl, next_len)
 	struct hfsc_class *cl;
 	int next_len;
@@ -906,7 +906,7 @@ update_ed(cl, next_len)
 	ellist_update(cl);
 }
 
-static void 
+static void
 update_d(cl, next_len)
 	struct hfsc_class *cl;
 	int next_len;
@@ -914,7 +914,7 @@ update_d(cl, next_len)
 	cl->cl_d = rtsc_y2x(&cl->cl_deadline, cl->cl_cumul + next_len);
 }
 
-static void 
+static void
 init_vf(cl, len)
 	struct hfsc_class *cl;
 	int len;
@@ -1007,7 +1007,7 @@ init_vf(cl, len)
 	}
 }
 
-static void 
+static void
 update_vf(cl, len, cur_time)
 	struct hfsc_class *cl;
 	int len;
@@ -1131,7 +1131,7 @@ static ellist_t *
 ellist_alloc()
 {
 	ellist_t *head;
-	
+
 	MALLOC(head, ellist_t *, sizeof(ellist_t), M_DEVBUF, M_WAITOK);
 	TAILQ_INIT(head);
 	return (head);
@@ -1144,7 +1144,7 @@ ellist_destroy(head)
 	FREE(head, M_DEVBUF);
 }
 
-static void 
+static void
 ellist_insert(cl)
 	struct hfsc_class *cl;
 {
@@ -1167,16 +1167,16 @@ ellist_insert(cl)
 	ASSERT(0); /* should not reach here */
 }
 
-static void 
+static void
 ellist_remove(cl)
 	struct hfsc_class *cl;
 {
 	struct hfsc_if	*hif = cl->cl_hif;
-	
+
 	TAILQ_REMOVE(hif->hif_eligible, cl, cl_ellist);
 }
 
-static void 
+static void
 ellist_update(cl)
 	struct hfsc_class *cl;
 {
@@ -1240,7 +1240,7 @@ static actlist_t *
 actlist_alloc()
 {
 	actlist_t *head;
-	
+
 	MALLOC(head, actlist_t *, sizeof(actlist_t), M_DEVBUF, M_WAITOK);
 	TAILQ_INIT(head);
 	return (head);
@@ -1252,7 +1252,7 @@ actlist_destroy(head)
 {
 	FREE(head, M_DEVBUF);
 }
-static void 
+static void
 actlist_insert(cl)
 	struct hfsc_class *cl;
 {
@@ -1274,7 +1274,7 @@ actlist_insert(cl)
 	ASSERT(0); /* should not reach here */
 }
 
-static void 
+static void
 actlist_remove(cl)
 	struct hfsc_class *cl;
 {
@@ -1354,7 +1354,7 @@ actlist_firstfit(cl, cur_time)
  *  bytes/nsec  12.5e-6    125e-6     1250e-6    12500e-6   125000e-6
  *  sm(500MHz)  25.0e-6    250e-6     2500e-6    25000e-6   250000e-6
  *  sm(200MHz)  62.5e-6    625e-6     6250e-6    62500e-6   625000e-6
- * 
+ *
  *  nsec/byte   80000      8000       800        80         8
  *  ism(500MHz) 40000      4000       400        40         4
  *  ism(200MHz) 16000      1600       160        16         1.6
@@ -1365,7 +1365,7 @@ actlist_firstfit(cl, cur_time)
 #define	SM_MASK		((1LL << SM_SHIFT) - 1)
 #define	ISM_MASK	((1LL << ISM_SHIFT) - 1)
 
-static __inline u_int64_t 
+static __inline u_int64_t
 seg_x2y(x, sm)
 	u_int64_t x;
 	u_int64_t sm;
@@ -1381,7 +1381,7 @@ seg_x2y(x, sm)
 	return (y);
 }
 
-static __inline u_int64_t 
+static __inline u_int64_t
 seg_y2x(y, ism)
 	u_int64_t y;
 	u_int64_t ism;
@@ -1409,7 +1409,7 @@ m2sm(m)
 	return (sm);
 }
 
-static __inline u_int64_t 
+static __inline u_int64_t
 m2ism(m)
 	u_int m;
 {
@@ -1422,7 +1422,7 @@ m2ism(m)
 	return (ism);
 }
 
-static __inline u_int64_t 
+static __inline u_int64_t
 d2dx(d)
 	u_int	d;
 {
@@ -1432,7 +1432,7 @@ d2dx(d)
 	return (dx);
 }
 
-static u_int 
+static u_int
 sm2m(sm)
 	u_int64_t sm;
 {
@@ -1442,7 +1442,7 @@ sm2m(sm)
 	return ((u_int)m);
 }
 
-static u_int 
+static u_int
 dx2d(dx)
 	u_int64_t dx;
 {
@@ -1452,7 +1452,7 @@ dx2d(dx)
 	return ((u_int)d);
 }
 
-static void 
+static void
 sc2isc(sc, isc)
 	struct service_curve	*sc;
 	struct internal_sc	*isc;
@@ -1469,7 +1469,7 @@ sc2isc(sc, isc)
  * initialize the runtime service curve with the given internal
  * service curve starting at (x, y).
  */
-static void 
+static void
 rtsc_init(rtsc, isc, x, y)
 	struct runtime_sc	*rtsc;
 	struct internal_sc	*isc;

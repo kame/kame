@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.11 2002/10/04 14:24:09 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.12 2002/11/29 04:36:23 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -26,7 +26,7 @@
  * SUN MICROSYSTEMS DOES NOT CLAIM MERCHANTABILITY OF THIS SOFTWARE OR THE
  * SUITABILITY OF THIS SOFTWARE FOR ANY PARTICULAR PURPOSE.  The software is
  * provided "as is" without express or implied warranty of any kind.
- *  
+ *
  * These notices must be retained in any copies of any part of this software.
  */
 
@@ -374,11 +374,11 @@ cbq_delete_filter(dfp)
 {
 	char		*ifacename;
 	cbq_state_t	*cbqp;
-    
+
 	ifacename = dfp->cbq_iface.cbq_ifacename;
 	if ((cbqp = altq_lookup(ifacename, ALTQT_CBQ)) == NULL)
 		return (EBADF);
-    
+
 	return acc_delete_filter(&cbqp->cbq_classifier,
 				 dfp->cbq_filter_handle);
 }
@@ -627,7 +627,7 @@ cbq_ifattach(ifacep)
 	bzero(new_cbqp->cbq_class_tbl, sizeof(struct rm_class *) * CBQ_MAX_CLASSES);
 	new_cbqp->cbq_qlen = 0;
 	new_cbqp->ifnp.ifq_ = &ifp->if_snd;	    /* keep the ifq */
-       
+
 	/*
 	 * set CBQ to this ifnet structure.
 	 */
@@ -934,7 +934,7 @@ static void cbq_class_dump(i)
 		return;
 	}
 	cl = cbq_list->cbq_class_tbl[i];
-    
+
 	printf("class %d cl=%p\n", i, cl);
 	if (cl != NULL) {
 		s = &cl->stats_;
