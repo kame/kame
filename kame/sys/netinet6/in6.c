@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.241 2001/10/16 03:52:02 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.242 2001/10/16 05:00:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -800,7 +800,13 @@ in6_control(so, cmd, data, ifp)
 			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
 				ifra->ifra_prefixmask.sin6_addr.s6_addr32[i];
 		}
-
+		/*
+		 * XXX: since we don't have an API to set prefix (not address)
+		 * lifetimes, we just use the same lifetimes as addresses.
+		 * The (temporarily) installed lifetimes can be overridden by
+		 * later advertised RAs (when accept_rtadv is non 0), which is
+		 * and intended behavior.
+		 */
 		pr0.ndpr_raf_onlink = 1; /* should be configurable? */
 		pr0.ndpr_raf_auto =
 			((ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0);
