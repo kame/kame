@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.18 2000/09/20 19:24:32 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.19 2000/09/20 20:26:31 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -44,8 +44,10 @@ vs Cryptek
 	    ESP 3des-cbc, hmac-sha1, transport mode, lifetime 600
 	Notes:
 	- racoon crashed because of linker problem, header size had changed.
-	- ph1 proposal mismatched because he sent DH group 1, but I expected 2.
-	- he sent 4 as ph1 spi size.  I warned and ignore it.
+	- ph1 proposal mismatched because cryptek sent DH group 1, but I
+	  expected 2.
+	- cryptek sent the length of 4 as ph1 spi size.
+	  racoon warned and ignore it.
 
 	phase 1: initiator, main
 	    preshared, 3des-cbc, md5, DH group 1, lifetime 600 <== choiced
@@ -56,8 +58,8 @@ vs Cryptek
 	    ESP 3des-cbc, hmac-sha1, transport mode, lifetime 300 <== choiced
 	    ESP 3des-cbc, hmac-md5, transport mode, lifetime 300
 	Notes:
-	- he might send me the broken ID payload.
-	- IPsec-SA was installed, but he still sent me the notify of
+	- cryptek might send me the broken ID payload.
+	- IPsec-SA was installed, but cryptek still sent me the notify of
 	  invalid-payload.
 
 vs SSH (IPv6)
@@ -95,15 +97,17 @@ vs SSH (IPv6)
 	- SSH uses different algorithm number for twofish than the AES draft.
 	- deflate does not look stable enough (memory leak in SSH side).  
 
-vs RapidStream (CONTINUE)
+vs RapidStream
 	phase 1: responder, main
 	    rsasig, 3des-cbc, md5, DH group 1, lifetime 600
-	phase 2:
+	phase 2: PFS group 2
+	    3des, hmac-sha1, tunnel mode, lifetime 300
 	Notes:
 	- racoon crashed due to unkown problem.  I may be incorrect to use
 	  openssl functions.
-	- he sent multiple subjectAltName and ID was matched 2nd one.
-	  But racoon can not process multiple one.
+	- rapidstream sent multiple subjectAltName and ID was matched 2nd one.
+	  But racoon can not process multiple one.  (fixed)
+	- fragmented packet was failed due to no response from rapidstream.
 
 vs HITACHI
 	phase 1: responder, main
@@ -111,10 +115,10 @@ vs HITACHI
 	    both subjectAltName and DN are OK.
 	    multiple subjectAltName is OK.
 	phase 2:
-		des, hmac-sha1, tunnel mode, lifetime 300	<== choiced
-		des, hmac-md5, tunnel mode, lifetime 300
-		3des, hmac-sha1, tunnel mode, lifetime 300
-		3des, hmac-md5, tunnel mode, lifetime 300
+	    des, hmac-sha1, tunnel mode, lifetime 300	<== choiced
+	    des, hmac-md5, tunnel mode, lifetime 300
+	    3des, hmac-sha1, tunnel mode, lifetime 300
+	    3des, hmac-md5, tunnel mode, lifetime 300
 	Notes:
 	- rekeying is fine.
 
