@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.34 2000/09/21 15:18:25 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.35 2000/10/03 23:44:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.34 2000/09/21 15:18:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.35 2000/10/03 23:44:42 itojun Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -474,6 +474,7 @@ base_i3recv(iph1, msg)
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)
 				goto end;
@@ -482,6 +483,7 @@ base_i3recv(iph1, msg)
 			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
@@ -831,6 +833,7 @@ base_r2recv(iph1, msg)
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)
 				goto end;
@@ -839,6 +842,7 @@ base_r2recv(iph1, msg)
 			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,

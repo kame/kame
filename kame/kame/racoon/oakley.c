@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.65 2000/09/29 18:28:53 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.66 2000/10/03 23:44:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.65 2000/09/29 18:28:53 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.66 2000/10/03 23:44:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -111,10 +111,12 @@ static struct cipher_algorithm cipher[] = {
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
+#ifdef HAVE_SIGNING_C
 static int get_cert_fromlocal __P((struct ph1handle *, int));
 static int oakley_check_certid __P((struct ph1handle *iph1));
 static int check_typeofcertname __P((int, int));
 static cert_t *save_certbuf __P((struct isakmp_gen *));
+#endif
 
 int
 oakley_get_defaultlifetime()
@@ -1562,8 +1564,6 @@ oakley_check_certid(iph1)
 	}
 	/*NOTREACHED*/
 }
-	
-#endif
 
 static int
 check_typeofcertname(doi, genid)
@@ -1831,6 +1831,7 @@ oakley_needcr(type)
 	}
 	/*NOTREACHED*/
 }
+#endif	/*HAVE_SIGNING_C*/
 
 /*
  * compute SKEYID

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.43 2000/09/22 18:03:09 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.44 2000/10/03 23:44:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.43 2000/09/22 18:03:09 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.44 2000/10/03 23:44:42 itojun Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -355,10 +355,12 @@ ident_i3recv(iph1, msg)
 				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CR:
 			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		default:
 			/* don't send information, see ident_r1recv() */
 			plog(logp, LOCATION, iph1->remote,
@@ -376,10 +378,12 @@ ident_i3recv(iph1, msg)
 		goto end;
 	}
 
+#ifdef HAVE_SIGNING_C
 	if (oakley_checkcr(iph1) < 0) {
 		/* Ignore this error in order to be interoperability. */
 		;
 	}
+#endif
 
 	iph1->status = PHASE1ST_MSG3RECEIVED;
 
@@ -527,6 +531,7 @@ ident_i4recv(iph1, msg0)
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)
 				goto end;
@@ -535,6 +540,7 @@ ident_i4recv(iph1, msg0)
 			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
@@ -1015,6 +1021,7 @@ ident_r3recv(iph1, msg0)
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CR:
 			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
@@ -1027,6 +1034,7 @@ ident_r3recv(iph1, msg0)
 			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
@@ -1099,10 +1107,12 @@ ident_r3recv(iph1, msg0)
 	}
     }
 
+#ifdef HAVE_SIGNING_C
 	if (oakley_checkcr(iph1) < 0) {
 		/* Ignore this error in order to be interoperability. */
 		;
 	}
+#endif
 
 	/*
 	 * XXX: Should we do compare two addresses, ph1handle's and ID
@@ -1216,6 +1226,7 @@ ident_ir2sendmx(iph1)
 	vchar_t *cr = NULL;
 	int error = -1;
 
+#ifdef HAVE_SIGNING_C
 	/* create CR if need */
 	if (iph1->side == RESPONDER
 	 && iph1->rmconf->send_cr
@@ -1229,6 +1240,7 @@ ident_ir2sendmx(iph1)
 			goto end;
 		}
 	}
+#endif
 
 	/* create buffer */
 	tlen = sizeof(struct isakmp)

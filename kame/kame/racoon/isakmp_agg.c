@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.42 2000/09/22 18:03:09 sakane Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.43 2000/10/03 23:44:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.42 2000/09/22 18:03:09 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.43 2000/10/03 23:44:42 itojun Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -133,6 +133,7 @@ agg_i1send(iph1, msg)
 	if (iph1->nonce == NULL)
 		goto end;
 
+#ifdef HAVE_SIGNING_C
 	/* create CR if need */
 	if (iph1->rmconf->send_cr
 	 && oakley_needcr(iph1->rmconf->proposal->authmethod)
@@ -145,6 +146,7 @@ agg_i1send(iph1, msg)
 			goto end;
 		}
 	}
+#endif
 
 	/* create buffer to send isakmp payload */
 	tlen = sizeof(struct isakmp)
@@ -278,6 +280,7 @@ agg_i2recv(iph1, msg)
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CR:
 			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
@@ -290,6 +293,7 @@ agg_i2recv(iph1, msg)
 			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
@@ -360,10 +364,12 @@ agg_i2recv(iph1, msg)
 	}
     }
 
+#ifdef HAVE_SIGNING_C
 	if (oakley_checkcr(iph1) < 0) {
 		/* Ignore this error in order to be interoperability. */
 		;
 	}
+#endif
 
 	/* change status of isakmp status entry */
 	iph1->status = PHASE1ST_MSG2RECEIVED;
@@ -581,10 +587,12 @@ agg_r1recv(iph1, msg)
 				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CR:
 			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		default:
 			/* don't send information, see isakmp_ident_r1() */
 			plog(logp, LOCATION, iph1->remote,
@@ -606,10 +614,12 @@ agg_r1recv(iph1, msg)
 		goto end;
 	}
 
+#ifdef HAVE_SIGNING_C
 	if (oakley_checkcr(iph1) < 0) {
 		/* Ignore this error in order to be interoperability. */
 		;
 	}
+#endif
 
 	iph1->status = PHASE1ST_MSG1RECEIVED;
 
@@ -697,6 +707,7 @@ agg_r1send(iph1, msg)
 	if (iph1->hash == NULL)
 		goto end;
 
+#ifdef HAVE_SIGNING_C
 	/* create CR if need */
 	if (iph1->rmconf->send_cr
 	 && oakley_needcr(iph1->approval->authmethod)
@@ -709,6 +720,7 @@ agg_r1send(iph1, msg)
 			goto end;
 		}
 	}
+#endif
 
 	tlen = sizeof(struct isakmp);
 
@@ -924,6 +936,7 @@ agg_r2recv(iph1, msg0)
 				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
+#ifdef HAVE_SIGNING_C
 		case ISAKMP_NPTYPE_CERT:
 			if (oakley_savecert(iph1, pa->ptr) < 0)
 				goto end;
@@ -932,6 +945,7 @@ agg_r2recv(iph1, msg0)
 			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
 				goto end;
 			break;
+#endif
 		case ISAKMP_NPTYPE_N:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,

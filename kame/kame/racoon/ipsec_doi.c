@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.113 2000/09/29 18:45:10 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.114 2000/10/03 23:44:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.113 2000/09/29 18:45:10 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.114 2000/10/03 23:44:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2984,12 +2984,14 @@ ipsecdoi_setid1(iph1)
 		id_b.type = idtype2doi(iph1->rmconf->identtype);
 		ident = lcconf->ident[iph1->rmconf->identtype];
 		break;
+#ifdef HAVE_SIGNING_C
 	case LC_IDENTTYPE_CERTNAME:
 		id_b.type = IPSECDOI_ID_DER_ASN1_DN;
 		if (oakley_getmycert(iph1) < 0)
 			goto err;
 		ident = eay_get_x509asn1subjectname(&iph1->cert->cert);
 		break;
+#endif
 	case LC_IDENTTYPE_ADDRESS:
 	default:
 		/* use IP address */
