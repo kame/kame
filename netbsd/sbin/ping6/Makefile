@@ -28,4 +28,6 @@ CPPFLAGS+=-DKAME_SCOPEID
 # new advanced API
 CPPFLAGS+=-DUSE_RFC2292BIS
 
+CPPFLAGS+=-DHAVE_POLL_H
+
 .include <bsd.prog.mk>
