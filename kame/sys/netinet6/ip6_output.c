@@ -600,11 +600,11 @@ skip_ipsec2:;
 		in6_ifstat_inc(ifp, ifs6_out_request);
 
 		/*
-		 * Check if there is the outgoing interface conflicts with
-		 * the interface specified by ifi6_ifindex(if specified).
+		 * Check if the outgoing interface conflicts with
+		 * the interface specified by ifi6_ifindex (if specified).
 		 * Note that loopback interface is always okay.
-		 * (this happens when we are sending packet toward my
-		 * interface)
+		 * (this may happen when we are sending packet to one of
+		 *  our own addresses.)
 		 */
 		if (opt && opt->ip6po_pktinfo
 		 && opt->ip6po_pktinfo->ipi6_ifindex) {
