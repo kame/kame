@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.38 2000/06/13 02:45:29 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.39 2000/06/13 02:50:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1407,8 +1407,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	} else
 		ifp->if_addrlist = (struct ifaddr *)ia;
 #else
-	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia,
-	    ifa_list);
+	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
 	/* gain another refcnt for the link from if_addrlist */
 	ia->ia_ifa.ifa_refcnt++;
