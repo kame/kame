@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.30 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.31 2001/01/15 15:42:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -928,7 +928,8 @@ u_int32_t            lifetime; /* Proposed lifetime in the BU */
 		return IPPROTO_DONE;
 	bzero(opt, sizeof(struct ip6_pktopts));
 
-	opt->ip6po_hlim = -1;       /* -1 means to use default hop limit */
+	opt->ip6po_hlim = -1;	/* -1 means to use default hop limit */
+	opt->ip6po_mtu = -1;	/* -1 means to use default mtu */
 	m_ip6 = mip6_create_ip6hdr(ip6_src, ip6_dst, IPPROTO_NONE);
 	if(m_ip6 == NULL)
 		return IPPROTO_DONE;
