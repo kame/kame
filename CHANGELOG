@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2488 2003/10/10 14:00:13 suz Exp $
+$KAME: CHANGELOG,v 1.2489 2003/10/13 06:27:29 itojun Exp $
 
 <200310>
+Mon Oct 13 15:24:46 JST 2003  itojun@iijlab.net
+	* sys/netinet6/nd6_rtr.c: revert previous change to nd6_rtmsg().
+	  it is freebsd sys/net/if.c which is incorrect, not nd6_rtmsg().
+
 2003-10-10 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/ip6_input.c
 	fixed an endian bug on fragment header scanning.
