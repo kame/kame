@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.4 1999/10/07 02:21:51 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.5 1999/10/19 23:57:48 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -491,29 +491,15 @@ upper_spec
 policy_spec
 	:	F_POLICY policy_requests
 		{
-			int len;
-
-			if ((len = ipsec_get_policylen($2.val.buf)) < 0) {
+			p_policy = ipsec_set_policy($2.val.buf, $2.val.len);
+			if (p_policy == NULL) {
 				free($2.val.buf);
-				yyerror(ipsec_strerror());
-				return -1;
-			}
-
-			if ((p_policy = malloc(len)) == NULL) {
-				free($2.val.buf);
-				yyerror("malloc");
-				return -1;
-			}
-
-			if ((len = ipsec_set_policy(p_policy, len, $2.val.buf)) < 0) {
-				free($2.val.buf);
-				free(p_policy);
 				p_policy = NULL;
 				yyerror(ipsec_strerror());
 				return -1;
 			}
 
-			p_policy_len += len;
+			p_policy_len += $2.val.len;
 
 			free($2.val.buf);
 		}
