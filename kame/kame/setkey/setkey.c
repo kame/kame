@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.16 2000/11/08 16:28:16 sakane Exp $	*/
+/*	$KAME: setkey.c,v 1.17 2000/12/20 01:14:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -549,7 +549,7 @@ shortdump(msg)
 			snprintf(buf, sizeof(buf), "%-3lu", (u_long)t);
 		printf("%s", buf);
 	} else
-		printf(" ???/???");
+		printf(" ??\?/???");	/* backslash to avoid trigraph ??/ */
 
 	printf(" ");
 
