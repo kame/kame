@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2103 2002/03/17 19:51:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.2104 2002/03/17 22:04:56 jinmei Exp $
 
 <200203>
+2002-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ah_input.c (ah6_ctlinput):
+	* kame/sys/netinet6/esp_input.c (esp6_ctlinput):
+	corrected arguments to key_allocsa().  This fix is very important
+	if you use IPsec, because key_allocsa() in recent snaps has a
+	strong validation check which will cause kernel panic against
+	bogus values.
+
 2002-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_output): do not update the
 	"dst" address, which is the next-hop address, for multicast
