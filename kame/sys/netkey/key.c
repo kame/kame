@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.208 2001/08/13 20:22:10 itojun Exp $	*/
+/*	$KAME: key.c,v 1.209 2001/08/16 05:36:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3158,7 +3158,7 @@ key_setsaval(sav, m, mhp)
 		}
 		/* we no longer support byte lifetime */
 		if (sav->lft_h->sadb_lifetime_bytes) {
-			error = ENOBUFS;
+			error = EINVAL;
 			goto fail;
 		}
 		/* initialize? */
@@ -3179,7 +3179,7 @@ key_setsaval(sav, m, mhp)
 		}
 		/* we no longer support byte lifetime */
 		if (sav->lft_s->sadb_lifetime_bytes) {
-			error = ENOBUFS;
+			error = EINVAL;
 			goto fail;
 		}
 		/* initialize? */
