@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.12 1999/12/08 13:26:19 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.13 1999/12/22 08:14:32 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -98,7 +98,7 @@ extern void yyerror __P((char *));
 %token UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
 %token F_MODE MODE F_REQID
-%token F_EXT EXTENSION
+%token F_EXT EXTENSION NOCYCLICSEQ
 %token ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %token F_LIFETIME_HARD F_LIFETIME_SOFT
 %token DECSTRING QUOTEDSTRING HEXSTRING ANY
@@ -365,6 +365,7 @@ extension_spec
 
 extension
 	:	F_EXT EXTENSION { p_ext |= $2; }
+	|	F_EXT NOCYCLICSEQ { p_ext ^= SADB_X_EXT_CYCSEQ; }
 	|	F_MODE MODE { p_mode = $2; }
 	|	F_MODE ANY { p_mode = IPSEC_MODE_ANY; }
 	|	F_REQID DECSTRING { p_reqid = $2; }
@@ -758,7 +759,7 @@ parse_init()
 	p_upper = 0;
 
 	p_satype = 0;
-	p_ext = SADB_X_EXT_NONE;
+	p_ext = SADB_X_EXT_CYCSEQ;
 	p_alg_enc = SADB_EALG_NONE;
 	p_alg_auth = SADB_AALG_NONE;
 	p_mode = IPSEC_MODE_ANY;

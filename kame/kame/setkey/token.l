@@ -189,7 +189,7 @@ tunnel		{ PREPROC; yylval.num = IPSEC_MODE_TUNNEL; return(MODE); }
 random-pad	{ PREPROC; yylval.num = SADB_X_EXT_PRAND; return(EXTENSION); }
 seq-pad		{ PREPROC; yylval.num = SADB_X_EXT_PSEQ; return(EXTENSION); }
 zero-pad	{ PREPROC; yylval.num = SADB_X_EXT_PZERO; return(EXTENSION); }
-cyclic-seq	{ PREPROC; yylval.num = SADB_X_EXT_CYCSEQ; return(EXTENSION); }
+nocyclic-seq	{ PREPROC; return(NOCYCLICSEQ); }
 {hyphen}r	{ PREPROC; return(F_REPLAY); }
 {hyphen}lh	{ PREPROC; return(F_LIFETIME_HARD); }
 {hyphen}ls	{ PREPROC; return(F_LIFETIME_SOFT); }
