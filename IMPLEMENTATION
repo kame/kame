@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/04/19 15:45:44 $
+			$Date: 2000/04/24 01:16:39 $
 
 1. IPv6
 
@@ -1059,6 +1059,7 @@ The following table lists the network drivers we have tried so far.
 	ep pcmcia/i386	ok	ok		-
 	le sbus/sparc	ok	ok		yes
 	ne pci/i386	ok	ok		yes
+	ne pcmcia/i386	ok	ok		yes
 	wi pcmcia/i386	ok	ok		yes
 	(ATM)
 	en pci/i386	ok	ok		-
