@@ -47,6 +47,7 @@ extern int in6_addrscopebyif __P((struct in6_addr *, char *));
 extern int in6_scope __P((struct in6_addr *));
 extern void setloglevel __P((int));
 extern void dprintf __P((int, const char *, ...));
+extern int get_duid __P((char *, struct duid *));
 
 /* missing */
 #ifndef HAVE_STRLCAT

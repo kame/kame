@@ -83,6 +83,7 @@ int rtsock;	/* routing socket */
 #define SITE_LOCAL_PLEN 10
 #define GLOBAL_PLEN 3
 
+static struct duid client_duid; 
 static u_int32_t current_xid;
 
 /* behavior constant */
@@ -101,9 +102,9 @@ static int sa2plen __P((struct sockaddr_in6 *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 static void tvfix __P((struct timeval *));
 static long retransmit_timer __P((long, long, long));
-static ssize_t gethwid __P((char *, int, const char *));
 
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
+#define DUID_FILE "/etc/dhcp6c_duid"
 
 int
 main(argc, argv)
@@ -151,10 +152,9 @@ main(argc, argv)
 			err(1, "daemon");
 		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 	}
+	setloglevel(debug);
 
 	client6_init();
-
-	setloglevel(debug);
 
 	/* dump current PID */
 	pid = getpid();
@@ -187,6 +187,10 @@ client6_init()
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0)
 		errx(1, "if_nametoindex(%s)", device);
+
+	/* get our DUID */
+	if (get_duid(DUID_FILE, &client_duid))
+		errx(1, "failed to get a DUID");
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
@@ -523,7 +527,7 @@ client6_getreply()
 	return -1;
 }
 
-/* 18.1.5. Creation and Transmission of Inform messages */
+/* 18.1.5. Creation and Transmission of Information-request messages */
 static void
 client6_sendinform(s)
 	int s;
@@ -546,23 +550,16 @@ client6_sendinform(s)
 	dh6->dh6_xid |= htonl(current_xid);
 	len = sizeof(*dh6);
 
-	/* DUID */
+	/* client ID */
 	opt = (struct dhcp6opt *)(dh6 + 1);
-	opt->dh6opt_type = htons(DH6OPT_DUID);
-	p0 = p = (char *)(opt + 1);
-	ep = buf + sizeof(buf);
-	*(u_int16_t *)p = htons(1);	/* DUID type: time + hw addr */
-	p += sizeof(u_int16_t);
-	*(u_int32_t *)p = htonl(time(NULL) - 946684800); /* Jan 1, 2000 */
-	p += sizeof(u_int32_t);
-	l = gethwid(p, ep - p, device);
-	if (l < 0) {
-		errx(1, "client6_sendinform: could not get hwid");
-		/* NOTREACHED */
+	opt->dh6opt_type = htons(DH6OPT_CLIENTID);
+	opt->dh6opt_len = htons(client_duid.duid_len);
+	len += sizeof(*opt) + client_duid.duid_len;
+	if (len > sizeof(buf)) {
+		dprintf(LOG_NOTICE, "internal buffer short for DUID");
+		return;
 	}
-	p += l;
-	opt->dh6opt_len = htons(p - p0);
-	len += sizeof(*opt) + (p - p0);
+	memcpy((void *)(opt + 1), client_duid.duid_id, client_duid.duid_len);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
@@ -590,7 +587,10 @@ client6_sendinform(s)
 		 
 }
 
-/* 18.1.6. Receipt of Reply message in response to a Inform message */
+/*
+ * 18.1.6. Receipt of Reply message in response to a Information-request
+ * message
+ */
 static int
 client6_recvreply(s)
 	int s;
@@ -613,20 +613,20 @@ client6_recvreply(s)
 	}
 
 	if (len < sizeof(*dh6)) {
-		dprintf(LOG_WARNING, "client6_recvreply: short packet");
+		dprintf(LOG_INFO, "client6_recvreply: short packet");
 		return -1;
 	}
 
 	dh6 = (struct dhcp6 *)rbuf;
 	if (dh6->dh6_msgtype != DH6_REPLY)
-		return -1;	/* should be siletly discarded */
+		return -1;	/* should be silently discarded */
 
 	/*
 	 * The ``transaction-ID'' field value MUST match the value we
-	 * used in our Inform message.
+	 * used in our Information-request message.
 	 */
 	if (current_xid != (ntohl(dh6->dh6_xid) & DH6_XIDMASK)) {
-		dprintf(LOG_WARNING, "client6_recvreply: XID mismatch");
+		dprintf(LOG_INFO, "client6_recvreply: XID mismatch");
 		return -1;
 	}
 
@@ -661,7 +661,7 @@ client6_recvreply(s)
 	return 0;
 
  malformed:
-	dprintf(LOG_WARNING, "client6_recvreply: malformed option");
+	dprintf(LOG_INFO, "client6_recvreply: malformed option");
 	return -1;
 }
 
@@ -694,38 +694,4 @@ retransmit_timer(cur, irt, mrt)
 			n = mrt + r * mrt;
 	}
 	return (long)n;
-}
-
-static ssize_t
-gethwid(buf, len, ifname)
-	char *buf;
-	int len;
-	const char *ifname;
-{
-	struct ifaddrs *ifa, *ifap;
-	struct sockaddr_dl *sdl;
-	ssize_t l;
-
-	if (getifaddrs(&ifap) < 0)
-		return -1;
-
-	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		if (strcmp(ifa->ifa_name, ifname) != 0)
-			continue;
-		if (ifa->ifa_addr->sa_family != AF_LINK)
-			continue;
-
-		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
-		if (len < 2 + sdl->sdl_alen)
-			goto fail;
-		*(u_int16_t *)&buf[0] = htons(sdl->sdl_type);
-		memcpy(&buf[2], LLADDR(sdl), sdl->sdl_alen);
-		l = sizeof(u_int16_t) + sdl->sdl_alen;
-		freeifaddrs(ifap);
-		return l;
-	}
-
-  fail:
-	freeifaddrs(ifap);
-	return -1;
 }

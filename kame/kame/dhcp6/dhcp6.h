@@ -54,6 +54,14 @@
 #define INF_TIMEOUT	500	/* msec */
 #define INF_MAX_RT	30000	/* msec */
 
+/* Internal data structure */
+
+/* DUID: DHCP unique Identifier */
+struct duid {
+	int duid_len;		/* length */
+	char *duid_id;		/* variable length ID value (must be opaque) */
+};
+
 /* DHCP6 base packet format */
 struct dhcp6 {
 	union {
@@ -67,14 +75,15 @@ struct dhcp6 {
 #define DH6_XIDMASK	0x00ffffff
 
 /* DUID type 1 */
-struct dhcp6_duid {
-	u_int32_t dh6duid_time;
-	u_int16_t dh6duid_hwtype;
+struct dhcp6_duid_type1 {
+	u_int16_t dh6duid1_type;
+	u_int16_t dh6duid1_hwtype;
+	u_int32_t dh6duid1_time;
 	/* link-layer address follows */
 } __attribute__ ((__packed__));
 
 /* option */
-#define DH6OPT_DUID	1	/* TBD */
+#define DH6OPT_CLIENTID	1	/* TBD */
 #define DH6OPT_DNS	11	/* TBD */
 struct dhcp6opt {
 	u_int16_t dh6opt_type;

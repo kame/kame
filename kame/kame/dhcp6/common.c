@@ -43,9 +43,13 @@
 # endif
 #endif
 #include <net/if.h>
+#include <net/if_types.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
+#include <net/if_dl.h>
+#include <net/if_arp.h>
+
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <errno.h>
@@ -76,6 +80,7 @@ int debug_thresh;
 static unsigned int if_maxindex __P((void));
 #endif
 static int in6_matchflags __P((struct sockaddr *, char *, int));
+static ssize_t gethwid __P((char *, int, const char *, u_int16_t *));
 
 #if 0
 static unsigned int
@@ -390,6 +395,149 @@ in6_matchflags(addr, ifnam, flags)
 	close(s);
 
 	return(ifr6.ifr_ifru.ifru_flags6 & flags);
+}
+
+int
+get_duid(idfile, duid)
+	char *idfile;
+	struct duid *duid;
+{
+	FILE *fp = NULL;
+	u_int16_t len = 0, hwtype;
+	struct dhcp6_duid_type1 *dp; /* we only support the type1 DUID */
+	char tmpbuf[256];	/* DUID should be no more than 256 bytes */
+
+	if ((fp = fopen(idfile, "r")) == NULL && errno != ENOENT)
+		dprintf(LOG_NOTICE, "get_duid: failed to open DUID file:");
+
+	if (fp) {
+		/* decode length */
+		if (fread(&len, sizeof(len), 1, fp) != 1) {
+			dprintf(LOG_ERR, "get_duid: DUID file corrupted");
+			goto fail;
+		}
+	} else {
+		int l;
+
+		if ((l = gethwid(tmpbuf, sizeof(tmpbuf), NULL, &hwtype)) < 0) {
+			dprintf(LOG_INFO,
+				"get_duid: failed to get a hardware address");
+			goto fail;
+		}
+		len = l + sizeof(struct dhcp6_duid_type1);
+	}
+
+	memset(duid, 0, sizeof(*duid));
+	duid->duid_len = len;
+	if ((duid->duid_id = (char *)malloc(len)) == NULL)
+		err(1, "get_duid: failed to allocate memory");
+
+	/* copy (and fill) the ID */
+	if (fp) {
+		if (fread(duid->duid_id, len, 1, fp) != 1) {
+			dprintf(LOG_ERR, "get_duid: DUID file corrupted");
+			goto fail;
+		}
+
+		dprintf(LOG_DEBUG,
+			"get_duid: extracted an existing DUID from %s",
+			idfile);
+	} else {
+		u_int64_t t64;
+
+		dp = (struct dhcp6_duid_type1 *)duid->duid_id;
+		dp->dh6duid1_type = htons(1); /* type 1 */
+		dp->dh6duid1_hwtype = htons(hwtype);
+		/* time is Jan 1, 2000 (UTC), modulo 2^32 */
+		t64 = (u_int64_t)(time(NULL) - 946684800);
+		dp->dh6duid1_time = htonl((u_long)(t64 & 0xffffffff));
+		memcpy((void *)(dp + 1), tmpbuf, (len - sizeof(*dp)));
+
+		dprintf(LOG_DEBUG, "get_duid: generated a new DUID");
+	}
+
+	/* save the (new) ID to the file for next time */
+	if (!fp) {
+		if ((fp = fopen(idfile, "w+")) == NULL) {
+			dprintf(LOG_ERR,
+				"get_duid: failed to open DUID file for save");
+			goto fail;
+		}
+		if ((fwrite(&len, sizeof(len), 1, fp)) != 1) {
+			dprintf(LOG_ERR, "get_duid: failed to save DUID");
+			goto fail;
+		}
+		if ((fwrite(duid->duid_id, len, 1, fp)) != 1) {
+			dprintf(LOG_ERR, "get_duid: failed to save DUID");
+			goto fail;
+		}
+
+		dprintf(LOG_DEBUG, "get_duid: saved generated DUID to %s",
+			idfile);
+	}
+
+	if (fp)
+		fclose(fp);
+	return(0);
+
+  fail:
+	if (fp)
+		fclose(fp);
+	if (duid->duid_id) {
+		free(duid->duid_id);
+		duid->duid_id = NULL; /* for safety */
+	}
+	return(-1);
+}
+
+static ssize_t
+gethwid(buf, len, ifname, hwtypep)
+	char *buf;
+	int len;
+	const char *ifname;
+	u_int16_t *hwtypep;
+{
+	struct ifaddrs *ifa, *ifap;
+	struct sockaddr_dl *sdl;
+	ssize_t l;
+
+	if (getifaddrs(&ifap) < 0)
+		return -1;
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifname && strcmp(ifa->ifa_name, ifname) != 0)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_LINK)
+			continue;
+
+		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
+		if (len < 2 + sdl->sdl_alen)
+			goto fail;
+		/*
+		 * translate interface type to hardware type based on
+		 * http://www.iana.org/assignments/arp-parameters
+		 */
+		switch(sdl->sdl_type) {
+		case IFT_ETHER:
+#ifdef IFT_IEEE80211
+		case IFT_IEEE80211:
+#endif
+			*hwtypep = ARPHRD_ETHER;
+			break;
+		default:
+			continue; /* XXX */
+		}
+		dprintf(LOG_DEBUG, "gethwid: found an interface %s for DUID",
+			ifa->ifa_name);
+		memcpy(buf, LLADDR(sdl), sdl->sdl_alen);
+		l = sdl->sdl_alen; /* sdl will soon be freed */
+		freeifaddrs(ifap);
+		return l;
+	}
+
+  fail:
+	freeifaddrs(ifap);
+	return -1;
 }
 
 void
