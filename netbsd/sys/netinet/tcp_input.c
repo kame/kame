@@ -124,8 +124,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  *	connections.
  */
 
-#define DEFER_MADJ
-
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 
@@ -1201,13 +1199,9 @@ after_listen:
 	}
 
 	/*
-	 * Drop TCP, IP headers and TCP options.
+	 * Compute mbuf offset to TCP data segment.
 	 */
 	hdroptlen  = toff + off;
-#ifndef DEFER_MADJ
-	m->m_data += hdroptlen;
-	m->m_len  -= hdroptlen;
-#endif
 
 	/*
 	 * Calculate amount of space in receive window,
@@ -1393,11 +1387,7 @@ after_listen:
 			tcpstat.tcps_rcvpartduppack++;
 			tcpstat.tcps_rcvpartdupbyte += todrop;
 		}
-#ifndef DEFER_MADJ
-		m_adj(m, todrop);
-#else
 		hdroptlen += todrop;	/*drop from head afterwards*/
-#endif
 		th->th_seq += todrop;
 		tlen -= todrop;
 		if (th->th_urp > todrop)
@@ -1440,17 +1430,6 @@ after_listen:
 				iss = tcp_new_iss(tp, sizeof(struct tcpcb),
 						  tp->snd_nxt);
 				tp = tcp_close(tp);
-#ifndef DEFER_MADJ
-				/*
-				 * We have already advanced the mbuf
-				 * pointers past the IP+TCP headers and
-				 * options.  Restore those pointers before
-				 * attempting to use the TCP header again.
-				 */
-				m->m_data -= hdroptlen;
-				m->m_len  += hdroptlen;
-				hdroptlen = 0;
-#endif
 				goto findpcb;
 			}
 			/*
@@ -1873,13 +1852,8 @@ step6:
 #ifdef SO_OOBINLINE
 		     && (so->so_options & SO_OOBINLINE) == 0
 #endif
-		     ) {
-#ifndef DEFER_MADJ
-			tcp_pulloutofband(so, th, m, 0);
-#else
+		     )
 			tcp_pulloutofband(so, th, m, hdroptlen);
-#endif
-		}
 	} else
 		/*
 		 * If no out of band data is expected,
@@ -1922,15 +1896,11 @@ dodata:							/* XXX */
 			tiflags = th->th_flags & TH_FIN;
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += tlen;
-#ifdef DEFER_MADJ
 			m_adj(m, hdroptlen);
-#endif
 			sbappend(&(so)->so_rcv, m);
 			sorwakeup(so);
 		} else {
-#ifdef DEFER_MADJ
 			m_adj(m, hdroptlen);
-#endif
 			tiflags = tcp_reass(tp, th, m, &tlen);
 			tp->t_flags |= TF_ACKNOW;
 		}
@@ -2046,11 +2016,6 @@ dropwithreset:
 		goto drop;
 	else if (ip6 && IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 		goto drop;
-#endif
-#ifndef DEFER_MADJ
-	/* recover the header if dropped. */
-	m->m_data -= hdroptlen;
-	m->m_len += hdroptlen;
 #endif
     {
 	/*
