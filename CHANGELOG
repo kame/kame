@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2186 2002/06/15 00:14:02 itojun Exp $
+$KAME: CHANGELOG,v 1.2187 2002/06/20 07:40:33 itojun Exp $
 
 <200206>
+Thu Jun 20 16:37:57 JST 2002  itojun@iijlab.net
+	* sys/net/if_stf.c: reject packets with private IPv4 address
+	  (or 6to4 address derived from private IPv4 address).  from hitachi
+
 Sat Jun 15 09:11:47 JST 2002  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: use per-socket policy cache even more.
 
