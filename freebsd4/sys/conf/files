@@ -761,6 +761,7 @@ netinet6/raw_ip6.c	optional inet6
 netinet6/route6.c	optional inet6
 netinet6/scope6.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
+netinet6/udp6_output.c	optional inet6
 netipx/ipx.c		optional ipx
 netipx/ipx_cksum.c	optional ipx
 netipx/ipx_input.c	optional ipx
