@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.344 1999/12/16 00:47:09 jinmei Exp $
+$Id: CHANGELOG,v 1.345 1999/12/16 05:43:51 jinmei Exp $
 
 <199912>
+1999-12-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/{bgpd, hroute6d, pim6dd, pim6sd, route6d, rtsold}:
+	The default directory to make dump/trace files was changed from
+	/var/tmp to /var/run in order to avoid possible security problems.
+	This fix was suggested by the OpenBSD team.
+
 Thu Dec 16 02:55:23 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/XFree86: Upgrade to 3.3.5(not tested).
 	  submitted by ume@mahoroba.org.
