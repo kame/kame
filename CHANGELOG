@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.310 1999/12/01 16:54:22 itojun Exp $
+$Id: CHANGELOG,v 1.311 1999/12/02 15:49:05 itojun Exp $
 
 <199912>
+Fri Dec  3 00:44:57 JST 1999  itojun@iijlab.net
+	* netbsd/usr.sbin/syslogd: add IPv6 support.  NetBSD PR 8934 by
+	  Feico Dillema <dillema@acm.org>.
+
 Thu Dec  2 01:50:28 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/icmp6.c: fix sanity check location for mbuf
 	  requirement in icmp6_error().
