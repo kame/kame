@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.45 2002/04/15 06:35:30 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.46 2002/04/16 04:35:01 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -59,6 +59,17 @@
 #define	D_MATCHINGRULE6	0x00080000
 #define	D_TRANSLATEIPV6	0x00100000
 #endif	/* _KERNEL */
+
+
+#define HAVE_IP6_SETPKTADDRS	(1)
+/* for backward compatibility */
+#ifndef MLD_LISTENER_QUERY
+#define	MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
+#define	MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
+#define	MLD_LISTENER_DONE	MLD6_LISTENER_DONE
+
+#undef HAVE_IP6_SETPKTADDRS
+#endif
 
 
 /*
