@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.364 2004/01/21 00:40:07 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.365 2004/01/26 09:46:42 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -215,9 +215,10 @@ RFC3542: Advanced Sockets API for IPv6 (revised)
     * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI.
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
-RFC3590: Source Address Selection for the Multicast Listener Discovery (MLD) Protocol
+RFC3590: Source Address Selection for the Multicast Listener Discovery
+	 (MLD) Protocol
 RFC3633: IPv6 Prefix Options for Dynamic Host Configuration Protocol (DHCP)
-	version 6
+	 version 6
 RFC3646: DNS Configuration options for Dynamic Host Configuration Protocol for
          IPv6 (DHCPv6)
 RFC3678: Socket Interface Extensions for Multicast Source Filters
