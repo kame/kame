@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.30 2000/06/22 20:16:12 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.31 2000/06/23 06:34:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1409,10 +1409,13 @@ struct rainfo *rainfo;
 
 	/*
 	 * unicast advertisements
+	 * XXX commented out.  reason: though spec does not forbit it, unicast
+	 * advert does not really help
 	 */
 	for (sol = rainfo->soliciter; sol; sol = nextsol) {
 		nextsol = sol->next;
 
+#if 0
 		sndmhdr.msg_name = (caddr_t)&sol->addr;
 		i = sendmsg(sock, &sndmhdr, 0);
 		if (i < 0 || i != rainfo->ra_datalen)  {
@@ -1423,6 +1426,7 @@ struct rainfo *rainfo;
 				    strerror(errno));
 			}
 		}
+#endif
 
 		sol->next = NULL;
 		free(sol);
