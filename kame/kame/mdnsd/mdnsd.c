@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.42 2001/07/30 23:38:33 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.43 2001/08/02 10:14:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -459,12 +459,10 @@ join0(s, ai)
 		memset(&mreq4, 0, sizeof(mreq4));
 		mreq4.imr_multiaddr =
 		    ((struct sockaddr_in *)ai->ai_addr)->sin_addr;
-#if 0
 		if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq4,
 		    sizeof(mreq4)) != 0) {
 			return -1;
 		}
-#endif
 		break;
 	default:
 		errno = EAFNOSUPPORT;
