@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.174 1999/10/07 23:43:44 itojun Exp $
+$Id: CHANGELOG,v 1.175 1999/10/08 01:31:08 itojun Exp $
 
 <199910>
 Fri Oct  8 08:42:12 JST 1999
@@ -85,7 +85,8 @@ Sat Oct  2 16:18:35 JST 1999  itojun@iijlab.net
 	  update ALTQ userland to 2.0.
 
 Fri Oct  1 09:02:23 JST 1999  itojun@iijlab.net
-	* freebsd[23]/lib/libftpio: fix EPSV case.
+	* freebsd[23]/lib/libftpio: fix EPSV case.  this should fix
+	  usr.bin/fetch.
 
 <199909>
 1999-09-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -614,7 +615,7 @@ Tue Aug 24 23:45:36 JST 1999  itojun@iijlab.net
 	Thanks to Mickael Hoerdt<mhoerdt@iutsud.u-strasbg.fr> for finding
 	the problem.
 
-Tue Aug 24 18:19:19 JST 1999  itojun@iijlb.net
+Tue Aug 24 18:19:19 JST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp*.c: Improve syn cache cleanup again.
 	  When listening socket goes away, syn cache entries associated to the
 	  listening socket will never be used.  Therefore, it makes more sense
@@ -1838,7 +1839,7 @@ Tue May 11 18:48:37 JST 1999  sakane@kame.net
 	* kit/ports/icecast, kit/pkgsrc/audio/icecast: upgrade to latest
 	  IPv6 patch, with song name broadcasting/request hack.
 
-Tue May 11 18:26:06 JST 1999  itojun@ijilab.net
+Tue May 11 18:26:06 JST 1999  itojun@iijlab.net
 	* sys/netkey (FreeBSD228/BSDI): strictly perform reference count on
 	  SPD/SAD.  Now netkey seems to have almost no memory leaks.
 	* sys/netkey/key.c, kit/src/setkey/setkey.c (FreeBSD228/BSDI):
@@ -1912,7 +1913,7 @@ Thu May  6 17:32:06 JST 1999  itojun@iijlab.net
 
 	  TODO: tunnel mode
 
-Wed May  5 13:31:28 JST 1999  itojun@iijlab.net:
+Wed May  5 13:31:28 JST 1999  itojun@iijlab.net
 	* kit/ports/tcp_wrapper: IPv6-ready tcp_wrappers_7.6.tar.gz
 	  NOTE: this is separate from kit/ports/tcpd.  kit/ports/tcpd is a
 	  rewrite of tcp_wrappers for IPv6 (similar functionality but
@@ -1926,7 +1927,7 @@ Wed May  5 13:31:28 JST 1999  itojun@iijlab.net:
 	position was referred as the PIM version field.
 	Repored by Mickael Hoerdt <mhoerdt@iutsud.u-strasbg.fr>
 
-Wed May  5 06:03:59 JST 1999  itojun@iiljab.net
+Wed May  5 06:03:59 JST 1999  itojun@iijlab.net
 	* sys/dev/en/midway.c (FreeBSD3): pvc interface did not have the
 	  IPv6 link-local address.  There was some patch slipped off during
 	  the merge.
@@ -3592,7 +3593,7 @@ Wed Jan 13 11:07:58 1999  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
 Wed Jan 13 00:25:43 1999  Yoshinobu Inoue  <shin@nd.net.fujitsu.co.jp>
 	* kit/libexec/route6d/udp6stat.c: Bug fix: wrong pointer was freed.
 	
-Tue Jan 12 17:26:48 JST 1999  itojun@iiljab.net
+Tue Jan 12 17:26:48 JST 1999  itojun@iijlab.net
 	* kit/libexec/ftpd, kit/usr.bin/ftp: (NetBSD) added EPRT/EPSV support.
 
 Tue Jan 12 16:03:30 JST 1999  itojun@iijlab.net
