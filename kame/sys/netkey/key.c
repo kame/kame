@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.195 2001/07/27 03:51:30 itojun Exp $	*/
+/*	$KAME: key.c,v 1.196 2001/07/27 04:14:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7817,6 +7817,11 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	if (name[0] >= KEYCTL_MAXID)
 		return EOPNOTSUPP;
 	switch (name[0]) {
+#ifdef KEY_DEBUG
+	case KEYCTL_DEBUG_LEVEL:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_debug_level);
+#endif
 	default:
 		return sysctl_int_arr(key_sysvars, name, namelen,
 			oldp, oldlenp, newp, newlen);
@@ -7827,8 +7832,6 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 #ifdef __NetBSD__
 #include <vm/vm.h>
 #include <sys/sysctl.h>
-
-static int *key_sysvars[] = KEYCTL_VARS;
 
 int
 key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
@@ -7841,12 +7844,45 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 {
 	if (name[0] >= KEYCTL_MAXID)
 		return EOPNOTSUPP;
-	if (!key_sysvars[name[0]])
-		return EOPNOTSUPP;
 	switch (name[0]) {
-	default:
+#ifdef KEY_DEBUG
+	case KEYCTL_DEBUG_LEVEL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-			key_sysvars[name[0]]);
+		    &key_debug_level);
+#endif
+	case KEYCTL_SPI_TRY:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_spi_trycnt);
+	case KEYCTL_SPI_MIN_VALUE:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_spi_minval);
+	case KEYCTL_SPI_MAX_VALUE:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_spi_maxval);
+	case KEYCTL_RANDOM_INT:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_int_random);
+	case KEYCTL_LARVAL_LIFETIME:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_larval_lifetime);
+	case KEYCTL_BLOCKACQ_COUNT:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_blockacq_count);
+	case KEYCTL_BLOCKACQ_LIFETIME:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &key_blockacq_lifetime);
+	case KEYCTL_ESP_KEYMIN:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ipsec_esp_keymin);
+	case KEYCTL_ESP_AUTH:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ipsec_esp_auth);
+	case KEYCTL_AH_KEYMIN:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ipsec_ah_keymin);
+	default:
+		return EOPNOTSUPP;
 	}
+	/* NOTREACHED */
 }
 #endif /*__NetBSD__*/
