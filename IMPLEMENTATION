@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.273 2001/09/03 10:10:02 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.274 2001/09/09 21:45:37 sakane Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1996,7 +1996,7 @@ SAs, or IKE daemon, for actual encryption:
 
 	# setkey -c <<EOF
 	spdadd A B any -P out ipsec esp/tunnel/C-D/use;
-	spdadd A B any -P in ipsec esp/tunnel/D-C/use;
+	spdadd B A any -P in ipsec esp/tunnel/D-C/use;
 	^D
 
 The inbound/outbound traffic is monitored/captured by SPD engine, which works
