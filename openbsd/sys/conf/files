@@ -511,6 +511,7 @@ file net/if_tun.c			tun			needs-count
 file net/if_bridge.c			bridge			needs-count
 file net/if_vlan.c			vlan			needs-count
 file net/radix.c
+file net/radix_art.c			radix_art
 file net/raw_cb.c
 file net/raw_usrreq.c
 file net/route.c
