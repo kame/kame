@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.36 2002/05/30 15:05:46 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.37 2002/10/22 04:51:10 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -461,7 +461,6 @@ m_aux_delete(m, victim)
 	struct mbuf *victim;
 {
 	struct mbuf *n, *prev, *next;
-	struct mauxtag *t;
 
 	if ((m->m_flags & M_PKTHDR) == 0)
 		return;
@@ -469,7 +468,6 @@ m_aux_delete(m, victim)
 	prev = NULL;
 	n = m->m_pkthdr.aux;
 	while (n) {
-		t = (struct mauxtag *)n->m_dat;
 		next = n->m_next;
 		if (n->m_data != ((caddr_t)t) + sizeof(struct mauxtag)) {
 			printf("m_aux_delete: "
