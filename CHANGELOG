@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2585 2004/04/06 11:21:54 suz Exp $
+$KAME: CHANGELOG,v 1.2586 2004/04/06 12:20:32 suz Exp $
 
 <200404>
 2004-04-06  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* kame/sys/netinet6/{ip6_output.c, ip6.h}
+	* kame/sys/netinet6/ip6_output.c, kame/sys/netinet/ip6.h
 	  FreeBSD Security Advisory: FreeBSD-SA-04:06.ipv6
 
 2004-04-04  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
