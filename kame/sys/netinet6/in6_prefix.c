@@ -73,6 +73,9 @@
 #include <sys/sockio.h>
 #include <sys/systm.h>
 #include <sys/syslog.h>
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#include <sys/proc.h>
+#endif
 
 #include <net/if.h>
 
@@ -90,12 +93,6 @@ static MALLOC_DEFINE(M_RR_ADDR, "rp_addr", "IPv6 Router Renumbering Ifid");
 struct rr_prhead rr_prefix;
 
 #include <net/net_osdep.h>
-
-extern int	in6_interfaces;
-
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-extern struct proc *curproc;	/*XXX*/
-#endif
 
 static int create_ra_entry __P((struct rp_addr **rapp));
 static int add_each_prefix __P((struct socket *so, struct rr_prefix *rpp));
