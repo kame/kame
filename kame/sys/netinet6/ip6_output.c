@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.277 2002/01/11 07:51:59 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.278 2002/01/23 05:12:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1185,11 +1185,13 @@ skip_ipsec2:;
 
 	/*
 	 * An advanced API option (IPV6_USE_MIN_MTU) overrides mtu setting.
-	 * We ignore the specified MTU if it is larger than the already-known
-	 * path MTU.
+	 * The caller of this function may also specify to use the minimum MTU
+	 * in some cases.
 	 */
-	if (mtu > IPV6_MMTU && opt && (opt->ip6po_flags & IP6PO_MINMTU))
+	if (mtu > IPV6_MMTU && ((flags & IPV6_MINMTU) ||
+				(opt && (opt->ip6po_flags & IP6PO_MINMTU)))) {
 		mtu = IPV6_MMTU;
+	}
 
 	/* Fake scoped addresses */
 	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
