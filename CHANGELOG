@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.626 2000/02/27 08:51:25 itojun Exp $
+$Id: CHANGELOG,v 1.627 2000/02/27 09:29:40 itojun Exp $
 
 <200002>
+Sun Feb 27 18:27:51 JST 2000  itojun@iijlab.net
+	* libinet6/resolv/res_init.c: allow extended scoped IPv6 address format
+	  into "nameserver" line in /etc/resolv.conf.
+
 Sun Feb 27 17:49:32 JST 2000  itojun@iijlab.net
 	* netbsd/lib/libinet6/getaddrinfo.c: add netbsd-specific getaddrinfo,
 	  which keeps search order declared in /etc/nsswitch.conf.
