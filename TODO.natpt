@@ -1,0 +1,59 @@
+$KAME: TODO.natpt,v 1.1 2001/03/18 19:21:57 fujisawa Exp $
+
+TODO list for NAT-PT implementation.
+KAME project
+
+o This NAT-PT implementation is IPv6 -> IPv4 translation, and also
+  including IPv4 <-> IPv4 NAT.	So, in this list, IPv4 issue is appeared.
+
+  USERLAND:
+    - natptconfig command.
+	o command has poor interface,
+	o command reads `/dev/kmem' in show subcommand.
+	  It is not so good to read '/dev/kmem', I need to think about
+	  another method to read these variables from kernel.
+    - maybe more...
+
+
+  KERNEL:
+    - traceroute6:
+    - ftp4: IPv4 <-> IPv4 ftp
+    - ftp6: IPv6  -> Ipv4 ftp
+	Currently, the implementation that change TCP/UDP payload is
+	not yet.
+    - checksum problem:
+	Sometimes, calculation of TCP/UDP checksum fails.  So, this
+	program calculate checksum about whole packet, not an
+	incremental way.
+    - ssh:
+	In IPv4 ssh session, ssh data corrupt was reported,
+	It occurs occasionally, it is difficult to chase it.
+    - porting to NetBSD.
+    - porting to BSD/OS.
+    - maybe more...
+
+
+    - IPv4 -> IPv6 translate
+	This is a little future work.
+	Currently, this NAT-PT can translate a outgoing IPv6 session.
+	It is expected that IPv4 -> IPv6 translation becomes necessary
+	in the near future, I intend to implement it.
+
+	For this purpose, some cooperation action with DNS-ALG become
+	necessary,  I intend to use 'totd'.
+
+
+o This is rough load map of half year in future.
+
+
+		  Mar	  Apr	  May	  Jun	  Jul	  Aug	  Sep
+		+-------+-------+-------+-------+-------+-------+-------+
+ftp6:		      <------>
+ftp4:			      <---->
+to NetBSD:			    <-->
+to BSD/OS:				<---->
+natptconfig:				      <----->
+checksum:					     <---->
+ssh:							   <---->
+
+[EOF]
