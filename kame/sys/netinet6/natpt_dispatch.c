@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.50 2002/04/25 07:29:54 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.51 2002/04/26 03:26:14 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -66,6 +66,8 @@
 
 int		natpt_enable;
 int		natpt_initialized;
+int		natpt_error;
+int		natpt_param;
 u_int		natpt_debug;
 u_int		natpt_dump;
 struct in6_addr	natpt_prefix;
@@ -129,9 +131,14 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 	if (isDump(D_IN6ACCEPT))
 		natpt_logMBuf(LOG_DEBUG, m6, "%s(): v6 translation accepted.", fn);
 
-	if (natpt_config6(m6, &cv6) == IPPROTO_IP)
-		return (IPPROTO_IP);
-
+	natpt_error = 0;
+	natpt_param = 0;
+	natpt_config6(m6, &cv6);
+	if (natpt_error == IPPROTO_ROUTING) {
+		icmp6_error(m6, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER, natpt_param);
+		return (IPPROTO_DONE);	/* discard packet without free */
+	}
+	
 	if (cv6.ip.ip6->ip6_hlim <= IPV6_HLIMDEC) {
 		icmp6_error(m6, ICMP6_TIME_EXCEEDED, ICMP6_TIME_EXCEED_TRANSIT, 0);
 		return (IPPROTO_DONE);	/* discard this packet without free */
@@ -371,6 +378,7 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 	int		hdrsz = 0;
 	caddr_t		ip6ext;
 	struct ip6_frag *ip6fh = NULL;
+	struct ip6_rthdr *ip6rt = NULL;
 
 	if (proto)	*proto = 0;
 	if (fh)		*fh = NULL;
@@ -379,8 +387,16 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 	nxt = ip6->ip6_nxt;
 	while ((nxt != IPPROTO_NONE) && (ip6ext < ip6end)) {
 		switch (nxt) {
-		case IPPROTO_HOPOPTS:
 		case IPPROTO_ROUTING:
+			ip6rt = (struct ip6_rthdr *)ip6ext;
+			if (ip6rt->ip6r_segleft != 0) {
+				natpt_error = IPPROTO_ROUTING;
+				natpt_param = (caddr_t)ip6rt - (caddr_t)ip6 + 3;
+				return (NULL); /* discard this packet */
+			}
+			/* fall through */
+
+		case IPPROTO_HOPOPTS:
 		case IPPROTO_DSTOPTS:
 			nxt = ((struct ip6_ext *)ip6ext)->ip6e_nxt;
 			ip6ext += ((((struct ip6_ext *)ip6ext)->ip6e_len + 1) << 3);
