@@ -951,11 +951,7 @@ syncache_add(inc, to, th, sop, m)
 		if (inc->inc_isipv6 &&
 		    (sc->sc_tp->t_inpcb->in6p_flags & IN6P_AUTOFLOWLABEL)) {
 			sc->sc_flowlabel = 
-#ifdef RANDOM_IP_ID
 			    (htonl(ip6_randomflowlabel()) & IPV6_FLOWLABEL_MASK);
-#else
-			    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
-#endif
 		}
 #endif
 	}
