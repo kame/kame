@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.51 2000/08/31 14:39:06 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.52 2000/09/05 14:25:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1428,6 +1428,8 @@ oakley_check_certid(iph1)
 				&altname, &type) !=0){
 			plog(logp, LOCATION, NULL,
 				"ERROR: Invalid SubjectAltName.\n");
+			free(altname);
+			return -1;
 		}
 		if (idlen != strlen(altname)) {
 			plog(logp, LOCATION, NULL,
