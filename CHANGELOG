@@ -1,6 +1,9 @@
-$Id: CHANGELOG,v 1.477 2000/01/24 08:28:51 itojun Exp $
+$Id: CHANGELOG,v 1.478 2000/01/24 14:38:11 itojun Exp $
 
 <200001>
+Mon Jan 24 23:37:38 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.1.
+
 Mon Jan 24 17:28:25 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/fetchmail: upgrade to 5.2.4.
 
