@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.60 2002/06/13 07:22:39 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.61 2002/06/23 08:26:52 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -287,7 +287,12 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		struct ifnet	destif;
 
 		bzero(&destif, sizeof(struct ifnet));
-		destif.if_mtu = IPV6_MMTU;
+		/*
+		 * For the sake of translation of IPv4 packet (DF bit
+		 * is on) into IPv6 packet without fragmentation.
+		 */
+		destif.if_mtu = IPV6_MMTU -
+			(sizeof(struct ip6_hdr) - sizeof(struct ip));
 
 		icmp_error(cv4.m, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
 		return (IPPROTO_DONE);	/* discard this packet without free. */
