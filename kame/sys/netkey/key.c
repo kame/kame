@@ -157,14 +157,12 @@ u_int32_t key_debug_level = 0;
 static u_int key_spi_trycnt = 1000;
 static u_int32_t key_spi_minval = 0x100;
 static u_int32_t key_spi_maxval = 0x0fffffff;	/* XXX */
-static u_int key_int_random = 60;	/*interval to initialize randseed,1(m)*/
 static u_int key_larval_lifetime = 30;	/* interval to expire acquiring, 30(s)*/
 static int key_blockacq_count = 10;	/* counter for blocking SADB_ACQUIRE.*/
 static int key_blockacq_lifetime = 20;	/* lifetime for blocking SADB_ACQUIRE.*/
 static int key_preferred_oldsa = 1;	/*preferred old sa rather than new sa.*/
 
 static u_int32_t acq_seq = 0;
-static int key_tick_init_random = 0;
 
 struct _satailq satailq;		/* list of all SAD entry */
 struct _sptailq sptailq;		/* SPD table + pcb */
@@ -272,10 +270,6 @@ SYSCTL_INT(_net_key, KEYCTL_SPI_MIN_VALUE,	spi_minval,	CTLFLAG_RW, \
 /* maximun spi value to allocate automatically. */
 SYSCTL_INT(_net_key, KEYCTL_SPI_MAX_VALUE,	spi_maxval,	CTLFLAG_RW, \
 	&key_spi_maxval,	0,	"");
-
-/* interval to initialize randseed */
-SYSCTL_INT(_net_key, KEYCTL_RANDOM_INT,	int_random,	CTLFLAG_RW, \
-	&key_int_random,	0,	"");
 
 /* lifetime for larval SA */
 SYSCTL_INT(_net_key, KEYCTL_LARVAL_LIFETIME,	larval_lifetime, CTLFLAG_RW, \
@@ -4826,12 +4820,6 @@ key_timehandler(arg)
 	}
     }
 
-	/* initialize random seed */
-	if (key_tick_init_random++ > key_int_random) {
-		key_tick_init_random = 0;
-		key_srandom();
-	}
-
 	/*
 	 * should set timeout based on the most closest timer expiration.
 	 * we don't bother to do that yet.
@@ -4849,13 +4837,6 @@ key_timehandler(arg)
 /*
  * to initialize a seed for random()
  */
-static void
-key_srandom()
-{
-
-	return;
-}
-
 static u_long
 key_random()
 {
@@ -8169,9 +8150,6 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case KEYCTL_SPI_MAX_VALUE:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &key_spi_maxval);
-	case KEYCTL_RANDOM_INT:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-		    &key_int_random);
 	case KEYCTL_LARVAL_LIFETIME:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &key_larval_lifetime);
