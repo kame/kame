@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1152 2000/07/26 02:04:51 itojun Exp $
+$Id: CHANGELOG,v 1.1153 2000/07/26 02:12:44 itojun Exp $
 
 <200007>
+Wed Jul 26 11:08:23 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: reject IPv6 packet with IPv4 mapped
+	  address in the header.  this makes more sense as we cannot be
+	  put into SIIT environment (no BSD supports non-INET kernel
+	  compilation).  This is an undo for a change on Mar 28 2000.
+
 Wed Jul 26 11:01:41 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/7/24 weekly snap
 	  from tcpdump.org.
