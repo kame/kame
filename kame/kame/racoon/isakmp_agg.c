@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.15 2000/02/09 05:18:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.16 2000/02/09 05:32:39 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -423,8 +423,8 @@ agg_i2send(iph1, msg)
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		tlen += sizeof(*gen) + iph1->hash->l;
 		break;
-	}
 #endif
+	}
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
