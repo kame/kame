@@ -84,6 +84,7 @@ static void copylladdr(char *, char *);
 static void make_ndopt_prefix(char *);
 static void make_ndopt_mtu(char *);
 static void make_ndopt_unknown(char *);
+static void gethex(char *);
 static char *gettest(char *, char *);
 
 extern char *nexthdr(char **bufp);
@@ -947,30 +948,7 @@ make_tcp(char *name)
 	pbp += th->th_off << 2;
 
 	if ((upper_data = tgetstr("tcp_data", &bp, tcpbuf)) != NULL) {
-		int i;
-		unsigned int hexval1, hexval2;
-		size_t datalen;
-
-		datalen = strlen(upper_data);
-		if ((datalen % 2) != 0) {
-			fprintf(stderr,
-				"v6test: make_tcp: data length (%u) "
-				"is invalid\n",
-				datalen);
-			exit(1);
-		}
-		for (i = 0; i < datalen; i += 2) {
-			if (sscanf(&upper_data[i], "%1x%1x",
-				   &hexval1, &hexval2) != 2) {
-				fprintf(stderr,
-					"v6test: make_tcp: "
-					"packet data format error: %s\n",
-					upper_data);
-				exit(1);
-			}
-			*pbp = ((hexval1 << 4) + hexval2) & 0xff;
-			pbp++;
-		}
+		gethex(upper_data);
 	}
 }
 
@@ -997,31 +975,57 @@ make_udp(char *name)
 	pbp += sizeof(*uh);
 
 	if ((upper_data = tgetstr("udp_data", &bp, udpbuf)) != NULL) {
-		int i;
-		unsigned int hexval1, hexval2;
-		size_t udplen;
+		gethex(upper_data);
+		uh->uh_ulen = htons((strlen(upper_data)/2)+sizeof(*uh));
+	}
+}
 
-		udplen = strlen(upper_data);
-		if ((udplen % 2) != 0) {
+void
+make_raw(char *name)
+{
+	char rawbuf[MAXPKTSIZ], area[MAXPKTSIZ];
+	char *bp = area, *upper_data;
+	short val16;
+	char nxt;
+
+	if (tgetent(rawbuf, name) <= 0) {
+		fprintf(stderr, "v6test: unknown header %s\n", name);
+		exit(1);
+	}
+
+	MUSTHAVE(nxt, "raw_proto", rawbuf);
+	if (nxthdrp) 
+		*nxthdrp = nxt;
+	nxthdrp = 0;
+	if ((upper_data = tgetstr("raw_data", &bp, rawbuf)) != NULL) {
+		gethex(upper_data);
+	}
+}
+
+static void
+gethex(char *str) 
+{
+	int i;
+	unsigned int hexval1, hexval2;
+	size_t len;
+
+	len = strlen(str);
+	if ((len % 2) != 0) {
+		fprintf(stderr,
+			"v6test: gethex: data length (%u) is invalid\n",
+			len);
+		exit(1);
+	}
+	for (i = 0; i < len; i += 2) {
+		if (sscanf(&str[i], "%1x%1x", &hexval1, &hexval2) != 2) {
 			fprintf(stderr,
-				"v6test: make_udp: data length (%u) is "
-				"invalid\n",
-				udplen);
+				"v6test: gethex: "
+				"packet data format error: %s\n",
+				str);
 			exit(1);
 		}
-		for (i = 0; i < udplen; i += 2) {
-			if (sscanf(&upper_data[i], "%1x%1x",
-				   &hexval1, &hexval2) != 2) {
-				fprintf(stderr,
-					"v6test: make_udp: "
-					"packet data format error: %s\n",
-					upper_data);
-				exit(1);
-			}
-			*pbp = ((hexval1 << 4) + hexval2) & 0xff;
-			pbp++;
-		}
-		uh->uh_ulen = htons((udplen/2)+sizeof(*uh));
+		*pbp = ((hexval1 << 4) + hexval2) & 0xff;
+		pbp++;
 	}
 }
 
@@ -1143,6 +1147,8 @@ getconfig(char *testname, u_char *buf)
 			*nxthdrp = IPPROTO_UDP;
 		    nxthdrp = 0;
 		    make_udp(hdrtype);
+		} else if (strncmp("raw", hdrtype, 3) == 0) {
+		    make_raw(hdrtype);
 		} else {
 			fprintf(stderr, "v6test: unknown packet type %s\n",
 				hdrtype);

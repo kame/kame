@@ -1,4 +1,4 @@
-.\"	$KAME: v6test.conf.5,v 1.2 2001/04/04 16:01:04 suz Exp $
+.\"	$KAME: v6test.conf.5,v 1.3 2001/04/04 18:47:20 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -63,7 +63,7 @@ except for the entries to be specified in the arguments of
 .Xr v6test 1 .
 Their name determines their properties to be specified.
 
-\fBinterval ether ip6 hbh icmp6echorpl icmp6echo icmp6err rtsol rtadvd nsol nadv redirect frghdr dstopt tcp udp\fR
+\fBinterval ether ip6 hbh icmp6echorpl icmp6echo icmp6err rtsol rtadvd nsol nadv redirect frghdr dstopt tcp udp raw\fR
 
 .Pp
 Every description begins with phrases regarding its argument. Its meanings are
@@ -452,6 +452,15 @@ UDP destination port
 UDP length field. If not specified, 8 is assumed.
 .It Cm \&udp_data \fI(hex)\fR
 UDP data.
+.El
+.Pp
+.It Cm \&raw \fI(entry)\fR
+Raw message dump for upper-layer protocols above IPv6, such as OSPFv3, Tunneled packet and so on. The following entries should be specified.
+.Bl -tag -width indent -compact
+.It Cm \&raw_proto \fI(num)\fR
+its protocol type
+.It Cm \&raw_data \fI(hex)\fR
+its actual data.
 .El
 .El
 

@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1637 2001/04/04 13:54:45 sakane Exp $
+$KAME: CHANGELOG,v 1.1638 2001/04/04 18:47:19 suz Exp $
 
 <200104>
+Thu Apr  5 03:42:24 JST 2001	suz@sdl.hitachi.co.jp
+	* kame/v6test/getconfig.c: v6test supports arbitrary raw packet 
+	advertisement, such as OSPFv3, Tunnelled packet etc.
+
 Wed Apr  4 22:47:27 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	support scopeid.  base code was from <Francis.Dupont@enst-bretagne.fr>.
