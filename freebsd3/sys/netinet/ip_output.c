@@ -270,6 +270,7 @@ ip_output(m0, opt, ro, flags, imo)
 	    imo != NULL && imo->imo_multicast_ifp != NULL) {
 		ifp = imo->imo_multicast_ifp;
 		IFP_TO_IA(ifp, ia);
+		isbroadcast = 0;
 	} else {
 		/*
 		 * If this is the case, we probably don't want to allocate
