@@ -1,4 +1,4 @@
-/*	$KAME: debugrm.c,v 1.3 2001/11/16 08:14:49 sakane Exp $	*/
+/*	$KAME: debugrm.c,v 1.4 2001/11/26 16:54:29 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,6 +29,8 @@
  * SUCH DAMAGE.
  */
 
+#define NONEED_DRM
+
 #include <sys/types.h>
 #include <sys/param.h>
 
@@ -39,6 +41,8 @@
 #include <err.h>
 
 #include "debugrm.h"
+
+#include "vmbuf.h"	/* need to mask vmbuf.c functions. */
 
 #define DRMLISTSIZE 1024
 
@@ -100,6 +104,10 @@ DRM_del(p)
 	void *p;
 {
 	int i;
+
+	if (!p)
+		return;
+
 	for (i = 0; i < sizeof(drmlist)/sizeof(drmlist[0]); i++) {
 		if (drmlist[i].ptr == p) {
 			drmlist[i].ptr = 0;
@@ -191,4 +199,74 @@ DRM_free(file, line, func, ptr)
 {
 	DRM_del(ptr);
 	free(ptr);
+}
+
+/*
+ * mask vmbuf.c functions.
+ */
+void *
+DRM_vmalloc(file, line, func, size)
+	char *file, *func;
+	int line;
+	size_t size;
+{
+	void *p;
+
+	p = vmalloc(size);
+	if (p) {
+		char buf[1024];
+		DRM_setmsg(buf, sizeof(buf), p, size, file, line, func);
+		DRM_add(p, buf);
+	}
+
+	return p;
+}
+
+void *
+DRM_vrealloc(file, line, func, ptr, size)
+	char *file, *func;
+	int line;
+	void *ptr;
+	size_t size;
+{
+	void *p;
+
+	p = vrealloc(ptr, size);
+	if (p) {
+		char buf[1024];
+		if (ptr && p != ptr)
+			DRM_del(ptr);
+		DRM_setmsg(buf, sizeof(buf), p, size, file, line, func);
+		DRM_add(p, buf);
+	}
+
+	return p;
+}
+
+void
+DRM_vfree(file, line, func, ptr)
+	char *file, *func;
+	int line;
+	void *ptr;
+{
+	DRM_del(ptr);
+	vfree(ptr);
+}
+
+void *
+DRM_vdup(file, line, func, ptr)
+	char *file, *func;
+	int line;
+	void *ptr;
+{
+	void *p;
+
+	p = vdup(ptr);
+	if (p) {
+		char buf[1024];
+		DRM_setmsg(buf, sizeof(buf), p, 0, file, line, func);
+		DRM_add(p, buf);
+	}
+
+	return p;
 }
