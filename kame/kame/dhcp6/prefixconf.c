@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.13 2003/01/06 06:45:18 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.14 2003/01/14 17:04:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -134,7 +134,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 
 	/*
 	 * Parameter check: reject prefixes where pltime is larger than vltime,
-	 * though that the spec is silent on this point.
+	 * though the spec is silent on this point.
 	 */
 	if (pinfo->vltime != DHCP6_DURATITION_INFINITE &&
 	    (pinfo->pltime == DHCP6_DURATITION_INFINITE ||
