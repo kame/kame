@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.6 2001/07/29 19:32:40 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.41 2001/11/06 08:05:01 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.42 2001/11/10 09:42:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -687,6 +687,13 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		}
 		if (addr->sa_family != AF_INET6) {
 			error = EAFNOSUPPORT;
+			goto bad;
+		}
+		/* KAME hack: embed scopeid */
+		if (in6_embedscope(&((struct sockaddr_in6 *)addr)->sin6_addr,
+				   (struct sockaddr_in6 *)addr,
+				   inp, NULL) != 0) {
+			error = EINVAL;
 			goto bad;
 		}
 	}

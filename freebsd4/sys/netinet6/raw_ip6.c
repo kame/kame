@@ -92,9 +92,7 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
-#ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h>
-#endif
 #include <netinet6/raw_ip6.h>
 
 #ifdef IPSEC
@@ -591,11 +589,9 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	if (TAILQ_EMPTY(&ifnet) || addr->sin6_family != AF_INET6)
 		return EADDRNOTAVAIL;
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
+	if (ip6_use_defzone && addr->sin6_scope_id == 0) {
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
-#endif
 #ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&addr->sin6_addr, addr, inp, NULL) != 0)
@@ -623,9 +619,6 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct in6_addr *in6a = NULL;
 	int error = 0;
-#ifdef ENABLE_DEFAULT_SCOPE
-	struct sockaddr_in6 tmp;
-#endif
 
 	if (nam->sa_len != sizeof(*addr))
 		return EINVAL;
@@ -633,14 +626,9 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return EADDRNOTAVAIL;
 	if (addr->sin6_family != AF_INET6)
 		return EAFNOSUPPORT;
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
-		/* avoid overwrites */
-		tmp = *addr;
-		addr = &tmp;
+	if (ip6_use_defzone && addr->sin6_scope_id == 0) {
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
-#endif
 #ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&addr->sin6_addr, addr, inp, NULL) != 0)
@@ -696,11 +684,8 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 		tmp = *(struct sockaddr_in6 *)nam;
 		dst = &tmp;
 	}
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (dst->sin6_scope_id == 0) {	/* not change if specified  */
+	if (ip6_use_defzone && dst->sin6_scope_id == 0)
 		dst->sin6_scope_id = scope6_addr2default(&dst->sin6_addr);
-	}
-#endif
 	return rip6_output(m, so, dst, control);
 }
 

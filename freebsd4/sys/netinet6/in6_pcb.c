@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.36 2001/10/23 09:29:41 sumikawa Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.37 2001/11/10 08:52:26 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,9 +99,7 @@
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
-#ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h>
-#endif
 
 #include "faith.h"
 #if defined(NFAITH) && NFAITH > 0
@@ -144,12 +142,10 @@ in6_pcbbind(inp, nam, p)
 		if (nam->sa_family != AF_INET6)
 			return(EAFNOSUPPORT);
 
-#ifdef ENABLE_DEFAULT_SCOPE
-		if (sin6->sin6_scope_id == 0) {	/* not change if specified  */
+		if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
 			sin6->sin6_scope_id =
 				scope6_addr2default(&sin6->sin6_addr);
 		}
-#endif
 #ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
@@ -294,12 +290,10 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (sin6->sin6_port == 0)
 		return (EADDRNOTAVAIL);
 
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (sin6->sin6_scope_id == 0) {	/* not change if specified  */
+	if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
 		sin6->sin6_scope_id =
 			scope6_addr2default(&sin6->sin6_addr);
 	}
-#endif
 #ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, &ifp) != 0)
