@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.235 2002/05/14 04:16:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.236 2002/05/14 05:01:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,6 +930,9 @@ key_do_allocsa_policy(sah, state)
  * Note that, however, we do need to keep source address in IPsec SA.
  * IKE specification and PF_KEY specification do assume that we
  * keep source address in IPsec SA.  We see a tricky situation here.
+ *
+ * BEWARE: src and dst are in_addr * if family == AF_INET, and sockaddr_in6 *
+ * if family == AF_INET6.
  */
 struct secasvar *
 key_allocsa(family, src, dst, proto, spi)
