@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.72 2000/11/30 03:55:53 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.73 2000/11/30 04:00:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -617,13 +617,14 @@ udp6_ctlinput(cmd, sa, d)
 				 * create the corresponding routing entry.
 				 */
 				icmp6_mtudisc_update((struct ip6ctlparam *)d);
-				return;
 			}
 
 			/*
-			 * if we did not call icmp6_mtudisc_update(),
+			 * regardless of if we called icmp6_mtudisc_update(),
 			 * we need to call in6_pcbnotify(), to notify path
-			 * MTU change to the userland (2292bis-02).
+			 * MTU change to the userland (2292bis-02), because
+			 * some unconnected sockets may share the same
+			 * destination and want to know the path MTU.
 			 */
 		}
 #endif
