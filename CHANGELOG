@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2249 2002/10/16 07:57:00 suz Exp $
+$KAME: CHANGELOG,v 1.2250 2002/10/16 15:08:45 jinmei Exp $
 
 <200210>
+2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): do not differentiate
+	manually configured address from autoconfigured ones with regard
+	to prefix management.  This should fix the problem that the direct
+	route to a prefix was removed when one of the addresses sharing the
+	prefix was removed.
+
 Wed Oct 16 16:56:06 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/netinet/in_msf.c: fixed a kernel crash caused by the 
 	IGMPv3/MLDv2 operation adding new source address to the existing 
