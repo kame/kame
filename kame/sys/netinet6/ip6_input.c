@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.206 2001/07/25 05:18:01 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.207 2001/07/25 05:52:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -632,6 +632,19 @@ ip6_input(m)
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
 		goto bad;
 	}
+	if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) &&
+	    !(m->m_flags & M_LOOP)) {
+		/*
+		 * In this case, the packet should come from the loopback
+		 * interface.  However, we cannot just check the if_flags,
+		 * because ip6_mloopback() passes the "actual" interface
+		 * as the outgoing/incoming interface.
+		 */
+		ip6stat.ip6s_badscope++;
+		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
+		goto bad;
+	}
+	     
 	/*
 	 * The following check is not documented in specs.  A malicious
 	 * party may be able to use IPv4 mapped addr to confuse tcp/udp stack
