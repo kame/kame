@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.42 2001/02/20 08:31:06 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.43 2001/02/20 08:51:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,7 +337,7 @@ gif_output(ifp, m, dst, rt)
 	ifp->if_opackets++;	
 	ifp->if_obytes += m->m_pkthdr.len;
 
-	/* AF-specific encapsulation */
+	/* inner AF-specific encapsulation */
 	switch (dst->sa_family) {
 #if defined(__NetBSD__) && defined(ISO)
 	case AF_ISO:
@@ -351,6 +351,7 @@ gif_output(ifp, m, dst, rt)
 
 	/* XXX should we check if our outer source is legal? */
 
+	/* dispatch to output logic based on outer AF */
 	switch (sc->gif_psrc->sa_family) {
 #ifdef INET
 	case AF_INET:
