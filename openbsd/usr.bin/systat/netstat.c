@@ -98,8 +98,8 @@ opennetstat()
 }
 
 struct netinfo {
-	int	nif_family;
 	struct	netinfo *nif_forw, *nif_prev;
+	int	nif_family;
 	short	nif_line;		/* line on screen */
 	short	nif_seen;		/* 0 when not present in list */
 	short	nif_flags;
