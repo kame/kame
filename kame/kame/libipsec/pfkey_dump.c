@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.23 2000/10/16 08:03:40 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.24 2000/10/16 08:05:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -50,6 +50,29 @@
 
 #include "ipsec_strerror.h"
 #include "libpfkey.h"
+
+/* cope with old kame headers - ugly */
+#ifndef SADB_X_AALG_MD5
+#define SADB_X_AALG_MD5		SADB_AALG_MD5	
+#endif
+#ifndef SADB_X_AALG_SHA
+#define SADB_X_AALG_SHA		SADB_AALG_SHA
+#endif
+#ifndef SADB_X_AALG_NULL
+#define SADB_X_AALG_NULL	SADB_AALG_NULL
+#endif
+
+#ifndef SADB_X_EALG_BLOWFISHCBC
+#define SADB_X_EALG_BLOWFISHCBC	SADB_EALG_BLOWFISHCBC
+#endif
+#ifndef SADB_X_EALG_CAST128CBC
+#define SADB_X_EALG_CAST128CBC	SADB_EALG_CAST128CBC
+#endif
+#ifndef SADB_X_EALG_RC5CBC
+#ifdef SADB_EALG_RC5CBC
+#define SADB_X_EALG_RC5CBC	SADB_EALG_RC5CBC
+#endif
+#endif
 
 #define GETMSGSTR(str, num) \
 do { \
@@ -134,15 +157,9 @@ static struct val2str str_alg_auth[] = {
 	{ SADB_AALG_NONE, "none", },
 	{ SADB_AALG_MD5HMAC, "hmac-md5", },
 	{ SADB_AALG_SHA1HMAC, "hmac-sha1", },
-#ifdef SADB_X_AALG_MD5
 	{ SADB_X_AALG_MD5, "md5", },
-#endif
-#ifdef SADB_X_AALG_SHA
 	{ SADB_X_AALG_SHA, "sha", },
-#endif
-#ifdef SADB_X_AALG_NULL
 	{ SADB_X_AALG_NULL, "null", },
-#endif
 	{ -1, NULL, },
 };
 
@@ -154,12 +171,8 @@ static struct val2str str_alg_enc[] = {
 #ifdef SADB_X_EALG_RC5CBC
 	{ SADB_X_EALG_RC5CBC, "rc5-cbc", },
 #endif
-#ifdef SADB_X_EALG_CAST128CBC
 	{ SADB_X_EALG_CAST128CBC, "cast128-cbc", },
-#endif
-#ifdef SADB_X_EALG_BLOWFISHCBC
 	{ SADB_X_EALG_BLOWFISHCBC, "blowfish-cbc", },
-#endif
 #ifdef SADB_X_EALG_RIJNDAELCBC
 	{ SADB_X_EALG_RIJNDAELCBC, "rijndael-cbc", },
 #endif
