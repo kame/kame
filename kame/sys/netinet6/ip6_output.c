@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.125 2000/10/02 04:55:07 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.126 2000/10/11 08:25:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1803,17 +1803,6 @@ do { \
 #ifdef HAVE_NRL_INPCB
 				error =	ip6_setmoptions(optname,
 					&inp->inp_moptions6, m);
-				/*
-				 * XXX: setting the flag would be redundant
-				 *      except at the first time. Also, we
-				 *      actually don't have to reset the flag,
-				 *      since ip6_freemoptions() would simply
-				 *      return when the inp_moptions6 is NULL.
-				 */
-				if (inp->inp_moptions6)
-					inp->inp_flags |= INP_IPV6_MCAST;
-				else
-					inp->inp_flags &= ~INP_IPV6_MCAST;
 #else
 				error =	ip6_setmoptions(optname,
 					&in6p->in6p_moptions, m);

@@ -771,8 +771,7 @@ udp_output(m, va_alist)
 	va_end(ap);
 
 #ifdef INET6
-	v6packet = ((inp->inp_flags & INP_IPV6) &&
-		    !(inp->inp_flags & INP_IPV6_MAPPED));
+	v6packet = (inp->inp_flags & INP_IPV6);
 #endif
 
 #ifdef INET6
@@ -794,8 +793,7 @@ udp_output(m, va_alist)
 
 	        /*
 		 * Save current PCB flags because they may change during
-		 * temporary connection, particularly the INP_IPV6_UNDEC
-		 * flag.
+		 * temporary connection.
 		 */
                 pcbflags = inp->inp_flags;
 
@@ -934,9 +932,7 @@ udp_output(m, va_alist)
 			uh->uh_sum = 0xffff;
 
 		error = ip6_output(m, inp->inp_outputopts6, &inp->inp_route6, 
-		    flags,
-		    (inp->inp_flags & INP_IPV6_MCAST)?inp->inp_moptions6:NULL,
-		    NULL);
+		    flags, inp->inp_moptions6, NULL);
 	} else
 #endif /* INET6 */
 	{
@@ -982,20 +978,10 @@ udp_output(m, va_alist)
 		}
 
 		udpstat.udps_opackets++;
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6_MCAST) {
-			error = ip_output(m, inp->inp_options, &inp->inp_route,
-				inp->inp_socket->so_options &
-				(SO_DONTROUTE | SO_BROADCAST),
-				NULL, NULL, inp->inp_socket);
-		} else
-#endif /* INET6 */
-		{
-			error = ip_output(m, inp->inp_options, &inp->inp_route,
-				inp->inp_socket->so_options &
-				(SO_DONTROUTE | SO_BROADCAST),
-		    		inp->inp_moptions, inp, NULL);
-		}
+		error = ip_output(m, inp->inp_options, &inp->inp_route,
+			inp->inp_socket->so_options &
+			(SO_DONTROUTE | SO_BROADCAST),
+			inp->inp_moptions, inp, NULL);
 	}
 
 bail:
@@ -1194,8 +1180,7 @@ udp_usrreq(so, req, m, addr, control)
 			return (error);
 #endif
 #ifdef INET6
-		if ((inp->inp_flags & INP_IPV6) &&
-		    !(inp->inp_flags & INP_IPV6_MAPPED))
+		if ((inp->inp_flags & INP_IPV6) != 0)
 			return (udp6_output(inp, m, addr, control));
 		else
 			return (udp_output(m, inp, addr, control));

@@ -189,6 +189,10 @@ in6_pcbbind(inp, nam)
 
 		lport = sin6->sin6_port;
 
+		/* reject IPv4 mapped address, we have no support for it */
+		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
+			return EADDRNOTAVAIL;
+
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
 			/*
 			 * Treat SO_REUSEADDR as SO_REUSEPORT for multicast;
@@ -266,26 +270,6 @@ in6_pcbbind(inp, nam)
 		if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 			inp->inp_ipv6.ip6_flow = htonl(0x60000000) |
 			    (sin6->sin6_flowinfo & htonl(0x0fffffff));
-		}
-
-		/*
-		 * Unroll first 2 compares of {UNSPEC,V4MAPPED}.
-		 * Mark PF_INET6 socket as undecided (bound to port-only) or
-		 * mapped (INET6 socket talking IPv4) here.  I may need to move
-		 * this code out of this if (nam) clause, and put it just before
-		 * function return.
-		 *
-		 * Then again, the only time this function is called with NULL
-		 * nam might be during a *_pcbconnect(), which then sets the
-		 * local address ANYWAY.
-		 */
-		if (inp->inp_laddr6.s6_addr32[0] == 0 &&
-		    inp->inp_laddr6.s6_addr32[1] == 0) {
-			if (inp->inp_laddr6.s6_addr32[2] == ntohl(0xffff))
-				inp->inp_flags |= INP_IPV6_MAPPED;
-			if (inp->inp_laddr6.s6_addr32[2] == 0 &&
-			    inp->inp_laddr6.s6_addr32[3] == 0)
-				inp->inp_flags |= INP_IPV6_UNDEC;
 		}
 	}
 
@@ -439,6 +423,10 @@ in6_pcbconnect(inp, nam)
 	if (sin6->sin6_port == 0)
 		return(EADDRNOTAVAIL);
 
+	/* reject IPv4 mapped address, we have no support for it */
+	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
+		return EADDRNOTAVAIL;
+
 	/* sanity check for mapped address case */
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 		if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
@@ -520,11 +508,6 @@ in6_pcbconnect(inp, nam)
 	 * but if this line is missing, the garbage value remains.
 	 */
 	inp->inp_ipv6.ip6_flow = sin6->sin6_flowinfo;
-	/* configure NRL flags properly */
-	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		inp->inp_flags |= INP_IPV6_MAPPED;
-		inp->inp_flags &= ~INP_IPV6_UNDEC;
-	}
 	in_pcbrehash(inp);
 	return(0);
 }

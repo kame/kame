@@ -126,9 +126,8 @@ extern u_long sb_max;
 #ifdef INET6
 #define ND6_HINT(tp) \
 do { \
-	if (tp && tp->t_inpcb && (tp->t_inpcb->inp_flags & INP_IPV6) \
-	 && !(tp->t_inpcb->inp_flags & INP_IPV6_MAPPED) \
-	 && tp->t_inpcb->inp_route6.ro_rt) { \
+	if (tp && tp->t_inpcb && (tp->t_inpcb->inp_flags & INP_IPV6) && \
+	    tp->t_inpcb->inp_route6.ro_rt) { \
 		nd6_nud_hint(tp->t_inpcb->inp_route6.ro_rt, NULL, 0); \
 	} \
 } while (0)
@@ -752,10 +751,7 @@ findpcb:
 			   * we also copy the flowinfo from the original pcb 
 			   * to the new one.
 			   */
-			  inp->inp_flags |= (flags & (INP_IPV6 | INP_IPV6_UNDEC
-						      | INP_IPV6_MAPPED));
-			  if (flags & INP_IPV6_MAPPED)
-				panic("unexpected v4 mapped inpcb");
+			  inp->inp_flags |= (flags & INP_IPV6);
 			  if ((inp->inp_flags & INP_IPV6) != 0) {
 			    inp->inp_ipv6.ip6_hlim = 
 			      oldinpcb->inp_ipv6.ip6_hlim;

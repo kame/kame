@@ -173,12 +173,6 @@ struct inpcbtable {
  * protocol at PRU_BIND, PRU_LISTEN, PRU_CONNECT, etc, or by in_pcb*().
  */
 #define	INP_IPV6	0x100	/* sotopf(inp->inp_socket) == PF_INET6 */
-#define	INP_IPV6_UNDEC	0x200	/* PCB is PF_INET6, but listens for V4/V6 */
-#define	INP_IPV6_MAPPED	0x400	/* PF_INET6 PCB which is connected to
-				 * an IPv4 host, or is bound to
-				 * an IPv4 address (specified with
-				 * the mapped form of v6 addresses) */
-#define INP_IPV6_MCAST	0x800	/* Set if inp_moptions points to ipv6 ones */
 
 #if 1	/*KAME*/
 /*
