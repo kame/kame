@@ -56,12 +56,11 @@
 #if 1 /*def NEW_STRUCT_ROUTE*/
 struct route {
 	struct	rtentry *ro_rt;
-	union {
-		struct sockaddr_storage rou_dst_ss;
-		struct sockaddr ro_dst_sa;
-	} ro_u;
+	struct	sockaddr ro_dst;
+	/* trailing pad to store sockaddr_iso safely */
+	u_int8_t ro_pad[32 > sizeof(struct sockaddr) ?
+	    (32 - sizeof(struct sockaddr)) : 0];
 };
-#define ro_dst ro_u.ro_dst_sa
 #else
 struct route {
 	struct	rtentry *ro_rt;
