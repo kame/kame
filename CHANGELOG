@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1134 2000/07/16 07:47:27 itojun Exp $
+$Id: CHANGELOG,v 1.1135 2000/07/16 18:32:49 sumikawa Exp $
 
 <200006>
+Mon Jul 17 03:31:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/ruby: upgrade to 1.4.5.
+
 Sun Jul 16 16:44:24 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_forward.c: enable IPSEC_IPV6FWD case by default.
 	  (actually, previous default behavior was wrong as it transmits
