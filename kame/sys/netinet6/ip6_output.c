@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.344 2002/10/31 11:25:44 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.345 2002/11/01 11:09:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -341,18 +341,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			goto freehdrs;					\
 	}								\
     } while (0)
-#ifdef MIP6
-#define MAKE_MOBILITYHDR(hp, mp)					\
-    do {								\
-	if (hp) {							\
-		struct ip6_mobility *mh = (struct ip6_mobility *)(hp);	\
-		error = ip6_copyexthdr((mp), (caddr_t)(hp),		\
-		    (mh)->ip6m_len << 3);				\
-		if (error)						\
-			goto freehdrs;					\
-	}								\
-    } while (0)
-#endif
 
 	bzero(&exthdrs, sizeof(exthdrs));
 
@@ -387,7 +375,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* Destination options header(2nd part) */
 		MAKE_EXTHDR(opt->ip6po_dest2, &exthdrs.ip6e_dest2);
 #ifdef MIP6
-		MAKE_MOBILITYHDR(opt->ip6po_mobility, &exthdrs.ip6e_mobility);
+		MAKE_EXTHDR(opt->ip6po_mobility, &exthdrs.ip6e_mobility);
 #endif /* MIP6 */
 	}
 #ifdef MIP6
@@ -441,7 +429,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			 * header is specified by the ip6_output()
 			 * caller.
 			 */
-			MAKE_MOBILITYHDR(mip6opt.mip6po_mobility,
+			MAKE_EXTHDR(mip6opt.mip6po_mobility,
 			    &exthdrs.ip6e_mobility);
 		}
 	} else {

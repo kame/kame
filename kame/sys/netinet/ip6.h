@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.36 2002/11/01 03:31:29 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.37 2002/11/01 11:09:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -271,7 +271,8 @@ struct ip6_frag {
 struct ip6_mobility {
 	u_int8_t ip6m_pproto;	/* following payload protocol (for PG) */
 	u_int8_t ip6m_len;	/* length in units of 8 octets */
-	u_int16_t ip6m_type;	/* message type */
+	u_int8_t ip6m_type;	/* message type */
+	u_int8_t ip6m_reserved;
 	u_int16_t ip6m_cksum;	/* sum of IPv6 pseudo-header and MH */
 	/* followed by type specific data */
 } __attribute__((__packed__));
@@ -280,25 +281,14 @@ struct ip6_mobility {
 #define IP6M_MINLEN	8
 
 /* Mobility header message types */
-#if BYTE_ORDER == BIG_ENDIAN
-#define IP6M_BINDING_REQUEST	0x0000
-#define IP6M_HOME_TEST_INIT	0x0001
-#define IP6M_CAREOF_TEST_INIT	0x0002
-#define IP6M_HOME_TEST		0x0003
-#define IP6M_CAREOF_TEST	0x0004
-#define IP6M_BINDING_UPDATE	0x0005
-#define IP6M_BINDING_ACK	0x0006
-#define IP6M_BINDING_ERROR	0x0007
-#else /* BYTE_ORDER == LITTLE_ENDIAN */
-#define IP6M_BINDING_REQUEST	0x0000
-#define IP6M_HOME_TEST_INIT	0x0100
-#define IP6M_CAREOF_TEST_INIT	0x0200
-#define IP6M_HOME_TEST		0x0300
-#define IP6M_CAREOF_TEST	0x0400
-#define IP6M_BINDING_UPDATE	0x0500
-#define IP6M_BINDING_ACK	0x0600
-#define IP6M_BINDING_ERROR	0x0700
-#endif /* BYTE_ORDER == LITTLE_ENDIAN */
+#define IP6M_BINDING_REQUEST	0
+#define IP6M_HOME_TEST_INIT	1
+#define IP6M_CAREOF_TEST_INIT	2
+#define IP6M_HOME_TEST		3
+#define IP6M_CAREOF_TEST	4
+#define IP6M_BINDING_UPDATE	5
+#define IP6M_BINDING_ACK	6
+#define IP6M_BINDING_ERROR	7
 
 /* Binding Refresh Request (BRR) message */
 struct ip6m_binding_request {
@@ -365,7 +355,7 @@ struct ip6m_binding_update {
 	u_int16_t ip6mu_seqno;
 	u_int8_t ip6mu_flags;
 	u_int8_t ip6mu_reserved;
-	u_int16_t ip6mu_lifetime;
+	u_int16_t ip6mu_lifetime;	/* a unit of 4 seconds */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -386,7 +376,7 @@ struct ip6m_binding_ack {
 	u_int8_t ip6ma_status;
 	u_int8_t ip6ma_reserved;
 	u_int16_t ip6ma_seqno;
-	u_int16_t ip6ma_lifetime;
+	u_int16_t ip6ma_lifetime;	/* a unit of 4 seconds */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 

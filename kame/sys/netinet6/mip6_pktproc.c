@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.77 2002/11/01 10:10:09 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.78 2002/11/01 11:09:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -194,7 +194,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 
 	bzero(ip6mh, ip6mh_size);
 	ip6mh->ip6mh_pproto = IPPROTO_NONE;
-	ip6mh->ip6mh_len = ip6mh_size >> 3;
+	ip6mh->ip6mh_len = (ip6mh_size >> 3) - 1;
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mh->ip6mh_hot_cookie, sizeof(ip6mh->ip6mh_hot_cookie));
@@ -305,7 +305,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 
 	bzero(ip6mc, ip6mc_size);
 	ip6mc->ip6mc_pproto = IPPROTO_NONE;
-	ip6mc->ip6mc_len = ip6mc_size >> 3;
+	ip6mc->ip6mc_len = (ip6mc_size >> 3) - 1;
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
 	ip6mc->ip6mc_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mc->ip6mc_cot_cookie, sizeof(ip6mc->ip6mc_cot_cookie));
@@ -626,11 +626,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		bi.mbc_pcoa.sin6_addr = mopt.mopt_altcoa;
 
 	bi.mbc_seqno = ntohs(ip6mu->ip6mu_seqno);
-#if 0 /* XXX MIPv6 Issue 58 */
 	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 2;	/* units of 4 secs */
-#else
-	bi.mbc_lifetime = ntohs(ip6mu->ip6mu_lifetime) << 4;	/* units of 16secs */
-#endif
 
 	if (!bu_safe && 
 	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
@@ -1003,11 +999,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	/* binding refresh advice option */
 	if ((mbu->mbu_flags & IP6MU_HOME) &&
 	    (mopt.valid_options & MOPT_REFRESH)) {
-#if 0 /* XXX MIPv6 Issue 86 */
 		refresh = mopt.mopt_refresh << 2;
-#else
-		refresh = mopt.mopt_refresh;
-#endif
 		if (refresh > lifetime || refresh == 0)
 			refresh = lifetime;
 	}
@@ -1389,7 +1381,7 @@ mip6_ip6mhi_create(pktopt_mobility, mbu)
 
 	bzero(ip6mhi, ip6mhi_size);
 	ip6mhi->ip6mhi_pproto = IPPROTO_NONE;
-	ip6mhi->ip6mhi_len = ip6mhi_size >> 3;
+	ip6mhi->ip6mhi_len = (ip6mhi_size >> 3) - 1;
 	ip6mhi->ip6mhi_type = IP6M_HOME_TEST_INIT;
 	bcopy(mbu->mbu_mobile_cookie, ip6mhi->ip6mhi_hot_cookie,
 	      sizeof(ip6mhi->ip6mhi_hot_cookie));
@@ -1427,7 +1419,7 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 
 	bzero(ip6mci, ip6mci_size);
 	ip6mci->ip6mci_pproto = IPPROTO_NONE;
-	ip6mci->ip6mci_len = ip6mci_size >> 3;
+	ip6mci->ip6mci_len = (ip6mci_size >> 3) - 1;
 	ip6mci->ip6mci_type = IP6M_CAREOF_TEST_INIT;
 	bcopy(mbu->mbu_mobile_cookie, ip6mci->ip6mci_cot_cookie,
 	      sizeof(ip6mci->ip6mci_cot_cookie));
@@ -1548,7 +1540,7 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 	bzero(ip6mu, ip6mu_size);
 
 	ip6mu->ip6mu_pproto = IPPROTO_NONE;
-	ip6mu->ip6mu_len = ip6mu_size >> 3;
+	ip6mu->ip6mu_len = (ip6mu_size >> 3) - 1;
 	ip6mu->ip6mu_type = IP6M_BINDING_UPDATE;
 	ip6mu->ip6mu_flags = mbu->mbu_flags;
 	ip6mu->ip6mu_seqno = htons(mbu->mbu_seqno);
@@ -1590,13 +1582,8 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-#if 0 /* XXX MIPv6 Issue 58 */
 		ip6mu->ip6mu_lifetime =
 		    htons((u_int16_t)(mbu->mbu_lifetime >> 2));	/* units 4 secs */
-#else
-		ip6mu->ip6mu_lifetime =
-		    htons((u_int16_t)(mbu->mbu_lifetime >> 4)); /* units 16 secs */
-#endif
 	}
 
 	if ((pad = bu_size - sizeof(struct ip6m_binding_update)) >= 2) {
@@ -1730,7 +1717,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	bzero(ip6ma, ip6ma_size);
 
 	ip6ma->ip6ma_pproto = IPPROTO_NONE;
-	ip6ma->ip6ma_len = ip6ma_size >> 3;
+	ip6ma->ip6ma_len = (ip6ma_size >> 3) - 1;
 	ip6ma->ip6ma_type = IP6M_BINDING_ACK;
 	ip6ma->ip6ma_status = status;
 	ip6ma->ip6ma_seqno = htons(seqno);
@@ -1764,11 +1751,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 	if (need_refresh) {
 		mopt_refresh->ip6mor_type = IP6MOPT_REFRESH;
 		mopt_refresh->ip6mor_len = sizeof(struct ip6m_opt_refresh) - 2;
-#if 0 /* XXX MIPv6 Issue 86 */
 		SET_NETVAL_S(&mopt_refresh->ip6mor_refresh, refresh >> 2);
-#else
-		SET_NETVAL_S(&mopt_refresh->ip6mor_refresh, refresh);
-#endif
 	}
 
 	if (need_auth) {
@@ -1950,7 +1933,7 @@ mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 
 	bzero(ip6me, ip6me_size);
 	ip6me->ip6me_pproto = IPPROTO_NONE;
-	ip6me->ip6me_len = ip6me_size >> 3;
+	ip6me->ip6me_len = (ip6me_size >> 3) - 1;
 	ip6me->ip6me_type = IP6M_BINDING_ERROR;
 	ip6me->ip6me_status = status;
 	ip6me->ip6me_addr = addr->sin6_addr;
