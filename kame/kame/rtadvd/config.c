@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.61 2002/05/29 10:06:42 itojun Exp $	*/
+/*	$KAME: config.c,v 1.62 2002/05/29 10:13:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -115,7 +115,9 @@ getconfig(intface)
 	tmp = (struct rainfo *)malloc(sizeof(*ralist));
 	memset(tmp, 0, sizeof(*tmp));
 	tmp->prefix.next = tmp->prefix.prev = &tmp->prefix;
+#ifdef ROUTEINFO
 	tmp->route.next = tmp->route.prev = &tmp->route;
+#endif
 
 	/* check if we are allowed to forward packets (if not determined) */
 	if (forwarding < 0) {
@@ -433,7 +435,7 @@ getconfig(intface)
 	}
 
 	/* route information */
-#ifndef ND_OPT_ROUTE_INFO
+#ifndef ROUTEINFO
 	MAYHAVE(val, "routes", -1);
 	if (val != -1)
 		syslog(LOG_INFO, "route information option is not available");
@@ -582,7 +584,7 @@ getconfig(intface)
 		}
 		rti->ltime = (u_int32_t)val64;
 	}
-#endif ND_OPT_ROUTE_INFO
+#endif
 
 	/* okey */
 	tmp->next = ralist;
@@ -870,7 +872,7 @@ make_packet(struct rainfo *rainfo)
 	struct nd_opt_advinterval *ndopt_advint;
 	struct nd_opt_homeagent_info *ndopt_hai;
 #endif
-#ifdef ND_OPT_ROUTE_INFO
+#ifdef ROUTEINFO
 	struct nd_opt_route_info *ndopt_rti;
 	struct rtinfo *rti;
 #endif
@@ -898,7 +900,7 @@ make_packet(struct rainfo *rainfo)
 	if (mobileip6 && rainfo->hatime)
 		packlen += sizeof(struct nd_opt_homeagent_info);
 #endif
-#ifdef ND_OPT_ROUTE_INFO
+#ifdef ROUTEINFO
 	for (rti = rainfo->route.next; rti != &rainfo->route; rti = rti->next)
 		packlen += sizeof(struct nd_opt_route_info) + 
 			   ((rti->prefixlen + 0x3f) >> 6) * 8;
@@ -1033,7 +1035,7 @@ make_packet(struct rainfo *rainfo)
 		buf += sizeof(struct nd_opt_prefix_info);
 	}
 
-#ifdef ND_OPT_ROUTE_INFO
+#ifdef ROUTEINFO
 	for (rti = rainfo->route.next; rti != &rainfo->route; rti = rti->next) {
 		u_int8_t psize = (rti->prefixlen + 0x3f) >> 6;
 

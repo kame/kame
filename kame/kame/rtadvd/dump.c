@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.24 2002/05/29 10:06:42 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.25 2002/05/29 10:13:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -222,6 +222,7 @@ if_dump()
 				"");
 			fprintf(fp, ")\n");
 		}
+#ifdef ROUTEINFO
 		for (first = 1, rti = rai->route.next; rti != &rai->route;
 		     rti = rti->next) {
 			if (first) {
@@ -240,6 +241,7 @@ if_dump()
 				fprintf(fp, "lifetime: %ld", (long)rti->ltime);
 			fprintf(fp, ")\n");
 		}
+#endif
 	}
 }
 
