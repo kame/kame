@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1912 2001/10/16 07:16:23 itojun Exp $
+$KAME: CHANGELOG,v 1.1913 2001/10/16 10:25:10 keiichi Exp $
 
 <200110>
+Tue Oct 16 19:22:52 JST 2001 keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_binding.c
+	fix the bug of the validation routine of a incoming tunneled
+	packet from a homeagent to a mobile node.
+
 Tue Oct 16 16:09:22 JST 2001  itojun@iijlab.net
 	* bsdi4/sys/netinet/ip_icmp.c:
 	  do not panic even if last arg to icmp_error() is NULL.
