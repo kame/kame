@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.19 2002/01/18 08:11:30 k-sugyou Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.20 2002/02/19 03:40:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -232,7 +232,7 @@ mip6_subnet_list_remove(ms_list, ms)
 struct mip6_subnet *
 mip6_subnet_list_find_withprefix(ms_list, prefix, prefixlen)
 	struct mip6_subnet_list *ms_list;
-	struct in6_addr *prefix;
+	struct sockaddr_in6 *prefix;
 	u_int8_t prefixlen;
 {
 	struct mip6_subnet *ms;
@@ -287,7 +287,7 @@ mip6_subnet_list_find_withmpfx(ms_list, mpfx)
 struct mip6_subnet *
 mip6_subnet_list_find_withhaaddr(ms_list, haaddr)
 	struct mip6_subnet_list *ms_list;
-	struct in6_addr *haaddr;
+	struct sockaddr_in6 *haaddr;
 {
 	struct mip6_subnet *ms;
 	struct mip6_subnet_ha *msha;
@@ -391,7 +391,7 @@ mip6_subnet_prefix_list_find_withmpfx(mspfx_list, mpfx)
 struct mip6_subnet_prefix *
 mip6_subnet_prefix_list_find_withprefix(mspfx_list, prefix, prefixlen)
 	struct mip6_subnet_prefix_list *mspfx_list;
-	struct in6_addr *prefix;
+	struct sockaddr_in6 *prefix;
 	u_int8_t prefixlen;
 {
 	struct mip6_subnet_prefix *mspfx;
@@ -411,8 +411,8 @@ mip6_subnet_prefix_list_find_withprefix(mspfx_list, prefix, prefixlen)
 				 __FILE__, __LINE__));
 			return (NULL);
 		}
-		if ((in6_are_prefix_equal(&mpfx->mpfx_prefix,
-					  prefix,
+		if ((in6_are_prefix_equal(&mpfx->mpfx_prefix.sin6_addr,
+					  &prefix->sin6_addr,
 					  prefixlen))
 		    && (mpfx->mpfx_prefixlen == prefixlen)) {
 			/* found. */
@@ -536,7 +536,7 @@ mip6_subnet_ha_list_find_withmha(msha_list, mha)
 struct mip6_subnet_ha *
 mip6_subnet_ha_list_find_withhaaddr(msha_list, haaddr)
 	struct mip6_subnet_ha_list *msha_list;
-	struct in6_addr *haaddr;
+	struct sockaddr_in6 *haaddr;
 {
 	struct mip6_subnet_ha *msha;
 	struct mip6_ha *mha;
@@ -555,9 +555,9 @@ mip6_subnet_ha_list_find_withhaaddr(msha_list, haaddr)
 				 __FILE__, __LINE__));
 			return (NULL);
 		}
-		if (IN6_ARE_ADDR_EQUAL(&mha->mha_lladdr,
+		if (SA6_ARE_ADDR_EQUAL(&mha->mha_lladdr,
 				       haaddr)
-		    || IN6_ARE_ADDR_EQUAL(&mha->mha_gaddr,
+		    || SA6_ARE_ADDR_EQUAL(&mha->mha_gaddr,
 					  haaddr)) {
 			/* found. */
 			return (msha);
@@ -674,10 +674,16 @@ mip6_subnet_ha_timeout(msha)
 					 */
 					continue;
 				}
-				if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_paddr,
+				if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_paddr,
 						       &mha->mha_gaddr)) {
 					/* this home agent has expired. */
-					mbu->mbu_paddr = in6addr_any;
+					bzero(&mbu->mbu_paddr,
+					      sizeof(mbu->mbu_paddr));
+					mbu->mbu_paddr.sin6_len
+						= sizeof(mbu->mbu_paddr);
+					mbu->mbu_paddr.sin6_family = AF_INET6;
+					mbu->mbu_paddr.sin6_addr
+						= in6addr_any;
 				}
 			}
 		}

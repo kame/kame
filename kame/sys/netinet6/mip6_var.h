@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.26 2002/02/18 14:00:27 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.27 2002/02/19 03:40:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -59,13 +59,13 @@
 
 struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
-	struct in6_addr         mpfx_prefix;
+	struct sockaddr_in6     mpfx_prefix;
 	u_int8_t                mpfx_prefixlen;
 	u_int32_t               mpfx_vltime;
 	time_t                  mpfx_vlexpire;
 	u_int32_t               mpfx_pltime;
 	time_t                  mpfx_plexpire;
-	struct in6_addr         mpfx_haddr;
+	struct sockaddr_in6     mpfx_haddr;
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
 
@@ -74,8 +74,8 @@ LIST_HEAD(mip6_prefix_list, mip6_prefix);
 /* XXX the home agent entry.  not good. */
 struct mip6_ha {
 	LIST_ENTRY(mip6_ha) mha_entry;
-	struct in6_addr     mha_lladdr;    /* XXX link-local addr */
-	struct in6_addr     mha_gaddr;     /* XXX global addr */
+	struct sockaddr_in6 mha_lladdr;    /* XXX link-local addr */
+	struct sockaddr_in6 mha_gaddr;     /* XXX global addr */
 	u_int8_t            mha_flags;     /* RA flags */
 	int16_t             mha_pref;      /* preference */
 	u_int16_t           mha_lifetime;  /* HA lifetime */
@@ -112,9 +112,9 @@ LIST_HEAD(mip6_subnet_list, mip6_subnet);
 /* the binding update list entry. */
 struct mip6_bu {
 	LIST_ENTRY(mip6_bu) mbu_entry;
-	struct in6_addr     mbu_paddr;      /* peer addr of this BU */
-	struct in6_addr     mbu_haddr;      /* home address */
-	struct in6_addr     mbu_coa;        /* COA */
+	struct sockaddr_in6 mbu_paddr;      /* peer addr of this BU */
+	struct sockaddr_in6 mbu_haddr;      /* home address */
+	struct sockaddr_in6 mbu_coa;        /* COA */
 	u_int32_t           mbu_lifetime;   /* BU lifetime */
 	time_t              mbu_expire;     /* expiration time of this BU. */
 	u_int32_t           mbu_refresh;    /* refresh frequency */
@@ -144,9 +144,9 @@ struct mip6_bu {
 /* the binding cache entry. */
 struct mip6_bc {
 	LIST_ENTRY(mip6_bc)   mbc_entry;
-	struct in6_addr       mbc_phaddr;    /* peer home address */
-	struct in6_addr       mbc_pcoa;      /* peer coa */
-	struct in6_addr       mbc_addr;      /* my addr (needed?) */
+	struct sockaddr_in6   mbc_phaddr;    /* peer home address */
+	struct sockaddr_in6   mbc_pcoa;      /* peer coa */
+	struct sockaddr_in6   mbc_addr;      /* my addr (needed?) */
 	u_int8_t              mbc_status;    /* BA statue */
 	u_int8_t              mbc_flags;     /* recved BU flags */
 #ifdef MIP6_DRAFT13
@@ -241,11 +241,11 @@ extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
 
 void mip6_init __P((void));
 
-int mip6_prefix_list_update		__P((struct in6_addr *,
+int mip6_prefix_list_update		__P((struct sockaddr_in6 *,
 					     struct nd_prefix *,
 					     struct nd_defrouter *,
 					     struct mbuf *));
-int mip6_process_pfxlist_status_change	__P((struct in6_addr *));
+int mip6_process_pfxlist_status_change	__P((struct sockaddr_in6 *));
 void mip6_probe_routers			__P((void));
 int mip6_select_coa			__P((struct ifnet *));
 int mip6_select_coa2			__P((void));
@@ -254,22 +254,22 @@ int mip6_process_movement		__P((void));
 int mip6_ifa_need_dad			__P((struct in6_ifaddr *));
 int64_t mip6_coa_get_lifetime		__P((struct in6_addr *));
 
-struct mbuf *mip6_create_ip6hdr		 __P((struct in6_addr *,
-					      struct in6_addr *,
+struct mbuf *mip6_create_ip6hdr		 __P((struct sockaddr_in6 *,
+					      struct sockaddr_in6 *,
 					      u_int8_t,
 					      u_int32_t));
 int mip6_exthdr_create			 __P((struct mbuf *,
 					      struct ip6_pktopts *,
 					      struct mip6_pktopts *));
 int mip6_ba_destopt_create		 __P((struct ip6_dest **,
-					      struct in6_addr *,
-					      struct in6_addr *,
+					      struct sockaddr_in6 *,
+					      struct sockaddr_in6 *,
 					      u_int8_t,
 					      MIP6_SEQNO_T,
 					      u_int32_t,
 					      u_int32_t));
 int mip6_rthdr_create			__P((struct ip6_rthdr **,
-					     struct in6_addr *,
+					     struct sockaddr_in6 *,
 					     struct ip6_pktopts *));
 void mip6_destopt_discard		__P((struct mip6_pktopts *));
 int mip6_addr_exchange			__P((struct mbuf *,
@@ -279,18 +279,14 @@ int mip6_process_destopt		__P((struct mbuf *,
 					     u_int8_t *, int));
 u_int8_t *mip6_destopt_find_subopt	__P((u_int8_t *,
 					     u_int8_t, u_int8_t));
-void mip6_create_addr			__P((struct in6_addr *,
-					     struct in6_addr *,
-					     struct in6_addr *,
-					     u_int8_t));
+void mip6_create_addr			__P((struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     struct nd_prefix *));
 struct mip6_bc *mip6_bc_list_find_withcoa
 					__P((struct mip6_bc_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 
 int mip6_ioctl				__P((u_long, caddr_t));
-int mip6_tunnel				__P((struct in6_addr *,
-					     struct in6_addr *,
-					     int, const struct encaptab **));
 int mip6_tunnel_input			__P((struct mbuf **, int *, int));
 int mip6_tunnel_output			__P((struct mbuf **,
 					     struct mip6_bc *));
@@ -307,7 +303,7 @@ int mip6_tunneled_rs_output		__P((struct hif_softc *,
 
 /* mip6_prefix management */
 void mip6_prefix_init			__P((void));
-struct mip6_prefix *mip6_prefix_create	__P((struct in6_addr *, u_int8_t,
+struct mip6_prefix *mip6_prefix_create	__P((struct sockaddr_in6 *, u_int8_t,
 					     u_int32_t, u_int32_t));
 int mip6_prefix_haddr_assign		__P((struct mip6_prefix *,
 					     struct hif_softc *));
@@ -319,7 +315,7 @@ struct mip6_prefix *mip6_prefix_list_find
 					__P((struct mip6_prefix *));
 struct mip6_prefix *mip6_prefix_list_find_withhaddr
 					__P((struct mip6_prefix_list *,
-					     struct in6_addr *haddr));
+					     struct sockaddr_in6 *haddr));
 
 /* subnet information management */
 void mip6_subnet_init			__P((void));
@@ -331,13 +327,13 @@ int mip6_subnet_list_remove		__P((struct mip6_subnet_list *,
 					     struct mip6_subnet *));
 struct mip6_subnet *mip6_subnet_list_find_withprefix
 					__P((struct mip6_subnet_list *,
-					     struct in6_addr *, u_int8_t));
+					     struct sockaddr_in6 *, u_int8_t));
 struct mip6_subnet *mip6_subnet_list_find_withmpfx
 					__P((struct mip6_subnet_list *,
 					     struct mip6_prefix *));
 struct mip6_subnet *mip6_subnet_list_find_withhaaddr
 					__P((struct mip6_subnet_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 struct mip6_subnet_prefix *mip6_subnet_prefix_create
 					__P((struct mip6_prefix *));
 int mip6_subnet_prefix_list_insert	__P((struct mip6_subnet_prefix_list *,
@@ -349,7 +345,7 @@ struct mip6_subnet_prefix *mip6_subnet_prefix_list_find_withmpfx
 					     struct mip6_prefix *mpfx));
 struct mip6_subnet_prefix *mip6_subnet_prefix_list_find_withprefix
 					__P((struct mip6_subnet_prefix_list *,
-					     struct in6_addr *, u_int8_t));
+					     struct sockaddr_in6 *, u_int8_t));
 int32_t mip6_subnet_prefix_list_get_minimum_lifetime
 					__P((struct mip6_subnet_prefix_list *));
 struct mip6_subnet_ha *mip6_subnet_ha_create
@@ -363,14 +359,14 @@ struct mip6_subnet_ha *mip6_subnet_ha_list_find_withmha
 					     struct mip6_ha *));
 struct mip6_subnet_ha *mip6_subnet_ha_list_find_withhaaddr
 					__P((struct mip6_subnet_ha_list *,
-					     struct in6_addr *haaddr));
+					     struct sockaddr_in6 *haaddr));
 
 
 /* homeagent list management */
 void mip6_ha_init			__P((void));
 /* mip6_ha functions */
-struct mip6_ha *mip6_ha_create		__P((struct in6_addr *,
-					     struct in6_addr *,
+struct mip6_ha *mip6_ha_create		__P((struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
 					     u_int8_t, int16_t, int32_t));
 int mip6_ha_list_insert			__P((struct mip6_ha_list *,
 					     struct mip6_ha *mha));
@@ -378,22 +374,22 @@ int mip6_ha_list_remove			__P((struct mip6_ha_list*,
 					     struct mip6_ha *mha));
 struct mip6_ha *mip6_ha_list_find_withaddr
 					__P((struct mip6_ha_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 int mip6_ha_list_update_hainfo		__P((struct mip6_ha_list *,
 					     struct nd_defrouter *,
 					     struct nd_opt_homeagent_info *));
 int mip6_ha_list_update_withndpr	__P((struct mip6_ha_list *,
-					     struct in6_addr *,
+					     struct sockaddr_in6 *,
 					     struct nd_prefix *));
 int mip6_ha_list_update_gaddr		__P((struct mip6_ha_list*,
-					     struct in6_addr *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *));
 
 /* binding update management */
 void mip6_bu_init			__P((void));
-struct mip6_bu *mip6_bu_create		__P((const struct in6_addr *,
+struct mip6_bu *mip6_bu_create		__P((const struct sockaddr_in6 *,
 					     struct mip6_prefix *,
-					     struct in6_addr *,
+					     struct sockaddr_in6 *,
 					     u_int16_t,
 					     struct hif_softc *));
 int mip6_bu_list_insert			__P((struct mip6_bu_list *,
@@ -401,10 +397,10 @@ int mip6_bu_list_insert			__P((struct mip6_bu_list *,
 int mip6_bu_list_remove_all		__P((struct mip6_bu_list *));
 struct mip6_bu *mip6_bu_list_find_withpaddr
 					__P((struct mip6_bu_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 struct mip6_bu *mip6_bu_list_find_home_registration
 					__P((struct mip6_bu_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 int mip6_home_registration		__P((struct hif_softc *));
 int mip6_validate_bu			__P((struct mbuf *, u_int8_t *));
 int mip6_process_bu			__P((struct mbuf *, u_int8_t *));
@@ -423,10 +419,10 @@ int mip6_bc_list_remove			__P((struct mip6_bc_list *,
 					     struct mip6_bc *));
 struct mip6_bc *mip6_bc_list_find_withphaddr
 					__P((struct mip6_bc_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 struct mip6_bc *mip6_bc_list_find_withpcoa
 					__P((struct mip6_bc_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
 struct secasvar;

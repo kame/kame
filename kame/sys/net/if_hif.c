@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.19 2002/01/28 07:01:57 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.20 2002/02/19 03:40:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,7 +178,11 @@ hifattach(dummy)
 
 	TAILQ_INIT(&hif_softc_list);
 	TAILQ_INIT(&hif_coa_list);
-	hif_coa = in6addr_any;
+
+	bzero(&hif_coa, sizeof(hif_coa));
+	hif_coa.sin6_len = sizeof(hif_coa);
+	hif_coa.sin6_family = AF_INET6;
+	hif_coa.sin6_addr = in6addr_any;
 
 	sc = malloc(NHIF * sizeof(struct hif_softc), M_DEVBUF, M_WAIT);
 	bzero(sc, NHIF * sizeof(struct hif_softc));
@@ -511,7 +515,7 @@ hif_subnet_list_remove_all(hs_list)
 struct hif_subnet *
 hif_subnet_list_find_withprefix(hs_list, prefix, prefixlen)
      struct hif_subnet_list *hs_list;
-     struct in6_addr *prefix;
+     struct sockaddr_in6 *prefix;
      u_int8_t prefixlen;
 {
 	struct hif_subnet *hs;
@@ -545,7 +549,7 @@ hif_subnet_list_find_withprefix(hs_list, prefix, prefixlen)
 struct hif_subnet *
 hif_subnet_list_find_withhaaddr(hs_list, haaddr)
      struct hif_subnet_list *hs_list;
-     struct in6_addr *haaddr;
+     struct sockaddr_in6 *haaddr;
 {
 	struct hif_subnet *hs;
 	struct mip6_subnet *ms;
@@ -794,7 +798,7 @@ hif_ha_list_update_withioctl(sc, data)
 
 struct hif_softc *
 hif_list_find_withhaddr(haddr)
-     struct in6_addr *haddr;
+     struct sockaddr_in6 *haddr;
 {
 	struct hif_softc *sc;
 	struct hif_subnet *hs;
@@ -812,7 +816,7 @@ hif_list_find_withhaddr(haddr)
 			     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 				if((mpfx = mspfx->mspfx_mpfx) == NULL)
 					continue;
-				if (IN6_ARE_ADDR_EQUAL(haddr,
+				if (SA6_ARE_ADDR_EQUAL(haddr,
 						       &mpfx->mpfx_haddr)) {
 					/* found. */
 					return (sc);

@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.35 2002/02/07 05:31:00 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.36 2002/02/19 03:40:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,9 @@ dest6_input(mp, offp, proto)
 	struct ip6_dest *dstopts;
 	struct mbuf *n;
 	struct ip6_opt_home_address *haopt = NULL;
+#ifdef MIP6
+	struct in6_addr ip6_home;
+#endif /* MIP6 */
 	struct ip6aux *ip6a = NULL;
 	u_int8_t *opt;
 	struct ip6_hdr *ip6;
@@ -162,6 +165,8 @@ dest6_input(mp, offp, proto)
 
 			/* XXX check header ordering */
 
+			bcopy(haopt->ip6oh_addr, &ip6_home,
+			      sizeof(ip6_home));
 			bcopy(&ip6a->ip6a_src.sin6_addr, &ip6a->ip6a_coa, 
 			    sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
@@ -170,11 +175,11 @@ dest6_input(mp, offp, proto)
 			 * reject invalid home-addresses
 			 */
 			/* XXX linklocal-address is not supported */
-			if (IN6_IS_ADDR_MULTICAST(&ip6a->ip6a_home) ||
-			    IN6_IS_ADDR_LINKLOCAL(&ip6a->ip6a_home) ||
-			    IN6_IS_ADDR_V4MAPPED(&ip6a->ip6a_home)  ||
-			    IN6_IS_ADDR_UNSPECIFIED(&ip6a->ip6a_home) ||
-			    IN6_IS_ADDR_LOOPBACK(&ip6a->ip6a_home)) {
+			if (IN6_IS_ADDR_MULTICAST(&ip6_home) ||
+			    IN6_IS_ADDR_LINKLOCAL(&ip6_home) ||
+			    IN6_IS_ADDR_V4MAPPED(&ip6_home)  ||
+			    IN6_IS_ADDR_UNSPECIFIED(&ip6_home) ||
+			    IN6_IS_ADDR_LOOPBACK(&ip6_home)) {
 				ip6stat.ip6s_badscope++;
 				goto bad;
 			}

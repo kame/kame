@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.16 2002/01/17 05:24:03 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.17 2002/02/19 03:40:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -84,7 +84,7 @@ mip6_prefix_init(void)
 
 struct mip6_prefix *
 mip6_prefix_create(prefix, prefixlen, vltime, pltime)
-	struct in6_addr *prefix;
+	struct sockaddr_in6 *prefix;
 	u_int8_t prefixlen;
 	u_int32_t vltime;
 	u_int32_t pltime;
@@ -131,8 +131,8 @@ int mip6_prefix_haddr_assign(mpfx, sc)
 
 	/* XXX */
 	mpfx->mpfx_haddr = mpfx->mpfx_prefix;
-	mpfx->mpfx_haddr.s6_addr32[2] = ifid.s6_addr32[2];
-	mpfx->mpfx_haddr.s6_addr32[3] = ifid.s6_addr32[3];
+	mpfx->mpfx_haddr.sin6_addr.s6_addr32[2] = ifid.s6_addr32[2];
+	mpfx->mpfx_haddr.sin6_addr.s6_addr32[3] = ifid.s6_addr32[3];
 
 	return (0);
 }
@@ -195,8 +195,8 @@ mip6_prefix_list_find(tmpmpfx)
 
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (in6_are_prefix_equal(&tmpmpfx->mpfx_prefix,
-					 &mpfx->mpfx_prefix,
+		if (in6_are_prefix_equal(&tmpmpfx->mpfx_prefix.sin6_addr,
+					 &mpfx->mpfx_prefix.sin6_addr,
 					 tmpmpfx->mpfx_prefixlen)
 		    && (tmpmpfx->mpfx_prefixlen == mpfx->mpfx_prefixlen)) {
 			/* found. */
@@ -211,13 +211,13 @@ mip6_prefix_list_find(tmpmpfx)
 struct mip6_prefix *
 mip6_prefix_list_find_withhaddr(mpfx_list, haddr)
      struct mip6_prefix_list *mpfx_list;
-     struct in6_addr *haddr;
+     struct sockaddr_in6 *haddr;
 {
 	struct mip6_prefix *mpfx;
 
 	for (mpfx = LIST_FIRST(mpfx_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (IN6_ARE_ADDR_EQUAL(haddr,
+		if (SA6_ARE_ADDR_EQUAL(haddr,
 				       &mpfx->mpfx_haddr)) {
 			/* found. */
 			return (mpfx);

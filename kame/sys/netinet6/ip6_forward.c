@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.97 2002/02/18 06:09:46 k-sugyou Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.98 2002/02/19 03:40:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -361,14 +361,13 @@ ip6_forward(m, srcrt)
 		 */
 		struct mip6_bc *mbc;
 
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-						   &sa6_dst->sin6_addr);
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, sa6_dst);
 		if (mbc &&
 		    (mbc->mbc_flags & IP6_BUF_HOME) &&
 		    (mbc->mbc_encap != NULL)) {
-			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr)
+			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr.sin6_addr)
 #ifdef MIP6_DISABLE_SITELOCAL
-			    || IN6_IS_ADDR_SITELOCAL(&mbc->mbc_phaddr)
+			    || IN6_IS_ADDR_SITELOCAL(&mbc->mbc_phaddr.sin6_addr)
 #endif
 			    )
 			{

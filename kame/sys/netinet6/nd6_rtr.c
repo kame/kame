@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.192 2002/02/04 05:22:20 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.193 2002/02/19 03:40:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -399,7 +399,7 @@ nd6_ra_input(m, off, icmp6len)
 				continue; /* prefix lifetime init failed */
 #ifdef MIP6
 			if (MIP6_IS_MN) {
-				if (mip6_prefix_list_update(&src_sa6->sin6_addr,
+				if (mip6_prefix_list_update(src_sa6,
 							    &pr, dr, m)) {
 					mip6log((LOG_ERR,
 						 "%s:%d: "
@@ -433,8 +433,7 @@ nd6_ra_input(m, off, icmp6len)
 		struct mip6_ha *mha;
 
 		/* the home agent is shutting down. */
-		mha = mip6_ha_list_find_withaddr(&mip6_ha_list,
-						 &src_sa6->sin6_addr);
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, src_sa6);
 		if (mha) {
 			if (mip6_ha_list_remove(&mip6_ha_list, mha)) {
 				mip6log((LOG_ERR,

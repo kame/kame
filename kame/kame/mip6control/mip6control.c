@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.20 2002/01/22 07:01:15 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.21 2002/02/19 03:40:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,7 +65,7 @@
 
 #define IOC_ENTRY_COUNT 100 /* XXX */
 
-static int getaddress __P((char *, struct in6_addr *));
+static int getaddress __P((char *, struct sockaddr_in6 *));
 static const char *ip6_sprintf __P((const struct in6_addr *));
 static const char *raflg_sprintf __P((u_int8_t));
 static const char *buflg_sprintf __P((u_int8_t));
@@ -335,6 +335,9 @@ main(argc, argv)
 		mpfx = (struct mip6_prefix *)((caddr_t)ifr 
 					      + sizeof(struct hif_ifreq));
 		ifr->ifr_ifru.ifr_mpfx = mpfx;
+		bzero(&mpfx->mpfx_prefix, sizeof(mpfx->mpfx_prefix));
+		mpfx->mpfx_prefix.sin6_len = sizeof(mpfx->mpfx_prefix);
+		mpfx->mpfx_prefix.sin6_family = AF_INET6;
 		getaddress(smhparg, &mpfx->mpfx_prefix);
 		mpfx->mpfx_prefixlen = atoi(pfxarg);
 		mpfx->mpfx_vltime = 0xffff; /* XXX */
@@ -372,7 +375,7 @@ main(argc, argv)
 				KREAD(mspfx->mspfx_mpfx, &mip6_prefix, mip6_prefix);
 				mpfx = &mip6_prefix;
 				printf(ipaddr_fmt[longdisp],
-				       ip6_sprintf(&mpfx->mpfx_prefix));
+				       ip6_sprintf(&mpfx->mpfx_prefix.sin6_addr));
 				printf("%7u %7u %7ld %7u %7ld ",
 				       mpfx->mpfx_prefixlen,
 				       mpfx->mpfx_vltime,
@@ -380,7 +383,7 @@ main(argc, argv)
 				       mpfx->mpfx_pltime,
 				       mpfx->mpfx_plexpire - time.tv_sec);
 				printf(ipaddr_fmt[longdisp],
-				       ip6_sprintf(&mpfx->mpfx_haddr));
+				       ip6_sprintf(&mpfx->mpfx_haddr.sin6_addr));
 				printf("\n");
 			}
 		}
@@ -402,7 +405,13 @@ main(argc, argv)
 		mha = (struct mip6_ha *)((caddr_t)ifr 
 					 + sizeof(struct hif_ifreq));
 		ifr->ifr_ifru.ifr_mha = mha;
+		bzero(&mha->mha_lladdr, sizeof(mha->mha_lladdr));
+		mha->mha_lladdr.sin6_len = sizeof(mha->mha_lladdr);
+		mha->mha_lladdr.sin6_family = AF_INET6;
 		getaddress(sllarg, &mha->mha_lladdr);
+		bzero(&mha->mha_gaddr, sizeof(mha->mha_gaddr));
+		mha->mha_gaddr.sin6_len = sizeof(mha->mha_gaddr);
+		mha->mha_gaddr.sin6_family = AF_INET6;
 		getaddress(shaarg, &mha->mha_gaddr);
 		mha->mha_flags = ND_RA_FLAG_HOME_AGENT;
 		mha->mha_pref = 0;
@@ -445,9 +454,9 @@ main(argc, argv)
 					KREAD(msha->msha_mha, &mip6_ha, mip6_ha);
 					mha = &mip6_ha;
 					printf(ipaddr_fmt[longdisp],
-					       ip6_sprintf(&mha->mha_lladdr));
+					       ip6_sprintf(&mha->mha_lladdr.sin6_addr));
 					printf(ipaddr_fmt[longdisp],
-					       ip6_sprintf(&mha->mha_gaddr));
+					       ip6_sprintf(&mha->mha_gaddr.sin6_addr));
 					printf("%-7s %7d %7d %7ld\n",
 					       raflg_sprintf(mha->mha_flags),
 					       mha->mha_pref,
@@ -473,11 +482,11 @@ main(argc, argv)
 			KREAD(mbu, &mip6_bu, mip6_bu);
 			mbu = &mip6_bu;
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbu->mbu_paddr));
+			       ip6_sprintf(&mbu->mbu_paddr.sin6_addr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbu->mbu_haddr));
+			       ip6_sprintf(&mbu->mbu_haddr.sin6_addr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbu->mbu_coa));
+			       ip6_sprintf(&mbu->mbu_coa.sin6_addr));
 			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %7x %-7s\n",
 			       mbu->mbu_lifetime,
 			       mbu->mbu_expire - time.tv_sec,
@@ -512,11 +521,11 @@ main(argc, argv)
 			KREAD(mbc, &mip6_bc, mip6_bc);
 			mbc = &mip6_bc;
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbc->mbc_phaddr));
+			       ip6_sprintf(&mbc->mbc_phaddr.sin6_addr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbc->mbc_pcoa));
+			       ip6_sprintf(&mbc->mbc_pcoa.sin6_addr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbc->mbc_addr));
+			       ip6_sprintf(&mbc->mbc_addr.sin6_addr));
 			printf(
 #ifdef MIP6_DRAFT13
 			       "%-7s %7u %7u %7u %7ld %-7s\n",
@@ -628,7 +637,7 @@ main(argc, argv)
 
 /* Returns the address in network order */
 static int
-getaddress(char *address, struct in6_addr *in6addr)
+getaddress(char *address, struct sockaddr_in6 *sin6)
 {
 	struct addrinfo hints, *res;
 	int ai_errno;
@@ -639,8 +648,16 @@ getaddress(char *address, struct in6_addr *in6addr)
 	ai_errno = getaddrinfo(address, NULL, &hints, &res);
 	if (ai_errno)
 		errx(1, "%s: %s", address, gai_strerror(ai_errno));
-	memcpy(in6addr, &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
-	       sizeof(struct in6_addr));
+	sin6->sin6_len = ((struct sockaddr_in6 *)res->ai_addr)->sin6_len;
+	sin6->sin6_family = ((struct sockaddr_in6 *)res->ai_addr)->sin6_family;
+	sin6->sin6_addr = ((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+	sin6->sin6_scope_id
+		= ((struct sockaddr_in6 *)res->ai_addr)->sin6_scope_id;
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+		*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
+			htons(((struct sockaddr_in6 *)res->ai_addr)->sin6_scope_id);
+#endif
 	freeaddrinfo(res);
 
         return 0;

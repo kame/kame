@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.33 2002/02/03 11:27:06 jinmei Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.34 2002/02/19 03:40:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -83,8 +83,8 @@ mip6_ha_init()
 
 struct mip6_ha *
 mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
-	struct in6_addr *lladdr;
-	struct in6_addr *gaddr;
+	struct sockaddr_in6 *lladdr;
+	struct sockaddr_in6 *gaddr;
 	u_int8_t flags;
 	int16_t pref;
 	int32_t lifetime;
@@ -104,7 +104,14 @@ mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
 	}
 	bzero(mha, sizeof(*mha));
 	mha->mha_lladdr = *lladdr;
-	mha->mha_gaddr = gaddr ? *gaddr : in6addr_any;
+	if (gaddr)
+		mha->mha_gaddr = *gaddr;
+	else {
+		bzero(&mha->mha_gaddr, sizeof(mha->mha_gaddr));
+		mha->mha_gaddr.sin6_len = sizeof(mha->mha_gaddr);
+		mha->mha_gaddr.sin6_family = AF_INET6;
+		mha->mha_gaddr.sin6_addr = in6addr_any;
+	}
 	mha->mha_flags = flags;
 	mha->mha_pref = pref;
 	mha->mha_lifetime = lifetime;
@@ -127,8 +134,8 @@ mip6_ha_print(mha)
 		 "pref     %u\n"
 		 "lifetime %u\n"
 		 "remain   %ld\n",
-		 ip6_sprintf(&mha->mha_lladdr),
-		 ip6_sprintf(&mha->mha_gaddr),
+		 ip6_sprintf(&mha->mha_lladdr.sin6_addr),
+		 ip6_sprintf(&mha->mha_gaddr.sin6_addr),
 		 mha->mha_pref,
 		 mha->mha_lifetime,
 		 mha->mha_expire - time_second));
@@ -188,7 +195,9 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	struct nd_defrouter *dr;
 	struct nd_opt_homeagent_info *hai;
 {
+#if 0
 	struct in6_addr lladdr;
+#endif
 	int16_t pref = 0;
 	u_int16_t lifetime;
 	struct mip6_ha *mha;
@@ -209,10 +218,12 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 	}
 
 	/* find an exising entry. */
+#if 0
 	lladdr = dr->rtaddr.sin6_addr; /* XXX: scope */
 	/* XXX: KAME link-local hack; remove ifindex */
 	lladdr.s6_addr16[1] = 0;
-	mha = mip6_ha_list_find_withaddr(mha_list, &lladdr);
+#endif
+	mha = mip6_ha_list_find_withaddr(mha_list, &dr->rtaddr);
 	if (mha == NULL) {
 		/* an entry must exist at this point. */
 		return (EINVAL);
@@ -238,7 +249,7 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 int
 mip6_ha_list_update_withndpr(mha_list, addr, ndpr)
 	struct mip6_ha_list *mha_list;
-	struct in6_addr *addr;
+	struct sockaddr_in6 *addr;
 	struct nd_prefix *ndpr;
 {
 	struct mip6_ha *mha;
@@ -247,7 +258,7 @@ mip6_ha_list_update_withndpr(mha_list, addr, ndpr)
 	if (mha == NULL) {
 		return (0);
 	}
-	mha->mha_gaddr = ndpr->ndpr_prefix.sin6_addr;
+	mha->mha_gaddr = ndpr->ndpr_prefix;
 	
 	return (0);
 }
@@ -255,17 +266,17 @@ mip6_ha_list_update_withndpr(mha_list, addr, ndpr)
 struct mip6_ha *
 mip6_ha_list_find_withaddr(mha_list, addr)
 	struct mip6_ha_list *mha_list;
-	struct in6_addr *addr;
+	struct sockaddr_in6 *addr;
 {
 	struct mip6_ha *mha, *match = NULL;
 
 	for (mha = LIST_FIRST(mha_list); mha;
 	     mha = LIST_NEXT(mha, mha_entry)) {
-		if (IN6_ARE_ADDR_EQUAL(&mha->mha_lladdr, addr)) {
+		if (SA6_ARE_ADDR_EQUAL(&mha->mha_lladdr, addr)) {
 			match = mha;
 			break;
 		}
-		if (IN6_ARE_ADDR_EQUAL(&mha->mha_gaddr, addr)) {
+		if (SA6_ARE_ADDR_EQUAL(&mha->mha_gaddr, addr)) {
 			match = mha;
 			break;
 		}

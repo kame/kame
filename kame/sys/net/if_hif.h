@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.8 2002/01/26 17:01:26 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.9 2002/02/19 03:40:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,7 +102,7 @@ struct hif_ifreq {
 
 TAILQ_HEAD(hif_softc_list, hif_softc) hif_softc_list;
 TAILQ_HEAD(hif_coa_list, hif_coa) hif_coa_list;
-struct in6_addr hif_coa;
+struct sockaddr_in6 hif_coa;
 
 struct hif_subnet {
 	TAILQ_ENTRY(hif_subnet) hs_entry;
@@ -158,16 +158,14 @@ int hif_subnet_list_remove		__P((struct hif_subnet_list *,
 int hif_subnet_list_remove_all		__P((struct hif_subnet_list *));
 struct hif_subnet *hif_subnet_list_find_withprefix
 					__P((struct hif_subnet_list *,
-					     struct in6_addr *,
+					     struct sockaddr_in6 *,
 					     u_int8_t));
 struct hif_subnet *hif_subnet_list_find_withhaaddr
 					__P((struct hif_subnet_list *,
-					     struct in6_addr *));
+					     struct sockaddr_in6 *));
 
 
-struct hif_softc *hif_list_find_withhaddr __P((struct in6_addr *));
-
-struct hif_ha *hif_ha_create __P((u_int8_t, struct mip6_ha *));
+struct hif_softc *hif_list_find_withhaddr __P((struct sockaddr_in6 *));
 
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.32 2002/02/18 12:27:53 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.33 2002/02/19 03:40:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -168,10 +168,15 @@ ip6_rthdr0(m, ip6, rh0)
 		int lastindex;
 		struct in6_addr *prevhop;
 		struct mbuf *n;
+		struct sockaddr_in6 *src, *dst;
 		struct ip6aux *ip6a;
 
 		if (!MIP6_IS_MN)
 			return (0);
+
+		/* get ip src and dst addrs. */
+		if (ip6_getpktaddrs(m, &src, &dst))
+			return(-1);
 
 		/*
 		 * check if the ip6_dst is my home address or not.  if
@@ -191,7 +196,7 @@ ip6_rthdr0(m, ip6, rh0)
 				/* XXX registration status ? */
 
 				/* check the final dest is a home address. */
-				if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
+				if (!SA6_ARE_ADDR_EQUAL(dst,
 							&mbu->mbu_haddr))
 					continue;
 
@@ -200,17 +205,18 @@ ip6_rthdr0(m, ip6, rh0)
 				prevhop = (struct in6_addr *)(rh0 + 1)
 					+ lastindex - 1;
 				if (!IN6_ARE_ADDR_EQUAL(prevhop,
-							&mbu->mbu_coa))
+							&mbu->mbu_coa.sin6_addr))
 					continue;
 
 				/*
 				 * route is already optimized.  set
 				 * optimized flag in m_aux.
 				 */
-				n = ip6_addaux(m);
+				n = ip6_findaux(m);
 				if (n) {
-					ip6a = mtod(n, struct ip6aux *);
-					ip6a->ip6a_flags = IP6A_ROUTEOPTIMIZED;
+					ip6a = mtod(m, struct ip6aux *);
+					ip6a->ip6a_flags
+						|= IP6A_ROUTEOPTIMIZED;
 				}
 			}
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.106 2002/02/08 04:51:14 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.107 2002/02/19 03:40:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -287,7 +287,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	for (sc = TAILQ_FIRST(&hif_softc_list);
 	     sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		mbu_dst = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
+		mbu_dst = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
+						      dstsock);
 		if ((mbu_dst != NULL) &&
 		    ((mbu_dst->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0))
 			coafallback = 1;
@@ -390,6 +391,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		if (!((opts != NULL) &&
 		      ((opts->ip6po_flags & IP6PO_USECOA) != 0))) {
 			struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
+			struct sockaddr_in6 ia_addr;
 
 			/*
 			 * If SA is simultaneously a home address and
@@ -402,12 +404,19 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 				/*
 				 * find a binding update entry for ia_best.
 				 */
+				ia_addr = ia_best->ia_addr;
+				if(in6_addr2zoneid(ia_best->ia_ifp,
+						   &ia_addr.sin6_addr,
+						   &ia_addr.sin6_scope_id)) {
+					*errorp = EINVAL; /* XXX */
+					return (NULL);
+				}
 				for (sc = TAILQ_FIRST(&hif_softc_list);
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
 					mbu_ia_best = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
-						&ia->ia_addr.sin6_addr);
+						&ia_addr);
 					if (mbu_ia_best)
 						break;
 				}
@@ -416,12 +425,19 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 				/*
 				 * find a binding update entry for ia.
 				 */
+				ia_addr = ia->ia_addr;
+				if(in6_addr2zoneid(ia->ia_ifp,
+						   &ia_addr.sin6_addr,
+						   &ia_addr.sin6_scope_id)) {
+					*errorp = EINVAL; /* XXX */
+					return (NULL);
+				}
 				for (sc = TAILQ_FIRST(&hif_softc_list);
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
 					mbu_ia = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
-						&ia->ia_addr.sin6_addr);
+						&ia_addr);
 					if (mbu_ia)
 						break;
 				}
