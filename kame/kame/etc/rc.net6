@@ -56,7 +56,7 @@ $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 #	break
 #    done
 #fi
-#if [ X"$defaultiface" = X"" ]; then
+#if [ X"$defaultiface" != X"" ]; then
 #    $route add -inet6 fe80:: -prefixlen 10 -interface $defaultiface -cloning
 #    $route add -inet6 fec0:: -prefixlen 10 -interface $deafultiface -cloning
 #fi
