@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.13 2002/10/11 07:00:49 k-sugyou Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.14 2002/10/11 07:23:35 k-sugyou Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -351,7 +351,7 @@ sctp6_input(mp, offp, proto)
 		s = splnet();
 #endif
 		(void)sctp_common_input_processing(in6p, stcb, netp, sh,
-						   ch, m, iphlen, offset,
+						   ch, &m, iphlen, offset,
 						   length, ecn_bits);
 		splx(s);
 	}
