@@ -1,7 +1,4 @@
-OpenSSH-1.2/src/usr.bin/ssh/lib/Makefile
-OpenSSH-1.2/src/usr.bin/ssh/scp/Makefile
 OpenSSH-1.2/src/usr.bin/ssh/COPYING.Ylonen
-OpenSSH-1.2/src/usr.bin/ssh/ChangeLog
 OpenSSH-1.2/src/usr.bin/ssh/Makefile
 OpenSSH-1.2/src/usr.bin/ssh/Makefile.inc
 OpenSSH-1.2/src/usr.bin/ssh/OVERVIEW
@@ -85,6 +82,8 @@ OpenSSH-1.2/src/usr.bin/ssh/uidswap.h
 OpenSSH-1.2/src/usr.bin/ssh/version.h
 OpenSSH-1.2/src/usr.bin/ssh/xmalloc.c
 OpenSSH-1.2/src/usr.bin/ssh/xmalloc.h
+OpenSSH-1.2/src/usr.bin/ssh/lib/Makefile
+OpenSSH-1.2/src/usr.bin/ssh/scp/Makefile
 OpenSSH-1.2/src/usr.bin/ssh/ssh-add/Makefile
 OpenSSH-1.2/src/usr.bin/ssh/ssh-agent/Makefile
 OpenSSH-1.2/src/usr.bin/ssh/ssh-keygen/Makefile

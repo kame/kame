@@ -1,0 +1,21 @@
+diff -ru /home/green/ssh/sshconnect.c ./sshconnect.c
+--- /home/green/ssh/sshconnect.c	Wed Nov  3 03:36:00 1999
++++ ./sshconnect.c	Mon Nov  8 00:06:40 1999
+@@ -17,7 +17,7 @@
+ #include "includes.h"
+ RCSID("$Id: patch-av,v 1.1 1999/11/25 10:56:34 sumikawa Exp $");
+ 
+-#include <ssl/bn.h>
++#include <openssl/bn.h>
+ #include "xmalloc.h"
+ #include "rsa.h"
+ #include "ssh.h"
+@@ -28,7 +28,7 @@
+ #include "uidswap.h"
+ #include "compat.h"
+ 
+-#include <ssl/md5.h>
++#include <openssl/md5.h>
+ 
+ /* Session id for the current session. */
+ unsigned char session_id[16];

@@ -1,0 +1,24 @@
+--- Makefile.inc.orig	Thu Nov 18 07:13:52 1999
++++ Makefile.inc	Thu Nov 18 07:16:54 1999
+@@ -1,16 +1,12 @@
+-CFLAGS+=	-I${.CURDIR}/..
++CFLAGS+=	-I${.CURDIR}/.. -I${PREFIX}/include
+ 
+-.include <bsd.obj.mk>
+-
+-.if exists(${.CURDIR}/../lib/${__objdir})
+-LDADD+=         -L${.CURDIR}/../lib/${__objdir} -lssh
+-DPADD+=         ${.CURDIR}/../lib/${__objdir}/libssh.a
+-.else
++AFS?=		no
++KERBEROS?=	no
++SKEY?=		no
++TCP_WRAPPERS?=	yes
+ LDADD+=         -L${.CURDIR}/../lib -lssh
+ DPADD+=         ${.CURDIR}/../lib/libssh.a
+-
+ CFLAGS+=	-I/usr/local/include -DINET6
+ CFLAGS+=	-DENABLE_ANOTHER_PORT_TRY
+ CFLAGS+=	-DENABLE_IPV6
+ LDADD+=		-L/usr/local/v6/lib -linet6
+-.endif

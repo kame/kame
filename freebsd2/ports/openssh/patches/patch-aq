@@ -1,0 +1,19 @@
+diff -ru /home/green/ssh/ssh-add/Makefile ./ssh-add/Makefile
+--- /home/green/ssh/ssh-add/Makefile	Thu Oct 28 03:32:00 1999
++++ ./ssh-add/Makefile	Mon Nov  8 00:13:30 1999
+@@ -10,12 +10,12 @@
+ BINMODE?=555
+ .endif
+ 
+-BINDIR=	/usr/bin
+-MAN=	ssh-add.1
++BINDIR=	/bin
++MAN1=	ssh-add.1
+ 
+ SRCS=	ssh-add.c log-client.c
+ 
+ .include <bsd.prog.mk>
+ 
+-LDADD+=	-lcrypto -lutil -lz
++LDADD+=	-lutil -lz ${CRYPTOLIBS}
+ DPADD+= ${LIBCRYPTO} ${LIBDES} ${LIBUTIL} ${LIBZ}

@@ -1,0 +1,11 @@
+--- includes.h-	Thu Nov 25 18:57:00 1999
++++ includes.h	Thu Nov 25 19:04:25 1999
+@@ -64,4 +64,8 @@
+    client program.  Socketpairs do not seem to work on all systems. */
+ #define USE_PIPES 1
+ 
++/* quick hack for being made compilable on FreeBSD 2.2.8 */
++#define	SHUT_RD		0		/* shut down the reading side */
++#define	SHUT_WR		1		/* shut down the writing side */
++#define	SHUT_RDWR	2		/* shut down both sides */
+ #endif /* INCLUDES_H */

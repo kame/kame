@@ -1,0 +1,36 @@
+--- ssh/Makefile.orig	Tue Oct 26 03:31:00 1999
++++ ssh/Makefile	Tue Nov  9 06:56:24 1999
+@@ -2,22 +2,17 @@
+ 
+ PROG=	ssh
+ BINOWN=	root
++BINMODE=4555
+ 
+-.if (${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH} == "powerpc" || \
+-	${MACHINE_ARCH} == "hppa")
+-BINMODE=0000
+-.else
+-BINMODE?=4555
+-.endif
+-
+-BINDIR=	/usr/bin
+-MAN=	ssh.1
++BINDIR=	/bin
++MAN1=	ssh.1
+ LINKS=	${BINDIR}/ssh ${BINDIR}/slogin
+ MLINKS=	ssh.1 slogin.1
+ 
+ SRCS=	ssh.c sshconnect.c log-client.c readconf.c clientloop.c
+ 
+ .include <bsd.own.mk> # for AFS
++.include "../Makefile.inc"
+ 
+ .if (${KERBEROS} == "yes")
+ CFLAGS+= -DKRB4 -I/usr/include/kerberosIV
+@@ -32,5 +27,5 @@
+ 
+ .include <bsd.prog.mk>
+ 
+-LDADD+=	-lutil -lz -lcrypto
++LDADD+=	-lutil -lz ${CRYPTOLIBS}
+ DPADD+=	${LIBCRYPTO} ${LIBUTIL} ${LIBZ}
