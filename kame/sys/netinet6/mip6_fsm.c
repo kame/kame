@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.19 2003/01/30 08:54:16 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.20 2003/03/28 08:09:27 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -142,7 +142,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -589,7 +589,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -652,7 +652,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -696,7 +696,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -793,7 +793,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -859,7 +859,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -901,7 +901,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -980,7 +980,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -1050,7 +1050,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -1230,7 +1230,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -1279,7 +1279,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -1340,7 +1340,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -1389,7 +1389,7 @@ mip6_bu_pri_fsm(mbu, event, data)
 					mip6log((LOG_ERR,
 					    "%s:%d: "
 					    "sending a home registration "
-					    "failed.\n",
+					    "failed. (%d)\n",
 					    __FILE__, __LINE__, error));
 					/* continue and try again. */
 				}
@@ -1449,7 +1449,7 @@ mip6_bu_pri_fsm_home_registration(mbu)
 	error = mip6_home_registration2(mbu);
 	if (error) {
 		mip6log((LOG_ERR,
-		    "%s:%d: sending a home registration failed.\n",
+		    "%s:%d: sending a home registration failed. (%d)\n",
 		    __FILE__, __LINE__, error));
 		/* continue and try again. */
 	}
