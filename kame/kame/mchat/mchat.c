@@ -306,7 +306,7 @@ main(argc, argv)
 		switch (res->ai_family) {
 		case AF_INET6:
 			level = IPPROTO_IPV6;
-			optname = IPV6_IPSEC_POLICY_OUT;
+			optname = IPV6_IPSEC_POLICY;
 			break;
 		default:
 			level = optname = 0;
