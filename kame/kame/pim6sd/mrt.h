@@ -1,4 +1,4 @@
-/*	$KAME: mrt.h,v 1.11 2001/08/09 10:22:39 suz Exp $	*/
+/*	$KAME: mrt.h,v 1.12 2001/11/02 04:07:07 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -81,7 +81,7 @@
 			IF_COPY(&from->joined_oifs , &to->joined_oifs);			\
 			IF_COPY(&from->oifs ,&to->oifs );				\
 			IF_COPY(&from->leaves , &to->leaves);				\
-			IF_COPY(&from->pruned_oifs , &to->leaves );			\
+			IF_COPY(&from->pruned_oifs , &to->pruned_oifs);			\
 			IF_COPY(&from->asserted_oifs ,&to->asserted_oifs);		\
 			bcopy(from->vif_timers , to->vif_timers ,			\
 			numvifs*sizeof(from->vif_timers[0]));				\
