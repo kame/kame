@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.134 2001/07/21 09:31:01 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.135 2001/07/21 09:32:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -773,10 +773,9 @@ defrouter_select()
 	 * such cases here for safety.
 	 */
 	if (ip6_forwarding || !ip6_accept_rtadv) {
-#ifdef DIAGNOSTIC
-		printf("defrouter_select: called unexpectedly (forwarding=%d, "
-		       "accept_rtadv=%d)\n", ip6_forwarding, ip6_accept_rtadv);
-#endif
+		nd6log((LOG_WARNING,
+		    "defrouter_select: called unexpectedly (forwarding=%d, "
+		    "accept_rtadv=%d)\n", ip6_forwarding, ip6_accept_rtadv));
 		return;
 	}
 
