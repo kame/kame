@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.11 2001/11/26 07:18:15 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.12 2001/11/26 10:52:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -565,7 +565,7 @@ mip6_subnet_timeout(arg)
 	struct mip6_subnet_prefix *mspfx, *mspfx_next;
 	struct mip6_prefix *mpfx;
 	struct mip6_subnet_ha *msha, *msha_next, *msha_head;
-	struct mip6_ha *mha, *mha_head;
+	struct mip6_ha *mha_head;
 	int s;
 
 	mip6_subnet_starttimer();
