@@ -227,6 +227,7 @@ identifier_statement
 identifier_stmt
 	:	VENDORID QUOTEDSTRING EOS
 		{
+			$2->l--;	/* nuke '\0' */
 			lcconf->vendorid = $2;
 			if (lcconf->vendorid == NULL) {
 				yyerror("failed to set vendorid: %s",
@@ -236,6 +237,7 @@ identifier_stmt
 		}
 	|	IDENTIFIERTYPE QUOTEDSTRING EOS
 		{
+			$2->l--;	/* nuke '\0' */
 			lcconf->ident[$1] = $2;
 			if (lcconf->ident[$1] == NULL) {
 				yyerror("failed to set my ident: %s",
