@@ -1,5 +1,4 @@
-/*	$KAME: altq_jobs.h,v 1.3 2002/10/25 06:13:09 kjc Exp $	*/
-/*	$Id: altq_jobs.h,v 1.3 2002/10/25 06:13:09 kjc Exp $	*/
+/*	$KAME: altq_jobs.h,v 1.4 2002/10/25 07:42:33 kjc Exp $	*/
 /*
  * Copyright (c) 2001, Rector and Visitors of the University of 
  * Virginia.
@@ -62,7 +61,7 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif 
+#endif
 
 #define	JOBS_MAXPRI	16	/* upper limit on the number of priorities */
 #define SCALE_RATE	32
@@ -77,7 +76,7 @@ typedef TAILQ_HEAD(_timestamps, _tsentry) TSLIST;
 typedef struct _tsentry {
 	TAILQ_ENTRY(_tsentry) ts_list;
 	uint64_t	timestamp;
-} TSENTRY;	
+} TSENTRY;
 
 /*
  * timestamp list macros
@@ -87,8 +86,8 @@ typedef struct _tsentry {
 #define tslist_last(s)	TAILQ_LAST(s, _timestamps)
 #define tslist_empty(s) TAILQ_EMPTY(s)
 
-/* 
- * scaling/conversion macros 
+/*
+ * scaling/conversion macros
  * none of these macros present side-effects, hence the lowercase
  */
 
@@ -103,7 +102,7 @@ typedef struct _tsentry {
 #define bps_to_internal(x)	(invsecs_to_invticks(bits_to_bytes(scale_rate(x))))
 #define internal_to_bps(x)	(unscale_rate(invticks_to_invsecs(bytes_to_bits(x))))
 
-/* 
+/*
  * this macro takes care of possible wraparound
  * effects in the computation of a delay
  * no side-effects here either
@@ -111,9 +110,9 @@ typedef struct _tsentry {
 
 #define delay_diff(x, y) ((x >= y)?(x - y):((ULLONG_MAX-y)+x+1))
 
-/* 
- * additional macros (PKTCNTR_ADD can be found 
- * in the original distribution) 
+/*
+ * additional macros (PKTCNTR_ADD can be found
+ * in the original distribution)
  */
 
 #define PKTCNTR_SUB(cntr, len) do {                                     \
@@ -141,31 +140,31 @@ struct jobs_add_class {
 	struct	jobs_interface	iface;
 	int	pri;			/* priority (0 is the lowest) */
 	int	flags;			/* misc flags (see below) */
-	
-	/* 
-	 * Delay Bound (-1 = NO ADC) is provided in us, 
+
+	/*
+	 * Delay Bound (-1 = NO ADC) is provided in us,
 	 * and is converted to clock ticks
 	 */
-	int64_t	cl_adc;			
+	int64_t	cl_adc;
 
-	/* 
+	/*
 	 * Loss Rate Bound (-1 = NO ALC) is provided in fraction of 1
 	 * and is converted to a fraction of  2^(SCALE_LOSS)
 	 */
 	int64_t	cl_alc;
-	
-	/* 
+
+	/*
 	 * lower bound on throughput (-1 = no ARC)
-	 * is provided in (string) and 
+	 * is provided in (string) and
 	 * is converted to internal format
-	 */			
-	int64_t	cl_arc;		
+	 */
+	int64_t	cl_arc;
 
 	/* RDC weight (-1 = NO RDC) - no unit */
 	int64_t	cl_rdc;
 
 	/* RLC weight (-1 = NO RLC) - no unit */
-	int64_t	cl_rlc;			
+	int64_t	cl_rlc;
 
 	u_long	class_handle;		/* return value */
 };
@@ -188,29 +187,29 @@ struct jobs_modify_class {
 	int	pri;
 
 	/* 
-	 * Delay Bound (-1 = NO ADC) is provided in us, 
+	 * Delay Bound (-1 = NO ADC) is provided in us,
 	 * and is converted to clock ticks
 	 */
-	int64_t	cl_adc;			
+	int64_t	cl_adc;
 
-	/* 
+	/*
 	 * Loss Rate Bound (-1 = NO ALC) is provided in fraction of 1
 	 * and is converted to a fraction of  2^(SCALE_LOSS)
 	 */
 	int64_t	cl_alc;
-	
-	/* 
+
+	/*
 	 * lower bound on throughput (-1 = no ARC)
-	 * is provided in (string) and 
+	 * is provided in (string) and
 	 * is converted to internal format
-	 */			
-	int64_t	cl_arc;		
+	 */
+	int64_t	cl_arc;
 
 	/* RDC weight (-1 = NO RDC) - no unit */
 	int64_t	cl_rdc;
 
 	/* RLC weight (-1 = NO RLC) - no unit */
-	int64_t	cl_rlc;			
+	int64_t	cl_rlc;
 
 	int	flags;
 };
@@ -262,7 +261,6 @@ struct jobs_class_stats {
 	struct	class_stats *stats;	/* pointer to stats array */
 	int	maxpri;			/* in/out */
 	struct	jobs_interface iface;
-
 };
 
 #define	JOBS_IF_ATTACH		_IOW('Q', 1, struct jobs_attach)
@@ -290,10 +288,10 @@ struct jobs_class {
 	u_long	cl_handle;		/* class handle */
 
 	/* control variables */
-  
-        /* 
-	 * internal representation: 
-	 * bytes/unit_time << 32 = (bps /8 << 32)*1/machclk_freq 
+
+        /*
+	 * internal representation:
+	 * bytes/unit_time << 32 = (bps /8 << 32)*1/machclk_freq
          */
 	int64_t	service_rate;		/* bps that should be out */
         int64_t	min_rate_adc;		/* bps that should be out for ADC/ARC */
@@ -309,14 +307,14 @@ struct jobs_class {
 	struct	pktcntr cl_rin;		/* let in packet counter */
 	struct	pktcntr cl_rout;	/* transmitted packet counter */
 
-	
+
 	/* modified deficit round-robin specific variables */
 
-	/* 
-	 * rout_th is SCALED for precision, as opposed to rout. 
+	/*
+	 * rout_th is SCALED for precision, as opposed to rout.
 	 */
 	int64_t st_service_rate;
-	u_int64_t	cl_last_rate_update; 
+	u_int64_t	cl_last_rate_update;
 	struct	pktcntr	cl_rout_th;	/* theoretical transmissions */
 	struct	pktcntr st_arrival;	/* rin+dropped */
 	struct	pktcntr	st_rin;		/* dropped packet counter */
@@ -330,30 +328,30 @@ struct jobs_class {
 	int	concerned_arc;
 	int	concerned_rdc;
 	int	concerned_rlc;
-	/* 
-	 * Delay Bound (-1 = NO ADC) is provided in us, 
+	/*
+	 * Delay Bound (-1 = NO ADC) is provided in us,
 	 * and is converted to clock ticks
 	 */
-	int64_t	cl_adc;			
+	int64_t	cl_adc;
 
-	/* 
+	/*
 	 * Loss Rate Bound (-1 = NO ALC) is provided in fraction of 1
 	 * and is converted to a fraction of  2^(SCALE_LOSS)
 	 */
 	int64_t	cl_alc;
-	
-	/* 
+
+	/*
 	 * lower bound on throughput (-1 = no ARC)
-	 * is provided in (string) and 
+	 * is provided in (string) and
 	 * is converted to internal format
-	 */			
-	int64_t	cl_arc;		
+	 */
+	int64_t	cl_arc;
 
 	/* RDC weight (-1 = NO RDC) - no unit */
 	int64_t	cl_rdc;
 
 	/* RLC weight (-1 = NO RLC) - no unit */
-	int64_t	cl_rlc;			
+	int64_t	cl_rlc;
 
 	u_int64_t	delay_prod_others;
 	u_int64_t	loss_prod_others;
@@ -391,6 +389,6 @@ struct jobs_if {
 
 #ifdef __cplusplus
 }
-#endif 
+#endif
 
 #endif /* _ALTQ_ALTQ_JOBS_H_ */

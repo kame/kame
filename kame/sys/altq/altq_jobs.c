@@ -1,5 +1,4 @@
-/*	$KAME: altq_jobs.c,v 1.3 2002/10/25 06:13:09 kjc Exp $	*/
-/*	$Id: altq_jobs.c,v 1.3 2002/10/25 06:13:09 kjc Exp $	*/
+/*	$KAME: altq_jobs.c,v 1.4 2002/10/25 07:42:33 kjc Exp $	*/
 /*
  * Copyright (c) 2001, the Rector and Board of Visitors of the
  * University of Virginia.
@@ -93,58 +92,50 @@
 /*
  * function prototypes
  */
-static struct jobs_if *jobs_attach __P((struct ifaltq *, 
-					u_int, u_int, u_int));
-static int jobs_detach __P((struct jobs_if *));
-static int jobs_clear_interface __P((struct jobs_if *));
-static int jobs_request __P((struct ifaltq *, int, void *));
-static void jobs_purge __P((struct jobs_if *));
-static struct jobs_class *jobs_class_create __P((struct jobs_if *,
-						 int, 
-						 int64_t, int64_t,
-						 int64_t, int64_t, 
-						 int64_t,
-						 int));
-static int jobs_class_destroy __P((struct jobs_class *));
-static int jobs_enqueue __P((struct ifaltq *, struct mbuf *,
-			     struct altq_pktattr *));
-static struct mbuf *jobs_dequeue __P((struct ifaltq *, int));
+static struct jobs_if *jobs_attach(struct ifaltq *, u_int, u_int, u_int);
+static int jobs_detach(struct jobs_if *);
+static int jobs_clear_interface(struct jobs_if *);
+static int jobs_request(struct ifaltq *, int, void *);
+static void jobs_purge(struct jobs_if *);
+static struct jobs_class *jobs_class_create(struct jobs_if *,
+    int, int64_t, int64_t, int64_t, int64_t, int64_t, int);
+static int jobs_class_destroy(struct jobs_class *);
+static int jobs_enqueue(struct ifaltq *, struct mbuf *, struct altq_pktattr *);
+static struct mbuf *jobs_dequeue(struct ifaltq *, int);
 
-static int jobs_addq __P((struct jobs_class *, struct mbuf *, 
-			  struct jobs_if*));
-static struct mbuf *jobs_getq __P((struct jobs_class *));
-static struct mbuf *jobs_pollq __P((struct jobs_class *));
-static void jobs_purgeq __P((struct jobs_class *));
+static int jobs_addq(struct jobs_class *, struct mbuf *, struct jobs_if*);
+static struct mbuf *jobs_getq(struct jobs_class *);
+static struct mbuf *jobs_pollq(struct jobs_class *);
+static void jobs_purgeq(struct jobs_class *);
 
-int jobsopen __P((dev_t, int, int, struct proc *));
-int jobsclose __P((dev_t, int, int, struct proc *));
-int jobsioctl __P((dev_t, ioctlcmd_t, caddr_t, int, struct proc *));
-static int jobscmd_if_attach __P((struct jobs_attach *));
-static int jobscmd_if_detach __P((struct jobs_interface *));
-static int jobscmd_add_class __P((struct jobs_add_class *));
-static int jobscmd_delete_class __P((struct jobs_delete_class *));
-static int jobscmd_modify_class __P((struct jobs_modify_class *));
-static int jobscmd_add_filter __P((struct jobs_add_filter *));
-static int jobscmd_delete_filter __P((struct jobs_delete_filter *));
-static int jobscmd_class_stats __P((struct jobs_class_stats *));
-static void get_class_stats __P((struct class_stats *, 
-				 struct jobs_class *));
-static struct jobs_class *clh_to_clp __P((struct jobs_if *, u_long));
-static u_long clp_to_clh __P((struct jobs_class *));
+int jobsopen(dev_t, int, int, struct proc *);
+int jobsclose(dev_t, int, int, struct proc *);
+int jobsioctl(dev_t, ioctlcmd_t, caddr_t, int, struct proc *);
+static int jobscmd_if_attach(struct jobs_attach *);
+static int jobscmd_if_detach(struct jobs_interface *);
+static int jobscmd_add_class(struct jobs_add_class *);
+static int jobscmd_delete_class(struct jobs_delete_class *);
+static int jobscmd_modify_class(struct jobs_modify_class *);
+static int jobscmd_add_filter(struct jobs_add_filter *);
+static int jobscmd_delete_filter(struct jobs_delete_filter *);
+static int jobscmd_class_stats(struct jobs_class_stats *);
+static void get_class_stats(struct class_stats *, struct jobs_class *);
+static struct jobs_class *clh_to_clp(struct jobs_if *, u_long);
+static u_long clp_to_clh(struct jobs_class *);
 
-static TSLIST *tslist_alloc __P((void));
-static void tslist_destroy __P((struct jobs_class *));
-static int tslist_enqueue __P((struct jobs_class *, u_int64_t));
-static void tslist_dequeue __P((struct jobs_class *));
-static void tslist_drop __P((struct jobs_class *));
+static TSLIST *tslist_alloc(void);
+static void tslist_destroy(struct jobs_class *);
+static int tslist_enqueue(struct jobs_class *, u_int64_t);
+static void tslist_dequeue(struct jobs_class *);
+static void tslist_drop(struct jobs_class *);
 
-static int enforce_wc __P((struct jobs_if *));
-static int64_t* adjust_rates_rdc __P((struct jobs_if *));
-static int64_t* assign_rate_drops_adc __P((struct jobs_if *));
-static int64_t* update_error __P((struct jobs_if *));
-static int min_rates_adc __P((struct jobs_if *));
-static int64_t proj_delay __P((struct jobs_if *, int));
-static int pick_dropped_rlc __P((struct jobs_if *));
+static int enforce_wc(struct jobs_if *);
+static int64_t* adjust_rates_rdc(struct jobs_if *);
+static int64_t* assign_rate_drops_adc(struct jobs_if *);
+static int64_t* update_error(struct jobs_if *);
+static int min_rates_adc(struct jobs_if *);
+static int64_t proj_delay(struct jobs_if *, int);
+static int pick_dropped_rlc(struct jobs_if *);
 
 /* jif_list keeps all jobs_if's allocated. */
 static struct jobs_if *jif_list = NULL;
@@ -161,7 +152,7 @@ jobs_attach(ifq, bandwidth, qlimit, separate)
 	u_int separate;
 {
 	struct jobs_if *jif;
-  
+
 	MALLOC(jif, struct jobs_if *, sizeof(struct jobs_if),
 	       M_DEVBUF, M_WAITOK);
 
@@ -173,11 +164,11 @@ jobs_attach(ifq, bandwidth, qlimit, separate)
 	jif->jif_qlimit = qlimit;
 	jif->jif_separate = separate;
 	printf("JoBS bandwidth = %d bps\n", (int)bandwidth);
-	printf("JoBS buffer size = %d pkts [%s]\n", 
+	printf("JoBS buffer size = %d pkts [%s]\n",
 	       (int)qlimit, separate?"separate buffers":"shared buffer");
 	jif->jif_maxpri = -1;
 	jif->jif_ifq = ifq;
-	
+
 	jif->wc_cycles_enqueue = 0;
 	jif->avg_cycles_enqueue = 0;
 	jif->avg_cycles2_enqueue = 0;
@@ -188,11 +179,11 @@ jobs_attach(ifq, bandwidth, qlimit, separate)
 	jif->bc_cycles_dequeue = INFINITY;
 	jif->total_enqueued = 0;
 	jif->total_dequeued = 0;
-	
+
 	/* add this state to the jobs list */
 	jif->jif_next = jif_list;
 	jif_list = jif;
-	
+
 	return (jif);
 }
 
@@ -201,13 +192,13 @@ jobs_detach(jif)
 	struct jobs_if *jif;
 {
 	(void)jobs_clear_interface(jif);
-  
+
 	/* remove this interface from the jif list */
 	if (jif_list == jif)
 		jif_list = jif->jif_next;
 	else {
 		struct jobs_if *p;
-	  
+
 		for (p = jif_list; p != NULL; p = p->jif_next)
 			if (p->jif_next == jif) {
 				p->jif_next = jif->jif_next;
@@ -229,15 +220,15 @@ jobs_clear_interface(jif)
 {
 	struct jobs_class	*cl;
 	int	pri;
-  
+
 	/* free the filters for this interface */
 	acc_discard_filters(&jif->jif_classifier, NULL, 1);
-	
+
 	/* clear out the classes */
 	for (pri = 0; pri <= jif->jif_maxpri; pri++)
 		if ((cl = jif->jif_classes[pri]) != NULL)
 			jobs_class_destroy(cl);
-  
+
 	return (0);
 }
 
@@ -248,7 +239,7 @@ jobs_request(ifq, req, arg)
 	void *arg;
 {
 	struct jobs_if	*jif = (struct jobs_if *)ifq->altq_disc;
-  
+
 	switch (req) {
 	case ALTRQ_PURGE:
 		jobs_purge(jif);
@@ -264,10 +255,9 @@ jobs_purge(jif)
 {
 	struct jobs_class *cl;
 	int pri;
-  
+
 	for (pri = 0; pri <= jif->jif_maxpri; pri++) {
-		if ((cl = jif->jif_classes[pri]) != NULL 
-		    && !qempty(cl->cl_q))
+		if ((cl = jif->jif_classes[pri]) != NULL && !qempty(cl->cl_q))
 			jobs_purgeq(cl);
 	}
 	if (ALTQ_IS_ENABLED(jif->jif_ifq))
@@ -287,7 +277,7 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 	int i, j;
 	int64_t tmp[JOBS_MAXPRI];
 	u_int64_t now;
-	
+
 	if ((cl = jif->jif_classes[pri]) != NULL) {
 		/* modify the class instead of creating a new one */
 #ifdef __NetBSD__
@@ -304,7 +294,7 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 		if (cl == NULL)
 			return (NULL);
 		bzero(cl, sizeof(struct jobs_class));
-    
+
 		MALLOC(cl->cl_q, class_queue_t *, sizeof(class_queue_t),
 		       M_DEVBUF, M_WAITOK);
 		if (cl->cl_q == NULL)
@@ -315,9 +305,9 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 		if (cl->arv_tm == NULL)
 			goto err_ret;
 	}
-  
+
 	jif->jif_classes[pri] = cl;
-  
+
 	if (flags & JOCF_DEFAULTCLASS)
 		jif->jif_default = cl;
 
@@ -325,17 +315,17 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 	qlen(cl->cl_q) = 0;
 	cl->service_rate = 0;
 	cl->min_rate_adc = 0;
-	cl->current_loss = 0;	
+	cl->current_loss = 0;
 	cl->cl_period = 0;
 	PKTCNTR_RESET(&cl->cl_arrival);
-	PKTCNTR_RESET(&cl->cl_rin);	
+	PKTCNTR_RESET(&cl->cl_rin);
 	PKTCNTR_RESET(&cl->cl_rout);
 	PKTCNTR_RESET(&cl->cl_rout_th);
-	PKTCNTR_RESET(&cl->cl_dropcnt);	
+	PKTCNTR_RESET(&cl->cl_dropcnt);
 	PKTCNTR_RESET(&cl->st_arrival);
-	PKTCNTR_RESET(&cl->st_rin);	
+	PKTCNTR_RESET(&cl->st_rin);
 	PKTCNTR_RESET(&cl->st_rout);
-	PKTCNTR_RESET(&cl->st_dropcnt);	
+	PKTCNTR_RESET(&cl->st_dropcnt);
 	cl->st_service_rate = 0;
 	cl->cl_lastdel = 0;
 	cl->cl_avgdel = 0;
@@ -352,7 +342,7 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 		alc = INFINITY;
 	} else 
 		cl->concerned_alc = 1;
-  
+
 	if (rdc == -1) {
 		rdc = 0;
 		cl->concerned_rdc = 0;
@@ -364,32 +354,31 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 		cl->concerned_rlc = 0;
 	} else 
 		cl->concerned_rlc = 1;
-	
+
 	if (arc == -1) {
 		arc = 0;
 		cl->concerned_arc = 0;
-	} else 
+	} else
 		cl->concerned_arc = 1;
-	
+
 	cl->cl_rdc=rdc;
 
 	if (cl->concerned_adc) {
 		/* adc is given in us, convert it to clock ticks */
 		cl->cl_adc = (u_int64_t)(adc*machclk_freq/GRANULARITY);
-	} else 
+	} else
 		cl->cl_adc = adc;
-  
+
 	if (cl->concerned_arc) {
 		/* arc is given in bps, convert it to internal unit */
 		cl->cl_arc = (u_int64_t)(bps_to_internal(arc));
-	} else 
+	} else
 		cl->cl_arc = arc;
-  
 
 	cl->cl_rlc=rlc;
 	cl->cl_alc=alc;
 	cl->delay_prod_others = 0;
-	cl->loss_prod_others = 0; 
+	cl->loss_prod_others = 0;
 	cl->cl_flags = flags;
 	cl->cl_pri = pri;
 	if (pri > jif->jif_maxpri)
@@ -397,12 +386,12 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 	cl->cl_jif = jif;
 	cl->cl_handle = (u_long)cl;  /* just a pointer to this class */
 
-	/* 
+	/*
 	 * update delay_prod_others and loss_prod_others
-	 * in all classes if needed 
+	 * in all classes if needed
 	 */
 
-	if (cl->concerned_rdc) { 
+	if (cl->concerned_rdc) {
 		for (i = 0; i <= jif->jif_maxpri; i++) {
 			scan1 = jif->jif_classes[i];
 			class_exists1 = (scan1 != NULL);
@@ -411,12 +400,12 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 				for (j = 0; j <= i-1; j++) {
 					scan2 = jif->jif_classes[j];
 					class_exists2 = (scan2 != NULL);
-					if (class_exists2 	
+					if (class_exists2
 					    && scan2->concerned_rdc)
 						tmp[i] *= scan2->cl_rdc;
-				} 
-			} else 
-				tmp[i] = 0; 
+				}
+			} else
+				tmp[i] = 0;
 		}
 
 		for (i = 0; i <= jif->jif_maxpri; i++) {
@@ -427,14 +416,14 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 				for (j = 0; j <= jif->jif_maxpri; j++) {
 					scan2 = jif->jif_classes[j];
 					class_exists2 = (scan2 != NULL);
-					if (class_exists2 && j != i 
-					    && scan2->concerned_rdc) 
+					if (class_exists2 && j != i
+					    && scan2->concerned_rdc)
 						scan1->delay_prod_others *= tmp[j];
 				}
 			}
 		}
 	}
-  
+
 	if (cl->concerned_rlc) {
 		for (i = 0; i <= jif->jif_maxpri; i++) {
 			scan1 = jif->jif_classes[i];
@@ -444,12 +433,12 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 				for (j = 0; j <= i-1; j++) {
 					scan2 = jif->jif_classes[j];
 					class_exists2 = (scan2 != NULL);
-					if (class_exists2 
+					if (class_exists2
 					    && scan2->concerned_rlc)
 						tmp[i] *= scan2->cl_rlc;
-				} 
-			} else 
-				tmp[i] = 0; 
+				}
+			} else
+				tmp[i] = 0;
 		}
 
 		for (i = 0; i <= jif->jif_maxpri; i++) {
@@ -460,8 +449,8 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 				for (j = 0; j <= jif->jif_maxpri; j++) {
 					scan2 = jif->jif_classes[j];
 					class_exists2 = (scan2 != NULL);
-					if (class_exists2 && j != i 	
-					    && scan2->concerned_rlc) 
+					if (class_exists2 && j != i
+					    && scan2->concerned_rlc)
 						scan1->loss_prod_others *= tmp[j];
 				}
 			}
@@ -471,7 +460,7 @@ jobs_class_create(jif, pri, adc, rdc, alc, rlc, arc, flags)
 	now = read_machclk();
 	cl->idletime = now;
 	return (cl);
-  
+
  err_ret:
 	if (cl->cl_q != NULL)
 		FREE(cl->cl_q, M_DEVBUF);
@@ -488,19 +477,19 @@ jobs_class_destroy(cl)
 {
 	struct jobs_if *jif;
 	int s, pri;
-  
+
 #ifdef __NetBSD__
 	s = splnet();
 #else
 	s = splimp();
 #endif
-	
+
 	/* delete filters referencing to this class */
 	acc_discard_filters(&cl->cl_jif->jif_classifier, cl, 0);
-	
+
 	if (!qempty(cl->cl_q))
 		jobs_purgeq(cl);
-  
+
 	jif = cl->cl_jif;
 	jif->jif_classes[cl->cl_pri] = NULL;
 	if (jif->jif_maxpri == cl->cl_pri) {
@@ -524,7 +513,7 @@ jobs_class_destroy(cl)
  * jobs_enqueue is an enqueue function to be registered to
  * (*altq_enqueue) in struct ifaltq.
  */
-static int 
+static int
 jobs_enqueue(ifq, m, pktattr)
 	struct ifaltq *ifq;
 	struct mbuf *m;
@@ -538,7 +527,6 @@ jobs_enqueue(ifq, m, pktattr)
 	u_int64_t now;
 	u_int64_t old_arv;
 	int64_t* delta_rate;
-	
 	u_int64_t tstamp1, tstamp2, cycles; /* used for benchmarking only */
 
 	jif->total_enqueued++;
@@ -553,9 +541,9 @@ jobs_enqueue(ifq, m, pktattr)
 		for (pri=0; pri <= jif->jif_maxpri; pri++) {
 			scan = jif->jif_classes[pri];
 			if (scan != NULL) {
-				/* 
-				 * reset all quantities, except: 
-				 * average delay, number of violations 
+				/*
+				 * reset all quantities, except:
+				 * average delay, number of violations
 				 */
 				PKTCNTR_RESET(&scan->cl_rin);
 				PKTCNTR_RESET(&scan->cl_rout);
@@ -565,32 +553,31 @@ jobs_enqueue(ifq, m, pktattr)
 				scan->cl_lastdel = 0;
 				scan->current_loss = 0;
 				scan->service_rate = 0;
-				scan->idletime = now; 
+				scan->idletime = now;
 				scan->cl_last_rate_update = now;
 			}
 		}
 	}
 
-
 	/* grab class set by classifier */
 	if (pktattr == NULL || (cl = pktattr->pattr_class) == NULL)
 		cl = jif->jif_default;
-  
+
 	len = m_pktlen(m);
 	old_arv = cl->cl_arrival.bytes;
 	PKTCNTR_ADD(&cl->cl_arrival, (int)len);
 	PKTCNTR_ADD(&cl->cl_rin, (int)len);
 	PKTCNTR_ADD(&cl->st_arrival, (int)len);
 	PKTCNTR_ADD(&cl->st_rin, (int)len);
-	
+
 	if (cl->cl_arrival.bytes < old_arv) {
 		/* deals w/ overflow */
 		for (pri=0; pri <= jif->jif_maxpri; pri++) {
 			scan = jif->jif_classes[pri];
 			if (scan != NULL) {
-				/* 
-				 * reset all quantities, except: 
-				 * average delay, number of violations 
+				/*
+				 * reset all quantities, except:
+				 * average delay, number of violations
 				 */
 				PKTCNTR_RESET(&scan->cl_rin);
 				PKTCNTR_RESET(&scan->cl_rout);
@@ -599,7 +586,7 @@ jobs_enqueue(ifq, m, pktattr)
 				PKTCNTR_RESET(&scan->cl_dropcnt);	
 				scan->current_loss = 0;
 				scan->service_rate = 0;
-				scan->idletime = now; 
+				scan->idletime = now;
 				scan->cl_last_rate_update = now;
 			}
 		}
@@ -608,10 +595,10 @@ jobs_enqueue(ifq, m, pktattr)
 	}
 
 	if (cl->cl_arrival.bytes > cl->cl_rin.bytes)
-		cl->current_loss = ((cl->cl_arrival.bytes 
-				     - cl->cl_rin.bytes) << SCALE_LOSS)
-				   /cl->cl_arrival.bytes;
-	else 
+		cl->current_loss =
+		    ((cl->cl_arrival.bytes - cl->cl_rin.bytes) << SCALE_LOSS)
+		    / cl->cl_arrival.bytes;
+	else
 		cl->current_loss = 0;
 
 	/* for MDRR: update theoretical value of the output curve */
@@ -619,66 +606,64 @@ jobs_enqueue(ifq, m, pktattr)
 	for (pri=0; pri <= jif->jif_maxpri; pri++) {
 		scan = jif->jif_classes[pri];
 		if (scan != NULL) {
-			if (scan->cl_last_rate_update == scan->idletime 
-			    || scan->cl_last_rate_update == 0) 
+			if (scan->cl_last_rate_update == scan->idletime
+			    || scan->cl_last_rate_update == 0)
 				scan->cl_last_rate_update = now; /* initial case */
-			else 
-				scan->cl_rout_th.bytes += 
+			else
+				scan->cl_rout_th.bytes +=
 				    delay_diff(now, scan->cl_last_rate_update)
-				    *(scan->service_rate); 
+				    * scan->service_rate;
 
-			/* 
-			 * we don't really care about packets here 
-			 * WARNING: rout_th is SCALED 
-			 * (b/c of the service rate) 
-			 * for precision, as opposed to rout. 
+			/*
+			 * we don't really care about packets here
+			 * WARNING: rout_th is SCALED
+			 * (b/c of the service rate)
+			 * for precision, as opposed to rout.
 			 */
 
 			scan->cl_last_rate_update = now;
 		}
 	}
 
-	if (jobs_addq(cl, m, jif) != 0) 
+	if (jobs_addq(cl, m, jif) != 0)
 		return_flag = ENOBUFS; /* signals there's a buffer overflow */
 	else
 		IFQ_INC_LEN(ifq);
-	
 
 	/* successfully queued. */
 
-	enforce_wc(jif); 
+	enforce_wc(jif);
 
 	if (!min_rates_adc(jif)) {
-		delta_rate = assign_rate_drops_adc(jif);        
+		delta_rate = assign_rate_drops_adc(jif);
 		if (delta_rate != NULL) {
-			for (pri = 0; pri <= jif->jif_maxpri; pri++) 
+			for (pri = 0; pri <= jif->jif_maxpri; pri++)
 			  if ((cl = jif->jif_classes[pri]) != NULL &&
-			      !qempty(cl->cl_q)) 
+			      !qempty(cl->cl_q))
 				cl->service_rate += delta_rate[pri];
 			FREE(delta_rate, M_DEVBUF);
 		}
 	}
-  
+
 	delta_rate = adjust_rates_rdc(jif);
 
 	if (delta_rate != NULL) {
-		for (pri = 0; pri <= jif->jif_maxpri; pri++) 
+		for (pri = 0; pri <= jif->jif_maxpri; pri++)
 			if ((cl = jif->jif_classes[pri]) != NULL &&
-			    !qempty(cl->cl_q)) 
+			    !qempty(cl->cl_q))
 				cl->service_rate += delta_rate[pri];
-		FREE(delta_rate, M_DEVBUF);      
+		FREE(delta_rate, M_DEVBUF);
 	}
-	
-  
+
 	tstamp2 = read_machclk();
 	cycles = delay_diff(tstamp2, tstamp1);
-	if (cycles > jif->wc_cycles_enqueue) 
+	if (cycles > jif->wc_cycles_enqueue)
 		jif->wc_cycles_enqueue=cycles;
-	if (cycles < jif->bc_cycles_enqueue) 
+	if (cycles < jif->bc_cycles_enqueue)
 		jif->bc_cycles_enqueue=cycles;
 
 	jif->avg_cycles_enqueue += cycles;
-	jif->avg_cycles2_enqueue += cycles*cycles;
+	jif->avg_cycles2_enqueue += cycles * cycles;
 
 	return (return_flag);
 }
@@ -692,7 +677,6 @@ jobs_enqueue(ifq, m, pktattr)
  *	ALTDQ_REMOVE must return the same packet if called immediately
  *	after ALTDQ_POLL.
  */
-
 
 static struct mbuf *
 jobs_dequeue(ifq, op)
@@ -718,65 +702,63 @@ jobs_dequeue(ifq, op)
 		/* no packet in the queue */
 		for (pri=0; pri <= jif->jif_maxpri; pri++) {
 		  cl = jif->jif_classes[pri];
-		  if (cl != NULL) 
-		    cl->idletime = now; 
+		  if (cl != NULL)
+		    cl->idletime = now;
 		}
 
 		tstamp2 = read_machclk();
 		cycles = delay_diff(tstamp2, tstamp1);
-		if (cycles > jif->wc_cycles_dequeue) 
-		  jif->wc_cycles_dequeue=cycles;
-		if (cycles < jif->bc_cycles_dequeue) 
-		  jif->bc_cycles_dequeue=cycles;
-		
-		jif->avg_cycles_dequeue += cycles;
-		jif->avg_cycles2_dequeue += cycles*cycles;
+		if (cycles > jif->wc_cycles_dequeue)
+			jif->wc_cycles_dequeue = cycles;
+		if (cycles < jif->bc_cycles_dequeue)
+			jif->bc_cycles_dequeue = cycles;
 
-		return (NULL);    
+		jif->avg_cycles_dequeue += cycles;
+		jif->avg_cycles2_dequeue += cycles * cycles;
+
+		return (NULL);
 	}
-   
-	/* 
-	 * select the class whose actual tranmissions are the furthest 
+
+	/*
+	 * select the class whose actual tranmissions are the furthest
 	 * from the promised transmissions
 	 */
 
 	max_error = -1;
 	svc_class = -1;
-	
+
 	for (pri=0; pri <= jif->jif_maxpri; pri++) {
 		if (((cl = jif->jif_classes[pri]) != NULL)
 		    && !qempty(cl->cl_q)) {
 			error = (int64_t)cl->cl_rout_th.bytes
 			    -(int64_t)scale_rate(cl->cl_rout.bytes);
 			if (max_error == -1) {
-			  max_error = error;
-			  svc_class = pri;
-			} else if (error > max_error){
-			  max_error = error;
-			  svc_class = pri;
+				max_error = error;
+				svc_class = pri;
+			} else if (error > max_error) {
+				max_error = error;
+				svc_class = pri;
 			}
 		}
 	}
-  
-  
-	if (svc_class != -1) 
+
+	if (svc_class != -1)
 		cl = jif->jif_classes[svc_class];
 	else
 		cl = NULL;
-  
-	if (op == ALTDQ_POLL) {
 
+	if (op == ALTDQ_POLL) {
 		tstamp2 = read_machclk();
 		cycles = delay_diff(tstamp2, tstamp1);
-		if (cycles > jif->wc_cycles_dequeue) 
-			jif->wc_cycles_dequeue=cycles;
-		if (cycles < jif->bc_cycles_dequeue) 
-			jif->bc_cycles_dequeue=cycles;
-	  
+		if (cycles > jif->wc_cycles_dequeue)
+			jif->wc_cycles_dequeue = cycles;
+		if (cycles < jif->bc_cycles_dequeue)
+			jif->bc_cycles_dequeue = cycles;
+
 		jif->avg_cycles_dequeue += cycles;
-		jif->avg_cycles2_dequeue += cycles*cycles;
-	  
-	  return (jobs_pollq(cl));
+		jif->avg_cycles2_dequeue += cycles * cycles;
+
+		return (jobs_pollq(cl));
 	}
 
 	if (cl != NULL)
@@ -786,11 +768,12 @@ jobs_dequeue(ifq, op)
 
 	if (m != NULL) {
 		IFQ_DEC_LEN(ifq);
-		if (qempty(cl->cl_q)) 
+		if (qempty(cl->cl_q))
 			cl->cl_period++;
-    
-		cl->cl_lastdel = (u_int64_t)delay_diff(now, tslist_first(cl->arv_tm)->timestamp);
-		if (cl->concerned_adc 
+
+		cl->cl_lastdel = (u_int64_t)delay_diff(now,
+		    tslist_first(cl->arv_tm)->timestamp);
+		if (cl->concerned_adc
 		    && (int64_t)cl->cl_lastdel > cl->cl_adc)
 			cl->adc_violations++;
 		cl->cl_avgdel  += ticks_to_secs(GRANULARITY*cl->cl_lastdel);
@@ -798,19 +781,18 @@ jobs_dequeue(ifq, op)
 		PKTCNTR_ADD(&cl->cl_rout, m_pktlen(m));
 		PKTCNTR_ADD(&cl->st_rout, m_pktlen(m));
 	}
-	if (cl != NULL) 
+	if (cl != NULL)
 		tslist_dequeue(cl);		/* dequeue the timestamp */
-
 
 	tstamp2 = read_machclk();
 	cycles = delay_diff(tstamp2, tstamp1);
-	if (cycles > jif->wc_cycles_dequeue) 
-		jif->wc_cycles_dequeue=cycles;
-	if (cycles < jif->bc_cycles_dequeue) 
-		jif->bc_cycles_dequeue=cycles;
+	if (cycles > jif->wc_cycles_dequeue)
+		jif->wc_cycles_dequeue = cycles;
+	if (cycles < jif->bc_cycles_dequeue)
+		jif->bc_cycles_dequeue = cycles;
 
 	jif->avg_cycles_dequeue += cycles;
-	jif->avg_cycles2_dequeue += cycles*cycles;
+	jif->avg_cycles2_dequeue += cycles * cycles;
 
 	return (m);
 }
@@ -819,13 +801,13 @@ static int
 jobs_addq(cl, m, jif)
 	struct jobs_class *cl;
 	struct mbuf *m;
-	struct jobs_if *jif;     
+	struct jobs_if *jif;
 {
 	int victim;
 	u_int64_t len;
 	u_int64_t now;
 	struct jobs_class* victim_class;
-  
+
 	victim = -1;
 	victim_class = NULL;
 	len = 0;
@@ -833,10 +815,10 @@ jobs_addq(cl, m, jif)
 	now = read_machclk();
 
 	if (jif->jif_separate && qlen(cl->cl_q) >= jif->jif_qlimit) {
-		/*	
-		 * separate buffers: no guarantees on packet drops 
+		/*
+		 * separate buffers: no guarantees on packet drops
 		 * can be offered
-		 * thus we drop the incoming packet 
+		 * thus we drop the incoming packet
 		 */
 		len = (u_int64_t)m_pktlen(m);
 		PKTCNTR_ADD(&cl->cl_dropcnt, (int)len);
@@ -848,14 +830,14 @@ jobs_addq(cl, m, jif)
 		m_freem(m);
 		return (-1);
 
-	} else if (!jif->jif_separate 
+	} else if (!jif->jif_separate
 		   && jif->jif_ifq->ifq_len >= jif->jif_qlimit) {
 		/* shared buffer: supports guarantees on losses */
 		if (!cl->concerned_rlc) {
 			if (!cl->concerned_alc) {
-				/* 
-				 * no ALC, no RLC on this class: 
-				 * drop the incoming packet 
+				/*
+				 * no ALC, no RLC on this class:
+				 * drop the incoming packet
 				 */
 				len = (u_int64_t)m_pktlen(m);
 				PKTCNTR_ADD(&cl->cl_dropcnt, (int)len);
@@ -866,14 +848,13 @@ jobs_addq(cl, m, jif)
 				m_freem(m);
 				return (-1);
 			} else {
-				/* 
-				 * no RLC, but an ALC: 
-				 * drop the incoming packet if possible 
+				/*
+				 * no RLC, but an ALC:
+				 * drop the incoming packet if possible
 				 */
 				len = (u_int64_t)m_pktlen(m);
-				if (cl->current_loss
-				    +(len << SCALE_LOSS)
-				    /cl->cl_arrival.bytes <= cl->cl_alc) {
+				if (cl->current_loss + (len << SCALE_LOSS)
+				    / cl->cl_arrival.bytes <= cl->cl_alc) {
 					PKTCNTR_ADD(&cl->cl_dropcnt, (int)len);
 					PKTCNTR_SUB(&cl->cl_rin, (int)len);
 					PKTCNTR_ADD(&cl->st_dropcnt, (int)len);
@@ -882,32 +863,32 @@ jobs_addq(cl, m, jif)
 					m_freem(m);
 					return (-1);
 				} else {
-					/* 
-					 * the ALC would be violated: 
-					 * pick another class 
+					/*
+					 * the ALC would be violated:
+					 * pick another class
 					 */
 					_addq(cl->cl_q, m);
 					tslist_enqueue(cl, now);
-					
+
 					victim = pick_dropped_rlc(jif);
-					
+
 					if (victim == -1) {
-						/* 
-						 * something went wrong 
-						 * let us discard 
+						/*
+						 * something went wrong
+						 * let us discard
 						 * the incoming packet,
-						 * regardless of what 
+						 * regardless of what
 						 * may happen...
 						 */
 						victim_class = cl;
-					} else 
+					} else
 						victim_class = jif->jif_classes[victim];
-	  				
+
 					if (victim_class != NULL) {
-						/* 
-						 * test for safety 
-						 * purposes... 
-						 * it must be true 
+						/*
+						 * test for safety
+						 * purposes...
+						 * it must be true
 						 */
 						m = _getq_tail(victim_class->cl_q);
 						len = (u_int64_t)m_pktlen(m);
@@ -923,28 +904,28 @@ jobs_addq(cl, m, jif)
 				}
 			}
 		} else {
-			/* 
-			 * RLC on that class: 
-			 * pick class according to RLCs 
+			/*
+			 * RLC on that class:
+			 * pick class according to RLCs
 			 */
 			_addq(cl->cl_q, m);
 			tslist_enqueue(cl, now);
 
 			victim = pick_dropped_rlc(jif);
 			if (victim == -1) {
-				/* 
-				 * something went wrong 
+				/*
+				 * something went wrong
 				 * let us discard the incoming packet,
 				 * regardless of what may happen...
 				 */
 				victim_class = cl;
-			} else 
+			} else
 				victim_class = jif->jif_classes[victim];
 
 			if (victim_class != NULL) {
-				/* 
-				 * test for safety purposes... 
-				 * it must be true 
+				/*
+				 * test for safety purposes...
+				 * it must be true
 				 */
 				m = _getq_tail(victim_class->cl_q);
 				len = (u_int64_t)m_pktlen(m);
@@ -960,10 +941,10 @@ jobs_addq(cl, m, jif)
 		}
 	}
 	/* else: no drop */
-	
+
 	_addq(cl->cl_q, m);
-	tslist_enqueue(cl, now);  
-	
+	tslist_enqueue(cl, now);
+
 	return (0);
 }
 
@@ -986,10 +967,10 @@ jobs_purgeq(cl)
 	struct jobs_class *cl;
 {
 	struct mbuf *m;
-  
+
 	if (qempty(cl->cl_q))
 		return;
-  
+
 	while ((m = _getq(cl->cl_q)) != NULL) {
 		PKTCNTR_ADD(&cl->cl_dropcnt, m_pktlen(m));
 		PKTCNTR_ADD(&cl->st_dropcnt, m_pktlen(m));
@@ -1000,9 +981,9 @@ jobs_purgeq(cl)
 }
 
 /*
- * timestamp list support routines 
+ * timestamp list support routines
  *
- * this implementation has been revamped and 
+ * this implementation has been revamped and
  * now uses a TAILQ structure.
  * timestamp list holds class timestamps
  * there is one timestamp list per class.
@@ -1011,7 +992,7 @@ static TSLIST *
 tslist_alloc()
 {
 	TSLIST *list_init;
-  
+
 	MALLOC(list_init, TSLIST *, sizeof(TSLIST), M_DEVBUF, M_WAITOK);
 	TAILQ_INIT(list_init);
 	return (list_init);
@@ -1031,18 +1012,18 @@ static int
 tslist_enqueue(cl, arv)
 	struct jobs_class *cl;
 	u_int64_t arv;
-{    
+{
 	TSENTRY *pushed;
-	MALLOC(pushed, TSENTRY*, sizeof(TSENTRY), M_DEVBUF, M_WAITOK);  
-	if (pushed == NULL) 
+	MALLOC(pushed, TSENTRY*, sizeof(TSENTRY), M_DEVBUF, M_WAITOK);
+	if (pushed == NULL)
 		return (0);	
-  
+
 	pushed->timestamp = arv;
 	TAILQ_INSERT_TAIL(cl->arv_tm, pushed, ts_list);
 	return (1);
 }
 
-static void 
+static void
 tslist_dequeue(cl)
      struct jobs_class *cl;
 {
@@ -1050,12 +1031,12 @@ tslist_dequeue(cl)
 	popped = tslist_first(cl->arv_tm);
 	if (popped != NULL) {
 		  TAILQ_REMOVE(cl->arv_tm, popped, ts_list);
-		  FREE(popped, M_DEVBUF);	
+		  FREE(popped, M_DEVBUF);
 	}
 	return;
 }
 
-static void 
+static void
 tslist_drop(cl)
 	struct jobs_class *cl;
 {
@@ -1063,7 +1044,7 @@ tslist_drop(cl)
 	popped = tslist_last(cl->arv_tm);
 	if (popped != NULL) {
 		  TAILQ_REMOVE(cl->arv_tm, popped, ts_list);
-		  FREE(popped, M_DEVBUF);	
+		  FREE(popped, M_DEVBUF);
 	}
 	return;
 }
@@ -1077,8 +1058,8 @@ tslist_drop(cl)
  * service rate.
  */
 
-static int 
-enforce_wc(jif) 
+static int
+enforce_wc(jif)
 	struct jobs_if *jif;
 {
 	struct jobs_class *cl;
@@ -1086,19 +1067,19 @@ enforce_wc(jif)
 	int64_t active_classes;
 	int pri;
 	int is_backlogged, class_exists, updated;
-	
+
 	updated = 0;
 	active_classes = 0;
-	
+
 	for (pri = 0; pri <= jif->jif_maxpri; pri++) {
 		cl = jif->jif_classes[pri];
 		class_exists = (cl != NULL);
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
-		
-		if (is_backlogged) 
+
+		if (is_backlogged)
 			active_classes++;
 		if ((is_backlogged && cl->service_rate <= 0)
-		    ||(class_exists 
+		    ||(class_exists
 		       && !is_backlogged && cl->service_rate > 0))
 			updated = 1;
 	}
@@ -1107,31 +1088,30 @@ enforce_wc(jif)
 		for (pri = 0; pri <= jif->jif_maxpri; pri++) {
 			cl = jif->jif_classes[pri];
 			class_exists = (cl != NULL);
-			is_backlogged = (class_exists 
-					 && !qempty(cl->cl_q));
-			
-			if (class_exists && !is_backlogged) 
+			is_backlogged = (class_exists && !qempty(cl->cl_q));
+
+			if (class_exists && !is_backlogged)
 				cl->service_rate = 0;
-			else if (is_backlogged) 
+			else if (is_backlogged)
 				cl->service_rate = (int64_t)(bps_to_internal((u_int64_t)jif->jif_bandwidth)/active_classes);
 		}
 	}
-  
+
 	return (updated);
 }
 
 /*
- * adjust_rates_rdc: compute the service rates adjustments 
+ * adjust_rates_rdc: compute the service rates adjustments
  * needed to realize the desired proportional delay differentiation.
  * essentially, the rate adjustement delta_rate = prop_control*error,
  * where error is the difference between the measured "weighted"
- * delay and the mean of the weighted delays. see paper for more 
+ * delay and the mean of the weighted delays. see paper for more
  * information.
  * prop_control has slightly changed since the INFOCOM paper,
  * this condition seems to provide better results.
  */
 
-static int64_t*
+static int64_t *
 adjust_rates_rdc(jif)
 	struct jobs_if *jif;
 {
@@ -1141,24 +1121,22 @@ adjust_rates_rdc(jif)
 	int i, j;
 	int rdc_classes, active_classes;
 	int class_exists, is_backlogged;
-	struct jobs_class *cl; 
+	struct jobs_class *cl;
 	int64_t* error;
 	int64_t prop_control;
 	u_int64_t max_prod;
-	
 	u_int64_t min_share;
 	u_int64_t max_avg_pkt_size;
-	
-	/* 
-	 * min_share is scaled 
+
+	/*
+	 * min_share is scaled
 	 * to avoid dealing with doubles
 	 */
-	
 	active_classes = 0;
 	rdc_classes = 0;
-	max_prod = 0;  
+	max_prod = 0;
 	max_avg_pkt_size = 0;
-	
+
 	upper_bound = (int64_t)jif->jif_bandwidth;
 
 	for (i = 0; i <= jif->jif_maxpri; i++) {
@@ -1167,23 +1145,24 @@ adjust_rates_rdc(jif)
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
 		if (is_backlogged) {
 			active_classes++;
-			if (cl->concerned_rdc) 
+			if (cl->concerned_rdc)
 				rdc_classes++;
-			else 
-				upper_bound -= 
+			else
+				upper_bound -=
 				    internal_to_bps(cl->service_rate);
 		}
 	}
 
-	MALLOC(result, int64_t*, (jif->jif_maxpri+1)*sizeof(int64_t), M_DEVBUF, M_WAITOK);
-  
-	if (result == NULL) 
+	MALLOC(result, int64_t*, (jif->jif_maxpri+1)*sizeof(int64_t),
+	    M_DEVBUF, M_WAITOK);
+
+	if (result == NULL)
 		return NULL;
 
-	for (i = 0; i <= jif->jif_maxpri; i++) 
+	for (i = 0; i <= jif->jif_maxpri; i++)
 		result[i] = 0;
 
-	if (upper_bound <= 0 || rdc_classes == 0) 
+	if (upper_bound <= 0 || rdc_classes == 0)
 		return result;
 
 	credit = 0;
@@ -1199,32 +1178,31 @@ adjust_rates_rdc(jif)
 			bk += cl->cl_rin.bytes;
 	}
 
-	if (bk == 0) 
-		return (result); 
+	if (bk == 0)
+		return (result);
 
 	for (i = 0; i <= jif->jif_maxpri; i++) {
 		cl = jif->jif_classes[i];
 		class_exists = (cl != NULL);
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
-		if (is_backlogged 
+		if (is_backlogged
 		    && (cl->cl_rin.bytes << SCALE_SHARE)/bk < min_share)
 			min_share = (cl->cl_rin.bytes << SCALE_SHARE)/bk;
-		if (is_backlogged && cl->concerned_rdc 
+		if (is_backlogged && cl->concerned_rdc
 		    && cl->delay_prod_others > max_prod)
 			max_prod = cl->delay_prod_others;
 
-		if (is_backlogged && cl->concerned_rdc 
+		if (is_backlogged && cl->concerned_rdc
 		    && cl->cl_rin.bytes > max_avg_pkt_size*cl->cl_rin.packets)
 			max_avg_pkt_size = (u_int64_t)((u_int)cl->cl_rin.bytes/(u_int)cl->cl_rin.packets);
 	}
 
 	error = update_error(jif);
-	if (!error) 
+	if (!error)
 		return (NULL);
 
 	prop_control = (upper_bound*upper_bound*min_share)
 	    /(max_prod*(max_avg_pkt_size << 2));
-
   
 	prop_control = bps_to_internal(ticks_to_secs(prop_control)); /* in BT-1 */
 
@@ -1235,13 +1213,12 @@ adjust_rates_rdc(jif)
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
 		if (is_backlogged && cl->concerned_rdc) {
 			result[i] = -prop_control*error[i]; /* in BT-1 */
-			result[i] >>= (SCALE_SHARE); 
+			result[i] >>= (SCALE_SHARE);
 		}
-	}    
-
+	}
 
 	FREE(error, M_DEVBUF); /* we don't need these anymore */
-	
+
 	/* saturation */
 
 	for (i = 0; i <= jif->jif_maxpri; i++) {
@@ -1249,34 +1226,34 @@ adjust_rates_rdc(jif)
 		class_exists = (cl != NULL);
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
 
-		if (is_backlogged && cl->concerned_rdc) 
-			lower_bound += cl->min_rate_adc; 
-		/* 
-		 * note: if there's no ADC or ARC on cl, 
-		 * this is equal to zero, which is fine 
+		if (is_backlogged && cl->concerned_rdc)
+			lower_bound += cl->min_rate_adc;
+		/*
+		 * note: if there's no ADC or ARC on cl,
+		 * this is equal to zero, which is fine
 		 */
 	}
-	
+
 	for (i = 0; i <= jif->jif_maxpri; i++) {
 		cl = jif->jif_classes[i];
 		class_exists = (cl != NULL);
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
 
-		if (is_backlogged && cl->concerned_rdc 
+		if (is_backlogged && cl->concerned_rdc
 		    && result[i] + cl->service_rate > upper_bound) {
 			for (j = 0; j <= jif->jif_maxpri; j++) {
 				cl = jif->jif_classes[j];
 				class_exists = (cl != NULL);
-				is_backlogged = (class_exists 
+				is_backlogged = (class_exists
 						 && !qempty(cl->cl_q));
 				if (is_backlogged && cl->concerned_rdc) {
-					if (j == i) 
+					if (j == i)
 						result[j] = upper_bound
-						    -cl->service_rate  
-						    + cl->min_rate_adc 
+						    -cl->service_rate
+						    + cl->min_rate_adc
 						    - lower_bound;
 					else
-						result[j] = 
+						result[j] =
 						    -cl->service_rate
 						    +cl->min_rate_adc;
 				}
@@ -1284,15 +1261,15 @@ adjust_rates_rdc(jif)
 			return result;
 		}
 
-		cl = jif->jif_classes[i]; 
+		cl = jif->jif_classes[i];
 		/* do this again since it may have been modified */
 		class_exists = (cl != NULL);
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
 
-		if (is_backlogged && cl->concerned_rdc 
+		if (is_backlogged && cl->concerned_rdc
 		    && result[i] + cl->service_rate < cl->min_rate_adc) {
 			credit += cl->service_rate+result[i]
-			    -cl->min_rate_adc; 
+			    -cl->min_rate_adc;
 			/* "credit" is in fact a negative number */
 			result[i] = -cl->service_rate+cl->min_rate_adc;
 		}
@@ -1304,7 +1281,7 @@ adjust_rates_rdc(jif)
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
  
 		if (is_backlogged && cl->concerned_rdc) {
-			available = result[i] 
+			available = result[i]
 			    + cl->service_rate-cl->min_rate_adc;
 			if (available >= -credit) {
 				result[i] += credit;
@@ -1312,30 +1289,30 @@ adjust_rates_rdc(jif)
 			} else {
 				result[i] -= available;
 				credit += available;
-			}      
+			}
 		}
 	}
 	return result;
 }
 
 /*
- * assign_rate_drops_adc: returns the adjustment needed to 
- * the service rates to meet the absolute delay/rate constraints 
- * (delay/throughput bounds) and drops traffic if need be. 
+ * assign_rate_drops_adc: returns the adjustment needed to
+ * the service rates to meet the absolute delay/rate constraints
+ * (delay/throughput bounds) and drops traffic if need be.
  * see tech. report UVA/T.R. CS-2000-24/CS-2001-21 for more info.
  */
 
-static int64_t*
+static int64_t *
 assign_rate_drops_adc(jif)
 	struct jobs_if* jif;
 {
 	int64_t* result;
 	int class_exists, is_backlogged;
 	struct jobs_class *cl;
-	
+
 	int64_t *c, *n, *k;
 	int64_t *available;
-	
+
 	int lowest, highest;
 	int keep_going;
 	int i;
@@ -1343,27 +1320,27 @@ assign_rate_drops_adc(jif)
 	int64_t	remaining_time;
 	struct mbuf* pkt;
 	u_int64_t len;
-	
+
 	now = read_machclk();
 	oldest_arv = now;
-	
-	MALLOC(result, int64_t*, (jif->jif_maxpri+1)*sizeof(int64_t), M_DEVBUF, M_WAITOK);  
-	if (result == NULL) 
+
+	MALLOC(result, int64_t*, (jif->jif_maxpri+1)*sizeof(int64_t), M_DEVBUF, M_WAITOK);
+	if (result == NULL)
 		return NULL;
-	MALLOC(c, int64_t*, (jif->jif_maxpri+1)*sizeof(u_int64_t), M_DEVBUF, M_WAITOK);  
-	if (c == NULL) 
+	MALLOC(c, int64_t*, (jif->jif_maxpri+1)*sizeof(u_int64_t), M_DEVBUF, M_WAITOK);
+	if (c == NULL)
 		return NULL;
-	MALLOC(n, int64_t*, (jif->jif_maxpri+1)*sizeof(u_int64_t), M_DEVBUF, M_WAITOK);  
-	if (n == NULL) 
+	MALLOC(n, int64_t*, (jif->jif_maxpri+1)*sizeof(u_int64_t), M_DEVBUF, M_WAITOK);
+	if (n == NULL)
 		return NULL;
-	MALLOC(k, int64_t*, (jif->jif_maxpri+1)*sizeof(u_int64_t), M_DEVBUF, M_WAITOK);  
-	if (k == NULL) 
+	MALLOC(k, int64_t*, (jif->jif_maxpri+1)*sizeof(u_int64_t), M_DEVBUF, M_WAITOK);
+	if (k == NULL)
 		return NULL;
 	MALLOC(available, int64_t*, (jif->jif_maxpri+1)*sizeof(int64_t), M_DEVBUF, M_WAITOK);
-	if (available == NULL) 
+	if (available == NULL)
 		return NULL;
-  
-	for (i = 0;i <= jif->jif_maxpri; i++) 
+
+	for (i = 0;i <= jif->jif_maxpri; i++)
 		result[i] = 0;
 
 	keep_going = 1;
@@ -1375,58 +1352,58 @@ assign_rate_drops_adc(jif)
 
 		if (is_backlogged) {
 			if (cl->concerned_adc) {
-				/* 
-				 * get the arrival time of the oldest 
-				 * class-i packet 
+				/*
+				 * get the arrival time of the oldest
+				 * class-i packet
 				 */
-				if (tslist_first(cl->arv_tm) == NULL) 
+				if (tslist_first(cl->arv_tm) == NULL)
 					oldest_arv = now; /* NOTREACHED */
 				else
-					oldest_arv = (tslist_first(cl->arv_tm))->timestamp; 
-				
+					oldest_arv = (tslist_first(cl->arv_tm))->timestamp;
+
 				n[i] = cl->service_rate;
 				k[i] = scale_rate((int64_t)(cl->cl_rin.bytes - cl->cl_rout.bytes));
 
-				remaining_time = cl->cl_adc 
+				remaining_time = cl->cl_adc
 				    - (int64_t)delay_diff(now, oldest_arv);
 				if (remaining_time > 0) {
 					c[i] = remaining_time;
-					/* 
-					 * c is the remaining time before 
-					 * the deadline is violated 
+					/*
+					 * c is the remaining time before
+					 * the deadline is violated
 					 * (in ticks)
-					 */	
+					 */
 					available[i] = n[i]-k[i]/c[i];
 				} else {
-					/* 
-					 * deadline has passed... 
-					 * we allocate the whole link 
-					 * capacity to hopefully 
-					 * solve the problem 
+					/*
+					 * deadline has passed...
+					 * we allocate the whole link
+					 * capacity to hopefully
+					 * solve the problem
 					 */
-					c[i] = 0;	  
+					c[i] = 0;
 					available[i] = -((int64_t)bps_to_internal((u_int64_t)jif->jif_bandwidth));
 				}
 				if (cl->concerned_arc) {
-					/* 
-					 * there's an ARC in addition 
-					 * to the ADC 
+					/*
+					 * there's an ARC in addition
+					 * to the ADC
 					 */
 					if (n[i] - cl->cl_arc < available[i])
-						available[i] = n[i] 
+						available[i] = n[i]
 						    - cl->cl_arc;
 				}
 			} else if (cl->concerned_arc) {
-				/* 
-				 * backlogged, concerned by ARC 
-				 * but not by ADC 
+				/*
+				 * backlogged, concerned by ARC
+				 * but not by ADC
 				 */
 				n[i] = cl->service_rate;
 				available[i] = n[i] - cl->cl_arc;
 			} else {
-				/* 
-				 * backlogged but not concerned by ADC 
-				 * or ARC -> can give everything 
+				/*
+				 * backlogged but not concerned by ADC
+				 * or ARC -> can give everything
 				 */
 				n[i] = cl->service_rate;
 				available[i] = n[i];
@@ -1444,7 +1421,7 @@ assign_rate_drops_adc(jif)
 	}
 
 	/* step 1: adjust rates (greedy algorithm) */
-	
+
 	highest = 0;
 	lowest  = jif->jif_maxpri;
 
@@ -1453,23 +1430,22 @@ assign_rate_drops_adc(jif)
 	while (lowest > 0 && available[lowest] <= 0)
 		lowest--;  /* which is the lowest class that needs less service? */
 
-
 	while (highest != jif->jif_maxpri+1 && lowest != -1) {
 		/* give the excess service from lowest to highest */
 		if (available[lowest]+available[highest] > 0) {
-			/* 
-			 * still some "credit" left 
-			 * give all that is needed by "highest" 
+			/*
+			 * still some "credit" left
+			 * give all that is needed by "highest"
 			 */
 			n[lowest]  += available[highest];
 			n[highest] -= available[highest];
 			available[lowest]  += available[highest];
 			available[highest] = 0;
 
-			while (highest < jif->jif_maxpri+1 
+			while (highest < jif->jif_maxpri+1
 			       && available[highest] >= 0)
 				highest++;  /* which is the highest class that needs more service now? */
-      
+
 		} else if (available[lowest]+available[highest] == 0) {
 			/* no more credit left but it's fine */
 			n[lowest]  += available[highest];
@@ -1477,16 +1453,16 @@ assign_rate_drops_adc(jif)
 			available[highest] = 0;
 			available[lowest]  = 0;
 
-			while (highest < jif->jif_maxpri+1 
+			while (highest < jif->jif_maxpri+1
 			       && available[highest] >= 0)
 				highest++;  /* which is the highest class that needs more service? */
 			while (lowest >= 0 && available[lowest] <= 0)
 				lowest--;   /* which is the lowest class that needs less service? */
 
 		} else if (available[lowest]+available[highest] < 0) {
-			/* 
-			 * no more credit left and we need to switch 
-			 * to another class 
+			/*
+			 * no more credit left and we need to switch
+			 * to another class
 			 */
 			n[lowest]  -= available[lowest];
 			n[highest] += available[lowest];
@@ -1505,10 +1481,10 @@ assign_rate_drops_adc(jif)
 		if (is_backlogged) {
 			result[i] = n[i] - cl->service_rate;
 		} else {
-		  if (class_exists)
-			result[i] = - cl->service_rate;
-		  else
-		    result[i] = 0;
+			if (class_exists)
+				result[i] = - cl->service_rate;
+			else
+				result[i] = 0;
 		}
 	}
 
@@ -1519,19 +1495,19 @@ assign_rate_drops_adc(jif)
 		for (i = 0; i <= jif->jif_maxpri; i++) {
 			cl = jif->jif_classes[i];
 			class_exists = (cl != NULL);
-			is_backlogged = (class_exists 
+			is_backlogged = (class_exists
 					 && !qempty(cl->cl_q));
 			if (is_backlogged && available[i] < 0) {
 				if (cl->concerned_adc) {
 					k[i] = c[i]*n[i];
 					while (keep_going && scale_rate((int64_t)(cl->cl_rin.bytes-cl->cl_rout.bytes)) > k[i]) {
 						pkt = qtail(cl->cl_q);
-						if (pkt != NULL) {	
+						if (pkt != NULL) {
 							/* "safeguard" test (a packet SHOULD be in there) */
 							len = (u_int64_t)m_pktlen(pkt);
 							/* access packet at the tail */
-							if (cl->concerned_alc 
-							    && cl->current_loss+(len << SCALE_LOSS)/cl->cl_arrival.bytes > cl->cl_alc) {	  
+							if (cl->concerned_alc
+							    && cl->current_loss+(len << SCALE_LOSS)/cl->cl_arrival.bytes > cl->cl_alc) {
 								keep_going = 0; /* relax ADC in favor of ALC */
 							} else {
 								/* drop packet at the tail of the class-i queue, update values */
@@ -1546,23 +1522,23 @@ assign_rate_drops_adc(jif)
 								tslist_drop(cl);
 								IFQ_DEC_LEN(cl->cl_jif->jif_ifq);
 							}
-						} else 
-						  keep_going = 0; /* NOTREACHED */
+						} else
+							keep_going = 0; /* NOTREACHED */
 					}
 					k[i] = scale_rate((int64_t)(cl->cl_rin.bytes-cl->cl_rout.bytes));
-				} 	
-				/* 
-				 * n[i] is the max rate we can give. 
+				}
+				/*
+				 * n[i] is the max rate we can give.
 				 * the above drops as much as possible
 				 * to respect a delay bound.
-				 * for throughput bounds, 
-				 * there's nothing that can be done 
+				 * for throughput bounds,
+				 * there's nothing that can be done
 				 * after the greedy reallocation.
 				 */
-			}            
+			}
 		}
-	} 
-	
+	}
+
 	/* update the values of min_rate_adc */
 	for (i = 0; i <= jif->jif_maxpri; i++) {
 		cl = jif->jif_classes[i];
@@ -1570,18 +1546,18 @@ assign_rate_drops_adc(jif)
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
 		if (is_backlogged && cl->concerned_adc) {
 			if (c[i] != 0) {
-				if (cl->concerned_adc 
-				    && !cl->concerned_arc) 
-					cl->min_rate_adc = k[i]/c[i]; 
-				else 
-					cl->min_rate_adc = n[i]; 
-			} else 
+				if (cl->concerned_adc
+				    && !cl->concerned_arc)
+					cl->min_rate_adc = k[i]/c[i];
+				else
+					cl->min_rate_adc = n[i];
+			} else
 				cl->min_rate_adc = (int64_t)bps_to_internal((u_int64_t)jif->jif_bandwidth);
-		} else if (is_backlogged && cl->concerned_arc) 
+		} else if (is_backlogged && cl->concerned_arc)
 			cl->min_rate_adc = n[i]; /* the best we can give */
 		else {
 			if (class_exists)
-				cl->min_rate_adc = 0;    
+				cl->min_rate_adc = 0;
 		}
 	}
 
@@ -1589,19 +1565,19 @@ assign_rate_drops_adc(jif)
 	FREE(n, M_DEVBUF);
 	FREE(k, M_DEVBUF);
 	FREE(available, M_DEVBUF);
-	
+
 	return (result);
 }
 
 /*
  * update_error: returns the difference between the mean weighted
- * delay and the weighted delay for each class. if proportional 
- * delay differentiation is perfectly achieved, it should return 
- * zero for each class. 
+ * delay and the weighted delay for each class. if proportional
+ * delay differentiation is perfectly achieved, it should return
+ * zero for each class.
  */
-static int64_t*
+static int64_t *
 update_error(jif)
-	struct jobs_if* jif;
+	struct jobs_if *jif;
 {
 	int i;
 	int active_classes, backlogged_classes;
@@ -1612,16 +1588,16 @@ update_error(jif)
 	struct jobs_class *cl;
 
 	MALLOC(error, int64_t*, sizeof(int64_t)*(jif->jif_maxpri+1), M_DEVBUF, M_WAITOK);
-	
-	if (error == NULL) 
+
+	if (error == NULL)
 		return NULL;
 
 	bzero(error, sizeof(int64_t)*(jif->jif_maxpri+1));
 
 	mean_weighted_delay = 0;
-	active_classes = 0 ; 
+	active_classes = 0;
 	backlogged_classes = 0;
-	
+
 	for (i = 0; i <= jif->jif_maxpri; i++) {
 		cl = jif->jif_classes[i];
 		class_exists = (cl != NULL);
@@ -1633,80 +1609,79 @@ update_error(jif)
 				delays[i] = proj_delay(jif, i);
 				mean_weighted_delay += cl->delay_prod_others*delays[i];
 				active_classes ++;
-			}    
+			}
 		}
 	}
-   
 
-	if (active_classes == 0) 
+	if (active_classes == 0)
 		return error;
-	else  
+	else
 		mean_weighted_delay /= active_classes;
 
 	for (i = 0; i <= jif->jif_maxpri; i++) {
 		cl = jif->jif_classes[i];
 		class_exists = (cl != NULL);
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
-		
-		if (is_backlogged && cl->concerned_rdc) 
+
+		if (is_backlogged && cl->concerned_rdc)
 			error[i] = ((int64_t)mean_weighted_delay)-((int64_t)cl->delay_prod_others*delays[i]);
-		else 
-			error[i] = 0; /* 
+		else
+			error[i] = 0; /*
 				       * either the class isn't concerned,
 				       * or it's not backlogged.
-				       * in any case, the rate shouldn't 
-				       * be adjusted. 
-				       */    
+				       * in any case, the rate shouldn't
+				       * be adjusted.
+				       */
 	}
 	return error;
 }
 
 /*
- * min_rates_adc: computes the minimum service rates needed in 
- * each class to meet the absolute delay bounds. if, for any 
- * class i, the current service rate of class i is less than 
- * the computed minimum service rate, this function returns 
+ * min_rates_adc: computes the minimum service rates needed in
+ * each class to meet the absolute delay bounds. if, for any
+ * class i, the current service rate of class i is less than
+ * the computed minimum service rate, this function returns
  * false, true otherwise.
  */
 static int
 min_rates_adc(jif)
-	struct jobs_if* jif;
+	struct jobs_if *jif;
 {
 	int result;
 	int i;
 	int class_exists, is_backlogged;
 	int64_t remaining_time;
 	struct jobs_class *cl;
-	result = 1;  
+	result = 1;
 
 	for (i = 0; i <= jif->jif_maxpri; i++) {
 		cl = jif->jif_classes[i];
 		class_exists = (cl != NULL);
 		is_backlogged = (class_exists && !qempty(cl->cl_q));
-		if (is_backlogged && cl->concerned_adc) {            
+		if (is_backlogged && cl->concerned_adc) { 
 			remaining_time = cl->cl_adc - proj_delay(jif, i);
 			if (remaining_time > 0 ) {
-			  /* min rate needed for ADC */	
-			  cl->min_rate_adc = scale_rate((int64_t)(cl->cl_rin.bytes-cl->cl_rout.bytes))/remaining_time;
-			  if (cl->concerned_arc 
-			      && cl->cl_arc > cl->min_rate_adc) {
-				/* min rate needed for ADC + ARC */
-			    cl->min_rate_adc = cl->cl_arc;
-			  }
+				/* min rate needed for ADC */
+				cl->min_rate_adc = scale_rate((int64_t)(cl->cl_rin.bytes-cl->cl_rout.bytes))/remaining_time;
+				if (cl->concerned_arc
+				    && cl->cl_arc > cl->min_rate_adc) {
+					/* min rate needed for ADC + ARC */
+					cl->min_rate_adc = cl->cl_arc;
+				}
 			} else {
 				/* the deadline has been exceeded: give the whole link capacity to hopefully fix the situation */
-				cl->min_rate_adc = (int64_t)bps_to_internal((u_int64_t)jif->jif_bandwidth);       
+				cl->min_rate_adc = (int64_t)bps_to_internal((u_int64_t)jif->jif_bandwidth);
 			}
-      		} else if (is_backlogged && cl->concerned_arc) 
+      		} else if (is_backlogged && cl->concerned_arc)
 			cl->min_rate_adc = cl->cl_arc; 			/* no ADC, an ARC */
-		else if (class_exists) 	
-			cl->min_rate_adc = 0;	/* 
+		else if (class_exists)
+			cl->min_rate_adc = 0;	/*
 						 * either the class is not
-						 * backlogged 
-						 * or there is no ADC and 
-						 * no ARC 
+						 * backlogged
+						 * or there is no ADC and
+						 * no ARC
 						 */
-		if (is_backlogged && cl->min_rate_adc > cl->service_rate) 
+		if (is_backlogged && cl->min_rate_adc > cl->service_rate)
 			result = 0;
 	}
 
@@ -1720,31 +1695,31 @@ min_rates_adc(jif)
  */
 static int64_t
 proj_delay(jif, i)
-	struct jobs_if* jif;
+	struct jobs_if *jif;
 	int i;
 {
 	u_int64_t now;
 	int class_exists, is_backlogged;
 	struct jobs_class *cl;
-	
+
 	now = read_machclk();
 	cl = jif->jif_classes[i];
 	class_exists = (cl != NULL);
 	is_backlogged = (class_exists && !qempty(cl->cl_q));
 
-	if (is_backlogged) 
+	if (is_backlogged)
 		return ((int64_t)delay_diff(now, tslist_first(cl->arv_tm)->timestamp));
 
 	return (0); /* NOTREACHED */
 }
 
 /*
- * pick_dropped_rlc: returns the class index of the class to be 
+ * pick_dropped_rlc: returns the class index of the class to be
  * dropped for meeting the relative loss constraints.
  */
 static int
 pick_dropped_rlc(jif)
-	struct jobs_if* jif;
+	struct jobs_if *jif;
 {
 	int64_t mean;
 	int64_t* loss_error;
@@ -1756,18 +1731,18 @@ pick_dropped_rlc(jif)
 	struct mbuf* pkt;
 	struct jobs_class *cl;
 	u_int64_t len;
-	
-	MALLOC(loss_error, int64_t *, sizeof(int64_t)*(jif->jif_maxpri+1), M_DEVBUF, M_WAITOK);  
-  
-	if (loss_error == NULL) 
-		return -1;	
-  
+
+	MALLOC(loss_error, int64_t *, sizeof(int64_t)*(jif->jif_maxpri+1), M_DEVBUF, M_WAITOK);
+
+	if (loss_error == NULL)
+		return -1;
+
 	class_dropped = -1;
 	max_error = 0;
 	mean = 0;
 	active_classes = 0;
 	backlogged_classes = 0;
-	
+
 	for (i = 0; i <= jif->jif_maxpri; i++) {
 		cl = jif->jif_classes[i];
 		class_exists = (cl != NULL);
@@ -1776,19 +1751,19 @@ pick_dropped_rlc(jif)
 			backlogged_classes ++;
 			if (cl->concerned_rlc) {
 				mean += cl->loss_prod_others
-				    *cl->current_loss;
-				active_classes ++;
-			}    
+				    * cl->current_loss;
+				active_classes++;
+			}
 		}
 	}
 
-	if (active_classes > 0) 
+	if (active_classes > 0)
 		mean /= active_classes;
 
-	if (active_classes == 0) 
-		class_dropped = JOBS_MAXPRI+1; /* 
+	if (active_classes == 0)
+		class_dropped = JOBS_MAXPRI+1; /*
 						* no classes are concerned
-						* by RLCs (JOBS_MAXPRI+1 
+						* by RLCs (JOBS_MAXPRI+1
 						* means "ignore RLC" here)
 						*/
 	else {
@@ -1797,55 +1772,55 @@ pick_dropped_rlc(jif)
 			class_exists = (cl != NULL);
 			is_backlogged = (class_exists
 					 && !qempty(cl->cl_q));
-			
-			if ((is_backlogged)&&(cl->cl_rlc)) 
+
+			if ((is_backlogged)&&(cl->cl_rlc))
 				loss_error[i]=cl->loss_prod_others
 				    *cl->current_loss-mean;
-			else 
+			else
 				loss_error[i] = INFINITY;
 		}
-    
+
 		for (i = 0; i <= jif->jif_maxpri; i++) {
 			cl = jif->jif_classes[i];
 			class_exists = (cl != NULL);
-			is_backlogged = (class_exists 
+			is_backlogged = (class_exists
 					 && !qempty(cl->cl_q));
 			if (is_backlogged && loss_error[i] <= max_error) {
-				/* 
-				 * find out which class is the most 
+				/*
+				 * find out which class is the most
 				 * below the mean.
-				 * it's the one that needs to be dropped 
-				 * ties are broken in favor of the higher 
-				 * priority classes (i.e., if two classes 
-				 * present the same deviation, the lower 
+				 * it's the one that needs to be dropped
+				 * ties are broken in favor of the higher
+				 * priority classes (i.e., if two classes
+				 * present the same deviation, the lower
 				 * priority class will get dropped).
 				 */
-				max_error = loss_error[i]; 
-				class_dropped = i;        
-			} 
+				max_error = loss_error[i];
+				class_dropped = i;
+			}
 		}
-    
+
 		if (class_dropped != -1) {
 			cl = jif->jif_classes[class_dropped];
 			pkt = qtail(cl->cl_q);
-			if (pkt != NULL) {		
-				/* 
-				 * "safeguard" test (a packet SHOULD be 
-				 * in there) 
+			if (pkt != NULL) {
+				/*
+				 * "safeguard" test (a packet SHOULD be
+				 * in there)
 				 */
 				len = (u_int64_t)m_pktlen(pkt);
 				/* access packet at the tail */
-				if (cl->current_loss+(len << SCALE_LOSS)/cl->cl_arrival.bytes > cl->cl_alc) {	  
-					/* 
-					 * the class to drop for meeting 
-					 * the RLC will defeat the ALC: 
-					 * ignore RLC. 
+				if (cl->current_loss+(len << SCALE_LOSS)/cl->cl_arrival.bytes > cl->cl_alc) {
+					/*
+					 * the class to drop for meeting
+					 * the RLC will defeat the ALC:
+					 * ignore RLC.
 					 */
-					class_dropped = JOBS_MAXPRI+1; 
+					class_dropped = JOBS_MAXPRI+1;
 				}
-			} else 
+			} else
 				class_dropped = JOBS_MAXPRI+1; /* NOTREACHED */
-		} else 
+		} else
 			class_dropped = JOBS_MAXPRI+1;
 	}
 
@@ -1854,14 +1829,14 @@ pick_dropped_rlc(jif)
 		for (i = jif->jif_maxpri; i >= 0; i--) {
 			cl = jif->jif_classes[i];
 			class_exists = (cl != NULL);
-			is_backlogged = (class_exists 
+			is_backlogged = (class_exists
 					 && !qempty(cl->cl_q));
 			if (is_backlogged) {
 				if (cl->concerned_alc && cl->cl_alc - cl->current_loss > max_alc) {
 					max_alc = cl->cl_alc-cl->current_loss; /* pick the class which is the furthest from its ALC */
 					class_dropped = i;
 				} else if (!cl->concerned_alc && ((int64_t) 1 << SCALE_LOSS)-cl->current_loss > max_alc) {
-					max_alc = ((int64_t) 1 << SCALE_LOSS)-cl->current_loss; 
+					max_alc = ((int64_t) 1 << SCALE_LOSS)-cl->current_loss;
 					class_dropped = i;
 				}
 			}
@@ -1872,8 +1847,8 @@ pick_dropped_rlc(jif)
 	return (class_dropped);
 }
 
-/* 
- * ALTQ binding/setup functions 
+/*
+ * ALTQ binding/setup functions
  */
 /*
  * jobs device interface
@@ -1903,19 +1878,19 @@ jobsclose(dev, flag, fmt, p)
 {
 	struct jobs_if *jif;
 	int err, error = 0;
-  
+
 	while ((jif = jif_list) != NULL) {
 		/* destroy all */
 		if (ALTQ_IS_ENABLED(jif->jif_ifq))
 			altq_disable(jif->jif_ifq);
-    
+
 		err = altq_detach(jif->jif_ifq);
 		if (err == 0)
 			err = jobs_detach(jif);
 		if (err != 0 && error == 0)
 			error = err;
 	}
-	
+
 	return error;
 }
 
@@ -1930,7 +1905,7 @@ jobsioctl(dev, cmd, addr, flag, p)
 	struct jobs_if *jif;
 	struct jobs_interface *ifacep;
 	int	error = 0;
-  
+
 	/* check super-user privilege */
 	switch (cmd) {
 	case JOBS_GETSTATS:
@@ -1944,18 +1919,18 @@ jobsioctl(dev, cmd, addr, flag, p)
 			return (error);
 #endif
 		break;
-  }
-  
+	}
+
 	switch (cmd) {
-    
+
 	case JOBS_IF_ATTACH:
 		error = jobscmd_if_attach((struct jobs_attach *)addr);
 		break;
-    
+
 	case JOBS_IF_DETACH:
 		error = jobscmd_if_detach((struct jobs_interface *)addr);
 		break;
-    
+
 	case JOBS_ENABLE:
 	case JOBS_DISABLE:
 	case JOBS_CLEAR:
@@ -1965,7 +1940,7 @@ jobsioctl(dev, cmd, addr, flag, p)
 			error = EBADF;
 			break;
 		}
-    
+
 		switch (cmd) {
 		case JOBS_ENABLE:
 			if (jif->jif_default == NULL) {
@@ -1977,41 +1952,41 @@ jobsioctl(dev, cmd, addr, flag, p)
 			}
 			error = altq_enable(jif->jif_ifq);
 			break;
-			
+
 		case JOBS_DISABLE:
 			error = altq_disable(jif->jif_ifq);
 			break;
-      
+
 		case JOBS_CLEAR:
 			jobs_clear_interface(jif);
 			break;
 		}
 		break;
-    
+
 		case JOBS_ADD_CLASS:
 			error = jobscmd_add_class((struct jobs_add_class *)addr);
 			break;
-    
+
 	case JOBS_DEL_CLASS:
 		error = jobscmd_delete_class((struct jobs_delete_class *)addr);
 		break;
-    
+
 	case JOBS_MOD_CLASS:
 		error = jobscmd_modify_class((struct jobs_modify_class *)addr);
 		break;
-    
+
 	case JOBS_ADD_FILTER:
 		error = jobscmd_add_filter((struct jobs_add_filter *)addr);
 		break;
-    
+
 	case JOBS_DEL_FILTER:
 		error = jobscmd_delete_filter((struct jobs_delete_filter *)addr);
 		break;
-    
+
 	case JOBS_GETSTATS:
 		error = jobscmd_class_stats((struct jobs_class_stats *)addr);
 		break;
-    
+
 	default:
 		error = EINVAL;
 		break;
@@ -2026,12 +2001,12 @@ jobscmd_if_attach(ap)
 	struct jobs_if *jif;
 	struct ifnet *ifp;
 	int error;
-  
+
 	if ((ifp = ifunit(ap->iface.jobs_ifname)) == NULL)
 		return (ENXIO);
 	if ((jif = jobs_attach(&ifp->if_snd, ap->bandwidth, ap->qlimit, ap->separate)) == NULL)
 		return (ENOMEM);
-  
+
 	/*
 	 * set JOBS to this ifnet structure.
 	 */
@@ -2039,7 +2014,7 @@ jobscmd_if_attach(ap)
 				 jobs_enqueue, jobs_dequeue, jobs_request,
 				 &jif->jif_classifier, acc_classify)) != 0)
 		(void)jobs_detach(jif);
-	
+
 	return (error);
 }
 
@@ -2049,16 +2024,16 @@ jobscmd_if_detach(ap)
 {
 	struct jobs_if *jif;
 	int error;
-  
+
 	if ((jif = altq_lookup(ap->jobs_ifname, ALTQT_JOBS)) == NULL)
 		return (EBADF);
-  
+
 	if (ALTQ_IS_ENABLED(jif->jif_ifq))
 		altq_disable(jif->jif_ifq);
-  
+
 	if ((error = altq_detach(jif->jif_ifq)))
 		return (error);
-  
+
 	return jobs_detach(jif);
 }
 
@@ -2075,13 +2050,12 @@ jobscmd_add_class(ap)
 	if (ap->pri < 0 || ap->pri >= JOBS_MAXPRI)
 		return (EINVAL);
 
-	if ((cl = jobs_class_create(jif, 
-				    ap->pri, 
-				    ap->cl_adc, ap->cl_rdc, 
+	if ((cl = jobs_class_create(jif, ap->pri,
+				    ap->cl_adc, ap->cl_rdc,
 				    ap->cl_alc, ap->cl_rlc, ap-> cl_arc,
 				    ap->flags)) == NULL)
 		return (ENOMEM);
-  
+
 	/* return a class handle to the user */
 	ap->class_handle = clp_to_clh(cl);
 	return (0);
@@ -2093,10 +2067,10 @@ jobscmd_delete_class(ap)
 {
 	struct jobs_if *jif;
 	struct jobs_class *cl;
-  
+
 	if ((jif = altq_lookup(ap->iface.jobs_ifname, ALTQT_JOBS)) == NULL)
 		return (EBADF);
-  
+
 	if ((cl = clh_to_clp(jif, ap->class_handle)) == NULL)
 		return (EINVAL);
 
@@ -2112,13 +2086,13 @@ jobscmd_modify_class(ap)
 
 	if ((jif = altq_lookup(ap->iface.jobs_ifname, ALTQT_JOBS)) == NULL)
 		return (EBADF);
-  
+
 	if (ap->pri < 0 || ap->pri >= JOBS_MAXPRI)
 		return (EINVAL);
-  
+
 	if ((cl = clh_to_clp(jif, ap->class_handle)) == NULL)
 		return (EINVAL);
-  
+
 	/*
 	 * if priority is changed, move the class to the new priority
 	 */
@@ -2129,11 +2103,10 @@ jobscmd_modify_class(ap)
 		jif->jif_classes[ap->pri] = cl;
 		cl->cl_pri = ap->pri;
 	}
-	
+
 	/* call jobs_class_create to change class parameters */
-	if ((cl = jobs_class_create(jif, 
-				    ap->pri, 
-				    ap->cl_adc, ap->cl_rdc, 
+	if ((cl = jobs_class_create(jif, ap->pri,
+				    ap->cl_adc, ap->cl_rdc,
 				    ap->cl_alc, ap->cl_rlc, ap->cl_arc,
 				    ap->flags)) == NULL)
 		return (ENOMEM);
@@ -2146,13 +2119,13 @@ jobscmd_add_filter(ap)
 {
 	struct jobs_if *jif;
 	struct jobs_class *cl;
-  
+
 	if ((jif = altq_lookup(ap->iface.jobs_ifname, ALTQT_JOBS)) == NULL)
 		return (EBADF);
-  
+
 	if ((cl = clh_to_clp(jif, ap->class_handle)) == NULL)
 		return (EINVAL);
-  
+
 	return acc_add_filter(&jif->jif_classifier, &ap->filter,
 			      cl, &ap->filter_handle);
 }
@@ -2162,10 +2135,10 @@ jobscmd_delete_filter(ap)
 	struct jobs_delete_filter *ap;
 {
 	struct jobs_if *jif;
-  
+
 	if ((jif = altq_lookup(ap->iface.jobs_ifname, ALTQT_JOBS)) == NULL)
 		return (EBADF);
-  
+
 		return acc_delete_filter(&jif->jif_classifier,
 					 ap->filter_handle);
 }
@@ -2178,12 +2151,12 @@ jobscmd_class_stats(ap)
 	struct jobs_class *cl;
 	struct class_stats stats, *usp;
 	int pri, error;
-	
+
 	if ((jif = altq_lookup(ap->iface.jobs_ifname, ALTQT_JOBS)) == NULL)
 		return (EBADF);
-  
+
 	ap->maxpri = jif->jif_maxpri;
-  
+
 	/* then, read the next N classes */
 	usp = ap->stats;
 	for (pri = 0; pri <= jif->jif_maxpri; pri++) {
@@ -2213,22 +2186,22 @@ static void get_class_stats(sp, cl)
 	sp->rin = cl->st_rin;
 	sp->arrival = cl->st_arrival;
 	sp->arrivalbusy = cl->cl_arrival;
-	sp->rout = cl->st_rout; 
-	sp->dropcnt = cl->cl_dropcnt; 
-	
+	sp->rout = cl->st_rout;
+	sp->dropcnt = cl->cl_dropcnt;
+
 	/*  PKTCNTR_RESET(&cl->st_arrival);*/
 	PKTCNTR_RESET(&cl->st_rin);
 	PKTCNTR_RESET(&cl->st_rout);
-	
+
 	sp->totallength = cl->cl_jif->jif_ifq->ifq_len;
-	sp->lastdel = ticks_to_secs(GRANULARITY*cl->cl_lastdel); 
+	sp->lastdel = ticks_to_secs(GRANULARITY*cl->cl_lastdel);
 	sp->avgdel = cl->cl_avgdel;
-	
+
 	cl->cl_avgdel = 0;
-	
+
 	sp->busylength = ticks_to_secs(1000*delay_diff(now, cl->idletime));
 	sp->adc_violations = cl->adc_violations;
-	
+
 	sp->wc_cycles_enqueue = cl->cl_jif->wc_cycles_enqueue;
 	sp->wc_cycles_dequeue = cl->cl_jif->wc_cycles_dequeue;
 	sp->bc_cycles_enqueue = cl->cl_jif->bc_cycles_enqueue;
@@ -2248,7 +2221,7 @@ clh_to_clp(jif, chandle)
 	u_long chandle;
 {
 	struct jobs_class *cl;
-  
+
 	cl = (struct jobs_class *)chandle;
 	if (chandle != ALIGN(cl)) {
 #if 1
@@ -2256,7 +2229,7 @@ clh_to_clp(jif, chandle)
 #endif
 		return (NULL);
 	}
-  
+
 	if (cl == NULL || cl->cl_handle != chandle || cl->cl_jif != jif)
 		return (NULL);
 	return (cl);
