@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.232 2002/03/25 08:00:26 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.233 2002/04/01 03:21:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1015,9 +1015,6 @@ nd6_is_addr_neighbor(addr, ifp)
 	struct rtentry *rt;
 	int i;
 
-#define IFADDR6(a) ((((struct in6_ifaddr *)(a))->ia_addr).sin6_addr)
-#define IFMASK6(a) ((((struct in6_ifaddr *)(a))->ia_prefixmask).sin6_addr)
-
 	/*
 	 * A link-local address is always a neighbor.
 	 * XXX: we should use the sin6_scope_id field rather than the embedded
@@ -1070,8 +1067,6 @@ nd6_is_addr_neighbor(addr, ifp)
 		return(1);
 
 	return(0);
-#undef IFADDR6
-#undef IFMASK6
 }
 
 /*
