@@ -290,25 +290,30 @@ udp_input(struct mbuf *m, ...)
 #ifdef INET6
 		if (ip6) {
 			ip6 = mtod(m, struct ip6_hdr *);
-			/*
-			 * extract full sockaddr structures for the src/dst
-			 * addresses, and make local copies of them.
-			 * The copies are necessary because the memory that
-			 * stores src and dst may be freed during the process
-			 * below.
-			 */
-			if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6)) {
-				m_freem(m);
-				return;
-			}
-			src_sa6_storage = *src_sa6;
-			dst_sa6_storage = *dst_sa6;
-			src_sa6 = &src_sa6_storage;
-			dst_sa6 = &dst_sa6_storage;
 		} else
 #endif /* INET6 */
 			ip = mtod(m, struct ip *);
 	}
+
+#ifdef INET6
+	if (ip6) {
+		/*
+		 * extract full sockaddr structures for the src/dst
+		 * addresses, and make local copies of them.
+		 * The copies are necessary because the memory that
+		 * stores src and dst may be freed during the process
+		 * below.
+		 */
+		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6)) {
+			m_freem(m);
+			return;
+		}
+		src_sa6_storage = *src_sa6;
+		dst_sa6_storage = *dst_sa6;
+		src_sa6 = &src_sa6_storage;
+		dst_sa6 = &dst_sa6_storage;
+	}
+#endif /* INET6 */
 	uh = (struct udphdr *)(mtod(m, caddr_t) + iphlen);
 
 	/* Check for illegal destination port 0 */
