@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.17 2004/06/08 07:51:53 suz Exp $
+ * $KAME: mld6v2.c,v 1.18 2004/06/08 07:55:06 suz Exp $
  */
 
 /*
@@ -82,6 +82,11 @@ extern struct iovec sndiov[2];
 extern struct msghdr sndmh;
 
 static struct sockaddr_in6 dst_sa;
+static int make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
+			   struct sockaddr_in6 *dst,
+			   struct sockaddr_in6 *group, int ifindex,
+			   unsigned int delay, int datalen, int alert,
+			   int sflag, int qrv, int qqic);
 
 /*
  * this function build three type of messages : 
@@ -103,7 +108,7 @@ static struct sockaddr_in6 dst_sa;
  * only used for mldv2 query messages 
  */
 
-int
+static int
 make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 		struct sockaddr_in6 *dst, struct sockaddr_in6 *group,
 		int ifindex,

@@ -105,11 +105,6 @@ unsigned int    codafloat(unsigned int nbr, unsigned int *realnbr,
 			  unsigned int sizeexp, unsigned int sizemant);
 unsigned int	decodeafloat(unsigned int nbr,unsigned int sizeexp,
 			     unsigned int sizemant);
-int		make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
-				struct sockaddr_in6 *dst,
-				struct sockaddr_in6 *group, int ifindex,
-				unsigned int delay, int datalen, int alert,
-				int sflag, int qrv, int qqic);
 void            send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 			    struct sockaddr_in6 *dst, struct sockaddr_in6 *group,
 			    int ifindex, unsigned int delay, int datalen,
