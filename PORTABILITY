@@ -1,9 +1,9 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.12 1999/10/07 03:24:45 itojun Exp $
+$Id: PORTABILITY,v 1.13 1999/10/15 11:57:55 itojun Exp $
 
 
-Source code in "kame" directory will be shared among operating systems
+Source code in the "kame" directory will be shared among operating systems
 and hardware platforms.  Here are several guidelines to be portable
 across those possibilities.
 
@@ -14,17 +14,17 @@ across those possibilities.
   Always try to keep paren-match correctly, regardless of #ifdef.
   The following is WRONG example:
 	#if foo
-		if (hoge) {
+		if (foo) {
 	#else
-		if (hoge && hage) {
+		if (foo && bar) {
 	#endif
 			....
 		}
   It should be written like follows:
 	#if foo
-		if (hoge)
+		if (foo)
 	#else
-		if (hoge && hage)
+		if (foo && bar)
 	#endif
 		{
 			....
@@ -37,6 +37,8 @@ across those possibilities.
 - Follow NetBSD KNF.
   They are the most strict guys about source code formatting.
   If you obey NetBSD KNF, other platforms are happy.
+  More information on KNF is available at:
+	http://www.netbsd.org/Documentation/kernel/programming.html
 
 - Pointer can be 64bit (for example, on alpha).
   When taking integer from pointer, use u_long, or long.
@@ -70,7 +72,7 @@ across those possibilities.
 - 2nd arg to ioctl() must be u_long, not int, on non-FreeBSD2 platforms.
 
 - If you define multi-statement #define, define that like:
-	#define foobaa (x, y) \
+	#define foobar (x, y) \
 	do { \
 		/*something*/ \
 	} while (0)
@@ -85,8 +87,8 @@ across those possibilities.
 	CFLAGS+=-g
 
 - To refer objects and machine-generated source code, FreeBSD needs to use
-  ${.OBJDIR}  This is because because FreeBSD completely separates "obj" tree
-  and "src" tree and has no symlink from ${.CURDIR}/obj to /usr/obj/foobaa.
+  ${.OBJDIR}.  This is because because FreeBSD completely separates "obj" tree
+  and "src" tree and has no symlink from ${.CURDIR}/obj to /usr/obj/foobar.
   On other platforms, ${.CURDIR}/obj should do.
 
 - On manpage installation.
@@ -95,31 +97,31 @@ across those possibilities.
 	MANDIR=	/usr/local/v6/man/cat
 	MAN5=	foo.0
 	MAN8=	baz.0
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
   For NetBSD, you need to set MAN (not MAN[0-9]).  MANDIR needs to point to
   "man" directory right above "catN" or "manN" directory:
 	MANDIR=	/usr/local/v6/man
 	MAN=	foo.5 baz.8
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
 	MKPIC=	# if you do not want shlib, make it empty
   For OpenBSD, you need to set MAN (not MAN[0-9]).  MANDIR needs to point to
   "catN" directory, without "N":
 	MANDIR=	/usr/local/v6/man/cat
 	MAN=	foo.5 baz.8
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
 	NOPIC=	yes	# if you do not want shlib, define it
   For FreeBSD, you need to set MAN[0-9] like below.  MANDIR needs to point
   to "manN" directory, without "N":
 	MANDIR=	/usr/local/v6/man/man
 	MAN5=	foo.5
 	MAN8=	baz.8
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
 	# if you do not want shlib, do not define SHLIB_{MAJOR,MINOR}
 
 - BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
   If you need to use __FUNCTION__, you need to set CC to "gcc", or "shlicc2"
   explicitly.
-  __FUNCTION__ macro is not included in ANSI standard, so it is best to
+  __FUNCTION__ macro is not included in the ANSI standard, so it is best to
   avoid __FUNCTION__, or make it optional, for portability.
 
 - sys/queue.h are very different in each of *BSDs.  Most of macros found in
