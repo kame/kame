@@ -128,10 +128,6 @@ static int ip6lifetime;
 
 struct	afswtch;
 
-#ifdef INET6
-char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
-#endif
-
 void	Perror __P((const char *cmd));
 void	checkatrange __P((struct sockaddr_at *));
 int	ifconfig __P((int argc, char *const *argv, const struct afswtch *afp));
@@ -143,6 +139,7 @@ void	status __P((const struct afswtch *afp, int addrcount,
 		    struct ifa_msghdr *ifam));
 void	usage __P((void));
 #ifdef INET6
+void in6_fillscopeid __P((struct sockaddr_in6 *));
 int	prefix __P((void *, int));
 static char *sec2str __P((time_t));
 int	explicit_prefix = 0;
@@ -1012,6 +1009,19 @@ in_status(s, info)
 
 #ifdef INET6
 void
+in6_fillscopeid(sin6)
+	struct sockaddr_in6 *sin6;
+{
+#if defined(__KAME__) && defined(KAME_SCOPEID)
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+		sin6->sin6_scope_id =
+			ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+		sin6->sin6_addr.s6_addr[2] = sin6->sin6_addr.s6_addr[3] = 0;
+	}
+#endif
+}
+
+void
 in6_status(s, info)
 	int s __unused;
 	struct rt_addrinfo * info;
@@ -1022,6 +1032,12 @@ in6_status(s, info)
 	u_int32_t flags6;
 	struct in6_addrlifetime lifetime;
 	time_t t = time(NULL);
+	char hbuf[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 
 	memset(&null_sin, 0, sizeof(null_sin));
 
@@ -1048,9 +1064,11 @@ in6_status(s, info)
 	lifetime = ifr6.ifr_ifru.ifru_lifetime;
 	close(s6);
 
-	printf("\tinet6 %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
-				ntop_buf, sizeof(ntop_buf)));
-
+	in6_fillscopeid(sin);
+	if (getnameinfo((struct sockaddr *)sin, sin->sin6_len,
+			hbuf, sizeof(hbuf), NULL, 0, niflag))
+		strncpy(hbuf, "", sizeof(hbuf));	/* some message? */
+	printf("\tinet6 %s ", hbuf);
 
 	if (flags & IFF_POINTOPOINT) {
 		/* note RTAX_BRD overlap with IFF_BROADCAST */
@@ -1060,8 +1078,13 @@ in6_status(s, info)
 		 * address.
 		 */
 		if (sin && sin->sin6_family == AF_INET6) {
-			printf("--> %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
-						ntop_buf, sizeof(ntop_buf)));
+			in6_fillscopeid(sin);
+			if (getnameinfo((struct sockaddr *)sin, sin->sin6_len,
+					hbuf, sizeof(hbuf), NULL, 0, niflag)) {
+				/* some message? */
+				strncpy(hbuf, "", sizeof(hbuf));
+			}
+			printf("--> %s ", hbuf);
 		}
 	}
 
@@ -1292,6 +1315,35 @@ in6_getaddr(s, which)
 	const char *s;
 	int which;
 {
+#if defined(__KAME__) && defined(KAME_SCOPEID)
+	struct sockaddr_in6 *sin6 = sin6tab[which];
+	struct addrinfo hints, *res;
+	int error;
+	char hbuf[200];
+
+	newaddr &= 1;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+#if 0
+	hints.ai_flags = AI_NUMERICHOST;
+#endif
+	error = getaddrinfo(s, "0", &hints, &res);
+	if (error)
+		errx(1, "%s: %s", s, gai_strerror(error));
+	if (res->ai_next)
+		errx(1, "%s: resolved to multiple hosts", s);
+	if (res->ai_addrlen != sizeof(struct sockaddr_in6))
+		errx(1, "%s: bad value", s);
+	memcpy(sin6, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) && sin6->sin6_scope_id) {
+		*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
+			htons(sin6->sin6_scope_id);
+		sin6->sin6_scope_id = 0;
+	}
+#else
 	register struct sockaddr_in6 *sin = sin6tab[which];
 
 	newaddr &= 1;
@@ -1302,6 +1354,7 @@ in6_getaddr(s, which)
 
         if (inet_pton(AF_INET6, s, &sin->sin6_addr) <= 0)
 		errx(1, "%s: bad value", s);
+#endif
 }
 
 void
