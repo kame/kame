@@ -3,6 +3,10 @@ vs microsoft
 	phase 1の最後のパケットを再送してくる。kame側のstate machineの
 	null pointer checkが足りず落ちた。明日再挑戦。
 
+	再挑戦、うまくいった
+		phase 1: pre-shared/3des/sha1/dh2
+		phase 2: esp/sha/des/600sec/3kb
+
 vs bluesteel
 	うまくいったらしい。
 
@@ -27,8 +31,15 @@ vs ashley laurent
 	phase 1 userfqdn supportいれてよんと言われた。今回間に合うのかな。
 
 vs ericsson
-	initiator: DH group typeをつけてはいけない
-	responder: blowfish、およびkey lengthをサポートしないとまずい
+	initiator: 既知のDH groupについてはDH group typeをつけてはいけない
+	responder: blowfish、およびkey lengthをちゃんとサポートしないとまずい
+
+	修正後ok(size=2000のpingまで)
+		phase 1: pre-shared/des/md5/dh1/lifetime 1hour/lifebyte 1MB
+		phase 2: esp/md5/blowfish 56bit/lifetime 1hour/lifebyte 1MB
+
+	delete payloadを受けてもこっちはphase 1を保持しつづけているが、
+	あっちはphase 1もきれたと思ってる。
 
 テストするには
 	psk.txtにエントリ追加。
