@@ -1,0 +1,102 @@
+			README of KAME kit
+
+			KAME Project
+
+			$Date: 1999/10/06 09:57:39 $
+
+<<<Project Overview>>>
+
+"KAME Project" is a joint effort to create single solid software set,
+especially targeted at IPv6/IPsec.  Talented researchers from Fujitsu
+Limited, Hitachi, Ltd., IIJ Research Laboratory, NEC Corporation,
+Toshiba Corporation, Yokogawa Digital Computer Corporation, Yokogawa
+Electric Corporation joined the project.  This joint effort will avoid
+unnecessary duplicated development in the same area, and effectively
+provides high quality and advanced featured package.
+
+KAME is originally called "Hydrangea" which was developed by v6
+working group, WIDE Project.  We are merging codes, which each company
+in Japan has developed, into "Hydrangea".  To identify the joint
+effort, we changed the name from "Hydrangea" to "KAME".
+
+"KAME" officially indicates a short word of <Ka>rigo<me> where our office
+locates.  But it, in fact, stands for turtle in Japanese.
+
+<<<Our Goals>>>
+
+KAME Project aims to provide FREE reference implementations of
+	(1) IPv6
+	(2) IPsec
+	(3) advanced internetworking such as advanced packet queuing, 
+	    ATM, mobility, and whatever interesting
+on several BSD variants.
+
+<<<Copyright>>>
+
+The kit comes with BSD-like copyright.  In short, the code is FREELY
+available but with NO WARRANTY.  Even commercial use is OK.  Please
+refer to the COPYRIGHT file for more details.  The copyright holder is
+WIDE Project instead of KAME Project.  This is because KAME Project is
+to be terminated in March 2000.
+
+READ CAREFULLY: Several countries have legal enforcement for
+export/import/use of cryptographic software.  Check it before playing
+with the kit.
+
+<<<What's Next?>>>
+
+To know the difference from the previous stable release, please refer
+to RELNOTES.
+
+To install this kit, please read INSTALL.
+
+If you want to know what features are provided, please refer to
+IMPLEMENTATION. 
+
+Before you start using this kit, please take a look at USAGE. 
+
+Our plans are described in TODO.
+
+<<<Contact Points>>
+
+If you want to know more about KAME Project, please visit:
+	http://www.kame.net/
+You can get snapshots as well as stable releases.  You are also able to
+send bug reports on this web page.
+
+If you have comments, please drop a line to:
+	core@kame.net
+
+If you have questions about commercial usage, please send the
+questions to:
+	kame-secretary@kame.net
+
+<<<Researchers>>>
+
+Current core members are:
+           Kazu YAMAMOTO  IIJ Research Laboratory
+       Jun-ichiro HAGINO  IIJ Research Laboratory
+          Shoichi SAKANE  Yokogawa Digital Computer Corporation
+      Munechika SUMIKAWA  Hitachi, Ltd.
+          Tatsuya JINMEI  Toshiba Corporation
+      Shin-ichi FUJISAWA  Yokogawa Electric Corporation
+           Kazushi SUGYO  NEC Corporation
+         Yoshinobu INOUE  Fujitsu Limited
+
+<<<Acknowledgements>>>
+
+The core members deeply thank the original members and the
+contributers including Keiichi SHIMA, Yusaku HASEGAWA, Kentaro MISU,
+Yasushi YAMASAKI, Atsushi ONOE, Noritoshi DEMIZU, Katsushi KOBAYASHI,
+Takahiro KIKUCHI, Motonori NAKAMURA, Kazunori FUJIWARA, Kenjiro CHO,
+HO Sonmyong, Masanari TSUBAI, Hiroshi URA, Craig Metz, Chris the Elder,
+UO Youjiro, Wayne Knowles, Hajimu UMEMOTO, Ichiro Fukuhara,
+David P. Wiggins, Martti Kuparinen, Tetsuya Isaki, Erik Bertelsen,
+Toshio Shimojou, Kazunori Fujiwara, Kimio Ishii, Masafumi OE,
+SUZUKI Shinsuke, Mickael Hoerdt, Arkadiusz Miskiewicz, 
+and Wolfgang Rupprecht. (in no particular order).
+
+We also would like to thank BSDI (http://www.bsdi.com/) for donating
+BSD/OS licenses for development.
+
+							<end of README>
