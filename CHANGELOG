@@ -1,11 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2607 2004/05/19 14:05:03 suz Exp $
+$KAME: CHANGELOG,v 1.2608 2004/05/19 15:41:34 suz Exp $
 
 <200405>
 2004-05-19  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/route.c: fixed a bug that (*,G) entry is not 
 	created at RP router when the RP address is specified in static-rp 
 	configuration.
+
+	* kame/kame/pim6sd/rp.c: fixed a bug that (*,G) entry is not created
+	with static-rp configuration once PIM neighboring goes down and up 
+	toward RP.
 
 2004-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): simply returned an error

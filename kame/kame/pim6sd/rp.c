@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.34 2003/09/02 09:48:46 suz Exp $	*/
+/*	$KAME: rp.c,v 1.35 2004/05/19 15:41:35 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1367,14 +1367,11 @@ update_rp_neighbor()
 		rpentry_t *rpentry = cand_rp->rpentry;
 
 		/* existing upstream is updated automatically */
-		if (cand_rp->rpentry->upstream != NULL)
+		if (rpentry->upstream != NULL)
 			continue;
 
 		/* (*,G) at RP has no upstream neighbor, but it's ok */
 		if (rpentry->incoming == reg_vif_num)
-			continue;
-
-		if (set_incoming(cand_rp->rpentry, PIM_IIF_RP))
 			continue;
 
 		/* have to update the (*,G) entry's upstream if it's empty */
