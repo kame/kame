@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.3 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.4 $";
 #endif
 
 #include <sys/types.h>
@@ -60,12 +60,12 @@ static int pfkey_send_x2 __P((int so, u_int type, u_int satype, u_int mode,
 	struct sockaddr *src, struct sockaddr *dst, u_int32_t spi));
 static int pfkey_send_x3 __P((int so, u_int type, u_int satype));
 
-static caddr_t pfkey_setsadbmsg __P((caddr_t buf, u_int type, u_int16_t tlen,
+static caddr_t pfkey_setsadbmsg __P((caddr_t buf, u_int type, u_int tlen,
 	u_int satype, u_int mode, u_int32_t seq, pid_t pid));
 static caddr_t pfkey_setsadbsa __P((caddr_t buf, u_int32_t spi, u_int wsize,
 	u_int auth, u_int enc, u_int32_t flags));
-static caddr_t pfkey_setsadbaddr __P((caddr_t buf, u_int16_t exttype,
-	struct sockaddr *saddr, u_int prefixlen, u_int16_t ul_proto));
+static caddr_t pfkey_setsadbaddr __P((caddr_t buf, u_int exttype,
+	struct sockaddr *saddr, u_int prefixlen, u_int ul_proto));
 static caddr_t pfkey_setsadbkey(caddr_t buf, u_int type,
 	caddr_t key, u_int keylen);
 static caddr_t pfkey_setsadblifetime(caddr_t buf, u_int type,
@@ -1257,7 +1257,7 @@ static caddr_t
 pfkey_setsadbmsg(buf, type, tlen, satype, mode, seq, pid)
 	caddr_t buf;
 	u_int type, satype, mode;
-	u_int16_t tlen;
+	u_int tlen;
 	u_int32_t seq;
 	pid_t pid;
 {
@@ -1317,10 +1317,10 @@ pfkey_setsadbsa(buf, spi, wsize, auth, enc, flags)
 static caddr_t
 pfkey_setsadbaddr(buf, exttype, saddr, prefixlen, ul_proto)
 	caddr_t buf;
-	u_int16_t exttype;
+	u_int exttype;
 	struct sockaddr *saddr;
 	u_int prefixlen;
-	u_int16_t ul_proto;
+	u_int ul_proto;
 {
 	struct sadb_address *p;
 	u_int len;
@@ -1330,8 +1330,8 @@ pfkey_setsadbaddr(buf, exttype, saddr, prefixlen, ul_proto)
 
 	memset(p, 0, len);
 	p->sadb_address_len = PFKEY_UNIT64(len);
-	p->sadb_address_exttype = exttype;
-	p->sadb_address_proto = ul_proto;
+	p->sadb_address_exttype = exttype & 0xffff;
+	p->sadb_address_proto = ul_proto & 0xff;
 	p->sadb_address_prefixlen = prefixlen;
 	p->sadb_address_reserved = 0;
 
