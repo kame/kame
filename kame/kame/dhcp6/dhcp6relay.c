@@ -68,7 +68,7 @@ static struct in6_pktinfo *spktinfo;
 
 static int mhops = DEFAULT_SOLICIT_HOPCOUNT;
 
-static struct sockaddr_in6 sa6_all_servers;
+static struct sockaddr_in6 sa6_all_servers, sa6_client;
 
 struct prefix_list {
 	TAILQ_ENTRY(prefix_list) plink;
@@ -77,7 +77,7 @@ struct prefix_list {
 };
 TAILQ_HEAD(, prefix_list) global_prefixes; /* list of non-link-local prefixes */
 static char *global_strings[] = {
-	"fec0::/10", "2001::/3", "3ffe::/16", "2002::/16",
+	"2001::/3", "3ffe::/16", "2002::/16", "fec0::/10",
 };
 
 static void usage __P((void));
@@ -87,6 +87,9 @@ static void relay6_loop __P((void));
 static int relay6_recv __P((int, char *));
 static void relay6_react __P((size_t, char *, char *, int));
 static void relay6_react_solicit __P((char *, size_t, char *));
+static void relay6_react_advert __P((char *, size_t, char *));
+static void relay6_forward_response __P((char *, size_t,
+					 struct in6_addr *, char *));
 
 int
 main(argc, argv)
@@ -288,9 +291,6 @@ relay6_init()
 		/* NOTREACHED */
 	}
 
-	/*
-	 * Setup a socket to communicate with servers.
-	 */
 	hints.ai_flags = 0;
 	error = getaddrinfo(DH6ADDR_ALLAGENT, 0, &hints, &res2);
 	if (error) {
@@ -332,7 +332,10 @@ relay6_init()
 	}
 	freeaddrinfo(res2);
 
-	hints.ai_flags = 0;
+	/*
+	 * Setup a socket to communicate with servers.
+	 */
+	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
@@ -344,15 +347,21 @@ relay6_init()
 		/* NOTREACHED */
 	}
 	if (ssock > maxfd) maxfd = ssock;
-	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-			&ifidx, sizeof(ifidx)) < 0) {
-		err(1, "setsockopt(ssock, IPV6_MULTICAST_IF)");
+	if (bind(ssock, res->ai_addr, res->ai_addrlen) < 0) {
+		err(1, "bind(ssock)");
 		/* NOTREACHED */
 	}
+	memcpy(&sa6_client, res->ai_addr, sizeof(sa6_client));
 	freeaddrinfo(res);
+
 	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mhops,
 		       sizeof(mhops)) < 0) {
 		err(1, "setsockopt(ssock, IPV6_MULTICAST_HOPS(%d))", mhops);
+		/* NOTREACHED */
+	}
+	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(IPV6_RECVPKTINFO)");
 		/* NOTREACHED */
 	}
 
@@ -401,8 +410,8 @@ relay6_loop()
 			relay6_react(cc, rdatabuf, rdev, 1);
 
 		if (FD_ISSET(ssock, &readfds) &&
-		    (cc = relay6_recv(ssock, NULL)) > 0)
-			relay6_react(cc, rdatabuf, NULL, 0);
+		    (cc = relay6_recv(ssock, rdev)) > 0)
+			relay6_react(cc, rdatabuf, rdev, 0);
 
 		if (FD_ISSET(icmp6sock, &readfds) &&
 		    (cc = relay6_recv(icmp6sock, NULL)) > 0) {
@@ -489,13 +498,11 @@ relay6_react(siz, buf, dev, fromclient)
 	else {
 		switch (dh6->dh6_msgtype) {
 		case DH6_ADVERT:
-#ifdef notyet
-			relay6_react_advert(buf, siz);
-#endif 
+			relay6_react_advert(buf, siz, dev);
 			break;
 		case DH6_REPLY:
 #ifdef notyet
-			relay6_react_reply(buf, siz);
+			relay6_react_reply(buf, siz, dev);
 #endif
 			break;
 		default:
@@ -587,4 +594,84 @@ relay6_react_solicit(buf, siz, dev)
 		     "(ifid = %d, src = %s)",
 		     spktinfo->ipi6_ifindex,
 		     in6addr2str(&spktinfo->ipi6_addr, 0));
+}
+
+static void
+relay6_react_advert(buf, siz, dev)
+	char *buf, *dev;
+	size_t siz;
+{
+	struct dhcp6_advert *dh6a;
+	struct sockaddr_in6 sa6_relay;
+	char *sdev;
+
+	dprintf((stderr, "relay6_react_advert\n"));
+
+	if (siz < sizeof(*dh6a)) {
+		warnx("relay6_react_advert: short packet (size = %d)", siz);
+		return;
+	}
+	dh6a = (struct dhcp6_advert *)buf;
+
+	memset(&sa6_relay, 0, sizeof(sa6_relay));
+	sa6_relay.sin6_family = AF_INET6;
+	sa6_relay.sin6_len = sizeof(sa6_relay);
+	sa6_relay.sin6_addr = dh6a->dh6adv_relayaddr;
+#ifdef notyet
+	/* if we seriously considered scope issues, we'd need this */
+	sa6_relay.sin6_scope_id = if_name2scopeid(dev);
+#endif
+
+	/*
+	 * draft-ietf-dhc-dhcpv6-14 does not require this check, but it'd
+	 * be better to add the check.
+	 */
+	if (!IN6_IS_ADDR_LINKLOCAL(&dh6a->dh6adv_cliaddr)) {
+		warnx("relay6_react_advert: client address (%s) is not "
+		      "link-local", in6addr2str(&dh6a->dh6adv_cliaddr, 0));
+		return;
+	}
+
+	/*
+	 * Note that sdev is necessarily equal to dev, if we take the weak
+	 * host model.
+	 */
+	if ((sdev = getdev(&sa6_relay)) == NULL) {
+		warnx("relay6_react_advert: can't detect interface from %s",
+		      addr2str((struct sockaddr *)&sa6_relay));
+		return;
+	}
+
+	relay6_forward_response(buf, siz, &dh6a->dh6adv_cliaddr, sdev);
+}
+
+static void
+relay6_forward_response(buf, siz, cliaddr, dev)
+	char *buf, *dev;
+	size_t siz;
+	struct in6_addr *cliaddr;
+{
+	static struct iovec iov[2];
+
+	dprintf((stderr, "relay6_forward_response\n"));
+
+	sa6_client.sin6_addr = *cliaddr;
+
+	smh.msg_name = (caddr_t)&sa6_client;
+	smh.msg_namelen = sizeof(sa6_client);
+	iov[0].iov_base = buf;
+	iov[0].iov_len = siz;
+	smh.msg_iov = iov;
+	smh.msg_iovlen = 1;
+	memset(spktinfo, 0, sizeof(*spktinfo));
+
+	/* set the outgoing interface */
+	if ((spktinfo->ipi6_ifindex = if_nametoindex(dev)) == 0) {
+		/* this must not occur, so we might have to assert here */
+		warn("relay6_forward_response: invlalid interface: %s", dev);
+		return;
+	}
+
+	if (sendmsg(ssock, &smh, 0) != siz)
+		warn("relay6_forward_response: sendmsg failed on %s", dev);
 }
