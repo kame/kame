@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1983 2001/11/15 11:11:03 keiichi Exp $
+$KAME: CHANGELOG,v 1.1984 2001/11/19 05:35:50 itojun Exp $
 
 <200111>
+Mon Nov 19 14:34:06 JST 2001  itojun@iijlab.net
+	* sys/netinet6/udp6_output.c: initialize IPv4 source address on packet
+	  correctly, when IPv4 mapped address is used on AF_INET6 socket.
+	  affects bsdi4 only.
+
 Thu Nov 15 20:09:26 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6*
   	- fix a binding request bug. now CN sends a binding request for
