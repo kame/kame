@@ -576,6 +576,7 @@ tcp_input(m, va_alist)
 	case 4:
 		af = AF_INET;
 		iphlen = sizeof(struct ip);
+#ifndef PULLDOWN_TEST
 		/* would like to get rid of this... */
 		if (toff > sizeof (struct ip)) {
 			ip_stripoptions(m, (struct mbuf *)0);
@@ -589,12 +590,22 @@ tcp_input(m, va_alist)
 		}
 		ip = mtod(m, struct ip *);
 		th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
+#else
+		ip = mtod(m, struct ip *);
+		IP6_EXTHDR_GET(th, struct tcphdr *, m, toff,
+			sizeof(struct tcphdr));
+		if (th == NULL) {
+			tcpstat.tcps_rcvshort++;
+			return;
+		}
+#endif
 
 		/*
 		 * Checksum extended TCP header and data.
 		 */
 		len = ip->ip_len;
 		tlen = len - toff;
+#ifndef PULLDOWN_TEST
 	    {
 		struct ipovly *ipov;
 		ipov = (struct ipovly *)ip;
@@ -605,6 +616,12 @@ tcp_input(m, va_alist)
 			tcpstat.tcps_rcvbadsum++;
 			goto drop;
 		}
+#else
+		if (in_cksum4(m, IPPROTO_TCP, toff, tlen) != 0) {
+			tcpstat.tcps_rcvbadsum++;
+			goto drop;
+		}
+#endif
 		break;
 #ifdef INET6
 	case 6:

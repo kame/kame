@@ -181,6 +181,7 @@ udp_input(m, va_alist)
 
 	udpstat.udps_ipackets++;
 
+#ifndef PULLDOWN_TEST
 	/*
 	 * Strip IP options, if any; should skip this,
 	 * make available to user, and use on returned packets,
@@ -191,6 +192,12 @@ udp_input(m, va_alist)
 		ip_stripoptions(m, (struct mbuf *)0);
 		iphlen = sizeof(struct ip);
 	}
+#else
+	/*
+	 * we may enable the above code if we save and pass IPv4 options
+	 * to the userland.
+	 */
+#endif
 
 	/*
 	 * Get IP and UDP header together in first mbuf.
