@@ -169,7 +169,9 @@
 #endif
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_var.h>
 #include <netinet6/in6_pcb.h>
+#include <netinet6/nd6.h>
 #endif
 
 #include <netinet/tcp.h>
@@ -261,7 +263,7 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 			 * for IPv6, path MTU discovery is always turned on,
 			 * or the node must use packet size <= 1280.
 			 */
-			size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+			size = IN6_LINKMTU(ifp) - iphlen - sizeof(struct tcphdr);
 		}
 	}
 

@@ -141,6 +141,7 @@
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet/icmp6.h>
+#include <netinet6/nd6.h>
 #endif
 
 #include <netinet/tcp.h>
@@ -1545,7 +1546,16 @@ tcp_mss_to_advertise(ifp, af)
 	 */
 
 	if (ifp != NULL)
-		mss = ifp->if_mtu;
+		switch (af) {
+		case AF_INET:
+			mss = ifp->if_mtu;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			mss = IN6_LINKMTU(ifp);
+			break;
+#endif
+		}
 
 	if (tcp_mss_ifmtu == 0)
 		switch (af) {
