@@ -1073,8 +1073,6 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 	 * See RFC 2292 section 6.
 	 */
 	if ((in6p->in6p_flags & IN6P_HOPOPTS) && privileged) {
-		struct ip6_hbh *prevhbh = NULL;
-
 		/*
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
@@ -1222,8 +1220,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 					 */
 					if (ctl->dest1 == NULL &&
 					    (prevdest1 &&
-					     prevdestlen == elen ||
-					     bcmp(ip6e, prevdest1, elen) == 0))
+					     (prevdestlen == elen ||
+					     bcmp(ip6e, prevdest1, elen) == 0)))
 						break;
 
 					*mp = sbcreatecontrol((caddr_t)ip6e,
@@ -1250,8 +1248,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 					/* see the above comment */
 					if (ctl->dest2 == NULL &&
 					    (prevdest2 &&
-					     prevdestlen == elen ||
-					     bcmp(ip6e, prevdest2, elen) == 0))
+					     (prevdestlen == elen ||
+					     bcmp(ip6e, prevdest2, elen) == 0)))
 						break;
 
 					*mp = sbcreatecontrol((caddr_t)ip6e,
