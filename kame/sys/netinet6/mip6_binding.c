@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.162 2003/01/16 03:31:25 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.163 2003/01/16 06:45:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2564,7 +2564,8 @@ mip6_bc_stoptimer(void)
 #endif
 }
 
-static void mip6_bc_starttimer(void)
+static void
+mip6_bc_starttimer(void)
 {
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&mip6_bc_ch,
