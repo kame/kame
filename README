@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/07/03 04:09:29 $
+			$Date: 2000/07/03 04:16:11 $
 
 <<<Project Overview>>>
 
@@ -106,7 +106,17 @@ When you report bugs, please be sure to include the following information:
 - (if necessary) IPv6/v4 connectivity status in your network
 
 Don't try to *describe* your settings, just paste command output itself
-onto the report instead.
+onto the report instead. A bad example is "I assigned 2001:200::1234 on
+my ethernet interface, but ping6 didn't work. Why?" No one will be
+able to answer this kind of question. Instead, you should type as follows:
+# /usr/local/v6/sbin/ifconfig -a
+(paste the output. Again, the exact output is best. Do not try to
+ describe the output by your own word)
+# /usr/local/v6/sbin/ifconfig ne0 inet6 2001:200::1234 prefixlen 64 alias
+(paste the output)
+# /usr/local/v6/sbin/ping6 -n 2001:300::1
+(paste the output, including errors and warnings)
+etc...
 
 If you track the bugs, please notice the following items:
 - be sure to use "ping6 -n", not "ping6", when you probe reachability.
