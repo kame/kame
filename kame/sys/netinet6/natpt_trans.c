@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.128 2002/06/26 06:15:25 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.129 2002/06/27 04:48:59 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1181,6 +1181,45 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 		HTONL(icmp6->icmp6_pptr);
 		break;
+	}
+
+	/* recalculate TCP/UDP checksum which is inside the ICMPv6 payload. */
+	if ((icmpip4->ip_p == IPPROTO_TCP)
+	    || (icmpip4->ip_p == IPPROTO_UDP)) {
+		int		hlen;
+		u_short		in4_cksum, in6_cksum;
+		caddr_t		icmpulp4, icmpulp6;
+		struct ulc4	ulc4;
+		struct ulc6	ulc6;
+
+		bzero(&ulc4, sizeof(struct ulc4));
+		bzero(&ulc6, sizeof(struct ulc6));
+
+		ulc4.ulc_src = icmpip4->ip_src;
+		ulc4.ulc_dst = icmpip4->ip_dst;
+		ulc6.ulc_src = icmpip6->ip6_src;
+		ulc6.ulc_dst = icmpip6->ip6_dst;
+
+#ifdef _IP_VHL
+		hlen = IP_VHL_HL(icmpip4->ip_vhl) << 2;
+#else
+		hlen = icmpip4->ip_hl << 2;
+#endif
+		icmpulp4 = (caddr_t)icmpip4 + hlen;
+		icmpulp6 = (caddr_t)icmpip6 + sizeof(struct ip6_hdr);
+		if (icmpip4->ip_p == IPPROTO_TCP) {
+			in4_cksum = ntohs(((struct tcphdr *)icmpulp4)->th_sum);
+		} else {
+			in4_cksum = ntohs(((struct udphdr *)icmpulp4)->uh_sum);
+		}
+		in6_cksum = natpt_fixCksum(in4_cksum,
+					   (u_char *)&ulc4, sizeof(struct ulc4),
+					   (u_char *)&ulc6, sizeof(struct ulc6));
+		if (icmpip4->ip_p == IPPROTO_TCP) {
+			((struct tcphdr *)icmpulp6)->th_sum = htons(in6_cksum);
+		} else {
+			((struct udphdr *)icmpulp6)->uh_sum = htons(in6_cksum);
+		}
 	}
 
 	return (sizeof(struct ip6_hdr) + dgramlen);
