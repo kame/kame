@@ -488,7 +488,9 @@ in_multientry(mc)
 	struct in_multi *mc;
 {
 	struct in_multi multi;
+#ifdef IGMP_V3_MEMBERSHIP_REPORT
 	struct in_multi_source src;
+#endif
 
 	KREAD(mc, &multi, struct in_multi);
 	printf("\t\tgroup %s", inet_ntoa(multi.inm_addr));
