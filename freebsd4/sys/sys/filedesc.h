@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/filedesc.h,v 1.19 2000/01/20 07:12:51 imp Exp $
+ * $FreeBSD: src/sys/sys/filedesc.h,v 1.19.2.3 2000/11/26 02:30:08 dillon Exp $
  */
 
 #ifndef _SYS_FILEDESC_H_
@@ -56,6 +56,8 @@
 #define NDFILE		20
 #define NDEXTENT	50		/* 250 bytes in 256-byte alloc. */
 
+struct klist;
+
 struct filedesc {
 	struct	file **fd_ofiles;	/* file structures for open files */
 	char	*fd_ofileflags;		/* per-process open file flags */
@@ -67,6 +69,11 @@ struct filedesc {
 	u_short	fd_freefile;		/* approx. next free file */
 	u_short	fd_cmask;		/* mask for file creation */
 	u_short	fd_refcnt;		/* reference count */
+
+	int	fd_knlistsize;		/* size of knlist */
+	struct	klist *fd_knlist;	/* list of attached knotes */
+	u_long	fd_knhashmask;		/* size of knhash */
+	struct	klist *fd_knhash;	/* hash table for attached knotes */
 };
 
 /*
@@ -87,7 +94,9 @@ struct filedesc0 {
  * Per-process open flags.
  */
 #define	UF_EXCLOSE 	0x01		/* auto-close on exec */
+#if 0
 #define	UF_MAPPED 	0x02		/* mapped from device */
+#endif
 
 /*
  * Storage required per open file descriptor.
@@ -122,7 +131,7 @@ SLIST_HEAD(sigiolst, sigio);
 /*
  * Kernel global variables and routines.
  */
-int	dupfdopen __P((struct filedesc *, int, int, int, int));
+int	dupfdopen __P((struct proc *, struct filedesc *, int, int, int, int));
 int	fdalloc __P((struct proc *p, int want, int *result));
 int	fdavail __P((struct proc *p, int n));
 int	falloc __P((struct proc *p, struct file **resultfp, int *resultfd));
@@ -133,6 +142,8 @@ struct	filedesc *fdcopy __P((struct proc *p));
 void	fdfree __P((struct proc *p));
 int	closef __P((struct file *fp,struct proc *p));
 void	fdcloseexec __P((struct proc *p));
+int	fdcheckstd __P((struct proc *p));
+struct	file *holdfp __P((struct filedesc* fdp, int fd, int flag));
 int	getvnode __P((struct filedesc *fdp, int fd, struct file **fpp));
 int	fdissequential __P((struct file *));
 void	fdsequential __P((struct file *, int));
