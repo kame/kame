@@ -2889,8 +2889,6 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 		case IPV6_NEXTHOP:
 			if (!priv)
 				return(EPERM);
-
-			/* turn off the previous */
 			
 			if (cm->cmsg_len < sizeof(u_char) ||
 			    /* check if cmsg_len is large enough for sa_len */
