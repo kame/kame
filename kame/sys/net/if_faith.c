@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.16 2000/08/01 02:34:54 sakane Exp $	*/
+/*	$KAME: if_faith.c,v 1.17 2000/08/05 18:00:35 sumikawa Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -92,7 +92,12 @@
 #include <netinet6/ip6_var.h>
 #endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include "bpf.h"
+#define NBPFILTER	NBPF
+#else
 #include "bpfilter.h"
+#endif
 
 #include <net/net_osdep.h>
 
