@@ -1,4 +1,37 @@
 /*
+ * Copyright (c) 1993, 1994 Jeffrey C. Mogul, Digital Equipment Corporation,
+ * Western Research Laboratory. All rights reserved.
+ * Copyright (c) 2001 Compaq Computer Corporation. All rights reserved.
+ *
+ *  Permission to use, copy, and modify this software and its
+ *  documentation is hereby granted only under the following terms and
+ *  conditions.  Both the above copyright notice and this permission
+ *  notice must appear in all copies of the software, derivative works
+ *  or modified versions, and any portions thereof, and both notices
+ *  must appear in supporting documentation.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *    1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *    2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS" AND COMPAQ COMPUTER CORPORATION
+ *  DISCLAIMS ALL WARRANTIES WITH REGARD TO THIS SOFTWARE, INCLUDING
+ *  ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS.   IN NO
+ *  EVENT SHALL COMPAQ COMPUTER CORPORATION BE LIABLE FOR ANY
+ *  SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ *  WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ *  AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+ *  OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS
+ *  SOFTWARE.
+ */
+
+/*
  * parsenfsfh.c - portable parser for NFS file handles
  *			uses all sorts of heuristics
  *
@@ -8,17 +41,16 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: parsenfsfh.c,v 1.14 97/06/15 13:20:27 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/parsenfsfh.c,v 1.25.2.2 2003/11/16 08:51:07 guy Exp $ (LBL)";
 #endif
 
-#include <sys/types.h>
-#include <sys/time.h>
-
-#include <ctype.h>
-#ifdef HAVE_MEMORY_H
-#include <memory.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
+
+#include <tcpdump-stdinc.h>
+
 #include <stdio.h>
 #include <string.h>
 
@@ -74,20 +106,22 @@ static const char rcsid[] =
 	((lsb) + ((e)<<8) + ((d)<<16) + ((c)<<24))
 #endif
 
-static int is_UCX(unsigned char *);
+static int is_UCX(const unsigned char *);
 
 void
-Parse_fh(fh, fsidp, inop, osnamep, fsnamep, ourself)
-register caddr_t *fh;
+Parse_fh(fh, len, fsidp, inop, osnamep, fsnamep, ourself)
+register const unsigned char *fh;
+int len;
 my_fsid *fsidp;
 ino_t *inop;
-char **osnamep;		/* if non-NULL, return OS name here */
-char **fsnamep;		/* if non-NULL, return server fs name here (for VMS) */
+const char **osnamep;		/* if non-NULL, return OS name here */
+const char **fsnamep;		/* if non-NULL, return server fs name here (for VMS) */
 int ourself;		/* true if file handle was generated on this host */
 {
-	register unsigned char *fhp = (unsigned char *)fh;
+	register const unsigned char *fhp = fh;
 	u_int32_t temp;
 	int fhtype = FHT_UNKNOWN;
+	int i;
 
 	if (ourself) {
 	    /* File handle generated on this host, no need for guessing */
@@ -365,14 +399,15 @@ int ourself;		/* true if file handle was generated on this host */
 
 	case FHT_UNKNOWN:
 #ifdef DEBUG
-	    {
-		/* XXX debugging */
-		int i;
-		for (i = 0; i < 32; i++)
-			(void)fprintf(stderr, "%x.", fhp[i]);
-		(void)fprintf(stderr, "\n");
-	    }
+	    /* XXX debugging */
+	    for (i = 0; i < 32; i++)
+		(void)fprintf(stderr, "%x.", fhp[i]);
+	    (void)fprintf(stderr, "\n");
 #endif
+	    /* Save the actual handle, so it can be display with -u */
+	    for (i = 0; i < 32; i++)
+	    	(void)snprintf(&(fsidp->Opaque_Handle[i*2]), 3, "%.2X", fhp[i]);
+
 	    /* XXX for now, give "bogus" values to aid debugging */
 	    fsidp->fsid_code = 0;
 	    fsidp->Fsid_dev.Minor = 257;
@@ -399,7 +434,7 @@ int ourself;		/* true if file handle was generated on this host */
  */
 static int
 is_UCX(fhp)
-unsigned char *fhp;
+const unsigned char *fhp;
 {
 	register int i;
 	int seen_null = 0;

@@ -22,27 +22,22 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: print-igrp.c,v 1.8 97/05/28 12:52:47 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-igrp.c,v 1.18.2.2 2003/11/16 08:51:26 guy Exp $ (LBL)";
 #endif
 
-#include <sys/param.h>
-#include <sys/types.h>			/* concession to AIX */
-#include <sys/socket.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
+#include <tcpdump-stdinc.h>
 
-#include <errno.h>
 #include <stdio.h>
 
 #include "interface.h"
 #include "addrtoname.h"
 #include "igrp.h"
+#include "ip.h"
 #include "extract.h"			/* must come after interface.h */
 
 static void
@@ -92,9 +87,7 @@ igrp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 	hdr = (struct igrphdr *)bp;
 	ip = (struct ip *)bp2;
 	cp = (u_char *)(hdr + 1);
-        (void)printf("%s > %s: igrp: ",
-	    ipaddr_string(&ip->ip_src),
-	    ipaddr_string(&ip->ip_dst));
+        (void)printf("igrp:");
 
 	/* Header */
 	TCHECK(*hdr);
@@ -103,8 +96,8 @@ igrp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 	next = EXTRACT_16BITS(&hdr->ig_nx);
 
 	(void)printf(" %s V%d edit=%d AS=%d (%d/%d/%d)",
-	    tok2str(op2str, "op-#%d", hdr->ig_op),
-	    hdr->ig_v,
+	    tok2str(op2str, "op-#%d", IGRP_OP(hdr->ig_vop)),
+	    IGRP_V(hdr->ig_vop),
 	    hdr->ig_ed,
 	    EXTRACT_16BITS(&hdr->ig_as),
 	    nint,
@@ -126,7 +119,7 @@ igrp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 			igrp_entry_print((struct igrprte *)cp, 0, 1);
 			--next;
 		} else {
-			(void)printf("[extra bytes %d]", length);
+			(void)printf(" [extra bytes %d]", length);
 			break;
 		}
 		cp += IGRP_RTE_SIZE;
@@ -135,5 +128,5 @@ igrp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 	if (nint == 0 && nsys == 0 && next == 0)
 		return;
 trunc:
-	fputs("[|igrp]", stdout);
+	fputs(" [|igrp]", stdout);
 }

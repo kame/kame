@@ -10,11 +10,16 @@
  * is provided ``as is'' without express or implied warranty.
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static const char sccsid[] = "@(#)strcasecmp.c	5.5 (Berkeley) 11/24/87";
-#endif /* LIBC_SCCS and not lint */
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <sys/types.h>
+#ifndef lint
+static const char rcsid[] _U_ =
+     "@(#) $Header: /tcpdump/master/tcpdump/strcasecmp.c,v 1.4.2.2 2003/11/16 08:51:57 guy Exp $";
+#endif
+
+#include <tcpdump-stdinc.h>
 
 #include "interface.h"
 

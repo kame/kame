@@ -20,30 +20,16 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: print-fddi.c,v 1.36 97/05/26 17:13:35 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-fddi.c,v 1.61.2.2 2003/11/16 08:51:20 guy Exp $ (LBL)";
 #endif
 
-#ifdef HAVE_FDDI
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-#include <sys/file.h>
-#include <sys/ioctl.h>
-
-#if __STDC__
-struct mbuf;
-struct rtentry;
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include <net/if.h>
 
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
+#include <tcpdump-stdinc.h>
 
-#include <ctype.h>
-#include <netdb.h>
 #include <pcap.h>
 #include <stdio.h>
 #include <string.h>
@@ -52,12 +38,13 @@ struct rtentry;
 #include "addrtoname.h"
 #include "ethertype.h"
 
+#include "ether.h"
 #include "fddi.h"
 
 /*
  * Some FDDI interfaces use bit-swapped addresses.
  */
-#if defined(ultrix) || defined(__alpha) || defined(__bsdi)
+#if defined(ultrix) || defined(__alpha) || defined(__bsdi) || defined(__NetBSD__) || defined(__linux__)
 int	fddi_bitswap = 0;
 #else
 int	fddi_bitswap = 1;
@@ -92,8 +79,6 @@ int	fddi_bitswap = 1;
  *
  *  - vj
  */
-
-#define FDDI_HDRLEN (sizeof(struct fddi_header))
 
 static u_char fddi_bit_swap[] = {
 	0x00, 0x80, 0x40, 0xc0, 0x20, 0xa0, 0x60, 0xe0,
@@ -217,8 +202,8 @@ extract_fddi_addrs(const struct fddi_header *fddip, char *fsrc, char *fdst)
 			fsrc[i] = fddi_bit_swap[fddip->fddi_shost[i]];
 	}
 	else {
-		memcpy(fdst, (char *)fddip->fddi_dhost, 6);
-		memcpy(fsrc, (char *)fddip->fddi_shost, 6);
+		memcpy(fdst, (const char *)fddip->fddi_dhost, 6);
+		memcpy(fsrc, (const char *)fddip->fddi_shost, 6);
 	}
 }
 
@@ -226,10 +211,10 @@ extract_fddi_addrs(const struct fddi_header *fddip, char *fsrc, char *fdst)
  * Print the FDDI MAC header
  */
 static inline void
-fddi_print(register const struct fddi_header *fddip, register u_int length,
+fddi_hdr_print(register const struct fddi_header *fddip, register u_int length,
 	   register const u_char *fsrc, register const u_char *fdst)
 {
-	char *srcname, *dstname;
+	const char *srcname, *dstname;
 
 	srcname = etheraddr_string(fsrc);
 	dstname = etheraddr_string(fdst);
@@ -248,53 +233,30 @@ fddi_print(register const struct fddi_header *fddip, register u_int length,
 }
 
 static inline void
-fddi_smt_print(const u_char *p, u_int length)
+fddi_smt_print(const u_char *p _U_, u_int length _U_)
 {
 	printf("<SMT printer not yet implemented>");
 }
 
-/*
- * This is the top level routine of the printer.  'sp' is the points
- * to the FDDI header of the packet, 'tvp' is the timestamp,
- * 'length' is the length of the packet off the wire, and 'caplen'
- * is the number of bytes actually captured.
- */
 void
-fddi_if_print(u_char *pcap, const struct pcap_pkthdr *h,
-	      register const u_char *p)
+fddi_print(const u_char *p, u_int length, u_int caplen)
 {
-	u_int caplen = h->caplen;
-	u_int length = h->len;
-	const struct fddi_header *fddip = (struct fddi_header *)p;
-	extern u_short extracted_ethertype;
+	const struct fddi_header *fddip = (const struct fddi_header *)p;
 	struct ether_header ehdr;
-
-	ts_print(&h->ts);
+	u_short extracted_ethertype;
 
 	if (caplen < FDDI_HDRLEN) {
 		printf("[|fddi]");
-		goto out;
+		return;
 	}
+
 	/*
 	 * Get the FDDI addresses into a canonical form
 	 */
 	extract_fddi_addrs(fddip, (char *)ESRC(&ehdr), (char *)EDST(&ehdr));
-	/*
-	 * Some printers want to get back at the link level addresses,
-	 * and/or check that they're not walking off the end of the packet.
-	 * Rather than pass them all the way down, we set these globals.
-	 */
-	snapend = p + caplen;
-	/*
-	 * Actually, the only printer that uses packetp is print-bootp.c,
-	 * and it assumes that packetp points to an Ethernet header.  The
-	 * right thing to do is to fix print-bootp.c to know which link
-	 * type is in use when it excavates. XXX
-	 */
-	packetp = (u_char *)&ehdr;
 
 	if (eflag)
-		fddi_print(fddip, length, ESRC(&ehdr), EDST(&ehdr));
+		fddi_hdr_print(fddip, length, ESRC(&ehdr), EDST(&ehdr));
 
 	/* Skip over FDDI MAC header */
 	length -= FDDI_HDRLEN;
@@ -305,14 +267,14 @@ fddi_if_print(u_char *pcap, const struct pcap_pkthdr *h,
 	extracted_ethertype = 0;
 	if ((fddip->fddi_fc & FDDIFC_CLFF) == FDDIFC_LLC_ASYNC) {
 		/* Try to print the LLC-layer header & higher layers */
-		if (llc_print(p, length, caplen, ESRC(&ehdr), EDST(&ehdr))
-		    == 0) {
+		if (llc_print(p, length, caplen, ESRC(&ehdr), EDST(&ehdr),
+		    &extracted_ethertype) == 0) {
 			/*
 			 * Some kinds of LLC packet we cannot
 			 * handle intelligently
 			 */
 			if (!eflag)
-				fddi_print(fddip, length,
+				fddi_hdr_print(fddip, length + FDDI_HDRLEN,
 				    ESRC(&ehdr), EDST(&ehdr));
 			if (extracted_ethertype) {
 				printf("(LLC %s) ",
@@ -326,28 +288,23 @@ fddi_if_print(u_char *pcap, const struct pcap_pkthdr *h,
 	else {
 		/* Some kinds of FDDI packet we cannot handle intelligently */
 		if (!eflag)
-			fddi_print(fddip, length, ESRC(&ehdr), EDST(&ehdr));
+			fddi_hdr_print(fddip, length + FDDI_HDRLEN, ESRC(&ehdr),
+			    EDST(&ehdr));
 		if (!xflag && !qflag)
 			default_print(p, caplen);
 	}
-	if (xflag)
-		default_print(p, caplen);
-out:
-	putchar('\n');
 }
-#else
-#include <sys/types.h>
-#include <sys/time.h>
 
-#include <stdio.h>
-
-#include "interface.h"
-void
-fddi_if_print(u_char *pcap, const struct pcap_pkthdr *h,
-	      register const u_char *p)
+/*
+ * This is the top level routine of the printer.  'p' points
+ * to the FDDI header of the packet, 'h->ts' is the timestamp,
+ * 'h->length' is the length of the packet off the wire, and 'h->caplen'
+ * is the number of bytes actually captured.
+ */
+u_int
+fddi_if_print(const struct pcap_pkthdr *h, register const u_char *p)
 {
+	fddi_print(p, h->len, h->caplen);
 
-	error("not configured for fddi");
-	/* NOTREACHED */
+	return (FDDI_HDRLEN);
 }
-#endif

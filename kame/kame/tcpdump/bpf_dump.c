@@ -19,19 +19,20 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  */
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: bpf_dump.c,v 1.9 96/09/26 23:11:04 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/bpf_dump.c,v 1.14.2.2 2003/11/16 08:51:04 guy Exp $ (LBL)";
 #endif
 
-#include <sys/types.h>
-#include <sys/time.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <tcpdump-stdinc.h>
 
 #include <pcap.h>
 #include <stdio.h>
 
 #include "interface.h"
-
-extern void bpf_dump(struct bpf_program *, int);
 
 void
 bpf_dump(struct bpf_program *p, int option)

@@ -1,3 +1,4 @@
+/* @(#) $Header: /tcpdump/master/tcpdump/ospf6.h,v 1.6 2002/12/11 07:13:56 guy Exp $ (LBL) */
 /*
  * Copyright (c) 1991, 1993, 1994, 1995, 1996, 1997
  *	The Regents of the University of California.  All rights reserved.
@@ -83,10 +84,10 @@
 #define	SLA_MASK_METRIC		0x00ffffff
 #define SLA_SHIFT_TOS		24
 
-/* asla_tosmetric breakdown	*/
-#define	ASLA_FLAG_EXTERNAL	0x80000000
-#define	ASLA_MASK_TOS		0x7f000000
-#define	ASLA_SHIFT_TOS		24
+/* asla_metric */
+#define ASLA_FLAG_EXTERNAL	0x04000000
+#define ASLA_FLAG_FWDADDR	0x02000000
+#define ASLA_FLAG_ROUTETAG	0x01000000
 #define	ASLA_MASK_METRIC	0x00ffffff
 
 /* multicast vertex type */
@@ -104,7 +105,7 @@ struct lsa_hdr {
     u_int32_t ls_seq;
     u_int16_t ls_chksum;
     u_int16_t ls_length;
-} ;
+};
 
 struct lsa_prefix {
     u_int8_t lsa_p_len;
@@ -149,22 +150,19 @@ struct lsa {
 	    struct lsa_prefix inter_ap_prefix[1];
 	} un_inter_ap;
 
+	/* AS external links advertisements */
+	struct {
+	    u_int32_t asla_metric;
+	    struct lsa_prefix asla_prefix[1];
+	    /* some optional fields follow */
+	} un_asla;
+
 #if 0
 	/* Summary links advertisements */
 	struct {
 	    struct in_addr sla_mask;
 	    u_int32_t sla_tosmetric[1];	/* may repeat	*/
 	} un_sla;
-
-	/* AS external links advertisements */
-	struct {
-	    struct in_addr asla_mask;
-	    struct aslametric {
-		u_int32_t asla_tosmetric;
-		struct in_addr asla_forward;
-		struct in_addr asla_tag;
-	    } asla_metric[1];		/* may repeat	*/
-	} un_asla;
 
 	/* Multicast group membership */
 	struct mcla {
@@ -197,7 +195,7 @@ struct lsa {
 	    struct lsa_prefix intra_ap_prefix[1];
 	} un_intra_ap;
     } lsa_un;
-} ;
+};
 
 
 /*
@@ -207,7 +205,7 @@ struct tos_metric {
     u_int8_t tos_type;
     u_int8_t tos_zero;
     u_int16_t tos_metric;
-} ;
+};
 
 #define	OSPF_AUTH_SIZE	8
 
@@ -270,7 +268,7 @@ struct ospf6hdr {
 	    struct lsa_hdr lsa_lshdr[1]; /* may repeat	*/
 	} un_lsa ;
     } ospf6_un ;
-} ;
+};
 
 #define	ospf6_hello	ospf6_un.un_hello
 #define	ospf6_db	ospf6_un.un_db

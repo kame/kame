@@ -20,97 +20,88 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) /master/usr.sbin/tcpdump/tcpdump/print-icmp.c,v 2.1 1995/02/03 18:14:42 polk Exp (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-rt6.c,v 1.23.2.3 2003/11/19 00:35:45 guy Exp $";
+#endif
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
 
 #ifdef INET6
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-
-#include <net/if.h>
-
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_icmp.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-#include <netinet/tcp.h>
+#include <tcpdump-stdinc.h>
 
 #include <stdio.h>
 
-#include <netinet/ip6.h>
+#include "ip6.h"
 
 #include "interface.h"
 #include "addrtoname.h"
+#include "extract.h"
 
 int
 rt6_print(register const u_char *bp, register const u_char *bp2)
 {
-	register const struct ip6_rthdr0 *dp;
+	register const struct ip6_rthdr *dp;
+	register const struct ip6_rthdr0 *dp0;
 	register const struct ip6_hdr *ip;
 	register const u_char *ep;
-	u_long bitmap = 0x0800;
-	u_long slmap;
 	int i, len;
+	register const struct in6_addr *addr;
 
-#if 0
-#define TCHECK(var) if ((u_char *)&(var) >= ep - sizeof(var)) goto trunc
-#endif
-
-	dp = (struct ip6_rthdr0 *)bp;
+	dp = (struct ip6_rthdr *)bp;
 	ip = (struct ip6_hdr *)bp2;
-	len = dp->ip6r0_len;
+	len = dp->ip6r_len;
 
-	/* 'ep' points to the end of avaible data. */
+	/* 'ep' points to the end of available data. */
 	ep = snapend;
 
-        printf("%s > %s: ",
-	       ip6addr_string(&ip->ip6_src),
-	       ip6addr_string(&ip->ip6_dst));
-	
-	TCHECK(dp->ip6r0_slmap[2]);
-	printf("srcrt (len=%d, ", dp->ip6r0_len);
-	printf("type=%d, ", dp->ip6r0_type);
-	printf("segleft=%d, ", dp->ip6r0_segleft);
-	if (dp->ip6r0_type != 0)
+	TCHECK(dp->ip6r_segleft);
+
+	printf("srcrt (len=%d", dp->ip6r_len);	/*)*/
+	printf(", type=%d", dp->ip6r_type);
+	printf(", segleft=%d", dp->ip6r_segleft);
+
+	switch (dp->ip6r_type) {
+#ifndef IPV6_RTHDR_TYPE_0
+#define IPV6_RTHDR_TYPE_0 0
+#endif
+#ifndef IPV6_RTHDR_TYPE_2
+#define IPV6_RTHDR_TYPE_2 2
+#endif
+	case IPV6_RTHDR_TYPE_0:
+	case IPV6_RTHDR_TYPE_2:			/* Mobile IPv6 ID-20 */
+		dp0 = (struct ip6_rthdr0 *)dp;
+
+		TCHECK(dp0->ip6r0_reserved);
+		if (dp0->ip6r0_reserved || vflag) {
+			printf(", rsv=0x%0x",
+			    EXTRACT_32BITS(&dp0->ip6r0_reserved));
+		}
+
+		if (len % 2 == 1)
+			goto trunc;
+		len >>= 1;
+		addr = &dp0->ip6r0_addr[0];
+		for (i = 0; i < len; i++) {
+			if ((u_char *)(addr + 1) > ep)
+				goto trunc;
+
+			printf(", [%d]%s", i, ip6addr_string(addr));
+			addr++;
+		}
+		/*(*/
+		printf(") ");
+		return((dp0->ip6r0_len + 1) << 3);
+		break;
+	default:
 		goto trunc;
-	slmap = (dp->ip6r0_slmap[0] << 16)
-	      | (dp->ip6r0_slmap[1] <<  8)
-	      | (dp->ip6r0_slmap[2]);
-	printf("bitmap=");
-	for (i = 24; i > 0; i--) {
-		if (slmap & bitmap)
-			printf("S");
-		else
-			printf("L");
-		bitmap >>= 1;
+		break;
 	}
-	if (len % 2 == 1)
-		goto trunc;
-	len >>= 1;
-	printf(", ");
-	for (i = 0; i < len; i++) {
-		if ((((u_char *)&(dp->ip6r0_reserved)) + sizeof(u_long)
-		     + (i<<4)) > ep) goto trunc;
-		printf(" [%d]%s", i,
-		       ip6addr_string(((u_char *)&(dp->ip6r0_reserved)) +
-				      sizeof(u_long) + (i<<4)));
-		if (i != len - 1)
-			printf(", ");
-		   
-	}
-	printf(")");
-	return((dp->ip6r0_len + 1) << 3);
+
  trunc:
 	fputs("[|srcrt]", stdout);
-	return 65535;
-#undef TCHECK
+	return -1;
 }
 #endif /* INET6 */

@@ -20,30 +20,15 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: print-raw.c,v 1.22 96/12/10 23:18:58 leres Locked $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-raw.c,v 1.39.2.2 2003/11/16 08:51:40 guy Exp $ (LBL)";
 #endif
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-#include <sys/file.h>
-#include <sys/ioctl.h>
-
-#if __STDC__
-struct mbuf;
-struct rtentry;
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include <net/if.h>
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/if_ether.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-#include <netinet/tcp.h>
+#include <tcpdump-stdinc.h>
 
 #include <pcap.h>
 #include <stdio.h>
@@ -52,36 +37,17 @@ struct rtentry;
 #include "addrtoname.h"
 #include "interface.h"
 
-#ifndef AF_NS
-#define AF_NS		6		/* XEROX NS protocols */
-#endif
-
 /*
  * The DLT_RAW packet has no header. It contains a raw IP packet.
  */
 
-void
-raw_if_print(u_char *user, const struct pcap_pkthdr *h, const u_char *p)
+u_int
+raw_if_print(const struct pcap_pkthdr *h, const u_char *p)
 {
-	u_int length = h->len;
-	u_int caplen = h->caplen;
-
-	ts_print(&h->ts);
-
-	/*
-	 * Some printers want to get back at the link level addresses,
-	 * and/or check that they're not walking off the end of the packet.
-	 * Rather than pass them all the way down, we set these globals.
-	 */
-	packetp = p;
-	snapend = p + caplen;
-
 	if (eflag)
 		printf("ip: ");
 
-	ip_print(p, length);
+	ipN_print(p, h->len);
 
-	if (xflag)
-		default_print(p, caplen);
-	putchar('\n');
+	return (0);
 }

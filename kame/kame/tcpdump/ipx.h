@@ -1,7 +1,7 @@
 /*
- * IPX protocol formats 
+ * IPX protocol formats
  *
- * @(#) $Header: ipx.h,v 1.1 94/06/09 11:47:03 mccanne Exp $
+ * @(#) $Header: /tcpdump/master/tcpdump/ipx.h,v 1.8 2002/12/11 07:13:54 guy Exp $
  */
 
 /* well-known sockets */
@@ -10,20 +10,22 @@
 #define	IPX_SKT_RIP		0x0453
 #define	IPX_SKT_NETBIOS		0x0455
 #define	IPX_SKT_DIAGNOSTICS	0x0456
+#define	IPX_SKT_NWLINK_DGM	0x0553	/* NWLink datagram, may contain SMB */
+#define	IPX_SKT_EIGRP		0x85be	/* Cisco EIGRP over IPX */
 
 /* IPX transport header */
 struct ipxHdr {
-    u_short	cksum;		/* Checksum */
-    u_short	length;		/* Length, in bytes, including header */
-    u_char	tCtl;		/* Transport Control (i.e. hop count) */
-    u_char	pType;		/* Packet Type (i.e. level 2 protocol) */
-    u_short	dstNet[2];	/* destination net */
-    u_char	dstNode[6];	/* destination node */
-    u_short	dstSkt;		/* destination socket */
-    u_short	srcNet[2];	/* source net */
-    u_char	srcNode[6];	/* source node */
-    u_short	srcSkt;		/* source socket */
-} ipx_hdr_t;
+    u_int16_t	cksum;		/* Checksum */
+    u_int16_t	length;		/* Length, in bytes, including header */
+    u_int8_t	tCtl;		/* Transport Control (i.e. hop count) */
+    u_int8_t	pType;		/* Packet Type (i.e. level 2 protocol) */
+    u_int16_t	dstNet[2];	/* destination net */
+    u_int8_t	dstNode[6];	/* destination node */
+    u_int16_t	dstSkt;		/* destination socket */
+    u_int16_t	srcNet[2];	/* source net */
+    u_int8_t	srcNode[6];	/* source node */
+    u_int16_t	srcSkt;		/* source socket */
+};
 
 #define ipxSize	30
 

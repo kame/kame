@@ -1,3 +1,4 @@
+/* @(#) $Header: /tcpdump/master/tcpdump/l2tp.h,v 1.5 2001/11/05 10:03:27 guy Exp $ (LBL) */
 /*
  * Copyright (c) 1991, 1993, 1994, 1995, 1996, 1997
  *      The Regents of the University of California.  All rights reserved.
@@ -18,7 +19,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * L2TP support contributed by Motonori Shindo (mshindo@ascend.co.jp)
+ * L2TP support contributed by Motonori Shindo (mshindo@mshindo.net)
  */
 
 
@@ -54,29 +55,8 @@
 #define L2TP_AUTHEN_TYPE_CHAP		0x0002	/* PPP CHAP */
 #define L2TP_AUTHEN_TYPE_PAP		0x0003	/* PPP PAP */
 #define L2TP_AUTHEN_TYPE_NO_AUTH	0x0004	/* No Authentication */
-#define L2TP_AUTHEN_TYPE_MSCHAP		0x0005	/* MSCHAPv1 */
+#define L2TP_AUTHEN_TYPE_MSCHAPv1	0x0005	/* MSCHAPv1 */
 
 #define L2TP_PROXY_AUTH_ID_MASK		0x00ff
 
-
-struct l2tp_avp_vec {
-	const char *name;
-	void (*print)(const u_char *, u_int);	
-};
-		
-struct l2tp_call_errors {
-	u_short	reserved;
-	u_int	crc_errs;
-	u_int	framing_errs;	
-	u_int	hardware_overruns;	
-	u_int	buffer_overruns;
-	u_int	timeout_errs;	
-	u_int	alignment_errs;	
-};
-
-struct l2tp_accm {
-	u_short reserved;
-	u_int	send_accm;
-	u_int	recv_accm;
-};
 

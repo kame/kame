@@ -1,4 +1,4 @@
-/* $Header: ntp.h,v 1.3 95/05/04 17:52:49 mccanne Exp $ */
+/* $Header: /tcpdump/master/tcpdump/ntp.h,v 1.7 2003/08/06 04:58:21 guy Exp $ */
 
 /*
  * Based on ntp.h from the U of MD implementation
@@ -8,7 +8,7 @@
 /*
  *  Definitions for the masses
  */
-#define	JAN_1970	2208988800	/* 1970 - 1900 in seconds */
+#define	JAN_1970	2208988800U	/* 1970 - 1900 in seconds */
 
 /*
  * Structure definitions for NTP fixed point values
@@ -33,8 +33,8 @@ struct l_fixedpt {
 };
 
 struct s_fixedpt {
-	u_short int_part;
-	u_short fraction;
+	u_int16_t int_part;
+	u_int16_t fraction;
 };
 
 /*  =================  Table 3.3. Packet Variables   ================= */

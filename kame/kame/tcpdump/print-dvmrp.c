@@ -20,28 +20,22 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: print-dvmrp.c,v 1.13 96/12/10 23:16:30 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-dvmrp.c,v 1.24.2.3 2003/11/19 09:41:28 guy Exp $ (LBL)";
 #endif
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/socket.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-#include <netinet/tcp.h>
+#include <tcpdump-stdinc.h>
 
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include <unistd.h>
 
 #include "interface.h"
+#include "extract.h"
 #include "addrtoname.h"
 
 /*
@@ -51,9 +45,7 @@ static const char rcsid[] =
 #define DVMRP_PROBE		1	/* for finding neighbors */
 #define DVMRP_REPORT		2	/* for reporting some or all routes */
 #define DVMRP_ASK_NEIGHBORS	3	/* sent by mapper, asking for a list */
-					/*
-					 * of this router's neighbors
-					 */
+					/* of this router's neighbors */
 #define DVMRP_NEIGHBORS		4	/* response to such a request */
 #define DVMRP_ASK_NEIGHBORS2	5	/* as above, want new format reply */
 #define DVMRP_NEIGHBORS2	6
@@ -70,13 +62,13 @@ static const char rcsid[] =
 #define DVMRP_NF_DISABLED	0x20	/* administratively disabled */
 #define DVMRP_NF_QUERIER	0x40	/* I am the subnet's querier */
 
-static void print_probe(const u_char *, const u_char *, u_int);
-static void print_report(const u_char *, const u_char *, u_int);
-static void print_neighbors(const u_char *, const u_char *, u_int);
-static void print_neighbors2(const u_char *, const u_char *, u_int);
-static void print_prune(const u_char *, const u_char *, u_int);
-static void print_graft(const u_char *, const u_char *, u_int);
-static void print_graft_ack(const u_char *, const u_char *, u_int);
+static int print_probe(const u_char *, const u_char *, u_int);
+static int print_report(const u_char *, const u_char *, u_int);
+static int print_neighbors(const u_char *, const u_char *, u_int);
+static int print_neighbors2(const u_char *, const u_char *, u_int);
+static int print_prune(const u_char *);
+static int print_graft(const u_char *);
+static int print_graft_ack(const u_char *);
 
 static u_int32_t target_level;
 
@@ -90,26 +82,29 @@ dvmrp_print(register const u_char *bp, register u_int len)
 	if (bp >= ep)
 		return;
 
+	TCHECK(bp[1]);
 	type = bp[1];
-	bp += 8;
-	/*
-	 * Skip IGMP header
-	 */
 
+	/* Skip IGMP header */
+	bp += 8;
 	len -= 8;
 
 	switch (type) {
 
 	case DVMRP_PROBE:
 		printf(" Probe");
-		if (vflag)
-			print_probe(bp, ep, len);
+		if (vflag) {
+			if (print_probe(bp, ep, len) < 0)
+				goto trunc;
+		}
 		break;
 
 	case DVMRP_REPORT:
 		printf(" Report");
-		if (vflag)
-			print_report(bp, ep, len);
+		if (vflag > 1) {
+			if (print_report(bp, ep, len) < 0)
+				goto trunc;
+		}
 		break;
 
 	case DVMRP_ASK_NEIGHBORS:
@@ -118,7 +113,8 @@ dvmrp_print(register const u_char *bp, register u_int len)
 
 	case DVMRP_NEIGHBORS:
 		printf(" Neighbors(old)");
-		print_neighbors(bp, ep, len);
+		if (print_neighbors(bp, ep, len) < 0)
+			goto trunc;
 		break;
 
 	case DVMRP_ASK_NEIGHBORS2:
@@ -132,45 +128,57 @@ dvmrp_print(register const u_char *bp, register u_int len)
 		 * address field
 		 */
 		bp -= 4;
+		TCHECK2(bp[0], 4);
 		target_level = (bp[0] << 24) | (bp[1] << 16) |
 		    (bp[2] << 8) | bp[3];
 		bp += 4;
-		print_neighbors2(bp, ep, len);
+		if (print_neighbors2(bp, ep, len) < 0)
+			goto trunc;
 		break;
 
 	case DVMRP_PRUNE:
 		printf(" Prune");
-		print_prune(bp, ep, len);
+		if (print_prune(bp) < 0)
+			goto trunc;
 		break;
 
 	case DVMRP_GRAFT:
 		printf(" Graft");
-		print_graft(bp, ep, len);
+		if (print_graft(bp) < 0)
+			goto trunc;
 		break;
 
 	case DVMRP_GRAFT_ACK:
 		printf(" Graft-ACK");
-		print_graft_ack(bp, ep, len);
+		if (print_graft_ack(bp) < 0)
+			goto trunc;
 		break;
 
 	default:
 		printf(" [type %d]", type);
 		break;
 	}
+	return;
+
+trunc:
+	printf("[|dvmrp]");
+	return;
 }
 
-static void
+static int 
 print_report(register const u_char *bp, register const u_char *ep,
     register u_int len)
 {
 	register u_int32_t mask, origin;
-	register int metric, i, width, done;
+	register int metric, done;
+	register u_int i, width;
 
 	while (len > 0) {
 		if (len < 3) {
 			printf(" [|]");
-			return;
+			return (0);
 		}
+		TCHECK2(bp[0], 3);
 		mask = (u_int32_t)0xff << 24 | bp[0] << 16 | bp[1] << 8 | bp[2];
 		width = 1;
 		if (bp[0])
@@ -186,18 +194,21 @@ print_report(register const u_char *bp, register const u_char *ep,
 		do {
 			if (bp + width + 1 > ep) {
 				printf(" [|]");
-				return;
+				return (0);
 			}
 			if (len < width + 1) {
 				printf("\n\t  [Truncated Report]");
-				return;
+				return (0);
 			}
 			origin = 0;
-			for (i = 0; i < width; ++i)
+			for (i = 0; i < width; ++i) {
+				TCHECK(*bp);
 				origin = origin << 8 | *bp++;
+			}
 			for ( ; i < 4; ++i)
 				origin <<= 8;
 
+			TCHECK(*bp);
 			metric = *bp++;
 			done = metric & 0x80;
 			metric &= 0x7f;
@@ -206,72 +217,80 @@ print_report(register const u_char *bp, register const u_char *ep,
 			len -= width + 1;
 		} while (!done);
 	}
+	return (0);
+trunc:
+	return (-1);
 }
 
-#define GET_ADDR(to) (memcpy((char *)to, (char *)bp, 4), bp += 4)
-
-static void
+static int
 print_probe(register const u_char *bp, register const u_char *ep,
     register u_int len)
 {
 	register u_int32_t genid;
-	u_char neighbor[4];
 
+	TCHECK2(bp[0], 4);
 	if ((len < 4) || ((bp + 4) > ep)) {
 		/* { (ctags) */
 		printf(" [|}");
-		return;
+		return (0);
 	}
 	genid = (bp[0] << 24) | (bp[1] << 16) | (bp[2] << 8) | bp[3];
 	bp += 4;
 	len -= 4;
-	printf("\n\tgenid %u", genid);
+	if (vflag > 1)
+		printf("\n\t");
+	else
+		printf(" ");
+	printf("genid %u", genid);
+	if (vflag < 2)
+		return (0);
 
 	while ((len > 0) && (bp < ep)) {
-		if ((len < 4) || ((bp + 4) > ep)) {
-			printf(" [|]");
-			return;
-		}
-		GET_ADDR(neighbor);
-		len -= 4;
-		printf("\n\tneighbor %s", ipaddr_string(neighbor));
+		TCHECK2(bp[0], 4);
+		printf("\n\tneighbor %s", ipaddr_string(bp));
+		bp += 4; len -= 4;
 	}
+	return (0);
+trunc:
+	return (-1);
 }
 
-static void
+static int
 print_neighbors(register const u_char *bp, register const u_char *ep,
     register u_int len)
 {
-	u_char laddr[4], neighbor[4];
+	const u_char *laddr;
 	register u_char metric;
 	register u_char thresh;
 	register int ncount;
 
 	while (len > 0 && bp < ep) {
-		if (len < 7 || (bp + 7) >= ep) {
-			printf(" [|]");
-			return;
-		}
-		GET_ADDR(laddr);
+		TCHECK2(bp[0], 7);
+		laddr = bp;
+		bp += 4;
 		metric = *bp++;
 		thresh = *bp++;
 		ncount = *bp++;
 		len -= 7;
-		while (--ncount >= 0 && (len >= 4) && (bp + 4) < ep) {
-			GET_ADDR(neighbor);
+		while (--ncount >= 0) {
+			TCHECK2(bp[0], 4);
 			printf(" [%s ->", ipaddr_string(laddr));
 			printf(" %s, (%d/%d)]",
-				   ipaddr_string(neighbor), metric, thresh);
+				   ipaddr_string(bp), metric, thresh);
+			bp += 4;
 			len -= 4;
 		}
 	}
+	return (0);
+trunc:
+	return (-1);
 }
 
-static void
+static int
 print_neighbors2(register const u_char *bp, register const u_char *ep,
     register u_int len)
 {
-	u_char laddr[4], neighbor[4];
+	const u_char *laddr;
 	register u_char metric, thresh, flags;
 	register int ncount;
 
@@ -280,20 +299,17 @@ print_neighbors2(register const u_char *bp, register const u_char *ep,
 	       (int)(target_level >> 8) & 0xff);
 
 	while (len > 0 && bp < ep) {
-		if (len < 8 || (bp + 8) >= ep) {
-			printf(" [|]");
-			return;
-		}
-		GET_ADDR(laddr);
+		TCHECK2(bp[0], 8);
+		laddr = bp;
+		bp += 4;
 		metric = *bp++;
 		thresh = *bp++;
 		flags = *bp++;
 		ncount = *bp++;
 		len -= 8;
 		while (--ncount >= 0 && (len >= 4) && (bp + 4) <= ep) {
-			GET_ADDR(neighbor);
 			printf(" [%s -> ", ipaddr_string(laddr));
-			printf("%s (%d/%d", ipaddr_string(neighbor),
+			printf("%s (%d/%d", ipaddr_string(bp),
 				     metric, thresh);
 			if (flags & DVMRP_NF_TUNNEL)
 				printf("/tunnel");
@@ -306,54 +322,48 @@ print_neighbors2(register const u_char *bp, register const u_char *ep,
 			if (flags & DVMRP_NF_DOWN)
 				printf("/down");
 			printf(")]");
+			bp += 4;
 			len -= 4;
 		}
 		if (ncount != -1) {
 			printf(" [|]");
-			return;
+			return (0);
 		}
 	}
+	return (0);
+trunc:
+	return (-1);
 }
 
-static void
-print_prune(register const u_char *bp, register const u_char *ep,
-    register u_int len)
+static int
+print_prune(register const u_char *bp)
 {
-	union a {
-		u_char b[4];
-		u_int32_t i;
-	} prune_timer;
-
-	if (len < 12 || (bp + 12) > ep) {
-		printf(" [|]");
-		return;
-	}
+	TCHECK2(bp[0], 12);
 	printf(" src %s grp %s", ipaddr_string(bp), ipaddr_string(bp + 4));
 	bp += 8;
-	GET_ADDR(prune_timer.b);
-	printf(" timer %d", (int)ntohl(prune_timer.i));
+	(void)printf(" timer ");
+	relts_print(EXTRACT_32BITS(bp));
+	return (0);
+trunc:
+	return (-1);
 }
 
-static void
-print_graft(register const u_char *bp, register const u_char *ep,
-    register u_int len)
+static int
+print_graft(register const u_char *bp)
 {
-
-	if (len < 8 || (bp + 8) > ep) {
-		printf(" [|]");
-		return;
-	}
+	TCHECK2(bp[0], 8);
 	printf(" src %s grp %s", ipaddr_string(bp), ipaddr_string(bp + 4));
+	return (0);
+trunc:
+	return (-1);
 }
 
-static void
-print_graft_ack(register const u_char *bp, register const u_char *ep,
-    register u_int len)
+static int
+print_graft_ack(register const u_char *bp)
 {
-
-	if (len < 8 || (bp + 8) > ep) {
-		printf(" [|]");
-		return;
-	}
+	TCHECK2(bp[0], 8);
 	printf(" src %s grp %s", ipaddr_string(bp), ipaddr_string(bp + 4));
+	return (0);
+trunc:
+	return (-1);
 }

@@ -20,19 +20,18 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: gmt2local.c,v 1.2 97/01/23 22:31:25 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/gmt2local.c,v 1.7.2.2 2003/11/16 08:51:06 guy Exp $ (LBL)";
 #endif
 
-#include <sys/types.h>
-#include <sys/time.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
+#include <tcpdump-stdinc.h>
 
 #include <stdio.h>
-#ifdef TIME_WITH_SYS_TIME
-#include <time.h>
-#endif
 
-#include "gnuc.h"
 #ifdef HAVE_OS_PROTO_H
 #include "os-proto.h"
 #endif

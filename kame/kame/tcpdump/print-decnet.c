@@ -20,32 +20,26 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: print-decnet.c,v 1.26 97/05/28 12:51:29 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-decnet.c,v 1.36.2.2 2003/11/16 08:51:16 guy Exp $ (LBL)";
 #endif
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/socket.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#if __STDC__
+#include <tcpdump-stdinc.h>
+
 struct mbuf;
 struct rtentry;
-#endif
-#include <net/if.h>
 
-#ifdef	HAVE_LIBDNET
+#ifdef HAVE_NETDNET_DNETDB_H
 #include <netdnet/dnetdb.h>
 #endif
 
-#include <ctype.h>
-#ifdef HAVE_MALLOC_H
-#include <malloc.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "decnet.h"
 #include "extract.h"
@@ -65,7 +59,7 @@ static void print_reason(int);
 static void pdata(u_char *, int);
 #endif
 
-#ifdef	HAVE_LIBDNET
+#ifndef HAVE_NETDNET_DNETDB_H_DNET_HTOA
 extern char *dnet_htoa(struct dn_naddr *);
 #endif
 
@@ -346,13 +340,13 @@ print_i_info(int info)
 }
 
 static void
-print_elist(const char *elp, u_int len)
+print_elist(const char *elp _U_, u_int len _U_)
 {
 	/* Not enough examples available for me to debug this */
 }
 
 static void
-print_nsp(const u_char *nspp, u_int nsplen)
+print_nsp(const u_char *nspp, u_int nsplen _U_)
 {
 	const struct nsphdr *nsphp = (struct nsphdr *)nspp;
 	int dst, src, flags;
@@ -732,29 +726,30 @@ print_reason(register int reason)
 	printf("%s ", tok2str(reason2str, "reason-%d", reason));
 }
 
-char *
+const char *
 dnnum_string(u_short dnaddr)
 {
 	char *str;
+	size_t siz;
 	int area = (u_short)(dnaddr & AREAMASK) >> AREASHIFT;
 	int node = dnaddr & NODEMASK;
 
-	str = (char *)malloc(sizeof("00.0000"));
+	str = (char *)malloc(siz = sizeof("00.0000"));
 	if (str == NULL)
 		error("dnnum_string: malloc");
-	sprintf(str, "%d.%d", area, node);
+	snprintf(str, siz, "%d.%d", area, node);
 	return(str);
 }
 
-char *
+const char *
 dnname_string(u_short dnaddr)
 {
-#ifdef	HAVE_LIBDNET
+#ifdef HAVE_DNET_HTOA
 	struct dn_naddr dna;
 
 	dna.a_len = sizeof(short);
 	memcpy((char *)dna.a_addr, (char *)&dnaddr, sizeof(short));
-	return (savestr(dnet_htoa(&dna)));
+	return (strdup(dnet_htoa(&dna)));
 #else
 	return(dnnum_string(dnaddr));	/* punt */
 #endif
@@ -769,10 +764,7 @@ pdata(u_char *dp, u_int maxlen)
 
 	while (x-- > 0) {
 	    c = *dp++;
-	    if (isprint(c))
-		putchar(c);
-	    else
-		printf("\\%o", c & 0xFF);
+	    safeputchar(c);
 	}
 }
 #endif

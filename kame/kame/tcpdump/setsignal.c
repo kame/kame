@@ -20,21 +20,21 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: setsignal.c,v 1.4 97/06/15 13:20:29 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/setsignal.c,v 1.9.2.2 2003/11/16 08:51:56 guy Exp $ (LBL)";
 #endif
 
-#include <sys/types.h>
-
-#ifdef HAVE_MEMORY_H
-#include <memory.h>
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
+
+#include <tcpdump-stdinc.h>
+
 #include <signal.h>
 #ifdef HAVE_SIGACTION
 #include <string.h>
 #endif
 
-#include "gnuc.h"
 #ifdef HAVE_OS_PROTO_H
 #include "os-proto.h"
 #endif
@@ -42,15 +42,33 @@ static const char rcsid[] =
 #include "setsignal.h"
 
 /*
- * An os independent signal() with BSD semantics, e.g. the signal
- * catcher is restored following service of the signal.
+ * An OS-independent signal() with, whenever possible, partial BSD
+ * semantics, i.e. the signal handler is restored following service
+ * of the signal, but system calls are *not* restarted, so that if
+ * "pcap_breakloop()" is called in a signal handler in a live capture,
+ * the read/recvfrom/whatever in the live capture doesn't get restarted,
+ * it returns -1 and sets "errno" to EINTR, so we can break out of the
+ * live capture loop.
  *
- * When sigset() is available, signal() has SYSV semantics and sigset()
- * has BSD semantics and call interface. Unfortunately, Linux does not
- * have sigset() so we use the more complicated sigaction() interface
- * there.
+ * We use "sigaction()" if available.  We don't specify that the signal
+ * should restart system calls, so that should always do what we want.
  *
- * Did I mention that signals suck?
+ * Otherwise, if "sigset()" is available, it probably has BSD semantics
+ * while "signal()" has traditional semantics, so we use "sigset()"; it
+ * might cause system calls to be restarted for the signal, however.
+ * I don't know whether, in any systems where it did cause system calls to
+ * be restarted, there was a way to ask it not to do so; there may no
+ * longer be any interesting systems without "sigaction()", however,
+ * and, if there are, they might have "sigvec()" with SV_INTERRUPT
+ * (which I think first appeared in 4.3BSD).
+ *
+ * Otherwise, we use "signal()" - which means we might get traditional
+ * semantics, wherein system calls don't get restarted *but* the
+ * signal handler is reset to SIG_DFL and the signal is not blocked,
+ * so that a subsequent signal would kill the process immediately.
+ *
+ * Did I mention that signals suck?  At least in POSIX-compliant systems
+ * they suck far less, as those systems have "sigaction()".
  */
 RETSIGTYPE
 (*setsignal (int sig, RETSIGTYPE (*func)(int)))(int)
@@ -60,9 +78,6 @@ RETSIGTYPE
 
 	memset(&new, 0, sizeof(new));
 	new.sa_handler = func;
-#ifdef SA_RESTART
-	new.sa_flags |= SA_RESTART;
-#endif
 	if (sigaction(sig, &new, &old) < 0)
 		return (SIG_ERR);
 	return (old.sa_handler);

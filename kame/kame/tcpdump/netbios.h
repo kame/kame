@@ -1,7 +1,7 @@
 /*
  * NETBIOS protocol formats
  *
- * @(#) $Header: netbios.h,v 1.1 94/06/09 11:47:15 mccanne Exp $
+ * @(#) $Header: /tcpdump/master/tcpdump/netbios.h,v 1.3 2002/12/11 07:13:55 guy Exp $
  */
 
 struct p8022Hdr {

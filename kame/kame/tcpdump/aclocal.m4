@@ -1,4 +1,4 @@
-dnl @(#) $Header: aclocal.m4,v 1.63 98/06/12 03:44:50 leres Exp $ (LBL)
+dnl @(#) $Header: /tcpdump/master/tcpdump/aclocal.m4,v 1.98.2.4 2004/03/28 21:04:49 fenner Exp $ (LBL)
 dnl
 dnl Copyright (c) 1995, 1996, 1997, 1998
 dnl	The Regents of the University of California.  All rights reserved.
@@ -51,13 +51,13 @@ AC_DEFUN(AC_LBL_C_INIT,
     $1="-O"
     $2=""
     if test "${srcdir}" != "." ; then
-	    $2="-I\$\(srcdir\)"
+	    $2="-I\$(srcdir)"
     fi
     if test "${CFLAGS+set}" = set; then
 	    LBL_CFLAGS="$CFLAGS"
     fi
     if test -z "$CC" ; then
-	    case "$target_os" in
+	    case "$host_os" in
 
 	    bsdi*)
 		    AC_CHECK_PROG(SHLICC2, shlicc2, yes, no)
@@ -100,7 +100,7 @@ AC_DEFUN(AC_LBL_C_INIT,
 		    ac_cv_lbl_cc_ansi_prototypes=no))
 	    AC_MSG_RESULT($ac_cv_lbl_cc_ansi_prototypes)
 	    if test $ac_cv_lbl_cc_ansi_prototypes = no ; then
-		    case "$target_os" in
+		    case "$host_os" in
 
 		    hpux*)
 			    AC_MSG_CHECKING(for HP-UX ansi compiler ($CC -Aa -D_HPUX_SOURCE))
@@ -129,14 +129,14 @@ AC_DEFUN(AC_LBL_C_INIT,
 	    $2="$$2 -I/usr/local/include"
 	    LDFLAGS="$LDFLAGS -L/usr/local/lib"
 
-	    case "$target_os" in
+	    case "$host_os" in
 
 	    irix*)
-		    V_CCOPT="$V_CCOPT -xansi -signed -g3"
+		    V_CCOPT="$V_CCOPT -xansi -signed -O"
 		    ;;
 
 	    osf*)
-		    V_CCOPT="$V_CCOPT -std1 -g3"
+		    V_CCOPT="$V_CCOPT -std1 -O"
 		    ;;
 
 	    ultrix*)
@@ -156,6 +156,51 @@ AC_DEFUN(AC_LBL_C_INIT,
 	    esac
     fi
 ])
+
+#
+# Try compiling a sample of the type of code that appears in
+# gencode.c with "inline", "__inline__", and "__inline".
+#
+# Autoconf's AC_C_INLINE, at least in autoconf 2.13, isn't good enough,
+# as it just tests whether a function returning "int" can be inlined;
+# at least some versions of HP's C compiler can inline that, but can't
+# inline a function that returns a struct pointer.
+#
+AC_DEFUN(AC_LBL_C_INLINE,
+    [AC_MSG_CHECKING(for inline)
+    AC_CACHE_VAL(ac_cv_lbl_inline, [
+	ac_cv_lbl_inline=""
+	ac_lbl_cc_inline=no
+	for ac_lbl_inline in inline __inline__ __inline
+	do
+	    AC_TRY_COMPILE(
+		[#define inline $ac_lbl_inline
+		static inline struct iltest *foo(void);
+		struct iltest {
+		    int iltest1;
+		    int iltest2;
+		};
+
+		static inline struct iltest *
+		foo()
+		{
+		    static struct iltest xxx;
+
+		    return &xxx;
+		}],,ac_lbl_cc_inline=yes,)
+	    if test "$ac_lbl_cc_inline" = yes ; then
+		break;
+	    fi
+	done
+	if test "$ac_lbl_cc_inline" = yes ; then
+	    ac_cv_lbl_inline=$ac_lbl_inline
+	fi])
+    if test ! -z "$ac_cv_lbl_inline" ; then
+	AC_MSG_RESULT($ac_cv_lbl_inline)
+    else
+	AC_MSG_RESULT(no)
+    fi
+    AC_DEFINE_UNQUOTED(inline, $ac_cv_lbl_inline, [Define as token for inline if inlining supported])])
 
 dnl
 dnl Use pfopen.c if available and pfopen() not in standard libraries
@@ -191,16 +236,16 @@ AC_DEFUN(AC_LBL_LIBPCAP,
     AC_MSG_CHECKING(for local pcap library)
     libpcap=FAIL
     lastdir=FAIL
-    places=`ls .. | sed -e 's,/$,,' -e 's,^,../,' | \
-	egrep '/libpcap-[[0-9]]*\.[[0-9]]*(\.[[0-9]]*)?([[ab]][[0-9]]*)?$'`
-    for dir in $places ../libpcap libpcap ; do
+    places=`ls $srcdir/.. | sed -e 's,/$,,' -e "s,^,$srcdir/../," | \
+	egrep '/libpcap-[[0-9]]*.[[0-9]]*(.[[0-9]]*)?([[ab]][[0-9]]*)?$'`
+    for dir in $places $srcdir/../libpcap $srcdir/libpcap ; do
 	    basedir=`echo $dir | sed -e 's/[[ab]][[0-9]]*$//'`
 	    if test $lastdir = $basedir ; then
 		    dnl skip alphas when an actual release is present
 		    continue;
 	    fi
 	    lastdir=$dir
-	    if test -r $dir/pcap.c ; then
+	    if test -r $dir/libpcap.a ; then
 		    libpcap=$dir/libpcap.a
 		    d=$dir
 		    dnl continue and select the last one that exists
@@ -212,13 +257,51 @@ AC_DEFUN(AC_LBL_LIBPCAP,
 	    if test $libpcap = FAIL ; then
 		    AC_MSG_ERROR(see the INSTALL doc for more info)
 	    fi
+	    dnl
+	    dnl Good old Red Hat Linux puts "pcap.h" in
+	    dnl "/usr/include/pcap"; had the LBL folks done so,
+	    dnl that would have been a good idea, but for
+	    dnl the Red Hat folks to do so just breaks source
+	    dnl compatibility with other systems.
+	    dnl
+	    dnl We work around this by assuming that, as we didn't
+	    dnl find a local libpcap, libpcap is in /usr/lib or
+	    dnl /usr/local/lib and that the corresponding header
+	    dnl file is under one of those directories; if we don't
+	    dnl find it in either of those directories, we check to
+	    dnl see if it's in a "pcap" subdirectory of them and,
+	    dnl if so, add that subdirectory to the "-I" list.
+	    dnl
+	    AC_MSG_CHECKING(for extraneous pcap header directories)
+	    if test \( ! -r /usr/local/include/pcap.h \) -a \
+			\( ! -r /usr/include/pcap.h \); then
+		if test -r /usr/local/include/pcap/pcap.h; then
+		    d="/usr/local/include/pcap"
+		elif test -r /usr/include/pcap/pcap.h; then
+		    d="/usr/include/pcap"
+		fi
+	    fi
+	    if test -z "$d" ; then
+		AC_MSG_RESULT(not found)
+	    else
+		$2="-I$d $$2"
+		AC_MSG_RESULT(found -- -I$d added)
+	    fi
     else
 	    $1=$libpcap
-	    $2="-I$d $$2"
+	    places=`ls $srcdir/.. | sed -e 's,/$,,' -e "s,^,$srcdir/../," | \
+    	 		egrep '/libpcap-[[0-9]]*.[[0-9]]*(.[[0-9]]*)?([[ab]][[0-9]]*)?$'`
+	    if test -r $d/pcap.h; then
+		    $2="-I$d $$2"
+	    elif test -r $places/pcap.h; then
+		    $2="-I$places $$2"
+	    else
+                    AC_MSG_ERROR(cannot find pcap.h, see INSTALL)
+ 	    fi
 	    AC_MSG_RESULT($libpcap)
     fi
     LIBS="$libpcap $LIBS"
-    case "$target_os" in
+    case "$host_os" in
 
     aix*)
 	    pseexe="/lib/pse.exp"
@@ -227,8 +310,42 @@ AC_DEFUN(AC_LBL_LIBPCAP,
 		    AC_MSG_RESULT(yes)
 		    LIBS="$LIBS -I:$pseexe"
 	    fi
+	    #
+	    # We need "-lodm" and "-lcfg", as libpcap requires them on
+	    # AIX, and we just build a static libpcap.a and thus can't
+	    # arrange that when you link with libpcap you automatically
+	    # link with those libraries.
+	    #
+	    LIBS="$LIBS -lodm -lcfg"
 	    ;;
-    esac])
+    esac
+
+    dnl
+    dnl Check for "pcap_list_datalinks()", "pcap_set_datalink()",
+    dnl and "pcap_datalink_name_to_val()", and use substitute versions
+    dnl if they're not present
+    dnl
+    AC_CHECK_FUNC(pcap_list_datalinks,
+	AC_DEFINE(HAVE_PCAP_LIST_DATALINKS),
+	AC_LIBOBJ(datalinks))
+    AC_CHECK_FUNC(pcap_set_datalink,
+	AC_DEFINE(HAVE_PCAP_SET_DATALINK))
+    AC_CHECK_FUNC(pcap_datalink_name_to_val,
+	[
+	    AC_DEFINE(HAVE_PCAP_DATALINK_NAME_TO_VAL)
+	    AC_CHECK_FUNC(pcap_datalink_val_to_description,
+		AC_DEFINE(HAVE_PCAP_DATALINK_VAL_TO_DESCRIPTION),
+		AC_LIBOBJ(dlnames))
+	],
+	AC_LIBOBJ(dlnames))
+
+    dnl
+    dnl Check for "pcap_breakloop()"; you can't substitute for it if
+    dnl it's absent (it has hooks into the live capture routines),
+    dnl so just define the HAVE_ value if it's there.
+    dnl
+    AC_CHECK_FUNCS(pcap_breakloop)
+])
 
 dnl
 dnl Define RETSIGTYPE and RETSIGVAL
@@ -250,17 +367,17 @@ AC_DEFUN(AC_LBL_TYPE_SIGNAL,
     else
 	    AC_DEFINE(RETSIGVAL,(0))
     fi
-    case "$target_os" in
+    case "$host_os" in
 
     irix*)
 	    AC_DEFINE(_BSD_SIGNALS)
 	    ;;
 
     *)
-	    dnl prefer sigset() to sigaction()
-	    AC_CHECK_FUNCS(sigset)
-	    if test $ac_cv_func_sigset = no ; then
-		    AC_CHECK_FUNCS(sigaction)
+	    dnl prefer sigaction() to sigset()
+	    AC_CHECK_FUNCS(sigaction)
+	    if test $ac_cv_func_sigaction = no ; then
+		    AC_CHECK_FUNCS(sigset)
 	    fi
 	    ;;
     esac])
@@ -483,9 +600,41 @@ dnl
 AC_DEFUN(AC_LBL_UNALIGNED_ACCESS,
     [AC_MSG_CHECKING(if unaligned accesses fail)
     AC_CACHE_VAL(ac_cv_lbl_unaligned_fail,
-	[case "$target_cpu" in
+	[case "$host_cpu" in
 
-	alpha|hp*|mips|sparc)
+	#
+	# These are CPU types where:
+	#
+	#	the CPU faults on an unaligned access, but at least some
+	#	OSes that support that CPU catch the fault and simulate
+	#	the unaligned access (e.g., Alpha/{Digital,Tru64} UNIX) -
+	#	the simulation is slow, so we don't want to use it;
+	#
+	#	the CPU, I infer (from the old
+	#
+	# XXX: should also check that they don't do weird things (like on arm)
+	#
+	#	comment) doesn't fault on unaligned accesses, but doesn't
+	#	do a normal unaligned fetch, either (e.g., presumably, ARM);
+	#
+	#	for whatever reason, the test program doesn't work
+	#	(this has been claimed to be the case for several of those
+	#	CPUs - I don't know what the problem is; the problem
+	#	was reported as "the test program dumps core" for SuperH,
+	#	but that's what the test program is *supposed* to do -
+	#	it dumps core before it writes anything, so the test
+	#	for an empty output file should find an empty output
+	#	file and conclude that unaligned accesses don't work).
+	#
+	# This run-time test won't work if you're cross-compiling, so
+	# in order to support cross-compiling for a particular CPU,
+	# we have to wire in the list of CPU types anyway, as far as
+	# I know, so perhaps we should just have a set of CPUs on
+	# which we know it doesn't work, a set of CPUs on which we
+	# know it does work, and have the script just fail on other
+	# cpu types and update it when such a failure occurs.
+	#
+	alpha*|arm*|hp*|mips*|sh*|sparc*|ia64|nv1)
 		ac_cv_lbl_unaligned_fail=yes
 		;;
 
@@ -540,7 +689,8 @@ EOF
 dnl
 dnl If using gcc and the file .devel exists:
 dnl	Compile with -g (if supported) and -Wall
-dnl	If using gcc 2, do extra prototype checking
+dnl	If using gcc 2 or later, do extra prototype checking and some other
+dnl	checks
 dnl	If an os prototype include exists, symlink os-proto.h to it
 dnl
 dnl usage:
@@ -566,11 +716,11 @@ AC_DEFUN(AC_LBL_DEVEL,
 			    fi
 			    $1="$$1 -Wall"
 			    if test $ac_cv_lbl_gcc_vers -gt 1 ; then
-				    $1="$$1 -Wmissing-prototypes -Wstrict-prototypes"
+				    $1="$$1 -Wmissing-prototypes -Wstrict-prototypes -Wwrite-strings -W"
 			    fi
 		    fi
 	    else
-		    case "$target_os" in
+		    case "$host_os" in
 
 		    irix6*)
 			    V_CCOPT="$V_CCOPT -n32"
@@ -580,7 +730,7 @@ AC_DEFUN(AC_LBL_DEVEL,
 			    ;;
 		    esac
 	    fi
-	    os=`echo $target_os | sed -e 's/\([[0-9]][[0-9]]*\)[[^0-9]].*$/\1/'`
+	    os=`echo $host_os | sed -e 's/\([[0-9]][[0-9]]*\)[[^0-9]].*$/\1/'`
 	    name="lbl/os-$os.h"
 	    if test -f $name ; then
 		    ln -s $name os-proto.h
@@ -604,13 +754,19 @@ dnl results:
 dnl
 dnl	LIBS
 dnl
+dnl XXX - "AC_LBL_LIBRARY_NET" was redone to use "AC_SEARCH_LIBS"
+dnl rather than "AC_LBL_CHECK_LIB", so this isn't used any more.
+dnl We keep it around for reference purposes in case it's ever
+dnl useful in the future.
+dnl
 
 define(AC_LBL_CHECK_LIB,
 [AC_MSG_CHECKING([for $2 in -l$1])
-dnl Use a cache variable name containing both the library and function name,
-dnl because the test really is for library $1 defining function $2, not
-dnl just for library $1.  Separate tests with the same $1 and different $2's
-dnl may have different results.
+dnl Use a cache variable name containing the library, function
+dnl name, and extra libraries to link with, because the test really is
+dnl for library $1 defining function $2, when linked with potinal
+dnl library $5, not just for library $1.  Separate tests with the same
+dnl $1 and different $2's or $5's may have different results.
 ac_lib_var=`echo $1['_']$2['_']$5 | sed 'y%./+- %__p__%'`
 AC_CACHE_VAL(ac_cv_lbl_lib_$ac_lib_var,
 [ac_save_LIBS="$LIBS"
@@ -686,21 +842,365 @@ dnl
 AC_DEFUN(AC_LBL_LIBRARY_NET, [
     # Most operating systems have gethostbyname() in the default searched
     # libraries (i.e. libc):
-    AC_CHECK_FUNC(gethostbyname, ,
-	# Some OSes (eg. Solaris) place it in libnsl:
-	AC_LBL_CHECK_LIB(nsl, gethostbyname, , 
-	    # Some strange OSes (SINIX) have it in libsocket:
-	    AC_LBL_CHECK_LIB(socket, gethostbyname, ,
-		# Unfortunately libsocket sometimes depends on libnsl.
-		# AC_CHECK_LIB's API is essentially broken so the
-		# following ugliness is necessary:
-		AC_LBL_CHECK_LIB(socket, gethostbyname,
-		    LIBS="-lsocket -lnsl $LIBS",
-		    AC_CHECK_LIB(resolv, gethostbyname),
-		    -lnsl))))
-    AC_CHECK_FUNC(socket, , AC_CHECK_LIB(socket, socket, ,
-	AC_LBL_CHECK_LIB(socket, socket, LIBS="-lsocket -lnsl $LIBS", ,
-	    -lnsl)))
+    # Some OSes (eg. Solaris) place it in libnsl
+    # Some strange OSes (SINIX) have it in libsocket:
+    AC_SEARCH_LIBS(gethostbyname, nsl socket resolv)
+    # Unfortunately libsocket sometimes depends on libnsl and
+    # AC_SEARCH_LIBS isn't up to the task of handling dependencies like this.
+    if test "$ac_cv_search_gethostbyname" = "no"
+    then
+	AC_CHECK_LIB(socket, gethostbyname,
+                     LIBS="-lsocket -lnsl $LIBS", , -lnsl)
+    fi
+    AC_SEARCH_LIBS(socket, socket, ,
+	AC_CHECK_LIB(socket, socket, LIBS="-lsocket -lnsl $LIBS", , -lnsl))
     # DLPI needs putmsg under HPUX so test for -lstr while we're at it
-    AC_CHECK_LIB(str, putmsg)
+    AC_SEARCH_LIBS(putmsg, str)
     ])
+
+dnl Copyright (c) 1999 WIDE Project. All rights reserved.
+dnl
+dnl Redistribution and use in source and binary forms, with or without
+dnl modification, are permitted provided that the following conditions
+dnl are met:
+dnl 1. Redistributions of source code must retain the above copyright
+dnl    notice, this list of conditions and the following disclaimer.
+dnl 2. Redistributions in binary form must reproduce the above copyright
+dnl    notice, this list of conditions and the following disclaimer in the
+dnl    documentation and/or other materials provided with the distribution.
+dnl 3. Neither the name of the project nor the names of its contributors
+dnl    may be used to endorse or promote products derived from this software
+dnl    without specific prior written permission.
+dnl 
+dnl THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+dnl ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+dnl IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+dnl ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+dnl FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+dnl DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+dnl OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+dnl HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+dnl LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+dnl OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+dnl SUCH DAMAGE.
+
+dnl
+dnl Checks to see if AF_INET6 is defined
+AC_DEFUN(AC_CHECK_AF_INET6, [
+	AC_MSG_CHECKING(for AF_INET6)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <sys/socket.h>],
+		[int a = AF_INET6],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+		if test $$1 = yes ; then
+			AC_DEFINE(HAVE_AF_INET6)
+	fi
+])
+
+dnl
+dnl Checks to see if the sockaddr struct has the 4.4 BSD sa_len member
+dnl borrowed from LBL libpcap
+AC_DEFUN(AC_CHECK_SA_LEN, [
+	AC_MSG_CHECKING(if sockaddr struct has sa_len member)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <sys/socket.h>],
+		[u_int i = sizeof(((struct sockaddr *)0)->sa_len)],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+		if test $$1 = yes ; then
+			AC_DEFINE(HAVE_SOCKADDR_SA_LEN)
+	fi
+])
+
+dnl
+dnl Checks for portable prototype declaration macro
+AC_DEFUN(AC_CHECK_PORTABLE_PROTO,  [
+	AC_MSG_CHECKING(for __P)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <unistd.h>],
+		[int f __P(())],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_PORTABLE_PROTOTYPE)
+	fi
+])
+
+dnl checks for u_intXX_t
+AC_DEFUN(AC_CHECK_BITTYPES, [
+	$1=yes
+dnl check for u_int8_t
+	AC_MSG_CHECKING(for u_int8_t)
+	AC_CACHE_VAL(ac_cv_u_int8_t,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>],
+		[u_int8_t i],
+		ac_cv_u_int8_t=yes,
+		ac_cv_u_int8_t=no))
+	AC_MSG_RESULT($ac_cv_u_int8_t)
+	if test $ac_cv_u_int8_t = yes; then
+		AC_DEFINE(HAVE_U_INT8_T)
+	else
+		$1=no
+	fi
+dnl check for u_int16_t
+	AC_MSG_CHECKING(for u_int16_t)
+	AC_CACHE_VAL(ac_cv_u_int16_t,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>],
+		[u_int16_t i],
+		ac_cv_u_int16_t=yes,
+		ac_cv_u_int16_t=no))
+	AC_MSG_RESULT($ac_cv_u_int16_t)
+	if test $ac_cv_u_int16_t = yes; then
+		AC_DEFINE(HAVE_U_INT16_T)
+	else
+		$1=no
+	fi
+dnl check for u_int32_t
+	AC_MSG_CHECKING(for u_int32_t)
+	AC_CACHE_VAL(ac_cv_u_int32_t,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>],
+		[u_int32_t i],
+		ac_cv_u_int32_t=yes,
+		ac_cv_u_int32_t=no))
+	AC_MSG_RESULT($ac_cv_u_int32_t)
+	if test $ac_cv_u_int32_t = yes; then
+		AC_DEFINE(HAVE_U_INT32_T)
+	else
+		$1=no
+	fi
+])
+
+dnl
+dnl Checks for addrinfo structure
+AC_DEFUN(AC_STRUCT_ADDRINFO, [
+	AC_MSG_CHECKING(for addrinfo)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <netdb.h>],
+		[struct addrinfo a],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_ADDRINFO)
+	else
+		AC_DEFINE(NEED_ADDRINFO_H)
+	fi
+])
+
+dnl
+dnl Checks for NI_MAXSERV
+AC_DEFUN(AC_NI_MAXSERV, [
+	AC_MSG_CHECKING(for NI_MAXSERV)
+	AC_CACHE_VAL($1,
+	AC_EGREP_CPP(yes, [#include <netdb.h>
+#ifdef NI_MAXSERV
+yes
+#endif],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 != yes; then
+		AC_DEFINE(NEED_ADDRINFO_H)
+	fi
+])
+
+dnl
+dnl Checks for NI_NAMEREQD
+AC_DEFUN(AC_NI_NAMEREQD, [
+	AC_MSG_CHECKING(for NI_NAMEREQD)
+	AC_CACHE_VAL($1,
+	AC_EGREP_CPP(yes, [#include <netdb.h>
+#ifdef NI_NOFQDN
+yes
+#endif],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 != yes; then
+		AC_DEFINE(NEED_ADDRINFO_H)
+	fi
+])
+
+dnl
+dnl Checks for sockaddr_storage structure
+AC_DEFUN(AC_STRUCT_SA_STORAGE, [
+	AC_MSG_CHECKING(for sockaddr_storage)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <sys/socket.h>],
+		[struct sockaddr_storage s],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_SOCKADDR_STORAGE)
+	fi
+])
+
+dnl
+dnl Checks for macro of IP address size
+AC_DEFUN(AC_CHECK_ADDRSZ, [
+	$1=yes
+dnl check for INADDRSZ
+	AC_MSG_CHECKING(for INADDRSZ)
+	AC_CACHE_VAL(ac_cv_inaddrsz,
+	AC_TRY_COMPILE([
+#		include <arpa/nameser.h>],
+		[int a = INADDRSZ],
+		ac_cv_inaddrsz=yes,
+		ac_cv_inaddrsz=no))
+	AC_MSG_RESULT($ac_cv_inaddrsz)
+	if test $ac_cv_inaddrsz = yes; then
+		AC_DEFINE(HAVE_INADDRSZ)
+	else
+		$1=no
+	fi
+dnl check for IN6ADDRSZ
+	AC_MSG_CHECKING(for IN6ADDRSZ)
+	AC_CACHE_VAL(ac_cv_in6addrsz,
+	AC_TRY_COMPILE([
+#		include <arpa/nameser.h>],
+		[int a = IN6ADDRSZ],
+		ac_cv_in6addrsz=yes,
+		ac_cv_in6addrsz=no))
+	AC_MSG_RESULT($ac_cv_in6addrsz)
+	if test $ac_cv_in6addrsz = yes; then
+		AC_DEFINE(HAVE_IN6ADDRSZ)
+	else
+		$1=no
+	fi
+])
+
+dnl
+dnl check for RES_USE_INET6
+AC_DEFUN(AC_CHECK_RES_USE_INET6, [
+	AC_MSG_CHECKING(for RES_USE_INET6)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <netinet/in.h>
+#		include <resolv.h>],
+		[int a = RES_USE_INET6],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_RES_USE_INET6)
+	fi
+])
+
+dnl
+dnl check for AAAA
+AC_DEFUN(AC_CHECK_AAAA, [
+	AC_MSG_CHECKING(for AAAA)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <arpa/nameser.h>],
+		[int a = T_AAAA],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_AAAA)
+	fi
+])
+
+dnl
+dnl check for struct res_state_ext
+AC_DEFUN(AC_STRUCT_RES_STATE_EXT, [
+	AC_MSG_CHECKING(for res_state_ext)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <netinet/in.h>
+#		include <netinet6/in6.h>
+#		include <resolv.h>],
+		[struct __res_state_ext e],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_RES_STATE_EXT)
+	fi
+])
+
+dnl
+dnl check for struct res_state_ext
+AC_DEFUN(AC_STRUCT_RES_STATE, [
+	AC_MSG_CHECKING(for nsort in res_state)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <netinet/in.h>
+#		include <netinet6/in6.h>
+#		include <resolv.h>],
+		[struct __res_state e; e.nsort = 0],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_NEW_RES_STATE)
+	fi
+])
+
+dnl
+dnl check for h_errno
+AC_DEFUN(AC_VAR_H_ERRNO, [
+	AC_MSG_CHECKING(for h_errno)
+	AC_CACHE_VAL(ac_cv_var_h_errno,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <netdb.h>],
+		[int foo = h_errno;],
+		ac_cv_var_h_errno=yes,
+		ac_cv_var_h_errno=no))
+	AC_MSG_RESULT($ac_cv_var_h_errno)
+	if test "$ac_cv_var_h_errno" = "yes"; then
+		AC_DEFINE(HAVE_H_ERRNO)
+	fi
+])
+
+dnl
+dnl Test for __attribute__
+dnl
+
+AC_DEFUN(AC_C___ATTRIBUTE__, [
+AC_MSG_CHECKING(for __attribute__)
+AC_CACHE_VAL(ac_cv___attribute__, [
+AC_TRY_COMPILE([
+#include <stdlib.h>
+],
+[
+static void foo(void) __attribute__ ((noreturn));
+
+static void
+foo(void)
+{
+  exit(1);
+}
+],
+ac_cv___attribute__=yes,
+ac_cv___attribute__=no)])
+if test "$ac_cv___attribute__" = "yes"; then
+  AC_DEFINE(HAVE___ATTRIBUTE__, 1, [define if your compiler has __attribute__])
+  V_DEFS="$V_DEFS -D_U_=\"__attribute__((unused))\""
+else
+  V_DEFS="$V_DEFS -D_U_=\"\""
+fi
+AC_MSG_RESULT($ac_cv___attribute__)
+])

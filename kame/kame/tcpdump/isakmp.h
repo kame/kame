@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +13,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.1.2.2.4.1 1999/02/12 08:10:02 sumikawa Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.10 2002/12/11 07:13:54 guy Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -98,20 +98,18 @@ typedef struct { /* i_cookie + r_cookie */
         +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 */
 struct isakmp {
-	cookie_t i_ck;     /* Initiator Cookie */
-	cookie_t r_ck;     /* Responder Cookie */
-	u_int8_t   np;       /* Next Payload Type */
-#if BYTE_ORDER == LITTLE_ENDIAN
-	u_int8_t   v_min:4,  /* MnVer */
-	         v_maj:4;  /* MjVer */
-#else
-	u_int8_t   v_maj:4,  /* MnVer */
-	         v_min:4;  /* MjVer */
-#endif
-	u_int8_t   etype;    /* Exchange Type */
-	u_int8_t   flags;    /* Flags */
-	msgid_t  msgid;
-	u_int32_t  len;      /* Length */
+	cookie_t i_ck;		/* Initiator Cookie */
+	cookie_t r_ck;		/* Responder Cookie */
+	u_int8_t np;		/* Next Payload Type */
+	u_int8_t vers;
+#define ISAKMP_VERS_MAJOR	0xf0
+#define ISAKMP_VERS_MAJOR_SHIFT	4
+#define ISAKMP_VERS_MINOR	0x0f
+#define ISAKMP_VERS_MINOR_SHIFT	0
+	u_int8_t etype;		/* Exchange Type */
+	u_int8_t flags;		/* Flags */
+	msgid_t msgid;
+	u_int32_t len;		/* Length */
 };
 
 /* Next Payload Type */
@@ -370,75 +368,6 @@ struct isakmp_ph2tab {
 	struct isakmp_ph2 *tail;
 	int len;
 };
-
-#if 0
-/* isakmp status structure */
-struct isakmp_ph1 {
-	isakmp_index index;
-	u_int8_t  dir;                 /* INITIATOR or RESPONDER */
-	u_int16_t status;              /* status of this SA */
-	u_int16_t etype;
-	u_int32_t doi;
-	u_int32_t sit;
-	vchar_t   *dhp;                /* DH; prime, static value */
-	vchar_t   *dhpriv;             /* DH; private value */
-	vchar_t   *dhpub;              /* DH; public value */
-	vchar_t   *dhpub_p;            /* DH; partner's public value */
-	vchar_t   *dhgxy;              /* DH; shared secret */
-	vchar_t   *nonce;              /* nonce value */
-	vchar_t   *nonce_p;            /* partner's nonce value */
-	vchar_t   *skeyid;             /* SKEYID */
-	vchar_t   *skeyid_d;           /* SKEYID_d */
-	vchar_t   *skeyid_a;           /* SKEYID_a, i.e. hash */
-	vchar_t   *skeyid_e;           /* SKEYID_e, i.e. encryption */
-	vchar_t   *key;                /* cipher key */
-	vchar_t   *hash;               /* HASH minus general header */
-	vchar_t   *iv;                 /* IV */
-	vchar_t   *ive;                /* new IV to encrypt next packet */
-	vchar_t   *ivd;                /* new IV to decrypt next packet */
-	vchar_t   *sa;                 /* SA minus general header including p,t.*/
-	vchar_t   *id;                 /* ID minus general header */
-	vchar_t   *id_p;               /* partner's ID minus general header */
-	struct sockaddr  *local;       /* pointer to the my sockaddr */
-	struct sockaddr  *remote;      /* partner's sockaddr */
-	struct oakley_sa *isa;         /* Is it good that caddr_t ? */
-	struct sched *sc;              /* back pointer to the record in schedule
-	                                used to resend. */
-	struct isakmp_ph1 *next;
-	struct isakmp_ph1 *prev;
-	struct isakmp_conf *cfp;     /* pointer to isakmp configuration */
-	struct isakmp_ph2tab ph2tab; /* list on negotiating Phase 2 */
-	u_int32_t msgid2;              /* XXX: msgid counter for Phase 2 */
-};
-
-struct isakmp_ph2 {
-	msgid_t msgid;
-	u_int8_t  dir;             /* INITIATOR or RESPONDER */
-	u_int16_t status;          /* status of this SA */
-	vchar_t *dhp;            /* DH; prime, static value */
-	vchar_t *dhpriv;         /* DH; private value */
-	vchar_t *dhpub;          /* DH; public value */
-	vchar_t *dhpub_p;        /* DH; partner's public value */
-	vchar_t *dhgxy;          /* DH; shared secret */
-	vchar_t *id;             /* ID */
-	vchar_t *id_p;           /* ID for peer */
-	vchar_t *nonce;          /* nonce value in phase 2 */
-	vchar_t *nonce_p;        /* partner's nonce value in phase 2 */
-	vchar_t *hash;           /* HASH2 minus general header */
-	vchar_t *iv;             /* IV for Phase 2 */
-	vchar_t *ive;            /* new IV to encrypt next packet */
-	vchar_t *ivd;            /* new IV to decrypt next packet */
-	struct isakmp_ph1 *ph1;  /* back pointer to isakmp status */
-	struct sched *sc;        /* back pointer to the schedule using resend */
-	struct pfkey_st *pst;    /* pointer to the pfkey status record.
-	                            is only used by initiator. */
-	u_int8_t proxy;            /* is proxy or not ?. */
-	vchar_t *sa;             /* SA payload */
-	struct ipsec_sa *isa;    /* values of SA to use, same SA in use. */
-	struct isakmp_ph2 *next;
-	struct isakmp_ph2 *prev;
-};
-#endif
 
 #define EXCHANGE_PROXY   1
 #define EXCHANGE_MYSELF  0

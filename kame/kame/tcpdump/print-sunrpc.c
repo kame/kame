@@ -20,39 +20,35 @@
  */
 
 #ifndef lint
-static const char rcsid[] =
-    "@(#) $Header: print-sunrpc.c,v 1.26 96/12/31 21:27:43 leres Exp $ (LBL)";
+static const char rcsid[] _U_ =
+    "@(#) $Header: /tcpdump/master/tcpdump/print-sunrpc.c,v 1.43.2.2 2003/11/16 08:51:47 guy Exp $ (LBL)";
 #endif
 
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/socket.h>
-
-#if __STDC__
-struct mbuf;
-struct rtentry;
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
-#include <net/if.h>
 
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/ip_var.h>
+#include <tcpdump-stdinc.h>
 
 #include <rpc/rpc.h>
 #ifdef HAVE_RPC_RPCENT_H
 #include <rpc/rpcent.h>
 #endif
+#ifndef WIN32
 #include <rpc/pmap_prot.h>
+#endif /* WIN32 */
 
-#include <ctype.h>
-#include <netdb.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "interface.h"
 #include "addrtoname.h"
+#include "extract.h"
+
+#include "ip.h"
+#ifdef INET6
+#include "ip6.h"
+#endif
 
 static struct tok proc2str[] = {
 	{ PMAPPROC_NULL,	"null" },
@@ -73,42 +69,62 @@ sunrpcrequest_print(register const u_char *bp, register u_int length,
 {
 	register const struct rpc_msg *rp;
 	register const struct ip *ip;
+#ifdef INET6
+	register const struct ip6_hdr *ip6;
+#endif
 	u_int32_t x;
+	char srcid[20], dstid[20];	/*fits 32bit*/
 
 	rp = (struct rpc_msg *)bp;
-	ip = (struct ip *)bp2;
 
-	if (!nflag)
-		(void)printf("%s.%x > %s.sunrpc: %d",
-			     ipaddr_string(&ip->ip_src),
-			     (u_int32_t)ntohl(rp->rm_xid),
-			     ipaddr_string(&ip->ip_dst),
-			     length);
-	else
-		(void)printf("%s.%x > %s.%x: %d",
-			     ipaddr_string(&ip->ip_src),
-			     (u_int32_t)ntohl(rp->rm_xid),
-			     ipaddr_string(&ip->ip_dst),
-			     PMAPPORT,
-			     length);
+	if (!nflag) {
+		snprintf(srcid, sizeof(srcid), "0x%x",
+		    EXTRACT_32BITS(&rp->rm_xid));
+		strlcpy(dstid, "sunrpc", sizeof(dstid));
+	} else {
+		snprintf(srcid, sizeof(srcid), "0x%x",
+		    EXTRACT_32BITS(&rp->rm_xid));
+		snprintf(dstid, sizeof(dstid), "0x%x", PMAPPORT);
+	}
+
+	switch (IP_V((struct ip *)bp2)) {
+	case 4:
+		ip = (struct ip *)bp2;
+		printf("%s.%s > %s.%s: %d",
+		    ipaddr_string(&ip->ip_src), srcid,
+		    ipaddr_string(&ip->ip_dst), dstid, length);
+		break;
+#ifdef INET6
+	case 6:
+		ip6 = (struct ip6_hdr *)bp2;
+		printf("%s.%s > %s.%s: %d",
+		    ip6addr_string(&ip6->ip6_src), srcid,
+		    ip6addr_string(&ip6->ip6_dst), dstid, length);
+		break;
+#endif
+	default:
+		printf("%s.%s > %s.%s: %d", "?", srcid, "?", dstid, length);
+		break;
+	}
+
 	printf(" %s", tok2str(proc2str, " proc #%u",
-	    (u_int32_t)ntohl(rp->rm_call.cb_proc)));
-	x = ntohl(rp->rm_call.cb_rpcvers);
+	    EXTRACT_32BITS(&rp->rm_call.cb_proc)));
+	x = EXTRACT_32BITS(&rp->rm_call.cb_rpcvers);
 	if (x != 2)
 		printf(" [rpcver %u]", x);
 
-	switch (ntohl(rp->rm_call.cb_proc)) {
+	switch (EXTRACT_32BITS(&rp->rm_call.cb_proc)) {
 
 	case PMAPPROC_SET:
 	case PMAPPROC_UNSET:
 	case PMAPPROC_GETPORT:
 	case PMAPPROC_CALLIT:
-		x = ntohl(rp->rm_call.cb_prog);
+		x = EXTRACT_32BITS(&rp->rm_call.cb_prog);
 		if (!nflag)
 			printf(" %s", progstr(x));
 		else
 			printf(" %u", x);
-		printf(".%u", (u_int32_t)ntohl(rp->rm_call.cb_vers));
+		printf(".%u", EXTRACT_32BITS(&rp->rm_call.cb_vers));
 		break;
 	}
 }
@@ -117,16 +133,22 @@ static char *
 progstr(prog)
 	u_int32_t prog;
 {
+#ifndef WIN32
 	register struct rpcent *rp;
+#endif
 	static char buf[32];
-	static int lastprog = 0;
+	static u_int32_t lastprog = 0;
 
 	if (lastprog != 0 && prog == lastprog)
 		return (buf);
+#ifndef WIN32
 	rp = getrpcbynumber(prog);
 	if (rp == NULL)
-		(void) sprintf(buf, "#%u", prog);
+#endif /* WIN32 */
+		(void) snprintf(buf, sizeof(buf), "#%u", prog);
+#ifndef WIN32
 	else
-		strcpy(buf, rp->r_name);
+		strlcpy(buf, rp->r_name, sizeof(buf));
+#endif
 	return (buf);
 }
