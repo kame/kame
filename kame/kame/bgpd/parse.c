@@ -1094,6 +1094,9 @@ conf_check(char *filename)
     
   /************************************************************************/
 
+  if (ripyes)
+	  rip_import_init();
+
   if (bgpyes) {
     struct sockaddr_in6 bgpsin;        /* my address      */
     int on;

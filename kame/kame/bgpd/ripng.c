@@ -73,8 +73,6 @@ rip_init()
   extern fd_set         fdmask;
   extern struct ifinfo *ifentry;
   extern task          *taskhead;
-  extern struct rpcb   *bgb;
-  extern byte           bgpyes;
 
   memset(&ripsin,   0, sizeof(ripsin));  /* sockaddr_in6  */
   memset(&mreq,     0, sizeof(mreq));
@@ -105,12 +103,6 @@ rip_init()
 
   ife = ifentry;
   while (ife) {   /*  for each available I/F  */
-	  /* (1998/05/21) */
-	  if (IN6_IS_ADDR_UNSPECIFIED(&ife->ifi_laddr)) {
-		  ripif->rip_mode |= IFS_NORIPIN;
-		  ripif->rip_mode |= IFS_NORIPOUT;
-	  }
-
 	  if (ife->ifi_flags & IFF_UP &&
 	      ife->ifi_flags & IFF_MULTICAST) /* XXX */
 	  {
@@ -121,6 +113,12 @@ rip_init()
 
 		  MALLOC(ripif, struct ripif);
 		  ripif->rip_ife   = ife;
+
+		  /* (1998/05/21) */
+		  if (IN6_IS_ADDR_UNSPECIFIED(&ife->ifi_laddr)) {
+			  ripif->rip_mode |= IFS_NORIPIN;
+			  ripif->rip_mode |= IFS_NORIPOUT;
+		  }
 
 		  if (ripifs) 
 			  insque(ripif, ripifs);
@@ -160,8 +158,37 @@ rip_init()
   FD_SET(ripsock,  &fdmask);
 
 
-  /*   Adj_Ribs_Out  initialization                        */
-  ripif = ripifs;
+  MALLOC(tsk, task);
+
+  if (taskhead) {
+    insque(tsk, taskhead);
+  } else {
+    taskhead      = tsk;
+    tsk->tsk_next = tsk;
+    tsk->tsk_prev = tsk;
+  }
+  tsk->tsk_timename         = RIP_DUMP_TIMER;
+  tsk->tsk_rip              = NULL;
+  tsk->tsk_timefull.tv_sec  = 1; /* immediately */ 
+  tsk->tsk_timefull.tv_usec = 0;
+
+
+  task_timer_update(tsk);
+
+  /* End of rip_init() */
+}
+
+/*
+ * rip_inport_init: initilize Adj_Ribs_Out for RIPng
+ */
+void
+rip_import_init()
+{
+  struct ripif      *ripif = ripifs;
+  extern byte           bgpyes;
+  extern struct ifinfo *ifentry;
+  extern struct rpcb   *bgb;
+
   while (ripif) {
 
     struct ripif  *outripif;
@@ -234,28 +261,7 @@ rip_init()
     if ((ripif = ripif->rip_next) == ripifs)
 	    break;
   } /* while (global "ripifs") */ 
-
-  MALLOC(tsk, task);
-
-  if (taskhead) {
-    insque(tsk, taskhead);
-  } else {
-    taskhead      = tsk;
-    tsk->tsk_next = tsk;
-    tsk->tsk_prev = tsk;
-  }
-  tsk->tsk_timename         = RIP_DUMP_TIMER;
-  tsk->tsk_rip              = NULL;
-  tsk->tsk_timefull.tv_sec  = 1; /* immediately */ 
-  tsk->tsk_timefull.tv_usec = 0;
-
-
-  task_timer_update(tsk);
-
-  /* End of rip_init() */
 }
-
-
 
 /*
  *   rip_query_dump()
@@ -572,7 +578,6 @@ rip_input()
   return; 
 }
 
-
 /*
  *  rip_process_request()
  */
@@ -628,7 +633,7 @@ rip_process_request(ripif, nn)
 	break;
       default:
 	fatalx("<rip_process_request>: BUG !");
-	break;
+	break;			/* NOTREACHED */
       }
       rte = find_rte(&key, base);
       if (rte) break;  /* while */
@@ -706,7 +711,7 @@ rip_process_response(ripif, nn)
     struct rt_entry *rte;           /* to be installed    */
     struct rt_entry *srte = NULL;   /* newly synchronized */
     struct ifinfo   *ife;           /* search for         */
-    struct rt_entry *orte;          /* old RTE            */
+    struct rt_entry *orte = NULL;   /* old RTE            */
     uprte = NULL;
 
 #ifdef DEBUG_RIP
