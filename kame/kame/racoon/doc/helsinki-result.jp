@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.48 2001/08/17 13:18:53 sakane Exp $
+$KAME: helsinki-result.jp,v 1.49 2001/08/17 14:33:48 sakane Exp $
 
 
 generic
@@ -394,8 +394,7 @@ SSH
 	sshはssh-test-ca1がサインした証明書を使い、
 	racoonはfujixeroxがサインした証明書でもOK
 
-	AES phase1 がうまくいかない。間違いなくracoonの問題。
-	key expantino問題。
+	AES phase1 がうまくいかない。間違いなくracoonの問題。(直して動作確認済)
 
 	phase1 proposalのパースに虫がいるかも。要確認
 
@@ -504,7 +503,6 @@ Nokia EPOC
 	phase 2 3DES + SHA1 + deflate, group 2, lifetime = 2min
 
 	IPsec keyも入るが、先方のポリシ問題でpingは返らない。
-
 
 Trustworks TrustedClient v3.2
 	Thu Aug 16 20:17:51 JST 2001
