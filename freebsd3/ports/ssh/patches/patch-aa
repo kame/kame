@@ -1,5 +1,5 @@
-*** make-ssh-known-hosts.pl.in.orig	Thu Jul  9 01:40:08 1998
---- make-ssh-known-hosts.pl.in	Sat Jul 18 17:15:23 1998
+*** make-ssh-known-hosts.pl.in.orig	Wed May 12 20:18:51 1999
+--- make-ssh-known-hosts.pl.in	Sun Jun  6 02:30:08 1999
 ***************
 *** 98,104 ****
   $debug = 5;

@@ -3,22 +3,20 @@
 # Date created:		30 Jul 1995
 # Whom:			torstenb@FreeBSD.org
 #
-# $Id: Makefile,v 1.3 2000/02/08 11:40:55 sumikawa Exp $
-# $FreeBSD: ports/security/ssh/Makefile,v 1.85 1999/11/25 21:26:03 cpiazza Exp $
+# $FreeBSD: ports/security/ssh/Makefile,v 1.90 2000/02/20 17:30:53 sumikawa Exp $
+# $Id: Makefile,v 1.4 2000/02/24 15:14:55 sumikawa Exp $
 #
 # Maximal ssh package requires YES values for
 # USE_PERL, USE_TCPWRAP
 #
 
-DISTNAME=	ssh-1.2.27
-CATEGORIES=	security net
+DISTNAME=       ssh-1.2.27
+CATEGORIES=	security net #ipv6
 MASTER_SITES=	ftp://ftp.cs.hut.fi/pub/ssh/
 
-PATCH_SITES=	ftp://ftp.kyoto.wide.ad.jp/IPv6/ssh/
-PATCHFILES=	ssh-1.2.27-IPv6-1.5-patch.gz
-PATCH_DIST_STRIP=	-p1
+MAINTAINER=	sumikawa@kame.net
 
-MAINTAINER=	itojun@itojun.org
+USE_AUTOCONF=	YES	# unfortunately... see comments in patch-xa for details
 
 # You can set USA_RESIDENT appropriately in /etc/make.conf if this bugs you..
 
@@ -112,7 +110,7 @@ post-install:
 	@if [ ! -f ${PREFIX}/etc/rc.d/sshd.sh ]; then \
 		${ECHO} "Installing ${PREFIX}/etc/rc.d/sshd.sh startup file."; \
 		${ECHO} "#!/bin/sh" > ${PREFIX}/etc/rc.d/sshd.sh; \
-		${ECHO} "[ -x ${PREFIX}/sbin/sshd ] && ${PREFIX}/sbin/sshd && ${ECHO} -n ' sshd/46'" >> ${PREFIX}/etc/rc.d/sshd.sh; \
+		${ECHO} "[ -x ${PREFIX}/sbin/sshd ] && ${PREFIX}/sbin/sshd && ${ECHO} -n ' sshd'" >> ${PREFIX}/etc/rc.d/sshd.sh; \
 		${CHMOD} 751 ${PREFIX}/etc/rc.d/sshd.sh; \
 	fi
 
@@ -138,6 +136,16 @@ CONFIGURE_ARGS+= --with-libwrap
 LIB_DEPENDS+=   wrap.7:${PORTSDIR}/security/tcp_wrapper
 .endif
 .endif
+
+# Original IPv6 patches were obtained from ftp://ftp.kyoto.wide.ad.jp/IPv6/ssh/
+# ssh-1.2.27-IPv6-1.5-patch.gz
+# We still use USE_INET6 here and try to support pre 4.0 machines with kame
+# IPv6 stack
+#.if ${OSVERSION} >= 400014 || ( ${OSVERSION} < 400014 && defined(USE_INET6) )
+CONFIGURE_ARGS+=	--enable-ipv6
+#.else
+#CONFIGURE_ARGS+=	--disable-ipv6
+#.endif
 
 # Include SOCKS firewall support
 .if defined(USE_SOCKS) && ${USE_SOCKS} == YES

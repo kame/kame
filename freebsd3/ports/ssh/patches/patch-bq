@@ -1,0 +1,19 @@
+*** server_config.sample.orig	Wed May 12 13:18:51 1999
+--- server_config.sample	Mon Jan 10 22:56:13 2000
+***************
+*** 1,7 ****
+  # This is ssh server systemwide configuration file.
+  
+  Port 22
+! ListenAddress 0.0.0.0
+  HostKey _ETCDIR_/ssh_host_key
+  RandomSeed _ETCDIR_/ssh_random_seed
+  ServerKeyBits 768
+--- 1,7 ----
+  # This is ssh server systemwide configuration file.
+  
+  Port 22
+! Port 722
+  HostKey _ETCDIR_/ssh_host_key
+  RandomSeed _ETCDIR_/ssh_random_seed
+  ServerKeyBits 768
