@@ -647,8 +647,8 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 #ifdef ENABLE_DEFAULT_SCOPE
 	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
 		/* avoid overwrites */
-		tmp = *sin6;
-		sin6 = &tmp;
+		tmp = *addr;
+		addr = &tmp;
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
 #endif
