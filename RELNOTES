@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/01/30 12:26:32 $
+		     $Date: 2000/02/10 04:57:07 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -40,11 +40,11 @@ PLATFORM DIFFERENCES
 As we support various platforms, there are several differences between
 those platforms.  Here is a brief list of important differences:
 - ALTQ
-	ALTQ 2.1 is merged into:	KAME/FreeBSD228, KAME/FreeBSD33,
-					KAME/NetBSD141, KAME/OpenBSD26
+	ALTQ 2.1 is merged into:	KAME/FreeBSD228, KAME/FreeBSD3x,
+					KAME/NetBSD, KAME/OpenBSD
 	No ALTQ support in:		KAME/BSDI31, KAME/BSDI41
 - IPsec
-	No KAME IPsec support in:	KAME/OpenBSD26, KAME/BSDI41
+	No KAME IPsec support in:	KAME/OpenBSD, KAME/BSDI41
 		(you can enjoy OpenBSD IPsec for IPv4)
 - TCP
 	see IMPLEMENTATION for details.
