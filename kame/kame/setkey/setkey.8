@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.61 2001/08/17 06:33:58 itojun Exp $
+.\"	$KAME: setkey.8,v 1.62 2001/08/17 06:39:37 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -124,6 +124,9 @@ hashmarks ('#') are treated as comment lines.
 .Li ;
 .Xc
 Add an SAD entry.
+.Li add
+can fail with multiple reasons,
+including when the key length does not match the specified algorithm.
 .\"
 .It Xo
 .Li get
@@ -551,7 +554,7 @@ of
 parameter:
 .Pp
 .Bd -literal -offset indent
-algorithm	keylen (bits)	comment
+algorithm	keylen (bits)
 hmac-md5	128		ah: rfc2403
 		128		ah-old: rfc2085
 hmac-sha1	160		ah: rfc2404
@@ -578,7 +581,7 @@ of
 parameter:
 .Pp
 .Bd -literal -offset indent
-algorithm	keylen (bits)	comment
+algorithm	keylen (bits)
 des-cbc		64		esp-old: rfc1829, esp: rfc2405
 3des-cbc	192		rfc2451
 simple		0 to 2048	rfc2410
@@ -586,8 +589,8 @@ blowfish-cbc	40 to 448	rfc2451
 cast128-cbc	40 to 128	rfc2451
 des-deriv	64		ipsec-ciph-des-derived-01 (expired)
 3des-deriv	192		no document
-rijndael-cbc	128/192/256	draft-ietf-ipsec-ciph-aes-cbc-00
-twofish-cbc	0 to 256	draft-ietf-ipsec-ciph-aes-cbc-00
+rijndael-cbc	128/192/256	draft-ietf-ipsec-ciph-aes-cbc-01
+twofish-cbc	0 to 256	draft-ietf-ipsec-ciph-aes-cbc-01
 .Ed
 .Pp
 Followings are the list of compression algorithms that can be used as
@@ -599,30 +602,30 @@ of
 parameter:
 .Pp
 .Bd -literal -offset indent
-algorithm	comment
+algorithm
 deflate		rfc2394
 .Ed
 .\"
 .Sh EXAMPLES
 .Bd -literal -offset
-add	3ffe:501:4819::1 3ffe:501:481d::1 esp 123457
-		-E des-cbc 0x3ffe05014819ffff ;
+add 3ffe:501:4819::1 3ffe:501:481d::1 esp 123457
+	-E des-cbc 0x3ffe05014819ffff ;
 
-add	3ffe:501:4819::1 3ffe:501:481d::1 ah 123456
-		-A hmac-sha1 "AH SA configuration!" ;
+add 3ffe:501:4819::1 3ffe:501:481d::1 ah 123456
+	-A hmac-sha1 "AH SA configuration!" ;
 
-add	10.0.11.41 10.0.11.33 esp 0x10001
-		-E des-cbc 0x3ffe05014819ffff
-		-A hmac-md5 "authentication!!" ;
+add 10.0.11.41 10.0.11.33 esp 0x10001
+	-E des-cbc 0x3ffe05014819ffff
+	-A hmac-md5 "authentication!!" ;
 
-get	3ffe:501:4819::1 3ffe:501:481d::1 ah 123456 ;
+get 3ffe:501:4819::1 3ffe:501:481d::1 ah 123456 ;
 
 flush ;
 
 dump esp ;
 
-spdadd	10.0.11.41/32[21] 10.0.11.33/32[any] any
-		-P out ipsec esp/tunnel/192.168.0.1-192.168.1.2/require ;
+spdadd 10.0.11.41/32[21] 10.0.11.33/32[any] any
+	-P out ipsec esp/tunnel/192.168.0.1-192.168.1.2/require ;
 
 .Ed
 .\"
@@ -631,8 +634,8 @@ The command exits with 0 on success, and non-zero on errors.
 .\"
 .Sh SEE ALSO
 .Xr ipsec_set_policy 3 ,
-.Xr sysctl 8 ,
-.Xr racoon 8
+.Xr racoon 8 ,
+.Xr sysctl 8
 .\"
 .Sh HISTORY
 The
@@ -640,4 +643,6 @@ The
 command first appeared in WIDE Hydrangea IPv6 protocol stack kit.
 The command was completely re-designed in June 1998.
 .\"
-.\" .Sh BUGS
+.Sh BUGS
+.Nm
+should report and handle syntax errors better.
