@@ -1,0 +1,146 @@
+.\"	$KAME: wru.8,v 1.1 2002/01/12 08:35:25 jinmei Exp $
+.\"
+.\" Copyright (C) 2002 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Jan 12, 2002
+.Dt WRU 8
+.Os KAME
+.Sh NAME
+.Nm wru
+.Nd
+.Tn ICMPv6 node information queries
+client
+.Sh SYNOPSIS
+.Nm wru
+.\" without ipsec, or new ipsec
+.Op Fl 1Amv
+.Bk -words
+.Op Fl a Ar addrtype
+.Ek
+.Bk -words
+.Op Fl i Ar interval
+.Ek
+.Bk -words
+.Op Fl c Ar count
+.Ek
+.Bk -words
+.Ar host
+.Ek
+.Sh DESCRIPTION
+.Nm
+uses the
+.Tn ICMPv6
+node information queries to collect information on a target
+.Ar host .
+Available information is the host's name and its IPv6 addresses.
+Available options are as follows:
+.Bl -tag -width Ds
+.It Fl 1
+specifies to wait only for a single reply for a query to a destination
+address of the host,
+even if the address is multicast.
+This option is exclusive with the
+.Fl m
+option.
+.It Fl A
+specifies to try all addresses of the target host,
+even after a successful reply is received.
+.It Fl a Ar addrtype
+Generate Node Addresses queries.
+.Ar addrtype
+must be a string constructed of the following characters.
+.Bl -tag -width Ds -compact
+.It Ic a
+requests unicast addresses from all of the responder's interfaces.
+If the character is omitted,
+only those addresses which belong to the interface which has the
+responder's address are requests.
+.It Ic c
+requests responder's IPv4-compatible and IPv4-mapped addresses.
+.It Ic g
+requests responder's global-scope addresses.
+.It Ic s
+requests responder's site-local addresses.
+.It Ic l
+requests responder's link-local addresses.
+.It Ic A
+requests responder's anycast addresses.
+Without this character, the responder will return unicast addresses only.
+With this character, the responder will return anycast addresses only.
+Note that the specification does not specify how to get responder's
+anycast addresses.
+This is an experimental option.
+.El
+.It Fl c Ar count
+specifies the number of queries for each address of the target host.
+The default value is 1.
+.It Fl i Ar interval
+specifies the interval in seconds that
+.Nm
+waits for a reply against a single query.
+The default value is 1.
+.It Fl m
+specifies to wait for a multiple replies for a query to a destination
+address of the host until the wait interval expires,
+even after a successful reply is received.
+This option is exclusive with the
+.Fl 1
+option.
+.It Fl v
+requires verbose output.
+.El
+.Sh RETURN VALUES
+.Nm
+returns 0 on success (the host is alive),
+and non-zero if the arguments are incorrect or the host is not responding.
+.Sh SEE ALSO
+.Xr ping6 8 ,
+.Xr icmp6 4 ,
+.Xr inet6 4 ,
+.Xr ip6 4 ,
+.Xr ping 8
+.Rs
+.%A Matt Crawford
+.%T "IPv6 Node Information Queries"
+.%N draft-ietf-ipngwg-icmp-name-lookups-08.txt
+.%D July 2001
+.%O work in progress material
+.Re
+.\".Sh BUGS
+.\" except for bsdi
+.Sh HISTORY
+The
+.Nm
+command first appeared in the WIDE/KAME IPv6 protocol stack kit.
+It was based on the
+.Nm ping6
+command in the kit, and some part of the
+.Nm
+implementation was just derived from the
+.Nm ping6
+code.
