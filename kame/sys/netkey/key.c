@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.234 2002/05/13 03:21:17 itojun Exp $	*/
+/*	$KAME: key.c,v 1.235 2002/05/14 04:16:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -504,6 +504,8 @@ static const char *key_getfqdn __P((void));
 static const char *key_getuserfqdn __P((void));
 #endif
 static void key_sa_chgstate __P((struct secasvar *, u_int8_t));
+static void key_sp_dead __P((struct secpolicy *));
+static void key_sp_unlink __P((struct secpolicy *));
 static struct mbuf *key_alloc_mbuf __P((int));
 #ifdef __NetBSD__
 struct callout key_timehandler_ch;
@@ -1200,9 +1202,6 @@ key_delsp(sp)
 #else
 	s = splnet();	/*called from softclock()*/
 #endif
-	/* remove from SP index */
-	if (__LIST_CHAINED(sp))
-		LIST_REMOVE(sp, chain);
 
     {
 	struct ipsecrequest *isr = sp->req, *nextisr;
@@ -1812,8 +1811,10 @@ key_spdadd(so, m, mhp)
 	newsp = key_getsp(&spidx);
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
 		if (newsp) {
-			newsp->state = IPSEC_SPSTATE_DEAD;
-			key_freesp(newsp);
+			key_sp_dead(newsp);
+			key_freesp(newsp);	/* ref gained by key_getsp */
+			key_sp_unlink(newsp);
+			newsp = NULL;
 		}
 	} else {
 		if (newsp != NULL) {
@@ -2100,8 +2101,10 @@ key_spddelete(so, m, mhp)
 	/* save policy id to buffer to be returned. */
 	xpl0->sadb_x_policy_id = sp->id;
 
-	sp->state = IPSEC_SPSTATE_DEAD;
-	key_freesp(sp);
+	key_sp_dead(sp);
+	key_freesp(sp);	/* ref gained by key_getsp */
+	key_sp_unlink(sp);
+	sp = NULL;
 
 	/* invalidate all cached SPD pointers on pcb */
 	ipsec_invalpcbcacheall();
@@ -2165,8 +2168,10 @@ key_spddelete2(so, m, mhp)
 		key_senderror(so, m, EINVAL);
 	}
 
-	sp->state = IPSEC_SPSTATE_DEAD;
-	key_freesp(sp);
+	key_sp_dead(sp);
+	key_freesp(sp);	/* ref gained by key_getsp */
+	key_sp_unlink(sp);
+	sp = NULL;
 
 	/* invalidate all cached SPD pointers on pcb */
 	ipsec_invalpcbcacheall();
@@ -2379,8 +2384,9 @@ key_spdflush(so, m, mhp)
 			nextsp = LIST_NEXT(sp, chain);
 			if (sp->state == IPSEC_SPSTATE_DEAD)
 				continue;
-			sp->state = IPSEC_SPSTATE_DEAD;
-			key_freesp(sp);
+			key_sp_dead(sp);
+			key_sp_unlink(sp);
+			sp = NULL;
 		}
 	}
 
@@ -4352,8 +4358,11 @@ key_timehandler(arg)
 		     sp = nextsp) {
 			nextsp = LIST_NEXT(sp, chain);
 
-			if (sp->state == IPSEC_SPSTATE_DEAD)
+			if (sp->state == IPSEC_SPSTATE_DEAD) {
+				key_sp_unlink(sp);	/*XXX*/
+				sp = NULL;
 				continue;
+			}
 
 			if (sp->lifetime == 0 && sp->validtime == 0)
 				continue;
@@ -4363,9 +4372,8 @@ key_timehandler(arg)
 			     tv.tv_sec - sp->created > sp->lifetime) ||
 			    (sp->validtime &&
 			     tv.tv_sec - sp->lastused > sp->validtime)) {
-				sp->state = IPSEC_SPSTATE_DEAD;
+				key_sp_dead(sp);
 				key_spdexpire(sp);
-				key_freesp(sp);
 				continue;
 			}
 		}
@@ -7669,6 +7677,26 @@ key_sa_stir_iv(sav)
 	if (!sav->iv)
 		panic("key_sa_stir_iv called with sav == NULL");
 	key_randomfill(sav->iv, sav->ivlen);
+}
+
+static void
+key_sp_dead(sp)
+	struct secpolicy *sp;
+{
+
+	/* mark the SP dead */
+	sp->state = IPSEC_SPSTATE_DEAD;
+}
+
+static void
+key_sp_unlink(sp)
+	struct secpolicy *sp;
+{
+
+	/* remove from SP index */
+	if (__LIST_CHAINED(sp))
+		LIST_REMOVE(sp, chain);
+	key_freesp(sp);
 }
 
 /* XXX too much? */
