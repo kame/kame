@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.194 2002/02/22 07:28:03 k-sugyou Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.195 2002/02/27 01:34:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1631,9 +1631,6 @@ pfxlist_onlink_check()
 {
 	struct nd_prefix *pr;
 	struct in6_ifaddr *ifa;
-#ifdef MIP6
-	int update_link = 0;
-#endif
 
 	/*
 	 * Check if there is a prefix that has a reachable advertising
@@ -1643,10 +1640,6 @@ pfxlist_onlink_check()
 		if (pr->ndpr_raf_onlink && find_pfxlist_reachable_router(pr))
 			break;
 	}
-#ifdef MIP6
-	if (pr == NULL)
-		update_link = 1;
-#endif
 	if (pr != NULL || TAILQ_FIRST(&nd_defrouter) != NULL) {
 		/*
 		 * There is at least one prefix that has a reachable router,
@@ -1716,9 +1709,6 @@ pfxlist_onlink_check()
 				    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 				    pr->ndpr_plen, e));
 			}
-#ifdef MIP6
-			update_link = 1;
-#endif
 		}
 		if ((pr->ndpr_stateflags & NDPRF_DETACHED) == 0 &&
 		    (pr->ndpr_stateflags & NDPRF_ONLINK) == 0 &&
@@ -1730,9 +1720,6 @@ pfxlist_onlink_check()
 				    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 				    pr->ndpr_plen, e));
 			}
-#ifdef MIP6
-			update_link = 1;
-#endif
 		}
 	}
 
@@ -1789,7 +1776,7 @@ pfxlist_onlink_check()
 
 		hif_save_location();
 		coa_changed = mip6_select_coa2();
-		if (coa_changed == 1 && update_link)
+		if (coa_changed == 1)
 			(void)mip6_process_pfxlist_status_change(&hif_coa);
 		if (coa_changed == 1)
 			mip6_process_movement();
