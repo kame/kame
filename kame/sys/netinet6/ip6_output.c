@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.81 2000/03/08 18:45:48 sakane Exp $	*/
+/*	$KAME: ip6_output.c,v 1.82 2000/03/09 08:34:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2003,6 +2003,13 @@ ip6_ctloutput(op, so, level, optname, mp)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m = NULL;
 				struct mbuf **mp = &m;
+
+				error = soopt_getm(sopt, &m); /* XXX */
+				if (error != NULL)
+					break;
+				error = soopt_mcopyin(sopt, m); /* XXX */
+				if (error != NULL)
+					break;
 #endif
 				if (m) {
 					req = mtod(m, caddr_t);
