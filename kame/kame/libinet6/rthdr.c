@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.20 2003/12/05 01:35:15 keiichi Exp $	*/
+/*	$KAME: rthdr.c,v 1.21 2005/02/08 01:29:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -477,19 +477,18 @@ inet6_rth_getaddr(const void *bp, int idx)
 #ifdef MIP6
 	struct ip6_rthdr2 *rh2;
 #endif /* MIP6 */
-	int rthlen, addrs;
+	int addrs;
 
 	switch (rh->ip6r_type) {
 	case IPV6_RTHDR_TYPE_0:
 		 rh0 = (struct ip6_rthdr0 *)bp;
-		 rthlen = (rh0->ip6r0_len + 1) << 3;
 		 
 		/*
 		 * Validation for a type-0 routing header.
 		 * Is this too strict?
 		 */
-		if ((rthlen % 2) != 0 ||
-		    (addrs = (rthlen >> 1)) < rh0->ip6r0_segleft)
+		if ((rh0->ip6r0_len % 2) != 0 ||
+		    (addrs = (rh0->ip6r0_len >> 1)) < rh0->ip6r0_segleft)
 			return (NULL);
 
 		if (idx < 0 || addrs <= idx)
@@ -499,7 +498,6 @@ inet6_rth_getaddr(const void *bp, int idx)
 #ifdef MIP6
 	case IPV6_RTHDR_TYPE_2:
 		rh2 = (struct ip6_rthdr2 *)bp;
-		rthlen = (rh2->ip6r2_len + 1) << 3;
 
 		/* rthdr2 contains just one address. */
 		if (idx != 1)
@@ -508,8 +506,8 @@ inet6_rth_getaddr(const void *bp, int idx)
 		/*
 		 * Validation for a type-2 routing header.
 		 */
-		if ((rthlen % 2) != 0 ||
-		    (addrs = (rthlen >> 1)) < rh2->ip6r2_segleft)
+		if ((rh2->ip6r2_len % 2) != 0 ||
+		    (addrs = (rh2->ip6r2_len >> 1)) < rh2->ip6r2_segleft)
 			return (NULL);
 
 		if (idx < 0 || addrs <= idx)
