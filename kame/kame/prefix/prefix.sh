@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#	$KAME: prefix.sh,v 1.5 2001/02/04 03:27:30 jinmei Exp $
+#	$KAME: prefix.sh,v 1.6 2001/02/04 03:29:54 jinmei Exp $
 
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -45,6 +45,8 @@ if [ -z $3 ]; then
 else
     command=$3
 fi
+
+echo "** The prefix command are almost invalidated. Please use ifconfig(8). **"
 
 case $command in
     set)
