@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.12 2001/09/06 06:01:40 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.13 2001/09/06 06:11:52 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -135,7 +135,6 @@ setRules(int type, struct ruletab *ruletab)
 		f->proto = ruletab->proto;
 	}
 
-	f->type = NATPT_RULE_STATIC;
 	f->lifetime = CSLOT_INFINITE_LIFETIME;
 	if (soctl(sfd, SIOCSETRULES, &mBox) < 0)
 		soctlFailure(fn);

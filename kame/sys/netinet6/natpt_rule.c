@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.21 2001/09/06 05:50:10 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.22 2001/09/06 06:11:13 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -315,9 +315,7 @@ natpt_flushRules(caddr_t addr)
 	csl = TAILQ_FIRST(&csl_head);
 	while (csl) {
 		csln = TAILQ_NEXT(csl, csl_list);
-		if ((csl->type == NATPT_RULE_STATIC)
-		    || ((csl->type == NATPT_RULE_DYNAMIC)
-			&& (mbx->flags == NATPT_FLUSHALL))) {
+		if (mbx->flags == NATPT_FLUSHALL) {
 			TAILQ_REMOVE(&csl_head, csl, csl_list);
 			FREE(csl, M_NATPT);
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.20 2001/09/06 05:50:10 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.21 2001/09/06 06:11:13 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -147,10 +147,6 @@ struct pAddr					/* sizeof():  40[byte]	*/
 struct	cSlot					/* sizeof(): 100[byte]	*/
 {
 	TAILQ_ENTRY(cSlot)	csl_list;
-
-	u_char		 type;
-#define	NATPT_RULE_STATIC	1	/* rule was set by hand.	*/
-#define	NATPT_RULE_DYNAMIC	2	/* rule was set by program.	*/
 
 	u_char		 proto;
 #define	NATPT_ICMPV6		0x01
