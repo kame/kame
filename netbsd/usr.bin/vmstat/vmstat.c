@@ -465,7 +465,7 @@ dovmstat(interval, reps)
 		    total.t_rq - 1, total.t_dw + total.t_pw, total.t_sw);
 #define pgtok(a) (long)((a) * (pagesize >> 10))
 #define	rate(x)	(u_long)(((x) + halfuptime) / uptime)	/* round */
-		(void)printf("%6ld%6ld ",
+		(void)printf(" %5ld %5ld ",
 		    pgtok(total.t_avm), pgtok(total.t_free));
 		(void)printf("%4lu ", rate(uvmexp.faults - ouvmexp.faults));
 		(void)printf("%3lu ", rate(uvmexp.pdreact - ouvmexp.pdreact));

@@ -429,7 +429,7 @@ sigjmp_buf	httpabort;
  * If proxyenv is set, use that for the proxy, otherwise try ftp_proxy or
  * http_proxy as appropriate.
  * Supports HTTP redirects.
- * Returns -1 on failure, 0 on completed xfer, 1 if ftp connection
+ * Returns 1 on failure, 0 on completed xfer, -1 if ftp connection
  * is still open (e.g, ftp xfer with trailing /)
  */
 static int
@@ -620,6 +620,10 @@ fetch_url(const char *url, const char *proxyenv, char *proxyauth, char *wwwauth)
 					}
 				}
 				FREEPTR(np_copy);
+				if (isproxy == 0 && urltype == FTP_URL_T) {
+					rval = fetch_ftp(url);
+					goto cleanup_fetch_url;
+				}
 			}
 
 			if (isproxy) {
