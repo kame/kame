@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2535 2004/01/26 09:42:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.2536 2004/01/26 09:43:00 jinmei Exp $
 
 <200401>
 2004-01-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/mld6.c (mld6_input):
 	* kame/kame/pim6sd/mld6.c (accept_mld6):
-	discarded MLD packets with the unspecified source address as
+	discard MLD packets with the unspecified source address as
 	specified in RFC3590.
 
 Jan 2004  itojun@iijlab.net
