@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.20 2000/09/20 22:28:02 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.21 2000/09/20 23:28:50 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -213,3 +213,14 @@ vs NetLock
 	Notes:
 	- fragmented ping works fine, large ftp transfer went well too
 	- BSD userland (or socket layer?) limits UDP echo size to 4k
+
+vs Pivotal
+	manual key
+	fragmented packet (8k) is ok.
+	1: esp tunnel des-cbc, hmac-md5
+	    vpn test.
+	2: esp tunnel 3des-cbc, hmac-sha1
+	    internal address is same to pivotal's network (10.33.134.0/24).
+		ifconfig lo0 inet 10.33.134.4 netmask 255.255.255.0 alias
+		route add -inet -net 10.33.134.0/24 206.175.32.1
+
