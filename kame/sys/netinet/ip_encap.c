@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.53 2001/07/25 00:17:08 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.54 2001/07/25 02:38:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -913,7 +913,7 @@ encap_detach(cookie)
 		}
 	}
 
-	return EINVAL;
+	return ENOENT;
 }
 
 #ifdef USE_RADIX
