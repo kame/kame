@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.96 2000/10/31 04:21:48 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.97 2000/11/06 16:44:23 kawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1926,6 +1926,7 @@ summary()
 #endif
 		(void)fflush(stdout);
 	}
+	(void)fflush(stdout);
 }
 
 /*subject type*/
