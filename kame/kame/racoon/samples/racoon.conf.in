@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.in,v 1.14 2000/08/31 10:56:15 sakane Exp $
+# $KAME: racoon.conf.in,v 1.15 2000/10/11 23:32:27 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -11,11 +11,6 @@ path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
 # racoon will look for certificate file in the directory,
 # if the certificate/certificate request payload is received.
 path certificate "@sysconfdir_x@/cert" ;
-
-# personal information.
-identifier user_fqdn "sakane@kame.net";
-identifier fqdn "mine.kame.net";
-identifier keyid "@sysconfdir_x@/racoon/keyid.txt";
 
 # "log" specifies logging level.  It is followed by either "info", "notify",
 # "debug" or "debug2".
@@ -60,8 +55,9 @@ remote anonymous
 	doi ipsec_doi;
 	situation identity_only;
 
-	#identifier address;
-	identifier user_fqdn;
+	#my_identifier address;
+	my_identifier user_fqdn "sakane@kame.net";
+	peers_identifier user_fqdn "sakane@kame.net";
 	#certificate_type x509 "mycert" "mypriv";
 
 	nonce_size 16;
@@ -86,8 +82,8 @@ remote ::1 [8000]
 	doi ipsec_doi;
 	situation identity_only;
 
-	#identifier address;
-	identifier user_fqdn;
+	my_identifier user_fqdn "sakane@kame.net";
+	peers_identifier user_fqdn "sakane@kame.net";
 	#certificate_type x509 "mycert" "mypriv";
 
 	nonce_size 16;
@@ -117,7 +113,6 @@ sainfo address 203.178.141.209 any address 203.178.141.218 any
 	pfs_group 1;
 	lifetime time 30 sec;
 	lifetime byte 5000 KB;
-	identifier user_fqdn;
 	encryption_algorithm des ;
 	authentication_algorithm hmac_md5;
 	compression_algorithm deflate ;
@@ -128,7 +123,6 @@ sainfo address ::1 icmp6 address ::1 icmp6
 	pfs_group 1;
 	lifetime time 60 sec;
 	lifetime byte 5000 KB;
-	#identifier user_fqdn;
 	encryption_algorithm 3des, cast128, blowfish, des ;
 	authentication_algorithm hmac_sha1, hmac_md5 ;
 	compression_algorithm deflate ;

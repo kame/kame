@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.17 2000/09/24 01:54:50 itojun Exp $
+# $KAME: racoon.conf.sample,v 1.18 2000/10/11 23:32:27 sakane Exp $
 
 # "path" affects "include" directive.  "path" must be specified before any
 # "include" directive with relative file path.
@@ -14,10 +14,6 @@ path pre_shared_key "/usr/local/v6/etc/psk.txt" ;
 # if the certificate/certificate request payload is received.
 #path certificate "/usr/local/openssl/certs" ;
 
-# identification for our side.
-#identifier user_fqdn "foo@kame.net";
-#identifier fqdn "foo.kame.net";
-
 # "log" specifies logging level.  It is followed by either "info", "notify",
 # "debug" or "debug2".
 #log notify;
@@ -27,8 +23,7 @@ remote anonymous
 	#exchange_mode main,aggressive,base;
 	exchange_mode aggressive,main,base;
 
-	identifier address;
-	#identifier user_fqdn;
+	#my_identifier fqdn "server.kame.net";
 	#certificate_type x509 "foo@kame.net.cert" "foo@kame.net.priv" ;
 
 	lifetime time 24 hour ;	# sec,min,hour
