@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.82 2001/06/28 11:39:52 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.83 2001/07/09 16:43:12 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -632,9 +632,7 @@ The default is off.
 .Ss Special directives
 .Bl -tag -width Ds -compact
 .It Ic complex_bundle (on \(ba off) ;
-Use KAME interpretation regarding to proposal for SA bundle.
-The default value is
-.Ic off .
+defines the interpretation of proposal in the case of SA bundle.
 Normally
 .Dq IP AH ESP IP payload
 is proposed as
@@ -643,6 +641,8 @@ The interpretation is more common to other IKE implementations, however,
 it allows very limited set of combinations for proposals.
 With the option enabled, it will be proposed as
 .Dq AH transport and ESP tunnel .
+The default value is
+.Ic off .
 .El
 .\"
 .Ss Pre-shared key File
