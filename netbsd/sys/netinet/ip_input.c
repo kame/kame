@@ -446,7 +446,7 @@ ip_input(struct mbuf *m)
 	struct ipqent *ipqe;
 	int hlen = 0, mff, len;
 	int downmatch;
-	in_addr_t pfrdr = 0;
+	int srcrt = 0;
 
 #ifdef	DIAGNOSTIC
 	if ((m->m_flags & M_PKTHDR) == 0)
@@ -622,7 +622,9 @@ ip_input(struct mbuf *m)
 	if (1)
 #endif
 	{
-		pfrdr = ip->ip_dst.s_addr;
+		struct in_addr odst;
+
+		odst = ip->ip_dst;
 		if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
 			goto bad;
 		if (m == NULL)
@@ -630,7 +632,7 @@ ip_input(struct mbuf *m)
 
 		ip = mtod(m, struct ip *);
 		hlen = ip->ip_hl << 2;
-		pfrdr = (pfrdr != ip->ip_dst.s_addr);
+		srcrt = (odst.s_addr != ip->ip_dst.s_addr);
 	}
 #endif
 
@@ -778,7 +780,7 @@ ip_input(struct mbuf *m)
 		}
 #endif
 
-		ip_forward(m, pfrdr);
+		ip_forward(m, srcrt);
 	}
 	return;
 
