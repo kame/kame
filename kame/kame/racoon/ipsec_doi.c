@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.164 2003/10/23 07:22:45 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.165 2003/11/13 02:21:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,7 +100,7 @@ static struct prop_pair *get_ph2approvalx __P((struct ph2handle *,
 static void free_proppair0 __P((struct prop_pair *));
 
 static int get_transform
-	__P((struct isakmp_pl_p *, struct prop_pair **, int *, int));
+	__P((struct isakmp_pl_p *, struct prop_pair **, int *));
 static u_int32_t ipsecdoi_set_ld __P((vchar_t *));
 
 static int check_doi __P((u_int32_t));
@@ -1163,14 +1163,6 @@ get_proppair(sa, mode)
 			vfree(pbuf);
 			return NULL;
 		}
-		if (mode == IPSECDOI_TYPE_PH1 &&
-		    pa != (struct isakmp_parse_t *)pbuf->v) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"Only a single proposal payload is allowed "
-				"during phase 1 processing.\n");
-			vfree(pbuf);
-			return NULL;
-		}
 
 		prop = (struct isakmp_pl_p *)pa->ptr;
 		proplen = pa->len;
@@ -1200,7 +1192,7 @@ get_proppair(sa, mode)
 			continue;
 
 		/* get transform */
-		if (get_transform(prop, pair, &num_p, mode) < 0) {
+		if (get_transform(prop, pair, &num_p) < 0) {
 			vfree(pbuf);
 			return NULL;
 		}
@@ -1277,11 +1269,10 @@ get_proppair(sa, mode)
  *	0	: No valid transform found.
  */
 static int
-get_transform(prop, pair, num_p, mode)
+get_transform(prop, pair, num_p)
 	struct isakmp_pl_p *prop;
 	struct prop_pair **pair;
 	int *num_p;
-	int mode;
 {
 	int tlen; /* total length of all transform in a proposal */
 	caddr_t bp;
@@ -1311,13 +1302,6 @@ get_transform(prop, pair, num_p, mode)
 		if (pa->type != ISAKMP_NPTYPE_T) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"Invalid payload type=%u\n", pa->type);
-			break;
-		}
-		if (mode == IPSECDOI_TYPE_PH1 &&
-		    pa != (struct isakmp_parse_t *)pbuf->v) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"Only a single transform payload is allowed "
-				"during phase 1 processing.\n");
 			break;
 		}
 
@@ -2789,6 +2773,12 @@ setph2proposal0(iph2, pp, pr)
 		np_t = &trns->h.np;
 
 		trnsoff += (sizeof(*trns) + attrlen);
+	}
+
+	if (np_t == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no suitable proposal was created.\n");
+		return NULL;
 	}
 
 	/* update length of this protocol. */
