@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.207 2004/12/07 14:12:02 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.208 2004/12/26 07:27:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4713,6 +4713,9 @@ res_queryN(name, target)
 		return -1;
 	}
 
+	rtt.tv_sec = 0;
+	rtt.tv_usec = 0;
+
 	for (t = target; t; t = t->next) {
 		int class, type;
 		u_char *answer;
@@ -4758,18 +4761,19 @@ res_queryN(name, target)
 		limitp = NULL;
 		gettimeofday(&now, NULL);
 		if (!(rtt.tv_sec == 0 && rtt.tv_usec == 0)) {
+			struct timeval rtt_new;
 			long rtt_usec;
 
 			rtt_usec = rtt.tv_sec * 1000000 + rtt.tv_usec;
 			rtt_usec *= 2;
-			rtt.tv_sec = rtt_usec / 1000000;
-			rtt.tv_usec = rtt_usec % 1000000;
+			rtt_new.tv_sec = rtt_usec / 1000000;
+			rtt_new.tv_usec = rtt_usec % 1000000;
 
 			limit.tv_sec = 1;
 			limit.tv_usec = 0;
 
-			if (timeval_lt(&limit, &rtt))
-				limit = rtt;
+			if (timeval_lt(&limit, &rtt_new))
+				limit = rtt_new;
 			timeval_add(&now, &limit, &limit);
 			limitp = &limit;
 		}
@@ -5766,18 +5770,19 @@ res_queryN(name, target)
 		limitp = NULL;
 		gettimeofday(&now, NULL);
 		if (!(rtt.tv_sec == 0 && rtt.tv_usec == 0)) {
+			struct timeval rtt_new;
 			long rtt_usec;
 
 			rtt_usec = rtt.tv_sec * 1000000 + rtt.tv_usec;
 			rtt_usec *= 2;
-			rtt.tv_sec = rtt_usec / 1000000;
-			rtt.tv_usec = rtt_usec % 1000000;
+			rtt_new.tv_sec = rtt_usec / 1000000;
+			rtt_new.tv_usec = rtt_usec % 1000000;
 
 			limit.tv_sec = 1;
 			limit.tv_usec = 0;
 
-			if (timeval_lt(&limit, &rtt))
-				limit = rtt;
+			if (timeval_lt(&limit, &rtt_new))
+				limit = rtt_new;
 			timeval_add(&now, &limit, &limit);
 			limitp = &limit;
 		}
