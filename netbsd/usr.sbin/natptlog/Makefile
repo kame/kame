@@ -7,7 +7,6 @@ MAN=	natptlog.8
 
 CFLAGS+=-g -Wall
 CPPFLAGS+=-I${SRCDIR}/../natptconfig
-CLEANFILES+= natptlog.cat8
 
 LDADD+=	-lutil
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \

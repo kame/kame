@@ -8,7 +8,6 @@ MAN=	natptconfig.8
 CPPFLAGS+=	-I. -DYYDEBUG -DreadKMEM
 CFLAGS+=	-g -Wall
 CLEANFILES+=	natptconfig.y.c natptconfig.y.h natptconfig.l.c
-CLEANFILES+=	natptconfig.cat8
 
 LDADD+=	-lutil
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \

@@ -6,7 +6,6 @@ SRCS=	main.c list.c message.c misc.c
 MAN=	natptd.8
 
 CFLAGS+= -g -Wall
-CLEANFILES+= natptd.cat8
 
 LDADD+=	-lutil
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
