@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.41 2004/06/14 04:38:47 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.42 2004/06/14 05:04:13 suz Exp $
  */
 
 /*
@@ -763,8 +763,7 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 
 	default:
 	    log_msg(LOG_NOTICE, 0,
-		"wrong multicast report type : %d",
-		mard->record_type);
+		"wrong multicast report type : %d", mard->record_type);
 	    break;
 	}
 }
