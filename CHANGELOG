@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2023 2001/12/22 05:10:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.2024 2001/12/24 10:56:30 jinmei Exp $
 
 <200112>
+2001-12-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd/sbin/ip6addrctl: a dedicated directory was digged in order
+	for the tool to be compiled as a standard package.
+
 2001-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c (in6_selectroute): corrected a
 	condition to getting a route to the next hop specified by the
