@@ -34,6 +34,7 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <err.h>
 #include <syslog.h>
 #include <unistd.h>
@@ -470,10 +471,10 @@ resin(s, event, arg)
 		/* recv: 227 Entering Passive Mode (x,x,x,x,x,x) */
 		/* send: 228 Entering Long Passive Mode (...) */
 		/* send: 229 Entering Extended Passive Mode (|||x|) */
-		if (strncmp(relay->ser.buf, "227 ", 3) != 0) {
+		if (strncmp(relay->ser.buf, "227 ", 4) != 0) {
 	epsvfail:
 			memcpy(errmsg, relay->ser.buf, 3);
-			errmsg[4] = '\0';
+			errmsg[3] = '\0';
 	epsvfail1:
 			relay->ser.len = snprintf(relay->ser.buf,
 			    sizeof(relay->ser.buf), "501 unexpected: %s\r\n",
@@ -482,11 +483,12 @@ resin(s, event, arg)
 			break;
 		}
 		ep = &relay->ser.buf[relay->ser.len];
-		for (p = relay->ser.buf + 4; p < ep; p++)
-			if (*p == '(')	/*)*/
-				break;
-		if (*p != '(' || ++p >= ep)	/*)*/
+		*ep = '\0';
+		p = strrchr(relay->ser.buf, ' ');
+		if (!p)
 			goto epsvfail;
+		if (*p == '(')	/*)*/
+			p++;
 		n = sscanf(p, "%u,%u,%u,%u,%u,%u",
 		    &ho[0], &ho[1], &ho[2], &ho[3], &po[0], &po[1]);
 		if (n != 6)
