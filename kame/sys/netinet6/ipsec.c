@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.158 2002/06/22 12:25:14 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.159 2002/06/22 12:26:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,7 +457,6 @@ ipsec4_getpolicybysock(m, dir, so, error)
 	}
 
 #ifdef DIAGNOSTIC
-	/* sanity check */
 	if (pcbsp == NULL)
 		panic("ipsec4_getpolicybysock: pcbsp is NULL.\n");
 #endif
@@ -661,7 +660,6 @@ ipsec6_getpolicybysock(m, dir, so, error)
 	pcbsp = sotoin6pcb(so)->in6p_sp;
 
 #ifdef DIAGNOSTIC
-	/* sanity check */
 	if (pcbsp == NULL)
 		panic("ipsec6_getpolicybysock: pcbsp is NULL.\n");
 #endif
