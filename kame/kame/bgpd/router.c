@@ -120,53 +120,6 @@ find_rtp(key, base)
 }
 
 /*
- * Internal structure to update or withdraw BGP4+ routes.
- * This is necessary since the list starting at bgb might be modified
- * during the advertisement.
- */
-struct distribute {
-	struct distribute *next;
-	struct rpcb *bnp;
-};
-
-static struct distribute *
-make_distribute_list()
-{
-	struct distribute *d = NULL, *new;
-	struct rpcb *bnp;
-	extern struct rpcb *bgb;
-	
-	bnp = bgb;
-	while(bnp) {
-		if (bnp->rp_state == BGPSTATE_ESTABLISHED) {
-			MALLOC(new, struct distribute);
-			new->bnp = bnp;	/* set the pointer */
-
-			/* make chain */
-			new->next = d;
-			d = new;
-		}
-		if ((bnp = bnp->rp_next) == bgb)
-			break;
-	}
-
-	return(d);
-}
-
-static void
-free_distribute_list(head)
-	struct distribute *head;
-{
-	struct distribute *d, *next;
-
-	for(d = head; d;) {
-		next = d->next;
-		free(d);
-		d = next;
-	}
-}
-
-/*
  *   propagate()
  */
 void
@@ -192,10 +145,10 @@ propagate(rte)
   srcrtp = &rte->rt_proto;
 
   if (bgpyes) {
-    struct distribute  *dist, *disthead;
+    struct bgpcblist  *dist, *disthead;
     struct rpcb *bnp;
 
-    disthead = make_distribute_list();
+    disthead = make_bgpcb_list();
     for (dist = disthead; dist; dist = dist->next) {
 	    bnp = dist->bnp;
 	     /*
@@ -223,7 +176,7 @@ propagate(rte)
 		    } /* while(irte) */
 	    }
     }
-    free_distribute_list(disthead);
+    free_bgpcb_list(disthead);
   }
 
   if (ripyes) {
@@ -364,9 +317,9 @@ redistribute(rte)
 
   if (bgpyes) {
     struct rpcb        *bnp;         /* Redistributed to...  */
-    struct distribute  *dist, *disthead;
+    struct bgpcblist  *dist, *disthead;
 
-    disthead = make_distribute_list();
+    disthead = make_bgpcb_list();
     for (dist = disthead; dist; dist = dist->next) {
 	    bnp = dist->bnp;
 	     /*
@@ -381,7 +334,7 @@ redistribute(rte)
 			    bgp_cease(bnp);
       }
     }
-    free_distribute_list(disthead);
+    free_bgpcb_list(disthead);
   }
 
 #ifdef DEBUG

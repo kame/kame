@@ -145,3 +145,16 @@ int              find_nexthop __P((struct in6_addr *, struct in6_addr *,
  * nexthop resolution
  */
 int set_nexthop __P((struct in6_addr *, struct rt_entry *));
+
+/*
+ * Internal structure to update or withdraw BGP4+ routes.
+ * This is necessary since the list starting at bgb might be modified
+ * during the advertisement.
+ */
+struct bgpcblist {
+	struct bgpcblist *next;
+	struct rpcb *bnp;
+};
+
+struct bgpcblist *make_bgpcb_list __P(());
+void free_bgpcb_list __P(());

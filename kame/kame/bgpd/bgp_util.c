@@ -215,11 +215,12 @@ bgp_enable_rte(rte)
 		  else {
 			  syslog(LOG_ERR,
 				 "<%s>: failed to add a route dst: %s/%d, "
-				 "gw: %s", __FUNCTION__,
+				 "gw: %s if: %s", __FUNCTION__,
 				 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 				 rte->rt_ripinfo.rip6_plen,
 				 ip6str(&rte->rt_gw,
-					rte->rt_gwif->ifi_ifn->if_index));
+					rte->rt_gwif->ifi_ifn->if_index),
+				 rte->rt_gwif->ifi_ifn->if_name);
 			  return 0; /* continue to next rte */
 		  }
 	      }
@@ -432,8 +433,8 @@ bgp_enable_rte_by_igp(rte)
 {
 	struct rpcb *bnp;
 	struct rt_entry *brte;
+	struct bgpcblist *bgpcb, *bgpcb_head;
 	extern byte bgpyes;
-	extern struct rpcb *bgb;
 
 	if (!bgpyes)
 		return;
@@ -444,35 +445,56 @@ bgp_enable_rte_by_igp(rte)
 #ifdef notyet
 	case RTPROTO_OSPF:
 #endif 
-		bnp = bgb;
-		while(bnp) {
-			/* XXX: bnp might be invalidated during redistribution */
-			struct rpcb *bnext = bnp->rp_next;
+		bgpcb_head = make_bgpcb_list();
+		for (bgpcb = bgpcb_head; bgpcb; bgpcb = bgpcb->next) {
+			bnp = bgpcb->bnp;
+			/*
+			 * XXX: bnp might be closed or even freed during the loop,
+			 * so the validity check is necessary.
+			 */
+			if (!bgp_rpcb_isvalid(bnp))
+				continue;
 
 			brte = bnp->rp_adj_ribs_in;
-			if ((brte->rt_flags & (RTF_UP|RTF_INSTALLED)) == RTF_UP) {
-				/* try to enable */
-				if (bgp_enable_rte(brte) == 1) {
-					struct rt_entry crte;
+			while(brte) {
+				if ((brte->rt_flags & (RTF_UP|RTF_INSTALLED)) ==
+				    RTF_UP) {
+					/* try to enable */
+					if (bgp_enable_rte(brte) == 1) {
+						struct rt_entry crte;
 #ifdef DEBUG_BGP
-					syslog(LOG_NOTICE,
-					       "<%s>: BGP route(%s/%d) was "
-					       "enabled",
-					       __FUNCTION__,
-					       ip6str(&brte->rt_ripinfo.rip6_dest,
-						      0),
-					       brte->rt_ripinfo.rip6_plen);
+						syslog(LOG_NOTICE,
+						       "<%s>: BGP route(%s/%d) "
+						       "was enabled",
+						       __FUNCTION__,
+						       ip6str(&brte->rt_ripinfo.rip6_dest,
+							      0),
+						       brte->rt_ripinfo.rip6_plen);
 #endif 
-					/* redistribute this route */
-					crte = *brte;
-					crte.rt_next = crte.rt_prev = &crte;
-					redistribute(&crte);
-				}
-			}
+						/* redistribute this route */
+						crte = *brte;
+						crte.rt_next = crte.rt_prev = &crte;
+						redistribute(&crte);
 
-			if (bnext == bgb)
-				break;
+						/*
+						 * XXX: redistrib might
+						 * invalidate bnp
+						 */
+						if (!bgp_rpcb_isvalid(bnp)) {
+							syslog(LOG_NOTICE,
+							       "<%s>: rpcb %p was "
+							       "invalidated during a "
+							       "redistribution",
+							       __FUNCTION__, bnp);
+							break;
+						}
+					}
+				}
+				if ((brte = brte->rt_next) == brte)
+					break;
+			}
 		}
+		free_bgpcb_list(bgpcb_head);
 		break;
 	default:
 		fatalx("<bgp_enable_rte_by_igp>: rt_proto.rtp_type corrupted");
@@ -492,8 +514,8 @@ bgp_disable_rte_by_igp(rte)
 {
 	struct rpcb *bnp;
 	struct rt_entry *brte;
+	struct bgpcblist *bgpcb, *bgpcb_head;
 	extern byte bgpyes;
-	extern struct rpcb *bgb;
 
 	if (!bgpyes)
 		return;
@@ -504,43 +526,62 @@ bgp_disable_rte_by_igp(rte)
 #ifdef notyet
 	case RTPROTO_OSPF:
 #endif 
-		bnp = bgb;
-		while(bnp) {
-			/* XXX: bnp might be invalidated during propagation */
-			struct rpcb *bnext = bnp->rp_next;
+		bgpcb_head = make_bgpcb_list();
+		for (bgpcb = bgpcb_head; bgpcb; bgpcb = bgpcb->next) {
+			bnp = bgpcb->bnp;
+			/*
+			 * XXX: bnp might be closed or even freed during the loop,
+			 * so the validity check is necessary.
+			 */
+			if (!bgp_rpcb_isvalid(bnp))
+				continue;
 
 			brte = bnp->rp_adj_ribs_in;
-			if (brte->rt_gwsrc_type ==
-			    rte->rt_proto.rtp_type && /* sanity? */
-			    brte->rt_gwsrc_entry == rte &&
-			    (brte->rt_flags & (RTF_UP|RTF_INSTALLED)) ==
-			    (RTF_UP|RTF_INSTALLED)) {
-				struct rt_entry crte;
+			while(brte) {
+				if (brte->rt_gwsrc_type ==
+				    rte->rt_proto.rtp_type && /* sanity? */
+				    brte->rt_gwsrc_entry == rte &&
+				    (brte->rt_flags & (RTF_UP|RTF_INSTALLED)) ==
+				    (RTF_UP|RTF_INSTALLED)) {
+					struct rt_entry crte;
 #ifdef DEBUG_BGP
-				syslog(LOG_NOTICE,
-				       "<%s>: BGP route(%s/%d) was disabled",
-				       __FUNCTION__,
-				       ip6str(&brte->rt_ripinfo.rip6_dest, 0),
-				       brte->rt_ripinfo.rip6_plen);
+					syslog(LOG_NOTICE,
+					       "<%s>: BGP route(%s/%d) was disabled",
+					       __FUNCTION__,
+					       ip6str(&brte->rt_ripinfo.rip6_dest,
+						      0),
+					       brte->rt_ripinfo.rip6_plen);
 #endif 
-			  	/* XXX: this might break bnp.. */
-				bgp_disable_rte(brte);
+			  		/* XXX: this might break bnp.. */
+					bgp_disable_rte(brte);
 
-				/* flush gateway information */
-				brte->rt_gwsrc_type = RTPROTO_NONE;
-				brte->rt_gwsrc_entry = NULL;
-				memset(&brte->rt_gw, 0, sizeof(struct in6_addr));
-				brte->rt_gwif = NULL;
+					/* flush gateway information */
+					brte->rt_gwsrc_type = RTPROTO_NONE;
+					brte->rt_gwsrc_entry = NULL;
+					memset(&brte->rt_gw, 0,
+					       sizeof(struct in6_addr));
+					brte->rt_gwif = NULL;
 
-				/* withdraw this route */
-				crte = *brte;
-				crte.rt_next = crte.rt_prev = &crte;
-				propagate(&crte);
+					/* withdraw this route */
+					crte = *brte;
+					crte.rt_next = crte.rt_prev = &crte;
+					propagate(&crte);
+
+					/* XXX: propagate might invalidate bnp */
+					if (!bgp_rpcb_isvalid(bnp)) {
+						syslog(LOG_NOTICE,
+						       "<%s>: rpcb %p was "
+						       "invalidated during a "
+						       "propagation",
+						       __FUNCTION__, bnp);
+						break;
+					}
+				}
+				if ((brte = brte->rt_next) == brte)
+					break;
 			}
-
-			if (bnext == bgb)
-				break;
 		}
+		free_bgpcb_list(bgpcb_head);
 		break;
 	default:
 		fatalx("<bgp_disable_rte_by_igp>: rt_proto.rtp_type corrupted");
@@ -1157,5 +1198,42 @@ bgp_peerstr(bnp)
 			ifindex = bnp->rp_ife->ifi_ifn->if_index;
 
 		return(ip6str(&bnp->rp_laddr, ifindex));
+	}
+}
+
+struct bgpcblist *
+make_bgpcb_list()
+{
+	struct bgpcblist *d = NULL, *new;
+	struct rpcb *bnp;
+	extern struct rpcb *bgb;
+	
+	bnp = bgb;
+	while(bnp) {
+		if (bnp->rp_state == BGPSTATE_ESTABLISHED) {
+			MALLOC(new, struct bgpcblist);
+			new->bnp = bnp;	/* set the pointer */
+
+			/* make chain */
+			new->next = d;
+			d = new;
+		}
+		if ((bnp = bnp->rp_next) == bgb)
+			break;
+	}
+
+	return(d);
+}
+
+void
+free_bgpcb_list(head)
+	struct bgpcblist *head;
+{
+	struct bgpcblist *d, *next;
+
+	for(d = head; d;) {
+		next = d->next;
+		free(d);
+		d = next;
 	}
 }

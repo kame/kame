@@ -150,6 +150,5 @@ int              chroute      __P((struct rt_entry *, const struct in6_addr *,
 				   struct ifinfo *));
 struct rt_entry *rte_remove   __P((struct rt_entry *, struct rt_entry *));
 
-
 #define BGP_DEF_LOCALPREF       100   /* like cisco, gated, at least */
 #define BGP_DEF_ASPREPEND	1 /* number of iteration of prepended AS(if enabled) */
