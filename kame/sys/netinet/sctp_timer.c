@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.22 2004/01/19 03:52:08 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.23 2004/01/19 04:31:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -123,6 +123,8 @@
 #include <netinet/sctp_header.h>
 #include <netinet/sctp_indata.h>
 #include <netinet/sctp_asconf.h>
+
+#include <net/net_osdep.h>
 
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;
