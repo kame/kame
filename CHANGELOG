@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.917 2000/05/22 15:29:24 itojun Exp $
+$Id: CHANGELOG,v 1.918 2000/05/22 16:49:04 fujisawa Exp $
 
 <200005>
+Tue May 23 01:46:39 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* Remove "options PM" from GENERIC.v6.
+
+	  Now, the facility of v4NAT was integrated by NATPT (some NAT
+ 	  function is not implemented yet), please use NATPT when you want
+ 	  to use v4NAT.
+
 Tue May 23 00:27:52 JST 2000  itojun@iijlab.net
 	* sys/netinet6/udp6_var.h: make sysctl symbol name meet with
 	  IPv4 counterpart.  freebsd2: net.inet6.udp6.maxdgram,
