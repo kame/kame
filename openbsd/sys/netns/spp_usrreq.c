@@ -1466,6 +1466,10 @@ spp_usrreq(so, req, m, nam, controlp)
 	case PRU_ACCEPT: {
 		struct sockaddr_ns *sns = mtod(nam, struct sockaddr_ns *);
 
+		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
+			error = ECONNABORTED;
+			break;
+		}
 		nam->m_len = sizeof (struct sockaddr_ns);
 		sns->sns_family = AF_NS;
 		sns->sns_addr = nsp->nsp_faddr;

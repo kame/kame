@@ -251,11 +251,7 @@ soaccept(so, nam)
 	if ((so->so_state & SS_NOFDREF) == 0)
 		panic("soaccept: !NOFDREF");
 	so->so_state &= ~SS_NOFDREF;
-	if ((so->so_state & SS_ISDISCONNECTED) == 0)
-		error = (*so->so_proto->pr_usrreq)(so, PRU_ACCEPT, NULL,
-		    nam, NULL);
-	else
-		error = ECONNABORTED;
+	error = (*so->so_proto->pr_usrreq)(so, PRU_ACCEPT, NULL, nam, NULL);
 	splx(s);
 	return (error);
 }

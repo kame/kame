@@ -1,4 +1,4 @@
-/*	$OpenBSD: spx_usrreq.c,v 1.6 1998/03/18 21:30:06 mickey Exp $	*/
+/*	$OpenBSD: spx_usrreq.c,v 1.12 2000/01/15 19:05:30 fgsch Exp $	*/
 
 /*-
  *
@@ -45,19 +45,15 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
-#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/errno.h>
 
-#include <net/if.h>
 #include <net/route.h>
 #include <netinet/tcp_fsm.h>
 
 #include <netipx/ipx.h>
 #include <netipx/ipx_pcb.h>
 #include <netipx/ipx_var.h>
-#include <netipx/ipx_error.h>
 #include <netipx/spx.h>
 #include <netipx/spx_timer.h>
 #include <netipx/spx_var.h>
@@ -92,7 +88,7 @@ spx_init()
 	spx_iss = 1; /* WRONG !! should fish it out of TODR */
 }
 
-/*ARGSUSED*/
+/* ARGSUSED */
 void
 spx_input(struct mbuf *m, ...)
 {
@@ -186,7 +182,7 @@ spx_input(struct mbuf *m, ...)
 		am = m_get(M_DONTWAIT, MT_SONAME);
 		if (am == NULL)
 			goto drop;
-		am->m_len = sizeof (struct sockaddr_ipx);
+		am->m_len = sizeof(struct sockaddr_ipx);
 		sipx = mtod(am, struct sockaddr_ipx *);
 		sipx->sipx_len = sizeof(*sipx);
 		sipx->sipx_family = AF_IPX;
@@ -271,9 +267,9 @@ spx_input(struct mbuf *m, ...)
 	if (so->so_options & SO_DEBUG || traceallspxs)
 		spx_trace(SA_INPUT, (u_char)ostate, cb, &spx_savesi, 0);
 
-	m->m_len -= sizeof (struct ipx);
-	m->m_pkthdr.len -= sizeof (struct ipx);
-	m->m_data += sizeof (struct ipx);
+	m->m_len -= sizeof(struct ipx);
+	m->m_pkthdr.len -= sizeof(struct ipx);
+	m->m_data += sizeof(struct ipx);
 
 	if (spx_reass(cb, si)) {
 		(void) m_freem(m);
@@ -289,7 +285,7 @@ dropwithreset:
 	si->si_seq = ntohs(si->si_seq);
 	si->si_ack = ntohs(si->si_ack);
 	si->si_alo = ntohs(si->si_alo);
-	ipx_error(dtom(si), IPX_ERR_NOSOCK, 0);
+	m_freem(dtom(si));
 	if (cb->s_ipxpcb->ipxp_socket->so_options & SO_DEBUG || traceallspxs)
 		spx_trace(SA_DROP, (u_char)ostate, cb, &spx_savesi, 0);
 	return;
@@ -311,8 +307,8 @@ int spxrexmtthresh = 3;
  */
 int
 spx_reass(cb, si)
-register struct spxpcb *cb;
-register struct spx *si;
+	register struct spxpcb *cb;
+	register struct spx *si;
 {
 	register struct spx_q	*q;
 	register struct mbuf	*m;
@@ -467,18 +463,18 @@ update_window:
 			spxstat.spxs_rcvpackafterwin++;
 		if (si->si_cc & SPX_OB) {
 			if (SSEQ_GT(si->si_seq, cb->s_alo + 60)) {
-				ipx_error(dtom(si), IPX_ERR_FULLUP, 0);
+				m_freem(dtom(si));
 				return (0);
 			} /* else queue this packet; */
 		} else {
 			/*register struct socket *so = cb->s_ipxpcb->ipxp_socket;
 			if (so->so_state && SS_NOFDREF) {
-				ipx_error(dtom(si), IPX_ERR_NOSOCK, 0);
+				m_freem(dtom(si));
 				(void)spx_close(cb);
 			} else
 				       would crash system*/
 			spx_istat.notyet++;
-			ipx_error(dtom(si), IPX_ERR_FULLUP, 0);
+			m_freem(dtom(si));
 			return (0);
 		}
 	}
@@ -615,14 +611,10 @@ spx_ctlinput(cmd, arg_as_sa, dummy)
 {
 	caddr_t arg = (/* XXX */ caddr_t)arg_as_sa;
 	struct ipx_addr *na;
-	struct ipx_errp *errp = (struct ipx_errp *)arg;
-	struct ipxpcb *ipxp;
 	struct sockaddr_ipx *sipx;
-	int type;
 
 	if (cmd < 0 || cmd > PRC_NCMDS)
 		return NULL;
-	type = IPX_ERR_UNREACH_HOST;
 
 	switch (cmd) {
 
@@ -639,38 +631,11 @@ spx_ctlinput(cmd, arg_as_sa, dummy)
 		break;
 
 	default:
-		errp = (struct ipx_errp *)arg;
-		na = &errp->ipx_err_ipx.ipx_dna;
-		type = errp->ipx_err_num;
-		type = ntohs((u_short)type);
 		break;
 	}
-	switch (type) {
-
-	case IPX_ERR_UNREACH_HOST:
-		ipx_pcbnotify(na, (int)ipxctlerrmap[cmd], spx_abort, (long)0);
-		break;
-
-	case IPX_ERR_TOO_BIG:
-	case IPX_ERR_NOSOCK:
-		ipxp = ipx_pcblookup(na, errp->ipx_err_ipx.ipx_sna.ipx_port,
-			IPX_WILDCARD);
-		if (ipxp) {
-			if(ipxp->ipxp_ppcb)
-				(void)spx_drop((struct spxpcb *)ipxp->ipxp_ppcb,
-						(int)ipxctlerrmap[cmd]);
-			else
-				(void)ipx_drop(ipxp, (int)ipxctlerrmap[cmd]);
-		}
-		break;
-
-	case IPX_ERR_FULLUP:
-		ipx_pcbnotify(na, 0, spx_quench, (long)0);
-		break;
-	}
-
 	return NULL;
 }
+
 /*
  * When a source quench is received, close congestion window
  * to one packet.  We will gradually open it again as we proceed.
@@ -688,7 +653,7 @@ spx_quench(ipxp)
 #ifdef notdef
 int
 spx_fixmtu(ipxp)
-register struct ipxpcb *ipxp;
+	register struct ipxpcb *ipxp;
 {
 	register struct spxpcb *cb = (struct spxpcb *)(ipxp->ipxp_ppcb);
 	register struct mbuf *m;
@@ -765,7 +730,7 @@ spx_output(cb, m0)
 				recordp = 1;
 		}
 		datalen = (cb->s_flags & SF_HO) ?
-				len - sizeof (struct spxhdr) : len;
+				len - sizeof(struct spxhdr) : len;
 		if (datalen > mtu) {
 			if (cb->s_flags & SF_PI) {
 				m_freem(m0);
@@ -830,15 +795,15 @@ spx_output(cb, m0)
 		 * Fill in mbuf with extended SP header
 		 * and addresses and length put into network format.
 		 */
-		MH_ALIGN(m, sizeof (struct spx));
-		m->m_len = sizeof (struct spx);
+		MH_ALIGN(m, sizeof(struct spx));
+		m->m_len = sizeof(struct spx);
 		m->m_next = m0;
 		si = mtod(m, struct spx *);
 		si->si_i = *cb->s_ipx;
 		si->si_s = cb->s_shdr;
 		if ((cb->s_flags & SF_PI) && (cb->s_flags & SF_HO)) {
 			register struct spxhdr *sh;
-			if (m0->m_len < sizeof (*sh)) {
+			if (m0->m_len < sizeof(*sh)) {
 				if((m0 = m_pullup(m0, sizeof(*sh))) == NULL) {
 					(void) m_free(m);
 					m_freem(m0);
@@ -849,9 +814,9 @@ spx_output(cb, m0)
 			sh = mtod(m0, struct spxhdr *);
 			si->si_dt = sh->spx_dt;
 			si->si_cc |= sh->spx_cc & SPX_EM;
-			m0->m_len -= sizeof (*sh);
-			m0->m_data += sizeof (*sh);
-			len -= sizeof (*sh);
+			m0->m_len -= sizeof(*sh);
+			m0->m_data += sizeof(*sh);
+			len -= sizeof(*sh);
 		}
 		len += sizeof(*si);
 		if ((cb->s_flags2 & SF_NEWCALL) && recordp) {
@@ -1041,14 +1006,14 @@ send:
 		 * Fill in mbuf with extended SP header
 		 * and addresses and length put into network format.
 		 */
-		MH_ALIGN(m, sizeof (struct spx));
-		m->m_len = sizeof (*si);
-		m->m_pkthdr.len = sizeof (*si);
+		MH_ALIGN(m, sizeof(struct spx));
+		m->m_len = sizeof(*si);
+		m->m_pkthdr.len = sizeof(*si);
 		si = mtod(m, struct spx *);
 		si->si_i = *cb->s_ipx;
 		si->si_s = cb->s_shdr;
 		si->si_seq = cb->s_smax + 1;
-		si->si_len = htons(sizeof (*si));
+		si->si_len = htons(sizeof(*si));
 		si->si_cc |= SPX_SP;
 	} else {
 		cb->s_outx = 3;
@@ -1123,7 +1088,8 @@ send:
 			spx_trace(SA_OUTPUT, cb->s_state, cb, si, 0);
 
 		if (so->so_options & SO_DONTROUTE)
-			error = ipx_outputfl(m, (struct route *)0, IPX_ROUTETOIF);
+			error = ipx_outputfl(m, (struct route *)0,
+			    IPX_ROUTETOIF);
 		else
 			error = ipx_outputfl(m, &cb->s_ipxpcb->ipxp_route, 0);
 	}
@@ -1167,7 +1133,7 @@ spx_setpersist(cb)
 		cb->s_rxtshift++;
 }
 
-/*ARGSUSED*/
+/* ARGSUSED */
 int
 spx_ctloutput(req, so, level, name, value)
 	int req;
@@ -1276,8 +1242,8 @@ spx_ctloutput(req, so, level, name, value)
 
 		case SO_DEFAULT_HEADERS:
 			{
-				register struct spxhdr *sp
-						= mtod(*value, struct spxhdr *);
+				register struct spxhdr *sp =
+				    mtod(*value, struct spxhdr *);
 				cb->s_dt = sp->spx_dt;
 				cb->s_cc = sp->spx_cc & SPX_EM;
 			}
@@ -1293,7 +1259,7 @@ spx_ctloutput(req, so, level, name, value)
 		return (error);
 }
 
-/*ARGSUSED*/
+/* ARGSUSED */
 int
 spx_usrreq(so, req, m, nam, controlp)
 	struct socket *so;
@@ -1355,11 +1321,11 @@ spx_usrreq(so, req, m, nam, controlp)
 		cb->s_swl1 = -1;
 		TAILQ_INIT(&cb->spxp_queue);
 		cb->s_ipxpcb = ipxp;
-		cb->s_mtu = 576 - sizeof (struct spx);
+		cb->s_mtu = 576 - sizeof(struct spx);
 		cb->s_cwnd = sbspace(sb) * CUNIT / cb->s_mtu;
 		cb->s_ssthresh = cb->s_cwnd;
 		cb->s_cwmx = sbspace(sb) * CUNIT /
-				(2 * sizeof (struct spx));
+				(2 * sizeof(struct spx));
 		/* Above is recomputed when connecting to account
 		   for changed buffering or mtu's */
 		cb->s_rtt = SPXTV_SRTTBASE;
@@ -1371,10 +1337,6 @@ spx_usrreq(so, req, m, nam, controlp)
 		break;
 
 	case PRU_DETACH:
-		if (ipxp == NULL) {
-			error = ENOTCONN;
-			break;
-		}
 		if (cb->s_state > TCPS_LISTEN)
 			cb = spx_disconnect(cb);
 		else
@@ -1439,20 +1401,6 @@ spx_usrreq(so, req, m, nam, controlp)
 		cb = spx_disconnect(cb);
 		break;
 
-	/*
-	 * Accept a connection.  Essentially all the work is
-	 * done at higher levels; just return the address
-	 * of the peer, storing through addr.
-	 */
-	case PRU_ACCEPT: {
-		struct sockaddr_ipx *sipx = mtod(nam, struct sockaddr_ipx *);
-
-		nam->m_len = sizeof (struct sockaddr_ipx);
-		sipx->sipx_family = AF_IPX;
-		sipx->sipx_addr = ipxp->ipxp_faddr;
-		break;
-		}
-
 	case PRU_SHUTDOWN:
 		socantsendmore(so);
 		cb = spx_usrclosed(cb);
@@ -1496,7 +1444,8 @@ spx_usrreq(so, req, m, nam, controlp)
 			break;
 		}
 		cb->s_oobflags |= SF_SOOB;
-		/* fall into */
+		/* FALLTRHOUGH */
+
 	case PRU_SEND:
 		if (controlp) {
 			u_short *p = mtod(controlp, u_short *);
@@ -1515,6 +1464,18 @@ spx_usrreq(so, req, m, nam, controlp)
 	case PRU_SOCKADDR:
 		ipx_setsockaddr(ipxp, nam);
 		break;
+
+	/*
+	 * Accept a connection.  Essentially all the work is
+	 * done at higher levels; just return the address
+	 * of the peer, storing through addr.
+	 */
+	case PRU_ACCEPT:
+		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
+			error = ECONNABORTED;
+			break;
+		}
+		/* FALLTHROUGH */
 
 	case PRU_PEERADDR:
 		ipx_setpeeraddr(ipxp, nam);
