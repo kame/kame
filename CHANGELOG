@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.585 2000/02/21 11:49:41 itojun Exp $
+$Id: CHANGELOG,v 1.586 2000/02/21 13:59:26 jinmei Exp $
 
 <200002>
+2000-02-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/(several files): added initialization for IPsec. Now
+	the kernel can be built and run with the IPSEC option (though we
+	may need some more work to stabilize it).
+
 Mon Feb 21 20:48:13 JST 2000  itojun@iijlab.net
 	* {freebsd[23],netbsd}/usr.sbin/racoon/Makefile.inc:
 	  add library paths for "USA resident" case (link separate librsaref).
