@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.6 1999/11/04 00:32:25 sakane Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.7 1999/11/30 18:36:08 sakane Exp $ */
 
 #ifdef _KERNEL
 # ifndef KERNEL
@@ -238,25 +238,42 @@ kdebug_sadb_identity(ext)
 	len = PFKEY_UNUNIT64(id->sadb_ident_len) - sizeof(*id);
 	printf("sadb_ident_%s{",
 	    id->sadb_ident_exttype == SADB_EXT_IDENTITY_SRC ? "src" : "dst");
-	printf(" type=%d id=%lu",
-	    id->sadb_ident_type, (u_long)id->sadb_ident_id);
-	if (len) {
-#ifdef KERNEL
-		ipsec_hexdump((caddr_t)(id + 1), len); /*XXX cast ?*/
-#else
-		char *p, *ep;
-		printf("\n  str=\"");
-		p = (char *)(id + 1);
-		ep = p + len;
-		for (/*nothing*/; *p && p < ep; p++) {
-			if (isprint(*p))
-				printf("%c", *p & 0xff);
-			else
-				printf("\\%03o", *p & 0xff);
-		}
-#endif
-		printf("\"");
+	switch (id->sadb_ident_type) {
+	case SADB_X_IDENTTYPE_ADDR:
+	{
+		union sadb_x_ident_id *aid;
+		aid = (union sadb_x_ident_id *)&id->sadb_ident_id;
+
+		printf(" type=%d prefix=%u ul_proto=%u\n",
+			id->sadb_ident_type,
+			aid->sadb_x_ident_id_addr.prefix,
+			aid->sadb_x_ident_id_addr.ul_proto);
+		kdebug_sockaddr((struct sockaddr *)(id + 1));
+		break;
 	}
+	default:
+		printf(" type=%d id=%lu",
+			id->sadb_ident_type, (u_long)id->sadb_ident_id);
+		if (len) {
+#ifdef KERNEL
+			ipsec_hexdump((caddr_t)(id + 1), len); /*XXX cast ?*/
+#else
+			char *p, *ep;
+			printf("\n  str=\"");
+			p = (char *)(id + 1);
+			ep = p + len;
+			for (/*nothing*/; *p && p < ep; p++) {
+				if (isprint(*p))
+					printf("%c", *p & 0xff);
+				else
+					printf("\\%03o", *p & 0xff);
+			}
+#endif
+			printf("\"");
+		}
+		break;
+	}
+
 	printf(" }\n");
 
 	return;
@@ -399,16 +416,20 @@ kdebug_sadb_x_policy(ext)
 		xisr = (struct sadb_x_ipsecrequest *)(xpl + 1);
 
 		while (tlen > 0) {
-			printf(" { len=%u proto=%u mode=%u level=%u\n",
+			printf(" { len=%u proto=%u mode=%u level=%u reqid=%u\n",
 				xisr->sadb_x_ipsecrequest_len,
 				xisr->sadb_x_ipsecrequest_proto,
 				xisr->sadb_x_ipsecrequest_mode,
-				xisr->sadb_x_ipsecrequest_level);
+				xisr->sadb_x_ipsecrequest_level,
+				xisr->sadb_x_ipsecrequest_reqid);
 
-			addr = (struct sockaddr *)(xisr + 1);
-			kdebug_sockaddr(addr);
-			addr = (struct sockaddr *)((caddr_t)addr + addr->sa_len);
-			kdebug_sockaddr(addr);
+			if (xisr->sadb_x_ipsecrequest_len > sizeof(*xisr)) {
+				addr = (struct sockaddr *)(xisr + 1);
+				kdebug_sockaddr(addr);
+				addr = (struct sockaddr *)((caddr_t)addr
+							+ addr->sa_len);
+				kdebug_sockaddr(addr);
+			}
 
 			printf(" }\n");
 
