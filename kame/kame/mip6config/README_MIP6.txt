@@ -145,12 +145,17 @@
 	The printout is enabled/disabled by using the ``mip6config -d [1|0]''
 	command.
 
-	You may enable or disable ``options IPSEC'' etc. in the kernel. IPsec
-	isn't required at this point. However, if you define IPsec and a
-	SPD entry of upperspec ``any'' between e.g. Mobile Node and Home Agent,
-	together with SAs using AH, Authentication Headers will be included in
-	the Binding Updates and Binding Acknowledgement. Please see setkey(8)
-	and mip6_ipsec.sh in this directory.
+	Kernel IPsec support ("options IPSEC" in the kernel config file) is
+	completely optional, but if EITHER the Mobile Node OR the Home
+	Agent have kernel support, then both sides MUST activate IPsec
+	between the two hosts.  The Mobile IPv6 implementation makes no
+	demands as to the IPsec protocol (AH, ESP) used between the two
+	hosts, nor to the security protocol mode (tunnel, transport,
+	any). However, if you define IPsec and a SPD entry of upperspec
+	``any'' between e.g. Mobile Node and Home Agent, together with SAs
+	using AH, Authentication Headers will be included in the Binding
+	Updates and Binding Acknowledgement. Please see setkey(8) and
+	mip6_ipsec.sh in this directory.
 
 3.2	Setting up the Home Agent
 
@@ -269,4 +274,4 @@
 	- Home Subnet Renumbering is not enabled in this first release
 	  (2001-03-16).
 
-$KAME: README_MIP6.txt,v 1.5 2001/03/29 05:34:28 itojun Exp $
+$KAME: README_MIP6.txt,v 1.6 2001/05/17 02:20:22 keiichi Exp $
