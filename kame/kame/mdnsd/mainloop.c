@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.21 2000/05/31 12:12:05 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.22 2000/05/31 12:12:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -72,7 +72,7 @@ static int mainloop0 __P((int));
 static int conf_mediator __P((int));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
-static int hexdump __P((const char *, const char *, int,
+static int dnsdump __P((const char *, const char *, int,
 	const struct sockaddr *));
 static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
 	int, int, int *));
@@ -323,7 +323,7 @@ fail:
 }
 
 static int
-hexdump(title, buf, len, from)
+dnsdump(title, buf, len, from)
 	const char *title;
 	const char *buf;
 	int len;
@@ -344,6 +344,7 @@ hexdump(title, buf, len, from)
 	}
 
 	printf("host %s port %s myaddr %d\n", hbuf, pbuf, ismyaddr(from));
+#if 0
 	for (i = 0; i < len; i++) {
 		if (i % 16 == 0)
 			printf("%08x: ", i);
@@ -353,6 +354,7 @@ hexdump(title, buf, len, from)
 	}
 	if (len % 16 != 0)
 		printf("\n");
+#endif
 
 	if (sizeof(*hp) > len) {
 		printf("packet too short, %d\n", len);
@@ -584,7 +586,7 @@ getans(s, buf, len, from)
 	hp = (HEADER *)buf;
 
 	if (dflag)
-		hexdump("getans I", buf, len, from);
+		dnsdump("getans I", buf, len, from);
 
 	/* we handle successful replies only  XXX negative cache */
 	if (hp->qr != 1 || hp->rcode != NOERROR)
@@ -614,7 +616,7 @@ getans(s, buf, len, from)
 	hp->id = ohp->id;
 	hp->ra = 0;	/* recursion not supported */
 	if (dflag)
-		hexdump("getans O", buf, len, (struct sockaddr *)&qc->from);
+		dnsdump("getans O", buf, len, (struct sockaddr *)&qc->from);
 	if (sendto(s, buf, len, 0, (struct sockaddr *)&qc->from,
 	    qc->from.ss_len) != len) {
 		delqcache(qc);
@@ -654,7 +656,7 @@ relay(buf, len, from)
 	hp = (HEADER *)buf;
 
 	if (dflag)
-		hexdump("relay I", buf, len, from);
+		dnsdump("relay I", buf, len, from);
 	if (hp->qr == 0 && hp->opcode == QUERY) {
 		/* query, no recurse - multicast it */
 		qc = newqcache(from, buf, len);
@@ -678,7 +680,7 @@ relay(buf, len, from)
 				sa = (struct sockaddr *)&ns->addr;
 
 				if (dflag)
-					hexdump("relay O", buf, len, sa);
+					dnsdump("relay O", buf, len, sa);
 				if (sendto(sock[i], buf, len, 0, sa,
 				    sa->sa_len) == len) {
 					sent++;
@@ -719,7 +721,7 @@ serve(s, buf, len, from)
 	int count;
 
 	if (dflag)
-		hexdump("serve I", buf, len, from);
+		dnsdump("serve I", buf, len, from);
 
 	/* we handle queries only */
 	if (sizeof(*hp) > len)
@@ -761,7 +763,7 @@ serve(s, buf, len, from)
 		hp->ancount = htons(count);
 
 		if (dflag)
-			hexdump("serve O", replybuf, p - replybuf, from);
+			dnsdump("serve O", replybuf, p - replybuf, from);
 
 		sendto(s, replybuf, p - replybuf, 0, from, from->sa_len);
 
@@ -810,7 +812,7 @@ serve(s, buf, len, from)
 		hp->ancount = htons(1);
 
 		if (dflag)
-			hexdump("serve D", replybuf, p - replybuf, from);
+			dnsdump("serve D", replybuf, p - replybuf, from);
 
 		sendto(s, replybuf, p - replybuf, 0, from, from->sa_len);
 
