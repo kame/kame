@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.17 2002/01/17 01:16:43 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.18 2002/01/17 03:43:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -111,19 +111,10 @@ struct mip6_bu {
 	struct in6_addr     mbu_haddr;      /* home address */
 	struct in6_addr     mbu_coa;        /* COA */
 	u_int32_t           mbu_lifetime;   /* BU lifetime */
-#if 0
-	int64_t             mbu_remain;     /* lifetime remain */
-#endif
 	time_t              mbu_expire;     /* expiration time of this BU. */
 	u_int32_t           mbu_refresh;    /* refresh frequency */
-#if 0
-	int64_t             mbu_refremain;  /* refresh time remain */
-#endif
 	time_t              mbu_refexpire;  /* expiration time of refresh. */
 	u_int32_t           mbu_acktimeout; /* current ack timo value */
-#if 0
-	int64_t             mbu_ackremain;  /* acklifetime remain */
-#endif
 	time_t              mbu_ackexpire;  /* expiration time of ack. */
 	MIP6_SEQNO_T        mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
