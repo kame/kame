@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.23 2004/01/19 04:31:36 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.24 2004/01/26 03:23:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -215,13 +215,15 @@ sctp_threshold_management(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 		MGET(oper, M_DONTWAIT, MT_DATA);
 		if (oper) {
 			struct sctp_paramhdr *ph;
-			int *ippp;
-			oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+			u_int32_t *ippp;
+
+			oper->m_len = sizeof(struct sctp_paramhdr) +
+			    sizeof(*ippp);
 			ph = mtod(oper, struct sctp_paramhdr *);
 			ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 			ph->param_length = htons(oper->m_len);
-			ippp = (int *)(ph +1);
-			*ippp = 0x40000001;
+			ippp = (u_int32_t *)(ph + 1);
+			*ippp = htonl(0x40000001);
 		}
 		sctp_abort_an_association(ep, tcb, SCTP_FAILED_THRESHOLD, oper);
 		if ((ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) &&
@@ -909,13 +911,15 @@ void sctp_cookie_timer(struct sctp_inpcb *ep,
 			MGET(oper, M_DONTWAIT, MT_DATA);
 			if (oper) {
 				struct sctp_paramhdr *ph;
-				int *ippp;
-				oper->m_len = sizeof(struct sctp_paramhdr) + 4;
+				u_int32_t *ippp;
+
+				oper->m_len = sizeof(struct sctp_paramhdr) +
+				    sizeof(*ippp);
 				ph = mtod(oper, struct sctp_paramhdr *);
 				ph->param_type = htons(SCTP_CAUSE_PROTOCOL_VIOLATION);
 				ph->param_length = htons(oper->m_len);
-				ippp = (int *)(ph +1);
-				*ippp = 0x40000002;
+				ippp = (u_int32_t *)(ph + 1);
+				*ippp = htonl(0x40000002);
 			}
 			sctp_abort_an_association(ep, tcb, SCTP_INTERNAL_ERROR,
 			    oper);
