@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/11 13:13:12 $
+			$Date: 1999/10/12 00:44:40 $
 
 1. IPv6
 
@@ -276,8 +276,13 @@ See 1.2 in the document for relationship between DAD and autoconfiguration.
 
 1.4.3 DHCPv6
 
-DHCPv6 server/client is not implemented yet.  "Managed" and "Other" bits in
-RA have no special effect to stateful autoconfiguration procedure
+DHCPv6 itself needs more work.  We supply a tiny DHCPv6 server/client
+kame/dhcp6.  However, the implementation is very premature (for example,
+this does NOT implement address lease/release), and it is not in default
+compilation tree.  If you want to experiment, compile it on your own.
+
+DHCPv6 and autoconfiguration also needs more work.  "Managed" and "Other"
+bits in RA have no special effect to stateful autoconfiguration procedure
 ("Managed" bit actually prevents stateless autoconfiguration, but no special
 action will be taken for DHCPv6 client).
 
