@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.353 2004/04/09 06:16:41 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.354 2004/04/09 06:54:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1119,7 +1119,7 @@ nd6_is_addr_neighbor(addr, ifp)
 		if (!(pr->ndpr_stateflags & NDPRF_ONLINK))
 			continue;
 
-		if (IN6_ARE_MASKED_ADDR_EQUAL(&pr->ndpr_prefix,
+		if (IN6_ARE_MASKED_ADDR_EQUAL(&pr->ndpr_prefix.sin6_addr,
 		    &addr->sin6_addr, &pr->ndpr_mask))
 			return (1);
 	}
@@ -1722,7 +1722,8 @@ nd6_ioctl(cmd, data, ifp)
 			struct nd_pfxrouter *pfr;
 			int j;
 
-			oprl->prefix[i].prefix = pr->ndpr_prefix;
+			(void)in6_embedscope(&oprl->prefix[i].prefix,
+			    &pr->ndpr_prefix);
 			oprl->prefix[i].raflags = pr->ndpr_raf;
 			oprl->prefix[i].prefixlen = pr->ndpr_plen;
 			oprl->prefix[i].vltime = pr->ndpr_vltime;
@@ -1803,7 +1804,7 @@ nd6_ioctl(cmd, data, ifp)
 
 			next = pr->ndpr_next;
 
-			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix))
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
 				continue; /* XXX */
 
 			/* do we really have to remove addresses as well? */
@@ -2769,10 +2770,7 @@ fill_prlist(req)
 			sin6 = (struct sockaddr_in6 *)(p + 1);
 #endif
 
-			bzero(&p->prefix, sizeof(p->prefix));
-			p->prefix.sin6_family = AF_INET6;
-			p->prefix.sin6_len = sizeof(struct sockaddr_in6);
-			p->prefix.sin6_addr = pr->ndpr_prefix; /* redundant */
+			p->prefix = pr->ndpr_prefix; /* almost redundant */
 			if (in6_recoverscope(&p->prefix,
 			    &p->prefix.sin6_addr, pr->ndpr_ifp) != 0)
 				log(LOG_ERR,

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.367 2004/02/23 04:42:26 suz Exp $	*/
+/*	$KAME: in6.c,v 1.368 2004/04/09 06:54:29 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -862,10 +862,10 @@ in6_control(so, cmd, data, ifp)
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 			break;	/* we don't need to install a host route. */
 		}
-		pr0.ndpr_prefix = ifra->ifra_addr.sin6_addr;
+		pr0.ndpr_prefix = ifra->ifra_addr;
 		/* apply the mask for safety. */
 		for (i = 0; i < 4; i++) {
-			pr0.ndpr_prefix.s6_addr32[i] &=
+			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
 			    ifra->ifra_prefixmask.sin6_addr.s6_addr32[i];
 		}
 		/*

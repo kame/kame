@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.191 2004/02/20 09:10:48 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.192 2004/04/09 06:54:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -714,10 +714,11 @@ in6_ifattach_linklocal(ifp, altifp)
 	pr0.ndpr_ifp = ifp;
 	/* this should be 64 at this moment. */
 	pr0.ndpr_plen = in6_mask2len(&ifra.ifra_prefixmask.sin6_addr, NULL);
-	pr0.ndpr_prefix = ifra.ifra_addr.sin6_addr;
+	pr0.ndpr_prefix = ifra.ifra_addr;
 	/* apply the mask for safety. (nd6_prelist_add will apply it again) */
 	for (i = 0; i < 4; i++) {
-		pr0.ndpr_prefix.s6_addr32[i] &= in6mask64.s6_addr32[i];
+		pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
+		    in6mask64.s6_addr32[i];
 	}
 	/*
 	 * Initialize parameters.  The link-local prefix must always be

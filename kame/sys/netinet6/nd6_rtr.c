@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.248 2004/02/13 02:52:11 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.249 2004/04/09 06:54:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -403,7 +403,9 @@ nd6_ra_input(m, off, icmp6len)
 			}
 
 			bzero(&pr, sizeof(pr));
-			pr.ndpr_prefix = pi->nd_opt_pi_prefix;
+			pr.ndpr_prefix.sin6_family = AF_INET6;
+			pr.ndpr_prefix.sin6_len = sizeof(pr.ndpr_prefix);
+			pr.ndpr_prefix.sin6_addr = pi->nd_opt_pi_prefix;
 			pr.ndpr_ifp = (struct ifnet *)m->m_pkthdr.rcvif;
 
 			pr.ndpr_raf_onlink = (pi->nd_opt_pi_flags_reserved &
@@ -1142,8 +1144,8 @@ nd6_prefix_lookup(key)
 	for (search = nd_prefix.lh_first; search; search = search->ndpr_next) {
 		if (key->ndpr_ifp == search->ndpr_ifp &&
 		    key->ndpr_plen == search->ndpr_plen &&
-		    in6_are_prefix_equal(&key->ndpr_prefix,
-		    &search->ndpr_prefix, key->ndpr_plen)) {
+		    in6_are_prefix_equal(&key->ndpr_prefix.sin6_addr,
+		    &search->ndpr_prefix.sin6_addr, key->ndpr_plen)) {
 			break;
 		}
 	}
@@ -1188,7 +1190,7 @@ nd6_prelist_add(pr, dr, newp)
 	in6_prefixlen2mask(&new->ndpr_mask, new->ndpr_plen);
 	/* make prefix in the canonical form */
 	for (i = 0; i < 4; i++)
-		new->ndpr_prefix.s6_addr32[i] &=
+		new->ndpr_prefix.sin6_addr.s6_addr32[i] &=
 		    new->ndpr_mask.s6_addr32[i];
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1207,7 +1209,7 @@ nd6_prelist_add(pr, dr, newp)
 		if ((e = nd6_prefix_onlink(new)) != 0) {
 			nd6log((LOG_ERR, "nd6_prelist_add: failed to make "
 			    "the prefix %s/%d on-link on %s (errno=%d)\n",
-			    ip6_sprintf(&pr->ndpr_prefix),
+			    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 			    pr->ndpr_plen, if_name(pr->ndpr_ifp), e));
 			/* proceed anyway. XXX: is it correct? */
 		}
@@ -1241,7 +1243,7 @@ prelist_remove(pr)
 	    (e = nd6_prefix_offlink(pr)) != 0) {
 		nd6log((LOG_ERR, "prelist_remove: failed to make %s/%d offlink "
 		    "on %s, errno=%d\n",
-		    ip6_sprintf(&pr->ndpr_prefix),
+		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 		    pr->ndpr_plen, if_name(pr->ndpr_ifp), e));
 		/* what should we do? */
 	}
@@ -1344,7 +1346,7 @@ prelist_update(new, dr, m)
 				    "prelist_update: failed to make "
 				    "the prefix %s/%d on-link on %s "
 				    "(errno=%d)\n",
-				    ip6_sprintf(&pr->ndpr_prefix),
+				    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 				    pr->ndpr_plen, if_name(pr->ndpr_ifp), e));
 				/* proceed anyway. XXX: is it correct? */
 			}
@@ -1367,7 +1369,7 @@ prelist_update(new, dr, m)
 			nd6log((LOG_NOTICE, "prelist_update: "
 			    "nd6_prelist_add failed for %s/%d on %s "
 			    "errno=%d, returnpr=%p\n",
-			    ip6_sprintf(&new->ndpr_prefix),
+			    ip6_sprintf(&new->ndpr_prefix.sin6_addr),
 			    new->ndpr_plen, if_name(new->ndpr_ifp),
 			    error, newpr));
 			goto end; /* we should just give up in this case. */
@@ -1698,7 +1700,7 @@ pfxlist_onlink_check()
 		 */
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 			/* XXX: a link-local prefix should never be detached */
-			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix))
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
 				continue;
 
 			/*
@@ -1718,7 +1720,7 @@ pfxlist_onlink_check()
 	} else {
 		/* there is no prefix that has a reachable router */
 		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix))
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
 				continue;
 
 			if (pr->ndpr_raf_onlink == 0)
@@ -1740,7 +1742,7 @@ pfxlist_onlink_check()
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		int e;
 
-		if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix))
+		if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
 			continue;
 
 		if (pr->ndpr_raf_onlink == 0)
@@ -1752,7 +1754,7 @@ pfxlist_onlink_check()
 				nd6log((LOG_ERR,
 				    "pfxlist_onlink_check: failed to "
 				    "make %s/%d offlink, errno=%d\n",
-				    ip6_sprintf(&pr->ndpr_prefix),
+				    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 				    pr->ndpr_plen, e));
 			}
 		}
@@ -1763,7 +1765,7 @@ pfxlist_onlink_check()
 				nd6log((LOG_ERR,
 				    "pfxlist_onlink_check: failed to "
 				    "make %s/%d onlink, errno=%d\n",
-				    ip6_sprintf(&pr->ndpr_prefix),
+				    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 				    pr->ndpr_plen, e));
 			}
 		}
@@ -1836,7 +1838,7 @@ nd6_prefix_onlink(pr)
 {
 	struct ifaddr *ifa;
 	struct ifnet *ifp = pr->ndpr_ifp;
-	struct sockaddr_in6 prefix6, mask6;
+	struct sockaddr_in6 mask6;
 	struct nd_prefix *opr;
 	u_long rtflags;
 	int error = 0;
@@ -1846,7 +1848,7 @@ nd6_prefix_onlink(pr)
 	if ((pr->ndpr_stateflags & NDPRF_ONLINK) != 0) {
 		nd6log((LOG_ERR,
 		    "nd6_prefix_onlink: %s/%d is already on-link\n",
-		    ip6_sprintf(&pr->ndpr_prefix), pr->ndpr_plen);
+		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr), pr->ndpr_plen);
 		return (EEXIST));
 	}
 
@@ -1865,8 +1867,8 @@ nd6_prefix_onlink(pr)
 			continue;
 
 		if (opr->ndpr_plen == pr->ndpr_plen &&
-		    in6_are_prefix_equal(&pr->ndpr_prefix,
-		    &opr->ndpr_prefix, pr->ndpr_plen))
+		    in6_are_prefix_equal(&pr->ndpr_prefix.sin6_addr,
+		    &opr->ndpr_prefix.sin6_addr, pr->ndpr_plen))
 			return (0);
 	}
 
@@ -1903,7 +1905,7 @@ nd6_prefix_onlink(pr)
 		nd6log((LOG_NOTICE,
 		    "nd6_prefix_onlink: failed to find any ifaddr"
 		    " to add route for a prefix(%s/%d) on %s\n",
-		    ip6_sprintf(&pr->ndpr_prefix),
+		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 		    pr->ndpr_plen, if_name(ifp)));
 		return (0);
 	}
@@ -1926,11 +1928,7 @@ nd6_prefix_onlink(pr)
 		 */
 		rtflags &= ~RTF_CLONING;
 	}
-	bzero(&prefix6, sizeof(prefix6));
-	prefix6.sin6_family = AF_INET6;
-	prefix6.sin6_len = sizeof(struct sockaddr_in6);
-	prefix6.sin6_addr = pr->ndpr_prefix;
-	error = rtrequest(RTM_ADD, (struct sockaddr *)&prefix6,
+	error = rtrequest(RTM_ADD, (struct sockaddr *)&pr->ndpr_prefix,
 	    ifa->ifa_addr, (struct sockaddr *)&mask6, rtflags, &rt);
 	if (error == 0) {
 		if (rt != NULL) /* this should be non NULL, though */
@@ -1940,7 +1938,7 @@ nd6_prefix_onlink(pr)
 		nd6log((LOG_ERR, "nd6_prefix_onlink: failed to add route for a"
 		    " prefix (%s/%d) on %s, gw=%s, mask=%s, flags=%lx "
 		    "errno = %d\n",
-		    ip6_sprintf(&pr->ndpr_prefix),
+		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr),
 		    pr->ndpr_plen, if_name(ifp),
 		    ip6_sprintf(&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr),
 		    ip6_sprintf(&mask6.sin6_addr), rtflags, error));
@@ -1966,7 +1964,7 @@ nd6_prefix_offlink(pr)
 	if ((pr->ndpr_stateflags & NDPRF_ONLINK) == 0) {
 		nd6log((LOG_ERR,
 		    "nd6_prefix_offlink: %s/%d is already off-link\n",
-		    ip6_sprintf(&pr->ndpr_prefix), pr->ndpr_plen));
+		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr), pr->ndpr_plen));
 		return (EEXIST);
 	}
 
@@ -2009,8 +2007,8 @@ nd6_prefix_offlink(pr)
 				continue;
 
 			if (opr->ndpr_plen == pr->ndpr_plen &&
-			    in6_are_prefix_equal(&pr->ndpr_prefix,
-			    &opr->ndpr_prefix, pr->ndpr_plen)) {
+			    in6_are_prefix_equal(&pr->ndpr_prefix.sin6_addr,
+			    &opr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 				int e;
 
 				if ((e = nd6_prefix_onlink(opr)) != 0) {
@@ -2018,7 +2016,7 @@ nd6_prefix_offlink(pr)
 					    "nd6_prefix_offlink: failed to "
 					    "recover a prefix %s/%d from %s "
 					    "to %s (errno = %d)\n",
-					    ip6_sprintf(&opr->ndpr_prefix),
+					    ip6_sprintf(&opr->ndpr_prefix.sin6_addr),
 					    opr->ndpr_plen, if_name(ifp),
 					    if_name(opr->ndpr_ifp), e));
 				}

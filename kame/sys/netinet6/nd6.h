@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.108 2004/04/09 05:37:46 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.109 2004/04/09 06:54:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -268,7 +268,7 @@ struct nd_prefixctl {
 	struct ifnet *ndpr_ifp;
 
 	/* prefix */
-	struct in6_addr ndpr_prefix;
+	struct sockaddr_in6 ndpr_prefix;
 	u_char	ndpr_plen;
 
 	u_int32_t ndpr_vltime;	/* advertised valid lifetime */
@@ -280,7 +280,7 @@ struct nd_prefixctl {
 struct nd_prefix {
 	struct ifnet *ndpr_ifp;
 	LIST_ENTRY(nd_prefix) ndpr_entry;
-	struct in6_addr ndpr_prefix;	/* prefix */
+	struct sockaddr_in6 ndpr_prefix;	/* prefix */
 	struct in6_addr ndpr_mask; /* netmask derived from the prefix */
 
 	u_int32_t ndpr_vltime;	/* advertised valid lifetime */
