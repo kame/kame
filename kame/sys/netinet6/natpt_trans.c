@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.38 2001/06/18 14:28:10 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.39 2001/06/18 14:34:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -933,7 +933,7 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
       = cv6->m->m_len
       = sizeof(struct ip6_hdr) + htons(ip6->ip6_plen);
 
-    switch (((struct icmp *)icmp4dgramoff)->icmp_type)
+    switch (cv4->_payload._icmp4->icmp_type)
     {
       case ICMP_ECHO:		/* ping unreach	*/
 	{
@@ -944,13 +944,14 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
 	}
 	break;
 
+      case ICMP_UNREACH:
       case ICMP_TIMXCEED:	/* traceroute return */
 	{
 	    struct udphdr	*icmpudp6;
 
 	    icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 + sizeof(struct ip6_hdr));
-	    icmpudp6->uh_sport = cv4->ats->local._dport;
-	    icmpudp6->uh_dport = cv4->ats->local._sport;
+	    icmpudp6->uh_sport = pad->_dport;
+	    icmpudp6->uh_dport = pad->_sport;
 	}
 	break;
     }
