@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2081 2002/02/19 13:46:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2082 2002/02/19 14:32:34 jinmei Exp $
 
 <200202>
+2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setmoptions): fixed kernel
+	panic in the case of IPV6_LEAVE_GROUP without an interface.
+	The kernel would choose the group based on the address only with
+	fix.
+	Note, however, that ambiguity on the scope zone of the address
+	would not be allowed by default.  This particularly means that you
+	should always specify the interface for interface or link local
+	groups.
+	Based on: a report from Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
 2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/tcp6_subr.c (tcp6_respond): called
 	ip6_getpktaddrs() correctly.  NULL pointers would be referred to
