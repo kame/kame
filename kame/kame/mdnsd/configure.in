@@ -56,7 +56,7 @@ AC_EGREP_CPP(yes,
 #endif], [result=kame])
 AC_MSG_RESULT($result)
 case $result in
-kame)	CFLAGS="-DINET6 $CFLAGS"
+kame)	AC_DEFINE(INET6)
 	o_LIBS="$LIBS"
 	LIBS="$LIBS -L/usr/local/v6/lib"
 	AC_CHECK_LIB(inet6, getaddrinfo, [], [LIBS="$o_LIBS"])
@@ -95,10 +95,11 @@ AC_TYPE_SIGNAL
 AC_CHECK_FUNCS(mktime select socket)
 
 dnl Checks for optinal parameters
-AC_MSG_CHECKING(if --enable-mediator option is specified)
-AC_ARG_WITH(mediator, [  --with-mediator         build with mediator],
-	[CFLAGS="-DMEDIATOR $CFLAGS"; with_mediator=yes], [with_mediator=no])
-AC_MSG_RESULT($with_mediator);
+dnl AC_MSG_CHECKING(if --enable-mediator option is specified)
+dnl AC_ARG_WITH(mediator, [  --with-mediator         build with mediator],
+dnl 	[AC_DEFINE(MEDIATOR)
+dnl 	with_mediator=yes], [with_mediator=no])
+dnl AC_MSG_RESULT($with_mediator);
 
 dnl Checks for optinal parameters
 AC_MSG_CHECKING(if --enable-pedant option is specified)
