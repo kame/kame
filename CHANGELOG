@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.395 2000/01/02 14:00:24 itojun Exp $
+$Id: CHANGELOG,v 1.396 2000/01/04 10:03:21 sakane Exp $
 
 <200001>
+Tue Jan  4 18:59:08 JST 2000 sakane@ydc.co.jp
+	* kame/sys/netkey:
+	  don't check sequence number at key_update() even if SA initiator.
+	  don't change sequence number passed from userland at key_getspi()
+	  instead of the value of sequence number.
+	  They can be re-enable to define IPSEC_DOSEQCHECK.
+
 Sun Jan  2 22:59:45 JST 2000  itojun@iijlab.net
 	* kame/libinet6/name6.c: don't bark even if we see T_SIG and other
 	  record types.
