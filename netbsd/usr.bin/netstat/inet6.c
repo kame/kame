@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.38 2000/08/13 18:50:29 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.39 2000/10/18 19:25:22 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -687,6 +687,7 @@ ip6_stats(off, name)
 	p(ip6s_nogif, "\t%llu tunneling packet%s that can't find gif\n");
 	p(ip6s_toomanyhdr,
 	    "\t%llu packet%s discarded due to too many headers\n");
+	p(icp6s_pmtuchg, "\t%llu path MTU change%s\n");
 
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\
