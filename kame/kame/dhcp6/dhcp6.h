@@ -109,7 +109,7 @@ struct dhcp6_request {
 	struct in6_addr dh6req_relayaddr; /* relay agent's (non-ll) addr */
 	/* struct in6_addr dh6req_serveraddr; optional: server's addr */
 	/* extensions */
-};
+} __attribute__ ((packed));
 
 struct dhcp6_reply {
 	u_int8_t dh6rep_msgtype;		/* DH6_REPLY */
