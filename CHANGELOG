@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1297 2000/09/23 19:38:58 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1298 2000/09/23 19:39:16 sumikawa Exp $
 
 <200009>
 Sun Sep 24 04:15:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/wwwoffle: upgrade to 2.5e.
 	* freebsd3/ports/netcat: netcat 1.10. you must select address
-	family to use -4/-6 option explicitly.
+	  family to use -4/-6 option explicitly.
 
 Sun Sep 24 00:38:51 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/tcp_wrapper: upgrade to latest IPv6 patch.
