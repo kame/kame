@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/05 09:58:09 $
+			$Date: 1999/10/05 10:02:09 $
 
 1. IPv6
 
@@ -87,6 +87,10 @@ draft-ietf-ipngwg-icmp-name-lookups-03: IPv6 Name Lookups Through ICMP
 draft-ietf-ipngwg-mld-01: Multicast Listener Discovery for IPv6
 draft-ietf-pim-ipv6-01.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
+draft-ietf-dhc-dhcpv6-14.txt: DHCPv6
+draft-ietf-dhc-v6exts-11.txt: Extensions for DHCPv6
+    * kame/dhcp6 has test implementation, which will not be compiled in
+      default compilation.
 draft-itojun-ipv6-tcp-to-anycast-00:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-yamamoto-wideipv6-comm-model-00
