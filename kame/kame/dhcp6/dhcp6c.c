@@ -1160,8 +1160,8 @@ client6_recvreply(s, serv)
 			break;
 		case OT6_STR:
 			/*
-			 * 15 draft is silent about padding requirement, and
-			 * string termination requirement for extensions.
+			 * 15/12 drafts are silent about padding requirement,
+			 * and string termination requirement for extensions.
 			 * at IETF48 dhc session, author confirmed that:
 			 * - no string termination character
 			 * - no padding (= unaligned extensions)
@@ -1190,8 +1190,8 @@ client6_recvreply(s, serv)
 			break;
 		default:
 			/*
-			 * 15 draft is silent about padding requirement, and
-			 * string termination requirement for extensions.
+			 * 15/12 drafts are silent about padding requirement,
+			 * and string termination requirement for extensions.
 			 * at IETF48 dhc session, author confirmed that:
 			 * - no string termination character
 			 * - no padding (= unaligned extensions)
