@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.51 2001/10/02 04:05:27 sakane Exp $	*/
+/*	$KAME: handler.c,v 1.52 2001/10/26 05:16:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -432,7 +432,6 @@ void
 initph2(iph2)
 	struct ph2handle *iph2;
 {
-
 	sched_scrub_param(iph2);
 	iph2->sce = NULL;
 	iph2->scr = NULL;
