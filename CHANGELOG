@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1645 2001/04/11 01:26:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.1646 2001/04/11 11:57:10 sakane Exp $
 
 <200104>
+Wed Apr 11 18:52:26 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	Supported to get a certificate from DNS CERT RR.
+	Also getcertsbyname() is implemented In order to get CERT RRs.
+	This function can use lwres.a if HAVE_LWRES is defined when racoon
+	is compiled.
+	XXX need more local test and interoperability test.
+	XXX should be arranged too many certificate stuff in racoon.conf.
+
 2001-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_pcbopt):
 	* kame/sys/netinet6/ip6_output.c (ip6_setpktoptions):
