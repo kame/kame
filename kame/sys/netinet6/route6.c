@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.44 2003/05/09 19:33:26 t-momose Exp $	*/
+/*	$KAME: route6.c,v 1.45 2003/06/06 06:00:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -243,8 +243,7 @@ ip6_rthdr0(m, ip6, rh0)
 	    IN6_IS_ADDR_V4MAPPED(nextaddr) ||
 	    IN6_IS_ADDR_V4COMPAT(nextaddr)) {
 		ip6stat.ip6s_badoptions++;
-		m_freem(m);
-		return (-1);
+		goto bad;
 	}
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) ||
 	    IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_dst) ||
