@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.35 2000/05/31 20:01:37 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.36 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -107,7 +107,7 @@ static struct cipher_algorithm cipher[] = {
 { "cast",	eay_cast_decrypt,	eay_cast_decrypt,	eay_cast_weakkey, },
 };
 
-static int oakley_compute_keymat_x __P((struct ph2handle *iph2, int side, int sa_dir));
+static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
 
 int
 oakley_get_defaultlifetime()
@@ -152,7 +152,7 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 	const struct dhgroup *dh;
 	vchar_t *pub, *priv, *pub_p, **gxy;
 {
-	if ((*gxy = vmalloc(dh->prime->l)) == 0) {
+	if ((*gxy = vmalloc(dh->prime->l)) == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to get DH buffer.\n");
 		return -1;

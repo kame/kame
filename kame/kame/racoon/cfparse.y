@@ -83,35 +83,30 @@ static int cur_algclass;
 
 static struct proposalspec *prhead;	/* the head is always current. */
 
-static struct addrinfo *parse_addr __P((char *host, char *port, int flag));
+static struct addrinfo *parse_addr __P((char *, char *, int));
 #if 0
-static struct policyindex * parse_spidx __P((caddr_t src, int prefs, int ports,
-		caddr_t dst, int prefd, int portd, int ul_proto, int dir));
+static struct policyindex * parse_spidx __P((caddr_t, int, int,
+		caddr_t, int, int, int, int));
 #endif
 static struct proposalspec *newprspec __P((void));
 static void cleanprhead __P((void));
-static void insprspec
-	__P((struct proposalspec *spspec, struct proposalspec **head));
+static void insprspec __P((struct proposalspec *, struct proposalspec **));
 static struct secprotospec *newspspec __P((void));
-static void insspspec
-	__P((struct secprotospec *spspec, struct proposalspec **head));
+static void insspspec __P((struct secprotospec *, struct proposalspec **));
 
 #if 0
-static int set_ipsec_proposal
-	__P((struct policyindex *spidx, struct proposalspec *prspec));
+static int set_ipsec_proposal __P((struct policyindex *, struct proposalspec *));
 #endif
 static int set_isakmp_proposal
-	__P((struct remoteconf *rmconf, struct proposalspec *prspec));
-static u_int32_t set_algtypes __P((struct secprotospec *s, int class));
+	__P((struct remoteconf *, struct proposalspec *));
+static u_int32_t set_algtypes __P((struct secprotospec *, int));
 static void clean_tmpalgtype __P((void));
 #if 0
-static int expand_ipsecspec __P((int prop_no, int trns_no, int *types,
-	int class, int last, struct proposalspec *p, struct secprotospec *s,
-	struct ipsecpolicy *ipsp));
+static int expand_ipsecspec __P((int, int, int *, int, int,
+	struct proposalspec *, struct secprotospec *, struct ipsecpolicy *));
 #endif
-static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
-	int class, int last, time_t lifetime, int lifebyte, int encklen,
-	struct remoteconf *rmconf));
+static int expand_isakmpspec __P((int, int, int *,
+	int, int, time_t, int, int, struct remoteconf *));
 %}
 
 %union {

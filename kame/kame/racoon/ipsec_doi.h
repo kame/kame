@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.17 2000/06/05 15:30:48 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.18 2000/06/08 06:43:51 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -159,22 +159,22 @@ extern int ipsecdoi_checkph1proposal __P((vchar_t *, struct ph1handle *));
 extern int ipsecdoi_selectph2proposal __P((struct ph2handle *));
 extern int ipsecdoi_checkph2proposal __P((struct ph2handle *));
 
-extern struct prop_pair **get_proppair __P((vchar_t *, int mode));
+extern struct prop_pair **get_proppair __P((vchar_t *, int));
 extern vchar_t *get_sabysaprop __P((struct saprop *, vchar_t *));
-extern int ipsecdoi_checkid1 __P((struct ph1handle *iph1));
-extern int ipsecdoi_setid1 __P((struct ph1handle *iph1));
-extern int ipsecdoi_setid2 __P((struct ph2handle *iph2));
+extern int ipsecdoi_checkid1 __P((struct ph1handle *));
+extern int ipsecdoi_setid1 __P((struct ph1handle *));
+extern int ipsecdoi_setid2 __P((struct ph2handle *));
 extern vchar_t *ipsecdoi_sockaddr2id __P((struct sockaddr *, u_int, u_int));
-extern int ipsecdoi_id2sockaddr __P((vchar_t *buf, struct sockaddr *saddr,
-	u_int8_t *prefixlen, u_int16_t *ul_proto));
-extern const char *ipsecdoi_id2str __P((const vchar_t *id));
+extern int ipsecdoi_id2sockaddr __P((vchar_t *, struct sockaddr *,
+	u_int8_t *, u_int16_t *));
+extern const char *ipsecdoi_id2str __P((const vchar_t *));
 
-extern vchar_t *ipsecdoi_setph1proposal __P((struct isakmpsa *proposal));
-extern int ipsecdoi_setph2proposal __P((struct ph2handle *iph2));
+extern vchar_t *ipsecdoi_setph1proposal __P((struct isakmpsa *));
+extern int ipsecdoi_setph2proposal __P((struct ph2handle *));
 extern int ipsecdoi_get_defaultlifetime __P((void));
-extern int ipsecdoi_checkalgtypes __P((int proto_id, int enc, int auth, int comp));
-extern int ipproto2doi __P((int proto));
+extern int ipsecdoi_checkalgtypes __P((int, int, int, int));
+extern int ipproto2doi __P((int));
 
 extern int ipsecdoi_t2satrns __P((struct isakmp_pl_t *,
 	struct saprop *, struct saproto *, struct satrns *));
-extern int ipsecdoi_authalg2trnsid __P((int alg));
+extern int ipsecdoi_authalg2trnsid __P((int));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.78 2000/06/05 15:30:47 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.79 2000/06/08 06:43:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -78,11 +78,10 @@
 #include "proposal.h"
 #include "strnames.h"
 
-static vchar_t *get_ph1approval __P((struct ph1handle *iph1,
-	struct prop_pair **pair));
-static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *p,
-	struct isakmpsa *proposal));
-static int t2isakmpsa __P((struct isakmp_pl_t *trns, struct isakmpsa *sa));
+static vchar_t *get_ph1approval __P((struct ph1handle *, struct prop_pair **));
+static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *,
+	struct isakmpsa *));
+static int t2isakmpsa __P((struct isakmp_pl_t *, struct isakmpsa *));
 static int cmp_aproppair __P((struct prop_pair *, struct prop_pair *));
 static struct prop_pair *get_ph2approval __P((struct ph2handle *,
 	struct prop_pair **));
@@ -91,9 +90,9 @@ static struct prop_pair *get_ph2approvalx __P((struct ph2handle *,
 static void free_proppair0 __P((struct prop_pair *));
 
 static int get_transform
-	__P((struct isakmp_pl_p *prop, struct prop_pair **pair, int *num_p));
+	__P((struct isakmp_pl_p *, struct prop_pair **, int *));
 static vchar_t *get_sabyproppair __P((struct prop_pair *, struct ph1handle *));
-static u_int32_t ipsecdoi_set_ld __P((vchar_t *buf));
+static u_int32_t ipsecdoi_set_ld __P((vchar_t *));
 
 static int check_doi __P((u_int32_t));
 static int check_situation __P((u_int32_t));
@@ -132,9 +131,9 @@ static int (*check_attributes[]) __P((struct isakmp_pl_t *)) = {
 	check_attr_ipcomp,	/* IPSECDOI_PROTO_IPCOMP */
 };
 
-static int setph1prop __P((struct isakmpsa *props, caddr_t buf));
-static int setph1trns __P((struct isakmpsa *props, caddr_t buf));
-static int setph1attr __P((struct isakmpsa *props, caddr_t buf));
+static int setph1prop __P((struct isakmpsa *, caddr_t));
+static int setph1trns __P((struct isakmpsa *, caddr_t));
+static int setph1attr __P((struct isakmpsa *, caddr_t));
 static vchar_t *setph2proposal0 __P((const struct ph2handle *,
 	const struct saprop *, const struct saproto *));
 

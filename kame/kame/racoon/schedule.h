@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.5 2000/06/07 08:27:19 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.6 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -66,8 +66,8 @@ struct scheddump {
 };
 
 struct timeval *schedular __P((void));
-struct sched *sched_new __P((time_t tick, void (*func)(), void *param));
-void sched_kill __P((struct sched *sc));
+struct sched *sched_new __P((time_t, void (*func)(), void *));
+void sched_kill __P((struct sched *));
 int sched_dump __P((caddr_t *, int *));
 void sched_init __P((void));
 

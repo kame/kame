@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.63 2000/06/08 03:37:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.64 2000/06/08 06:43:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -123,10 +123,9 @@ static int (*ph2exchange[][2][PHASE2ST_MAX])
 
 static u_char r_ck0[] = { 0,0,0,0,0,0,0,0 }; /* used to verify the r_ck. */
  
-static int isakmp_ph1begin_r __P((vchar_t *msg,
-	struct sockaddr *remote, u_int8_t etype));
-static int isakmp_ph2begin_r __P((struct ph1handle *iph1, vchar_t *msg));
-static int etypesw __P((int etype));
+static int isakmp_ph1begin_r __P((vchar_t *, struct sockaddr *, u_int8_t));
+static int isakmp_ph2begin_r __P((struct ph1handle *, vchar_t *));
+static int etypesw __P((int));
 
 /*
  * isakmp packet handler
@@ -358,6 +357,7 @@ isakmp_main(msg, remote, local)
 				}
 
 				/* XXX to be acceptable check of version */
+
 				/* it must be responder's 1st exchange. */
 				if (isakmp_ph1begin_r(msg, remote,
 					isakmp->etype) < 0)
@@ -716,7 +716,7 @@ isakmp_ph1begin_r(msg, remote, etype)
 	iph1->version = isakmp->v;
 	iph1->msgid = 0;
 
-	/* XXX copy remote address */
+	/* copy remote address */
 	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
 		return -1;
 
@@ -740,29 +740,19 @@ isakmp_ph1begin_r(msg, remote, etype)
 	/* start exchange */
 	if ((ph1exchange[etypesw(iph1->etype)]
 	                [iph1->side]
-	                [iph1->status])(iph1, msg) < 0) {
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, remote,
-				"failed to pre-process packet.\n"));
-		goto err;
-	}
-
-	/* send */
-	if ((ph1exchange[etypesw(iph1->etype)]
+	                [iph1->status])(iph1, msg) < 0
+	 || (ph1exchange[etypesw(iph1->etype)]
 			[iph1->side]
 			[iph1->status])(iph1, msg) < 0) {
 		YIPSDEBUG(DEBUG_NOTIFY,
 			plog(logp, LOCATION, remote,
 				"failed to process packet.\n"));
-		/* don't release handler */
-		;
+		remph1(iph1);
+		delph1(iph1);
+		return -1;
 	}
 
 	return 0;
-err:
-	remph1(iph1);
-	delph1(iph1);
-	return -1;
 }
 
 /* new negotiation of phase 2 for responder */

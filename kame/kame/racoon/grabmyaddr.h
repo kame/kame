@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.h,v 1.2 2000/05/31 15:05:55 sakane Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.h,v 1.3 2000/06/08 06:43:51 sakane Exp $ */
 
 struct myaddrs {
 	struct myaddrs *next;
@@ -38,9 +38,9 @@ extern void clear_myaddr __P((struct myaddrs **));
 extern void grab_myaddrs __P((void));
 extern int update_myaddrs __P((void));
 extern int autoconf_myaddrsport __P((void));
-extern u_short getmyaddrsport __P((struct sockaddr *local));
+extern u_short getmyaddrsport __P((struct sockaddr *));
 extern struct myaddrs *newmyaddr __P((void));
-extern void insmyaddr __P((struct myaddrs *new, struct myaddrs **head));
-extern void delmyaddr __P((struct myaddrs *myaddr));
+extern void insmyaddr __P((struct myaddrs *, struct myaddrs **));
+extern void delmyaddr __P((struct myaddrs *));
 extern int initmyaddr __P((void));
 

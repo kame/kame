@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.12 2000/03/07 09:39:39 sakane Exp $ */
+/* $Id: signing.c,v 1.13 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -85,8 +85,7 @@
 BIO *bio_err=NULL;
 
 #if 0
-static int verify_certificate
-	__P((char *CApath, char *CAfile, char *cert_to_check));
+static int verify_certificate __P((char *, char *, char *));
 #endif
 
 #if 0

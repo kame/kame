@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.10 2000/05/23 16:25:07 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.11 2000/06/08 06:43:50 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -66,8 +66,8 @@
 #include "admin_var.h"
 #include "session.h"
 
-static int admin_process __P((int so2, char *combuf));
-static int admin_reply __P((int so, struct admin_com *combuf, vchar_t *buf));
+static int admin_process __P((int, char *));
+static int admin_reply __P((int, struct admin_com *, vchar_t *));
 
 int
 admin_handler()

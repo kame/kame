@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.43 2000/06/08 03:37:06 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.44 2000/06/08 06:43:52 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -79,28 +79,28 @@
 #include "strnames.h"
 
 /* prototype */
-static int pfkey_setspidxbymsg __P((caddr_t *mhp, struct policyindex *spidx));
-static int pfkey_spidxinfo __P((struct sadb_ident *id, struct sockaddr *saddr,
-	u_int8_t *pref, u_int16_t *ul_proto)); 
-static u_int ipsecdoi2pfkey_aalg __P((u_int hashtype));
-static u_int ipsecdoi2pfkey_ealg __P((u_int t_id));
-static u_int ipsecdoi2pfkey_calg __P((u_int t_id));
-static u_int keylen_aalg __P((u_int hashtype));
-static u_int keylen_ealg __P((u_int t_id, int encklen));
+static int pfkey_setspidxbymsg __P((caddr_t *, struct policyindex *));
+static int pfkey_spidxinfo __P((struct sadb_ident *, struct sockaddr *,
+	u_int8_t *, u_int16_t *)); 
+static u_int ipsecdoi2pfkey_aalg __P((u_int));
+static u_int ipsecdoi2pfkey_ealg __P((u_int));
+static u_int ipsecdoi2pfkey_calg __P((u_int));
+static u_int keylen_aalg __P((u_int));
+static u_int keylen_ealg __P((u_int, int));
 
-static int pk_recvgetspi __P((caddr_t *mhp));
-static int pk_recvupdate __P((caddr_t *mhp));
-static int pk_recvadd __P((caddr_t *mhp));
-static int pk_recvdelete __P((caddr_t *mhp));
-static int pk_recvacquire __P((caddr_t *mhp));
-static int pk_recvexpire __P((caddr_t *mhp));
-static int pk_recvspdupdate __P((caddr_t *mhp));
-static int pk_recvspdadd __P((caddr_t *mhp));
-static int pk_recvspddelete __P((caddr_t *mhp));
-static int pk_recvspdget __P((caddr_t *mhp));
-static int pk_recvspddump __P((caddr_t *mhp));
-static int pk_recvspdflush __P((caddr_t *mhp));
-static struct sadb_msg *pk_recv __P((int so, int *lenp));
+static int pk_recvgetspi __P((caddr_t *));
+static int pk_recvupdate __P((caddr_t *));
+static int pk_recvadd __P((caddr_t *));
+static int pk_recvdelete __P((caddr_t *));
+static int pk_recvacquire __P((caddr_t *));
+static int pk_recvexpire __P((caddr_t *));
+static int pk_recvspdupdate __P((caddr_t *));
+static int pk_recvspdadd __P((caddr_t *));
+static int pk_recvspddelete __P((caddr_t *));
+static int pk_recvspdget __P((caddr_t *));
+static int pk_recvspddump __P((caddr_t *));
+static int pk_recvspdflush __P((caddr_t *));
+static struct sadb_msg *pk_recv __P((int, int *));
 
 static int (*pkrecvf[]) __P((caddr_t *)) = {
 NULL,
@@ -128,7 +128,7 @@ NULL,	/* SADB_X_SPDEXPIRE */
 NULL,	/* SADB_X_SPDDELETE2 */
 };
 
-static int addnewsp __P((caddr_t *mhp));
+static int addnewsp __P((caddr_t *));
 
 /*
  * PF_KEY packet handler

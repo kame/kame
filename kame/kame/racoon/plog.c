@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: plog.c,v 1.2 2000/01/10 22:38:39 itojun Exp $ */
+/* YIPS @(#)$Id: plog.c,v 1.3 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -62,10 +62,13 @@
 struct log *logp;
 static char *logfile = NULL;
 
-static void plog_common
-	__P((struct log *lp, const char *func, struct sockaddr *sa));
+static void plog_common __P((struct log *, const char *, struct sockaddr *));
 
-extern void warn();	/* XXX redeclared type mismatched in openssl. */
+/*
+ * NOTE: The reason why warn() is defined here is that
+ * it's redeclared as its type mismatched in openssl.
+ */
+extern void warn();
 
 static void
 plog_common(struct log *lp, const char *func, struct sockaddr *sa)

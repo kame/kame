@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.11 2000/06/08 03:37:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.12 2000/06/08 06:43:52 sakane Exp $ */
 
 #define PORT_ISAKMP 500
 
@@ -52,50 +52,47 @@ struct ipsecdoi_pl_id;	/* XXX */
 struct isakmp_pl_ke;	/* XXX */
 struct isakmp_pl_nonce;	/* XXX */
 
-extern int isakmp_handler __P((int so_isakmp));
-extern int isakmp_main __P((vchar_t *msg, struct sockaddr *remote, struct sockaddr *local));
-extern int isakmp_ph1begin_i __P((struct remoteconf *rmconf, struct sockaddr *remote));
+extern int isakmp_handler __P((int));
+extern int isakmp_main __P((vchar_t *, struct sockaddr *, struct sockaddr *));
+extern int isakmp_ph1begin_i __P((struct remoteconf *, struct sockaddr *));
 
-extern vchar_t * isakmp_parsewoh __P((int np0, struct isakmp_gen *gen, int len));
-extern vchar_t *isakmp_parse __P((vchar_t *buf));
+extern vchar_t * isakmp_parsewoh __P((int, struct isakmp_gen *, int));
+extern vchar_t *isakmp_parse __P((vchar_t *));
 
 extern int isakmp_init __P((void));
 extern const char *isakmp_pindex __P((const isakmp_index *, const u_int32_t));
 extern int isakmp_open __P((void));
 extern void isakmp_close __P((void));
-extern int isakmp_send __P((struct ph1handle *iph1, vchar_t *buf));
+extern int isakmp_send __P((struct ph1handle *, vchar_t *));
 
-extern void isakmp_ph1resend __P((struct ph1handle *iph1));
-extern void isakmp_ph2resend __P((struct ph2handle *iph2));
-extern void isakmp_ph1expire __P((struct ph1handle *iph1));
-extern void isakmp_ph1delete __P((struct ph1handle *iph1));
-extern void isakmp_ph2expire __P((struct ph2handle *iph2));
+extern void isakmp_ph1resend __P((struct ph1handle *));
+extern void isakmp_ph2resend __P((struct ph2handle *));
+extern void isakmp_ph1expire __P((struct ph1handle *));
+extern void isakmp_ph1delete __P((struct ph1handle *));
+extern void isakmp_ph2expire __P((struct ph2handle *));
 extern void isakmp_ph2delete __P((struct ph2handle *));
 
-extern int isakmp_post_acquire __P((struct ph2handle *iph2));
-extern int isakmp_post_getspi __P((struct ph2handle *iph2));
-extern void isakmp_chkph1there __P((struct ph2handle *iph2));
+extern int isakmp_post_acquire __P((struct ph2handle *));
+extern int isakmp_post_getspi __P((struct ph2handle *));
+extern void isakmp_chkph1there __P((struct ph2handle *));
 
-extern caddr_t isakmp_set_attr_v
-	__P((caddr_t buf, int type, caddr_t val, int len));
-extern caddr_t isakmp_set_attr_l
-	__P((caddr_t buf, int type, u_int32_t val));
+extern caddr_t isakmp_set_attr_v __P((caddr_t, int, caddr_t, int));
+extern caddr_t isakmp_set_attr_l __P((caddr_t, int, u_int32_t));
 
-extern int isakmp_newcookie
-	__P((caddr_t place, struct sockaddr *remote, struct sockaddr *local));
+extern int isakmp_newcookie __P((caddr_t, struct sockaddr *, struct sockaddr *));
 
-extern int isakmp_p2ph __P((vchar_t **buf, struct isakmp_gen *gen));
+extern int isakmp_p2ph __P((vchar_t **, struct isakmp_gen *));
 
-extern u_int32_t isakmp_newmsgid2 __P((struct ph1handle *iph1));
-extern caddr_t set_isakmp_header __P((vchar_t *buf, struct ph1handle *iph1, int nptype));
-extern caddr_t set_isakmp_header2 __P((vchar_t *buf, struct ph2handle *iph2, int nptype));
-extern caddr_t set_isakmp_payload __P((caddr_t buf, vchar_t *src, int nptype));
+extern u_int32_t isakmp_newmsgid2 __P((struct ph1handle *));
+extern caddr_t set_isakmp_header __P((vchar_t *, struct ph1handle *, int));
+extern caddr_t set_isakmp_header2 __P((vchar_t *, struct ph2handle *, int));
+extern caddr_t set_isakmp_payload __P((caddr_t, vchar_t *, int));
 
 #ifdef HAVE_PRINT_ISAKMP_C
-extern void isakmp_printpacket __P((vchar_t *msg, struct sockaddr *from,
-	struct sockaddr *my, int decoded));
+extern void isakmp_printpacket __P((vchar_t *, struct sockaddr *,
+	struct sockaddr *, int));
 #endif
 
-extern int copy_ph1addresses __P(( struct ph1handle *iph1,
-	struct remoteconf *rmconf, struct sockaddr *remote));
+extern int copy_ph1addresses __P(( struct ph1handle *,
+	struct remoteconf *, struct sockaddr *));
 extern void log_ph1established __P((const struct ph1handle *));

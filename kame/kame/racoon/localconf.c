@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.12 2000/05/31 15:54:39 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.13 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,7 +56,7 @@
 struct localconf *lcconf;
 
 static void setdefault __P((void));
-static vchar_t *getpsk __P((const char *str, const int len));
+static vchar_t *getpsk __P((const char *, const int));
 
 void
 initlcconf()

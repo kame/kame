@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.c,v 1.3 2000/01/12 06:09:33 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.c,v 1.4 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -57,7 +57,7 @@ static time_t deltaY2039;
 
 static TAILQ_HEAD(_schedtree, sched) sctree;
 
-static void sched_add __P((struct sched *sc));
+static void sched_add __P((struct sched *));
 static time_t current_time __P((void));
 
 /*

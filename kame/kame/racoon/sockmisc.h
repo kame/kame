@@ -26,25 +26,24 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.h,v 1.3 2000/01/11 01:02:19 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.h,v 1.4 2000/06/08 06:43:52 sakane Exp $ */
 
 extern const int niflags;
 
-extern int cmpsaddrwop __P((struct sockaddr *addr1, struct sockaddr *addr2));
-extern int cmpsaddr __P((struct sockaddr *addr1, struct sockaddr *addr2));
+extern int cmpsaddrwop __P((struct sockaddr *, struct sockaddr *));
+extern int cmpsaddr __P((struct sockaddr *, struct sockaddr *));
 
-extern struct sockaddr *getlocaladdr __P((struct sockaddr *remote));
+extern struct sockaddr *getlocaladdr __P((struct sockaddr *));
 
-extern int recvfromto __P((int s, void *buf, size_t buflen, int flags,
-	struct sockaddr *from, int *fromlen, struct sockaddr *to , int *tolen));
-extern int sendfromto __P((int s, const void *buf, size_t buflen,
-	struct sockaddr *src, struct sockaddr *dst));
+extern int recvfromto __P((int, void *, size_t, int,
+	struct sockaddr *, int *, struct sockaddr *, int *));
+extern int sendfromto __P((int, const void *, size_t,
+	struct sockaddr *, struct sockaddr *));
 
-extern int setsockopt_bypass __P((int so, int family));
+extern int setsockopt_bypass __P((int, int));
 
-extern struct sockaddr *newsaddr __P((int len));
-extern struct sockaddr *dupsaddr __P((struct sockaddr *src));
-extern char *saddr2str __P((struct sockaddr *saddr));
-extern char *saddrwop2str __P((struct sockaddr *saddr));
-extern void mask_sockaddr __P((struct sockaddr *a, struct sockaddr *b,
-	size_t l));
+extern struct sockaddr *newsaddr __P((int));
+extern struct sockaddr *dupsaddr __P((struct sockaddr *));
+extern char *saddr2str __P((struct sockaddr *));
+extern char *saddrwop2str __P((struct sockaddr *));
+extern void mask_sockaddr __P((struct sockaddr *, struct sockaddr *, size_t));

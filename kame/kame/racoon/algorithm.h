@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.h,v 1.5 2000/05/31 15:54:39 sakane Exp $ */
+/* YIPS @(#)$Id: algorithm.h,v 1.6 2000/06/08 06:43:50 sakane Exp $ */
 
 /* algorithm strength */
 enum {
@@ -102,9 +102,9 @@ enum {
 	algtype_rsaenc, algtype_rsarev,
 };
 
-extern int default_keylen __P((int class, int type));
-extern int check_keylen __P((int class, int type, int len));
-extern int algtype2doi __P((int class, int type));
-extern int algclass2doi __P((int class));
+extern int default_keylen __P((int, int));
+extern int check_keylen __P((int, int, int));
+extern int algtype2doi __P((int, int));
+extern int algclass2doi __P((int));
 extern struct algorithm_strength **initalgstrength __P((void));
 extern void flushalgstrength __P((struct algorithm_strength **));

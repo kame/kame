@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.h,v 1.2 2000/04/24 18:34:42 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.h,v 1.3 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -56,7 +56,7 @@ struct sainfoalg {
 	struct sainfoalg *next;
 };
 
-extern struct sainfo *getsainfo __P((const vchar_t *, const vchar_t *dst));
+extern struct sainfo *getsainfo __P((const vchar_t *, const vchar_t *));
 extern struct sainfo *newsainfo __P((void));
 extern void delsainfo __P((struct sainfo *));
 extern void inssainfo __P((struct sainfo *));
@@ -66,4 +66,4 @@ extern void initsainfo __P((void));
 extern struct sainfoalg *newsainfoalg __P((void));
 extern void delsainfoalg __P((struct sainfoalg *));
 extern void inssainfoalg __P((struct sainfoalg **, struct sainfoalg *));
-extern const char * sainfo2str __P((const struct sainfo *si));
+extern const char * sainfo2str __P((const struct sainfo *));

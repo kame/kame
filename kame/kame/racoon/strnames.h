@@ -26,23 +26,23 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.h,v 1.3 2000/01/11 16:45:53 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.h,v 1.4 2000/06/08 06:43:53 sakane Exp $ */
 
-extern char *s_ipsecdoi_proto __P((int proto));
-extern char *s_ipsecdoi_trns __P((int proto, int trns));
-extern char *s_oakley_attr __P((int type));
-extern char *s_oakley_attr_v __P((int type, int val));
-extern char *s_oakley_attr_method __P((int type));
-extern char *s_ipsec_level __P((int level));
-extern char *s_ipsecdoi_attr __P((int type));
-extern char *s_ipsecdoi_encmode __P((int mode));
-extern char *s_ipsecdoi_attr_v __P((int type, int val));
-extern char *s_algclass __P((int class));
-extern char *s_algstrength __P((int s));
-extern char *s_algtype __P((int class, int n));
-extern char *s_ipsecdoi_ident __P((int type));
-extern char *s_isakmp_etype __P((u_int8_t etype));
-extern char *s_pfkey_type __P((u_int8_t type));
-extern char *s_pfkey_satype __P((u_int8_t type));
-extern char *s_isakmp_notify_msg __P((u_int8_t type));
-extern char *s_isakmp_nptype __P((u_int8_t type));
+extern char *s_ipsecdoi_proto __P((int));
+extern char *s_ipsecdoi_trns __P((int, int));
+extern char *s_oakley_attr __P((int));
+extern char *s_oakley_attr_v __P((int, int));
+extern char *s_oakley_attr_method __P((int));
+extern char *s_ipsec_level __P((int));
+extern char *s_ipsecdoi_attr __P((int));
+extern char *s_ipsecdoi_encmode __P((int));
+extern char *s_ipsecdoi_attr_v __P((int, int));
+extern char *s_algclass __P((int));
+extern char *s_algstrength __P((int));
+extern char *s_algtype __P((int, int));
+extern char *s_ipsecdoi_ident __P((int));
+extern char *s_isakmp_etype __P((u_int8_t));
+extern char *s_pfkey_type __P((u_int8_t));
+extern char *s_pfkey_satype __P((u_int8_t));
+extern char *s_isakmp_notify_msg __P((u_int8_t));
+extern char *s_isakmp_nptype __P((u_int8_t));

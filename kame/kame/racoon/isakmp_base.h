@@ -26,14 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.h,v 1.2 2000/01/09 22:59:36 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.h,v 1.3 2000/06/08 06:43:51 sakane Exp $ */
 
-extern int base_i1send __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_i2recv __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_i2send __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_i3recv __P((struct ph1handle *iph1, vchar_t *msg));
+extern int base_i1send __P((struct ph1handle *, vchar_t *));
+extern int base_i2recv __P((struct ph1handle *, vchar_t *));
+extern int base_i2send __P((struct ph1handle *, vchar_t *));
+extern int base_i3recv __P((struct ph1handle *, vchar_t *));
 
-extern int base_r1recv __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_r1send __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_r2recv __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_r2send __P((struct ph1handle *iph1, vchar_t *msg));
+extern int base_r1recv __P((struct ph1handle *, vchar_t *));
+extern int base_r1send __P((struct ph1handle *, vchar_t *));
+extern int base_r2recv __P((struct ph1handle *, vchar_t *));
+extern int base_r2send __P((struct ph1handle *, vchar_t *));

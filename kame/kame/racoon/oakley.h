@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.8 2000/02/16 03:45:34 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.9 2000/06/08 06:43:52 sakane Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -132,48 +132,46 @@ struct isakmp_ivm;
 extern int oakley_get_defaultlifetime __P((void));
 
 extern void oakley_dhinit __P((void));
-extern void oakley_dhgrp_free __P((struct dhgroup *dhgrp));
-extern int oakley_dh_compute __P((const struct dhgroup *dh,
-	vchar_t *pub, vchar_t *priv, vchar_t *pub_p, vchar_t **gxy));
-extern int oakley_dh_generate
-	__P((const struct dhgroup *dh, vchar_t **pub, vchar_t **priv));
-extern int oakley_setdhgroup __P((int group, struct dhgroup **dhgrp));
+extern void oakley_dhgrp_free __P((struct dhgroup *));
+extern int oakley_dh_compute __P((const struct dhgroup *,
+	vchar_t *, vchar_t *, vchar_t *, vchar_t **));
+extern int oakley_dh_generate __P((const struct dhgroup *,
+	vchar_t **, vchar_t **));
+extern int oakley_setdhgroup __P((int, struct dhgroup **));
 
-extern vchar_t *oakley_prf
-	__P((vchar_t *key, vchar_t *buf, struct ph1handle *iph1));
-extern vchar_t *oakley_hash __P((vchar_t *buf, struct ph1handle *iph1));
+extern vchar_t *oakley_prf __P((vchar_t *, vchar_t *, struct ph1handle *));
+extern vchar_t *oakley_hash __P((vchar_t *, struct ph1handle *));
 
-extern int oakley_compute_keymat __P((struct ph2handle *iph2, int side));
+extern int oakley_compute_keymat __P((struct ph2handle *, int));
 
 #if notyet
 extern vchar_t *oakley_compute_hashx __P((void));
 #endif
-extern vchar_t *oakley_compute_hash3
-	__P((struct ph1handle *iph1, u_int32_t msgid, vchar_t *body));
-extern vchar_t *oakley_compute_hash1
-	__P((struct ph1handle *iph1, u_int32_t msgid, vchar_t *body));
-extern vchar_t *oakley_ph1hash_common __P((struct ph1handle *iph1, int sw));
-extern vchar_t *oakley_ph1hash_base_i __P((struct ph1handle *iph1, int sw));
-extern vchar_t *oakley_ph1hash_base_r __P((struct ph1handle *iph1, int sw));
+extern vchar_t *oakley_compute_hash3 __P((struct ph1handle *,
+	u_int32_t, vchar_t *));
+extern vchar_t *oakley_compute_hash1 __P((struct ph1handle *,
+	u_int32_t, vchar_t *));
+extern vchar_t *oakley_ph1hash_common __P((struct ph1handle *, int));
+extern vchar_t *oakley_ph1hash_base_i __P((struct ph1handle *, int));
+extern vchar_t *oakley_ph1hash_base_r __P((struct ph1handle *, int));
 
-extern int oakley_validate_auth __P((struct ph1handle *iph1));
+extern int oakley_validate_auth __P((struct ph1handle *));
 #ifdef HAVE_SIGNING_C
-extern int oakley_getmycert __P((struct ph1handle *iph1));
-extern int oakley_getsign __P((struct ph1handle *iph1));
+extern int oakley_getmycert __P((struct ph1handle *));
+extern int oakley_getsign __P((struct ph1handle *));
 #endif
 struct isakmp_gen;
 extern int oakley_savecert __P((struct ph1handle *, struct isakmp_gen *));
 
-extern int oakley_skeyid __P((struct ph1handle *iph1));
-extern int oakley_skeyid_dae __P((struct ph1handle *iph1));
+extern int oakley_skeyid __P((struct ph1handle *));
+extern int oakley_skeyid_dae __P((struct ph1handle *));
 
-extern int oakley_compute_enckey __P((struct ph1handle *iph1));
-extern int oakley_newiv __P((struct ph1handle *iph1));
-extern struct isakmp_ivm *oakley_newiv2
-	__P((struct ph1handle *iph1, u_int32_t msgid));
-extern void oakley_delivm __P((struct isakmp_ivm *ivm));
-extern vchar_t *oakley_do_decrypt __P((struct ph1handle *iph1,
-	vchar_t *msg, vchar_t *ivdp, vchar_t *ivep));
-extern vchar_t *oakley_do_encrypt __P((struct ph1handle *iph1,
-	vchar_t *msg, vchar_t *ivep, vchar_t *ivp));
-extern int oakley_padlen __P((int len));
+extern int oakley_compute_enckey __P((struct ph1handle *));
+extern int oakley_newiv __P((struct ph1handle *));
+extern struct isakmp_ivm *oakley_newiv2 __P((struct ph1handle *, u_int32_t));
+extern void oakley_delivm __P((struct isakmp_ivm *));
+extern vchar_t *oakley_do_decrypt __P((struct ph1handle *,
+	vchar_t *, vchar_t *, vchar_t *));
+extern vchar_t *oakley_do_encrypt __P((struct ph1handle *,
+	vchar_t *, vchar_t *, vchar_t *));
+extern int oakley_padlen __P((int));

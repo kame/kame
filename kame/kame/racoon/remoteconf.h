@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.7 2000/06/05 15:24:45 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.8 2000/06/08 06:43:52 sakane Exp $ */
 
 /* remote configuration */
 
@@ -85,17 +85,17 @@ struct isakmpsa {
 	struct remoteconf *rmconf;	/* backpointer to remoteconf */
 };
 
-struct remoteconf *getrmconf __P((struct sockaddr *remote));
+struct remoteconf *getrmconf __P((struct sockaddr *));
 extern struct remoteconf *newrmconf __P((void));
-extern void delrmconf __P((struct remoteconf *rmconf));
-extern void delisakmpsa __P((struct isakmpsa *sa));
-extern void deletypes __P((struct etypes *e));
-extern void insrmconf __P((struct remoteconf *new));
+extern void delrmconf __P((struct remoteconf *));
+extern void delisakmpsa __P((struct isakmpsa *));
+extern void deletypes __P((struct etypes *));
+extern void insrmconf __P((struct remoteconf *));
 extern void flushrmconf __P((void));
 extern void initrmconf __P((void));
 extern struct etypes *check_etypeok
-	__P((struct remoteconf *rmconf, u_int8_t etype));
+	__P((struct remoteconf *, u_int8_t));
 
 extern struct isakmpsa *newisakmpsa __P((void));
-extern void insisakmpsa __P((struct isakmpsa *new, struct remoteconf *rmconf));
+extern void insisakmpsa __P((struct isakmpsa *, struct remoteconf *));
 extern const char *rm2str __P((const struct remoteconf *));

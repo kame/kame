@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: plog.h,v 1.1 2000/01/09 01:31:30 itojun Exp $ */
+/* YIPS @(#)$Id: plog.h,v 1.2 2000/06/08 06:43:52 sakane Exp $ */
 
 #define LC_DEFAULT_LOGF	"/var/log/racoon.log"
 
@@ -38,14 +38,14 @@
 
 extern struct log *logp;
 
-extern void plog __P((struct log *lp, const char *func, struct sockaddr *sa,
-	const char *fmt, ...));
-extern void plogv __P((struct log *lp, const char *func, struct sockaddr *sa,
-	const char *fmt, va_list ap));
+extern void plog __P((struct log *, const char *, struct sockaddr *,
+	const char *, ...));
+extern void plogv __P((struct log *, const char *, struct sockaddr *,
+	const char *, va_list));
 extern void plognl __P((void));
 extern void plogsp __P((void));
-extern void plogh __P((struct log *lp, unsigned char c));
-extern void plogc __P((struct log *lp, unsigned char c));
+extern void plogh __P((struct log *, unsigned char));
+extern void plogc __P((struct log *, unsigned char));
 extern void ploginit __P((void));
-extern void plogset __P((char *file));
+extern void plogset __P((char *));
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.22 2000/06/07 08:35:12 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.23 2000/06/08 06:43:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -177,6 +177,15 @@ void
 delph1(iph1)
 	struct ph1handle *iph1;
 {
+	if (iph1->remote) {
+		free(iph1->remote);
+		iph1->remote = NULL;
+	}
+	if (iph1->local) {
+		free(iph1->local);
+		iph1->local = NULL;
+	}
+
 	if (iph1->authstr) {
 		vfree(iph1->authstr);
 		iph1->authstr = NULL;

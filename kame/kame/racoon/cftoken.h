@@ -26,15 +26,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: cftoken.h,v 1.1 2000/01/09 01:31:21 itojun Exp $ */
+/* YIPS @(#)$Id: cftoken.h,v 1.2 2000/06/08 06:43:51 sakane Exp $ */
 
 extern int yyerrorcount;
 
 extern int yylex __P((void));
-extern void yyerror __P((char *s, ...));
-extern void yywarn __P((char *s, ...));
+extern void yyerror __P((char *, ...));
+extern void yywarn __P((char *, ...));
 
-extern int yycf_switch_buffer __P((char *path));
-extern int yycf_set_buffer __P((char *path));
+extern int yycf_switch_buffer __P((char *));
+extern int yycf_set_buffer __P((char *));
 extern void yycf_init_buffer __P((void));
 extern void yycf_clean_buffer __P((void));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.36 2000/06/05 15:30:48 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.37 2000/06/08 06:43:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -83,7 +83,7 @@
 
 /* quick mode */
 static vchar_t *quick_ir1sendmx __P((struct ph2handle *, vchar_t *));
-static int get_sainfo_r __P((struct ph2handle *iph2));
+static int get_sainfo_r __P((struct ph2handle *));
 static int get_proposal_r __P((struct ph2handle *));
 
 /* %%%

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.29 2000/06/08 03:37:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.30 2000/06/08 06:43:51 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -776,11 +776,6 @@ agg_r1send(iph1, msg)
 	error = 0;
 
 end:
-	if (iph1->sa_ret != NULL) {
-		vfree(iph1->sa_ret);
-		iph1->sa_ret = NULL;
-	}
-
 	return error;
 }
 

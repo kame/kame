@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.11 2000/06/07 08:33:54 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.12 2000/06/08 06:43:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -135,22 +135,21 @@ int com_init __P((void));
 int com_send __P((void));
 int com_recv __P((void));
 
-int get_combuf __P((int ac, char **av));
-u_int set_combuf_cmd __P((char *str));
-u_int set_combuf_proto __P((char *str));
-int set_combuf_index __P((caddr_t buf, int ac, char **av));
-int set_combuf_indexes __P((caddr_t buf, int ac, char **av));
-u_int set_combuf_family __P((char *str));
-int set_combuf_comb_address __P((void *buf, u_int family, char *str,
-	u_int *pref));
-int set_combuf_sockaddr __P((void *buf, u_int family, char *name, char *port));
-u_int set_combuf_ul_proto __P((char *str));
+int get_combuf __P((int ac, char **));
+u_int set_combuf_cmd __P((char *));
+u_int set_combuf_proto __P((char *));
+int set_combuf_index __P((caddr_t, int, char **));
+int set_combuf_indexes __P((caddr_t, int, char **));
+u_int set_combuf_family __P((char *));
+int set_combuf_comb_address __P((void *, u_int, char *, u_int *));
+int set_combuf_sockaddr __P((void *, u_int, char *, char *));
+u_int set_combuf_ul_proto __P((char *));
 
-void dump_isakmp_sa __P((char *buf, int total_len));
-void dump_internal __P((char *buf, int tlen));
-char *pindex_isakmp __P((isakmp_index *index));
-void print_schedule __P((caddr_t buf, int len));
-char * fixed_addr __P((char *addr, char *port, int len));
+void dump_isakmp_sa __P((char *, int));
+void dump_internal __P((char *, int));
+char *pindex_isakmp __P((isakmp_index *));
+void print_schedule __P((caddr_t, int));
+char * fixed_addr __P((char *, char *, int));
 
 void
 Usage()

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.20 2000/06/07 08:35:12 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.21 2000/06/08 06:43:51 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -289,29 +289,30 @@ struct ph1handle;
 struct ph2handle;
 struct policyindex;
 
-extern struct ph1handle *getph1byindex __P((isakmp_index *index));
-extern struct ph1handle *getph1byindex0 __P((isakmp_index *index));
-extern struct ph1handle *getph1byaddr __P((struct sockaddr *remote));
+extern struct ph1handle *getph1byindex __P((isakmp_index *));
+extern struct ph1handle *getph1byindex0 __P((isakmp_index *));
+extern struct ph1handle *getph1byaddr __P((struct sockaddr *));
 extern vchar_t *dumpph1 __P((void));
 extern struct ph1handle *newph1 __P((void));
-extern void delph1 __P((struct ph1handle *iph1));
-extern int insph1 __P((struct ph1handle *iph1));
-extern void remph1 __P((struct ph1handle *iph1));
+extern void delph1 __P((struct ph1handle *));
+extern int insph1 __P((struct ph1handle *));
+extern void remph1 __P((struct ph1handle *));
 extern void flushph1 __P((void));
 extern void initph1tree __P((void));
 
-extern struct ph2handle *getph2byspidx __P((struct policyindex *spidx));
-extern struct ph2handle *getph2byspid __P((u_int32_t spid));
-extern struct ph2handle *getph2byseq __P((u_int32_t seq));
-extern struct ph2handle *getph2bymsgid __P((struct ph1handle *iph1, u_int32_t msgid));
-extern struct ph2handle *getph2bysaidx __P((struct sockaddr *src, struct sockaddr *dst, u_int proto_id, u_int32_t spi));
+extern struct ph2handle *getph2byspidx __P((struct policyindex *));
+extern struct ph2handle *getph2byspid __P((u_int32_t));
+extern struct ph2handle *getph2byseq __P((u_int32_t));
+extern struct ph2handle *getph2bymsgid __P((struct ph1handle *, u_int32_t));
+extern struct ph2handle *getph2bysaidx __P((struct sockaddr *,
+	struct sockaddr *, u_int, u_int32_t));
 extern struct ph2handle *newph2 __P((void));
-extern void initph2 __P((struct ph2handle *iph2));
-extern void delph2 __P((struct ph2handle *iph2));
-extern int insph2 __P((struct ph2handle *iph2));
-extern void remph2 __P((struct ph2handle *iph2));
+extern void initph2 __P((struct ph2handle *));
+extern void delph2 __P((struct ph2handle *));
+extern int insph2 __P((struct ph2handle *));
+extern void remph2 __P((struct ph2handle *));
 extern void flushph2 __P((void));
 extern void initph2tree __P((void));
 
-extern void bindph12 __P((struct ph1handle *iph1, struct ph2handle *iph2));
-extern void unbindph12 __P((struct ph2handle *iph2));
+extern void bindph12 __P((struct ph1handle *, struct ph2handle *));
+extern void unbindph12 __P((struct ph2handle *));

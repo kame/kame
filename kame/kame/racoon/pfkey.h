@@ -26,31 +26,28 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.7 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.8 2000/06/08 06:43:52 sakane Exp $ */
 
 struct ipsecsa;
 
 extern int pfkey_handler __P((void));
-extern vchar_t *pfkey_dump_sadb __P((int satype));
-extern void pfkey_flush_sadb __P((u_int proto));
+extern vchar_t *pfkey_dump_sadb __P((int));
+extern void pfkey_flush_sadb __P((u_int));
 extern int pfkey_init __P((void));
 
-extern struct pfkey_st *pfkey_getpst
-	__P((caddr_t *mhp, int how_addrs, int how_spi));
+extern struct pfkey_st *pfkey_getpst __P((caddr_t *, int, int));
 
-extern int pk_sendgetspi __P((struct ph2handle *sa));
-extern int pk_sendupdate __P((struct ph2handle *sa));
-extern int pk_sendadd __P((struct ph2handle *sa));
+extern int pk_sendgetspi __P((struct ph2handle *));
+extern int pk_sendupdate __P((struct ph2handle *));
+extern int pk_sendadd __P((struct ph2handle *));
 
-extern void pfkey_timeover __P((struct ph2handle *iph2));
+extern void pfkey_timeover __P((struct ph2handle *));
 
-extern u_int pfkey2ipsecdoi_proto __P((u_int proto));
-extern u_int ipsecdoi2pfkey_proto __P((u_int proto));
-extern u_int pfkey2ipsecdoi_mode __P((u_int mode));
-extern u_int ipsecdoi2pfkey_mode __P((u_int mode));
+extern u_int pfkey2ipsecdoi_proto __P((u_int));
+extern u_int ipsecdoi2pfkey_proto __P((u_int));
+extern u_int pfkey2ipsecdoi_mode __P((u_int));
+extern u_int ipsecdoi2pfkey_mode __P((u_int));
 
-extern int pfkey_convertfromipsecdoi __P((
-	u_int proto_id, u_int t_id, u_int hashtype,
-	u_int *e_type, u_int *e_keylen, u_int *a_type, u_int *a_keylen,
-	u_int *flags));
+extern int pfkey_convertfromipsecdoi __P(( u_int, u_int, u_int,
+	u_int *, u_int *, u_int *, u_int *, u_int *));
 extern u_int32_t pk_getseq __P((void));

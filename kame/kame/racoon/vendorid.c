@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vendorid.c,v 1.3 2000/05/24 09:56:52 sakane Exp $ */
+/* YIPS @(#)$Id: vendorid.c,v 1.4 2000/06/08 06:43:53 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -88,13 +88,13 @@ check_vendorid(gen)
 		YIPSDEBUG(DEBUG_SA,
 			plog(logp, LOCATION, NULL,
 				"Vendor ID matched.\n"));
-		return -1;
+		return 0;
 	}
 
 	YIPSDEBUG(DEBUG_SA,
 		plog(logp, LOCATION, NULL,
 			"Vendor ID mismatch.\n"));
 
-	return 0;
+	return -1;
 }
 

@@ -63,7 +63,7 @@ static int incstackp = 0;
 
 static int yy_first_time = 1;
 
-static int yycf_count_nl __P((char *p));
+static int yycf_count_nl __P((char *));
 %}
 
 /* common seciton */
