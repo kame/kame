@@ -156,7 +156,7 @@ void pfx_flush __P((void));
 void rtr_flush __P((void));
 void harmonize_rtr __P((void));
 #ifdef SIOCSDEFIFACE_IN6	/* XXX: check SIOCGDEFIFACE_IN6 as well? */
-static void getdefif __P(());
+static void getdefif __P((void));
 static void setdefif __P((char *));
 #endif
 static char *sec2str __P((time_t t));
