@@ -554,7 +554,7 @@ dg_badinput(struct sockaddr *sa)
 		if (IN_MULTICAST(in.s_addr))
 			goto bad;
 		switch ((in.s_addr & 0xff000000) >> 24) {
-		case 0: case 127: case 255:
+		case 0: case 255:
 			goto bad;
 		}
 		if (dg_broadcast(&in))
