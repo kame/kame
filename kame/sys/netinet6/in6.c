@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.240 2001/10/11 08:17:31 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.241 2001/10/16 03:52:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -800,12 +800,7 @@ in6_control(so, cmd, data, ifp)
 			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
 				ifra->ifra_prefixmask.sin6_addr.s6_addr32[i];
 		}
-		/*
-		 * XXX: since we don't have enough APIs, we just set infinity
-		 * to lifetimes.  They can be overridden by later advertised
-		 * RAs (when accept_rtadv is non 0), but we'd rather intend
-		 * such a behavior.
-		 */
+
 		pr0.ndpr_raf_onlink = 1; /* should be configurable? */
 		pr0.ndpr_raf_auto =
 			((ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0);
