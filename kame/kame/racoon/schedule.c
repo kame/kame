@@ -1,4 +1,4 @@
-/*	$KAME: schedule.c,v 1.18 2001/10/08 23:58:22 sakane Exp $	*/
+/*	$KAME: schedule.c,v 1.19 2001/11/05 10:53:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -207,8 +207,8 @@ sched_scrub_param(param)
 	TAILQ_FOREACH(sc, &sctree, chain) {
 		if (sc->param == param) {
 			if (!sc->dead) {
-				plog(LLV_ERROR, LOCATION, NULL,
-					"insanity schedule found.\n");
+				plog(LLV_DEBUG, LOCATION, NULL,
+				    "an undead schedule has been deleted.\n");
 			}
 			sched_kill(sc);
 		}
