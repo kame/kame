@@ -1,7 +1,25 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2224 2002/09/04 07:32:15 itojun Exp $
+$KAME: CHANGELOG,v 1.2225 2002/09/05 08:15:24 suz Exp $
 
 <200209>
+Thu Sep  5 17:00:00 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4/sys/conf/{files,options}, freebsd4/sys/i386/conf/GENERIC.KAME,
+	  freebsd4/sys/netinet/{in.c,in_pcb.c,ip_output.c},
+	  freebsd4/sys/netinet6/{in6_pcb.c,udp6_usrreq.c},
+	  netbsd/sys/conf/files, netbsd/sys/arch/i386/conf/GENERIC.KAME,
+	  netbsd/sys/netinet/{in_pcb.c,ip_output.c,udp_usrreq.c},
+	  netbsd/sys/netinet6/Makefile,
+	  kame/sys/netinet/{icmp6.h, in_msf.[ch]},
+	  kame/sys/netinet6/{in6.[ch], in6_ifattach.c, in6_msf.[ch], in6_pcb.c,
+	  in6_var.h, ip6_input.c, ip6_mroute.c, ip6_output.c, ip6_var.h, mld6.c,
+	  mld6_var.h, nd6.c}
+	  MLDv2 host-side implementation for NetBSD and FreeBSD-4.
+
+	* kame/kame/kame/ifmcstat: displays MLDv2 info
+
+	* kame/kame/kame/pim6sd: changes the names of MLDv2-related 
+	structures or members to sync with MLDv2 host-side implementation
+
 Wed Sep  4 16:30:49 JST 2002  itojun@iijlab.net
 	* sys/netinet6/nd6.c: allow "deprecated" bit be specified via userland
 	  like ifconfig(8).   NetBSD PR 18163
