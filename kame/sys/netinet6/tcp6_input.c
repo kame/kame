@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.32 2000/08/02 11:02:27 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.33 2000/11/08 17:12:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -669,6 +669,32 @@ findpcb:
 				}
 				goto drop;
 			}
+
+			/*
+			 * If deprecated address is forbidden,
+			 * we do not accept SYN to deprecated interface
+			 * address to prevent any new inbound connection from
+			 * getting established.  So drop the SYN packet.
+			 * Note that we cannot issue a RST as we cannot use
+			 * the address as the source.
+			 *
+			 * The wording in RFC2462 is confusing, and there are
+			 * multiple description text for deprecated address
+			 * handling - worse, they are not exactly the same.
+			 * I believe 5.5.4 is the best one, so we follow 5.5.4.
+			 */
+			if (!ip6_use_deprecated) {
+				struct mbuf *n;
+				struct in6_ifaddr *ia6;
+
+				n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
+				if (n && n->m_len == sizeof(ia6))
+					ia6 = *mtod(n, struct in6_ifaddr **);
+				if (ia6 &&
+				    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
+					goto drop;
+			}
+
 			oso = so;
 			so = sonewconn(so, 0);
 			/*

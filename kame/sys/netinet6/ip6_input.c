@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.126 2000/11/08 14:57:21 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.127 2000/11/08 17:12:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -726,6 +726,7 @@ ip6_input(m)
 	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP) {
 		struct in6_ifaddr *ia6 =
 			(struct in6_ifaddr *)ip6_forward_rt.ro_rt->rt_ifa;
+		struct mbuf *n;
 
 #ifdef MEASURE_PERFORMANCE
 		ctr_end = read_tsc();
@@ -739,6 +740,20 @@ ip6_input(m)
 
 		if (ia6->ia6_flags & IN6_IFF_ANYCAST)
 			m->m_flags |= M_ANYCAST6;
+
+		/*
+		 * record address information into m_aux.
+		 * TODO: we will be able to remove M_ANYCAST.
+		 */
+		n = m_aux_add(m, AF_INET6, IPPROTO_IPV6);
+		if (n) {
+			if (M_TRAILINGSPACE(n) >= sizeof(ia6)) {
+				n->m_len = sizeof(ia6);
+				*mtod(n, struct in6_ifaddr **) = ia6;
+			} else
+				m_aux_delete(m, n);
+		}
+
 		/*
 		 * packets to a tentative, duplicated, or somehow invalid
 		 * address must not be accepted.
