@@ -66,6 +66,7 @@ char	*plurales (int);
 void	protopr (u_long, char *, int);
 void	tcp_stats (u_long, char *, int);
 void	udp_stats (u_long, char *, int);
+void	dccp_stats (u_long, char *, int);
 void	ip_stats (u_long, char *, int);
 void	icmp_stats (u_long, char *, int);
 void	igmp_stats (u_long, char *, int);

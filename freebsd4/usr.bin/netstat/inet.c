@@ -68,6 +68,14 @@ static const char rcsid[] =
 #include <netinet/tcp_debug.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+#ifdef DCCP
+#undef SEQ_LT
+#undef SEQ_GT
+#include <netinet/dccp.h>
+#include <sys/callout.h>
+#define DCCPSTATES
+#include <netinet/dccp_var.h>
+#endif
 
 #include <arpa/inet.h>
 #include <err.h>
@@ -85,6 +93,9 @@ void	inetprint (struct in_addr *, int, char *, int);
 #ifdef INET6
 extern void	sa_print (struct sockaddr *, char *, int);
 static int udp_done, tcp_done;
+#ifdef DCCP
+static int dccp_done;
+#endif
 #endif /* INET6 */
 
 /*
@@ -97,17 +108,21 @@ void
 protopr(u_long proto,		/* for sysctl version we pass proto # */
 	char *name, int af)
 {
-	int istcp;
+	int istcp, isdccp;
 	static int first = 1;
 	char *buf;
 	const char *mibvar, *vchar;
 	struct tcpcb *tp = NULL;
+	struct dccpcb *dp = NULL;
 	struct inpcb *inp;
 	struct xinpgen *xig, *oxig;
 	struct xsocket *so;
 	size_t len;
 
 	istcp = 0;
+#ifdef DCCP
+	isdccp = 0;
+#endif
 	switch (proto) {
 	case IPPROTO_TCP:
 #ifdef INET6
@@ -128,6 +143,18 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 #endif
 		mibvar = "net.inet.udp.pcblist";
 		break;
+#ifdef DCCP
+	case IPPROTO_DCCP:
+#ifdef INET6
+		if (dccp_done != 0)
+			return;
+		else
+			dccp_done = 1;
+#endif
+		isdccp = 1;
+		mibvar = "net.inet.dccp.pcblist";
+		break;
+#endif
 	case IPPROTO_DIVERT:
 		mibvar = "net.inet.divert.pcblist";
 		break;
@@ -159,6 +186,12 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			tp = &((struct xtcpcb *)xig)->xt_tp;
 			inp = &((struct xtcpcb *)xig)->xt_inp;
 			so = &((struct xtcpcb *)xig)->xt_socket;
+#ifdef DCCP
+		} else if (isdccp) {
+			dp = &((struct xdccpcb *)xig)->xd_dp;
+			inp = &((struct xdccpcb *)xig)->xd_inp;
+			so = &((struct xdccpcb *)xig)->xd_socket;
+#endif
 		} else {
 			inp = &((struct xinpcb *)xig)->xi_inp;
 			so = &((struct xinpcb *)xig)->xi_socket;
@@ -215,12 +248,12 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			if (Aflag)
 				printf("%-8.8s ", "Socket");
 			if (Lflag)
-				printf("%-5.5s %-14.14s %-22.22s\n",
+				printf("%-6.6s %-14.14s %-22.22s\n",
 					"Proto", "Listen", "Local Address");
 			else
 				printf((Aflag && !Wflag) ?
-		"%-5.5s %-6.6s %-6.6s  %-18.18s %-18.18s %s\n" :
-		"%-5.5s %-6.6s %-6.6s  %-22.22s %-22.22s %s\n",
+		"%-6.6s %-6.6s %-6.6s  %-18.18s %-18.18s %s\n" :
+		"%-6.6s %-6.6s %-6.6s  %-22.22s %-22.22s %s\n",
 					"Proto", "Recv-Q", "Send-Q",
 					"Local Address", "Foreign Address",
 					"(state)");
@@ -242,7 +275,12 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 #endif
 		vchar = ((inp->inp_vflag & INP_IPV4) != 0)
 				? "4 " : "  ";
-		printf("%-3.3s%-2.2s ", name, vchar);
+#ifdef DCCP
+		if ( isdccp )
+			printf("%-4.4s%-2.2s ", name, vchar);
+		else
+#endif
+			printf("%-3.3s%-2.2s  ", name, vchar);
 		if (Lflag) {
 			char buf[15];
 
@@ -321,6 +359,15 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 #endif /* defined(TF_NEEDSYN) && defined(TF_NEEDFIN) */
                       }
 		}
+#ifdef DCCP
+		if (isdccp && !Lflag) {
+			if (dp->state >= DCCPS_TIME_WAIT)
+				printf("%d", dp->state);
+			else {
+				printf("%s", dccpstates[dp->state]);
+			}
+		}
+#endif
 		putchar('\n');
 	}
 	if (xig != oxig && xig->xig_gen != oxig->xig_gen) {
@@ -519,6 +566,85 @@ udp_stats(u_long off __unused, char *name, int af __unused)
 #undef p
 #undef p1a
 }
+
+#ifdef DCCP
+/*
+ * Dump DCCP statistics structure.
+ */
+void
+dccp_stats(u_long off, char *name, int af1)
+{
+	struct dccpstat dccpstat, zerostat;
+	size_t len = sizeof dccpstat;
+	u_long delivered;
+
+	if (zflag)
+		memset(&zerostat, 0, len);
+	if (sysctlbyname("net.inet.dccp.stats", &dccpstat, &len,
+	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
+		warn("sysctl: net.inet.dccp.stats");
+		return;
+	}
+
+#ifdef INET6
+	if (dccp_done != 0)
+		return;
+	else
+		dccp_done = 1;
+#endif
+
+	printf("%s:\n", name);
+#define	p(f, m) if (dccpstat.f || sflag <= 1) \
+    printf(m, dccpstat.f, plural(dccpstat.f))
+#define	p1a(f, m) if (dccpstat.f || sflag <= 1) \
+    printf(m, dccpstat.f)
+	p(dccps_ipackets, "\t%lu packet%s received\n");
+	p(dccps_ibytes, "\t%lu byte%s received\n");
+	p(dccps_connattempt, "\t%lu connection request%s\n");
+	p(dccps_connects, "\t%lu connection%s established\n");
+	p(dccps_drops, "\t%lu packet%s dropped\n");
+	p(dccps_badlen, "\t%lu packet%s with bad data length field\n");
+	p(dccps_badsum, "\t%lu packet%s with bad checksum\n");
+	p(dccps_badseq, "\t%lu packet%s with bad sequencenumber\n");
+	p(dccps_noport, "\t%lu packet%s dropped due to no socket\n");
+	p(dccps_opackets, "\t%lu packet%s output\n");
+	p(dccps_obytes, "\t%lu byte%s output\n");
+
+	printf("\n\tTFRC Sender:\n");
+	p(tfrcs_send_conn, "\t%lu connection%s established\n");
+	p(tfrcs_send_fbacks, "\t%lu correct feedback packet%s received\n");
+	p(tfrcs_send_noopt, "\t%lu dropped feedback packet%s (missing option)\n");
+	p(tfrcs_send_nomem, "\t%lu send%s refused (no memory for history)\n");
+	p(tfrcs_send_erropt, "\t%lu send%s refused (unable to add option)\n");
+
+	printf("\tTFRC Receiver:\n");
+	p(tfrcs_recv_conn, "\t%lu connection%s established\n");
+	p(tfrcs_recv_fbacks, "\t%lu correct feedback packet%s received\n");
+	p(tfrcs_recv_losts, "\t%lu lost packet%s\n");
+	p(tfrcs_recv_noopt, "\t%lu dropped packet%s (missing option)\n");
+	p(tfrcs_recv_nomem, "\t%lu dropped packet%s (no memory for history)\n");
+	p(tfrcs_recv_erropt, "\t%lu feedback packet%s failed option adding on feedback packet\n");
+
+	printf("\n\tTCPlike Sender:\n");
+	p(tcplikes_send_conn, "\t%lu connection%s established\n");
+	p(tcplikes_send_reploss, "\t%lu data packet%s reported lost\n");
+	p(tcplikes_send_assloss, "\t%lu data packet%s assumed lost\n");
+	p(tcplikes_send_ackrecv, "\t%lu acknowledgement%s received\n");
+	p(tcplikes_send_missack, "\t%lu ack packet%s assumed lost\n");
+	p(tcplikes_send_badseq, "\t%lu bad sequence number on outgoing packet%s\n");
+	p(tcplikes_send_memerr, "\t%lu memory allocation error%s\n");
+
+	printf("\tTCPlike Receiver:\n");
+	p(tcplikes_recv_conn, "\t%lu connection%s established\n");
+	p(tcplikes_recv_datarecv, "\t%lu data packet%s received\n");
+	p(tcplikes_recv_ackack, "\t%lu Ack-on-ack%s received\n");
+	p(tcplikes_recv_acksent, "\t%lu acknowledgement packet%s sent\n");
+	p(tcplikes_recv_memerr, "\t%lu memory allocation error%s\n");
+
+#undef p
+#undef p1a
+}
+#endif
 
 /*
  * Dump IP statistics structure.
