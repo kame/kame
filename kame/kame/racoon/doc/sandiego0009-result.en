@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.9 2000/09/19 17:40:02 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.10 2000/09/19 21:28:01 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -99,3 +99,11 @@ vs HITACHI
 		3des, hmac-md5, tunnel mode, lifetime 300
 	Notes:
 	- rekeying is fine.
+
+vs Ericsson
+	manual key
+	    ESP blowfish-cbc, transport mode, key = mekmitasdigoat (112bit)
+
+	Notes:
+	- works just fine after blowfish-cbc logic fix.
+	- no fragment tests as Ericsson side would panic.
