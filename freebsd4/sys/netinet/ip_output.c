@@ -672,9 +672,8 @@ pass:
 	
 	case IPSEC_POLICY_IPSEC:
 		if (sp->req == NULL) {
-			/* XXX should be panic ? */
-			printf("ip_output: No IPsec request specified.\n");
-			error = EINVAL;
+			/* acquire a policy */
+			error = key_spdacquire(sp);
 			goto bad;
 		}
 		break;
