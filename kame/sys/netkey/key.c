@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.218 2001/10/30 08:41:54 itojun Exp $	*/
+/*	$KAME: key.c,v 1.219 2001/11/05 17:36:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,7 +148,7 @@ static u_int key_int_random = 60;	/*interval to initialize randseed,1(m)*/
 static u_int key_larval_lifetime = 30;	/* interval to expire acquiring, 30(s)*/
 static int key_blockacq_count = 10;	/* counter for blocking SADB_ACQUIRE.*/
 static int key_blockacq_lifetime = 20;	/* lifetime for blocking SADB_ACQUIRE.*/
-static int key_prefered_oldsa = 1;	/* prefered old sa rather than new sa.*/
+static int key_preferred_oldsa = 1;	/*preferred old sa rather than new sa.*/
 
 static u_int32_t acq_seq = 0;
 static int key_tick_init_random = 0;
@@ -275,8 +275,8 @@ SYSCTL_INT(_net_key, KEYCTL_AH_KEYMIN,	ah_keymin, CTLFLAG_RW, \
 	&ipsec_ah_keymin,	0,	"");
 
 /* perfered old SA rather than new SA */
-SYSCTL_INT(_net_key, KEYCTL_PREFERED_OLDSA,	prefered_oldsa, CTLFLAG_RW,\
-	&key_prefered_oldsa,	0,	"");
+SYSCTL_INT(_net_key, KEYCTL_PREFERED_OLDSA,	preferred_oldsa, CTLFLAG_RW,\
+	&key_preferred_oldsa,	0,	"");
 #endif /* __FreeBSD__ */
 
 #ifndef LIST_FOREACH
@@ -827,7 +827,7 @@ key_do_allocsa_policy(sah, state)
 				"lifetime_current is NULL.\n");
 
 		/* What the best method is to compare ? */
-		if (key_prefered_oldsa) {
+		if (key_preferred_oldsa) {
 			if (candidate->lft_c->sadb_lifetime_addtime >
 					sav->lft_c->sadb_lifetime_addtime) {
 				candidate = sav;
@@ -836,7 +836,7 @@ key_do_allocsa_policy(sah, state)
 			/*NOTREACHED*/
 		}
 
-		/* prefered new sa rather than old sa */
+		/* preferred new sa rather than old sa */
 		if (candidate->lft_c->sadb_lifetime_addtime <
 				sav->lft_c->sadb_lifetime_addtime) {
 			d = candidate;
@@ -7789,7 +7789,7 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    &ipsec_ah_keymin);
 	case KEYCTL_PREFERED_OLDSA:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-		    &key_prefered_oldsa);
+		    &key_preferred_oldsa);
 	default:
 		return EOPNOTSUPP;
 	}
