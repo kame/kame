@@ -688,6 +688,9 @@ AC_SUBST(sysconfdir_x)
 dnl Checks for getifaddrs
 AC_CHECK_FUNCS(getifaddrs)
 
+dnl Checks for arc4random
+AC_REPLACE_FUNCS(arc4random)
+
 dnl defines package version
 AC_MSG_CHECKING(if --with-pkgversion option is specified)
 AC_ARG_WITH(pkgversion, [  --with-pkgversion=VERSION   specify package version],

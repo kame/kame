@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.172 2002/01/02 09:06:53 jinmei Exp $	*/
+/*	$KAME: isakmp.c,v 1.173 2002/06/04 05:20:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,6 +87,9 @@
 #include "isakmp_inf.h"
 #include "isakmp_newg.h"
 #include "strnames.h"
+#ifndef HAVE_ARC4RANDOM
+#include "arc4random.h"
+#endif
 
 static int nostate1 __P((struct ph1handle *, vchar_t *));
 static int nostate2 __P((struct ph2handle *, vchar_t *));
@@ -1208,8 +1211,6 @@ isakmp_init()
 	initctdtree();
 	init_recvdpkt();
 
-	srandom(time(0));
-
 	if (isakmp_open() < 0)
 		goto err;
 
@@ -2035,7 +2036,7 @@ isakmp_newmsgid2(iph1)
 	u_int32_t msgid2;
 
 	do {
-		msgid2 = random();
+		msgid2 = arc4random();
 	} while (getph2bymsgid(iph1, msgid2));
 
 	return msgid2;

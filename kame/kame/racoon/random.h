@@ -1,4 +1,4 @@
-/*	$KAME: random.h,v 1.1 2000/10/05 06:34:56 itojun Exp $	*/
+/*	$KAME: random.h,v 1.2 2002/06/04 05:20:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -29,4 +29,4 @@
  * SUCH DAMAGE.
  */
 
-extern void random_init __P((void));
+extern u_int32_t arc4random __P((void));

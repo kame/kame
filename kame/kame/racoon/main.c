@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.44 2002/03/05 15:34:59 sakane Exp $	*/
+/*	$KAME: main.c,v 1.45 2002/06/04 05:20:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,8 +68,10 @@
 #include "oakley.h"
 #include "pfkey.h"
 #include "crypto_openssl.h"
-#include "random.h"
 #include "backupsa.h"
+#ifndef HAVE_ARC4RANDOM
+#include "arc4random.h"
+#endif
 
 int f_foreground = 0;	/* force running in foreground. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
@@ -162,7 +164,7 @@ main(ac, av)
 	parse(ac, av);
 
 	ploginit();
-	random_init();
+	(void)arc4random();	/* XXX test if random number is available */
 
 #ifdef RACOON_PKG_VERSION
 	plog(LLV_INFO, LOCATION, NULL, "%s\n", version0);

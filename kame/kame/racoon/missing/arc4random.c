@@ -1,4 +1,4 @@
-/*	$KAME: random.c,v 1.5 2000/11/06 08:43:17 itojun Exp $	*/
+/*	$KAME: arc4random.c,v 1.1 2002/06/04 05:20:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -40,13 +40,14 @@
 #include <fcntl.h>
 #include <err.h>
 
-#include "random.h"
+#include "arc4random.h"
 
 static int fd = -1;
 
-void
-random_init()
+static void
+arc4random_init()
 {
+
 	fd = open("/dev/urandom", O_RDONLY, 0600);
 	if (fd < 0) {
 		err(1, "/dev/urandom");
@@ -54,24 +55,13 @@ random_init()
 	}
 }
 
-long
-random()
+u_int32_t
+arc4random()
 {
-	long v;
+	u_int32_t v;
 
+	if (fd < 0)
+		arc4random_init();
 	read(fd, &v, sizeof(v));
-	v &= ((~0UL) >> 1);
 	return v;
-}
-
-void
-srandom(seed)
-#ifdef __bsdi__
-	unsigned int seed;
-#else
-	unsigned long seed;
-#endif
-{
-
-	/* nothing to do */
 }

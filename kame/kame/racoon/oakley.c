@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.112 2001/12/24 15:05:05 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.113 2002/06/04 05:20:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,6 +74,9 @@
 #include "sockmisc.h"
 #include "strnames.h"
 #include "gcmalloc.h"
+#ifndef HAVE_ARC4RANDOM
+#include "arc4random.h"
+#endif
 
 #ifdef HAVE_GSSAPI
 #include "gssapi.h"
@@ -2769,7 +2772,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 		char *p = &buf->v[len];
 		if (lcconf->pad_random) {
 			for (i = 0; i < padlen; i++)
-				*p++ = (char)random();
+				*p++ = arc4random() & 0xff;
 		}
         }
         memcpy(buf->v, pl, len);
@@ -2845,7 +2848,8 @@ oakley_padlen(len, base)
 	padlen = base - len % base;
 
 	if (lcconf->pad_randomlen)
-		padlen += ((random() % (lcconf->pad_maxsize + 1) + 1) * base);
+		padlen += ((arc4random() % (lcconf->pad_maxsize + 1) + 1) *
+		    base);
 
 	return padlen;
 }
