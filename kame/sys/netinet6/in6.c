@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.177 2001/02/16 15:14:48 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.178 2001/02/23 08:58:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1434,8 +1434,24 @@ in6_unlink_ifa(ia, ifp)
 	}
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	if (oia->ia6_multiaddrs.lh_first != NULL)
+	if (oia->ia6_multiaddrs.lh_first != NULL) {
+#ifdef __NetBSD__
+		/*
+		 * XXX thorpej@netbsd.org -- if the interface is going
+		 * XXX away, don't save the multicast entries, delete them!
+		 */
+		if (oia->ia_ifa.ifa_ifp->if_output == if_nulloutput) {
+			struct in6_multi *in6m;
+
+			while ((in6m =
+			    LIST_FIRST(&oia->ia6_multiaddrs)) != NULL)
+				in6_delmulti(in6m);
+		} else
+			in6_savemkludge(oia);
+#else
 		in6_savemkludge(oia);
+#endif
+	}
 #endif
 
 #ifdef MEASURE_PERFORMANCE
