@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.105 2002/06/09 14:43:59 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.106 2002/07/12 06:35:00 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -348,6 +348,31 @@ ip6_forward(m, srcrt)
 		}
 		m_freem(m);
 		return;
+	}
+
+	/* adjust pointer */
+	ip6 = mtod(m, struct ip6_hdr *);
+	if (ip6_getpktaddrs(m, &sa6_src, &sa6_dst)) {
+		m_freem(m);
+		return;
+	}
+	if (ip6_forward_rt.ro_rt &&
+#ifdef SCOPEDROUTING
+	    !SA6_ARE_ADDR_EQUAL(sa6_dst, &ip6_forward_rt.ro_dst)
+#else
+	    !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr,
+		&((struct sockaddr_in6 *)&ip6_forward_rt.ro_dst)->sin6_addr)
+#endif
+	    ) {
+		struct sockaddr_in6 *dst6;
+
+		RTFREE(ip6_forward_rt.ro_rt);
+		ip6_forward_rt.ro_rt = (struct rtentry *)NULL;
+		dst6 = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
+		*dst6 = *sa6_dst;
+#ifndef SCOPEDROUTING
+		dst6->sin6_scope_id = 0; /* XXX */
+#endif
 	}
     }
     skip_ipsec:
