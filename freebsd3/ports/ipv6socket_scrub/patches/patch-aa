@@ -4,8 +4,8 @@
                                 -e 's/#.*if/_#_if/' \
                                 -e 's/#.*else/_#_else/' \
                                 %s | \
--                  /usr/ccs/lib/cpp -BP 2>&1 | \
-+                  /usr/bin/cpp -BP 2>&1 | \
+-                  /usr/ccs/lib/cpp -P 2>&1 | \
++                  /usr/bin/cpp -P 2>&1 | \
                    /usr/bin/sed -e 's/_#_include/#include/' \
                                 -e 's/_#_end/#end/' \
                                 -e 's/_#_if/#if/' \
@@ -14,9 +14,9 @@
  
    if ((stat("/usr/bin/sed", &statbuff) == -1) ||
 -     stat("/usr/ccs/lib/cpp", &statbuff) == -1) {
--         fprintf (stderr, "\nCannot find /usr/bin/sed and/or /usr/ccs/lib/cpp -BP.\n Terminating...\n");
+-         fprintf (stderr, "\nCannot find /usr/bin/sed and/or /usr/ccs/lib/cpp -P.\n Terminating...\n");
 +     stat("/usr/bin/cpp", &statbuff) == -1) {
-+         fprintf (stderr, "\nCannot find /usr/bin/sed and/or /usr/bin/cpp -BP.\n Terminating...\n");
++         fprintf (stderr, "\nCannot find /usr/bin/sed and/or /usr/bin/cpp -P.\n Terminating...\n");
           exit (2);
  
       }
@@ -24,8 +24,8 @@
        }
  
        if (check_file (buf,ignore_conf,pri_conf,sec_conf,fo1,fo2,tmpfile)) {
--         fprintf (stderr, "\nCannot process file %s.  Cannot find /usr/bin/sed and/or /usr/ccs/lib/cpp -BP.\n Terminating...\n",buf);
-+         fprintf (stderr, "\nCannot process file %s.  Cannot find /usr/bin/sed and/or /usr/bin/cpp -BP.\n Terminating...\n",buf);
+-         fprintf (stderr, "\nCannot process file %s.  Cannot find /usr/bin/sed and/or /usr/ccs/lib/cpp -P.\n Terminating...\n",buf);
++         fprintf (stderr, "\nCannot process file %s.  Cannot find /usr/bin/sed and/or /usr/bin/cpp -P.\n Terminating...\n",buf);
           unlink(tmpfile);
           exit (2);
        }
