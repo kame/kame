@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.24 2003/08/01 01:17:50 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.25 2003/08/01 01:20:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -57,10 +57,6 @@
 #include "timer.h"
 #include "dhcp6c_ia.h"
 #include "prefixconf.h"
-
-#ifndef TAILQ_EMPTY
-#define	TAILQ_EMPTY(head) ((head)->tqh_first == NULL)
-#endif
 
 TAILQ_HEAD(siteprefix_list, siteprefix);
 struct iactl_pd {

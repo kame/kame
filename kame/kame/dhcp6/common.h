@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.35 2003/07/31 21:44:11 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.36 2003/08/01 01:20:05 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -37,6 +37,11 @@
 #define FNAME __FUNCTION__
 #else
 #define FNAME ""
+#endif
+
+/* XXX: bsdi4 does not have TAILQ_EMPTY */
+#ifndef TAILQ_EMPTY
+#define	TAILQ_EMPTY(head) ((head)->tqh_first == NULL)
 #endif
 
 extern int foreground;

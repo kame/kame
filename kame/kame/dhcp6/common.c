@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.91 2003/08/01 01:17:50 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.92 2003/08/01 01:20:05 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -78,10 +78,6 @@
 #include <timer.h>
 
 #define MAXDNAME 255
-
-#ifndef TAILQ_EMPTY
-#define	TAILQ_EMPTY(head) ((head)->tqh_first == NULL)
-#endif
 
 int foreground;
 int debug_thresh;
