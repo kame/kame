@@ -12,7 +12,8 @@ SRCS+=	tcpdump.c \
 	print-wb.c addrtoname.c bpf_dump.c gmt2local.c machdep.c \
 	parsenfsfh.c util.c savestr.c setsignal.c \
 	print-esp.c print-ah.c print-vjc.c print-isakmp.c print-chdlc.c \
-	print-ipcomp.c print-mobile.c print-l2tp.c print-bgp.c
+	print-ipcomp.c print-mobile.c print-l2tp.c print-bgp.c \
+	print-ascii.c print-telnet.c
 SRCS+=	print-ip6.c print-ip6opts.c print-ripng.c print-icmp6.c print-frag6.c \
 	print-rt6.c print-ospf6.c print-dhcp6.c
 SRCS+= version.c
