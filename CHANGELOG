@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1484 2001/01/19 06:43:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.1485 2001/01/19 08:10:14 itojun Exp $
 
 <200101>
+Fri Jan 19 17:09:17 JST 2001  itojun@iijlab.net
+	* sys/netinet/icmp6.h: synchronize RR flag bit definitions to
+	  RFC2894.  you need to compile every system you have, to make RR work.
+	  KAME PR 300.
+
 2001-01-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/i386/isa/if_ef.c (efintr): do not use the sentinel
 	pointer stored in ef_mb, and force the EF_NEWM macro to create a
