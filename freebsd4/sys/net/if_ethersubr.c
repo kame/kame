@@ -34,6 +34,7 @@
  * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.8 2000/07/17 21:24:34 archie Exp $
  */
 
+#include "opt_altq.h"
 #include "opt_atalk.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -142,7 +143,6 @@ ether_output(ifp, m, dst, rt0)
 	int off, loop_copy = 0;
 	int hlen;	/* link layer header lenght */
 	struct arpcom *ac = IFP2AC(ifp);
-	short mflags;
 #ifdef ALTQ
 	struct altq_pktattr pktattr;
 #endif
@@ -369,7 +369,11 @@ bad:			if (m != NULL)
 	}
 
 	/* Continue with link-layer output */
+#ifdef ALTQ
+	return ether_output_frame(ifp, m, &pktattr);
+#else
 	return ether_output_frame(ifp, m);
+#endif
 }
 
 /*
@@ -379,11 +383,19 @@ bad:			if (m != NULL)
  * in the first mbuf (if BRIDGE'ing).
  */
 int
-ether_output_frame(ifp, m)
+ether_output_frame(ifp, m
+#ifdef ALTQ
+		   , pktattr
+#endif
+	)
 	struct ifnet *ifp;
 	struct mbuf *m;
+#ifdef ALTQ
+	struct altq_pktattr *pktattr;
+#endif
 {
 	int s, error = 0;
+	short mflags;
 
 #ifdef BRIDGE
 	if (do_bridge) {
@@ -407,7 +419,7 @@ ether_output_frame(ifp, m)
 	 * not yet active.
 	 */
 #ifdef ALTQ
-	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	IFQ_ENQUEUE(&ifp->if_snd, m, pktattr, error);
 #else
 	IFQ_ENQUEUE(&ifp->if_snd, m, error);
 #endif

@@ -451,7 +451,12 @@ void	ether_input __P((struct ifnet *, struct ether_header *, struct mbuf *));
 void	ether_demux __P((struct ifnet *, struct ether_header *, struct mbuf *));
 int	ether_output __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
+#ifdef ALTQ
+int	ether_output_frame __P((struct ifnet *, struct mbuf *,
+				struct altq_pktattr *));
+#else
 int	ether_output_frame __P((struct ifnet *, struct mbuf *));
+#endif
 int	ether_ioctl __P((struct ifnet *, int, caddr_t));
 
 int	if_addmulti __P((struct ifnet *, struct sockaddr *,
