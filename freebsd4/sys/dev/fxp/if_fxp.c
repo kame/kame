@@ -1271,6 +1271,7 @@ fxp_intr_body(struct fxp_softc *sc, u_int8_t statack, int count)
 				m_freem(txp->mb_head);
 				txp->mb_head = NULL;
 			}
+			sc->tx_queued--;
 		}
 		sc->cbl_first = txp;
 		ifp->if_timer = 0;
