@@ -100,12 +100,13 @@
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #endif /*INET*/
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__)
+#include <netinet/in_pcb.h>
+#endif
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
 #include <netinet6/in6_pcb.h>
-#else
-#include <netinet/in_pcb.h>
 #endif
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
@@ -846,7 +847,7 @@ ip6_unknown_opt(optp, m, off)
  */
 void
 ip6_savecontrol(in6p, mp, ip6, m)
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
 	register struct inpcb *in6p;
 #else
 	register struct in6pcb *in6p;
@@ -855,8 +856,10 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;
 {
-#ifndef __OpenBSD__	/*XXX*/
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#ifdef __OpenBSD__
+# define in6p_flags	inp_flags
+#endif
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct proc *p = curproc;	/* XXX */
 #endif
 #ifdef __bsdi__
@@ -865,12 +868,17 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	int privileged;
 
 	privileged = 0;
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
+		privileged++;
+#else
+#ifdef HAVE_NRL_INPCB
+	if ((in6p->inp_socket->so_state & SS_PRIV) != 0)
 		privileged++;
 #else
 	if ((in6p->in6p_socket->so_state & SS_PRIV) != 0)
 		privileged++;
+#endif
 #endif
 
 #ifdef SO_TIMESTAMP
@@ -1041,8 +1049,9 @@ ip6_savecontrol(in6p, mp, ip6, m)
 #ifdef __bsdi__
 # undef sbcreatecontrol
 #endif
-
-#endif /*XXX OpenBSD*/
+#ifdef __OpenBSD__
+# undef in6p_flags
+#endif
 }
 
 /*

@@ -1228,7 +1228,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 	register struct mbuf *m = *mp;
 	int error, optval;
 	int optlen;
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct proc *p = curproc;	/* XXX */
 #endif
 
@@ -1236,10 +1236,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 	error = optval = 0;
 
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	privileged = (p == 0 || suser(p->p_ucred, &p->p_acflag)) ? 0 : 1;
 #else
+#ifdef HAVE_NRL_INPCB
+	privileged = (inp->inp_socket->so_state & SS_PRIV);
+#else
 	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
+#endif
 #endif
 
 	if (level == IPPROTO_IPV6) {

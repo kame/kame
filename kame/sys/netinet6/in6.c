@@ -179,6 +179,9 @@ in6_canforward(src, dst)
 static int
 in6_is_ifloop_auto(struct ifaddr *ifa)
 {
+#ifdef __OpenBSD__
+	return 0;
+#else
 #define SIN6(s) ((struct sockaddr_in6 *)s)
 	/*
 	 * If RTF_CLONING is unset, or (IFF_LOOPBACK | IFF_POINTOPOINT),
@@ -196,6 +199,7 @@ in6_is_ifloop_auto(struct ifaddr *ifa)
 	else
 		return 1;
 #undef SIN6
+#endif
 }
 
 /*
@@ -469,7 +473,7 @@ in6_control(so, cmd, data, ifp)
 	int privileged;
 
 	privileged = 0;
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		privileged++;
 #else

@@ -454,7 +454,7 @@ in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 		/* XXX: init dummy so */
 		bzero(&so, sizeof(so));
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__NetBSD__)
-			so.so_state |= SS_PRIV;
+		so.so_state |= SS_PRIV;
 #endif
 
 		error = add_each_prefix(&so, &rp);
