@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.115 2001/06/27 14:16:25 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.116 2001/06/27 15:54:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1901,6 +1901,60 @@ pk_recvspdadd(mhp)
 
 	if (addnewsp(mhp) < 0)
 		return -1;
+
+	return 0;
+}
+
+/*
+ * this function has to be used by responder side.
+ */
+int
+pk_sendspddelete(iph2)
+	struct ph2handle *iph2;
+{
+	struct policyindex *spidx;
+	struct sadb_x_policy *xpl;
+	caddr_t policy = NULL;
+	int policylen;
+
+	spidx = (struct policyindex *)iph2->spidx_gen;
+
+	/* get policy buffer size */
+	policylen = sizeof(struct sadb_x_policy);
+
+	/* make policy structure */
+	policy = racoon_malloc(policylen);
+	if (!policy) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"buffer allocation failed.\n");
+		return -1;
+	}
+
+	xpl = (struct sadb_x_policy *)policy;
+	xpl->sadb_x_policy_len = PFKEY_UNIT64(policylen);
+	xpl->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
+	xpl->sadb_x_policy_type = IPSEC_POLICY_IPSEC;
+	xpl->sadb_x_policy_dir = spidx->dir;
+	xpl->sadb_x_policy_id = 0;
+
+	if (pfkey_send_spddelete(
+			lcconf->sock_pfkey,
+			(struct sockaddr *)&spidx->src,
+			spidx->prefs,
+			(struct sockaddr *)&spidx->dst,
+			spidx->prefd,
+			spidx->ul_proto,
+			policy, policylen, 0) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"libipsec failed send spddelete (%s)\n",
+			ipsec_strerror());
+		goto end;
+	}
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_spddelete\n");
+
+end:
+	if (policy)
+		racoon_free(policy);
 
 	return 0;
 }
