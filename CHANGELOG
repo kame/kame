@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.192 1999/10/18 05:34:49 jinmei Exp $
+$Id: CHANGELOG,v 1.193 1999/10/18 15:58:44 sumikawa Exp $
 
 <199910>
+Tue Oct 19 00:53:51 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/wu-ftpd: upgrade to 2.5.0 with security
+	patches. If you use old wu-ftpd, you should upgrade it because of
+	several security holes.
+
 Mon Oct 18 13:43:40 JST 1999  itojun@iijlab.net
 	* kame/tcpdump/print-bgp.c: decode BGP packets.  BGP data that crosses
 	  packet boundary will not be decoded (it does not reassemble TCP
