@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.4 2000/01/12 06:09:33 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.5 2000/06/07 08:27:19 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -48,12 +48,14 @@ struct sched {
 	TAILQ_ENTRY(sched) chain;
 };
 
+/* cancel schedule */
 #define SCHED_KILL(s)                                                          \
 do {                                                                           \
 	sched_kill(s);                                                         \
 	s = NULL;                                                              \
 } while(0)
 
+/* must be called after it's called from scheduler. */
 #define SCHED_INIT(s)	(s) = NULL
 
 struct scheddump {
