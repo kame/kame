@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1611 2001/03/20 13:19:19 itojun Exp $
+$KAME: CHANGELOG,v 1.1612 2001/03/21 15:27:49 itojun Exp $
 
 <200103>
+Thu Mar 22 00:26:51 JST 2001  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: update MTU on path MTU timeout.
+	  noted by onoe@sm.sony.co.jp.
+	* ndp/ndp.c: do not dereference null pointer.  from tomomi suzuki
+
 2001-03-20  Shin'ichi Fujisawa  <shin@loquat.rant.net>
 	* sys/netinet6/natpt_trans.c: Put IPPROTO_UDP into IPv6 header.
 	  Because conversion of IP header part is shared with TCP, default
