@@ -727,6 +727,14 @@ file netinet6/nd6_rtr.c			inet6
 #file netinet6/tcp6_usrreq.c		inet6 & tcp6
 #file netinet6/udp6_usrreq.c		inet6
 
+# ... Ericsson mobile-ip6
+file netinet6/mip6.c			inet6 & mip6
+file netinet6/mip6_hooks.c		inet6 & mip6
+file netinet6/mip6_io.c			inet6 & mip6
+file netinet6/mip6_mn.c			inet6 & mip6
+file netinet6/mip6_md.c			inet6 & mip6
+file netinet6/mip6_ha.c			inet6 & mip6
+
 # ... PF_KEY
 file net/pfkey.c			key | ipsec | tcp_signature
 file net/pfkeyv2.c			key | ipsec | tcp_signature
