@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.63 2002/10/24 12:53:25 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.64 2002/10/25 02:16:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -423,7 +423,7 @@ main(argc, argv)
 			ep = NULL;
 			errno = 0;
 			first_hop = strtoul(optarg, &ep, 0);
-			if (errno || !*optarg || *ep|| first_hop > 255) {
+			if (errno || !*optarg || *ep || first_hop > 255) {
 				fprintf(stderr,
 				    "traceroute6: invalid min hoplimit.\n");
 				exit(1);
