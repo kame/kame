@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.21 2003/08/25 11:28:40 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.22 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,7 +120,7 @@ LIST_HEAD(hif_site_prefix_list, hif_site_prefix);
 
 struct hif_softc {
 	struct ifnet hif_if;
-	TAILQ_ENTRY(hif_softc) hif_entry;
+	LIST_ENTRY(hif_softc)  hif_entry;
 	int                    hif_location;             /* cur location */
 	int                    hif_location_prev; /* XXX */
 	struct in6_ifaddr      *hif_coa_ifa;
@@ -133,7 +133,7 @@ struct hif_softc {
 	u_int8_t               hif_dhaad_count;
 	struct in6_addr        hif_ifid;
 };
-TAILQ_HEAD(hif_softc_list, hif_softc);
+LIST_HEAD(hif_softc_list, hif_softc);
 
 #ifdef _KERNEL
 

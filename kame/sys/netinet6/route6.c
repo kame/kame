@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.45 2003/06/06 06:00:44 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.46 2003/08/26 04:42:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -353,11 +353,9 @@ ip6_rthdr2(m, ip6, rh2)
 	}
 
 	/* check addresses in ip6_dst and rh2. */
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		for (mbu = LIST_FIRST(&sc->hif_bu_list);
-		     mbu;
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
+		for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
 		     mbu = LIST_NEXT(mbu, mbu_entry)) {
 			if ((mbu->mbu_flags & IP6MU_HOME) == 0)
 				continue;

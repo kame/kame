@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.58 2003/08/26 04:27:49 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.59 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,7 +182,7 @@ hifattach(dummy)
 	struct hif_softc *sc;
 	int i;
 
-	TAILQ_INIT(&hif_softc_list);
+	LIST_INIT(&hif_softc_list);
 
 	sc = malloc(NHIF * sizeof(struct hif_softc), M_DEVBUF, M_WAIT);
 	bzero(sc, NHIF * sizeof(struct hif_softc));
@@ -236,7 +236,7 @@ hifattach(dummy)
 		sc->hif_ifid = in6addr_any;
 
 		/* create hif_softc list */
-		TAILQ_INSERT_TAIL(&hif_softc_list, sc, hif_entry);
+		LIST_INSERT_HEAD(&hif_softc_list, sc, hif_entry);
 	}
 }
 
@@ -462,8 +462,8 @@ hif_list_find_withhaddr(haddr)
 	struct hif_prefix *hpfx;
 	struct mip6_prefix *mpfx;
 
-	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-	    hif = TAILQ_NEXT(hif, hif_entry)) {
+	for (hif = LIST_FIRST(&hif_softc_list); hif;
+	    hif = LIST_NEXT(hif, hif_entry)) {
 		for (hpfx = LIST_FIRST(&hif->hif_prefix_list_home); hpfx;
 		    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
 			mpfx = hpfx->hpfx_mpfx;
@@ -515,8 +515,8 @@ hif_prefix_list_update_withprefix(sc, data)
 			return (error);
 		}
 
-		for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-		     hif = TAILQ_NEXT(hif, hif_entry)) {
+		for (hif = LIST_FIRST(&hif_softc_list); hif;
+		    hif = LIST_NEXT(hif, hif_entry)) {
 			if (hif == sc)
 				hif_prefix_list_insert_withmpfx(
 				    &hif->hif_prefix_list_home, mpfx);
@@ -605,8 +605,8 @@ hif_prefix_list_update_withhaaddr(sc, data)
 		error = mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
 		if (error)
 			return (error);
-		for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-		    hif = TAILQ_NEXT(hif, hif_entry)) {
+		for (hif = LIST_FIRST(&hif_softc_list); hif;
+		    hif = LIST_NEXT(hif, hif_entry)) {
 			if (sc == hif)
 				hif_prefix_list_insert_withmpfx(
 				    &sc->hif_prefix_list_home, mpfx);

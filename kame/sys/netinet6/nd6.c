@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.332 2003/08/20 13:31:14 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.333 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -738,8 +738,8 @@ nd6_timer(ignored_arg)
 				goto purge;
 			if (in6_embedscope(&haddr.sin6_addr, &haddr))
 				goto purge;
-			for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-			     hif = TAILQ_NEXT(hif, hif_entry)) {
+			for (hif = LIST_FIRST(&hif_softc_list); hif;
+			    hif = LIST_NEXT(hif, hif_entry)) {
 				mbu = mip6_bu_list_find_home_registration(
 				    &hif->hif_bu_list, &haddr);
 				if (mbu) {

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.131 2003/06/23 08:33:49 t-momose Exp $	*/
+/*	$KAME: in6_src.c,v 1.132 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,12 +411,10 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 					*errorp = EINVAL; /* XXX */
 					return (NULL);
 				}
-				for (sc = TAILQ_FIRST(&hif_softc_list);
-				     sc;
-				     sc = TAILQ_NEXT(sc, hif_entry)) {
+				for (sc = LIST_FIRST(&hif_softc_list); sc;
+				    sc = LIST_NEXT(sc, hif_entry)) {
 					mbu_ia_best = mip6_bu_list_find_home_registration(
-						&sc->hif_bu_list,
-						&ia_addr);
+					    &sc->hif_bu_list, &ia_addr);
 					if (mbu_ia_best)
 						break;
 				}
@@ -432,12 +430,10 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 					*errorp = EINVAL; /* XXX */
 					return (NULL);
 				}
-				for (sc = TAILQ_FIRST(&hif_softc_list);
-				     sc;
-				     sc = TAILQ_NEXT(sc, hif_entry)) {
+				for (sc = LIST_FIRST(&hif_softc_list); sc;
+				    sc = LIST_NEXT(sc, hif_entry)) {
 					mbu_ia = mip6_bu_list_find_home_registration(
-						&sc->hif_bu_list,
-						&ia_addr);
+					    &sc->hif_bu_list, &ia_addr);
 					if (mbu_ia)
 						break;
 				}

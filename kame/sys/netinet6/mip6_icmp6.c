@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.76 2003/08/25 11:28:40 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.77 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -239,9 +239,8 @@ mip6_icmp6_input(m, off, icmp6len)
 				 * must use bi-directional tunneling
 				 * to contiue communication.
 				 */
-				for (sc = TAILQ_FIRST(&hif_softc_list);
-				     sc;
-				     sc = TAILQ_NEXT(sc, hif_entry)) {
+				for (sc = LIST_FIRST(&hif_softc_list); sc;
+				    sc = LIST_NEXT(sc, hif_entry)) {
 					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
 					mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB, NULL);
 				}
@@ -266,9 +265,8 @@ mip6_icmp6_input(m, off, icmp6len)
 					 "Mobile IPv6.\n",
 					 __FILE__, __LINE__,
 					 ip6_sprintf(&paddr.sin6_addr)));
-				for (sc = TAILQ_FIRST(&hif_softc_list);
-				     sc;
-				     sc = TAILQ_NEXT(sc, hif_entry)) {
+				for (sc = LIST_FIRST(&hif_softc_list); sc;
+				    sc = LIST_NEXT(sc, hif_entry)) {
 					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
 					mip6_bu_fsm(mbu, MIP6_BU_PRI_FSM_EVENT_ICMP_PARAMPROB, NULL);
 				}
@@ -450,8 +448,8 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	/* find hif that matches this receiving hadiscovid of DHAAD reply. */
 	hdrep_id = hdrep->dhaad_rep_id;
 	hdrep_id = ntohs(hdrep_id);
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
 		if (sc->hif_dhaad_id == hdrep_id)
 			break;
 	}
@@ -965,8 +963,8 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			}
 			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
 			mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
-			for (tmphif = TAILQ_FIRST(&hif_softc_list); tmphif;
-			     tmphif = TAILQ_NEXT(tmphif, hif_entry)) {
+			for (tmphif = LIST_FIRST(&hif_softc_list); tmphif;
+			    tmphif = LIST_NEXT(tmphif, hif_entry)) {
 				if (hif == tmphif)
 					hif_prefix_list_insert_withmpfx(
 					    &tmphif->hif_prefix_list_home,

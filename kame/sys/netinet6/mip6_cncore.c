@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.32 2003/08/26 04:27:49 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.33 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -315,8 +315,8 @@ mip6_ioctl(cmd, data)
 			mip6log((LOG_INFO,
 			    "%s:%d: MN function disabled\n",
 			    __FILE__, __LINE__));
-			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-			    sc = TAILQ_NEXT(sc, hif_entry)) {
+			for (sc = LIST_FIRST(&hif_softc_list); sc;
+			    sc = LIST_NEXT(sc, hif_entry)) {
 				if (sc->hif_coa_ifa != NULL)
 					IFAFREE(&sc->hif_coa_ifa->ia_ifa);
 				sc->hif_coa_ifa = NULL;

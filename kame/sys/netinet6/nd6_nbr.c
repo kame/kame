@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.129 2003/08/05 11:47:36 ono Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.130 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,19 +473,16 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		struct mip6_bu *mbu;
 
 		/* 10.20. Returning Home */
-		for (sc = TAILQ_FIRST(&hif_softc_list);
-		     sc;
-		     sc = TAILQ_NEXT(sc, hif_entry)) {
+		for (sc = LIST_FIRST(&hif_softc_list); sc;
+		    sc = LIST_NEXT(sc, hif_entry)) {
 			mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-							  taddr6,
-							  NULL);
+			    taddr6, NULL);
 			if (mbu == NULL)
 				continue;
 			if ((mbu->mbu_flags & IP6MU_HOME) == 0)
 				continue;
 #if 0			/* XXX WAITD is CN's BU only? */
-			if (mbu->mbu_fsm_state ==
-					MIP6_BU_FSM_STATE_WAITD)
+			if (mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_WAITD)
 #endif
 			{
 				/* unspecified source */

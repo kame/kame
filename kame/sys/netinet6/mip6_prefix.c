@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.26 2003/08/25 11:28:40 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.27 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -178,8 +178,8 @@ mip6_prefix_send_mps(mpfx)
 	struct mip6_bu *mbu;
 	int error = 0;
 
-	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-	     hif = TAILQ_NEXT(hif, hif_entry)) {
+	for (hif = LIST_FIRST(&hif_softc_list); hif;
+	    hif = LIST_NEXT(hif, hif_entry)) {
 		if (!SA6_IS_ADDR_UNSPECIFIED(&mpfx->mpfx_haddr)) {
 			mbu = mip6_bu_list_find_home_registration(
 			    &hif->hif_bu_list, &mpfx->mpfx_haddr);
@@ -361,8 +361,8 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	}
 
 	/* remove all references from hif interfaces. */
-	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
-	    hif = TAILQ_NEXT(hif, hif_entry)) {
+	for (hif = LIST_FIRST(&hif_softc_list); hif;
+	    hif = LIST_NEXT(hif, hif_entry)) {
 		hif_prefix_list_remove(&hif->hif_prefix_list_home,
 		    hif_prefix_list_find_withmpfx(&hif->hif_prefix_list_home,
 			mpfx));

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.29 2003/08/26 04:27:49 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.30 2003/08/26 04:42:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -194,9 +194,8 @@ mip6_prelist_update(saddr, ndopts, dr, m)
 		return (0);
 	}
 
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
 		/* reorganize subnet groups. */
 		error = mip6_prelist_update_sub(sc, saddr, ndopts, dr, m);
 		if (error) {
@@ -578,8 +577,8 @@ mip6_process_movement(void)
 	struct hif_softc *sc;
 	int coa_changed = 0;
 
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
 		hif_save_location(sc);
 		coa_changed = mip6_select_coa(sc);
 		if (coa_changed == 1) {
@@ -1255,8 +1254,8 @@ mip6_ifa_need_dad(ia)
 	if (in6_addr2zoneid(ia->ia_ifp, &sin6.sin6_addr, &sin6.sin6_scope_id))
 		return (EINVAL);
 
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
 		mbu = mip6_bu_list_find_home_registration(
 			&sc->hif_bu_list,
 			&sin6);
@@ -2335,8 +2334,8 @@ mip6_bu_timeout(arg)
 #endif
 	mip6_bu_starttimer();
 
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
 		struct mip6_bu *mbu, *mbu_entry;
 
 		for (mbu = LIST_FIRST(&sc->hif_bu_list);
@@ -2484,8 +2483,8 @@ mip6_mobile_node_exthdr_size(src, dst)
 		return (0);
 
 	hdrsiz = 0;
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
 		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
 		if (mbu != NULL) {
 			if (MIP6_IS_BU_BOUND_STATE(mbu)) {
@@ -2822,12 +2821,10 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	}
 
 	/* too ugly... */
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		for (mbu = LIST_FIRST(&sc->hif_bu_list);
-		     mbu;
-		     mbu = LIST_NEXT(mbu, mbu_entry)) {
+	for (sc = LIST_FIRST(&hif_softc_list); sc;
+	    sc = LIST_NEXT(sc, hif_entry)) {
+		for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
+		    mbu = LIST_NEXT(mbu, mbu_entry)) {
 			if (SA6_ARE_ADDR_EQUAL(&dst_sa, &mbu->mbu_coa) &&
 			    SA6_ARE_ADDR_EQUAL(&src_sa, &mbu->mbu_paddr))
 				break;
