@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.174 2002/06/10 09:36:12 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.175 2002/07/31 06:58:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1386,8 +1386,10 @@ isakmp_close()
 	for (p = lcconf->myaddrs; p; p = next) {
 		next = p->next;
 
-		if (!p->addr)
+		if (!p->addr) {
+			racoon_free(p);
 			continue;
+		}
 		close(p->sock);
 		racoon_free(p->addr);
 		racoon_free(p);
