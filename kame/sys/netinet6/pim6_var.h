@@ -1,4 +1,4 @@
-/*	$KAME: pim6_var.h,v 1.8 2000/06/06 08:07:43 jinmei Exp $	*/
+/*	$KAME: pim6_var.h,v 1.9 2002/09/23 12:40:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -51,8 +51,6 @@ struct pim6stat {
 };
 
 #if (defined(KERNEL)) || (defined(_KERNEL))
-extern struct pim6stat pim6stat;
-
 int pim6_input __P((struct mbuf **, int*, int));
 #endif /* KERNEL */
 
