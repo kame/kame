@@ -307,3 +307,78 @@ inet6_rthdr_getflags(cmsg, index)
 	return -1;
     }
 }
+
+/*
+ * The following functions are defined in a successor of RFC2292, aka
+ * rfc2292bis.
+ */
+
+/*
+ * This function returns the number of segments (addresses) contained in
+ * the Routing header described by bp.  On success the return value is
+ * zero or greater.  The return value of the function is -1 upon an
+ * error.
+ */
+int
+inet6_rth_segments(const void *bp)
+{
+	struct ip6_rthdr *rh = (struct ip6_rthdr *)bp;
+	struct ip6_rthdr0 *rh0;
+	int addrs;
+
+	switch(rh->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+		rh0 = (struct ip6_rthdr0 *)bp;
+
+		/*
+		 * Validation for a type-0 routing header.
+		 * Is this too strict?
+		 */
+		if ((rh0->ip6r0_len % 2) != 0 ||
+		    (addrs = (rh0->ip6r0_len >> 1)) < rh0->ip6r0_segleft)
+			return(-1);
+
+		return(addrs);
+	default:
+		return(-1);	/* unknown type */
+	}
+}
+
+/*
+ * This function returns a pointer to the IPv6 address specified by
+ * index (which must have a value between 0 and one less than the value
+ * returned by inet6_rth_segments()) in the Routing header described by
+ * bp. An application should first call inet6_rth_segments() to obtain
+ * the number of segments in the Routing header.
+ *
+ * Upon an error the return value of the function is NULL.
+ */
+struct in6_addr *
+inet6_rth_getaddr(const void *bp, int index)
+{
+	struct ip6_rthdr *rh = (struct ip6_rthdr *)bp;
+	struct ip6_rthdr0 *rh0;
+	int rthlen, addrs;
+
+	switch(rh->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+		 rh0 = (struct ip6_rthdr0 *)bp;
+		 rthlen = (rh0->ip6r0_len + 1) << 3;
+		 
+		/*
+		 * Validation for a type-0 routing header.
+		 * Is this too strict?
+		 */
+		if ((rthlen % 2) != 0 ||
+		    (addrs = (rthlen >> 1)) < rh0->ip6r0_segleft)
+			return(NULL);
+
+		if (index < 0 || addrs <= index)
+			return(NULL);
+
+		return(((struct in6_addr *)(rh0 + 1)) + index);
+	default:
+		return(NULL);	/* unknown type */
+		break;
+	}
+}
