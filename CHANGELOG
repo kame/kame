@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.258 1999/11/05 01:42:37 itojun Exp $
+$Id: CHANGELOG,v 1.259 1999/11/05 09:17:06 itojun Exp $
 
 <199911>
+Fri Nov  5 18:15:36 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/ipcomp_core.c: do not use default memory window
+	  size for zlib, it is too big.  let user choose memory window size.
+	  no sysctl access is provided right now, you need to rewrite
+	  the value by modifying source code, or by using kmem/bpatch.
+	    
+	  From: Laine Stump <lainestump@rcn.com>
+
 Fri Nov  5 10:41:26 JST 1999  itojun@iijlab.net
 	* netbsd/sys/dev/pcmcia/if_awi_pcmcia.c (and others):
 	  bring in awk driver for BayStack 650 card from NetBSD-currnt.
