@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.15 2000/09/06 20:08:14 itojun Exp $	*/
+/*	$KAME: config.c,v 1.16 2000/09/07 04:44:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -488,13 +488,11 @@ get_prefix(struct rainfo *rai)
 		}
 		memset(pp, 0, sizeof(*pp));
 
-		/* set prefix and its length */
-		memcpy(&pp->prefix, a, sizeof(*a));
-		p = (u_char *)&pp->prefix;
-		ep = (u_char *)(&pp->prefix + 1);
+		/* set prefix length */
 		m = (u_char *)&((struct sockaddr_in6 *)ifa->ifa_netmask)->sin6_addr;
 		lim = (u_char *)(ifa->ifa_netmask) + ifa->ifa_netmask->sa_len;
-		if ((pp->prefixlen = prefixlen(m, lim)) < 0) {
+		pp->prefixlen = prefixlen(m, lim);
+		if (pp->prefixlen < 0 || pp->prefixlen > 128) {
 			syslog(LOG_ERR,
 			       "<%s> failed to get prefixlen "
 			       "or prefix is invalid",
@@ -502,7 +500,10 @@ get_prefix(struct rainfo *rai)
 			exit(1);
 		}
 
-		/* sweep bits outside of prefixlen */
+		/* set prefix, sweep bits outside of prefixlen */
+		memcpy(&pp->prefix, a, sizeof(*a));
+		p = (u_char *)&pp->prefix;
+		ep = (u_char *)(&pp->prefix + 1);
 		while (m < lim)
 			*p++ &= *m++;
 		while (p < ep)
