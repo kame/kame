@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.149 2002/11/27 12:44:57 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.150 2002/11/29 04:54:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -83,12 +83,14 @@
 #define	TFTP		69
 
 #if BYTE_ORDER == BIG_ENDIAN
+#define	FTP4_PASV	0x50415356
 #define	FTP4_PORT	0x504f5254
 #define	FTP6_LPSV	0x4c505356
 #define	FTP6_LPRT	0x4c505254
 #define	FTP6_EPRT	0x45505254
 #define	FTP6_EPSV	0x45505356
 #else
+#define	FTP4_PASV	0x56534150
 #define	FTP4_PORT	0x54524f50
 #define	FTP6_LPSV	0x5653504c
 #define	FTP6_LPRT	0x5452504c
@@ -99,11 +101,12 @@
 #define	FTPMINCMD	"CWD\r\n"
 #define	FTPMINCMDLEN	strlen(FTPMINCMD)
 
-#define	FTPS_PORT	1
-#define	FTPS_LPRT	2
-#define	FTPS_LPSV	3
-#define	FTPS_EPRT	4
-#define	FTPS_EPSV	5
+#define	FTPS_PASV	1
+#define	FTPS_PORT	2
+#define	FTPS_LPRT	3
+#define	FTPS_LPSV	4
+#define	FTPS_EPRT	5
+#define	FTPS_EPSV	6
 
 
 struct pseudohdr {
@@ -210,6 +213,7 @@ struct sockaddr	*natpt_parseLPRT		__P((caddr_t, caddr_t, struct sockaddr_in6 *))
 struct sockaddr	*natpt_parseEPRT		__P((caddr_t, caddr_t, struct sockaddr_in6 *));
 struct sockaddr	*natpt_parsePORT		__P((caddr_t, caddr_t, struct sockaddr_in *));
 struct sockaddr	*natpt_parse227		__P((caddr_t, caddr_t, struct sockaddr_in *));
+struct sockaddr	*natpt_parse229		__P((caddr_t, caddr_t, struct sockaddr_in6 *));
 int		 natpt_pton6		__P((caddr_t, caddr_t, struct in6_addr *));
 int		 natpt_rewriteMbuf	__P((struct mbuf *, char *, int, char *,int));
 void		 natpt_incrementSeq	__P((struct tcphdr *, int));
@@ -833,10 +837,12 @@ void
 natpt_translatePYLD6To4(struct pcv *cv4)
 {
 	int		delta = 0;
+	int		fromto = 0;
 	struct tcphdr	*th4 = cv4->pyld.tcp4;
 	struct tcpstate	*ts  = NULL;
 
-	if (htons(cv4->pyld.tcp4->th_dport) == FTP_CONTROL) {
+	if ((htons(cv4->pyld.tcp4->th_dport) == FTP_CONTROL)
+	    || (htons(cv4->pyld.tcp4->th_sport) == FTP_CONTROL)) {
 		if ((delta = natpt_translateFTP6CommandTo4(cv4)) != 0) {
 			struct mbuf	*mbf = cv4->m;
 			struct ip	*ip4 = cv4->ip.ip4;
@@ -851,22 +857,41 @@ natpt_translatePYLD6To4(struct pcv *cv4)
 		    || ((ts = cv4->ats->suit.tcps) == NULL))
 			return ;
 
-		if (ts->delta[0]
-		    && (cv4->fromto == NATPT_FROM))
-			natpt_incrementSeq(th4, ts->delta[0]);
+		if (ts->delta[0]) {
+			if (cv4->fromto == NATPT_FROM)
+				natpt_incrementSeq(th4, ts->delta[0]);
+			else if ((cv4->fromto == NATPT_TO)
+				 && (th4->th_flags & TH_ACK))
+				natpt_decrementAck(th4, ts->delta[0]);
+		}
 
-		if (ts->delta[1]
-		    && (th4->th_flags & TH_ACK)
-		    && (cv4->fromto == NATPT_FROM))
-			natpt_decrementAck(th4, ts->delta[1]);
+		if (ts->delta[1]) {
+			if (cv4->fromto == NATPT_TO)
+				natpt_incrementSeq(th4, ts->delta[1]);
+			else if ((cv4->fromto == NATPT_FROM)
+				 && (th4->th_flags & TH_ACK))
+				natpt_decrementAck(th4, ts->delta[1]);
+		}
+
+		if (cv4->fromto == NATPT_TO)
+			fromto = 1;
 
 		if ((delta != 0)
-		    && ((th4->th_seq != ts->seq[0])
-			|| (th4->th_ack != ts->ack[0])))
-		{
-			ts->delta[0] += delta;
-			ts->seq[0] = th4->th_seq;
-			ts->ack[0] = th4->th_ack;
+		    && ((th4->th_seq != ts->seq[fromto])
+			|| (th4->th_ack != ts->ack[fromto]))) {
+#ifdef NATPT_DEBUG
+			printf("%s():\n", __FUNCTION__);
+			printf("  delta, fromto: %5d %5d\n", delta, fromto);
+			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
+			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));
+#endif
+			ts->delta[fromto] += delta;
+			ts->seq[fromto] = th4->th_seq;
+			ts->ack[fromto] = th4->th_ack;
+#ifdef NATPT_DEBUG
+			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
+			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));
+#endif
 		}
 	}
 }
@@ -1548,10 +1573,12 @@ void
 natpt_translatePYLD4To6(struct pcv *cv6)
 {
 	int		delta = 0;
+	int		fromto = 0;
 	struct tcphdr	*th6 = cv6->pyld.tcp6;
 	struct tcpstate	*ts  = NULL;
 
-	if (htons(cv6->pyld.tcp6->th_sport) == FTP_CONTROL) {
+	if ((htons(cv6->pyld.tcp6->th_sport) == FTP_CONTROL)
+	    || (htons(cv6->pyld.tcp6->th_dport) == FTP_CONTROL)) {
 		if ((delta = natpt_translateFTP4ReplyTo6(cv6)) != 0) {
 			struct mbuf	*mbf = cv6->m;
 			struct ip6_hdr	*ip6 = cv6->ip.ip6;
@@ -1566,22 +1593,41 @@ natpt_translatePYLD4To6(struct pcv *cv6)
 		    || ((ts = cv6->ats->suit.tcps) == NULL))
 			return ;
 
-		if (ts->delta[1]
-		    && (cv6->fromto == NATPT_TO))
-			natpt_incrementSeq(th6, ts->delta[1]);
+		if (ts->delta[0]) {
+			if (cv6->fromto == NATPT_FROM)
+				natpt_incrementSeq(th6, ts->delta[0]);
+			else if ((cv6->fromto == NATPT_TO)
+				 && (th6->th_flags & TH_ACK))
+				natpt_decrementAck(th6, ts->delta[0]);
+		}
 
-		if (ts->delta[0]
-		    && (th6->th_flags & TH_ACK)
-		    && (cv6->fromto == NATPT_TO))
-			natpt_decrementAck(th6, ts->delta[0]);
+		if (ts->delta[1]) {
+			if (cv6->fromto == NATPT_TO)
+				natpt_incrementSeq(th6, ts->delta[1]);
+			else if ((cv6->fromto == NATPT_FROM)
+				 && (th6->th_flags & TH_ACK))
+				natpt_decrementAck(th6, ts->delta[1]);
+		}
+
+		if (cv6->fromto == NATPT_TO)
+			fromto = 1;
 
 		if ((delta != 0)
-		    && ((th6->th_seq != ts->seq[1])
-			|| (th6->th_ack != ts ->ack[1])))
-		{
-			ts->delta[1] += delta;
-			ts->seq[1] = th6->th_seq;
-			ts->ack[1] = th6->th_ack;
+		    && ((th6->th_seq != ts->seq[fromto])
+			|| (th6->th_ack != ts ->ack[fromto]))) {
+#ifdef NATPT_DEBUG
+			printf("%s():\n", __FUNCTION__);
+			printf("  delta, fromto: %5d %5d\n", delta, fromto);
+			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
+			       ts->delta[fromto], htol(ts->seq[fromto]), htol(ts->ack[fromto]));
+#endif
+			ts->delta[fromto] += delta;
+			ts->seq[fromto] = th6->th_seq;
+			ts->ack[fromto] = th6->th_ack;
+#ifdef NATPT_DEBUG
+			printf("  delta, seq, ack: %5ld, %11lu, %11lu\n",
+			       ts->delta[fromto], htonl(ts->seq[fromto]), htonl(ts->ack[fromto]));
+#endif
 		}
 	}
 
@@ -2091,7 +2137,14 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 	    || (natpt_parseFTPdialogue(kb, kk, &ftp6) == NULL))
 		return (0);
 
-	ts = cv4->ats->suit.tcps;
+	ats = cv4->ats;
+	ts  = ats->suit.tcps;
+	if (ftp6.cmd < 1000)
+		goto FTP6response;
+
+	/*
+	 * In case FTP6 server sends command to FTP4 client.
+	 */
 	switch (ftp6.cmd) {
 #ifdef NATPT_NAT
 	case FTP4_PORT:
@@ -2099,7 +2152,6 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		if (natpt_parsePORT(ftp6.arg, kk, &sin) == NULL)
 			return (0);
 
-		ats = cv4->ats;
 		local = ats->local;
 		local.port[0] = sin.sin_port;
 		local.port[1] = htons(FTP_DATA);
@@ -2144,7 +2196,6 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 				return (0);
 		}
 
-		ats = cv4->ats;
 		/* v6 client side */
 		local = ats->local;
 		local.port[0] = sin6.sin6_port;
@@ -2191,6 +2242,37 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		break;
 	}
 
+ FTP6response:;
+	/*
+	 * In case FTP6 server sends response to FTP4 client.
+	 */
+	switch (ts->ftpstate) {
+	case FTPS_PASV:
+		if (ftp6.cmd != 229)
+			return (0);
+
+		/*
+		 * getting:   229 Entering Extended Passive Mode (|||6446|)
+		 * expecting: 227 Entering Passive Mode (h1,h2,h3,h4,p1,p2).
+		 */
+		if (natpt_parse229(ftp6.arg, kk, &sin6) == NULL)
+			return (0);
+
+		/* v4 client side */
+		local = ats->local;
+		h = (u_char *)&local.addr[1];
+		p = (u_char *)&sin6.sin6_port;
+		snprintf(wow, sizeof(wow),
+			 "227 Entering Passive Mode (%u,%u,%u,%u,%u,%u)\r\n",
+			 h[0], h[1], h[2], h[3], p[0], p[1]);
+		delta = natpt_rewriteMbuf(cv4->m, kb, (kk-kb), wow, strlen(wow));
+		ts->rewrite[cv4->fromto] = 1;
+		break;
+
+	case FTPS_PORT:
+		break;
+	}
+
 	return (delta);
 }
 
@@ -2199,6 +2281,7 @@ int
 natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 {
 	int		delta = 0;
+	char		*tstr;
 	char		*d;
 	u_char		*h, *p;
 	caddr_t		kb, kk;
@@ -2206,6 +2289,7 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 	struct tcphdr	*th6 = cv6->pyld.tcp6;
 	struct tSlot	*ats;
 	struct tcpstate	*ts;
+	struct pAddr	local, remote;
 	struct sockaddr_in sin;
 	struct ftpparam	ftp4;
 	char		Wow[128];
@@ -2218,6 +2302,29 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 
 	ats = cv6->ats;
 	ts  = ats->suit.tcps;
+
+	if (ftp4.cmd < 1000)
+		goto FTP4response;
+
+	/*
+	 * In case FTP4 client sends commmand to FTP6 server.
+	 */
+	switch (ftp4.cmd) {
+	case FTP4_PASV:
+		ts->ftpstate = FTPS_PASV;
+		tstr = "EPSV\r\n";
+		ts->rewrite[cv6->fromto] = 1;
+		delta = natpt_rewriteMbuf(cv6->m, kb, (kk-kb), tstr, strlen(tstr));
+		return (delta);
+
+	case FTP4_PORT:
+		return (delta);
+	}
+
+ FTP4response:;
+	/*
+	 * In case FTP4 server sends response to FTP6 client.
+	 */
 	switch (ts->ftpstate) {
 	case FTPS_LPRT:
 	case FTPS_EPRT:
@@ -2521,6 +2628,41 @@ natpt_parse227(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
 	sin->sin_addr = inaddr;
 
 	return ((struct sockaddr *)sin);
+}
+
+
+struct sockaddr *
+natpt_parse229(caddr_t kb, caddr_t kk, struct sockaddr_in6 *sin6)
+{
+	u_short port;
+
+	while ((kb < kk) && (*kb != '(') && !isdigit(*kb))
+		kb++;
+
+	if (*kb == '(')
+		kb++;
+
+	if (strncmp(kb, "|||", 3) != 0)
+		return (NULL);
+
+	kb += 3;
+	port = 0;
+	while ((kb < kk) && isdigit(*kb)) {
+		port = port * 10 + *kb - '0';
+		kb++;
+	}
+
+	if (*kb++ != '|')
+		return (NULL);
+
+	if (*kb != ')')
+		return (NULL);
+
+	bzero(sin6, sizeof(struct sockaddr_in6));
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_port = htons(port);
+
+	return ((struct sockaddr *)sin6);
 }
 
 
