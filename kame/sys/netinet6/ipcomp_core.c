@@ -66,11 +66,12 @@ static int deflate_compress __P((struct mbuf *, struct mbuf *, size_t *));
 static int deflate_decompress __P((struct mbuf *, struct mbuf *, size_t *));
 
 /*
- * We need to use default window size (2^15 = 32Kbytes as of writing) here.
- * Otherwise we get interop problem.
+ * We need to use default window size (2^15 = 32Kbytes as of writing) for
+ * inbound case.  Otherwise we get interop problem.
  */
 static int deflate_policy = Z_DEFAULT_COMPRESSION;
-static int deflate_window = MAX_WBITS;	
+static int deflate_window_out = 12;
+static const int deflate_window_in = MAX_WBITS;	/* don't change it */
 static int deflate_memlevel = MAX_MEM_LEVEL; 
 
 struct ipcomp_algorithm ipcomp_algorithms[] = {
@@ -124,9 +125,9 @@ deflate_common(m, md, lenp, mode)
 	zs.zalloc = deflate_alloc;
 	zs.zfree = deflate_free;
 
-	zerror = mode ? inflateInit2(&zs, deflate_window)
+	zerror = mode ? inflateInit2(&zs, deflate_window_in)
 		      : deflateInit2(&zs, deflate_policy, Z_DEFLATED,
-				deflate_window, deflate_memlevel,
+				deflate_window_out, deflate_memlevel,
 				Z_DEFAULT_STRATEGY);
 	if (zerror != Z_OK) {
 		error = ENOBUFS;
