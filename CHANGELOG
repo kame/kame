@@ -1,5 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2177 2002/05/31 13:32:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.2178 2002/06/03 00:52:55 itojun Exp $
+
+<200206>
+Mon Jun  3 09:52:03 JST 2002  itojun@iijlab.net
+	* sys/netinet6/nd6.c: in nd6_setmtu0(), do not hardcode if_mtu
+	  values (let sys/net layer handle them).  special cases are IFT_ARC
+	  and IFT_FDDI, which needs special handling in L3.
 
 <200205>
 2002-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
