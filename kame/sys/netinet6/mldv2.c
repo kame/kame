@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.33 2004/12/31 20:06:24 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.34 2005/01/01 01:44:52 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -143,6 +143,7 @@
 #include <netinet/icmp6.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/in6_msf.h>
+#include <netinet6/scope6_var.h>
 
 #ifdef __FreeBSD__
 #include <net/ethernet.h>
@@ -1364,7 +1365,8 @@ mld_set_hostcompat(ifp, rti, query_ver)
 
 /*
  * Parse source addresses from MLDv2 Group-and-Source-Specific Query message
- * and merge them in a recorded source list.
+ * and merge them in a recorded source list as specified in RFC3810 6.3 (3).
+ * If the recorded source list cannot be kept in memory, return an error code.
  * If no pending source was recorded, return -1.
  * If some source was recorded as a reply for Group-and-Source-Specific Query,
  * return 0.
@@ -1375,7 +1377,6 @@ mld_record_queried_source(in6m, mld, mldlen)
 	struct mld_hdr *mld;
 	u_int16_t mldlen;
 {
-	struct in6_addr_source *curias;
 	u_int16_t numsrc, i;
 	int ref_count;
 	struct sockaddr_in6 src;
@@ -1392,83 +1393,22 @@ mld_record_queried_source(in6m, mld, mldlen)
 	src.sin6_len = sizeof(src);
 	for (i = 0; i < numsrc && mldlen >= addrlen; i++, mldlen -= addrlen) {
 		bcopy(&mldh->mld_src[i], &src.sin6_addr, sizeof(src.sin6_addr));
-		if (in6mm_src->i6ms_grpjoin > 0) {
-			ref_count = in6_merge_msf_source_addr(in6mm_src->i6ms_rec, &src, IMS_ADD_SOURCE);
-			if (ref_count < 0) {
-				in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
-				in6mm_src->i6ms_rec->numsrc = 0;
-				return ENOBUFS;
-			}
-			if (ref_count == 1)
-				++in6mm_src->i6ms_rec->numsrc;
-			recorded = 1;
+		scope6_setzoneid(in6m->in6m_ifp, &src);
+
+		if (match_msf6_per_if(in6m, &src.sin6_addr, &in6m->in6m_addr) == 0)
 			continue;
+
+		ref_count = in6_merge_msf_source_addr(in6mm_src->i6ms_rec, &src, IMS_ADD_SOURCE);
+		if (ref_count < 0) {
+			if (in6mm_src->i6ms_rec->numsrc)
+				in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
+			in6mm_src->i6ms_rec->numsrc = 0;
+			return ENOBUFS;
 		}
+		if (ref_count == 1)
+			++in6mm_src->i6ms_rec->numsrc;	/* new entry */
 
-		LIST_FOREACH(curias, in6mm_src->i6ms_cur->head, i6as_list) {
-			/* sanity check */
-			if (curias->i6as_addr.sin6_family != src.sin6_family)
-				continue;
-
-			if (SS_CMP(&curias->i6as_addr, <, &src))
-				continue;
-
-			if (SS_CMP(&curias->i6as_addr, ==, &src)) {
-				if (in6mm_src->i6ms_mode != MCAST_INCLUDE)
-					break;
-				ref_count = in6_merge_msf_source_addr
-					(in6mm_src->i6ms_rec,
-					 &src, IMS_ADD_SOURCE);
-				if (ref_count < 0) {
-				 	in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
-					in6mm_src->i6ms_rec->numsrc = 0;
-					return ENOBUFS;
-				}
-				if (ref_count == 1)
-					++in6mm_src->i6ms_rec->numsrc;
-				recorded = 1;
-				break;
-			}
-
-			/* curias->i6as_addr > src */
-			if (in6mm_src->i6ms_mode == MCAST_EXCLUDE) {
-				ref_count = in6_merge_msf_source_addr
-						(in6mm_src->i6ms_rec,
-						 &src, IMS_ADD_SOURCE);
-				if (ref_count < 0) {
-					in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
-					in6mm_src->i6ms_rec->numsrc = 0;
-					return ENOBUFS;
-				}
-				if (ref_count == 1)
-					++in6mm_src->i6ms_rec->numsrc;
-				recorded = 1;
-			}
-
-			break;
-		}
-
-		if (!curias) {
-			if (in6mm_src->i6ms_mode == MCAST_EXCLUDE) {
-				ref_count = in6_merge_msf_source_addr
-						(in6mm_src->i6ms_rec,
-						 &src, IMS_ADD_SOURCE);
-				if (ref_count < 0) {
-					in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
-					in6mm_src->i6ms_rec->numsrc = 0;
-					return ENOBUFS;
-				}
-				if (ref_count == 1)
-					++in6mm_src->i6ms_rec->numsrc;
-				recorded = 1;
-			}
-		}
-	}
-
-	if (i != numsrc) {
-		in6_free_msf_source_list(in6mm_src->i6ms_rec->head);
-		in6mm_src->i6ms_rec->numsrc = 0;
-		return EOPNOTSUPP; /* XXX */
+		recorded = 1;
 	}
 
 	return ((recorded == 0) ? -1 : 0);
