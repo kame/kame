@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.88 2000/05/19 19:10:06 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.89 2000/05/19 19:59:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -481,7 +481,15 @@ ip6_input(m)
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
 			ip6->ip6_dst.s6_addr16[1]
 				= htons(m->m_pkthdr.rcvif->if_index);
-	} else {
+	}
+
+	/*
+	 * XXX we need this since we do not have "goto ours" hack route
+	 * for some of our ifaddrs on loopback interface.
+	 * we should correct it by changing in6_ifattach to install
+	 * "goto ours" hack route.
+	 */
+	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) != 0) {
 		if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
 			ours = 1;
 			deliverifp = m->m_pkthdr.rcvif;
