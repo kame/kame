@@ -704,6 +704,7 @@ findpcb:
 		if (so->so_options & SO_ACCEPTCONN) {
 			struct socket *so1;
 
+#ifdef INET6
 			/*
 			 * If deprecated address is forbidden,
 			 * we do not accept SYN to deprecated interface
@@ -731,13 +732,14 @@ findpcb:
 			 * handling - worse, they are not exactly the same.
 			 * I believe 5.5.4 is the best one, so we follow 5.5.4.
 			 */
-			if (!ip6_use_deprecated) {
+			if (ipv6 && !ip6_use_deprecated) {
 				struct in6_ifaddr *ia6;
 
 				if ((ia6 = ip6_getdstifaddr(m)) &&
 				    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
 					goto drop;
 			}
+#endif
 
 			so1 = sonewconn(so, 0);
 			if (so1 == NULL) {
