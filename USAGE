@@ -2,13 +2,17 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/24 01:09:00 $
+		     $Date: 2000/04/26 14:24:32 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
 installed in "/usr/local/v6/man".  It is very convenient to add this
 path to "MANPATH".  Also, /usr/local/v6/share/doc/kame has several documents
 related to KAME kit.
+
+http://www.kame.net/ has comprehensive information on latest releases,
+bug databases, daily usage tips, links to offsite URLs and more.
+Be sure to visit the web server as well.
 
 
 <<<ifconfig>>>
@@ -158,6 +162,7 @@ de1: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
 
 See also "/usr/local/v6/etc/rc.net6".
 
+
 <<<route>>>
 
 If there is a router announcing Router Advertisement on a subnet,
@@ -179,12 +184,13 @@ more details.
 For ease of configuration we recommend you to avoid static routes and run
 a routing daemon (route6d for example) instead.
 
+
 <<<ping6>>>
 
 Reachability can be checked by "ping6".  This "ping6" allows multicast
 for its argument.
 
-% ping6 -I ed0 ff02::1
+% ping6 -n -I ed0 ff02::1
 
 PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1%ed0
 56 bytes from fe80::5254:ff:feda:cb7d%lo0, icmp_seq=0 hlim=64 time=0.25 ms
@@ -193,13 +199,14 @@ PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1%ed0
 56 bytes from fe80::260:97ff:fec2:80bf%ed0, icmp_seq=0 hlim=64 time=1.538 ms(DUP!)
 56 bytes from 3ffe:501:4819:2000:5054:ff:fedb:aa46, icmp_seq=0 hlim=255 time=1.615 ms(DUP!)
 
+
 <<<ping6 -w>>>
 
 Name resolution is possible by ICMPv6 node information query message.
 This is very convenient for link-local addresses whose host name cannot be
 resolved by DNS.  Specify the "-w" option to "ping6".
 
-% ping6 -I ed0 -w ff02::1
+% ping6 -n -I ed0 -w ff02::1
 
 64 bytes from fe80::5254:ff:feda:cb7d%lo0: fto.kame.net
 67 bytes from fe80::5254:ff:feda:d161%ed0: banana.kame.net
@@ -207,6 +214,7 @@ resolved by DNS.  Specify the "-w" option to "ping6".
 66 bytes from fe80::260:8ff:fe8b:447f%ed0: taroh.kame.net
 66 bytes from fe80::2a0:c9ff:fe84:ed6c%ed0: ayame.kame.net
 	
+
 <<<traceroute6>>>
 
 The route for a target host can be checked by "traceroute6".
@@ -225,6 +233,7 @@ traceroute to tokyo.v6.wide.ad.jp (3ffe:501:0:401:200:e8ff:fed5:8923), 30 hops m
  1  nr60.v6.kame.net (3ffe:501:4819:2000:260:97ff:fec2:80bf)  1.23 ms  0.952 ms  0.92 ms
  2  otemachi.v6.wide.ad.jp (3ffe:501:0:1802:260:97ff:feb6:7ff0)  27.345 ms  26.706 ms  26.563 ms
  3  tokyo.v6.wide.ad.jp (3ffe:501:0:401:200:e8ff:fed5:8923)  26.329 ms  26.36 ms  28.63 ms
+
 
 <<<ndp>>>
 
@@ -260,6 +269,7 @@ fe80::260:97ff:fec2:80bf if=ed0, flags=, expire=29m55s
 fe80::5254:ff:fedc:5217 if=ed0, flags=, expire=29m7s
 fe80::200:eff:fe49:f929 if=ed0, flags=, expire=28m47s
 
+
 <<<rtsol>>>
 
 To generate a Router Solicitation message right now to get global
@@ -279,6 +289,7 @@ ef0: flags=8863<UP,BROADCAST,NOTRAILERS,RUNNING,SIMPLEX,MULTICAST>
         inet6 fe80::2a0:24ff:feab:839b%ef0 prefixlen 64 scopeid 0x2
         inet6 3ffe:501:4819:2000:2a0:24ff:feab:839b prefixlen 64
 
+
 <<<rtsold>>>
 
 rtsold is a daemon version of rtsol.  If you run KAME IPv6 on a laptop
@@ -291,12 +302,14 @@ rtsold also supports multiple interfaces.  For example, you can
 invoke the daemon as follows:
 # rtsold -m ep0 cnw0
 
+
 <<<netstat>>>
 
 To see routing table:
 	
 # netstat -nr
 # netstat -nrl (long format with Ref and Use)
+
 
 <<<sysctl>>>
 
@@ -307,6 +320,7 @@ default value is 0.  To set "net.inet6.ip6.accept_rtadv" to 1, execute
 as follows:
 
 # sysctl -w net.inet6.ip6.accept_rtadv=1
+
 
 <<<gifconfig>>>
 
@@ -344,6 +358,7 @@ for inner and outer header (i.e. IPv4-over-IPv4).
 
 Refer to gifconfig(8) for more details.
 
+
 <<<6to4>>>
 
 WARNING: malicious party can abuse 6to4 relay routers/sites, read through
@@ -352,6 +367,7 @@ before configuring it.
 
 "stf" interface enables you to perform 6to4 IPv6-over-IPv4 encapsulation,
 as documented in draft-ietf-ngtrans-6to4-04.txt.  See stf(4) for details.
+
 
 <<<inetd/inet6d>>>
 
@@ -367,6 +383,7 @@ it with OS-supplied inetd(8).
 
 Consult INSTALL document in platform-dependent directory (for example,
 netbsd/INSTALL).
+
 
 <<<IPsec>>>
 
@@ -468,6 +485,7 @@ to be AH transport mode inner ESP tunnel mode like below.
 	    | ======= ESP =======                    |
 	    ==================== AH ==================
 
+
 <<<NATv4>>>
 
 To configure and control NAT, use the "pma" command. 
@@ -480,9 +498,11 @@ To configure and control NAT, use the "pma" command.
 
 For more information, please refer to the "pma" man page.
 
+
 <<<mobile-ip6>>>
 KAME kit includes mobile-ip6 code.  For more details, please look at
 kame/kame/mip6config/README_MIP6.txt and manpages.
+
 
 <<<altq>>>
 ALTQ implements several queueing disciplines that can be used to
@@ -519,5 +539,39 @@ How to install and use ALTQ:
 	SIGINT or SIGTERM.
 	send SIGHUP to reload the config file.
 	use altqstat(1) to monitor traffic.
+
+
+<<<EDNS0>>>
+
+EDNS0 is defined in RFC2671.  With EDNS0, the resolver library can tell DNS
+server of its receiving buffer size, and permit DNS server to transmit large
+reply packet.  EDNS0 is necessary to take advantage of larger minimum MTU
+in IPv6.  Server side support for EDNS0 is included in by BIND9.
+
+	query packet with EDNS0
+	tells receive buffer size
+KAME box -----------------------------> BIND9 DNS server
+KAME box <----------------------------- BIND9 DNS server
+	can transmit jumbo reply, since DNS server
+	knows receive buffer size of KAME box
+
+How to play with it:
+- prepare KAME box and BIND9 DNS server (can be a same node)
+- add the following into /etc/resolv.conf on KAME box:
+	options edns0		<--- enables EDNS0
+	nameserver <IPv4 or v6 address of BIND9 box>
+- run applications compiled with libinet6 (like /usr/local/v6/bin/telnet),
+  see EDNS0 packet fly on the wire by tcpdump or some other method.
+
+Caveats:
+- BIND 4/8 DNS server will choke with EDNS0 packet, so you must not
+  turn the option on if you have BIND 4/8 DNS server.  If you enable
+  "options edns0" against BIND 4/8 DNS server, you will never be able
+  to resolve names.
+- if you use IPv6 UDP as DNS transport, path MTU discovery may
+  affect the traffic.  KAME box tries to fragment packet to 1280
+  bytes, however, BIND9 may not.
+- kame/freebsd4 and kame/bsdi4 do not support EDNS0 queries, due to
+  differences in resolver code.
 
 							<end of USAGE>
