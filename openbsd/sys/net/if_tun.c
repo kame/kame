@@ -433,6 +433,7 @@ tunioctl(dev, cmd, data, flag, p)
 	int		unit, s;
 	struct tun_softc *tp;
 	struct tuninfo *tunp;
+	struct mbuf *m;
 
 	if ((unit = minor(dev)) >= ntun)
 		return (ENXIO);
@@ -494,8 +495,9 @@ tunioctl(dev, cmd, data, flag, p)
 			tp->tun_flags &= ~TUN_ASYNC;
 		break;
 	case FIONREAD:
-		if (tp->tun_if.if_snd.ifq_head)
-			*(int *)data = tp->tun_if.if_snd.ifq_head->m_pkthdr.len;
+		IFQ_POLL(&tp->tun_if.if_snd, m);
+		if (m != NULL)
+			*(int *)data = m->m_pkthdr.len;
 		else	
 			*(int *)data = 0;
 		break;
@@ -731,6 +733,7 @@ tunselect(dev, rw, p)
 	int		unit, s;
 	struct tun_softc *tp;
 	struct ifnet	*ifp;
+	struct mbuf	*m;
 
 	if ((unit = minor(dev)) >= ntun)
 		return (ENXIO);
@@ -742,7 +745,8 @@ tunselect(dev, rw, p)
 
 	switch (rw) {
 	case FREAD:
-		if (ifp->if_snd.ifq_len > 0) {
+		IFQ_POLL(&ifp->if_snd, m);
+		if (m != NULL) {
 			splx(s);
 			TUNDEBUG(("%s: tunselect q=%d\n", ifp->if_xname,
 				  ifp->if_snd.ifq_len));

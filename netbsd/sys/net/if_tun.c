@@ -524,6 +524,7 @@ tunioctl(dev, cmd, data, flag, p)
 {
 	int		s;
 	struct tun_softc *tp;
+	struct mbuf *m;
 
 	tp = tun_find_unit(dev);
 
@@ -585,8 +586,9 @@ tunioctl(dev, cmd, data, flag, p)
 
 	case FIONREAD:
 		s = splnet();
-		if (tp->tun_if.if_snd.ifq_head)
-			*(int *)data = tp->tun_if.if_snd.ifq_head->m_pkthdr.len;
+		IFQ_POLL(&tp->tun_if.if_snd, m);
+		if (m != NULL)
+			*(int *)data = m->m_pkthdr.len;
 		else	
 			*(int *)data = 0;
 		splx(s);
