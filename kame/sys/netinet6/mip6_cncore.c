@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.13 2003/07/10 11:05:01 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.14 2003/07/21 04:15:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1400,7 +1400,7 @@ mip6_create_keygen_token(addr, nodekey, nonce, hc, token)
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr, sizeof(struct in6_addr));
 	hmac_loop(&hmac_ctx, (u_int8_t *)nonce, sizeof(mip6_nonce_t));
 	hmac_loop(&hmac_ctx, (u_int8_t *)&hc, sizeof(hc));
-	hmac_result(&hmac_ctx, result);
+	hmac_result(&hmac_ctx, result, sizeof(result));
 	/* First64 */
 	bcopy(result, token, 8);
 }
@@ -1596,7 +1596,7 @@ mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen, exclud
 			data + exclude_offset + exclude_data_len);
 #endif
 	}
-	hmac_result(&hmac_ctx, sha1_result);
+	hmac_result(&hmac_ctx, sha1_result, sizeof(sha1_result));
 	bcopy(sha1_result, result, MIP6_AUTHENTICATOR_LEN);
 #ifdef RR_DBG
 	mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);

@@ -1,4 +1,4 @@
-/*	$KAME: hmac.c,v 1.4 2002/07/10 07:39:05 t-momose Exp $	*/
+/*	$KAME: hmac.c,v 1.5 2003/07/21 04:15:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -64,20 +64,20 @@
 
 static void md5_init_stub(HMAC_CTX *);
 static void md5_update_stub(HMAC_CTX *, u_int8_t *, u_int);
-static void md5_result_stub(HMAC_CTX *, u_int8_t *);
+static void md5_result_stub(HMAC_CTX *, u_int8_t *, size_t);
 static void sha1_init_stub(HMAC_CTX *);
 static void sha1_update_stub(HMAC_CTX *, u_int8_t *, u_int);
-static void sha1_result_stub(HMAC_CTX *, u_int8_t *);
+static void sha1_result_stub(HMAC_CTX *, u_int8_t *, size_t);
 #ifdef IPSEC
 static void sha2_256_init_stub(HMAC_CTX *);
 static void sha2_256_update_stub(HMAC_CTX *, u_int8_t *, u_int);
-static void sha2_256_result_stub(HMAC_CTX *, u_int8_t *);
+static void sha2_256_result_stub(HMAC_CTX *, u_int8_t *, size_t);
 static void sha2_384_init_stub(HMAC_CTX *);
 static void sha2_384_update_stub(HMAC_CTX *, u_int8_t *, u_int);
-static void sha2_384_result_stub(HMAC_CTX *, u_int8_t *);
+static void sha2_384_result_stub(HMAC_CTX *, u_int8_t *, size_t);
 static void sha2_512_init_stub(HMAC_CTX *);
 static void sha2_512_update_stub(HMAC_CTX *, u_int8_t *, u_int);
-static void sha2_512_result_stub(HMAC_CTX *, u_int8_t *);
+static void sha2_512_result_stub(HMAC_CTX *, u_int8_t *, size_t);
 #endif
 
 struct hmac_hash hmac_hash[] = {
@@ -112,9 +112,10 @@ md5_update_stub(hmac_ctx, addr, len)
 }
 
 static void
-md5_result_stub(hmac_ctx, result)
+md5_result_stub(hmac_ctx, result, l)
 	HMAC_CTX *hmac_ctx;
 	u_int8_t *result;
+	size_t l;
 {
 	MD5Final(result, (MD5_CTX *)hmac_ctx->hash_ctx);
 }
@@ -136,9 +137,10 @@ sha1_update_stub(hmac_ctx, addr, len)
 }
 
 static void
-sha1_result_stub(hmac_ctx, result)
+sha1_result_stub(hmac_ctx, result, l)
 	HMAC_CTX *hmac_ctx;
 	u_int8_t *result;
+	size_t l;
 {
 	SHA1Final(result, (SHA1_CTX *)hmac_ctx->hash_ctx);
 }
@@ -161,9 +163,10 @@ sha2_256_update_stub(hmac_ctx, addr, len)
 }
 
 static void
-sha2_256_result_stub(hmac_ctx, result)
+sha2_256_result_stub(hmac_ctx, result, l)
 	HMAC_CTX *hmac_ctx;
 	u_int8_t *result;
+	size_t l;
 {
 	SHA256_Final(result, (SHA256_CTX *)hmac_ctx->hash_ctx);
 }
@@ -185,9 +188,10 @@ sha2_384_update_stub(hmac_ctx, addr, len)
 }
 
 static void
-sha2_384_result_stub(hmac_ctx, result)
+sha2_384_result_stub(hmac_ctx, result, l)
 	HMAC_CTX *hmac_ctx;
 	u_int8_t *result;
+	size_t l;
 {
 	SHA384_Final(result, (SHA384_CTX *)hmac_ctx->hash_ctx);
 }
@@ -209,9 +213,10 @@ sha2_512_update_stub(hmac_ctx, addr, len)
 }
 
 static void
-sha2_512_result_stub(hmac_ctx, result)
+sha2_512_result_stub(hmac_ctx, result, l)
 	HMAC_CTX *hmac_ctx;
 	u_int8_t *result;
+	size_t l;
 {
 	SHA512_Final(result, (SHA512_CTX *)hmac_ctx->hash_ctx);
 }
@@ -263,7 +268,7 @@ hmac_init(ctx, hmac_key, hmac_keylen, hash)
 		}
 		hash->init(ctx);
 		hash->loop(ctx, ctx->key, ctx->keylen);
-		hash->result(ctx, tk);
+		hash->result(ctx, tk, hash->hash_resultlen);
 		key = tk;
 		keylen = hash->hash_resultlen;
 	} else {
@@ -311,9 +316,10 @@ hmac_loop(ctx, addr, len)
 }
 
 int
-hmac_result(ctx, addr)
+hmac_result(ctx, addr, l)
 	HMAC_CTX *ctx;
 	u_int8_t *addr;
+	size_t l;
 {
 	u_char *digest;
 	u_char *ipad;
@@ -332,14 +338,14 @@ hmac_result(ctx, addr)
 		goto bad;
 	}
 
-	ctx->hash->result(ctx, digest);
+	ctx->hash->result(ctx, digest, ctx->hash->hash_resultlen);
 
 	ctx->hash->init(ctx);
 	ctx->hash->loop(ctx, opad, 64);
 	ctx->hash->loop(ctx, digest, ctx->hash->hash_resultlen);
-	ctx->hash->result(ctx, digest);
+	ctx->hash->result(ctx, digest, ctx->hash->hash_resultlen);
 
-	bcopy(digest, (void *)addr, HMACSIZE);
+	bcopy(digest, (void *)addr, sizeof(digest) > l ? l : sizeof(digest));
 
 	free(digest, M_TEMP);
 

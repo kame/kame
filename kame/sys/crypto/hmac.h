@@ -1,4 +1,4 @@
-/*	$KAME: hmac.h,v 1.3 2002/07/08 09:52:10 t-momose Exp $	*/
+/*	$KAME: hmac.h,v 1.4 2003/07/21 04:15:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -37,7 +37,7 @@ struct hmac_hash {
 	int hash_resultlen;
 	void (*init) (struct hmac_ctx *);
 	void (*loop) (struct hmac_ctx *, u_int8_t *, u_int);
-	void (*result) (struct hmac_ctx *, u_int8_t *);
+	void (*result) (struct hmac_ctx *, u_int8_t *, size_t);
 };
 
 struct hmac_ctx {
@@ -60,7 +60,7 @@ extern struct hmac_hash hmac_hash[];
 
 int hmac_init(HMAC_CTX *, u_int8_t *, int, struct hmac_hash *);
 int hmac_loop(HMAC_CTX *, u_int8_t *, int);
-int hmac_result(HMAC_CTX *, u_int8_t *addr);
+int hmac_result(HMAC_CTX *, u_int8_t *, size_t);
 #endif /* defined(KERNEL) || defined(_KERNEL) */
 
 
