@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1991 2001/11/27 10:07:31 sakane Exp $
+$KAME: CHANGELOG,v 1.1992 2001/11/28 06:10:09 fujisawa Exp $
 
 <200111>
+2001-11-28 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs,dispatch,trans,tslot,var}.[ch]:
+	- Support translation from fragmented IPv6 packet to IPv4.
+	  IPv4 packet is also fragmented.
+
+	  Restriction: The first fragmented packet must have all of
+	  header of ICMP/TCP/UDP, because this translation does not
+	  support assembly of fragmented packets.
+
 Tue Nov 27 19:03:30 JST 2001 sakane@kame.net
 	* kame/sys/crypto/cast128,kame/sys/netinet6/esp_core.c:
 	fixed the cast128 calculation with a short cipher key length.
