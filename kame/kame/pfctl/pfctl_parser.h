@@ -125,9 +125,9 @@ struct node_queue_opt {
 	}			 data;
 };
 
-SIMPLEQ_HEAD(node_tinithead, node_tinit);
+TAILQ_HEAD(node_tinithead, node_tinit);
 struct node_tinit {	/* table initializer */
-	SIMPLEQ_ENTRY(node_tinit)	 entries;
+	TAILQ_ENTRY(node_tinit)	 entries;
 	struct node_host		*host;
 	char				*file;
 };

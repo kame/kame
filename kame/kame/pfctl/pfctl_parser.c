@@ -795,7 +795,7 @@ print_tabledef(const char *name, int flags, int addrs,
 		printf(" const");
 	if (flags & PFR_TFLAG_PERSIST)
 		printf(" persist");
-	SIMPLEQ_FOREACH(ti, nodes, entries) {
+	TAILQ_FOREACH(ti, nodes, entries) {
 		if (ti->file) {
 			printf(" file \"%s\"", ti->file);
 			continue;
@@ -806,7 +806,7 @@ print_tabledef(const char *name, int flags, int addrs,
 				printf(h->not ? " !" : " ");
 				print_addr(&h->addr, h->af, 0);
 			}
-			nti = SIMPLEQ_NEXT(ti, entries);
+			nti = TAILQ_NEXT(ti, entries);
 			if (nti != NULL && nti->file == NULL)
 				ti = nti;	/* merge lists */
 			else
@@ -814,7 +814,7 @@ print_tabledef(const char *name, int flags, int addrs,
 		}
 		printf(" }");
 	}
-	if (addrs && SIMPLEQ_EMPTY(nodes))
+	if (addrs && TAILQ_EMPTY(nodes))
 		printf(" { }");
 	printf("\n");
 }
