@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2085 2002/02/22 15:18:53 suz Exp $
+$KAME: CHANGELOG,v 1.2086 2002/02/22 16:36:18 jinmei Exp $
 
 <200202>
+2002-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtrequest): rejected the process of
+	RESOLVE when the interface does not need neighbor caches.
+	Otherwise, this function would mistakenly try to make a neighbor
+	cache for an stf interface.
+	Based on a report from Ross Finlayson <finlayson@live.com> at the
+	freebsd-net ML.
+
 2002-02-23  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
 	* kame/pim6sd/{pim6_proto.c, route.c}:
 	pim6sd doesn't crash now when receiving (*,*,RP) entry.
