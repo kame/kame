@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.227 2001/10/17 05:05:32 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.228 2001/10/17 05:14:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -333,6 +333,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	if (mip6_exthdr_create(m, opt, &pktopt_mip6rthdr, &pktopt_haddr,
 			       &pktopt_mip6dest2))
 		goto freehdrs;
+	/*
+	 * mip6_exthdr_create() won't fill pktopt_mip6rthdr if opt->ip6po_rthdr
+	 * is already filled.  therefore, we won't insert dest1 twice.
+	 * yuck...
+	 */
 	if (pktopt_mip6rthdr) {
 		/*
 		 * pktopt_mip6rthdr will be only allocated when we
