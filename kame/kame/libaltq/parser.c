@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.8 2001/08/06 06:57:40 itojun Exp $	*/
+/*	$KAME: parser.c,v 1.9 2001/08/06 10:49:53 itojun Exp $	*/
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -69,7 +69,7 @@ static int get_ifname(char **cpp, char **ifnamep);
 static int get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask);
 static int get_port(const char *name, u_int16_t *port_no);
 static int get_proto(const char *name, int *proto_no);
-static int get_fltr_opts(char **cpp, char *fltr_name, int *ruleno);
+static int get_fltr_opts(char **cpp, char *fltr_name, size_t, int *ruleno);
 static int interface_parser(char *cmdbuf);
 static int class_parser(char *cmdbuf) ;
 static int filter_parser(char *cmdbuf);
@@ -442,7 +442,7 @@ get_ifname(char **cpp, char **ifnamep)
 			if (strcmp(w, ifnp->if_name) == 0) {
 				/* if_name found. advance the word pointer */
 				*cpp = ocp; 
-				strcpy(if_names[TNO], w);
+				strlcpy(if_names[TNO], w, sizeof(if_names[TNO]));
 				*ifnamep = if_names[TNO];
 				return (1);
 			}
@@ -535,7 +535,7 @@ get_proto(const char *name, int *proto_no)
 }
 
 static int
-get_fltr_opts(char **cpp, char *fltr_name, int *ruleno)
+get_fltr_opts(char **cpp, char *fltr_name, size_t l, int *ruleno)
 {
 	char w[128], *ocp;
 
@@ -544,7 +544,7 @@ get_fltr_opts(char **cpp, char *fltr_name, int *ruleno)
 		if (EQUAL(w, "name")) {
 			if (!next_word(&ocp, w))
 				return (0);
-			strcpy(fltr_name, w);
+			strlcpy(fltr_name, w, l);
 			*cpp = ocp;
 		} else if (EQUAL(w, "ruleno")) {
 			if (!next_word(&ocp, w))
@@ -581,7 +581,7 @@ interface_parser(char *cmdbuf)
 	ap = w;
 	while (next_word(&cp, ap)) {
 		if (is_qdisc_name(ap))
-			strcpy(qdisc_name, ap);
+			strlcpy(qdisc_name, ap, sizeof(qdisc_name));
 
 		argv[argc] = ap;
 		ap += strlen(ap) + 1;
@@ -695,7 +695,7 @@ filter_parser(char *cmdbuf)
 
 	fltr_name[0] = '\0';
 	ruleno = 0;
-	if (!get_fltr_opts(&cp, &fltr_name[0], &ruleno)) {
+	if (!get_fltr_opts(&cp, &fltr_name[0], sizeof(fltr_name), &ruleno)) {
 		LOG(LOG_ERR, 0,
 		    "bad filter option in %s, line %d\n",
 		    altqconfigfile, line_no);
@@ -831,7 +831,7 @@ filter6_parser(char *cmdbuf)
 
 	fltr_name[0] = '\0';
 	ruleno = 0;
-	if (!get_fltr_opts(&cp, &fltr_name[0], &ruleno)) {
+	if (!get_fltr_opts(&cp, &fltr_name[0], sizeof(fltr_name), &ruleno)) {
 		LOG(LOG_ERR, 0,
 		    "bad filter option in %s, line %d\n",
 		    altqconfigfile, line_no);
