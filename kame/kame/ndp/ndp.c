@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.44 2000/10/09 08:39:16 sumikawa Exp $	*/
+/*	$KAME: ndp.c,v 1.45 2000/10/09 09:06:30 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -172,7 +172,7 @@ main(argc, argv)
 	char **argv;
 {
 	int ch;
-	int aflag = 0, cflag = 0, dflag = 0, sflag = 0, Hflag = 0,
+	int aflag = 0, dflag = 0, sflag = 0, Hflag = 0,
 		pflag = 0, rflag = 0, Pflag = 0, Rflag = 0;
 
 	pid = getpid();
@@ -565,7 +565,7 @@ dump(addr)
 	char flgbuf[8];
 
 	/* Print header */
-	if (!tflag)
+	if (!tflag && !cflag)
 		printf("%-31.31s %-17.17s %6.6s %-9.9s %2s %4s %4s\n",
 		       "Neighbor", "Linklayer Address", "Netif", "Expire",
 		       "St", "Flgs", "Prbs");
