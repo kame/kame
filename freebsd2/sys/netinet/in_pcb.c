@@ -124,6 +124,9 @@ in_pcballoc(so, pcbinfo)
 {
 	register struct inpcb *inp;
 	int s;
+#ifdef IPSEC
+	int error;
+#endif
 
 	MALLOC(inp, struct inpcb *, sizeof(*inp), M_PCB, M_NOWAIT);
 	if (inp == NULL)
@@ -131,6 +134,13 @@ in_pcballoc(so, pcbinfo)
 	bzero((caddr_t)inp, sizeof(*inp));
 	inp->inp_pcbinfo = pcbinfo;
 	inp->inp_socket = so;
+#ifdef IPSEC
+	error = ipsec_init_policy(so, &inp->inp_sp);
+	if (error != 0) {
+		FREE(inp, M_PCB);
+		return (error);
+	}
+#endif /*IPSEC*/
 	s = splnet();
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	in_pcbinshash(inp);

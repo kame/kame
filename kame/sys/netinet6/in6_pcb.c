@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.100 2001/07/25 05:30:44 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.101 2001/07/25 16:25:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,7 +118,7 @@ in6_pcballoc(so, head)
 	struct in6pcb *head;
 {
 	struct in6pcb *in6p;
-#if defined(IPSEC) && defined(__NetBSD__)
+#if defined(IPSEC) && (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2))
 	int error;
 #endif
 
@@ -138,7 +138,7 @@ in6_pcballoc(so, head)
 		return(ENOBUFS); /* XXX */
 	}
 	bzero(in6p->in6p_inputopts, sizeof(struct ip6_recvpktopts));
-#if defined(IPSEC) && defined(__NetBSD__)
+#if defined(IPSEC) && (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2))
 	error = ipsec_init_policy(so, &in6p->in6p_sp);
 	if (error != 0) {
 		FREE(in6p->in6p_inputopts, M_IP6OPT);

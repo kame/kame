@@ -585,16 +585,6 @@ udp_usrreq(so, req, m, addr, control)
 		if (error)
 			break;
 		((struct inpcb *) so->so_pcb)->inp_ip_ttl = ip_defttl;
-#ifdef IPSEC
-		inp = (struct inpcb *)so->so_pcb;
-		if (inp) {
-			error = ipsec_init_policy(so, &inp->inp_sp);
-			if (error != 0) {
-				in_pcbdetach(inp);
-				return (error);
-			}
-		}
-#endif /*IPSEC*/
 		break;
 
 	case PRU_DETACH:

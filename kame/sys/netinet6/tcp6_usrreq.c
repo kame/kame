@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_usrreq.c,v 1.14 2000/12/03 00:54:01 itojun Exp $	*/
+/*	$KAME: tcp6_usrreq.c,v 1.15 2001/07/25 16:35:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -556,7 +556,7 @@ tcp6_attach(so)
 	if (error)
 		return (error);
 	in6p = sotoin6pcb(so);
-#ifdef IPSEC
+#if defined(IPSEC) && !(defined(__FreeBSD__) && __FreeBSD__ == 2)
 	error = ipsec_init_policy(so, &in6p->in6p_sp);
 	if (error != 0) {
 		in6_pcbdetach(in6p);

@@ -401,15 +401,6 @@ rip_usrreq(so, req, m, nam, control)
 			break;
 		inp = (struct inpcb *)so->so_pcb;
 		inp->inp_ip_p = (int)nam;
-#ifdef IPSEC
-		if (inp) {
-			error = ipsec_init_policy(so, &inp->inp_sp);
-			if (error != 0) {
-				in_pcbdetach(inp);
-				return (error);
-			}
-		}
-#endif /*IPSEC*/
 		break;
 
 	case PRU_DISCONNECT:
