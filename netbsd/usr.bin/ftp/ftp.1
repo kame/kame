@@ -1616,10 +1616,10 @@ IPv6 addresses with a form like
 indicate IPv4 destination which can be handled by
 .Dv AF_INET
 sockets.
-However, in certain IPv6 network configuration that include SIIT translator,
-the assumption is not true.
+However, in certain IPv6 network configuration, the assumption is not true.
 In such an environment, IPv4 mapped address must be passed to
 .Dv AF_INET6
 sockets directly.
+For example, if your site uses SIIT translator for IPv6-to-IPv4 translation,
 .Nm
-is unable to support such an environment.
+is unable to support your configuration.
