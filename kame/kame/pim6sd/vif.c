@@ -420,27 +420,22 @@ update_reg_vif( vifi_t register_vifi )
 
     /* Find the first useable vif with solid physical background */
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
-	    if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | VIFF_TUNNEL
-			       | MIFF_REGISTER))
-		    continue;
-
-	    /* Found. Stop the bogus Register vif first */
-	    stop_vif(register_vifi);
-	    uvifs[register_vifi].uv_linklocal->pa_addr =
-		    uvifs[vifi].uv_linklocal->pa_addr;
-
-	    start_vif(register_vifi);
-	    IF_DEBUG(DEBUG_PIM_REGISTER | DEBUG_IF)
-		    log(LOG_NOTICE, 0,
-			"%s has come up; vif #%u now in service",
-			uvifs[register_vifi].uv_name, register_vifi);
-	    return 0;
+	if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | VIFF_TUNNEL
+			   | MIFF_REGISTER))
+	    continue;
+        /* Found. Stop the bogus Register vif first */
+	stop_vif(register_vifi);
+	uvifs[register_vifi].uv_linklocal->pa_addr =
+	    uvifs[vifi].uv_linklocal->pa_addr;
+	start_vif(register_vifi);
+	IF_DEBUG(DEBUG_PIM_REGISTER | DEBUG_IF)
+	    log(LOG_NOTICE, 0, "%s has come up; vif #%u now in service",
+		uvifs[register_vifi].uv_name, register_vifi);
+	return 0;
     }
-
     vifs_down = TRUE;
     log(LOG_WARNING, 0, "Cannot start Register vif: %s",
 	uvifs[vifi].uv_name);
-
     return(-1);
 }
 
@@ -524,13 +519,13 @@ local_iface(char *ifname)
  * tunnel end-points.  Ignore interfaces that have been administratively
  * disabled.
  */     
-
-void check_vif_state()
+void
+check_vif_state()
 {
-	register vifi_t vifi;
-	register struct uvif *v;
-	struct ifreq ifr;
-	static int checking_vifs=0;
+    register vifi_t vifi;
+    register struct uvif *v;
+    struct ifreq ifr;
+    static int checking_vifs=0;
 
     /*
      * XXX: TODO: True only for DVMRP?? Check.
@@ -538,88 +533,83 @@ void check_vif_state()
      * at once, and we decide to send a prune out one of the failed ones)
      * then don't go into an infinite loop!
      */
+    if( checking_vifs )
+	return;
 
-	if( checking_vifs )
-		return;
-
-	vifs_down=FALSE;
-	checking_vifs=TRUE;
+    vifs_down=FALSE;
+    checking_vifs=TRUE;
 
     /* TODO: Check all potential interfaces!!! */
     /* Check the physical and tunnels only */
+    for( vifi=0 , v=uvifs ; vifi<numvifs ; ++vifi , ++v )
+    {
+	if( v->uv_flags & ( VIFF_DISABLED|MIFF_REGISTER	) )
+	    continue;
 
-	for( vifi=0 , v=uvifs ; vifi<numvifs ; ++vifi , ++v )
-	{
-		if( v->uv_flags & ( VIFF_DISABLED|MIFF_REGISTER	) )
-			continue;
-
-		strncpy( ifr.ifr_name , v->uv_name , IFNAMSIZ );
-
-		/* get the interface flags */
-		if( ioctl( udp_socket , SIOCGIFFLAGS , (char *)&ifr )<0 )
-			log(LOG_ERR, errno,
+	strncpy( ifr.ifr_name , v->uv_name , IFNAMSIZ );
+  
+	/* get the interface flags */
+	if( ioctl( udp_socket , SIOCGIFFLAGS , (char *)&ifr )<0 )
+	    log(LOG_ERR, errno,
         	"check_vif_state: ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 
-		if( v->uv_flags & VIFF_DOWN )
-		{
-			if ( ifr.ifr_flags & IFF_UP )
-			{
-				start_vif( vifi );
-			}
-			else
-				vifs_down=TRUE;
-		}
-		else
-		{
-			if( !( ifr.ifr_flags & IFF_UP ))
-			{
-				log( LOG_WARNING ,0,
-				     "%s has gone down ; vif #%u taken out of  service",
-				     v->uv_name, vifi);
-				stop_vif ( vifi );
-				vifs_down = TRUE;
-			}
-		}
-	}
-
-	/* Check the register(s) vif(s) */
-	for( vifi=0 , v=uvifs ; vifi<numvifs ; ++vifi , ++v )
+	if( v->uv_flags & VIFF_DOWN )
 	{
-		register vifi_t vifi2;
-		register struct uvif *v2;
-		int found;
-
-		if( !(v->uv_flags & MIFF_REGISTER ) )
-			continue;
-		else
-		{
-			found=0;
-
-			/* Find a physical vif with the same IP address as the
-			 * Register vif.
-			 */
-	
-			for( vifi2=0 , v2=uvifs ; vifi2<numvifs ; ++vifi2 , ++v2 )
-			{
-				if( v2->uv_flags & (VIFF_DISABLED|VIFF_DOWN|VIFF_TUNNEL|MIFF_REGISTER ))
-					continue;
-				if( IN6_ARE_ADDR_EQUAL(&v->uv_linklocal->pa_addr.sin6_addr,
-						       &v2->uv_linklocal->pa_addr.sin6_addr ))
-				{
-					found=1;
-					break;
-				}
-			}
-			if(!found)
-				/*
-				 * The physical interface with the IP address
-				 * as the Register
-				 * vif is probably DOWN. Get a replacement.
-				 */
-				update_reg_vif(vifi);
-		}
+	    if ( ifr.ifr_flags & IFF_UP )
+	    {
+		start_vif( vifi );
+	    }
+	    else
+		vifs_down=TRUE;
 	}
-	checking_vifs=0;
+	else
+	{
+	    if( !( ifr.ifr_flags & IFF_UP ))
+	    {
+		log( LOG_NOTICE ,0,
+		     "%s has gone down ; vif #%u taken out of  service",
+		     v->uv_name , vifi );
+		stop_vif ( vifi );
+		vifs_down = TRUE;
+	    }
+	}
+    }
+
+    /* Check the register(s) vif(s) */
+    for( vifi=0 , v=uvifs ; vifi<numvifs ; ++vifi , ++v )
+    {
+	register vifi_t vifi2;
+	register struct uvif *v2;
+	int found;
+
+	if( !(v->uv_flags & MIFF_REGISTER ) )
+	    continue;
+	else
+	{
+	    found=0;
+
+	    /* Find a physical vif with the same IP address as the
+	     * Register vif.
+	     */
+	    for( vifi2=0 , v2=uvifs ; vifi2<numvifs ; ++vifi2 , ++v2 )
+	    {
+		if( v2->uv_flags & ( VIFF_DISABLED|VIFF_DOWN|VIFF_TUNNEL|MIFF_REGISTER ))
+		    continue;
+		if( IN6_ARE_ADDR_EQUAL( &v->uv_linklocal->pa_addr.sin6_addr,
+					&v2->uv_linklocal->pa_addr.sin6_addr ))
+		{
+		    found=1;
+		    break;
+		}
+	    }
+	    if(!found)
+		/* The physical interface with the IP address as the Register
+		 * vif is probably DOWN. Get a replacement.
+		 */
+		update_reg_vif( vifi );
+	}
+    }
+    checking_vifs=0;
 }
 
 /*
@@ -749,9 +739,11 @@ void
 stop_all_vifs()
 {
     vifi_t vifi;
+    struct uvif *v;
  
-    for (vifi = 0; vifi < numvifs; vifi++) {  
-    stop_vif(vifi);
+    for (vifi = 0, v=uvifs; vifi < numvifs; ++vifi, ++v) {
+	if (!(v->uv_flags &  VIFF_DOWN)) {
+	    stop_vif(vifi);
+	}
     }
 }
-

@@ -722,6 +722,7 @@ restart(i)
 
     free_all_callouts();
     stop_all_vifs();
+    nhandlers=0;
     k_stop_pim(mld6_socket);
     close(mld6_socket);
     close(pim6_socket);
