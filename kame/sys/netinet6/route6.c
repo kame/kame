@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.29 2002/01/08 02:40:59 k-sugyou Exp $	*/
+/*	$KAME: route6.c,v 1.30 2002/01/21 05:00:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,7 +158,10 @@ ip6_rthdr0(m, ip6, rh0)
 	struct ip6_rthdr0 *rh0;
 {
 	int addrs, index;
+	struct sockaddr_in6 next_sa;
+	int64_t nextzone;
 	struct in6_addr *nextaddr, tmpaddr;
+	struct in6_ifaddr *ifa;
 
 	if (rh0->ip6r0_segleft == 0)
 #ifdef MIP6
@@ -265,20 +268,43 @@ ip6_rthdr0(m, ip6, rh0)
 	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst) ||
 	    IN6_IS_ADDR_V4COMPAT(&ip6->ip6_dst)) {
 		ip6stat.ip6s_badoptions++;
-		m_freem(m);
-		return(-1);
+		goto bad;
 	}
+
+	/*
+	 * determine the scope zone of the next hop, based on the interface
+	 * of the current hop.
+	 * [draft-ietf-ipngwg-scoping-arch, Section 9]
+	 */
+	if ((ifa = ip6_getdstifaddr(m)) == NULL)
+		goto bad;
+	if ((nextzone = in6_addr2zoneid(ifa->ia_ifp, nextaddr)) < 0) {
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
+	/*
+	 * construct a sockaddr_in6 for the next hop with the zone ID,
+	 * then update the recorded destination address.
+	 */
+	bzero(&next_sa, sizeof(next_sa));
+	next_sa.sin6_family = AF_INET6;
+	next_sa.sin6_len = sizeof(next_sa);
+	next_sa.sin6_addr = *nextaddr;
+	next_sa.sin6_scope_id = nextzone;
+	if (in6_embedscope(&next_sa.sin6_addr, &next_sa)) {
+		/* XXX: should not happen */
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
+	if (!ip6_setpktaddrs(m, NULL, &next_sa))
+		goto bad;
 
 	/*
 	 * Swap the IPv6 destination address and nextaddr. Forward the packet.
 	 */
 	tmpaddr = *nextaddr;
 	*nextaddr = ip6->ip6_dst;
-	if (IN6_IS_ADDR_LINKLOCAL(nextaddr))
-		nextaddr->s6_addr16[1] = 0;
 	ip6->ip6_dst = tmpaddr;
-	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst))
-		ip6->ip6_dst.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
 #ifdef COMPAT_RFC1883
 	if (rh0->ip6r0_slmap[index / 8] & (1 << (7 - (index % 8))))
@@ -290,4 +316,8 @@ ip6_rthdr0(m, ip6, rh0)
 #endif
 
 	return(-1);			/* m would be freed in ip6_forward() */
+
+  bad:
+	m_freem(m);
+	return(-1);
 }
