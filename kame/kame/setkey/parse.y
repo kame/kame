@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.35 2001/05/18 05:35:01 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.36 2001/06/07 15:53:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -557,17 +557,20 @@ upper_spec
 			struct protoent *ent;
 
 			ent = getprotobyname($1.buf);
-			if (!ent) {
+			if (ent)
+				p_upper = ent->p_proto;
+			else {
 				if (strcmp("icmp6", $1.buf) == 0) {
 					p_upper = IPPROTO_ICMPV6;
 				} else if(strcmp("ip4", $1.buf) == 0) {
 					p_upper = IPPROTO_IPV4;
+				} else {
+					yyerror("invalid upper layer protocol");
+					free($1.buf);
+					return -1;
 				}
-				yyerror("invalid upper layer protocol");
-				free($1.buf);
-				return -1;
 			}
-			p_upper = ent->p_proto;
+			free($1.buf);
 		}
 	;
 
