@@ -324,6 +324,141 @@ inet6_rthdr_getflags(cmsg, index)
  */
 
 /*
+ * This function returns the number of bytes required to hold a Routing
+ * header of the specified type containing the specified number of
+ * segments (addresses).
+ * If the return value is 0, then either the type of the Routing header
+ * is not supported by this implementation or the number of segments is
+ * invalid for this type of Routing header.
+ */
+size_t
+inet6_rth_space(int type, int segments)
+{
+	switch(type) {
+	case IPV6_RTHDR_TYPE_0:
+		return(((segments * 2) + 1) << 3);
+	default:
+		return(0);	/* type not suppported */
+	}
+}
+
+/*
+ * This function initializes the buffer pointed to by bp to contain a
+ * Routing header of the specified type and sets ip6r_len based on the
+ * segments parameter. bp_len is only used to verify that the buffer is
+ * large enough.  The ip6r_segleft field is set to zero;
+ * inet6_rth_add() will increment it.
+ * Upon success the return value is the pointer to the buffer (bp), and
+ * this is then used as the first argument to inet6_rth_add() function.
+ * Upon an error the return value is NULL.
+ */
+void *
+inet6_rth_init(void *bp, int bp_len, int type, int segments)
+{
+	struct ip6_rthdr *rth = (struct ip6_rthdr *)bp;
+	struct ip6_rthdr0 *rth0;
+
+	switch(type) {
+	case IPV6_RTHDR_TYPE_0:
+		/* length validation */
+		if (bp_len < inet6_rth_space(IPV6_RTHDR_TYPE_0, segments))
+			return(NULL);
+
+		memset(bp, 0, bp_len);
+		rth0 = (struct ip6_rthdr0 *)rth;
+		rth0->ip6r0_len = segments * 2;
+		rth0->ip6r0_type = IPV6_RTHDR_TYPE_0;
+		rth0->ip6r0_segleft = 0;
+		rth0->ip6r0_reserved = 0;
+		break;
+	default:
+		return(NULL);	/* type not supported */
+	}
+
+	return(bp);
+}
+
+/*
+ * This function adds the IPv6 address pointed to by addr to the end of
+ * the Routing header being constructed.
+ * If successful, the segleft member of the Routing Header is updated to
+ * account for the new address in the Routing header and the return
+ * value of the function is 0.  Upon an error the return value of the
+ * function is -1.
+ */
+int
+inet6_rth_add(void *bp, const struct in6_addr *addr)
+{
+	struct ip6_rthdr *rth = (struct ip6_rthdr *)bp;
+	struct ip6_rthdr0 *rth0;
+	struct in6_addr *nextaddr;
+
+	switch(rth->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+		rth0 = (struct ip6_rthdr0 *)rth;
+		nextaddr = (struct in6_addr *)(rth0 + 1) + rth0->ip6r0_segleft;
+		*nextaddr = *addr;
+		rth0->ip6r0_segleft++;
+		break;
+	default:
+		return(-1);	/* type not supported */
+	}
+
+	return(0);
+}
+
+/*
+ * This function takes a Routing header extension header (pointed to by
+ * the first argument) and writes a new Routing header that sends
+ * datagrams along the reverse of that route.  Both arguments are
+ * allowed to point to the same buffer (that is, the reversal can occur
+ * in place).
+ * The return value of the function is 0 on success, or -1 upon an
+ * error.
+ */
+int
+inet6_rth_reverse(const void *in, void *out)
+{
+	struct ip6_rthdr *rth_in = (struct ip6_rthdr *)in;
+	struct ip6_rthdr0 *rth0_in, *rth0_out;
+	int i, segments;
+
+	switch(rth_in->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+		rth0_in = (struct ip6_rthdr0 *)in;
+		rth0_out = (struct ip6_rthdr0 *)out;
+
+		/* parameter validation XXX too paranoid? */
+		if (rth0_in->ip6r0_len % 2)
+			return(-1);
+		segments = rth0_in->ip6r0_len / 2;
+
+		/* we can't use memcpy here, since in and out may overlap */
+		memmove((void *)rth0_out, (void *)rth0_in,
+			((rth0_in->ip6r0_len) + 1) << 3);
+		rth0_out->ip6r0_segleft = segments;
+
+		/* reverse the addresses */
+		for (i = 0; i < segments / 2; i++) {
+			struct in6_addr addr_tmp, *addr1, *addr2;
+
+			addr1 = (struct in6_addr *)(rth0_out + 1) + i;
+			addr2 = (struct in6_addr *)(rth0_out + 1) +
+				(segments - i - 1);
+			addr_tmp = *addr1;
+			*addr1 = *addr2;
+			*addr2 = addr_tmp;
+		}
+		
+		break;
+	default:
+		return(-1);	/* type not supported */
+	}
+
+	return(0);
+}
+
+/*
  * This function returns the number of segments (addresses) contained in
  * the Routing header described by bp.  On success the return value is
  * zero or greater.  The return value of the function is -1 upon an
