@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.2 1999/09/01 08:26:19 jinmei Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.3 1999/12/01 01:41:25 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -202,11 +202,15 @@ cookie_record(cookie_t *in, const u_char *bp2)
 			sizeof(cookiecache[ninitiator].raddr));
 
 		sin = (struct sockaddr_in *)&cookiecache[ninitiator].iaddr;
+#ifdef HAVE_SIN_LEN
 		sin->sin_len = sizeof(struct sockaddr_in);
+#endif
 		sin->sin_family = AF_INET;
 		memcpy(&sin->sin_addr, &ip->ip_src, sizeof(ip->ip_src));
 		sin = (struct sockaddr_in *)&cookiecache[ninitiator].raddr;
+#ifdef HAVE_SIN_LEN
 		sin->sin_len = sizeof(struct sockaddr_in);
+#endif
 		sin->sin_family = AF_INET;
 		memcpy(&sin->sin_addr, &ip->ip_dst, sizeof(ip->ip_dst));
 		break;
@@ -219,11 +223,15 @@ cookie_record(cookie_t *in, const u_char *bp2)
 
 		ip6 = (struct ip6_hdr *)bp2;
 		sin6 = (struct sockaddr_in6 *)&cookiecache[ninitiator].iaddr;
+#ifdef HAVE_SIN6_LEN
 		sin6->sin6_len = sizeof(struct sockaddr_in6);
+#endif
 		sin6->sin6_family = AF_INET6;
 		memcpy(&sin6->sin6_addr, &ip6->ip6_src, sizeof(ip6->ip6_src));
 		sin6 = (struct sockaddr_in6 *)&cookiecache[ninitiator].raddr;
+#ifdef HAVE_SIN6_LEN
 		sin6->sin6_len = sizeof(struct sockaddr_in6);
+#endif
 		sin6->sin6_family = AF_INET6;
 		memcpy(&sin6->sin6_addr, &ip6->ip6_dst, sizeof(ip6->ip6_dst));
 		break;
@@ -254,7 +262,9 @@ cookie_sidecheck(int i, const u_char *bp2, int initiator)
 	switch (ip->ip_v) {
 	case 4:
 		sin = (struct sockaddr_in *)&ss;
+#ifdef HAVE_SIN_LEN
 		sin->sin_len = sizeof(struct sockaddr_in);
+#endif
 		sin->sin_family = AF_INET;
 		memcpy(&sin->sin_addr, &ip->ip_src, sizeof(ip->ip_src));
 		break;
@@ -262,7 +272,9 @@ cookie_sidecheck(int i, const u_char *bp2, int initiator)
 	case 6:
 		ip6 = (struct ip6_hdr *)bp2;
 		sin6 = (struct sockaddr_in6 *)&ss;
+#ifdef HAVE_SIN6_LEN
 		sin6->sin6_len = sizeof(struct sockaddr_in6);
+#endif
 		sin6->sin6_family = AF_INET6;
 		memcpy(&sin6->sin6_addr, &ip6->ip6_src, sizeof(ip6->ip6_src));
 		break;
@@ -281,9 +293,17 @@ cookie_sidecheck(int i, const u_char *bp2, int initiator)
 
 	if (sa1->sa_family != sa2->sa_family)
 		return 0;
+#ifdef __linux__
+	if (SA_LEN(sa1) != SA_LEN(sa2))
+#else
 	if (sa1->sa_len != sa2->sa_len)
+#endif
 		return 0;
+#ifdef __linux__
+	if (memcmp(sa1, sa2, SA_LEN(sa1)) == 0)
+#else
 	if (memcmp(sa1, sa2, sa1->sa_len) == 0)
+#endif
 		return 1;
 	return 0;
 }
