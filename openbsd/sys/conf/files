@@ -347,6 +347,7 @@ pseudo-device crypto: ifnet
 pseudo-device dummy: ifnet
 pseudo-device stf: ifnet
 pseudo-device hif: ifnet
+pseudo-device vrrp: ifnet, ether
 
 pseudo-device altq: ifnet
 
@@ -655,6 +656,7 @@ file net/slcompress.c			sl | ppp | strip
 file net/if_enc.c			enc			needs-count
 file net/if_pflog.c			pflog			needs-count
 file net/if_gre.c			gre			needs-count
+file net/if_vrrp.c			vrrp			needs-count
 #file net/if_ieee1394subr.c		ieee1394
 file netccitt/ccitt_proto.c		ccitt
 file netccitt/hd_debug.c		hdlc

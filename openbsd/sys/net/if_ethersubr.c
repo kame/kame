@@ -121,6 +121,11 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <net/if_vlan_var.h>
 #endif /* NVLAN > 0 */
 
+#include "vrrp.h"
+#if NVRRP > 0
+#include <net/if_vrrp_var.h>
+#endif /* NVRRP > 0 */
+
 #ifdef INET6
 #ifndef INET
 #include <netinet/in.h>
@@ -717,11 +722,15 @@ ether_input(ifp, eh, m)
 	int s, llcfound = 0;
 	register struct llc *l;
 	struct arpcom *ac;
+#if NVRRP > 0
+	struct m_tag *mtag;
+#endif
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		return;
 	}
+
 	if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
 		if ((ifp->if_flags & IFF_SIMPLEX) == 0) {
 			struct ifaddr *ifa;
@@ -783,6 +792,12 @@ ether_input(ifp, eh, m)
        }
 #endif /* NVLAN > 0 */
 
+#if NVRRP > 0
+	if (nvrrp_active > 0 &&
+	    (mtag = m_tag_find(m, PACKET_TAG_VRRP, NULL)) == NULL) {
+		vrrp_input(eh, m);
+	}
+#endif
 	ac = (struct arpcom *)ifp;
 
 	/*

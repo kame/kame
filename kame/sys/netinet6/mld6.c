@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.77 2003/02/19 10:13:16 ono Exp $	*/
+/*	$KAME: mld6.c,v 1.78 2003/03/19 09:03:10 ono Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -132,19 +132,7 @@
 #include <dev/rndvar.h>
 #endif
 
-#ifdef __FreeBSD__
-#include <net/ethernet.h>
-#endif
 #include <net/if.h>
-#include <net/if_arp.h>
-#ifdef __NetBSD__
-#include <net/if_ether.h>
-#endif
-#include <net/if_types.h>
-#ifdef IFT_VRRP
-#include <net/if_dl.h>
-#include <net/if_vrrp_var.h>
-#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -156,6 +144,24 @@
 #ifdef MLDV2
 #include <netinet6/in6_msf.h>
 #endif
+
+#ifdef __FreeBSD__
+#include <net/ethernet.h>
+#endif
+#include <net/if_arp.h>
+#ifdef __NetBSD__
+#include <net/if_ether.h>
+#else
+#ifdef __OpenBSD__
+#include <netinet/if_ether.h>
+#endif
+#endif
+#include <net/if_types.h>
+#ifdef IFT_VRRP
+#include <net/if_dl.h>
+#include <net/if_vrrp_var.h>
+#endif
+
 #include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

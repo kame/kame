@@ -12,6 +12,9 @@ CPPFLAGS+=-DKAME_SCOPEID
 # comment out to disable ISATAP
 CPPFLAGS+=-DUSE_ISATAP
 
+# comment out to disable VRRP
+CPPFLAGS+=-DUSE_VRRP
+
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \

@@ -1,4 +1,4 @@
-/*	$KAME: if_vrrp_var.h,v 1.3 2003/02/19 10:13:16 ono Exp $ */
+/*	$KAME: if_vrrp_var.h,v 1.4 2003/03/19 09:03:10 ono Exp $ */
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -49,10 +49,10 @@ struct vrrp_mc_entry {
 #define	mc_enm		mc_u.mcu_enm
 
 struct	ifvrrp {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-        struct  arpcom ifv_ac;
-#else
+#ifdef __NetBSD__
         struct  ethercom ifv_ec;
+#else
+        struct  arpcom ifv_ac;
 #endif
 	struct	ifnet *ifv_p;	/* parent inteface of this vrrp */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -63,10 +63,10 @@ struct	ifvrrp {
 	LIST_ENTRY(ifvrrp) ifv_list;
 	struct resource *r_unit;	/* resource allocated for this unit */
 };
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#define	ifv_if	ifv_ac.ac_if
-#else
+#ifdef __NetBSD__
 #define	ifv_if	ifv_ec.ec_if
+#else
+#define	ifv_if	ifv_ac.ac_if
 #endif
 #endif /* _KERNEL */
 

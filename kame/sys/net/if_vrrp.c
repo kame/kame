@@ -1,4 +1,4 @@
-/*      $KAME: if_vrrp.c,v 1.6 2003/02/19 17:04:46 suz Exp $ */
+/*      $KAME: if_vrrp.c,v 1.7 2003/03/19 09:03:09 ono Exp $ */
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -32,6 +32,8 @@
 #if defined(__FreeBSD__)
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "bpf.h"
+#define NBPFILTER    NBPF
 #else
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -39,13 +41,7 @@
 #endif
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#ifndef NVRRP
 #include "vrrp.h"
-#endif
-#else
-#include "vrrp.h"
-#endif
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -64,7 +60,7 @@
 #if defined(__FreeBSD__)
 #include <machine/bus.h>	/* XXX: Shouldn't really be required! */
 #include <sys/rman.h>
-#else    <sys/proc.h>
+#include <sys/proc.h>
 #endif
 
 #if NBPFILTER > 0 || defined(__FreeBSD__)
@@ -88,11 +84,11 @@
 #endif
 #endif
 
+#include <net/net_osdep.h>
 #include <net/if_vrrp_var.h>
 
 #ifdef __FreeBSD__
 void vrrpattach(void *);
-static MALLOC_DEFINE(M_VRRP, "vrrp", "VRRP Interface");
 #else
 void vrrpattach(int);
 #endif
@@ -161,14 +157,18 @@ vrrp_setmulti(struct ifnet *ifp)
 		if (error)
 			return (error);
 		SLIST_REMOVE_HEAD(&sc->vrrp_mc_listhead, mc_entries);
-		free(mc, M_VRRP);
+		free(mc, M_DEVBUF);
 	}
 
 	/* Now program new ones. */
+#if __FreeBSD__ >= 5
+	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+#else
 	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+#endif
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		mc = malloc(sizeof(struct vrrp_mc_entry), M_VRRP, M_WAITOK);
+		mc = malloc(sizeof(struct vrrp_mc_entry), M_DEVBUF, M_WAITOK);
 		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
 		    (char *)&mc->mc_addr, ETHER_ADDR_LEN);
 		SLIST_INSERT_HEAD(&sc->vrrp_mc_listhead, mc, mc_entries);
@@ -182,7 +182,7 @@ vrrp_setmulti(struct ifnet *ifp)
 	return (0);
 }
 
-#else /* NetBSD */
+#else /* NetBSD/OpenBSD */
 static int
 vrrp_ether_addmulti(struct ifvrrp *ifv, struct ifreq *ifr)
 {
@@ -193,7 +193,11 @@ vrrp_ether_addmulti(struct ifvrrp *ifv, struct ifreq *ifr)
 	if (ifr->ifr_addr.sa_len > sizeof(struct sockaddr_storage))
 		return (EINVAL);
 
+#ifdef __NetBSD__
 	error = ether_addmulti(ifr, &ifv->ifv_ec);
+#else /* OpenBSD */
+	error = ether_addmulti(ifr, (struct arpcom *)&ifv->ifv_ac);
+#endif
 	if (error != ENETRESET)
 		return (error);
 
@@ -214,7 +218,11 @@ vrrp_ether_addmulti(struct ifvrrp *ifv, struct ifreq *ifr)
 	 * statement shouldn't fail.
 	 */
 	(void)ether_multiaddr(&ifr->ifr_addr, addrlo, addrhi);
+#ifdef __NetBSD__
 	ETHER_LOOKUP_MULTI(addrlo, addrhi, &ifv->ifv_ec, mc->mc_enm);
+#else
+	ETHER_LOOKUP_MULTI(addrlo, addrhi, &ifv->ifv_ac, mc->mc_enm);
+#endif
 	memcpy(&mc->mc_addr, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
 	LIST_INSERT_HEAD(&ifv->vrrp_mc_listhead, mc, mc_entries);
 
@@ -228,7 +236,11 @@ vrrp_ether_addmulti(struct ifvrrp *ifv, struct ifreq *ifr)
 	LIST_REMOVE(mc, mc_entries);
 	FREE(mc, M_DEVBUF);
  alloc_failed:
+#ifdef __NetBSD__
 	(void)ether_delmulti(ifr, &ifv->ifv_ec);
+#else
+	(void)ether_delmulti(ifr, &ifv->ifv_ac);
+#endif
 	return (error);
 }
 
@@ -246,9 +258,15 @@ vrrp_ether_delmulti(struct ifvrrp *ifv, struct ifreq *ifr)
 	 */
 	if ((error = ether_multiaddr(&ifr->ifr_addr, addrlo, addrhi)) != 0)
 		return (error);
+#ifdef __NetBSD__
 	ETHER_LOOKUP_MULTI(addrlo, addrhi, &ifv->ifv_ec, enm);
 
 	error = ether_delmulti(ifr, &ifv->ifv_ec);
+#else /* OpenBSD */
+	ETHER_LOOKUP_MULTI(addrlo, addrhi, &ifv->ifv_ac, enm);
+
+	error = ether_delmulti(ifr, (struct arpcom *)&ifv->ifv_ac);
+#endif
 	if (error != ENETRESET)
 		return (error);
 
@@ -267,7 +285,11 @@ vrrp_ether_delmulti(struct ifvrrp *ifv, struct ifreq *ifr)
 		}
 		KASSERT(mc != NULL);
 	} else
+#ifdef __NetBSD__
 		(void)ether_addmulti(ifr, &ifv->ifv_ec);
+#else
+		(void)ether_addmulti(ifr, &ifv->ifv_ac);
+#endif
 	return (error);
 }
 #endif
@@ -303,7 +325,7 @@ vrrp_ether_purgemulti(struct ifvrrp *ifv)
 	    if (error)
 		return (error);
 	    SLIST_REMOVE_HEAD(&ifv->vrrp_mc_listhead, mc_entries);
-	    free(mc, M_VRRP);
+	    free(mc, M_DEVBUF);
 	}
 #else
 	union {
@@ -327,7 +349,9 @@ vrrp_ether_purgemulti(struct ifvrrp *ifv)
 }
 
 #ifdef __FreeBSD__
+#if !(__FreeBSD__ >= 5)
 PSEUDO_SET(vrrpattach, if_vrrp);
+#endif
 #endif
 
 void
@@ -359,11 +383,11 @@ vrrpattach(dummy)
 	bzero(ifv, nvrrp * sizeof(struct ifvrrp));
 	for (i = 0; i < nvrrp; ifv++, i++) {
 		ifp = &ifv->ifv_if;
-#if defined(__NetBSD__)
-		sprintf(ifp->if_xname, "vrrp%d", i);
-#else
+#ifdef __FreeBSD__
 		ifp->if_name = "vrrp";
 		ifp->if_unit = i;
+#else
+		sprintf(ifp->if_xname, "vrrp%d", i);
 #endif
 		vrrpattach0(ifv);
 		LIST_INSERT_HEAD(&ifv_list, ifv, ifv_list);
@@ -375,7 +399,7 @@ vrrpattach0(ifv)
 	struct ifvrrp *ifv;
 {
 	struct ifnet *ifp;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 5)
 	u_int8_t mac_dummy[ETHER_ADDR_LEN];
 #endif
 
@@ -389,18 +413,27 @@ vrrpattach0(ifv)
 	ifp->if_softc = ifv;
 
 #ifdef __FreeBSD__
+#if __FreeBSD__ >= 5
+	bzero(mac_dummy, ETHER_ADDR_LEN);
+	ether_ifattach(ifp, &mac_dummy[0]);
+#else
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	ifp->if_output = ether_output;
 #endif
+#endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
 #endif
 	IFQ_SET_READY(&ifp->if_snd);
-#ifdef __NetBSD__
+#if !defined(__FreeBSD__)
 	if_attach(ifp);
+#ifdef __NetBSD__
 	bzero(mac_dummy, ETHER_ADDR_LEN);
 	ether_ifattach(ifp, &mac_dummy[0]);
+#else /* OpenBSD*/
+	ether_ifattach(ifp);
+#endif
 #endif
 
 	/* NB: mtu is not set here */
@@ -429,11 +462,11 @@ vrrp_start(struct ifnet *ifp)
 		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
+#if NBPFILTER > 0
 		if (ifp->if_bpf)
-#ifdef __FreeBSD__
+#ifdef HAVE_NEW_BPF
 			bpf_mtap(ifp, m);
 #else
-#if NBPFILTER > 0
 			bpf_mtap(ifp->if_bpf, m);
 #endif
 #endif
@@ -491,11 +524,15 @@ vrrp_input(struct ether_header *eh, struct mbuf *m)
 
 	for (ifv = LIST_FIRST(&ifv_list); ifv != NULL;
 	     ifv = LIST_NEXT(ifv, ifv_list)) {
-		struct ifnet *ifp = ifv->ifv_p;
+		struct ifnet *ifp, *ifp_p;
 		struct m_tag *mtag;
-		if (m->m_pkthdr.rcvif == ifp &&
+
+		ifp = &ifv->ifv_if;
+		ifp_p = ifv->ifv_p;
+
+		if (m->m_pkthdr.rcvif == ifp_p &&
 		    ((eh->ether_dhost[0] & 1) != 0 ||
-		    bcmp((caddr_t) eh->ether_dhost, IFP2MAC(&ifv->ifv_if), ETHER_ADDR_LEN) == 0)) {
+		    bcmp((caddr_t) eh->ether_dhost, IFP2MAC(ifp), ETHER_ADDR_LEN) == 0)) {
 			mcp = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
 #ifdef VRRP_DEBUG
 			printf("vrrp_input matched(%s,%x:%x:%x:%x:%x:%x ",
@@ -516,20 +553,20 @@ vrrp_input(struct ether_header *eh, struct mbuf *m)
 #endif
 			if (mcp == NULL)
 				return (-1);
-			mcp->m_pkthdr.rcvif = &ifv->ifv_if;
-			ifv->ifv_if.if_ipackets++;
+			mcp->m_pkthdr.rcvif = ifp;
+			ifp->if_ipackets++;
 			ehcp = *eh;
 			mtag = m_tag_get(PACKET_TAG_VRRP, sizeof(u_int), M_NOWAIT);
 			if (mtag == NULL) {
-				ifp->if_oerrors++;
+				ifp_p->if_oerrors++;
 				continue;
 			}
-			bcopy(&ifp, (caddr_t)(mtag + 1), sizeof(struct ifnet *));
+			bcopy(&ifp_p, (caddr_t)(mtag + 1), sizeof(struct ifnet *));
 			m_tag_prepend(mcp, mtag);
-#if defined(__NetBSD__)
-			(*ifp->if_input)(&ifv->ifv_if, mcp);
-#else /* FreeBSD */
-			ether_input(&ifv->ifv_if, &ehcp, mcp);
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 5)
+			(*ifp->if_input)(ifp, mcp);
+#else /* FreeBSD4 */
+			ether_input(ifp, &ehcp, mcp);
 #endif
 		}
 	}
@@ -612,6 +649,21 @@ vrrp_unconfig(struct ifnet *ifp)
 }
 
 static int
+vrrp_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
+{
+	int error = 0;
+#ifdef __FreeBSD__
+	error = if_setlladdr(ifp, lladdr, len);
+#else
+	bcopy(lladdr, IFP2MAC(ifp), len);
+#ifdef __OpenBSD__
+	bcopy(lladdr, ((struct arpcom *)ifp)->ac_enaddr, len);
+#endif
+#endif
+	return error;
+}
+
+static int
 vrrp_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct ifaddr *ifa;
@@ -638,7 +690,11 @@ vrrp_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		switch (ifa->ifa_addr->sa_family) {
 #ifdef INET
 		case AF_INET:
+#ifdef __OpenBSD__
+			arp_ifinit(&ifv->ifv_ac, ifa);
+#else
 			arp_ifinit(ifp, ifa);
+#endif
 			break;
 #endif
 		default:
@@ -688,13 +744,9 @@ vrrp_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 /*			ifp->if_flags = 0;*/
 			ifp->if_flags = IFF_MULTICAST;
 			bzero(dummy_mac, ETHER_ADDR_LEN);
-#ifdef __FreeBSD__
-			if ((error = if_setlladdr(ifp, dummy_mac, ETHER_ADDR_LEN)) != 0) {
+			if ((error = vrrp_setlladdr(ifp, dummy_mac, ETHER_ADDR_LEN)) != 0) {
 				break;
 			}
-#else
-			bcopy(dummy_mac, IFP2MAC(ifp), ifp->if_addrlen);
-#endif
 			break;
 		}
                 if (if_index < ifindex) {
@@ -717,13 +769,9 @@ vrrp_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 
-#ifdef __FreeBSD__
-		if ((error = if_setlladdr(ifp, vrrpreq.vr_lladdr.sa_data, ETHER_ADDR_LEN)) != 0) {
+		if ((error = vrrp_setlladdr(ifp, vrrpreq.vr_lladdr.sa_data, ETHER_ADDR_LEN)) != 0) {
 			break;
 		}
-#else
-		bcopy(vrrpreq.vr_lladdr.sa_data, IFP2MAC(ifp), ifp->if_addrlen);
-#endif
 #ifdef VRRP_DEBUG
 		printf("lladdr=%x:%x:%x:%x:%x:%x",
 		    (LLADDR(ifp->if_sadl))[0], 
