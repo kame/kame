@@ -94,6 +94,13 @@ typedef unsigned char cc_t;
 #include <strings.h>
 #endif
 
+#if defined(IPSEC)
+#include <netinet6/ipsec.h>
+#if defined(IPSEC_POLICY_IPSEC)
+extern char *ipsec_policy;
+#endif
+#endif
+
 #ifndef	_POSIX_VDISABLE
 # ifdef sun
 #  include <sys/param.h>	/* pick up VDISABLE definition, mayby */
@@ -275,7 +282,8 @@ int ayt_status P((void));
 int tn P((int, char *[]));
 void command P((int, char *, int));
 void cmdrc P((const char *, const char *));
-unsigned long sourceroute P((char *, char **, unsigned long *));
+struct addrinfo;
+int sourceroute P((struct addrinfo *, char *, char **, int *, int*));
 
 /* main.c */
 void tninit P((void));

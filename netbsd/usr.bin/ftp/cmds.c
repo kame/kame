@@ -1,5 +1,34 @@
 /*	$NetBSD: cmds.c,v 1.47 1999/03/08 03:09:08 lukem Exp $	*/
 
+/*
+ * Copyright (C) 1997 and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -697,8 +726,8 @@ status(argc, argv)
 		}
 		pswitch(0);
 	}
-	fprintf(ttyout, "Gate ftp: %s, server %s, port %d.\n", onoff(gatemode),
-	    *gateserver ? gateserver : "(none)", ntohs(gateport));
+	fprintf(ttyout, "Gate ftp: %s, server %s, port %s.\n", onoff(gatemode),
+	    *gateserver ? gateserver : "(none)", gateport);
 	fprintf(ttyout, "Passive mode: %s.\n", onoff(passivemode));
 	fprintf(ttyout, "Mode: %s; Type: %s; Form: %s; Structure: %s.\n",
 	    modename, typename, formname, structname);
@@ -724,7 +753,7 @@ status(argc, argv)
 	fprintf(ttyout,
 	    "Hash mark printing: %s; Mark count: %d; Progress bar: %s.\n",
 	    onoff(hash), mark, onoff(progress));
-	fprintf(ttyout, "Use of PORT cmds: %s.\n", onoff(sendport));
+	fprintf(ttyout, "Use of PORT/LPRT cmds: %s.\n", onoff(sendport));
 #ifndef SMALL
 	fprintf(ttyout, "Command line editing: %s.\n", onoff(editing));
 #endif /* !SMALL */
@@ -861,7 +890,7 @@ setverbose(argc, argv)
 }
 
 /*
- * Toggle PORT cmd use before each data connection.
+ * Toggle PORT/LPRT cmd use before each data connection.
  */
 /*VARARGS*/
 void
@@ -870,7 +899,7 @@ setport(argc, argv)
 	char *argv[];
 {
 
-	code = togglevar(argc, argv, &sendport, "Use of PORT cmds");
+	code = togglevar(argc, argv, &sendport, "Use of PORT/LPRT cmds");
 }
 
 /*
@@ -926,6 +955,7 @@ setgate(argc, argv)
 			gatemode = 0;
 		else {
 			if (argc == 3) {
+#if 0
 				char *ep;
 				long port;
 
@@ -939,6 +969,9 @@ setgate(argc, argv)
 					return;
 				}
 				gateport = htons(port);
+#else
+				gateport = strdup(argv[2]);
+#endif
 			}
 			strncpy(gsbuf, argv[1], sizeof(gsbuf) - 1);
 			gsbuf[sizeof(gsbuf) - 1] = '\0';
@@ -951,9 +984,9 @@ setgate(argc, argv)
 		    "Disabling gate-ftp mode - no gate-ftp server defined.\n");
 		gatemode = 0;
 	} else {
-		fprintf(ttyout, "Gate ftp: %s, server %s, port %d.\n",
+		fprintf(ttyout, "Gate ftp: %s, server %s, port %s.\n",
 		    onoff(gatemode), *gateserver ? gateserver : "(none)",
-		    ntohs(gateport));
+		    gateport);
 	}
 	code = gatemode;
 }

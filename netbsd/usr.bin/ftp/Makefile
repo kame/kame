@@ -13,4 +13,12 @@ CPPFLAGS+= -DHAVE_TIMEGM	# system has timegm(3), a UTC version of mktime
 LDADD+=	-ledit -ltermcap -lutil
 DPADD+=	${LIBEDIT} ${LIBTERMCAP} ${LIBUTIL}
 
+CPPFLAGS+= -DINET6
+LDADD+= -L${.CURDIR}/../../lib/libinet6 \
+	-L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+
 .include <bsd.prog.mk>

@@ -417,9 +417,19 @@ try_connect:
 	if (dflag &&
 	    setsockopt(rem, SOL_SOCKET, SO_DEBUG, &one, sizeof(one)) < 0)
 		warn("setsockopt DEBUG (ignored)");
-	one = IPTOS_LOWDELAY;
-	if (setsockopt(rem, IPPROTO_IP, IP_TOS, (char *)&one, sizeof(int)) < 0)
-		warn("setsockopt TOS (ignored)");
+    {
+	struct sockaddr_storage ss;
+	int sslen;
+	sslen = sizeof(ss);
+	if (getsockname(rem, (struct sockaddr *)&ss, &sslen) == 0
+	 && ss.__ss_family == AF_INET) {
+		one = IPTOS_LOWDELAY;
+		if (setsockopt(rem, IPPROTO_IP, IP_TOS, (char *)&one,
+				sizeof(int)) < 0) {
+			warn("setsockopt TOS (ignored)");
+		}
+	}
+    }
 
 	(void)setuid(uid);
 	doit(&smask);

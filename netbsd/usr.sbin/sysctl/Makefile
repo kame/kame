@@ -4,4 +4,8 @@
 PROG=	sysctl
 MAN=	sysctl.8
 
+CPPFLAGS+=-DINET6 -DIPSEC
+LDFLAGS+= -static
+#CFLAGS+=-DTCP6
+
 .include <bsd.prog.mk>

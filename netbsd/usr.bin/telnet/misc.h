@@ -1,7 +1,7 @@
-/*	$NetBSD: pathnames.h,v 1.4 1997/02/16 15:01:03 mrg Exp $	*/
+/*	$NetBSD: misc.h,v 1.6 1998/07/27 01:45:10 mycroft Exp $	*/
 
-/*
- * Copyright (c) 1989, 1993
+/*-
+ * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,8 +32,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)pathnames.h	8.1 (Berkeley) 6/6/93
- *	$NetBSD: pathnames.h,v 1.4 1997/02/16 15:01:03 mrg Exp $
+ *	from: @(#)misc.h	8.1 (Berkeley) 6/4/93
  */
 
-#define	_PATH_RLOGIN	"/usr/local/v6/bin/rlogin"
+__BEGIN_DECLS
+extern char *UserNameRequested;
+extern const char *LocalHostName;
+extern const char *RemoteHostName;
+extern int ConnectedCount;
+extern int ReservedPort;
+
+int isprefix __P((char *, char *));
+char **genget __P((char *, char **, int));
+int Ambiguous __P((void *));
+__END_DECLS
+
+#include "misc-proto.h"

@@ -10,4 +10,6 @@ BINMODE=2555
 DPADD=	${LIBKVM}
 LDADD=	-lkvm
 
+CPPFLAGS+=	-DINET6
+
 .include <bsd.prog.mk>

@@ -1204,6 +1204,13 @@ it is stored in the current directory as the
 of
 .Ic file .
 Otherwise, the remote name is used as the local name.
+.Pp
+When specifying IPv6 numeric address into URL, one need to follow
+.Li draft-ietf-ipngwg-url-literal-01.txt
+and put the address into square bracket, like
+.Li ftp://[::1]:21/ .
+This is because colons are used in IPv6 numeric address as well as
+separator for port number.
 .Sh ABORTING A FILE TRANSFER
 To abort a file transfer, use the terminal interrupt key
 (usually Ctrl-C).
@@ -1517,8 +1524,9 @@ attempts to be compliant with
 .Cm RFC 959 ,
 .Cm RFC 1123 ,
 .Cm RFC 1738 ,
+.Cm RFC 2068 ,
 and
-.Cm RFC 2068 .
+.Cm RFC 2428 .
 .Sh HISTORY
 The
 .Nm
@@ -1531,6 +1539,8 @@ fetching of files and URLs, and modification time
 preservation were implemented in
 .Nx 1.3
 by Luke Mewburn, with assistance from Jason Thorpe.
+.Pp
+IPv6 support is added by WIDE/KAME project.
 .Sh BUGS
 Correct execution of many commands depends upon proper behavior
 by the remote server.

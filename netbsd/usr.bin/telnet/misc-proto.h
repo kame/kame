@@ -1,7 +1,7 @@
-/*	$NetBSD: pathnames.h,v 1.4 1997/02/16 15:01:03 mrg Exp $	*/
+/*	$NetBSD: misc-proto.h,v 1.7 1998/07/27 01:45:10 mycroft Exp $	*/
 
-/*
- * Copyright (c) 1989, 1993
+/*-
+ * Copyright (c) 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,8 +32,45 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)pathnames.h	8.1 (Berkeley) 6/6/93
- *	$NetBSD: pathnames.h,v 1.4 1997/02/16 15:01:03 mrg Exp $
+ *	from: @(#)misc-proto.h	8.1 (Berkeley) 6/4/93
  */
 
-#define	_PATH_RLOGIN	"/usr/local/v6/bin/rlogin"
+/*
+ * Copyright (C) 1990 by the Massachusetts Institute of Technology
+ *
+ * Export of this software from the United States of America is assumed
+ * to require a specific license from the United States Government.
+ * It is the responsibility of any person or organization contemplating
+ * export to obtain such a license before exporting.
+ *
+ * WITHIN THAT CONSTRAINT, permission to use, copy, modify, and
+ * distribute this software and its documentation for any purpose and
+ * without fee is hereby granted, provided that the above copyright
+ * notice appear in all copies and that both that copyright notice and
+ * this permission notice appear in supporting documentation, and that
+ * the name of M.I.T. not be used in advertising or publicity pertaining
+ * to distribution of the software without specific, written prior
+ * permission.  M.I.T. makes no representations about the suitability of
+ * this software for any purpose.  It is provided "as is" without express
+ * or implied warranty.
+ */
+
+#ifndef	__MISC_PROTO__
+#define	__MISC_PROTO__
+
+#include <sys/cdefs.h>
+
+void auth_encrypt_init __P((const char *, const char *, const char *, int));
+void auth_encrypt_user __P((const char *));
+void auth_encrypt_connect __P((int));
+void printd __P((unsigned char *, int));
+
+/*
+ * These functions are imported from the application
+ */
+int net_write __P((unsigned char *, int));
+void net_encrypt __P((void));
+int telnet_spin __P((void));
+char *telnet_getenv __P((char *));
+char *telnet_gets __P((char *, char *, int, int));
+#endif

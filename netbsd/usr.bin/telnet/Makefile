@@ -47,9 +47,8 @@ PROG=	telnet
 CPPFLAGS+=-DTERMCAP -DKLUDGELINEMODE -DUSE_TERMIO -Dunix
 CPPFLAGS+=-DENV_HACK
 CPPFLAGS+=-I${.CURDIR}/../../lib
-LDADD+=	-ltermcap -ltelnet
+LDADD+= -ltermcap -ltelnet
 DPADD=	${LIBTERMCAP} ${LIBTELNET}
-
 
 SRCS=	authenc.c commands.c main.c network.c ring.c sys_bsd.c telnet.c \
 	terminal.c tn3270.c utilities.c
@@ -68,6 +67,21 @@ MAN=	telnet.1
 .include <bsd.man.mk>
 
 .endif	# EXPORTABLE_SYSTEM
+
+CPPFLAGS+=-DIPSEC
+LDADD+=	-L${.CURDIR}/../../lib/libipsec \
+	-L${.CURDIR}/../../lib/libipsec/obj \
+	-L/usr/local/v6/lib -lipsec
+DPADD+=	${.CURDIR}/../../lib/libipsec/libipsec.a \
+	${.CURDIR}/../../lib/libipsec/obj/libipsec.a \
+	/usr/local/v6/lib/libipsec.a
+CPPFLAGS+=-DINET6
+LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
+	-L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 
 nocrypt:
 	@echo "Encryption code already removed."
