@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.65 2003/05/10 01:58:45 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.66 2003/09/10 11:39:41 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -313,8 +313,7 @@ udp6_input(mp, offp, proto)
 				 */ \
 				if (last->in6p_flags & IN6P_CONTROLOPTS \
 				    || last->in6p_socket->so_options & SO_TIMESTAMP) \
-					ip6_savecontrol(last, ip6, \
-							n, &opts); \
+					ip6_savecontrol(last, n, &opts); \
 				m_adj(n, off + sizeof(struct udphdr)); \
 				if (sbappendaddr(&last->in6p_socket->so_rcv, \
 						(struct sockaddr *)&fromsa, \
@@ -342,8 +341,7 @@ udp6_input(mp, offp, proto)
 			 */ \
 			if (last->in6p_flags & IN6P_CONTROLOPTS \
 			    || last->in6p_socket->so_options & SO_TIMESTAMP) \
-				ip6_savecontrol(last, ip6, \
-						n, &opts); \
+				ip6_savecontrol(last, n, &opts); \
 			m_adj(n, off + sizeof(struct udphdr)); \
 			if (sbappendaddr(&last->in6p_socket->so_rcv, \
 					(struct sockaddr *)&fromsa, \
@@ -470,8 +468,7 @@ udp6_input(mp, offp, proto)
 					 */
 					if (last->in6p_flags & IN6P_CONTROLOPTS
 					    || last->in6p_socket->so_options & SO_TIMESTAMP)
-						ip6_savecontrol(last, ip6,
-								n, &opts);
+						ip6_savecontrol(last, n, &opts);
 
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -533,7 +530,7 @@ udp6_input(mp, offp, proto)
 #endif /* FAST_IPSEC */
 		if (last->in6p_flags & IN6P_CONTROLOPTS
 		    || last->in6p_socket->so_options & SO_TIMESTAMP)
-			ip6_savecontrol(last, ip6, m, &opts);
+			ip6_savecontrol(last, m, &opts);
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -595,7 +592,7 @@ udp6_input(mp, offp, proto)
 	fromsa.sin6_port = uh->uh_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 	    || in6p->in6p_socket->so_options & SO_TIMESTAMP)
-		ip6_savecontrol(in6p, ip6, m, &opts);
+		ip6_savecontrol(in6p, m, &opts);
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
 			(struct sockaddr *)&fromsa,

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.49 2002/07/30 02:21:44 keiichi Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.50 2003/09/10 11:41:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -250,8 +250,8 @@ udp6_input(mp, offp, proto)
 					 */
 					if (last->in6p_flags & IN6P_CONTROLOPTS
 					    || last->in6p_socket->so_options & SO_TIMESTAMP)
-						ip6_savecontrol(last, ip6, n,
-								&opts, NULL);
+						ip6_savecontrol(last, n,
+						    &opts, NULL);
 								
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -301,7 +301,7 @@ udp6_input(mp, offp, proto)
 #endif /*IPSEC*/
 		if (last->in6p_flags & IN6P_CONTROLOPTS
 		    || last->in6p_socket->so_options & SO_TIMESTAMP)
-			ip6_savecontrol(last, ip6, m, &opts, NULL);
+			ip6_savecontrol(last, m, &opts, NULL);
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
@@ -356,7 +356,7 @@ udp6_input(mp, offp, proto)
 	udp_in6.sin6_port = uh->uh_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 	    || in6p->in6p_socket->so_options & SO_TIMESTAMP)
-		ip6_savecontrol(in6p, ip6, m, &opts, NULL);
+		ip6_savecontrol(in6p, m, &opts, NULL);
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
 			(struct sockaddr *)&udp_in6,
