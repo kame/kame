@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $Id: ip6fw.c,v 1.3 1999/08/17 12:27:04 itojun Exp $
+ * $Id: ip6fw.c,v 1.4 1999/08/19 12:02:35 itojun Exp $
  *
  */
 
@@ -1156,8 +1156,7 @@ ip6fw_main(ac,av)
 	int 	ac;
 	char 	**av;
 {
-
-	char 		ch;
+	int 		ch;
 	extern int 	optind;
 
 	/* init optind to 1 */
