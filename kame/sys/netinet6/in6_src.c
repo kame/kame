@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.59 2001/08/18 05:58:18 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.60 2001/08/18 05:58:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -375,7 +375,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		if (best_matchlen < new_matchlen)
 			REPLACE(14);
 
-		/* Rule is 15 is reserved. */
+		/* Rule 15 is reserved. */
 
 		/*
 		 * Last resort: just keep the current candidate.
