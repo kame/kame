@@ -39,6 +39,14 @@
 #include <netdb.h>
 #include <errno.h>
 
+/* backward compatibility behavior for obsoleted numbers - 2553bis-02 */
+#ifndef EAI_NODATA
+#define EAI_NODATA	-5	/* no address associated with name */
+#endif
+#ifndef EAI_ADDRFAMILY
+#define EAI_ADDRFAMILY	-9	/* address family for name not supported */
+#endif
+
 char *
 gai_strerror(int errnum)
 {
@@ -53,7 +61,7 @@ gai_strerror(int errnum)
 		return "temporary failure in name resolution";
 	case EAI_FAIL:
 		return "non-recoverable failure in name resolution";
-	case -5: /* was EAI_NODATA */
+	case EAI_NODATA:
 		return "no address associated with name";
 	case EAI_FAMILY:
 		return "ai_family not supported";
@@ -61,7 +69,7 @@ gai_strerror(int errnum)
 		return "ai_socktype not supported";
 	case EAI_SERVICE:
 		return "service not supported for ai_socktype";
-	case -9: /* was EAI_ADDRFAMILY */
+	case EAI_ADDRFAMILY:
 		return "address family for name not supported";
 	case EAI_MEMORY:
 		return "memory allocation failure";
