@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.33 2004/05/26 02:55:31 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.34 2004/05/26 04:16:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,18 +85,33 @@ struct pfkeystat pfkeystat;
 
 static int key_sendup0 __P((struct rawcb *, struct mbuf *, int, int));
 
+#ifdef __FreeBSD__
+static int key_receive __P((struct socket *, struct sockaddr **, struct uio *,
+	struct mbuf **, struct mbuf **, int *));
+#else
 static int key_receive __P((struct socket *, struct mbuf **, struct uio *,
 	struct mbuf **, struct mbuf **, int *));
+#endif
 
+#ifdef __FreeBSD__
+static int
+key_receive(struct socket *so, struct sockaddr **paddr, struct uio *uio,
+	struct mbuf **mp0, struct mbuf **controlp, int *flagsp)
+#else
 static int
 key_receive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 	struct mbuf **mp0, struct mbuf **controlp, int *flagsp)
+#endif
 {
 	struct rawcb *rp = sotorawcb(so);
 	struct keycb *kp = (struct keycb *)rp;
 	int error;
 
+#ifndef __FreeBSD__
 	error = (*kp->kp_receive)(so, paddr, uio, mp0, controlp, flagsp);
+#else
+	error = soreceive(so, paddr, uio, mp0, controlp, flagsp);
+#endif
 	if (kp->kp_queue &&
 	    sbspace(&rp->rcb_socket->so_rcv) > kp->kp_queue->m_pkthdr.len)
 		sorwakeup(so);
@@ -104,7 +119,7 @@ key_receive(struct socket *so, struct mbuf **paddr, struct uio *uio,
 	return error;
 }
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 /*
  * key_usrreq()
  * derived from net/rtsock.c:route_usrreq()
@@ -138,8 +153,6 @@ key_usrreq(so, req, m, nam, control, p)
 		so->so_pcb = (caddr_t)kp;
 		if (so->so_pcb)
 			bzero(so->so_pcb, sizeof(*kp));
-		kp->kp_receive = so->so_receive;
-		so->so_receive = key_receive;
 	}
 	if (req == PRU_DETACH && kp) {
 		int af = kp->kp_raw.rcb_proto.sp_protocol;
@@ -177,6 +190,9 @@ key_usrreq(so, req, m, nam, control, p)
 		}
 
 		kp->kp_promisc = kp->kp_registered = 0;
+
+		kp->kp_receive = so->so_receive;
+		so->so_receive = key_receive;
 
 		if (af == PF_KEY) /* XXX: AF_KEY */
 			key_cb.key_count++;
@@ -480,7 +496,7 @@ key_sendup_mbuf(so, m, target)
 	return error;
 }
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 /*
  * key_abort()
  * derived from net/rtsock.c:rts_abort()
@@ -535,9 +551,6 @@ key_attach(struct socket *so, int proto, struct proc *p)
 	}
 
 	kp->kp_promisc = kp->kp_registered = 0;
-
-	kp->kp_receive = so->so_receive;
-	so->so_receive = key_receive;
 
 	if (kp->kp_raw.rcb_proto.sp_protocol == PF_KEY) /* XXX: AF_KEY */
 		key_cb.key_count++;
@@ -703,7 +716,7 @@ struct pr_usrreqs key_usrreqs = {
 	key_disconnect, pru_listen_notsupp, key_peeraddr,
 	pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, key_send, pru_sense_null, key_shutdown,
-	key_sockaddr, sosend, soreceive, sopoll
+	key_sockaddr, sosend, key_receive, sopoll
 };
 #endif /* __FreeBSD__ >= 3 */
 
