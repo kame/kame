@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.87 2001/01/18 14:38:34 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.88 2001/01/20 16:37:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,6 +121,7 @@ int	nd6_delay	= 5;	/* delay first probe time 5 second */
 int	nd6_umaxtries	= 3;	/* maximum unicast query */
 int	nd6_mmaxtries	= 3;	/* maximum multicast query */
 int	nd6_useloopback = 1;	/* use loopback interface for local traffic */
+int	nd6_gctimer	= (60 * 60 * 24); /* 1 day: garbage collection timer */
 
 /* preventing too many loops in ND option parsing */
 int nd6_maxndopt = 10;	/* max # of ND options allowed */
@@ -537,13 +538,18 @@ nd6_timer(ignored_arg)
 			}
 			break;
 		case ND6_LLINFO_REACHABLE:
-			if (ln->ln_expire)
+			if (ln->ln_expire) {
 				ln->ln_state = ND6_LLINFO_STALE;
+				ln->ln_expire = time_second + nd6_gctimer;
+			}
 			break;
-		/*
-		 * ND6_LLINFO_STALE state requires nothing for timer
-		 * routine.
-		 */
+
+		case ND6_LLINFO_STALE:
+			/* Garbage Collection(RFC 2461 5.3) */
+			if (ln->ln_expire)
+				nd6_free(rt);
+			break;
+
 		case ND6_LLINFO_DELAY:
 			if (ndi && (ndi->flags & ND6_IFF_PERFORMNUD) != 0) {
 				/* We need NUD */
@@ -554,8 +560,10 @@ nd6_timer(ignored_arg)
 				nd6_ns_output(ifp, &dst->sin6_addr,
 					      &dst->sin6_addr,
 					      ln, 0);
-			} else
+			} else {
 				ln->ln_state = ND6_LLINFO_STALE; /* XXX */
+				ln->ln_expire = time_second + nd6_gctimer;
+			}
 			break;
 		case ND6_LLINFO_PROBE:
 			if (ln->ln_asked < nd6_umaxtries) {
@@ -1810,6 +1818,7 @@ fail:
 #endif
 				ln->ln_hold = 0;
 			}
+			ln->ln_expire = time_second + nd6_gctimer;
 		} else if (ln->ln_state == ND6_LLINFO_INCOMPLETE) {
 			/* probe right away */
 			ln->ln_expire = time_second;
@@ -2070,8 +2079,10 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 
 	/* We don't have to do link-layer address resolution on a p2p link. */
 	if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
-	    ln->ln_state < ND6_LLINFO_REACHABLE)
+	    ln->ln_state < ND6_LLINFO_REACHABLE) {
 		ln->ln_state = ND6_LLINFO_STALE;
+		ln->ln_expire = time_second + nd6_gctimer;
+	}
 
 	/*
 	 * The first time we send a packet to a neighbor whose entry is

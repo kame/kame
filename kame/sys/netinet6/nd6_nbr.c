@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.49 2001/01/18 14:38:34 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.50 2001/01/20 16:37:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -684,8 +684,10 @@ nd6_na_input(m, off, icmp6len)
 				ln->ln_expire = time_second +
 #endif
 					nd_ifinfo[rt->rt_ifp->if_index].reachable;
-		} else
+		} else {
 			ln->ln_state = ND6_LLINFO_STALE;
+			ln->ln_expire = time_second + nd6_gctimer;
+		}
 		ln->ln_router = is_router;
 	} else {
 		int llchange;
@@ -729,8 +731,10 @@ nd6_na_input(m, off, icmp6len)
 			 * If state is REACHABLE, make it STALE.
 			 * no other updates should be done.
 			 */
-			if (ln->ln_state == ND6_LLINFO_REACHABLE)
+			if (ln->ln_state == ND6_LLINFO_REACHABLE) {
 				ln->ln_state = ND6_LLINFO_STALE;
+				ln->ln_expire = time_second + nd6_gctimer;
+			}
 			goto freeit;
 		} else if (is_override				   /* (2a) */
 			|| (!is_override && (lladdr && !llchange)) /* (2b) */
@@ -760,8 +764,10 @@ nd6_na_input(m, off, icmp6len)
 						nd_ifinfo[ifp->if_index].reachable;
 				}
 			} else {
-				if (lladdr && llchange)
+				if (lladdr && llchange) {
 					ln->ln_state = ND6_LLINFO_STALE;
+					ln->ln_expire = time_second + nd6_gctimer;
+				}
 			}
 		}
 
