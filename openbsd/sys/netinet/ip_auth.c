@@ -386,7 +386,11 @@ fr_authioctlloop:
 #  if SOLARIS
 			error = fr_qout(fr_auth[i].fra_q, m);
 #  else /* SOLARIS */
+#ifdef __OpenBSD__
+			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL);
+#else
 			error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL);
+#endif
 #  endif /* SOLARIS */
 			if (error)
 				fr_authstats.fas_sendfail++;

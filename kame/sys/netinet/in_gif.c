@@ -228,7 +228,11 @@ in_gif_output(ifp, family, m, rt)
 	m->m_pkthdr.rcvif = NULL;
 #endif
 #endif /*IPSEC*/
-	error = ip_output(m, 0, &sc->gif_ro, 0, 0);
+#ifndef __OpenBSD__
+	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
+#else
+	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL, NULL);
+#endif
 	return(error);
 }
 
