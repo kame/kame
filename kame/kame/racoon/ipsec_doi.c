@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.134 2001/04/10 15:44:53 thorpej Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.135 2001/07/09 13:56:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,9 +85,12 @@
 #include "gssapi.h"
 #endif
 
+int verbose_proposal_check = 1;
+
 static vchar_t *get_ph1approval __P((struct ph1handle *, struct prop_pair **));
 static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *,
 	struct isakmpsa *, struct isakmpsa *));
+static void print_ph1mismatched __P((struct prop_pair *, struct isakmpsa *));
 static int t2isakmpsa __P((struct isakmp_pl_t *, struct isakmpsa *));
 static int cmp_aproppair_i __P((struct prop_pair *, struct prop_pair *));
 static struct prop_pair *get_ph2approval __P((struct ph2handle *,
@@ -212,16 +215,38 @@ get_ph1approval(iph1, pair)
 			/* compare proposal and select one */
 			for (p = s; p; p = p->tnext) {
 				sa = get_ph1approvalx(p, iph1->rmconf->proposal,
-				    &tsa);
+						      &tsa);
 				if (sa != NULL)
 					goto found;
 			}
 		}
 	}
 
+	/*
+	 * if there is no suitable proposal, racoon complains about all of
+	 * mismatched items in those proposal.
+	 */
+	if (verbose_proposal_check) {
+		for (i = 0; i < MAXPROPPAIRLEN; i++) {
+			if (pair[i] == NULL)
+				continue;
+			for (s = pair[i]; s; s = s->next) {
+				prophlen = sizeof(struct isakmp_pl_p)
+						+ s->prop->spi_size;
+				for (p = s; p; p = p->tnext) {
+					print_ph1mismatched(p,
+						iph1->rmconf->proposal);
+				}
+			}
+		}
+	}
+	plog(LLV_ERROR, LOCATION, NULL, "no suitable proposal found.\n");
+
 	return NULL;
 
 found:
+	plog(LLV_DEBUG, LOCATION, NULL, "an acceptable proposal found.\n");
+
 	/* check DH group settings */
 	if (sa->dhgrp) {
 		if (sa->dhgrp->prime && sa->dhgrp->gen1) {
@@ -304,7 +329,12 @@ saok:
 	return newsa;
 }
 
-/* compare proposal and select one */
+/*
+ * compare peer's single proposal and all of my proposal.
+ * and select one if suiatable.
+ * p       : one of peer's proposal.
+ * proposal: my proposals.
+ */
 static struct isakmpsa *
 get_ph1approvalx(p, proposal, sap)
 	struct prop_pair *p;
@@ -365,24 +395,86 @@ get_ph1approvalx(p, proposal, sap)
 		if (tsap->lifebyte > s->lifebyte) ;
 		if (tsap->encklen >= s->encklen) ;
 #endif
-		if (tsap->enctype == s->enctype
+		if(tsap->enctype == s->enctype 
 		 && tsap->authmethod == s->authmethod
 		 && tsap->hashtype == s->hashtype
 		 && tsap->dh_group == s->dh_group)
 			break;
 	}
 
-	if (s == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"unacceptable proposal found.\n");
-	} else {
-		plog(LLV_DEBUG, LOCATION, NULL,
-			"acceptable proposal found.\n");
-	};
-
 	if (tsap->dhgrp != NULL)
 		oakley_dhgrp_free(tsap->dhgrp);
 	return s;
+}
+
+/*
+ * print all of items in peer's proposal which are mismatched to my proposal.
+ * p       : one of peer's proposal.
+ * proposal: my proposals.
+ */
+static void
+print_ph1mismatched(p, proposal)
+	struct prop_pair *p;
+	struct isakmpsa *proposal;
+{
+	struct isakmpsa sa, *s;
+
+	memset(&sa, 0, sizeof(sa));
+	if (t2isakmpsa(p->trns, &sa) < 0)
+		return;
+	for (s = proposal; s ; s = s->next) {
+		if (sa.enctype != s->enctype) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"rejected enctype: "
+				"DB(prop#%d:trns#%d):Peer(prop#%d:trns#%d) = "
+				"%s:%s\n",
+				s->prop_no, s->trns_no,
+				p->prop->p_no, p->trns->t_no,
+				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
+					s->enctype),
+				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
+					sa.enctype));
+		}
+		if (sa.authmethod != s->authmethod) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"rejected authmethod: "
+				"DB(prop#%d:trns#%d):Peer(prop#%d:trns#%d) = "
+				"%s:%s\n",
+				s->prop_no, s->trns_no,
+				p->prop->p_no, p->trns->t_no,
+				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
+					s->authmethod),
+				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
+					sa.authmethod));
+		}
+		if (sa.hashtype != s->hashtype) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"rejected hashtype: "
+				"DB(prop#%d:trns#%d):Peer(prop#%d:trns#%d) = "
+				"%s:%s\n",
+				s->prop_no, s->trns_no,
+				p->prop->p_no, p->trns->t_no,
+				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
+					s->hashtype),
+				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
+					sa.hashtype));
+		}
+		if (sa.dh_group != s->dh_group) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"rejected dh_group: "
+				"DB(prop#%d:trns#%d):Peer(prop#%d:trns#%d) = "
+				"%s:%s\n",
+				s->prop_no, s->trns_no,
+				p->prop->p_no, p->trns->t_no,
+				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
+					s->dh_group),
+				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
+					sa.dh_group));
+		}
+	}
+
+	if (sa.dhgrp != NULL)
+		oakley_dhgrp_free(sa.dhgrp);
 }
 
 /*
