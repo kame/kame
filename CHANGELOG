@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.346 1999/12/16 08:37:02 sumikawa Exp $
+$Id: CHANGELOG,v 1.347 1999/12/17 14:26:23 itojun Exp $
 
 <199912>
+Sat Dec 18 08:21:50 JST 1999  itojun@iijlab.net
+	* share/man/man4/icmp6.4: manpage for ICMPv6 socket.
+	* netbsd/pkgsrc/security/heimdal: upgrade to 0.2h.
+
 Thu Dec 16 17:31:49 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* IPv6-enable xemacs-21.1.8. (not tested)
 	  submitted by URA Hiroshi <ura@hiru.aoba.yokohama.jp>
