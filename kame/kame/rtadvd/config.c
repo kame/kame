@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.18 2000/11/08 05:24:35 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.19 2000/11/08 06:00:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -305,7 +305,12 @@ getconfig(intface)
 
 			makeentry(entbuf, i, "vltimedecr", added);
 			MAYHAVE(val, entbuf, 0); /* 0 = not decrement */
-			pfx->vltimedecr = val;
+			if (val != 0) {
+				struct timeval now;
+				gettimeofday(&now, 0);
+				pfx->vltimeexpire =
+					now.tv_sec + pfx->validlifetime;
+			}
 
 			makeentry(entbuf, i, "pltime", added);
 			MAYHAVE(val, entbuf, DEF_ADVPREFERREDLIFETIME);
@@ -319,7 +324,12 @@ getconfig(intface)
 
 			makeentry(entbuf, i, "pltimedecr", added);
 			MAYHAVE(val, entbuf, 0); /* 0 = not decrement */
-			pfx->pltimedecr = val;
+			if (val != 0) {
+				struct timeval now;
+				gettimeofday(&now, 0);
+				pfx->pltimeexpire =
+					now.tv_sec + pfx->preflifetime;
+			}
 
 			makeentry(entbuf, i, "addr", added);
 			addr = (char *)agetstr(entbuf, &bp);
@@ -823,16 +833,18 @@ make_packet(struct rainfo *rainfo)
 			ndopt_pi->nd_opt_pi_flags_reserved |=
 				ND_OPT_PI_FLAG_RTADDR;
 #endif
-		if (pfx->vltimedecr || pfx->pltimedecr) {
+		if (pfx->vltimeexpire || pfx->pltimeexpire)
 			gettimeofday(&now, NULL);
-			if (pfx->firstadv == 0)
-				pfx->firstadv = now.tv_sec;
-			fst = pfx->firstadv;
-		}
-		vltime = (pfx->vltimedecr == 0) ? pfx->validlifetime :
-			now.tv_sec - fst;
-		pltime = (pfx->pltimedecr == 0) ? pfx->preflifetime :
-			now.tv_sec - fst;
+		if (pfx->vltimeexpire == 0)
+			vltime = pfx->validlifetime;
+		else
+			vltime = (pfx->vltimeexpire > now.tv_sec) ?
+				pfx->vltimeexpire - now.tv_sec : 0;
+		if (pfx->pltimeexpire == 0)
+			pltime = pfx->preflifetime;
+		else
+			pltime = (pfx->pltimeexpire > now.tv_sec) ? 
+				pfx->pltimeexpire - now.tv_sec : 0;
 		if (vltime < pltime) {
 			/*
 			 * this can happen if vltime is decrement but pltime
