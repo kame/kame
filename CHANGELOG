@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2041 2002/01/10 14:05:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.2042 2002/01/11 08:37:18 jinmei Exp $
 
 <200201>
+2002-01-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_input): do not accept packets
+	to a destination that has a rejected or blackhole host route.
+
 2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* (many kernel files): cleaned up the code to receive extension
 	headers (and other optional information) on TCP sockets.  As a
