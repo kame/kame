@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.53 2001/03/15 11:44:08 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.54 2001/03/21 22:10:11 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -172,25 +172,6 @@ octetstring	{octet}({dot}{octet})+
 <S_RTRY>phase1		{ YYD; return(RETRY_PHASE1); }
 <S_RTRY>phase2		{ YYD; return(RETRY_PHASE2); }
 <S_RTRY>{ecl}		{ BEGIN S_INI; return(EOC); }
-
-	/* algorithm_level */
-<S_INI>algorithm_strength	{ BEGIN S_ALGST; YYDB; yywarn("it is obsoleted."); return(ALGORITHM_LEVEL); }
-<S_ALGST>{bcl}			{ return(BOC); }
-<S_ALGST>isakmp_encryption	{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_isakmp_enc; return(ALGORITHM_CLASS); }
-<S_ALGST>isakmp_hash		{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_isakmp_hash; return(ALGORITHM_CLASS); }
-<S_ALGST>isakmp_dh_group	{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_isakmp_dh; return(ALGORITHM_CLASS); }
-<S_ALGST>isakmp_auth_method	{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_isakmp_ameth; return(ALGORITHM_CLASS); }
-<S_ALGST>ipsec_encryption	{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_ipsec_enc; return(ALGORITHM_CLASS); }
-<S_ALGST>ipsec_authentication	{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_ipsec_auth; return(ALGORITHM_CLASS); }
-<S_ALGST>ipsec_ipcomp		{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_ipsec_comp; return(ALGORITHM_CLASS); }
-<S_ALGST>{ecl}		{ BEGIN S_INI; return(EOC); }
-<S_ALGCL>{bcl}		{ return(BOC); }
-<S_ALGCL>extra_high	{ YYD; yylval.num = algstrength_ehigh; return(STRENGTHTYPE); }
-<S_ALGCL>high		{ YYD; yylval.num = algstrength_high; return(STRENGTHTYPE); }
-<S_ALGCL>normal		{ YYD; yylval.num = algstrength_normal; return(STRENGTHTYPE); }
-<S_ALGCL>nothing	{ YYD; yylval.num = algtype_nothing; return(ALGORITHMTYPE); }
-<S_ALGCL>{comma}	{ YYD; /* XXX ignored, but to be handled. */ ; }
-<S_ALGCL>{ecl}		{ BEGIN S_ALGST; return(EOC); }
 
 	/* policy */
 <S_INI>policy		{ BEGIN S_PLCY; YYDB; yywarn("it is obsoleted"); return(POLICY); }
