@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: foraddr.c,v 1.3 2000/07/21 12:33:33 jinmei Exp $
+ * $Id: foraddr.c,v 1.4 2000/08/06 23:06:47 itojun Exp $
  *
  */
 
@@ -47,6 +47,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
+#include <net/route.h>
 #include <netdb.h>
 #include <string.h>
 #include <netinet6/in6_var.h>

@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: halist.c,v 1.2 2000/07/21 12:33:33 jinmei Exp $
+ * $Id: halist.c,v 1.3 2000/08/06 23:08:39 itojun Exp $
  *
  */
 
@@ -47,6 +47,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
+#include <net/route.h>
 #include <netdb.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
