@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.304 2002/04/24 10:34:48 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.305 2002/05/23 01:32:25 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -196,7 +196,7 @@ RFC3152: Delegation of IP6.ARPA
     * libinet6 resolvers contained in the KAME snaps support to use
       the ip6.arpa domain (with the nibble format) for IPv6 reverse
       lookups.
-draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
+draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-24.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
     * kame/dhcp6 has test implementation, which will not be compiled in
