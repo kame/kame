@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.18 2000/02/16 12:58:18 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.19 2000/02/22 12:36:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -150,15 +150,8 @@ eay_get_x509cert(path)
 #endif
 	fclose (fp);
 
-	if (x509 == NULL) {
-		fp = fopen (path, "r");
-		if (fp == NULL)
-			return NULL;
-		x509 = d2i_X509_fp(fp, NULL);
-		fclose (fp);
-		if (x509 == NULL)
-			return NULL;
-	}
+	if (x509 == NULL)
+		return NULL;
 
 	len = i2d_X509(x509, NULL);
 	cert = vmalloc(len);
