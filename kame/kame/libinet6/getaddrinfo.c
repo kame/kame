@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.202 2004/12/03 12:53:11 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.203 2004/12/03 12:54:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3902,10 +3902,10 @@ struct _hostconf {
 
 /* default order */
 static struct _hostconf _hostconf[MAXHOSTCONF] = {
-	_dns_getaddrinfo,
-	_files_getaddrinfo,
+	{ _dns_getaddrinfo },
+	{ _files_getaddrinfo },
 #ifdef ICMPNL
-	NULL,
+	{ NULL },
 #endif /* ICMPNL */
 };
 
