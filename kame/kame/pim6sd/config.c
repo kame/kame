@@ -197,12 +197,29 @@ config_vifs_from_kernel()
 		 * Get netmask of the address.
 		 */
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
-		if(ioctl(udp_socket,SIOCGIFNETMASK_IN6,(char *)&ifr6) <0)
-			        log(LOG_ERR, errno,
-				    "ioctl SIOCGIFNETMASK_IN6 for %s",
-				    ifr6.ifr_name);
-
+		if(ioctl(udp_socket, SIOCGIFNETMASK_IN6, (char *)&ifr6) <0)
+			log(LOG_ERR, errno, "ioctl SIOCGIFNETMASK_IN6 for %s",
+			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
 		memcpy(&mask,&ifr6.ifr_addr.sin6_addr,sizeof(mask));
+
+		/*
+		 * Get IPv6 specific flags, and ignore an anycast address.
+		 * XXX: how about a deprecated, tentative, duplicated or
+		 * detached address?
+		 */
+		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
+			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
+		}
+		else {
+			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) {
+				log(LOG_DEBUG, 0, "config_vifs_from_kernel: "
+				    "%s on %s is an anycast address, ignored",
+				    inet6_fmt(&ifr6.ifr_addr.sin6_addr),
+				    ifr.ifr_name);
+				continue;
+			}
+		}
 
 		/*
 		 * Hack for KAME kernel.
