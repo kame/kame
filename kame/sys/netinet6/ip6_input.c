@@ -201,7 +201,13 @@ static void
 ip6_init2(dummy)
 	void *dummy;
 {
+#ifndef __bsdi__
 	int i;
+#endif
+	int ret;
+
+	/* get EUI64 from somewhere */
+	ret = in6_ifattach_getifid(NULL);
 
 	/*
 	 * to route local address of p2p link to loopback,
@@ -214,8 +220,8 @@ ip6_init2(dummy)
 		in6_ifattach(&loif[i], IN6_IFT_LOOP, NULL, 0);
 #endif
 
-	/* get EUI64 from somewhere, attach pseudo interfaces */
-	if (in6_ifattach_getifid(NULL) == 0)
+	/* attach pseudo interfaces */
+	if (ret == 0)
 		in6_ifattach_p2p();
 
 	/* nd6_timer_init */

@@ -314,11 +314,20 @@ struct ip6protosw inet6sw[] = {
 },
 };
 
+#ifdef __FreeBSD__
+extern int in6_inithead __P((void **, int));
+#endif
+
 struct domain inet6domain =
     { AF_INET6, "internet6", 0, 0, 0, 
       (struct protosw *)inet6sw,
       (struct protosw *)&inet6sw[sizeof(inet6sw)/sizeof(inet6sw[0])], 0,
-      rn_inithead, offsetof(struct sockaddr_in6, sin6_addr) << 3,
+#ifdef __FreeBSD__
+      in6_inithead,
+#else
+      rn_inithead,
+#endif
+      offsetof(struct sockaddr_in6, sin6_addr) << 3,
       sizeof(struct sockaddr_in6) };
 
 #ifdef __FreeBSD__

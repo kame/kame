@@ -105,7 +105,7 @@ int	nd6_proxyall	= 0;	/* enable Proxy Neighbor Advertisement */
 static int nd6_inuse, nd6_allocated;
 
 struct llinfo_nd6 llinfo_nd6 = {&llinfo_nd6, &llinfo_nd6};
-struct nd_ifinfo *nd_ifinfo;
+struct nd_ifinfo *nd_ifinfo = NULL;
 struct nd_drhead nd_defrouter = { 0 };
 struct nd_prhead nd_prefix = { 0 };
 
