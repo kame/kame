@@ -48,6 +48,7 @@
 #endif
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <syslog.h>
