@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-udp.c,v 1.2 1999/09/11 04:43:49 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-udp.c,v 1.3 1999/10/15 07:51:42 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -302,6 +302,8 @@ rtcp_print(const u_char *hdr, const u_char *ep)
 
 #ifdef INET6
 #define RIPNG_PORT 521		/*XXX*/
+#define DHCP6_PORT1 546		/*XXX*/
+#define DHCP6_PORT2 547		/*XXX*/
 #endif
 
 void
@@ -489,7 +491,7 @@ udp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 #ifdef INET6
 		else if (ISPORT(RIPNG_PORT))
 			ripng_print((const u_char *)(up + 1), length);
-		else if (ISPORT(546) || ISPORT(547)) {
+		else if (ISPORT(DHCP6_PORT1) || ISPORT(DHCP6_PORT2)) {
 			dhcp6_print((const u_char *)(up + 1), length,
 				sport, dport);
 		}
