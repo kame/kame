@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.75 2001/06/04 14:28:59 itojun Exp $
+	$KAME: RELNOTES,v 1.76 2002/04/08 11:35:25 jinmei Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -50,7 +50,7 @@ END OF LIFE
 ===========
 We do not maintain KAME kits for older releases on a BSD release branch -
 for example, on FreeBSD 4.x series, KAME kit is supplied and maintained for
-the latest one only (4.2-RELEASE as of this writing).
+the latest one only (4.5-RELEASE as of April 2002).
 
 KAME/FreeBSD 3.5 (or 3.x series) has reached its end of life.  We supply it for
 reference purposes only.  The tree may not compile at all.
