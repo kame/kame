@@ -812,8 +812,6 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * disconnected sockets if the corresponding application
 		 * wanted. This is because some UDP applications keep sending
 		 * sockets disconnected.
-		 * XXX: not sure if PRC_MSGSIZE can be given by other reasons
-		 *      than ICMP6 too big messages.
 		 * XXX: should we avoid to notify the value to TCP sockets?
 		 */
 		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
@@ -828,7 +826,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * Detect if we should notify the error. If no source and
 		 * destination ports are specifed, but non-zero flowinfo and
 		 * local address match, notify the error. This is the case
-		 * when the error is delivered with an encrypted error buffer
+		 * when the error is delivered with an encrypted buffer
 		 * by ESP. Otherwise, just compare addresses and ports
 		 * as usual.
 		 */

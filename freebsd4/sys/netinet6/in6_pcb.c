@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.25 2000/12/01 01:27:21 kawa Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.26 2000/12/01 05:31:28 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -817,8 +817,6 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg,notify)
 		 * disconnected sockets if the corresponding application
 		 * wanted. This is because some UDP applications keep sending
 		 * sockets disconnected.
-		 * XXX: not sure if PRC_MSGSIZE can be given by other reasons
-		 *      than ICMP6 too big messages.
 		 * XXX: should we avoid to notify the value to TCP sockets?
 		 */
 		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
@@ -833,7 +831,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg,notify)
 		 * Detect if we should notify the error. If no source and
 		 * destination ports are specifed, but non-zero flowinfo and
 		 * local address match, notify the error. This is the case
-		 * when the error is delivered with an encrypted error buffer
+		 * when the error is delivered with an encrypted buffer
 		 * by ESP. Otherwise, just compare addresses and ports
 		 * as usual.
 		 */
