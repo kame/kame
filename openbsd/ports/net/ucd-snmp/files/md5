@@ -1,4 +1,6 @@
-$NetBSD$
-
+SHA1 (ucd-snmp-4.0.1.tar.gz) = 50733f75abdc431aa23b6415cf327a23cb5f02f4
+RMD160 (ucd-snmp-4.0.1.tar.gz) = ba380f7e22d2df21a6889528c3bf702f60a9cce4
 MD5 (ucd-snmp-4.0.1.tar.gz) = ba72a7b8c9efd226b72baf74d68d4511
-MD5 (ucd-snmp-4.0.1-v6-19991104.diff.gz) = 0b0ef15def2f0d794a695266b5a56f09
+SHA1 (ucd-snmp-4.0.1-v6-19991104a.diff.gz) = 98c1e9195e5aa490508e7f9b7ada69be8975ae00
+RMD160 (ucd-snmp-4.0.1-v6-19991104a.diff.gz) = 8acd65eb84d240644206adf7933ffb05525ce339
+MD5 (ucd-snmp-4.0.1-v6-19991104a.diff.gz) = 974625ac7926e4a89cc3b4d607f203ae

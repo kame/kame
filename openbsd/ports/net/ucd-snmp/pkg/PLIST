@@ -14,7 +14,7 @@ bin/snmptrap
 bin/snmpusm
 bin/snmpwalk
 bin/tkmib
-etc/rc.d/snmpd.sh
+@comment etc/rc.d/snmpd.sh
 include/ucd-snmp/asn1.h
 include/ucd-snmp/int64.h
 include/ucd-snmp/mib.h
@@ -36,31 +36,31 @@ lib/libsnmp.a
 @comment lib/libsnmp.so.3.5
 @comment @exec ln %D/lib/libsnmp.so %D/lib/libsnmp.so.3.5
 @comment @unexec rm -f %D/lib/libsnmp.so.3.5
-man/man1/snmpbulkwalk.1.gz
-man/man1/snmpcmd.1.gz
-man/man1/snmpd.1.gz
-man/man1/snmpdelta.1.gz
-man/man1/snmpget.1.gz
-man/man1/snmpgetnext.1.gz
-man/man1/snmpnetstat.1.gz
-man/man1/snmpset.1.gz
-man/man1/snmpstatus.1.gz
-man/man1/snmptable.1.gz
-man/man1/snmptest.1.gz
-man/man1/snmptranslate.1.gz
-man/man1/snmptrap.1.gz
-man/man1/snmpusm.1.gz
-man/man1/snmpwalk.1.gz
-man/man3/mib_api.3.gz
-man/man3/read_config.3.gz
-man/man3/snmp_api.3.gz
-man/man3/snmp_sess_api.3.gz
-man/man5/snmp.conf.5.gz
-man/man5/snmp_config.5.gz
-man/man5/snmpd.conf.5.gz
-man/man5/snmptrapd.conf.5.gz
-man/man5/variables.5.gz
-man/man8/snmptrapd.8.gz
+man/man1/snmpbulkwalk.1
+man/man1/snmpcmd.1
+man/man1/snmpd.1
+man/man1/snmpdelta.1
+man/man1/snmpget.1
+man/man1/snmpgetnext.1
+man/man1/snmpnetstat.1
+man/man1/snmpset.1
+man/man1/snmpstatus.1
+man/man1/snmptable.1
+man/man1/snmptest.1
+man/man1/snmptranslate.1
+man/man1/snmptrap.1
+man/man1/snmpusm.1
+man/man1/snmpwalk.1
+man/man3/mib_api.3
+man/man3/read_config.3
+man/man3/snmp_api.3
+man/man3/snmp_sess_api.3
+man/man5/snmp.conf.5
+man/man5/snmp_config.5
+man/man5/snmpd.conf.5
+man/man5/snmptrapd.conf.5
+man/man5/variables.5
+man/man8/snmptrapd.8
 sbin/snmpd
 sbin/snmptrapd
 share/examples/ucd-snmp/README

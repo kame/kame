@@ -3,18 +3,18 @@
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.1 1999/11/04 00:02:15 itojun Exp $
+# $Id: Makefile,v 1.2 1999/11/04 00:03:03 itojun Exp $
 #
 
 DISTNAME=	ucd-snmp-4.0.1
-PKGNAME=	ucd-snmp-v6-4.0.1.19991104
+PKGNAME=	ucd-snmp-v6-4.0.1.19991104a
 CATEGORIES=	net
 MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 		ftp://sunsite.cnlab-switch.ch/mirror/ucd-snmp/ \
 		ftp://ftp.win.or.jp/pub/network/snmp/ucd-snmp/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ucd-snmp-4.0.1-v6-19991104.diff.gz
+PATCHFILES=	ucd-snmp-4.0.1-v6-19991104a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@iijlab.net
@@ -55,11 +55,11 @@ post-install:
 	@${MKDIR} ${PREFIX}/share/examples/ucd-snmp
 	@for F in ${WRKSRC}/etc/* ; do \
 		${INSTALL_DATA} $$F ${PREFIX}/share/examples/ucd-snmp ; done
-	@if [ ! -f ${PREFIX}/etc/rc.d/snmpd.sh ]; then \
-		echo "Creating ${PREFIX}/etc/rc.d/snmpd.sh startup file."; \
-		echo "#!/bin/sh" > ${PREFIX}/etc/rc.d/snmpd.sh; \
-		echo "[ -x ${PREFIX}/sbin/snmpd ] && ${PREFIX}/sbin/snmpd && echo -n ' snmpd'" >> ${PREFIX}/etc/rc.d/snmpd.sh; \
-		chmod 751 ${PREFIX}/etc/rc.d/snmpd.sh; \
-	 fi
+#	@if [ ! -f ${PREFIX}/etc/rc.d/snmpd.sh ]; then \
+#		echo "Creating ${PREFIX}/etc/rc.d/snmpd.sh startup file."; \
+#		echo "#!/bin/sh" > ${PREFIX}/etc/rc.d/snmpd.sh; \
+#		echo "[ -x ${PREFIX}/sbin/snmpd ] && ${PREFIX}/sbin/snmpd && echo -n ' snmpd'" >> ${PREFIX}/etc/rc.d/snmpd.sh; \
+#		chmod 751 ${PREFIX}/etc/rc.d/snmpd.sh; \
+#	 fi
 
-.include "../../mk/bsd.pkg.mk"
+.include <bsd.port.mk>
