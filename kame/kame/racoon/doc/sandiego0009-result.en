@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.32 2000/09/22 16:06:41 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.33 2000/09/22 16:48:43 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -159,6 +159,7 @@ vs Linux FreeSWAN
 	    preshared, 3des-cbc, md5, DH group 2, lifetime 1h
 	phase 2:
 	    ESP 3des-cbc, hmac-md5, transport mode, lifetime 1h, PFS 2
+	    AH
 	    (the IPsec SA did not get installed into linux kernel)
 
 	Notes:
