@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.221 2001/11/06 05:14:30 itojun Exp $	*/
+/*	$KAME: key.c,v 1.222 2002/01/28 14:28:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,6 +78,7 @@
 #include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #endif /* INET6 */
 
 #ifdef INET
@@ -938,12 +939,16 @@ key_allocsa(family, src, dst, proto, spi)
 	struct secasvar *sav;
 	u_int stateidx, state;
 	struct sockaddr_in sin;
-	struct sockaddr_in6 sin6;
 	int s;
 
 	/* sanity check */
 	if (src == NULL || dst == NULL)
 		panic("key_allocsa: NULL pointer is passed.\n");
+	if (family == AF_INET6 &&
+	    (((struct sockaddr *)src)->sa_family != AF_INET6 ||
+	     ((struct sockaddr *)dst)->sa_family != AF_INET6)) {
+		panic("key_allocsa: src/dst family is inconsistent\n");
+	}
 
 	/*
 	 * searching SAD.
@@ -988,18 +993,7 @@ key_allocsa(family, src, dst, proto, spi)
 
 					break;
 				case AF_INET6:
-					bzero(&sin6, sizeof(sin6));
-					sin6.sin6_family = AF_INET6;
-					sin6.sin6_len = sizeof(sin6);
-					bcopy(src, &sin6.sin6_addr,
-					    sizeof(sin6.sin6_addr));
-					if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)) {
-						/* kame fake scopeid */
-						sin6.sin6_scope_id =
-						    ntohs(sin6.sin6_addr.s6_addr16[1]);
-						sin6.sin6_addr.s6_addr16[1] = 0;
-					}
-					if (key_sockaddrcmp((struct sockaddr*)&sin6,
+					if (key_sockaddrcmp((struct sockaddr *)src,
 					    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
 						continue;
 					break;
@@ -1025,18 +1019,7 @@ key_allocsa(family, src, dst, proto, spi)
 
 					break;
 				case AF_INET6:
-					bzero(&sin6, sizeof(sin6));
-					sin6.sin6_family = AF_INET6;
-					sin6.sin6_len = sizeof(sin6);
-					bcopy(dst, &sin6.sin6_addr,
-					    sizeof(sin6.sin6_addr));
-					if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)) {
-						/* kame fake scopeid */
-						sin6.sin6_scope_id =
-						    ntohs(sin6.sin6_addr.s6_addr16[1]);
-						sin6.sin6_addr.s6_addr16[1] = 0;
-					}
-					if (key_sockaddrcmp((struct sockaddr*)&sin6,
+					if (key_sockaddrcmp((struct sockaddr *)dst,
 					    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
 						continue;
 					break;
@@ -7003,6 +6986,9 @@ key_parse(m, so)
 	u_int orglen;
 	int error;
 	int target;
+#ifdef INET6
+	struct sockaddr_in6 *sin6;
+#endif
 
 	/* sanity check */
 	if (m == NULL || so == NULL)
@@ -7195,6 +7181,20 @@ key_parse(m, so)
 				error = EINVAL;
 				goto senderror;
 			}
+#ifdef INET6
+			/*
+			 * Check validity of the scope zone ID of the
+			 * addresses.
+			 * XXX: scope6_check_id may modify the buffer to
+			 * embed the IDs.
+			 */
+			sin6 = (struct sockaddr_in6 *)PFKEY_ADDR_SADDR(src0);
+			if ((error = scope6_check_id(sin6, 0)) != 0)
+				goto senderror;
+			sin6 = (struct sockaddr_in6 *)PFKEY_ADDR_SADDR(dst0);
+			if ((error = scope6_check_id(sin6, 0)) != 0)
+				goto senderror;
+#endif
 			break;
 		default:
 			ipseclog((LOG_DEBUG,
