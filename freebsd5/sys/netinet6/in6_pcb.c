@@ -401,6 +401,7 @@ in6_pcbconnect(inp, nam, td)
 		inp->in6p_laddr = *addr6;
 	}
 	inp->in6p_faddr = sin6->sin6_addr;
+	inp->inp_fport = sin6->sin6_port;
 	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	inp->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	if (inp->in6p_flags & IN6P_AUTOFLOWLABEL)
