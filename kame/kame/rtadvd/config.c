@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.87 2003/12/05 01:35:15 keiichi Exp $	*/
+/*	$KAME: config.c,v 1.88 2004/02/05 05:54:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -339,10 +339,7 @@ getconfig(intface)
 	} else {
 		MAYHAVE(val, "hapref", 0);	/* XXX signed */
 		tmp->hapref = val;
-		if (tmp->hapref != 0)
-			MUSTHAVE(val, "hatime");
-		else
-			MAYHAVE(val, "hatime", 0);
+		MAYHAVE(val, "hatime", tmp->lifetime);
 		if (val <= 0) {
 			if (tmp->hapref != 0 || val < 0) {
 				syslog(LOG_ERR,
