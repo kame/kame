@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.121 2002/06/12 04:36:23 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.122 2002/06/14 03:50:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -475,7 +475,7 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 	struct ip6_hdr	*icmpip6, *ip6 = cv6->ip.ip6;
 	struct icmp	*icmp4;
 	struct icmp6_hdr	*icmp6;
-	struct udphdr	*udp4;
+	struct udphdr	*udp4, *udp6;
 	caddr_t		ip6end;
 	caddr_t		icmpip6pyld, icmpip4pyld;
 
@@ -554,6 +554,40 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 			: (icmp6->icmp6_pptr == 24) ? 16 /* destination address */
 			: 0xff; /* XXX */
 		break;
+	}
+
+	/* recalculate UDP checksum which is inside the ICMPv6 payload */
+	if (icmpip6->ip6_nxt == IPPROTO_UDP) {
+		u_short		cksum4, cksum6;
+		struct ulc6	ulc6;
+		struct ulc4	ulc4;
+
+		bzero(&ulc6, sizeof(struct ulc6));
+		bzero(&ulc4, sizeof(struct ulc4));
+
+		udp6 = (struct udphdr *)icmpip6pyld;
+		ulc6.ulc_src = icmpip6->ip6_src;
+		ulc6.ulc_dst = icmpip6->ip6_dst;
+		ulc6.ulc_len = htonl(ntohs(udp6->uh_ulen));
+		ulc6.ulc_pr  = IPPROTO_UDP;
+
+		udp4 = (struct udphdr *)icmpip4pyld;
+		ulc4.ulc_src = icmpip4->ip_src;
+		ulc4.ulc_dst = icmpip4->ip_dst;
+		ulc4.ulc_len = udp4->uh_ulen;
+		ulc4.ulc_pr  = IPPROTO_UDP;
+
+		ulc6.ulc_tu.uh.uh_sport = udp6->uh_sport;
+		ulc6.ulc_tu.uh.uh_dport = udp6->uh_dport;
+
+		ulc4.ulc_tu.uh.uh_sport = udp4->uh_sport;
+		ulc4.ulc_tu.uh.uh_dport = udp4->uh_dport;
+
+		cksum6 = ntohs(udp6->uh_sum);
+		cksum4 = natpt_fixCksum(cksum6,
+				       (u_char *)&ulc6, sizeof(struct ulc6),
+				       (u_char *)&ulc4, sizeof(struct ulc4));
+		udp4->uh_sum = htons(cksum4);
 	}
 }
 
