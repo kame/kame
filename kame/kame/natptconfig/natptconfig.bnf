@@ -1,5 +1,7 @@
+/*	$KAME: natptconfig.bnf,v 1.6 2001/09/02 20:49:10 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,147 +27,134 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: natptconfig.bnf,v 1.5 2001/05/05 11:50:07 fujisawa Exp $
  */
 
-/* Top level definitions							*/
+/* Top level definitions */
 
-      <statement> ::= <comment>
-		    | <question>
-		    | <break>
-		    | <interface>
-		    | <prefix>
-		    | <rule>
-		    | <switch>
-		    | <set>
-		    | <show>
-		    | <test>
-		    | <error>
-
-
-/* Comment definition								*/
-
-	<comment> ::= SCOMMENT
+  <statement> ::= <question>
+		| <break>
+		| <prefix>
+		| <rules>
+		| <switch>
+		| <set>
+		| <show>
+		| <log>
+		| <test>
+		| <error>
 
 
-/* ???										*/
+/* question mark */
 
-       <question> ::= "?"
-
-
-/* Stop at breakpoiont (for debug only)						*/
-
-	  <break> ::= SBREAK
+   <question> ::= SQUESTION
 
 
-/* Interface definitions							*/
+/* stop at breakpoint (for debug) */
 
-      <interface> ::= "interface" "?"
-		    | "interface" <netdevice> <in_ex>
-
-	  <in_ex> ::= "internal"
-		    | "external"
+      <break> ::= SBREAK
 
 
-/* Set NATPT prefix to the kernel						*/
+/* set NAT-PT prefix */
 
-	 <prefix> ::= "prefix" "?"
-		    | "natpt" IPV6ADDR
-		    | "natpt" IPV6ADDR "/" DECIMAL
-
-
-/* Tranlation rule definitions							*/
-
-	   <rule> ::= "map" "?"
-		    | "map" <dir> "from" <ipaddrport> "to" <ipaddrport>
-		    | "map" <dir> "from" "any4" "to" <ipaddrport>
-		    | "map" <dir> "from" "any6" "to" <ipaddrport>
-		    | "map" "flush" <opt_type>
+     <prefix> ::= SPREFIX SQUESTION
+		| SPREFIX <ipv6addr>
 
 
-	    <dir> ::= "inbound"
-		    | "incoming"
-		    | "outbound"
-		    | "outgoing"
+/* Translation rule */
+
+      <rules> ::= SMAP SQUESTION
+
+		/* IPv6 -> IPv4 */
+		| SMAP SFROM SANY6 STO <ipv4addr> <opt_ports> <opt_proto>
+		| SMAP SFROM <ipv6addrs> STO <ipv4addrs> <opt_ports> <opt_proto>
+
+		/* IPv4 -> IPv6 */
+		| SMAP SFROM <ipv4addrs> STO <ipv6addrs> <opt_proto>
+		| SMAP SFROM <ipv4addr> <dport> STO <ipv6addr> <dport> <opt_proto>
+
+		/* IPv4 -> IPv4 (outbound) */
+		| SMAP SFROM <ipv4addrs> STO <ipv4addrs> <opt_ports> <opt_proto> <opt_bidir>
+
+		/* IPv4 -> IPv4 (inbound) */
+		| SMAP SFROM <ipv4addr> <dport> STO <ipv4addr> <dport> <opt_proto>
+
+		| SMAP SFLUSH <opt_all>
 
 
-/* Translation on/off switch definition						*/
+/* Translation of/off */
 
-	  <swich> ::= "map" "enable"
-		    | "map" "disable"
-
-
-/* Set definition								*/
-
-	    <set> ::= "set" "?"
-		    | "set" <name> "=" <decimail>
-		    | "set" <name> "=" <hexdecimal>
+     <switch> ::= SMAP SENABLE
+		| SMAP SDISABLE
 
 
-/* Show definitions								*/
+/* Set variable(s) */
 
-	   <show> ::= "show" "?"
-		    | "show" "interface" <opt_netdevice>
-		    | "show" "prefix"
-		    | "show" "static"
-		    | "show" "dynamic"
-		    | "show" "xlate" <opt_long> <opt_decimal>
-		    | "show" "variables"
-		    | "show" "mapping"
+	<set> ::= SSET SQUESTION
+		| SSET name SEQUAL SDECIMAL
+		| SSET name SEQUAL SHEXADECIMAL
 
 
-/* Test something								*/
+/* Show rule/variables/... */
 
-	   <test> ::= "test" "?"
-		    | "test" "log"
-		    | "test" "log" <name>
-		    | "test" "log" <string>
-
-
-/* Miscellaneous definitions							*/
-
-  <opt_netdevice> ::= eps
-		    | <netdevice>
-
-      <netdevice> ::= STRING
-		    | NAME
-
-      ipaddrport> ::= <ipv4addrs>
-		    | <ipv4addrs> <port>
-		    | <ipv6addrs>
-		    | <ipv6addrs> <port>
-
-      <ipv4addrs> ::= <ipv4addr>
-		    | <ipv4addr> "/" <decimal>
-		    | <ipv4addr> "-" <ipv4addr>
-
-      <ipv6addrs> ::= <ipv6addr>
-		    | <ipv6addr> "/" <decimal>
-
-       <ipv4addr> ::= IPV4ADDR
-
-       <ipv6addr> ::= IPV6ADDR
-
-	   <name> ::= SNAME
-
-	<decimal> ::= SDECIMAL
-
-     <hexdecimal> ::= SHEXDECIMAL
-
-	   <port> ::= "port" SDECIMAL
-		    | "port" SDECIMAL ":" SDECIMAL
-		    | "port" SDECIMAL "-" SDECIMAL
+       <show> ::= SSHOW SQUESTION
+		| SSHOW SPREFIX
+		| SSHOW SRULES <opt_all>
+		| SSHOW SXLATE <opt_long> <opt_decimal>
+		| SSHOW SVARIABLES
+		| SSHOW SMAPPING
 
 
-/* Optional termila definitions							*/
+/* Log */
 
-       <opt_type> ::= eps
-		    | "static"
-		    | "dynamic"
+	<log> ::= SLOG SSTRING
+		| SLOG SSYSLOG
 
-       <opt_long> ::= eps
-		    | "long"
 
-    <opt_decimal> ::= eps
-		    | DECIMAL
+/* Test log system */
+       <test> ::= STEST SQUESTION
+		| STEST SLOG
+		| STEST SLOG SNAME
+		| STEST SLOG SSTRING
+
+
+/* conventional */
+
+  <opt_ports> ::= <eps>
+		| SPORT SDECIMAL SMINUS SDECIMAL
+		| SPORT SDECIMAL SCOLON SDECIMAL
+
+  <opt_proto> ::= <eps>
+		| <protos>
+
+    <opt_all> ::= <eps>
+		| SALL
+
+  <opt_bidir> ::= <eps>
+		| SBIDIR
+
+   <opt_long> ::= <eps>
+		| SLONG
+
+<opt_decimal> ::= <eps>
+		| SDECIMAL
+
+      <dport> ::= SDPORT SDECIMAL
+
+     <protos> ::= <proto>
+		| <protos> SSLASH <proto>
+
+      <proto> ::= SICMP
+		| STCP
+		| SUDP
+
+  <ipv4addrs> ::= <ipv4addr>
+		| <ipv4addr> SSLASH <SDECIMAL>
+		| <ipv4addr> SMINUS <ipv4addr>
+
+   <ipv4addr> ::= SIPV4ADDR
+
+  <ipv6addrs> ::= <ipv6addr>
+		| <ipv6addr> SSLASH SDECIMAL
+
+   <ipv6addr> ::= SIPV6ADDR
+
+       <name> ::= SNAME
