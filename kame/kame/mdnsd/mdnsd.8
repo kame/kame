@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.47 2001/09/03 10:09:41 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.48 2002/09/24 09:24:33 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -65,14 +65,14 @@ will receive unicast DNS queries
 and forward the queries toward link-local multicast DNS address on
 .Ar intface ,
 if the query is within
-.Dq local.arpa.
+.Dq Li local.
 domain.
 Whenever a reply comes back against the multicast queries,
 .Nm
 will forward the reply to the original querier.
 .Nm
 can also relay queries to unicast DNS server(s), if the query is outside of
-.Dq local.arpa.
+.Dq Li local.
 domain.
 .Pp
 .Nm
@@ -142,7 +142,7 @@ must be invoked under root privilege to use this option.
 .Nm
 listens to UDP port
 .Ar inport
-for incoming DNS multicast/unicast queries, or unicast replies.
+for incoming DNS unicast queries, or unicast replies.
 By default,
 .Ar inport
 will be 53.
@@ -150,11 +150,11 @@ will be 53.
 is for debugging purposes only.
 .It Fl P Ar outport
 .Nm
-transmits UDP multicast queries to UDP port
+accepts/transmits UDP multicast queries/replies to UDP port
 .Ar outport.
 By default,
 .Ar outport
-will be 53.
+will be 5353.
 .Fl P
 is for debugging purposes only
 .Po
@@ -163,6 +163,8 @@ for running two daemons on a single node
 .It Ar server
 Specify unicast DNS servers we may want to try sending queries.
 Users can list multiple DNS servers.
+.Ar server
+has to be numeric IPv4/v6 addresses.
 .El
 .Pp
 .Nm
@@ -192,22 +194,22 @@ Then, configure
 to resolve IP addresses from names using
 .Nm Ns .
 Notice the presense of
-.Li itojun.org.local.arpa.
+.Dq Li itojun.org.local.
 and
-.Li local.arpa.
+.Dq Li local.
 From the speficiation, we can only resolve names using multicast DNS,
 iff names are under
-.Li local.arpa.
+.Li local.
 domain.
 .Bd -literal -offset indent
-search itojun.org itojun.org.local.arpa local.arpa
+search itojun.org itojun.org.local local
 nameserver ::1
 .Ed
 .Pp
 If you would like to contact unicast DNS servers as well, you may want to
 specify them on the command line.
 DNS queries will be sent to unicast servers, if the DNS name is outside of
-.Li local.arpa.
+.Li local.
 .Bd -literal -offset indent
 # mdnsd -6 -i wi0 3ffe:501:4819::42
 .Ed
@@ -217,7 +219,7 @@ on a multicast name resolution:
 .Bl -bullet
 .It
 An application on node A queries AAAA record of
-.Dq b.local.arpa. .
+.Dq Li b.local. .
 The query is transmitted toward the address configured in
 .Pa /etc/resolv.conf ,
 which is the loopback address.
@@ -231,7 +233,7 @@ on node A relays the query out to the ethernet interface, as multicast packet.
 .It
 .Nm
 on node B receives the packet, and finds out that it is asking for
-.Dq b.local.arpa. .
+.Dq Li b.local. .
 .It
 .Nm
 on node B responds to node A, with the list of IPv6 addresses assigned to
@@ -312,3 +314,14 @@ Imagine cases where the original querier supports EDNS0,
 while multicast/unicast nameservers
 .Pq which are the destination of the relayed packet
 do not.
+.Pp
+.Nm
+uses
+.Dq Li local.
+instead of
+.Dq Li local.arpa.
+for mDNS suffix, to interoperate with Apple Rendezvous implementation in
+MacOS 10.2.
+.Pp
+The latest mDNS/LLMNR spec does not recommend the use of domain suffix to
+switch between mDNS/LLMNR and DNS lookup.
