@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1917 2001/10/16 15:07:18 sakane Exp $
+$KAME: CHANGELOG,v 1.1918 2001/10/17 05:53:07 fujisawa Exp $
 
 <200110>
+2001-10-17 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c:
+	- Fix a bug to miscalculate when compute a checksum in IPv4 ->
+	  IPv4 translation.
+	- Remove natpt_recalculateTCP4Checksum() and related include
+	  file. This function became useless by modification mentioned above.
+
 Wed Oct 17 00:03:54 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
 	fixed the internal value of the wild card of the upper layer protocol.
