@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.43 2001/02/16 23:48:46 thorpej Exp $
+.\"	$KAME: setkey.8,v 1.44 2001/02/21 09:31:12 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -447,13 +447,26 @@ is either
 .Li transport
 or
 .Li tunnel .
-You must specify the end-points addresses of the SA as
+If
+.Ar mode
+is
+.Li tunnel ,
+you must specify the end-points addresses of the SA as
 .Ar src
 and
 .Ar dst
 with
 .Sq -
 between these addresses which is used to specify the SA to use.
+If
+.Ar mode
+is
+.Li transport ,
+both
+.Ar src
+and
+.Ar dst
+can be omited.
 .Ar level
 is to be one of the following:
 .Li default , use , require
