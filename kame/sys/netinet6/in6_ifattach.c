@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.160 2002/05/26 23:31:10 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.161 2002/05/27 02:45:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1153,7 +1153,6 @@ void
 in6_tmpaddrtimer(ignored_arg)
 	void *ignored_arg;
 {
-	int i;
 	struct nd_ifinfo *ndi;
 	u_int8_t nullbuf[8];
 	struct ifnet *ifp;
