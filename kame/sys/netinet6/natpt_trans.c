@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.125 2002/06/24 11:48:02 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.126 2002/06/25 05:34:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -310,7 +310,8 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 	case ICMP6_PACKET_TOO_BIG:
 		icmp4->icmp_type = ICMP_UNREACH;
 		icmp4->icmp_code = ICMP_UNREACH_NEEDFRAG;
-		icmp4->icmp_nextmtu = ntohl(icmp6->icmp6_mtu);
+		icmp4->icmp_nextmtu = ntohl(icmp6->icmp6_mtu) -
+			(sizeof(struct ip6_hdr) - sizeof(struct ip));
 		HTONS(icmp4->icmp_nextmtu);
 		natpt_icmp6MimicPayload(cv6, &cv4, pad);
 		break;
