@@ -1,12 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2091 2002/02/26 02:27:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.2092 2002/02/26 05:19:35 jinmei Exp $
 
 <200202>
 2002-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/tcp_syncache.c (syncache_socket): when
 	making a PCB entry from a syn cache, do not forget to copy
-	inc_isipv6.  Otherwise, we would fail to update a stale cached
-	route.
+	inc_isipv6.
+	* freebsd4/sys/netinet/tcp_usrreq.c (tcp6_usr_connect): set
+	inc_isipv6 when connecting to a non-mapped AF_INET6 address.
+
+	All FreeBSD users are recommended to apply this fix.   Without
+	these changes, we would fail to update a stale cached route.
 
 2002-02-25 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
 	* sys/netinet6/in6_src.c (in6_selectsrc):
