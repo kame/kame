@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.12 2001/01/23 15:23:36 itojun Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.13 2001/01/23 15:42:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -637,7 +637,7 @@ send:
 
 #ifdef IPSEC
 	if (ipsec_setsocket(m, so) != 0) {
-		error = ENOBUFS
+		error = ENOBUFS;
 		goto out;
 	}
 #endif /*IPSEC*/
