@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.145 2001/01/22 18:00:13 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.146 2001/01/23 08:53:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1673,7 +1673,6 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 
 	/* we could do in(6)_socktrim here, but just omit it at this moment. */
 
-#if 1
 	/*
 	 * We'll make an interface direct route when
 	 * - prefixlen is smaller than 128, or
@@ -1687,24 +1686,6 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 	}
-#else  /* this case should be removed in a short period */
-	switch (ifp->if_type) {
-	case IFT_ARCNET:
-	case IFT_ETHER:
-	case IFT_FDDI:
-	case IFT_IEEE1394:
-#ifdef IFT_IEEE80211
-	case IFT_IEEE80211:
-#endif
-		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
-		ia->ia_ifa.ifa_flags |= RTF_CLONING;
-		break;
-	case IFT_PPP:
-		ia->ia_ifa.ifa_rtrequest = nd6_p2p_rtrequest;
-		ia->ia_ifa.ifa_flags |= RTF_CLONING;
-		break;
-	}
-#endif
 
 	/* this should be in in6_ifaddroute()? */
 	ia->ia_ifa.ifa_metric = ifp->if_metric;
