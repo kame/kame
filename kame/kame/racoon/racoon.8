@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.19 2000/11/20 01:39:25 sakane Exp $
+.\"	$KAME: racoon.8,v 1.20 2000/12/15 15:27:29 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -50,7 +50,7 @@
 .Op Fl l Ar logfile
 .Ek
 .Bk -words
-.Op Fl d Ar dlevel
+.Op Fl d Ar debuglevel
 .Ek
 .\"
 .Sh DESCRIPTION
@@ -61,23 +61,27 @@ SPD in the kernel usually trigger to start
 .Nm racoon .
 .Bl -tag -width Ds
 .It Fl f Ar configfile
-Use alternate configuration file.
+use
+.Ar configfile
+as the configuration file instead of the default.
 .It Fl p Ar isakmp-port
-specifies UDP port number for ISAKMP key exchange.
-.Xr racoon 8
-usually uses UDP port number 500.
+listen for ISAKMP key exchange on port
+.Ar isakmp-port
+instead of the default port number, 500.
 .It Fl l Ar logfile
-Use alternate log file.
+use
+.Ar logfile
+as the logging file.
 .It Fl F
-Force running in foreground.
-.It Fl d Ar dlevel
-defines a debugging level from 0 to 0xffffffff.
-0xffffffff is defined to this option and with
-.Fl F ,
-then a lot of messages appears on standard output during a negotiation.
-See
-.Pa debug.h
-for detail debugging information.
+run
+.Nm racoon
+in the foreground.
+.It Fl d Ar debuglevel
+set the daemon's debug level to
+.Ar debuglevel .
+Debugging trances from
+.Nm racoon
+become more verbose as the debug level increases.
 .It Fl v
 causes a packet dump verbose when using high debugging level.
 .El
@@ -102,7 +106,8 @@ The command exits with 0 on success, and non-zero on errors.
 .Sh SEE ALSO
 .Xr ipsec 4 ,
 .Xr racoon.conf 5 ,
-.Xr setkey 8
+.Xr setkey 8,
+.Xr syslogd 8
 .\"
 .Sh HISTORY
 The
