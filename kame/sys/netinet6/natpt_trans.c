@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.124 2002/06/23 08:08:24 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.125 2002/06/24 11:48:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -709,9 +709,6 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 
 	diff = htons(cv6->ip.ip6->ip6_plen) + sizeof(struct ip6_hdr) -
 		(cv6->plen + sizeof(struct ip));
-	if (cv6->fh) {
-		diff += sizeof(struct ip6_frag);
-	}
 	m4->m_data += diff;
 	m4->m_len  -= diff;
 	m4->m_pkthdr.len -= diff;
