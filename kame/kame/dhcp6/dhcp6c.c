@@ -317,9 +317,8 @@ client6_mainloop()
 		/*NOTREACHED*/
 	}
 	p = TAILQ_FIRST(&servtab);
-	inet_ntop(AF_INET6, &p->st_serv, hbuf, sizeof(hbuf));
 	dprintf((stderr, "primary server: pref=%u addr=%s\n",
-		p->st_pref, hbuf));
+		p->st_pref, in6addr2str(&p->st_serv, 0)));
 
 	for (p = TAILQ_FIRST(&servtab); p; p = TAILQ_NEXT(p, st_list)) {
 		if (client6_getreply(p) < 0)
