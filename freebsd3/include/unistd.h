@@ -203,8 +203,7 @@ pid_t	 vfork __P((void));
 #if 1 /*INET6*/
 int	rresvport_af __P((int *, int));
 int	iruserok_af __P((const void *, int, const char *, const char *, int));
-struct sockaddr;
-int	iruserok_sa __P((const struct sockaddr *, int, const char *, const char *));
+int	iruserok_sa __P((const void *, int, int, const char *, const char *));
 #endif
 
 extern char *suboptarg;			/* getsubopt(3) external variable */
