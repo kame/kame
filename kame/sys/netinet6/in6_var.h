@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.95 2004/03/18 05:14:46 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.96 2004/04/03 15:55:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,7 +610,7 @@ do { \
 	struct ifmultiaddr *ifma; \
 	TAILQ_FOREACH(ifma, &(ifp)->if_multiaddrs, ifma_link) { \
 		if (ifma->ifma_addr->sa_family == AF_INET6 \
-		    && IN6_ARE_ADDR_EQUAL(&(((struct sockaddr_in6 *)ifma->ifma_addr)->sin6_addr, \
+		    && IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)ifma->ifma_addr)->sin6_addr, \
 					  &(addr))) \
 			break; \
 	} \
