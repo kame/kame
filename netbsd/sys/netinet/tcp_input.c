@@ -1435,6 +1435,7 @@ findpcb:
 					}
 					break;
 #endif
+				}
 #endif
 
 				/*
