@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.65 2001/07/29 04:27:25 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.66 2001/07/29 04:46:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,7 +37,6 @@
 #endif
 #endif
 #ifdef __NetBSD__
-#include "opt_mrouting.h"
 #include "opt_inet.h"
 #include "opt_iso.h"
 #endif
@@ -82,10 +81,6 @@
 #ifdef INET6
 #include <netinet/ip6.h>
 #endif
-
-#ifdef MROUTING
-#include <netinet/ip_mroute.h>
-#endif /* MROUTING */
 
 #include <net/if_gif.h>	
 
