@@ -1,6 +1,6 @@
 SRCDIR=	${.CURDIR}/../../kame/dtcp
 
-MAN8=	dtcps.8 dtcpc.8
+MAN=	dtcps.8 dtcpc.8
 
 # path to Ruby interpreter
 LPREFIX=	/usr/pkg/bin
