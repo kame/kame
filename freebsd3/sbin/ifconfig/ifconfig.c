@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.38.2.1 1999/08/29 15:13:40 peter Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.38.2.2 1999/12/13 02:02:20 jkh Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -192,6 +192,11 @@ struct	cmd {
 	{ "mediaopt",	NEXTARG,	setmediaopt },
 	{ "-mediaopt",	NEXTARG,	unsetmediaopt },
 #endif
+#ifdef USE_VLANS
+	{ "vlan",	NEXTARG,	setvlantag },
+	{ "vlandev",	NEXTARG,	setvlandev },
+	{ "-vlandev",	NEXTARG,	unsetvlandev },
+#endif
 	{ "normal",	-IFF_LINK0,	setifflags },
 	{ "compress",	IFF_LINK0,	setifflags },
 	{ "noicmp",	IFF_LINK1,	setifflags },
@@ -259,6 +264,9 @@ struct	afswtch {
 #if 0	/* XXX conflicts with the media command */
 #ifdef USE_IF_MEDIA
 	{ "media", AF_INET, media_status, NULL, NULL },	/* XXX not real!! */
+#endif
+#ifdef USE_VLANS
+	{ "vlan", AF_INET, media_Status, NULL, NULL},	/* XXX not real!! */
 #endif
 #endif
 	{ 0,	0,	    0,		0 }
@@ -851,6 +859,9 @@ status(afp, addrcount, sdl, ifm, ifam)
 #ifdef USE_IF_MEDIA
 			    afp->af_status != media_status &&
 #endif
+#ifdef USE_VLANS
+			    afp->af_status != vlan_status &&
+#endif 
 			    afp->af_status != ether_status) {
 				p = afp;
 				(*p->af_status)(s, &info);
@@ -859,6 +870,9 @@ status(afp, addrcount, sdl, ifm, ifam)
 			if (p->af_af == info.rti_info[RTAX_IFA]->sa_family &&
 #ifdef USE_IF_MEDIA
 			    p->af_status != media_status &&
+#endif
+#ifdef USE_VLANS
+			    p->af_status != vlan_status &&
 #endif
 			    p->af_status != ether_status) 
 				(*p->af_status)(s, &info);
@@ -871,6 +885,10 @@ status(afp, addrcount, sdl, ifm, ifam)
 #ifdef USE_IF_MEDIA
 	if (allfamilies || afp->af_status == media_status)
 		media_status(s, NULL);
+#endif
+#ifdef USE_VLANS
+        if (allfamilies || afp->af_status == vlan_status)
+                vlan_status(s, NULL);
 #endif
 	if (!allfamilies && !p && afp->af_status != media_status &&
 	    afp->af_status != ether_status)
