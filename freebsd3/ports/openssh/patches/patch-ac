@@ -1,5 +1,5 @@
---- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/includes.h	Tue Nov  2 16:21:02 1999
-+++ ./includes.h	Tue Nov 23 19:20:38 1999
+--- includes.h.orig	Tue Jan 18 14:08:10 2000
++++ includes.h	Tue Jan 18 14:13:01 2000
 @@ -24,12 +24,12 @@
  #include <sys/select.h>
  #include <sys/param.h>
@@ -22,3 +22,17 @@
  #include <stdio.h>
  #include <ctype.h>
  #include <errno.h>
+@@ -65,5 +64,13 @@
+  * client program.  Socketpairs do not seem to work on all systems.
+  */
+ #define USE_PIPES 1
++
++#if defined(__FreeBSD__) && __FreeBSD__ <= 3
++/*
++ * Data types.
++ */
++typedef u_char          sa_family_t;
++typedef u_int32_t       socklen_t;
++#endif
+ 
+ #endif				/* INCLUDES_H */

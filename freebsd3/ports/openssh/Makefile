@@ -3,8 +3,7 @@
 # Date created:		7 October 1999
 # Whom:			green
 #
-# $FreeBSD: ports/security/openssh/Makefile,v 1.31 1999/12/23 06:37:20 green Exp $
-# $Id: Makefile,v 1.5 2000/01/07 04:48:20 sumikawa Exp $
+# $FreeBSD: ports/security/openssh/Makefile,v 1.34 2000/01/15 23:17:13 green Exp $
 #
 
 DISTNAME=	src/usr.bin/ssh
@@ -13,7 +12,8 @@ CATEGORIES=	security net
 # ${MASTER_SITES} is only for if CVS won't work, period.
 MASTER_SITES=	ftp://internat.FreeBSD.org/pub/Crypto/OpenSSH/
 
-MAINTAINER=	sumikawa@kame.net
+MAINTAINER=	green@FreeBSD.org
+MAINTAINER+=	sumikawa@FreeBSD.org
 
 RESTRICTED=	"One file calls external cryptographic routines."
 
@@ -35,6 +35,10 @@ CRYPTOLIBS+=	-lRSAglue -lrsaref
 .endif
 # Here, MANDIR is concetenated to DESTDIR which all forms the man install dir...
 MAKE_ENV=	DESTDIR=${PREFIX} MANDIR=/man/man CRYPTOLIBS="${CRYPTOLIBS}"
+#.if defined(USE_INET6)
+MAKE_ENV+=	USET_INET6=yes
+MAKE_ENV+=	LDADD="-L/usr/local/v6/lib -linet6"
+#.endif
 .if !exists(/usr/include/tcpd.h)
 MAKE_ENV+=	TCP_WRAPPERS=no
 .endif
@@ -107,13 +111,19 @@ fetchsrctarball:
 	done; \
 	${ECHO_MSG} ">> Couldn't fetch $$file."; \
 	${ECHO_MSG} ">> Please try to retrieve this file manually into"; \
-	${ECHO_MSG" ">> ${_DISTDIR} and try again."; \
+	${ECHO_MSG} ">> ${_DISTDIR} and try again."; \
 	exit 1
 
 do-extract:
 	@${MKDIR} ${WRKDIR}
 	@${CP} -r ${DISTDIR}/${PKGNAME}/${DISTNAME} ${WRKDIR}
 	@${CP} ${FILESDIR}/strlcat.c ${FILESDIR}/strlcpy.c ${WRKSRC}/lib/
+#.if !defined(USE_INET6)
+#	@${CP} ${FILESDIR}/getaddrinfo.c  ${FILESDIR}/name6.c ${WRKSRC}/lib/
+#	@${CP} ${FILESDIR}/bindresvport.c ${FILESDIR}/rcmd.c ${WRKSRC}/lib/
+#	@${CP} ${FILESDIR}/getnameinfo.c ${FILESDIR}/rcmd.c ${WRKSRC}/lib/
+#	@${CP} ${FILESDIR}/netdb.h ${WRKSRC}/
+#.endif
 	@${MKDIR} ${WRKSRC}/pam_ssh
 	@${CP} ${FILESDIR}/pam_ssh_Makefile ${WRKSRC}/pam_ssh/Makefile
 	@${CP} ${FILESDIR}/pam_ssh.c ${WRKSRC}/pam_ssh/
@@ -153,4 +163,4 @@ post-install:
 	@${ECHO_MSG} ">> need to update it to work with OpenSSH."
 .endif
 
-.include <bsd.port.mk>
+.include <bsd.port.post.mk>

@@ -1,6 +1,6 @@
---- Makefile.inc.orig	Fri Jan  7 01:43:03 2000
-+++ Makefile.inc	Fri Jan  7 01:44:17 2000
-@@ -2,10 +2,14 @@
+--- Makefile.inc.orig	Fri Jan 14 08:35:05 2000
++++ Makefile.inc	Fri Jan 14 08:40:03 2000
+@@ -2,10 +2,17 @@
  
  .include <bsd.obj.mk>
  
@@ -8,7 +8,6 @@
 -LDADD+=         -L${.CURDIR}/../lib/${__objdir} -lssh
 -DPADD+=         ${.CURDIR}/../lib/${__objdir}/libssh.a
 -.else
--LDADD+=         -L${.CURDIR}/../lib -lssh
 +AFS?=		no
 +KERBEROS?=	no
 +PAM?=		no
@@ -17,6 +16,9 @@
 +.if !defined(MAKEFILE_INC_FIRST_PASS)
 +MAKEFILE_INC_FIRST_PASS=	0
 +CFLAGS+=	-I${PREFIX}/include
-+LDADD+=         -L${.CURDIR}/../lib -lssh -L/usr/local/v6/lib -linet6
++.if defined(USE_INET6)
++CFLAGS+=	-DINET6
++.endif
+ LDADD+=         -L${.CURDIR}/../lib -lssh
  DPADD+=         ${.CURDIR}/../lib/libssh.a
  .endif
