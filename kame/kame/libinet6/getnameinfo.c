@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.50 2001/04/26 23:40:23 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.51 2001/04/26 23:40:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -346,7 +346,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 				return EAI_MEMORY;
 
 			/*
-			 * construct <numeric-addr><delim><scopeid>
+			 * construct <numeric-addr><delim><zoneid>
 			 */
 			memcpy(host + numaddrlen + 1, scopebuf,
 			       scopelen);
