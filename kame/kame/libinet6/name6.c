@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.26 2000/06/27 16:16:26 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.27 2000/07/03 02:40:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1336,7 +1336,7 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 				continue;
 			}
 			strcpy(bp, tbuf);
-			tname = bp;
+			template->h_name = bp;
 			bp += n;
 			buflen -= n;
 			continue;
