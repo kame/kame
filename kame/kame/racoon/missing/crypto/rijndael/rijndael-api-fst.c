@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-api-fst.c,v 1.1 2001/08/08 09:56:23 sakane Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.2 2001/08/16 21:46:54 sakane Exp $	*/
 
 /*
  * rijndael-api-fst.c   v2.3   April '2000
@@ -112,7 +112,7 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 		
 	case MODE_CBC:
-#if 1 /*STRICT_ALIGN*/
+#if 0 /*STRICT_ALIGN*/
 		bcopy(cipher->IV, block, 16);
 		bcopy(input, iv, 16);
 		((word32*)block)[0] ^= ((word32*)iv)[0];
@@ -128,7 +128,7 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		rijndaelEncrypt(block, outBuffer, key->keySched, key->ROUNDS);
 		input += 16;
 		for (i = numBlocks - 1; i > 0; i--) {
-#if 1 /*STRICT_ALIGN*/
+#if 0 /*STRICT_ALIGN*/
 			bcopy(outBuffer, block, 16);
 			((word32*)block)[0] ^= ((word32*)iv)[0];
 			((word32*)block)[1] ^= ((word32*)iv)[1];
@@ -147,7 +147,7 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 	
 	case MODE_CFB1:
-#if 1 /*STRICT_ALIGN*/
+#if 0 /*STRICT_ALIGN*/
 		bcopy(cipher->IV, iv, 16); 
 #else  /* !STRICT_ALIGN */
 		*((word32*)iv[0]) = *((word32*)(cipher->IV   ));
@@ -243,7 +243,13 @@ int rijndael_padEncrypt(cipherInstance *cipher, keyInstance *key,
 			input += 16;
 			outBuffer += 16;
 		}
+#if 0	/*XXX i'm not sure that is correct. sakane@kame.net */
 		padLen = 16 - (inputOctets - 16*numBlocks);
+#else
+		padLen = 16 - inputOctets % 16;
+		if (padLen == 16)
+			padLen = 0;
+#endif
 		if (padLen > 0 && padLen <= 16)
 			panic("rijndael_padEncrypt(CBC)");
 		for (i = 0; i < 16 - padLen; i++) {
@@ -288,7 +294,7 @@ int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 		
 	case MODE_CBC:
-#if 1 /*STRICT_ALIGN */
+#if 0 /*STRICT_ALIGN */
 		bcopy(cipher->IV, iv, 16); 
 #else
 		*((word32*)iv[0]) = *((word32*)(cipher->IV   ));
@@ -302,7 +308,7 @@ int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
 			((word32*)block)[1] ^= *((word32*)iv[1]);
 			((word32*)block)[2] ^= *((word32*)iv[2]);
 			((word32*)block)[3] ^= *((word32*)iv[3]);
-#if 1 /*STRICT_ALIGN*/
+#if 0 /*STRICT_ALIGN*/
 			bcopy(input, iv, 16);
 			bcopy(block, outBuffer, 16);
 #else
@@ -317,7 +323,7 @@ int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 	
 	case MODE_CFB1:
-#if 1 /*STRICT_ALIGN */
+#if 0 /*STRICT_ALIGN */
 		bcopy(cipher->IV, iv, 16); 
 #else
 		*((word32*)iv[0]) = *((word32*)(cipher->IV));
