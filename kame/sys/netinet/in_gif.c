@@ -62,6 +62,8 @@
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/in_gif.h>
+#include <netinet/in_var.h>
+#include <netinet/ip_encap.h>
 #include <netinet/ip_ecn.h>
 
 #ifdef INET6
@@ -79,6 +81,8 @@
 #include <machine/stdarg.h>
 
 #include <net/net_osdep.h>
+
+extern struct protosw in_gif_protosw;
 
 #if NGIF > 0
 int ip_gif_ttl = GIF_TTL;
@@ -242,10 +246,15 @@ in_gif_input(m, va_alist)
 #endif
 {
 	int off, proto;
+#if 0
 	struct gif_softc *sc;
+#endif
 	struct ifnet *gifp = NULL;
 	struct ip *ip;
-	int i, af;
+#if 0
+	int i;
+#endif
+	int af;
 	va_list ap;
 	u_int8_t otos;
 
@@ -261,6 +270,7 @@ in_gif_input(m, va_alist)
 	proto = ip->ip_p;
 #endif
 
+#if 0
 	/* this code will be soon improved. */
 #define	satosin(sa)	((struct sockaddr_in *)(sa))	
 	for (i = 0, sc = gif; i < ngif; i++, sc++) {
@@ -288,8 +298,21 @@ in_gif_input(m, va_alist)
 			break;
 		}
 	}
+#else
+	gifp = (struct ifnet *)m->m_pkthdr.aux;
+	m->m_pkthdr.aux = NULL;
+#endif
 
 	if (gifp == NULL) {
+#ifdef __OpenBSD__
+#if defined(MROUTING) || defined(IPSEC)
+		/* for backward compatibility */
+		if (proto == IPPROTO_IPV4) {
+			ip4_input(m, off, proto);
+			return;
+		}
+#endif
+#else
 #ifdef MROUTING
 		/* for backward compatibility */
 		if (proto == IPPROTO_IPV4) {
@@ -297,6 +320,7 @@ in_gif_input(m, va_alist)
 			return;
 		}
 #endif /*MROUTING*/
+#endif
 		m_freem(m);
 		ipstat.ips_nogif++;
 		return;
@@ -349,4 +373,85 @@ in_gif_input(m, va_alist)
 	}
 	gif_input(m, af, gifp);
 	return;
+}
+
+int
+in_gif_ioctl(ifp, cmd, data)
+	struct ifnet *ifp;
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+	int cmd;
+#else
+	u_long cmd;
+#endif
+	caddr_t data;
+{
+	struct gif_softc *sc  = (struct gif_softc*)ifp;
+	struct ifreq     *ifr = (struct ifreq*)data;
+	int error = 0, size;
+	struct sockaddr *sa, *dst, *src;
+	void *p;
+	struct sockaddr_in mask4;
+	struct sockaddr *mask;
+		
+	switch (cmd) {
+#ifdef INET
+	case SIOCSIFPHYADDR:
+#endif
+		switch (ifr->ifr_addr.sa_family) {
+#ifdef INET
+		case AF_INET:
+			src = (struct sockaddr *)
+				&(((struct in_aliasreq *)data)->ifra_addr);
+			dst = (struct sockaddr *)
+				&(((struct in_aliasreq *)data)->ifra_dstaddr);
+
+			bzero(&mask4, sizeof(mask4));
+			mask4.sin_addr.s_addr = ~0;
+			mask = (struct sockaddr *)&mask4;
+			size = sizeof(struct sockaddr_in);
+			break;
+#endif /* INET */
+		default:
+			error = EAFNOSUPPORT;
+			goto bad;
+		}
+
+		if (sc->gif_psrc != NULL)
+			free((caddr_t)sc->gif_psrc, M_IFADDR);
+		if (sc->gif_pdst != NULL)
+			free((caddr_t)sc->gif_pdst, M_IFADDR);
+
+		p = encap_attach(ifr->ifr_addr.sa_family, -1, src, mask,
+			dst, mask, (struct protosw *)&in_gif_protosw,
+			&sc->gif_if);
+		if (p == NULL) {
+			error = EINVAL;
+			goto bad;
+		}
+		if (sc->encap_cookie)
+			(void)encap_detach(sc->encap_cookie);
+		sc->encap_cookie = p;
+
+		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
+		bzero((caddr_t)sa, size);
+		bcopy((caddr_t)src, (caddr_t)sa, size);
+		sc->gif_psrc = sa;
+		
+		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
+		bzero((caddr_t)sa, size);
+		bcopy((caddr_t)dst, (caddr_t)sa, size);
+		sc->gif_pdst = sa;
+		
+		ifp->if_flags |= IFF_UP;
+		if_up(ifp);		/* send up RTM_IFINFO */
+
+		error = 0;
+		break;
+	default:
+		error = EINVAL;
+		goto bad;
+	}
+
+ bad:
+	return error;
 }

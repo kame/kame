@@ -105,6 +105,7 @@
 #include <netinet/tcp_debug.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+#include <netinet/ip_encap.h>
 /*
  * TCP/IP protocol family: IP, ICMP, UDP, TCP.
  */
@@ -199,28 +200,25 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,		ipsec_sysctl
 },
 #endif /* IPSEC */
-#if NGIF > 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	rip_output, 	0,		rip_ctloutput,
+  encap4_input,	rip_output, 	0,		rip_ctloutput,
   rip_usrreq,	/*XXX*/
   0,		0,		0,		0,
 },
 #ifdef INET6
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	rip_output, 	0,		rip_ctloutput,
+  encap4_input,	rip_output, 	0,		rip_ctloutput,
   rip_usrreq,	/*XXX*/
   0,		0,		0,		0,
 },
 #endif /* INET6 */
-#else /* NGIF */
-#if NIPIP > 0 || defined(MROUTING)
+#if 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
   ipip_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,	/* XXX */
   0,		0,		0,		0,
 },
-#endif /* NIPIP > 0 || MROUTING */
-#endif /* NGIF */
+#endif
 #if NGRE > 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_GRE,	PR_ATOMIC|PR_ADDR,
   gre_input,	rip_output,	0,		rip_ctloutput,
@@ -274,6 +272,15 @@ struct protosw inetsw[] = {
   rip_init,	0,		0,		0,
 },
 };
+
+#if NGIF > 0
+struct protosw in_gif_protosw =
+{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[4]*/,	PR_ATOMIC|PR_ADDR,
+  in_gif_input, rip_output,	0,		rip_ctloutput,
+  rip_usrreq,
+  0,            0,              0,              0,
+};
+#endif /*NGIF*/
 
 struct domain inetdomain =
     { PF_INET, "internet", 0, 0, 0, 

@@ -36,5 +36,10 @@ extern int ip_gif_ttl;
 
 void in_gif_input __P((struct mbuf *, ...));
 int in_gif_output __P((struct ifnet *, int, struct mbuf *, struct rtentry *));
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+int in_gif_ioctl __P((struct ifnet *, int, caddr_t));
+#else
+int in_gif_ioctl __P((struct ifnet *, u_long, caddr_t));
+#endif
 
 #endif /*_NETINET_IN_GIF_H_*/

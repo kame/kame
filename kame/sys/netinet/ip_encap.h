@@ -27,59 +27,17 @@
  * SUCH DAMAGE.
  */
 
-/*
- * if_gif.h
- */
+#ifndef _NETINET_IP_ENCAP_H_
+#define _NETINET_IP_ENCAP_H_
 
-#ifndef _NET_IF_GIF_H_
-#define _NET_IF_GIF_H_
-
-
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
-#if defined(_KERNEL) && !defined(_LKM)
-#include "opt_inet.h"
-#endif
-#endif
-
-#include <netinet/in.h>
-/* xxx sigh, why route have struct route instead of pointer? */
-
-struct gif_softc {
-	struct ifnet	gif_if;	   /* common area */
-	struct sockaddr	*gif_psrc; /* Physical src addr */
-	struct sockaddr	*gif_pdst; /* Physical dst addr */
-	union {
-		struct route  gifscr_ro;    /* xxx */
-#ifdef INET6
-		struct route_in6 gifscr_ro6; /* xxx */
-#endif
-	} gifsc_gifscr;
-	int		gif_flags;
-	void		*encap_cookie;
-};
-
-#define gif_ro gifsc_gifscr.gifscr_ro
-#ifdef INET6
-#define gif_ro6 gifsc_gifscr.gifscr_ro6
+#ifdef _KERNEL
+void	encap_init __P((void));
+void	encap4_input __P((struct mbuf *, ...));
+int	encap6_input __P((struct mbuf **, int *, int));
+void	*encap_attach __P((int, int, struct sockaddr *, struct sockaddr *,
+		struct sockaddr *, struct sockaddr *, struct protosw *,
+		void *));
+int	encap_detach __P((void *));
 #endif
 
-#define	GIFF_INUSE	0x1	/* gif is in use */
-
-#define GIF_MTU		(1280)	/* Default MTU */
-#define	GIF_MTU_MIN	(1280)	/* Minimum MTU */
-#define	GIF_MTU_MAX	(8192)	/* Maximum MTU */
-
-extern int ngif;
-extern struct gif_softc *gif;
-
-/* Prototypes */
-void gif_input __P((struct mbuf *, int, struct ifnet *));
-int gif_output __P((struct ifnet *, struct mbuf *,
-		    struct sockaddr *, struct rtentry *));
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-int gif_ioctl __P((struct ifnet *, int, caddr_t));
-#else
-int gif_ioctl __P((struct ifnet *, u_long, caddr_t));
-#endif
-
-#endif /* _NET_IF_GIF_H_ */
+#endif /*_NETINET_IP_ENCAP_H_*/

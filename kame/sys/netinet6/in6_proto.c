@@ -90,6 +90,7 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
+#include <netinet/ip_encap.h>
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
@@ -341,9 +342,8 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #endif /* IPSEC */
-#if NGIF > 0
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
-  in6_gif_input, rip6_output,	 0,		rip6_ctloutput,
+  encap6_input,	rip6_output, 	0,		rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -367,8 +367,7 @@ struct ip6protosw inet6sw[] = {
   &rip6_usrreqs
 #endif
 },
-#endif /* INET6 */
-#endif /* GIF */
+#endif /*INET6*/
 { SOCK_RAW,     &inet6domain,	IPPROTO_PIM,	PR_ATOMIC|PR_ADDR,
   pim6_input,    rip6_output,	0,              rip6_ctloutput, 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -395,6 +394,22 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 };
+
+#if NGIF > 0
+struct ip6protosw in6_gif_protosw =
+{ SOCK_RAW,	&inet6domain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
+  in6_gif_input, rip6_output,	0,		rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip6_usrreq,
+#endif
+  0,            0,              0,              0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+#endif
+};
+#endif /*NGIF*/
 
 #ifdef __FreeBSD__
 extern int in6_inithead __P((void **, int));
