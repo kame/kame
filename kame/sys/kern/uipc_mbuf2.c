@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.29 2001/02/14 13:42:10 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.30 2001/07/31 00:14:43 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -376,6 +376,8 @@ m_dup1(m, off, len, wait)
 	if (copyhdr)
 		M_COPY_PKTHDR(n, m);
 	m_copydata(m, off, len, mtod(n, caddr_t));
+	n->m_len = len;
+
 	return n;
 }
 #endif
