@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.46 2001/07/29 09:23:05 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.47 2001/07/29 10:38:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -281,8 +281,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 #else  /* !bsdi */
 #ifdef RADIX_MPATH
 				rtalloc_mpath((struct route *)ro,
-					      ntohl(ip6->ip6_src.s6_addr32[3] ^
-						    ip6->ip6_dst.s6_addr32[3]));
+				    ntohl(dstsock->sin6_addr.s6_addr32[3]));
 #else
 				rtalloc((struct route *)ro);
 #endif /* RADIX_MPATH */
