@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.29 2000/08/05 17:57:17 sumikawa Exp $	*/
+/*	$KAME: esp_input.c,v 1.30 2000/08/16 09:52:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -413,6 +413,7 @@ noreplaycheck:
 		s = splimp();
 		if (IF_QFULL(&ipintrq)) {
 			ipsecstat.in_inval++;
+			splx(s);
 			goto bad;
 		}
 		IF_ENQUEUE(&ipintrq, m);
@@ -779,6 +780,7 @@ noreplaycheck:
 		s = splimp();
 		if (IF_QFULL(&ip6intrq)) {
 			ipsec6stat.in_inval++;
+			splx(s);
 			goto bad;
 		}
 		IF_ENQUEUE(&ip6intrq, m);
