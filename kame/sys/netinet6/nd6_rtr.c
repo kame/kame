@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.178 2001/11/04 14:01:35 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.179 2001/11/05 01:26:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -961,7 +961,7 @@ static int
 rtpref(struct nd_defrouter *dr)
 {
 #ifdef RTPREF
-	switch ((dr->flags & ND_RA_FLAG_RTPREF_MASK)) {
+	switch (dr->flags & ND_RA_FLAG_RTPREF_MASK) {
 	case ND_RA_FLAG_RTPREF_HIGH:
 		return RTPREF_HIGH;
 	case ND_RA_FLAG_RTPREF_MEDIUM:
