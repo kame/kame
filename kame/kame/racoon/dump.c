@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.1 2000/09/22 19:50:00 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.2 2000/09/23 15:21:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -170,6 +170,7 @@ isakmp_dump(msg, from, my)
 		if (my)
 			ip.ip_dst = ((struct sockaddr_in *)my)->sin_addr;
 		ip.ip_p = IPPROTO_UDP;
+		ip.ip_ttl = 1;
 		ip.ip_len = htons(sizeof(ip) + sizeof(uh) + msg->l);
 		sf_hdr.caplen = sf_hdr.len = sizeof(af) + ntohs(ip.ip_len);
 		if (write(fd, &sf_hdr, sizeof(sf_hdr)) < sizeof(sf_hdr))
@@ -187,6 +188,7 @@ isakmp_dump(msg, from, my)
 			ip6.ip6_dst = ((struct sockaddr_in6 *)my)->sin6_addr;
 		ip6.ip6_nxt = IPPROTO_UDP;
 		ip6.ip6_plen = htons(sizeof(uh) + msg->l);
+		ip6.ip6_hlim = 1;
 		sf_hdr.caplen = sf_hdr.len =
 		    sizeof(af) + sizeof(ip6) + ntohs(ip6.ip6_plen);
 		if (write(fd, &sf_hdr, sizeof(sf_hdr)) < sizeof(sf_hdr))
