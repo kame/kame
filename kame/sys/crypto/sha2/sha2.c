@@ -1,4 +1,4 @@
-/*	$KAME: sha2.c,v 1.10 2003/09/04 00:11:02 itojun Exp $	*/
+/*	$KAME: sha2.c,v 1.11 2004/06/02 09:52:45 itojun Exp $	*/
 
 /*
  * sha2.c
@@ -62,7 +62,7 @@
  *
  */
 
-#if defined(__bsdi__) || defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #define assert(x)
 #endif
 
