@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.17 2002/09/11 02:40:49 itojun Exp $	*/
+/*	$KAME: keydb.h,v 1.18 2003/01/08 05:25:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,7 +62,15 @@ struct secashead {
 					/* SA chain */
 					/* The first of this list is newer SA */
 
+#ifdef NEW_STRUCT_ROUTE
 	struct route sa_route;		/* route cache */
+#else
+	union {
+		struct route sau_route;
+		struct route_in6 sau_route6;
+	} sa_u;
+#define sa_route sa_u.sau_route
+#endif
 };
 
 /* Security Association */
