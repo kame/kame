@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.65 2000/10/22 14:09:57 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.66 2000/11/01 08:13:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -423,6 +423,12 @@ in6_pcbconnect(in6p, nam)
 	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 #endif
 	{
+		/*
+		 * XXX in IPv4 mapped address case, we should grab fresh
+		 * local port number by in_pcbbind, not in6_pcbbind.
+		 * if we are in bad luck, we may assign conflicting port number
+		 * between IPv4 and IPv6 unwillingly.
+		 */
 		if (in6p->in6p_lport == 0) {
 #ifdef __NetBSD__
 			(void)in6_pcbbind(in6p, (struct mbuf *)0,
