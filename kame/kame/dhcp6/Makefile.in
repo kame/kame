@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.18 2003/01/05 17:12:12 jinmei Exp $
+# $Id: Makefile.in,v 1.19 2003/01/22 01:30:36 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -53,6 +53,7 @@ getaddrinfo.o:	$(srcdir)/missing/getaddrinfo.c
 getnameinfo.o:	$(srcdir)/missing/getnameinfo.c
 strlcat.o:	$(srcdir)/missing/strlcat.c
 strlcpy.o:	$(srcdir)/missing/strlcpy.c
+arc4random.o:	$(srcdir)/missing/arc4random.c
 
 $(srcdir)/ianaopts.h: gentab.pl bootp-dhcp-parameters
 	expand bootp-dhcp-parameters | perl gentab.pl > ianaopts.h
