@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.19 2000/10/29 11:48:35 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.20 2001/03/18 10:02:14 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1301,7 +1301,7 @@ translatingUDPv6To4(struct _cv *cv6, struct pAddr *pad)
 	iphlen = ip4->ip_hl << 2;
 
 	save_ip = *cv4._ip._ip4;
-	bzero(ui, sizeof(struct udpiphdr));
+	bzero(ui, sizeof(struct ip));
 	ui->ui_pr = IPPROTO_UDP;
 	ui->ui_len = htons(cv4.m->m_pkthdr.len - iphlen);
 	ui->ui_src = save_ip.ip_src;
