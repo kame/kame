@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.14 2002/09/25 11:41:22 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.15 2002/10/02 11:15:10 k-sugyou Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -1740,6 +1740,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 		}
 		/* now is there some left in our SHUTDOWN state? */
 		if (cnt_in_sd) {
+			splx(s);
 			return;
 		}
 	}
@@ -1748,7 +1749,8 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 #ifdef IPSEC
 #ifdef __OpenBSD__
 	/* XXX IPsec cleanup here */
-	s = spltdb();
+{
+	int s = spltdb();
 	if (ip_pcb->inp_tdb_in)
 		TAILQ_REMOVE(&ip_pcb->inp_tdb_in->tdb_inp_in,
 			     ip_pcb, inp_tdb_in_next);
@@ -1768,6 +1770,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 	if (ip_pcb->inp_ipsec_remoteauth)
 		ipsp_reffree(ip_pcb->inp_ipsec_remoteauth);
 	splx(s);
+}
 #else
 	ipsec4_delete_pcbpolicy(ip_pcb);
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.10 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.11 2002/10/02 11:15:10 k-sugyou Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -2442,7 +2442,11 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	struct radix_node *exist, *curparent;
 	struct sockaddr_storage s_store;
 	struct sockaddr *sa;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 
 	if (existing == NULL) {
 		/* No existing route, we just to rtalloc1() */
@@ -2481,6 +2485,7 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	/* first lets look in the rn_dupedkey chain */
 	tmp = sctp_rt_scan_dups(dst,existing,s);
 	if(tmp){
+		splx(s);
 		return (tmp);
 	}
 
@@ -2496,8 +2501,10 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	}
 	if(tmp && (tmp != existing)){
 		tmp2 = sctp_rt_scan_dups(dst,tmp,s);
-		if(tmp2)
+		if(tmp2) {
+			splx(s);
 			return (tmp2);
+		}
 	}
  nodups:
 	/*
@@ -2549,11 +2556,13 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
                 if (existing->rt_gateway != tmp->rt_gateway) {
 			/* found a different gateway */
 			tmp2 = rtfinalize_route(dst, tmp, s);
+			splx(s);
 			return (tmp2);
 		}
 		/* now what about any dup's of tmp? */
 		tmp2 = sctp_rt_scan_dups(dst,tmp,s);
 		if(tmp2){
+			splx(s);
 			return (tmp2);
 		}
 		/* Ok we need to move up a level */
@@ -2578,12 +2587,15 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 		if (existing->rt_gateway != tmp->rt_gateway) {
 			/* found a different gateway out */
 			tmp2 = rtfinalize_route(dst, tmp, s);
+			splx(s);
 			return (tmp2);
 		}
 		/* now what about any dup's of tmp? */
 		tmp2 = sctp_rt_scan_dups(dst,tmp,s);
-		if(tmp2)
+		if(tmp2) {
+			splx(s);
 			return (tmp2);
+		}
 	}
  noexisting:
 #ifdef __FreeBSD__

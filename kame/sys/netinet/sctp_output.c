@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.14 2002/09/18 01:00:25 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.15 2002/10/02 11:15:10 k-sugyou Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -6009,6 +6009,7 @@ sctp_output(inp, m, addr, control, p)
 				if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
 					tcb = LIST_FIRST(&inp->sctp_asoc_list);
 					if (tcb == NULL) {
+						splx(s);
 						return (ENOTCONN);
 					}
 					net = tcb->asoc.primary_destination;
@@ -6039,6 +6040,7 @@ sctp_output(inp, m, addr, control, p)
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
 			if (tcb == NULL) {
+				splx(s);
 				return (ENOTCONN);
 			}
 			if (addr == NULL) {

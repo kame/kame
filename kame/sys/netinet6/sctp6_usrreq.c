@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.10 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.11 2002/10/02 11:15:11 k-sugyou Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -345,7 +345,11 @@ sctp6_input(mp, offp, proto)
 	ecn_bits = ((ntohl(ip6->ip6_flow) >> 20) & 0x000000ff);
 	{
 		int s;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		s = splsoftnet();
+#else
 		s = splnet();
+#endif
 		(void)sctp_common_input_processing(in6p, stcb, netp, sh,
 						   ch, m, iphlen, offset,
 						   length, ecn_bits);
@@ -493,10 +497,14 @@ sctp6_ctlinput(cmd, pktdst, d)
 		final.sin6_addr = ((struct sockaddr_in6 *)pktdst)->sin6_addr;
 #endif /* __FreeBSD_cc_version */
 		final.sin6_port = sh.dest_port;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 		stcb = sctp_findassociation_addr_sa((struct sockaddr *)ip6cp->ip6c_src,
 						    (struct sockaddr *)&final,
 						    &inp,&netp);
-		s = splnet();
 		if (stcb != NULL && inp && (inp->sctp_socket != NULL)) {
 			if (cmd == PRC_MSGSIZE) {
 				sctp6_notify_mbuf(inp,
@@ -552,7 +560,11 @@ sctp6_getcred(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
 	if (error)
 		return (error);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 
 	inp = sctp_pcb_findep((struct sockaddr *)&addrs[0]);
 	if (inp == NULL || inp->sctp_socket == NULL) {
@@ -584,7 +596,11 @@ sctp6_abort(struct socket *so)
 	if (inp == 0)
 		return EINVAL;	/* ??? possible? panic instead? */
 	soisdisconnected(so);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	sctp_inpcb_free(inp,1);
 	splx(s);
 	return 0;
@@ -606,7 +622,11 @@ sctp6_attach(struct socket *so, int proto, struct proc *p)
 		if (error)
 			return error;
 	}
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	error = sctp_inpcb_alloc(so);
 	splx(s);
 	if (error)
@@ -722,7 +742,11 @@ sctp6_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 				inp->inp_vflag &= ~INP_IPV6;
 #endif
 #endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+				s = splsoftnet();
+#else
 				s = splnet();
+#endif
 				error = sctp_inpcb_bind(so, (struct sockaddr *)&sin, p);
 				splx(s);
 				return error;
@@ -743,7 +767,11 @@ sctp6_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 				return EINVAL;
 		}
 	}
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	error = sctp_inpcb_bind(so, addr, p);
 	splx(s);
 	return error;
@@ -759,7 +787,11 @@ sctp6_detach(struct socket *so)
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0)
 		return EINVAL;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	sctp_inpcb_free(inp,0);
 	splx(s);
 	return 0;
@@ -771,7 +803,11 @@ sctp6_disconnect(struct socket *so)
 	struct sctp_inpcb *inp;
 	int s;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();		/* XXX */
+#endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == NULL) {
 		splx(s);
@@ -924,7 +960,11 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 static int
 sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 {
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	int s = splsoftnet();
+#else
 	int s = splnet();
+#endif
 	int error = 0;
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
@@ -1220,7 +1260,11 @@ sctp6_in6getaddr(struct socket *so,
 	if (inp == NULL)
 		return EINVAL;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	/* allow v6 addresses precedence */
 	error = sctp6_getaddr(so, nam);
 	if (error) {
@@ -1268,7 +1312,11 @@ sctp6_getpeeraddr(struct socket *so,
 	if (inp == NULL)
 		return EINVAL;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	/* allow v6 addresses precedence */
 	error = sctp6_peeraddr(so, nam);
 	if (error) {
@@ -1329,7 +1377,11 @@ sctp6_usrreq(so, req, m, nam, control)
 	int error = 0;
 	int family;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 	family = so->so_proto->pr_domain->dom_family;
 
 	if (req == PRU_CONTROL) {

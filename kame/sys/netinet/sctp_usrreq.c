@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.19 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.20 2002/10/02 11:15:10 k-sugyou Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -375,11 +375,6 @@ sctp_ctlinput(cmd, sa, vip)
 			}
 		} else {
 			if (PRC_IS_REDIRECT(cmd) && inp) {
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-				s = splsoftnet();
-#else
-				s = splnet();
-#endif
 				in_rtchange((struct inpcb *)inp,
 					    inetctlerrmap[cmd]);
 			}
@@ -774,6 +769,7 @@ sctp_disconnect(struct socket *so)
 #endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == NULL) {
+		splx(s);
 		return (ENOTCONN);
 	}
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
@@ -787,8 +783,10 @@ sctp_disconnect(struct socket *so)
 			struct sctp_tcb *tcb;
 
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
-			if (tcb == NULL)
+			if (tcb == NULL) {
+				splx(s);
 				return (EINVAL);
+			}
 
 			asoc = &tcb->asoc;
 			if (!TAILQ_EMPTY(&asoc->out_wheel)) {
@@ -833,10 +831,12 @@ sctp_disconnect(struct socket *so)
 				 */
 				asoc->state |= SCTP_STATE_SHUTDOWN_PENDING;
 			}
+			splx(s);
 			return (0);
 		}
 	} else {
 		/* UDP model does not support this */
+		splx(s);
 		return EOPNOTSUPP;
 	}
 }
@@ -853,8 +853,10 @@ sctp_shutdown(struct socket *so)
 	s = splnet();
 #endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
-	if (inp == 0)
+	if (inp == 0) {
+		splx(s);
 		return EINVAL;
+	}
 
 	/* For UDP model this is a invalid call */
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_UDPTYPE) {
@@ -881,6 +883,7 @@ sctp_shutdown(struct socket *so)
 			 * call was made after an abort or something.
 			 * Nothing to do now.
 			 */
+			splx(s);
 			return (0);
 		}
 		asoc = &tcb->asoc;
@@ -3341,8 +3344,10 @@ sctp_usrreq(so, req, m, nam, control)
 		struct sockaddr *name;
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
-		else
+		else {
+			splx(s);
 			return (EINVAL);
+		}
 		error  = sctp_bind(so, name
 #if defined(__NetBSD__)
 				   , p
@@ -3366,8 +3371,10 @@ sctp_usrreq(so, req, m, nam, control)
 		struct sockaddr *name;
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
-		else
+		else {
+			splx(s);
 			return (EINVAL);
+		}
 		error = sctp_connect(so, name
 #if defined(__NetBSD__)
 				     , p
@@ -3385,8 +3392,10 @@ sctp_usrreq(so, req, m, nam, control)
 		struct sockaddr *name;
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
-		else
+		else {
+			splx(s);
 			return (EINVAL);
+		}
 		error = sctp_accept(so, name);
 	}
 	break;
@@ -3440,8 +3449,10 @@ sctp_usrreq(so, req, m, nam, control)
 		struct sockaddr *name;
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
-		else
+		else {
+			splx(s);
 			return (EINVAL);
+		}
 		error = sctp_peeraddr(so, name);
 	}
 	break;
@@ -3450,8 +3461,10 @@ sctp_usrreq(so, req, m, nam, control)
 		struct sockaddr *name;
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
-		else
+		else {
+			splx(s);
 			return (EINVAL);
+		}
 
 		error = sctp_ingetaddr(so, name);
 	}
