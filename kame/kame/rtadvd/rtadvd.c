@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.66 2002/05/29 14:18:36 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.67 2002/05/31 13:30:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -486,7 +486,13 @@ rtmsg_input()
 			}
 			prefix = find_prefix(rai, addr, plen);
 			if (prefix) {
-				if (dflag > 1) {
+				if (prefix->timer) {
+					/*
+					 * If the prefix has been invalidated,
+					 * make it available again.
+					 */
+					update_prefix(prefix);
+				} else if (dflag > 1) {
 					syslog(LOG_DEBUG,
 					    "<%s> new prefix(%s/%d) "
 					    "added on %s, "
@@ -533,7 +539,7 @@ rtmsg_input()
 				}
 				break;
 			}
-			delete_prefix(rai, prefix);
+			invalidate_prefix(prefix);
 			break;
 		case RTM_NEWADDR:
 		case RTM_DELADDR:
@@ -1601,7 +1607,7 @@ struct rainfo *rainfo;
 }
 
 /* process RA timer */
-void
+struct rtadvd_timer *
 ra_timeout(void *data)
 {
 	struct rainfo *rai = (struct rainfo *)data;
@@ -1615,6 +1621,8 @@ ra_timeout(void *data)
 	       __FUNCTION__, rai->ifname);
 
 	ra_output(rai);
+
+	return(rai->timer);
 }
 
 /* update RA timer */

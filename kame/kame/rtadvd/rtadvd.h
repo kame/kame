@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.20 2002/05/29 10:13:10 itojun Exp $	*/
+/*	$KAME: rtadvd.h,v 1.21 2002/05/31 13:30:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -72,6 +72,12 @@
 struct prefix {
 	struct prefix *next;	/* forward link */
 	struct prefix *prev;	/* previous link */
+
+	struct rainfo *rainfo;	/* back pointer to the interface */
+
+	struct rtadvd_timer *timer; /* expiration timer.  used when a prefix
+				     * derived from the kernel is deleted.
+				     */
 
 	u_int32_t validlifetime; /* AdvValidLifetime */
 	long	vltimeexpire;	/* expiration of vltime; decrement case only */
@@ -162,7 +168,7 @@ struct	rainfo {
 	struct soliciter *soliciter;	/* recent solication source */
 };
 
-void ra_timeout __P((void *));
+struct rtadvd_timer *ra_timeout __P((void *));
 void ra_timer_update __P((void *, struct timeval *));
 
 int prefix_match __P((struct in6_addr *, int, struct in6_addr *, int));

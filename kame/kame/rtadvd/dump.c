@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.29 2002/05/31 11:56:08 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.30 2002/05/31 13:30:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -220,6 +220,15 @@ if_dump()
 				pfx->routeraddr ? "R" :
 #endif
 				"");
+			if (pfx->timer) {
+				struct timeval *rest;
+
+				rest = rtadvd_timer_rest(pfx->timer);
+				if (rest) { /* XXX: what if not? */
+					fprintf(fp, ", expire in: %ld",
+					    (long)rest->tv_sec);
+				}
+			}
 			fprintf(fp, ")\n");
 		}
 #ifdef ROUTEINFO
