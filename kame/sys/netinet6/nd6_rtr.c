@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.258 2004/07/07 10:16:04 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.259 2004/07/23 05:53:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1449,8 +1449,7 @@ prelist_update(new, dr, m, mcast)
 		ifa6 = (struct in6_ifaddr *)ifa;
 
 		/*
-		 * We only consider autoconfigured addresses as per
-		 * rfc2462bis
+		 * We only consider autoconfigured addresses as per rfc2462bis.
 		 */
 		if (!(ifa6->ia6_flags & IN6_IFF_AUTOCONF))
 			continue;
@@ -1473,9 +1472,6 @@ prelist_update(new, dr, m, mcast)
 
 		if (ia6_match == NULL) /* remember the first one */
 			ia6_match = ifa6;
-
-		if ((ifa6->ia6_flags & IN6_IFF_AUTOCONF) == 0)
-			continue;
 
 		/*
 		 * An already autoconfigured address matched.  Now that we
