@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.142 2004/02/16 07:32:34 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.143 2004/02/25 08:54:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -752,16 +752,10 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 #else
 		ifp = ifindex2ifnet[pi->ipi6_ifindex];
 #endif
-		if (ifp != NULL && IN6_IS_SCOPE_LINKLOCAL(dst)) {
-			/* mismatch case will be handled later on */
-			if (dstsock->sin6_scope_id == 0)
-				dstsock->sin6_scope_id = pi->ipi6_ifindex;
-
-			in6_embedscope(dst, dstsock);
-		}
-		if (ifp != NULL && !retrt && IN6_IS_ADDR_MULTICAST(dst)) {
+		if (ifp != NULL &&
+		    (retrt == NULL || IN6_IS_ADDR_MULTICAST(dst))) {
 			/*
-			 * we do not have to check nor get the route for
+			 * we do not have to check or get the route for
 			 * multicast.
 			 */
 			goto done;
