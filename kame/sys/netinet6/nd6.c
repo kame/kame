@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.69 2000/07/10 11:38:37 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.70 2000/07/10 23:21:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -869,7 +869,6 @@ nd6_free(rt)
 	struct rtentry *rt;
 {
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo;
-	struct sockaddr_dl *sdl;
 	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 	struct nd_defrouter *dr;
 
