@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.148 2001/07/14 14:13:24 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.149 2001/07/29 13:42:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1298,7 +1298,9 @@ isakmp_open()
 {
 	const int yes = 1;
 	int ifnum;
+#ifdef INET6
 	int pktinfo;
+#endif
 	struct myaddrs *p;
 
 	ifnum = 0;
