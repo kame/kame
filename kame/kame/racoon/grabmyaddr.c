@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.23 2000/11/18 11:21:26 jinmei Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.24 2000/11/19 23:48:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -401,8 +401,7 @@ suitable_ifaddr6(ifname, ifaddr)
 
 	close(s);
 
-	if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TENTATIVE
-	 || ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DUPLICATED
+	if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DUPLICATED
 	 || ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED)
 		return 0;
 
