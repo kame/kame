@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.65 2002/04/22 12:03:02 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.66 2002/05/29 03:39:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1649,7 +1649,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	static struct route_in6 ro;
 #endif
 	struct	in6_multi *in6m;
-	u_int32_t linkmtu;
+	u_long linkmtu;
 
 	/*
 	 * Make a new reference to the packet; make sure that
