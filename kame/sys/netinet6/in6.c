@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.346 2003/08/12 12:16:39 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.347 2003/08/14 08:24:32 kjc Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1138,6 +1138,9 @@ in6_update_ifa(ifp, ifra, ia)
 		bzero((caddr_t)ia, sizeof(*ia));
 		LIST_INIT(&ia->ia6_memberships);
 		/* Initialize the address and masks, and put time stamp */
+#if defined(__FreeBSD__) && (__FreeBSD_version >= 501000)
+		IFA_LOCK_INIT(&ia->ia_ifa);
+#endif
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 		ia->ia_addr.sin6_family = AF_INET6;
 		ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
