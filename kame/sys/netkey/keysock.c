@@ -333,6 +333,7 @@ key_sendup0(rp, m, promisc, canwait)
 		    sbspace(&rp->rcb_socket->so_rcv) < m->m_pkthdr.len) {
 			error = EAGAIN;
 			kp->kp_queue = m;
+			m->m_nextpkt = n;
 			break;
 		}
 
