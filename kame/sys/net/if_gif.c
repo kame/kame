@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.102 2003/03/28 05:29:21 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.103 2003/03/28 09:55:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -515,9 +515,7 @@ gif_input(m, af, ifp)
 	int af;
 	struct ifnet *ifp;
 {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	int error;
-#else
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
 #endif
 	int isr;
@@ -594,8 +592,7 @@ gif_input(m, af, ifp)
 	}
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	IFQ_HANDOFF(ifp, m, NULL, error);
-	if (error)
+	if (!IF_HANDOFF(ifq, m, NULL))
 		return;
 #else
 #ifdef __NetBSD__

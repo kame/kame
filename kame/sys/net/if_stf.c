@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.106 2003/03/28 05:29:21 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.107 2003/03/28 09:55:55 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1033,9 +1033,7 @@ in_stf_input(m, va_alist)
 	struct ip *ip;
 	struct ip6_hdr *ip6;
 	u_int8_t otos, itos;
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	int error;
-#else
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
 #endif
 	int isr;
@@ -1150,8 +1148,7 @@ in_stf_input(m, va_alist)
 	isr = NETISR_IPV6;
 
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	IFQ_HANDOFF(ifp, m, NULL, error);
-	if (error)
+	if (!IF_HANDOFF(ifq, m, NULL))
 		return;
 #else
 #if defined(__NetBSD__) || defined(__OpenBSD__)
