@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.42 2001/07/25 05:18:01 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.43 2001/07/26 05:39:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -609,7 +609,7 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 			if (scopeid < 0 || if_index < scopeid)
 				return ENXIO;  /* XXX EINVAL? */
 			ifp = ifindex2ifnet[scopeid];
-			/*XXX assignment to 16bit from 32bit variable */
+			/* XXX assignment to 16bit from 32bit variable */
 			in6->s6_addr16[1] = htons(scopeid & 0xffff);
 		}
 
