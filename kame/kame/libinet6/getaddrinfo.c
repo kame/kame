@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.165 2004/04/13 08:06:52 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.166 2004/04/13 08:11:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1562,6 +1562,8 @@ get_port(ai, servname, matchonly)
 
 	port = str2number(servname);
 	if (port >= 0) {
+		if (!allownumeric)
+			return EAI_SERVICE;
 		if (port < 0 || port > 65535)
 			return EAI_SERVICE;
 		port = htons(port);
