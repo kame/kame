@@ -131,6 +131,7 @@ extern struct in6pcb rawin6pcb;
 extern struct inpcbhead ripcb;
 #endif
 extern u_int icmp6errratelim;
+extern int icmp6_nodeinfo;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
@@ -664,8 +665,10 @@ icmp6_input(mp, offp, proto)
 #define hostnamelen	strlen(hostname)
 #endif
 		if (mode == FQDN) {
+#ifndef PULLDOWN_TEST
 			IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_nodeinfo),
 					 IPPROTO_DONE);
+#endif
 			n = ni6_input(m, off);
 			noff = sizeof(struct ip6_hdr);
 		}
@@ -907,6 +910,10 @@ icmp6_input(mp, offp, proto)
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif 
 
+/*
+ * NOTE: it should not modify the source mbuf (m), as it will be 
+ * used by the caller (icmp6_input) afterwards.
+ */
 static struct mbuf *
 ni6_input(m, off)
 	struct mbuf *m;
@@ -920,11 +927,18 @@ ni6_input(m, off)
 	int addrs;		/* for NI_QTYPE_NODEADDR */
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
 
+	if (!icmp6_nodeinfo)
+		return NULL;
+
 #ifndef PULLDOWN_TEST
 	ni6 = (struct icmp6_nodeinfo *)(mtod(m, caddr_t) + off);
 #else
-	IP6_EXTHDR_GET(ni6, struct icmp6_nodeinfo *, m, off,
-		sizeof(*ni6));
+	n = m_copy(m, 0, M_COPYALL);
+	if (n == NULL)
+		return NULL;
+	m = n;
+	n = NULL;
+	IP6_EXTHDR_GET(ni6, struct icmp6_nodeinfo *, m, off, sizeof(*ni6));
 	if (ni6 == NULL)
 		return NULL;
 #endif
@@ -2321,6 +2335,8 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				&nd6_useloopback);
 	case ICMPV6CTL_ND6_PROXYALL:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &nd6_proxyall);
+	case ICMPV6CTL_NODEINFO:
+		return sysctl_int(oldp, oldlenp, newp, newlen, &icmp6_nodeinfo);
 	default:
 		return ENOPROTOOPT;
 	}

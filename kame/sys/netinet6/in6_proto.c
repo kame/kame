@@ -475,6 +475,7 @@ u_long	rip6_recvspace = RIPV6RCVQ;
 int	icmp6_rediraccept = 1;		/* accept and process redirects */
 int	icmp6_redirtimeout = 10 * 60;	/* 10 minutes */
 u_int	icmp6errratelim = 1000;		/* 1000usec = 1msec */
+int	icmp6_nodeinfo = 1;		/* enable/disable NI response */
 
 #ifdef TCP6
 /* TCP on IP6 parameters */
@@ -671,6 +672,8 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_USELOOPBACK,
 	nd6_useloopback, CTLFLAG_RW,	&nd6_useloopback, 0, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_PROXYALL,
 	nd6_proxyall, CTLFLAG_RW,	&nd6_proxyall, 0, "");
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_NODEINFO,
+	nodeinfo, CTLFLAG_RW,	&icmp6_nodeinfo,	0, "");
 
 #if __FreeBSD__ < 3
 /* net.inet6.udp6 */

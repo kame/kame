@@ -524,7 +524,8 @@ struct icmp6stat {
 #define ICMPV6CTL_ND6_MMAXTRIES		10
 #define ICMPV6CTL_ND6_USELOOPBACK	11
 #define ICMPV6CTL_ND6_PROXYALL	12
-#define ICMPV6CTL_MAXID		13
+#define ICMPV6CTL_NODEINFO	13
+#define ICMPV6CTL_MAXID		14
 
 #define ICMPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -540,6 +541,7 @@ struct icmp6stat {
 	{ "nd6_mmaxtries", CTLTYPE_INT }, \
 	{ "nd6_useloopback", CTLTYPE_INT }, \
 	{ "nd6_proxyall", CTLTYPE_INT }, \
+	{ "nodeinfo", CTLTYPE_INT }, \
 }
 
 #define ICMPV6CTL_VARS { \
@@ -557,6 +559,7 @@ struct icmp6stat {
 	&nd6_mmaxtries,	\
 	&nd6_useloopback, \
 	&nd6_proxyall, \
+	&icmp6_nodeinfo, \
 }
 
 #define RTF_PROBEMTU	RTF_PROTO1
