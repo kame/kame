@@ -590,7 +590,7 @@ send:
 	 }
 
 #ifdef DIAGNOSTIC
-	if (max_linkhdr + hdrlen > MHLEN)
+	if (max_linkhdr + hdrlen > MCLBYTES)
 		panic("tcphdr too big");
 #endif
 
