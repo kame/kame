@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2361 2003/03/19 09:39:49 ono Exp $
+$KAME: CHANGELOG,v 1.2362 2003/03/22 09:10:32 jinmei Exp $
 
 <200303>
+2003-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): made sure to keep
+	the current stored lifetime when it was not updated by an RA.
+	Discovered through a periodic TAHI test by Ozoe Nobumichi
+	<ozoe@tahi.org>.
+
 2003-03-19  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
 	* kame/kame/vrrp6d,
 	  kame/sys/net/{if_vrrp.c,if_vrrp_var.h},kame/sys/netinet6/mld6.c,
