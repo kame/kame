@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.85 2002/02/18 14:00:27 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.86 2002/02/19 00:58:45 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1875,7 +1875,7 @@ mip6_dad_success(ifa)
 		mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_ADD);
 	}
 	free(ifa, M_IFADDR);
-	mbc->mbc_dad = NULL;
+	prim->mbc_dad = NULL;
 	/* return BA */
 	if (mip6_bc_send_ba(&prim->mbc_addr, &prim->mbc_phaddr,
 			    &prim->mbc_pcoa,
@@ -1911,7 +1911,7 @@ mip6_dad_duplicated(ifa)
 
 	prim = mbc;
 	free(ifa, M_IFADDR);
-	mbc->mbc_dad = NULL;
+	prim->mbc_dad = NULL;
 	for(mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
 	    mbc = mbc_next) {
