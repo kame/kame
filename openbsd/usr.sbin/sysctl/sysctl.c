@@ -1100,7 +1100,7 @@ sysctl_inet6(string, bufpp, mib, flags, typep)
 	if ((indx = findname(string, "third", bufpp, &inet6list)) == -1)
 		return(-1);
 	mib[2] = indx;
-	if (indx < IPPROTO_MAXID && inet6vars[indx].list != NULL)
+	if (indx < IPV6PROTO_MAXID && inet6vars[indx].list != NULL)
 		lp = &inet6vars[indx];
 	else if (!flags)
 		return(-1);
