@@ -152,6 +152,7 @@ void ifinfo __P((int, char **));
 void rtrlist __P((void));
 void plist __P((void));
 void pfx_flush __P((void));
+void rtrlist __P((void));
 void rtr_flush __P((void));
 void harmonize_rtr __P((void));
 #ifdef SIOCSDEFIFACE_IN6	/* XXX: check SIOCGDEFIFACE_IN6 as well? */
