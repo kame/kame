@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2181 2002/06/06 12:57:50 jinmei Exp $
+$KAME: CHANGELOG,v 1.2182 2002/06/07 13:45:01 itojun Exp $
 
 <200206>
+Fri Jun  7 22:44:34 JST 2002  itojun@iijlab.net
+	* sys/netinet/ip_input.c: look at rmx_mtu on IPsec tunnel MTU
+	  computation.  From: David Waitzman <djw@bbn.com>
+
 2002-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd: when an advertised prefix configured from the
 	kernel has been added or invalidated, notice the change in a short
