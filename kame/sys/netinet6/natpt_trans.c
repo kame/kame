@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.84 2002/03/25 07:12:27 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.85 2002/03/25 07:21:14 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1374,8 +1374,7 @@ natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 	/*
 	 * Renewal of port number and change of checksum.
 	 */
-	if ((isFirstFragment(cv4)
-	     || needFragment(cv4))
+	if (isZeroOffset(cv4)
 	    && ((cv4->ip_p == IPPROTO_TCP)
 		|| (cv4->ip_p == IPPROTO_UDP))) {
 		u_short		 cksum4, cksum6;

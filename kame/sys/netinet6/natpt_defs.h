@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.41 2002/03/08 04:10:35 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.42 2002/03/25 07:21:14 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -140,6 +140,7 @@ struct pcv {
 #define	NEED_FRAGMENT		0x08	/* need fragment? */
 #define	SET_DF			0x80	/* is DF bit set? */
 #define	NO_DF			0x40	/* DF flag is not set */
+#define	ZERO_OFFSET		0x10	/* fragment offset == 0 */
 
 #define	IS_FRAGMENT		(FIRST_FRAGMENT | NEXT_FRAGMENT)
 
@@ -149,6 +150,7 @@ struct pcv {
 #define	needFragment(cv)	((cv)->flags & NEED_FRAGMENT)
 #define	isDFset(cv)		((cv)->flags & SET_DF)
 #define isNoDF(cv)		((cv)->flags & NO_DF)
+#define	isZeroOffset(cv)	((cv)->flags & ZERO_OFFSET)
 
 	u_int16_t	poff;		/* payload offset */
 	u_int16_t	plen;		/* payload length */

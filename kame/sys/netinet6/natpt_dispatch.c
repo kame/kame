@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.45 2002/03/13 04:53:26 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.46 2002/03/25 07:21:14 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -479,20 +479,22 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 	 * Add fragment header when IPv4 packet does not set DF flag.
 	 * According to RFC2765 3.1.
 	 */
-	if ((ip->ip_off & IP_DF) == 0)
+	if ((ip->ip_off & IP_DF) == 0) {
+		cv4->flags |= NO_DF;
 		hdrsz += sizeof(struct ip6_frag);
+	}
 
-	if (((ip->ip_off & IP_OFFMASK) == 0)
-	    && ((ip->ip_off & IP_MF) != 0))
-		cv4->flags |= FIRST_FRAGMENT;
+	if ((ip->ip_off & IP_OFFMASK) == 0) {
+		cv4->flags |= ZERO_OFFSET;
+		if ((ip->ip_off & IP_MF) != 0)
+			cv4->flags |= FIRST_FRAGMENT;
+	}
 	if ((ip->ip_off & IP_OFFMASK) != 0)
 		cv4->flags |= NEXT_FRAGMENT;
 	if (hdrsz + cv4->plen > IPV6_MMTU)
 		cv4->flags |= NEED_FRAGMENT;
 	if ((ip->ip_off & IP_DF) != 0)
 		cv4->flags |= SET_DF;
-	else
-		cv4->flags |= NO_DF;
 
 	return (ip->ip_p);
 }
