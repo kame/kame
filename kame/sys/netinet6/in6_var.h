@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.40 2000/08/12 09:47:02 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.41 2000/08/14 13:31:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -698,6 +698,7 @@ void	in6_purgeprefix __P((struct ifnet *));
 void in6h_hashinit __P((void));
 void in6h_addifa __P((struct in6_ifaddr *));
 struct in6hash *in6h_lookup __P((struct in6_addr *, struct ifnet *));
+void in6h_rebuild __P((int));
 #endif
 #endif /* _KERNEL */
 

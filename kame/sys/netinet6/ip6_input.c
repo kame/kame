@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.106 2000/08/14 02:49:00 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.107 2000/08/14 13:31:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,8 +184,25 @@ const int int6intrq_present = 1;
 
 #ifdef MEASURE_PERFORMANCE
 #define IP6_PERFORM_LOGSIZE 10000
+static int logentry;
 unsigned long long ip6_performance_log[IP6_PERFORM_LOGSIZE];
 #endif
+#ifdef MEASURE_PERFORMANCE
+#define OURS_CHECK_ALG_RTABLE 0
+#define OURS_CHECK_ALG_LINEAR 1
+#define OURS_CHECK_ALG_HASH 2
+#define OURS_CHECK_ALG_LARGEHASH 3
+#ifdef OURS_CHECK_LINEAR
+int ip6_ours_check_algorithm = OURS_CHECK_ALG_LINEAR;
+#elif OURS_CHECK_HASH
+int ip6_ours_check_algorithm = OURS_CHECK_ALG_HASH;
+#else
+int ip6_ours_check_algorithm = OURS_CHECK_ALG_RTABLE;
+#endif
+#else
+int ip6_ours_check_algorithm;
+#endif
+
 
 #ifdef IPV6FIREWALL
 /* firewall hooks */
@@ -234,8 +251,6 @@ static __inline void
 add_performance_log(val)
 	unsigned long long val;
 {
-	static int logentry = 0;
-
 	logentry = (logentry + 1) % IP6_PERFORM_LOGSIZE;
 	ip6_performance_log[logentry] = val;
 }
@@ -578,7 +593,9 @@ ip6_input(m)
 	/*
 	 *  Unicast check
 	 */
-#ifdef OURS_CHECK_LINEAR
+	switch(ip6_ours_check_algorithm) {
+#ifdef MEASURE_PERFORMANCE
+	case OURS_CHECK_ALG_LINEAR:
 	/* traditional linear search: just for measurement */
 	{
 		struct in6_ifaddr *ia;
@@ -595,7 +612,8 @@ ip6_input(m)
 			}
 		}
 	}
-#elif defined(OURS_CHECK_HASH) && defined(MEASURE_PERFORMANCE)
+	break;
+	case OURS_CHECK_ALG_HASH:
 	{
 		struct in6_ifaddr *ia;
 		struct in6hash *ih;
@@ -610,7 +628,14 @@ ip6_input(m)
 			goto hbhcheck;
 		}
 	}
-#else
+	break;
+#endif /* MEASURE_PERFORMANCE */
+	default:
+		/*
+		 * XXX: I intentionally broke our indentation rule here,
+		 *      since this switch-case is just for measurement and
+		 *      therefore should soon be removed.
+		 */
 	if (ip6_forward_rt.ro_rt != NULL &&
 	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 && 
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
@@ -690,7 +715,7 @@ ip6_input(m)
 			goto bad;
 		}
 	}
-#endif
+	} /* XXX indentation (see above) */
 
 	/*
 	 * FAITH(Firewall Aided Internet Translator)
@@ -2123,3 +2148,59 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 }
 #endif /* __bsdi__ */
+
+#ifdef MEASURE_PERFORMANCE
+#ifdef __FreeBSD__
+#include <sys/sysctl.h>
+
+extern int in6_nhash;
+
+/* we lie, but it's rather safe for this temporary purpose... */
+#define IPV6CTL_DEFMTU		4	/* default MTU */
+#define IPV6CTL_OURSALG IPV6CTL_DEFMTU
+
+static int
+sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS
+{
+	int error = 0;
+	int oldalg;
+	int i, s;
+
+	error = SYSCTL_OUT(req, arg1, sizeof(int));
+	if (error || !req->newptr)
+		return (error);
+	oldalg = ip6_ours_check_algorithm;
+	if ((error = SYSCTL_IN(req, arg1, sizeof(int))) != 0)
+		return(error);
+	if (ip6_ours_check_algorithm > OURS_CHECK_ALG_LARGEHASH) {
+		ip6_ours_check_algorithm = oldalg;
+		return(EINVAL);
+	}
+
+	s = splnet();
+
+	/* clear all statistics */
+	for (i = 0; i < IP6_PERFORM_LOGSIZE; i++) {
+		ip6_performance_log[i] = 0;
+	}
+	logentry = 0;
+
+	switch(ip6_ours_check_algorithm) {
+	case OURS_CHECK_ALG_HASH:
+		in6h_rebuild(23); /* XXX hardcoding */
+		break;
+	case OURS_CHECK_ALG_LARGEHASH:
+		in6h_rebuild(997); /* XXX hardcofing */
+		break;
+	}
+
+	splx(s);
+
+	return(error);
+}
+
+SYSCTL_OID(_net_inet6_ip6, IPV6CTL_OURSALG, oursalg,
+	   CTLTYPE_INT|CTLFLAG_RW, &ip6_ours_check_algorithm, 0,
+	   sysctl_ip6_oursalg, "I", "");
+#endif
+#endif

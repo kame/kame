@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.101 2000/08/12 09:47:02 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.102 2000/08/14 13:31:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -174,7 +174,6 @@ struct multi6_kludge {
 
 #ifdef MEASURE_PERFORMANCE
 static void in6h_delifa __P((struct in6_ifaddr *));
-static void in6h_rebuild __P((void));
 static void in6h_addhash __P((struct in6hash *));
 static void in6h_delhash __P((struct in6hash *));
 #endif
@@ -991,7 +990,7 @@ in6_update_ifa(ifp, ifra, ia)
 		if (new_ifa)
 			in6h_addifa(ia);
 		else
-			in6h_rebuild();
+			in6h_rebuild(0);
 		splx(s);
 	}
 #endif
@@ -2575,6 +2574,7 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 #endif /*freebsd3*/
 
 #ifdef MEASURE_PERFORMANCE
+#define IN6_MAXADDRHASH 1000
 #ifndef	IN6_ADDRHASH
 #ifndef INET6_SERVER
 #define	IN6_ADDRHASH	23
@@ -2584,7 +2584,7 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 #endif
 
 static struct in6hash in6h_hash_any = { NULL, IN6ADDR_ANY_INIT, NULL, 0 };
-struct in6hash *in6hash[IN6_ADDRHASH];	/* hash buckets for local IPv6 addrs */
+struct in6hash *in6hash[IN6_MAXADDRHASH];/* hash buckets for local IPv6 addrs */
 int in6_nhash = IN6_ADDRHASH;		/* number of hash buckets for addrs */
 
 #define HASH6(in6) ((in6)->s6_addr32[0]^(in6)->s6_addr32[1]^\
@@ -2618,13 +2618,20 @@ in6h_addifa(ia)
  * from the hash and add them all back.  This insures that the order
  * of addresses in the hash is consistent.
  */
-static void
-in6h_rebuild()
+void
+in6h_rebuild(newhashsiz)
+	int newhashsiz;		/* can be 0, meaning unchange the size */
 {
 	struct in6_ifaddr *ia;
 
+	if (newhashsiz > IN6_MAXADDRHASH)
+		return;		/* XXX invalid */
+
 	for (ia = in6_ifaddr; ia != NULL; ia = ia->ia_next)
 		in6h_delifa(ia);
+
+	if (newhashsiz)
+		in6_nhash = newhashsiz;
 
 	for (ia = in6_ifaddr; ia != NULL; ia = ia->ia_next)
 		in6h_addifa(ia);
