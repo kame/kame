@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.222 2001/06/01 05:47:01 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.223 2001/06/10 10:19:15 keiichi Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1878,13 +1878,17 @@ IPsec, and/or 2292bis API, needs further study.
 
 6.2 KAME node as home agent/mobile node
 
-KAME kit includes Ericsson mobile-ip6 code.  The integration is just started
-(in Feb 2000), and we will need some more time to integrate it better.
+KAME mobile-ip6 code is now under reconstruction. The code contributed
+by Ericsson integrated before has been removed.
 
-See kame/mip6config/{QUICKSTART,README_MIP6.txt} for more details.
+The last snap that includes mobile-ip6 code is 20010604. We at least
+will provide the mobile-ip6 patch for the snap 20010611. The patch is
+available from the location shown bellow.
 
-The Ericsson code implements revision 13 of the mobile-ip6 draft.  There
-are other implementations available:
+	ftp://ftp.kame.net/kame/contrib/mip6/ericsson/
+
+Other implementations are also available.
+
 	NEC: http://www.6bone.nec.co.jp/mipv6/internal-dist/ (-13 draft)
 	SFC: http://neo.sfc.wide.ad.jp/~mip6/ (-13 draft)
 

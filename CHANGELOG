@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1715 2001/06/09 12:13:41 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1716 2001/06/10 10:19:14 keiichi Exp $
 
 <200106>
+2001-06-10 Keiichi SHIMA <keiichi@iij.ad.jp>
+	Remove MIP6 code from KAME source tree. MIP6 code is now
+	under reconstruction. The last KAME snap that includes MIP6 is
+	20010604 snap.
+
 2001-06-09  Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_trans.c (tr_icmp4MimicPayload):
 	- Correct a packet header stored in a data part of returned

@@ -1,41 +1,11 @@
 TODOs for mobile-ip6
 KAME project
-$KAME: TODO.mobile-ip6,v 1.11 2001/03/29 05:34:27 itojun Exp $
+$KAME: TODO.mobile-ip6,v 1.12 2001/06/10 10:19:15 keiichi Exp $
+
+- provide a single mobile-ip6 stack.
 
 
-- Finish DHAAD over icmp6.
-- Finish Home network renumbering and tunneled RS/RA.
-- IPsec issues: other than manual keys of type "any".
-- KLD support for platforms that support it. (not interesting /Mattias)
-- Test.
-- there's no vprintf() in kernel for bsdi[34].  (sys/netinet6/mip6.c)
-
-done:
-- ioctl should use error code declared in sys/errno.h, not others.
-- "struct input_data" in mip6_common.h is way too generic name and
-  I've changed it into mip6_input_data.
-- function prototypes with __P().
-- rtadvd needs to preserve non-mobileip6 behavior so I added a command
-  line option (-m).
-- tcpdump can use netinet6/mip6.h decls so I've used them.
-  may need to back out the change or integrate part of mip6.h into
-  print-{icmp6,ip6opts}.c when we integrate the change into
-  tcpdump.org tree.
-- portability fixes for non-freebsd3.
-- Nuke in6_control() calls from within the kernel.
-- Remove MIP6_MN and MIP6_HA #ifdef.  Too many #ifdef will kill us, and it is
-  painful to reconfigure kernel every time we switch the operation.  ioctl
-  or sysctl should switch the behavior (it is okay to have one-way switch:
-  if can require reboot to go back to normal stationary node).
-- Make routing table/inpcb refresh code portable.  Use of in6_rtchange with
-  rnh->rnh_walktree is suggested.
-- make use of encap6_attach(), instead of gif interface.
-- Indentation.  mip6*.c is not consistent even within a files.  At least
-  rule should be consistent across the file.
-- relationship with IPsec.
-- Call ip6_output from mip6_tunnel_output.
-- mbuf leakage.
-- Minimize copying of structs.
-- No faked home nd_prefix.
-- Home addresses are not bound to physical interfaces.
-- Support I-D v13.
+The Ericsson's code integrated before has been removed. Tha last
+kame-snap that includes MIP code is 20010604. You can also retreive a
+patch for the 20010611 snap from
+ftp://ftp.kame.net/pub/kame/contrib/mip6/ericsson.
