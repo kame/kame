@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.16 2000/02/28 14:07:25 itojun Exp $
+$Id: COVERAGE,v 1.17 2000/02/29 01:23:39 itojun Exp $
 
 
 x: supported/integrated
@@ -88,6 +88,10 @@ scoped addr in /etc/resolv.conf "nameserver" line
 ipsec socket passing to ip{6,}_output
 		rcvif	-	rcvif	notyet	notyet	notyet
 				+ flags
+
+source address selection
+		feb00	feb00	nov99	notyet	notyet	notyet
+				+ sitelocal?
 
 basic userland	x	x	x	notyet	notyet	notyet
 
