@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.174 2003/02/14 08:47:20 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.175 2003/02/20 12:06:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2637,7 +2637,6 @@ mip6_tunnel_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
 	int s;
-	struct sockaddr_in6 sin6;
 
 	m_adj(m, *offp);
 
@@ -2651,12 +2650,7 @@ mip6_tunnel_input(mp, offp, proto)
 
 		ip6 = mtod(m, struct ip6_hdr *);
 
-		bzero(&sin6, sizeof(sin6));
-		sin6.sin6_family = AF_INET6;
-		sin6.sin6_len = sizeof(sin6);
-		sin6.sin6_addr = ip6->ip6_dst;
-		if (!(MIP6_IS_MN && hif_list_find_withhaddr(&sin6)))
-			mip6stat.mip6s_revtunnel++;
+		mip6stat.mip6s_revtunnel++;
 
 #ifdef __NetBSD__
 		s = splnet();
