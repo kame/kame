@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.26 2000/07/26 08:07:08 itojun Exp $
+	$KAME: USAGE,v 1.27 2000/11/15 16:50:33 itojun Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -19,6 +19,11 @@ A link-local address is automatically assigned to each interface, when
 the interface becomes up for the first time.  Even if you find an interface
 without a link-local address, do not panic.  The link-local address will be
 assigned when it becomes up (with "ifconfig IF up").
+
+If you do not see a link-local address assigned to an interface on "ifconfig
+up", the interface does not support IPv6 for some reasons - for example,
+if the interface does not support link-layer multicast (IFF_MULTICAST is not
+set), the interface cannot be used for IPv6.
 
 Some network drivers allow an interface to become up even without a
 hardware address (for example, PCMCIA network cards).  In such cases, it is
