@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.90 2002/06/28 07:29:43 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.91 2002/09/24 14:20:50 itojun Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -325,6 +325,13 @@ server6_init()
 		exit(1);
 	}
 #endif
+	if (setsockopt(insock, IPPROTO_IPV6, IPV6_V6ONLY,
+	    &on, sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s"
+		    "setsockopt(inbound, IPV6_V6ONLY): %s",
+		    FNAME, strerror(errno));
+		exit(1);
+	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		dprintf(LOG_ERR, "%s" "bind(insock): %s",
 			FNAME, strerror(errno));
@@ -425,7 +432,6 @@ server6_mainloop()
 	struct timeval *w;
 	int ret;
 	fd_set r;
-	ssize_t l;
 
 	while (1) {
 		w = dhcp6_check_timer();
@@ -463,7 +469,6 @@ server6_recv(s)
 	struct in6_pktinfo *pi = NULL;
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
-	struct dhcp6opt *opt, *eopt;
 	struct dhcp6_optinfo optinfo;
 
 	memset(&iov, 0, sizeof(iov));
@@ -482,6 +487,7 @@ server6_recv(s)
 		dprintf(LOG_ERR, "%s" "recvmsg: %s", FNAME, strerror(errno));
 		return -1;
 	}
+	fromlen = mhdr.msg_namelen;
 
 	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&mhdr); cm;
 	     cm = (struct cmsghdr *)CMSG_NXTHDR(&mhdr, cm)) {
@@ -498,7 +504,7 @@ server6_recv(s)
 	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
 		dprintf(LOG_INFO, "%s" "unexpected interface (%d)", FNAME,
 		    (unsigned int)pi->ipi6_ifindex);
-		return;
+		return -1;
 	}
 
 	if (len < sizeof(*dh6)) {
@@ -565,7 +571,6 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
 	struct dhcp6_listval *opt;
-	struct dhcp6_list ret_prefix_list;
 	int resptype, do_binding = 0, error;
 
 	/*
@@ -574,7 +579,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 	 */
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
-		return(-1);
+		return (-1);
 	} else {
 		dprintf(LOG_DEBUG, "%s" "client ID %s", FNAME,
 			duidstr(&optinfo->clientID));
@@ -650,7 +655,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 	error = server6_send(resptype, ifp, dh6, optinfo, from, fromlen,
 			     &roptinfo);
 	dhcp6_clear_options(&roptinfo);
-	return(error);
+	return (error);
 
   fail:
 	dhcp6_clear_options(&roptinfo);
@@ -668,7 +673,6 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
-	struct dhcp6_listval *opt, *p;
 
 	/* message validation according to Section 15.4 of dhcpv6-26 */
 
@@ -928,7 +932,6 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 	struct dhcp6_optinfo roptinfo;
 	struct dhcp6_listval *lv;
 	struct dhcp6_binding *binding;
-	int add_success = 0;
 
 	/* message validation according to Section 15.7 of dhcpv6-26 */
 
@@ -1026,7 +1029,7 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 	if (optinfo->serverID.duid_len &&
 	    duidcmp(&optinfo->serverID, &server_duid)) {
 		dprintf(LOG_INFO, "%s" "server DUID mismatch", FNAME);
-		return(-1);
+		return (-1);
 	}
 
 	/*
@@ -1057,7 +1060,7 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 	    &roptinfo);
 
 	dhcp6_clear_options(&roptinfo);
-	return(error);
+	return (error);
 
   fail:
 	dhcp6_clear_options(&roptinfo);
@@ -1080,7 +1083,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 
 	if (sizeof(struct dhcp6) > sizeof(replybuf)) {
 		dprintf(LOG_ERR, "%s" "buffer size assumption failed", FNAME);
-		return(-1);
+		return (-1);
 	}
 
 	dh6 = (struct dhcp6 *)replybuf;
@@ -1096,7 +1099,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 					roptinfo)) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to construct reply options",
 			FNAME);
-		return(-1);
+		return (-1);
 	}
 	len += optlen;
 
@@ -1108,7 +1111,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 			replybuf, len) != 0) {
 		dprintf(LOG_ERR, "%s" "transmit %s to %s failed", FNAME,
 			dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
-		return(-1);
+		return (-1);
 	}
 
 	dprintf(LOG_DEBUG, "%s" "transmit %s to %s", FNAME,
@@ -1214,7 +1217,7 @@ add_binding(clientid, type, val0)
 
 	if ((binding = malloc(sizeof(*binding))) == NULL) {
 		dprintf(LOG_ERR, "%s" "failed to allocate memory", FNAME);
-		return(NULL);
+		return (NULL);
 	}
 	memset(binding, 0, sizeof(*binding));
 	binding->type = type;
@@ -1259,7 +1262,7 @@ add_binding(clientid, type, val0)
 	dprintf(LOG_DEBUG, "%s" "add a new binding %s for %s", FNAME,
 		bindingstr(binding), duidstr(clientid));
 
-	return(binding);
+	return (binding);
 
   fail:
 	if (binding) {
@@ -1268,7 +1271,7 @@ add_binding(clientid, type, val0)
 	}
 	if (val)
 		free(val);
-	return(NULL);
+	return (NULL);
 }
 
 static struct dhcp6_binding *
@@ -1293,7 +1296,7 @@ find_binding(clientid, type, val0)
 			pfx = (struct dhcp6_prefix *)bp->val;
 			if (pfx0->plen == pfx->plen &&
 			    IN6_ARE_ADDR_EQUAL(&pfx0->addr, &pfx->addr)) {
-				return(bp);
+				return (bp);
 			}
 			break;
 		default:
@@ -1304,7 +1307,7 @@ find_binding(clientid, type, val0)
 		}
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 static void
@@ -1383,7 +1386,7 @@ bindingstr(binding)
 		snprintf(strbuf, sizeof(strbuf),
 			 "[prefix: %s/%d, duration=%ld]",
 			 in6addr2str(&pfx->addr, 0), pfx->plen,
-			 binding->duration);
+			 (unsigned long)binding->duration);
 		break;
 	default:
 		dprintf(LOG_ERR, "%s" "unexpected binding type(%d)", FNAME,
@@ -1391,5 +1394,5 @@ bindingstr(binding)
 		exit(1);
 	}
 
-	return(strbuf);
+	return (strbuf);
 }

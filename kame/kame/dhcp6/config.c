@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.20 2002/06/14 15:32:55 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.21 2002/09/24 14:20:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <sys/queue.h>
 
+#include <net/if.h>
 #include <net/if_dl.h>
 
 #include <netinet/in.h>
@@ -211,12 +212,12 @@ configure_interface(iflist)
 		}
 	}
 	
-	return(0);
+	return (0);
 
   bad:
 	clear_ifconf(dhcp6_ifconflist);
 	dhcp6_ifconflist = NULL;
-	return(-1);
+	return (-1);
 }
 
 int
@@ -282,11 +283,11 @@ configure_prefix_interface(iflist)
 		}
 	}
 	
-	return(0);
+	return (0);
 
   bad:
 	/* there is currently nothing special to recover the error */
-	return(-1);
+	return (-1);
 }
 
 int
@@ -357,11 +358,11 @@ configure_host(hostlist)
 		}
 	}
 
-	return(0);
+	return (0);
 
   bad:
 	/* there is currently nothing special to recover the error */
-	return(-1);
+	return (-1);
 }
 
 int
@@ -407,6 +408,7 @@ configure_duid(str, duid)
 	char *cp, *bp;
 	char *idbuf = NULL;
 	int duidlen, slen;
+	unsigned int x;
 
 	/* calculate DUID len */
 	slen = strlen(str);
@@ -419,12 +421,12 @@ configure_duid(str, duid)
 	duidlen += (slen / 3);
 	if (duidlen > 256) {
 		dprintf(LOG_ERR, "%s" "too long DUID (%d)", FNAME, duidlen);
-		return(-1);
+		return (-1);
 	}
 
 	if ((idbuf = malloc(sizeof(duidlen))) == NULL) {
 		dprintf(LOG_ERR, "%s" "memory allocation failed", FNAME);
-		return(-1);
+		return (-1);
 	}
 
 	for (cp = str, bp = idbuf; *cp;) {
@@ -433,8 +435,9 @@ configure_duid(str, duid)
 			continue;
 		}
 
-		if (sscanf(cp, "%02x", bp) != 1)
+		if (sscanf(cp, "%02x", &x) != 1)
 			goto bad;
+		*bp = x;
 		cp += 2;
 		bp++;
 	}
@@ -442,13 +445,13 @@ configure_duid(str, duid)
 	duid->duid_len = duidlen;
 	duid->duid_id = idbuf;
 
-	return(0);
+	return (0);
 
   bad:
 	if (idbuf)
 		free(idbuf);
 	dprintf(LOG_ERR, "%s" "assumption failure (bad string)", FNAME);
-	return(-1);
+	return (-1);
 }
 
 /* we currently only construct EUI-64 based interface ID */
@@ -510,11 +513,11 @@ get_default_ifid(pif)
 	}
 
 	freeifaddrs(ifap);
-	return(0);
+	return (0);
 
   fail:
 	freeifaddrs(ifap);
-	return(-1);
+	return (-1);
 }
 
 void
@@ -623,7 +626,7 @@ clear_hostconf(hlist)
 		host_next = host->next;
 
 		free(host->name);
-		while (p = TAILQ_FIRST(&host->prefix_list)) {
+		while ((p = TAILQ_FIRST(&host->prefix_list)) != NULL) {
 			TAILQ_REMOVE(&host->prefix_list, p, link);
 			free(p);
 		}
@@ -659,7 +662,7 @@ add_options(opcode, ifc, cfl0)
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
 		if (opcode ==  DHCPOPTCODE_REQUEST) {
-			for (TAILQ_FIRST(&ifc->reqopt_list); opt;
+			for (opt = TAILQ_FIRST(&ifc->reqopt_list); opt;
 			     opt = TAILQ_NEXT(opt, link)) {
 				if (opt->val_num == cfl->type) {
 					dprintf(LOG_INFO, "%s"
@@ -684,7 +687,7 @@ add_options(opcode, ifc, cfl0)
 				dprintf(LOG_ERR, "%s" "invalid operation (%d) "
 					"for option type (%d)",
 					FNAME, opcode, cfl->type);
-				return(-1);
+				return (-1);
 			}
 			break;
 		case DHCPOPT_PREFIX_DELEGATION:
@@ -695,7 +698,7 @@ add_options(opcode, ifc, cfl0)
 				    &opttype, DHCP6_LISTVAL_NUM) == NULL) {
 					dprintf(LOG_ERR, "%s" "failed to "
 					    "configure an option", FNAME);
-					return(-1);
+					return (-1);
 				}
 				break;
 			default:
@@ -713,7 +716,7 @@ add_options(opcode, ifc, cfl0)
 				    &opttype, DHCP6_LISTVAL_NUM) == NULL) {
 					dprintf(LOG_ERR, "%s" "failed to "
 					    "configure an option", FNAME);
-					return(-1);
+					return (-1);
 				}
 				break;
 			default:
@@ -726,13 +729,13 @@ add_options(opcode, ifc, cfl0)
 		default:
 			dprintf(LOG_ERR, "%s"
 				"unknown option type: %d", FNAME, cfl->type);
-				return(-1);
+				return (-1);
 		}
 
 	  next:
 	}
 
-	return(0);
+	return (0);
 }
 
 static int
@@ -749,7 +752,7 @@ add_prefix(hconf, prefix0)
 	if (oprefix.plen < 0 || oprefix.plen > 128) {
 		dprintf(LOG_ERR, "%s" "invalid prefix: %d",
 			FNAME, oprefix.plen);
-		return(-1);
+		return (-1);
 	}
 	/* clear trailing bits */
 	prefix6_mask(&oprefix.addr, oprefix.plen);
@@ -768,7 +771,7 @@ add_prefix(hconf, prefix0)
 	    IN6_IS_ADDR_SITELOCAL(&oprefix.addr)) {
 		dprintf(LOG_ERR, "%s" "invalid prefix address: %s",
 			FNAME, in6addr2str(&oprefix.addr, 0));
-		return(-1);
+		return (-1);
 	}
 
 	/* prefix duplication check */
@@ -780,7 +783,7 @@ add_prefix(hconf, prefix0)
 				"duplicated prefix: %s/%d for %s", FNAME,
 				in6addr2str(&oprefix.addr, 0), oprefix.plen,
 				hconf->name);
-			return(-1);
+			return (-1);
 		}
 	}
 
@@ -788,13 +791,13 @@ add_prefix(hconf, prefix0)
 	if ((pent = malloc(sizeof(*pent))) == NULL) {
 		dprintf(LOG_ERR, "%s" "memory allocation failed for %s",
 			FNAME, hconf->name);
-		return(-1);
+		return (-1);
 	}
 	memset(pent, 0, sizeof(*pent));
 	pent->val_prefix6 = oprefix;
 	TAILQ_INSERT_TAIL(&hconf->prefix_list, pent, link);
 
-	return(0);
+	return (0);
 }
 
 struct dhcp6_if *
@@ -805,10 +808,10 @@ find_ifconfbyname(ifname)
 
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		if (strcmp(ifp->ifname, ifname) == 0)
-			return(ifp);
+			return (ifp);
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 struct dhcp6_if *
@@ -819,10 +822,10 @@ find_ifconfbyid(id)
 
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		if (ifp->ifid == id)
-			return(ifp);
+			return (ifp);
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 struct prefix_ifconf *
@@ -833,10 +836,10 @@ find_prefixifconf(ifname)
 
 	for (ifp = prefix_ifconflist; ifp; ifp = ifp->next) {
 		if (strcmp(ifp->ifname, ifname) == NULL)
-			return(ifp);
+			return (ifp);
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 struct host_conf *
@@ -849,11 +852,11 @@ find_hostconf(duid)
 		if (host->duid.duid_len == duid->duid_len &&
 		    memcmp(host->duid.duid_id, duid->duid_id,
 			   host->duid.duid_len) == 0) {
-			return(host);
+			return (host);
 		}
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 struct dhcp6_prefix *
@@ -866,7 +869,8 @@ find_prefix6(list, prefix)
 	for (v = TAILQ_FIRST(list); v; v = TAILQ_NEXT(v, link)) {
 		if (v->val_prefix6.plen == prefix->plen &&
 		    IN6_ARE_ADDR_EQUAL(&v->val_prefix6.addr, &prefix->addr)) {
-			return(&v->val_prefix6);
+			return (&v->val_prefix6);
 		}
 	}
+	return (NULL);
 }

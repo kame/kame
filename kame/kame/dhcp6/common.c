@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.63 2002/06/21 10:23:32 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.64 2002/09/24 14:20:49 itojun Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -116,7 +116,7 @@ dhcp6_clear_list(head)
 {
 	struct dhcp6_listval *v;
 
-	while (v = TAILQ_FIRST(head)) {
+	while ((v = TAILQ_FIRST(head)) != NULL) {
 		TAILQ_REMOVE(head, v, link);
 		free(v);
 	}
@@ -149,12 +149,12 @@ dhcp6_find_listval(head, val, type)
 		switch(type) {
 		case DHCP6_LISTVAL_NUM:
 			if (lv->val_num == *(int *)val)
-				return(lv);
+				return (lv);
 			break;
 		case DHCP6_LISTVAL_ADDR6:
 			if (IN6_ARE_ADDR_EQUAL(&lv->val_addr6,
 			    (struct in6_addr *)val)) {
-				return(lv);
+				return (lv);
 			}
 			break;
 		case DHCP6_LISTVAL_PREFIX6:
@@ -162,13 +162,13 @@ dhcp6_find_listval(head, val, type)
 			    &((struct dhcp6_prefix *)val)->addr) &&
 			    lv->val_prefix6.plen ==
 			    ((struct dhcp6_prefix *)val)->plen) {
-				return(lv);
+				return (lv);
 			}
 			break;
 		}
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 struct dhcp6_listval *
@@ -182,7 +182,7 @@ dhcp6_add_listval(head, val, type)
 	if ((lv = malloc(sizeof(*lv))) == NULL) {
 		dprintf(LOG_ERR, "%s" "failed to allocate memory for list "
 		    "entry", FNAME);
-		return(NULL);
+		return (NULL);
 	}
 	memset(lv, 0, sizeof(*lv));
 
@@ -204,7 +204,7 @@ dhcp6_add_listval(head, val, type)
 
 	TAILQ_INSERT_TAIL(head, lv, link);
 
-	return(lv);
+	return (lv);
 }
 
 struct dhcp6_event *
@@ -217,13 +217,13 @@ dhcp6_create_event(ifp, state)
 	if ((ev = malloc(sizeof(*ev))) == NULL) {
 		dprintf(LOG_ERR, "%s" "failed to allocate memory for an event",
 			FNAME);
-		return(NULL);
+		return (NULL);
 	}
 	ev->ifp = ifp;
 	ev->state = state;
 	TAILQ_INIT(&ev->data_list);
 
-	return(ev);
+	return (ev);
 }
 
 void
@@ -339,7 +339,7 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 	}
 
 	freeifaddrs(ifap);
-	return(error);
+	return (error);
 }
 
 int
@@ -350,18 +350,18 @@ in6_addrscopebyif(addr, ifnam)
 	u_int ifindex; 
 
 	if ((ifindex = if_nametoindex(ifnam)) == 0)
-		return(-1);
+		return (-1);
 
 	if (IN6_IS_ADDR_LINKLOCAL(addr) || IN6_IS_ADDR_MC_LINKLOCAL(addr))
-		return(ifindex);
+		return (ifindex);
 
 	if (IN6_IS_ADDR_SITELOCAL(addr) || IN6_IS_ADDR_MC_SITELOCAL(addr))
-		return(1);	/* XXX */
+		return (1);	/* XXX */
 
 	if (IN6_IS_ADDR_MC_ORGLOCAL(addr))
-		return(1);	/* XXX */
+		return (1);	/* XXX */
 
-	return(1);		/* treat it as global */
+	return (1);		/* treat it as global */
 }
 
 /* XXX: this code assumes getifaddrs(3) */
@@ -394,7 +394,7 @@ getdev(addr)
 		strlcpy(ret_ifname, ifa->ifa_name, sizeof(ret_ifname));
 	freeifaddrs(ifap);
 
-	return(ifa ? ret_ifname : NULL);
+	return (ifa ? ret_ifname : NULL);
 }
 
 int
@@ -433,12 +433,12 @@ prefix6_mask(in6, plen)
 	int i;
 
 	if (sa6_plen2mask(&mask6, plen))
-		return(-1);
+		return (-1);
 
 	for (i = 0; i < 16; i++)
 		in6->s6_addr[i] &= mask6.sin6_addr.s6_addr[i];
 
-	return(0);
+	return (0);
 }
 
 int
@@ -449,7 +449,7 @@ sa6_plen2mask(sa6, plen)
 	u_char *cp;
 
 	if (plen < 0 || plen > 128)
-		return(-1);
+		return (-1);
 
 	memset(sa6, 0, sizeof(*sa6));
 	sa6->sin6_family = AF_INET6;
@@ -459,7 +459,7 @@ sa6_plen2mask(sa6, plen)
 		*cp++ = 0xff;
 	*cp = 0xff << (8 - plen);
 
-	return(0);
+	return (0);
 }
 
 char *
@@ -475,7 +475,7 @@ addr2str(sa)
 
 	getnameinfo(sa, sa->sa_len, cp, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 
-	return(cp);
+	return (cp);
 }
 
 char *
@@ -491,7 +491,7 @@ in6addr2str(in6, scopeid)
 	sa6.sin6_addr = *in6;
 	sa6.sin6_scope_id = scopeid;
 
-	return(addr2str((struct sockaddr *)&sa6));
+	return (addr2str((struct sockaddr *)&sa6));
 }
 
 /* return IPv6 address scope type. caller assumes that smaller is narrower. */
@@ -519,7 +519,7 @@ in6_scope(addr)
 
 	/* multicast scope. just return the scope field */
 	if (addr->s6_addr[0] == 0xff)
-		return(addr->s6_addr[1] & 0x0f);
+		return (addr->s6_addr[1] & 0x0f);
 
 	if (bcmp(&in6addr_loopback, addr, sizeof(addr) - 1) == 0) {
 		if (addr->s6_addr[15] == 1) /* loopback */
@@ -542,7 +542,7 @@ in6_matchflags(addr, ifnam, flags)
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		warn("in6_matchflags: socket(DGRAM6)");
-		return(-1);
+		return (-1);
 	}
 	memset(&ifr6, 0, sizeof(ifr6));
 	strncpy(ifr6.ifr_name, ifnam, sizeof(ifr6.ifr_name));
@@ -552,12 +552,12 @@ in6_matchflags(addr, ifnam, flags)
 		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6, %s)",
 		     addr2str(addr));
 		close(s);
-		return(-1);
+		return (-1);
 	}
 
 	close(s);
 
-	return(ifr6.ifr_ifru.ifru_flags6 & flags);
+	return (ifr6.ifr_ifru.ifru_flags6 & flags);
 }
 
 int
@@ -645,7 +645,7 @@ get_duid(idfile, duid)
 
 	if (fp)
 		fclose(fp);
-	return(0);
+	return (0);
 
   fail:
 	if (fp)
@@ -654,7 +654,7 @@ get_duid(idfile, duid)
 		free(duid->duid_id);
 		duid->duid_id = NULL; /* for safety */
 	}
-	return(-1);
+	return (-1);
 }
 
 static ssize_t
@@ -725,9 +725,6 @@ void
 dhcp6_clear_options(optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
-	struct dhcp6_optconf *ropt, *ropt_next;
-	struct dnslist *d, *dn;
-	struct delegated_prefix *p, *pn;
 
 	duidfree(&optinfo->clientID);
 	duidfree(&optinfo->serverID);
@@ -774,7 +771,6 @@ dhcp6_get_options(p, ep, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6opt *np, opth;
-	struct dhcp6_listval *lv;
 	int i, opt, optlen, reqopts, num;
 	char *cp, *val;
 	u_int16_t val16;
@@ -852,7 +848,6 @@ dhcp6_get_options(p, ep, optinfo)
 			reqopts = optlen / 2;
 			for (i = 0, val = cp; i < reqopts;
 			     i++, val += sizeof(u_int16_t)) {
-				struct dhcp6_listval *opt;
 				u_int16_t opttype;
 
 				memcpy(&opttype, val, sizeof(u_int16_t));
@@ -924,14 +919,14 @@ dhcp6_get_options(p, ep, optinfo)
 		}
 	}
 
-	return(0);
+	return (0);
 
   malformed:
 	dprintf(LOG_INFO, "%s" "malformed DHCP option: type %d, len %d",
 	    FNAME, opt, optlen);
   fail:
 	dhcp6_clear_options(optinfo);
-	return(-1);
+	return (-1);
 }
 
 static int
@@ -943,7 +938,6 @@ get_delegated_prefixes(p, ep, optinfo)
 	struct dhcp6opt opth;
 	struct dhcp6_prefix_info pi;
 	struct dhcp6_prefix prefix;
-	struct dhcp6_listval *dp;
 	int optlen, opt;
 
 	for (; p + sizeof(struct dhcp6opt) <= ep; p = np) {
@@ -1017,14 +1011,14 @@ get_delegated_prefixes(p, ep, optinfo)
 	  nextoption:
 	}
 
-	return(0);
+	return (0);
 
   malformed:
 	dprintf(LOG_INFO,
 		"  malformed prefix delegation option: type %d, len %d",
 		opt, optlen);
   fail:
-	return(-1);
+	return (-1);
 }
 
 #define COPY_OPTION(t, l, v, p) do { \
@@ -1122,7 +1116,6 @@ dhcp6_set_options(bp, ep, optinfo)
 	}
 
 	if (!TAILQ_EMPTY(&optinfo->prefix_list)) {
-		int pfxs;
 		char *tp;
 		struct dhcp6_listval *dp;
 		struct dhcp6_prefix_info pi;
@@ -1154,12 +1147,12 @@ dhcp6_set_options(bp, ep, optinfo)
 		free(tmpbuf);
 		     
 	}
-	return(len);
+	return (len);
 
   fail:
 	if (tmpbuf)
 		free(tmpbuf);
-	return(-1);
+	return (-1);
 }
 #undef COPY_OPTION
 
@@ -1288,11 +1281,11 @@ duidcpy(dd, ds)
 	dd->duid_len = ds->duid_len;
 	if ((dd->duid_id = malloc(dd->duid_len)) == NULL) {
 		dprintf(LOG_ERR, "%s" "memory allocation failed", FNAME);
-		return(-1);
+		return (-1);
 	}
 	memcpy(dd->duid_id, ds->duid_id, dd->duid_len);
 
-	return(0);
+	return (0);
 }
 
 int
@@ -1300,9 +1293,9 @@ duidcmp(d1, d2)
 	struct duid *d1, *d2;
 {
 	if (d1->duid_len == d2->duid_len) {
-		return(memcmp(d1->duid_id, d2->duid_id, d1->duid_len));
+		return (memcmp(d1->duid_id, d2->duid_id, d1->duid_len));
 	} else
-		return(-1);
+		return (-1);
 }
 
 void
@@ -1344,7 +1337,7 @@ dhcp6optstr(type)
 		return "prefix information";
 	default:
 		sprintf(genstr, "opt_%d", type);
-		return(genstr);
+		return (genstr);
 	}
 }
 
@@ -1374,7 +1367,7 @@ dhcp6msgstr(type)
 		return "information request";
 	default:
 		sprintf(genstr, "msg%d", type);
-		return(genstr);
+		return (genstr);
 	}
 }
 
@@ -1408,7 +1401,7 @@ dhcp6_stcodestr(code)
 		return "use multicast";
 	default:
 		sprintf(genstr, "code%d", code);
-		return(genstr);
+		return (genstr);
 	}
 }
 
@@ -1428,7 +1421,7 @@ duidstr(duid)
 	if (i < duid->duid_len)
 		sprintf(cp, "%s", "...");
 
-	return(duidstr);
+	return (duidstr);
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.6 2002/06/21 10:23:33 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.7 2002/09/24 14:20:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -49,6 +49,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #include "dhcp6.h"
 #include "config.h"
@@ -85,6 +86,7 @@ static int update __P((struct dhcp6_siteprefix *, struct dhcp6_prefix *,
 
 extern struct dhcp6_timer *client6_timo __P((void *));
 extern void client6_send_renew __P((struct dhcp6_event *));
+extern void client6_send_rebind __P((struct dhcp6_event *));
 
 void
 prefix6_init()
@@ -226,7 +228,6 @@ prefix6_update(ev, prefix_list, serverid)
 {
 	struct dhcp6_listval *lv;
 	struct dhcp6_eventdata *evd, *evd_next;
-	struct dhcp6_siteprefix *sp;
 
 	/* add new prefixes */
 	for (lv = TAILQ_FIRST(prefix_list); lv; lv = TAILQ_NEXT(lv, link)) {
@@ -351,11 +352,11 @@ find_siteprefix6(prefix)
 	     sp = TAILQ_NEXT(sp, link)) {
 		if (sp->prefix.plen == prefix->plen &&
 		    IN6_ARE_ADDR_EQUAL(&sp->prefix.addr, &prefix->addr)) {
-			return(sp);
+			return (sp);
 		}
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 static struct dhcp6_timer *
@@ -366,7 +367,6 @@ prefix6_timo(arg)
 	struct dhcp6_event *ev;
 	struct dhcp6_eventdata *evd;
 	struct timeval timeo;
-	struct dhcp6_timer *new_timer = NULL;
 	int dhcpstate;
 	double d;
 
@@ -384,7 +384,7 @@ prefix6_timo(arg)
 		dprintf(LOG_INFO, "%s" "failed to rebind a prefix %s/%d",
 		    FNAME, in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen);
 		prefix6_remove(sp);
-		return(NULL);
+		return (NULL);
 	}
 
 	switch(sp->state) {
@@ -403,6 +403,8 @@ prefix6_timo(arg)
 		timeo.tv_usec = 0;
 		duidfree(&sp->serverid);
 		break;
+	default:
+		return (NULL);
 	}
 	dhcp6_set_timer(&timeo, sp->timer);
 
@@ -454,9 +456,12 @@ prefix6_timo(arg)
 	case PREFIX6S_REBIND:
 		client6_send_rebind(ev);
 		break;
+	case PREFIX6S_ACTIVE:
+		/* what to do? */
+		break;
 	}
 
-	return(sp->timer);
+	return (sp->timer);
 }
 
 static int
@@ -552,12 +557,14 @@ ifaddrconf(cmd, ifpfx)
 		cmdstr = "remove";
 		ioctl_cmd = SIOCDIFADDR_IN6;
 		break;
+	default:
+		return (-1);
 	}
 
 	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		dprintf(LOG_ERR, "%s" "can't open a temporary socket: %s",
 			FNAME, strerror(errno));
-		return(-1);
+		return (-1);
 	}
 
 	memset(&req, 0, sizeof(req));
@@ -572,12 +579,12 @@ ifaddrconf(cmd, ifpfx)
 		dprintf(LOG_NOTICE, "%s" "failed to %s an address on %s: %s",
 		    FNAME, cmdstr, pconf->ifname, strerror(errno));
 		close(s);
-		return(-1);
+		return (-1);
 	}
 
 	dprintf(LOG_DEBUG, "%s" "%s an address %s on %s", FNAME, cmdstr,
 	    addr2str((struct sockaddr *)&ifpfx->ifaddr), pconf->ifname);
 
 	close(s);
-	return(0);
+	return (0);
 }

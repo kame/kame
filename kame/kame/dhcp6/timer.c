@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.2 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: timer.c,v 1.3 2002/09/24 14:20:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -72,7 +72,7 @@ dhcp6_add_timer(timeout, timeodata)
 
 	if ((newtimer = malloc(sizeof(*newtimer))) == NULL) {
 		dprintf(LOG_ERR, "%s" "can't allocate memory", FNAME);
-		return(NULL);
+		return (NULL);
 	}
 
 	memset(newtimer, 0, sizeof(*newtimer));
@@ -87,7 +87,7 @@ dhcp6_add_timer(timeout, timeodata)
 
 	LIST_INSERT_HEAD(&timer_head, newtimer, link);
 
-	return(newtimer);
+	return (newtimer);
 }
 
 void
@@ -147,13 +147,13 @@ dhcp6_check_timer()
 
 	if (TIMEVAL_EQUAL(tm_max, tm_sentinel)) {
 		/* no need to timeout */
-		return(NULL);
+		return (NULL);
 	} else if (TIMEVAL_LT(tm_sentinel, now)) {
 		/* this may occur when the interval is too small */
 		returnval.tv_sec = returnval.tv_usec = 0;
 	} else
 		timeval_sub(&tm_sentinel, &now, &returnval);
-	return(&returnval);
+	return (&returnval);
 }
 
 struct timeval *
@@ -172,7 +172,7 @@ dhcp6_timer_rest(timer)
 	} else
 		timeval_sub(&timer->tm, &now, &returnval);
 
-	return(&returnval);
+	return (&returnval);
 }
 
 /* result = a + b */

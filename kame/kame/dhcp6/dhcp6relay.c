@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.33 2002/04/24 14:31:32 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.34 2002/09/24 14:20:49 itojun Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -185,7 +185,7 @@ make_prefix(pstr0)
 	if (strlcpy(pstr, pstr0, sizeof(pstr)) >= sizeof(pstr)) {
 		dprintf(LOG_WARNING,
 			"prefix string too long (maybe bogus): %s", pstr0);
-		return(NULL);
+		return (NULL);
 	}
 
 	/* parse the string */
@@ -195,13 +195,13 @@ make_prefix(pstr0)
 		if (p[1] == '\0') {
 			dprintf(LOG_WARNING,
 				"no prefix length (ignored): %s", p + 1);
-			return(NULL);
+			return (NULL);
 		}
 		plen = (int)strtoul(p + 1, &ep, 10);
 		if (*ep != '\0') {
 			dprintf(LOG_WARNING,
 				"illegal prefix length (ignored): %s", p + 1);
-			return(NULL);
+			return (NULL);
 		}
 		*p = '\0';
 	}
@@ -225,7 +225,7 @@ make_prefix(pstr0)
 	pent->paddr.sin6_addr = paddr;
 	pent->plen = plen;
 
-	return(pent);
+	return (pent);
 }
 
 
@@ -317,14 +317,16 @@ relay6_init()
 	}
 	if (csock > maxfd)
 		maxfd = csock;
-	if (setsockopt(csock, SOL_SOCKET, SO_REUSEPORT,
-		       &on, sizeof(on)) < 0) {
+	if (setsockopt(csock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
 		err(1, "setsockopt(csock, SO_REUSEPORT)");
 		/* NOTREACHED */
 	}
-	if (setsockopt(csock, SOL_SOCKET, SO_REUSEADDR,
-		       &on, sizeof(on)) < 0) {
+	if (setsockopt(csock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
 		err(1, "setsockopt(csock, SO_REUSEADDR)");
+		/* NOTREACHED */
+	}
+	if (setsockopt(csock, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(csock, IPV6_V6ONLY)");
 		/* NOTREACHED */
 	}
 	if (bind(csock, res->ai_addr, res->ai_addrlen) < 0) {
@@ -379,9 +381,12 @@ relay6_init()
 	}
 	if (ssock > maxfd)
 		maxfd = ssock;
-	if (setsockopt(ssock, SOL_SOCKET, SO_REUSEPORT,
-		       &on, sizeof(on)) < 0) {
+	if (setsockopt(ssock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
 		err(1, "setsockopt(ssock, SO_REUSEPORT)");
+		/* NOTREACHED */
+	}
+	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_V6ONLY, &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(ssock, IPV6_V6ONLY)");
 		/* NOTREACHED */
 	}
 	if (bind(ssock, res->ai_addr, res->ai_addrlen) < 0) {
@@ -487,7 +492,7 @@ relay6_recv(s, rdevice)
 
 	if ((len = recvmsg(s, &rmh, 0)) < 0) {
 		dprintf(LOG_WARNING, "recvmsg: %s", strerror(errno));
-		return(-1);	/* should assert? */
+		return (-1);	/* should assert? */
 	}
 
 	dprintf(LOG_DEBUG, "relay6_recv: from %s, size %d",
@@ -509,16 +514,16 @@ relay6_recv(s, rdevice)
 		if (pi == NULL) {
 			dprintf(LOG_WARNING, "relay6_recv: "
 				"failed to get the arrival interface");
-			return(-1);
+			return (-1);
 		}
 		if (if_indextoname(pi->ipi6_ifindex, rdevice) == NULL) {
 			dprintf(LOG_WARNING, "if_indextoname(id = %d): %s",
 				pi->ipi6_ifindex, strerror(errno));
-			return(-1);
+			return (-1);
 		}
 	}
 
-	return(len);
+	return (len);
 }
 
 static void

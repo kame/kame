@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.96 2002/06/28 07:30:35 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.97 2002/09/24 14:20:49 itojun Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -98,7 +98,7 @@ static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
 static struct dhcp6_serverinfo *select_server __P((struct dhcp6_if *));
 static void client6_send __P((struct dhcp6_event *));
-static int client6_recv __P((void));
+static void client6_recv __P((void));
 static int client6_recvadvert __P((struct dhcp6_if *, struct dhcp6 *,
 				   ssize_t, struct dhcp6_optinfo *));
 static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
@@ -106,7 +106,9 @@ static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
 static void client6_signal __P((int));
 static struct dhcp6_event *find_event_withid __P((struct dhcp6_if *,
 						  u_int32_t));
+#if 0
 static int sa2plen __P((struct sockaddr_in6 *));
+#endif
 
 struct dhcp6_timer *client6_timo __P((void *));
 void client6_send_renew __P((struct dhcp6_event *));
@@ -207,7 +209,6 @@ client6_init()
 	static struct sockaddr_in6 sa6_allagent_storage;
 	int error, on = 1;
 	struct dhcp6_if *ifp;
-	struct dhcp6_event *ev;
 	int ifidx;
 
 	ifidx = if_nametoindex(device);
@@ -261,6 +262,12 @@ client6_init()
 		exit(1);
 	}
 #endif
+	if (setsockopt(insock, IPPROTO_IPV6, IPV6_V6ONLY,
+	    &on, sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s" "setsockopt(inbound, IPV6_V6ONLY): %s",
+			FNAME, strerror(errno));
+		exit(1);
+	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		dprintf(LOG_ERR, "%s" "bind(inbonud): %s",
 			FNAME, strerror(errno));
@@ -295,6 +302,12 @@ client6_init()
 			FNAME, strerror(errno));
 		exit(1);
 	}
+	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_V6ONLY,
+	    &on, sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s" "setsockopt(outbound, IPV6_V6ONLY): %s",
+		    FNAME, strerror(errno));
+		exit(1);
+	}
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
 		dprintf(LOG_ERR, "%s" "shutdown(outbound, 0): %s",
@@ -320,12 +333,12 @@ client6_init()
 	}
 	if (setsockopt(outsock, SOL_SOCKET, SO_REUSEPORT,
 		       &on, sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "%s" "setsockopt(inbound, SO_REUSEPORT): %s",
+		dprintf(LOG_ERR, "%s" "setsockopt(outbound, SO_REUSEPORT): %s",
 			FNAME, strerror(errno));
 		exit(1);
 	}
 	if (bind(outsock, res->ai_addr, res->ai_addrlen) < 0) {
-		dprintf(LOG_ERR, "%s" "bind(inbonud): %s",
+		dprintf(LOG_ERR, "%s" "bind(outbonud): %s",
 			FNAME, strerror(errno));
 		exit(1);
 	}
@@ -493,7 +506,7 @@ client6_timo(arg)
 	if (ev->max_retrans_cnt && ev->timeouts > ev->max_retrans_cnt) {
 		dprintf(LOG_INFO, "%s" "no responses were received", FNAME);
 		dhcp6_remove_event(ev);	/* XXX: should free event data? */
-		return(NULL);
+		return (NULL);
 	}
 
 	switch(ev->state) {
@@ -520,7 +533,7 @@ client6_timo(arg)
 			    "all information to be updated were canceled",
 			    FNAME);
 			dhcp6_remove_event(ev);
-			return(NULL);
+			return (NULL);
 		}
 		break;
 	case DHCP6S_SOLICIT:
@@ -542,7 +555,7 @@ client6_timo(arg)
 
 	dhcp6_reset_timer(ev);
 
-	return(ev->timer);
+	return (ev->timer);
 }
 
 static struct dhcp6_serverinfo *
@@ -560,11 +573,11 @@ select_server(ifp)
 		if (s->active) {
 			dprintf(LOG_DEBUG, "%s" "picked a server (ID: %s)",
 				FNAME, duidstr(&s->optinfo.serverID));
-			return(s);
+			return (s);
 		}
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 static void
@@ -584,6 +597,7 @@ client6_signal(sig)
 	}
 }
 
+#if 0
 static int
 sa2plen(sa6)
 	struct sockaddr_in6 *sa6;
@@ -622,12 +636,13 @@ sa2plen(sa6)
 		case 0x00:
 			break;
 		default:
-			return(-1);
+			return (-1);
 		}
 	}
 
-	return(masklen);
+	return (masklen);
 }
+#endif
 
 static void
 client6_send(ev)
@@ -636,9 +651,7 @@ client6_send(ev)
 	struct dhcp6_if *ifp;
 	char buf[BUFSIZ];
 	struct sockaddr_in6 dst;
-	int error;
 	struct dhcp6 *dh6;
-	struct dhcp6opt *opt;
 	struct dhcp6_optinfo optinfo;
 	ssize_t optlen, len;
 
@@ -771,7 +784,6 @@ client6_send_renew(ev)
 	struct dhcp6_if *ifp;
 	struct dhcp6_eventdata *evd;
 	struct dhcp6_optinfo optinfo;
-	struct dhcp6_listval *dlv;
 	struct dhcp6 *dh6;
 	char buf[BUFSIZ];
 	ssize_t optlen, len;
@@ -872,7 +884,6 @@ client6_send_rebind(ev)
 	struct dhcp6_if *ifp;
 	struct dhcp6_eventdata *evd;
 	struct dhcp6_optinfo optinfo;
-	struct dhcp6_listval *dlv;
 	struct dhcp6 *dh6;
 	char buf[BUFSIZ];
 	ssize_t optlen, len;
@@ -961,7 +972,7 @@ client6_send_rebind(ev)
 	return;
 }
 
-static int
+static void
 client6_recv()
 {
 	char rbuf[BUFSIZ], cmsgbuf[BUFSIZ];
@@ -1046,7 +1057,6 @@ client6_recv()
 		break;
 	}
 
-  end:
 	dhcp6_clear_options(&optinfo);
 	return;
 }
@@ -1058,7 +1068,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	ssize_t len;
 	struct dhcp6_optinfo *optinfo0;
 {
-	struct dhcp6_serverinfo *newserver, *s, **sp;
+	struct dhcp6_serverinfo *newserver, **sp;
 	struct dhcp6_event *ev;
 
 	/* find the corresponding event based on the received xid */
@@ -1181,10 +1191,10 @@ find_server(ifp, duid)
 
 	for (s = ifp->servers; s; s = s->next) {
 		if (duidcmp(&s->optinfo.serverID, duid) == 0)
-			return(s);
+			return (s);
 	}
 
-	return(NULL);
+	return (NULL);
 }
 
 static int
@@ -1285,8 +1295,8 @@ find_event_withid(ifp, xid)
 	for (ev = TAILQ_FIRST(&ifp->event_list); ev;
 	     ev = TAILQ_NEXT(ev, link)) {
 		if (ev->xid == xid)
-			return(ev);
+			return (ev);
 	}
 
-	return(NULL);
+	return (NULL);
 }

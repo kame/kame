@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.15 2002/06/14 15:32:55 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.16 2002/09/24 14:20:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -35,6 +35,8 @@
 
 #include <netinet/in.h>
 
+#include <arpa/inet.h>
+
 #include "dhcp6.h"
 #include "config.h"
 #include "common.h"
@@ -42,12 +44,17 @@
 extern int lineno;
 extern int cfdebug;
 
+extern void yywarn __P((char *, ...))
+	__attribute__((__format__(__printf__, 1, 2)));
+extern void yyerror __P((char *, ...))
+	__attribute__((__format__(__printf__, 1, 2)));
+
 #define MAKE_NAMELIST(l, n, p) do { \
 	(l) = (struct cf_namelist *)malloc(sizeof(*(l))); \
 	if ((l) == NULL) { \
 		yywarn("can't allocate memory"); \
 		if (p) cleanup_cflist(p); \
-		return(-1); \
+		return (-1); \
 	} \
 	memset((l), 0, sizeof(*(l))); \
 	l->line = lineno; \
@@ -61,7 +68,7 @@ extern int cfdebug;
 		yywarn("can't allocate memory"); \
 		if (pp) free(pp); \
 		if (pl) cleanup_cflist(pl); \
-		return(-1); \
+		return (-1); \
 	} \
 	memset((l), 0, sizeof(*(l))); \
 	l->line = lineno; \
@@ -122,7 +129,7 @@ interface_statement:
 		MAKE_NAMELIST(ifl, $2, $4);
 
 		if (add_namelist(ifl, &iflist_head))
-			return(-1);
+			return (-1);
 	}
 	;
 
@@ -134,7 +141,7 @@ prefix_interface_statement:
 		MAKE_NAMELIST(ifl, $2, $4);
 
 		if (add_namelist(ifl, &piflist_head))
-			return(-1);
+			return (-1);
 	}
 	;
 
@@ -146,7 +153,7 @@ host_statement:
 		MAKE_NAMELIST(host, $2, $4);
 
 		if (add_namelist(host, &hostlist_head))
-			return(-1);
+			return (-1);
 	}
 	;
 
@@ -190,11 +197,11 @@ address_list_ent:
 		if (inet_pton(AF_INET6, $1, &a0) != 1) {
 			yywarn("invalid IPv6 address: %s", $1);
 			free($1);
-			return(-1);
+			return (-1);
 		}
 		if ((a = malloc(sizeof(*a))) == NULL) {
 			yywarn("can't allocate memory");
-			return(-1);
+			return (-1);
 		}
 		*a = a0;
 
@@ -356,7 +363,7 @@ prefixparam:
 		if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {
 			yywarn("invalid IPv6 address: %s", $1);
 			free($1);
-			return(-1);
+			return (-1);
 		}
 		free($1);
 		/* validate other parameters later */
@@ -368,7 +375,7 @@ prefixparam:
 
 		if ((pconf = malloc(sizeof(*pconf))) == NULL) {
 			yywarn("can't allocate memory");
-			return(-1);
+			return (-1);
 		}
 		*pconf = pconf0;
 
@@ -400,14 +407,14 @@ add_namelist(new, headp)
 			yywarn("duplicated interface: %s (ignored)",
 			       new->name);
 			cleanup_namelist(new);
-			return(0);
+			return (0);
 		}
 	}
 
 	new->next = *headp;
 	*headp = new;
 
-	return(0);
+	return (0);
 }
 
 /* free temporary resources */
@@ -455,7 +462,7 @@ cleanup_cflist(p)
 }
 
 #define config_fail() \
-	do { cleanup(); configure_cleanup(); return(-1); } while(0)
+	do { cleanup(); configure_cleanup(); return (-1); } while(0)
 
 int
 cf_post_config()
@@ -474,7 +481,7 @@ cf_post_config()
 
 	configure_commit();
 	cleanup();
-	return(0);
+	return (0);
 }
 #undef config_fail
 

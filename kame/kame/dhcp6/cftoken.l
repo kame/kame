@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.14 2002/06/14 15:32:55 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.15 2002/09/24 14:20:49 itojun Exp $	*/
 
 %{
 /*
@@ -102,60 +102,60 @@ ecl		\}
 	}
 %}
 	/* interface configuration */
-<S_CNF>interface { DECHO; BEGIN S_IFACE; return(INTERFACE); }
+<S_CNF>interface { DECHO; BEGIN S_IFACE; return (INTERFACE); }
 <S_IFACE>{string} {
 	DECHO;
 	yylval.str = strdup(yytext);
 	BEGIN S_CNF;
-	return(IFNAME);
+	return (IFNAME);
 }
 
 	/* host configuration */
-<S_CNF>host { DECHO; BEGIN S_HOST; return(HOST); }
+<S_CNF>host { DECHO; BEGIN S_HOST; return (HOST); }
 <S_HOST>{string} {
 	DECHO;
 	yylval.str = strdup(yytext);
 	BEGIN S_CNF;
-	return(HOSTNAME);
+	return (HOSTNAME);
 }
 
-<S_CNF>duid { DECHO; BEGIN S_DUID; return(DUID); }
+<S_CNF>duid { DECHO; BEGIN S_DUID; return (DUID); }
 <S_DUID>{duid} {
 	DECHO;
 	yylval.str = strdup(yytext);
 	BEGIN S_CNF;
-	return(DUID_ID);
+	return (DUID_ID);
 }
 
-<S_CNF>prefix { DECHO; return(PREFIX); }
+<S_CNF>prefix { DECHO; return (PREFIX); }
 
-<S_CNF>preference { DECHO; return(PREFERENCE); }
+<S_CNF>preference { DECHO; return (PREFERENCE); }
 
 	/* request */
-<S_CNF>request { DECHO; return(REQUEST); }
+<S_CNF>request { DECHO; return (REQUEST); }
 
 	/* send */
-<S_CNF>send { DECHO; return(SEND); }
+<S_CNF>send { DECHO; return (SEND); }
 
 	/* DHCP options */
-<S_CNF>option { DECHO; return(OPTION); }
+<S_CNF>option { DECHO; return (OPTION); }
 
-<S_CNF>rapid-commit { DECHO; return(RAPID_COMMIT); }
-<S_CNF>prefix-delegation { DECHO; return(PREFIX_DELEGATION); }
-<S_CNF>domain-name-servers { DECHO; return(DNS_SERVERS); }
+<S_CNF>rapid-commit { DECHO; return (RAPID_COMMIT); }
+<S_CNF>prefix-delegation { DECHO; return (PREFIX_DELEGATION); }
+<S_CNF>domain-name-servers { DECHO; return (DNS_SERVERS); }
 
 	/* generic options */
-<S_CNF>information-only { DECHO; return(INFO_ONLY); }
+<S_CNF>information-only { DECHO; return (INFO_ONLY); }
 
-<S_CNF>allow { DECHO; return(ALLOW); }
+<S_CNF>allow { DECHO; return (ALLOW); }
 
 	/* interface parameters for delegated prefix configuration */
-<S_CNF>prefix-interface { DECHO; BEGIN S_IFACE; return(PREFIX_INTERFACE); }
-<S_CNF>sla-id { DECHO; return(SLA_ID); }
-<S_CNF>sla-len { DECHO; return(SLA_LEN); }
+<S_CNF>prefix-interface { DECHO; BEGIN S_IFACE; return (PREFIX_INTERFACE); }
+<S_CNF>sla-id { DECHO; return (SLA_ID); }
+<S_CNF>sla-len { DECHO; return (SLA_LEN); }
 
 	/* duration */
-<S_CNF>infinity { DECHO; return(INFINITY); }
+<S_CNF>infinity { DECHO; return (INFINITY); }
 
 	/* misc */
 {ws}		{ ; }
@@ -164,19 +164,19 @@ ecl		\}
 {number} 	{
 	DECHO;
 	yylval.num = strtoll(yytext, NULL, 10);
-	return(NUMBER);
+	return (NUMBER);
 }
-{slash} { DECHO; return(SLASH); }
-{comma} { DECHO; return(COMMA); }
-{semi} { DP("end of sentence"); return(EOS); }
-{bcl} { DP("begin of closure"); return(BCL); }
-{ecl} { DP("end of closure"); return(ECL); }
+{slash} { DECHO; return (SLASH); }
+{comma} { DECHO; return (COMMA); }
+{semi} { DP("end of sentence"); return (EOS); }
+{bcl} { DP("begin of closure"); return (BCL); }
+{ecl} { DP("end of closure"); return (ECL); }
 
 	/* generic string */
 {string} {
 		DECHO;
 		yylval.str = strdup(yytext);
-		return(STRING);
+		return (STRING);
 	}
 
 %%
@@ -239,10 +239,10 @@ cfparse(conf)
 	configfilename = conf;
 	if ((yyin = fopen(configfilename, "r")) == NULL) {
 		if (errno == ENOENT)
-			return(0);
+			return (0);
 		dprintf(LOG_ERR, "cfparse: fopen(%s): %s",
 			configfilename, strerror(errno));
-		return(-1);
+		return (-1);
 	}
 
 	if (yyparse() || yyerrorcount) {
@@ -251,8 +251,8 @@ cfparse(conf)
 				yyerrorcount);
 		} else
 			yyerror("fatal parse failure: exiting");
-		return(-1);
+		return (-1);
 	}
 
-	return(cf_post_config());
+	return (cf_post_config());
 }
