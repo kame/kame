@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.52 2001/08/16 21:01:57 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.53 2001/08/16 21:03:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -113,7 +113,7 @@ extern void yyerror __P((const char *));
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
-%type <intnum> prefix port protocol_spec upper_spec key_string
+%type <intnum> prefix protocol_spec upper_spec key_string
 %type <val> PORT PL_REQUESTS portstr
 %type <val> policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
@@ -546,34 +546,6 @@ portstr
 	|	PORT
 		{
 			$$ = $1;
-		}
-	;
-
-port
-	:	/*NOTHING*/ { $$ = htons(IPSEC_PORT_ANY); }
-	|	PORT
-		{
-			struct servent *ent;
-
-			if (strcmp("any", $1.buf) == 0)
-				$$ = IPSEC_PORT_ANY;
-			else {
-				ent = getservbyname($1.buf, NULL);
-				if (ent) {
-					/* we just choice the first entry. */
-					$$ = ent->s_port;
-				} else {
-					char *p = NULL;
-					$$ = (u_int)strtol($1.buf, &p, 10);
-					if (p && *p != '\0') {
-						yyerror("invalid service name");
-						free($1.buf);
-						return -1;
-					}
-					$$ = htons($$);
-				}
-			}
-			free($1.buf);
 		}
 	;
 
