@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.2.2.1 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.h,v 1.10 2000/11/30 15:22:09 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.11 2001/01/20 15:55:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,6 +118,7 @@ int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
 	struct inpcb *, struct ifnet **));
 int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));
+void in6_clearscope __P((struct in6_addr *));
 #endif /* _KERNEL */
 
 #endif /* !_NETINET6_IN6_PCB_H_ */
