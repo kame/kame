@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.354 1999/12/21 11:40:58 jinmei Exp $
+$Id: CHANGELOG,v 1.355 1999/12/21 12:40:58 jinmei Exp $
 
 <199912>
+1999-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/{bgpd, hroute6d, pim6[ds]d, ping6, racoon, route6d,
+	rtadvd, rtsol[d], traceroute6}: use IPV6_RECVxxx options (if
+	available) instead of according options in RFC2292.
+	
 1999-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_ctloutput: supported IPV6_RECVxxx socket
 	options according to rfc2292bis-01.
