@@ -354,6 +354,8 @@ struct cmsgcred {
 #define	CMSG_DATA(cmsg)		((u_char *)(cmsg) + \
 				 ALIGN(sizeof(struct cmsghdr)))
 
+#define CMSG_ALIGN(n)		ALIGN(n)
+
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
 	(((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len) + \
