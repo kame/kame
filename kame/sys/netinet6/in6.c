@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.242 2001/10/16 05:00:39 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.243 2001/10/16 05:01:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -805,7 +805,7 @@ in6_control(so, cmd, data, ifp)
 		 * lifetimes, we just use the same lifetimes as addresses.
 		 * The (temporarily) installed lifetimes can be overridden by
 		 * later advertised RAs (when accept_rtadv is non 0), which is
-		 * and intended behavior.
+		 * an intended behavior.
 		 */
 		pr0.ndpr_raf_onlink = 1; /* should be configurable? */
 		pr0.ndpr_raf_auto =
