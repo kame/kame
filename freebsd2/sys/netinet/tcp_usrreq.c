@@ -79,10 +79,7 @@ extern	char *tcpstates[];
 
 static int	tcp_attach __P((struct socket *));
 static int	tcp_connect __P((struct tcpcb *, struct mbuf *));
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-struct tcpcb *
+static struct tcpcb *
 		tcp_disconnect __P((struct tcpcb *));
 static struct tcpcb *
 		tcp_usrclosed __P((struct tcpcb *));
@@ -102,10 +99,7 @@ static struct tcpcb *
  * TCP attaches to socket via pru_attach(), reserving space,
  * and an internet control block.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_attach(struct socket *so, int proto)
 {
 	int s = splnet();
@@ -140,10 +134,7 @@ out:
  * which may finish later; embryonic TCB's can just
  * be discarded here.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_detach(struct socket *so)
 {
 	int s = splnet();
@@ -184,10 +175,7 @@ tcp_usr_detach(struct socket *so)
 /*
  * Give the socket an address.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_bind(struct socket *so, struct mbuf *nam)
 {
 	int s = splnet();
@@ -218,10 +206,7 @@ tcp_usr_bind(struct socket *so, struct mbuf *nam)
 /*
  * Prepare to accept connections.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_listen(struct socket *so)
 {
 	int s = splnet();
@@ -245,10 +230,7 @@ tcp_usr_listen(struct socket *so)
  * Send initial segment on connection.
  */
 
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_connect(struct socket *so, struct mbuf *nam)
 {
 	int s = splnet();
@@ -286,10 +268,7 @@ tcp_usr_connect(struct socket *so, struct mbuf *nam)
  *
  * SHOULD IMPLEMENT LATER PRU_CONNECT VIA REALLOC TCPCB.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_disconnect(struct socket *so)
 {
 	int s = splnet();
@@ -323,10 +302,7 @@ tcp_usr_accept(struct socket *so, struct mbuf *nam)
 /*
  * Mark the connection as being incapable of further output.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_shutdown(struct socket *so)
 {
 	int s = splnet();
@@ -345,10 +321,7 @@ tcp_usr_shutdown(struct socket *so)
 /*
  * After a receive, possibly send window update to peer.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_rcvd(struct socket *so, int flags)
 {
 	int s = splnet();
@@ -365,10 +338,7 @@ tcp_usr_rcvd(struct socket *so, int flags)
  * Do a send by putting data in output queue and updating urgent
  * marker if URG set.  Possibly send more data.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_send(struct socket *so, int flags, struct mbuf *m, struct mbuf *nam,
 	     struct mbuf *control)
 {
@@ -452,10 +422,7 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m, struct mbuf *nam,
 /*
  * Abort the TCP.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_abort(struct socket *so)
 {
 	int s = splnet();
@@ -484,10 +451,7 @@ tcp_usr_sense(struct socket *so, struct stat *sb)
 /*
  * Receive out-of-band data.
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-int
+static int
 tcp_usr_rcvoob(struct socket *so, struct mbuf *m, int flags)
 {
 	int s = splnet();
@@ -820,10 +784,7 @@ tcp_attach(so)
  * current input data; switch states based on user close, and
  * send segment to peer (with FIN).
  */
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* MAPPED_ADDR_ENABLED */
-struct tcpcb *
+static struct tcpcb *
 tcp_disconnect(tp)
 	register struct tcpcb *tp;
 {

@@ -68,9 +68,6 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#ifdef MAPPED_ADDR_ENABLED
-#include <sys/domain.h>
-#endif /* MAPPED_ADDR_ENABLED */
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -124,14 +121,8 @@ static struct	udpstat udpstat;	/* from udp_var.h */
 SYSCTL_STRUCT(_net_inet_udp, UDPCTL_STATS, stats, CTLFLAG_RD,
 	&udpstat, udpstat, "");
 
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* !MAPPED_ADDR_ENABLED */
-void udp_detach __P((struct inpcb *));
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* !MAPPED_ADDR_ENABLED */
-int udp_output __P((struct inpcb *, struct mbuf *, struct mbuf *,
+static void udp_detach __P((struct inpcb *));
+static int udp_output __P((struct inpcb *, struct mbuf *, struct mbuf *,
 			    struct mbuf *));
 static	void udp_notify __P((struct inpcb *, int));
 
@@ -156,9 +147,6 @@ udp_input(m, off, proto)
 	int len;
 	struct ip save_ip;
 	struct sockaddr_in udp_in;
-#ifdef MAPPED_ADDR_ENABLED
-	struct sockaddr_in6 udp_in6;
-#endif
 	struct sockaddr *sa;
 
 	udpstat.udps_ipackets++;
@@ -298,13 +286,6 @@ udp_input(m, off, proto)
 					    || last->inp_socket->so_options & SO_TIMESTAMP)
 						ip_savecontrol(last, &opts, ip, n);
 					sa = (struct sockaddr *)&udp_in;
-#ifdef MAPPED_ADDR_ENABLED
-					if (last->inp_socket->so_proto->pr_domain->dom_family == AF_INET6) {
-						in6_sin_2_v4mapsin6(&udp_in,
-								    &udp_in6);
-						sa = (struct sockaddr *)&udp_in6;
-					}
-#endif /* MAPPED_ADDR_ENABLED */
 					if (sbappendaddr(&last->inp_socket->so_rcv,
 						sa, n, opts) == 0) {
 						m_freem(n);
@@ -352,13 +333,6 @@ udp_input(m, off, proto)
 		    || last->inp_socket->so_options & SO_TIMESTAMP)
 			ip_savecontrol(last, &opts, ip, m);
 		sa = (struct sockaddr *)&udp_in;
-#ifdef MAPPED_ADDR_ENABLED
-		if (last->inp_socket->so_proto->pr_domain->dom_family ==
-		    AF_INET6) {
-			in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
-			sa = (struct sockaddr *)&udp_in6;
-		}
-#endif /* MAPPED_ADDR_ENABLED */
 		if (sbappendaddr(&last->inp_socket->so_rcv, sa, m, opts) == 0) {
 			udpstat.udps_fullsock++;
 			goto bad;
@@ -408,12 +382,6 @@ udp_input(m, off, proto)
 	m->m_pkthdr.len -= iphlen;
 	m->m_data += iphlen;
 	sa = (struct sockaddr *)&udp_in;
-#ifdef MAPPED_ADDR_ENABLED
-	if (inp->inp_socket->so_proto->pr_domain->dom_family == AF_INET6) {
-		in6_sin_2_v4mapsin6(&udp_in, &udp_in6);
-		sa = (struct sockaddr *)&udp_in6;
-	}
-#endif /* MAPPED_ADDR_ENABLED */
 	if (sbappendaddr(&inp->inp_socket->so_rcv, sa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
@@ -461,10 +429,7 @@ udp_ctlinput(cmd, sa, vip)
 		in_pcbnotify(&udb, sa, 0, zeroin_addr, 0, cmd, udp_notify);
 }
 
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* !MAPPED_ADDR_ENABLED */
-int
+static int
 udp_output(inp, m, addr, control)
 	register struct inpcb *inp;
 	register struct mbuf *m;
@@ -715,10 +680,7 @@ release:
 	return (error);
 }
 
-#ifndef MAPPED_ADDR_ENABLED
-static
-#endif /* !MAPPED_ADDR_ENABLED */
-void
+static void
 udp_detach(inp)
 	struct inpcb *inp;
 {
