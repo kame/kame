@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.2 2000/02/06 09:51:48 itojun Exp $
+ *	$Id: natptlog.c,v 1.3 2000/02/14 09:59:23 itojun Exp $
  */
 
 #include <stdio.h>
@@ -462,6 +462,7 @@ log(int priority, char *fmt, ...)
 {
     va_list	ap;
     char	Wow[BUFSIZ];
+    time_t t;
 
     va_start(ap, fmt);
     vsprintf(Wow, fmt, ap);
@@ -484,7 +485,8 @@ log(int priority, char *fmt, ...)
 	else
 	{
 	    gettimeofday(&atv, NULL);
-	    tm = localtime(&atv.tv_sec);
+	    t = (time_t)atv.tv_sec;
+	    tm = localtime(&t);
 
 	    fprintf(stderr, "%s ", months[tm->tm_mon]);
 	    fprintf(stderr, "%02d ", tm->tm_mday);
