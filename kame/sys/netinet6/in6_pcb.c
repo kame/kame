@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.106 2001/08/05 04:52:58 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.107 2001/08/16 04:18:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -208,11 +208,13 @@ in6_pcbbind(in6p, nam)
 			return(EADDRNOTAVAIL);
 #endif
 
+#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
 			return EINVAL;
 		/* this must be cleared for ifa_ifwithaddr() */
 		sin6->sin6_scope_id = 0;
+#endif
 
 		lport = sin6->sin6_port;
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
@@ -368,9 +370,12 @@ in6_pcbconnect(in6p, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
+#ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, &ifp) != 0)
 		return EINVAL;
+	sin6->sin6_scope_id = 0;
+#endif
 
 	/* Source address selection. */
 #ifndef TCP6

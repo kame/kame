@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.92 2001/09/01 06:10:02 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.93 2001/09/04 17:34:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -840,10 +840,10 @@ rip6_usrreq(so, req, m, nam, control, p)
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
 #endif
+#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&addr->sin6_addr, addr, in6p, NULL) != 0)
 			return EINVAL;
-#ifndef SCOPEDROUTING
 		addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
 
@@ -908,9 +908,12 @@ rip6_usrreq(so, req, m, nam, control, p)
 				scope6_addr2default(&addr->sin6_addr);
 		}
 #endif
+#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&addr->sin6_addr, addr, in6p, NULL) != 0)
 			return EINVAL;
+		addr->sin6_scope_id = 0;
+#endif
 
 		/* Source address selection. XXX: need pcblookup? */
 		in6a = in6_selectsrc(addr, in6p->in6p_outputopts,
