@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)ping.8	8.2 (Berkeley) 12/11/93
-.\" $FreeBSD: src/sbin/ping/ping.8,v 1.19.2.2 1999/08/29 15:15:07 peter Exp $
+.\" $FreeBSD: src/sbin/ping/ping.8,v 1.19.2.3 2000/03/03 15:13:10 sheldonh Exp $
 .\"
 .Dd March 1, 1997
 .Dt PING 8
@@ -78,9 +78,11 @@ and then an arbitrary number of
 bytes used to fill out the packet.  The options are as follows:
 .Bl -tag -width indent
 .It Fl a
-Audible. Include a bell
+Audible.
+Include a bell
 .Pq ASCII 0x07
-character in the output when any packet is received. This option is ignored
+character in the output when any packet is received.
+This option is ignored
 if other format options are present.
 .It Fl c Ar count
 Stop after sending
