@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.73 2001/09/05 01:12:34 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.74 2001/09/23 12:40:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.73 2001/09/05 01:12:34 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.74 2001/09/23 12:40:33 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -3332,10 +3332,10 @@ fatal(fmt, va_alist)
 	va_start(ap);
 #endif
 	vsnprintf(buf, sizeof(buf), fmt, ap);
+	va_end(ap);
 	perror(buf);
 	syslog(LOG_ERR, "%s: %s", buf, strerror(errno));
 	rtdexit();
-	va_end(ap);
 }
 
 void
