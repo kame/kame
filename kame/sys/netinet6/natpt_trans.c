@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.155 2002/12/09 05:47:22 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.156 2002/12/11 04:19:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -177,7 +177,6 @@ struct mbuf	*natpt_translateTCPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateUDPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv6To4 __P((struct pcv *, struct pAddr *,
 					     struct pcv *));
-void		 natpt_translatePYLD6To4	__P((struct pcv *));
 void		 natpt_watchUDP6		__P((struct pcv *));
 
 /* IPv4 -> IPv6 */
@@ -190,7 +189,6 @@ struct mbuf	*natpt_translateTCPv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateUDPv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv4To6 __P((struct pcv *, struct pAddr *,
 					     struct pcv *));
-void		 natpt_translatePYLD4To6	__P((struct pcv *));
 
 void		 natpt_translateFragment4to66 __P((struct pcv *, struct pAddr *));
 void		 natpt_sendFragmentedTail	__P((struct pcv *, struct ip6_hdr *, struct ip6_frag *));
@@ -206,6 +204,7 @@ struct mbuf	*natpt_translateTCPUDPv4To4 __P((struct pcv *, struct pAddr *,
 void		 natpt_translatePYLD4To4	__P((struct pcv *));
 
 /* FTP translation */
+void		 natpt_translatePYLD		__P((struct pcv *, u_short *));
 int		 natpt_translateFTP6CommandTo4 __P((struct pcv *));
 int		 natpt_translateFTP4ReplyTo6 __P((struct pcv *));
 struct ftpparam	*natpt_parseFTPdialogue	__P((caddr_t, caddr_t, struct ftpparam *));
@@ -687,6 +686,10 @@ natpt_translateTCPv6To4(struct pcv *cv6, struct pAddr *pad)
 {
 	struct pcv	cv4;
 	struct mbuf	*m4;
+	u_short		 ports[2];
+
+	ports[0] = cv6->pyld.tcp6->th_sport;
+	ports[1] = cv6->pyld.tcp6->th_dport;
 
 	bzero(&cv4, sizeof(struct pcv));
 	if ((m4 = natpt_translateTCPUDPv6To4(cv6, pad, &cv4)) == NULL)
@@ -694,7 +697,7 @@ natpt_translateTCPv6To4(struct pcv *cv6, struct pAddr *pad)
 
 	cv4.ip_p = IPPROTO_TCP;
 	natpt_updateTcpStatus(&cv4);
-	natpt_translatePYLD6To4(&cv4);
+	natpt_translatePYLD(&cv4, ports);
 	if (cv4.ats->suit.tcps
 	    && (cv4.ats->suit.tcps->rewrite[cv4.fromto] == 0)) {
 		/* payload unchanged */
@@ -810,6 +813,7 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 	m4->m_pkthdr.len -= diff;
     }
 
+	cv4->sa_family = AF_INET;
 	cv4->m = m4;
 	cv4->plen = cv6->plen;
 	cv4->poff = sizeof(struct ip);
@@ -831,32 +835,6 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 	}
 
 	return (m4);
-}
-
-
-void
-natpt_translatePYLD6To4(struct pcv *cv4)
-{
-	int		delta = 0;
-	char		tcphdr6[TCPHDRSZ];
-
-	/* Save unmodified tcp header for a check of packet retransmission. */
-	bcopy(cv4->pyld.tcp4, tcphdr6, TCPHDRSZ);
-
-	if ((htons(cv4->pyld.tcp4->th_dport) == FTP_CONTROL)
-	    || (htons(cv4->pyld.tcp4->th_sport) == FTP_CONTROL)) {
-		if ((delta = natpt_translateFTP6CommandTo4(cv4)) != 0) {
-			struct mbuf	*mbf = cv4->m;
-			struct ip	*ip4 = cv4->ip.ip4;
-
-			ip4->ip_len += delta;
-			mbf->m_len += delta;
-			if (mbf->m_flags & M_PKTHDR)
-				mbf->m_pkthdr.len += delta;
-		}
-
-		natpt_updateSeqAck(cv4, tcphdr6, delta);
-	}
 }
 
 
@@ -1382,6 +1360,10 @@ natpt_translateTCPv4To6(struct pcv *cv4, struct pAddr *pad)
 {
 	struct pcv	cv6;
 	struct mbuf	*m6;
+	u_short		 ports[2];
+
+	ports[0] = cv4->pyld.tcp4->th_sport;
+	ports[1] = cv4->pyld.tcp4->th_dport;
 
 	bzero(&cv6, sizeof(struct pcv));
 	if ((m6 = natpt_translateTCPUDPv4To6(cv4, pad, &cv6)) == NULL)
@@ -1389,7 +1371,7 @@ natpt_translateTCPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 	cv6.ip_p = IPPROTO_TCP;
 	natpt_updateTcpStatus(cv4);
-	natpt_translatePYLD4To6(&cv6);
+	natpt_translatePYLD(&cv6, ports);
 	if (cv6.ats->suit.tcps
 	    && (cv6.ats->suit.tcps->rewrite[cv6.fromto] == 0)) {
 		/* payload unchanged */
@@ -1506,6 +1488,7 @@ natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 		return (NULL);
 
 	bzero(cv6, sizeof(struct pcv));
+	cv6->sa_family = AF_INET6;
 	cv6->m = m6;
 	cv6->ip.ip6 = ip6 = mtod(m6, struct ip6_hdr *);
 	cv6->pyld.caddr = (caddr_t)(ip6 + 1);
@@ -1529,34 +1512,6 @@ natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 
 	m6->m_pkthdr.len = m6->m_len = hdrsz + cv4->plen;
 	return (m6);
-}
-
-
-void
-natpt_translatePYLD4To6(struct pcv *cv6)
-{
-	int		delta = 0;
-	char		tcphdr4[TCPHDRSZ];
-
-	/* Save unmodified tcp header for a check of packet retransmission. */
-	bcopy(cv6->pyld.tcp6, tcphdr4, TCPHDRSZ);
-
-	if ((htons(cv6->pyld.tcp6->th_sport) == FTP_CONTROL)
-	    || (htons(cv6->pyld.tcp6->th_dport) == FTP_CONTROL)) {
-		if ((delta = natpt_translateFTP4ReplyTo6(cv6)) != 0) {
-			struct mbuf	*mbf = cv6->m;
-			struct ip6_hdr	*ip6 = cv6->ip.ip6;
-
-			ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) + delta);
-			mbf->m_len += delta;
-			if (mbf->m_flags & M_PKTHDR)
-				mbf->m_pkthdr.len += delta;
-		}
-
-		natpt_updateSeqAck(cv6, tcphdr4, delta);
-	}
-
-	return ;
 }
 
 
@@ -2037,6 +1992,48 @@ natpt_translateFragment4to4(struct pcv *cv4from, struct pAddr *pad)
 /*
  *
  */
+
+void
+natpt_translatePYLD(struct pcv *cv, u_short * ports)
+{
+	int		delta = 0;
+	char		tcphdr[TCPHDRSZ];
+
+	/* Save unmodified tcp header for a check of packet retransmission. */
+	bcopy(cv->pyld.tcp4, tcphdr, TCPHDRSZ);
+
+	/*
+	 * if ((outgoing session) and (ato[1] == FTP_CONTROL)
+	 *     || (mae[0] == FTP_CONTROL))
+	 */
+	if (((cv->fromto == NATPT_FROM)
+	     && (ntohs(cv->pyld.tcp4->th_dport) == FTP_CONTROL))
+	    || (ntohs(ports[0]) == FTP_CONTROL)) {
+		struct mbuf	*mbf = cv->m;
+
+		/* cv holds v6/v4 packet after translation */
+		if (cv->sa_family == AF_INET) {
+			/* In case translation from v6 to v4 */
+			struct ip	*ip4 = cv->ip.ip4;
+
+			if ((delta = natpt_translateFTP6CommandTo4(cv)) != 0)
+				ip4->ip_len += delta;
+		} else {
+			/* In case translatino from v4 to v6 */
+			struct ip6_hdr	*ip6 = cv->ip.ip6;
+
+			if ((delta = natpt_translateFTP4ReplyTo6(cv)) != 0)
+				ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) + delta);
+		}
+
+		mbf->m_len += delta;
+		if (mbf->m_flags & M_PKTHDR)
+			mbf->m_pkthdr.len += delta;
+	}
+
+	natpt_updateSeqAck(cv, tcphdr, delta);
+}
+
 
 int
 natpt_translateFTP6CommandTo4(struct pcv *cv4)
