@@ -347,8 +347,8 @@ route_output(m, va_alist)
 				register struct ifaddr *oifa = rt->rt_ifa;
 				if (oifa != ifa) {
 				    if (oifa && oifa->ifa_rtrequest)
-					oifa->ifa_rtrequest(RTM_DELETE,
-								rt, gate);
+					oifa->ifa_rtrequest(RTM_DELETE, rt,
+					    &info);
 				    IFAFREE(rt->rt_ifa);
 				    rt->rt_ifa = ifa;
 				    ifa->ifa_refcnt++;
@@ -358,7 +358,7 @@ route_output(m, va_alist)
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
 					&rt->rt_rmx);
 			if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
-			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, gate);
+			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, &info);
 			if (genmask)
 				rt->rt_genmask = genmask;
 			/*

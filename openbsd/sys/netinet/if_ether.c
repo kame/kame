@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.c,v 1.13 1999/03/13 21:15:16 deraadt Exp $	*/
+/*	$OpenBSD: if_ether.c,v 1.22 2000/06/22 19:05:51 art Exp $	*/
 /*	$NetBSD: if_ether.c,v 1.31 1996/05/11 12:59:58 mycroft Exp $	*/
 
 /*
@@ -85,7 +85,7 @@ int	arpt_down = 20;		/* once declared down, don't send for 20 secs */
 static	void arprequest
 	    __P((struct arpcom *, u_int32_t *, u_int32_t *, u_int8_t *));
 static	void arptfree __P((struct llinfo_arp *));
-static	void arptimer __P((void *));
+void arptimer __P((void *));
 static	struct llinfo_arp *arplookup __P((u_int32_t, int, int));
 static	void in_arpinput __P((struct mbuf *));
 
@@ -98,17 +98,11 @@ int	useloopback = 1;	/* use loopback interface for local traffic */
 int	arpinit_done = 0;
 
 /* revarp state */
-static struct	in_addr myip, srv_ip;
-static int	myip_initialized = 0;
-static int	revarp_in_progress = 0;
-static struct	ifnet *myip_ifp = NULL;
+static struct in_addr myip, srv_ip;
+static int myip_initialized = 0;
+static int revarp_in_progress = 0;
+struct ifnet *myip_ifp = NULL;
 
-static void arptimer __P((void *));
-static void arprequest __P((struct arpcom *, u_int32_t *, u_int32_t *,
-			    u_int8_t *));
-static void in_arpinput __P((struct mbuf *));
-static void arptfree __P((struct llinfo_arp *));
-static struct llinfo_arp *arplookup __P((u_int32_t, int, int ));
 #ifdef DDB
 #include <vm/vm.h>
 
@@ -122,15 +116,16 @@ static int db_show_radix_node __P((struct radix_node *, void *));
  * Timeout routine.  Age arp_tab entries periodically.
  */
 /* ARGSUSED */
-static void
+void
 arptimer(arg)
 	void *arg;
 {
+	struct timeout *to = (struct timeout *)arg;
 	int s;
-	register struct llinfo_arp *la, *nla;
+	struct llinfo_arp *la, *nla;
 
 	s = splsoftnet();
-	timeout(arptimer, NULL, arpt_prune * hz);
+	timeout_add(to, arpt_prune * hz);
 	for (la = llinfo_arp.lh_first; la != 0; la = nla) {
 		register struct rtentry *rt = la->la_rt;
 
@@ -145,16 +140,18 @@ arptimer(arg)
  * Parallel to llc_rtrequest.
  */
 void
-arp_rtrequest(req, rt, sa)
+arp_rtrequest(req, rt, info)
 	int req;
 	register struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	register struct sockaddr *gate = rt->rt_gateway;
 	register struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 
 	if (!arpinit_done) {
+		static struct timeout arptimer_to;
+
 		arpinit_done = 1;
 		/*
 		 * We generate expiration times from time.tv_sec
@@ -163,7 +160,9 @@ arp_rtrequest(req, rt, sa)
 		if (time.tv_sec == 0) {
 			time.tv_sec++;
 		}
-		timeout(arptimer, (caddr_t)0, hz);
+
+		timeout_set(&arptimer_to, arptimer, &arptimer_to);
+		timeout_add(&arptimer_to, hz);
 	}
 	if (rt->rt_flags & RTF_GATEWAY)
 		return;
@@ -431,7 +430,7 @@ arpintr()
 }
 
 /*
- * ARP for Internet protocols on 10 Mb/s Ethernet.
+ * ARP for Internet protocols on Ethernet.
  * Algorithm is that given in RFC 826.
  * In addition, a sanity check is performed on the sender
  * protocol address, to catch impersonators.
@@ -464,7 +463,9 @@ in_arpinput(m)
 	bcopy((caddr_t)ea->arp_spa, (caddr_t)&isaddr, sizeof (isaddr));
 	bcopy((caddr_t)ea->arp_tpa, (caddr_t)&itaddr, sizeof (itaddr));
 	for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next)
-		if (ia->ia_ifp == &ac->ac_if) {
+		if (ia->ia_ifp == &ac->ac_if ||
+		    (ia->ia_ifp->if_bridge &&
+		    ia->ia_ifp->if_bridge == ac->ac_if.if_bridge)) {
 			maybe_ia = ia;
 			if (itaddr.s_addr == ia->ia_addr.sin_addr.s_addr ||
 			    isaddr.s_addr == ia->ia_addr.sin_addr.s_addr)
@@ -493,9 +494,32 @@ in_arpinput(m)
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
 		if (sdl->sdl_alen &&
-		    bcmp((caddr_t)ea->arp_sha, LLADDR(sdl), sdl->sdl_alen))
-			log(LOG_INFO, "arp info overwritten for %s by %s\n",
-			    inet_ntoa(isaddr), ether_sprintf(ea->arp_sha));
+		    bcmp((caddr_t)ea->arp_sha, LLADDR(sdl), sdl->sdl_alen)) {
+		  	if (rt->rt_flags & RTF_PERMANENT_ARP) {
+				log(LOG_WARNING,
+				   "arp: attempt to overwrite permanent "
+				   "entry for %s by %s on %s\n", 
+				   inet_ntoa(isaddr),
+				   ether_sprintf(ea->arp_sha),
+				   (&ac->ac_if)->if_xname);
+				goto out;
+			} else if (rt->rt_ifp != &ac->ac_if) {
+			        log(LOG_WARNING,
+				   "arp: attempt to overwrite entry for %s "
+				   "on %s by %s on %s\n",
+				   inet_ntoa(isaddr), rt->rt_ifp->if_xname,
+				   ether_sprintf(ea->arp_sha),
+				   (&ac->ac_if)->if_xname);
+				goto out;
+			} else {
+				log(LOG_INFO,
+				   "arp info overwritten for %s by %s on %s\n",
+			    	   inet_ntoa(isaddr), 
+				   ether_sprintf(ea->arp_sha),
+				   (&ac->ac_if)->if_xname);
+				rt->rt_expire = 1; /* no longer static */
+			}
+		}
 		bcopy((caddr_t)ea->arp_sha, LLADDR(sdl),
 		    sdl->sdl_alen = sizeof(ea->arp_sha));
 		if (rt->rt_expire)
@@ -625,7 +649,7 @@ arp_ifinit(ac, ifa)
 }
 
 /*
- * Called from 10 Mb/s Ethernet interrupt handlers
+ * Called from Ethernet interrupt handlers
  * when ether packet type ETHERTYPE_REVARP
  * is received.  Common length and type checks are done here,
  * then the protocol-specific routine is called.
@@ -658,7 +682,7 @@ out:
 }
 
 /*
- * RARP for Internet protocols on 10 Mb/s Ethernet.
+ * RARP for Internet protocols on Ethernet.
  * Algorithm is that given in RFC 903.
  * We are only using for bootstrap purposes to get an ip address for one of
  * our interfaces.  Thus we support no user-interface.

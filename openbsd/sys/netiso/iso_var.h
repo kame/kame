@@ -160,7 +160,7 @@ int m_datalen __P((struct mbuf *));
 int m_compress __P((struct mbuf *, struct mbuf **));
 
 /* iso_snpac.c */
-void llc_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+void llc_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 void iso_setmcasts __P((struct ifnet *, int));
 int iso_snparesolve __P((struct ifnet *, struct sockaddr_iso *,
 			 caddr_t, int *));

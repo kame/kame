@@ -401,10 +401,10 @@ lo_altqstart(ifp)
 
 /* ARGSUSED */
 void
-lortrequest(cmd, rt, sa)
+lortrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 
 	if (rt)

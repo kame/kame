@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.19 2001/01/17 15:36:44 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.20 2001/01/17 16:59:27 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -108,7 +108,7 @@ static int faithioctl __P((struct ifnet *, u_long, caddr_t));
 #endif
 int faithoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
-#ifdef __NetBSD__
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
 static void faithrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
 static void faithrtrequest __P((int, struct rtentry *, struct sockaddr *));
@@ -254,7 +254,7 @@ faithoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
-#ifdef __NetBSD__
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
 faithrtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;

@@ -199,7 +199,7 @@ void	arpintr __P((void));
 int	arpresolve __P((struct arpcom *,
 	    struct rtentry *, struct mbuf *, struct sockaddr *, u_char *));
 void	arp_ifinit __P((struct arpcom *, struct ifaddr *));
-void	arp_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+void	arp_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 
 int	ether_addmulti __P((struct ifreq *, struct arpcom *));
 int	ether_delmulti __P((struct ifreq *, struct arpcom *));
@@ -275,7 +275,7 @@ struct ether_multistep {
 
 extern struct ifnet *myip_ifp;
 
-void arp_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+void arp_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 int arpresolve __P((struct arpcom *, struct rtentry *, struct mbuf *,
 		    struct sockaddr *, u_char *));
 void arpintr __P((void));

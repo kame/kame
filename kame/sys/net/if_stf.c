@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.48 2001/01/17 15:36:44 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.49 2001/01/17 16:59:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -188,7 +188,7 @@ static int stf_checkaddr4 __P((struct stf_softc *, struct in_addr *,
 	struct ifnet *));
 static int stf_checkaddr6 __P((struct stf_softc *, struct in6_addr *,
 	struct ifnet *));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
 static void stf_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
 static void stf_rtrequest __P((int, struct rtentry *, struct sockaddr *));
@@ -767,7 +767,7 @@ in_stf_input(m, va_alist)
 
 /* ARGSUSED */
 static void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
 stf_rtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
