@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.6 2003/10/22 08:54:15 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.7 2003/10/23 05:44:35 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -129,7 +129,7 @@ void tcplike_rto_timeout(void *ccb)
 	cb->ssthresh = cb->cwnd >>1;
 	cb->cwnd = 1; /* allowing 1 packet to be sent */
 	cb->outstanding = 0; /* is this correct? */
-	cb->rto_timer.callout = NULL;
+	cb->rto_timer_callout = NULL;
 	cb->rto = cb->rto << 1;
 	TIMEOUT_DEBUG((LOG_INFO, "RTO Timeout. New RTO = %u\n", cb->rto));
 	
@@ -234,6 +234,14 @@ void *tcplike_send_init(struct dccpcb* pcb)
 		    cb->cwnd, cb->outstanding));
 	cb->rtt = 0xffff;
 	cb->rto = TIMEOUT_UBOUND;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&cb->rto_timer, 0);
+	callout_init(&cb->free_timer, 0);
+#else
+	callout_init(&cb->rto_timer);
+	callout_init(&cb->free_timer);
+#endif
+	cb->rto_timer_callout = 0;
 	cb->rtt_d = 0;
 	cb->timestamp = 0;
 	
@@ -297,15 +305,16 @@ void tcplike_send_free(void *ccb)
 	cb->cv_hs = cb->cv_ts = 0;
 
 	/* untimeout any active timer */
-	if (cb->rto_timer.callout) {
+	if (cb->rto_timer_callout) {
 		TCPLIKE_DEBUG((LOG_INFO, "Untimeout RTO Timer\n"));
-		untimeout(tcplike_rto_timeout, (void*) cb, cb->rto_timer);
+		callout_stop(&cb->rto_timer);
+		cb->rto_timer_callout = 0;
 	}
 	
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
 #endif
-	timeout(tcplike_send_term, (void*)cb, 10*hz);
+	callout_reset(&cb->free_timer, 10*hz, tcplike_send_term, (void*)cb);
 }
 
 /* Ask TCPlike wheter one can send a packet or not 
@@ -333,10 +342,11 @@ int tcplike_send_packet(void *ccb, long datasize)
 	if (cb->cwnd <= cb->outstanding) {
 		/* May not send. trigger RTO */
 		/*TIMEOUT_DEBUG((LOG_INFO, "cwnd (%d) < outstanding (%d)\n", cb->cwnd, cb->outstanding));*/
-		if (!cb->rto_timer.callout) {
+		if (!cb->rto_timer_callout) {
 			LOSS_DEBUG((LOG_INFO, "Trigger TCPlike RTO timeout timer. Ticks = %u\n", cb->rto));
 			ticks = (long)cb->rto;
-			cb->rto_timer = timeout(tcplike_rto_timeout, (void *)cb, ticks);
+			callout_reset(&cb->rto_timer, ticks, tcplike_rto_timeout, (void *)cb);
+			cb->rto_timer_callout = 1;
 		}
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		mtx_unlock(&(cb->mutex));
@@ -354,10 +364,10 @@ int tcplike_send_packet(void *ccb, long datasize)
 	}
 	
 	/* untimeout any active timer */
-	if (cb->rto_timer.callout) {
+	if (cb->rto_timer_callout) {
 		LOSS_DEBUG((LOG_INFO, "Untimeout RTO Timer\n"));
-		untimeout(tcplike_rto_timeout, (void*) cb, cb->rto_timer);
-		cb->rto_timer.callout = NULL;
+		callout_stop(&cb->rto_timer);
+		cb->rto_timer_callout = 0;
 	}
 
 	if (!cb->sample_rtt) {
@@ -652,11 +662,11 @@ void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 	CWND_DEBUG((LOG_INFO, "Recvd. CWND value: %u , OUTSTANDING value: %u\n",
 		    cb->cwnd, cb->outstanding));
 
-	if (cb->cwnd > cb->outstanding && cb->rto_timer.callout) {
+	if (cb->cwnd > cb->outstanding && cb->rto_timer_callout) {
                 LOSS_DEBUG((LOG_INFO, "Force DCCP_OUTPUT, CWND = %u Outstanding = %u\n",
                             cb->cwnd, cb->outstanding));
-		untimeout(tcplike_rto_timeout, (void*) cb, cb->rto_timer);
-		cb->rto_timer.callout = NULL;
+		callout_stop(&cb->rto_timer);
+		cb->rto_timer_callout = 0;
 		
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		mtx_unlock(&(cb->mutex));
@@ -869,6 +879,12 @@ void *tcplike_recv_init(struct dccpcb *pcb)
 
 	ccb->pcb->remote_ackvector = 1;
 	dccp_use_ackvector(ccb->pcb);
+
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&ccb->free_timer, 0);
+#else
+	callout_init(&ccb->free_timer);
+#endif
 	
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_init(&(ccb->mutex), "TCPlike Receiver mutex", NULL, MTX_DEF);
@@ -922,7 +938,7 @@ void tcplike_recv_free(void *ccb)
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
 #endif
-	timeout(tcplike_recv_term, (void*)cb, 10*hz);
+	callout_reset(&cb->free_timer, 10*hz, tcplike_recv_term, (void*)cb);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.h,v 1.4 2003/10/22 08:54:15 itojun Exp $	*/
+/*	$KAME: dccp_tfrc.h,v 1.5 2003/10/23 05:44:35 ono Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -89,7 +89,7 @@ struct tfrc_send_ccb {
   u_int8_t     last_win_count; /* Last window counter sent */
   struct timeval t_last_win_count; /* Timestamp of earliest packet with
 				      last_win_count value sent */
-  struct callout_handle ch_nftimer;  /* Handle to no feedback timer */
+  struct callout	*ch_nftimer;  /* Handle to no feedback timer */
   u_int8_t     idle;
   u_int32_t    t_rto;      /* Time out value = 4*rtt */
   struct timeval t_ld;        /* Time last doubled during slow start */
@@ -98,7 +98,7 @@ struct tfrc_send_ccb {
                  t_ipi,    /* Interpacket (send) interval */
                  delta;    /* Send timer delta */    
 
-  struct callout_handle ch_stimer;  /* Handle to scheduled send timer */ 
+  struct callout	*ch_stimer;  /* Handle to scheduled send timer */ 
 
   struct s_hist_head hist;        /* Packet history */
 };

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.6 2003/10/20 12:22:51 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.7 2003/10/23 05:44:35 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -33,15 +33,21 @@
 #ifndef _NETINET_DCCP_VAR_H_
 #define _NETINET_DCCP_VAR_H_
 
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef in6pcb
+#define in6pcb		inpcb
+#endif
+#endif
+
 struct dccpcb {
 	u_int8_t	state; /* initial, listening, connecting, established,
 				  closing, closed etc */
 	u_int8_t	who;	/* undef, server, client, listener */
 
-	struct callout_handle	connect_timer;	/* Connection timer */
-	struct callout_handle	retrans_timer;	/* Retransmit timer */
-	struct callout_handle	close_timer;	/* Closing timer */
-	struct callout_handle	timewait_timer;	/* Time wait timer */
+	struct callout	connect_timer;	/* Connection timer */
+	struct callout	retrans_timer;	/* Retransmit timer */
+	struct callout	close_timer;	/* Closing timer */
+	struct callout	timewait_timer;	/* Time wait timer */
 
 	u_int32_t	retrans;
 
@@ -93,9 +99,14 @@ struct xdccpcb {
 	size_t		xd_len;
 	struct	inpcb	xd_inp;
 	struct	dccpcb	xd_dp;
+#ifdef __FreeBSD__
 	struct	xsocket	xd_socket;
+#endif
 };
 #endif
+
+#define	intodccpcb(ip)	((struct dccpcb *)(ip)->inp_ppcb)
+#define	in6todccpcb(ip)	((struct dccpcb *)(ip)->inp_ppcb)
 
 struct	dccpstat {
 	u_long	dccps_connattempt;	/* Initiated connections */
@@ -187,7 +198,9 @@ const char *dccpstates[] = {
 }
 
 #ifdef _KERNEL
+#ifdef __FreeBSD__
 SYSCTL_DECL(_net_inet_dccp);
+#endif
 
 extern struct	pr_usrreqs dccp_usrreqs;
 extern struct	inpcbhead dccpb;
@@ -199,10 +212,22 @@ extern int	dccp_log_in_vain; /* if we should log connections to
 				     ports w/o listeners */
 
 /* These four functions are called from inetsw (in_proto.c) */
-void	dccp_ctlinput(int, struct sockaddr *, void *);
 void	dccp_init(void);
+#ifdef __FreeBSD__
 void	dccp_input(struct mbuf *, int);
+void	dccp_ctlinput(int, struct sockaddr *, void *);
 int	dccp_ctloutput(struct socket *, struct sockopt *);
+#else
+void	dccp_input(struct mbuf *, ...);
+void*	dccp_ctlinput(int, struct sockaddr *, void *);
+int	dccp_ctloutput(int , struct socket *, int, int, struct mbuf **);
+int	dccp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
+#ifdef __NetBSD__
+int	dccp_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
+#else /* OpenBSD */
+int	dccp_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *);
+#endif
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 struct inpcb *

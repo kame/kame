@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_var.h,v 1.4 2003/10/18 08:23:35 itojun Exp $	*/
+/*	$KAME: dccp6_var.h,v 1.5 2003/10/23 05:44:35 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark
@@ -34,7 +34,9 @@
 #define _NETINET_DCCP6_VAR_H_
 
 #ifdef _KERNEL
+#ifdef __FreeBSD__
 SYSCTL_DECL(_net_inet6_dccp6);
+#endif
 
 extern struct	pr_usrreqs dccp6_usrreqs;
 

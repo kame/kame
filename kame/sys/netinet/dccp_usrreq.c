@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.14 2003/10/22 08:54:16 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.15 2003/10/23 05:44:35 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -65,7 +65,9 @@
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
  */
 
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
+#endif
 #include "opt_dccp.h"
 
 #include <sys/param.h>
@@ -100,9 +102,9 @@
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
-#include <netinet/ip.h>
 #ifdef INET6
 #include <netinet/ip6.h>
 #endif
@@ -119,7 +121,9 @@
 #include <netinet/dccp6_var.h>
 #include <netinet/dccp_cc_sw.h>
 
+#ifdef __FreeBSD__
 #include <machine/in_cksum.h>
+#endif
 
 #undef DEBUG
 #undef ACKDEBUG
@@ -152,8 +156,10 @@
 extern struct dccp_cc_sw cc_sw[];
 
 int	dccp_log_in_vain = 1;
+#ifdef __FreeBSD__
 SYSCTL_INT(_net_inet_dccp, OID_AUTO, dccp_log_in_vain, CTLFLAG_RW, 
     &dccp_log_in_vain, 0, "Log all incoming DCCP packets");
+#endif
 
 struct	inpcbhead dccpb;		/* from dccp_var.h */
 struct	inpcbinfo dccpbinfo;
@@ -166,8 +172,10 @@ u_long	dccp_sendspace = 32768;
 u_long	dccp_recvspace = 65536;
 
 struct	dccpstat dccpstat;	/* from dccp_var.h */
+#ifdef __FreeBSD__
 SYSCTL_STRUCT(_net_inet_dccp, DCCPCTL_STATS, stats, CTLFLAG_RW,
     &dccpstat, dccpstat, "DCCP statistics (struct dccpstat, netinet/dccp_var.h)");
+#endif
 
 static struct	sockaddr_in dccp_in = { sizeof(dccp_in), AF_INET };
 
@@ -621,7 +629,7 @@ dccp_input(struct mbuf *m, int off)
 			if (len > data_off) {
 				dccp_add_option(dp, DCCP_OPT_DATA_DISCARD, test, 0);
 			}
-			dp->connect_timer = timeout(dccp_connect_t, dp, DCCP_CONNECT_TIMER);
+			callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
 			dccp_output(dp, 0);
 			break;
 
@@ -654,8 +662,8 @@ dccp_input(struct mbuf *m, int off)
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
 			dp->ack_snd = dp->seq_rcv;
 
-			untimeout(dccp_retrans_t, dp, dp->retrans_timer);
-			untimeout(dccp_connect_t, dp, dp->connect_timer);
+			callout_stop(&dp->retrans_timer);
+			callout_stop(&dp->connect_timer);
 
 			/* First check if we have negotiated a cc */
 			if (dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0) {
@@ -685,7 +693,7 @@ dccp_input(struct mbuf *m, int off)
 				dp = dccp_close(dp);
 				return;
 			} else {
-				untimeout(dccp_retrans_t, dp, dp->retrans_timer);
+				callout_stop(&dp->retrans_timer);
 				dp->state = DCCPS_TIME_WAIT;
 			}
 		}
@@ -698,7 +706,7 @@ dccp_input(struct mbuf *m, int off)
 		case DCCP_TYPE_DATAACK:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP ACK/DATAACK\n"));
 
-			untimeout(dccp_connect_t, dp, dp->connect_timer);
+			callout_stop(&dp->connect_timer);
 
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
 
@@ -725,7 +733,7 @@ dccp_input(struct mbuf *m, int off)
 			return;
 		case DCCP_TYPE_RESET:
 			dp->state = DCCPS_TIME_WAIT;
-			untimeout(dccp_retrans_t, dp, dp->retrans_timer);
+			callout_stop(&dp->retrans_timer);
 			break;
 
 		default:
@@ -785,8 +793,8 @@ dccp_input(struct mbuf *m, int off)
 		case DCCP_TYPE_RESET:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP RESET\n"));
 			dp->state = DCCPS_TIME_WAIT;
-			untimeout(dccp_retrans_t, dp, dp->retrans_timer);
-			dp->timewait_timer = timeout(dccp_timewait_t, dp, DCCP_TIMEWAIT_TIMER);
+			callout_stop(&dp->retrans_timer);
+			callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER, dccp_timewait_t, dp);
 			break;
 	
 		case DCCP_TYPE_MOVE:
@@ -802,13 +810,13 @@ dccp_input(struct mbuf *m, int off)
 		switch(dh->dh_type) {
 		case DCCP_TYPE_CLOSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP CLOSE (State DCCPS_SERVER_CLOSE)\n"));
-			untimeout(dccp_retrans_t, dp, dp->retrans_timer);
+			callout_stop(&dp->retrans_timer);
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 			dp = dccp_close(dp);
 			return;
 		case DCCP_TYPE_RESET:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP RESET\n"));
-			untimeout(dccp_retrans_t, dp, dp->retrans_timer);
+			callout_stop(&dp->retrans_timer);
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 			dp->state = DCCPS_TIME_WAIT;
 			break;
@@ -829,9 +837,9 @@ dccp_input(struct mbuf *m, int off)
 			break;
 		case DCCP_TYPE_RESET:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP RESET\n"));
-			untimeout(dccp_retrans_t, dp, dp->retrans_timer);
+			callout_stop(&dp->retrans_timer);
 			dp->state = DCCPS_TIME_WAIT;
-			dp->timewait_timer = timeout(dccp_timewait_t, dp, DCCP_TIMEWAIT_TIMER);
+			callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER, dccp_timewait_t, dp);
 			break;
 		default:
 			DCCP_DEBUG((LOG_INFO, "Got a %u packet while in client_close stage!\n", dh->dh_type));
@@ -1461,10 +1469,10 @@ dccp_close(struct dccpcb *dp)
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_close!\n"));
 
 	/* Stop all timers */
-	untimeout(dccp_connect_t, dp, dp->connect_timer);
-	untimeout(dccp_retrans_t, dp, dp->retrans_timer);
-	untimeout(dccp_close_t, dp, dp->close_timer);
-	untimeout(dccp_timewait_t, dp, dp->timewait_timer);
+	callout_stop(&dp->connect_timer);
+	callout_stop(&dp->retrans_timer);
+	callout_stop(&dp->close_timer);
+	callout_stop(&dp->timewait_timer);
 
 	if (dp->cc_in_use[0] > 0)
 		(*cc_sw[dp->cc_in_use[0]].cc_send_free)(dp->cc_state[0]);
@@ -1676,8 +1684,8 @@ dccp_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 	if (error != 0)
 		goto bad;
 
-	dp->retrans_timer = timeout(dccp_retrans_t, dp, dp->retrans);
-	dp->connect_timer = timeout(dccp_connect_t, dp, DCCP_CONNECT_TIMER);
+	callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
+	callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
 
 	test[0] = dp->pref_cc;
 	/* FIX THIS LATER */
@@ -1755,8 +1763,8 @@ dccp6_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 	if (error != 0)
 		goto bad;
 
-	dp->retrans_timer = timeout(dccp_retrans_t, dp, dp->retrans);
-	dp->connect_timer = timeout(dccp_connect_t, dp, DCCP_CONNECT_TIMER);
+	callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
+	callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
 
 	test[0] = dp->pref_cc;
 	/* FIX THIS LATER */
@@ -1961,8 +1969,8 @@ dccp_disconnect2(struct dccpcb *dp)
 		sbflush(&so->so_rcv);
 		if (dp->state == DCCPS_ESTAB) {
 			dp->retrans = 100;
-			dp->retrans_timer = timeout(dccp_retrans_t, dp, dp->retrans);
-			dp->close_timer = timeout(dccp_close_t, dp, DCCP_CLOSE_TIMER);
+			callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
+			callout_reset(&dp->close_timer, DCCP_CLOSE_TIMER, dccp_close_t, dp);
 			if (dp->who == DCCP_CLIENT) {
 				dp->state = DCCPS_CLIENT_CLOSE;
 			} else {
@@ -2264,10 +2272,17 @@ dccp_newdccpcb(struct inpcb *inp)
 	dp = &id->dp;
 	bzero((char *) dp, sizeof(struct dccpcb));
 
-	callout_handle_init(&dp->connect_timer);
-	callout_handle_init(&dp->retrans_timer);
-	callout_handle_init(&dp->close_timer);
-	callout_handle_init(&dp->timewait_timer);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&dp->connect_timer, 0);
+	callout_init(&dp->retrans_timer, 0);
+	callout_init(&dp->close_timer, 0);
+	callout_init(&dp->timewait_timer, 0);
+#else
+	callout_init(&dp->connect_timer);
+	callout_init(&dp->retrans_timer);
+	callout_init(&dp->close_timer);
+	callout_init(&dp->timewait_timer);
+#endif
 
 	dp->d_inpcb = inp;
 	dp->ndp = 0;
@@ -2737,8 +2752,10 @@ INP_LOCK(inp);
 	return error;
 }
 
+#ifdef __FreeBSD__
 SYSCTL_PROC(_net_inet_dccp, DCCPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
     dccp_pcblist, "S,xdccpcb", "List of active DCCP sockets");
+#endif
 
 void
 dccp_timewait_t(void *dcb)
@@ -2788,7 +2805,7 @@ dccp_close_t(void *dcb)
 		INP_LOCK(dp->d_inpcb);
 		dccp_output(dp, DCCP_TYPE_RESET + 2);
 		/*dp->state = DCCPS_TIME_WAIT; */
-		dp->timewait_timer = timeout(dccp_timewait_t, dp, DCCP_TIMEWAIT_TIMER);
+		callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER, dccp_timewait_t, dp);
 		INP_UNLOCK(dp->d_inpcb);
 	}
 	INP_INFO_WUNLOCK(&dccpbinfo);
@@ -2808,10 +2825,10 @@ dccp_retrans_t(void *dcb)
 	inp = dp->d_inpcb;
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&dccpbinfo);
-	untimeout(dccp_retrans_t, dp, dp->retrans_timer);
+	callout_stop(&dp->retrans_timer);
 	dccp_output(dp, 0);
 	dp->retrans = dp->retrans * 2;
-	timeout(dccp_retrans_t, dp, dp->retrans);
+	callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
 	INP_UNLOCK(inp);
 	splx(s);
 }

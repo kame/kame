@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.h,v 1.6 2003/10/22 08:54:15 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.h,v 1.7 2003/10/23 05:44:35 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -70,7 +70,9 @@ struct tcplike_send_ccb
 	u_int32_t ack_last; /* Last ok Ack packet */
 	u_int32_t ack_miss; /* oldest missing Ack packet */
 	
-	struct callout_handle rto_timer;
+	struct callout free_timer;
+	struct callout rto_timer;
+	u_int rto_timer_callout;
 
 	u_char *cwndvector;  /* 2 bits per packet */
 	u_char *cv_hp;  /* head ptr for cwndvector */
@@ -135,6 +137,7 @@ struct tcplike_recv_ccb {
 	/* No ack ratio or vector here. it's a global feature */
 	struct ack_list *av_list;
 	u_int16_t unacked; /* no of unacked packets */
+	struct callout free_timer;
 };
 
 #ifdef _KERNEL
