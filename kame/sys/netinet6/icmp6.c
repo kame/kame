@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.353 2003/08/06 14:45:30 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.354 2003/08/09 15:19:31 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1127,7 +1127,7 @@ icmp6_input(mp, offp, proto)
 static int
 icmp6_notify_error(m, off, icmp6len, code)
 	struct mbuf *m;
-	int off, icmp6len;
+	int off, icmp6len, code;
 {
 	struct icmp6_hdr *icmp6;
 	struct ip6_hdr *eip6;
