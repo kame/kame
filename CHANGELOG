@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1289 2000/09/22 08:16:25 itojun Exp $
+$KAME: CHANGELOG,v 1.1290 2000/09/22 08:32:11 itojun Exp $
 
 <200009>
-Fri Sep 22 14:00:17 JST 2000  itojun@iijlab.net
+Fri Sep 22 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: clarify policy lookup.  always pull port
 	  number from the packet.  previous code looked up port number from
 	  pcb, and did not work right on sendto() with explicit address.
@@ -18,6 +18,8 @@ Fri Sep 22 14:00:17 JST 2000  itojun@iijlab.net
 	  IPComp, to meet the latest IPComp draft.  need more checks.
 	  (2) stabilize behavior when many phase 1 proposals are presetned.
 	  (3) make it possible to build with boehm GC.
+	* sys/netkey/keysock.c: stabilize behavior in heavy SADB_ACQUIRE
+	  traffic.
 
 Thu Sep 21 03:18:11 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: make it possible to use rijndael and twofish
