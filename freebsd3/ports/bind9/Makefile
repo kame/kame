@@ -3,13 +3,13 @@
 # Date created:		Sun Feb  6 02:55:31 JST 2000
 # Whom:			sumikawa
 #
-# $Id: Makefile,v 1.1 2000/02/05 18:03:35 sumikawa Exp $
+# $Id: Makefile,v 1.2 2000/04/29 09:49:05 jinmei Exp $
 #
 
-DISTNAME=	bind-9.0.0b1
-PKGNAME=	bind-9.0.0.b1
+DISTNAME=	bind-9.0.0b2
+PKGNAME=	bind-9.0.0.b2
 CATEGORIES=	net
-MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0b1/
+MASTER_SITES=	ftp://ftp.isc.org/isc/bind9/9.0.0b2/
 
 MAINTAINER=	sumikawa@kame.net
 

@@ -1,22 +1,19 @@
---- configure.in-	Sat Feb  5 13:27:06 2000
-+++ configure.in	Sat Feb  5 13:24:49 2000
-@@ -543,7 +543,7 @@
- 	*)
- 		if test -f $kame_path/lib/libinet6.a; then
- 			AC_MSG_RESULT($kame_path/lib/libinet6.a)
--			LIBS="$kame_path/lib -linet6 $LIBS"
-+			LIBS="-L$kame_path/lib -linet6 $LIBS"
- 		else
- 			AC_MSG_ERROR([$kame_path/lib/libinet6.a not found.
- 
---- configure-	Sat Feb  5 13:32:16 2000
-+++ configure	Sat Feb  5 13:32:27 2000
-@@ -3153,7 +3153,7 @@
- 	*)
- 		if test -f $kame_path/lib/libinet6.a; then
- 			echo "$ac_t""$kame_path/lib/libinet6.a" 1>&6
--			LIBS="$kame_path/lib -linet6 $LIBS"
-+			LIBS="-L$kame_path/lib -linet6 $LIBS"
- 		else
- 			{ echo "configure: error: $kame_path/lib/libinet6.a not found.
- 
+*** lib/isc/unix/include/isc/Makefile.in-	Sat Apr 29 18:43:55 2000
+--- lib/isc/unix/include/isc/Makefile.in	Sat Apr 29 18:44:08 2000
+***************
+*** 30,36 ****
+  	if [ ! -d ${DESTDIR}${includedir} ]; then \
+  		mkdir ${DESTDIR}${includedir} ; \
+  	fi
+! 	if [ ! -d ${DESTDIR)${includedir}/isc ]; then \
+  		mkdir ${DESTDIR}${includedir}/isc ; \
+  	fi
+  
+--- 30,36 ----
+  	if [ ! -d ${DESTDIR}${includedir} ]; then \
+  		mkdir ${DESTDIR}${includedir} ; \
+  	fi
+! 	if [ ! -d ${DESTDIR}${includedir}/isc ]; then \
+  		mkdir ${DESTDIR}${includedir}/isc ; \
+  	fi
+  
