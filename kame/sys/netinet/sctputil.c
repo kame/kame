@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.25 2004/01/19 08:39:26 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.26 2004/01/26 03:30:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -2773,7 +2773,6 @@ sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
 /*
  * ntop() routines
  */
-#define SPRINTF(x)	((size_t)sprintf x)
 #define NS_INT16SZ    2       /* #/bytes of data in a u_int16_t */
 #define NS_IN6ADDRSZ  16      /* IPv6 T_AAAA */
 
@@ -2781,11 +2780,11 @@ const char *
 sctp_ntop4(const u_char *src, char *dst, size_t size) {
 	char tmp[sizeof("255.255.255.255")];
 
-	if (SPRINTF((tmp, "%u.%u.%u.%u", src[0], src[1], src[2], src[3])) >
-	    size) {
+	if (snprintf(tmp, sizeof(tmp), "%u.%u.%u.%u",
+	    src[0], src[1], src[2], src[3]) > size) {
 		return (NULL);
 	}
-	strcpy(dst, tmp);
+	strlcpy(dst, tmp, sizeof(dst));
 	return (dst);
 }
 
@@ -2857,7 +2856,7 @@ sctp_ntop6(const u_char *src, char *dst, size_t size) {
 			tp += strlen(tp);
 			break;
 		}
-		tp += SPRINTF((tp, "%x", words[i]));
+		tp += snprintf(tp, sizeof(tmp) - (tp - tmp), "%x", words[i]);
 	}
 	/* Was it a trailing run of 0x00's? */
 	if (best.base != -1 && (best.base + best.len) ==
@@ -2871,7 +2870,7 @@ sctp_ntop6(const u_char *src, char *dst, size_t size) {
 	if ((size_t)(tp - tmp) > size) {
 		return (NULL);
 	}
-	strcpy(dst, tmp);
+	strlcpy(dst, tmp, sizeof(dst));
 	return (dst);
 }
 

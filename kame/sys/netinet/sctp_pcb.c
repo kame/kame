@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.30 2004/01/19 03:52:08 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.31 2004/01/26 03:30:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1570,8 +1570,7 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 #if defined(__FreeBSD__)
 #ifdef SCTP_BASE_FREEBSD
 				if (in6_embedscope(&sin6->sin6_addr, sin6,
-						   (struct in6pc6 *)ip_inp,
-						   NULL) != 0)
+				    ip_inp, NULL) != 0)
 					return (EINVAL);
 #else
 				error = scope6_check_id(sin6, ip6_use_defzone);
@@ -1606,8 +1605,10 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 #else
 				  suser(p)
 #endif
-#else
+#elif defined(__NetBSD__)
 				  suser(p->p_ucred, &p->p_acflag)
+#else
+				  suser(p, 0)
 #endif
 				))
 				return (error);
@@ -1649,8 +1650,10 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 #else
 				  suser(p)
 #endif
-#else
+#elif defined(__NetBSD__)
 				  suser(p->p_ucred, &p->p_acflag)
+#else
+				  suser(p, 0)
 #endif
 				))
 				return (error);

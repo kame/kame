@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.35 2004/01/19 08:39:25 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.36 2004/01/26 03:30:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -146,25 +146,32 @@ int	sctp_recvspace = 128 * (1024 +
 void
 sctp_init()
 {
+#ifdef __OpenBSD__
+#define nmbclusters	nmbclust
+#endif
 	/* Init the SCTP pcb in sctp_pcb.c */
 	u_long sb_max_adj;
 
 	sctp_pcb_init();
 	if (nmbclusters >  SCTP_ASOC_MAX_CHUNKS_ON_QUEUE)
 		sctp_max_chunks_on_queue = nmbclusters;
-	/* Allow a user to take no more than 1/2
+	/*
+	 * Allow a user to take no more than 1/2
 	 * the number of clusters or the SB_MAX whichever
 	 * is smaller for the send window.
 	 */
 	sb_max_adj = (u_long)((u_quad_t)(SB_MAX) * MCLBYTES / (MSIZE + MCLBYTES));
-	sctp_sendspace = min((min(SB_MAX, sb_max_adj)),
-			     ((nmbclusters/2) * SCTP_DEFAULT_MAXSEGMENT));
-	/* Now for the recv window, should we take the same
+	sctp_sendspace = min(min(SB_MAX, sb_max_adj),
+	    ((nmbclusters / 2) * SCTP_DEFAULT_MAXSEGMENT));
+	/*
+	 * Now for the recv window, should we take the same
 	 * amount? or should I do 1/2 the SB_MAX instead in the SB_MAX min
 	 * above. For now I will just copy.
 	 */
 	sctp_recvspace = sctp_sendspace;
-
+#ifdef __OpenBSD__
+#undef nmbclusters
+#endif
 }
 
 #ifdef INET6

@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.25 2004/01/16 09:56:01 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.26 2004/01/26 03:30:45 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -351,11 +351,13 @@ sctp6_input(mp, offp, proto)
 #endif
 	    ) {
 #ifdef __FreeBSD__
-#if defined(__FreeBSD_cc_version) && __FreeBSD_cc_version >= 440000
+#ifdef SCTP_BASE_FREEBSD
+		ip6_savecontrol(in6p_ip, &opts, ip6, m);
+#elif defined(__FreeBSD_cc_version) && __FreeBSD_cc_version >= 440000
 		ip6_savecontrol(in6p_ip, m, &opts);
 #else
 		ip6_savecontrol(in6p_ip, m, &opts, NULL);
-#endif /* __FreeBSD_cc_version */
+#endif
 #else
 		ip6_savecontrol((struct in6pcb *)in6p_ip, m, &opts);
 #endif

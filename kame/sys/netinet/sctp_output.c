@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.35 2004/01/19 03:52:07 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.36 2004/01/26 03:30:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -3169,7 +3169,9 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				stc.site_scope = 1;
 				stc.ipv4_scope = 1;
 			} else if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+#ifndef SCTP_BASE_FREEBSD
 				struct sockaddr_in6 src;
+3endif
 				/*
 				 * If the new destination is a LINK_LOCAL 
 				 * we must have common both site and local
@@ -3184,8 +3186,8 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				/* pull out the scope_id from incoming pkt */
 #ifdef SCTP_BASE_FREEBSD
 				sin6->sin6_scope_id = stc.scope_id =
-					in6_addr2scopeid(in_initpkt->m_pkthdr.rcvif,
-							 &ip6->ip6_dst);
+				    in6_addr2scopeid(in_initpkt->m_pkthdr.rcvif,
+				    &ip6->ip6_dst);
 #else
 				if (ip6_getpktaddrs(in_initpkt, &src, NULL)) {
 					/* this is bad- can't get the scope! */
@@ -7628,7 +7630,9 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 	struct mbuf *mout;
 	struct sctp_shutdown_complete_msg *comp_cp;
 	struct ip6_hdr *iph6;
+#ifndef SCTP_BASE_FREEBSD
 	struct sockaddr_in6 lsa6, fsa6;
+#endif
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
 #else
