@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.9 1999/11/16 19:26:45 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.10 1999/11/18 23:55:37 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -290,7 +290,7 @@ enc_key
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_ENCRYPT,
 					p_alg_enc,
 					PFKEY_UNUNIT64(p_key_enc_len)) < 0) {
-				yyerror(ipsec_strerror());
+				yyerror("algorithm not supported.");
 				return -1;
 			}
 		}
@@ -316,7 +316,7 @@ auth_key
 			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_AUTH,
 					p_alg_auth,
 					PFKEY_UNUNIT64(p_key_auth_len)) < 0) {
-				yyerror(ipsec_strerror());
+				yyerror("algorithm not supported.");
 				return -1;
 			}
 		}
