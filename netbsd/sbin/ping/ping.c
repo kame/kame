@@ -377,11 +377,15 @@ main(int argc, char *argv[])
 #ifdef IPSEC_POLICY_IPSEC
 		case 'E':
 			pingflags |= F_POLICY;
-			if (!strncmp("in", optarg, 2))
+			if (!strncmp("in", optarg, 2)) {
 				policy_in = strdup(optarg);
-			else if (!strncmp("out", optarg, 3))
+				if (!policy_in)
+					err(1, "strdup");
+			} else if (!strncmp("out", optarg, 3)) {
 				policy_out = strdup(optarg);
-			else
+				if (!policy_out)
+					err(1, "strdup");
+			} else
 				errx(1, "invalid security policy");
 			break;
 #else
