@@ -1,3 +1,5 @@
+/*	$KAME: rijndael-alg-fst.h,v 1.4 2000/10/02 17:14:26 itojun Exp $	*/
+
 /*
  * rijndael-alg-fst.h   v2.3   April '2000
  *

@@ -1,3 +1,5 @@
+/*	$KAME: rijndael-api-fst.h,v 1.5 2000/10/02 17:14:27 itojun Exp $	*/
+
 /*
  * rijndael-api-fst.h   v2.3   April '2000
  *
