@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.88 2002/01/28 14:30:09 jinmei Exp $	*/
+/*	$KAME: if_gif.c,v 1.89 2002/01/29 00:56:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,6 +88,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_gif.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet6/scope6_var.h>
 #endif /* INET6 */
 
 #if defined(__NetBSD__) && defined(ISO)
