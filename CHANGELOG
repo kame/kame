@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2562 2004/03/12 12:10:17 jinmei Exp $
+$KAME: CHANGELOG,v 1.2563 2004/03/12 12:12:08 jinmei Exp $
 
 <200403>
+2004-03-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_output): fixed overkilling about
+	the "dst" argument to this function.  The caller side were fixed
+	accordingly.  This change also contains a bug fix about incorrect
+	arguments to rtalloc1().
+
 2004-03-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output. (ip6_output): recovered some
 	features related address scope lost for a while:
