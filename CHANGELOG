@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.793 2000/04/19 01:54:28 itojun Exp $
+$Id: CHANGELOG,v 1.794 2000/04/19 08:34:36 fujisawa Exp $
 
 <200004>
+Wed Apr 19 17:18:25 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* v4NAT in NATPT works.
+	  - v4 traceroute does not work yet.  I will fix it soon.
+	  - FTP active transfer process does not work.
+	    When you want to use ftp, use passve mode instead of active.
+
 Wed Apr 19 10:52:56 JST 2000  itojun@iijlab.net
 	* sys/netinet{,6}/in{,6}_gif.c: do not attempt to transmit packet
 	  if we are apparently making infinite loop.
