@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2596 2004/04/20 10:13:00 suz Exp $
+$KAME: CHANGELOG,v 1.2597 2004/04/21 13:52:49 jinmei Exp $
 
 <200404>
+2004-04-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): simplified the
+	fix to FreeBSD-SA-04:06.ipv6 (merged from FreeBSD to KAME on
+	040406).  The previous one worried too much about parameters even
+	though we actually validate them in subroutines.  This code also
+	is more compatible with other *BSDs, which do copyin within
+	setsockopt().
+
 2004-04-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/icmp6.c: ICMPv6 packets regarding multicast 
 	routing (e.g. MLDv1 report) shouldn't be a target of MSF, although
