@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.101 2001/02/25 10:33:45 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.102 2001/02/27 08:38:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2040,8 +2040,8 @@ in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
  */
 void
 rt6_flush(gateway, ifp)
-    struct in6_addr *gateway;
-    struct ifnet *ifp;
+	struct in6_addr *gateway;
+	struct ifnet *ifp;
 {
 	struct radix_node_head *rnh = rt_tables[AF_INET6];
 #ifdef __NetBSD__
