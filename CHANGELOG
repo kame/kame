@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1801 2001/07/22 02:10:25 itojun Exp $
+$KAME: CHANGELOG,v 1.1802 2001/07/22 15:32:58 itojun Exp $
 
 <200107>
+Mon Jul 23 00:28:05 JST 2001  itojun@iijlab.net
+	* sys/net/radix_mpath.c: (netbsd, RADIX_MPATH) reject RTM_ADD of
+	  conflicting entries, where all key/mask/gw are the same.
+
 Sun Jul 22 11:07:17 JST 2001  itojun@iijlab.net
 	* netbsd/sys/netinet/in.c: improve IFA_ROUTE management, to make sure
 	  multiple interface addresses with the same prefix (10.0.0.1/24 and

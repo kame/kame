@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.242 2001/07/21 15:34:13 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.243 2001/07/22 15:32:59 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1977,7 +1977,6 @@ command argument is considered ambiguous)
 # route delete -inet 10.1.0.0
 
 TODO:
-- routing: reject same key/gw pair on RTM_ADD
 - L3: more clever hash/gw selection policy (-> RFC2991/2992)
 - L3: avoid faulty gateways/nonworking paths
 - L3: revisit issues with cached route on struct route/sendto(3)
