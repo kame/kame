@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.140 2001/08/16 06:29:23 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.141 2001/08/16 13:54:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2180,7 +2180,7 @@ ahmismatch:
 				return -1;
 			}
 
-			if (!alg_oakley_dhdef_doi(lorv)) {
+			if (!alg_oakley_dhdef_ok(lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid group description=%u.\n",
 					lorv);
@@ -2318,7 +2318,7 @@ check_attr_ipcomp(trns)
 				return -1;
 			}
 
-			if (!alg_oakley_dhdef_doi(lorv)) {
+			if (!alg_oakley_dhdef_ok(lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid group description=%u.\n",
 					lorv);
@@ -2698,7 +2698,7 @@ setph2proposal0(iph2, pp, pr)
 			return NULL;
 		}
 
-		if (alg_oakley_dhdef_doi(iph2->sainfo->pfs_group))
+		if (alg_oakley_dhdef_ok(iph2->sainfo->pfs_group))
 			attrlen += sizeof(struct isakmp_data);
 
 		p = vrealloc(p, p->l + sizeof(*trns) + attrlen);
@@ -2751,7 +2751,7 @@ setph2proposal0(iph2, pp, pr)
 		 || pr->proto_id == IPSECDOI_PROTO_IPSEC_AH)
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_AUTH, tr->authtype);
 
-		if (alg_oakley_dhdef_doi(iph2->sainfo->pfs_group))
+		if (alg_oakley_dhdef_ok(iph2->sainfo->pfs_group))
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_GRP_DESC,
 				iph2->sainfo->pfs_group);
 
