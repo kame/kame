@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.31 2003/07/31 21:44:11 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.32 2003/08/01 01:17:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -46,6 +46,10 @@
 #include <dhcp6.h>
 #include <config.h>
 #include <common.h>
+
+#ifndef TAILQ_EMPTY
+#define	TAILQ_EMPTY(head) ((head)->tqh_first == NULL)
+#endif
 
 extern int errno;
 

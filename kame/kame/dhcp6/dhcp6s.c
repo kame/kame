@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.109 2003/07/31 23:33:38 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.110 2003/08/01 01:17:50 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -69,6 +69,10 @@
 #include <config.h>
 #include <common.h>
 #include <timer.h>
+
+#ifndef TAILQ_EMPTY
+#define	TAILQ_EMPTY(head) ((head)->tqh_first == NULL)
+#endif
 
 typedef enum { DHCP6_BINDING_IA } dhcp6_bindingtype_t;
 

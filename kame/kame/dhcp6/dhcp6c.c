@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.121 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.122 2003/08/01 01:17:50 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -123,6 +123,9 @@ extern void client6_script __P((struct dhcp6_if *, int,
     struct dhcp6_optinfo *));
 
 #define MAX_ELAPSED_TIME 0xffff
+#ifndef TAILQ_EMPTY
+#define	TAILQ_EMPTY(head) ((head)->tqh_first == NULL)
+#endif
 
 int
 main(argc, argv)
