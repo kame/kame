@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2192 2002/06/24 13:02:54 itojun Exp $
+$KAME: CHANGELOG,v 1.2193 2002/06/24 16:27:51 itojun Exp $
 
 <200206>
+Tue Jun 25 01:26:45 JST 2002  itojun@iijlab.net
+	* faithd.libevent: faithd re-implementation using libevent (by niels
+	  provos - a great library!).  it does not fork(2) at all.  supports
+	  ftp protocol translation (EPSV only).
+
 Mon Jun 24 22:02:16 JST 2002  itojun@iijlab.net
 	* sys/netinet/ip_output.c (except bsdi3/bsdi4/freebsd4):
 	  skip routing table lookup if outgoing interface is specified via
