@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2162 2002/05/23 13:52:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.2163 2002/05/25 12:09:21 jinmei Exp $
 
 <200205>
+2002-05-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/scope6.c (scope6_init): newly added to
+	inialize scope zone IDs for as many interfaces as possible.
+	This is important when an interface is somehow used for IPv6
+	before activating (i.e. making it up) the interface.
+	TODO: we'll still need to handle the case where an interface is
+	dynamically attached.
+
 2002-05-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6[cs].conf.5: provided man pages for
 	configuration files of DHCPv6 client and server.
