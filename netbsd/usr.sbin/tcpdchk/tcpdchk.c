@@ -29,6 +29,7 @@ __RCSID("$NetBSD: tcpdchk.c,v 1.5 1999/01/18 18:01:26 christos Exp $");
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
