@@ -1114,6 +1114,34 @@ tcp_drain()
 	}
 }
 
+#ifdef INET6
+void
+tcp6_drain()
+{
+	struct in6pcb *in6p;
+	struct tcpcb *tp;
+	struct in6pcb *head = &tcb6;
+
+	/*
+	 * Free the sequence queue of all TCP connections.
+	 */
+	for (in6p = head->in6p_next; in6p != head; in6p = in6p->in6p_next) {
+		if ((tp = in6totcpcb(in6p)) != NULL) {
+			/*
+			 * We may be called from a device's interrupt
+			 * context.  If the tcpcb is already busy,
+			 * just bail out now.
+			 */
+			if (tcp_reass_lock_try(tp) == 0)
+				continue;
+			if (tcp_freeq(tp))
+				tcpstat.tcps_connsdrained++;
+			TCP_REASS_UNLOCK(tp);
+		}
+	}
+}
+#endif
+
 /*
  * Notify a tcp user of an asynchronous error;
  * store error as soft error, but wake up user

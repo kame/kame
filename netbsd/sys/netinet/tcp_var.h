@@ -672,6 +672,9 @@ struct tcpcb *
 void	 tcp_dooptions __P((struct tcpcb *,
 	    u_char *, int, struct tcphdr *, struct tcp_opt_info *));
 void	 tcp_drain __P((void));
+#ifdef INET6
+void	 tcp6_drain __P((void));
+#endif
 void	 tcp_established __P((struct tcpcb *));
 void	 tcp_fasttimo __P((void));
 void	 tcp_init __P((void));
