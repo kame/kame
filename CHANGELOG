@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1338 2000/10/15 20:25:45 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1339 2000/10/17 10:52:18 kjc Exp $
 
 <200010>
+2000/10/17 19:47:21 JST kjc@csl.sony.co.jp
+	* freebsd4/sys/alpha/alpha exception.s:
+	* freebsd4/sys/alpha/include asm.h:
+	import the fix from FreeBSD-current that allows to boot large
+	kernels on alpha.
+	without this fix, GENERIC.KAME kernels hang after printing
+	the copyright.
+
 Mon Oct 16 05:13:56 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/mozilla: upgrade to M18
 
