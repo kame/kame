@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.38 2001/09/19 05:38:36 sakane Exp $	*/
+/*	$KAME: rtsold.c,v 1.39 2001/09/19 05:41:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -749,7 +749,7 @@ warnmsg(priority, func, msg, va_alist)
 }
 
 /*
- * return a list of interfaces which is suitable to send RS.
+ * return a list of interfaces which is suitable to sending an RS.
  */
 static char **
 autoifprobe()
