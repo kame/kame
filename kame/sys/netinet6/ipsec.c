@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.209 2004/02/06 06:50:22 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.210 2004/02/11 10:41:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2722,7 +2722,7 @@ vshiftl(bitmap, nbit, wsize)
 		for (i = 1; i < wsize; i++) {
 			over = (bitmap[i] >> (8 - s));
 			bitmap[i] <<= s;
-			bitmap[i-1] |= over;
+			bitmap[i - 1] |= over;
 		}
 	}
 
