@@ -1,4 +1,4 @@
-$Id: TODO,v 1.30 2000/09/23 15:20:46 itojun Exp $
+$Id: TODO,v 1.31 2000/09/23 15:21:40 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -42,7 +42,7 @@ o require less configuration.  phase 2 is easier (as kernel presents racoon
 		we may need to pick from "no PFS" or "same as phase 1 DH group")
 	guess how we should negotiate lifetime
 		(is "strict" a reasonable default?)
-	guess which mode to use for negotiation (is main mode useful?
+	guess which mode to use for phase 1 negotiation (is main mode useful?
 		is base mode popular enough?)
 o psk.txt should be a database? (psk.db?)  psk_mkdb?
 
