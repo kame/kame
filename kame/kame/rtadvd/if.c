@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.18 2001/11/09 04:21:30 itojun Exp $	*/
+/*	$KAME: if.c,v 1.19 2001/11/09 04:21:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -215,11 +215,11 @@ int
 lladdropt_length(struct sockaddr_dl *sdl)
 {
 	switch(sdl->sdl_type) {
-	 case IFT_ETHER:
-	 case IFT_FDDI:
-		 return(ROUNDUP8(ETHER_ADDR_LEN + 2));
-	 default:
-		 return(0);
+	case IFT_ETHER:
+	case IFT_FDDI:
+		return(ROUNDUP8(ETHER_ADDR_LEN + 2));
+	default:
+		return(0);
 	}
 }
 
@@ -231,17 +231,16 @@ lladdropt_fill(struct sockaddr_dl *sdl, struct nd_opt_hdr *ndopt)
 	ndopt->nd_opt_type = ND_OPT_SOURCE_LINKADDR; /* fixed */
 
 	switch(sdl->sdl_type) {
-	 case IFT_ETHER:
-	 case IFT_FDDI:
-		 ndopt->nd_opt_len = (ROUNDUP8(ETHER_ADDR_LEN + 2)) >> 3;
-		 addr = (char *)(ndopt + 1);
-		 memcpy(addr, LLADDR(sdl), ETHER_ADDR_LEN);
-		 break;
-	 default:
-		 syslog(LOG_ERR,
-			"<%s> unsupported link type(%d)",
-			__FUNCTION__, sdl->sdl_type);
-		 exit(1);
+	case IFT_ETHER:
+	case IFT_FDDI:
+		ndopt->nd_opt_len = (ROUNDUP8(ETHER_ADDR_LEN + 2)) >> 3;
+		addr = (char *)(ndopt + 1);
+		memcpy(addr, LLADDR(sdl), ETHER_ADDR_LEN);
+		break;
+	default:
+		syslog(LOG_ERR, "<%s> unsupported link type(%d)",
+		    __FUNCTION__, sdl->sdl_type);
+		exit(1);
 	}
 
 	return;
