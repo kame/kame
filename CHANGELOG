@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1045.2.14 2000/07/03 03:37:31 itojun Exp $
+$Id: CHANGELOG,v 1.1045.2.15 2000/07/03 12:20:08 jinmei Exp $
 
 <200006>
+2000-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/bgp.c (connect_try): made sure to zero-clear a
+	newly allocated buffer.
+	Report from: Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
 Thu Jun 29 10:14:47 JST 2000  itojun@iijlab.net
 	* faithd/faithd.c, natptd/main.c, natptlog/natptlog.c: be more careful
 	  about arg to syslog(3), to prevent possible buffer overrun.
