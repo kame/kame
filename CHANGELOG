@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.44 1999/08/20 11:30:14 itojun Exp $
+$Id: CHANGELOG,v 1.45 1999/08/20 13:09:59 itojun Exp $
 
 <199908>
 Fri Aug 20 20:27:34 JST 1999  itojun@iijlab.net
@@ -210,7 +210,7 @@ Sat Jul 31 12:14:07 JST 1999  itojun@iijlab.net
 	  From: Hajimu UMEMOTO <ume@mahoroba.org>
 
 1999/07/31 06:31:34 JST shin@nd.net.fujitsu.co.jp
-	 sys/netinet6/tcp6_subr.c, udp6_usrreq.c (FreeBSD228, BSDI, NetBSD):
+	 sys/netinet6/tcp6_subr.c, udp6_usrreq.c (FreeBSD228, BSDI3):
 	 -consider interface id at link local address connect error
 
 Fri Jul 30 10:15:56 JST 1999  itojun@iijlab.net
