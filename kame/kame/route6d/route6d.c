@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.17 2000/04/17 13:50:44 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.18 2000/05/16 09:27:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.17 2000/04/17 13:50:44 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.18 2000/05/16 09:27:37 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2195,6 +2195,7 @@ rt_entry(rtm, again)
 		ifname = index2ifc[s]->ifc_name;
 	else {
 		trace(1, " not configured\n");
+		free(rrt);
 		return;
 	}
 	trace(1, " if %s sock %d\n", ifname, s);
