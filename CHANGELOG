@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2314 2003/01/21 08:04:20 itojun Exp $
+$KAME: CHANGELOG,v 1.2315 2003/01/21 12:58:30 jinmei Exp $
 
 <200301>
+2003-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported the Release message:
+	- client now releases stateful resources before exiting or restarting
+	  by sending the message.
+	- server now accepts the message and release the corresponding
+	  binding.
+
 Tue Jan 21 17:02:57 JST 2003  itojun@iijlab.net
 	* sys/mbuf.h: switch from m_aux framework to m_tag framework (from
 	  openbsd) for tagging extra information to mbuf chain.
