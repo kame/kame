@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/14 08:35:28 $
+		     $Date: 2000/04/20 01:55:02 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -477,5 +477,9 @@ To configure and control NAT, use the "pma" command.
 # pma nat enable
 
 For more information, please refer to the "pma" man page.
+
+<<<mobile-ip6>>>
+KAME kit includes mobile-ip6 code.  For more details, please look at
+kame/kame/mip6config/README_MIP6.txt and manpages.
 
 							<end of USAGE>
