@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.208 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.209 2004/02/06 06:50:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3428,6 +3428,8 @@ ipsec6_output_tunnel(state, sp, flags)
 				state->ro->ro_rt = NULL;
 			}
 			if (state->ro->ro_rt == 0) {
+				dst6->sin6_len = sizeof(*dst6);
+				dst6->sin6_family = AF_INET6;
 				dst6->sin6_addr = ip6->ip6_dst;
 				dst6->sin6_scope_id = 0; /* XXX */
 				rtalloc(state->ro);
@@ -3579,6 +3581,8 @@ ipsec6_output_tunnel(state, sp, flags)
 				state->ro->ro_rt = NULL;
 			}
 			if (state->ro->ro_rt == 0) {
+				dst6->sin6_len = sizeof(*dst6);
+				dst6->sin6_family = AF_INET6;
 				dst6->sin6_addr = ip6->ip6_dst;
 				dst6->sin6_scope_id = 0; /* XXX */
 				rtalloc(state->ro);
