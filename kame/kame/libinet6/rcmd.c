@@ -91,7 +91,10 @@ extern int innetgr __P(( const char *, const char *, const char *, const char * 
 #define max(a, b)	((a > b) ? a : b)
 
 int __ivaliduser_af __P((FILE *, const void *, const char *, const char *, int, int));
+#if 0
 static int __icheckhost __P((const void *, const char *, int, int));
+#endif
+static int __icheckhost_sa __P((const struct sockaddr *, const char *));
 
 char paddr[INET6_ADDRSTRLEN];
 
@@ -294,38 +297,30 @@ int	__check_rhosts_file = 1;
 char	*__rcmd_errstr;
 
 int
-ruserok_af(rhost, superuser, ruser, luser, af)
-	const char *rhost, *ruser, *luser;
-	int superuser, af;
-{
-	struct hostent *hp;
-	union {
-		struct in_addr addr_in;
-		struct in6_addr addr_in6;
-	} addr;
-	char **ap;
-	int ret, h_error;
-
-	if ((hp = getipnodebyname(rhost, af, AI_DEFAULT, &h_error)) == NULL)
-		return (-1);
-	ret = -1;
-	for (ap = hp->h_addr_list; *ap; ++ap) {
-		bcopy(*ap, &addr, hp->h_length);
-		if (iruserok_af(&addr, superuser, ruser, luser, af) == 0) {
-			ret = 0;
-			break;
-		}
-	}
-	freehostent(hp);
-	return (ret);
-}
-
-int
 ruserok(rhost, superuser, ruser, luser)
 	const char *rhost, *ruser, *luser;
 	int superuser;
 {
-	return ruserok_af(rhost, superuser, ruser, luser, AF_INET);
+	struct addrinfo hints, *res0, *res;
+	int error;
+	int ret;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;	/*XXX dummy*/
+	error = getaddrinfo(rhost, "0", &hints, &res0);
+	if (error)
+		return (-1);
+	ret = -1;
+	for (res = res0; res; res = res->ai_next) {
+		if (iruserok_sa(res->ai_addr, res->ai_addrlen, superuser,
+				ruser, luser) == 0) {
+			ret = 0;
+			break;
+		}
+	}
+	freeaddrinfo(res0);
+	return (ret);
 }
 
 /*
@@ -344,6 +339,7 @@ iruserok_af(raddr, superuser, ruser, luser, af)
 	const char *ruser, *luser;
 	int af;
 {
+#if 0
 	register char *cp;
 	struct stat sbuf;
 	struct passwd *pwd;
@@ -415,6 +411,116 @@ again:
 		goto again;
 	}
 	return (-1);
+#else
+	struct sockaddr *sa = NULL;
+	struct sockaddr_in *sin = NULL;
+#ifdef INET6
+	struct sockaddr_in6 *sin6 = NULL;
+#endif
+	struct sockaddr_storage ss;
+
+	memset(&ss, 0, sizeof(ss));
+	switch (af) {
+	case AF_INET:
+		sin = (struct sockaddr_in *)&ss;
+		sin->sin_family = AF_INET;
+		sin->sin_len = sizeof(struct sockaddr_in);
+		memcpy(&sin->sin_addr, raddr, sizeof(sin->sin_addr));
+		break;
+#ifdef INET6
+	case AF_INET6:
+		/* you will lose scope info */
+		sin6 = (struct sockaddr_in6 *)&ss;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(struct sockaddr_in6);
+		memcpy(&sin6->sin6_addr, raddr, sizeof(sin6->sin6_addr));
+		break;
+#endif
+	default:
+		return -1;
+	}
+
+	sa = (struct sockaddr *)&ss;
+	return iruserok_sa(sa, superuser, ruser, luser);
+#endif
+}
+
+/*
+ * New .rhosts strategy: We are passed an ip address. We spin through
+ * hosts.equiv and .rhosts looking for a match. When the .rhosts only
+ * has ip addresses, we don't have to trust a nameserver.  When it
+ * contains hostnames, we spin through the list of addresses the nameserver
+ * gives us and look for a match.
+ *
+ * Returns 0 if ok, -1 if not ok.
+ */
+int
+iruserok_sa(raddr, superuser, ruser, luser)
+	const struct sockaddr *raddr;
+	int superuser;
+	const char *ruser, *luser;
+{
+	register char *cp;
+	struct stat sbuf;
+	struct passwd *pwd;
+	FILE *hostf;
+	uid_t uid;
+	int first;
+	char pbuf[MAXPATHLEN];
+
+	first = 1;
+	hostf = superuser ? NULL : fopen(_PATH_HEQUIV, "r");
+again:
+	if (hostf) {
+		if (__ivaliduser_sa(hostf, raddr, luser, ruser) == 0) {
+			(void)fclose(hostf);
+			return (0);
+		}
+		(void)fclose(hostf);
+	}
+	if (first == 1 && (__check_rhosts_file || superuser)) {
+		first = 0;
+		if ((pwd = getpwnam(luser)) == NULL)
+			return (-1);
+		(void)strcpy(pbuf, pwd->pw_dir);
+		(void)strcat(pbuf, "/.rhosts");
+
+		/*
+		 * Change effective uid while opening .rhosts.  If root and
+		 * reading an NFS mounted file system, can't read files that
+		 * are protected read/write owner only.
+		 */
+		uid = geteuid();
+		(void)seteuid(pwd->pw_uid);
+		hostf = fopen(pbuf, "r");
+		(void)seteuid(uid);
+
+		if (hostf == NULL)
+			return (-1);
+		/*
+		 * If not a regular file, or is owned by someone other than
+		 * user or root or if writeable by anyone but the owner, quit.
+		 */
+		cp = NULL;
+		if (lstat(pbuf, &sbuf) < 0)
+			cp = ".rhosts lstat failed";
+		else if (!S_ISREG(sbuf.st_mode))
+			cp = ".rhosts not regular file";
+		else if (fstat(fileno(hostf), &sbuf) < 0)
+			cp = ".rhosts fstat failed";
+		else if (sbuf.st_uid && sbuf.st_uid != pwd->pw_uid)
+			cp = "bad .rhosts owner";
+		else if (sbuf.st_mode & (S_IWGRP|S_IWOTH))
+			cp = ".rhosts writeable by other than owner";
+		/* If there were any problems, quit. */
+		if (cp) {
+			__rcmd_errstr = cp;
+			(void)fclose(hostf);
+			return (-1);
+		}
+		goto again;
+	}
+	return (-1);
 }
 
 int
@@ -427,7 +533,17 @@ iruserok(raddr, superuser, ruser, luser)
 	int superuser;
 	const char *ruser, *luser;
 {
+#if 0
 	return iruserok_af(&raddr, superuser, ruser, luser, AF_INET);
+#else
+	struct sockaddr_in sin;
+
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_len = sizeof(struct sockaddr_in);
+	memcpy(&sin.sin_addr, &raddr, sizeof(sin.sin_addr));
+	return iruserok_sa((struct sockaddr *)&sin, superuser, ruser, luser);
+#endif
 }
 
 /*
@@ -440,6 +556,7 @@ __ivaliduser_af(hostf, raddr, luser, ruser, af, len)
 	const char *luser, *ruser;
 	int af, len;
 {
+#if 0
 	register char *user, *p;
 	int ch;
 	char buf[MAXHOSTNAMELEN + 128];		/* host + login */
@@ -555,6 +672,165 @@ __ivaliduser_af(hostf, raddr, luser, ruser, af, len)
 			return(0);
 	}
 	return (-1);
+#else
+	struct sockaddr *sa = NULL;
+	struct sockaddr_in *sin = NULL;
+#ifdef INET6
+	struct sockaddr_in6 *sin6 = NULL;
+#endif
+	struct sockaddr_storage ss;
+
+	memset(&ss, 0, sizeof(ss));
+	switch (af) {
+	case AF_INET:
+		if (len != sizeof(sin->sin_addr))
+			return -1;
+		sin = (struct sockaddr_in *)&ss;
+		sin->sin_family = AF_INET;
+		sin->sin_len = sizeof(struct sockaddr_in);
+		memcpy(&sin->sin_addr, raddr, sizeof(sin->sin_addr));
+		break;
+#ifdef INET6
+	case AF_INET6:
+		if (len != sizeof(sin6->sin6_addr))
+			return -1;
+		/* you will lose scope info */
+		sin6 = (struct sockaddr_in6 *)&ss;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(struct sockaddr_in6);
+		memcpy(&sin6->sin6_addr, raddr, sizeof(sin6->sin6_addr));
+		break;
+#endif
+	default:
+		return -1;
+	}
+
+	sa = (struct sockaddr *)&ss;
+	return __ivaliduser_sa(hostf, sa, luser, ruser);
+#endif
+}
+
+/*
+ * Returns 0 if ok, -1 if not ok.
+ */
+int
+__ivaliduser_sa(hostf, raddr, luser, ruser)
+	FILE *hostf;
+	const struct sockaddr *raddr;
+	const char *luser, *ruser;
+{
+	register char *user, *p;
+	int ch;
+	char buf[MAXHOSTNAMELEN + 128];		/* host + login */
+	char hname[MAXHOSTNAMELEN];
+	struct hostent *hp;
+	/* Presumed guilty until proven innocent. */
+	int userok = 0, hostok = 0;
+	int h_error;
+#ifdef YP
+	char *ypdomain;
+
+	if (yp_get_default_domain(&ypdomain))
+		ypdomain = NULL;
+#else
+#define	ypdomain NULL
+#endif
+
+	/* We need to get the damn hostname back for netgroup matching. */
+	if (getnameinfo(raddr, raddr->sa_len, hname, sizeof(hname),
+			NULL, 0, NI_NAMEREQD) != 0)
+		return (-1);
+
+	while (fgets(buf, sizeof(buf), hostf)) {
+		p = buf;
+		/* Skip lines that are too long. */
+		if (strchr(p, '\n') == NULL) {
+			while ((ch = getc(hostf)) != '\n' && ch != EOF);
+			continue;
+		}
+		if (*p == '\n' || *p == '#') {
+			/* comment... */
+			continue;
+		}
+		while (*p != '\n' && *p != ' ' && *p != '\t' && *p != '\0') {
+			*p = isupper(*p) ? tolower(*p) : *p;
+			p++;
+		}
+		if (*p == ' ' || *p == '\t') {
+			*p++ = '\0';
+			while (*p == ' ' || *p == '\t')
+				p++;
+			user = p;
+			while (*p != '\n' && *p != ' ' &&
+			    *p != '\t' && *p != '\0')
+				p++;
+		} else
+			user = p;
+		*p = '\0';
+		/*
+		 * Do +/- and +@/-@ checking. This looks really nasty,
+		 * but it matches SunOS's behavior so far as I can tell.
+		 */
+		switch(buf[0]) {
+		case '+':
+			if (!buf[1]) {     /* '+' matches all hosts */
+				hostok = 1;
+				break;
+			}
+			if (buf[1] == '@')  /* match a host by netgroup */
+				hostok = innetgr((char *)&buf[2],
+					(char *)&hname, NULL, ypdomain);
+			else		/* match a host by addr */
+				hostok = __icheckhost_sa(raddr, (char *)&buf[1]);
+			break;
+		case '-':     /* reject '-' hosts and all their users */
+			if (buf[1] == '@') {
+				if (innetgr((char *)&buf[2],
+					      (char *)&hname, NULL, ypdomain))
+					return(-1);
+			} else {
+				if (__icheckhost_sa(raddr, (char *)&buf[1]))
+					return(-1);
+			}
+			break;
+		default:  /* if no '+' or '-', do a simple match */
+			hostok = __icheckhost_sa(raddr, buf);
+			break;
+		}
+		switch(*user) {
+		case '+':
+			if (!*(user+1)) {      /* '+' matches all users */
+				userok = 1;
+				break;
+			}
+			if (*(user+1) == '@')  /* match a user by netgroup */
+				userok = innetgr(user+2, NULL, ruser, ypdomain);
+			else	   /* match a user by direct specification */
+				userok = !(strcmp(ruser, user+1));
+			break;
+		case '-': 		/* if we matched a hostname, */
+			if (hostok) {   /* check for user field rejections */
+				if (!*(user+1))
+					return(-1);
+				if (*(user+1) == '@') {
+					if (innetgr(user+2, NULL,
+							ruser, ypdomain))
+						return(-1);
+				} else {
+					if (!strcmp(ruser, user+1))
+						return(-1);
+				}
+			}
+			break;
+		default:	/* no rejections: try to match the user */
+			if (hostok)
+				userok = !(strcmp(ruser,*user ? user : luser));
+			break;
+		}
+		if (hostok && userok)
+			return(0);
+	}
+	return (-1);
 }
 
 int
@@ -563,9 +839,20 @@ __ivaliduser(hostf, raddr, luser, ruser)
 	u_long raddr;
 	const char *luser, *ruser;
 {
+#if 0
 	return __ivaliduser_af(hostf, &raddr, luser, ruser, AF_INET, sizeof(raddr));
+#else
+	struct sockaddr_in sin;
+
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_len = sizeof(struct sockaddr_in);
+	memcpy(&sin.sin_addr, &raddr, sizeof(sin.sin_addr));
+	return __ivaliduser_sa(hostf, (struct sockaddr *)&sin, luser, ruser);
+#endif
 }
 
+#if 0
 /*
  * Returns "true" if match, 0 if no match.
  */
@@ -602,5 +889,52 @@ __icheckhost(raddr, lhost, af, len)
 		}
 	
 	freehostent(hp);
+	return (match);
+}
+#endif
+
+/*
+ * Returns "true" if match, 0 if no match.
+ */
+static int
+__icheckhost_sa(raddr, lhost)
+	const struct sockaddr *raddr;
+        const char *lhost;
+{
+	char **pp;
+	int match;
+	struct addrinfo hints, *res0, *res;
+	int error;
+	struct sockaddr_in *sa4, *sb4;
+#ifdef INET6
+	struct sockaddr_in6 *sa6, *sb6;
+#endif
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+
+	if (getnameinfo(raddr, raddr->sa_len, h1, sizeof(h1), NULL, 0,
+			NI_NUMERICHOST) != 0)
+		return (0);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = raddr->sa_family;
+	hints.ai_socktype = SOCK_DGRAM;	/*XXX dummy*/
+	error = getaddrinfo(lhost, "0", &hints, &res0);
+	if (error)
+		return (0);
+
+	match = 0;
+	for (res = res0; res && match == 0; res = res->ai_next) {
+		if (res->ai_family != raddr->sa_family
+		 || res->ai_addrlen != raddr->sa_len)
+			continue;
+		if (getnameinfo(res->ai_addr, res->ai_addrlen, h2, sizeof(h2),
+				NULL, 0, NI_NUMERICHOST) != 0)
+			continue;
+		if (strcmp(h1, h2) == 0) {
+			match = 1;
+			break;
+		}
+	}
+
+	freeaddrinfo(res0);
 	return (match);
 }
