@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.370 2003/06/06 06:36:05 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.371 2003/06/10 05:06:00 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3797,6 +3797,7 @@ ip6_setmoptions(optname, im6op, m)
 			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
+		in6_clearscope(&sa6_mc.sin6_addr);
 
 		/*
 		 * See if the membership already exists.
