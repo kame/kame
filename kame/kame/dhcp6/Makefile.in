@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.34 2004/06/17 13:11:28 jinmei Exp $
+# $Id: Makefile.in,v 1.35 2004/07/28 22:58:07 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -34,7 +34,9 @@ LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
 LIBS=	@LIBS@ -ly -ll
 CC=	@CC@
-TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6lc dhcp6sctl
+#we are not sure if dhcp6lc really makes sense
+#TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6lc dhcp6sctl
+TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6sctl
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
