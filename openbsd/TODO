@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.27 1999/11/21 14:23:12 itojun Exp $
+$Id: TODO,v 1.28 1999/11/21 14:25:04 itojun Exp $
 
 
 Things we can do with the current code:
@@ -35,6 +35,7 @@ Things we can't do with the current code:
   be raised with this configuration.
 - due to library twists, behavior of ifconfig for IPv6 network name does not
   work.  it will be fixed once libinet6 is integrated into libc.
+- ssh6 port does not work on sparc (ssh does not work.  sshd works fine - why?)
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
