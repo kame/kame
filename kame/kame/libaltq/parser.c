@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.14 2002/02/13 05:39:57 kjc Exp $	*/
+/*	$KAME: parser.c,v 1.15 2002/02/15 04:52:43 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2002
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -466,12 +466,12 @@ interface_parser(char *cmdbuf)
 	}
 
 	/* create argment list & look for scheduling discipline options. */
-	sprintf(qdisc_name, "null");
+	snprintf(qdisc_name, sizeof qdisc_name, "null");
 	argc = 0;
 	ap = w;
 	while (next_word(&cp, ap)) {
 		if (is_qdisc_name(ap))
-			strcpy(qdisc_name, ap);
+			strlcpy(qdisc_name, ap, sizeof qdisc_name);
 
 		argv[argc] = ap;
 		ap += strlen(ap) + 1;
