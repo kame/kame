@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.36 2000/08/24 06:57:50 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.37 2000/08/30 11:18:33 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -60,8 +60,8 @@
 #include "remoteconf.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
-#include "handler.h"
 #include "oakley.h"
+#include "handler.h"
 #include "ipsec_doi.h"
 #include "crypto_openssl.h"
 #include "pfkey.h"
@@ -354,7 +354,7 @@ ident_i3recv(iph1, msg)
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
-			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
 			break;
 		default:
@@ -390,7 +390,7 @@ end:
 		VPTRINIT(iph1->dhpub_p);
 		VPTRINIT(iph1->nonce_p);
 		VPTRINIT(iph1->id_p);
-		VPTRINIT(iph1->cr_p);
+		oakley_delcert(iph1->cr_p);
 	}
 
 	return error;
@@ -594,8 +594,8 @@ end:
 
 	if (error) {
 		VPTRINIT(iph1->id_p);
-		VPTRINIT(iph1->cert_p);
-		VPTRINIT(iph1->crl_p);
+		oakley_delcert(iph1->cert_p);
+		oakley_delcert(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
 	}
 
@@ -1011,7 +1011,7 @@ ident_r3recv(iph1, msg0)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CR:
-			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_CERT:
@@ -1120,10 +1120,10 @@ end:
 
 	if (error) {
 		VPTRINIT(iph1->id_p);
-		VPTRINIT(iph1->cert_p);
-		VPTRINIT(iph1->crl_p);
+		oakley_delcert(iph1->cert_p);
+		oakley_delcert(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
-		VPTRINIT(iph1->cr_p);
+		oakley_delcert(iph1->cr_p);
 	}
 
 	return error;
@@ -1355,7 +1355,7 @@ ident_ir3sendmx(iph1)
 		tlen += sizeof(*gen) + iph1->id->l
 			+ sizeof(*gen) + iph1->sig->l;
 		if (iph1->cert != NULL)
-			tlen += sizeof(*gen) + iph1->cert->l;
+			tlen += sizeof(*gen) + iph1->cert->pl->l;
 		if (need_cr)
 			tlen += sizeof(*gen) + cr->l;
 
@@ -1378,7 +1378,7 @@ ident_ir3sendmx(iph1)
 
 		/* add CERT payload if there */
 		if (iph1->cert != NULL)
-			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig,
 			need_cr ? ISAKMP_NPTYPE_CR : ISAKMP_NPTYPE_NONE);

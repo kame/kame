@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.c,v 1.6 2000/08/11 05:55:31 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.c,v 1.7 2000/08/30 11:18:34 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -52,8 +52,8 @@
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "ipsec_doi.h"
-#include "handler.h"
 #include "oakley.h"
+#include "handler.h"
 #include "algorithm.h"
 #include "sainfo.h"
 

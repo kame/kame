@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.36 2000/08/24 06:57:50 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.37 2000/08/30 11:18:33 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -60,8 +60,8 @@
 #include "remoteconf.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
-#include "handler.h"
 #include "oakley.h"
+#include "handler.h"
 #include "ipsec_doi.h"
 #include "crypto_openssl.h"
 #include "pfkey.h"
@@ -276,7 +276,7 @@ agg_i2recv(iph1, msg)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_CR:
-			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_CERT:
@@ -376,10 +376,10 @@ end:
 		VPTRINIT(iph1->dhpub_p);
 		VPTRINIT(iph1->nonce_p);
 		VPTRINIT(iph1->id_p);
-		VPTRINIT(iph1->cert_p);
-		VPTRINIT(iph1->crl_p);
+		oakley_delcert(iph1->cert_p);
+		oakley_delcert(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
-		VPTRINIT(iph1->cr_p);
+		oakley_delcert(iph1->cr_p);
 	}
 
 	return error;
@@ -451,7 +451,7 @@ agg_i2send(iph1, msg)
 
 		tlen += sizeof(*gen) + iph1->sig->l;
 		if (iph1->cert != NULL)
-			tlen += sizeof(*gen) + iph1->cert->l;
+			tlen += sizeof(*gen) + iph1->cert->pl->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) {
@@ -469,7 +469,7 @@ agg_i2send(iph1, msg)
 
 		/* add CERT payload if there */
 		if (iph1->cert != NULL)
-			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
 		break;
@@ -572,7 +572,7 @@ agg_r1recv(iph1, msg)
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
-			if (isakmp_p2ph(&iph1->cr_p, pa->ptr) < 0)
+			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
 			break;
 		default:
@@ -613,7 +613,7 @@ end:
 		VPTRINIT(iph1->dhpub_p);
 		VPTRINIT(iph1->nonce_p);
 		VPTRINIT(iph1->id_p);
-		VPTRINIT(iph1->cr_p);
+		oakley_delcert(iph1->cr_p);
 	}
 
 	return error;
@@ -769,7 +769,7 @@ agg_r1send(iph1, msg)
 			+ sizeof(*gen) + iph1->id->l
 			+ sizeof(*gen) + iph1->sig->l;
 		if (iph1->cert != NULL)
-			tlen += sizeof(*gen) + iph1->cert->l;
+			tlen += sizeof(*gen) + iph1->cert->pl->l;
 		if (lcconf->vendorid)
 			tlen += sizeof(*gen) + lcconf->vendorid->l;
 		if (need_cr)
@@ -803,7 +803,7 @@ agg_r1send(iph1, msg)
 
 		/* add CERT payload if there */
 		if (iph1->cert != NULL)
-			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig,
 			lcconf->vendorid ? ISAKMP_NPTYPE_VID
@@ -956,8 +956,8 @@ end:
 	if (msg)
 		vfree(msg);
 	if (error) {
-		VPTRINIT(iph1->cert_p);
-		VPTRINIT(iph1->crl_p);
+		oakley_delcert(iph1->cert_p);
+		oakley_delcert(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
 	}
 

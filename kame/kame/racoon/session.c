@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.8 2000/08/02 15:47:33 sakane Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.9 2000/08/30 11:18:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -71,6 +71,7 @@
 #include "cfparse.h"
 #include "isakmp_var.h"
 #include "admin_var.h"
+#include "oakley.h"
 #include "pfkey.h"
 #include "handler.h"
 #include "localconf.h"

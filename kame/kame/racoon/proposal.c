@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.11 2000/08/25 10:51:12 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.12 2000/08/30 11:18:34 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -56,8 +56,8 @@
 #include "sainfo.h"
 #include "localconf.h"
 #include "remoteconf.h"
-#include "handler.h"
 #include "oakley.h"
+#include "handler.h"
 #include "strnames.h"
 
 /* %%%

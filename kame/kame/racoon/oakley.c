@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.48 2000/08/24 12:04:35 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.49 2000/08/30 11:18:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -107,6 +107,10 @@ static struct cipher_algorithm cipher[] = {
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
+#if 0
+static int check_typeofcertname __P((int, int));
+#endif
+static cert_t *save_certbuf __P((struct isakmp_gen *));
 
 int
 oakley_get_defaultlifetime()
@@ -1156,27 +1160,38 @@ oakley_validate_auth(iph1)
 				return -1;
 			}
 
-			iph1->cert_p = vmalloc(cert->l + 1);
-			if (iph1->cert_p == NULL) {
+			iph1->cert_p = oakley_newcert();
+			if (!iph1->cert_p) {
 				plog(logp, LOCATION, NULL,
 					"failed to get cert buffer\n");
 				vfree(cert);
 				return -1;
 			}
-			memcpy(iph1->cert_p->v + 1, cert->v, cert->l);
-			iph1->cert_p->v[0] = iph1->rmconf->certtype;
+			iph1->cert_p->pl = vmalloc(cert->l + 1);
+			if (!iph1->cert_p->pl) {
+				plog(logp, LOCATION, NULL,
+					"failed to get cert buffer\n");
+				oakley_delcert(iph1->cert_p);
+				vfree(cert);
+				return -1;
+			}
+			memcpy(iph1->cert_p->pl->v + 1, cert->v, cert->l);
+			iph1->cert_p->pl->v[0] = iph1->rmconf->certtype;
+			iph1->cert_p->type = iph1->rmconf->certtype;
+			iph1->cert_p->cert.v = iph1->cert_p->pl->v + 1;
+			iph1->cert_p->cert.l = iph1->cert_p->pl->l - 1;
 
 			YIPSDEBUG(DEBUG_CERT,
 				plog(logp, LOCATION, NULL,
 					"get peer's CERT from cache:\n"));
-			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
+			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p->pl));
 		}
 
 		/* don't cache the certificate passed. */
 
 		switch (iph1->rmconf->certtype) {
 		case ISAKMP_CERT_X509SIGN:
-			error = eay_check_x509cert(iph1->cert_p,
+			error = eay_check_x509cert(&iph1->cert_p->cert,
 					lcconf->pathinfo[LC_PATHTYPE_CERT]);
 			/* XXX to be checked subjectAltName */
 			break;
@@ -1218,7 +1233,7 @@ oakley_validate_auth(iph1)
 		case ISAKMP_CERT_X509SIGN:
 			error = eay_check_x509sign(my_hash,
 					iph1->sig_p,
-					iph1->cert_p);
+					&iph1->cert_p->cert);
 			break;
 		default:
 			plog(logp, LOCATION, NULL,
@@ -1301,18 +1316,28 @@ oakley_getmycert(iph1)
 		goto end;
 	}
 
-	iph1->cert = vmalloc(cert->l + 1);
-	if (iph1->cert == NULL) {
+	iph1->cert = oakley_newcert();
+	if (!iph1->cert) {
 		plog(logp, LOCATION, NULL,
 			"failed to get cert buffer\n");
 		goto end;
 	}
-	memcpy(iph1->cert->v + 1, cert->v, cert->l);
-	iph1->cert->v[0] = iph1->rmconf->certtype;
+	iph1->cert->pl = vmalloc(cert->l + 1);
+	if (iph1->cert->pl == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get cert buffer\n");
+		oakley_delcert(iph1->cert_p);
+		goto end;
+	}
+	memcpy(iph1->cert->pl->v + 1, cert->v, cert->l);
+	iph1->cert->pl->v[0] = iph1->rmconf->certtype;
+	iph1->cert->type = iph1->rmconf->certtype;
+	iph1->cert->cert.v = iph1->cert->pl->v + 1;
+	iph1->cert->cert.l = iph1->cert->pl->l - 1;
 
-	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL,
-		"created CERT payload:\n"));
-	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert));
+	YIPSDEBUG(DEBUG_CERT,
+		plog(logp, LOCATION, NULL, "created CERT payload:\n"));
+	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert->pl));
 
 	error = 0;
 
@@ -1353,7 +1378,8 @@ oakley_getsign(iph1)
 			plog(logp, LOCATION, NULL, "private key:\n"));
 		YIPSDEBUG(DEBUG_DCERT, PVDUMP(privkey));
 
-		iph1->sig = eay_get_x509sign(iph1->hash, privkey, iph1->cert);
+		iph1->sig = eay_get_x509sign(iph1->hash,
+					privkey, &iph1->cert->cert);
 		break;
 	default:
 		goto end;
@@ -1377,6 +1403,39 @@ end:
 }
 #endif
 
+#if 0
+static int
+check_typeofcertname(doi, genid)
+	int doi, genid;
+{
+	switch (doi) {
+	case IPSECDOI_ID_IPV4_ADDR:
+	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
+	case IPSECDOI_ID_IPV6_ADDR:
+	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
+	case IPSECDOI_ID_IPV4_ADDR_RANGE:
+	case IPSECDOI_ID_IPV6_ADDR_RANGE:
+		if (genid != GENT_IPADD)
+			return -1;
+		return 0;
+	case IPSECDOI_ID_FQDN:
+		if (genid != IPSECDOI_ID_FQDN)
+			return -1;
+		return 0;
+	case IPSECDOI_ID_USER_FQDN:
+		if (genid != IPSECDOI_ID_USER_FQDN)
+			return -1;
+		return 0;
+	case IPSECDOI_ID_DER_ASN1_DN: /* should not be passed to this function*/
+	case IPSECDOI_ID_DER_ASN1_GN:
+	case IPSECDOI_ID_KEY_ID:
+	default:
+		return -1;
+	}
+	/*NOTREACHED*/
+}
+#endif
+
 /*
  * save certificate including certificate type.
  */
@@ -1385,9 +1444,10 @@ oakley_savecert(iph1, gen)
 	struct ph1handle *iph1;
 	struct isakmp_gen *gen;
 {
-	u_int8_t type = *(u_int8_t *)(gen + 1) & 0xff;
-	int len = ntohs(gen->len) - sizeof(*gen) - 1;
-	caddr_t data = (caddr_t)(gen + 1) + 1;
+	cert_t **c;
+	u_int8_t type;
+
+	type = *(u_int8_t *)(gen + 1) & 0xff;
 
 	switch (type) {
 	case ISAKMP_CERT_PKCS7:
@@ -1396,32 +1456,10 @@ oakley_savecert(iph1, gen)
 	case ISAKMP_CERT_X509SIGN:
 	case ISAKMP_CERT_KERBEROS:
 	case ISAKMP_CERT_SPKI:
-		iph1->cert_p = vmalloc(len);
-		if (iph1->cert_p == NULL) {
-			plog(logp, LOCATION, NULL,
-				"Failed to copy CERT from packet.\n");
-			return -1;
-		}
-		memcpy(iph1->cert_p->v, data, len);
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "CERT saved:\n"));
-		YIPSDEBUG(DEBUG_CERT,
-			char *p = eay_get_x509text(iph1->cert_p);
-			plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
-			free(p));
-		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
+		c = &iph1->cert_p;
 		break;
 	case ISAKMP_CERT_CRL:
-		iph1->crl_p = vmalloc(len);
-		if (iph1->crl_p == NULL) {
-			plog(logp, LOCATION, NULL,
-				"Failed to copy CRL from packet.\n");
-			return -1;
-		}
-		memcpy(iph1->crl_p->v, data, len);
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "CRL saved:\n"));
-		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->crl_p));
+		c = &iph1->crl_p;
 		break;
 	case ISAKMP_CERT_X509KE:
 	case ISAKMP_CERT_X509ATTR:
@@ -1435,7 +1473,116 @@ oakley_savecert(iph1, gen)
 		return -1;
 	}
 
+	*c = save_certbuf(gen);
+	if (!*c) {
+		plog(logp, LOCATION, NULL,
+			"Failed to get CERT buffer.\n");
+		return -1;
+	}
+
 	return 0;
+}
+
+/*
+ * save certificate including certificate type.
+ */
+int
+oakley_savecr(iph1, gen)
+	struct ph1handle *iph1;
+	struct isakmp_gen *gen;
+{
+	cert_t **c;
+	u_int8_t type;
+
+	type = *(u_int8_t *)(gen + 1) & 0xff;
+
+	switch (type) {
+	case ISAKMP_CERT_PKCS7:
+	case ISAKMP_CERT_PGP:
+	case ISAKMP_CERT_DNS:
+	case ISAKMP_CERT_X509SIGN:
+	case ISAKMP_CERT_KERBEROS:
+	case ISAKMP_CERT_SPKI:
+		c = &iph1->cr_p;
+		break;
+	case ISAKMP_CERT_X509KE:
+	case ISAKMP_CERT_X509ATTR:
+	case ISAKMP_CERT_ARL:
+		plog(logp, LOCATION, NULL,
+			"No supported such CR type %d\n", type);
+		return -1;
+	case ISAKMP_CERT_CRL:
+	default:
+		plog(logp, LOCATION, NULL,
+			"Invalid CR type %d\n", type);
+		return -1;
+	}
+
+	*c = save_certbuf(gen);
+	if (!*c) {
+		plog(logp, LOCATION, NULL,
+			"Failed to get CR buffer.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static cert_t *
+save_certbuf(gen)
+	struct isakmp_gen *gen;
+{
+	cert_t *new;
+
+	new = oakley_newcert();
+	if (!new) {
+		plog(logp, LOCATION, NULL,
+			"Failed to get CERT buffer.\n");
+		return NULL;
+	}
+
+	new->pl = vmalloc(ntohs(gen->len) - sizeof(*gen));
+	if (new->pl == NULL) {
+		plog(logp, LOCATION, NULL,
+			"Failed to copy CERT from packet.\n");
+		oakley_delcert(new);
+		return NULL;
+	}
+	memcpy(new->pl->v, gen + 1, new->pl->l);
+	new->type = new->pl->v[0] & 0xff;
+	new->cert.v = new->pl->v + 1;
+	new->cert.l = new->pl->l - 1;
+
+	switch (new->type) {
+	case ISAKMP_CERT_PKCS7:
+	case ISAKMP_CERT_PGP:
+	case ISAKMP_CERT_DNS:
+	case ISAKMP_CERT_X509SIGN:
+	case ISAKMP_CERT_KERBEROS:
+	case ISAKMP_CERT_SPKI:
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "CERT saved:\n"));
+		YIPSDEBUG(DEBUG_CERT,
+			char *p = eay_get_x509text(new->pl);
+			plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
+			free(p));
+		YIPSDEBUG(DEBUG_CERT, PVDUMP(new->pl));
+		break;
+	case ISAKMP_CERT_CRL:
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "CRL saved:\n"));
+		YIPSDEBUG(DEBUG_CERT, PVDUMP(new->pl));
+		break;
+	case ISAKMP_CERT_X509KE:
+	case ISAKMP_CERT_X509ATTR:
+	case ISAKMP_CERT_ARL:
+	default:
+		/* XXX */
+		oakley_delcert(new);
+		return NULL;
+	}
+
+	return new;
 }
 
 /*
@@ -1482,17 +1629,15 @@ oakley_checkcr(iph1)
 	YIPSDEBUG(DEBUG_NOTIFY,
 		plog(logp, LOCATION, iph1->remote,
 		"peer transmitted CR: %s\n",
-		s_isakmp_certtype(iph1->cr_p->v[0])));
+		s_isakmp_certtype(iph1->cr_p->type)));
 
-	if (iph1->cr_p->v[0] != iph1->rmconf->certtype) {
+	if (iph1->cr_p->type != iph1->rmconf->certtype) {
 		YIPSDEBUG(DEBUG_NOTIFY,
 			plog(logp, LOCATION, iph1->remote,
 			"such a cert type isn't supported: %d\n",
-			(char)iph1->cr_p->v[0]));
+			(char)iph1->cr_p->type));
 		return -1;
 	}
-
-	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cr_p));
 
 	return 0;
 }
@@ -1910,6 +2055,36 @@ oakley_compute_enckey(iph1)
 
 end:
 	return error;
+}
+
+/* allocated new buffer for CERT */
+cert_t *
+oakley_newcert()
+{
+	cert_t *new;
+
+	new = CALLOC(sizeof(*new), cert_t *);
+	if (new == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get cert's buffer\n");
+		return NULL;
+	}
+
+	new->pl = NULL;
+
+	return new;
+}
+
+/* delete buffer for CERT */
+void
+oakley_delcert(cert)
+	cert_t *cert;
+{
+	if (!cert)
+		return;
+	if (cert->pl)
+		VPTRINIT(cert->pl);
+	free(cert);
 }
 
 /*

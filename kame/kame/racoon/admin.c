@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.12 2000/07/04 13:38:54 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.13 2000/08/30 11:18:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -60,6 +60,7 @@
 #include "grabmyaddr.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
+#include "oakley.h"
 #include "handler.h"
 #include "pfkey.h"
 #include "admin.h"

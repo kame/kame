@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.33 2000/08/02 20:33:54 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.34 2000/08/30 11:18:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -246,10 +246,10 @@ delph1(iph1)
 	VPTRINIT(iph1->hash);
 	VPTRINIT(iph1->sig);
 	VPTRINIT(iph1->sig_p);
-	VPTRINIT(iph1->cert);
-	VPTRINIT(iph1->cert_p);
-	VPTRINIT(iph1->crl_p);
-	VPTRINIT(iph1->cr_p);
+	oakley_delcert(iph1->cert);
+	oakley_delcert(iph1->cert_p);
+	oakley_delcert(iph1->crl_p);
+	oakley_delcert(iph1->cr_p);
 	VPTRINIT(iph1->id);
 	VPTRINIT(iph1->id_p);
 

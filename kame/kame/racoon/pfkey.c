@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.71 2000/08/28 17:50:59 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.72 2000/08/30 11:18:34 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -72,6 +72,7 @@
 #include "isakmp.h"
 #include "isakmp_inf.h"
 #include "ipsec_doi.h"
+#include "oakley.h"
 #include "pfkey.h"
 #include "handler.h"
 #include "policy.h"

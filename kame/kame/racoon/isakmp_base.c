@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.28 2000/08/24 06:57:50 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.29 2000/08/30 11:18:33 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -60,8 +60,8 @@
 #include "remoteconf.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
-#include "handler.h"
 #include "oakley.h"
+#include "handler.h"
 #include "ipsec_doi.h"
 #include "crypto_openssl.h"
 #include "pfkey.h"
@@ -374,7 +374,7 @@ base_i2send(iph1, msg)
 		tlen += sizeof(*gen) + iph1->dhpub->l
 			+ sizeof(*gen) + iph1->sig->l;
 		if (iph1->cert != NULL)
-			tlen += sizeof(*gen) + iph1->cert->l;
+			tlen += sizeof(*gen) + iph1->cert->pl->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) {
@@ -395,7 +395,7 @@ base_i2send(iph1, msg)
 
 		/* add CERT payload if there */
 		if (iph1->cert != NULL)
-			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
 		break;
@@ -543,8 +543,8 @@ end:
 
 	if (error) {
 		VPTRINIT(iph1->dhpub_p);
-		VPTRINIT(iph1->cert_p);
-		VPTRINIT(iph1->crl_p);
+		oakley_delcert(iph1->cert_p);
+		oakley_delcert(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
 	}
 
@@ -859,8 +859,8 @@ end:
 
 	if (error) {
 		VPTRINIT(iph1->dhpub_p);
-		VPTRINIT(iph1->cert_p);
-		VPTRINIT(iph1->crl_p);
+		oakley_delcert(iph1->cert_p);
+		oakley_delcert(iph1->crl_p);
 		VPTRINIT(iph1->sig_p);
 	}
 
@@ -962,7 +962,7 @@ base_r2send(iph1, msg)
 		tlen += sizeof(*gen) + iph1->dhpub->l
 			+ sizeof(*gen) + iph1->sig->l;
 		if (iph1->cert != NULL)
-			tlen += sizeof(*gen) + iph1->cert->l;
+			tlen += sizeof(*gen) + iph1->cert->pl->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) {
@@ -983,7 +983,7 @@ base_r2send(iph1, msg)
 
 		/* add CERT payload if there */
 		if (iph1->cert != NULL)
-			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
+			p = set_isakmp_payload(p, iph1->cert->pl, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
 		break;

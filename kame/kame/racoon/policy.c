@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.27 2000/07/31 14:39:52 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.28 2000/08/30 11:18:34 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -52,8 +52,8 @@
 #include "localconf.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
-#include "handler.h"
 #include "oakley.h"
+#include "handler.h"
 
 static TAILQ_HEAD(_sptree, secpolicy) sptree;
 

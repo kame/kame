@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.51 2000/08/09 19:37:10 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.52 2000/08/30 11:18:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -73,8 +73,8 @@
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "isakmp_inf.h"
-#include "handler.h"
 #include "oakley.h"
+#include "handler.h"
 #include "ipsec_doi.h"
 #include "crypto_openssl.h"
 #include "pfkey.h"

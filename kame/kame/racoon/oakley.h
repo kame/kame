@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.11 2000/06/15 05:29:17 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.12 2000/08/30 11:18:34 sakane Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -125,6 +125,13 @@ struct dhgroup {
 
 extern struct dhgroup dhgroup[MAXDHGROUP];
 
+/* certificate holder */
+typedef struct cert_t_tag {
+	u_int8_t type;		/* type of CERT, must be same to buf->v[0]*/
+	vchar_t cert;		/* pointer to the CERT */
+	vchar_t *pl;		/* CERT payload */
+} cert_t;
+
 struct ph1handle;
 struct ph2handle;
 struct isakmp_ivm;
@@ -165,11 +172,14 @@ extern int oakley_checkcr __P((struct ph1handle *));
 extern int oakley_needcr __P((int));
 struct isakmp_gen;
 extern int oakley_savecert __P((struct ph1handle *, struct isakmp_gen *));
+extern int oakley_savecr __P((struct ph1handle *, struct isakmp_gen *));
 
 extern int oakley_skeyid __P((struct ph1handle *));
 extern int oakley_skeyid_dae __P((struct ph1handle *));
 
 extern int oakley_compute_enckey __P((struct ph1handle *));
+extern cert_t *oakley_newcert __P((void));
+extern void oakley_delcert __P((cert_t *));
 extern int oakley_newiv __P((struct ph1handle *));
 extern struct isakmp_ivm *oakley_newiv2 __P((struct ph1handle *, u_int32_t));
 extern void oakley_delivm __P((struct isakmp_ivm *));
