@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.7 2000/03/25 07:23:36 sumikawa Exp $	*/
+/*	$KAME: ip6.h,v 1.8 2000/07/02 13:58:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -342,8 +342,7 @@ do {									\
 			return ret;					\
 		}							\
 	}								\
-    }									\
-    else {								\
+    } else {								\
 	if ((m)->m_len < (off) + (hlen)) {				\
 		ip6stat.ip6s_tooshort++;				\
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_truncated);	\
