@@ -2424,6 +2424,67 @@ ip6_clearpktopts(pktopt, needfree, optname)
 	}
 }
 
+#define PKTOPT_EXTHDRCPY(type) if (src->type) {\
+		int hlen =\
+			(((struct ip6_ext *)src->type)->ip6e_len + 1) << 3;\
+		dst->type = malloc(hlen, M_IP6OPT, canwait);\
+		if (dst->type == NULL && canwait == M_NOWAIT)\
+			goto bad;\
+		bcopy(src->type, dst->type, hlen);\
+	}
+
+struct ip6_pktopts *
+ip6_copypktopts(src, canwait)
+	struct ip6_pktopts *src;
+	int canwait;
+{
+	struct ip6_pktopts *dst;
+
+	if (src == NULL) {
+		printf("ip6_clearpktopts: invalid argument\n");
+		return(NULL);
+	}
+
+	dst = malloc(sizeof(*dst), M_IP6OPT, canwait);
+	if (dst == NULL && canwait == M_NOWAIT)
+		goto bad;
+	bzero(dst, sizeof(*dst));
+
+	dst->ip6po_hlim = src->ip6po_hlim;
+	dst->ip6po_flags = src->ip6po_flags;
+	if (src->ip6po_pktinfo) {
+		dst->ip6po_pktinfo = malloc(sizeof(*dst->ip6po_pktinfo),
+					    M_IP6OPT, canwait);
+		if (dst->ip6po_pktinfo == NULL && canwait == M_NOWAIT)
+			goto bad;
+		*dst->ip6po_pktinfo = *src->ip6po_pktinfo;
+	}
+	if (src->ip6po_nexthop) {
+		dst->ip6po_nexthop = malloc(src->ip6po_nexthop->sa_len,
+					    M_IP6OPT, canwait);
+		if (dst->ip6po_nexthop == NULL && canwait == M_NOWAIT)
+			goto bad;
+		bcopy(src->ip6po_nexthop, dst->ip6po_nexthop,
+		      src->ip6po_nexthop->sa_len);
+	}
+	PKTOPT_EXTHDRCPY(ip6po_hbh);
+	PKTOPT_EXTHDRCPY(ip6po_dest1);
+	PKTOPT_EXTHDRCPY(ip6po_dest2);
+	PKTOPT_EXTHDRCPY(ip6po_rthdr); /* not copy the cached route */
+	return(dst);
+
+  bad:
+	printf("ip6_copypktopts: copy failed");
+	if (dst->ip6po_pktinfo) free(dst->ip6po_pktinfo, M_IP6OPT);
+	if (dst->ip6po_nexthop) free(dst->ip6po_nexthop, M_IP6OPT);
+	if (dst->ip6po_hbh) free(dst->ip6po_hbh, M_IP6OPT);
+	if (dst->ip6po_dest1) free(dst->ip6po_dest1, M_IP6OPT);
+	if (dst->ip6po_dest2) free(dst->ip6po_dest2, M_IP6OPT);
+	if (dst->ip6po_rthdr) free(dst->ip6po_rthdr, M_IP6OPT);
+	return(NULL);
+}
+#undef PKTOPT_EXTHDRCPY
+
 void
 ip6_freepcbopts(pktopt)
 	struct ip6_pktopts *pktopt;

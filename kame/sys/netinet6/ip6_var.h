@@ -298,6 +298,7 @@ int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
 int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int, int));
 void	ip6_clearpktopts __P((struct ip6_pktopts *, int, int));
+struct ip6_pktopts *ip6_copypktopts __P((struct ip6_pktopts *, int));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
 int	ip6_optlen __P((struct inpcb *));
 #else

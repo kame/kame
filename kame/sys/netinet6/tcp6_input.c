@@ -696,9 +696,25 @@ findpcb:
 			in6p = sotoin6pcb(so);
 			in6p->in6p_laddr = ip6->ip6_dst;
 			in6p->in6p_lport = th->th_dport;
-			/* inherit socket options from the listening socket */
+
+			/*
+			 * Inherit socket options from the listening socket.
+			 * Note that in6p_inputopts are not (even should not
+			 * be) copied, since it stores previously received
+			 * options and is used to detect if each new option is
+			 * different than the previous one and hence should be
+			 * passed to a user.
+			 * If we copied in6p_inputopts, a user would not be
+			 * able to receive options just after calling the
+			 * accept system call.
+			 */
 			in6p->in6p_flags |=
 				(oin6p->in6p_flags & IN6P_CONTROLOPTS);
+			if (oin6p->in6p_outputopts)
+				in6p->in6p_outputopts =
+					ip6_copypktopts(oin6p->in6p_outputopts,
+							M_NOWAIT);
+
 			if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
 				bzero(&newopts, sizeof(newopts));
 				ip6_savecontrol(in6p, ip6, m, &newopts,
