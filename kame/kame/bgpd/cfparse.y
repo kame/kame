@@ -1467,8 +1467,6 @@ export_config()
 
 	cprint("Export config\n");
 	for (info = yy_exportinfo_head; info; info = info->next) {
-		cprint("  peer: ");
-
 		peeras = info->asnum;
 		peeraddr = &info->peeraddr;
 		if (!IN6_IS_ADDR_UNSPECIFIED(&peeraddr->sin6_addr)) {
