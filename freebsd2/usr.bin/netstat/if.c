@@ -72,6 +72,11 @@ static char sccsid[] = "@(#)if.c	8.3 (Berkeley) 4/28/95";
 static void sidewaysintpr __P((u_int, u_long));
 static void catchalarm __P((int));
 
+#ifdef INET6
+char *netname6 __P((struct in6_addr *, struct in6_addr *));
+static char ntop_buf[INET6_ADDRSTRLEN];		/* for inet_ntop() */
+#endif
+
 /*
  * Print a description of the network interfaces.
  */
@@ -84,6 +89,9 @@ intpr(interval, ifnetaddr)
 	union {
 		struct ifaddr ifa;
 		struct in_ifaddr in;
+#ifdef INET6
+		struct in6_ifaddr in6;
+#endif
 		struct ipx_ifaddr ipx;
 #ifdef NS
 		struct ns_ifaddr ns;
@@ -124,6 +132,9 @@ intpr(interval, ifnetaddr)
 	ifaddraddr = 0;
 	while (ifnetaddr || ifaddraddr) {
 		struct sockaddr_in *sin;
+#ifdef INET6
+		struct sockaddr_in6 *sin6;
+#endif
 		register char *cp;
 		int n, m;
 
@@ -179,6 +190,18 @@ intpr(interval, ifnetaddr)
 				printf("%-15.15s ",
 				    routename(sin->sin_addr.s_addr));
 				break;
+#ifdef INET6
+			case AF_INET6:
+				sin6 = (struct sockaddr_in6 *)sa;
+				printf("%-11.11s ",
+				    netname6(&ifaddr.in6.ia_addr.sin6_addr,
+					&ifaddr.in6.ia_prefixmask.sin6_addr));
+				printf("%-17.17s ",
+				    (char *)inet_ntop(AF_INET6,
+					&sin6->sin6_addr,
+					ntop_buf, sizeof(ntop_buf)));
+				break;
+#endif /*INET6*/
 			case AF_IPX:
 				{
 				struct sockaddr_ipx *sipx =
@@ -220,10 +243,12 @@ intpr(interval, ifnetaddr)
 				{
 				struct sockaddr_dl *sdl =
 					(struct sockaddr_dl *)sa;
-				    cp = (char *)LLADDR(sdl);
-				    n = sdl->sdl_alen;
+				char linknum[10];
+				cp = (char *)LLADDR(sdl);
+				n = sdl->sdl_alen;
+				sprintf(linknum, "<Link#%d>", sdl->sdl_index);
+				m = printf("%-11.11s ", linknum);
 				}
-				m = printf("%-11.11s ", "<Link>");
 				goto hexprint;
 			default:
 				m = printf("(%d)", sa->sa_family);
@@ -276,6 +301,25 @@ intpr(interval, ifnetaddr)
 			    }
 			    break;
 			}
+#ifdef INET6
+		    case AF_INET6:
+		    {
+			     u_long multiaddr;
+			     struct in6_multi inm;
+
+			     multiaddr = (u_long)ifaddr.in6.ia6_multiaddrs.lh_first;
+			     while (multiaddr != 0) {
+				 kread(multiaddr, (char *)&inm, sizeof(inm));
+				 multiaddr = (u_long)inm.in6m_entry.le_next;
+				 printf("%23s %-19.19s(refs: %d)\n", "",
+					inet_ntop(AF_INET6, &inm.in6m_addr,
+						  ntop_buf, sizeof(ntop_buf)),
+					inm.in6m_refcount);
+			     }
+			     break;
+		    }
+			    
+#endif /* INET6 */
 		    case AF_LINK:
 			    switch (ifnet.if_type) {
 			    case IFT_ETHER:

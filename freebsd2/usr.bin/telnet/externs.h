@@ -86,6 +86,13 @@ typedef unsigned char cc_t;
 #endif
 #include <strings.h>
 
+#if defined(IPSEC)
+#include <netinet6/ipsec.h>
+#if defined(IPSEC_POLICY_IPSEC)
+extern char *ipsec_policy;
+#endif
+#endif
+
 #ifndef	_POSIX_VDISABLE
 # ifdef sun
 #  include <sys/param.h>	/* pick up VDISABLE definition, mayby */

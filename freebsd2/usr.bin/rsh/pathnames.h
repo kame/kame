@@ -33,4 +33,4 @@
  *	@(#)pathnames.h	8.1 (Berkeley) 6/6/93
  */
 
-#define	_PATH_RLOGIN	"/usr/bin/rlogin"
+#define	_PATH_RLOGIN	"/usr/local/v6/bin/rlogin"

@@ -46,6 +46,7 @@ static const char rcsid[] =
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
+#include <sys/errno.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -68,10 +69,9 @@ netfinger(name)
 	extern int Tflag;
 	register FILE *fp;
 	register int c, lastc;
-	struct in_addr defaddr;
-	struct hostent *hp, def;
-	struct servent *sp;
-	struct sockaddr_in sin;
+	struct addrinfo hints, *res, *res0;
+	int error;
+	char *emsg = NULL;
 	int s;
 	char *alist[1], *host;
 	struct iovec iov[3];
@@ -80,35 +80,18 @@ netfinger(name)
 	if (!(host = rindex(name, '@')))
 		return;
 	*host++ = '\0';
-	if (isdigit(*host) && (defaddr.s_addr = inet_addr(host)) != -1) {
-		def.h_name = host;
-		def.h_addr_list = alist;
-		def.h_addr = (char *)&defaddr;
-		def.h_length = sizeof(struct in_addr);
-		def.h_addrtype = AF_INET;
-		def.h_aliases = 0;
-		hp = &def;
-	} else if (!(hp = gethostbyname(host))) {
-		warnx("unknown host: %s", host);
-		return;
-	}
-	if (!(sp = getservbyname("finger", "tcp"))) {
-		warnx("tcp/finger: unknown service");
-		return;
-	}
-	sin.sin_family = hp->h_addrtype;
-	bcopy(hp->h_addr, (char *)&sin.sin_addr, MIN(hp->h_length,sizeof(sin.sin_addr)));
-	sin.sin_port = sp->s_port;
-	if ((s = socket(hp->h_addrtype, SOCK_STREAM, 0)) < 0) {
-		perror("finger: socket");
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_CANONNAME;
+	error = getaddrinfo(host, "finger", &hints, &res0);
+	if (error) {
+		warnx("%s: %s", gai_strerror(error), host);
 		return;
 	}
 
-	/* have network connection; identify the host connected with */
-	(void)printf("[%s]\n", hp->h_name);
-
-	msg.msg_name = (void *)&sin;
-	msg.msg_namelen = sizeof sin;
+	msg.msg_name = NULL;	/*later*/
+	msg.msg_namelen = 0;	/*later*/
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 0;
 	msg.msg_control = 0;
@@ -126,17 +109,57 @@ netfinger(name)
 	iov[msg.msg_iovlen].iov_base = "\r\n";
 	iov[msg.msg_iovlen++].iov_len = 2;
 
-	/* -T disables T/TCP: compatibility option to finger broken hosts */
-	if (Tflag && connect(s, (struct sockaddr *)&sin, sizeof (sin))) {
-		perror("finger: connect");
+	s = -1;
+	for (res = res0; res; res = res->ai_next) {
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s < 0) {
+			emsg = "socket";
+			continue;
+		}
+
+		msg.msg_name = (void *)res->ai_addr;
+		msg.msg_namelen = res->ai_addrlen;
+
+		/*
+		 * Try T/TCP first, then normal TCP.  -T disables T/TCP.
+		 */
+		if (!Tflag) {
+			if (sendmsg(s, &msg, 0) >= 0)
+				break;
+		}
+
+		if (errno != ENOTCONN) {
+			close(s);
+			s = -1;
+			emsg = "sendmsg";
+			continue;
+		}
+
+		/* T/TCP failed on this address family - try normal TCP */
+		if (connect(s, res->ai_addr, res->ai_addrlen)) {
+			close(s);
+			s = -1;
+			emsg = "connect";
+			continue;
+		}
+
+		if (sendmsg(s, &msg, 0) < 0) {
+			close(s);
+			s = -1;
+			emsg = "sendmsg";
+			continue;
+		}
+
+		break;
+	}
+	if (s < 0) {
+		if (emsg != NULL)
+			warn(emsg);
 		return;
 	}
 
-	if (sendmsg(s, &msg, 0) < 0) {
-		perror("finger: sendmsg");
-		close(s);
-		return;
-	}
+	/* have network connection; identify the host connected with */
+	(void)printf("[%s]\n", res0->ai_canonname ? res0->ai_canonname : host);
 
 	/*
 	 * Read from the remote system; once we're connected, we assume some

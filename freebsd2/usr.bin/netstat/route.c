@@ -121,6 +121,12 @@ static void p_sockaddr __P((struct sockaddr *, struct sockaddr *, int, int));
 static void p_flags __P((int, char *));
 static void p_rtentry __P((struct rtentry *));
 
+#ifdef INET6
+char *routename6 __P((struct in6_addr *));
+char *netname6 __P((struct in6_addr *, struct in6_addr *));
+static char ntop_buf[INET6_ADDRSTRLEN];
+#endif /*INET6*/
+
 /*
  * Print routing tables.
  */
@@ -174,6 +180,11 @@ pr_family(af)
 	case AF_INET:
 		afname = "Internet";
 		break;
+#ifdef INET6
+	case AF_INET6:
+		afname = "Internet6";
+		break;
+#endif /*INET6*/
 	case AF_IPX:
 		afname = "IPX";
 		break;
@@ -202,8 +213,13 @@ pr_family(af)
 }
 
 /* column widths; each followed by one space */
-#define	WID_DST		18	/* width of destination column */
+#ifndef INET6
+#define	WID_DST 	18	/* width of destination column */
 #define	WID_GW		18	/* width of gateway column */
+#else
+#define	WID_DST	(lflag ? 39 : (nflag ? 29 : 18)) /* width of dest column */
+#define	WID_GW	(lflag ? 27 : (nflag ? 25 : 18)) /* width of gateway column */
+#endif /*INET6*/
 
 /*
  * Print header for routing table columns.
@@ -213,10 +229,16 @@ pr_rthdr()
 {
 	if (Aflag)
 		printf("%-8.8s ","Address");
-	printf("%-*.*s %-*.*s %-6.6s  %6.6s%8.8s  %8.8s %6s\n",
-		WID_DST, WID_DST, "Destination",
-		WID_GW, WID_GW, "Gateway",
-		"Flags", "Refs", "Use", "Netif", "Expire");
+	if (lflag)
+		printf("%-*.*s %-*.*s %-6.6s  %6.6s%8.8s  %8.8s %6s\n",
+			WID_DST, WID_DST, "Destination",
+			WID_GW, WID_GW, "Gateway",
+			"Flags", "Refs", "Use", "Netif", "Expire");
+	else
+		printf("%-*.*s %-*.*s %-6.6s  %8.8s %6s\n",
+			WID_DST, WID_DST, "Destination",
+			WID_GW, WID_GW, "Gateway",
+			"Flags", "Netif", "Expire");
 }
 
 static struct sockaddr *
@@ -405,6 +427,23 @@ p_sockaddr(sa, mask, flags, width)
 		break;
 	    }
 
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct in6_addr *in6 = &((struct sockaddr_in6 *)sa)->sin6_addr;
+
+		if (flags & RTF_HOST)
+			cp = routename6(in6);
+		else if (mask)
+			cp = netname6(in6,
+				&((struct sockaddr_in6 *)mask)->sin6_addr);
+		else {
+			cp = netname6(in6, NULL);
+		}
+		break;
+	    }
+#endif /*INET6*/
+
 	case AF_IPX:
 	    {
 		struct ipx_addr work = ((struct sockaddr_ipx *)sa)->sipx_addr;
@@ -505,7 +544,11 @@ p_rtentry(rt)
 	static char name[16];
 	static char prettyname[9];
 	struct sockaddr *sa;
+#ifndef INET6
 	struct sockaddr addr, mask;
+#else
+	struct sockaddr_in6 addr, mask;
+#endif
 
 	/*
 	 * Don't print protocol-cloned routes unless -a.
@@ -516,32 +559,37 @@ p_rtentry(rt)
 	if (!(sa = kgetsa(rt_key(rt))))
 		bzero(&addr, sizeof addr);
 	else
-		addr = *sa;
+		bcopy(sa, &addr, sizeof addr);
 	if (!rt_mask(rt) || !(sa = kgetsa(rt_mask(rt))))
 		bzero(&mask, sizeof mask);
 	else
-		mask = *sa;
-	p_sockaddr(&addr, &mask, rt->rt_flags, WID_DST);
+		bcopy(sa, &mask, sizeof mask);
+	p_sockaddr((struct sockaddr *)&addr, (struct sockaddr *)&mask,
+		rt->rt_flags, WID_DST);
 	p_sockaddr(kgetsa(rt->rt_gateway), NULL, RTF_HOST, WID_GW);
 	p_flags(rt->rt_flags, "%-6.6s ");
-	printf("%6d %8ld ", rt->rt_refcnt, rt->rt_use);
+	if (lflag)
+		printf("%6d %8ld ", rt->rt_refcnt, rt->rt_use);
 	if (rt->rt_ifp) {
 		if (rt->rt_ifp != lastif) {
 			kget(rt->rt_ifp, ifnet);
 			kread((u_long)ifnet.if_name, name, 16);
 			lastif = rt->rt_ifp;
 			snprintf(prettyname, sizeof prettyname,
-				 "%.6s%d", name, ifnet.if_unit);
+				 "%s%d", name, ifnet.if_unit);
 		}
-		if(rt->rt_rmx.rmx_expire) {
+		if (rt->rt_rmx.rmx_expire) {
 			time_t expire_time;
 
 		        if ((expire_time
-			       =rt->rt_rmx.rmx_expire - time((time_t *)0)) > 0)
+			       = rt->rt_rmx.rmx_expire - time((time_t *)0)) > 0)
 			    printf(" %8.8s %6d%s", prettyname,
 				   (int)expire_time,
 				   rt->rt_nodes[0].rn_dupedkey ? " =>" : "");
+			else
+			    goto ifandkey;
 		} else {
+ifandkey:;
 			printf(" %8.8s%s", prettyname,
 			       rt->rt_nodes[0].rn_dupedkey ? " =>" : "");
 		}
@@ -688,6 +736,103 @@ netname(in, mask)
 	domask(line+strlen(line), i, omask);
 	return (line);
 }
+
+#ifdef INET6
+char *
+netname6(in6, mask)
+	struct in6_addr *in6;
+	struct in6_addr *mask;
+{
+	static char line[MAXHOSTNAMELEN + 1];
+	u_char *p = (u_char *)mask;
+	u_char *lim;
+	char *cp = 0;
+	int masklen, illegal = 0;
+	struct hostent *hp;
+
+	if (mask) {
+		for (masklen = 0, lim = p + 16; p < lim; p++) {
+			switch (*p) {
+			 case 0xff:
+				 masklen += 8;
+				 break;
+			 case 0xfe:
+				 masklen += 7;
+				 break;
+			 case 0xfc:
+				 masklen += 6;
+				 break;
+			 case 0xf8:
+				 masklen += 5;
+				 break;
+			 case 0xf0:
+				 masklen += 4;
+				 break;
+			 case 0xe0:
+				 masklen += 3;
+				 break;
+			 case 0xc0:
+				 masklen += 2;
+				 break;
+			 case 0x80:
+				 masklen += 1;
+				 break;
+			 case 0x00:
+				 break;
+			 default:
+				 illegal ++;
+				 break;
+			}
+		}
+		if (illegal)
+			fprintf(stderr, "illegal prefixlen\n");
+	}
+	else
+		masklen = 128;
+
+	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(in6))
+		return("default");
+
+	if (!nflag) {
+		hp = gethostbyaddr((char *)in6, sizeof(*in6), AF_INET6);
+		if (hp) {
+			cp = hp->h_name;
+			trimdomain(cp);
+		}
+	}
+	if (cp)
+		strncpy(line, cp, sizeof(line) - 1);
+	else
+		sprintf(line, "%s/%d", inet_ntop(AF_INET6, in6, ntop_buf,
+						 sizeof(ntop_buf)),
+			masklen);
+	return line;
+}
+
+char *
+routename6(in6)
+	struct in6_addr *in6;
+{
+	register char *cp = 0;
+	static char line[MAXHOSTNAMELEN + 1];
+	struct hostent *hp;
+
+	if (!nflag) {
+		hp = gethostbyaddr((char *)in6, sizeof(*in6), AF_INET6);
+		if (hp) {
+			cp = hp->h_name;
+			trimdomain(cp);
+		}
+	}
+	if (cp)
+		strncpy(line, cp, sizeof(line) - 1);
+	else
+		sprintf(line, "%s", inet_ntop(AF_INET6, in6, ntop_buf,
+					      sizeof(ntop_buf)));
+		
+	return line;
+}
+#endif /*INET6*/
 
 /*
  * Print routing statistics

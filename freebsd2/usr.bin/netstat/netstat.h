@@ -41,6 +41,7 @@ int	bflag;		/* show i/f total bytes in/out */
 int	dflag;		/* show i/f dropped packets */
 int	gflag;		/* show group (multicast) routing or stats */
 int	iflag;		/* show interfaces */
+int	lflag;		/* show routing table with use and ref */
 int	mflag;		/* show memory stats */
 int	nflag;		/* show addresses numerically */
 int	pflag;		/* show given protocol */
@@ -66,7 +67,21 @@ void	udp_stats __P((u_long, char *));
 void	ip_stats __P((u_long, char *));
 void	icmp_stats __P((u_long, char *));
 void	igmp_stats __P((u_long, char *));
+#ifdef IPSEC
+void	ipsec_stats __P((u_long, char *));
+#endif
 void	protopr __P((u_long, char *));
+
+#ifdef INET6
+void	ip6protopr __P((u_long, char *));
+void	tcp6_stats __P((u_long, char *));
+void	udp6_stats __P((u_long, char *));
+void	ip6_stats __P((u_long, char *));
+void	icmp6_stats __P((u_long, char *));
+void	pim6_stats __P((u_long, char *));
+void	mroute6pr __P((u_long, u_long, u_long));
+void	mrt6_stats __P((u_long, u_long));
+#endif /*INET6*/
 
 void	mbpr __P((u_long));
 

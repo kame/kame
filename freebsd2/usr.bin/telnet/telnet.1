@@ -554,9 +554,10 @@ will attempt to contact a
 .Tn TELNET
 server at the default port.
 The host specification may be either a host name (see
-.Xr hosts  5  )
-or an Internet address specified in the \*(Lqdot notation\*(Rq (see
-.Xr inet 3 ) .
+.Xr hosts  5  ) ,
+an Internet address specified in the \*(Lqdot notation\*(Rq (see
+.Xr inet 3 ) ,
+or IPv6 host name or IPv6 coloned-hexadecimal addreess.
 The
 .Fl l
 option may be used to specify the user name
@@ -1376,6 +1377,8 @@ The
 .Nm
 command appeared in
 .Bx 4.2 .
+.Pp
+IPv6 support was added by WIDE/KAME project.
 .Sh NOTES
 .Pp
 On some remote systems, echo has to be turned off manually when in
@@ -1387,3 +1390,5 @@ the terminal's
 .Ic eof
 character is only recognized (and sent to the remote system)
 when it is the first character on a line.
+.Pp
+Kerberos support is not implemented in IPv6 version.

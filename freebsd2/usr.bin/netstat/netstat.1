@@ -44,7 +44,7 @@
 .Op Fl M Ar core
 .Op Fl N Ar system
 .Nm netstat
-.Op Fl bdghimnrs
+.Op Fl bdghilmnrs
 .Op Fl f Ar address_family
 .Op Fl M Ar core
 .Op Fl N Ar system
@@ -106,6 +106,9 @@ are recognized:
 .Ar inet  ,
 for
 .Dv AF_INET  ,
+.Ar inet6  ,
+for
+.Dv AF_INET6  ,
 .Ar ipx ,
 for
 .Dv AF_IPX  ,
@@ -182,6 +185,11 @@ Show the routing tables.
 When
 .Fl s
 is also present, show routing statistics instead.
+When
+.Fl l
+is also present,
+.Nm
+assumes more columns are there.
 .It Fl w Ar wait
 Show network interface statistics at intervals of
 .Ar wait
@@ -287,6 +295,8 @@ The
 .Nm netstat
 command appeared in
 .Bx 4.2 .
+.Pp
+IPv6 support was added by WIDE/KAME project.
 .\" .Sh FILES
 .\" .Bl -tag -width /dev/kmem -compact
 .\" .It Pa /kernel

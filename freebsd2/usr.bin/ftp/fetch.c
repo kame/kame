@@ -38,7 +38,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$Id: fetch.c,v 1.5 1997/12/16 08:58:15 ache Exp $");
+__RCSID("$Id: fetch.c,v 1.1.1.1.2.1 1998/04/10 01:56:55 itojun Exp $");
 __RCSID_SOURCE("$NetBSD: fetch.c,v 1.16.2.1 1997/11/18 01:00:22 mellon Exp $");
 #endif /* not lint */
 
@@ -91,9 +91,14 @@ url_get(origline, proxyenv)
 	const char *origline;
 	const char *proxyenv;
 {
+#if 0
 	struct sockaddr_in sin;
+#else
+	struct addrinfo hints;
+	struct addrinfo *res;
+#endif
 	int i, out, isftpurl;
-	u_int16_t port;
+	char *port;
 	volatile int s;
 	size_t len;
 	char c, *cp, *ep, *portnum, *path, buf[4096];
@@ -101,6 +106,7 @@ url_get(origline, proxyenv)
 	char *line, *proxy, *host;
 	volatile sig_t oldintr;
 	off_t hashbytes;
+	int error;
 
 	s = -1;
 	proxy = NULL;
@@ -172,14 +178,24 @@ url_get(origline, proxyenv)
 		path = line;
 	}
 
-	portnum = strchr(host, ':');			/* find portnum */
-	if (portnum != NULL)
+	if (*host == '[' && (portnum = strrchr(host, ']'))) {	/* IPv6 URL */
 		*portnum++ = '\0';
-
+		host++;
+		if (*portnum == ':')
+			portnum++;
+		else
+			portnum = NULL;
+	} else {
+		portnum = strrchr(host, ':');	/* find portnum */
+		if (portnum != NULL)
+			*portnum++ = '\0';
+	}
+	
 	if (debug)
 		printf("host %s, port %s, path %s, save as %s.\n",
 		    host, portnum, path, savefile);
 
+#if 0
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 
@@ -202,7 +218,9 @@ url_get(origline, proxyenv)
 		}
 		memcpy(&sin.sin_addr, hp->h_addr, hp->h_length);
 	}
+#endif
 
+#if 0
 	if (! EMPTYSTRING(portnum)) {
 		char *ep;
 		long nport;
@@ -216,16 +234,43 @@ url_get(origline, proxyenv)
 	} else
 		port = httpport;
 	sin.sin_port = port;
+#else
+	if (! EMPTYSTRING(portnum))
+		port = portnum;
+	else
+		port = httpport;
+#endif
 
-	s = socket(AF_INET, SOCK_STREAM, 0);
-	if (s == -1) {
-		warn("Can't create socket");
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_flags = AI_CANONNAME;
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
+	error = getaddrinfo(host, port, &hints, &res);
+	if (error) {
+		warnx("%s: %s", host, gai_strerror(error));
 		goto cleanup_url_get;
 	}
+	if (res->ai_canonname)
+		host = res->ai_canonname;
 
-	if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) == -1) {
-		warn("Can't connect to %s", host);
-		goto cleanup_url_get;
+	while (1) {
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s < 0) {
+			warn("Can't create socket");
+			goto cleanup_url_get;
+		}
+
+		if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+			close(s);
+			res = res->ai_next;
+			if (res)
+				continue;
+			warn("Can't connect to %s", host);
+			goto cleanup_url_get;
+		}
+		
+		break;
 	}
 
 	/*
@@ -638,4 +683,15 @@ parsed_url:
 	if (connected && rval != -1)
 		disconnect(0, NULL);
 	return (rval);
+}
+
+int
+isurl(p)
+	const char *p;
+{
+	if (strncasecmp(p, FTP_URL, sizeof(FTP_URL) - 1) == 0
+	 || strncasecmp(p, HTTP_URL, sizeof(HTTP_URL) - 1) == 0) {
+		return 1;
+	}
+	return 0;
 }

@@ -1,3 +1,32 @@
+/*
+ * Copyright (C) 1997 and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /*	$Id: ftp.c,v 1.8.2.3 1998/07/17 04:18:07 jkh Exp $	*/
 /*	$NetBSD: ftp.c,v 1.29.2.1 1997/11/18 01:01:04 mellon Exp $	*/
 
@@ -71,68 +100,67 @@ __RCSID_SOURCE("$NetBSD: ftp.c,v 1.29.2.1 1997/11/18 01:01:04 mellon Exp $");
 
 #include "ftp_var.h"
 
-struct	sockaddr_in hisctladdr;
-struct	sockaddr_in data_addr;
+extern int h_errno;
+
 int	data = -1;
 int	abrtflag = 0;
 jmp_buf	ptabort;
 int	ptabflg;
 int	ptflag = 0;
-struct	sockaddr_in myctladdr;
-
+off_t restart_point = 0;
 
 FILE	*cin, *cout;
+
+union sockunion {
+	struct sockinet {
+		u_char si_len;
+		u_char si_family;
+		u_short si_port;
+	} su_si;
+	struct sockaddr_in  su_sin;
+	struct sockaddr_in6 su_sin6;
+};
+#define su_len		su_si.si_len
+#define su_family	su_si.si_family
+#define su_port		su_si.si_port
+
+union sockunion myctladdr, hisctladdr, data_addr;
 
 char *
 hookup(host, port)
 	const char *host;
-	int port;
+	char *port;
 {
-	struct hostent *hp = NULL;
-	int s, len, tos;
-	static char hostnamebuf[MAXHOSTNAMELEN];
+	int s, len, error;
+	struct addrinfo hints, *res;
 
-	memset((void *)&hisctladdr, 0, sizeof(hisctladdr));
-	if (inet_aton(host, &hisctladdr.sin_addr) != 0) {
-		hisctladdr.sin_family = AF_INET;
-		(void) strncpy(hostnamebuf, host, sizeof(hostnamebuf));
-	} else {
-		hp = gethostbyname(host);
-		if (hp == NULL) {
-			warnx("%s: %s", host, hstrerror(h_errno));
-			code = -1;
-			return ((char *) 0);
-		}
-		hisctladdr.sin_family = hp->h_addrtype;
-		memcpy(&hisctladdr.sin_addr, hp->h_addr_list[0], 
-			MIN(hp->h_length,sizeof(hisctladdr.sin_addr)));
-		(void) strncpy(hostnamebuf, hp->h_name, sizeof(hostnamebuf));
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_flags = AI_CANONNAME;
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
+	error = getaddrinfo(host, port, &hints, &res);
+	if (error) {
+		warnx("%s: %s", host, gai_strerror(error));
+		code = -1;
+		return (0);
 	}
-	hostnamebuf[sizeof(hostnamebuf) - 1] = '\0';
-	hostname = hostnamebuf;
-	s = socket(hisctladdr.sin_family, SOCK_STREAM, 0);
+
+	if (res->ai_canonname)
+		hostname = res->ai_canonname;
+	else
+		hostname = host;
+	
+	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (s < 0) {
 		warn("socket");
 		code = -1;
 		return (0);
 	}
-	hisctladdr.sin_port = port;
-	while (connect(s, (struct sockaddr *)&hisctladdr,
-			sizeof(hisctladdr)) < 0) {
-		if (hp && hp->h_addr_list[1]) {
-			int oerrno = errno;
-			char *ia;
-
-			ia = inet_ntoa(hisctladdr.sin_addr);
-			errno = oerrno;
-			warn("connect to address %s", ia);
-			hp->h_addr_list++;
-			memcpy(&hisctladdr.sin_addr, hp->h_addr_list[0], 
-				MIN(hp->h_length,sizeof(hisctladdr.sin_addr)));
-			printf("Trying %s...\n",
-			    inet_ntoa(hisctladdr.sin_addr));
-			(void)close(s);
-			s = socket(hisctladdr.sin_family, SOCK_STREAM, 0);
+	while (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
+		res = res->ai_next;
+		if (res) {
+			s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 			if (s < 0) {
 				warn("socket");
 				code = -1;
@@ -144,17 +172,13 @@ hookup(host, port)
 		code = -1;
 		goto bad;
 	}
+	memcpy(&hisctladdr, res->ai_addr, res->ai_addrlen);
 	len = sizeof(myctladdr);
 	if (getsockname(s, (struct sockaddr *)&myctladdr, &len) < 0) {
 		warn("getsockname");
 		code = -1;
 		goto bad;
 	}
-#ifdef IP_TOS
-	tos = IPTOS_LOWDELAY;
-	if (setsockopt(s, IPPROTO_IP, IP_TOS, (char *)&tos, sizeof(int)) < 0)
-		warn("setsockopt TOS (ignored)");
-#endif
 	cin = fdopen(s, "r");
 	cout = fdopen(s, "w");
 	if (cin == NULL || cout == NULL) {
@@ -177,14 +201,14 @@ hookup(host, port)
 		goto bad;
 	}
 #ifdef SO_OOBINLINE
-	{
+    {
 	int on = 1;
 
 	if (setsockopt(s, SOL_SOCKET, SO_OOBINLINE, (char *)&on, sizeof(on))
 		< 0 && debug) {
 			warn("setsockopt");
 		}
-	}
+    }
 #endif /* SO_OOBINLINE */
 
 	return (hostname);
@@ -328,17 +352,36 @@ getreply(expecteof)
 			}
 			if (dig < 4 && isdigit((unsigned char)c))
 				code = code * 10 + (c - '0');
-			if (!pflag && code == 227)
-				pflag = 1;
-			if (dig > 4 && pflag == 1 && isdigit((unsigned char)c))
+			switch (pflag) {
+			case 0:
+				if (code == 227 || code == 228) {
+					/* result for PASV/LPSV */
+					pflag = 1;
+					/* fall through */
+				} else if (code == 229) {
+					/* result for EPSV */
+					pflag = 1;
+					pflag = 100;
+					break;
+				} else
+					break;
+			case 1:
+				if (!(dig > 4 && isdigit((unsigned char)c)))
+					break;
 				pflag = 2;
-			if (pflag == 2) {
+				/* fall through */
+			case 2:
 				if (c != '\r' && c != ')')
 					*pt++ = c;
 				else {
 					*pt = '\0';
 					pflag = 3;
 				}
+				break;
+			case 100:
+				if (dig > 4 && c == '(')
+					pflag = 2;
+				break;
 			}
 			if (dig == 4 && c == '-') {
 				if (continuation)
@@ -1083,60 +1126,173 @@ initconn()
 	char *p, *a;
 	int result, len, tmpno = 0;
 	int on = 1;
-	int a0, a1, a2, a3, p0, p1;
-	int ports;
+	int error, ports;
+	u_int af;
+	u_int hal, h[16];
+	u_int pal, prt[2];
+	char *pasvcmd;
 
 	if (passivemode) {
-		data = socket(AF_INET, SOCK_STREAM, 0);
+		data_addr = myctladdr;
+		data = socket(data_addr.su_family, SOCK_STREAM, 0);
 		if (data < 0) {
 			warn("socket");
 			return (1);
 		}
 		if ((options & SO_DEBUG) &&
 		    setsockopt(data, SOL_SOCKET, SO_DEBUG, (char *)&on,
-			       sizeof(on)) < 0)
+			       sizeof (on)) < 0)
 			warn("setsockopt (ignored)");
-		if (command("PASV") != COMPLETE) {
+		switch (data_addr.su_family) {
+		case AF_INET:
+			result = command(pasvcmd = "EPSV");
+			if (code / 10 == 22 && code != 229) {
+				puts("wrong server: return code must be 229");
+				result = COMPLETE + 1;
+			}
+			if (result != COMPLETE)
+				result = command(pasvcmd = "PASV");
+			break;
+		case AF_INET6:
+			result = command(pasvcmd = "EPSV");
+			if (code / 10 == 22 && code != 229) {
+				puts("wrong server: return code must be 229");
+				result = COMPLETE + 1;
+			}
+			if (result != COMPLETE)
+				result = command(pasvcmd = "LPSV");
+			break;
+		default:
+			result = COMPLETE + 1;
+		}
+		if (result != COMPLETE) {
 			puts("Passive mode refused.");
 			goto bad;
 		}
 
+#define pack2(var, offset) \
+	(((var[(offset) + 0] & 0xff) << 8) | ((var[(offset) + 1] & 0xff) << 0))
+#define pack4(var, offset) \
+    (((var[(offset) + 0] & 0xff) << 24) | ((var[(offset) + 1] & 0xff) << 16) \
+     | ((var[(offset) + 2] & 0xff) << 8) | ((var[(offset) + 3] & 0xff) << 0))
 		/*
-		 * What we've got at this point is a string of comma
-		 * separated one-byte unsigned integer values.
-		 * The first four are the an IP address. The fifth is
-		 * the MSB of the port number, the sixth is the LSB.
-		 * From that we'll prepare a sockaddr_in.
+		 * What we've got at this point is a string of comma separated
+		 * one-byte unsigned integer values, separated by commas.
 		 */
+		if (strcmp(pasvcmd, "PASV") == 0) {
+			if (code / 10 == 22 && code != 227) {
+				puts("wrong server: return code must be 227");
+				error = 1;
+				goto bad;
+			}
+			error = sscanf(pasv, "%d,%d,%d,%d,%d,%d",
+			       &h[0], &h[1], &h[2], &h[3],
+			       &prt[0], &prt[1]);
+			if (error == 6) {
+				error = 0;
+				data_addr.su_sin.sin_addr.s_addr =
+					htonl(pack4(h, 0));
+			} else
+				error = 1;
+		} else if (strcmp(pasvcmd, "LPSV") == 0) {
+			if (code / 10 == 22 && code != 228) {
+				puts("wrong server: return code must be 228");
+				error = 1;
+				goto bad;
+			}
+			switch (data_addr.su_family) {
+			case AF_INET:
+				error = sscanf(pasv,
+"%d,%d,%d,%d,%d,%d,%d,%d,%d",
+				       &af, &hal,
+				       &h[0], &h[1], &h[2], &h[3],
+				       &pal, &prt[0], &prt[1]);
+				if (error == 9 && af == 4 && hal == 4 && pal == 2) {
+					error = 0;
+					data_addr.su_sin.sin_addr.s_addr =
+						htonl(pack4(h, 0));
+				} else
+					error = 1;
+				break;
+			case AF_INET6:
+				error = sscanf(pasv,
+"%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+					       &af, &hal,
+					       &h[0], &h[1], &h[2], &h[3],
+					       &h[4], &h[5], &h[6], &h[7],
+					       &h[8], &h[9], &h[10], &h[11],
+					       &h[12], &h[13], &h[14], &h[15],
+					       &pal, &prt[0], &prt[1]);
+				if (error != 21 || af != 6 || hal != 16 || pal != 2) {
+					error = 1;
+					break;
+				}
 
-		if (sscanf(pasv, "%d,%d,%d,%d,%d,%d",
-			   &a0, &a1, &a2, &a3, &p0, &p1) != 6) {
+				error = 0;
+				data_addr.su_sin6.sin6_addr.s6_addr32[0] =
+					htonl(pack4(h, 0));
+				data_addr.su_sin6.sin6_addr.s6_addr32[1] =
+					htonl(pack4(h, 4));
+				data_addr.su_sin6.sin6_addr.s6_addr32[2] =
+					htonl(pack4(h, 8));
+				data_addr.su_sin6.sin6_addr.s6_addr32[3] =
+					htonl(pack4(h, 12));
+				break;
+			default:
+				error = 1;
+			}
+		} else if (strcmp(pasvcmd, "EPSV") == 0) {
+			char delim[4];
+			char *tcpport;
+
+			prt[0] = 0;
+			if (code / 10 == 22 && code != 229) {
+				puts("wrong server: return code must be 229");
+				error = 1;
+				goto bad;
+			}
+			error = sscanf(pasv, "%c%c%c%d%c",
+				&delim[0], &delim[1], &delim[2],
+				&prt[1], &delim[3]);
+			if (error != 5) {
+				error = 1;
+				goto epsv_done;
+			}
+			if (delim[0] != delim[1] || delim[0] != delim[2]
+			 || delim[0] != delim[3]) {
+				error = 1;
+				goto epsv_done;
+			}
+
+			data_addr = hisctladdr;
+			/* quickhack */
+			prt[0] = (prt[1] & 0xff00) >> 8;
+			prt[1] &= 0xff;
+			error = 0;
+epsv_done:;
+		} else
+			error = 1;
+
+		if (error) {
 			puts(
 "Passive mode address scan failure. Shouldn't happen!");
 			goto bad;
-		}
+		};
 
-		memset(&data_addr, 0, sizeof(data_addr));
-		data_addr.sin_family = AF_INET;
-		a = (char *)&data_addr.sin_addr.s_addr;
-		a[0] = a0 & 0xff;
-		a[1] = a1 & 0xff;
-		a[2] = a2 & 0xff;
-		a[3] = a3 & 0xff;
-		p = (char *)&data_addr.sin_port;
-		p[0] = p0 & 0xff;
-		p[1] = p1 & 0xff;
+		data_addr.su_port = htons(pack2(prt, 0));
 
-		if (connect(data, (struct sockaddr *)&data_addr,
-			    sizeof(data_addr)) < 0) {
+		if (connect(data, (struct sockaddr *) &data_addr,
+			    data_addr.su_len)<0) {
 			warn("connect");
 			goto bad;
 		}
+#if 0
 #ifdef IP_TOS
 		on = IPTOS_THROUGHPUT;
 		if (setsockopt(data, IPPROTO_IP, IP_TOS, (char *)&on,
 			       sizeof(int)) < 0)
 			warn("setsockopt TOS (ignored)");
+#endif
 #endif
 		return (0);
 	}
@@ -1144,10 +1300,10 @@ initconn()
 noport:
 	data_addr = myctladdr;
 	if (sendport)
-		data_addr.sin_port = 0;	/* let system pick one */
+		data_addr.su_port = 0;	/* let system pick one */
 	if (data != -1)
 		(void)close(data);
-	data = socket(AF_INET, SOCK_STREAM, 0);
+	data = socket(data_addr.su_family, SOCK_STREAM, 0);
 	if (data < 0) {
 		warn("socket");
 		if (tmpno)
@@ -1160,13 +1316,15 @@ noport:
 			warn("setsockopt (reuse address)");
 			goto bad;
 		}
+#if 0
 #ifdef IP_PORTRANGE
 	ports = restricted_data_ports ? IP_PORTRANGE_HIGH : IP_PORTRANGE_DEFAULT;
 	if (setsockopt(data, IPPROTO_IP, IP_PORTRANGE, (char *)&ports,
 		       sizeof(ports)) < 0)
 	    warn("setsockopt PORTRANGE (ignored)");
 #endif
-	if (bind(data, (struct sockaddr *)&data_addr, sizeof(data_addr)) < 0) {
+#endif /* 0 */
+	if (bind(data, (struct sockaddr *)&data_addr, data_addr.su_len) < 0) {
 		warn("bind");
 		goto bad;
 	}
@@ -1181,14 +1339,58 @@ noport:
 	}
 	if (listen(data, 1) < 0)
 		warn("listen");
-	if (sendport) {
-		a = (char *)&data_addr.sin_addr;
-		p = (char *)&data_addr.sin_port;
+
 #define	UC(b)	(((int)b)&0xff)
-		result =
-		    command("PORT %d,%d,%d,%d,%d,%d",
-		      UC(a[0]), UC(a[1]), UC(a[2]), UC(a[3]),
-		      UC(p[0]), UC(p[1]));
+
+	if (sendport) {
+		char hname[INET6_ADDRSTRLEN];
+		int af;
+
+		switch (data_addr.su_family) {
+		case AF_INET:
+		case AF_INET6:
+			af = (data_addr.su_family == AF_INET) ? 1 : 2;
+			if (getnameinfo((struct sockaddr *)&data_addr,
+					data_addr.su_len, hname, sizeof(hname),
+					NULL, 0, NI_NUMERICHOST)) {
+				result = ERROR;
+			} else {
+				result = command("EPRT |%d|%s|%d|",
+					af, hname, ntohs(data_addr.su_port));
+			}
+			break;
+		default:
+			result = COMPLETE + 1;
+			break;
+		}
+		if (result == COMPLETE)
+			goto skip_port;
+
+		switch (data_addr.su_family) {
+		case AF_INET:
+			a = (char *)&data_addr.su_sin.sin_addr;
+			p = (char *)&data_addr.su_port;
+			result = command("PORT %d,%d,%d,%d,%d,%d",
+					 UC(a[0]), UC(a[1]), UC(a[2]), UC(a[3]),
+					 UC(p[0]), UC(p[1]));
+			break;
+		case AF_INET6:
+			a = (char *)&data_addr.su_sin6.sin6_addr;
+			p = (char *)&data_addr.su_port;
+			result = command(
+"LPRT %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+				 6, 16,
+				 UC(a[0]),UC(a[1]),UC(a[2]),UC(a[3]),
+				 UC(a[4]),UC(a[5]),UC(a[6]),UC(a[7]),
+				 UC(a[8]),UC(a[9]),UC(a[10]),UC(a[11]),
+				 UC(a[12]),UC(a[13]),UC(a[14]),UC(a[15]),
+				 2, UC(p[0]), UC(p[1]));
+			break;
+		default:
+			result = COMPLETE + 1; /* xxx */
+		}
+	skip_port:
+		
 		if (result == ERROR && sendport == -1) {
 			sendport = 0;
 			tmpno = 1;
@@ -1198,11 +1400,6 @@ noport:
 	}
 	if (tmpno)
 		sendport = 1;
-#ifdef IP_TOS
-	on = IPTOS_THROUGHPUT;
-	if (setsockopt(data, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int)) < 0)
-		warn("setsockopt TOS (ignored)");
-#endif
 	return (0);
 bad:
 	(void)close(data), data = -1;
@@ -1215,10 +1412,8 @@ FILE *
 dataconn(lmode)
 	const char *lmode;
 {
-	struct sockaddr_in from;
-	int s, fromlen, tos;
-
-	fromlen = sizeof(from);
+	union sockunion from;
+	int s, fromlen = myctladdr.su_len;
 
 	if (passivemode)
 		return (fdopen(data, lmode));
@@ -1231,11 +1426,6 @@ dataconn(lmode)
 	}
 	(void)close(data);
 	data = s;
-#ifdef IP_TOS
-	tos = IPTOS_THROUGHPUT;
-	if (setsockopt(s, IPPROTO_IP, IP_TOS, (char *)&tos, sizeof(int)) < 0)
-		warn("setsockopt TOS (ignored)");
-#endif
 	return (fdopen(data, lmode));
 }
 
@@ -1265,8 +1455,8 @@ pswitch(flag)
 	static struct comvars {
 		int connect;
 		char name[MAXHOSTNAMELEN];
-		struct sockaddr_in mctl;
-		struct sockaddr_in hctl;
+		union sockunion mctl;
+		union sockunion hctl;
 		FILE *in;
 		FILE *out;
 		int tpe;

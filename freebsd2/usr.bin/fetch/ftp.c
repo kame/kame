@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: ftp.c,v 1.3.2.6 1998/09/23 12:23:29 jkh Exp $
+ *	$Id: ftp.c,v 1.1.1.2 1998/12/03 03:43:38 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -98,8 +98,23 @@ ftp_parse(struct fetch_state *fs, const char *uri)
 	else
 		q = atsign + 1;
 
+#ifdef INET6
+	if (q[0] == '[') {
+		r = strchr(q, ']');
+		if (!r) {
+			warnx("`%s': malformed `ftp' URL", uri);
+			return EX_USAGE;
+		}
+		if ((colon = strchr(r + 1, ':')) != 0)
+			*colon = '\0';
+	} else {
+		if ((colon = strchr(q, ':')) != 0)
+			*colon = '\0';
+	}
+#else
 	if ((colon = strchr(q, ':')) != 0)
 		*colon = '\0';
+#endif /*INET6*/
 
 	if (colon && *(colon + 1)) {
 		unsigned long ul;
@@ -153,6 +168,18 @@ ftp_parse(struct fetch_state *fs, const char *uri)
 		ftps->ftp_hostname = safe_strdup(atsign + 1);
 	} else
 		ftps->ftp_hostname = safe_strdup(hostname);
+#ifdef INET6
+	r = ftps->ftp_hostname + strlen(ftps->ftp_hostname);
+	if (r != ftps->ftp_hostname) {
+		r--;
+		if (ftps->ftp_hostname[0] == '[' && r[0] == ']') {
+			r[0] = '\0';
+			r = safe_strdup(ftps->ftp_hostname + 1);
+			free(ftps->ftp_hostname);
+			ftps->ftp_hostname = r;
+		}
+	}
+#endif
 	ftps->ftp_port = port;
 
 	/* Save the full path for error messages. */

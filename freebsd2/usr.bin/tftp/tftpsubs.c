@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)tftpsubs.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: tftpsubs.c,v 1.1.1.1.8.1 1997/08/18 07:09:42 charnier Exp $";
+	"$Id: tftpsubs.c,v 1.1.1.1.4.1 1998/12/03 06:45:10 itojun Exp $";
 #endif /* not lint */
 
 /* Simple minded read-ahead/write-behind subroutines for tftp user and
@@ -260,7 +260,7 @@ synchnet(f)
 {
 	int i, j = 0;
 	char rbuf[PKTSIZE];
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	int fromlen;
 
 	while (1) {

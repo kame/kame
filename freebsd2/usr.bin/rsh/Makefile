@@ -2,7 +2,7 @@
 
 PROG=	rsh
 SRCS=	rsh.c
-CFLAGS+=-Wall
+CFLAGS+=-Wall -g
 
 .if exists(${DESTDIR}/usr/lib/libkrb.a) && defined(MAKE_KERBEROS4)
 SRCS+=	krcmd.c kcmd.c rcmd_util.c encrypt.c
@@ -21,5 +21,14 @@ DISTRIBUTION=	krb
 BINOWN=	root
 BINMODE=4555
 INSTALLFLAGS=-fschg
+
+LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
+	-L${.CURDIR}/../../lib/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+CFLAGS+=-DINET6
+#.PATH:	${.CURDIR}/../rlogin
 
 .include <bsd.prog.mk>

@@ -56,6 +56,10 @@ static char sccsid[] = "@(#)main.c	8.2 (Berkeley) 12/15/93";
 #define FORWARD
 #endif
 
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+char *ipsec_policy = NULL;
+#endif
+
 /*
  * Initialize variables.
  */
@@ -96,7 +100,11 @@ usage()
 #else
 	    "[-r] ",
 #endif
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+	    "[-P policy] [host-name [port]]"
+#else
 	    "[host-name [port]]"
+#endif
 	);
 	exit(1);
 }
@@ -135,7 +143,12 @@ main(argc, argv)
 	rlogin = (strncmp(prompt, "rlog", 4) == 0) ? '~' : _POSIX_VDISABLE;
 	autologin = -1;
 
-	while ((ch = getopt(argc, argv, "8EKLS:X:acde:fFk:l:n:rt:x")) != -1) {
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+	while ((ch = getopt(argc, argv, "8EKLS:X:acde:fFk:l:n:rt:xP:")) != -1)
+#else
+	while ((ch = getopt(argc, argv, "8EKLS:X:acde:fFk:l:n:rt:x")) != -1)
+#endif
+	{
 		switch(ch) {
 		case '8':
 			eight = 3;	/* binary output and input */
@@ -267,6 +280,11 @@ main(argc, argv)
 			    "%s: Warning: -x ignored, no ENCRYPT support.\n",
 								prompt);
 			break;
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+		case 'P':
+			ipsec_policy = strdup(optarg);
+			break;
+#endif
 		case '?':
 		default:
 			usage();

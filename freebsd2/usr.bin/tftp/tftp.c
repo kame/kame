@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)tftp.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-	"$Id: tftp.c,v 1.1.1.1.8.2 1998/07/17 07:25:06 jkh Exp $";
+	"$Id: tftp.c,v 1.1.1.1.4.2 1998/12/03 07:14:05 itojun Exp $";
 #endif /* not lint */
 
 /* Many bug fixes are from Jim Guyton <guyton@rand-unix> */
@@ -63,7 +63,7 @@ static const char rcsid[] =
 #include "extern.h"
 #include "tftpsubs.h"
 
-extern  struct sockaddr_in peeraddr;	/* filled in by main */
+extern  struct sockaddr_storage peeraddr;	/* filled in by main */
 extern  int     f;			/* the opened socket */
 extern  int     trace;
 extern  int     verbose;
@@ -75,6 +75,7 @@ char    ackbuf[PKTSIZE];
 int	timeout;
 jmp_buf	toplevel;
 jmp_buf	timeoutbuf;
+static struct sockaddr_storage tpeer;
 
 static void nak __P((int));
 static int makerequest __P((int, const char *, struct tftphdr *, const char *));
@@ -98,7 +99,7 @@ sendfile(fd, name, mode)
 	register int n;
 	volatile int block, size, convert;
 	volatile unsigned long amount;
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	int fromlen;
 	FILE *file;
 
@@ -109,6 +110,7 @@ sendfile(fd, name, mode)
 	convert = !strcmp(mode, "netascii");
 	block = 0;
 	amount = 0;
+	tpeer = peeraddr;
 
 	signal(SIGALRM, timer);
 	do {
@@ -130,7 +132,7 @@ send_data:
 		if (trace)
 			tpacket("sent", dp, size + 4);
 		n = sendto(f, dp, size + 4, 0,
-		    (struct sockaddr *)&peeraddr, sizeof(peeraddr));
+		    (struct sockaddr *)&tpeer, tpeer.__ss_len);
 		if (n != size + 4) {
 			warn("sendto");
 			goto abort;
@@ -148,7 +150,18 @@ send_data:
 				warn("recvfrom");
 				goto abort;
 			}
-			peeraddr.sin_port = from.sin_port;	/* added */
+			switch (from.__ss_family) {
+			case AF_INET:
+				((struct sockaddr_in *)&tpeer)->sin_port
+					= ((struct sockaddr_in *)&from)->sin_port;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				((struct sockaddr_in6 *)&tpeer)->sin6_port
+					= ((struct sockaddr_in6 *)&from)->sin6_port;
+				break;
+#endif
+			}
 			if (trace)
 				tpacket("received", ap, n);
 			/* should verify packet came from server */
@@ -203,7 +216,7 @@ recvfile(fd, name, mode)
 	register int n;
 	volatile int block, size, firsttrip;
 	volatile unsigned long amount;
-	struct sockaddr_in from;
+	struct sockaddr_storage from;
 	int fromlen;
 	FILE *file;
 	volatile int convert;		/* true if converting crlf -> lf */
@@ -216,6 +229,7 @@ recvfile(fd, name, mode)
 	block = 1;
 	firsttrip = 1;
 	amount = 0;
+	tpeer = peeraddr;
 
 	signal(SIGALRM, timer);
 	do {
@@ -233,8 +247,8 @@ recvfile(fd, name, mode)
 send_ack:
 		if (trace)
 			tpacket("sent", ap, size);
-		if (sendto(f, ackbuf, size, 0, (struct sockaddr *)&peeraddr,
-		    sizeof(peeraddr)) != size) {
+		if (sendto(f, ackbuf, size, 0, (struct sockaddr *)&tpeer,
+		    tpeer.__ss_len) != size) {
 			alarm(0);
 			warn("sendto");
 			goto abort;
@@ -252,7 +266,18 @@ send_ack:
 				warn("recvfrom");
 				goto abort;
 			}
-			peeraddr.sin_port = from.sin_port;	/* added */
+			switch (from.__ss_family) {
+			case AF_INET:
+				((struct sockaddr_in *)&tpeer)->sin_port
+					= ((struct sockaddr_in *)&from)->sin_port;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				((struct sockaddr_in6 *)&tpeer)->sin6_port
+					= ((struct sockaddr_in6 *)&from)->sin6_port;
+				break;
+#endif
+			}
 			if (trace)
 				tpacket("received", dp, n);
 			/* should verify client address */
@@ -292,8 +317,8 @@ send_ack:
 abort:						/* ok to ack, since user */
 	ap->th_opcode = htons((u_short)ACK);	/* has seen err msg */
 	ap->th_block = htons((u_short)block);
-	(void) sendto(f, ackbuf, 4, 0, (struct sockaddr *)&peeraddr,
-	    sizeof(peeraddr));
+	(void) sendto(f, ackbuf, 4, 0, (struct sockaddr *)&tpeer,
+	    tpeer.__ss_len);
 	write_behind(file, convert);		/* flush last buffer */
 	fclose(file);
 	stopclock();
@@ -365,8 +390,8 @@ nak(error)
 	length = strlen(pe->e_msg) + 4;
 	if (trace)
 		tpacket("sent", tp, length);
-	if (sendto(f, ackbuf, length, 0, (struct sockaddr *)&peeraddr,
-	    sizeof(peeraddr)) != length)
+	if (sendto(f, ackbuf, length, 0, (struct sockaddr *)&tpeer,
+	    tpeer.__ss_len) != length)
 		warn("nak");
 }
 
@@ -438,7 +463,7 @@ printstats(direction, amount)
 		((tstart.tv_sec*10.)+(tstart.tv_usec/100000));
 	delta = delta/10.;      /* back to seconds */
 	printf("%s %d bytes in %.1f seconds", direction, amount, delta);
-	if (verbose)
+	if (verbose && delta != 0.0)
 		printf(" [%.0f bits/sec]", (amount*8.)/delta);
 	putchar('\n');
 }

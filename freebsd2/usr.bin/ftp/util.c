@@ -1,4 +1,4 @@
-/*	$Id: util.c,v 1.4.2.1 1998/02/07 22:09:29 steve Exp $	*/
+/*	$Id: util.c,v 1.1.1.1 1998/04/07 15:43:27 itojun Exp $	*/
 /*	$NetBSD: util.c,v 1.16.2.1 1997/11/18 01:02:33 mellon Exp $	*/
 
 /*
@@ -36,7 +36,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$Id: util.c,v 1.4.2.1 1998/02/07 22:09:29 steve Exp $");
+__RCSID("$Id: util.c,v 1.1.1.1 1998/04/07 15:43:27 itojun Exp $");
 __RCSID_SOURCE("$NetBSD: util.c,v 1.16.2.1 1997/11/18 01:02:33 mellon Exp $");
 #endif /* not lint */
 
@@ -76,7 +76,7 @@ setpeer(argc, argv)
 	char *argv[];
 {
 	char *host;
-	u_int16_t port;
+	char *port;
 
 	if (connected) {
 		printf("Already connected to %s, use close first.\n",
@@ -95,6 +95,7 @@ setpeer(argc, argv)
 		port = gateport;
 	else
 		port = ftpport;
+#if 0
 	if (argc > 2) {
 		char *ep;
 		long nport;
@@ -108,6 +109,10 @@ setpeer(argc, argv)
 		}
 		port = htons(nport);
 	}
+#else
+	if (argc > 2)
+		port = strdup(argv[2]);
+#endif
 
 	if (gatemode) {
 		if (gateserver == NULL || *gateserver == '\0')
