@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.12 2003/02/06 13:43:31 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.13 2003/02/10 14:06:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -265,7 +265,8 @@ reestablish_ia(ia)
 	}
 
 	/* we don't need a timer for the IA (see comments in ia_timo()) */
-	dhcp6_remove_timer(&ia->timer);
+	if (ia->timer)
+		dhcp6_remove_timer(&ia->timer);
 
 	if ((ev = dhcp6_create_event(ia->ifp, DHCP6S_REQUEST)) == NULL) {
 		dprintf(LOG_NOTICE, "%s" "failed to create a new event",
