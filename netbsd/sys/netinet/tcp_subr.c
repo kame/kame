@@ -1183,12 +1183,12 @@ tcp6_ctlinput(cmd, sa, d)
 		off = ip6cp->ip6c_off;
 
 		/* translate addresses into internal form */
-		memcpy(&finaldst, ip6cp->ip6c_finaldst, sizeof(finaldst));
+		bcopy(ip6cp->ip6c_finaldst, &finaldst, sizeof(finaldst));
 		if (IN6_IS_ADDR_LINKLOCAL(&finaldst)) {
 			finaldst.s6_addr16[1] =
 			    htons(m->m_pkthdr.rcvif->if_index);
 		}
-		memcpy(&s, &ip6->ip6_src, sizeof(s));
+		bcopy(&ip6->ip6_src, &s, sizeof(s));
 		if (IN6_IS_ADDR_LINKLOCAL(&s))
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	} else {
@@ -1209,7 +1209,7 @@ tcp6_ctlinput(cmd, sa, d)
 		struct in6_addr s;
 
 		/* translate addresses into internal form */
-		memcpy(&s, &ip6->ip6_src, sizeof(s));
+		bcopy(&ip6->ip6_src, &s, sizeof(s));
 		if (IN6_IS_ADDR_LINKLOCAL(&s))
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
