@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.124 2004/06/12 13:15:13 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.125 2004/06/12 13:19:42 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -121,7 +121,7 @@ const dhcp6_mode_t dhcp6_mode = DHCP6_MODE_SERVER;
 char *device = NULL;
 int insock;			/* inbound UDP port */
 int outsock;			/* outbound UDP port */
-int ctlsock;			/* control TCP port */
+int ctlsock = -1;		/* control TCP port */
 char *ctladdr = DEFAULT_CONTROL_ADDR;
 /*char *ctlport = DEFAULT_CONTROL_PORT;*/
 char *ctlport = "none";	/* disable by default until implementing auth */
@@ -563,10 +563,12 @@ server6_mainloop()
 
 		FD_ZERO(&r);
 		FD_SET(insock, &r);
-		FD_SET(ctlsock, &r);
-		maxsock = (insock > ctlsock) ? insock : ctlsock;
-
-		(void)dhcp6_ctl_setreadfds(&r, &maxsock);
+		maxsock = insock;
+		if (ctlsock >= 0) {
+			FD_SET(ctlsock, &r);
+			maxsock = (insock > ctlsock) ? insock : ctlsock;
+			(void)dhcp6_ctl_setreadfds(&r, &maxsock);
+		}
 
 		ret = select(maxsock + 1, &r, NULL, NULL, w);
 		switch (ret) {
@@ -582,9 +584,12 @@ server6_mainloop()
 		}
 		if (FD_ISSET(insock, &r))
 			server6_recv(insock);
-		if (FD_ISSET(ctlsock, &r))
-			dhcp6_ctl_acceptcommand(ctlsock, server6_do_command);
-		dhcp6_ctl_readcommand(&r);
+		if (ctlsock >= 0) {
+			if (FD_ISSET(ctlsock, &r))
+				dhcp6_ctl_acceptcommand(ctlsock,
+				    server6_do_command);
+			dhcp6_ctl_readcommand(&r);
+		}
 	}
 }
 
