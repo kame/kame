@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1535 2001/02/06 01:51:03 itojun Exp $
+$KAME: CHANGELOG,v 1.1536 2001/02/06 02:34:03 jinmei Exp $
 
 <200102>
+2001-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_update_ifa): always set the
+	destination address when specified regardless of the type of the
+	interface.  This would solve a problem that bsdi3 could not add a
+	route that has ::1 as the gateway (bsdi3 specific, maybe).
+	This fix was in response to a report from Tomomi Suzuki
+	<stomomi@ebina.hitachi.co.jp>.
+
 Tue Feb  6 10:49:36 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: correct m->m_pkthdr.rcvif setting for
 	  own linklocal address cases.  broken around Feb 2.
