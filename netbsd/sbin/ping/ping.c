@@ -573,11 +573,11 @@ main(int argc, char *argv[])
 			free(buf);
 		}
 	}
-	if ((len = ipsec_get_policylen("in bypass")) < 0)
+	if ((len = ipsec_get_policylen("out bypass")) < 0)
 		errx(1, ipsec_strerror());
 	if ((buf = malloc(len)) == NULL)
 		err(1, "malloc");
-	if ((len = ipsec_set_policy(buf, len, "in bypass")) < 0)
+	if ((len = ipsec_set_policy(buf, len, "out bypass")) < 0)
 		errx(1, ipsec_strerror());
 	if (setsockopt(sloop, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0) {
 #if 0
