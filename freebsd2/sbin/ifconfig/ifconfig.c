@@ -459,7 +459,9 @@ main(argc, argv)
 #ifdef INET6
 	/* initialization */
 	in6_addreq.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
+	in6_addreq.ifra_lifetime.ia6t_preferred = 0;
 	in6_addreq.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
+	in6_addreq.ifra_lifetime.ia6t_expire = 0;
 #endif
 
 	next = buf;
@@ -743,20 +745,31 @@ setip6lifetime(cmd, val, afp)
 	const struct afswtch *afp;
 {
 	time_t newval, t;
+	u_int32_t expire, period;
 	char *ep;
 
-	t = time(NULL);
-	newval = (time_t)strtoul(val, &ep, 0);
-	if (val == ep)
-		errx(1, "invalid %s", cmd);
 	if (afp->af_af != AF_INET6)
 		errx(1, "%s not allowed for the AF", cmd);
+	if (strcmp(val, "infty") == 0) {
+		expire = 0;
+		period = ND6_INFINITE_LIFETIME;
+	} else {
+		if (!*val)
+			errx(1, "invalid %s", cmd);
+		newval = (time_t)strtoul(val, &ep, 0);
+		if (*ep)
+			errx(1, "invalid %s", cmd);
+
+		t = time(NULL);
+		expire = (u_int32_t)(t + newval);
+		period = (u_int32_t)newval;
+	}
 	if (strcmp(cmd, "vltime") == 0) {
-		in6_addreq.ifra_lifetime.ia6t_expire = t + newval;
-		in6_addreq.ifra_lifetime.ia6t_vltime = newval;
+		in6_addreq.ifra_lifetime.ia6t_expire = expire;
+		in6_addreq.ifra_lifetime.ia6t_vltime = period;
 	} else if (strcmp(cmd, "pltime") == 0) {
-		in6_addreq.ifra_lifetime.ia6t_preferred = t + newval;
-		in6_addreq.ifra_lifetime.ia6t_pltime = newval;
+		in6_addreq.ifra_lifetime.ia6t_preferred = expire;
+		in6_addreq.ifra_lifetime.ia6t_pltime = period;
 	}
 }
 #endif
@@ -1111,7 +1124,7 @@ in6_status(s, info)
 	if (scopeid)
 		printf(" scopeid 0x%x", scopeid);
 
-	if (ip6lifetime && (lifetime.ia6t_preferred || lifetime.ia6t_expire)) {
+	if (ip6lifetime) {
 		printf(" pltime ");
 		if (lifetime.ia6t_preferred) {
 			printf("%s", lifetime.ia6t_preferred < t
