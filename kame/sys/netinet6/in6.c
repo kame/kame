@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.70 2000/03/29 17:31:46 sumikawa Exp $	*/
+/*	$KAME: in6.c,v 1.71 2000/03/29 22:48:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -521,10 +521,11 @@ in6_control(so, cmd, data, ifp)
 				/* interface ID is not embedded by the user */
 				sa6->sin6_addr.s6_addr16[1] =
 					htons(ifp->if_index);
-			} else
-				if (sa6->sin6_addr.s6_addr16[1] !=
-				    htons(ifp->if_index))
-					return(EINVAL);	/* ifid is contradict */
+			}
+			else if (sa6->sin6_addr.s6_addr16[1] !=
+				    htons(ifp->if_index)) {
+				return(EINVAL);	/* ifid is contradict */
+			}
 			if (sa6->sin6_scope_id) {
 				if (sa6->sin6_scope_id !=
 				    (u_int32_t)ifp->if_index)
@@ -717,12 +718,12 @@ in6_control(so, cmd, data, ifp)
 				/* interface ID is not embedded by the user */
 				ia->ia_dstaddr.sin6_addr.s6_addr16[1]
 					= htons(ifp->if_index);
-			} else
-				if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
+			}
+			else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
 				    htons(ifp->if_index)) {
-					ia->ia_dstaddr = oldaddr;
-					return(EINVAL);	/* ifid is contradict */
-				}
+				ia->ia_dstaddr = oldaddr;
+				return(EINVAL);	/* ifid is contradict */
+			}
 		}
 
 		if (ifp->if_ioctl && (error = (ifp->if_ioctl)
@@ -839,10 +840,9 @@ in6_control(so, cmd, data, ifp)
 		if (ifra->ifra_addr.sin6_len == 0) {
 			ifra->ifra_addr = ia->ia_addr;
 			hostIsNew = 0;
-		} else
-			if (IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
-					       &ia->ia_addr.sin6_addr))
-				hostIsNew = 0;
+		} else if (IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
+					      &ia->ia_addr.sin6_addr))
+			hostIsNew = 0;
 
 		/* Validate address families: */
 		/*
@@ -879,12 +879,11 @@ in6_control(so, cmd, data, ifp)
 					 */
 					ia->ia_dstaddr.sin6_addr.s6_addr16[1]
 						= htons(ifp->if_index);
-				} else
-					if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
+				} else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
 					    htons(ifp->if_index)) {
-						ia->ia_dstaddr = oldaddr;
-						return(EINVAL);	/* ifid is contradict */
-					}
+					ia->ia_dstaddr = oldaddr;
+					return(EINVAL);	/* ifid is contradict */
+				}
 			}
 			prefixIsNew = 1; /* We lie; but effect's the same */
 		}
@@ -1403,12 +1402,11 @@ in6_ifinit(ifp, ia, sin6, scrub)
 	if (ifp->if_flags & IFF_LOOPBACK) {
 		ia->ia_ifa.ifa_dstaddr = ia->ia_ifa.ifa_addr;
 		flags |= RTF_HOST;
-	} else
-		if (ifp->if_flags & IFF_POINTOPOINT) {
-			if (ia->ia_dstaddr.sin6_family != AF_INET6)
-				return(0);
-			flags |= RTF_HOST;
-		}
+	} else if (ifp->if_flags & IFF_POINTOPOINT) {
+		if (ia->ia_dstaddr.sin6_family != AF_INET6)
+			return(0);
+		flags |= RTF_HOST;
+	}
 	if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD, flags)) == 0)
 		ia->ia_flags |= IFA_ROUTE;
 
