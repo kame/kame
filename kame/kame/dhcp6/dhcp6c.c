@@ -30,6 +30,9 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
+#ifdef __FreeBSD__
+#include <sys/queue.h>
+#endif
 #include <errno.h>
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
@@ -62,36 +65,10 @@
 #include <unistd.h>
 #include <string.h>
 #include <err.h>
+#include <ifaddrs.h>
 
 #include <dhcp6.h>
-#include <dhcp6opt.h>
 #include <common.h>
-
-struct servtab {
-	TAILQ_ENTRY(servtab) st_list;
-	u_int8_t st_pref;
-	struct in6_addr st_llcli;
-	struct in6_addr st_relay;
-	struct in6_addr st_serv;
-	u_int16_t st_xid;
-};
-
-#ifdef MEDIATOR
-#ifndef MEDIATOR_CTRL_PORT
-#define MEDIATOR_CTRL_PORT 13863
-#endif
-#ifndef MEDIATOR_CTRL_VERSION
-#define MEDIATOR_CTRL_VERSION 1
-#endif
-
-/* control structure to communicate with mediator */
-struct mediator_control_msg {
-	int version;
-	int lifetime;
-	char serveraddr[128];
-};
-static struct mediator_control_msg mediator_msg;
-#endif 
 
 static int debug = 0;
 static int signaled = 0;
@@ -101,50 +78,31 @@ char *device = NULL;
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
 int rtsock;	/* routing socket */
-TAILQ_HEAD(, servtab) servtab;
 
 static struct in6_addr link_local_prefix, site_local_prefix, global_prefix;
 #define LINK_LOCAL_PLEN 10
 #define SITE_LOCAL_PLEN 10
 #define GLOBAL_PLEN 3
 
-#if 0
-#define MAXCALLBACK	30
-static struct callback {
-	int fd;
-	pcap_t *cap;
-	void (*func)();
-} callbacks[MAXCALLBACK];
-static int ncallbacks = 0;
-static int maxfd = -1;
-#endif
-
-static u_int16_t current_solicit_id;
-static struct in6_addr current_cliaddr;
-
-#define MAX_SOLICIT_ID	0x1ff	/* all 1 in 9 bits */
+static u_int32_t current_xid;
 
 /* behavior constant */
 #define SOLICIT_RETRY	2
 #define REQUEST_RETRY	10
 
 static void usage __P((void));
-#if 0
-void callback_register __P((int, pcap_t *, void (*)()));
-#endif
 static void client6_init __P((void));
 static void client6_mainloop __P((void));
-static void client6_findserv __P((void));
-static int client6_getreply __P((struct servtab *));
-static void client6_sendsolicit __P((int, int));
-static int client6_recvadvert __P((int, struct servtab *));
-static void client6_sendrequest __P((int, struct servtab *));
-static int client6_recvreply __P((int, struct servtab *));
+static int client6_getreply __P((void));
+static void client6_sendinform __P((int));
+static int client6_recvreply __P((int));
 static void client6_sleep __P((void));
 void client6_hup __P((int));
 static int sa2plen __P((struct sockaddr_in6 *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 static void tvfix __P((struct timeval *));
+static long retransmit_timer __P((long, long, long));
+static ssize_t gethwid __P((char *, int, const char *));
 
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
 
@@ -213,35 +171,9 @@ main(argc, argv)
 static void
 usage()
 {
+
 	fprintf(stderr, "usage: dhcpc [-dDf] intface\n");
 }
-
-#if 0
-void
-callback_register(fd, cap, func)
-	int fd;
-	pcap_t *cap;
-	void (*func)();
-{
-	if (MAXCALLBACK <= ncallbacks) {
-		errx(1, "callback exceeds limit(%d), try increase MAXCALLBACK",
-			MAXCALLBACK);
-		/* NOTREACHED */
-	}
-	if (fd && cap) {
-		errx(1, "internal error: both fd and cap are present");
-		/* NOTREACHED */
-	}
-
-	if (maxfd < fd)
-		maxfd = fd;
-
-	callbacks[ncallbacks].fd = fd;
-	callbacks[ncallbacks].cap = cap;
-	callbacks[ncallbacks].func = func;
-	ncallbacks++;
-}
-#endif
 
 /*------------------------------------------------------------*/
 
@@ -325,8 +257,6 @@ client6_init()
 	}
 	freeaddrinfo(res);
 
-	TAILQ_INIT(&servtab);
-
 	/* open a routing socket to watch the routing table */
 	if ((rtsock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0)
 		err(1, "open a routing socket");
@@ -335,24 +265,9 @@ client6_init()
 static void
 client6_mainloop()
 {
-	struct servtab *p;
 
 	do {
-		client6_findserv();
-
-		if (TAILQ_FIRST(&servtab)) {
-			p = TAILQ_FIRST(&servtab);
-			dprintf(LOG_DEBUG, "primary server: pref=%u addr=%s",
-				p->st_pref, in6addr2str(&p->st_serv, 0));
-
-			for (p = TAILQ_FIRST(&servtab); p;
-			     p = TAILQ_NEXT(p, st_list)) {
-				if (client6_getreply(p) < 0)
-					continue;
-				break;
-			}
-		} else
-			dprintf(LOG_NOTICE, "no server found");
+		(void)client6_getreply();
 
 		client6_sleep();
 	} while(1);
@@ -364,6 +279,7 @@ void
 client6_hup(sig)
 	int sig;
 {
+
 	dprintf(LOG_INFO, "client6_hup: received a SIGHUP");
 	signaled = 1;
 }
@@ -558,154 +474,24 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 	}
 }
 
-static void
-client6_addserv(p)
-	struct servtab *p;
-{
-	struct servtab *q;
-
-	/* XXX: those two loops are a bit lengthy */
-	for (q = TAILQ_FIRST(&servtab); q; q = TAILQ_NEXT(q, st_list)) {
-		if (IN6_ARE_ADDR_EQUAL(&q->st_serv, &p->st_serv)) {
-			dprintf(LOG_INFO, "client6_addserv: duplicated server "
-				"(%s) found", in6addr2str(&p->st_serv, 0));
-			free(p);
-			return;
-		}
-	}
-	for (q = TAILQ_FIRST(&servtab); q; q = TAILQ_NEXT(q, st_list)) {
-		if (p->st_pref > q->st_pref) {
-			TAILQ_INSERT_BEFORE(q, p, st_list);
-			return;
-		}
-	}
-	TAILQ_INSERT_TAIL(&servtab, p, st_list);
-}
-
-static void
-client6_findserv()
-{
-	struct timeval w;
-	fd_set r;
-	int timeo;
-	int ret;
-	time_t sendtime, delaytime, waittime, t;
-	struct servtab *p;
-	enum { WAIT, DELAY } mode;
-
-	/* send solicit, wait for advert */
-	timeo = 0;
-	sendtime = time(NULL);
-	delaytime = random_between(MIN_SOLICIT_DELAY, MAX_SOLICIT_DELAY);
-	waittime = 0;
-	while (1) {
-		t = time(NULL);
-		dprintf(LOG_DEBUG, "sendtime=%ld waittime=%d delaytime=%d",
-			(long)sendtime, (int)waittime, (int)delaytime);
-		mode = WAIT;	/* to fake a nosiy compiler */
-		if (waittime && waittime < delaytime) {
-			if (sendtime + waittime > t) {
-				w.tv_sec = waittime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = WAIT;
-			} else if (sendtime + delaytime > t) {
-				w.tv_sec = delaytime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = DELAY;
-			}
-		} else {
-			if (sendtime + delaytime > t) {
-				w.tv_sec = delaytime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = DELAY;
-			} else if (sendtime + waittime > t) {
-				w.tv_sec = waittime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = WAIT;
-			}
-		}
-		FD_ZERO(&r);
-		FD_SET(insock, &r);
-		ret = select(insock + 1, &r, NULL, NULL, &w);
-		switch (ret) {
-		case -1:
-			err(1, "select");
-			/* NOTREACHED */
-		case 0:
-			if (mode == WAIT && TAILQ_FIRST(&servtab) != NULL) {
-				/* we have more than 1 reply and timeouted */
-				return;
-			}
-
-			if (mode == WAIT) {
-			} else {
-				if (timeo >= SOLICIT_RETRY)
-					return;
-
-				dprintf(LOG_DEBUG, "send solicit");
-				if (++current_solicit_id > MAX_SOLICIT_ID)
-					current_solicit_id = 1;
-				client6_sendsolicit(outsock,
-						    current_solicit_id);
-				++timeo;
-				sendtime = time(NULL);
-				delaytime *= 2;
-				delaytime += random_between(MIN_SOLICIT_DELAY,
-					MAX_SOLICIT_DELAY);
-				waittime = ADV_CLIENT_WAIT;
-			}
-			break;
-		default:
-			p = (struct servtab *)malloc(sizeof(struct servtab));
-			memset(p, 0, sizeof(*p));
-			if (client6_recvadvert(insock, p) < 0) {
-				free(p);
-				break;
-			}
-			client6_addserv(p);
-
-			/*
-			 * XXX: we should hear more advertisements and
-			 * choose the primary server. But currently, we just
-			 * take the first server.
-			 */
-			return;
-			break;
-		}
-	}
-}
-
 static int
-client6_getreply(p)
-	struct servtab *p;
+client6_getreply()
 {
 	struct timeval w, finish;
 	fd_set r;
-	int timeo;
 	int ret;
-	long reply_msg_timeo_usec;
-
-	/* sanity checks */
-	if (IN6_IS_ADDR_MULTICAST(&p->st_relay)
-	 || IN6_IS_ADDR_MULTICAST(&p->st_serv)) {
-		dprintf(LOG_DEBUG,
-			"client6_getreply: "
-			"invlalid server (%s) or relay (%s)",
-			in6addr2str(&p->st_serv, 0),
-			in6addr2str(&p->st_relay, 0));
-		return(-1);
-	}
+	int timeo;
+	long retrans;
 
 	timeo = 0;
-	reply_msg_timeo_usec = REPLY_MSG_TIMEOUT * 100;
+	retrans = retransmit_timer(0, INF_TIMEOUT * 1000, INF_MAX_RT * 1000);
 	if (gettimeofday(&finish, NULL) < 0)
 		err(1, "gettimeofday");
-	finish.tv_sec += reply_msg_timeo_usec / 1000000;
-	finish.tv_usec += reply_msg_timeo_usec % 1000000;
+	finish.tv_sec += retrans / 1000000;
+	finish.tv_usec += retrans % 1000000;
 	tvfix(&finish);
-	client6_sendrequest(outsock, p);
+	client6_sendinform(outsock);
 	while (1) {
-		/* 11.4.2. Time out and retransmission of Request Messages */
 		FD_ZERO(&r);
 		FD_SET(insock, &r);
 		if (gettimeofday(&w, NULL) < 0)
@@ -726,136 +512,36 @@ client6_getreply(p)
 			/* NOTREACHED */
 		case 0:
 			timeo++;
-			reply_msg_timeo_usec *= 2;
 			if (timeo >= REQUEST_RETRY) {
 				dprintf(LOG_NOTICE,
 					"client6_getreply: no replies "
-					"are received. give up.");
+					"were received. give up.");
 				return(-1);
 			}
 			/* re-compute timeout */
+			retrans = retransmit_timer(retrans,
+			    INF_TIMEOUT * 1000, INF_MAX_RT * 1000);
 			if (gettimeofday(&finish, NULL) < 0)
 				err(1, "gettimeofday");
-			finish.tv_sec += reply_msg_timeo_usec / 1000000;
-			finish.tv_usec += reply_msg_timeo_usec % 1000000;
+			finish.tv_sec += retrans / 1000000;
+			finish.tv_usec += retrans % 1000000;
 			tvfix(&finish);
-			client6_sendrequest(outsock, p);
+			client6_sendinform(outsock);
 			break;
 		default:
-			if (client6_recvreply(insock, p) < 0)
+			if (client6_recvreply(insock) < 0)
 				continue;
-			return(0);
+			return 0;
 		}
 	}
 
-	return(-1);
+	return -1;
 }
 
-/* 10.3.1. Creation and sending of the Solicit message */
+/* 18.1.5. Creation and Transmission of Inform messages */
 static void
-client6_sendsolicit(s, solicitid)
-	int s, solicitid;
-{
-	char buf[BUFSIZ];
-	struct dhcp6_solicit *dh6s;
-	size_t len;
-	const int firsttime = 1;
-
-	dh6s = (struct dhcp6_solicit *)buf;
-	len = sizeof(*dh6s);
-	memset(dh6s, 0, sizeof(*dh6s));
-	dh6s->dh6sol_msgtype = DH6_SOLICIT;
-	dh6s->dh6sol_plen_id = htons(solicitid & 0xffff);
-	if (getifaddr(&dh6s->dh6sol_cliaddr, device, &link_local_prefix,
-		      LINK_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
-		errx(1, "getifaddr failed");
-		/* NOTREACHED */
-	}
-	current_cliaddr = dh6s->dh6sol_cliaddr;
-
-	if (firsttime) {	/* XXX: currently we have no cache */
-		/* erase any server state */
-		dh6s->dh6sol_flags = DH6SOL_CLOSE;
-	}
-
-	if (transmit(s, DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, 1, buf, len) != 0) {
-		err(1, "transmit failed");
-		/* NOTREACHED */
-	}
-}
-
-/* 10.3.3. Receipt of Advertise messages */
-static int
-client6_recvadvert(s, serv)
+client6_sendinform(s)
 	int s;
-	struct servtab *serv;
-{
-	char buf[BUFSIZ];
-	struct dhcp6_advert *dh6a;
-	ssize_t len;
-	struct sockaddr_storage from;
-	socklen_t fromlen;
-	u_int16_t solid;
-
-	memset(serv, 0, sizeof(*serv));
-
-	fromlen = sizeof(from);
-	if ((len = recvfrom(s, buf, sizeof(buf), 0,
-			(struct sockaddr *)&from, &fromlen)) < 0) {
-		err(1, "recvfrom(inbound)");
-		/* NOTREACHED */
-	}
-
-	if (len < sizeof(*dh6a))
-		return(-1);
-	dh6a = (struct dhcp6_advert *)buf;
-	if (dh6a->dh6adv_msgtype != DH6_ADVERT)
-		return(-1);
-
-	/* 10.2. Advertise Message Validation */
-	/*
-	 * The ``Solicit-ID'' field value MUST match the value that
-	 * we used in the Solicit message.
-	 */
-	memcpy(&solid, &dh6a->dh6adv_rsv_id, sizeof(solid));
-	dprintf(LOG_DEBUG, "solicit ID: %d (expected %d)",
-		DH6SOL_SOLICIT_ID(ntohs(solid)), current_solicit_id);
-	if (DH6SOL_SOLICIT_ID(ntohs(solid)) != current_solicit_id) {
-		dprintf(LOG_DEBUG, "client6_recvadvert: solicit ID mismatch");
-		return(-1);
-	}
-
-	/*
-	 * The ``client's link-local address'' field value MUST match
-	 * the link-local address of the interface upon which we
-	 * sent the Solicit message.
-	 */
-	if (!IN6_ARE_ADDR_EQUAL(&dh6a->dh6adv_cliaddr, &current_cliaddr)) {
-		dprintf(LOG_DEBUG,
-			"client6_recvadvert: client address mismatch");
-		return(-1);
-	}
-
-	serv->st_pref = dh6a->dh6adv_pref;
-	serv->st_relay = dh6a->dh6adv_relayaddr;
-	serv->st_serv = dh6a->dh6adv_serveraddr;
-	serv->st_llcli = dh6a->dh6adv_cliaddr;
-
-	if (IN6_IS_ADDR_MULTICAST(&serv->st_serv)) { /* do we need this? */
-		memset(serv, 0, sizeof(*serv));
-		return(-1);
-	}
-
-	/* extension handling */
-
-	return(0);
-}
-
-/* 11.4.1. Creation and sending of Request messages */
-static void
-client6_sendrequest(s, p)
-	int s;
-	struct servtab *p;
 {
 	int offlinkserv = 0, direct;
 	struct sockaddr_in6 dst;
@@ -863,332 +549,139 @@ client6_sendrequest(s, p)
 	int error;
 	struct in6_addr myaddr;
 	char buf[BUFSIZ];
-	struct dhcp6_request *dh6r;
+	struct dhcp6 *dh6;
+	struct dhcp6opt *opt;
 	const int firsttime = 1; /* currently we don't implement any cache */
+	ssize_t len, l;
+	char *p, *p0, *ep;
 
-	dh6r = (struct dhcp6_request *)buf;
-	memset(dh6r, 0, sizeof(*dh6r));
-	dh6r->dh6req_msgtype = DH6_REQUEST;
+	dh6 = (struct dhcp6 *)buf;
+	memset(dh6, 0, sizeof(*dh6));
+	dh6->dh6_msgtype = DH6_INFORM_REQ;
 
-	/*
-	 * Unless the Request message is created in response to a
-	 * Reconfigure-init message, the client generates a transaction
-	 * ID in the range of 1024--65535 and inserts this value in the
-	 * ``transaction-ID'' field.
-	 */
-	p->st_xid = random_between(MIN_CLIENT_XID, MAX_CLIENT_XID);
-	dh6r->dh6req_xid = htons(p->st_xid);
-	if (getifaddr(&dh6r->dh6req_cliaddr, device, &link_local_prefix,
-		      LINK_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
-		errx(1, "getifaddr failed");
+	current_xid = random() & DH6_XIDMASK;
+	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
+	dh6->dh6_xid |= htonl(current_xid);
+	len = sizeof(*dh6);
+
+	/* DUID */
+	opt = (struct dhcp6opt *)(dh6 + 1);
+	opt->dh6opt_type = htons(DH6OPT_DUID);
+	p0 = p = (char *)(opt + 1);
+	ep = buf + sizeof(buf);
+	*(u_int16_t *)p = htons(1);	/* DUID type: time + hw addr */
+	p += sizeof(u_int16_t);
+	*(u_int32_t *)p = htonl(time(NULL) - 946684800); /* Jan 1, 2000 */
+	p += sizeof(u_int32_t);
+	l = gethwid(p, ep - p, device);
+	if (l < 0) {
+		errx(1, "client6_sendinform: could not get hwid");
 		/* NOTREACHED */
 	}
-	p->st_llcli = dh6r->dh6req_cliaddr; /* we can override this */
+	p += l;
+	opt->dh6opt_len = htons(p - p0);
+	len += sizeof(*opt) + (p - p0);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
-	error = getaddrinfo("::", DH6PORT_UPSTREAM, &hints, &res);
+	error = getaddrinfo(DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
+		/* NOTREACHED */
+	}
+	if (sizeof(dst) != res->ai_addrlen) {
+		errx(1, "getaddrinfo: invalid size");
 		/* NOTREACHED */
 	}
 	memcpy(&dst, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
 
-	/*
-	 * Place the address of the destination server in the
-	 * ``server-address'' field.
-	 */
-	dh6r->dh6req_serveraddr = p->st_serv;
-
-	/*
-	 * If the client is not on the same link as the destination server,
-	 * place the appropriate relay's address in the ``relay-address''
-	 * field.
-	 */
-	if (!IN6_IS_ADDR_LINKLOCAL(&p->st_serv)) {
-		offlinkserv = 1;
-
-		dh6r->dh6req_relayaddr = p->st_relay;
-	}
-
-	/* Set the C bit if this is the first request. */
-	if (firsttime)
-		dh6r->dh6req_flags |= DH6REQ_CLOSE;
-
-	/* XXX: should we set the R bit as well? */
-
-	/*
-	 * If the client already has an IP address of sufficient scope to
-	 * directly reach the server, then the client SHOULD unicast the
-	 * Request to the server.  Otherwise, if the server is off-link,
-	 * the client unicasts the Request message to the appropriate relay.
-	 */
-	if (offlinkserv) {
-		/* check scope */
-		if (getifaddr(&myaddr, device, &global_prefix, GLOBAL_PLEN,
-			      0, IN6_IFF_INVALID) == 0 ||
-		    (IN6_IS_ADDR_SITELOCAL(&p->st_serv) &&
-		     getifaddr(&myaddr, device, &site_local_prefix,
-			       SITE_LOCAL_PLEN, 0, IN6_IFF_INVALID)))
-			direct = 1;
-		else
-			direct = 0;
-	}
-	else
-		direct = 1;
-	if (direct) {
-		memcpy(&dst.sin6_addr, &p->st_serv, sizeof(p->st_serv));
-		dst.sin6_scope_id = in6_addrscopebyif(&p->st_serv, device);
-	}
-	else {
-		memcpy(&dst.sin6_addr, &p->st_relay, sizeof(p->st_relay));
-		dst.sin6_scope_id = in6_addrscopebyif(&p->st_relay, device);
-	}
-
-	if (transmit_sa(s, (struct sockaddr *)&dst, 0,
-			buf, sizeof(*dh6r)) != 0) {
+	if (transmit_sa(s, (struct sockaddr *)&dst, 0, buf, len) != 0) {
 		err(1, "transmit failed");
 		/* NOTREACHED */
 	}
 
 	dprintf(LOG_DEBUG, "send request to %s",
-		addr2str((struct sockaddr *)&dst));
+	    addr2str((struct sockaddr *)&dst));
 		 
 }
 
-/* 11.4.3. Receipt of Reply message in response to a Request */
+/* 18.1.6. Receipt of Reply message in response to a Inform message */
 static int
-client6_recvreply(s, serv)
+client6_recvreply(s)
 	int s;
-	struct servtab *serv;
 {
 	char rbuf[BUFSIZ], buf[BUFSIZ];
-	struct dhcp6_reply *dh6r;
+	struct dhcp6 *dh6;
 	ssize_t len;
 	struct sockaddr_storage from;
 	socklen_t fromlen;
-	char *cp, *ep;
-	struct dhcp6_opt *p;
+	char *cp;
+	struct dhcp6opt *p, *ep, *np;
 	u_int16_t code, elen;
 	int i;
+	struct in6_addr in6;
 
 	fromlen = sizeof(from);
 	if ((len = recvfrom(s, rbuf, sizeof(rbuf), 0,
-			(struct sockaddr *)&from, &fromlen)) < 0) {
+	    (struct sockaddr *)&from, &fromlen)) < 0) {
 		dprintf(LOG_ERR, "recvfrom(inbound): %s", strerror(errno));
-		return(-1);
+		return -1;
 	}
 
-	if (len < 1) {		/* we need at least 1 byte to check type */
-		dprintf(LOG_WARNING, "relay6_react: short packet");
-		return(-1);
+	if (len < sizeof(*dh6)) {
+		dprintf(LOG_WARNING, "client6_recvreply: short packet");
+		return -1;
 	}
 
-	dh6r = (struct dhcp6_reply *)rbuf;
-	if (dh6r->dh6rep_msgtype != DH6_REPLY)
-		return(-1);	/* should be siletly discarded */
-
-	if (len < sizeof(*dh6r)) {
-		dprintf(LOG_WARNING, "client6_recvreply: short packet (len=%d)",
-			len);
-		return(-1);
-	}
-
-	/* 11.2. Reply Message Validation */
+	dh6 = (struct dhcp6 *)rbuf;
+	if (dh6->dh6_msgtype != DH6_REPLY)
+		return -1;	/* should be siletly discarded */
 
 	/*
 	 * The ``transaction-ID'' field value MUST match the value we
-	 * used in our Request (or Release) message.
+	 * used in our Inform message.
 	 */
-	if (serv->st_xid != ntohs(dh6r->dh6rep_xid)) {
+	if (current_xid != (ntohl(dh6->dh6_xid) & DH6_XIDMASK)) {
 		dprintf(LOG_WARNING, "client6_recvreply: XID mismatch");
-		return(-1);
+		return -1;
 	}
 
-	/*
-	 * The ``client's link-local address'' field value MUST match
-	 * the link-local address of the interface upon which we
-	 * sent in our Request (or Release) message.
-	 */
-	if (!IN6_ARE_ADDR_EQUAL(&dh6r->dh6rep_cliaddr, &serv->st_llcli)) {
-		dprintf(LOG_WARNING,
-			"client6_recvreply: client address mismatch");
-		return(-1);
-	}
+	p = (struct dhcp6opt *)(dh6 + 1);
+	ep = (struct dhcp6opt *)(rbuf + len);
+	while (p + 1 <= ep) {
+		cp = (char *)(p + 1);
+		np = (struct dhcp6opt *)(cp + ntohs(p->dh6opt_len));
+		/* option length field overrun */
+		if (np > ep)
+			goto malformed;
 
-	/*
-	 * If the Reply message contains an authentication extension, then the
-	 * messages MUST be correctly authenticated.
-	 * XXX: not implemented yet.
-	 */
-	
-	/*
-	 * If the ``status'' field contains a non-zero value, 
-	 * report the error status.
-	 */
-	if ((dh6r->dh6rep_flagandstat & DH6REP_STATMASK) != 0) {
-		dprintf(LOG_WARNING,
-			"client6_recvreply: status indicates an error (%d)",
-			dh6r->dh6rep_flagandstat & DH6REP_STATMASK);
-		return(-1);
-	}
-
-	/* extension handling */
-	cp = (char *)(dh6r + 1);
-	if ((dh6r->dh6rep_flagandstat & DH6REP_RELAYPRESENT) != 0)
-		cp += sizeof(struct in6_addr);
-	ep = rbuf + len;
-	for (; cp < ep; cp += elen + 4) {
-		if (cp + 4 > ep) {
-			dprintf(LOG_NOTICE,
-				"client6_recvreply: malformed extension");
-			break;
-		}
-
-		code = ntohs(*(u_int16_t *)&cp[0]);
-		if (code != 65535)
-			elen = ntohs(*(u_int16_t *)&cp[2]);
-		else
-			elen = 0;
-		if (cp + 4 + elen > ep) {
-			dprintf(LOG_NOTICE,
-				"client6_recvreply: malformed extension");
-			break;
-		}
-		
-		p = dhcp6opttab_bycode(code);
-		if (p == NULL) {
-			dprintf(LOG_NOTICE, "unknown, len=%d", len);
-			continue;
-		}
-
-		/* sanity check on length */
-		switch (p->len) {
-		case OL6_N:
-			break;
-		case OL6_16N:
-			if (elen % 16 != 0)
-				return(-1);
-			break;
-		case OL6_Z:
-			if (elen != 0)
-				return(-1);
+		switch (ntohs(p->dh6opt_type)) {
+		case DH6OPT_DNS:
+			if (ntohs(p->dh6opt_len) % sizeof(in6) ||
+			    ntohs(p->dh6opt_len) == 0)
+				goto malformed;
+			for (i = 0; i < ntohs(p->dh6opt_len); i += sizeof(in6)) {
+				memcpy(&in6, &cp[i], sizeof(in6));
+				fprintf(stderr, "nameserver %s\n",
+				    inet_ntop(AF_INET6, &in6, buf, sizeof(buf)));
+			}
 			break;
 		default:
-			if (elen != p->len)
-				return(-1);
+			/* ignore */
 			break;
 		}
 
-		dprintf(LOG_DEBUG, "%s:", p->name);
-
-		switch(code) {
-#ifdef MEDIATOR
-		case OC6_DNS:
-		{
-			struct sockaddr_in to_mediator;
-			struct in6_addr in6;
-			int s = -1;
-			char *ap;
-
-			if ( (s = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
-				dprintf(LOG_WARNING,
-					"client6_recvreply: socket: %s",
-					strerror(errno));
-				break;
-			}
-
-			bzero((char *)&to_mediator, sizeof(to_mediator));
-			to_mediator.sin_family = AF_INET;
-			to_mediator.sin_len = sizeof(to_mediator);
-			to_mediator.sin_port= htons(MEDIATOR_CTRL_PORT);
-			inet_aton("127.0.0.1", &to_mediator.sin_addr);
-
-			memset(&mediator_msg, 0, sizeof(mediator_msg));
-			mediator_msg.version = htonl(MEDIATOR_CTRL_VERSION);
-			mediator_msg.lifetime = -1; /* XXX: never expire */
-
-			for (ap = cp + 4; ap < cp + 4 + elen;
-			     ap += sizeof(struct in6_addr)) {
-				/*
-				 * use a separate pointer to avoid alignment
-				 * issues.
-				 */
-				memcpy(&in6, ap, sizeof(struct in6_addr));
-
-				strlcpy(mediator_msg.serveraddr,
-				    in6addr2str(&in6, 0),
-				    sizeof(mediator_msg.serveraddr));
-			       
-				dprintf(LOG_DEBUG,
-					"Notifing to mediator: server %s",
-					mediator_msg.serveraddr);
-				if (sendto(s, &mediator_msg,
-					   sizeof(mediator_msg), 0,
-					   (struct sockaddr *)(&to_mediator),
-					   sizeof(to_mediator)) < 0) {
-					dprintf(LOG_WARNING,
-						"client6_recvreply: "
-						"sendto mediator: %s",
-						strerror(errno));
-				}
-			}
-		}
-		break;
-#endif /* MEDIATOR */
-		}
-
-		switch (p->type) {
-		case OT6_V6:
-			for (i = 0; i < elen; i += 16) {
-				inet_ntop(AF_INET6, &cp[4 + i], buf,
-					sizeof(buf));
-				if (i != 0)
-					dprintf(LOG_DEBUG, ",");
-				dprintf(LOG_DEBUG, "  %s", buf);
-			}
-			break;
-		case OT6_STR:
-			/*
-			 * 15/12 drafts are silent about padding requirement,
-			 * and string termination requirement for extensions.
-			 * at IETF48 dhc session, author confirmed that:
-			 * - no string termination character
-			 * - no padding (= unaligned extensions)
-			 */
-			if (sizeof(buf) >= elen + 1) {
-				/*
-				 * do not use strcpy/strlcpy here, because
-				 * padding requirement is unclear in spec.
-				 */
-				memset(&buf, 0, sizeof(buf));
-				memcpy(buf, &cp[4], elen);
-				buf[elen] = '\0';
-			} else
-				strlcpy(buf, "?", sizeof(buf));
-			dprintf(LOG_DEBUG, "  %s", buf);
-			break;
-		case OT6_NUM:
-			dprintf(LOG_DEBUG, "%d",
-				(u_int32_t)ntohl(*(u_int32_t *)&cp[4]));
-			break;
-		default:
-			/*
-			 * 15/12 drafts are silent about padding requirement,
-			 * and string termination requirement for extensions.
-			 * at IETF48 dhc session, author confirmed that:
-			 * - no string termination character
-			 * - no padding (= unaligned extensions)
-			 */
-			for (i = 0; i < elen; i++)
-				dprintf(LOG_DEBUG, "  %02x", cp[4 + i] & 0xff);
-		}
+		p = np;
 	}
 
-	return(0);
+	return 0;
+
+ malformed:
+	dprintf(LOG_WARNING, "client6_recvreply: malformed option");
+	return -1;
 }
 
 static void
@@ -1200,4 +693,58 @@ tvfix(tv)
 	s = tv->tv_usec / (1000 * 1000);
 	tv->tv_usec %= (1000 * 1000);
 	tv->tv_sec += s;
+}
+
+static long
+retransmit_timer(cur, irt, mrt)
+	long cur;
+	long irt;
+	long mrt;
+{
+	double n;
+	double r;
+
+	r = ((double)(random() % 2000) - 1000) / 1000;
+	if (cur == 0)
+		n = 2 * irt + r * irt;
+	else {
+		n = 2 * cur + r * cur;
+		if (n > mrt)
+			n = mrt + r * mrt;
+	}
+	return (long)n;
+}
+
+static ssize_t
+gethwid(buf, len, ifname)
+	char *buf;
+	int len;
+	const char *ifname;
+{
+	struct ifaddrs *ifa, *ifap;
+	struct sockaddr_dl *sdl;
+	ssize_t l;
+
+	if (getifaddrs(&ifap) < 0)
+		return -1;
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (strcmp(ifa->ifa_name, ifname) != 0)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_LINK)
+			continue;
+
+		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
+		if (len < 2 + sdl->sdl_alen)
+			goto fail;
+		*(u_int16_t *)&buf[0] = htons(sdl->sdl_type);
+		memcpy(&buf[2], LLADDR(sdl), sdl->sdl_alen);
+		l = sizeof(u_int16_t) + sdl->sdl_alen;
+		freeifaddrs(ifap);
+		return l;
+	}
+
+  fail:
+	freeifaddrs(ifap);
+	return -1;
 }

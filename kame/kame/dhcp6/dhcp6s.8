@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.8,v 1.13 2000/12/05 08:36:47 itojun Exp $
+.\"	$KAME: dhcp6s.8,v 1.14 2001/12/27 08:09:36 itojun Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -38,7 +38,6 @@
 .Nm
 .Op Fl Dd
 .Op Fl n Ar dnsserv
-.Op Fl N Ar dnsdom
 .Ar interface
 .\"
 .Sh DESCRIPTION
@@ -50,13 +49,6 @@ can give the following information to clients.
 .It
 IPv6 address of DNS server
 .Pq Fl n Ar dnsserv
-.It
-DNS domain name
-.Pq Fl N Ar dnsdom
-.It
-Current timezone offset
-.It
-IEEE 1003.1 information for current timezone
 .El
 .Pp
 Command line options are as below:
@@ -80,22 +72,16 @@ This option can be used multiple times in order to specify more than one
 DNS server.
 .Ar dnsserv
 must be an IPv6 numeric address.
-.It Fl N Ar dnsdom
-The option specifies the local DNS domain name, like
-.Dq Li kame.net. .
 .El
 .\"
 .Sh SEE ALSO
-.Xr dhcp6c 8 ,
-.Xr dhcp6relay 8
+.Xr dhcp6c 8
 .Rs
-.%A J. Bound
-.%A M. Carney
-.%A C. Perkins
-.%D 5 May 2000
+.%A Ralph Droms, Editor
+.%D 21 Dec 2001
 .%T Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
 .%R internet draft
-.%N draft-ietf-dhc-dhcpv6-15.txt
+.%N draft-ietf-dhc-dhcpv6-22.txt
 .%O work in progress material
 .Re
 .\"
@@ -114,6 +100,4 @@ it does not manage client-agent mapping table nor client XID,
 .It
 it does not handle resource allocations
 .Pq such as an IPv6 address ,
-.It
-it does not implement DHCPv6 release nor reconfigure message handling.
 .El

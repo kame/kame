@@ -103,7 +103,6 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 	int strong;		/* if strong host model is required or not */
 	int ignoreflags;
 {
-#ifdef USE_GETIFADDRS
 	struct ifaddrs *ifap, *ifa;
 	struct sockaddr_in6 sin6;
 	int error = -1;
@@ -170,105 +169,6 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 
 	freeifaddrs(ifap);
 	return(error);
-#else
-	int s;
-	unsigned int maxif;
-	struct ifreq *iflist;
-	struct ifconf ifconf;
-	struct ifreq *ifr, *ifr_end;
-	struct sockaddr_in6 sin6;
-	int error;
-
-#if 1
-	maxif = if_maxindex() + 1;
-#else
-	maxif = 1;
-#endif
-	iflist = (struct ifreq *)malloc(maxif * BUFSIZ);	/* XXX */
-	if (!iflist) {
-		errx(1, "not enough core");
-		/*NOTREACHED*/
-	}
-
-	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
-		err(1, "socket(SOCK_DGRAM)");
-		/*NOTREACHED*/
-	}
-	memset(&ifconf, 0, sizeof(ifconf));
-	ifconf.ifc_req = iflist;
-	ifconf.ifc_len = maxif * BUFSIZ;	/* XXX */
-	if (ioctl(s, SIOCGIFCONF, &ifconf) < 0) {
-		err(1, "ioctl(SIOCGIFCONF)");
-		/*NOTREACHED*/
-	}
-	close(s);
-
-	/* Look for this interface in the list */
-	error = ENOENT;
-	ifr_end = (struct ifreq *) (ifconf.ifc_buf + ifconf.ifc_len);
-	for (ifr = ifconf.ifc_req;
-	     ifr < ifr_end;
-	     ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
-				    + ifr->ifr_addr.sa_len)) {
-		int s1, s2;
-
-		if (strong && strcmp(ifnam, ifr->ifr_name) != 0)
-			continue;
-
-		/* in any case, ignore interfaces in different scope zones. */
-		if ((s1 = in6_addrscopebyif(prefix, ifnam)) < 0 ||
-		    (s2 = in6_addrscopebyif(prefix, ifr->ifr_name)) < 0 ||
-		     s1 != s2)
-			continue;
-
-		if (ifr->ifr_addr.sa_family != AF_INET6)
-			continue;
-		if (ifr->ifr_addr.sa_len > sizeof(sin6))
-			continue;
-
-		if (in6_matchflags(&ifr->ifr_addr, ifr->ifr_name, ignoreflags))
-			continue;
-
-		memcpy(&sin6, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
-
-
-#ifdef __KAME__
-		if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr)) {
-			sin6.sin6_addr.s6_addr[2] = 0;
-			sin6.sin6_addr.s6_addr[3] = 0;
-		}
-#endif
-		if (plen % 8 == 0) {
-			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
-				continue;
-		} else {
-			struct in6_addr a, m;
-			int i;
-			memcpy(&a, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
-			memset(&m, 0, sizeof(m));
-			memset(&m, 0xff, plen / 8);
-			m.s6_addr[plen / 8] = (0xff00 >> (plen % 8)) & 0xff;
-			for (i = 0; i < sizeof(a); i++)
-				a.s6_addr[i] &= m.s6_addr[i];
-
-			if (memcmp(&a, prefix, plen / 8) != 0 ||
-			    a.s6_addr[plen / 8] !=
-			    (prefix->s6_addr[plen / 8] & m.s6_addr[plen / 8]))
-				continue;
-		}
-		memcpy(addr, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
-#ifdef __KAME__
-		if (IN6_IS_ADDR_LINKLOCAL(addr))
-			addr->s6_addr[2] = addr->s6_addr[3] = 0;
-#endif
-		error = 0;
-		break;
-	}
-
-	free(iflist);
-	close(s);
-	return error;
-#endif
 }
 
 int
