@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.123 2002/06/07 20:52:43 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.124 2002/06/07 21:26:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -273,8 +273,7 @@ rip6_input(mp, offp, proto)
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
-						(struct sockaddr *)&fromsa,
-						 n, opts.head) == 0) {
+				    (struct sockaddr *)&fromsa, n, opts.head) == 0) {
 					m_freem(n);
 					if (opts.head)
 						m_freem(opts.head);
@@ -313,8 +312,7 @@ rip6_input(mp, offp, proto)
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&fromsa,
-				 m, opts.head) == 0) {
+		    (struct sockaddr *)&fromsa, m, opts.head) == 0) {
 			m_freem(m);
 			if (opts.head)
 				m_freem(opts.head);
