@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.56 2002/12/06 07:42:03 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.57 2002/12/09 06:49:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1539,6 +1539,13 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
     data_ptr = data_ptr_start;
     num_groups_tmp = num_groups;
 
+    memset(&group, 0, sizeof(group));
+    group.sin6_len = sizeof(group);
+    group.sin6_family = AF_INET6;
+    memset(&source, 0, sizeof(source));
+    source.sin6_len = sizeof(source);
+    source.sin6_family = AF_INET6;
+
     if (!inet6_localif_address(&target, v) &&
 	!IN6_IS_ADDR_UNSPECIFIED(&uni_target_addr.unicast_addr))
     {
@@ -1557,11 +1564,6 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	upstream_router = find_pim6_nbr(&target);
 	if (upstream_router == (pim_nbr_entry_t *) NULL)
 	    return (FALSE);	/* I have no such neighbor */
-
-	group.sin6_len = sizeof(group);
-	group.sin6_family = AF_INET6;
-	source.sin6_len = sizeof(source);
-	source.sin6_family = AF_INET6;
 
 	while (num_groups--)
 	{
