@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.29 2001/08/16 14:37:29 itojun Exp $	*/
+/*	$KAME: sockmisc.c,v 1.30 2001/10/10 08:37:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,6 +112,7 @@ cmpsaddrwop(addr1, addr2)
 
 /*
  * compare two sockaddr with port, taking care wildcard.
+ * addr1 is a subject address, addr2 is in a database entry.
  * OUT:	0: equal.
  *	1: not equal.
  */
@@ -138,7 +139,7 @@ cmpsaddrwild(addr1, addr2)
 		sa2 = (caddr_t)&((struct sockaddr_in *)addr2)->sin_addr;
 		port1 = ((struct sockaddr_in *)addr1)->sin_port;
 		port2 = ((struct sockaddr_in *)addr2)->sin_port;
-		if (!(port1 == 0 || port2 == 0 || port1 == port2))
+		if (!(port2 == 0 || port1 == port2))
 			return 1;
 		if (memcmp(sa1, sa2, sizeof(struct in_addr)) != 0)
 			return 1;
@@ -149,7 +150,7 @@ cmpsaddrwild(addr1, addr2)
 		sa2 = (caddr_t)&((struct sockaddr_in6 *)addr2)->sin6_addr;
 		port1 = ((struct sockaddr_in6 *)addr1)->sin6_port;
 		port2 = ((struct sockaddr_in6 *)addr2)->sin6_port;
-		if (!(port1 == 0 || port2 == 0 || port1 == port2))
+		if (!(port2 == 0 || port1 == port2))
 			return 1;
 		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
 			return 1;
