@@ -261,6 +261,7 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 #define IN6P_BINDV6ONLY		0x400000
 #endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
+#define IN6P_RTHDRDSTOPTS	0x800000
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
 					INP_RECVIF|\
 				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_NEXTHOP|\
