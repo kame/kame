@@ -39,6 +39,7 @@ exclude ipcomp_core.c
 exclude ipcomp.h
 exclude raw_ip6.c
 conflict in6_pcb.c
+exclude in6_pcb.h
 exclude udp6.h
 exclude udp6_usrreq.c
 exclude udp6_var.h
