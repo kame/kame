@@ -204,7 +204,10 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 
 			fprintf(fp, "        ");
 			for (c = 0; c < optatr->len && c < 20; c++)
-				fprintf(fp, "%02x ", optatr->data[c]);
+				fprintf(fp, "%02x ",
+					(unsigned char)optatr->data[c]);
+			if (optatr->len > 20)
+				fprintf(fp, "...");
 			fputc('\n', fp);
 		}
 
