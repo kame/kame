@@ -1,0 +1,63 @@
+srcdir=	@srcdir@
+.PATH:	@srcdir@ @srcdir@/resolv
+
+prefix=	@prefix@
+exec_prefix=@exec_prefix@
+libdir=	@libdir@
+mandir=	@mandir@
+
+CC=	@CC@
+CPP=	@CPP@
+INSTALL=@INSTALL@
+INSTALL_PROGRAM=@INSTALL_PROGRAM@
+INSTALL_DATA=@INSTALL_DATA@
+
+CFLAGS=	@DEFS@ @CFLAGS@
+LDFLAGS=@LDFLAGS@
+
+OBJS=	getaddrinfo.o getnameinfo.o ifname.o vars.o rresvport_af.o rcmd.o
+OBJS+=	rthdr.o ip6opt.o
+OBJS+=	name6.o
+OBJS+=	base64.o herror.o nsap_addr.o 
+OBJS+=	res_comp.o res_data.o res_debug.o
+OBJS+=	res_init.o res_mkquery.o res_query.o 
+OBJS+=	res_send.o
+OBJS+=	inet_pton.o inet_addr.o
+
+MAN3=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
+	rresvport_af.3 if_indextoname.3 getipnodebyname.3
+MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
+		getipnodebyname.3 freehostent.3 \
+		getaddrinfo.3 freeaddrinfo.3 \
+		getaddrinfo.3 gai_strerror.3 \
+		if_indextoname.3 if_nametoindex.3 \
+		if_indextoname.3 if_nameindex.3 \
+		if_indextoname.3 if_freenameindex.3
+
+libinet6.a: $(OBJS)
+	$(AR) cq libinet6.a $(OBJS)
+
+install:
+	$(INSTALL_DATA) libinet6.a $(libdir)
+	$(INSTALL_DATA) $(MAN3) $(mandir)/man3
+	@set ${MLINKS}; \
+	while test $$# -ge 2; do \
+		name=$$1; \
+		shift; \
+		dir=$(mandir)/man$${name##*.}; \
+		l=$${dir}/$$name; \
+		name=$$1; \
+		shift; \
+		dir=$(mandir)/man$${name##*.}; \
+		t=$${dir}${MANSUBDIR}/$$name; \
+		if [ -z "${UPDATE}" -o ! -f $$t ]; then \
+		    echo $$t -\> $$l; \
+		    ln -f $$l $$t; \
+		fi; \
+	done
+
+clean:
+	/bin/rm -f libinet6.a *.o
+
+distclean: clean
+	/bin/rm -f Makefile config.log config.cache config.status
