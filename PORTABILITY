@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.31 2000/02/19 17:12:46 itojun Exp $
+	$Id: PORTABILITY,v 1.32 2000/02/23 04:36:33 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -255,3 +255,14 @@ across those possibilities.
   you can always talk with other developers.
 
 - For portability in kernel networking code, look at kame/sys/net/net_osdep.h.
+
+- The -interface modifier of the route(8) command does not take an
+  argument except on FreeBSD. Also, the FreeBSD's extension has
+  several bugs. If you regard portability and stability, it is
+  recommended to use the -ifp modifier instead of -interface.
+  For example,
+  # route add -inet6 default -interface gif0 (on FreeBSD)
+  is equivalent to
+  # route add -inet6 default ::1 -ifp gif0 (on all OSes including
+  FreeBSD)
+  The latter is much more portable and stabler than the latter.
