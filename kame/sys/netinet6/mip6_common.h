@@ -1,4 +1,4 @@
-/*	$KAME: mip6_common.h,v 1.5 2000/02/22 14:04:25 itojun Exp $	*/
+/*	$KAME: mip6_common.h,v 1.6 2000/02/26 18:08:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -36,7 +36,7 @@
  * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
  *             Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- *  $Id: mip6_common.h,v 1.5 2000/02/22 14:04:25 itojun Exp $
+ *  $Id: mip6_common.h,v 1.6 2000/02/26 18:08:39 itojun Exp $
  */
 
 

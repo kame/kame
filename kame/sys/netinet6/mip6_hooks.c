@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.3 2000/02/22 14:04:25 itojun Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.4 2000/02/26 18:08:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -36,7 +36,7 @@
  * Author: Hesham Soliman <hesham.soliman@ericsson.com.au>
  *         Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- * $Id: mip6_hooks.c,v 1.3 2000/02/22 14:04:25 itojun Exp $
+ * $Id: mip6_hooks.c,v 1.4 2000/02/26 18:08:39 itojun Exp $
  *
  */
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -101,12 +101,12 @@ extern void (*mip6_minus_a_case_hook)(struct nd_prefix *);
 extern struct mip6_esm * (*mip6_esm_find_hook)(struct in6_addr *);
 
 
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))    
+#if (defined(MIP6_MN) || defined(MIP6_MODULES))
 void
 mip6_minus_a_case(struct nd_prefix *pr)
 {
 	struct in6_addr   addr;
-	
+
     if (IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr) ||
         IN6_IS_ADDR_MULTICAST(&pr->ndpr_addr) ||
         IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_addr)) {
@@ -145,9 +145,9 @@ mip6_find_auto_home_addr(void)
             continue;
         else
             break;  /* XXXYYY Remove in v2.0. */
-        
+
         /* XXXYYY Add in v2.0
-           for (pfxrtr = pr->ndpr_advrtrs.lh_first; pfxrtr; 
+           for (pfxrtr = pr->ndpr_advrtrs.lh_first; pfxrtr;
              pfxrtr = pfxrtr->pfr_next) {
             if ((pfxrtr->router->flags & ND_RA_FLAG_HA) == ND_RA_FLAG_HA)
                 break;
@@ -159,7 +159,7 @@ mip6_find_auto_home_addr(void)
                    ip6_sprintf(&pr->ndpr_addr));
 #endif
     }
-    
+
     return pr;
 }
 #endif
@@ -186,16 +186,16 @@ mip6_enable_hooks(int scope)
 
     if (scope == MIP6_CONFIG_HOOKS) {
         /* Activate Home Agent-specific hooks */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))    
+#if (defined(MIP6_HA) || defined(MIP6_MODULES))
         if (MIP6_IS_HA_ACTIVE) {
             mip6_write_config_data_ha_hook = mip6_write_config_data_ha;
             mip6_clear_config_data_ha_hook = mip6_clear_config_data_ha;
             mip6_enable_func_ha_hook = mip6_enable_func_ha;
         }
 #endif
-        
+
         /* Activate Mobile Node-specific hooks */
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))    
+#if (defined(MIP6_MN) || defined(MIP6_MODULES))
         if (MIP6_IS_MN_ACTIVE) {
             mip6_write_config_data_mn_hook = mip6_write_config_data_mn;
             mip6_clear_config_data_mn_hook = mip6_clear_config_data_mn;
@@ -207,7 +207,7 @@ mip6_enable_hooks(int scope)
     if (scope == MIP6_SPECIFIC_HOOKS) {
 
         /* Activate Home Agent-specific hooks */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))    
+#if (defined(MIP6_HA) || defined(MIP6_MODULES))
         if (MIP6_IS_HA_ACTIVE) {
             mip6_rec_ra_hook = mip6_rec_raha;
             mip6_global_addr_hook = mip6_global_addr;
@@ -215,12 +215,12 @@ mip6_enable_hooks(int scope)
             mip6_icmp6_output_hook = mip6_icmp6_output;
         }
 #endif
-        
+
         /* Activate Mobile Node-specific hooks */
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))    
+#if (defined(MIP6_MN) || defined(MIP6_MODULES))
         if (MIP6_IS_MN_ACTIVE) {
             mip6_route_optimize_hook = mip6_route_optimize;
-            mip6_rec_ra_hook = mip6_rec_ramn;   
+            mip6_rec_ra_hook = mip6_rec_ramn;
             mip6_select_defrtr_hook = mip6_select_defrtr;
             mip6_get_home_prefix_hook = mip6_get_home_prefix;
             mip6_prelist_update_hook = mip6_prelist_update;
@@ -260,9 +260,9 @@ mip6_disable_hooks(int scope)
     }
 
     if (scope == MIP6_SPECIFIC_HOOKS) {
-        
+
             /* De-activate Home Agent-specific hooks */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))    
+#if (defined(MIP6_HA) || defined(MIP6_MODULES))
         if (MIP6_IS_HA_ACTIVE) {
             mip6_rec_ra_hook = 0;
             mip6_global_addr_hook = 0;
@@ -272,9 +272,9 @@ mip6_disable_hooks(int scope)
             mip6_enable_func_ha_hook = 0;
         }
 #endif
-        
+
             /* De-activate Mobile Node-specific hooks */
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))    
+#if (defined(MIP6_MN) || defined(MIP6_MODULES))
         if (MIP6_IS_MN_ACTIVE) {
             mip6_route_optimize_hook = 0;
             mip6_rec_ra_hook = 0;
@@ -294,7 +294,7 @@ mip6_disable_hooks(int scope)
             mip6_esm_find_hook = 0;
             mip6_minus_a_case_hook = 0;
         }
-#endif  
+#endif
     }
     splx(s);
     return;
@@ -307,15 +307,15 @@ mip6_attach(void)
 {
 /*
   No support for modules here yet.  XXXYYY
-  
+
   #if (defined(MIP6_MN) || defined (MIP6_HA) || defined(MIP6_MODULES))
 */
 #ifdef MIP6_MN
     if (MIP6_IS_MN_ACTIVE) {
         if(mip6_get_home_prefix_hook)       /* Test arbitrary hook */
             return 0;
-        
-        /* 
+
+        /*
            If autoconfig state: find a global address to use as Home Address.
            - Take first available on any interface, else if no found:
            - Enable hook to wait for a Router Advertisement to give us one.
@@ -323,7 +323,7 @@ mip6_attach(void)
         if (mip6_config.autoconfig) {
             struct nd_prefix *pr;
             struct in6_addr   addr;
-            
+
             addr = in6addr_any;
             if ((pr = mip6_find_auto_home_addr()) != NULL) {
                 mip6_esm_create(pr->ndpr_ifp, &addr, &addr,

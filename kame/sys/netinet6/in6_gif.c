@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.24 2000/02/26 09:32:13 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.25 2000/02/26 18:08:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,19 +263,7 @@ int in6_gif_input(mp, offp, proto)
 		}
 	}
 #else
-#if 0
-	gifp = m->m_pkthdr.aux;
-	m->m_pkthdr.aux = NULL;
-#else
-    {
-	struct mbuf *n;
-	n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
-	if (n) {
-		gifp = *mtod(n, struct ifnet **);
-		m_aux_delete(m, n);
-	}
-    }
-#endif
+	gifp = (struct ifnet *)encap_getarg(m);
 #endif
 
 	if (gifp == NULL) {

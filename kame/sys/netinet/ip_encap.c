@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.14 2000/02/22 14:02:01 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.15 2000/02/26 18:08:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,6 +101,7 @@ MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
 
 static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
+static void encap_fillarg __P((struct mbuf *, const struct encaptab *));
 
 LIST_HEAD(, encaptab) encaptab;
 
@@ -156,14 +157,7 @@ encap4_input(m, va_alist)
 
 		/* found a match */
 		if (ep->psw && ep->psw->pr_input) {
-#if 0
-			m->m_pkthdr.aux = ep->arg;	/*XXX*/
-#else
-			struct mbuf *n;
-			n = m_aux_add(m, AF_INET, IPPROTO_IPV4);
-			if (n)
-				*mtod(n, void **) = ep->arg;
-#endif
+			encap_fillarg(m, ep);
 			(*ep->psw->pr_input)(m, off, proto);
 		} else
 			m_freem(m);
@@ -224,14 +218,7 @@ encap6_input(mp, offp, proto)
 		/* found a match */
 		psw = (struct ip6protosw *)ep->psw;
 		if (psw && psw->pr_input) {
-#if 0
-			m->m_pkthdr.aux = ep->arg;	/*XXX*/
-#else
-			struct mbuf *n;
-			n = m_aux_add(m, AF_INET6, IPPROTO_IPV6);
-			if (n)
-				*mtod(n, void **) = ep->arg;
-#endif
+			encap_fillarg(m, ep);
 			return (*psw->pr_input)(mp, offp, proto);
 		} else {
 			m_freem(m);
@@ -396,4 +383,45 @@ mask_match(ep, sp, dp)
 		return 1;
 	} else
 		return 0;
+}
+
+static void
+encap_fillarg(m, ep)
+	struct mbuf *m;
+	const struct encaptab *ep;
+{
+#if 0
+	m->m_pkthdr.aux = ep->arg;
+#else
+	struct mbuf *n;
+
+	n = m_aux_add(m, AF_INET, IPPROTO_IPV4);
+	if (n) {
+		*mtod(n, void **) = ep->arg;
+		n->m_len = sizeof(void *);
+	}
+#endif
+}
+
+void *
+encap_getarg(m)
+	struct mbuf *m;
+{
+	void *p;
+#if 0
+	p = m->m_pkthdr.aux;
+	m->m_pkthdr.aux = NULL;
+	return p;
+#else
+	struct mbuf *n;
+
+	p = NULL;
+	n = m_aux_find(m, AF_INET, IPPROTO_IPV4);
+	if (n) {
+		if (n->m_len == sizeof(void *))
+			p = *mtod(n, void **);
+		m_aux_delete(m, n);
+	}
+	return p;
+#endif
 }

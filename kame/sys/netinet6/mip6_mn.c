@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.8 2000/02/22 14:04:26 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.9 2000/02/26 18:08:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_mn.c,v 1.8 2000/02/22 14:04:26 itojun Exp $
+ * $Id: mip6_mn.c,v 1.9 2000/02/26 18:08:40 itojun Exp $
  *
  */
 
@@ -96,7 +96,7 @@ struct callout_handle  mip6_timer_esm_handle;
 /*
  ******************************************************************************
  * Function:    mip6_mn_init
- * Description: Initialization of MIPv6 variables that must be initialized 
+ * Description: Initialization of MIPv6 variables that must be initialized
  *              before the MN code is executed.
  ******************************************************************************
  */
@@ -271,7 +271,7 @@ struct nd_defrouter *def_router;   /* New default router being used */
 
         bu_data.prefix_len = esp->prefix_len;
         bu_data.ack = 1;
-        
+
         if (mip6_send_bu(bulp, &bu_data, NULL) != 0)
             return;
 
@@ -286,7 +286,7 @@ struct nd_defrouter *def_router;   /* New default router being used */
 	    if (mip6_tunnel(home_addr, &esp->ha_fn->addr, MIP6_TUNNEL_ADD,
 			    MIP6_NODE_MN, (void *)esp))
 		    return;
-	    
+
             mip6_send_bu2fn(&old_coa, esp->ha_fn, home_addr,
 			    esp->ifp, lifetime);
             free(esp->ha_fn, M_TEMP);
@@ -343,10 +343,10 @@ struct nd_defrouter *def_router;   /* New default router being used */
             bulp->coa = *prim_addr;
             bulp->lifetime = mip6_config.hr_lifetime;
             bulp->refreshtime = mip6_config.hr_lifetime;
-            
+
             bu_data.prefix_len = esp->prefix_len;
             bu_data.ack = 1;
-            
+
             if (mip6_send_bu(bulp, &bu_data, NULL) != 0)
                 return;
         } else if (esp->state == MIP6_STATE_REG ||
@@ -376,7 +376,7 @@ struct nd_defrouter *def_router;   /* New default router being used */
 
             bu_data.prefix_len = esp->prefix_len;
             bu_data.ack = 1;
-            
+
             if (mip6_send_bu(bulp, &bu_data, NULL) != 0)
                 return;
 
@@ -391,7 +391,7 @@ struct nd_defrouter *def_router;   /* New default router being used */
 		if (mip6_tunnel(prim_addr, &esp->ha_fn->addr,
 				MIP6_TUNNEL_MOVE, MIP6_NODE_MN, (void *)esp))
 			return;
-		
+
                 mip6_send_bu2fn(&old_coa, esp->ha_fn, prim_addr,
 				esp->ifp, lifetime);
                 free(esp->ha_fn, M_TEMP);
@@ -451,7 +451,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 #endif
 
     /* Make sure that the length field in the BA is >= 11. */
-    if (mip6_indatap->ba_opt->len < IP6OPT_BALEN) {
+    if (mip6_inp->ba_opt->len < IP6OPT_BALEN) {
         ip6stat.ip6s_badoptions++;
         log(LOG_ERR, "%s: Length field in BA < 11\n", __FUNCTION__);
         return IPPROTO_DONE;
@@ -460,43 +460,43 @@ int          off;   /* Offset from start of mbuf to start of dest option */
     /* Make sure that the sent BU sequence number == received BA sequence
        number. But first, find the source address for the incoming packet
        (it may include a home address option). */
-    if (mip6_indatap->optflag & MIP6_DSTOPT_HA)
-        from_src = &mip6_indatap->ha_opt->home_addr;
+    if (mip6_inp->optflag & MIP6_DSTOPT_HA)
+        from_src = &mip6_inp->ha_opt->home_addr;
     else
-        from_src = &mip6_indatap->ip6_src;
+        from_src = &mip6_inp->ip6_src;
 
-    bul_entry = mip6_bul_find(from_src, &mip6_indatap->ip6_dst);
+    bul_entry = mip6_bul_find(from_src, &mip6_inp->ip6_dst);
     if (bul_entry == NULL) {
         log(LOG_ERR, "%s: No Binding Update List entry found\n", __FUNCTION__);
         return IPPROTO_DONE;
     }
 
-    if (mip6_indatap->ba_opt->seqno != bul_entry->seqno) {
+    if (mip6_inp->ba_opt->seqno != bul_entry->seqno) {
         ip6stat.ip6s_badoptions++;
         log(LOG_ERR, "%s: Received sequence number not equal to sent\n",
             __FUNCTION__);
         return IPPROTO_DONE;
     }
-	
+
 #ifdef MIP6_DEBUG
     mip6_debug("\nReceived Binding Acknowledgement\n");
     mip6_debug("IP Header Src:      %s\n", ip6_sprintf(from_src));
     mip6_debug("IP Header Dst:      %s\n",
-	       ip6_sprintf(&mip6_indatap->ip6_dst));
+	       ip6_sprintf(&mip6_inp->ip6_dst));
     mip6_debug("Type/Length/Status: %x / %u / %u\n",
-	       mip6_indatap->ba_opt->type,
-          mip6_indatap->ba_opt->len, mip6_indatap->ba_opt->status);
-    mip6_debug("Seq no/Life time:   %u / %u\n", mip6_indatap->ba_opt->seqno,
-          mip6_indatap->ba_opt->lifetime);
-    mip6_debug("Refresh time:       %u\n", mip6_indatap->ba_opt->refresh);
+	       mip6_inp->ba_opt->type,
+          mip6_inp->ba_opt->len, mip6_inp->ba_opt->status);
+    mip6_debug("Seq no/Life time:   %u / %u\n", mip6_inp->ba_opt->seqno,
+          mip6_inp->ba_opt->lifetime);
+    mip6_debug("Refresh time:       %u\n", mip6_inp->ba_opt->refresh);
 
-    if (mip6_indatap->ba_opt->len > IP6OPT_BALEN) {
+    if (mip6_inp->ba_opt->len > IP6OPT_BALEN) {
         offset = mip6_opt_offset(m_in, off, IP6OPT_BINDING_ACK);
         if (offset == 0)
             goto end_debug;
 
         mip6_debug("Sub-options present (TLV coded)\n");
-        for (ii = IP6OPT_BALEN; ii < mip6_indatap->ba_opt->len; ii++) {
+        for (ii = IP6OPT_BALEN; ii < mip6_inp->ba_opt->len; ii++) {
             if ((ii - IP6OPT_BALEN) % 16 == 0)
                 mip6_debug("\t0x:");
             if ((ii - IP6OPT_BALEN) % 4 == 0)
@@ -513,7 +513,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 #endif
 
     /* Check the status field in the BA. */
-    if (mip6_indatap->ba_opt->status < 128) {
+    if (mip6_inp->ba_opt->status < 128) {
         /* BA was accepted. Update corresponding entry in the BUL. Stop
            retransmitting the BU. */
         bul_entry->no_of_sent_bu = 0;
@@ -540,7 +540,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
                 free(esp->dad, M_TEMP);
                 esp->dad = NULL;
             }
-            
+
             /* Update the state for the home address. */
             if (esp->state == MIP6_STATE_DEREG) {
                 mip6_bul_delete(bul_entry);
@@ -566,25 +566,25 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 		if (mip6_tunnel(&esp->coa, &esp->ha_hn,
 				MIP6_TUNNEL_MOVE, MIP6_NODE_MN, (void *)esp))
 			return IPPROTO_DONE;
-		
+
                 /* Send BU to each CN in the BUL to update the BC entry. */
-                bul_entry->lifetime = mip6_indatap->ba_opt->lifetime;
-                bul_entry->refreshtime = mip6_indatap->ba_opt->refresh;
+                bul_entry->lifetime = mip6_inp->ba_opt->lifetime;
+                bul_entry->refreshtime = mip6_inp->ba_opt->refresh;
                 mip6_update_cns(&esp->home_addr, &esp->coa, 0,
                                 bul_entry->lifetime);
             }
         }
         return 0;
     }
-    
+
     /* Remove the BUL entry and process the error (order is important). */
     bind_addr = bul_entry->bind_addr;
     hr_flag = bul_entry->hr_flag;
     mip6_bul_delete(bul_entry);
-    
-    error = mip6_ba_error(from_src, &mip6_indatap->ip6_dst,
+
+    error = mip6_ba_error(from_src, &mip6_inp->ip6_dst,
                           &bind_addr, hr_flag);
-    return error;    
+    return error;
 }
 
 
@@ -619,23 +619,23 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 #endif
 
     /* Make sure that the BA contains a valid AH or ESP header. */
-    if (mip6_indatap->br_opt->type != IP6OPT_BINDING_REQ) {
+    if (mip6_inp->br_opt->type != IP6OPT_BINDING_REQ) {
         ip6stat.ip6s_badoptions++;
         return IPPROTO_DONE;
     }
 
 #ifdef MIP6_DEBUG
     mip6_debug("\nReceived Binding Request\n");
-    mip6_debug("Type/Length: %x / %u\n", mip6_indatap->br_opt->type,
-          mip6_indatap->br_opt->len);
-    
-    if (mip6_indatap->br_opt->len > IP6OPT_BRLEN) {
+    mip6_debug("Type/Length: %x / %u\n", mip6_inp->br_opt->type,
+          mip6_inp->br_opt->len);
+
+    if (mip6_inp->br_opt->len > IP6OPT_BRLEN) {
         offset = mip6_opt_offset(m_in, off, IP6OPT_BINDING_REQ);
         if (offset == 0)
             goto end_debug;
 
         mip6_debug("Sub-options present (TLV coded)\n");
-        for (ii = IP6OPT_BRLEN; ii < mip6_indatap->br_opt->len; ii++) {
+        for (ii = IP6OPT_BRLEN; ii < mip6_inp->br_opt->len; ii++) {
 	    if (m->m_len < offset + 2 + ii + 1)
 		break;
             if ((ii - IP6OPT_BRLEN) % 16 == 0)
@@ -654,7 +654,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 #endif
 
     /* Check if the BR includes a Unique Identifier sub-option. */
-    if (mip6_indatap->br_opt->len > IP6OPT_BRLEN) {
+    if (mip6_inp->br_opt->len > IP6OPT_BRLEN) {
         /* Received tunneled Router Advertisement when the MN's home subnet
            is renumbered while the MN is away from home. */
         /* XXX Code have to be added. */
@@ -662,23 +662,23 @@ int          off;   /* Offset from start of mbuf to start of dest option */
         /* A CN is requesting the MN to send a BU to update its BC. */
         /* Find the source address for the incoming packet (it may include
            a home address option). */
-        if (mip6_indatap->optflag & MIP6_DSTOPT_HA)
-            from_src = &mip6_indatap->ha_opt->home_addr;
+        if (mip6_inp->optflag & MIP6_DSTOPT_HA)
+            from_src = &mip6_inp->ha_opt->home_addr;
         else
-            from_src = &mip6_indatap->ip6_src;
+            from_src = &mip6_inp->ip6_src;
 
         /* Find out which lifetime to use in the BU */
-        bul_entry_cn = mip6_bul_find(from_src, &mip6_indatap->ip6_dst);
+        bul_entry_cn = mip6_bul_find(from_src, &mip6_inp->ip6_dst);
         if (bul_entry_cn == NULL)
             return IPPROTO_DONE;
 
-        esp = mip6_esm_find(&mip6_indatap->ip6_dst);
+        esp = mip6_esm_find(&mip6_inp->ip6_dst);
         if (esp == NULL) {
             log(LOG_ERR, "%s: no event-state machine found\n", __FUNCTION__);
             return IPPROTO_DONE;
         }
 
-        bul_entry_ha = mip6_bul_find(&esp->ha_hn, &mip6_indatap->ip6_dst);
+        bul_entry_ha = mip6_bul_find(&esp->ha_hn, &mip6_inp->ip6_dst);
         if (bul_entry_ha == NULL)
             return IPPROTO_DONE;
 
@@ -689,7 +689,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
                                     bul_entry_ha->lifetime);
             if (bu_opt == NULL)
                 return IPPROTO_DONE;
-            
+
             altcoa.type = IP6SUBOPT_ALTCOA;
             altcoa.len = IP6OPT_COALEN;
             altcoa.coa = bul_entry_cn->coa;
@@ -698,7 +698,7 @@ int          off;   /* Offset from start of mbuf to start of dest option */
                     free(subbuf, M_TEMP);
                 return IPPROTO_DONE;
             }
-            
+
             mip6_outq_create(bu_opt, subbuf, &esp->home_addr,
                              from_src, NOT_SENT);
 
@@ -745,7 +745,7 @@ struct mip6_subopt_hal  *hal;  /* List of HA's on the home link */
     int    found, ii, new_len, index;
 
     subbuf = NULL;
-    
+
     /* Find the event-state machine */
     esp = mip6_esm_find(dst);
     if (esp == NULL) {
@@ -819,11 +819,11 @@ struct mip6_subopt_hal  *hal;  /* List of HA's on the home link */
                            &esp->coa, MIP6_BU_LIFETIME_DHAAD, 1);
     if (bulp == NULL)
         return IPPROTO_DONE;
-    
+
     /* Send a BU registration to the Home Agent with highest preference. */
     bu_data.prefix_len = esp->prefix_len;
     bu_data.ack = 1;
-    
+
     if (mip6_send_bu(bulp, &bu_data, subbuf) != 0)
         return IPPROTO_DONE;
 
@@ -869,7 +869,7 @@ int           off;  /* Offset from start of mbuf to start of RA */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
     long time_second = time.tv_sec;
 #endif
-    
+
     /* Find out if the RA can be processed */
     ip6 = mtod(m, struct ip6_hdr *);
     if (ip6->ip6_hlim != 255) {
@@ -982,7 +982,7 @@ int           off;  /* Offset from start of mbuf to start of RA */
                     }
                 }
             }
-            
+
             cur_off += 4 * 8;
             continue;
         } else {
@@ -1026,7 +1026,7 @@ struct mbuf *m;  /* Mbuf containing the entire IPv6 packet */
 	   the original sender of the packet. */
 	if (!(m->m_flags & M_MIP6TUNNEL))
 		return 0;
-	
+
 	ip6 = mtod(m, struct ip6_hdr *);
 	esp = mip6_esm_find(&ip6->ip6_dst);
 	if (esp == NULL)
@@ -1138,7 +1138,7 @@ struct mip6_subbuf   *subbuf;
     /* Make sure that it's allowed to send a BU */
     if (bulp == NULL)
         return 0;
-    
+
     if (!bulp->bu_flag) {
         log(LOG_INFO,
             "%s: BU not sent to host %s due to an ICMP Parameter Problem, "
@@ -1159,7 +1159,7 @@ struct mip6_subbuf   *subbuf;
             __FUNCTION__, ip6_sprintf(&bulp->bind_addr));
         return 0;
     }
-        
+
     /* Evaluate the parameters according to the note in the function header */
     if ((data == NULL) && (subbuf == NULL)) {
         if ((bulp->state == NULL) || (bulp->state->bu_opt == NULL)) {
@@ -1238,7 +1238,7 @@ struct mip6_subbuf   *subbuf;
     /* Update Binding Update List variables. */
     bulp->lasttime = time_second;
     bulp->no_of_sent_bu += 1;
-    
+
     if ( !(bu_opt->flags & MIP6_BU_AFLAG)) {
         if (bulp->no_of_sent_bu >= MIP6_MAX_FAST_UPDATES)
             bulp->update_rate = MIP6_SLOW_UPDATE_RATE;
@@ -1322,7 +1322,7 @@ u_int32_t         lifetime;  /* Lifetime for BU */
             return;
         }
     }
-    
+
     /* Find an existing or create a new BUL entry. */
     bulp = mip6_bul_find(NULL, old_coa);
     if (bulp == NULL) {
@@ -1348,10 +1348,10 @@ u_int32_t         lifetime;  /* Lifetime for BU */
 
     /* Send the Binding Update option */
     subbuf = NULL;
-    
+
     bu_data.prefix_len = 0;
     bu_data.ack = 0;
-    
+
     altcoa.type = IP6SUBOPT_ALTCOA;
     altcoa.len = IP6OPT_COALEN;
     altcoa.coa = *coa;
@@ -1360,7 +1360,7 @@ u_int32_t         lifetime;  /* Lifetime for BU */
             free(subbuf, M_TEMP);
         return;
     }
-    
+
     if (mip6_send_bu(bulp, &bu_data, subbuf) != 0)
         return;
 }
@@ -1394,7 +1394,7 @@ u_int32_t         lifetime;    /* Lifetime for BU registration */
             !IN6_ARE_ADDR_EQUAL(coa, &bulp->coa)) {
 
             /* Queue a BU for transmission to the node. */
-            mip6_queue_bu(bulp, home_addr, coa, prefix_len, lifetime); 
+            mip6_queue_bu(bulp, home_addr, coa, prefix_len, lifetime);
 
             /* Remove BUL entry if it's a de-registration. */
             if (IN6_ARE_ADDR_EQUAL(home_addr, coa) || (lifetime == 0))
@@ -1438,7 +1438,7 @@ u_int32_t         lifetime;   /* Lifetime for BU registration */
     /* Check if it's allowed to send a BU to this node. */
     if ((coa == NULL) || (bulp == NULL))
         return;
-    
+
     if (bulp->bu_flag == 0) {
         log(LOG_INFO,
             "%s: BU not sent to host %s due to an ICMP Parameter Problem, "
@@ -1595,31 +1595,31 @@ u_int8_t          hr_flag;    /* Home reg flag in BU causing this error */
     struct mip6_bu_data  bu_data;  /* Data used when a BU is created */
     u_int32_t            lifetime;
     int                  error, max_index;
-    
-    if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_UNSPEC) {
+
+    if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_UNSPEC) {
         /* Reason unspecified
            Received when either a Home Agent or Correspondent Node was
            not able to process the BU. */
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d "
             "(Reason unspecified) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
-    } else if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_PROHIBIT) {
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
+    } else if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_PROHIBIT) {
         /* Administratively prohibited */
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d "
             "(Administratively prohibited) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
         log(LOG_INFO, "Contact your system administrator\n");
-    } else if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_RESOURCE) {
+    } else if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_RESOURCE) {
         /* Insufficient resources
            Received when a Home Agent receives a BU with the H-bit set and
            insufficient space exist or can be reclaimed (sec. 8.7). */
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d "
             "(Insufficient resources) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
-    } else if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_HOMEREGNOSUP) {
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
+    } else if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_HOMEREGNOSUP) {
         /* Home registration not supported
            Received when a primary care-of address registration (sec. 9.3)
            is done and the node is not a router implementing Home Agent
@@ -1627,8 +1627,8 @@ u_int8_t          hr_flag;    /* Home reg flag in BU causing this error */
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d "
             "(Home registration not supported) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
-    } else if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_SUBNET) {
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
+    } else if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_SUBNET) {
         /* Not home subnet
            Received when a primary care-of address registration (sec. 9.3)
            is done and the home address for the binding is not an on-link
@@ -1637,14 +1637,14 @@ u_int8_t          hr_flag;    /* Home reg flag in BU causing this error */
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d "
             "(Not home subnet) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
-    } else if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_DHAAD) {
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
+    } else if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_DHAAD) {
         /* Dynamic Home Agent Address Discovery
            Received when a Mobile Node is trying to find out the global
            address of the home agents on its home subnetwork (sec 9.2). */
-        error = mip6_rec_hal(src, dst, mip6_indatap->hal);
+        error = mip6_rec_hal(src, dst, mip6_inp->hal);
         return error;
-    } else if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_IFLEN) {
+    } else if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_IFLEN) {
         /* Incorrect subnet prefix length
            Received when a primary care-of address registration (sec. 9.3)
            is done and the prefix length in the BU differs from the length
@@ -1653,8 +1653,8 @@ u_int8_t          hr_flag;    /* Home reg flag in BU causing this error */
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d "
             "(Incorrect subnet prefix length) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
-    } else if (mip6_indatap->ba_opt->status == MIP6_BA_STATUS_NOTHA) {
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
+    } else if (mip6_inp->ba_opt->status == MIP6_BA_STATUS_NOTHA) {
         /* Not Home Agent for this Mobile Node
            Received when a primary care-of address de-registration (sec. 9.4)
            is done and the Home Agent has no entry for this mobil node marked
@@ -1662,11 +1662,11 @@ u_int8_t          hr_flag;    /* Home reg flag in BU causing this error */
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d "
             "(Not Home Agent for this Mobile Node) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
     } else {
         log(LOG_INFO,
             "\nBinding Acknowledgement error = %d (Unknown) from host %s\n",
-            mip6_indatap->ba_opt->status, ip6_sprintf(src));
+            mip6_inp->ba_opt->status, ip6_sprintf(src));
     }
 
     /* Furthr processing according to the desription in the header. */
@@ -1695,7 +1695,7 @@ u_int8_t          hr_flag;    /* Home reg flag in BU causing this error */
             esp->coa = in6addr_any;
             return 0;
         }
-        
+
         /* If it's a registration, perform dynamic home agent address
            discovery or use the existing. */
         if (esp->dad) {
@@ -1737,7 +1737,7 @@ u_int8_t          hr_flag;    /* Home reg flag in BU causing this error */
             dst_addr = &esp->ha_hn;
             lifetime = mip6_config.hr_lifetime;
         }
-        
+
         /* Create a new BUL entry and send a BU to the Home Agent */
         bulp = mip6_bul_create(dst_addr, &esp->home_addr, &esp->coa,
                                lifetime, 1);
@@ -1962,7 +1962,7 @@ u_int8_t              hr;         /* Home registration flag */
         mip6_bulq = bulp;
     }
     splx(s);
-	
+
 #ifdef MIP6_DEBUG
     mip6_debug("\nBinding Update List Entry created (0x%x)\n", bulp);
     mip6_debug("Destination Address: %s\n", ip6_sprintf(&bulp->dst_addr));
@@ -2080,7 +2080,7 @@ u_int16_t        lifetime;   /* Lifetime for event-state machine */
 {
     struct mip6_esm  *esp, *esp_tmp;
     int               start_timer, s;
-    
+
     esp = (struct mip6_esm *)malloc(sizeof(struct mip6_esm), M_TEMP, M_WAITOK);
     if (esp == NULL) {
         log(LOG_ERR,
@@ -2167,7 +2167,7 @@ struct mip6_esm  *esm_remove;    /* Event-state machine to be deleted */
 
 	    mip6_tunnel(NULL, NULL, MIP6_TUNNEL_DEL, MIP6_NODE_MN,
 			(void *)esp);
-	    
+
             if (esp->dad) {
                 if (esp->dad->hal)
                     free(esp->dad->hal, M_TEMP);
@@ -2211,7 +2211,7 @@ struct mip6_esm  *esm_remove;    /* Event-state machine to be deleted */
  * Ret value:   0 Everything is OK
  *              Otherwise appropriate error code
  * Note:        If the outqueue timeout function has not been started it is
- *              started. The outqueue timeout function will be called once 
+ *              started. The outqueue timeout function will be called once
  *              every MIP6_OUTQ_INTERVAL second until there are no more entries
  *              in the list.
  ******************************************************************************
@@ -2297,7 +2297,7 @@ struct mip6_output  *oqp_remove;    /* Output queue entry to be deleted */
             mip6_debug("\nOutput Queue entry deleted (0x%x)\n", oqp);
 #endif
             free(oqp, M_TEMP);
-            
+
             /* Remove the timer if the output queue is empty */
             if (mip6_outq == NULL) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -2422,7 +2422,7 @@ mip6_outq_flush()
             outp = mip6_outq_delete(outp);
         else
             outp = outp->next;
-        
+
         /* Remove the timer if the output queue is empty */
         if (mip6_outq == NULL) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -2447,7 +2447,7 @@ mip6_outq_flush()
  # reducing timer counters and removing entries from the list if needed.
  #
  ##############################################################################
- */	
+ */
 
 /*
  ******************************************************************************
@@ -2572,7 +2572,7 @@ void  *arg;  /* Not used */
  ******************************************************************************
  * Function:    mip6_timer_bul
  * Description: Search the Binding Update list for entries for which the life-
- *              time or refresh time has expired. 
+ *              time or refresh time has expired.
  *              If there are more entries left in the output queue, call this
  *              fuction again once every second until the queue is empty.
  * Ret value:   -
@@ -2612,7 +2612,7 @@ void  *arg;   /* Not used */
             bulp = bulp->next;
             continue;
         }
-            
+
         bulp->lifetime -= 1;
         if (bulp->lifetime == 0) {
             if ((bulp->hr_flag) && (esp->type == PERMANENT)) {
@@ -2651,7 +2651,7 @@ void  *arg;   /* Not used */
                                            &bulp->coa, lifetime, 1);
                 if (new_bulp == NULL)
                     break;
-                
+
                 bu_data.prefix_len = esp->prefix_len;
                 bu_data.ack = 1;
 
@@ -2723,7 +2723,7 @@ void  *arg;   /* Not used */
                     free(subbuf, M_TEMP);
                 break;
             }
-            
+
             if (bulp->hr_flag) {
                 /* Since this is an entry for the Home Agent a new BU
                    is being sent for which we require the receiver to
@@ -2828,7 +2828,7 @@ void  *arg;  /* Not used */
  ##############################################################################
  */
 
-/* 
+/*
  ******************************************************************************
  * Function:    mip6_write_config_data_mn
  * Description: This function is called to write certain config values for
@@ -2869,7 +2869,7 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 	ifp = ifunit(input->if_name);
 	if (ifp == NULL)
 	    return EINVAL;
-	
+
 	p = mip6_esm_create(ifp, &input->ha_addr, &any,
 			    &input->ip6_addr, input->prefix_len,
 			    MIP6_STATE_UNDEF, PERMANENT, 0xFFFF);
@@ -2887,7 +2887,7 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 	break;
 
     case SIOCDCOADDR_MIP6:
-	input = (struct mip6_input_data *) arg;           
+	input = (struct mip6_input_data *) arg;
 	for (np = mip6_config.fna_list.lh_first; np != NULL;
 	     np = np->addr_entry.le_next){
 	    if (IN6_ARE_ADDR_EQUAL(&input->ip6_addr, &np->ip6_addr))
@@ -2905,7 +2905,7 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 
 
 
-/* 
+/*
  ******************************************************************************
  * Function:    mip6_clear_config_data_mn
  * Description: This function is called to clear internal lists handled by
@@ -2945,7 +2945,7 @@ int mip6_clear_config_data_mn(u_long cmd, caddr_t data)
 
 
 
-/* 
+/*
  ******************************************************************************
  * Function:    mip6_enable_func_mn
  * Description: This function is called to enable or disable certain functions
@@ -2962,9 +2962,9 @@ int mip6_enable_func_mn(u_long cmd, caddr_t data)
 
     switch (cmd) {
     case SIOCSPROMMODE_MIP6:
-	mip6_config.enable_prom_mode = enable;            
+	mip6_config.enable_prom_mode = enable;
 	break;
-	
+
     case SIOCSBU2CN_MIP6:
 	mip6_config.enable_bu_to_cn = enable;
 	break;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_io.c,v 1.4 2000/02/22 14:04:25 itojun Exp $	*/
+/*	$KAME: mip6_io.c,v 1.5 2000/02/26 18:08:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_io.c,v 1.4 2000/02/22 14:04:25 itojun Exp $
+ * $Id: mip6_io.c,v 1.5 2000/02/26 18:08:39 itojun Exp $
  *
  */
 
@@ -69,7 +69,7 @@ struct mip6_esm * (*mip6_esm_find_hook)(struct in6_addr *) = 0;
 
 
 /* Declaration of Global variables. */
-struct mip6_indata  *mip6_indatap = NULL;
+struct mip6_indata  *mip6_inp = NULL;
 struct mip6_output  *mip6_outq = NULL;
 
 
@@ -88,7 +88,7 @@ struct mip6_output  *mip6_outq = NULL;
  ******************************************************************************
  * Function:    mip6_new_packet
  * Description: Called once when a new IPv6 packet is received. Resets the
- *              mip6_indatap variable needed later when options in the dest-
+ *              mip6_inp variable needed later when options in the dest-
  *              ination header are validated.
  * Ret value:   0 if OK. Otherwise IPPROTO_DONE.
  * Note:        A prerequisite for this function is that the AH or ESP header
@@ -102,34 +102,32 @@ struct mbuf  *m;   /* Mbuf containing IPv6 header */
 {
     /* If memory for global variable mip6_indata already allocated,
        discard it. */
-    if (mip6_indatap != NULL) {
-        if (mip6_indatap->bu_opt != NULL)
-            free(mip6_indatap->bu_opt, M_TEMP);
-        if (mip6_indatap->ba_opt != NULL)
-            free(mip6_indatap->ba_opt, M_TEMP);
-        if (mip6_indatap->br_opt != NULL)
-            free(mip6_indatap->br_opt, M_TEMP);
-        if (mip6_indatap->ha_opt != NULL)
-            free(mip6_indatap->ha_opt, M_TEMP);
-        if (mip6_indatap->uid != NULL)
-            free(mip6_indatap->uid, M_TEMP);
-        if (mip6_indatap->coa != NULL)
-            free(mip6_indatap->coa, M_TEMP);
-        if (mip6_indatap->hal != NULL)
-            free(mip6_indatap->hal, M_TEMP);
-        free(mip6_indatap, M_TEMP);
-        mip6_indatap = NULL;
+    if (mip6_inp != NULL) {
+        if (mip6_inp->bu_opt != NULL)
+            free(mip6_inp->bu_opt, M_TEMP);
+        if (mip6_inp->ba_opt != NULL)
+            free(mip6_inp->ba_opt, M_TEMP);
+        if (mip6_inp->br_opt != NULL)
+            free(mip6_inp->br_opt, M_TEMP);
+        if (mip6_inp->ha_opt != NULL)
+            free(mip6_inp->ha_opt, M_TEMP);
+        if (mip6_inp->uid != NULL)
+            free(mip6_inp->uid, M_TEMP);
+        if (mip6_inp->coa != NULL)
+            free(mip6_inp->coa, M_TEMP);
+        if (mip6_inp->hal != NULL)
+            free(mip6_inp->hal, M_TEMP);
+        free(mip6_inp, M_TEMP);
+        mip6_inp = NULL;
     }
 
-    /* Allocate memory for global variable mip6_indatap */
-    mip6_indatap = (struct mip6_indata *)
+    /* Allocate memory for global variable mip6_inp */
+    mip6_inp = (struct mip6_indata *)
         malloc(sizeof(struct mip6_indata), M_TEMP, M_WAITOK);
-    if (mip6_indatap == NULL)
+    if (mip6_inp == NULL)
         panic("%s: We should not come here !!!!", __FUNCTION__);
-    bzero(mip6_indatap, sizeof(struct mip6_indata));
+    bzero(mip6_inp, sizeof(struct mip6_indata));
 
-    /* If we are acting as a MN we have to check if a BU shall be sent
-       to the source of the incoming packet. */
     return 0;
 }
 
@@ -220,13 +218,13 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
     switch (*opt) {
         case IP6OPT_BINDING_UPDATE:
             /* Allocate and store Binding Update option data */
-            mip6_indatap->bu_opt = (struct mip6_opt_bu *)
+            mip6_inp->bu_opt = (struct mip6_opt_bu *)
                 malloc(sizeof(struct mip6_opt_bu), M_TEMP, M_WAITOK);
-            if (mip6_indatap->bu_opt == NULL)
+            if (mip6_inp->bu_opt == NULL)
                 return ENOBUFS;
-            bzero(mip6_indatap->bu_opt, sizeof(struct mip6_opt_bu));
+            bzero(mip6_inp->bu_opt, sizeof(struct mip6_opt_bu));
 
-            bu_opt = mip6_indatap->bu_opt;
+            bu_opt = mip6_inp->bu_opt;
 	    m_copydata(mp, optoff, sizeof(bu_opt->type),
 	        (caddr_t)&bu_opt->type);
             tmplen = sizeof(bu_opt->type);
@@ -250,7 +248,7 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             bu_opt->lifetime = ntohl(bu_opt->lifetime);
 
             /* Set the BU option present flag */
-            mip6_indatap->optflag |= MIP6_DSTOPT_BU;
+            mip6_inp->optflag |= MIP6_DSTOPT_BU;
 
             /* If sub-options are present, store them as well. */
             if (bu_opt->len > IP6OPT_BULEN) {
@@ -262,13 +260,13 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             break;
         case IP6OPT_BINDING_ACK:
             /* Allocate and store all Binding Acknowledgement option data */
-            mip6_indatap->ba_opt = (struct mip6_opt_ba *)
+            mip6_inp->ba_opt = (struct mip6_opt_ba *)
                 malloc(sizeof(struct mip6_opt_ba), M_TEMP, M_WAITOK);
-            if (mip6_indatap->ba_opt == NULL)
+            if (mip6_inp->ba_opt == NULL)
                 return ENOBUFS;
-            bzero(mip6_indatap->ba_opt, sizeof(struct mip6_opt_ba));
+            bzero(mip6_inp->ba_opt, sizeof(struct mip6_opt_ba));
 
-            ba_opt = mip6_indatap->ba_opt;
+            ba_opt = mip6_inp->ba_opt;
 	    m_copydata(mp, optoff, sizeof(ba_opt->type),
 		(caddr_t)&ba_opt->type);
             tmplen = sizeof(ba_opt->type);
@@ -293,7 +291,7 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             ba_opt->refresh = ntohl(ba_opt->refresh);
 
             /* Set the BA option present flag */
-            mip6_indatap->optflag |= MIP6_DSTOPT_BA;
+            mip6_inp->optflag |= MIP6_DSTOPT_BA;
 
             /* If sub-options are present, store them as well */
             if (ba_opt->len > IP6OPT_BALEN) {
@@ -305,13 +303,13 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             break;
         case IP6OPT_BINDING_REQ:
             /* Allocate and store Binding Update option data */
-            mip6_indatap->br_opt = (struct mip6_opt_br *)
+            mip6_inp->br_opt = (struct mip6_opt_br *)
                 malloc(sizeof(struct mip6_opt_br), M_TEMP, M_WAITOK);
-            if (mip6_indatap->br_opt == NULL)
+            if (mip6_inp->br_opt == NULL)
                 return ENOBUFS;
-            bzero(mip6_indatap->br_opt, sizeof(struct mip6_opt_br));
+            bzero(mip6_inp->br_opt, sizeof(struct mip6_opt_br));
 
-            br_opt = mip6_indatap->br_opt;
+            br_opt = mip6_inp->br_opt;
 	    m_copydata(mp, optoff, sizeof(br_opt->type),
                 (caddr_t)&br_opt->type);
             tmplen = sizeof(br_opt->type);
@@ -320,7 +318,7 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             tmplen += sizeof(br_opt->len);
 
             /* Set the BR option present flag */
-            mip6_indatap->optflag |= MIP6_DSTOPT_BR;
+            mip6_inp->optflag |= MIP6_DSTOPT_BR;
 
             /* If sub-options are present, store them as well. */
             if (br_opt->len > IP6OPT_BRLEN) {
@@ -332,14 +330,14 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             break;
         case IP6OPT_HOME_ADDRESS:
             /* Allocate and store Home Address option data */
-            mip6_indatap->ha_opt = (struct mip6_opt_ha *)
+            mip6_inp->ha_opt = (struct mip6_opt_ha *)
                 malloc(sizeof(struct mip6_opt_ha), M_TEMP, M_WAITOK);
-            if (mip6_indatap->ha_opt == NULL)
+            if (mip6_inp->ha_opt == NULL)
                 return ENOBUFS;
-            bzero(mip6_indatap->ha_opt, sizeof(struct mip6_opt_ha));
+            bzero(mip6_inp->ha_opt, sizeof(struct mip6_opt_ha));
 
             /* Store Home Address option data */
-            ha_opt = mip6_indatap->ha_opt;
+            ha_opt = mip6_inp->ha_opt;
 	    m_copydata(mp, optoff, sizeof(ha_opt->type),
                 (caddr_t)&ha_opt->type);
             tmplen = sizeof(ha_opt->type);
@@ -351,7 +349,7 @@ u_int8_t     optoff;  /* Offset from beginning of mbuf to start of current
             tmplen += sizeof(ha_opt->home_addr);
 
             /* Set the HA option present flag */
-            mip6_indatap->optflag |= MIP6_DSTOPT_HA;
+            mip6_inp->optflag |= MIP6_DSTOPT_HA;
             break;
         default:
             /* We will not come here since the calling function knows
@@ -401,19 +399,19 @@ int          tmplen;  /* Tmp length for positioning in option */
                 }
 
                 /* Allocate and store additional sub-option data */
-                mip6_indatap->uid = (struct mip6_subopt_id *)
+                mip6_inp->uid = (struct mip6_subopt_id *)
                     malloc(sizeof(struct mip6_subopt_id), M_TEMP, M_WAITOK);
-                if (mip6_indatap->uid == NULL)
+                if (mip6_inp->uid == NULL)
                     return ENOBUFS;
-                bzero(mip6_indatap->uid, sizeof(struct mip6_subopt_id));
+                bzero(mip6_inp->uid, sizeof(struct mip6_subopt_id));
 
 		m_copydata(mp, optoff + tmplen, sizeof(struct mip6_subopt_id),
-                    (caddr_t)mip6_indatap->uid);
+                    (caddr_t)mip6_inp->uid);
                 tmplen += sizeof(struct mip6_subopt_id);
-                mip6_indatap->uid->id = ntohs(mip6_indatap->uid->id);
+                mip6_inp->uid->id = ntohs(mip6_inp->uid->id);
 
                 /* Set the Unique Id sub-option present flag */
-                mip6_indatap->optflag |= MIP6_DSTOPT_UID;
+                mip6_inp->optflag |= MIP6_DSTOPT_UID;
                 break;
             case IP6SUBOPT_HALIST:
                 /* Make sure that the length is OK */
@@ -424,16 +422,16 @@ int          tmplen;  /* Tmp length for positioning in option */
 
                 /* Allocate and store additional sub-option data */
                 len = *(opt + tmplen +1) / IP6OPT_HALISTLEN;
-                mip6_indatap->hal = (struct mip6_subopt_hal *)
+                mip6_inp->hal = (struct mip6_subopt_hal *)
                     malloc(sizeof(struct mip6_subopt_hal) +
                            (len - 1) * sizeof(struct in6_addr),
                            M_TEMP, M_WAITOK);
-                if (mip6_indatap->hal == NULL) {
+                if (mip6_inp->hal == NULL) {
                     MIP6_FREEINDATA;
                     return ENOMEM;
                 }
 
-                hal = mip6_indatap->hal;
+                hal = mip6_inp->hal;
 		m_copydata(mp, optoff + tmplen, sizeof(hal->type),
                     (caddr_t)&hal->type);
                 tmplen += sizeof(hal->type);
@@ -441,14 +439,14 @@ int          tmplen;  /* Tmp length for positioning in option */
                     (caddr_t)&hal->len);
                 tmplen += sizeof(hal->len);
 
-                /* Loop over the addresses */                
+                /* Loop over the addresses */
                 for (ii = 0; ii < len; ii++) {
 		    m_copydata(mp, optoff, tmplen, (caddr_t)&hal->halist[ii]);
                     tmplen += sizeof(struct in6_addr);
                 }
 
                 /* Set the BA HA List sub-option present flag */
-                mip6_indatap->optflag |= MIP6_DSTOPT_HAL;
+                mip6_inp->optflag |= MIP6_DSTOPT_HAL;
                 break;
             case IP6SUBOPT_ALTCOA:
                 /* Make sure that the length is OK */
@@ -458,13 +456,13 @@ int          tmplen;  /* Tmp length for positioning in option */
                 }
 
                 /* Allocate and store additional sub-option data */
-                mip6_indatap->coa = (struct mip6_subopt_coa *)
+                mip6_inp->coa = (struct mip6_subopt_coa *)
                     malloc(sizeof(struct mip6_subopt_coa), M_TEMP, M_WAITOK);
-                if (mip6_indatap->coa == NULL)
+                if (mip6_inp->coa == NULL)
                     return ENOBUFS;
-                bzero(mip6_indatap->coa, sizeof(struct mip6_subopt_coa));
+                bzero(mip6_inp->coa, sizeof(struct mip6_subopt_coa));
 
-                coa = mip6_indatap->coa;
+                coa = mip6_inp->coa;
 		m_copydata(mp, optoff + tmplen, sizeof(coa->type),
                     (caddr_t)&coa->type);
                 tmplen += sizeof(coa->type);
@@ -476,7 +474,7 @@ int          tmplen;  /* Tmp length for positioning in option */
                 tmplen += sizeof(coa->coa);
 
                 /* Set the Alternate COA sub-option present flag */
-                mip6_indatap->optflag |= MIP6_DSTOPT_COA;
+                mip6_inp->optflag |= MIP6_DSTOPT_COA;
                 break;
             default:
                 /* Quietly ignore and skip over the sub-option.
@@ -533,7 +531,7 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
 
     /* We have to maintain a list of all prefixes announced by the
        rtadvd deamon (for on-link determination). */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))    
+#if (defined(MIP6_HA) || defined(MIP6_MODULES))
     if (MIP6_IS_HA_ACTIVE) {
         if (ip6->ip6_nxt == IPPROTO_ICMPV6)
             if (mip6_icmp6_output_hook) (*mip6_icmp6_output_hook)(m);
@@ -554,7 +552,7 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
     /* If this is a MN and the source address is one of the home addresses
        for the MN then a Home Address option must be inserted. */
     esp = NULL;
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))    
+#if (defined(MIP6_MN) || defined(MIP6_MODULES))
     if (MIP6_IS_MN_ACTIVE) {
         if (mip6_esm_find_hook)
             esp = (*mip6_esm_find_hook)(&ip6->ip6_src);
@@ -567,7 +565,7 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
                 bzero(opt, sizeof(struct ip6_pktopts));
                 opt->ip6po_hlim = -1;  /* -1 means to use default hop limit */
             }
-            
+
             mip6_dest_offset(opt->ip6po_dest2, &off);
             if ((error = mip6_add_ha(&opt->ip6po_dest2,
                                      &off, &ip6->ip6_src, &esp->coa)) != 0)
@@ -1041,7 +1039,7 @@ struct mip6_subbuf  *subopt;  /* BU sub-option data (NULL if not present) */
 
     /* Reset BU option length in case of retransmission. */
     optbu->len = IP6OPT_BULEN;
-    
+
     /* Copy the BU data from the internal structure to the Dest Header */
     bcopy((caddr_t)&optbu->type, (caddr_t)dest + *off, sizeof(optbu->type));
     *off += sizeof(optbu->type);
@@ -1302,7 +1300,7 @@ struct mip6_subbuf  *subopt;   /* BR sub-option data (NULL if not present) */
     dstlen = (*off >> 3) - 1;
     bcopy(&dstlen, (caddr_t)dest + 1, 1);
     *dstopt = dest;
-    return 0;	
+    return 0;
 }
 
 
@@ -1334,7 +1332,7 @@ caddr_t              subopt;  /* TLV coded sub-option */
     /* Make sure that a sub-option is present. */
     if (subopt == NULL)
         return 0;
-    
+
     /* Allocate memory for buffer if not already allocated. */
     buf = *subbuf;
     if (buf == NULL) {
@@ -1344,7 +1342,7 @@ caddr_t              subopt;  /* TLV coded sub-option */
             return 1;
         bzero(buf, sizeof(struct mip6_subbuf));
     }
-    
+
     /* Find offset in the current buffer */
     padn = IP6OPT_PADN;
     pad1 = IP6OPT_PAD1;
@@ -1367,11 +1365,11 @@ caddr_t              subopt;  /* TLV coded sub-option */
             bcopy(&uid->type, (caddr_t)buf->buffer + buf->len,
                   sizeof(uid->type));
             buf->len += sizeof(uid->type);
-            
+
             bcopy(&uid->len, (caddr_t)buf->buffer + buf->len,
                   sizeof(uid->len));
             buf->len += sizeof(uid->len);
-            
+
             tmp16 = htons(uid->id);
             bcopy(&tmp16, (caddr_t)buf->buffer + buf->len, sizeof(tmp16));
             buf->len += sizeof(tmp16);
@@ -1381,7 +1379,7 @@ caddr_t              subopt;  /* TLV coded sub-option */
             hal = (struct mip6_subopt_hal *)subopt;
             if (hal->len % IP6OPT_HALISTLEN)
                 return 1;
-            
+
             /* Compensate for the alignment requirement. */
             rest =  buf->len % 8;
             if (rest > 3) {
@@ -1395,7 +1393,7 @@ caddr_t              subopt;  /* TLV coded sub-option */
             } else if (rest == 3) {
                 bcopy(&pad1, (caddr_t)buf->buffer + buf->len, 1);
                 buf->len += 1;
-            } else if (rest <= 1) {                
+            } else if (rest <= 1) {
                 padlen = rest + 4;
                 bcopy(&padn, (caddr_t)buf->buffer + buf->len, 1);
                 buf->len += 1;
@@ -1409,11 +1407,11 @@ caddr_t              subopt;  /* TLV coded sub-option */
             bcopy(&hal->type, (caddr_t)buf->buffer + buf->len,
                   sizeof(hal->type));
             buf->len += sizeof(hal->type);
-            
+
             bcopy(&hal->len, (caddr_t)buf->buffer + buf->len,
                   sizeof(hal->len));
             buf->len += sizeof(hal->len);
-            
+
             /* Loop over the addresses */
             no = hal->len / IP6OPT_HALISTLEN;
             for (ii = 0; ii < no; ii++) {
@@ -1427,7 +1425,7 @@ caddr_t              subopt;  /* TLV coded sub-option */
             altcoa = (struct mip6_subopt_coa *)subopt;
             if (altcoa->len % IP6OPT_COALEN)
                 return 1;
-            
+
             /* Compensate for the alignment requirement. */
             rest =  buf->len % 8;
             if (rest > 3) {
@@ -1441,7 +1439,7 @@ caddr_t              subopt;  /* TLV coded sub-option */
             } else if (rest == 3) {
                 bcopy(&pad1, (caddr_t)buf->buffer + buf->len, 1);
                 buf->len += 1;
-            } else if (rest <= 1) {                
+            } else if (rest <= 1) {
                 padlen = rest + 4;
                 bcopy(&padn, (caddr_t)buf->buffer + buf->len, 1);
                 buf->len += 1;
@@ -1455,15 +1453,15 @@ caddr_t              subopt;  /* TLV coded sub-option */
             bcopy(&altcoa->type, (caddr_t)buf->buffer + buf->len,
                   sizeof(altcoa->type));
             buf->len += sizeof(altcoa->type);
-            
+
             bcopy(&altcoa->len, (caddr_t)buf->buffer + buf->len,
                   sizeof(altcoa->len));
             buf->len += sizeof(altcoa->len);
-            
+
             bcopy(&altcoa->coa, (caddr_t)buf->buffer + buf->len,
                   sizeof(altcoa->coa));
             buf->len += sizeof(altcoa->coa);
-            break;            
+            break;
         default:
     }
     *subbuf = buf;

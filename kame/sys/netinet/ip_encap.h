@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.h,v 1.4 2000/02/22 14:02:01 itojun Exp $	*/
+/*	$KAME: ip_encap.h,v 1.5 2000/02/26 18:08:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,6 +53,7 @@ const struct encaptab *encap_attach __P((int, int, const struct sockaddr *,
 		const struct sockaddr *, const struct sockaddr *,
 		const struct sockaddr *, const struct protosw *, void *));
 int	encap_detach __P((const struct encaptab *));
+void	*encap_getarg __P((struct mbuf *));
 #endif
 
 #endif /*_NETINET_IP_ENCAP_H_*/

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.28 2000/02/22 14:04:20 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.29 2000/02/26 18:08:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -302,6 +302,7 @@ ip6_forward(m, srcrt)
 				return;
 			}
 		}
+		ip6 = mtod(m, struct ip6_hdr *);	/* m has changed */
 	}
 #endif
 	

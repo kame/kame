@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.6 2000/02/22 14:04:25 itojun Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.7 2000/02/26 18:08:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_ha.c,v 1.6 2000/02/22 14:04:25 itojun Exp $
+ * $Id: mip6_ha.c,v 1.7 2000/02/26 18:08:39 itojun Exp $
  *
  */
 
@@ -92,7 +92,7 @@ struct callout_handle  mip6_timer_ll_handle;
 /*
  ******************************************************************************
  * Function:    mip6_ha_init
- * Description: Initialization of MIPv6 variables that must be initialized 
+ * Description: Initialization of MIPv6 variables that must be initialized
  *              before the HA code is executed.
  ******************************************************************************
  */
@@ -100,8 +100,8 @@ void
 mip6_ha_init(void)
 {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-    /* Initialize handle for timer functions. */
-    callout_handle_init(&mip6_timer_ll_handle);
+	/* Initialize handle for timer functions. */
+	callout_handle_init(&mip6_timer_ll_handle);
 #endif
 }
 
@@ -117,22 +117,22 @@ mip6_ha_init(void)
 void
 mip6_ha_exit()
 {
-    struct mip6_link_list *llp;
-    int                    s;
+	struct mip6_link_list *llp;
+	int                    s;
 
-    /* Cancel outstanding timeout function calls. */
+	/* Cancel outstanding timeout function calls. */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-    untimeout(mip6_timer_ll, (void *)NULL, mip6_timer_ll_handle);
+	untimeout(mip6_timer_ll, (void *)NULL, mip6_timer_ll_handle);
 #else
-    untimeout(mip6_timer_ll, (void *)NULL);
+	untimeout(mip6_timer_ll, (void *)NULL);
 #endif
 
-    /* Remove each entry in every queue. */
-    s = splnet();
-    for (llp = mip6_llq; llp;)
-        llp = mip6_ll_delete(llp);
-    mip6_llq = NULL;
-    splx(s);
+	/* Remove each entry in every queue. */
+	s = splnet();
+	for (llp = mip6_llq; llp;)
+		llp = mip6_ll_delete(llp);
+	mip6_llq = NULL;
+	splx(s);
 }
 
 
@@ -163,78 +163,78 @@ mip6_rec_raha(m, off)
 struct mbuf  *m;    /* Mbuf containing the entire IPv6 packet */
 int           off;  /* Offset from start of mbuf to start of RA */
 {
-    struct ifnet            *ifp;   /* Receiving interface */
-    struct ip6_hdr          *ip6;   /* IPv6 header */
-    struct nd_router_advert *ra;    /* Router Advertisement */
-    struct mip6_link_list   *llp;   /* Link list entry */
-    struct mip6_ha_list     *halp;  /* Home Agent list entry */
-    caddr_t  icmp6msg;              /* Copy of mbuf (consequtively) */
-    char     ifname[IFNAMSIZ+1];    /* Interface name */
-    int      res, s, icmp6len;
+	struct ifnet            *ifp;   /* Receiving interface */
+	struct ip6_hdr          *ip6;   /* IPv6 header */
+	struct nd_router_advert *ra;    /* Router Advertisement */
+	struct mip6_link_list   *llp;   /* Link list entry */
+	struct mip6_ha_list     *halp;  /* Home Agent list entry */
+	caddr_t  icmp6msg;              /* Copy of mbuf (consequtively) */
+	char     ifname[IFNAMSIZ+1];    /* Interface name */
+	int      res, s, icmp6len;
 
-    /* Find out if the RA can be processed */
-    ip6 = mtod(m, struct ip6_hdr *);
-    if (ip6->ip6_hlim != 255) {
-        log(LOG_INFO,
-            "%s: Invalid hlim %d in Router Advertisement\n", __FUNCTION__,
-            ip6->ip6_hlim);
-        return 0;
-    }
+	/* Find out if the RA can be processed */
+	ip6 = mtod(m, struct ip6_hdr *);
+	if (ip6->ip6_hlim != 255) {
+		log(LOG_INFO,
+		    "%s: Invalid hlim %d in Router Advertisement\n",
+		    __FUNCTION__, ip6->ip6_hlim);
+		return 0;
+	}
 
-    if (!IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
-        log(LOG_INFO,
-            "%s: Source Address %s is not link-local\n", __FUNCTION__,
-            ip6_sprintf(&ip6->ip6_src));
-        return 0;
-    }
+	if (!IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
+		log(LOG_INFO,
+		    "%s: Source Address %s is not link-local\n",
+		    __FUNCTION__, ip6_sprintf(&ip6->ip6_src));
+		return 0;
+	}
 
-    /* Find out which interface the RA arrived at */
-    ifp = m->m_pkthdr.rcvif;
-    sprintf(ifname, "%s", if_name(ifp));
+	/* Find out which interface the RA arrived at */
+	ifp = m->m_pkthdr.rcvif;
+	sprintf(ifname, "%s", if_name(ifp));
 
-    llp = mip6_ll_find(ifname);
-    if (llp == NULL) {
-        llp = mip6_ll_create(ifname, ifp);
-        if (llp == NULL)
-            return ENOBUFS;
-    }
+	llp = mip6_ll_find(ifname);
+	if (llp == NULL) {
+		llp = mip6_ll_create(ifname, ifp);
+		if (llp == NULL)
+			return ENOBUFS;
+	}
 
-    /* The mbuf data must be stored consequtively to be able to
-       cast data from it. */
-    icmp6len = m->m_pkthdr.len - off;
-    icmp6msg = (caddr_t)malloc(icmp6len, M_TEMP, M_WAITOK);
-    if (icmp6msg == NULL)
-        return IPPROTO_DONE;
+	/* The mbuf data must be stored consequtively to be able to
+	   cast data from it. */
+	icmp6len = m->m_pkthdr.len - off;
+	icmp6msg = (caddr_t)malloc(icmp6len, M_TEMP, M_NOWAIT);
+	if (icmp6msg == NULL)
+		return IPPROTO_DONE;
 
-    m_copydata(m, off, icmp6len, icmp6msg);
-    ra = (struct nd_router_advert *)icmp6msg;
+	m_copydata(m, off, icmp6len, icmp6msg);
+	ra = (struct nd_router_advert *)icmp6msg;
 
-    /* Find the Home Agent sending the RA and read its options.
-       This section must have high priority since the Home Agent
-       list entry lifetime is initialized to 0 and could be
-       removed by the timer function before the RA options have
-       been evaluated. */
-    s = splnet();
-    halp = mip6_hal_find(llp->ha_list, &ip6->ip6_src);
-    if (halp == NULL) {
-        halp = mip6_hal_create(&llp->ha_list, &ip6->ip6_src,
-                               ntohl(ra->nd_ra_router_lifetime), 0);
-        if (halp == NULL) {
-            splx(s);
-            return ENOBUFS;
-        }
-    } else {
-        halp->lifetime = ntohl(ra->nd_ra_router_lifetime);
-        halp->pref = 0;
-    }
+	/* Find the Home Agent sending the RA and read its options.
+	   This section must have high priority since the Home Agent
+	   list entry lifetime is initialized to 0 and could be
+	   removed by the timer function before the RA options have
+	   been evaluated. */
+	s = splnet();
+	halp = mip6_hal_find(llp->ha_list, &ip6->ip6_src);
+	if (halp == NULL) {
+		halp = mip6_hal_create(&llp->ha_list, &ip6->ip6_src,
+				       ntohl(ra->nd_ra_router_lifetime), 0);
+		if (halp == NULL) {
+			splx(s);
+			return ENOBUFS;
+		}
+	} else {
+		halp->lifetime = ntohl(ra->nd_ra_router_lifetime);
+		halp->pref = 0;
+	}
 
-    res = mip6_ra_options(halp, icmp6msg, icmp6len);
-    if (res) {
-        splx(s);
-        return res;
-    }
-    splx(s);
-    return 0;
+	res = mip6_ra_options(halp, icmp6msg, icmp6len);
+	if (res) {
+		splx(s);
+		return res;
+	}
+	splx(s);
+	return 0;
 }
 
 
@@ -263,101 +263,103 @@ struct mip6_ha_list  *halp;      /* Home Agent list entry */
 caddr_t               icmp6msg;  /* icmp6 message */
 int                   icmp6len;  /* Length of icmp6 message */
 {
-    struct mip6_addr_list   *addrp;  /* Address list entry */
-    struct nd_opt_hai       *hai;    /* Home Agent information option */
-    struct nd_opt_advint    *ai;     /* Advertisement Interval option */
-    struct nd_opt_prefix_info *pi;   /* Ptr to prefix information */
-    int       cur_off;               /* Cur offset from start of RA */
-    u_int8_t  *opt_ptr;              /* Ptr to current option in RA */
+	struct mip6_addr_list     *ap;   /* Address list entry */
+	struct nd_opt_hai         *hai;  /* Home Agent information option */
+	struct nd_opt_advint      *ai;   /* Advertisement Interval option */
+	struct nd_opt_prefix_info *pi;   /* Ptr to prefix information */
+	u_int8_t                  *optp; /* Ptr to current option in RA */
+	int       cur_off;               /* Cur offset from start of RA */
 
-    /* Process each option in the RA */
-    cur_off = sizeof(struct nd_router_advert);
-    while (cur_off < icmp6len) {
-        opt_ptr = ((caddr_t)icmp6msg + cur_off);
-        if (*opt_ptr == ND_OPT_PREFIX_INFORMATION) {
-            /* Check the prefix information option */
-            pi = (struct nd_opt_prefix_info *)opt_ptr;
-            if (pi->nd_opt_pi_len != 4) {
-                ip6stat.ip6s_badoptions++;
-                return IPPROTO_DONE;
-            }
+	/* Process each option in the RA */
+	cur_off = sizeof(struct nd_router_advert);
+	while (cur_off < icmp6len) {
+		optp = ((caddr_t)icmp6msg + cur_off);
+		if (*optp == ND_OPT_PREFIX_INFORMATION) {
+			/* Check the prefix information option */
+			pi = (struct nd_opt_prefix_info *)optp;
+			if (pi->nd_opt_pi_len != 4) {
+				ip6stat.ip6s_badoptions++;
+				return IPPROTO_DONE;
+			}
 
-            if (!(pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_RTADDR)) {
-                cur_off += 4 * 8;
-                continue;
-            }
+			if (!(pi->nd_opt_pi_flags_reserved &
+			      ND_OPT_PI_FLAG_RTADDR)) {
+				cur_off += 4 * 8;
+				continue;
+			}
 
-            if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
-                IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix)) {
-                cur_off += 4 * 8;
-                continue;
-            }
+			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
+			    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix)) {
+				cur_off += 4 * 8;
+				continue;
+			}
 
-            /* Aggregatable unicast address, rfc2374 */
-            if (((pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) > 0x10) &&
-                (pi->nd_opt_pi_prefix_len != 64)) {
-                cur_off += 4 * 8;
-                continue;
-            }
+			/* Aggregatable unicast address, rfc2374 */
+			if (((pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) > 0x10)
+			    && (pi->nd_opt_pi_prefix_len != 64)) {
+				cur_off += 4 * 8;
+				continue;
+			}
 
-            /* Store the address if not already present */
-            for (addrp = halp->addr_list; addrp; addrp = addrp->next) {
-                if (IN6_ARE_ADDR_EQUAL(&addrp->ip6_addr,
-                                       &pi->nd_opt_pi_prefix))
-                    break;
-            }
+			/* Store the address if not already present */
+			for (ap = halp->addr_list; ap; ap = ap->next) {
+				if (IN6_ARE_ADDR_EQUAL(&ap->ip6_addr,
+						       &pi->nd_opt_pi_prefix))
+					break;
+			}
 
-            if (addrp == NULL) {
-                /* Create a new address list entry. */
-                addrp = (struct mip6_addr_list *)
-                    malloc(sizeof(struct mip6_addr_list), M_TEMP, M_WAITOK);
-                if (addrp == NULL)
-                    return ENOBUFS;
-                bzero(addrp, sizeof(struct mip6_addr_list));
+			if (ap == NULL) {
+				/* Create a new address list entry. */
+				ap = (struct mip6_addr_list *)
+					malloc(sizeof(struct mip6_addr_list),
+					       M_TEMP, M_WAITOK);
+				if (ap == NULL)
+					return ENOBUFS;
+				bzero(ap, sizeof(struct mip6_addr_list));
 
-                addrp->next = halp->addr_list;
-                addrp->ip6_addr = pi->nd_opt_pi_prefix;
-                addrp->prefix_len = pi->nd_opt_pi_prefix_len;
-                halp->addr_list = addrp;
-            }
-            cur_off += 4 * 8;
-            continue;
-        } else if (*opt_ptr == ND_OPT_ADV_INTERVAL) {
-            /* Check the advertisement interval option */
-            ai = (struct nd_opt_advint *)opt_ptr;
-            if (ai->nd_opt_int_len != 1) {
-                ip6stat.ip6s_badoptions++;
-                return IPPROTO_DONE;
-            }
+				ap->next = halp->addr_list;
+				ap->ip6_addr = pi->nd_opt_pi_prefix;
+				ap->prefix_len = pi->nd_opt_pi_prefix_len;
+				halp->addr_list = ap;
+			}
+			cur_off += 4 * 8;
+			continue;
+		} else if (*optp == ND_OPT_ADV_INTERVAL) {
+			/* Check the advertisement interval option */
+			ai = (struct nd_opt_advint *)optp;
+			if (ai->nd_opt_int_len != 1) {
+				ip6stat.ip6s_badoptions++;
+				return IPPROTO_DONE;
+			}
 
-            /* XXX Send to Mattias. Function call to move detection */
-            cur_off += 8;
-            continue;
-        } else if (*opt_ptr == ND_OPT_HA_INFORMATION) {
-            /* Check the home agent information option */
-            hai = (struct nd_opt_hai *)opt_ptr;
-            if (hai->nd_opt_hai_len != 1) {
-                ip6stat.ip6s_badoptions++;
-                return IPPROTO_DONE;
-            }
+			/* XXX. Function call to move detection */
+			cur_off += 8;
+			continue;
+		} else if (*optp == ND_OPT_HA_INFORMATION) {
+			/* Check the home agent information option */
+			hai = (struct nd_opt_hai *)optp;
+			if (hai->nd_opt_hai_len != 1) {
+				ip6stat.ip6s_badoptions++;
+				return IPPROTO_DONE;
+			}
 
-            halp->pref = ntohs(hai->nd_opt_hai_pref);
-            halp->lifetime = ntohs(hai->nd_opt_hai_lifetime);
-            cur_off += 8;
-            continue;
-        } else {
-            if (*(opt_ptr + 1) == 0) {
-                ip6stat.ip6s_badoptions++;
-                return IPPROTO_DONE;
-            }
-            cur_off += *(opt_ptr + 1) * 8;
-        }
-    }	
-    return 0;
+			halp->pref = ntohs(hai->nd_opt_hai_pref);
+			halp->lifetime = ntohs(hai->nd_opt_hai_lifetime);
+			cur_off += 8;
+			continue;
+		} else {
+			if (*(optp + 1) == 0) {
+				ip6stat.ip6s_badoptions++;
+				return IPPROTO_DONE;
+			}
+			cur_off += *(optp + 1) * 8;
+		}
+	}
+	return 0;
 }
 
 
- 
+
 /*
  ******************************************************************************
  * Function:    mip6_hal_dynamic
@@ -395,7 +397,7 @@ struct in6_addr  *own_addr;   /* Own global unicast source address used */
         return NULL;
 
     sprintf(ifname, "%s", if_name(if_addr->ifa_ifp));
-    
+
     llp = mip6_ll_find(ifname);
     if (llp == NULL)
         return NULL;
@@ -835,12 +837,12 @@ struct mip6_link_list  *llp_del;    /* Link list entry to be deleted */
                 for (halp = llp->ha_list; halp;)
                     halp = mip6_hal_delete(&llp->ha_list, halp);
             }
-			
+
 #ifdef MIP6_DEBUG
             mip6_debug("\nLink List entry deleted (0x%x)\n", llp);
 #endif
             free(llp, M_TEMP);
-            
+
             /* Remove the timer if the BC queue is empty */
             if (mip6_llq == NULL) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -966,7 +968,7 @@ struct mip6_ha_list  **ha_head;  /* Start of Home Agent list */
         /* Move it to the new list */
         if (local_start == NULL)
             local_start = halp_move;
-        else 
+        else
             local_last->next = halp_move;
         local_last = halp_move;
 
@@ -1107,7 +1109,7 @@ void  *arg;  /* Not used */
  ##############################################################################
  */
 
-/* 
+/*
  ******************************************************************************
  * Function:    mip6_write_config_data_ha
  * Description: This function is called to write certain config values for
@@ -1129,7 +1131,7 @@ int mip6_write_config_data_ha(u_long cmd, void *arg)
 
 
 
-/* 
+/*
  ******************************************************************************
  * Function:    mip6_clear_config_data_ha
  * Description: This function is called to clear internal lists handled by
@@ -1156,7 +1158,7 @@ int mip6_clear_config_data_ha(u_long cmd, void *data)
 
 
 
-/* 
+/*
  ******************************************************************************
  * Function:    mip6_enable_func_ha
  * Description: This function is called to enable or disable certain functions

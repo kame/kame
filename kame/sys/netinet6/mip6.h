@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.6 2000/02/22 14:04:24 itojun Exp $	*/
+/*	$KAME: mip6.h,v 1.7 2000/02/26 18:08:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -30,7 +30,7 @@
  */
 
 /*
- *  $Id: mip6.h,v 1.6 2000/02/22 14:04:24 itojun Exp $
+ *  $Id: mip6.h,v 1.7 2000/02/26 18:08:38 itojun Exp $
  */
 
 
@@ -64,7 +64,7 @@ struct ifnet;
 #define MIP6_MD_FOREIGN    0x04
 
 
-/* Definition of Home Address route states used by the move detection 
+/* Definition of Home Address route states used by the move detection
    algorithm used by MIPv6. */
 #define MIP6_ROUTE_NET     0x01
 #define MIP6_ROUTE_HOST    0x02
@@ -188,15 +188,15 @@ struct ifnet;
 #define MIP6_ADDR_ANYCAST_HA   0x7e
 
 #if BYTE_ORDER == BIG_ENDIAN
-#define MIP6_ADDR_INT32_ULL    0xfe800000  /* Unicast Link Local */
-#define MIP6_ADDR_INT32_USL	   0xfec00000  /* Unicast Site Local */
-#define MIP6_ADDR_INT32_AHA1   0xfffffffe  /* Anycast Home Agent bit 97-128 */
-#define MIP6_ADDR_INT32_AHA2   0xfdffffff  /* Anycast Home Agent bit 65-96  */
+#define MIP6_ADDR_INT32_ULL	0xfe800000  /* Unicast Link Local */
+#define MIP6_ADDR_INT32_USL	0xfec00000  /* Unicast Site Local */
+#define MIP6_ADDR_INT32_AHA1	0xfffffffe  /* Anycast Home Agent bit 97-128 */
+#define MIP6_ADDR_INT32_AHA2	0xfdffffff  /* Anycast Home Agent bit 65-96  */
 #elif BYTE_ORDER == LITTLE_ENDIAN
-#define MIP6_ADDR_INT32_ULL    0x000080fe
-#define MIP6_ADDR_INT32_USL	   0x0000c0fe
-#define MIP6_ADDR_INT32_AHA1   0xfeffffff
-#define MIP6_ADDR_INT32_AHA2   0xfffffffd
+#define MIP6_ADDR_INT32_ULL	0x000080fe
+#define MIP6_ADDR_INT32_USL	0x0000c0fe
+#define MIP6_ADDR_INT32_AHA1	0xfeffffff
+#define MIP6_ADDR_INT32_AHA2	0xfffffffd
 #endif
 
 
@@ -521,29 +521,29 @@ struct mip6_output {
 
 /*
  * Macro MIP6_FREEINDATA free memory allocated for the global variable
- * mip6_indatap and its members. Set the variable to point at NULL when
+ * mip6_inp and its members. Set the variable to point at NULL when
  * the memory has been freed.
  */
-#define MIP6_FREEINDATA					\
-do {							\
-    if (mip6_indatap != NULL) {				\
-	if (mip6_indatap->bu_opt != NULL)		\
-	    free(mip6_indatap->bu_opt, M_TEMP);		\
-	if (mip6_indatap->ba_opt != NULL)		\
-	    free(mip6_indatap->ba_opt, M_TEMP);		\
-	if (mip6_indatap->br_opt != NULL)		\
-	    free(mip6_indatap->br_opt, M_TEMP);		\
-	if (mip6_indatap->ha_opt != NULL)		\
-	    free(mip6_indatap->ha_opt, M_TEMP);		\
-	if (mip6_indatap->uid != NULL)			\
-	    free(mip6_indatap->uid, M_TEMP);		\
-	if (mip6_indatap->coa != NULL)			\
-	    free(mip6_indatap->coa, M_TEMP);		\
-	if (mip6_indatap->hal != NULL)			\
-	    free(mip6_indatap->hal, M_TEMP);		\
-	free(mip6_indatap, M_TEMP);			\
-	mip6_indatap = NULL;				\
-    }							\
+#define MIP6_FREEINDATA				\
+do {						\
+    if (mip6_inp != NULL) {			\
+	if (mip6_inp->bu_opt != NULL)		\
+	    free(mip6_inp->bu_opt, M_TEMP);	\
+	if (mip6_inp->ba_opt != NULL)		\
+	    free(mip6_inp->ba_opt, M_TEMP);	\
+	if (mip6_inp->br_opt != NULL)		\
+	    free(mip6_inp->br_opt, M_TEMP);	\
+	if (mip6_inp->ha_opt != NULL)		\
+	    free(mip6_inp->ha_opt, M_TEMP);	\
+	if (mip6_inp->uid != NULL)		\
+	    free(mip6_inp->uid, M_TEMP);	\
+	if (mip6_inp->coa != NULL)		\
+	    free(mip6_inp->coa, M_TEMP);	\
+	if (mip6_inp->hal != NULL)		\
+	    free(mip6_inp->hal, M_TEMP);	\
+	free(mip6_inp, M_TEMP);			\
+	mip6_inp = NULL;			\
+    }						\
 } while (0)
 
 #define MIP6_IS_MN_ACTIVE ((mip6_module & MIP6_MN_MODULE) == MIP6_MN_MODULE)
@@ -551,7 +551,7 @@ do {							\
 
 
 /* External Declaration of Global variables. */
-extern struct mip6_indata  *mip6_indatap; /* Input data rec in one packet */
+extern struct mip6_indata  *mip6_inp;     /* Input data rec in one packet */
 extern struct mip6_output  *mip6_outq;    /* Ptr to output queue */
 extern struct mip6_esm     *mip6_esmq;    /* Ptr to list of Home Addresses */
 extern struct mip6_bc      *mip6_bcq;     /* First entry in the BC list */
@@ -602,7 +602,7 @@ extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *,
 #else
 extern int mip6_ioctl __P((struct socket *, u_long, caddr_t, struct ifnet *));
 #endif
-#if defined(MIP6_DEBUG)
+#ifdef MIP6_DEBUG
 void mip6_debug __P((char *, ...));
 #endif
 
@@ -651,6 +651,8 @@ extern int mip6_tunnel_input
 	__P((struct mbuf **, int *, int));
 extern int mip6_tunnel
 	__P((struct in6_addr *, struct in6_addr *, int, int, void *));
+extern int mip6_proxy
+	__P((struct in6_addr*, struct in6_addr*));
 extern struct mip6_bc *mip6_bc_find
 	__P((struct in6_addr *));
 extern struct mip6_bc *mip6_bc_create

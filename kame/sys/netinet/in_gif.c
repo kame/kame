@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.24 2000/02/26 09:31:14 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.25 2000/02/26 18:08:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -308,19 +308,7 @@ in_gif_input(m, va_alist)
 		}
 	}
 #else
-#if 0
-	gifp = (struct ifnet *)m->m_pkthdr.aux;
-	m->m_pkthdr.aux = NULL;
-#else
-    {
-	struct mbuf *n;
-	n = m_aux_find(m, AF_INET, IPPROTO_IPV4);
-	if (n) {
-		gifp = *mtod(n, struct ifnet **);
-		m_aux_delete(m, n);
-	}
-    }
-#endif
+	gifp = (struct ifnet *)encap_getarg(m);
 #endif
 
 	if (gifp == NULL) {
