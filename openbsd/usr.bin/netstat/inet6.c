@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$Id: inet6.c,v 1.6 2000/01/16 14:53:15 itojun Exp $");*/
+/*__RCSID("$Id: inet6.c,v 1.7 2000/02/03 06:04:17 jinmei Exp $");*/
 #endif
 #endif /* not lint */
 
@@ -503,6 +503,75 @@ ip6_stats(off, name)
 	printf("\t\t%qu two or more ext mbuf\n", ip6stat.ip6s_mext2m);	
 	p(ip6s_exthdrtoolong, "\t%qu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%qu tunneling packet%s that can't find gif\n");
+
+	/* for debugging source address selection */
+#define PRINT_SCOPESTAT(s,i) do {\
+		switch(i) { /* XXX hardcoding in each case */\
+		case 1:\
+			p(s, "\t\t%qu node-local%s\n");\
+			break;\
+		case 2:\
+			p(s,"\t\t%qu link-local%s\n");\
+			break;\
+		case 5:\
+			p(s,"\t\t%qu site-local%s\n");\
+			break;\
+		case 14:\
+			p(s,"\t\t%qu global%s\n");\
+			break;\
+		default:\
+			printf("\t\t%qu addresses scope=%x\n",\
+			       ip6stat.s, i);\
+		}\
+	} while(0);
+
+	p(ip6s_sources_none,
+	  "\t%qu failure%s of source address selection\n");
+	for (first = 1, i = 0; i < 16; i++) {
+		if (ip6stat.ip6s_sources_sameif[i]) {
+			if (first) {
+				printf("\tsource addresses on an outgoing I/F\n");
+				first = 0;
+			}
+			PRINT_SCOPESTAT(ip6s_sources_sameif[i], i);
+		}
+	}
+	for (first = 1, i = 0; i < 16; i++) {
+		if (ip6stat.ip6s_sources_otherif[i]) {
+			if (first) {
+				printf("\tsource addresses on a non-outgoing I/F\n");
+				first = 0;
+			}
+			PRINT_SCOPESTAT(ip6s_sources_otherif[i], i);
+		}
+	}
+	for (first = 1, i = 0; i < 16; i++) {
+		if (ip6stat.ip6s_sources_samescope[i]) {
+			if (first) {
+				printf("\tsource addresses of same scope\n");
+				first = 0;
+			}
+			PRINT_SCOPESTAT(ip6s_sources_samescope[i], i);
+		}
+	}
+	for (first = 1, i = 0; i < 16; i++) {
+		if (ip6stat.ip6s_sources_otherscope[i]) {
+			if (first) {
+				printf("\tsource addresses of a different scope\n");
+				first = 0;
+			}
+			PRINT_SCOPESTAT(ip6s_sources_otherscope[i], i);
+		}
+	}
+	for (first = 1, i = 0; i < 16; i++) {
+		if (ip6stat.ip6s_sources_deprecated[i]) {
+			if (first) {
+				printf("\tdeprecated source addresses\n");
+				first = 0;
+			}
+			PRINT_SCOPESTAT(ip6s_sources_deprecated[i], i);
+		}
+	}
 #undef p
 #undef p1
 }
