@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.55 2002/06/29 07:38:36 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.56 2002/06/29 07:47:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,7 +407,7 @@ main(argc, argv)
 	seq = 0;
 	
 	while ((ch = getopt(argc, argv, "df:g:lm:np:q:rs:w:v")) != -1)
-		switch(ch) {
+		switch (ch) {
 		case 'd':
 			options |= SO_DEBUG;
 			break;
@@ -844,7 +844,7 @@ main(argc, argv)
 						lastaddr = Rcv.sin6_addr;
 					}
 					printf("  %g ms", deltaT(&t1, &t2));
-					switch(i - 1) {
+					switch (i - 1) {
 					case ICMP6_DST_UNREACH_NOROUTE:
 						++unreachable;
 						printf(" !N");
@@ -1201,7 +1201,7 @@ get_udphdr(ip6, lim)
 	cp += sizeof(struct ip6_hdr);
 
 	while (lim - cp >= 8) {
-		switch(nh) {
+		switch (nh) {
 		case IPPROTO_ESP:
 		case IPPROTO_TCP:
 		case IPPROTO_ICMPV6:
