@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.31 2002/03/15 12:32:42 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.32 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -39,12 +39,6 @@
 
 #ifndef _MIP6_VAR_H_
 #define _MIP6_VAR_H_
-
-#ifdef MIP6_DRAFT13
-#define MIP6_SEQNO_T u_int16_t
-#else
-#define MIP6_SEQNO_T u_int8_t
-#endif /* MIP6_DRAFT13 */
 
 #define GET_NETVAL_S(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohs(v)
 #define GET_NETVAL_L(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohl(v)
@@ -134,7 +128,7 @@ struct mip6_bu {
 	time_t              mbu_refexpire;  /* expiration time of refresh. */
 	u_int32_t           mbu_acktimeout; /* current ack timo value */
 	time_t              mbu_ackexpire;  /* expiration time of ack. */
-	MIP6_SEQNO_T        mbu_seqno;      /* sequence number */
+	u_int16_t           mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
 	u_int8_t            mbu_state;
 	u_int8_t            mbu_reg_state;  /* registration status */
@@ -162,10 +156,7 @@ struct mip6_bc {
 	struct sockaddr_in6   mbc_addr;      /* my addr (needed?) */
 	u_int8_t              mbc_status;    /* BA statue */
 	u_int8_t              mbc_flags;     /* recved BU flags */
-#ifdef MIP6_DRAFT13
-	u_int8_t              mbc_prefixlen; /* recved BU prefixlen */
-#endif /* MIP6_DRAFT13 */
-	MIP6_SEQNO_T          mbc_seqno;     /* recved BU seqno */
+	u_int16_t             mbc_seqno;     /* recved BU seqno */
 	u_int32_t             mbc_lifetime;  /* recved BU lifetime */
 	time_t                mbc_expire;    /* expiration time of this BC. */
 	u_int8_t              mbc_state;     /* BC state */
@@ -191,13 +182,8 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 #define MIP6_TUNNEL_CHANGE 1
 #define MIP6_TUNNEL_DELETE 2
 
-#ifdef MIP6_DRAFT13
 /* Macro for modulo 2^^16 comparison */
 #define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
-#else
-/* Macro for modulo 2^^8 comparison */
-#define MIP6_LEQ(a,b)   ((int8_t)((a)-(b)) <= 0)
-#endif /* MIP6_DRAFT13 */
 
 struct mip6_config {
 	u_int8_t mcfg_type;
@@ -221,6 +207,7 @@ struct mip6_pktopts {
 	struct ip6_rthdr *mip6po_rthdr;
 	struct ip6_dest *mip6po_haddr;
 	struct ip6_dest *mip6po_dest2;
+	struct ip6_mobility *mip6po_mobility;
 };
 
 /* buffer for storing a consequtive sequence of sub-options. */
@@ -278,17 +265,53 @@ struct mbuf *mip6_create_ip6hdr		 __P((struct sockaddr_in6 *,
 int mip6_exthdr_create			 __P((struct mbuf *,
 					      struct ip6_pktopts *,
 					      struct mip6_pktopts *));
+int mip6_ip6mu_create			__P((struct ip6_mobility **,
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     struct hif_softc *));
+int mip6_ip6ma_create			__P((struct ip6_mobility **,
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     u_int8_t,
+					     u_int16_t,
+					     u_int32_t,
+					     u_int32_t));
+int mip6_ip6me_create			__P((struct ip6_mobility **,
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     u_int8_t,
+					     struct sockaddr_in6 *));
+int mip6_process_hrbu __P((struct sockaddr_in6 *,
+			   struct sockaddr_in6 *,
+			   u_int8_t, u_int16_t, u_int32_t,
+			   struct sockaddr_in6 *));
+int mip6_process_hurbu __P((struct sockaddr_in6 *,
+			    struct sockaddr_in6 *,
+			    u_int8_t, u_int16_t, u_int32_t,
+			    struct sockaddr_in6 *));
+int mip6_bu_destopt_create		__P((struct ip6_dest **,
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     struct ip6_pktopts *,
+					     struct hif_softc *));
 int mip6_ba_destopt_create		 __P((struct ip6_dest **,
 					      struct sockaddr_in6 *,
 					      struct sockaddr_in6 *,
 					      u_int8_t,
-					      MIP6_SEQNO_T,
+					      u_int16_t,
 					      u_int32_t,
 					      u_int32_t));
 int mip6_rthdr_create			__P((struct ip6_rthdr **,
 					     struct sockaddr_in6 *,
 					     struct ip6_pktopts *));
 void mip6_destopt_discard		__P((struct mip6_pktopts *));
+caddr_t mip6_add_opt2dh __P((caddr_t, struct mip6_buffer *));
+void mip6_find_offset __P((struct mip6_buffer *));
+void mip6_align_destopt __P((struct mip6_buffer *));
+#if defined(IPSEC) && !defined(__OpenBSD__)
+caddr_t mip6_add_subopt2dh __P((u_int8_t *, u_int8_t *,
+				       struct mip6_buffer *));
+#endif /* IPSEC && !__OpenBSD__ */
 int mip6_addr_exchange			__P((struct mbuf *,
 					     struct mbuf *));
 int mip6_process_destopt		__P((struct mbuf *,
@@ -313,14 +336,8 @@ int mip6_icmp6_tunnel_input		__P((struct mbuf *, int, int));
 int mip6_icmp6_ha_discov_req_output	__P((struct hif_softc *));
 int mip6_icmp6_mp_sol_output		__P((struct mip6_prefix *,
 					     struct mip6_ha *));
-#ifdef MIP6_BDT
 int mip6_bdt_create			__P((struct hif_softc *,
 					     struct sockaddr_in6 *));
-#endif /* MIP6_BDT */
-#if 0
-int mip6_tunneled_rs_output		__P((struct hif_softc *,
-					     struct mip6_pfx *));
-#endif
 
 /* mip6_prefix management */
 void mip6_prefix_init			__P((void));
@@ -415,6 +432,12 @@ struct mip6_bu *mip6_bu_create		__P((const struct sockaddr_in6 *,
 					     struct hif_softc *));
 int mip6_bu_list_insert			__P((struct mip6_bu_list *,
 					     struct mip6_bu *));
+int mip6_bu_list_remove __P((struct mip6_bu_list *, struct mip6_bu *));
+int mip6_bu_list_notify_binding_change __P((struct hif_softc *));
+int mip6_tunnel_control __P((int, void *,
+			     int (*) __P((const struct mbuf *,
+					  int, int, void *)),
+			     const struct encaptab **));
 int mip6_bu_list_remove_all		__P((struct mip6_bu_list *));
 struct mip6_bu *mip6_bu_list_find_withpaddr
 					__P((struct mip6_bu_list *,
@@ -423,9 +446,17 @@ struct mip6_bu *mip6_bu_list_find_withpaddr
 struct mip6_bu *mip6_bu_list_find_home_registration
 					__P((struct mip6_bu_list *,
 					     struct sockaddr_in6 *));
+int mip6_bu_encapcheck __P((const struct mbuf *, int, int, void *));
 int mip6_home_registration		__P((struct hif_softc *));
 int mip6_validate_bu			__P((struct mbuf *, u_int8_t *));
 int mip6_process_bu			__P((struct mbuf *, u_int8_t *));
+
+int mip6_ip6mu_input			__P((struct mbuf *,
+					     struct ip6m_binding_update *,
+					     int));
+int mip6_ip6ma_input			__P((struct mbuf *,
+					     struct ip6m_binding_ack *,
+					     int));
 
 /* binding ack management */
 int mip6_validate_ba			__P((struct mbuf *, u_int8_t *));
@@ -445,27 +476,11 @@ struct mip6_bc *mip6_bc_list_find_withphaddr
 struct mip6_bc *mip6_bc_list_find_withpcoa
 					__P((struct mip6_bc_list *,
 					     struct sockaddr_in6 *));
-#if defined(IPSEC) && !defined(__OpenBSD__)
-#ifndef MIP6_DRAFT13
-struct secasvar;
-struct mip6_subopt_authdata *mip6_authdata_create
-					__P((struct secasvar *));
-int mip6_bu_authdata_calc __P((struct secasvar *,
-			       struct in6_addr *,
-			       struct in6_addr *,
-			       struct in6_addr *,
-			       struct ip6_opt_binding_update *,
-			       struct mip6_subopt_authdata *,
-			       caddr_t));
-int mip6_ba_authdata_calc __P((struct secasvar *,
-			       struct in6_addr *,
-			       struct in6_addr *,
-			       struct ip6_opt_binding_ack *,
-			       struct mip6_subopt_authdata *,
-			       caddr_t));
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
-
+int mip6_bc_send_ba __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
+			 struct sockaddr_in6 *, u_int8_t, u_int16_t,
+			 u_int32_t, u_int32_t));
+int mip6_bc_send_bm			__P((struct mbuf *,
+					     struct in6_addr *));
 int mip6_dad_success			__P((struct ifaddr *));
 int mip6_dad_duplicated			__P((struct ifaddr *));
 struct ifaddr *mip6_dad_find		__P((struct in6_addr *, struct ifnet *));

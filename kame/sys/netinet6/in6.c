@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.270 2002/04/22 12:03:02 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.271 2002/05/14 13:31:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -819,7 +819,7 @@ in6_control(so, cmd, data, ifp)
 						 __FILE__, __LINE__));
 					/* ignore this error... */
 				}
-#endif
+#endif /* MIP6 */
 			break;	/* we don't need to install a host route. */
 		}
 		pr0.ndpr_prefix = ifra->ifra_addr;
@@ -1226,9 +1226,9 @@ in6_update_ifa(ifp, ifra, ia)
 	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
 #ifdef MIP6
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia))
-#else /* MIP6 */
+#else /* !MIP6 */
 	if (hostIsNew && in6if_do_dad(ifp))
-#endif /* MIP6 */
+#endif /* !MIP6 */
 		ia->ia6_flags |= IN6_IFF_TENTATIVE;
 
 	/*
@@ -1479,10 +1479,10 @@ in6_update_ifa(ifp, ifra, ia)
 #ifdef MIP6
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia) &&
 	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
-#else /* MIP6 */
+#else /* !MIP6 */
 	if (hostIsNew && in6if_do_dad(ifp) &&
 	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
-#endif /* MIP6 */
+#endif /* !MIP6 */
 	{
 		nd6_dad_start((struct ifaddr *)ia, NULL);
 	}

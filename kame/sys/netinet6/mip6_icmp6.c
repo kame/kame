@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.44 2002/04/08 09:16:55 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.45 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -166,7 +166,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		 */
 		mip6_icmp6_find_addr(m, off, icmp6len, &laddr, &paddr);
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &paddr);
-		if (mbc && (mbc->mbc_flags & IP6_BUF_HOME) == 0) {
+		if (mbc && (mbc->mbc_flags & IP6MU_HOME) == 0) {
 			mip6log((LOG_INFO,
 				 "%s:%d: "
 				 "a mobile node (%s) moved.\n",
@@ -175,19 +175,7 @@ mip6_icmp6_input(m, off, icmp6len)
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
 		}
 		break;
-#ifdef MIP6_KERNEL_DHAAD
-	case ICMP6_HADISCOV_REQUEST:
-		if (!MIP6_IS_HA)
-			break;
-		error = mip6_icmp6_ha_discov_req_input(m, off, icmp6len);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: failed to process a DHAAD request.\n",
-				 __FILE__, __LINE__));
-			return (error);
-		}
-		break;
-#endif
+
 	case ICMP6_HADISCOV_REPLY:
 		if (!MIP6_IS_MN)
 			break;
@@ -215,85 +203,84 @@ mip6_icmp6_input(m, off, icmp6len)
 	case ICMP6_PARAM_PROB:
 		if (!MIP6_IS_MN)
 			break;
-		if (icmp6->icmp6_code != ICMP6_PARAMPROB_OPTION)
-			break;
 
 		pptr = ntohl(icmp6->icmp6_pptr);
 		if ((sizeof(*icmp6) + pptr + 1) > icmp6len) {
 			/*
-			 * we can't get the detail of the packet,
-			 * ignore this...
+			 * we can't get the detail of the
+			 * packet, ignore this...
 			 */
 			break;
 		}
 
-		/*
-		 * XXX: TODO
-		 *
-		 * should we mcopydata??
-		 */
-		origip6 = (caddr_t)(icmp6 + 1);
-		switch (*(u_int8_t *)(origip6 + pptr)) {
-		case IP6OPT_BINDING_UPDATE:
-			mip6_icmp6_find_addr(m, off, icmp6len,
-					     &laddr, &paddr);
+		switch (icmp6->icmp6_code) {
+		case ICMP6_PARAMPROB_OPTION:
 			/*
-			 * a node that doesn't support MIP6 returns an
-			 * icmp paramprob when it receives a binding
-			 * update destination option.  we shold avoid
-			 * further sending of a binding update
-			 * destination option to that node.
+			 * XXX: TODO
+			 *
+			 * should we mcopydata??
 			 */
-			for (sc = TAILQ_FIRST(&hif_softc_list);
-			     sc;
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-								  &paddr,
-								  &laddr);
-				if (mbu) {
-					mip6log((LOG_INFO,
-						 "%s:%d: a node (%s) doesn't support a binding update destopt.\n",
-						 __FILE__, __LINE__,
-						 ip6_sprintf(&paddr.sin6_addr)));
-					mbu->mbu_state
-						|= MIP6_BU_STATE_BUNOTSUPP;
+			origip6 = (caddr_t)(icmp6 + 1);
+			switch (*(u_int8_t *)(origip6 + pptr)) {
+			case IP6OPT_HOME_ADDRESS:
+				/*
+				 * all IPv6 nodes must support a home
+				 * address destination option.
+				 */
+				mip6_icmp6_find_addr(m, off, icmp6len,
+						     &laddr, &paddr);
+				mip6log((LOG_NOTICE,
+					 "%s:%d: a node (%s) doesn't support a home address destopt.\n",
+					 __FILE__, __LINE__,
+					 ip6_sprintf(&paddr.sin6_addr)));
+				/*
+				 * as i said above, all IPv6 nodes must
+				 * support a home address destination
+				 * option, but ...
+				 */
+				for (sc = TAILQ_FIRST(&hif_softc_list);
+				     sc;
+				     sc = TAILQ_NEXT(sc, hif_entry)) {
+					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
+					if (mbu) {
+						mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+						mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+						(void)mip6_bdt_create(sc,
+								      &paddr);
+					}
 				}
+				break;
 			}
 			break;
 
-		case IP6OPT_HOME_ADDRESS:
-			/*
-			 * all IPv6 node must support a home address
-			 * destination option.
-			 */
-			mip6_icmp6_find_addr(m, off, icmp6len,
-					     &laddr, &paddr);
-			mip6log((LOG_NOTICE,
-				 "%s:%d: a node (%s) doesn't support a home address destopt.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&paddr.sin6_addr)));
-#if defined(MIP6_ALLOW_COA_FALLBACK) || defined(MIP6_BDT)
-			/*
-			 * as i said above, all IPv6 node must support
-			 * a home address destination option, but ...
-			 */
-			for (sc = TAILQ_FIRST(&hif_softc_list);
-			     sc;
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-								  &paddr,
-								  &laddr);
-				if (mbu) {
-					mbu->mbu_state
-						|= MIP6_BU_STATE_BUNOTSUPP;
-					mbu->mbu_state
-						|= MIP6_BU_STATE_MIP6NOTSUPP;
-#ifdef MIP6_BDT
-					(void)mip6_bdt_create(sc, &paddr);
-#endif /* MIP6_BDT */
+		case ICMP6_PARAMPROB_NEXTHEADER:
+			origip6 = (caddr_t)(icmp6 + 1);
+			switch (*(u_int8_t *)(origip6 + pptr)) {
+			case IPPROTO_MOBILITY:
+				/*
+				 * the peer doesn't recognize mobility header.
+				 */
+				
+				mip6_icmp6_find_addr(m, off, icmp6len,
+						     &laddr, &paddr);
+				mip6log((LOG_NOTICE,
+					 "%s:%d: a node (%s) doesn't support "
+					 "Mobile IPv6.\n",
+					 __FILE__, __LINE__,
+					 ip6_sprintf(&paddr.sin6_addr)));
+				for (sc = TAILQ_FIRST(&hif_softc_list);
+				     sc;
+				     sc = TAILQ_NEXT(sc, hif_entry)) {
+					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
+					if (mbu) {
+						mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+						mbu->mbu_state |= MIP6_BU_STATE_MIP6NOTSUPP;
+						(void)mip6_bdt_create(sc,
+								      &paddr);
+					}
 				}
+				break;
 			}
-#endif /* MIP6_ALLOW_COA_FALLBACK || MIP6_BDT */
 			break;
 		}
 		break;
@@ -566,167 +553,6 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			&sin6peer->sin6_scope_id); /* XXX */
 }
 
-#ifdef MIP6_KERNEL_DHAAD
-/*
- * dynamic homeagent discovery request input routine.
- */
-static int
-mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
-	struct mbuf *m; /* points ip header */
-	int off;
-	int icmp6len;
-{
-	struct ip6_hdr *ip6, *ip6_rep;
-	struct ha_discov_req *hdreq;
-	struct ha_discov_rep *hdrep;
-	int hdreplen;
-#ifdef MIP6_DRAFT13
-	struct in6_addr *haddr;
-#endif /* MIP6_DRAFT13 */
-	struct in6_ifaddr *haifa;
-	struct in6_addr *halist;
-	int halistlen;
-	struct mbuf *n;
-	int error = 0;
-
-	/* check packet length. */
-	if (icmp6len < sizeof(struct ha_discov_req)) {
-		mip6log((LOG_ERR,
-			 "%s:%d: too short HHAAD request\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
-	}
-
-	ip6 = mtod(m, struct ip6_hdr *);
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(*hdreq), EINVAL);
-	hdreq = (struct ha_discov_req *)((caddr_t)ip6 + off);
-#else 
-	IP6_EXTHDR_GET(hdreq, struct ha_discov_req *, m, off, sizeof(*hdreq));
-	if (hdreq == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: failed to EXTHDR_GET\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
-	}
-#endif
-
-#ifdef MIP6_DRAFT13
-	/*
-	 * the DHAAD request format of draft-13 has a field for the
-	 * home address of the mobile node sending this DHAAD packet.
-	 */
-	haddr = &hdreq->ha_dreq_home;
-#endif /* MIP6_DRAFT13 */
-
-	/* 
-	 * find a home agent address based on the homeaddress of the
-	 * mobile node.
-	 */
-	{
-		struct sockaddr_in6 sin6;
-		struct ifaddr *ifa;
-
-		bzero((caddr_t)&sin6, sizeof(sin6));
-		sin6.sin6_len = sizeof(sin6);
-		sin6.sin6_family = AF_INET6;
-#ifdef MIP6_DRAFT13
-		sin6.sin6_addr = *haddr;	/* MN's home address */
-#else
-		/*
-		 * the destination ip address of a DHAAD request
-		 * packet contains a subnet home agent anycast
-		 * address.  we can find the home link by searching
-		 * all interfaces with the prefix of the anycast
-		 * address as a search key.
-		 */
-		sin6.sin6_addr = ip6->ip6_dst;	/* HA's anycast address */
-#endif /* MIP6_DRAFT13 */
-		ifa = ifa_ifwithnet((struct sockaddr *)&sin6);
-		haifa = in6_ifawithifp(ifa->ifa_ifp, &sin6.sin6_addr);
-	}
-
-        /*
-	 * XXX: TODO
-	 *
-	 * here, we should collect all home agents on the home link
-	 * and create the home agent list.  is it easier to do DHAAD
-	 * work in a user space than in a kernel space?  we should
-	 * consider creating a daemon program for this work.
-	 */
-
-	/* create the home agent list. */
-	/* XXX: currently we provide only one home agent as a reply. */
-	halistlen = sizeof(struct in6_addr) * 1;
-	halist = malloc(halistlen, M_TEMP, M_NOWAIT);
-	if (halist == NULL) {
-		m_freem(m);
-		return (ENOBUFS);
-	}
-	bcopy((caddr_t)&haifa->ia_addr.sin6_addr, (caddr_t)halist,
-	      sizeof(struct in6_addr));
-	
-	/*
-	 * create a DHAAD reply packet.
-	 */
-#ifdef MIP6_DRAFT13
-	if (IN6_IS_ADDR_UNSPECIFIED(haddr)) {
-		/*
-		 * the case that a mobile node has no valid home
-		 * address.  such a mobile node will send a DHAAD
-		 * request packet from its CoA.  use the CoA as a
-		 * destination addr of the DHAAD reply packet.
-		 */
-		haddr = &ip6->ip6_src;
-	}
-#endif /* MIP6_DRAFT13 */
-	hdreplen = sizeof(*hdrep);
-	n = mip6_create_ip6hdr(&haifa->ia_addr.sin6_addr,
-			       &ip6->ip6_src, /* XXX: true? */
-			       IPPROTO_ICMPV6, hdreplen + halistlen);
-	if (n == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: mbuf for DHAAD reply allocation failed\n",
-			 __FILE__, __LINE__));
-		/* free the input packet */
-		m_freem(m);
-		free(halist, M_TEMP);
-		return (ENOBUFS);
-	}
-	ip6_rep = mtod(n, struct ip6_hdr *);
-	ip6_rep->ip6_hlim = in6_selecthlim(NULL, haifa->ia_ifp);
-	hdrep = (struct ha_discov_rep *)(ip6_rep + 1);
-	bzero((caddr_t)hdrep, sizeof(*hdrep));
-	hdrep->discov_rep_type = ICMP6_HADISCOV_REPLY;
-	hdrep->discov_rep_code = 0;
-	hdrep->discov_rep_cksum = 0;
-	hdrep->discov_rep_id = hdreq->discov_req_id;
-	/* copy the home agent addresses at the end of a DHAAD reply packet. */
-	bcopy((caddr_t)halist, (caddr_t)(hdrep + 1), halistlen);
-	free(halist, M_TEMP);
-
-	/* calcurate a checksum. */
-	hdrep->discov_rep_cksum
-		= in6_cksum(n, IPPROTO_ICMPV6,
-			    sizeof(struct ip6_hdr),
-			    n->m_pkthdr.len - sizeof(struct ip6_hdr));
-
-	if ((error = mip6_setpktaddrs(n)) != 0) { /* XXX */
-		m_freem(n);
-		return(error);
-	}
-	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: "
-			 "failed to send a DHAAD reply packet (errno = %d)\n",
-			 __FILE__, __LINE__, error));
-	}
-
-	return (0);
-}
-#endif /* MIP6_KERNEL_DHAAD */
-
 static int
 mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	struct mbuf *m;
@@ -928,7 +754,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	 */
 	for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
-		if ((mbu->mbu_flags & IP6_BUF_HOME)
+		if ((mbu->mbu_flags & IP6MU_HOME)
 		    && SA6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
 			/* home registration. */
 			mbu->mbu_paddr = mha_prefered->mha_gaddr;
@@ -1043,13 +869,6 @@ mip6_icmp6_ha_discov_req_output(sc)
 	hdreq->discov_req_type = ICMP6_HADISCOV_REQUEST;
 	hdreq->discov_req_code = 0;
 	hdreq->discov_req_id = htons(sc->hif_hadiscovid);
-#ifdef MIP6_DRAFT13
-	/*
-	 * the format of draft-13 has a home address field for the
-	 * sending mobile node.
-	 */
-	hdreq->ha_dreq_home = mpfx->mpfx_haddr.sin6_addr;
-#endif /* MIP6_DRAFT13 */
 
 	/* calculate checksum for this DHAAD request packet. */
 	off = sizeof(struct ip6_hdr);

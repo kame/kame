@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.49 2002/02/13 14:52:00 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.50 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -67,12 +67,8 @@ struct mip6_req {
 #define MIP6SUBOPT_PAD1     0x00
 #define MIP6SUBOPT_PADN     0x01
 #define MIP6SUBOPT_UNIQID   0x02
-#ifdef MIP6_DRAFT13
-#define MIP6SUBOPT_ALTCOA   0x04
-#else
 #define MIP6SUBOPT_ALTCOA   0x03
 #define MIP6SUBOPT_AUTHDATA 0x04
-#endif /* MIP6_DRAFT13 */
 
 /* binding ack status code. */
 #define MIP6_BA_STATUS_ACCEPTED              0
@@ -82,9 +78,6 @@ struct mip6_req {
 #define MIP6_BA_STATUS_RESOURCES             131
 #define MIP6_BA_STATUS_NOT_SUPPORTED         132
 #define MIP6_BA_STATUS_NOT_HOME_SUBNET       133
-#ifdef MIP6_DRAFT13
-#define MIP6_BA_STATUS_INCORRECT_IFID_LENGTH 136
-#endif
 #define MIP6_BA_STATUS_NOT_HOME_AGENT        137
 #define MIP6_BA_STATUS_DAD_FAILED            138
 #define MIP6_BA_STATUS_NO_SA                 139
@@ -111,5 +104,22 @@ struct mip6_subopt_authdata {
 	u_int8_t spi[4]; /* security parameter index */
 	/* followed by authentication data (variable length) */
 } __attribute__ ((__packed__));
+
+/* Binding Ack status code. */
+#define IP6MA_STATUS_ACCEPTED              0
+#define IP6MA_STATUS_ERRORBASE             128
+#define IP6MA_STATUS_UNSPECIFIED           128
+#define IP6MA_STATUS_PROHIBIT              130
+#define IP6MA_STATUS_RESOURCES             131
+#define IP6MA_STATUS_NOT_SUPPORTED         132
+#define IP6MA_STATUS_NOT_HOME_SUBNET       133
+#define IP6MA_STATUS_NOT_HOME_AGENT        137
+#define IP6MA_STATUS_DAD_FAILED            138
+#define IP6MA_STATUS_NO_SA                 139
+#define IP6MA_STATUS_SEQNO_TOO_SMALL       141
+
+/* Binding Error status code. */
+#define IP6ME_STATUS_NO_BINDING		1
+#define IP6ME_STATUS_UNKNOWN_MH_TYPE	2
 
 #endif /* !_MIP6_H_ */

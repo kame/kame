@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.38 2002/04/01 07:50:31 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.39 2002/05/14 13:31:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,12 +60,24 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+#include <netinet6/scope6_var.h>
+
 #ifdef MIP6
 #include <net/if_hif.h>
 #include <netinet6/nd6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-#endif
+#endif /* MIP6 */
+
+#ifdef MIP6
+static int	dest6_send_bm __P((struct sockaddr_in6 *,
+				   struct sockaddr_in6 *,
+				   struct sockaddr_in6 *));
+#endif /* MIP6 */
+
+#ifdef MIP6
+extern struct mip6_bc_list mip6_bc_list;
+#endif /* MIP6 */
 
 /*
  * Destination options header processing.
@@ -80,7 +92,7 @@ dest6_input(mp, offp, proto)
 	struct ip6_dest *dstopts;
 	struct mbuf *n;
 	struct ip6_opt_home_address *haopt = NULL;
-	struct in6_addr ip6_home;
+	struct sockaddr_in6 *src_sa, *dst_sa, home_sa;
 	struct ip6aux *ip6a = NULL;
 	u_int8_t *opt;
 	struct ip6_hdr *ip6;
@@ -152,8 +164,54 @@ dest6_input(mp, offp, proto)
 
 			/* XXX check header ordering */
 
-			bcopy(haopt->ip6oh_addr, &ip6_home,
-			      sizeof(ip6_home));
+			if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+				/* must not happen. */
+				goto bad;
+			}
+			bzero(&home_sa, sizeof(home_sa));
+			home_sa.sin6_len = sizeof(home_sa);
+			home_sa.sin6_family = AF_INET6;
+			bcopy(haopt->ip6oh_addr, &home_sa.sin6_addr,
+			      sizeof(struct in6_addr));
+			if (scope6_check_id(&home_sa, ip6_use_defzone)
+			    != 0)
+				goto bad;
+
+#ifdef MIP6
+			/* check whether this HAO is 'verified'. */
+			if (mip6_bc_list_find_withphaddr(
+				&mip6_bc_list, &home_sa) != NULL) {
+				/*
+				 * we have a corresponding binding
+				 * cache entry for the home address
+				 * includes in this HAO.
+				 */
+				goto verified;
+			}
+			/* next, check if we have a ESP header.  */
+#if 0
+			if (dstopts->ip6d_nxt == IPPROTO_ESP) {
+				/*
+				 * this packet is protected by ESP.
+				 * leave the validation to the ESP
+				 * processing routine.
+				 */
+				goto verified;
+			}
+#else
+			goto verified;
+#endif
+			/*
+			 * we have neither a corresponding binding
+			 * cache nor ESP header. we have no clue to
+			 * beleive this HAO is a correct one.
+			 */
+			(void)dest6_send_bm(dst_sa, src_sa, &home_sa);
+			goto bad;
+		verified:
+#endif /* MIP6 */
+
+			/* store the CoA in a aux. */
 			bcopy(&ip6a->ip6a_src.sin6_addr, &ip6a->ip6a_coa, 
 			    sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
@@ -162,11 +220,11 @@ dest6_input(mp, offp, proto)
 			 * reject invalid home-addresses
 			 */
 			/* XXX linklocal-address is not supported */
-			if (IN6_IS_ADDR_MULTICAST(&ip6_home) ||
-			    IN6_IS_ADDR_LINKLOCAL(&ip6_home) ||
-			    IN6_IS_ADDR_V4MAPPED(&ip6_home)  ||
-			    IN6_IS_ADDR_UNSPECIFIED(&ip6_home) ||
-			    IN6_IS_ADDR_LOOPBACK(&ip6_home)) {
+			if (IN6_IS_ADDR_MULTICAST(&home_sa.sin6_addr) ||
+			    IN6_IS_ADDR_LINKLOCAL(&home_sa.sin6_addr) ||
+			    IN6_IS_ADDR_V4MAPPED(&home_sa.sin6_addr)  ||
+			    IN6_IS_ADDR_UNSPECIFIED(&home_sa.sin6_addr) ||
+			    IN6_IS_ADDR_LOOPBACK(&home_sa.sin6_addr)) {
 				ip6stat.ip6s_badscope++;
 				goto bad;
 			}
@@ -177,17 +235,6 @@ dest6_input(mp, offp, proto)
 			 */
 
 			break;
-
-#ifdef MIP6
-		case IP6OPT_BINDING_UPDATE:
-		case IP6OPT_BINDING_ACK:
-		case IP6OPT_BINDING_REQ:
-			if (mip6_process_destopt(m, dstopts, opt, dstoptlen)
-			    == -1)
-				goto bad;
-			optlen = *(opt + 1) + 2;
-			break;
-#endif /* MIP6 */
 
 		default:		/* unknown option */
 			optlen = ip6_unknown_opt(opt, m,
@@ -228,3 +275,47 @@ dest6_input(mp, offp, proto)
 	m_freem(m);
 	return (IPPROTO_DONE);
 }
+
+#ifdef MIP6
+/*
+ * send a binding missing message.
+ */
+static int
+dest6_send_bm(src, dst, home)
+	struct sockaddr_in6 *src;
+	struct sockaddr_in6 *dst;
+	struct sockaddr_in6 *home;
+{
+	struct mbuf *m;
+	struct ip6_pktopts opt;
+	int error = 0;
+
+	/*
+	 * XXX a binding message must be rate limited (per host?).
+	 */
+
+	init_ip6pktopts(&opt);
+
+	m = mip6_create_ip6hdr(src, dst, IPPROTO_NONE, 0);
+	if (m == NULL)
+		return (ENOMEM);
+
+	error = mip6_ip6me_create(&opt.ip6po_mobility, src, dst,
+				  IP6ME_STATUS_NO_BINDING, home);
+	if (error) {
+		m_freem(m);
+ 		goto free_ip6pktopts;
+	}
+				  
+	/* output a binding missing message. */
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	if (error)
+		goto free_ip6pktopts;
+
+ free_ip6pktopts:
+	if (opt.ip6po_mobility)
+		free(opt.ip6po_mobility, M_IP6OPT);
+
+	return (error);
+}
+#endif /* MIP6 */

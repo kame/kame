@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.272 2002/04/17 04:32:22 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.273 2002/05/14 13:31:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -139,7 +139,7 @@
 #include <net/if_hif.h> 
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-#endif
+#endif /* MIP6 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #include <netinet6/ipsec.h>
@@ -164,10 +164,6 @@
 #if NGIF > 0
 #include <netinet6/in6_gif.h>
 #endif
-
-#ifdef MIP6
-#include <netinet6/mip6.h>
-#endif /* MIP6 */
 
 #ifdef __OpenBSD__
 #if NPF > 0
@@ -1122,11 +1118,12 @@ ip6_input(m)
 		 */
 		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
 		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
-		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH)) {
+		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH) &&
+		    (nxt != IPPROTO_MOBILITY)) {
 			if (mip6_route_optimize(m))
 				goto bad;
 		}
-#endif /* MIP6 */		
+#endif /* MIP6 */
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}
 	return;

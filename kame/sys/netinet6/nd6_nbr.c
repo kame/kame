@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.100 2002/04/22 09:39:06 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.101 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -266,7 +266,7 @@ nd6_ns_input(m, off, icmp6len)
 	if (!ifa) {
 		ifa = mip6_dad_find(&taddr6.sin6_addr, ifp);
 	}
-#endif
+#endif /* MIP6 */
 	if (!ifa) {
 		/*
 		 * We've got an NS packet, and we don't have that adddress
@@ -402,7 +402,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 	caddr_t mac;
 #ifdef MIP6
 	int unicast_ns = 0;
-#endif
+#endif /* MIP6 */
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
 #else
@@ -478,7 +478,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 							  NULL);
 			if (mbu == NULL)
 				continue;
-			if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)
+			if ((mbu->mbu_flags & IP6MU_HOME) == 0)
 				continue;
 			if (mbu->mbu_reg_state ==
 					MIP6_BU_REG_STATE_DEREGWAITACK) {
@@ -491,7 +491,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		}
 	}
 	if (!unicast_ns)
-#endif
+#endif /* MIP6 */
 	if (daddr6 == NULL || IN6_IS_ADDR_MULTICAST(&daddr6->sin6_addr)) {
 		m->m_flags |= M_MCAST;
 		im6o.im6o_multicast_ifp = ifp;
@@ -521,7 +521,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 #ifdef MIP6
 	else if (unicast_ns)
 		dst_sa = *taddr6;
-#endif
+#endif /* MIP6 */
 	else {
 		dst_sa.sin6_addr.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
 		dst_sa.sin6_addr.s6_addr16[1] = 0;
@@ -577,9 +577,9 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 			src0 = in6_selectsrc(&dst_sa,
 #ifdef MIP6
 					     &opts,
-#else
+#else /* !MIP6 */
 					     NULL,
-#endif /* MIP6 */
+#endif /* !MIP6 */
 					     NULL, &ro, NULL, NULL, &error);
 			if (src0 == NULL) {
 				nd6log((LOG_DEBUG,
@@ -776,7 +776,7 @@ nd6_na_input(m, off, icmp6len)
 	if (!ifa) {
 		ifa = mip6_dad_find(&taddr6.sin6_addr, ifp);
 	}
-#endif
+#endif /* MIP6 */
 
 	/*
 	 * Target address matches one of my interface address.
@@ -1094,9 +1094,9 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	src0 = in6_selectsrc(&dst_sa,
 #ifdef MIP6
 			     &opts,
-#else
+#else /* !MIP6 */
 			     NULL,
-#endif /* MIP6 */
+#endif /* !MIP6 */
 			     NULL, &ro, NULL, NULL, &error);
 	if (src0 == NULL) {
 		nd6log((LOG_DEBUG, "nd6_na_output: source can't be "
@@ -1531,7 +1531,7 @@ nd6_dad_timer(ifa)
 			dp = NULL;
 #ifdef MIP6
 			if (mip6_dad_success(ifa) == ENOENT)
-#endif
+#endif /* MIP6 */
 			IFAFREE(ifa);
 		}
 	}
@@ -1574,7 +1574,7 @@ nd6_dad_duplicated(ifa)
 	dp = NULL;
 #ifdef MIP6
 	if (mip6_dad_duplicated(ifa) == ENOENT)
-#endif
+#endif /* MIP6 */
 	IFAFREE(ifa);
 }
 

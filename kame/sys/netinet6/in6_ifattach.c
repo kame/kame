@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.153 2002/04/22 12:13:25 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.154 2002/05/14 13:31:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -514,9 +514,9 @@ found:
  */
 #ifdef MIP6
 int
-#else /* MIP6 */
+#else /* !MIP6 */
 static int
-#endif /* MIP6 */
+#endif /* !MIP6 */
 get_ifid(ifp0, altifp, in6)
 	struct ifnet *ifp0;
 	struct ifnet *altifp;	/* secondary EUI64 source */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.110 2002/03/15 07:46:13 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.111 2002/05/14 13:31:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -210,7 +210,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 #ifdef MIP6_ALLOW_COA_FALLBACK
 	struct mip6_bu *mbu_dst;
 #endif
-#endif
+#endif /* MIP6 */
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;

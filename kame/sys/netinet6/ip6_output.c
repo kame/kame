@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.297 2002/04/22 12:03:02 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.298 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -179,6 +179,7 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_rthdr;
 	struct mbuf *ip6e_haddr; /* for MIP6 */
 	struct mbuf *ip6e_dest2;
+	struct mbuf *ip6e_mobility; /* for MIP6 */
 };
 
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **,
@@ -353,6 +354,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		MAKE_EXTHDR(opt->ip6po_rthdr, &exthdrs.ip6e_rthdr);
 		/* Destination options header(2nd part) */
 		MAKE_EXTHDR(opt->ip6po_dest2, &exthdrs.ip6e_dest2);
+#ifdef MIP6
+		MAKE_EXTHDR(opt->ip6po_mobility, &exthdrs.ip6e_mobility);
+#endif /* MIP6 */
 	}
 #ifdef MIP6
 	bzero((caddr_t)&mip6opt, sizeof(mip6opt));
@@ -402,9 +406,15 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			}
 		}
 		MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
-		if (mip6opt.mip6po_dest2) {
-			m_freem(exthdrs.ip6e_dest2);
-			MAKE_EXTHDR(mip6opt.mip6po_dest2, &exthdrs.ip6e_dest2);
+		/*
+		 * add a mobility header only when there is no
+		 * mobility header specified by the caller of
+		 * ip6_output().
+		 */
+		if ((mip6opt.mip6po_mobility != NULL) &&
+		    (exthdrs.ip6e_mobility == NULL)) {
+			MAKE_EXTHDR(mip6opt.mip6po_mobility,
+				    &exthdrs.ip6e_mobility);
 		}
 	} else {
 		/*
@@ -496,10 +506,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #if 1 /* XXX */
 		/* if we have any extension header, we cannot perform IPsec */
 		if (exthdrs.ip6e_hbh || exthdrs.ip6e_dest1 ||
+		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2
 #ifdef MIP6
-		    exthdrs.ip6e_haddr ||
+		    || exthdrs.ip6e_haddr || exthdrs.ip6e_mobility
 #endif /* MIP6 */
-		    exthdrs.ip6e_rthdr || exthdrs.ip6e_dest2) {
+		    ) {
 			error = EHOSTUNREACH;
 			goto freehdrs;
 		}
@@ -567,6 +578,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	unfragpartlen = optlen + sizeof(struct ip6_hdr);
 	/* NOTE: we don't add AH/ESP length here. do that later. */
 	if (exthdrs.ip6e_dest2) optlen += exthdrs.ip6e_dest2->m_len;
+#ifdef MIP6
+	if (exthdrs.ip6e_mobility) optlen += exthdrs.ip6e_mobility->m_len;
+#endif /* MIP6 */
 
 	/*
 	 * If we need IPsec, or there is at least one extension header,
@@ -624,6 +638,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	{
 		u_char *nexthdrp = &ip6->ip6_nxt;
 		struct mbuf *mprev = m;
+#ifdef MIP6
+		struct mbuf *lasthdr = m;
+#endif /* MIP6 */
 
 		/*
 		 * we treat dest2 specially.  this makes IPsec processing
@@ -640,7 +657,21 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			m->m_next = exthdrs.ip6e_dest2;
 			*mtod(exthdrs.ip6e_dest2, u_char *) = ip6->ip6_nxt;
 			ip6->ip6_nxt = IPPROTO_DSTOPTS;
+#ifdef MIP6
+			lasthdr = exthdrs.ip6e_dest2;
+			nexthdrp = mtod(exthdrs.ip6e_dest2, u_char *);
+#endif /* MIP6 */
 		}
+#ifdef MIP6
+		if (exthdrs.ip6e_mobility) {
+			if (!hdrsplit)
+				panic("assumption failed: hdr not split");
+			exthdrs.ip6e_mobility->m_next = lasthdr->m_next;
+			lasthdr->m_next = exthdrs.ip6e_mobility;
+			*mtod(exthdrs.ip6e_mobility, u_char *) = *nexthdrp;
+			*nexthdrp = IPPROTO_MOBILITY;
+		}
+#endif /* MIP6 */
 
 #define MAKE_CHAIN(m, mp, p, i)\
     do {\
@@ -777,6 +808,10 @@ skip_ipsec2:;
 
 		finaldst = ip6->ip6_dst;
 		switch (rh->ip6r_type) {
+#ifdef MIP6
+		case IPV6_RTHDR_TYPE_2:
+printf("MIP6 ip6_output XXX\n");
+#endif /* MIP6 */
 		case IPV6_RTHDR_TYPE_0:
 			 rh0 = (struct ip6_rthdr0 *)rh;
 			 addr = (struct in6_addr *)(rh0 + 1);
@@ -1567,10 +1602,11 @@ freehdrs:
 	m_freem(exthdrs.ip6e_hbh);	/* m_freem will check if mbuf is 0 */
 	m_freem(exthdrs.ip6e_dest1);
 	m_freem(exthdrs.ip6e_rthdr);
+	m_freem(exthdrs.ip6e_dest2);
 #ifdef MIP6
 	m_freem(exthdrs.ip6e_haddr);
+	m_freem(exthdrs.ip6e_mobility);
 #endif /* MIP6 */
-	m_freem(exthdrs.ip6e_dest2);
 	/* fall through */
 bad:
 	m_freem(m);

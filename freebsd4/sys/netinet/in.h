@@ -107,6 +107,7 @@
 #define	IPPROTO_DSTOPTS		60		/* IP6 destination option */
 #define	IPPROTO_AHIP		61		/* any host internal protocol */
 #define	IPPROTO_CFTP		62		/* CFTP */
+#define	IPPROTO_MOBILITY	62		/* XXX is CFTP used? */
 #define	IPPROTO_HELLO		63		/* "hello" routing protocol */
 #define	IPPROTO_SATEXPAK	64		/* SATNET/Backroom EXPAK */
 #define	IPPROTO_KRYPTOLAN	65		/* Kryptolan */

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.301 2002/04/22 12:03:02 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.302 2002/05/14 13:31:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,7 +132,7 @@
 #include <net/if_hif.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-#endif
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -711,16 +711,16 @@ icmp6_input(mp, offp, proto)
 
 	case ICMP6_PARAM_PROB:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_paramprob);
+#ifdef MIP6
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+#endif /* MIP6 */
 		switch (code) {
 		case ICMP6_PARAMPROB_NEXTHEADER:
 			code = PRC_UNREACH_PROTOCOL;
 			break;
 		case ICMP6_PARAMPROB_HEADER:
 		case ICMP6_PARAMPROB_OPTION:
-#ifdef MIP6
-			if (mip6_icmp6_input(m, off, icmp6len))
-				goto freeit;
-#endif /* MIP6 */
 			code = PRC_PARAMPROB;
 			break;
 		default:
@@ -831,11 +831,8 @@ icmp6_input(mp, offp, proto)
 			goto badlen;
 		if (code != 0)
 			goto badcode;
-#ifdef MIP6_KERNEL_DHAAD
-		if (mip6_icmp6_input(m, off, icmp6len))
-			goto freeit;
-#endif
 		break;
+
 	case ICMP6_HADISCOV_REPLY:
 		if (icmp6len < sizeof(struct ha_discov_rep))
 			goto badlen;
@@ -844,7 +841,7 @@ icmp6_input(mp, offp, proto)
 		if (mip6_icmp6_input(m, off, icmp6len))
 			goto freeit;
 		break;
-#ifndef MIP6_DRAFT13
+
 	case ICMP6_MOBILEPREFIX_SOLICIT:
 		if (icmp6len < sizeof(struct mobile_prefix_solicit))
 			goto badlen;
@@ -862,7 +859,6 @@ icmp6_input(mp, offp, proto)
 		if (mip6_icmp6_input(m, off, icmp6len))
 			goto freeit;
 		break;
-#endif /* !MIP6_DRAFT13 */
 #endif /* MIP6 */
 
 	case MLD_LISTENER_QUERY:

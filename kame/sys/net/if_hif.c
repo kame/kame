@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.25 2002/04/04 06:44:40 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.26 2002/05/14 13:31:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1067,7 +1067,6 @@ contiguousfail:
 	 * if ! link-local, prepend an outer ip header and send it.
 	 * if link-local, discard it.
 	 */
-#ifdef MIP6_BDT
 	{
 		struct sockaddr_in6 *src_sa, *dst_sa;
 		struct mip6_bu *mbu;
@@ -1115,7 +1114,6 @@ contiguousfail:
 #endif
 	}
  done:
-#endif /* MIP6_BDT */
 
 	m_freem(m);
 	return(0);

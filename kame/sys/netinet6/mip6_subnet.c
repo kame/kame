@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.21 2002/03/12 11:57:55 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.22 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -667,7 +667,7 @@ mip6_subnet_ha_timeout(msha)
 			for (mbu = LIST_FIRST(&sc->hif_bu_list);
 			     mbu;
 			     mbu = LIST_NEXT(mbu, mbu_entry)) {
-				if ((mbu->mbu_flags & IP6_BUF_HOME) == 0) {
+				if ((mbu->mbu_flags & IP6MU_HOME) == 0) {
 					/*
 					 * this is not a home
 					 * registration entry.

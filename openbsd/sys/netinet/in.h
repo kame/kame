@@ -71,6 +71,7 @@
 #define IPPROTO_ICMPV6		58		/* ICMP for IPv6 */
 #define IPPROTO_NONE		59		/* No next header */
 #define IPPROTO_DSTOPTS		60		/* Destination options header */
+#define IPPROTO_MOBILITY	62		/* Mobile IPv6 mobility hdr */
 #define	IPPROTO_EON		80		/* ISO cnlp */
 #define IPPROTO_ETHERIP		97		/* Ethernet in IPv4 */
 #define	IPPROTO_ENCAP		98		/* encapsulation header */

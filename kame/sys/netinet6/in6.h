@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.124 2002/05/14 10:38:17 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.125 2002/05/14 13:31:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -529,6 +529,7 @@ struct route_in6 {
 #define IPV6_RTHDR_LOOSE     0 /* this hop need not be a neighbor. XXX old spec */
 #define IPV6_RTHDR_STRICT    1 /* this hop must be a neighbor. XXX old spec */
 #define IPV6_RTHDR_TYPE_0    0 /* IPv6 routing header type 0 */
+#define IPV6_RTHDR_TYPE_2    2 /* IPv6 routing header type 2 for Mobile IPv6 */
 
 /*
  * Defaults and limits for options

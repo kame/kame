@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.101 2002/03/15 12:32:42 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.102 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -120,28 +120,16 @@ static int mip6_bu_count = 0;
 static int mip6_bc_count = 0;
 
 /* binding update functions. */
-static int mip6_bu_list_remove __P((struct mip6_bu_list *, struct mip6_bu *));
-static int mip6_bu_list_notify_binding_change __P((struct hif_softc *));
 static int mip6_bu_send_bu __P((struct mip6_bu *));
 static void mip6_bu_timeout __P((void *));
 static void mip6_bu_starttimer __P((void));
 static void mip6_bu_stoptimer __P((void));
-static int mip6_bu_encapcheck __P((const struct mbuf *, int, int, void *));
 
 /* binding cache functions. */
-#ifdef MIP6_DRAFT13
 static struct mip6_bc *mip6_bc_create 
     __P((struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *,
-	 u_int8_t, u_int8_t, MIP6_SEQNO_T, u_int32_t, struct ifnet *));
-#else
-static struct mip6_bc *mip6_bc_create 
-    __P((struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *,
-	 u_int8_t, MIP6_SEQNO_T, u_int32_t, struct ifnet *));
-#endif /* MIP6_DRAFT13 */
+	 u_int8_t, u_int16_t, u_int32_t, struct ifnet *));
 static int mip6_bc_list_insert __P((struct mip6_bc_list *, struct mip6_bc *));
-static int mip6_bc_send_ba __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
-				struct sockaddr_in6 *, u_int8_t, MIP6_SEQNO_T,
-				u_int32_t, u_int32_t));
 static int mip6_bc_proxy_control __P((struct sockaddr_in6 *,
 				      struct sockaddr_in6 *,
 				      int));
@@ -155,40 +143,11 @@ static struct mip6_timeout_entry *mip6_timeoutentry_insert __P((time_t, caddr_t)
 static void mip6_bc_timeoutentry_remove __P((struct mip6_timeout_entry *));
 #endif /* MIP6_CALLOUTTEST */
 
-static int mip6_process_hrbu __P((struct sockaddr_in6 *,
-				  struct sockaddr_in6 *,
-				  struct ip6_opt_binding_update *,
-				  MIP6_SEQNO_T, u_int32_t,
-				  struct sockaddr_in6 *));
-static int mip6_process_hurbu __P((struct sockaddr_in6 *,
-				   struct sockaddr_in6 *,
-				   struct ip6_opt_binding_update *,
-				   MIP6_SEQNO_T, u_int32_t,
-				   struct sockaddr_in6 *));
 static int mip6_dad_start __P((struct mip6_bc *, struct in6_addr *));
 static int mip6_dad_stop __P((struct mip6_bc *));
-static int mip6_tunnel_control __P((int, void *, 
-				    int (*) __P((const struct mbuf *,
-						 int, int, void *)),
-				    const struct encaptab **));
-#ifdef MIP6_BDT
 static int mip6_bdt_delete __P((struct sockaddr_in6 *));
-#endif /* MIP6_BDT */
 static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
 				    u_int8_t));
-#if defined(IPSEC) && !defined(__OpenBSD__)
-#ifndef MIP6_DRAFT13
-static int mip6_bu_authdata_verify __P((struct in6_addr *,
-					struct in6_addr *,
-					struct in6_addr *,
-					struct ip6_opt_binding_update *,
-					struct mip6_subopt_authdata *));
-static int mip6_ba_authdata_verify __P((struct in6_addr *,
-					struct in6_addr *,
-					struct ip6_opt_binding_ack *,
-					struct mip6_subopt_authdata *));
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
 
 #ifdef MIP6_DEBUG
 void mip6_bu_print __P((struct mip6_bu *));
@@ -253,7 +212,7 @@ mip6_bu_list_find_home_registration(bu_list, haddr)
 	for (mbu = LIST_FIRST(bu_list); mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
 		if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, haddr) &&
-		    (mbu->mbu_flags & IP6_BUF_HOME) != 0)
+		    (mbu->mbu_flags & IP6MU_HOME) != 0)
 			break;
 	}
 	return (mbu);
@@ -319,7 +278,6 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	return (mbu);
 }
 
-#if 1
 int
 mip6_home_registration(sc)
 	struct hif_softc *sc;
@@ -353,7 +311,7 @@ mip6_home_registration(sc)
 			for (mbu = LIST_FIRST(&sc->hif_bu_list);
 			     mbu;
 			     mbu = LIST_NEXT(mbu, mbu_entry)) {
-				if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)
+				if ((mbu->mbu_flags & IP6MU_HOME) == 0)
 					continue;
 				if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr,
 						       &mpfx->mpfx_haddr))
@@ -415,7 +373,7 @@ mip6_home_registration(sc)
 				}
 
 				mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
-						     IP6_BUF_ACK|IP6_BUF_HOME|IP6_BUF_DAD|IP6_BUF_SINGLE,
+						     IP6MU_ACK|IP6MU_HOME|IP6MU_DAD|IP6MU_SINGLE,
 						     sc);
 				if (mbu == NULL)
 					return (ENOMEM);
@@ -480,7 +438,7 @@ mip6_home_registration(sc)
 				mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
 				mbu->mbu_ackexpire
 					= time_second + mbu->mbu_acktimeout;
-				/* mbu->mbu_flags |= IP6_BUF_DAD ;*/
+				/* mbu->mbu_flags |= IP6MU_DAD ;*/
 			}
 			mbu->mbu_state |= (MIP6_BU_STATE_WAITACK|MIP6_BU_STATE_WAITSENT);
 		}
@@ -488,195 +446,8 @@ mip6_home_registration(sc)
 
 	return (0);
 }
-#else
+
 int
-mip6_home_registration(sc)
-	struct hif_softc *sc;
-{
-	struct mip6_bu *mbu;
-	struct hif_subnet *hs;
-	struct mip6_subnet *ms;
-	struct mip6_subnet_ha *msha;
-
-	/* find the subnet info of this home link. */
-	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
-	if (hs == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: no home subnet\n",
-			 __FILE__, __LINE__));
-		return (EINVAL);
-	}
-	if ((ms = hs->hs_ms) == NULL) {
-		/* must not happen. */
-		return (EINVAL);
-	}
-
-	/* check each binding update entry that has a BUF_HOME flag
-	 * on. */
-	for (mbu = LIST_FIRST(&sc->hif_bu_list);
-	     mbu;
-	     mbu = LIST_NEXT(mbu, mbu_entry)) {
-		if ((mbu->mbu_flags & IP6_BUF_HOME) == 0)
-			continue;
-
-		/*
-		 * check if this binding update entry is for a home
-		 * registration to the home agent or home registration
-		 * to the AR of a foreign network.  if paddr of the
-		 * binding update is one of the home agents of our
-		 * home link, this binding update is a home
-		 * registration to the home agent.
-		 */
-		msha = mip6_subnet_ha_list_find_withhaaddr(&ms->ms_msha_list,
-							   &mbu->mbu_paddr);
-		if (msha) {
-			/*
-			 * this binding update is a home registration
-			 * to our home agent.
-			 */
-			break;
-		}
-			
-	}
-	if (mbu == NULL) {
-		const struct sockaddr_in6 *haaddr;
-		struct mip6_ha *mha;
-		struct mip6_subnet_prefix *mspfx;
-		struct mip6_prefix *mpfx;
-		u_int8_t bu_flags = 0;
-
-		if (sc->hif_location == HIF_LOCATION_HOME) {
-			/*
-			 * we are home and we have no binding update
-			 * entry for home registration.  this will
-			 * happen when either of the following two
-			 * cases happens.
-			 *
-			 * 1. enabling MN function at home subnet.
-			 * 2. returning home with expired home registration.
-			 *
-			 * in either case, we should do nothing.
-			 */
-			return (0);
-		}
-
-		/*
-		 * no home registration found.  create a new binding
-		 * update entry.
-		 */
-
-		/* pick the preferable HA from the list. */
-		msha = mip6_subnet_ha_list_find_preferable(&ms->ms_msha_list);
-		if (msha == NULL) {
-			/*
-			 * if no HA is found, try to find a HA using
-			 * Dynamic Home Agent Discovery.
-			 */
-			mip6log((LOG_INFO,
-				 "%s:%d: "
-				 "no home agent.  start ha discovery.\n",
-				 __FILE__, __LINE__));
-			mip6_icmp6_ha_discov_req_output(sc);
-			haaddr = &sin6_any;
-		} else {
-			if ((mha = msha->msha_mha) == NULL) {
-				return (EINVAL);
-			}
-			haaddr = &mha->mha_gaddr;
-		}
-
-		/*
-		 * pick one home prefix up to determine the home
-		 * address of this MN.
-		 */
-		/* 
-		 * XXX: which prefix to use to get a home address when
-		 * we have multiple home prefixes.
-		 */
-		if ((mspfx = TAILQ_FIRST(&ms->ms_mspfx_list)) == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d: we don't have any home prefix.\n",
-				 __FILE__, __LINE__));
-			return (EINVAL);
-		}
-		if ((mpfx = mspfx->mspfx_mpfx) == NULL)
-			return (EINVAL);
-		mip6log((LOG_INFO,
-			 "%s:%d: home address is %s\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&mpfx->mpfx_haddr.sin6_addr)));
-
-		bu_flags = IP6_BUF_ACK|IP6_BUF_HOME|IP6_BUF_DAD;
-		if (mip6_config.mcfg_bu_use_single != 0)
-			bu_flags |= IP6_BUF_SINGLE;
-		mbu = mip6_bu_create(haaddr, mpfx, &hif_coa, bu_flags, sc);
-		if (mbu == NULL)
-			return (ENOMEM);
-		/*
-		 * for the first registration to the home agent, the
-		 * ack timeout value should be (retrans *
-		 * dadtransmits) * 1.5.
-		 */
-		/*
-		 * XXX: TODO: KAME has different dad retrans values
-		 * for each interfaces.  which retrans value should be
-		 * selected ?
-		 */
-
-		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
-	} else {
-		int32_t coa_lifetime, prefix_lifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		long time_second = time.tv_sec;
-#endif
-
-		/* a binding update entry exists.  update information. */
-
-		/* update coa. */
-		if (sc->hif_location == HIF_LOCATION_HOME) {
-			/* un-registration. */
-			mbu->mbu_coa = mbu->mbu_haddr;
-			mbu->mbu_reg_state = MIP6_BU_REG_STATE_DEREGWAITACK;
-		} else {
-			/* registration. */
-			mbu->mbu_coa = hif_coa;
-			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REGWAITACK;
-		}
-
-		/* update lifetime. */
-		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa.sin6_addr);
-		prefix_lifetime
-			= mip6_subnet_prefix_list_get_minimum_lifetime(&ms->ms_mspfx_list);
-		if (coa_lifetime < prefix_lifetime) {
-			mbu->mbu_lifetime = coa_lifetime;
-		} else {
-			mbu->mbu_lifetime = prefix_lifetime;
-		}
-		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
-		/* sanity check for overflow */
-		if (mbu->mbu_expire < time_second)
-			mbu->mbu_expire = 0x7fffffff;
-		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-		/* sanity check for overflow */
-		if (mbu->mbu_refexpire < time_second)
-			mbu->mbu_refexpire = 0x7fffffff;
-		mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
-		mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
-		/* mbu->mbu_flags |= IP6_BUF_DAD ;*/
-	}
-	mbu->mbu_state |= (MIP6_BU_STATE_WAITACK|MIP6_BU_STATE_WAITSENT);
-
-	/*
-	 * XXX
-	 * register to a previous ar.
-	 */
-
-	return (0);
-}
-#endif
-
-static int
 mip6_bu_list_notify_binding_change(sc)
 	struct hif_softc *sc;
 {
@@ -693,7 +464,7 @@ mip6_bu_list_notify_binding_change(sc)
 	     mbu = mbu_next) {
 		mbu_next = LIST_NEXT(mbu, mbu_entry);
 
-		if (mbu->mbu_flags & IP6_BUF_HOME) {
+		if (mbu->mbu_flags & IP6MU_HOME) {
 			/* this is a BU for our home agent */
 			/*
 			 * XXX
@@ -791,7 +562,7 @@ mip6_bu_timeout(arg)
 
 			/* check expiration */
 			if (mbu->mbu_expire < time_second) {
-				if ((mbu->mbu_flags & IP6_BUF_HOME) != 0) {
+				if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 					/*
 					 * the binding update entry for
 					 * the home registration
@@ -823,7 +594,7 @@ mip6_bu_timeout(arg)
 #endif
 
 			/* check ack status */
-			if ((mbu->mbu_flags & IP6_BUF_ACK)
+			if ((mbu->mbu_flags & IP6MU_ACK)
 			    && ((mbu->mbu_state & MIP6_BU_STATE_WAITACK) != 0)
 			    && (mbu->mbu_ackexpire < time_second)) {
 				mbu->mbu_acktimeout *= 2;
@@ -843,7 +614,7 @@ mip6_bu_timeout(arg)
 				/* sanity check for overflow */
 				if (mbu->mbu_refexpire < time_second)
 					mbu->mbu_refexpire = 0x7fffffff;
-				if (mbu->mbu_flags & IP6_BUF_ACK) {
+				if (mbu->mbu_flags & IP6MU_ACK) {
 					mbu->mbu_acktimeout
 						= MIP6_BA_INITIAL_TIMEOUT;
 					mbu->mbu_ackexpire
@@ -887,7 +658,7 @@ mip6_bu_send_bu(mbu)
 	int error = 0;
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr)) {
-		if ((mbu->mbu_flags & IP6_BUF_HOME) != 0) {
+		if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 			mip6log((LOG_INFO,
 				 "%s:%d: "
 				 "no home agent.  start ha discovery.\n",
@@ -951,7 +722,7 @@ mip6_bu_list_insert(bu_list, mbu)
 	return (0);
 }
 
-static int
+int
 mip6_bu_list_remove(mbu_list, mbu)
 	struct mip6_bu_list *mbu_list;
 	struct mip6_bu *mbu;
@@ -960,11 +731,9 @@ mip6_bu_list_remove(mbu_list, mbu)
 		return (EINVAL);
 	}
 
-#ifdef MIP6_BDT
 	if ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0) {
 		mip6_bdt_delete(&mbu->mbu_paddr);
 	}
-#endif /* MIP6_BDT */
 
 	LIST_REMOVE(mbu, mbu_entry);
 	FREE(mbu, M_TEMP);
@@ -980,7 +749,6 @@ mip6_bu_list_remove(mbu_list, mbu)
 	return (0);
 }
 
-#ifdef MIP6_BDT
 int
 mip6_bdt_create(sc, paddr)
 	struct hif_softc *sc;
@@ -1053,7 +821,6 @@ mip6_bdt_delete(paddr)
 
 	return (error);
 }
-#endif /* MIP6_BDT */
 
 int
 mip6_bu_list_remove_all(mbu_list)
@@ -1086,532 +853,13 @@ mip6_bu_list_remove_all(mbu_list)
 /*
  * validate incoming binding updates.
  */
+
 int
-mip6_validate_bu(m, opt)
-	struct mbuf *m;
-	u_int8_t *opt;
-{
-	struct ip6_hdr *ip6;
-	struct mbuf *n;
-	struct ip6aux *ip6a = NULL;
-	struct ip6_opt_binding_update *bu_opt;
-	MIP6_SEQNO_T seqno;
-	struct mip6_bc *mbc;
-#ifndef MIP6_DRAFT13
-	int error = 0;
-#endif /* !MIP6_DRAFT13 */
-#if defined(IPSEC) && !defined(__OpenBSD__)
-	int ipsec_protected = 0;
-#ifndef MIP6_DRAFT13
-	struct mip6_subopt_authdata *authdata = NULL;
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
-
-	ip6 = mtod(m, struct ip6_hdr *);
-	bu_opt = (struct ip6_opt_binding_update *)(opt);
-	    
-#if defined(IPSEC) && !defined(__OpenBSD__)
-	/*
-	 * check if the incoming binding update is protected by the
-	 * ipsec mechanism.
-	 */
-	if (mip6_config.mcfg_use_ipsec != 0) {
-		/*
-		 * we will take into consideration of using the ipsec
-		 * mechanism to protect binding updates.
-		 */
-		if ((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM)) {
-			/*
-			 * this packet is protected by the ipsec
-			 * mechanism.
-			 */
-			ipsec_protected = 1;
-		} else {
-#ifdef MIP6_DRAFT13
-			/*
-			 * draft-13 requires that the binding update
-			 * must be protected by the ipsec
-			 * authentication mechanism.  if this packet
-			 * is not protected, ignore this.
-			 */
-			mip6log((LOG_NOTICE,
-				 "%s:%d: an unprotected binding update "
-				 "from %s.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&ip6->ip6_src)));
-
-			/* silently ignore. */
-			return (1);
-#endif /* MIP6_DRAFT13 */
-			/*
-			 * draft-15 and later introduces
-			 * authentication data sub-option to protect
-			 * the binding updates.  if this binding
-			 * update is not protected by the ipsec, we
-			 * will check the authentication data
-			 * sub-option later in this function.
-			 */
-		}
-	}
-#endif /* IPSEC && !__OpenBSD__ */
-
-	/*
-	 * check if this packet contains a home address destination
-	 * option.
-	 */
-	n = ip6_findaux(m);
-	if (!n) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no Home Address option found "
-			 "in the binding update from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ip6->ip6_src)));
-		/* silently ignore. */
-		/* discard */
-		return (-1);
-	}
-
-	/*
-	 * find ip6aux to get the home address and coa information of
-	 * the sending node.
-	 */
-	ip6a = mtod(n, struct ip6aux *);
-	if ((ip6a == NULL) || (ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no home address destination option found "
-			 "in the binding update from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ip6->ip6_src)));
-		/* silently ignore. */
-		/* discard */
-		return (-1);
-	}
-
-	/*
-	 * make sure that the length field of the incoming binding
-	 * update is >= IP6OPT_BULEN.
-	 */
-	if (bu_opt->ip6ou_len < IP6OPT_BULEN) {
-		ip6stat.ip6s_badoptions++;
-		mip6log((LOG_NOTICE,
-			 "%s:%d: too short binding update (len = %d) "
-			 "from host %s.\n",
-			 __FILE__, __LINE__,
-			 bu_opt->ip6ou_len,
-			 ip6_sprintf(&ip6->ip6_src)));
-		/* silently ignore */
-		/* discard */
-		return (-1);
-	}
-
-	/*
-	 * check if the received sequence number of the binding update
-	 * > the last received sequence number.
-	 */
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &ip6a->ip6a_home);
-	if (mbc == NULL) {
-		/* no binding cache entry yet.  create it later. */
-		goto check_suboptions;
-	}
-#ifdef MIP6_DRAFT13
-	GET_NETVAL_S(bu_opt->ip6ou_seqno, seqno);
-#else
-	seqno = bu_opt->ip6ou_seqno;
-#endif
-	if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
-		ip6stat.ip6s_badoptions++;
-		mip6log((LOG_NOTICE,
-			 "%s:%d: received sequence no (%d) <= current "
-			 "seq no (%d) in BU from host %s.\n",
-			 __FILE__, __LINE__,
-			 seqno,
-			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
-#ifndef MIP6_DRAFT13
-		/*
-		 * the seqno of this binding update is smaller than the
-		 * corresponding binding cache.  we send TOO_SMALL
-		 * binding ack as an error.  in this case, we use the
-		 * coa of the incoming packet instead of the coa
-		 * stored in the binding cache as a destination
-		 * addrress.  because the sending mobile node's coa
-		 * might have changed after it had registered before.
-		 */
-		{
-			struct sockaddr_in6 pcoa;
-			pcoa = ip6a->ip6a_src;
-			pcoa.sin6_addr = ip6a->ip6a_coa;
-			error = mip6_bc_send_ba(&mbc->mbc_addr,
-						&mbc->mbc_phaddr,
-						&pcoa,
-						MIP6_BA_STATUS_SEQNO_TOO_SMALL,
-						mbc->mbc_seqno,
-						0, 0);
-		}
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: sending a binding ack failed.\n",
-				 __FILE__, __LINE__));
-		}
-#endif /* !MIP6_DRAFT13 */
-		/* silently ignore. */
-		/* discard */
-		return (-1);
-	}
-
- check_suboptions:
-	/* check sub-option(s). */
-	if (bu_opt->ip6ou_len > IP6OPT_BULEN) {
-		/* we have sub-option(s). */
-		int suboptlen = bu_opt->ip6ou_len - IP6OPT_BULEN;
-		u_int8_t *opt = (u_int8_t *)(bu_opt + 1);
-		int optlen;
-		for (optlen = 0;
-		     suboptlen > 0;
-		     suboptlen -= optlen, opt += optlen) {
-			if (*opt != MIP6SUBOPT_PAD1 &&
-			    (suboptlen < 2 || *(opt + 1) + 2 > suboptlen)) {
-				mip6log((LOG_ERR,
-					 "%s:%d: "
-					 "sub-option too small\n",
-					 __FILE__, __LINE__));
-				return (-1);
-			}
-			switch (*opt) {
-			case MIP6SUBOPT_PAD1:
-				optlen = 1;
-				break;
-
-			case MIP6SUBOPT_ALTCOA:
-				/* XXX */
-				optlen = *(opt + 1) + 2;
-				if (optlen != IP6OPT_COALEN) {
-					mip6log((LOG_ERR,
-						 "%s:%d: "
-						 "alt coa sub-option too small\n",
-						 __FILE__, __LINE__));
-					/* discard */
-					return (-1);
-				}
-				break;
-
-#if defined(IPSEC) && !defined(__OpenBSD__)
-#ifndef MIP6_DRAFT13
-			case MIP6SUBOPT_AUTHDATA:
-				optlen = *(opt + 1) + 2;
-				if (optlen < IP6OPT_AUTHDATALEN) {
-					mip6log((LOG_ERR,
-						 "%s:%d: "
-						 "auth data sub-option too small\n",
-						 __FILE__, __LINE__));
-					/* discard */
-					return (-1);
-				}
-				authdata = (struct mip6_subopt_authdata *)opt;
-				break;
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
-
-			default:
-				optlen = *(opt + 1) + 2;
-				break;
-			}
-		}
-	}
-
-#if defined(IPSEC) && !defined(__OpenBSD__)
-#ifndef MIP6_DRAFT13
-	/*
-	 * if the packet is protected by the ipsec, we believe it.
-	 * otherwise, check the authentication data sub-option.
-	 */
-	if ((ipsec_protected == 0) && (mip6_config.mcfg_use_authdata != 0)) {
-		if (authdata == NULL) {
-			/*
-			 * if the packet is not protected by the ipsec
-			 * and does not have a authentication data
-			 * either, this packet is not reliable.
-			 */
-			mip6log((LOG_ERR,
-				 "%s:%d: an unprotected binding update "
-				 "from host %s\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&ip6->ip6_src)));
-			if (mip6_config.mcfg_use_ipsec != 0) {
-				/* silently ignore */
-				return (1);
-			}
-		} else {
-			/*
-			 * if the packet is not protected by the ipsec
-			 * but an authentication data sub-option
-			 * exists, check the authentication data.  if
-			 * it seems good, we think this packet is
-			 * protected by some week auth mechanisms.
-			 */
-			if (mip6_bu_authdata_verify(&ip6a->ip6a_home.sin6_addr,
-						    &ip6a->ip6a_dst.sin6_addr,
-						    &ip6a->ip6a_coa,
-						    bu_opt, authdata)) {
-				mip6log((LOG_ERR,
-					 "%s:%d: invalid authenticataion data "
-					 "from host %s\n",
-					 __FILE__, __LINE__,
-					 ip6_sprintf(&ip6->ip6_src)));
-				/* siliently ignore. */
-				return (1);
-			}
-			/* verified. */
-		}
-	}
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
-
-	/* we have a valid binding update. */
-	return (0);
-}
-
-/*
- * process the incoming binding update.
- */
-int
-mip6_process_bu(m, opt)
-	struct mbuf *m;
-	u_int8_t *opt;
-{
-	struct ip6_hdr *ip6;
-	struct mbuf *n;
-	struct ip6aux *ip6a = NULL;
-	struct ip6_opt_binding_update *bu_opt;
-	struct sockaddr_in6 pcoa;
-	u_int8_t *subopthead;
-	struct mip6_subopt_altcoa *altcoa_subopt;
-	u_int8_t suboptlen;
-	u_int32_t lifetime;
-	MIP6_SEQNO_T seqno;
-	struct mip6_bc *mbc;
-	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
-
-	ip6 = mtod(m, struct ip6_hdr *);
-	bu_opt = (struct ip6_opt_binding_update *)(opt);
-
-	n = ip6_findaux(m);
-	if (!n) {
-		/* just in case */
-		return (EINVAL);
-	}
-	ip6a = mtod(n, struct ip6aux *);
-	if (ip6a == NULL) {
-		/* just in case */
-		return (EINVAL);
-	}
-
-	/* find alternative coa suboption. */
-	subopthead = opt + IP6OPT_MINLEN + IP6OPT_BULEN;
-	suboptlen = *(opt + 1) - IP6OPT_BULEN;
-	altcoa_subopt = (struct mip6_subopt_altcoa *)
-		mip6_destopt_find_subopt(subopthead,
-					 suboptlen,
-					 MIP6SUBOPT_ALTCOA);
-	bzero(&pcoa, sizeof(pcoa));
-	pcoa.sin6_len = sizeof(pcoa);
-	pcoa.sin6_family = AF_INET6;
-	if (altcoa_subopt == NULL) {
-		pcoa.sin6_addr = ip6a->ip6a_coa;
-	} else {
-		pcoa.sin6_addr = *(struct in6_addr *)altcoa_subopt->coa;
-	}
-
-	GET_NETVAL_L(bu_opt->ip6ou_lifetime, lifetime);
-#ifdef MIP6_DRAFT13
-	GET_NETVAL_S(bu_opt->ip6ou_seqno, seqno);
-#else
-	seqno = bu_opt->ip6ou_seqno;
-#endif
-
-	/*
-	 * lifetime != 0 and haddr != coa means that this BU is a reqeust
-	 * to cache binding (or home registration) for the sending MN.
-	 */
-	if ((lifetime != 0)
-	    && (!SA6_ARE_ADDR_EQUAL(&ip6a->ip6a_home, &pcoa))) {
-		/* check home registration flag. */
-		if (bu_opt->ip6ou_flags & IP6_BUF_HOME) {
-			if (mip6_config.mcfg_hrbc_lifetime_limit > 0 &&
-			    lifetime > mip6_config.mcfg_hrbc_lifetime_limit)
-				lifetime = mip6_config.mcfg_hrbc_lifetime_limit;
-			/* a request for a home registration. */
-			if (MIP6_IS_HA) {
-				/* XXX TODO write code of section 9.1 */
-				mip6_process_hrbu(&ip6a->ip6a_home,
-						  &pcoa,
-						  bu_opt,
-						  seqno,
-						  lifetime,
-						  &ip6a->ip6a_dst);
-			} else {
-				/* this is not acting as a homeagent. */
-				if (mip6_bc_send_ba(&ip6a->ip6a_dst,
-						    &ip6a->ip6a_home,
-						    &pcoa,
-						    MIP6_BA_STATUS_NOT_SUPPORTED,
-						    seqno,
-						    0,
-						    0)) {
-					mip6log((LOG_ERR,
-						 "%s:%d: sending BA to %s(%s) failed. "
-						 "send it later.\n",
-						 __FILE__, __LINE__,
-						 ip6_sprintf(&ip6a->ip6a_home.sin6_addr),
-						 ip6_sprintf(&pcoa.sin6_addr)));
-				}
-				return (0); /* XXX is 0 OK? */
-			}
-		} else {
-			if (mip6_config.mcfg_bc_lifetime_limit > 0 &&
-			    lifetime > mip6_config.mcfg_bc_lifetime_limit)
-				lifetime = mip6_config.mcfg_bc_lifetime_limit;
-			/* a request to cache binding. */
-			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-							   &ip6a->ip6a_home);
-			if (mbc == NULL) {
-				/* create a binding cache entry. */
-				mbc = mip6_bc_create(&ip6a->ip6a_home,
-						     &pcoa,
-						     &ip6a->ip6a_dst,
-						     bu_opt->ip6ou_flags,
-#ifdef MIP6_DRAFT13
-						     bu_opt->ip6ou_prefixlen,
-#endif /* MIP6_DRAFT13 */
-						     seqno,
-						     lifetime,
-						     NULL);
-				if (mbc == NULL) {
-					mip6log((LOG_ERR,
-						 "%s:%d: mip6_bc memory "
-						 "allocation failed.\n",
-						 __FILE__, __LINE__));
-					return (ENOMEM);
-				}
-				error = mip6_bc_list_insert(&mip6_bc_list,
-							    mbc);
-				if (error) {
-					return (error);
-				}
-			} else {
-				/* update a BC entry. */
-				mbc->mbc_pcoa = pcoa;
-				mbc->mbc_flags = bu_opt->ip6ou_flags;
-#ifdef MIP6_DRAFT13
-				mbc->mbc_prefixlen = bu_opt->ip6ou_prefixlen;
-#endif /* MIP6_DRAFT13 */
-				mbc->mbc_seqno = seqno;
-				mbc->mbc_lifetime = lifetime;
-				mbc->mbc_expire
-					= time_second + mbc->mbc_lifetime;
-				/* sanity check for overflow */
-				if (mbc->mbc_expire < time_second)
-					mbc->mbc_expire = 0x7fffffff;
-				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
-			}
-			
-			if (bu_opt->ip6ou_flags & IP6_BUF_ACK) {
-				if (mip6_bc_send_ba(&ip6a->ip6a_dst,
-						    &ip6a->ip6a_home,
-						    &pcoa,
-						    MIP6_BA_STATUS_ACCEPTED,
-						    seqno,
-						    lifetime,
-						    lifetime)) {
-					mip6log((LOG_ERR,
-						 "%s:%d: sending BA to %s(%s) failed. "
-						 "send it later.\n",
-						 __FILE__, __LINE__,
-						 ip6_sprintf(&ip6a->ip6a_home.sin6_addr),
-						 ip6_sprintf(&pcoa.sin6_addr)));
-				}
-			}
-		}
-	}
-
-	/*
-	 * lifetime == 0 or haddr == coa meaans that this BU is a reqeust
-	 * to delete cache (or home unregistration).
-	 */
-	if ((lifetime == 0) || (SA6_ARE_ADDR_EQUAL(&ip6a->ip6a_home, &pcoa))) {
-		/* check home registration flag */
-		if (bu_opt->ip6ou_flags & IP6_BUF_HOME) {
-			/* a request to home unregistration */
-			if (MIP6_IS_HA) {
-				/* XXX TODO write code of section 9.2 */
-				mip6_process_hurbu(&ip6a->ip6a_home,
-						   &pcoa,
-						   bu_opt,
-						   seqno,
-						   lifetime,
-						   &ip6a->ip6a_dst);
-			} else {
-				/* this is not HA.  return BA with error. */
-				if (mip6_bc_send_ba(&ip6a->ip6a_dst,
-						    &ip6a->ip6a_home,
-						    &pcoa,
-						    MIP6_BA_STATUS_NOT_SUPPORTED,
-						    seqno,
-						    0,
-						    0)) {
-					mip6log((LOG_ERR,
-						 "%s:%d: sending BA to %s(%s) failed. "
-						 "send it later.\n",
-						 __FILE__, __LINE__,
-						 ip6_sprintf(&ip6a->ip6a_home.sin6_addr),
-						 ip6_sprintf(&pcoa.sin6_addr)));
-				}
-				return (0); /* XXX is 0 OK? */
-			}
-		} else {
-			/* a request to delete binding. */
-			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-							   &ip6a->ip6a_home);
-			if (mbc) {
-				error = mip6_bc_list_remove(&mip6_bc_list,
-							    mbc);
-				if (error) {
-					mip6log((LOG_ERR,
-						 "%s:%d: can't remove BC.\n",
-						 __FILE__, __LINE__));
-					return (error);
-				}
-			}
-			if (bu_opt->ip6ou_flags & IP6_BUF_ACK) {
-				if (mip6_bc_send_ba(&ip6a->ip6a_dst,
-						    &ip6a->ip6a_home,
-						    &pcoa,
-						    MIP6_BA_STATUS_ACCEPTED,
-						    seqno,
-						    lifetime,
-						    lifetime)) {
-					mip6log((LOG_ERR,
-						 "%s:%d: sending BA to %s(%s) failed. "
-						 "send it later.\n",
-						 __FILE__, __LINE__,
-						 ip6_sprintf(&ip6a->ip6a_home.sin6_addr),
-						 ip6_sprintf(&pcoa.sin6_addr)));
-				}
-			}
-		}
-	}
-
-	return (0);
-}
-
-static int
-mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
+mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	struct sockaddr_in6 *haddr0;
 	struct sockaddr_in6 *coa;
-	struct ip6_opt_binding_update *bu_opt;
-	MIP6_SEQNO_T seqno;
+	u_int8_t flags;
+	u_int16_t seqno;
 	u_int32_t lifetime;
 	struct sockaddr_in6 *haaddr;
 {
@@ -1619,9 +867,6 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct nd_prefix *pr;
 	struct ifnet *hifp = NULL;
 	int error = 0;
-#ifdef MIP6_DRAFT13
-	u_int8_t prefixlen;
-#endif /* MIP6_DRAFT13 */
 
 	/* find the home ifp of this homeaddress. */
 	for(pr = nd_prefix.lh_first;
@@ -1652,13 +897,8 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		}
 		return (0); /* XXX is 0 OK? */
 	}
-#ifdef MIP6_DRAFT13
-	prefixlen = bu_opt->ip6ou_prefixlen;
-	if (prefixlen == 0)
-#else
-	if (bu_opt->ip6ou_flags & IP6_BUF_SINGLE)
-#endif /* MIP6_DRAFT13 */
-	{
+
+	if (flags & IP6MU_SINGLE) {
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 						   haddr0);
 		if (mbc == NULL) {
@@ -1717,12 +957,7 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 
 			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
 						 &haddr0->sin6_addr,
-#ifdef MIP6_DRAFT13
-						 prefixlen
-#else
-						 64 /* XXX */
-#endif /* MIP6_DRAFT13 */
-				    ))
+						 64 /* XXX */))
 				continue;
 
 			found = 1;
@@ -1825,12 +1060,12 @@ mip6_are_ifid_equal(addr1, addr2, prefixlen)
 	return (1);
 }
 
-static int
-mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
+int
+mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	struct sockaddr_in6 *haddr0;
 	struct sockaddr_in6 *coa;
-	struct ip6_opt_binding_update *bu_opt;
-	MIP6_SEQNO_T seqno;
+	u_int8_t flags;
+	u_int16_t seqno;
 	u_int32_t lifetime;
 	struct sockaddr_in6 *haaddr;
 {
@@ -1844,10 +1079,6 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
-#ifdef MIP6_DRAFT13
-	struct nd_prefix *home_pr;
-#endif
-
 	/* find the home ifp of this homeaddress. */
 	for(pr = nd_prefix.lh_first;
 	    pr;
@@ -1856,9 +1087,6 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 					 &pr->ndpr_prefix.sin6_addr,
 					 pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
-#ifdef MIP6_DRAFT13
-			home_pr = pr;
-#endif
 		}
 	}
 	/* XXX really stupid to loop twice? */
@@ -1893,47 +1121,12 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		}
 		return (0); /* XXX is 0 OK? */
 	}
-#ifdef MIP6_DRAFT13
-	if (bu_opt->ip6ou_prefixlen != 0 &&
-	    home_pr->ndpr_plen != bu_opt->ip6ou_prefixlen) {
-		/* the haddr has an incorrect prefix length. */
-		/* XXX return 136 INCORRECT SUBNET PREFIX LENGTH */
-		if (mip6_bc_send_ba(haaddr, haddr0, coa,
-				    MIP6_BA_STATUS_INCORRECT_IFID_LENGTH,
-				    seqno,
-				    0,
-				    0)) {
-			mip6log((LOG_ERR,
-				 "%s:%d: sending BA to %s(%s) failed. "
-				 "send it later.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&haddr0->sin6_addr),
-				 ip6_sprintf(&coa->sin6_addr)));
-		}
-		return (0); /* XXX is 0 OK? */
-	}
-	if ((bu_opt->ip6ou_flags & IP6_BUF_ROUTER) != 0) {
-		/* XXX we don't support R bit in GNA and proxy ND */
-		mip6log((LOG_INFO,
-			 "%s:%d: IP6_BUF_ROUTER is not supported"
-			 " from host %s(%s)\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&haddr0->sin6_addr),
-			 ip6_sprintf(&coa->sin6_addr)));
-		/* XXX ignore? */
-	}
-#endif /* MIP6_DRAFT13 */
 
 	/* adjust lifetime */
 	if (lifetime > prlifetime)
 		lifetime = prlifetime;
 
-#ifdef MIP6_DRAFT13
-	if (bu_opt->ip6ou_prefixlen == 0)
-#else
-	if ((bu_opt->ip6ou_flags & IP6_BUF_SINGLE) != 0)
-#endif /* MIP6_DRAFT13 */
-	{
+	if ((flags & IP6MU_SINGLE) != 0) {
 		/*
 		 * if prefixlen == 0, create a binding cache exactly
 		 * for the only address specified by the sender.
@@ -1945,10 +1138,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			mbc = mip6_bc_create(haddr0,
 					     coa,
 					     haaddr,
-					     bu_opt->ip6ou_flags,
-#ifdef MIP6_DRAFT13
-					     bu_opt->ip6ou_prefixlen,
-#endif /* MIP6_DRAFT13 */
+					     flags,
 					     seqno,
 					     lifetime,
 					     hifp);
@@ -1962,7 +1152,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				return (-1);
 			}
 
-			if (bu_opt->ip6ou_flags & IP6_BUF_DAD) {
+			if (flags & IP6MU_DAD) {
 				mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
 				dad_mbc = mbc;
 			}
@@ -1982,10 +1172,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		} else {
 			/* update a BC entry. */
 			mbc->mbc_pcoa = *coa;
-			mbc->mbc_flags = bu_opt->ip6ou_flags;
-#ifdef MIP6_DRAFT13
-			mbc->mbc_prefixlen = bu_opt->ip6ou_prefixlen;
-#endif /* MIP6_DRAFT13 */
+			mbc->mbc_flags = flags;
 			mbc->mbc_seqno = seqno;
 			mbc->mbc_lifetime = lifetime;
 			mbc->mbc_expire = time_second + mbc->mbc_lifetime;
@@ -2032,17 +1219,14 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				mbc = mip6_bc_create(&haddr,
 						     coa,
 						     haaddr,
-						     bu_opt->ip6ou_flags,
-#ifdef MIP6_DRAFT13
-						     bu_opt->ip6ou_prefixlen,
-#endif /* MIP6_DRAFT13 */
+						     flags,
 						     seqno,
 						     lifetime,
 						     hifp);
 				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
 					return (-1);
 
-				if ((bu_opt->ip6ou_flags & IP6_BUF_DAD)) {
+				if ((flags & IP6MU_DAD)) {
 					mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
 					if (SA6_ARE_ADDR_EQUAL(&haddr, haddr0))
 						dad_mbc = mbc;
@@ -2061,10 +1245,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			} else {
 				/* update a BC entry. */
 				mbc->mbc_pcoa = *coa;
-				mbc->mbc_flags = bu_opt->ip6ou_flags;
-#ifdef MIP6_DRAFT13
-				mbc->mbc_prefixlen = bu_opt->ip6ou_prefixlen;
-#endif /* MIP6_DRAFT13 */
+				mbc->mbc_flags = flags;
 				mbc->mbc_seqno = seqno;
 				mbc->mbc_lifetime = lifetime;
 				mbc->mbc_expire
@@ -2288,75 +1469,6 @@ struct ifnet *ifp;
 	return (NULL);
 }
 
-static int
-mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
-	struct sockaddr_in6 *dstcoa;
-	u_int8_t status;
-	MIP6_SEQNO_T seqno;
-	u_int32_t lifetime;
-	u_int32_t refresh;
-{
-	struct mbuf *m;
-	struct ip6_pktopts opt;
-	struct ip6_dest *pktopt_badest2;
-	struct ip6_rthdr *pktopt_rthdr;
-	int error = 0;
-
-	init_ip6pktopts(&opt);
-
-	m = mip6_create_ip6hdr(src, dst, IPPROTO_NONE, 0);
-	if (m == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: creating ip6hdr failed.\n",
-			 __FILE__, __LINE__));
-		return (ENOMEM);
-	}
-
-	error =  mip6_ba_destopt_create(&pktopt_badest2, src, dst,
-					status, seqno, lifetime, refresh);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: ba destopt creation error (%d)\n",
-			 __FILE__, __LINE__, error));
-		m_freem(m);
- 		goto free_ip6pktopts;
-	}
-	opt.ip6po_dest2 = pktopt_badest2;
-
-	if (!SA6_ARE_ADDR_EQUAL(dst, dstcoa) &&
-	    mip6_bc_list_find_withphaddr(&mip6_bc_list, dst) == NULL) {
-		error = mip6_rthdr_create(&pktopt_rthdr, dstcoa, NULL);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: ba rthdr creation error (%d)\n",
-				 __FILE__, __LINE__, error));
-			m_freem(m);
- 			goto free_ip6pktopts;
-		}
-		opt.ip6po_rthdr = pktopt_rthdr;
-	}
-
-	if (!ip6_setpktaddrs(m, src, dst)) {
-		m_freem(m);
-		goto free_ip6pktopts;
-	}
-	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: sending ip packet error. (%d)\n",
-			 __FILE__, __LINE__, error));
- 		goto free_ip6pktopts;
-	}
- free_ip6pktopts:
-	if (opt.ip6po_dest2)
-		free(opt.ip6po_dest2, M_IP6OPT);
-	if (opt.ip6po_rthdr)
-		free(opt.ip6po_rthdr, M_IP6OPT);
-
-	return (error);
-}
 
 static int
 mip6_bc_proxy_control(target, local, cmd)
@@ -2627,824 +1739,7 @@ mip6_bu_print(mbu)
  * binding ack management functions.
  */
 
-/*
- * validate the incoming binding ackowledgements.
- */
-int
-mip6_validate_ba(m, opt)
-	struct mbuf *m;
-	u_int8_t *opt;
-{
-	struct ip6_hdr *ip6;
-	struct mbuf *n;
-	struct ip6aux *ip6a = NULL;
-	struct sockaddr_in6 *sin6src, *sin6dst, *sin6home;
-	struct ip6_opt_binding_ack *ba_opt;
-	MIP6_SEQNO_T seqno;
-	struct mip6_bu *mbu;
-	struct hif_softc *sc;
-#if defined(IPSEC) && !defined(__OpenBSD__)
-	int ipsec_protected = 0;
-#ifndef MIP6_DRAFT13
-	struct mip6_subopt_authdata *authdata = NULL;
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
 
-	ip6 = mtod(m, struct ip6_hdr *);
-	ba_opt = (struct ip6_opt_binding_ack *)(opt);
-	if (ip6_getpktaddrs(m, &sin6src, &sin6dst))
-		return (EINVAL);
-
-#if defined(IPSEC) && !defined(__OpenBSD__)
-	/*
-	 * check if this incoming binding ack is protected by the
-	 * ipsec mechanism.
-	 */
-	if (mip6_config.mcfg_use_ipsec != 0) {
-		/*
-		 * we will take into consideration of using the ipsec
-		 * mechanism to protect binding acks.
-		 */
-		if ((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM)) {
-			/*
-			 * this packet is protected by the ipsec
-			 * mechanism.
-			 */
-			ipsec_protected = 1;
-		} else {
-#ifdef MIP6_DRAFT13
-			/*
-			 * draft-13 requires that the binding ack must
-			 * be protected by the ipsec authentication
-			 * mechanism.  if this packet is not
-			 * protected, ignore this.
-			 */
-			mip6log((LOG_NOTICE,
-				 "%s:%d: an unprotected binding ack "
-				 "from %s.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&ip6->ip6_src)));
-			/* silently ignore */
-			return (1);
-#endif
-			/*
-			 * draft-15 and later introduces
-			 * authentication data sub-option to protect
-			 * the binding acks.  if this binding update
-			 * is not protected by the ipsec, we will
-			 * check the authentication data sub-option
-			 * later in this function.
-			 */
-		}
-	}
-#endif /* IPSEC && !__OpenBSD__ */
-
-	/*
-	 * check if this packet contains a home address destination
-	 * option.
-	 */
-	sin6home = sin6src;
-	n = ip6_findaux(m);
-	if (n != NULL) {
-		ip6a = mtod(n, struct ip6aux *);
-		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
-			/*
-			 * the node sending this binding ack is a
-			 * mobile node.  get its home address.
-			 */
-			sin6home = &ip6a->ip6a_home;
-		}
-	}
-
-	/*
-	 * check if the length field of the incoming binding ack is >=
-	 * IP6OPT_BALEN.
-	 */
-	if (ba_opt->ip6oa_len < IP6OPT_BALEN) {
-		ip6stat.ip6s_badoptions++;
-		mip6log((LOG_NOTICE,
-			 "%s:%d: too short binding ack (%d) from host %s.\n",
-			 __FILE__, __LINE__,
-			 ba_opt->ip6oa_len,
-			 ip6_sprintf(&sin6src->sin6_addr)));
-		/* silently ignore */
-		/* discard */
-		return (-1);
-	}
-
-	/*
-	 * check if the sequence number of the binding update sent ==
-	 * the sequence number of the binding ack received.
-	 */
-	sc = hif_list_find_withhaddr(sin6dst);
-	if (sc == NULL) {
-		/*
-		 * if we receive a binding ack before sending binding
-		 * updates(!), sc will be NULL.  because we search the
-		 * hif interface that have a binding update entry having
-		 * ip6_dst as a home address.
-		 */
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no matching binding update entry found.\n",
-			 __FILE__, __LINE__));
-		/* silently ignore. */
-		return (1);
-	}
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src, sin6dst);
-	if (mbu == NULL) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no matching binding update entry found.\n",
-			 __FILE__, __LINE__));
-		/* silently ignore */
-		return (1);
-	}
-#ifdef MIP6_DRAFT13
-	GET_NETVAL_S(ba_opt->ip6oa_seqno, seqno);
-#else
-	seqno = ba_opt->ip6oa_seqno;
-	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
-		/*
-		 * our home agent has a greater sequence number in its
-		 * binging cache entriy of mine.  we should resent
-		 * binding update with greater than the sequence
-		 * number of the binding cache already exists in our
-		 * home agent.  this binding ack is valid though the
-		 * sequence number doesn't match.
-		 */
-		goto check_suboptions;
-	}
-	else
-#endif /* MIP6_DRAFT13 */
-	if (seqno != mbu->mbu_seqno) {
-		ip6stat.ip6s_badoptions++;
-		mip6log((LOG_NOTICE,
-			 "%s:%d: unmached sequence no "
-			 "(%d recv, %d sent) from host %s.\n",
-			 __FILE__, __LINE__,
-			 seqno,
-			 mbu->mbu_seqno,
-			 ip6_sprintf(&ip6->ip6_src)));
-		/* silently ignore. */
-		/* discard */
-		return (-1);
-	}
-
-#ifndef MIP6_DRAFT13
- check_suboptions:
-#endif
-	/* check sub-option(s). */
-	if (ba_opt->ip6oa_len > IP6OPT_BALEN) {
-		/* we have sub-option(s). */
-		int suboptlen = ba_opt->ip6oa_len - IP6OPT_BALEN;
-		u_int8_t *opt = (u_int8_t *)(ba_opt + 1);
-		int optlen;
-		for (optlen = 0;
-		     suboptlen > 0;
-		     suboptlen -= optlen, opt += optlen) {
-			if (*opt != MIP6SUBOPT_PAD1 &&
-			    (suboptlen < 2 || *(opt + 1) + 2 > suboptlen)) {
-				mip6log((LOG_ERR,
-					 "%s:%d: "
-					 "sub-option too small\n",
-					 __FILE__, __LINE__));
-				return (-1);
-			}
-			switch (*opt) {
-			case MIP6SUBOPT_PAD1:
-				optlen = 1;
-				break;
-
-#if defined(IPSEC) && !defined(__OpenBSD__)
-#ifndef MIP6_DRAFT13
-			case MIP6SUBOPT_AUTHDATA:
-				optlen = *(opt + 1) + 2;
-				if (optlen < IP6OPT_AUTHDATALEN) {
-					mip6log((LOG_ERR,
-						 "%s:%d: "
-						 "auth data sub-option too small\n",
-						 __FILE__, __LINE__));
-					/* discard */
-					return (-1);
-				}
-				authdata = (struct mip6_subopt_authdata *)opt;
-				break;
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
-
-			default:
-				optlen = *(opt + 1) + 2;
-				break;
-			}
-		}
-	}
-
-#if defined(IPSEC) && !defined(__OpenBSD__)
-#ifndef MIP6_DRAFT13
-	/*
-	 * if the packet is protected by the ipsec, we believe it.
-	 * otherwise, check the authentication sub-option.
-	 */
-	if ((ipsec_protected == 0) && (mip6_config.mcfg_use_authdata != 0)) {
-		if (authdata == NULL) {
-			/*
-			 * if the packet is not protected by the ipsec
-			 * and do not have a authentication data
-			 * either, this packet is not reliable.
-			 */
-			mip6log((LOG_ERR,
-				 "%s:%d: an unprotected binding ack "
-				 "from host %s\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&ip6->ip6_src)));
-			if (mip6_config.mcfg_use_ipsec != 0) {
-				/* silently ignore. */
-				return (1);
-			}
-		} else {
-			/*
-			 * if the packet is not protected by the ipsec
-			 * but an authentication data sub-option
-			 * exists, check the authentication data.  if
-			 * it seems good, we think this packet is
-			 * protected by some week auth mechanisms.
-			 */
-			if (mip6_ba_authdata_verify(&sin6home->sin6_addr,
-						    &sin6dst->sin6_addr,
-						    ba_opt, authdata)) {
-				mip6log((LOG_ERR,
-					 "%s:%d: authenticate binding ack "
-					 "failed from host %s\n",
-					 __FILE__, __LINE__,
-					 ip6_sprintf(&ip6->ip6_src)));
-				/* silently ignore. */
-				return (1);
-			}
-			/* verified. */
-		}			
-	}
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
-
-	/* we have a valid binding ack. */
-	return (0);
-}
-
-/*
- * binding acknowledgment processing
- */
-int
-mip6_process_ba(m, opt)
-	struct mbuf *m;
-	u_int8_t *opt;
-{
-	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sin6src, *sin6dst;
-	struct hif_softc *sc;
-	struct ip6_opt_binding_ack *ba_opt;
-	struct mip6_bu *mbu;
-	u_int32_t lifetime;
-	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
-
-	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &sin6src, &sin6dst))
-		return (EINVAL);
-	ba_opt = (struct ip6_opt_binding_ack *)opt;
-	sc = hif_list_find_withhaddr(sin6dst);
-
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src, sin6dst);
-	if (mbu == NULL) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no matching BU entry found from host %s.\n",
-			 __FILE__, __LINE__, ip6_sprintf(&ip6->ip6_src)));
-		/* ignore */
-		return (0);
-	}
-
-	if (ba_opt->ip6oa_status >= MIP6_BA_STATUS_ERRORBASE) {
-		mip6log((LOG_NOTICE, 
-			 "%s:%d: BU rejected (error code %d).\n",
-			 __FILE__, __LINE__, ba_opt->ip6oa_status));
-		if (ba_opt->ip6oa_status == MIP6_BA_STATUS_NOT_HOME_AGENT &&
-		    mbu->mbu_flags & IP6_BUF_HOME &&
-		    mbu->mbu_reg_state == MIP6_BU_REG_STATE_DEREGWAITACK) {
-			/* XXX no registration? */
-			goto success;
-		}
-#ifndef MIP6_DRAFT13
-		if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
-			/* seqno is too small.  adjust it and re-send BU. */
-			mbu->mbu_seqno = ba_opt->ip6oa_seqno + 1;
-			mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
-			return (0);
-		}
-#endif /* !MIP6_DRAFT13 */
-		/* BU error handling... */
-		error = mip6_bu_list_remove(&sc->hif_bu_list, mbu);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: can't remove BU.\n",
-				 __FILE__, __LINE__));
-			return (error);
-		}
-		/* XXX some error recovery process needed. */
-		return (0);
-	}
-
-success:
-	/*
-	 * the binding updated has been accepted.  reset WAIT_ACK
-	 * status.
-	 */
-	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
-
-	/* update lifetime and refresh time. */
-	GET_NETVAL_L(ba_opt->ip6oa_lifetime, lifetime);
-	if (lifetime < mbu->mbu_lifetime) {
-		mbu->mbu_expire -= (mbu->mbu_lifetime - lifetime);
-		if (mbu->mbu_expire < time_second)
-			mbu->mbu_expire = time_second;
-	}
-	GET_NETVAL_L(ba_opt->ip6oa_refresh, mbu->mbu_refresh);
-	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-	/* sanity check for overflow */
-	if (mbu->mbu_refexpire < time_second)
-		mbu->mbu_refexpire = 0x7fffffff;
-	if (mbu->mbu_refresh > mbu->mbu_expire)
-		mbu->mbu_refresh = mbu->mbu_expire;
-
-	if (mbu->mbu_flags & IP6_BUF_HOME) {
-		/* this is from our home agent */
-
-		if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_DEREGWAITACK) {
-			/* home unregsitration has completed. */
-
-			/* notify all the CNs that we are home. */
-			error = mip6_bu_list_notify_binding_change(sc);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: removing the bining cache entries of all CNs failed.\n",
-					 __FILE__, __LINE__));
-				return (error);
-			}
-
-			/* remove a tunnel to our homeagent. */
-			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-						   mbu,
-						   mip6_bu_encapcheck,
-						   &mbu->mbu_encap);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: tunnel removal failed.\n",
-					 __FILE__, __LINE__));
-				return (error);
-			}
-
-			error = mip6_bu_list_remove_all(&sc->hif_bu_list);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: BU remove all failed.\n",
-					 __FILE__, __LINE__));
-				return (error);
-			}
-
-			/* XXX: send a unsolicited na. */
-		{
-			struct sockaddr_in6 sa6, daddr, taddr; /* XXX */
-			struct ifaddr *ifa;
-
-			bzero(&sa6, sizeof(sa6));
-			sa6.sin6_family = AF_INET6;
-			sa6.sin6_len = sizeof(sa6);
-			/* XXX or mbu_haddr.  XXX scope consideration  */
-			sa6_copy_addr(&mbu->mbu_coa, &sa6);
-#ifndef SCOPEDROUTING
-			sa6.sin6_scope_id = 0;
-#endif
-
-			if ((ifa = ifa_ifwithaddr((struct sockaddr *)&sa6))
-			    == NULL) {
-				mip6log((LOG_ERR,
-					 "%s:%d: can't find CoA interface\n",
-					 __FILE__, __LINE__));
-				return(EINVAL);	/* XXX */
-			}
-
-			bzero(&daddr, sizeof(daddr));
-			daddr.sin6_family = AF_INET6;
-			daddr.sin6_len = sizeof(daddr);
-			daddr.sin6_addr = in6addr_linklocal_allnodes;
-			if (in6_addr2zoneid(ifa->ifa_ifp, &daddr.sin6_addr,
-					    &daddr.sin6_scope_id)) {
-				/* XXX: should not happen */
-				mip6log((LOG_ERR,
-					 "%s:%d: in6_addr2zoneid failed\n",
-					 __FILE__, __LINE__));
-				return(EIO);
-			}
-			if ((error = in6_embedscope(&daddr.sin6_addr,
-						    &daddr))) {
-				/* XXX: should not happen */
-				mip6log((LOG_ERR,
-					 "%s:%d: in6_embedscope failed\n",
-					 __FILE__, __LINE__));
-				return(error);
-			}
-
-			bzero(&taddr, sizeof(taddr));
-			taddr.sin6_family = AF_INET6;
-			taddr.sin6_len = sizeof(taddr);
-			sa6_copy_addr(&mbu->mbu_haddr, &taddr);
-
-			nd6_na_output(ifa->ifa_ifp, &daddr,
-					      &taddr,
-					      ND_NA_FLAG_OVERRIDE,
-					      1, NULL);
-			mip6log((LOG_INFO,
-				 "%s:%d: send a unsolicited na to %s\n",
-				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
-		}
-		} else if (mbu->mbu_reg_state
-			   == MIP6_BU_REG_STATE_REGWAITACK) {
-			if (lifetime == 0) {
-				mip6log((LOG_WARNING,
-					 "%s:%d: lifetime are zero.\n",
-					 __FILE__, __LINE__));
-				/* XXX ignored */
-			}
-			/* home registration completed */
-			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REG;
-
-			/* create tunnel to HA */
-			error = mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
-						    mbu,
-						    mip6_bu_encapcheck,
-						    &mbu->mbu_encap);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: tunnel move failed.\n",
-					 __FILE__, __LINE__));
-				return (error);
-			}
-
-			/* notify all the CNs that we have a new coa. */
-			error = mip6_bu_list_notify_binding_change(sc);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: updating the bining cache entries of all CNs failed.\n",
-					 __FILE__, __LINE__));
-				return (error);
-			}
-		} else if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_REG) {
-			/* nothing to do. */
-		} else {
-			mip6log((LOG_NOTICE,
-				 "%s:%d: unexpected condition.\n",
-				 __FILE__, __LINE__));
-		}
-	}
-
-	return (0);
-}
-
-#if defined(IPSEC) && !defined(__OpenBSD__)
-#ifndef MIP6_DRAFT13
-static int
-mip6_bu_authdata_verify(src, dst, coa, bu_opt, authdata)
-	struct in6_addr *src;
-	struct in6_addr *dst;
-	struct in6_addr *coa;
-	struct ip6_opt_binding_update *bu_opt;
-	struct mip6_subopt_authdata *authdata;
-{
-	struct secasvar *sav = NULL;
-	const struct ah_algorithm *algo;
-	u_int32_t authdata_spi;
-	u_char sumbuf[AH_MAXSUMSIZE];
-	int error = 0;
-	struct sockaddr_in6 src_sa, dst_sa;
-
-	bcopy((caddr_t)&authdata->spi[0], &authdata_spi, sizeof(authdata_spi));
-
-	/* XXX: this function should take full sockaddrs */
-	bzero(&src_sa, sizeof(src_sa));
-	bzero(&dst_sa, sizeof(dst_sa));
-	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
-	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	src_sa.sin6_addr = *src;
-	dst_sa.sin6_addr = *dst;
-	sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
-			  IPPROTO_AH, authdata_spi);
-	if (sav == NULL) {
-		/* no secirity association found. */
-		error = EACCES;
-		goto freesa;
-	}
-	if ((sav->state != SADB_SASTATE_MATURE) &&
-	    (sav->state != SADB_SASTATE_DYING)) {
-		/* no secirity association found. */
-		error = EACCES;
-		goto freesa;
-	}
-
-	error = mip6_bu_authdata_calc(sav, src, dst, coa,
-				      bu_opt, authdata, &sumbuf[0]);
-	if (error)
-		goto freesa;
-
-	/* find the calculation algorithm. */
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (algo == NULL) {
-		error = EACCES;
-		goto freesa;
-	}
-
-	if (bcmp((caddr_t)(authdata + 1), &sumbuf[0],
-		 (*algo->sumsiz)(sav)) != 0) {
-		/* checksum mismatch. */
-		error = EACCES;
-		goto freesa;
-	}
-
-	error = 0;
- freesa:
-	if (sav != NULL)
-		key_freesav(sav);
-	return (error);
-}
-
-static int
-mip6_ba_authdata_verify(src, dst, ba_opt, authdata)
-	struct in6_addr *src;
-	struct in6_addr *dst;
-	struct ip6_opt_binding_ack *ba_opt;
-	struct mip6_subopt_authdata *authdata;
-{
-	struct secasvar *sav = NULL;
-	const struct ah_algorithm *algo;
-	u_int32_t authdata_spi;
-	u_char sumbuf[AH_MAXSUMSIZE];
-	int error = 0;
-	struct sockaddr_in6 src_sa, dst_sa;
-
-	bcopy((caddr_t)&authdata->spi[0], &authdata_spi, sizeof(authdata_spi));
-
-	/* XXX: this function should take full sockaddrs */
-	bzero(&src_sa, sizeof(src_sa));
-	bzero(&dst_sa, sizeof(dst_sa));
-	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
-	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	src_sa.sin6_addr = *src;
-	dst_sa.sin6_addr = *dst;
-	sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
-			  IPPROTO_AH, authdata_spi);
-	if (sav == NULL) {
-		/* no secirity association found. */
-		error = EACCES;
-		goto freesa;
-	}
-	if ((sav->state != SADB_SASTATE_MATURE) &&
-	    (sav->state != SADB_SASTATE_DYING)) {
-		/* no secirity association found. */
-		error = EACCES;
-		goto freesa;
-	}
-
-	error = mip6_ba_authdata_calc(sav, src, dst,
-				      ba_opt, authdata, &sumbuf[0]);
-	if (error)
-		goto freesa;
-
-	/* find the calculation algorithm. */
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (algo == NULL) {
-		error = EACCES;
-		goto freesa;
-	}
-
-	if (bcmp((caddr_t)(authdata + 1), &sumbuf[0],
-		 (*algo->sumsiz)(sav)) != 0) {
-		/* checksum mismatch. */
-		error = EACCES;
-		goto freesa;
-	}
-
-	error = 0;
- freesa:
-	if (sav != NULL)
-		key_freesav(sav);
-	return (error);
-}
-
-struct mip6_subopt_authdata *
-mip6_authdata_create(sav)
-	struct secasvar *sav;
-{
-	struct mip6_subopt_authdata *authdata;
-	const struct ah_algorithm *algo;
-	int authdata_size;
-	int sumsize = 0;
-
-	/* sanity check. */
-	if (sav == NULL)
-		return (NULL);
-
-	/* find the calculation algorithm. */
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (algo == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: unsupported algorithm.\n",
-			 __FILE__, __LINE__));
-		return (NULL);
-	}
-
-	/* calculate the sumsize and the authentication data size. */
-	sumsize = (*algo->sumsiz)(sav);
-	authdata_size = sizeof(*authdata) + sumsize;
-	authdata = malloc(authdata_size, M_TEMP, M_NOWAIT);
-	if (authdata == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: failed to alloc memory.\n",
-			 __FILE__, __LINE__));
-		return (NULL);
-	}
-	bzero((caddr_t)authdata, authdata_size);
-
-	/* fill the authentication data sub-option. */
-	authdata->type = MIP6SUBOPT_AUTHDATA;
-	authdata->len = authdata_size - 2;
-	bcopy((caddr_t)&sav->spi, (caddr_t)&authdata->spi[0], sizeof(u_int32_t));
-
-	/* checksum calculation will be done after. */
-
-	return (authdata);
-}
-
-int
-mip6_bu_authdata_calc(sav, src, dst, coa, bu_opt, authdata, sumbuf)
-	struct secasvar *sav;
-	struct in6_addr *src;
-	struct in6_addr *dst;
-	struct in6_addr *coa;
-	struct ip6_opt_binding_update *bu_opt;
-	struct mip6_subopt_authdata *authdata;
-	caddr_t sumbuf;
-{
-	const struct ah_algorithm *algo;
-	struct ah_algorithm_state algos;
-	int suboptlen = 0, bytes;
-
-	/* sanity check. */
-	if (sav == NULL)
-		return (EINVAL);
-
-	/* find the calculation algorithm. */
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (algo == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: unsupported algorithm.\n",
-			 __FILE__, __LINE__));
-		return (EACCES);
-	}
-
-	/*
-	 * calculate the checksum based on the algorithm specified by
-	 * the security association.
-	 */
-	(algo->init)(&algos, sav);
-	bytes = 0;
-	(algo->update)(&algos, (caddr_t)dst, 16);
-	bytes += 16;
-	(algo->update)(&algos, (caddr_t)coa, 16);
-	bytes += 16;
-	(algo->update)(&algos, (caddr_t)src, 16);
-	bytes += 16;
-	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_type, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_len, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_flags, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_reserved[0], 2);
-	bytes += 2;
-	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_seqno, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_lifetime[0], 4);
-	bytes += 4;
-	suboptlen = (caddr_t)authdata - (caddr_t)(bu_opt + 1);
-	(algo->update)(&algos, (caddr_t)(bu_opt + 1), suboptlen);
-	bytes += suboptlen;
-	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&authdata->spi[0], 4);
-	bytes += 4;
-	/* calculate the result. */
-	(algo->result)(&algos, sumbuf);
-
-	/* record data transfer on SA, and update timestamps */
-	/* XXX key.c:key_sa_recordxfer(sav, m) */
-	if (sav->lft_c == NULL)
-		return (0);
-	sav->lft_c->sadb_lifetime_bytes += bytes;
-	sav->lft_c->sadb_lifetime_allocations++;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	sav->lft_c->sadb_lifetime_usetime = time_second;
-#else
-	sav->lft_c->sadb_lifetime_usetime = time.tv_sec;
-#endif
-
-	return (0);
-}
-
-int
-mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
-	struct secasvar *sav;
-	struct in6_addr *src;
-	struct in6_addr *dst;
-	struct ip6_opt_binding_ack *ba_opt;
-	struct mip6_subopt_authdata *authdata;
-	caddr_t sumbuf;
-{
-	const struct ah_algorithm *algo;
-	struct ah_algorithm_state algos;
-	int suboptlen = 0, bytes;
-
-	/* sanity check. */
-	if (sav == NULL)
-		return (EINVAL);
-
-	/* find the calculation algorithm. */
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (algo == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: unsupported algorithm.\n",
-			 __FILE__, __LINE__));
-		return (EACCES);
-	}
-
-	/*
-	 * calculate the checksum based on the algorithm specified by
-	 * the security association.
-	 */
-	(algo->init)(&algos, sav);
-	bytes = 0;
-	(algo->update)(&algos, (caddr_t)dst, 16);
-	bytes += 16;
-	(algo->update)(&algos, (caddr_t)src, 16);
-	bytes += 16;
-	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_type, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_len, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_status, 1);
-	bytes += 1;
-#if 0
-	/*
-	 * as Vijay said in his mail sent Wed, 09 Jan 2002 10:36:17
-	 * -0800 to mobile-ip, not to include the reserved field is a
-	 * mistake of the spec.  but for now, we follow the spec.
-	 */
-	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_reserved, 1);
-	bytes += 1;
-#endif
-	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_seqno, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_lifetime[0], 4);
-	bytes += 4;
-	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_refresh[0], 4);
-	bytes += 4;
-	suboptlen = (caddr_t)authdata - (caddr_t)(ba_opt + 1);
-	(algo->update)(&algos, (caddr_t)(ba_opt + 1), suboptlen);
-	bytes += suboptlen;
-	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
-	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&authdata->spi[0], 4);
-	bytes += 4;
-	/* calculate the result. */
-	(algo->result)(&algos, sumbuf);
-
-	/* record data transfer on SA, and update timestamps */
-	/* XXX key.c:key_sa_recordxfer(sav, m) */
-	if (sav->lft_c == NULL)
-		return (0);
-	sav->lft_c->sadb_lifetime_bytes += bytes;
-	sav->lft_c->sadb_lifetime_allocations++;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	sav->lft_c->sadb_lifetime_usetime = time_second;
-#else
-	sav->lft_c->sadb_lifetime_usetime = time.tv_sec;
-#endif
-
-	return (0);
-}
-#endif /* !MIP6_DRAFT13 */
-#endif /* IPSEC && !__OpenBSD__ */
 
 /*
  * binding request management functions
@@ -3535,28 +1830,15 @@ mip6_bc_init()
 	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
 }
 
-#ifdef MIP6_DRAFT13
-static struct mip6_bc *
-mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime, ifp)
-	struct sockaddr_in6 *phaddr;
-	struct sockaddr_in6 *pcoa;
-	struct sockaddr_in6 *addr;
-	u_int8_t flags;
-	u_int8_t prefixlen;
-	MIP6_SEQNO_T seqno;
-	u_int32_t lifetime;
-	struct ifnet *ifp;
-#else
 static struct mip6_bc *
 mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	struct sockaddr_in6 *phaddr;
 	struct sockaddr_in6 *pcoa;
 	struct sockaddr_in6 *addr;
 	u_int8_t flags;
-	MIP6_SEQNO_T seqno;
+	u_int16_t seqno;
 	u_int32_t lifetime;
 	struct ifnet *ifp;
-#endif /* MIP6_DRAFT13 */
 {
 	struct mip6_bc *mbc;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -3577,9 +1859,6 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	mbc->mbc_pcoa = *pcoa;
 	mbc->mbc_addr = *addr;
 	mbc->mbc_flags = flags;
-#ifdef MIP6_DRAFT13
-	mbc->mbc_prefixlen = prefixlen;
-#endif /* MIP6_DRAFT13 */
 	mbc->mbc_seqno = seqno;
 	mbc->mbc_lifetime = lifetime;
 	mbc->mbc_expire = time_second + mbc->mbc_lifetime;
@@ -3722,7 +2001,7 @@ mip6_bc_list_remove(mbc_list, mbc)
 	}
 #endif
 	LIST_REMOVE(mbc, mbc_entry);
-	if (mbc->mbc_flags & IP6_BUF_HOME) {
+	if (mbc->mbc_flags & IP6MU_HOME) {
 		error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL,
 					      RTM_DELETE);
 		if (error) {
@@ -3883,7 +2162,7 @@ static void mip6_bc_starttimer(void)
 /*
  * tunneling functions.
  */
-static int
+int
 mip6_tunnel_control(action, entry, func, ep)
 	int action;
 	void *entry;
@@ -3918,7 +2197,7 @@ mip6_tunnel_control(action, entry, func, ep)
 	return (0);
 }
 
-static int
+int
 mip6_bu_encapcheck(m, off, proto, arg)
 	const struct mbuf *m;
 	int off;

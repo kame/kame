@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.91 2002/04/25 11:05:15 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.92 2002/05/14 13:31:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,6 +161,9 @@ struct	ip6_pktopts {
 
 	/* Destination options header (after a routing header) */
 	struct	ip6_dest *ip6po_dest2;
+	
+	/* Mobility header (just before an upper layer header) */
+	struct	ip6_mobility *ip6po_mobility;
 	
 	int	ip6po_tclass;	/* traffic class */
 
@@ -461,6 +464,7 @@ int	rip6_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
 
 int	dest6_input __P((struct mbuf **, int *, int));
+int	mobility6_input __P((struct mbuf **, int *, int));
 int	none_input __P((struct mbuf **, int *, int));
 
 #ifdef NEW_STRUCT_ROUTE
