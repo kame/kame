@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2432 2003/07/10 03:56:28 sakane Exp $
+$KAME: CHANGELOG,v 1.2433 2003/07/10 12:18:28 kjc Exp $
 
 <200307>
+2003/07/10 21:07:50 JST kjc@csl.sony.co.jp
+	the first step for transition to pf/altq.
+	marge pf/altq into the existing altq-3.
+	allow both pf/altq and altq-3 to coexit.
+	currently, ALTQ3_COMPAT and ALTQ3_CLFIER_COMPAT are defined
+	in sys/altq/altq.h to support altq-3.
+	altq-3 will remain in kame for research experiments but will
+	not be merged into bsd releases.
+
 2003-07-08  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
 	* kame/sys/netinet6/{in6_ifattach.c,ip6_mroute.c,ip6_mroute.h}
 	protect against interface removal.
