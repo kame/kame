@@ -1,24 +1,28 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.46 2000/11/09 01:02:46 itojun Exp $
+	$KAME: README,v 1.47 2000/11/22 08:18:43 itojun Exp $
 
 <<<Project Overview>>>
 
 "KAME Project" is a joint effort to create single solid software set,
 especially targeted at IPv6/IPsec.  Talented researchers from Fujitsu
 Limited, Hitachi, Ltd., IIJ Research Laboratory, NEC Corporation,
-Toshiba Corporation, YDC Corporation, Yokogawa Electric Corporation
+Toshiba Corporation, YDC Corporation and Yokogawa Electric Corporation
 joined the project.  This joint effort will avoid unnecessary duplicated
 development in the same area, and effectively provides high quality and
 advanced featured packages.
 
-KAME is originally called "Hydrangea" which was developed by v6
+KAME was originally called "Hydrangea" which was developed by v6
 working group, WIDE Project.  We have merged codes, which each company
 in Japan has developed, into "Hydrangea".  To identify the joint
 effort, we changed the name from "Hydrangea" to "KAME".
 
-KAME software has been merged into {FreeBSD,NetBSD,OpenBSD}-current.
-It will also be merged into BSD/OS.
+Stabilized portion of KAME software has been merged into FreeBSD, NetBSD,
+OpenBSD, and BSD/OS:
+- FreeBSD: 4.0 and beyond
+- NetBSD: 1.5 and beyond
+- OpenBSD: 2.7 and beyond
+- BSD/OS: 4.2 and beyond
 
 "KAME" officially indicates a short word of <Ka>rigo<me> where our office
 locates.  But it, in fact, stands for turtle in Japanese.
@@ -40,7 +44,7 @@ The kit comes with BSD-like copyright.  In short, the code is FREELY
 available but with NO WARRANTY.  Even commercial use is OK.  Please
 refer to the COPYRIGHT file for more details.  The copyright holder is
 WIDE Project instead of KAME Project.  This is because KAME Project is
-to be terminated in March 2002.
+to be terminated in March 2002 (may be extended).
 
 READ CAREFULLY: Several countries have legal enforcement for
 export/import/use of cryptographic software.  Check it before playing
@@ -78,10 +82,6 @@ Basically,
 http://www.kame.net/project-overview.html#release talks more about this issue.
 A file named COVERAGE has detailed comparison between kame/*bsd, *bsd-curernt
 and recent *bsd releases.
-
-Please do not mix up development cycle in *BSD team, and in KAME team.  They
-are totally separate.  For example, "FreeBSD 4.0-STABLE" has nothing to do
-with "KAME STABLE kit".
 
 
 <<<Reporting bugs>>
@@ -136,8 +136,8 @@ Thanks for your feedback!
 
 If you want to know more about KAME Project, please visit:
 	http://www.kame.net/
-You can get snapshots as well as stable releases.  You are also able to
-send bug reports on this web page.
+You can get source code snapshots as well as bug reports (you can also
+send bug reports on this web page).
 
 We maintain users mailing list, called "snap-users".
 	http://www.kame.net/snap-users/
@@ -161,10 +161,10 @@ Current core members are:
       Munechika SUMIKAWA  Hitachi, Ltd.
           Tatsuya JINMEI  Toshiba Corporation
       Shin-ichi FUJISAWA  Yokogawa Electric Corporation
-           Kazushi SUGYO  NEC Corporation
-         Yoshinobu INOUE  Fujitsu Limited
 	     Kenjiro CHO  Sony Computer Science Laboratory Inc.
 	 Shinsuke SUZUKI  Hitachi, Ltd.
+	  Shuichi KARINO  NEC Corporation
+	     Koji KAWANO  Matsushita Graphic Communication Systems, Inc.
 
 
 <<<Acknowledgements>>>
@@ -192,7 +192,8 @@ Benoit Hilt, Noriaki Takamiya, Olivier TOGNI, Greg Troxel, Bill
 Fenner, Goeran Bengtson, Tomio Narita, Conny Larsson, Ryuji Somegawa,
 Akira Kato, Ronald van der Pol, Graham Wheeler, Kris Kennaway, Kazuo Horikawa,
 larry baird, rimi guyomarch, Makoto MATSUSHITA, Kevin Lahey
-SHIMIZU Ryo and and Shigeyuki Fukushima (in no particular order).
+SHIMIZU Ryo, Shigeyuki Fukushima, Kazushi SUGYO and Yoshinobu Inoue
+(in no particular order).
 
 We would also like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
