@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.338 1999/12/14 06:44:05 jinmei Exp $
+$Id: CHANGELOG,v 1.339 1999/12/14 07:56:27 jinmei Exp $
 
 <199912>
+1999-12-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_input): use
+	PRC_UNREACH_PROTOCOL as notification code upon receiving an ICMPv6 
+	DST_UNREACH_ADMIN error.
+	XXX: is this a good code?
+
 1999-12-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/{in6_pcb.c, ip6_output.c, tcp6_input.c,
 	tcp_subr.c}: rtcalloc was reverted for bsdi where it was necessary
