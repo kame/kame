@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qdisc_fifoq.c,v 1.1 2000/01/18 07:29:01 kjc Exp $
+ * $Id: qdisc_fifoq.c,v 1.2 2000/07/28 09:22:42 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -58,8 +58,8 @@ fifoq_stat_loop(int fd, const char *ifname, int count, int interval)
 		if (ioctl(fd, FIFOQ_GETSTATS, &get_stats) < 0)
 			err(1, "ioctl FIFOQ_GETSTATS");
 
-		printf(" q_len:%d, q_limit:%d\n",
-		       get_stats.q_len, get_stats.q_limit);
+		printf(" q_len:%d q_limit:%d period:%u\n",
+		       get_stats.q_len, get_stats.q_limit, get_stats.period);
 		printf(" xmit:%u pkts (%qu bytes) drop:%u pkts (%qu bytes)\n",
 		       get_stats.xmit_packets, get_stats.xmit_bytes,
 		       get_stats.drop_packets, get_stats.drop_bytes);
