@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.60 2001/07/24 13:44:08 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.61 2001/07/25 00:38:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,6 +94,9 @@
 #include <machine/stdarg.h>
 
 #include <net/net_osdep.h>
+
+static int gif_validate4 __P((const struct ip *, struct gif_softc *,
+	struct ifnet *));
 
 #if NGIF > 0
 int ip_gif_ttl = GIF_TTL;
@@ -435,42 +438,33 @@ in_gif_input(m, va_alist)
 }
 
 /*
- * we know that we are in IFF_UP, outer address available, and outer family
- * matched the physical addr family.  see gif_encapcheck().
+ * validate outer address.
  */
-int
-gif_encapcheck4(m, off, proto, arg)
-	const struct mbuf *m;
-	int off;
-	int proto;
-	void *arg;
-{
-	struct ip ip;
+static int
+gif_validate4(ip, sc, ifp)
+	const struct ip *ip;
 	struct gif_softc *sc;
+	struct ifnet *ifp;
+{
 	struct sockaddr_in *src, *dst;
 	struct in_ifaddr *ia4;
 
-	/* sanity check done in caller */
-	sc = (struct gif_softc *)arg;
 	src = (struct sockaddr_in *)sc->gif_psrc;
 	dst = (struct sockaddr_in *)sc->gif_pdst;
 
-	/* LINTED const cast */
-	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
-
 	/* check for address match */
-	if (src->sin_addr.s_addr != ip.ip_dst.s_addr ||
-	    dst->sin_addr.s_addr != ip.ip_src.s_addr)
+	if (src->sin_addr.s_addr != ip->ip_dst.s_addr ||
+	    dst->sin_addr.s_addr != ip->ip_src.s_addr)
 		return 0;
 
 	/* martian filters on outer source - NOT done in ip_input! */
 #if defined(__OpenBSD__) || defined(__NetBSD__)
-	if (IN_MULTICAST(ip.ip_src.s_addr))
+	if (IN_MULTICAST(ip->ip_src.s_addr))
 #else
-	if (IN_MULTICAST(ntohl(ip.ip_src.s_addr)))
+	if (IN_MULTICAST(ntohl(ip->ip_src.s_addr)))
 #endif
 		return 0;
-	switch ((ntohl(ip.ip_src.s_addr) & 0xff000000) >> 24) {
+	switch ((ntohl(ip->ip_src.s_addr) & 0xff000000) >> 24) {
 	case 0: case 127: case 255:
 		return 0;
 	}
@@ -486,26 +480,25 @@ gif_encapcheck4(m, off, proto, arg)
 	{
 		if ((ia4->ia_ifa.ifa_ifp->if_flags & IFF_BROADCAST) == 0)
 			continue;
-		if (ip.ip_src.s_addr == ia4->ia_broadaddr.sin_addr.s_addr)
+		if (ip->ip_src.s_addr == ia4->ia_broadaddr.sin_addr.s_addr)
 			return 0;
 	}
 
 	/* ingress filters on outer source */
-	if ((sc->gif_if.if_flags & IFF_LINK2) == 0 &&
-	    (m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
+	if ((sc->gif_if.if_flags & IFF_LINK2) == 0 && ifp) {
 		struct sockaddr_in sin;
 		struct rtentry *rt;
 
 		bzero(&sin, sizeof(sin));
 		sin.sin_family = AF_INET;
 		sin.sin_len = sizeof(struct sockaddr_in);
-		sin.sin_addr = ip.ip_src;
+		sin.sin_addr = ip->ip_src;
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&sin, 0, 0UL);
 #else
 		rt = rtalloc1((struct sockaddr *)&sin, 0);
 #endif
-		if (!rt || rt->rt_ifp != m->m_pkthdr.rcvif) {
+		if (!rt || rt->rt_ifp != ifp) {
 #if 0
 			log(LOG_WARNING, "%s: packet from 0x%x dropped "
 			    "due to ingress filter\n", if_name(&sc->gif_if),
@@ -519,4 +512,29 @@ gif_encapcheck4(m, off, proto, arg)
 	}
 
 	return 32 * 2;
+}
+
+/*
+ * we know that we are in IFF_UP, outer address available, and outer family
+ * matched the physical addr family.  see gif_encapcheck().
+ */
+int
+gif_encapcheck4(m, off, proto, arg)
+	const struct mbuf *m;
+	int off;
+	int proto;
+	void *arg;
+{
+	struct ip ip;
+	struct gif_softc *sc;
+	struct ifnet *ifp;
+
+	/* sanity check done in caller */
+	sc = (struct gif_softc *)arg;
+
+	/* LINTED const cast */
+	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
+	ifp = ((m->m_flags & M_PKTHDR) != 0) ? m->m_pkthdr.rcvif : NULL;
+
+	return gif_validate4(&ip, sc, ifp);
 }

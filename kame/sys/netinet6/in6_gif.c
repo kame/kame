@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.56 2001/07/24 13:44:08 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.57 2001/07/25 00:38:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,6 +81,9 @@
 #endif
 
 #include <net/net_osdep.h>
+
+static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
+	struct ifnet *));
 
 #ifndef offsetof
 #define offsetof(s, e) ((int)&((s *)0)->e)
@@ -428,52 +431,42 @@ int in6_gif_input(mp, offp, proto)
 }
 
 /*
- * we know that we are in IFF_UP, outer address available, and outer family
- * matched the physical addr family.  see gif_encapcheck().
+ * validate outer address.
  */
-int
-gif_encapcheck6(m, off, proto, arg)
-	const struct mbuf *m;
-	int off;
-	int proto;
-	void *arg;
-{
-	struct ip6_hdr ip6;
+static int
+gif_validate6(ip6, sc, ifp)
+	const struct ip6_hdr *ip6;
 	struct gif_softc *sc;
+	struct ifnet *ifp;
+{
 	struct sockaddr_in6 *src, *dst;
 
-	/* sanity check done in caller */
-	sc = (struct gif_softc *)arg;
 	src = (struct sockaddr_in6 *)sc->gif_psrc;
 	dst = (struct sockaddr_in6 *)sc->gif_pdst;
 
-	/* LINTED const cast */
-	m_copydata((struct mbuf *)m, 0, sizeof(ip6), (caddr_t)&ip6);
-
 	/* check for address match */
-	if (!IN6_ARE_ADDR_EQUAL(&src->sin6_addr, &ip6.ip6_dst) ||
-	    !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6.ip6_src))
+	if (!IN6_ARE_ADDR_EQUAL(&src->sin6_addr, &ip6->ip6_dst) ||
+	    !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6->ip6_src))
 		return 0;
 
 	/* martian filters on outer source - done in ip6_input */
 
 	/* ingress filters on outer source */
-	if ((sc->gif_if.if_flags & IFF_LINK2) == 0 &&
-	    (m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.rcvif) {
+	if ((sc->gif_if.if_flags & IFF_LINK2) == 0 && ifp) {
 		struct sockaddr_in6 sin6;
 		struct rtentry *rt;
 
 		bzero(&sin6, sizeof(sin6));
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
-		sin6.sin6_addr = ip6.ip6_src;
+		sin6.sin6_addr = ip6->ip6_src;
 		/* XXX scopeid */
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
 #else
 		rt = rtalloc1((struct sockaddr *)&sin6, 0);
 #endif
-		if (!rt || rt->rt_ifp != m->m_pkthdr.rcvif) {
+		if (!rt || rt->rt_ifp != ifp) {
 #if 0
 			log(LOG_WARNING, "%s: packet from %s dropped "
 			    "due to ingress filter\n", if_name(&sc->gif_if),
@@ -487,4 +480,29 @@ gif_encapcheck6(m, off, proto, arg)
 	}
 
 	return 128 * 2;
+}
+
+/*
+ * we know that we are in IFF_UP, outer address available, and outer family
+ * matched the physical addr family.  see gif_encapcheck().
+ */
+int
+gif_encapcheck6(m, off, proto, arg)
+	const struct mbuf *m;
+	int off;
+	int proto;
+	void *arg;
+{
+	struct ip6_hdr ip6;
+	struct gif_softc *sc;
+	struct ifnet *ifp;
+
+	/* sanity check done in caller */
+	sc = (struct gif_softc *)arg;
+
+	/* LINTED const cast */
+	m_copydata((struct mbuf *)m, 0, sizeof(ip6), (caddr_t)&ip6);
+	ifp = ((m->m_flags & M_PKTHDR) != 0) ? m->m_pkthdr.rcvif : NULL;
+
+	return gif_validate6(&ip6, sc, ifp);
 }
