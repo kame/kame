@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.50 2001/06/21 04:45:49 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.51 2001/07/06 06:21:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,7 +163,7 @@
  *
  * - ovbcopy()
  *	in NetBSD 1.4 or later, ovbcopy() is not supplied in the kernel.
- *	bcopy() is safe against overwrites.
+ *	we have updated sys/systm.h to include declaration.
  *
  * - splnet()
  *	NetBSD 1.4 or later requires splsoftnet().
@@ -256,10 +256,6 @@ extern const char *if_name __P((struct ifnet *));
 #define ifa_list	ifa_link
 #define if_addrlist	if_addrhead
 #define if_list		if_link
-#endif
-
-#if defined(__NetBSD__) && __NetBSD_Version__ >= 104000000
-#define ovbcopy		bcopy
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
