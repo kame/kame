@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.125 2001/01/18 05:57:24 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.126 2001/01/18 14:38:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1020,6 +1020,9 @@ in6_update_ifa(ifp, ifra, ia)
 	case IFT_ETHER:
 	case IFT_FDDI:
 	case IFT_IEEE1394:
+#ifdef IFT_IEEE80211
+	case IFT_IEEE80211:
+#endif
 #if 0
 	case IFT_ATM:
 	case IFT_SLIP:
@@ -1590,6 +1593,9 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 	case IFT_ETHER:
 	case IFT_FDDI:
 	case IFT_IEEE1394:
+#ifdef IFT_IEEE80211
+	case IFT_IEEE80211:
+#endif
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 		break;

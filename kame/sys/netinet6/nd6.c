@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.86 2001/01/17 16:59:28 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.87 2001/01/18 14:38:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,6 +263,11 @@ nd6_setmtu(ifp)
 	 case IFT_IEEE1394:	/* XXX should be IEEE1394MTU(1500) */
 		 ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
 		 break;
+#ifdef IFT_IEEE80211
+	 case IFT_IEEE80211:	/* XXX should be IEEE80211MTU(1500) */
+		 ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
+		 break;
+#endif
 	 default:
 		 ndi->maxmtu = ifp->if_mtu;
 		 break;
@@ -1042,7 +1047,10 @@ nd6_resolve(ifp, rt, m, dst, desten)
 	if (m->m_flags & M_MCAST) {
 		switch (ifp->if_type) {
 		case IFT_ETHER:
-		case IFT_FDDI:			
+		case IFT_FDDI:
+#ifdef IFT_IEEE80211
+		case IFT_IEEE80211:
+#endif
 			ETHER_MAP_IPV6_MULTICAST(&SIN6(dst)->sin6_addr,
 						 desten);
 			return(1);
@@ -1946,6 +1954,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	case IFT_ETHER:
 	case IFT_FDDI:
 	case IFT_IEEE1394:
+#ifdef IFT_IEEE80211
+	case IFT_IEEE80211:
+#endif
 	case IFT_GIF:		/* XXX need more cases? */
 		break;
 	default:
@@ -2138,7 +2149,10 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 	if (m->m_flags & M_MCAST) {
 		switch (ifp->if_type) {
 		case IFT_ETHER:
-		case IFT_FDDI:			
+		case IFT_FDDI:
+#ifdef IFT_IEEE80211
+		case IFT_IEEE80211:
+#endif
 			ETHER_MAP_IPV6_MULTICAST(&SIN6(dst)->sin6_addr,
 						 desten);
 			return(1);
