@@ -1876,16 +1876,22 @@ icmp6_redirect_output(m0, rt)
 	 * we almost always ask for an mbuf cluster for simplicity.
 	 * (MHLEN < IPV6_MMTU is almost always true)
 	 */
+#ifdef DIAGNOSTIC
+	if (IPV6_MMTU >= MCLBYTES)
+		printf("assumption failed about IPV6_MMTU and MCLBYTES\n");
+#endif
 	MGETHDR(m, M_DONTWAIT, MT_HEADER);
+	if (m && IPV6_MMTU >= MHLEN)
+		MCLGET(m, M_DONTWAIT);
 	if (!m)
 		goto fail;
-	if (MHLEN < IPV6_MMTU)
-		MCLGET(m, M_DONTWAIT);
 	maxlen = (m->m_flags & M_EXT) ? MCLBYTES : MHLEN;
 	maxlen = min(IPV6_MMTU, maxlen);
 	/* just for safety */
-	if (maxlen < sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr))
+	if (maxlen < sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr) +
+	    ((sizeof(struct nd_opt_hdr) + ifp->if_addrlen + 7) & ~7)) {
 		goto fail;
+	}
 
 	{
 		/* get ip6 linklocal address for ifp(my outgoing interface). */
@@ -1957,6 +1963,11 @@ icmp6_redirect_output(m0, rt)
 	rt_router = nd6_lookup(router_ll6, 0, ifp);
 	if (!rt_router)
 		goto nolladdropt;
+	len = sizeof(*nd_opt) + ifp->if_addrlen;
+	len = (len + 7) & ~7;	/*round by 8*/
+	/* safety check */
+	if (len + (p - (u_char *)ip6) > maxlen)
+		goto nolladdropt;
 	if (!(rt_router->rt_flags & RTF_GATEWAY) &&
 	    (rt_router->rt_flags & RTF_LLINFO) &&
 	    (rt_router->rt_gateway->sa_family == AF_LINK) &&
@@ -1964,12 +1975,10 @@ icmp6_redirect_output(m0, rt)
 	    sdl->sdl_alen) {
 		nd_opt = (struct nd_opt_hdr *)p;
 		nd_opt->nd_opt_type = ND_OPT_TARGET_LINKADDR;
-		len = 2 + ifp->if_addrlen;
-		len = (len + 7) & ~7;	/*round by 8*/
 		nd_opt->nd_opt_len = len >> 3;
-		p += len;
 		lladdr = (char *)(nd_opt + 1);
 		bcopy(LLADDR(sdl), lladdr, ifp->if_addrlen);
+		p += len;
 	}
     }
 nolladdropt:;
@@ -1981,6 +1990,8 @@ nolladdropt:;
 	if (m0->m_flags & M_DECRYPTED)
 		goto noredhdropt;
 #endif
+	if (p - (u_char *)ip6 > maxlen)
+		goto noredhdropt;
 
     {
 	/* redirected header option */
@@ -2051,9 +2062,7 @@ nolladdropt:;
 	m->m_next = m0;
 	m->m_pkthdr.len = m->m_len + m0->m_len;
     }
-#ifdef M_DECRYPTED	/*not openbsd*/
 noredhdropt:;
-#endif
 
 	if (IN6_IS_ADDR_LINKLOCAL(&sip6->ip6_src))
 		sip6->ip6_src.s6_addr16[1] = 0;
