@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64 2000/03/11 00:24:29 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.15 2001/12/26 17:36:36 luigi Exp $
  */
 
 /*
@@ -58,6 +58,11 @@
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/netisr.h>
+#include <net/if_llc.h>
+#ifdef BRIDGE
+#include <net/ethernet.h>
+#include <net/bridge.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -109,12 +114,13 @@ SYSCTL_INT(_net_link_ether_inet, OID_AUTO, useloopback, CTLFLAG_RW,
 SYSCTL_INT(_net_link_ether_inet, OID_AUTO, proxyall, CTLFLAG_RW,
 	   &arp_proxyall, 0, "");
 
-static void	arp_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+static void	arp_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 static void	arprequest __P((struct arpcom *,
 			struct in_addr *, struct in_addr *, u_char *));
 static void	arpintr __P((void));
 static void	arptfree __P((struct llinfo_arp *));
 static void	arptimer __P((void *));
+static void	arp_rtdrain __P((struct rtentry *, struct rttimer *));
 static struct llinfo_arp
 		*arplookup __P((u_long, int, int));
 #ifdef INET
@@ -147,15 +153,16 @@ arptimer(ignored_arg)
  * Parallel to llc_rtrequest.
  */
 static void
-arp_rtrequest(req, rt, sa)
+arp_rtrequest(req, rt, info)
 	int req;
 	register struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	register struct sockaddr *gate = rt->rt_gateway;
 	register struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 	static int arpinit_done;
+	int mine = 0;
 
 	if (!arpinit_done) {
 		arpinit_done = 1;
@@ -252,6 +259,7 @@ arp_rtrequest(req, rt, sa)
 		     * It is now necessary to clear "useloopback" and remove
 		     * the route to force traffic out to the hardware.
 		     */
+			mine = 1;
 			rt->rt_expire = 0;
 			Bcopy(((struct arpcom *)rt->rt_ifp)->ac_enaddr,
 				LLADDR(SDL(gate)), SDL(gate)->sdl_alen = 6);
@@ -259,6 +267,14 @@ arp_rtrequest(req, rt, sa)
 				rt->rt_ifp = loif;
 
 		}
+
+		/*
+		 * if this is a cached route, which is very likely,
+		 * put it in the timer queue.
+		 */
+		if (!(rt->rt_flags & (RTF_STATIC | RTF_ANNOUNCE)) && !mine)
+			rt_add_cache(rt, arp_rtdrain);
+
 		break;
 
 	case RTM_DELETE:
@@ -272,6 +288,30 @@ arp_rtrequest(req, rt, sa)
 			m_freem(la->la_hold);
 		Free((caddr_t)la);
 	}
+}
+
+static void
+arp_rtdrain(rt, rtt)
+	struct rtentry *rt;
+	struct rttimer *rtt;
+{
+	struct llinfo_arp *la;
+	struct sockaddr_dl *sdl;
+
+	if ((la = (struct llinfo_arp *)rt->rt_llinfo) == NULL)
+		panic("arp_rtdrain: not an arp entry");
+
+	/* if the arp entry has been resolved, just keep it. */
+	sdl = (struct sockaddr_dl *)rt->rt_gateway;
+	if (sdl && sdl->sdl_family == AF_LINK && /* check just in case */
+	    sdl->sdl_alen != 0) {
+		rt_add_cache(rt, arp_rtdrain);
+		return;
+	}
+
+	arptfree(la);
+
+	return;			/* the caller will free rtt */
 }
 
 /*
@@ -290,23 +330,24 @@ arprequest(ac, sip, tip, enaddr)
 	register struct ether_header *eh;
 	register struct ether_arp *ea;
 	struct sockaddr sa;
+	static u_char	llcx[] = { 0x82, 0x40, LLC_SNAP_LSAP, LLC_SNAP_LSAP,
+				   LLC_UI, 0x00, 0x00, 0x00, 0x08, 0x06 };
 
 	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL)
 		return;
 	m->m_pkthdr.rcvif = (struct ifnet *)0;
 	switch (ac->ac_if.if_type) {
 	case IFT_ISO88025:
-		m->m_len = sizeof(*ea) + 10;
-		m->m_pkthdr.len = sizeof(*ea) + 10;
-		MH_ALIGN(m, sizeof(*ea) + 10);
-		(void)memcpy(mtod(m, caddr_t),
-		    "\x82\x40\xaa\xaa\x03\x00\x00\x00\x08\x06", 10);
+		m->m_len = sizeof(*ea) + sizeof(llcx);
+		m->m_pkthdr.len = sizeof(*ea) + sizeof(llcx);
+		MH_ALIGN(m, sizeof(*ea) + sizeof(llcx));
+		(void)memcpy(mtod(m, caddr_t), llcx, sizeof(llcx));
 		(void)memcpy(sa.sa_data, etherbroadcastaddr, 6);
 		(void)memcpy(sa.sa_data + 6, enaddr, 6);
-		sa.sa_data[6] |= 0x80;
-		sa.sa_data[12] = 0x10;
-		sa.sa_data[13] = 0x40;
-		ea = (struct ether_arp *)(mtod(m, char *) + 10);
+		sa.sa_data[6] |= TR_RII;
+		sa.sa_data[12] = TR_AC;
+		sa.sa_data[13] = TR_LLC_FRAME;
+		ea = (struct ether_arp *)(mtod(m, char *) + sizeof(llcx));
 		bzero((caddr_t)ea, sizeof (*ea));
 		ea->arp_hrd = htons(ARPHRD_IEEE802);
 		break;
@@ -361,7 +402,7 @@ arpresolve(ac, rt, m, dst, desten, rt0)
 	register u_char *desten;
 	struct rtentry *rt0;
 {
-	register struct llinfo_arp *la = 0;
+	struct llinfo_arp *la = 0;
 	struct sockaddr_dl *sdl;
 
 	if (m->m_flags & M_BCAST) {	/* broadcast */
@@ -397,6 +438,16 @@ arpresolve(ac, rt, m, dst, desten, rt0)
 		return 1;
 	}
 	/*
+	 * If ARP is disabled on this interface, stop.
+	 * XXX
+	 * Probably should not allocate empty llinfo struct if we are
+	 * not going to be sending out an arp request.
+	 */
+	if (ac->ac_if.if_flags & IFF_NOARP) {
+		m_freem(m);
+		return (0);
+	}
+	/*
 	 * There is an arptab entry, but no ethernet address
 	 * response yet.  Replace the held mbuf with this
 	 * latest one.
@@ -430,9 +481,9 @@ arpresolve(ac, rt, m, dst, desten, rt0)
 static void
 arpintr()
 {
-	register struct mbuf *m, *m0;
+	register struct mbuf *m;
 	register struct arphdr *ar;
-	int s, ml;
+	int s;
 
 	while (arpintrq.ifq_head) {
 		s = splimp();
@@ -442,8 +493,8 @@ arpintr()
 			panic("arpintr");
 	
                 if (m->m_len < sizeof(struct arphdr) &&
-                    (m = m_pullup(m, sizeof(struct arphdr)) == NULL)) {
-			log(LOG_ERR, "arp: runt packet -- m_pullup failed.");
+                    ((m = m_pullup(m, sizeof(struct arphdr))) == NULL)) {
+			log(LOG_ERR, "arp: runt packet -- m_pullup failed\n");
 			continue;
 		}
 		ar = mtod(m, struct arphdr *);
@@ -451,22 +502,15 @@ arpintr()
 		if (ntohs(ar->ar_hrd) != ARPHRD_ETHER
 		    && ntohs(ar->ar_hrd) != ARPHRD_IEEE802) {
 			log(LOG_ERR,
-			    "arp: unknown hardware address format (%2D)",
+			    "arp: unknown hardware address format (0x%2D)\n",
 			    (unsigned char *)&ar->ar_hrd, "");
 			m_freem(m);
 			continue;
 		}
 
-		m0 = m;
-		ml = 0;
-		while (m0 != NULL) {	
-			ml += m0->m_len;	/* wanna implement m_size?? */
-			m0 = m0->m_next;	
-		}
-
-		if (ml < sizeof(struct arphdr) + 2 * ar->ar_hln
+		if (m->m_pkthdr.len < sizeof(struct arphdr) + 2 * ar->ar_hln
 		    + 2 * ar->ar_pln) {
-			log(LOG_ERR, "arp: runt packet.");
+			log(LOG_ERR, "arp: runt packet\n");
 			m_freem(m);
 			continue;
 		}
@@ -497,6 +541,12 @@ arpintr()
  * We no longer reply to requests for ETHERTYPE_TRAIL protocol either,
  * but formerly didn't normally send requests.
  */
+static int log_arp_wrong_iface = 1;
+
+SYSCTL_INT(_net_link_ether_inet, OID_AUTO, log_arp_wrong_iface, CTLFLAG_RW,
+	&log_arp_wrong_iface, 0,
+	"log arp packets arriving on the wrong interface");
+
 static void
 in_arpinput(m)
 	struct mbuf *m;
@@ -507,37 +557,63 @@ in_arpinput(m)
 	struct iso88025_header *th = (struct iso88025_header *)0;
 	register struct llinfo_arp *la = 0;
 	register struct rtentry *rt;
-	struct in_ifaddr *ia, *maybe_ia = 0;
+	struct ifaddr *ifa;
+	struct in_ifaddr *ia;
 	struct sockaddr_dl *sdl;
 	struct sockaddr sa;
 	struct in_addr isaddr, itaddr, myaddr;
-	int op;
+	int op, rif_len;
+
+	if (m->m_len < sizeof(struct ether_arp) &&
+	    (m = m_pullup(m, sizeof(struct ether_arp))) == NULL) {
+		log(LOG_ERR, "in_arp: runt packet -- m_pullup failed\n");
+		return;
+	}
 
 	ea = mtod(m, struct ether_arp *);
 	op = ntohs(ea->arp_op);
 	(void)memcpy(&isaddr, ea->arp_spa, sizeof (isaddr));
 	(void)memcpy(&itaddr, ea->arp_tpa, sizeof (itaddr));
-	for (ia = in_ifaddrhead.tqh_first; ia; ia = ia->ia_link.tqe_next)
 #ifdef BRIDGE
-		/*
-		 * For a bridge, we want to check the address irrespective
-		 * of the receive interface. (This will change slightly
-		 * when we have clusters of interfaces).
-		 */
-		{
+#define BRIDGE_TEST (do_bridge)
 #else
-		if (ia->ia_ifp == &ac->ac_if) {
+#define BRIDGE_TEST (0) /* cc will optimise the test away */
 #endif
-			maybe_ia = ia;
-			if ((itaddr.s_addr == ia->ia_addr.sin_addr.s_addr) ||
-			     (isaddr.s_addr == ia->ia_addr.sin_addr.s_addr))
-				break;
+	/*
+	 * For a bridge, we want to check the address irrespective
+	 * of the receive interface. (This will change slightly
+	 * when we have clusters of interfaces).
+	 */
+	LIST_FOREACH(ia, INADDR_HASH(itaddr.s_addr), ia_hash)
+		if ((BRIDGE_TEST || (ia->ia_ifp == &ac->ac_if)) &&
+		    itaddr.s_addr == ia->ia_addr.sin_addr.s_addr)
+			goto match;
+	LIST_FOREACH(ia, INADDR_HASH(isaddr.s_addr), ia_hash)
+		if ((BRIDGE_TEST || (ia->ia_ifp == &ac->ac_if)) &&
+		    isaddr.s_addr == ia->ia_addr.sin_addr.s_addr)
+			goto match;
+	/*
+	 * No match, use the first inet address on the receive interface
+	 * as a dummy address for the rest of the function.
+	 */
+	TAILQ_FOREACH(ifa, &ac->ac_if.if_addrhead, ifa_link)
+		if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET) {
+			ia = ifatoia(ifa);
+			goto match;
 		}
-	if (maybe_ia == 0) {
+	/*
+	 * If bridging, fall back to using any inet address.
+	 * This is probably incorrect, the right way being try to match
+	 * addresses for interfaces in the same cluster, so if we
+	 * get here we should always drop the packet.
+	 */
+	if (!BRIDGE_TEST ||
+	    (ia = TAILQ_FIRST(&in_ifaddrhead)) == NULL) {
 		m_freem(m);
 		return;
 	}
-	myaddr = ia ? ia->ia_addr.sin_addr : maybe_ia->ia_addr.sin_addr;
+match:
+	myaddr = ia->ia_addr.sin_addr;
 	if (!bcmp((caddr_t)ea->arp_sha, (caddr_t)ac->ac_enaddr,
 	    sizeof (ea->arp_sha))) {
 		m_freem(m);	/* it's from me, ignore it. */
@@ -560,16 +636,16 @@ in_arpinput(m)
 	}
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
-#ifndef BRIDGE /* the following is not an error when doing bridging */
-		if (rt->rt_ifp != &ac->ac_if) {
+		/* the following is not an error when doing bridging */
+		if (!BRIDGE_TEST && rt->rt_ifp != &ac->ac_if) {
+		    if (log_arp_wrong_iface)
 			log(LOG_ERR, "arp: %s is on %s%d but got reply from %6D on %s%d\n",
 			    inet_ntoa(isaddr),
 			    rt->rt_ifp->if_name, rt->rt_ifp->if_unit,
 			    ea->arp_sha, ":",
 			    ac->ac_if.if_name, ac->ac_if.if_unit);
-			goto reply;
+		    goto reply;
 		}
-#endif
 		if (sdl->sdl_alen &&
 		    bcmp((caddr_t)ea->arp_sha, LLADDR(sdl), sdl->sdl_alen)) {
 			if (rt->rt_expire)
@@ -587,7 +663,7 @@ in_arpinput(m)
 		}
 		(void)memcpy(LLADDR(sdl), ea->arp_sha, sizeof(ea->arp_sha));
 		sdl->sdl_alen = sizeof(ea->arp_sha);
-                sdl->sdl_rcf = NULL;
+                sdl->sdl_rcf = (u_short)0;
 		/*
 		 * If we receive an arp from a token-ring station over
 		 * a token-ring nic then try to save the source
@@ -595,30 +671,29 @@ in_arpinput(m)
 		 */
 		if (ac->ac_if.if_type == IFT_ISO88025) {
 			th = (struct iso88025_header *)m->m_pkthdr.header;
-			if ((th->iso88025_shost[0] & 0x80) &&
-			    ((th->rcf & 0x001f) > 2)) {
-				sdl->sdl_rcf = (th->rcf & 0x8000) ?
-				    (th->rcf & 0x7fff) :
-				    (th->rcf | 0x8000);
-				memcpy(sdl->sdl_route, th->rseg,
-				    (th->rcf & 0x001f)  - 2);
-				sdl->sdl_rcf = sdl->sdl_rcf & 0xff1f;
+			rif_len = TR_RCF_RIFLEN(th->rcf);
+			if ((th->iso88025_shost[0] & TR_RII) &&
+			    (rif_len > 2)) {
+				sdl->sdl_rcf = th->rcf;
+				sdl->sdl_rcf ^= htons(TR_RCF_DIR);
+				memcpy(sdl->sdl_route, th->rd, rif_len - 2);
+				sdl->sdl_rcf &= ~htons(TR_RCF_BCST_MASK);
 				/*
 				 * Set up source routing information for
 				 * reply packet (XXX)
 				 */
-				m->m_data -= (th->rcf & 0x001f);
-				m->m_len  += (th->rcf & 0x001f);
-				m->m_pkthdr.len += (th->rcf & 0x001f);
+				m->m_data -= rif_len;
+				m->m_len  += rif_len;
+				m->m_pkthdr.len += rif_len;
 			} else {
-				th->iso88025_shost[0] &= 0x7f;
+				th->iso88025_shost[0] &= ~TR_RII;
 			}
 			m->m_data -= 8;
 			m->m_len  += 8;
 			m->m_pkthdr.len += 8;
 			th->rcf = sdl->sdl_rcf;
 		} else {
-			sdl->sdl_rcf = NULL;
+			sdl->sdl_rcf = (u_short)0;
 		}
 		if (rt->rt_expire)
 			rt->rt_expire = time_second + arpt_keep;
@@ -696,16 +771,16 @@ reply:
 		memcpy(th->iso88025_shost, ac->ac_enaddr,
 		    sizeof(th->iso88025_shost));
 		/* Set the source routing bit if neccesary */
-		if (th->iso88025_dhost[0] & 0x80) {
-			th->iso88025_dhost[0] &= 0x7f;
-			if ((th->rcf & 0x001f) - 2)
-				th->iso88025_shost[0] |= 0x80;
+		if (th->iso88025_dhost[0] & TR_RII) {
+			th->iso88025_dhost[0] &= ~TR_RII;
+			if (TR_RCF_RIFLEN(th->rcf) > 2)
+				th->iso88025_shost[0] |= TR_RII;
 		}
 		/* Copy the addresses, ac and fc into sa_data */
 		memcpy(sa.sa_data, th->iso88025_dhost,
 		    sizeof(th->iso88025_dhost) * 2);
-		sa.sa_data[(sizeof(th->iso88025_dhost) * 2)] = 0x10;
-		sa.sa_data[(sizeof(th->iso88025_dhost) * 2) + 1] = 0x40;
+		sa.sa_data[(sizeof(th->iso88025_dhost) * 2)] = TR_AC;
+		sa.sa_data[(sizeof(th->iso88025_dhost) * 2) + 1] = TR_LLC_FRAME;
 		break;
 	case IFT_ETHER:
 	case IFT_FDDI:
