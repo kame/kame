@@ -1092,6 +1092,9 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				&ip6_gif_hlim);
 	case IPV6CTL_KAME_VERSION:
 		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
+	case IPV6CTL_USE_DEPRECATED:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				&ip6_use_deprecated);
 	default:
 		return EOPNOTSUPP;
 	}
@@ -1118,8 +1121,8 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &ip6stat,
 		    sizeof(ip6stat));
-	case IPV6CTL_FORWARDING:
 #if 0
+	case IPV6CTL_FORWARDING:
 	    {
 		int error, old;
 

@@ -365,6 +365,7 @@ int	ip6_gif_hlim = GIF_HLIM;
 #else
 int	ip6_gif_hlim = 0;
 #endif
+int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 
 u_int32_t ip6_id = 0UL;
 int	ip6_keepfaith = 0;
@@ -517,6 +518,10 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_DEFMCASTHLIM,
 	defmcasthlim, CTLFLAG_RW,	&ip6_defmcasthlim,	0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_GIF_HLIM,
 	gifhlim, CTLFLAG_RW,	&ip6_gif_hlim,			0, "");
+SYSCTL_STRING(_net_inet6_ip6, IPV6CTL_KAME_VERSION,
+	kame_version, CTLFLAG_RD,	__KAME_VERSION,		0, "");
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEPRECATED,
+	use_deprecated, CTLFLAG_RW,	&ip6_use_deprecated,	0, "");
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,

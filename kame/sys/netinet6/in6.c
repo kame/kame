@@ -103,6 +103,7 @@
 
 #include <netinet6/nd6.h>
 #include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_ifattach.h>
@@ -1808,7 +1809,10 @@ in6_ifawithscope(ifp, dst)
 {
 	int dst_scope =	in6_addrscope(dst), blen = -1, tlen;
 	struct ifaddr *ifa;
-	struct in6_ifaddr *besta = 0, *ia;
+	struct in6_ifaddr *besta = NULL, *ia;
+	struct in6_ifaddr *dep[2];	/*last-resort: deprecated*/
+
+	dep[0] = dep[1] = NULL;
 
 	/*
 	 * We first look for addresses in the same scope. 
@@ -1830,8 +1834,11 @@ in6_ifawithscope(ifp, dst)
 			continue; /* don't use this interface */
 		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DETACHED)
 			continue;
-		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DEPRECATED)
+		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (ip6_use_deprecated)
+				dep[0] = (struct in6_ifaddr *)ifa;
 			continue;
+		}
 
 		if (dst_scope == in6_addrscope(&IFA_IN6(ifa))) {
 			/*
@@ -1850,19 +1857,32 @@ in6_ifawithscope(ifp, dst)
 		}
 	}
 	if (besta)
-		return(besta);
+		return besta;
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-		if (IPV6_ADDR_SCOPE_GLOBAL == 
-		    in6_addrscope(&(ia->ia_addr.sin6_addr))
-		    && (ia->ia6_flags & IN6_IFF_ANYCAST) == 0
-		    && (ia->ia6_flags & IN6_IFF_NOTREADY) == 0
-		    && (ia->ia6_flags & IN6_IFF_DETACHED) == 0
-		    && (ia->ia6_flags & IN6_IFF_DEPRECATED) == 0) {
-			/* XXX: is there any case to allow anycast? */
-			return ia;
+		if (IPV6_ADDR_SCOPE_GLOBAL != 
+		    in6_addrscope(&(ia->ia_addr.sin6_addr)))
+			continue;
+		/* XXX: is there any case to allow anycast? */
+		if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
+			continue;
+		if ((ia->ia6_flags & IN6_IFF_NOTREADY) != 0)
+			continue;
+		if ((ia->ia6_flags & IN6_IFF_DETACHED) != 0)
+			continue;
+		if ((ia->ia6_flags & IN6_IFF_DEPRECATED) != 0) {
+			if (ip6_use_deprecated)
+				dep[1] = (struct in6_ifaddr *)ifa;
+			continue;
 		}
+		return ia;
 	}
+
+	/* use the last-resort values, that are, deprecated addresses */
+	if (dep[0])
+		return dep[0];
+	if (dep[1])
+		return dep[1];
 
 	return NULL;
 }
@@ -1880,6 +1900,9 @@ in6_ifawithifp(ifp, dst)
 	int dst_scope =	in6_addrscope(dst), blen = -1, tlen;
 	struct ifaddr *ifa;
 	struct in6_ifaddr *besta = 0;
+	struct in6_ifaddr *dep[2];	/*last-resort: deprecated*/
+
+	dep[0] = dep[1] = NULL;
 
 	/*
 	 * We first look for addresses in the same scope. 
@@ -1901,8 +1924,11 @@ in6_ifawithifp(ifp, dst)
 			continue; /* don't use this interface */
 		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DETACHED)
 			continue;
-		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DEPRECATED)
+		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (ip6_use_deprecated)
+				dep[0] = (struct in6_ifaddr *)ifa;
 			continue;
+		}
 
 		if (dst_scope == in6_addrscope(&IFA_IN6(ifa))) {
 			/*
@@ -1937,11 +1963,20 @@ in6_ifawithifp(ifp, dst)
 			continue; /* don't use this interface */
 		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DETACHED)
 			continue;
-		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DEPRECATED)
+		if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (ip6_use_deprecated)
+				dep[1] = (struct in6_ifaddr *)ifa;
 			continue;
+		}
 
 		return (struct in6_ifaddr *)ifa;
 	}
+
+	/* use the last-resort values, that are, deprecated addresses */
+	if (dep[0])
+		return dep[0];
+	if (dep[1])
+		return dep[1];
 
 	return NULL;
 }

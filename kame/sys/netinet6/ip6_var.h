@@ -182,6 +182,7 @@ extern int	ip6_defmcasthlim;	/* default multicast hop limit */
 extern int	ip6_forwarding;		/* act as router? */
 extern int	ip6_forward_srcrt;	/* forward src-routed? */
 extern int	ip6_gif_hlim;		/* Hop limit for gif encap packet */
+extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern struct socket *ip6_mrouter; 	/* multicast routing daemon */
 extern int	ip6_sendredirects;	/* send IP redirects when forwarding? */
 extern int	ip6_maxfragpackets; /* Maximum packets in reassembly queue */

@@ -471,8 +471,9 @@ struct in6_pktinfo {
 #define IPV6CTL_DEFMCASTHLIM	18
 #define IPV6CTL_GIF_HLIM	19	/* default HLIM for gif encap packet */
 #define IPV6CTL_KAME_VERSION	20
+#define IPV6CTL_USE_DEPRECATED	21	/* use deprecated addr (RFC2462 5.5.4) */
 /* New entries should be added here from current IPV6CTL_MAXID value. */
-#define IPV6CTL_MAXID		21
+#define IPV6CTL_MAXID		22
 
 #define IPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -496,6 +497,7 @@ struct in6_pktinfo {
 	{ "defmcasthlim", CTLTYPE_INT }, \
 	{ "gifhlim", CTLTYPE_INT }, \
 	{ "kame_version", CTLTYPE_STRING }, \
+	{ "use_deprecated", CTLTYPE_INT }, \
 }
 
 #define IPV6CTL_VARS { \
@@ -520,6 +522,7 @@ struct in6_pktinfo {
 	&ip6_defmcasthlim, \
 	&ip6_gif_hlim, \
 	0, \
+	&ip6_use_deprecated, \
 }
 #endif /* !_XOPEN_SOURCE */
 
