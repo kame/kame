@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.41 2000/07/16 08:25:51 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.42 2000/07/31 19:01:23 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1855,6 +1855,12 @@ oakley_compute_enckey(iph1)
 		vfree(buf);
 	}
 
+	/*
+	 * don't check any weak key or not.
+	 * draft-ietf-ipsec-ike-01.txt Appendix B.
+	 * draft-ietf-ipsec-ciph-aes-cbc-00.txt Section 2.3.
+	 */
+#if 0
 	/* weakkey check */
 	if (iph1->approval->enctype > ARRAYLEN(cipher))
 		goto end;
@@ -1864,6 +1870,7 @@ oakley_compute_enckey(iph1)
 			"weakkey was generated.\n");
 		goto end;
 	}
+#endif
 
 	YIPSDEBUG(DEBUG_CRYPT,
 		plog(logp, LOCATION, NULL, "final cipher key computed: "));
