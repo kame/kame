@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1445 2000/12/21 01:58:56 jinmei Exp $
+$KAME: CHANGELOG,v 1.1446 2000/12/21 02:00:34 jinmei Exp $
 
 <200012>
 2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -16,6 +16,8 @@ $KAME: CHANGELOG,v 1.1445 2000/12/21 01:58:56 jinmei Exp $
 	* kame/sys/netinet6/ip6_output.c (init_ip6pktopts): added to avoid
 	forgetting initialization of packet options. This function is
 	called from ip6_pcbopt() and ip6_setpktoptions().
+	This change would fix a problem that traceroute6 source routing
+	failed by EMSGSIZE.
 
 2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netkey/key.c (key_cmpspidx_withmask): applied the same
