@@ -799,7 +799,7 @@ client6_recvreply(s, serv)
 				       in6addr2str(&in6, 0));
 			       
 				dprintf((stderr,
-					 "Notifing to mediator: server %s",
+					 "Notifing to mediator: server %s\n",
 					 mediator_msg.serveraddr));
 				if (sendto(s, &mediator_msg,
 					   sizeof(mediator_msg), 0,
