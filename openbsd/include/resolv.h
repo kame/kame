@@ -309,10 +309,6 @@ extern const struct res_sym __p_type_syms[];
 #define	res_mkquery	__res_mkquery
 #endif
 
-#define	res_queryN	__res_queryN
-#define	res_searchN	__res_searchN
-#define	res_querydomainN	__res_querydomainN
-
 __BEGIN_DECLS
 int		res_hnok(const char *);
 int		res_ownok(const char *);
@@ -355,12 +351,6 @@ int		res_query(const char *, int, int, u_char *, int);
 int		res_search(const char *, int, int, u_char *, int);
 int		res_querydomain(const char *, const char *, int, int,
 		    u_char *, int);
-#if 0
-int		res_queryN __P((const char *, struct res_target *));
-int		res_searchN __P((const char *, struct res_target *));
-int		res_querydomainN __P((const char *, const char *,
-			struct res_target *));
-#endif
 int		res_mkquery(int, const char *, int, int, const u_char *, int,
 		    const u_char *, u_char *, int);
 int		res_send(const u_char *, int, u_char *, int);
