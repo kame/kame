@@ -1,0 +1,16 @@
+$KAME: README,v 1.1 2001/08/27 08:36:40 keiichi Exp $
+
+NOTE: the current code is still very unstable, has many uncompleted parts.
+
+- kernel config
+	options MIP6
+	options MIP6_DEBUG
+	pseudo-device hif 1
+
+- MN
+	mip6control -i hif0 -H<homeprefix> -P<prefixlen>
+	mip6control -i hif0 -m
+	rtsol <physical if>
+
+- HA
+	mip6control -g
