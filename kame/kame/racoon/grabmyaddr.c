@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.3 2000/01/10 22:38:38 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.4 2000/01/10 22:42:13 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -158,9 +158,10 @@ grab_myaddrs()
 #endif
 			lcconf->myaddrs = p;
 			YIPSDEBUG(DEBUG_MISC,
-				getnameinfo(p->addr, p->addr->sa_len,
-					_addr1_, sizeof(_addr1_), NULL, 0,
-					NI_NUMERICHOST);
+				if (getnameinfo(p->addr, p->addr->sa_len,
+						_addr1_, sizeof(_addr1_),
+						NULL, 0, NI_NUMERICHOST))
+					strcpy(_addr1_, "(invalid)");
 				plog(logp, LOCATION, NULL,
 					"my interface: %s (%s)\n",
 					_addr1_, ifr->ifr_name));
