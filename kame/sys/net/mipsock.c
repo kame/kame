@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.6 2005/02/28 19:08:06 keiichi Exp $ */
+/* $Id: mipsock.c,v 1.7 2005/03/01 00:41:01 keiichi Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -72,19 +72,19 @@ static struct	sockproto mips_proto = { PF_MOBILITY, };
 #ifdef __FreeBSD__
 static int mips_abort(struct socket *);
 #endif
-#if __FreeBSD_version >= 50300
+#if __FreeBSD_version >= 503000
 static int mips_attach(struct socket *, int, struct thread *);
 static int mips_bind(struct socket *, struct sockaddr *, struct thread *);
 static int mips_connect(struct socket *, struct sockaddr *, struct thread *);
 static int mips_send(struct socket *, int, struct mbuf *, struct sockaddr *,
     struct mbuf *, struct thread *);
-#else /* __FreeBSD_version >= 50300 */
+#else /* __FreeBSD_version >= 503000 */
 static int mips_attach(struct socket *, int, struct proc *);
 static int mips_bind(struct socket *, struct sockaddr *, struct proc *);
 static int mips_connect(struct socket *, struct sockaddr *, struct proc *);
 static int mips_send(struct socket *, int, struct mbuf *, struct sockaddr *,
     struct mbuf *, strut proc *);
-#endif /* __FreeBSD_version >= 50300 */
+#endif /* __FreeBSD_version >= 503000 */
 static int mips_detach(struct socket *);
 static int mips_disconnect(struct socket *);
 static int mips_peeraddr(struct socket *, struct sockaddr **);
