@@ -10,10 +10,6 @@ YFLAGS+=-d
 
 SCRIPTS=	scriptdump
 
-BINOWN=root
-BINGRP=bin
-BINMODE=555
-
 all: ${PROG} scriptdump
 
 CPPFLAGS+=-DIPSEC_DEBUG -DINET6 -DYY_NO_UNPUT
