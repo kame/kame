@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.37 2000/05/05 11:00:55 sumikawa Exp $	*/
+/*	$KAME: if_stf.c,v 1.38 2000/05/22 06:57:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * 6to4 interface, based on draft-ietf-ngtrans-6to4-03.txt.
+ * 6to4 interface, based on draft-ietf-ngtrans-6to4-05.txt.
  *
  * 6to4 interface is NOT capable of link-layer (I mean, IPv4) multicasting.
  * There is no address mapping defined from IPv6 multicast address to IPv4
@@ -59,7 +59,8 @@
  * ICMPv6:
  * - Redirects cannot be used due to the lack of link-local address.
  *
- * 04 draft suggests to have link-local address onto 6to4 interface.
+ * Starting from 04 draft, the specification suggests how to construct
+ * link-local address for 6to4 interface.
  * However, it seems to have no real use and does not help the above symptom
  * much.  Even if we assign link-locals to interface, we cannot really
  * use link-local unicast/multicast on top of 6to4 cloud, and the above

@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/13 19:58:09 $
+			$Date: 2000/05/22 06:57:09 $
 
 1. IPv6
 
@@ -110,7 +110,7 @@ draft-ietf-ngtrans-tcpudp-relay-00.txt:
 	An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
       details.
-draft-ietf-ngtrans-6to4-03.txt:
+draft-ietf-ngtrans-6to4-05.txt:
 	Connection of IPv6 Domains via IPv4 Clouds without Explicit Tunnels
     * "stf" interface implements it.  Be sure to read the next item before
       configuring it, there are security issues.
