@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.45 2002/05/09 12:00:28 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.46 2002/05/09 12:36:29 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -83,6 +83,8 @@ static unsigned int if_maxindex __P((void));
 #endif
 static int in6_matchflags __P((struct sockaddr *, char *, int));
 static ssize_t gethwid __P((char *, int, const char *, u_int16_t *));
+static int get_delegated_prefixes __P((char *, char *,
+				       struct dhcp6_optinfo *));
 
 #if 0
 static unsigned int
@@ -546,6 +548,7 @@ dhcp6_init_options(optinfo)
 {
 	memset(optinfo, 0, sizeof(*optinfo));
 	TAILQ_INIT(&optinfo->dnslist);
+	TAILQ_INIT(&optinfo->prefix);
 }
 
 void
@@ -554,6 +557,7 @@ dhcp6_clear_options(optinfo)
 {
 	struct dhcp6_optconf *ropt, *ropt_next;
 	struct dnslist *d, *dn;
+	struct delegated_prefix *p, *pn;
 
 	for (ropt = optinfo->requests; ropt; ropt = ropt_next) {
 		ropt_next = ropt->next;
@@ -567,6 +571,12 @@ dhcp6_clear_options(optinfo)
 		dn = TAILQ_NEXT(d, link);
 		TAILQ_REMOVE(&optinfo->dnslist, d, link);
 		free(d);
+	}
+
+	for (p = TAILQ_FIRST(&optinfo->prefix); p; p = pn) {
+		pn = TAILQ_NEXT(p, link);
+		TAILQ_REMOVE(&optinfo->prefix, p, link);
+		free(p);
 	}
 
 	dhcp6_init_options(optinfo);
@@ -666,11 +676,14 @@ dhcp6_get_options(p, ep, optinfo)
 						  dle, link);
 			}
 			break;
+		case DH6OPT_PREFIX_DELEGATION:
+			if (get_delegated_prefixes(cp, cp + optlen, optinfo))
+				goto fail;
+			break;
 		default:
 			/* no option specific behavior */
-			dprintf(LOG_INFO,
-				"unknown DHCP6 option type %d, len %d",
-				opt, optlen);
+			dprintf(LOG_INFO, "unknown or unexpected DHCP6 option "
+				"%s, len %d", dhcpoptstr(opt), optlen);
 			break;
 		}
 	}
@@ -682,6 +695,81 @@ dhcp6_get_options(p, ep, optinfo)
 		opt, optlen);
   fail:
 	dhcp6_clear_options(optinfo);
+	return(-1);
+}
+
+static int
+get_delegated_prefixes(p, ep, optinfo)
+	char *p, *ep;
+	struct dhcp6_optinfo *optinfo;
+{
+	char *np, *cp;
+	struct dhcp6opt opth;
+	struct dhcp6_prefix_info pi;
+	struct delegated_prefix *dp;
+	int optlen, opt;
+
+	for (; p + sizeof(struct dhcp6opt) <= ep; p = np) {
+		/* XXX: alignment issue */
+		memcpy(&opth, p, sizeof(opth));
+		optlen =  ntohs(opth.dh6opt_len);
+		opt = ntohs(opth.dh6opt_type);
+
+		cp = p + sizeof(opth);
+		np = cp + optlen;
+		dprintf(LOG_DEBUG, "  prefix delegation option: %s, "
+			"len %d", dhcpoptstr(opt), optlen);
+
+		if (np > ep) {
+			dprintf(LOG_INFO, "malformed DHCP options");
+			return -1;
+		}
+
+		switch(opt) {
+		case DH6OPT_PREFIX_INFORMATION:
+			if (optlen != sizeof(pi) - 4)
+				goto malformed;
+			memcpy(&pi, p, sizeof(pi));
+			if (pi.dh6_pi_plen > 128) {
+				dprintf(LOG_INFO, "  invalid prefix length "
+					"(%d)", pi.dh6_pi_plen);
+				goto malformed;
+			}
+			pi.dh6_pi_duration = ntohl(pi.dh6_pi_duration);
+			if (pi.dh6_pi_duration != DHCP6_DURATITION_INFINITE) {
+				dprintf(LOG_DEBUG, "  prefix information: "
+					"%s/%d duration %ld",
+					in6addr2str(&pi.dh6_pi_paddr, 0),
+					pi.dh6_pi_plen, pi.dh6_pi_duration);
+			} else {
+				dprintf(LOG_DEBUG, "  prefix information: "
+					"%s/%d duration infinity",
+					in6addr2str(&pi.dh6_pi_paddr, 0),
+					pi.dh6_pi_plen);
+			}
+			break;
+
+			if ((dp = malloc(sizeof(*dp))) == NULL) {
+				dprintf(LOG_ERR, "memory allocation failed"
+					"during parse prefix options");
+				goto fail;
+			}
+			memset(dp, 0, sizeof(*dp));
+			dp->prefix.addr = pi.dh6_pi_paddr;
+			dp->prefix.plen = pi.dh6_pi_plen;
+			dp->prefix.plen = pi.dh6_pi_duration;
+
+			TAILQ_INSERT_TAIL(&optinfo->prefix, dp, link);
+		}
+	}
+
+	return(0);
+
+  malformed:
+	dprintf(LOG_INFO,
+		"  malformed prefix delegation option: type %d, len %d",
+		opt, optlen);
+  fail:
 	return(-1);
 }
 
@@ -794,7 +882,7 @@ dhcp6_set_options(bp, ep, optinfo)
 			memset(&pi, 0, sizeof(pi));
 			pi.dh6_pi_type = htons(DH6OPT_PREFIX_INFORMATION);
 			pi.dh6_pi_len = htons(sizeof(pi) - 4);
-			pi.dh6_pi_lease = htonl(dp->prefix.duration);
+			pi.dh6_pi_duration = htonl(dp->prefix.duration);
 			pi.dh6_pi_plen = dp->prefix.plen;
 			memcpy(&pi.dh6_pi_paddr, &dp->prefix.addr,
 			       sizeof(struct in6_addr));
@@ -835,6 +923,8 @@ dhcpoptstr(type)
 		return "DNS";
 	case DH6OPT_PREFIX_DELEGATION:
 		return "prefix delegation";
+	case DH6OPT_PREFIX_INFORMATION:
+		return "prefix information";
 	default:
 		sprintf(genstr, "opt_%d", type);
 		return(genstr);

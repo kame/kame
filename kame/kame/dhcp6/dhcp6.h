@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.23 2002/05/09 11:48:54 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.24 2002/05/09 12:36:29 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -157,7 +157,7 @@ struct dhcp6_duid_type1 {
 struct dhcp6_prefix_info {
 	u_int16_t dh6_pi_type;
 	u_int16_t dh6_pi_len;
-	u_int32_t dh6_pi_lease;
+	u_int32_t dh6_pi_duration;
 	u_int8_t dh6_pi_plen;
 	struct in6_addr dh6_pi_paddr;
 } __attribute__ ((__packed__));
