@@ -79,8 +79,8 @@ __RCSID("$NetBSD: sysctl.c,v 1.18 1998/11/13 20:56:21 thorpej Exp $");
 #include <netinet/tcp_var.h>
 
 #ifdef INET6
-#include <netinet6/ip6.h>
-#include <netinet6/icmp6.h>
+#include <netinet/ip6.h>
+#include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
