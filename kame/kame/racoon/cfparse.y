@@ -374,7 +374,7 @@ timer_stmt
 algorithm_statement
 	:	ALGORITHM_LEVEL
 		{
-			yywarn("algorithm_strength directive are obsoleted.");
+			yywarn("algorithm_strength directive is obsoleted.");
 		} BOC algorithm_stmts EOC
 	;
 algorithm_stmts
@@ -406,7 +406,7 @@ algorithm_type
 policy_statement
 	:	POLICY policy_index
 		{
-			yywarn("policy directive are obsoleted.");
+			yywarn("policy directive is obsoleted.");
 			cur_spidx = $2;
 		}
 		policy_specswrap
@@ -575,7 +575,7 @@ secproto_spec
 	|	SECMODE secmode EOS
 	|	STRENGTH
 		{
-			yyerror("strength directive are obsoleted.");
+			yyerror("strength directive is obsoleted.");
 		} STRENGTHTYPE EOS
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
@@ -1028,7 +1028,7 @@ isakmpproposal_specs
 isakmpproposal_spec
 	:	STRENGTH
 		{
-			yyerror("strength directive are obsoleted.");
+			yyerror("strength directive is obsoleted.");
 		} STRENGTHTYPE EOS
 	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
 		{
