@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.8 2003/06/25 02:53:51 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.9 2003/06/25 17:25:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1595,7 +1595,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 			 ip6_sprintf(&src_sa.sin6_addr)));
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
-		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		icmp6_error(m0, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 		    (caddr_t)&ip6mhi->ip6mhi_len - (caddr_t)mtod(m0, struct ip6_hdr *));
 		return (EINVAL);
 	}
@@ -1692,7 +1692,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 			 ip6_sprintf(&src_sa.sin6_addr)));
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
-		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		icmp6_error(m0, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 		    (caddr_t)&ip6mci->ip6mci_len - (caddr_t)mtod(m0, struct ip6_hdr *));
 		return (EINVAL);
 	}
