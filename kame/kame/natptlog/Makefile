@@ -17,6 +17,7 @@
 .endif
 
 BINDIR=	${PREFIX}/bin
+
 PROG=	natptlog
 SRCS=	natptlog.c showsubs.c
 
@@ -24,7 +25,7 @@ SRCS=	natptlog.c showsubs.c
 CFLAGS+= -Wall
 .endif
 
-CFLAGS+= -g -I${.CURDIR}/../../sys/ -DNATPT
+CFLAGS+= -g -I${.CURDIR}/../natptconfig -DNATPT
 
 LDADD+=	-L${.CURDIR}/../libinet6 -L${.CURDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
@@ -41,5 +42,7 @@ MAN=	natptlog.8
 etags:
 		etags *.[ch] ../natptconfig/showsubs.c
 
+
+.PATH: ${.CURDIR}/../natptconfig
 
 .include <bsd.prog.mk>

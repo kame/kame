@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.5 2000/02/18 16:28:31 itojun Exp $
+ *	$Id: natptlog.c,v 1.6 2000/03/09 02:53:51 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -404,8 +404,8 @@ hexdump16(int priority, char *buffer, int len)
     int		 i, j;
     int		 offh, offc;
     int		 nbytes;
-    u_char	*dbyte;
-    u_char	 Wow[128];
+    char	*dbyte;
+    char	 Wow[128];
 
     dbyte = buffer;
     memset(Wow, ' ', sizeof(Wow));
@@ -638,10 +638,13 @@ sighandler(int sig)
 	{
 	    int		iter;
 
-	    sigemptyset(&mask);
+	    if (sigemptyset(&mask) < 0)
+		log(LOG_ERR, "Unable to initialize a signal set.");
+
 	    for (iter = 0; iter < sizeof(signals) / sizeof(signals[0]); iter++)
 	    {
-		sigaddset(&mask, signals[iter]);
+		if (sigaddset(&mask, signals[iter]) < 0)
+		    log(LOG_ERR, "Unable to adds to the signal set");
 	    }
 
 	    for (iter = 0; iter < sizeof(signals) / sizeof(signals[0]); iter++)
