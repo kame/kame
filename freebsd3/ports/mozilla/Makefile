@@ -5,9 +5,8 @@
 # $FreeBSD: ports/www/mozilla/Makefile,v 1.42 2000/04/21 02:36:44 reg Exp $
 #
 
-PORTNAME=	mozilla
-PORTVERSION= 	M15
-CATEGORIES=	www ipv6
+DISTNAME=	mozilla-M15
+CATEGORIES=	www #ipv6
 MASTER_SITES=	ftp://ftp.mozilla.org/pub/mozilla/releases/${PORTVERSION:S/M/m/}/src/
 DISTNAME=	${PORTNAME}-source-${PORTVERSION}
 
