@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.51 2001/07/06 06:21:43 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.52 2001/07/24 08:06:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -227,7 +227,9 @@
  *	others: do not increase refcnt for ifp->if_addrlist and in_ifaddr.
  *		use IFAFREE once when ifaddr is disconnected from
  *		ifp->if_addrlist and in_ifaddr.  IFAFREE frees ifaddr when
- *		ifa_refcnt goes negative.
+ *		ifa_refcnt goes negative.  in KAME environment, IFAREF is
+ *		provided as a compatibility wrapper (use it instead of
+ *		ifa_refcnt++ to reduce #ifdef).
  *
  * - ifnet.if_lastchange
  *	freebsd, bsdi, netbsd-current (jun 14 2001-),
