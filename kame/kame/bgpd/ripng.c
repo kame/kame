@@ -1326,6 +1326,11 @@ rip_make_dump(ripif)
 	  }
 	  memcpy(np, &agg->rt_ripinfo, sizeof(struct ripinfo6));
 	  np->rip6_metric = MIN(np->rip6_metric+1, RIPNG_METRIC_UNREACHABLE);
+	  IFLOG(LOG_RIP)
+	    syslog(LOG_DEBUG, "RIPng DUMP\t%d\t%s/%d (%d) on %s",
+		   nn, ip6str(&np->rip6_dest, 0),
+		   np->rip6_plen, np->rip6_metric,
+		   ripif->rip_ife->ifi_ifn->if_name);
 	  np++;  /* nibbing */ 
 	  nn++;  /* count   */	    
 	  agg->rt_aggr.ag_flags |= AGGR_ADVDONE;
