@@ -2,7 +2,7 @@ SRCDIR=	${.CURDIR}/../../kame/libipsec
 
 LIB=	ipsec
 CFLAGS+=-g -Wall -Werror
-CPPFLAGS+=-DIPSEC_DEBUG -DIPSEC -DINET6 -I. -DYY_NO_UNPUT
+CPPFLAGS+=-DIPSEC_DEBUG -DIPSEC -DINET6 -I. -I${SRCDIR} -DYY_NO_UNPUT
 
 .PATH:	${SRCDIR}
 #${.CURDIR}/../../sys/netkey
