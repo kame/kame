@@ -77,7 +77,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_debug.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_debug.c,v 1.7 2000/12/03 07:10:20 kjc Exp $";
+static char rcsid[] = "$Id: res_debug.c,v 1.8 2004/06/15 07:57:35 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/param.h>
@@ -86,9 +86,9 @@ static char rcsid[] = "$Id: res_debug.c,v 1.7 2000/12/03 07:10:20 kjc Exp $";
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #define MAX_KEY_BASE64 NS_MD5RSA_MAX_BASE64
-#endif /* __FreeBSD__ >= 3 */
+#endif
 
 #include <ctype.h>
 #include <netdb.h>
@@ -964,10 +964,11 @@ const struct res_sym __p_type_syms[] = {
 int
 __sym_ston(syms, name, success)
 	const struct res_sym *syms;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	const
-#endif /* __FreeBSD__ >= 3 */
+#ifdef __FreeBSD__
+	const char *name;
+#else
 	char *name;
+#endif
 	int *success;
 {
 	for (/*nothing*/; syms->name != 0; syms++) {
@@ -1525,10 +1526,11 @@ loc_ntoa(binary, ascii)
 /* Return the number of DNS hierarchy levels in the name. */
 int
 __dn_count_labels(name)
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	const
-#endif /* __FreeBSD__ >= 3 */
+#ifdef __FreeBSD__
+	const char *name;
+#else
 	char *name;
+#endif
 {
 	int i, len, count;
 
