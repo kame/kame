@@ -1816,6 +1816,6 @@ usage()
 #endif		      
 		      "] [-a [aAclsg]] [-b sockbufsiz] [-c count] \n\
              [-I interface] [-i wait] [-l preload] [-p pattern] [-S sourceaddr]\n\
-             [-s packetsize] [-h hoplimit] [hops...] host\n");
+             [-s packetsize] [-H] [-h hoplimit] [hops...] host\n");
 	exit(1);
 }
