@@ -139,7 +139,8 @@ int set __P((int, char **));
 void get __P((char *));
 int delete __P((char *));
 void dump __P((struct in6_addr *));
-static struct in6_nbrinfo *getnbrinfo __P((struct in6_addr *addr, int ifindex));
+static struct in6_nbrinfo *getnbrinfo __P((struct in6_addr *addr,
+					   int ifindex, int));
 static char *ether_str __P((struct sockaddr_dl *));
 int ndp_ether_aton __P((char *, u_char *));
 void usage __P((void));
@@ -575,7 +576,7 @@ again:;
 		       if_indextoname(sdl->sdl_index, ifix_buf));
 
 		/* Print neighbor discovery specific informations */
-		nbi = getnbrinfo(&sin->sin6_addr, sdl->sdl_index);
+		nbi = getnbrinfo(&sin->sin6_addr, sdl->sdl_index, 1);
 		if (nbi) {
 			if (nbi->expire > time.tv_sec) {
 				printf(" %-9.9s",
@@ -654,9 +655,10 @@ again:;
 }
 
 static struct in6_nbrinfo *
-getnbrinfo(addr, ifindex)
+getnbrinfo(addr, ifindex, warning)
 	struct in6_addr *addr;
 	int ifindex;
+	int warning;
 {
 	static struct in6_nbrinfo nbi;
 	int s;
@@ -668,7 +670,8 @@ getnbrinfo(addr, ifindex)
 	if_indextoname(ifindex, nbi.ifname);
 	nbi.addr = *addr;
 	if (ioctl(s, SIOCGNBRINFO_IN6, (caddr_t)&nbi) < 0) {
-		warn("ioctl");
+		if (warning)
+			warn("ioctl");
 		close(s);
 		return(NULL);
 	}
@@ -926,7 +929,8 @@ plist()
 					    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 				printf("    %s", host_buf);
 
-				nbi = getnbrinfo(&sin6.sin6_addr, PR.if_index);
+				nbi = getnbrinfo(&sin6.sin6_addr, PR.if_index,
+						 0);
 				if (nbi) {
 					switch(nbi->state) {
 					 case ND6_LLINFO_REACHABLE:
