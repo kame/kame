@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.380 1999/12/27 20:20:10 sumikawa Exp $
+$Id: CHANGELOG,v 1.381 1999/12/27 20:35:40 sumikawa Exp $
 
 <199912>
+Tue Dec 28 05:35:02 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/ja-mnews: add IPv6-ready port directory for
+	  version 1.22.
+
 Tue Dec 28 05:19:33 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/fetchmail: Upgrade to 5.2.1.
 
