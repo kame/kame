@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.111 2003/12/04 12:01:21 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.112 2003/12/04 13:19:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -555,7 +555,7 @@ ip6_mrouter_init(so, m, cmd)
 		return (EOPNOTSUPP);
 
 	if (!m || (m->m_len != sizeof(int *)))
-		return (ENOPROTOOPT);
+		return (EINVAL);
 
 	v = mtod(m, int *);
 	if (*v != 1)
