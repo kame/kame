@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.74 2001/10/02 08:56:44 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.75 2001/10/19 09:47:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,7 +90,20 @@
 static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
 	struct ifnet *));
 
-extern struct ip6protosw in6_gif_protosw;
+extern struct domain inet6domain;
+struct ip6protosw in6_gif_protosw =
+{ SOCK_RAW,	&inet6domain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
+  in6_gif_input, rip6_output,	in6_gif_ctlinput, rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip6_usrreq,
+#endif
+  0,            0,              0,              0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+#endif
+};
 
 extern LIST_HEAD(, gif_softc) gif_softc_list;
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.107 2001/10/15 05:32:34 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.108 2001/10/19 09:47:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -176,11 +176,6 @@
 #endif /* IPSEC */
 
 #include <netinet6/ip6protosw.h>
-
-#include "gif.h"
-#if NGIF > 0
-#include <netinet6/in6_gif.h>
-#endif
 
 #ifdef MIP6
 #include <netinet6/mip6.h>
@@ -448,22 +443,6 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 };
-
-#if NGIF > 0
-struct ip6protosw in6_gif_protosw =
-{ SOCK_RAW,	&inet6domain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
-  in6_gif_input, rip6_output,	in6_gif_ctlinput, rip6_ctloutput,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  0,
-#else
-  rip6_usrreq,
-#endif
-  0,            0,              0,              0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  &rip6_usrreqs
-#endif
-};
-#endif /*NGIF*/
 
 #ifdef MIP6
 struct ip6protosw mip6_tunnel_protosw =
