@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.26 2000/05/08 08:04:30 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.27 2000/05/24 15:04:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -467,8 +467,6 @@ ah4_input(m, va_alist)
 	} else {
 		/*
 		 * strip off AH.
-		 * We do deep-copy since KAME requires that
-		 * the packet is placed in a single external mbuf.
 		 */
 		size_t stripsiz = 0;
 
@@ -482,6 +480,10 @@ ah4_input(m, va_alist)
 
 		ip = mtod(m, struct ip *);
 #ifndef PULLDOWN_TEST
+		/*
+		 * We do deep-copy since KAME requires that
+		 * the packet is placed in a single external mbuf.
+		 */
 		ovbcopy((caddr_t)ip, (caddr_t)(((u_char *)ip) + stripsiz), off);
 		m->m_data += stripsiz;
 		m->m_len -= stripsiz;
@@ -857,8 +859,6 @@ ah6_input(mp, offp, proto)
 	} else {
 		/*
 		 * strip off AH.
-		 * We do deep-copy since KAME requires that
-		 * the packet is placed in a single mbuf.
 		 */
 		size_t stripsiz = 0;
 		char *prvnxtp;
@@ -881,6 +881,10 @@ ah6_input(mp, offp, proto)
 
 		ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
+		/*
+		 * We do deep-copy since KAME requires that
+		 * the packet is placed in a single mbuf.
+		 */
 		ovbcopy((caddr_t)ip6, ((caddr_t)ip6) + stripsiz, off);
 		m->m_data += stripsiz;
 		m->m_len -= stripsiz;
