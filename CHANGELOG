@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1312 2000/10/03 09:30:09 jinmei Exp $
+$KAME: CHANGELOG,v 1.1313 2000/10/03 11:57:54 jinmei Exp $
 
 <200010>
+2000-10-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrouter_addifreq): use rtrequest1
+	with a proper interface address for bsdi4, instead of rtrequest.
+	This is necessary for the function to work correctly for a p2p
+	interface.
+
 2000-10-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi3/sys/netinet/tcp_subr.c (ipsec4_hdrsiz_tcp):
 	* bsdi4/sys/netinet/tcp_subr.c (ipsec_hdrsiz_tcp):
