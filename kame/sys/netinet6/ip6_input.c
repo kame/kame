@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.174 2001/02/09 06:17:41 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.175 2001/02/10 02:38:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1800,18 +1800,18 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				     (IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) == 0)
 					break;
 
-				 /*
-				  * We also require super-user privilege for
-				  * the option.
-				  * See the comments on IN6_HOPOPTS.
-				  */
+				/*
+				 * We also require super-user privilege for
+				 * the option.
+				 * See the comments on IN6_HOPOPTS.
+				 */
 				if (!privileged)
 					break;
 
-				 /*
-				  * Save a dst opt header before a routing
-				  * header if the user wanted.
-				  */
+				/*
+				 * Save a dst opt header before a routing
+				 * header if the user wanted.
+				 */
 				if (rthdr_exist && pass_rthdr == 0 &&
 				    (in6p->in6p_flags & IN6P_RTHDRDSTOPTS)) {
 					if (prevctl && prevctl->dest1) {
