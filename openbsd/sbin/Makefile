@@ -2,6 +2,6 @@
 
 SUBDIR+=ifconfig sysctl
 
-SUBDIR+=ping6 rtsol ip6addrctl
+SUBDIR+=ping6 rtsol
 
 .include <bsd.subdir.mk>
