@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.9 2001/06/20 12:45:33 jinmei Exp $
+$KAME: FAQ,v 1.10 2001/06/20 12:45:49 jinmei Exp $
 
 
 GENERAL
@@ -48,7 +48,7 @@ Which version of IPv6/IPsec does KAME support?
 	kit/IMPLEMENTATION in the distribution kit, or
 	http://www2.kame.net/dev/cvsweb.cgi/kit/IMPLEMENTATION.
 
-Q: Why does KAME separates ping6 from ping (for IPv4), and traceroute6 from
+Q: Why does KAME separate ping6 from ping (for IPv4), and traceroute6 from
    traceroute (for IPv4)?
 	TBD
 
