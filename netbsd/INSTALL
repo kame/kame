@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.21 2002/01/11 15:20:59 jinmei Exp $
+$Id: INSTALL,v 1.22 2002/01/11 15:22:02 jinmei Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -109,7 +109,7 @@ E-4. The directory ./etc/rc.d/ may contain startup scripts to support
      lines to /etc/rc.conf:
 	critical_filesystems_beforenet='/usr/local'
 	PATH=/usr/local/v6/sbin:/usr/local/v6/bin:$PATH
-     (the first line should contain enough paths to mount /usr/local/*).
+     (the first line should contain enough paths to mount /usr/local/v6/*).
 
 E-5. There are batch of documents installed into /usr/local/v6/man
      and /usr/local/v6/share/doc.  Please read them as necessary.
