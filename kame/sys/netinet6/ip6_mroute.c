@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.46 2001/04/04 05:17:30 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.47 2001/07/23 06:52:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -118,7 +118,7 @@ static int register_send __P((struct ip6_hdr *, struct mif6 *,
  * Globals.  All but ip6_mrouter, ip6_mrtproto and mrt6stat could be static,
  * except for netstat or debugging purposes.
  */
-struct socket  *ip6_mrouter  = NULL;
+struct socket  *ip6_mrouter = NULL;
 int		ip6_mrouter_ver = 0;
 int		ip6_mrtproto = IPPROTO_PIM;    /* for netstat only */
 struct mrt6stat	mrt6stat;
