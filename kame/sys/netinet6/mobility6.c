@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.18 2003/01/22 00:34:08 suz Exp $	*/
+/*	$KAME: mobility6.c,v 1.19 2003/02/14 12:07:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,17 +108,22 @@ mobility6_input(mp, offp, proto)
 	mh6len = (mh6->ip6m_len + 1) << 3;
 	if (mh6len < IP6M_MINLEN) {
 		/* too small */
-		m_freem(m);
 		ip6stat.ip6s_toosmall++;
+		/* 9.2 discard and SHOULD send ICMP Parameter Problem */
+		icmp6_error(m, ICMP6_PARAM_PROB,
+			    ICMP6_PARAMPROB_HEADER,
+			    (caddr_t)&mh6->ip6m_len - (caddr_t)ip6);
 		return (IPPROTO_DONE);
 	}
 
 	if (mh6->ip6m_pproto != IPPROTO_NONE) {
 		mip6log((LOG_INFO, "%s:%d: Payload Proto %d.\n",
 			__FILE__, __LINE__, mh6->ip6m_pproto));
-		/* 9.2.1 silently discard */
-		m_freem(m);
+		/* 9.2 discard and SHOULD send ICMP Parameter Problem */
 		mip6stat.mip6s_payloadproto++;
+		icmp6_error(m, ICMP6_PARAM_PROB,
+			    ICMP6_PARAMPROB_HEADER,
+			    (caddr_t)&mh6->ip6m_pproto - (caddr_t)ip6);
 		return (IPPROTO_DONE);
 	}
 
