@@ -140,6 +140,8 @@ extern int pmtu_expire;
 #ifndef HAVE_NRL_INPCB
 static int icmp6_rip6_input __P((struct mbuf **, int));
 #endif
+static void icmp6_mtudisc_update __P((struct in6_addr *, struct icmp6_hdr *,
+				      struct mbuf *));
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
@@ -463,74 +465,14 @@ icmp6_input(mp, offp, proto)
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_pkttoobig);
 		if (code != 0)
 			goto badcode;
-	    {
-		u_int mtu = ntohl(icmp6->icmp6_mtu);
-		struct rtentry *rt = NULL;
-		struct sockaddr_in6 sin6;
-#ifdef __bsdi__
-		struct route_in6 ro6;
-#endif
 
-		if (icmp6len < sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr)) {
-			icmp6stat.icp6s_tooshort++;
-			goto freeit;
-		}
-#ifndef PULLDOWN_TEST
-		IP6_EXTHDR_CHECK(m, off,
-			sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
-			IPPROTO_DONE);
-		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
-#else
-		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, off,
-			sizeof(*icmp6) + sizeof(struct ip6_hdr));
-		if (icmp6 == NULL) {
-			icmp6stat.icp6s_tooshort++;
-			return IPPROTO_DONE;
-		}
-#endif
 		code = PRC_MSGSIZE;
-		bzero(&sin6, sizeof(sin6));
-		sin6.sin6_family = PF_INET6;
-		sin6.sin6_len = sizeof(struct sockaddr_in6);
-		sin6.sin6_addr = ((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		rt = rtalloc1((struct sockaddr *)&sin6, 1);	/*clone*/
-		if (!rt || (rt->rt_flags & RTF_HOST) == 0) {
-			if (rt)
-				RTFREE(rt);
-			rt = icmp6_mtudisc_clone((struct sockaddr *)&sin6);
-		}
-#else
-#ifdef __FreeBSD__
-		rt = rtalloc1((struct sockaddr *)&sin6, 0,
-			RTF_CLONING | RTF_PRCLONING);
-#else
-#ifdef __bsdi__
-		bcopy(&sin6, &ro6.ro_dst, sizeof(struct sockaddr_in6));
-		ro6.ro_rt = 0;
-		rtcalloc((struct route *)&ro6);
-		rt = ro6.ro_rt;
-#else
-#error no case for this particular operating system
-#endif
-#endif
-#endif
 
-		if (rt && (rt->rt_flags & RTF_HOST)
-		    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {
-			if (mtu < IPV6_MMTU) {
-				/* xxx */
-				rt->rt_rmx.rmx_locks |= RTV_MTU;
-			} else if (mtu < rt->rt_ifp->if_mtu &&
-				   rt->rt_rmx.rmx_mtu > mtu) {
-				rt->rt_rmx.rmx_mtu = mtu;
-			}
-		}
-		if (rt)
-			RTFREE(rt);
-
+		/*
+		 * Updating the path MTU will be done after examining
+		 * intermediate extension headers.
+		 */
 		goto deliver;
-	    }
 		break;
 
 	case ICMP6_TIME_EXCEEDED:
@@ -822,19 +764,20 @@ icmp6_input(mp, offp, proto)
 		int eoff = off + sizeof(struct icmp6_hdr) +
 			sizeof(struct ip6_hdr);
 		struct ip6ctlparam ip6cp;
+		struct in6_addr *finaldst = NULL;
+		int icmp6type = icmp6->icmp6_type;
+		struct ip6_frag *fh;
+		struct ip6_rthdr *rth;
+		struct ip6_rthdr0 *rth0;
+		int rthlen;
 
 		while (1) { /* XXX: should avoid inf. loop explicitly? */
 			struct ip6_ext *eh;
 
 			switch(nxt) {
-			case IPPROTO_ESP:
-			case IPPROTO_NONE:
-				goto passit;
 			case IPPROTO_HOPOPTS:
 			case IPPROTO_DSTOPTS:
-			case IPPROTO_ROUTING:
 			case IPPROTO_AH:
-			case IPPROTO_FRAGMENT:
 #ifndef PULLDOWN_TEST
 				IP6_EXTHDR_CHECK(m, 0, eoff +
 						 sizeof(struct ip6_ext),
@@ -849,14 +792,96 @@ icmp6_input(mp, offp, proto)
 					return IPPROTO_DONE;
 				}
 #endif
+				
 				if (nxt == IPPROTO_AH)
 					eoff += (eh->ip6e_len + 2) << 2;
-				else if (nxt == IPPROTO_FRAGMENT)
-					eoff += sizeof(struct ip6_frag);
 				else
 					eoff += (eh->ip6e_len + 1) << 3;
 				nxt = eh->ip6e_nxt;
 				break;
+			case IPPROTO_ROUTING:
+				/*
+				 * When the erroneous packet contains a
+				 * routing header, we should examine the
+				 * header to determine the final destination.
+				 * Otherwise, we can't properly update
+				 * information that depends on the final
+				 * destination (e.g. path MTU).
+				 */
+#ifndef PULLDOWN_TEST
+				IP6_EXTHDR_CHECK(m, 0, eoff + sizeof(*rth),
+						 IPPROTO_DONE);
+				rth = (struct ip6_rthdr *)(mtod(m, caddr_t)
+							   + eoff);
+#else
+				IP6_EXTHDR_GET(rth, struct ip6_rthdr *, m,
+					eoff, sizeof(*rth));
+				if (rth == NULL) {
+					icmp6stat.icp6s_tooshort++;
+					return IPPROTO_DONE;
+				}
+#endif
+				rthlen = (rth->ip6r_len + 1) << 3;
+				/*
+				 * XXX: currently there is no
+				 * officially defined type other
+				 * than type-0.
+				 * Note that if the segment left field
+				 * is 0, all intermediate hops must
+				 * have been passed.
+				 */
+				if (rth->ip6r_segleft &&
+				    rth->ip6r_type == IPV6_RTHDR_TYPE_0) {
+					int hops;
+
+#ifndef PULLDOWN_TEST
+					IP6_EXTHDR_CHECK(m, 0, eoff + rthlen,
+							 IPPROTO_DONE);
+					rth0 = (struct ip6_rthdr0 *)(mtod(m, caddr_t) + eoff);
+#else
+					IP6_EXTHDR_GET(rth0,
+						       struct ip6_rthdr0 *, m,
+						       eoff, rthlen);
+					if (rth0 == NULL) {
+						icmp6stat.icp6s_tooshort++;
+						return IPPROTO_DONE;
+					}
+#endif
+					/* just ignore a bogus header */
+					if ((rth0->ip6r0_len % 2) == 0 &&
+					    (hops = rth0->ip6r0_len/2))
+						finaldst = (struct in6_addr *)(rth0 + 1) + (hops - 1);
+				}
+				eoff += rthlen;
+				nxt = rth->ip6r_nxt;
+				break;
+			case IPPROTO_FRAGMENT:
+#ifndef PULLDOWN_TEST
+				IP6_EXTHDR_CHECK(m, 0, eoff +
+						 sizeof(struct ip6_frag),
+						 IPPROTO_DONE);
+				fh = (struct ip6_frag *)(mtod(m, caddr_t)
+							 + eoff);
+#else
+				IP6_EXTHDR_GET(fh, struct ip6_frag *, m,
+					eoff, sizeof(*fh));
+				if (fh == NULL) {
+					icmp6stat.icp6s_tooshort++;
+					return IPPROTO_DONE;
+				}
+#endif
+				/*
+				 * Data after a fragment header is meaningless
+				 * unless it is the first fragment.
+				 */
+				if (fh->ip6f_offlg & IP6F_OFF_MASK)
+					goto notify;
+
+				eoff += sizeof(struct ip6_frag);
+				nxt = fh->ip6f_nxt;
+				break;
+			case IPPROTO_ESP:
+			case IPPROTO_NONE:
 			default:
 				goto notify;
 			}
@@ -872,6 +897,12 @@ icmp6_input(mp, offp, proto)
 			return IPPROTO_DONE;
 		}
 #endif
+		if (icmp6type == ICMP6_PACKET_TOO_BIG) {
+			if (finaldst == NULL)
+				finaldst = &((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
+			icmp6_mtudisc_update(finaldst, icmp6, m);
+		}
+
 		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {
@@ -892,7 +923,6 @@ icmp6_input(mp, offp, proto)
 		break;
 	}
 
- passit:
 #ifdef HAVE_NRL_INPCB
 	rip6_input(&m, offp, IPPROTO_ICMPV6);
 #else
@@ -903,6 +933,61 @@ icmp6_input(mp, offp, proto)
  freeit:
 	m_freem(m);
 	return IPPROTO_DONE;
+}
+
+static void
+icmp6_mtudisc_update(dst, icmp6, m)
+	struct in6_addr *dst;
+	struct icmp6_hdr *icmp6;/* we can assume the validity of the pointer */
+	struct mbuf *m;	/* currently unused but added for scoped addrs */
+{
+	u_int mtu = ntohl(icmp6->icmp6_mtu);
+	struct rtentry *rt = NULL;
+	struct sockaddr_in6 sin6;
+#ifdef __bsdi__
+	struct route_in6 ro6;
+#endif
+
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = PF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = *dst;
+	/* sin6.sin6_scope_id = XXX: should be set if DST is a scoped addr */
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	rt = rtalloc1((struct sockaddr *)&sin6, 1);	/*clone*/
+	if (!rt || (rt->rt_flags & RTF_HOST) == 0) {
+		if (rt)
+			RTFREE(rt);
+		rt = icmp6_mtudisc_clone((struct sockaddr *)&sin6);
+	}
+#else
+#ifdef __FreeBSD__
+	rt = rtalloc1((struct sockaddr *)&sin6, 0,
+		      RTF_CLONING | RTF_PRCLONING);
+#else
+#ifdef __bsdi__
+	bcopy(&sin6, &ro6.ro_dst, sizeof(struct sockaddr_in6));
+	ro6.ro_rt = 0;
+	rtcalloc((struct route *)&ro6);
+	rt = ro6.ro_rt;
+#else
+#error no case for this particular operating system
+#endif
+#endif
+#endif
+
+	if (rt && (rt->rt_flags & RTF_HOST)
+	    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {
+		if (mtu < IPV6_MMTU) {
+				/* xxx */
+			rt->rt_rmx.rmx_locks |= RTV_MTU;
+		} else if (mtu < rt->rt_ifp->if_mtu &&
+			   rt->rt_rmx.rmx_mtu > mtu) {
+			rt->rt_rmx.rmx_mtu = mtu;
+		}
+	}
+	if (rt)
+		RTFREE(rt);
 }
 
 /*
