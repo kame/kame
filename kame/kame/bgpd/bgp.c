@@ -110,7 +110,7 @@ bgp_connect_start(struct rpcb *bnp)
 
 /*
  *   connect_try()
- *       Triggerd by SIGALRM (only and only-if).
+ *       Triggerd by SIGALRM (if and only-if).
  */ 
 void
 connect_try(struct rpcb *bnp)
