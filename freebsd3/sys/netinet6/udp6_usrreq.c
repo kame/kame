@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.33 2000/07/26 15:53:09 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.34 2000/07/27 03:08:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,6 +178,19 @@ udp6_input(mp, offp, proto)
 
 	if (plen != ulen) {
 		udpstat.udps_badlen++;
+		goto bad;
+	}
+
+	/*
+	 * Be proactive about unspecified IPv6 address in source.
+	 * As we use all-zero to indicate unbounded/unconnected pcb,
+	 * unspecified IPv6 address can be used to confuse us.
+	 *
+	 * Note that packets with unspecified IPv6 destination is
+	 * already dropped in ip6_input.
+	 */
+	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
+		/* XXX stat */
 		goto bad;
 	}
 
