@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.166 2003/02/03 09:54:47 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.167 2003/02/03 10:14:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -3127,6 +3127,7 @@ mip6_route_optimize(m)
 	return (error);
 }
 
+#ifdef MIP6_HAIPSEC
 #ifdef IPSEC
 #ifndef __OpenBSD__
 int
@@ -3161,3 +3162,4 @@ mip6_update_ipsecdb(haddr, ocoa, ncoa, haaddr)
 /* __OpenBSD__ part.  not yet. */
 #endif
 #endif /* IPSEC */
+#endif /* MIP6_HAIPSEC */
