@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.15 2000/01/13 07:27:47 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.16 2000/01/13 23:24:04 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -984,7 +984,7 @@ pk_sendupdate(iph2)
 				4,	/* XXX static size of window */
 				k->keymat->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
-				0, s->lifebyte, s->lifetime, 0,
+				0, s->lifebyte * 1024, s->lifetime, 0,
 				iph2->seq) < 0) {
 			plog(logp, LOCATION, NULL,
 				"libipsec failed send update (%s)\n",
@@ -1177,7 +1177,7 @@ pk_sendadd(iph2)
 				4,	/* XXX static size of window */
 				k->keymat_p->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
-				0, s->lifebyte, s->lifetime, 0,
+				0, s->lifebyte * 1024, s->lifetime, 0,
 				iph2->seq) < 0) {
 			plog(logp, LOCATION, NULL,
 				"libipsec failed send add (%s)\n", ipsec_strerror());
