@@ -1,9 +1,9 @@
 # New ports collection makefile for:   ethereal
-# Version required:    0.7.5
+# Version required:    0.7.8
 # Date created:        10 August 1998
 # Whom:                Bill Fumerola <billf@chc-chimes.com>
 #
-# $Id: Makefile,v 1.3 1999/11/25 11:00:20 sumikawa Exp $
+# $Id: Makefile,v 1.4 1999/11/25 11:03:43 sumikawa Exp $
 #
 
 DISTNAME=	ethereal-0.7.8
