@@ -36,7 +36,7 @@
  * - privileged process
  *	NetBSD, FreeBSD 3
  *		struct proc *p;
- *		if (p && !suser(p->p_ucred, &p->p_acflag)
+ *		if (p && !suser(p->p_ucred, &p->p_acflag))
  *			privileged;
  *	OpenBSD, BSDI 3, FreeBSD 2
  *		struct socket *so;
@@ -101,6 +101,9 @@
  * - splnet()
  *	NetBSD 1.4 or later requires splsoftnet().
  *	other operating systems use splnet().
+ *
+ * - mtod()
+ *	NEVER USE IT!
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
