@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.15 2000/07/02 14:17:37 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.16 2000/08/12 00:37:41 itojun Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -938,7 +938,7 @@ zero_entry6(struct mbuf *m)
 	struct ip6_fw_chain *fcp;
 	int s;
 
-	if (m) {
+	if (m && m->m_len != 0) {
 		if (m->m_len != sizeof(struct ip6_fw))
 			return(EINVAL);
 		frwl = mtod(m, struct ip6_fw *);
