@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.18 2000/12/12 16:59:40 thorpej Exp $	*/
+/*	$KAME: main.c,v 1.19 2000/12/13 23:24:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,7 +187,11 @@ parse(ac, av)
 	extern int yydebug;
 #endif
 
-	pname = *av;
+	pname = strrchr(*av, '/');
+	if (pname)
+		pname++;
+	else
+		pname = *av;
 
 	while ((c = getopt(ac, av, "d:Fp:a:f:l:vZ"
 #ifdef YYDEBUG
