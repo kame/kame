@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1442 2000/12/20 06:11:48 itojun Exp $
+$KAME: CHANGELOG,v 1.1443 2000/12/21 01:44:46 jinmei Exp $
 
 <200012>
+2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netkey/key.c (key_cmpspidx_withmask): applied the same
+	fix as one introduced on 2000-12-07 (see below) for inbond
+	packets.
+
 Wed Dec 20 14:41:11 JST 2000  itojun@iijlab.net
 	* netbsd/lib/libinet6/getaddrinfo.c: experimental support for A6
 	  records, only for cases where all 128 bits are supplied in a single
