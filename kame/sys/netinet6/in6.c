@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.184 2001/04/11 18:56:38 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.185 2001/04/27 07:22:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1869,6 +1869,9 @@ in6_ifinit(ifp, ia, sin6, newhost)
 			continue;
 		ifacount++;
 	}
+
+	ia->ia_addr = *sin6;
+
 	if (ifacount <= 1 && ifp->if_ioctl &&
 	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia))) {
 		splx(s);
@@ -1876,7 +1879,6 @@ in6_ifinit(ifp, ia, sin6, newhost)
 	}
 	splx(s);
 
-	ia->ia_addr = *sin6;
 	ia->ia_ifa.ifa_metric = ifp->if_metric;
 
 	/* we could do in(6)_socktrim here, but just omit it at this moment. */
