@@ -1,5 +1,7 @@
-#	$KAME: Makefile,v 1.7 2000/11/08 06:15:15 itojun Exp $
+#	$KAME: Makefile,v 1.8 2002/02/27 03:54:02 itojun Exp $
 
+# regress test for blowfish/des assembly version can be found in NetBSD
+# regress/sys/crypto.
 OPSYS!=	uname -s
 SUBDIR=	des blowfish cast128 rijndael twofish md5
 
