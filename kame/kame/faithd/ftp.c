@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.7 2000/05/31 03:06:07 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.8 2000/07/28 07:05:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -508,7 +508,7 @@ passivefail:
 		error = setsockopt(wport6, IPPROTO_IPV6, IPV6_FAITH,
 			&on, sizeof(on));
 		if (error == -1)
-			exit_error("setsockopt(IPV6_FAITH): %s", ERRSTR);
+			exit_failure("setsockopt(IPV6_FAITH): %s", ERRSTR);
 	    }
 #endif
 		error = bind(wport6, (struct sockaddr *)sin6, sin6->sin6_len);
