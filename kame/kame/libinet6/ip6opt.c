@@ -456,13 +456,14 @@ inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 		return(-1);
 
 	/* Calculate the padding length. */
+	currentlen += 2 + len;	/* 2 means "type + len" */
 	if (currentlen % align)
 		padlen = align - (currentlen % align);
 
 	/* The option must fit in the extension header buffer. */
-	currentlen += padlen + 2 + len;
+	currentlen += padlen;
 	if (extlen &&		/* XXX: right? */
-	    currentlen > extlen) /* 2 means "type + len" */
+	    currentlen > extlen)
 		return(-1);
 
 	if (extbuf) {
