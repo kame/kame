@@ -1,61 +1,72 @@
-Installation procedure - preparation of the tree
-KAME project
-$Id: INSTALL,v 1.10 1999/11/08 13:29:13 kazu Exp $
+	Installation procedure - preparation of the tree
+	KAME project
+	$Id: INSTALL,v 1.11 1999/12/09 12:23:25 kazu Exp $
 
+Let's call the entire file-tree under this directory "the KAME tree".
 
-KAME build tree shares parts of the tree among operating system
-platforms.  The "kame" directory is shared among "netbsd", "freebsd2",
-and other platforms.  You'll first need to make a complete tree from
-the distributed tree.
+This directory contains several information files and two
+directories. The "kame" directory contains files created by the KAME
+project, which are shareable among NetBSD, FreeBSD, and other
+operating systems.
 
-NOTE: On some platforms it is possible to perform "make obj" before
-the build.  However, it is not recommended since it will cause
-troubles with anoncvs operation.  For example, "make update" target in
-the top-level Makefile will become unusable.  Do not perform "make
-obj" unless you are ready to tackle those troubles.
+The other directory is for your target operating system. In most
+cases, sufficient files are provided and ready for IPv6. So, you don't
+have to apply any patches.
 
+However, due to license issues, some necessary files are not provided
+for some operating systems. In this case you have to complete the KAME
+tree by yourself (in the step 2).
 
-0. If you have installed KAME kit in the past, you may need to remove
-   files under /usr/local/v6 to avoid conflicts or misuse of old file during
-   build process.  We recommend you to remove the following, at least:
+NOTE: On some operating systems it is possible to perform "make obj"
+before building.  However, it is not recommended since it might cause
+troubles with anoncvs operation.  For example, the "update" target for
+Makefile in the top-level directory will become unusable.  Do not
+perform "make obj" unless you are ready to tackle those troubles.
+
+0. If you have an installed KAME kit in the past, you may need to
+   remove the files under "/usr/local/v6" to avoid conflicts or misuse
+   of the old files during building.  We recommend you to remove the
+   following, at least:
 	/usr/local/v6/lib/*
-   Also, do not forget to update /usr/include in step 5 (see below),
-   otherwise include files and source code become out-of-sync.
-  
-1. Identify your target operating system, by looking at document named
-   "VERSION".  Suppose the target is "netbsd".
+   Also, do not forget to update "/usr/include" in step 5 (see below),
+   otherwise the include files and source code become out-of-sync.
 
-2. Be sure to have complete tree under your target directory ("netbsd").
-   In some cases you'll need to bring in vanilla distribution into
-   subdirectories and perform "patch" operation.  Consult target directory-
-   dependent document for details.
+1. See the "VERSION" file and identify a symbol name for your target
+   operating system. For the rest of this document, we assume "netbsd"
+   for explanation.
+  
+2. Be sure to have the complete KAME tree. In some cases you'll need
+   to get sources and put them into the target directory, then perform
+   "patch" operations.  Please read the documents under your target
+   directory for more information.
 
 3. Invoke the following:
 	% make TARGET=netbsd prepare
-   This will create necessary symbolic links for the build (from TARGET
-   tree to "kame" tree).
-   NOTE: You'll need "perl" interpreter for invoking this.
+   This will create necessary symbolic links for building (from the
+   "netbsd" tree to the "kame" tree).  NOTE: You'll need the "perl"
+   interpreter to invoke this.
 
-4. Some part of the tree will be compiled, only if there are certain libraries
-   installed beforehand:
+4. Some parts of the KAME tree will be compiled, only if there are
+   certain libraries installed beforehand:
 	usr.sbin/tcpdump:
-		If There is SSLeay or OpenSSL installed beforehand, 
+		If there is SSLeay or OpenSSL installed beforehand, 
 		tcpdump will let you look inside IPsec packet (-E option).
-	usr.bin/racoon:
+	usr.sbin/racoon:
 		Compiles only if SSLeay or OpenSSL is installed beforehand.
-   Please install those libraries before building KAME tree.
+   Please install those libraries before building.
 
-   We support the following installations in build tree:
-   - you installed SSLeay, with default installation path
-   - you installed OpenSSL, with default installation path
+   We support the following installations.
+   - You installed SSLeay, with default installation path
+   - You installed OpenSSL, with default installation path
 	This means that you have given no option to "./configure".
-   - you installed SSLeay, via FreeBSD ports/NetBSD pkgsrc system
-   - you installed OpenSSL, via FreeBSD ports/NetBSD pkgsrc system.
+   - You installed SSLeay, via FreeBSD ports/NetBSD pkgsrc system
+   - You installed OpenSSL, via FreeBSD ports/NetBSD pkgsrc system.
 	Note that we do not support ports-current/pkgsrc-current.  Please
 	stick to the ports/pkgsrc came the FreeBSD/NetBSD you are using.
-   If you install SSLeay/OpenSSL with some other ways, KAME build tree
-   may fail to find SSLeay/OpenSSL and omit compilation of, for example,
-   usr.sbin/racoon.
 
-5. Go down to the target operating system you have specified, and read
-   document named "INSTALL".  Good luck!
+   If you install SSLeay/OpenSSL with some other ways, the KAME tree
+   may fail to find SSLeay/OpenSSL and omit compilation of, for
+   example, usr.sbin/racoon.
+
+5. Go down to the target directory that you have specified(e.g
+   "netbsd"), and read document named "INSTALL".  Good luck!
