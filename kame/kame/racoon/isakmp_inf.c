@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.38 2000/07/06 13:46:18 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.39 2000/07/14 11:22:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -187,6 +187,50 @@ isakmp_info_recv(iph1, msg0)
 		vfree(msg);
 
 	return 0;
+}
+
+/*
+ * send Delete payload (for ISAKMP SA) in Informational exchange.
+ */
+int
+isakmp_info_send_d1(iph1)
+	struct ph1handle *iph1;
+{
+	struct saproto *pr;
+	struct isakmp_pl_d *d;
+	vchar_t *payload = NULL;
+	int tlen;
+	int error = 0;
+
+	if (iph1->status != PHASE2ST_ESTABLISHED)
+		return 0;
+
+	/* create delete payload */
+
+	/* send SPIs of inbound SAs. */
+	/* XXX should send outbound SAs's ? */
+	tlen = sizeof(*d) + sizeof(pr->spi);
+	payload = vmalloc(tlen);
+	if (payload == NULL) {
+		plog(logp, LOCATION, NULL, 
+			"failed to get buffer for payload.\n");
+		return errno;
+	}
+
+	d = (struct isakmp_pl_d *)payload->v;
+	d->h.np = ISAKMP_NPTYPE_NONE;
+	d->h.len = htons(tlen);
+	d->doi = htonl(IPSEC_DOI);
+	d->proto_id = IPSECDOI_PROTO_ISAKMP;
+	d->spi_size = sizeof(isakmp_index);
+	d->num_spi = htons(1);
+	memcpy(d + 1, &iph1->index, sizeof(isakmp_index));
+
+	error = isakmp_info_send_common(iph1, payload,
+					ISAKMP_NPTYPE_D, 0);
+	vfree(payload);
+
+	return error;
 }
 
 /*

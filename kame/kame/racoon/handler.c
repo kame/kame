@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.28 2000/07/06 13:46:18 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.29 2000/07/14 11:22:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -264,6 +264,11 @@ flushph1()
 
 	for (p = LIST_FIRST(&ph1tree); p; p = next) {
 		next = LIST_NEXT(p, chain);
+
+		/* send delete information */
+		if (p->status == PHASE1ST_ESTABLISHED) 
+			isakmp_info_send_d1(p);
+
 		remph1(p);
 		delph1(p);
 	}
