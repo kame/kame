@@ -7,7 +7,7 @@ CFLAGS+=-DIPSEC_DEBUG -DIPSEC -DINET6
 .PATH:	${SRCDIR} ${.CURDIR}/../../sys/netkey
 SRCS=	pfkey.c pfkey_dump.c
 SRCS+=	ipsec_strerror.c policy_parse.y policy_token.l
-SRCS+=	ipsec_get_policylen.c
+SRCS+=	ipsec_get_policylen.c ipsec_dump_policy.c
 SRCS+=	key_debug.c
 LDADD+=	-ll -ly
 CLEANFILES+=	y.tab.c y.tab.h
