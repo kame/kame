@@ -140,7 +140,7 @@ struct host_info *host;
 
     if (!sa)
 	return;
-    switch (sa->sa_family) {
+    switch (af = sa->sa_family) {
     case AF_INET:
 	ap = (char *)&((struct sockaddr_in *)sa)->sin_addr;
 	alen = sizeof(struct in_addr);
