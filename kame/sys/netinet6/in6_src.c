@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.127 2003/02/07 10:17:08 suz Exp $	*/
+/*	$KAME: in6_src.c,v 1.128 2003/03/28 08:11:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -414,8 +414,10 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 					mbu_ia_best = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
 						&ia_addr);
-					if (mbu_ia_best)
+					if (mbu_ia_best
+					    && !MIP6_IS_BU_WAITA_STATE(mbu_ia_best))
 						break;
+					mbu_ia_best = NULL;
 				}
 			}
 			if (ia->ia6_flags & IN6_IFF_HOME) {
@@ -435,8 +437,10 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 					mbu_ia = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
 						&ia_addr);
-					if (mbu_ia)
+					if (mbu_ia
+					    && !MIP6_IS_BU_WAITA_STATE(mbu_ia))
 						break;
+					mbu_ia = NULL;
 				}
 			}
 			/*
