@@ -298,15 +298,11 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			}
 #endif
 			default:
-				if (inet_ntop(afd->a_af, addr, numaddr,
-					      sizeof(numaddr))
-				    == NULL)
-					return ENI_NOHOSTNAME;
+				if (inet_ntop(afd->a_af, addr, host,
+				    hostlen) == NULL)
+					return ENI_SYSTEM;
 				break;
 			}
-			if (strlen(numaddr) > hostlen)
-				return ENI_MEMORY;
-			strcpy(host, numaddr);
 		}
 	}
 	return SUCCESS;
