@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.37 2002/11/01 10:10:08 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.38 2002/11/12 03:12:05 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1094,8 +1094,11 @@ contiguousfail:
 
 		if (IN6_IS_ADDR_LINKLOCAL(&src_sa->sin6_addr)
 		    || IN6_IS_ADDR_LINKLOCAL(&dst_sa->sin6_addr)
+#ifdef MIP6_DISABLE_SITELOCAL
 		    || IN6_IS_ADDR_SITELOCAL(&src_sa->sin6_addr)
-		    || IN6_IS_ADDR_SITELOCAL(&dst_sa->sin6_addr))
+		    || IN6_IS_ADDR_SITELOCAL(&dst_sa->sin6_addr)
+#endif
+		    )
 			goto done;
 
 		mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list,
