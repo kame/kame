@@ -1,7 +1,38 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2113 2002/04/01 13:14:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.2114 2002/04/05 15:47:05 jinmei Exp $
 
 <200204>
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_lookup): specified RTF_CACHE for a
+	newly created route so that the route entry would be subject to
+	cached route management.
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtdrain): added as the callback
+	function for each ND entry as a cached route, and decides
+	whether the entry should really be removed based on the ND state.
+	Entries which are reachable, delay or probe will not be removed.
+	An ND cache to a default route will not be removed either.
+	[FreeBSD4 only]
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.c (rtredirect): set RTF_CACHE before
+	calling rtrequest() so that routes created by redirect will be
+	subject to management of cached routes.
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.c: made cached route management more
+	refined:
+	- we now have 3 parameters to limit the cache; max, hiwat, and
+	  lowat, all of which are configured automatically based on the
+	  kernel memory limit.
+	- rt_draincache() is called when the number of entries are being
+	  beyond "hiwat", and the function tries to keep the entries
+	  between "lowat" and "hiwat".
+	- do not regard static routes as cache.
+	- allow ifa_rtrequest() functions to add a timer entry so that
+	  they can set a refined cleanup function.
+	
 2002-04-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/net/route.c: added cached routes management (see
 	below).
