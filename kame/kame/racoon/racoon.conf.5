@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.108 2003/12/17 01:42:25 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.109 2003/12/17 01:43:57 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -729,6 +729,9 @@ Yokogawa IPsec implementation.
 Some statements may not be handled by
 .Xr racoon 8
 yet.
+.Pp
+Diffie-Hellman computation can take a very long time,
+and may cause unwanted timeouts, specifically when large D-H group is used.
 .\"
 .Sh SECURITY CONSIDERATIONS
 The use of IKE phase 1 aggressive mode is not recommended,
