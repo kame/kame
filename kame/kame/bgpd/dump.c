@@ -193,10 +193,12 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 					rte->rt_gwif->ifi_ifn->if_name);
 				break;
 			case RTPROTO_RIP:
-				fprintf(fp, "gwsrc: ripng(%s/%d on %s, gw=%s)",
+				fprintf(fp, "gwsrc: ripng(%s/%d on %s,\n",
 					ip6str(&rte->rt_gwsrc_entry->rt_ripinfo.rip6_dest, 0),
 					rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
-					rte->rt_gwif->ifi_ifn->if_name,
+					rte->rt_gwif->ifi_ifn->if_name);
+				fprintf(fp, "        ");
+				fprintf(fp, "             %s",
 					ip6str(&rte->rt_gwsrc_entry->rt_gw,
 					       rte->rt_gwif->ifi_ifn->if_index));
 				break;
