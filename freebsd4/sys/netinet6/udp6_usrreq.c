@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.37 2001/08/16 09:58:51 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.38 2001/09/05 02:37:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -464,7 +464,8 @@ udp6_ctlinput(cmd, sa, d)
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
 
-		(void) in6_pcbnotify(&udb, sa, uh.uh_dport, ip6cp->ip6c_src, 
+		(void) in6_pcbnotify(&udb, sa, uh.uh_dport, 
+				     (struct sockaddr *)ip6cp->ip6c_src,
 				     uh.uh_sport, cmd, cmdarg, notify);
 	} else
 		(void) in6_pcbnotify(&udb, sa, 0, (struct sockaddr *)&sa6_src,
