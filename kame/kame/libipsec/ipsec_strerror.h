@@ -28,7 +28,7 @@
  */
 
 extern int ipsec_errcode;
-extern void ipsec_set_strerror(char *str);
+extern void ipsec_set_strerror __P((char *));
 
 #define EIPSEC_NO_ERROR		0	/*success*/
 #define EIPSEC_NOT_SUPPORTED	1	/*not supported*/
