@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.171 2000/12/09 00:07:03 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.172 2000/12/11 19:27:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1243,12 +1243,7 @@ icmp6_mtudisc_update(ip6cp, validated)
 	}
 	/* sin6.sin6_scope_id = XXX: should be set if DST is a scoped addr */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	rt = rtalloc1((struct sockaddr *)&sin6, 1);	/*clone*/
-	if (!rt || (rt->rt_flags & RTF_HOST) == 0) {
-		if (rt)
-			RTFREE(rt);
-		rt = icmp6_mtudisc_clone((struct sockaddr *)&sin6);
-	}
+	rt = icmp6_mtudisc_clone((struct sockaddr *)&sin6);
 #else
 #ifdef __FreeBSD__
 	rt = rtalloc1((struct sockaddr *)&sin6, 0,
