@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.14 2000/01/09 22:59:35 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.15 2000/01/09 23:06:14 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -262,9 +262,13 @@ isakmp_main(msg, remote, local)
 
 	/* ignore commit bit. */
 	if (ISSET(isakmp->flags, ISAKMP_FLAG_C)) {
-		YIPSDEBUG(DEBUG_NOTIFY,
+		if (isakmp->msgid == 0) {
+			isakmp_info_send_nx(isakmp, remote, local,
+				ISAKMP_NTYPE_INVALID_FLAGS, NULL);
 			plog(logp, LOCATION, remote,
-				"ISAKMP_FLAG_C unsupported (ignored).\n"));
+				"Commit bit on phase1 forbidden.\n");
+			return -1;
+		}
 	}
 
 	iph1 = getph1byindex(index);
