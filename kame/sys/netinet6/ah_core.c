@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.54 2003/07/20 18:01:20 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.55 2003/07/20 18:08:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,7 +143,8 @@ static int ah_hmac_sha2_256_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_hmac_sha2_256_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_hmac_sha2_256_result __P((struct ah_algorithm_state *, u_int8_t *, size_t));
+static void ah_hmac_sha2_256_result __P((struct ah_algorithm_state *,
+	u_int8_t *, size_t));
 static int ah_hmac_sha2_384_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_hmac_sha2_384_loop __P((struct ah_algorithm_state *, u_int8_t *,
