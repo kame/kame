@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.48 2001/06/08 04:46:19 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.49 2001/06/11 03:09:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -76,7 +76,7 @@ static int getinet6sysctl __P((int));
 
 extern struct rainfo *ralist;
 
-#ifdef defined(__FreeBSD__) && __FreeBSD__ <= 3	/* XXX: see PORTABILITY */
+#if defined(__FreeBSD__) && __FreeBSD__ <= 3	/* XXX: see PORTABILITY */
 #define LONGLONG "%qd"
 #else
 #define LONGLONG "%lld"
@@ -239,7 +239,7 @@ getconfig(intface)
 	if (val64 < 0 || val64 > 0xffffffff) {
 		syslog(LOG_ERR, "<%s> retrans time (" LONGLONG
 			") on %s out of range",
-		       __FUNCTION__, val64, intface);
+		       __FUNCTION__, (long long)val64, intface);
 		exit(1);
 	}
 	tmp->retranstimer = (u_int32_t)val64;
@@ -383,7 +383,7 @@ getconfig(intface)
 			if (val64 < 0 || val64 > 0xffffffff) {
 				syslog(LOG_ERR, "<%s> vltime (" LONGLONG
 				       ") for %s/%d on %s is out of range",
-				       __FUNCTION__, val64,
+				       __FUNCTION__, (long long)val64,
 				       addr, pfx->prefixlen, intface);
 				exit(1);
 			}
@@ -403,7 +403,7 @@ getconfig(intface)
 				syslog(LOG_ERR,
 				       "<%s> pltime (" LONGLONG
 					") for %s/%d  on %s is out of range",
-				       __FUNCTION__, val64,
+				       __FUNCTION__, (long long)val64,
 				       addr, pfx->prefixlen, intface);
 				exit(1);
 			}
@@ -534,7 +534,7 @@ getconfig(intface)
 		if (val64 < 0 || val64 > 0xffffffff) {
 			syslog(LOG_ERR, "<%s> route lifetime (" LONGLONG
 				") for %s/%d on %s out of range", __FUNCTION__,
-			       (long)val64, addr, rti->prefixlen, intface);
+			       (long long)val64, addr, rti->prefixlen, intface);
 			exit(1);
 		}
 		rti->ltime = (u_int32_t)val64;
