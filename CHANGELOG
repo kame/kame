@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1502 2001/01/23 11:48:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.1503 2001/01/23 13:19:36 itojun Exp $
 
 <200101>
+Tue Jan 23 22:14:08 JST 2001  itojun@iijlab.net
+	* freebsd4: share sys/netinet6/ipsec.h.  sys/netinet6/ipsec6.h is gone.
+	  NOTE: "make TARGET=freebsd4 clean" is necessary on upgrade.
+
 2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_update_ifa, in6_ifscrub):
 	considered cases where multiple addresses with a same single
