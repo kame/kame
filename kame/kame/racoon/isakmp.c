@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.34 2000/01/11 16:45:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.35 2000/01/11 19:29:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -195,7 +195,7 @@ isakmp_handler(so_isakmp)
 	YIPSDEBUG(DEBUG_DNET, PVDUMP(buf));
 
 	/* avoid packets with malicious port/address */
-	if (_INPORTBYSA((struct sockaddr *)&remote) = 0) {
+	if (_INPORTBYSA((struct sockaddr *)&remote) == 0) {
 		plog(logp, LOCATION, (struct sockaddr *)&remote,
 			"possible attack: src port == 0 "
 			"(valid as UDP but not with IKE)\n");
@@ -294,7 +294,7 @@ isakmp_main(msg, remote, local)
 		/* must be same addresses in one stream of a phase at least. */
 		if (cmpsaddr(iph1->remote, remote) != 0) {
 			plog(logp, LOCATION, remote,
-				"remote address mismathed. db=%s\n",
+				"remote address mismatched. db=%s\n",
 				saddr2str(iph1->remote));
 		}
 		/*
