@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.347 2003/08/05 11:47:31 ono Exp $
+	$KAME: IMPLEMENTATION,v 1.348 2003/08/06 23:33:26 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -87,6 +87,7 @@ Table of Contents
 	7.1 ART routing table lookup algorithm
 	7.2 Multipath routing support
 	8. Coding style
+	9. Policy on technology with intellectual property right restriction
 
 1. IPv6
 
@@ -1460,6 +1461,7 @@ libinet6.a has a comple of extensions against libc DNS resolver:
   releases now has it already.
 - Partial A6 chain chasing/DNAME/bit string label support (KAME/BSDI4).
 
+
 2. Network Drivers
 
 KAME requires three items to be added into the standard drivers:
@@ -1638,6 +1640,7 @@ You may want to use "@insert" directive in /etc/pccard.conf to invoke
 (*) exp driver has serious conflict with KAME initialization sequence.
 A workaround is committed into sys/i386/pci/if_exp.c, and should be okay by now.
 
+
 3. Translator
 
 We categorize IPv4/IPv6 translator into 4 types.
@@ -1686,6 +1689,7 @@ For more details, consult kame/kame/faithd/README and RFC3142.
 3.2 IPv6-to-IPv4 header translator
 
 (to be written)
+
 
 4. IPsec
 
@@ -2119,6 +2123,7 @@ be able to interoperate with a picky RFC2401 implementations - if the other
 end checks certain outer IP header fields (like TOS), you will not be able to
 interoperate.
 
+
 5. ALTQ
 
 KAME kit includes ALTQ, which supports FreeBSD3, FreeBSD4, FreeBSD5
@@ -2141,6 +2146,7 @@ steps:
 - build a kernel.
 - before building userland, change netbsd/{lib,usr.sbin,usr.bin}/Makefile
   (or openbsd/foobaa) so that it will visit altq-related sub directories.
+
 
 6. Mobile IPv6
 
@@ -2172,6 +2178,7 @@ Other implementations are also available.
 
 	NEC: http://www.6bone.nec.co.jp/mipv6/ (-13 draft)
 	SFC: http://neo.sfc.wide.ad.jp/~mip6/ (-13 draft)
+
 
 7. Routing table extensions
 
@@ -2252,6 +2259,7 @@ TODO:
 - L3: revisit issues with cached route on struct route/sendto(3)
 
 RADIX_MPATH kernel compilation option conflicts with RADIX_ART.
+
 
 8. Coding style
 
@@ -2355,5 +2363,33 @@ do not mind* the agreement, it would be helpful for the project to
 keep these rules.  Note, however, that we would never intend to force
 you to adopt our rules.  We would rather regard your own style,
 especially when you have a policy about the style.
+
+
+9. Policy on technology with intellectual property right restriction
+
+There are quite a few IETF documents/whatever which has intellectual property
+right (IPR) restriction.  KAME's stance is stated below.
+
+    The goal of KAME is to provide freely redistributable, BSD-licensed,
+    implementation of Internet protocol technologies.
+    For this purpose, we implement protocols that (1) do not need license
+    contract with IPR holder, and (2) are royality-free.
+    The reason for (1) is, even if KAME contracts with the IPR holder in
+    question, the users of KAME stack (usually implementers of some other
+    codebase) would need to make a license contract with the IPR holder.
+    it would damage "freely redistributable" status of KAME codebase.
+
+    By doing so KAME is (implicitly) trying to advocate no-license-contract,
+    royality-free, release of IPRs.
+
+However, as documented in README, we do not guarantee that KAME code is free
+of IPR infringement, you MUST check it if you are to integrate KAME into your
+product:
+    READ CAREFULLY: Several countries have legal enforcement for
+    export/import/use of cryptographic software.  Check it before playing
+    with the kit.  We do not intend to be your legalease clearing house
+    (NO WARRANTY).  If you intend to include KAME stack into your product,
+    you'll need to check if the licenses on each file fit your situations,
+    and/or possible intellectual property right issues.
 
 						 <end of IMPLEMENTATION>
