@@ -253,8 +253,8 @@ tcp_template(tp)
 #ifdef INET6
 		if (in6p) {
 			/* mapped addr case */
-			if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr)
-			 && IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr))
+			if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr) &&
+			    IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr))
 				break;
 		}
 #endif

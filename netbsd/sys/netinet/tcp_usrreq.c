@@ -317,6 +317,10 @@ tcp_usrreq(so, req, m, nam, control, p)
 			break;
 #ifdef INET6
 		case PF_INET6:
+			/*
+			 * in6_pcbbind() will always reject IPv4 mapped
+			 * address on netbsd, due to port allocation issues
+			 */
 			error = in6_pcbbind(in6p, nam, p);
 			if (!error) {
 				/* mapped addr case */
@@ -376,6 +380,7 @@ tcp_usrreq(so, req, m, nam, control, p)
 				if (error)
 					break;
 			}
+			/* in6_pcbconnect() takes care of IPV6_V6ONLY */
 			error = in6_pcbconnect(in6p, nam);
 			if (!error) {
 				/* mapped addr case */

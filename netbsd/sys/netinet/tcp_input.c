@@ -808,7 +808,10 @@ findpcb:
 		if (inp == 0) {
 			struct in6_addr s, d;
 
-			/* mapped addr case */
+			/*
+			 * mapped addr case.  IPV6_V6ONLY case is handled in
+			 * in6_pcblookup_bind().
+			 */
 			bzero(&s, sizeof(s));
 			s.s6_addr16[5] = htons(0xffff);
 			bcopy(&ip->ip_src, &s.s6_addr32[3], sizeof(ip->ip_src));
