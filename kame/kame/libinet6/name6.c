@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.13 2000/01/21 03:58:24 itojun Exp $ */
+/* $Id: name6.c,v 1.14 2000/01/21 03:59:45 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -51,7 +51,7 @@
 #include "sockstorage.h"
 #endif 
 
-#ifndef NEED_ADDRINFO_H
+#ifdef NEED_ADDRINFO_H
 #include "addrinfo.h"
 #endif
 

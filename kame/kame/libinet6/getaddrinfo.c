@@ -81,7 +81,7 @@
 #include "sockstorage.h"
 #endif 
 
-#ifndef NEED_ADDRINFO_H
+#ifdef NEED_ADDRINFO_H
 #include "addrinfo.h"
 #endif
 
