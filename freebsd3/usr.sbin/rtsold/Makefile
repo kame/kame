@@ -1,7 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/rtsold
 
 PROG=	rtsold
-SRCS=	rtsold.c rtsol.c if.c probe.c
+SRCS=	rtsold.c rtsol.c if.c probe.c dump.c
 
 CFLAGS+=-DINET6
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
