@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.143 2005/01/12 06:06:11 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.144 2005/03/19 07:18:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1022,7 +1022,6 @@ process_relayforw(dh6p, optendp, relayinfohead, from)
 	}
 
 	TAILQ_INSERT_HEAD(relayinfohead, relayinfo, link);
-	dh6relay = (struct dhcp6_relay *)relayinfo->relay_msg.dv_buf;
 
 	dhcp6_clear_options(&optinfo);
 
