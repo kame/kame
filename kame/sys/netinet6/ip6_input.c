@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.241 2001/12/27 15:37:40 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.242 2001/12/27 17:40:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1885,7 +1885,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 			case IPPROTO_DSTOPTS:
 			{
 				struct ip6_dest *prevdest = NULL;
-				int prevdestlen;
+				int prevdestlen = 0;
 
 				if (!(in6p->in6p_flags & IN6P_DSTOPTS))
 					break;
