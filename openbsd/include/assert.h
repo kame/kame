@@ -1,4 +1,4 @@
-/*	$OpenBSD: assert.h,v 1.4 2002/02/19 19:39:36 millert Exp $	*/
+/*	$OpenBSD: assert.h,v 1.8 2002/06/10 19:47:45 espie Exp $	*/
 /*	$NetBSD: assert.h,v 1.6 1994/10/26 00:55:44 cgd Exp $	*/
 
 /*-

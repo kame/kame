@@ -1,4 +1,4 @@
-/*	$OpenBSD: login_cap.h,v 1.7 2002/02/16 21:27:17 millert Exp $	*/
+/*	$OpenBSD: login_cap.h,v 1.9 2002/08/02 23:56:44 millert Exp $	*/
 
 /*-
  * Copyright (c) 1995,1997 Berkeley Software Design, Inc. All rights reserved.
@@ -38,7 +38,7 @@
 #define _LOGIN_CAP_H_
 
 #define	LOGIN_DEFCLASS		"default"
-#define	LOGIN_DEFSTYLE		"krb4-or-pwd"
+#define	LOGIN_DEFSTYLE		"passwd"
 #define	LOGIN_DEFSERVICE	"login"
 #define	LOGIN_DEFUMASK		022
 #define	_PATH_LOGIN_CONF	"/etc/login.conf"
@@ -69,7 +69,7 @@
 /*
  * bits which can be returned by authenticate()/auth_scan()
  */
-#define	AUTH_OKAY	0x01			/* user authentciated */
+#define	AUTH_OKAY	0x01			/* user authenticated */
 #define	AUTH_ROOTOKAY	0x02			/* authenticated as root */
 #define	AUTH_SECURE	0x04			/* secure login */
 #define	AUTH_SILENT	0x08			/* silent rejection */
