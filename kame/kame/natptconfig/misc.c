@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.21 2002/01/13 12:48:11 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.22 2002/01/13 14:22:31 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -221,22 +221,23 @@ setValue(char *name, int val)
 {
 	const char *fn = __FUNCTION__;
 
-	int			type = 0;
+	int			idx;
 	struct natpt_msgBox	mBox;
+	struct natptctl_names	ctlnames[] = NATPTCTL_NAMES;
 
-	bzero(&mBox, sizeof(struct natpt_msgBox));
+	for (idx = 0; ctlnames[idx].ctl_name; idx++) {
+		if (strlen(ctlnames[idx].ctl_name) != strlen(name))
+			continue;
+		if (strncasecmp(ctlnames[idx].ctl_name, name, strlen(name)) == 0) {
+			mBox.flags = idx;
+			mBox.m_uint = val;
+			if (soctl(sfd, SIOCSETVALUE, &mBox) < 0)
+				soctlFailure(fn);
+			return;
+		}
+	}
 
-	if (strcmp(name, "natpt_debug") == 0)		type = NATPT_DEBUG;
-	else if (strcmp(name, "natpt_dump") == 0)	type = NATPT_DUMP;
-
-	if (type == 0)
-		errx(1, "%s(): %s: no such variable\n", fn, name);
-
-	mBox.flags = type;
-	mBox.m_uint = val;
-
-	if (soctl(sfd, SIOCSETVALUE, &mBox) < 0)
-		soctlFailure(fn);
+	errx(1, "%s(): %s: no such variable\n", fn, name);
 }
 
 
