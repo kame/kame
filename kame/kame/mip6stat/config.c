@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: config.c,v 1.3 2000/06/04 03:31:28 itojun Exp $
+ * $Id: config.c,v 1.4 2000/07/21 12:33:33 jinmei Exp $
  *
  */
 
@@ -41,6 +41,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/queue.h>
 #include <netinet/in.h>
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

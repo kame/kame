@@ -1,4 +1,4 @@
-/*	$KAME: lexer.l,v 1.4 2000/07/03 02:54:08 itojun Exp $	*/
+/*	$KAME: lexer.l,v 1.5 2000/07/21 12:33:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 
 #include <string.h>
 

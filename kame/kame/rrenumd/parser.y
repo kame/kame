@@ -1,4 +1,4 @@
-/*	$KAME: parser.y,v 1.3 2000/07/03 02:54:08 itojun Exp $	*/
+/*	$KAME: parser.y,v 1.4 2000/07/21 12:33:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,6 +34,7 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

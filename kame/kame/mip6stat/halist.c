@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: halist.c,v 1.1 2000/02/07 17:27:09 itojun Exp $
+ * $Id: halist.c,v 1.2 2000/07/21 12:33:33 jinmei Exp $
  *
  */
 
@@ -41,6 +41,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/param.h>
+#include <sys/queue.h>
 #include <netinet/in.h>
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
