@@ -290,6 +290,16 @@ if_detach(ifp)
 		IFAFREE(ifa);
 	}
 
+#ifdef INET6
+	/*
+	 * Remove all IPv6 kernel structs related to ifp.  This should be done
+	 * before removing routing entries below, before IPv6 interface direct
+	 * routes are expected to be removed the IPv6-specific kernel APIs.
+	 * Otherwise, the kernel will detect some inconsistency and bark it.
+	 */
+	in6_ifdetach(ifp);
+#endif
+
 	/*
 	 * Delete all remaining routes using this interface
 	 * Unfortuneatly the only way to do this is to slog through
@@ -301,11 +311,6 @@ if_detach(ifp)
 			continue;
 		(void) rnh->rnh_walktree(rnh, if_rtdel, ifp);
 	}
-
-#ifdef INET6
-	/* nuke all IPv6 kernel structs related to ifp */
-	in6_ifdetach(ifp);
-#endif
 
 	TAILQ_REMOVE(&ifnet, ifp, if_link);
 	splx(s);
