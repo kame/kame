@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.172 2003/02/07 10:53:03 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.173 2003/02/13 09:10:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -146,6 +146,7 @@ static struct mip6_timeout_entry *mip6_timeoutentry_insert(time_t, caddr_t);
 static int mip6_timeoutentry_insert_with_mtoe(time_t,
     struct mip6_timeout_entry *);
 static void mip6_timeoutentry_remove(struct mip6_timeout_entry *);
+static void mip6_timeoutentry_remove_without_mtoe_free(struct mip6_timeout_entry *);
 static void mip6_timeoutentry_update(struct mip6_timeout_entry *, time_t);
 #endif /* MIP6_CALLOUTTEST */
 
@@ -2150,14 +2151,14 @@ mip6_timeoutentry_update(mtoe, newexpire)
 	if (mtoe->mtoe_timeout->mto_expire == newexpire)
 		return;
 
-	mip6_timeoutentry_remove(mtoe);
+	mip6_timeoutentry_remove_without_mtoe_free(mtoe);
 	mip6_timeoutentry_insert_with_mtoe(newexpire, mtoe);
 	mip6log((LOG_INFO, "%s:%d: A timeout entry is updated.\n",
 		__FILE__, __LINE__));
 }
 
 static void
-mip6_timeoutentry_remove(mtoe)
+mip6_timeoutentry_remove_without_mtoe_free(mtoe)
 	struct mip6_timeout_entry *mtoe;
 {
 /* XXX splxxx ?? */
@@ -2166,9 +2167,15 @@ mip6_timeoutentry_remove(mtoe)
 		TAILQ_REMOVE(&mip6_bc_timeout_list, mtoe->mtoe_timeout, mto_entry);
 		FREE(mtoe->mtoe_timeout, M_TEMP);
 	}
+}
+
+static void
+mip6_timeoutentry_remove(mtoe)
+	struct mip6_timeout_entry *mtoe;
+{
+	mip6_timeoutentry_remove_without_mtoe_free(mtoe);
 	/* Content of this timeout entry (mtoe_ptr) isn't cared in this function */
 	FREE(mtoe, M_TEMP);
-
 }
 #endif /* MIP6_CALLOUTTEST */
 
