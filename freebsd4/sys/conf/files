@@ -1020,6 +1020,7 @@ netinet6/scope6.c	optional inet6
 netinet6/sctp6_usrreq.c	optional inet6 sctp
 netinet6/udp6_output.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
+netinet6/dccp6_usrreq.c	optional inet6 dccp
 net/if_hif.c		optional hif mip6 mip6_mobile_node
 netinet6/mobility6.c	optional inet6 mip6
 netinet6/mip6_cncore.c	optional mip6
