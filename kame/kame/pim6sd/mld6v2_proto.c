@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.3 2001/08/09 08:46:57 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.4 2001/08/09 11:03:16 suz Exp $
  */
 
 /*
@@ -127,7 +127,7 @@ query_groupsV2(v)
 /*
  * Send a group/source-specific v2 query : it only append if I am the querier
  * and interface isn't configured with nonlistener option if the source list
- * is null , it is a group-specifique query
+ * is null , it is a group-specific query
  * according to the spec : Two specific query are built and sent : the first
  * one with the S flag set contain source who has timer <=LLQI, the second
  * with S flag cleared contain source who has timer >LLQI : not possible
@@ -445,7 +445,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
     v->uv_in_mld_report++;
 
     /*
-     * loop trough each multicast record 
+     * loop through each multicast record 
      */
 
     for (i = 0; i < nummard; i++)
@@ -478,7 +478,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    {
 		/*
 		 * Look for the src/group 
-		 * in our scr/group list; if found, reset its timer.
+		 * in our src/group list; if found, reset its timer.
                  * (B)=MALI implementation
 		 */
 
