@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.16 2000/10/18 13:19:07 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.17 2001/05/02 07:19:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,6 +122,8 @@ extern int eay_revbnl __P((vchar_t *));
 #include <openssl/bn.h>
 extern int eay_v2bn __P((BIGNUM **, vchar_t *));
 extern int eay_bn2v __P((vchar_t **, BIGNUM *));
+
+extern const char *eay_version __P((void));
 
 #define CBC_BLOCKLEN 8
 #define IPSEC_ENCRYPTKEYLEN 8

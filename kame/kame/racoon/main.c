@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.33 2001/04/19 08:49:21 sakane Exp $	*/
+/*	$KAME: main.c,v 1.34 2001/05/02 07:19:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,9 +161,8 @@ main(ac, av)
 #endif
 	plog(LLV_INFO, LOCATION, NULL, "%s\n", version);
 	plog(LLV_INFO, LOCATION, NULL, "@(#)"
-	"This product linked software developed by the OpenSSL Project "
-	"for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
-	"\n");
+	"This product linked %s (http://www.openssl.org/)"
+	"\n", eay_version());
 
 	if (pfkey_init() < 0)
 		exit(1);

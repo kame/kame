@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.50 2001/04/03 15:51:54 thorpej Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.51 2001/05/02 07:19:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1782,4 +1782,10 @@ eay_bn2v(var, bn)
 	(*var)->l = BN_bn2bin(bn, (*var)->v);
 
 	return 0;
+}
+
+const char *
+eay_version()
+{
+	return SSLeay_version(SSLEAY_VERSION);
 }
