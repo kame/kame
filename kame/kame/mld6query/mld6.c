@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.11 2001/05/13 15:45:07 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.12 2001/11/21 08:55:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -286,7 +286,8 @@ dump(int s)
 
 /* ARGSUSED */
 void
-quit(int signum) {
+quit(int signum)
+{
 	mreq.ipv6mr_multiaddr = any;
 	mreq.ipv6mr_interface = ifindex;
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_LEAVE_GROUP, &mreq,
