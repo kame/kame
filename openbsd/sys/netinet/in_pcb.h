@@ -185,19 +185,20 @@ struct inpcbtable {
 
 #if 1	/*KAME*/
 /* flags in in6p_flags */
-#define IN6P_RECVOPTS	INP_RECVOPTS	/* receive incoming IP6 options */
-#define IN6P_RECVRETOPTS INP_RECVRETOPTS /* receive IP6 options for reply */
-#define IN6P_RECVDSTADDR INP_RECVDSTADDR /* receive IP6 dst address */
-#define IN6P_HIGHPORT	INP_HIGHPORT	/* user wants "high" port binding */
-#define IN6P_LOWPORT	INP_LOWPORT	/* user wants "low" port binding */
-#define IN6P_ANONPORT	0x40		/* port chosen for user */
-#define IN6P_FAITH	0x80		/* accept FAITH'ed connections */
-#define IN6P_PKTINFO	0x010000
-#define IN6P_HOPLIMIT	0x020000
-#define IN6P_NEXTHOP	0x040000
-#define IN6P_HOPOPTS	0x080000
-#define IN6P_DSTOPTS	0x100000
-#define IN6P_RTHDR	0x200000
+#define IN6P_RECVOPTS		INP_RECVOPTS	/* recv incoming IP6 options */
+#define IN6P_RECVRETOPTS	INP_RECVRETOPTS /* recv IP6 options for reply */
+#define IN6P_RECVDSTADDR	INP_RECVDSTADDR /* recv IP6 dst address */
+#define IN6P_HIGHPORT		INP_HIGHPORT	/* user wants "high" port */
+#define IN6P_LOWPORT		INP_LOWPORT	/* user wants "low" port */
+#define IN6P_ANONPORT		0x40		/* port chosen for user */
+#define IN6P_FAITH		0x80	/* accept FAITH'ed connections */
+#define IN6P_PKTINFO		0x010000
+#define IN6P_HOPLIMIT		0x020000
+#define IN6P_NEXTHOP		0x040000
+#define IN6P_HOPOPTS		0x080000
+#define IN6P_DSTOPTS		0x100000
+#define IN6P_RTHDR		0x200000
+#define IN6P_RTHDRDSTOPTS	0x400000
 #define IN6P_CONTROLOPTS	(0x3f0000 | IN6P_RECVOPTS | IN6P_RECVRETOPTS | IN6P_RECVDSTADDR)
 #endif
 
