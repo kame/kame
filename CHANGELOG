@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2500 2003/11/05 14:10:33 suz Exp $
+$KAME: CHANGELOG,v 1.2501 2003/11/06 10:40:53 suz Exp $
 
 <200310>
+2003-11-05  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/dhcp6: changed the default values of the IA_PD and
+	and IA_PD_PREFIX option to those officially assigned by IANA.
+	(see the CHANGELOG comment on 2003-09-29)
+
 2003-11-05  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd4: sync with FreeBSD 4.9-RELEASE
 
