@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1124 2000/07/12 13:16:26 jinmei Exp $
+$Id: CHANGELOG,v 1.1125 2000/07/12 13:48:30 jinmei Exp $
 
 <200006>
 2000-07-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* bsdi4/sys/net/route.h: redefined the route structure so that it
+	* *bsd*/sys/net/route.h: redefined the route structure so that it
 	can support protcols that have large socket address (e.g. IPv6).
 	Currently, this is enabled only with the NEW_STRUCT_ROUTE kernel
 	compilation option, but will be default once stabilized.
