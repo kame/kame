@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: uucplock.c,v 1.10.2.1 1999/03/11 09:10:04 brian Exp $
+ * $FreeBSD: src/lib/libutil/uucplock.c,v 1.10.2.2 1999/08/29 14:58:03 peter Exp $
  *
  */
 

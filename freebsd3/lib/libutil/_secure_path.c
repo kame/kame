@@ -18,7 +18,7 @@
  * 5. Modifications may be freely made to this file providing the above
  *    conditions are met.
  *
- *	$Id: _secure_path.c,v 1.4 1998/10/09 11:24:19 jkh Exp $
+ * $FreeBSD: src/lib/libutil/_secure_path.c,v 1.4.2.1 1999/08/29 14:57:47 peter Exp $
  */
 
 

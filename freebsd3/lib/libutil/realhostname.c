@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: realhostname.c,v 1.2.2.1 1999/05/02 08:50:52 brian Exp $
+ * $FreeBSD: src/lib/libutil/realhostname.c,v 1.2.2.2 1999/08/29 14:58:01 peter Exp $
  */
 
 #include <sys/param.h>
