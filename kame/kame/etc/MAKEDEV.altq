@@ -58,10 +58,10 @@ case ${osname} in
 		altqchr=62
 		;;
 	OpenBSD*i386)
-		altqchr=70
+		altqchr=74
 		;;
 	OpenBSD*alpha)
-		altqchr=52
+		altqchr=53
 		;;
 	*)
 		echo "${osname} : unknown os type!"

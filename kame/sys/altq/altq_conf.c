@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.12 2001/11/30 11:47:50 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.13 2002/01/29 10:16:01 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -178,9 +178,9 @@ void	altqattach __P((int));
 #endif
 #elif defined(__OpenBSD__)
 #if defined(__i386__)
-#define	CDEV_MAJOR 70		/* OpenBSD i386 (not official) */
+#define	CDEV_MAJOR 74		/* OpenBSD i386 (official) */
 #elif defined(__alpha__)
-#define	CDEV_MAJOR 52		/* OpenBSD alpha (not official) */
+#define	CDEV_MAJOR 53		/* OpenBSD alpha (official) */
 #else
 #error arch not supported
 #endif
