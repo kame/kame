@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.12 2001/08/20 06:50:42 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.13 2001/09/05 01:10:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -83,23 +83,37 @@ ftp_relay(int ctl6, int ctl4)
 	syslog(LOG_INFO, "starting ftp control connection");
 
 	for (;;) {
+		int maxfd = 0;
+
 		FD_ZERO(&readfds);
 		FD_SET(ctl4, &readfds);
 		FD_SET(ctl6, &readfds);
-		if (0 <= port4)
+		if (0 <= port4) {
 			FD_SET(port4, &readfds);
-		if (0 <= port6)
+			if (port4 > maxfd)
+				maxfd = port4;
+		}
+		if (0 <= port6) {
 			FD_SET(port6, &readfds);
+			if (port6 > maxfd)
+				maxfd = port6;
+		}
 #if 0
-		if (0 <= wport4)
+		if (0 <= wport4) {
 			FD_SET(wport4, &readfds);
-		if (0 <= wport6)
+			if (wport4 > maxfd)
+				maxfd = wport4;
+		}
+		if (0 <= wport6) {
 			FD_SET(wport6, &readfds);
+			if (wport6 > maxfd)
+				maxfd = wport6;
+		}
 #endif
 		tv.tv_sec = FAITH_TIMEOUT;
 		tv.tv_usec = 0;
 
-		error = select(256, &readfds, NULL, NULL, &tv);
+		error = select(maxfd + 1, &readfds, NULL, NULL, &tv);
 		if (error == -1)
 			exit_failure("select: %s", strerror(errno));
 		else if (error == 0)

@@ -1,4 +1,4 @@
-/*	$KAME: rsh.c,v 1.6 2001/07/02 14:36:49 itojun Exp $	*/
+/*	$KAME: rsh.c,v 1.7 2001/09/05 01:10:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -65,7 +65,7 @@ rsh_relay(int s_src, int s_dst)
 	FD_SET(s_src, &readfds);
 	tv.tv_sec = FAITH_TIMEOUT;
 	tv.tv_usec = 0;
-	error = select(256, &readfds, NULL, NULL, &tv);
+	error = select(s_src + 1, &readfds, NULL, NULL, &tv);
 	if (error == -1)
 		exit_failure("select %d: %s", s_src, strerror(errno));
 	else if (error == 0)
@@ -167,16 +167,25 @@ rsh_dual_relay(int s_src, int s_dst)
 	syslog(LOG_INFO, "starting rsh control connection");
 
 	for (;;) {
+		int maxfd = 0;
+
 		FD_ZERO(&readfds);
 		if (half == NO)
 			FD_SET(s_src, &readfds);
 		FD_SET(s_dst, &readfds);
+		if (s_dst > maxfd)
+			maxfd = s_dst;
 		FD_SET(s_ctl, &readfds);
+		if (s_ctl > maxfd)
+			maxfd = s_ctl;
 		FD_SET(s_ctl6, &readfds);
+		if (s_ctl6 > maxfd)
+			maxfd = s_ctl6;
+
 		tv.tv_sec = FAITH_TIMEOUT;
 		tv.tv_usec = 0;
 
-		error = select(256, &readfds, NULL, NULL, &tv);
+		error = select(maxfd + 1, &readfds, NULL, NULL, &tv);
 		if (error == -1)
 			exit_failure("select 4 sockets: %s", strerror(errno));
 		else if (error == 0)
