@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.85 1999/09/01 05:19:17 itojun Exp $
+$Id: CHANGELOG,v 1.86 1999/09/02 08:13:21 jinmei Exp $
 
-<199908>
+
+<199909>
+1999-09-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/: changed hop limit selection algorithm;
+	hop limit stored in the template header is not considered.
+	Also, TCP6 was changed to always select hop limit when sending
+	segment in order to reflect IPV6_UNICAST_HOPS setsockopt and
+	current hop limit adverised via router advertisements.
+
 Wed Sep  1 14:14:43 JST 1999  itojun@iijlab.net
 	* usr.bin/ftp (all platforms): On data connection establishment,
 	  warn if scoped address is used.  If peer (ftp daemon) does not
@@ -16,6 +24,7 @@ Wed Sep  1 14:14:43 JST 1999  itojun@iijlab.net
 
 	  This seems to be sort of protocol spec twist.
 	  
+<199908>
 Tue Aug 31 18:37:00 JST 1999  itojun@iijlab.net
 	* openbsd: made GENERIC.v6 at least compilable.
 	  GENERIC.v6 kernel boots okay, replies to ping6.
