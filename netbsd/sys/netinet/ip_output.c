@@ -1205,6 +1205,8 @@ ip_multicast_if(a, ifindexp)
 	int ifindex;
 	struct ifnet *ifp;
 
+	if (ifindexp)
+		*ifindexp = 0;
 	if (ntohl(a->s_addr) >> 24 == 0) {
 		ifindex = ntohl(a->s_addr) & 0xffffff;
 		if (ifindex < 0 || if_index < ifindex)
@@ -1214,8 +1216,6 @@ ip_multicast_if(a, ifindexp)
 			*ifindexp = ifindex;
 	} else {
 		INADDR_TO_IFP(*a, ifp);
-		if (ifindexp)
-			*ifindexp = 0;
 	}
 	return ifp;
 }
