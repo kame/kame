@@ -225,6 +225,7 @@ struct mbuf *
 void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
 int	 ip_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	 ipintr __P((void));
+void *	 rip_ctlinput __P((int, struct sockaddr *, void *));
 int	 rip_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 void	 rip_init __P((void));
 void	 rip_input __P((struct mbuf *, ...));

@@ -97,6 +97,8 @@
 
 struct inpcbtable rawcbtable;
 
+int	rip_pcbnotify __P((struct inpcbtable *, struct in_addr,
+    struct in_addr, int, int, void (*) __P((struct inpcb *, int))));
 int	 rip_bind __P((struct inpcb *, struct mbuf *));
 int	 rip_connect __P((struct inpcb *, struct mbuf *));
 void	 rip_disconnect __P((struct inpcb *));
@@ -230,6 +232,67 @@ rip_input(m, va_alist)
 			m_freem(m);
 	}
 	return;
+}
+
+int
+rip_pcbnotify(table, faddr, laddr, proto, errno, notify)
+	struct inpcbtable *table;
+	struct in_addr faddr, laddr;
+	int proto;
+	int errno;
+	void (*notify) __P((struct inpcb *, int));
+{
+	struct inpcb *inp, *ninp;
+	int nmatch;
+
+	nmatch = 0;
+	for (inp = table->inpt_queue.cqh_first;
+	    inp != (struct inpcb *)&table->inpt_queue;
+	    inp = ninp) {
+		ninp = inp->inp_hash.le_next;
+		if (inp->inp_ip.ip_p && inp->inp_ip.ip_p != proto)
+			continue;
+		if (in_hosteq(inp->inp_faddr, faddr) &&
+		    in_hosteq(inp->inp_laddr, laddr)) {
+			(*notify)(inp, errno);
+			nmatch++;
+		}
+	}
+
+	return nmatch;
+}
+
+void *
+rip_ctlinput(cmd, sa, v)
+	int cmd;
+	struct sockaddr *sa;
+	void *v;
+{
+	struct ip *ip = v;
+	void (*notify) __P((struct inpcb *, int)) = in_rtchange;
+	int errno;
+
+	if (sa->sa_family != AF_INET ||
+	    sa->sa_len != sizeof(struct sockaddr_in))
+		return NULL;
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return NULL;
+	errno = inetctlerrmap[cmd];
+	if (PRC_IS_REDIRECT(cmd))
+		notify = in_rtchange, ip = 0;
+	else if (cmd == PRC_HOSTDEAD)
+		ip = 0;
+	else if (errno == 0)
+		return NULL;
+	if (ip) {
+		rip_pcbnotify(&rawcbtable, satosin(sa)->sin_addr,
+		    ip->ip_src, ip->ip_p, errno, notify);
+
+		/* XXX mapped address case */
+	} else
+		in_pcbnotifyall(&rawcbtable, satosin(sa)->sin_addr, errno,
+		    notify);
+	return NULL;
 }
 
 /*
