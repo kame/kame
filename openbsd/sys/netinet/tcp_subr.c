@@ -345,13 +345,13 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 		((struct ip6_hdr *)ti)->ip6_flow   = htonl(0x60000000);
 		((struct ip6_hdr *)ti)->ip6_nxt  = IPPROTO_TCP;
 		((struct ip6_hdr *)ti)->ip6_hlim =
-			in6_selecthlim(tp->t_inpcb, NULL);	/*XXX*/
+			in6_selecthlim(tp ? tp->t_inpcb : NULL, NULL);	/*XXX*/
 		((struct ip6_hdr *)ti)->ip6_plen = tlen - sizeof(struct ip6_hdr);
 		th->th_sum = 0;
 		th->th_sum = in6_cksum(m, IPPROTO_TCP,
 		   sizeof(struct ip6_hdr), ((struct ip6_hdr *)ti)->ip6_plen);
 		HTONS(((struct ip6_hdr *)ti)->ip6_plen);
-		ip6_output(m, tp->t_inpcb->inp_outputopts6,
+		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
 			(struct route_in6 *)ro, 0, NULL, NULL);
 	} else
 #endif /* INET6 */
