@@ -60,6 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.46.2.3 1999/08/29 16:29:35 peter Exp $
  */
 
 #include "opt_inet.h"
@@ -199,7 +200,7 @@ in6_pcbbind(inp, nam, p)
 			if (ntohs(lport) < IPV6PORT_RESERVED && p &&
 			    suser(p->p_ucred, &p->p_acflag))
 				return(EACCES);
-			if (so->so_uid &&
+			if (so->so_cred && so->so_cred->p_ruid != 0 &&
 			    !IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
 				t = in6_pcblookup_local(inp->inp_pcbinfo,
 							&sin6->sin6_addr,
@@ -210,7 +211,9 @@ in6_pcbbind(inp, nam, p)
 				     !IN6_IS_ADDR_UNSPECIFIED(&t->in6p_laddr) ||
 				     (t->inp_socket->so_options &
 				      SO_REUSEPORT) == 0) &&
-				    so->so_uid != t->inp_socket->so_uid)
+				    (t->inp_socket->so_cred) &&
+				    (so->so_cred->p_ruid !=
+				     t->inp_socket->so_cred->p_ruid))
 					return (EADDRINUSE);
 			}
 			t = in6_pcblookup_local(pcbinfo, &sin6->sin6_addr,
@@ -434,8 +437,11 @@ in6_pcbconnect(inp, nam, p)
 		return (EADDRINUSE);
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)) {
-		if (inp->inp_lport == 0)
-			(void)in6_pcbbind(inp, (struct sockaddr *)0, p);
+		if (inp->inp_lport == 0) {
+			error = in6_pcbbind(inp, (struct sockaddr *)0, p);
+			if (error)
+				return (error);
+		}
 		inp->in6p_laddr = *addr6;
 	}
 	inp->in6p_faddr = sin6->sin6_addr;

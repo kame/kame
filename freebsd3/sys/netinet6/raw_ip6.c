@@ -256,7 +256,7 @@ rip6_output(m, va_alist)
 		priv = 1;
     }
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	if (so->so_uid == 0)
+	if (so->so_cred && so->so_cred->p_ruid == 0)
 		priv = 1;
 #else
 	if ((so->so_state & SS_PRIV) != 0)

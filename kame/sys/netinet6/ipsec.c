@@ -51,11 +51,13 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #ifdef __NetBSD__
-#include <sys/proc.h>
 #include <vm/vm.h>
 #endif
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/sysctl.h>
+#endif
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include <sys/proc.h>
 #endif
 
 #include <net/if.h>
@@ -242,8 +244,13 @@ ipsec4_getpolicybysock(m, dir, so, error)
 			pcbsp = sotoinpcb(so)->inp_sp_out;
 			break;
 		}
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __NetBSD__
 		if (so->so_uid == 0)	/*XXX*/
+			priv = 1;
+		else
+			priv = 0;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		if (so->so_cred && so->so_cred->p_ruid == 0)	/*XXX*/
 			priv = 1;
 		else
 			priv = 0;
@@ -264,8 +271,13 @@ ipsec4_getpolicybysock(m, dir, so, error)
 			pcbsp = sotoin6pcb(so)->in6p_sp_out;
 			break;
 		}
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __NetBSD__
 		if (so->so_uid == 0)	/*XXX*/
+			priv = 1;
+		else
+			priv = 0;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		if (so->so_cred && so->so_cred->p_ruid == 0)	/*XXX*/
 			priv = 1;
 		else
 			priv = 0;
@@ -490,8 +502,13 @@ ipsec6_getpolicybysock(m, dir, so, error)
 	}
 
 	/* when privilieged socket */
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __NetBSD__
 	if (so->so_uid == 0)	/*XXX*/
+		priv = 1;
+	else
+		priv = 0;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+	if (so->so_cred && so->so_cred->p_ruid == 0)	/*XXX*/
 		priv = 1;
 	else
 		priv = 0;
