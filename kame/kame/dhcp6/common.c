@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.93 2003/12/16 10:31:48 suz Exp $	*/
+/*	$KAME: common.c,v 1.94 2004/01/20 07:14:35 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -927,7 +927,7 @@ dhcp6_copy_options(dst, src)
 		goto fail;
 	if (dhcp6_copy_list(&dst->dns_list, &src->dns_list))
 		goto fail;
-	if (dhcp6_copy_list(&dst->dns_list, &src->dnsname_list))
+	if (dhcp6_copy_list(&dst->dnsname_list, &src->dnsname_list))
 		goto fail;
 	if (dhcp6_copy_list(&dst->ntp_list, &src->ntp_list))
 		goto fail;
