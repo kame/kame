@@ -1348,9 +1348,11 @@ tcp_mss_to_advertise(ifp, af)
 	case AF_INET:
 		hdrsiz = sizeof(struct ip);
 		break;
+#ifdef INET6
 	case AF_INET6:
 		hdrsiz = sizeof(struct ip6_hdr);
 		break;
+#endif
 	default:
 		hdrsiz = 0;
 		break;
