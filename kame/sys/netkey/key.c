@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.146 2000/08/02 18:07:39 sakane Exp $	*/
+/*	$KAME: key.c,v 1.147 2000/08/02 23:27:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3997,7 +3997,7 @@ key_bbcmp(p1, p2, bits)
  * time handler.
  * scanning SPD and SAD to check status for each entries,
  * and do to remove or to expire.
- * XXX: 2039 problem may remain.
+ * XXX: year 2038 problem may remain.
  */
 void
 key_timehandler(void)
