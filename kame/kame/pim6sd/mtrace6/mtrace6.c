@@ -674,7 +674,8 @@ make_packet()
 static void
 usage()
 {
-	errx(1,
+	fprintf(stderr, "usage: mtrace6 %s\n",
 	     "[-d destination] [-g gateway] [-h hops] [-i interface] "
 	     "[-m maxhops] [-n] [-r response_addr] [-w waittime] source group");
+	exit(1);
 }
