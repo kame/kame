@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.28 2003/08/05 12:34:23 itojun Exp $	*/
+/*	$KAME: if.c,v 1.29 2003/09/20 09:33:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,16 +107,14 @@ if_nametosdl(char *name)
 	size_t len;
 	struct if_msghdr *ifm;
 	struct sockaddr *sa, *rti_info[RTAX_MAX];
-	struct sockaddr_dl *sdl = NULL, *ret_sdl;
+	struct sockaddr_dl *sdl = NULL, *ret_sdl = NULL;
 
 	if (sysctl(mib, 6, NULL, &len, NULL, 0) < 0)
 		return(NULL);
 	if ((buf = malloc(len)) == NULL)
 		return(NULL);
-	if (sysctl(mib, 6, buf, &len, NULL, 0) < 0) {
-		free(buf);
-		return(NULL);
-	}
+	if (sysctl(mib, 6, buf, &len, NULL, 0) < 0)
+		goto end;
 
 	lim = buf + len;
 	for (next = buf; next < lim; next += ifm->ifm_msglen) {
@@ -140,14 +138,16 @@ if_nametosdl(char *name)
 	}
 	if (next == lim) {
 		/* search failed */
-		free(buf);
-		return(NULL);
+		goto end;
 	}
 
 	if ((ret_sdl = malloc(sdl->sdl_len)) == NULL)
-		return(NULL);
+		goto end;
 	memcpy((caddr_t)ret_sdl, (caddr_t)sdl, sdl->sdl_len);
-	return(ret_sdl);
+
+  end:
+	free(buf);
+	return (ret_sdl);
 }
 
 int
