@@ -51,6 +51,7 @@
 #include <netdb.h>
 
 #include <dhcp6.h>
+#include <dhcp6opt.h>
 #include <common.h>
 
 struct servtab {
@@ -59,9 +60,9 @@ struct servtab {
 	struct in6_addr st_llcli;
 	struct in6_addr st_relay;
 	struct in6_addr st_serv;
+	u_int16_t st_xid;
 };
 
-int dump = 0;
 int debug = 0;
 #define dprintf(x)	{ if (debug) fprintf x; }
 char *device = NULL;
@@ -85,6 +86,7 @@ static int maxfd = -1;
 
 /* behavior constant */
 #define SOLICIT_RETRY	2
+#define REQUEST_RETRY	2
 
 static void usage __P((void));
 static void mainloop __P((void));
@@ -94,8 +96,11 @@ void callback_register __P((int, pcap_t *, void (*)()));
 static void client6_init __P((void));
 static void client6_mainloop __P((void));
 static void client6_findserv __P((void));
+static int client6_getreply __P((struct servtab *));
 static void client6_sendsolicit __P((int));
 static int client6_recvadvert __P((int, struct servtab *));
+static void client6_sendrequest __P((int, struct servtab *));
+static int client6_recvreply __P((int, struct servtab *));
 
 int
 main(argc, argv)
@@ -107,13 +112,10 @@ main(argc, argv)
 	int ch;
 
 	srandom(time(NULL) & getpid());
-	while ((ch = getopt(argc, argv, "dD")) != EOF) {
+	while ((ch = getopt(argc, argv, "d")) != EOF) {
 		switch (ch) {
 		case 'd':
 			debug++;
-			break;
-		case 'D':
-			dump++;
 			break;
 		default:
 			usage();
@@ -136,7 +138,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: dhcpc intface\n");
+	fprintf(stderr, "usage: dhcpc [-d] intface\n");
 	exit(0);
 }
 
@@ -310,6 +312,7 @@ client6_mainloop()
 	char hbuf[BUFSIZ];
 
 	client6_findserv();
+
 	if (TAILQ_FIRST(&servtab) == NULL) {
 		errx(1, "no server found");
 		/*NOTREACHED*/
@@ -318,6 +321,12 @@ client6_mainloop()
 	inet_ntop(AF_INET6, &p->st_serv, hbuf, sizeof(hbuf));
 	dprintf((stderr, "primary server: pref=%u addr=%s\n",
 		p->st_pref, hbuf));
+
+	for (p = TAILQ_FIRST(&servtab); p; p = TAILQ_NEXT(p, st_list)) {
+		if (client6_getreply(p) < 0)
+			continue;
+		break;
+	}
 }
 
 static void
@@ -419,6 +428,48 @@ client6_findserv()
 	}
 }
 
+static int
+client6_getreply(p)
+	struct servtab *p;
+{
+	struct timeval w;
+	fd_set r;
+	int timeo;
+	int ret;
+
+	/* sanity checks */
+	if (IN6_IS_ADDR_MULTICAST(&p->st_relay)
+	 || IN6_IS_ADDR_MULTICAST(&p->st_serv)) {
+		return -1;
+	}
+
+	timeo = 0;
+	while (1) {
+		w.tv_sec = REPLY_MSG_TIMEOUT;
+		w.tv_usec = 0;
+		client6_sendrequest(outsock, p);
+		FD_ZERO(&r);
+		FD_SET(insock, &r);
+		ret = select(insock + 1, &r, NULL, NULL, &w);
+		switch (ret) {
+		case -1:
+			err(1, "select");
+			/*NOTREACHED*/
+		case 0:
+			timeo++;
+			if (timeo >= REQUEST_RETRY)
+				return -1;
+			break;
+		default:
+			if (client6_recvreply(insock, p) <0)
+				return -1;
+			return 0;
+		}
+	}
+
+	return -1;
+}
+
 /* 5.2. Sending DHCP Solicit Messages */
 static void
 client6_sendsolicit(s)
@@ -481,6 +532,8 @@ client6_recvadvert(s, serv)
 	if (len < sizeof(*dh6a))
 		return -1;
 	dh6a = (struct dhcp6_advert *)buf;
+	if (dh6a->dh6adv_msgtype != DH6_ADVERT)
+		return -1;
 	serv->st_pref = dh6a->dh6adv_pref;
 	if ((dh6a->dh6adv_flags & DH6ADV_SERVPRESENT) == 0)
 		serv->st_serv = dh6a->dh6adv_relayaddr;
@@ -495,6 +548,199 @@ client6_recvadvert(s, serv)
 	}
 
 	/* extension handling */
+
+	return 0;
+}
+
+/* 5.4. Sending DHCP Request Messages */
+static void
+client6_sendrequest(s, p)
+	int s;
+	struct servtab *p;
+{
+	int offlinkserv, offlink;
+	struct sockaddr_in6 dst;
+	struct addrinfo hints, *res;
+	int error;
+	struct in6_addr myaddr, target;
+	char buf[BUFSIZ];
+	size_t len;
+	struct dhcp6_request *dh6r;
+	int hlim;
+
+	dh6r = (struct dhcp6_request *)buf;
+	len = sizeof(*dh6r);
+	memset(dh6r, 0, sizeof(*dh6r));
+	dh6r->dh6req_msgtype = DH6_REQUEST;
+	dh6r->dh6req_flags = DH6REQ_CLOSE | DH6REQ_REBOOT;
+	dh6r->dh6req_xid = p->st_xid;
+	inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+	if (getifaddr(&dh6r->dh6req_cliaddr, device, &target, 10) != 0) {
+		errx(1, "getifaddr failed");
+		/*NOTREACHED*/
+	}
+#ifdef __KAME__
+	dh6r->dh6req_cliaddr.s6_addr[2] = 0;
+	dh6r->dh6req_cliaddr.s6_addr[3] = 0;
+#endif
+	memcpy(&dh6r->dh6req_relayaddr, &p->st_relay, sizeof(p->st_relay));
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+	error = getaddrinfo("::", DH6PORT_UPSTREAM, &hints, &res);
+	if (error) {
+		errx(1, "getaddrinfo: %s", gai_strerror(error));
+		/*NOTREACHED*/
+	}
+	memcpy(&dst, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+
+	if (!IN6_IS_ADDR_LINKLOCAL(&p->st_serv)) {
+		offlinkserv = 1;
+
+		/* is it possible to transmit packets to offlink dst? */
+		offlink = 1;
+		inet_pton(AF_INET6, "2000::", &target, sizeof(target));
+		if (getifaddr(&myaddr, device, &target, 3) != 0) {
+			inet_pton(AF_INET6, "fec0::", &target, sizeof(target));
+			if (getifaddr(&myaddr, device, &target, 10) != 0)
+				offlink = 0;
+		}
+	} else {
+		offlink = 0;
+		offlinkserv = 0;
+	}
+	if (!offlink) {
+		inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+		if (getifaddr(&myaddr, device, &target, 10) != 0) {
+			errx(1, "getifaddr failed");
+			/*NOTREACHED*/
+		}
+	}
+
+	if (!offlinkserv) {
+		memcpy(&dst.sin6_addr, &p->st_serv, sizeof(p->st_serv));
+		dst.sin6_scope_id = if_nametoindex(device);
+		hlim = 1;
+	} else {
+		if (offlink) {
+			memcpy(&dst.sin6_addr, &p->st_serv, sizeof(p->st_serv));
+			hlim = 0;
+		} else {
+			memcpy(&dst.sin6_addr, &p->st_relay,
+				sizeof(p->st_relay));
+			dst.sin6_scope_id = if_nametoindex(device);
+
+			dh6r->dh6req_flags |= DH6REQ_SERVPRESENT;
+			memcpy(dh6r + 1, &p->st_serv, sizeof(p->st_serv));
+			len += sizeof(p->st_serv);
+			hlim = 1;
+		}
+	}
+
+	if (transmit_sa(s, (struct sockaddr *)&dst, hlim, buf, len) != 0) {
+		err(1, "transmit failed");
+		/*NOTREACHED*/
+	}
+}
+
+/* 5.5. Receiving DHCP Reply Messages */
+static int
+client6_recvreply(s, serv)
+	int s;
+	struct servtab *serv;
+{
+	char buf[BUFSIZ];
+	struct dhcp6_reply *dh6r;
+	ssize_t len;
+	struct sockaddr_storage from;
+	socklen_t fromlen;
+	char *cp, *ep;
+	struct dhcp6_opt *p;
+	u_int16_t code, elen;
+	int i;
+
+	fromlen = sizeof(from);
+	if ((len = recvfrom(s, buf, sizeof(buf), 0,
+			(struct sockaddr *)&from, &fromlen)) < 0) {
+		err(1, "recvfrom(inbound)");
+		/*NOTREACHED*/
+	}
+
+	if (len < sizeof(*dh6r))
+		return -1;
+	dh6r = (struct dhcp6_reply *)buf;
+	if (dh6r->dh6rep_msgtype != DH6_REPLY)
+		return -1;
+	if (serv->st_xid != dh6r->dh6rep_xid)
+		return -1;
+	if ((dh6r->dh6rep_flagandstat & DH6REP_STATMASK) != 0)
+		return -1;
+
+	/* extension handling */
+	cp = (char *)(dh6r + 1);
+	if ((dh6r->dh6rep_flagandstat & DH6REP_CLIPRESENT) != 0)
+		cp += sizeof(struct in6_addr);
+	ep = buf + len;
+	while (cp < ep) {
+		code = ntohs(*(u_int16_t *)&cp[0]);
+		if (code != 65535)
+			elen = ntohs(*(u_int16_t *)&cp[2]);
+		else
+			elen = 0;
+		p = dhcp6opttab_bycode(code);
+		if (p == NULL) {
+			printf("unknown, len=%d\n", len);
+			cp += elen + 4;
+			continue;
+		}
+
+		/* sanity check on length */
+		switch (p->len) {
+		case OL6_N:
+			break;
+		case OL6_16N:
+			if (elen % 16 != 0)
+				return -1;
+			break;
+		case OL6_Z:
+			if (elen != 0)
+				return -1;
+			break;
+		default:
+			if (elen != p->len)
+				return -1;
+			break;
+		}
+
+		printf("%s, ", p->name);
+		switch (p->type) {
+		case OT6_V6:
+			for (i = 0; i < elen; i += 16) {
+				inet_ntop(AF_INET6, &cp[4 + i], buf,
+					sizeof(buf));
+				if (i != 0)
+					printf(",");
+				printf("%s", buf);
+			}
+			break;
+		case OT6_STR:
+			memset(&buf, 0, sizeof(buf));
+			strncpy(buf, &cp[4], elen);
+			printf("%s", buf);
+			break;
+		case OT6_NUM:
+			printf("%d", (u_int32_t)ntohl(*(u_int32_t *)&cp[4]));
+			break;
+		default:
+			for (i = 0; i < elen; i++)
+				printf("%02x", cp[4 + i] & 0xff);
+		}
+		printf("\n");
+		cp += len + 4;
+	}
 
 	return 0;
 }
