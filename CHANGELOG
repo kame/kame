@@ -1,5 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1959 2001/10/31 11:30:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.1960 2001/11/02 05:47:00 jinmei Exp $
+
+<200111>
+2001-11-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/in.c (in_control): fixed a bug that the kernel
+	can panic in process of the SIOCSIFADDR ioctl unless the
+	COMPAT_IFIOCTL kernel compilation option is specified.
 
 <200110>
 2001-10-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
