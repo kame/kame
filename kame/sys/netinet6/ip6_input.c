@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.148 2001/01/23 06:50:01 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.149 2001/01/23 09:52:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -423,6 +423,8 @@ ip6_input(m)
 	u_int32_t rtalert = ~0;
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
+	struct mbuf *mhist;	/*onion peeling history*/
+	caddr_t hist;
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
@@ -528,10 +530,11 @@ ip6_input(m)
 	 * Check with the firewall...
 	 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	if (ip6_fw_enable && ip6_fw_chk_ptr) {
+	if (ip6_fw_enable && ip6_fw_chk_ptr)
 #else
-	if (ip6_fw_chk_ptr) {
+	if (ip6_fw_chk_ptr)
 #endif
+	{
 		u_short port = 0;
 		/* If ipfw says divert, we have to just drop packet */
 		/* use port as a dummy argument */
@@ -1119,6 +1122,20 @@ ip6_input(m)
 		if (m->m_pkthdr.len < off) {
 			ip6stat.ip6s_tooshort++;
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_truncated);
+			goto bad;
+		}
+
+		/*
+		 * do we need to do it for every header?  yeah, other
+		 * functions can play with it (like re-allocate and copy).
+		 */
+		mhist = ip6_addaux(m);
+		if (mhist && M_TRAILINGSPACE(mhist) >= sizeof(nxt)) {
+			hist = mtod(mhist, caddr_t) + mhist->m_len;
+			bcopy(&nxt, hist, sizeof(nxt));
+			mhist->m_len += sizeof(nxt);
+		} else {
+			ip6stat.ip6s_toomanyhdr++;
 			goto bad;
 		}
 		
