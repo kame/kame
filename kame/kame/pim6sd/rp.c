@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.28 2003/08/10 17:02:41 suz Exp $	*/
+/*	$KAME: rp.c,v 1.29 2003/08/15 04:09:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1349,10 +1349,36 @@ update_rp_neighbor()
 	cand_rp_t      *cand_rp;
 
 	for (cand_rp = cand_rp_list; cand_rp != NULL; cand_rp = cand_rp->next) {
+		rp_grp_entry_t *rp_grp_entry_ptr; 
+		rpentry_t *rpentry = cand_rp->rpentry;
+
 		/* existing upstream is updated automatically */
 		if (cand_rp->rpentry->upstream != NULL)
 			continue;
 
-		set_incoming(cand_rp->rpentry, PIM_IIF_RP);
+		if (set_incoming(cand_rp->rpentry, PIM_IIF_RP))
+			continue;
+
+		/* have to update the (*,G) entry's upstream if it's empty */
+		for (rp_grp_entry_ptr = cand_rp->rp_grp_next;
+		     rp_grp_entry_ptr != NULL;
+		     rp_grp_entry_ptr = rp_grp_entry_ptr->rp_grp_next) {
+			grpentry_t *grpentry_ptr;
+
+			for (grpentry_ptr = rp_grp_entry_ptr->grplink;
+			     grpentry_ptr != NULL;
+			     grpentry_ptr = grpentry_ptr->rpnext) {
+				mrtentry_t *mrtentry_grp;
+				mrtentry_grp = grpentry_ptr->grp_route;
+
+				if (mrtentry_grp == NULL)
+					continue;
+
+				/* existing upstream is updated automatically */
+				if (mrtentry_grp->upstream != NULL)
+					continue;
+				mrtentry_grp->upstream = rpentry->upstream;
+			}
+		}
 	}
 }
