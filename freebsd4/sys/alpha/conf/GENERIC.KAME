@@ -165,7 +165,8 @@ pseudo-device	tun		# Packet tunnel.
 pseudo-device	pty		# Pseudo-ttys (telnet etc)
 pseudo-device	md		# Memory "disks"
 pseudo-device	gif		# IPv6 and IPv4 tunneling
-#pseudo-device	faith	1	# IPv6-to-IPv4 relaying/(translation)
+pseudo-device	faith	1	# IPv6-to-IPv4 relaying/(translation)
+#pseudo-device   vrrp    4       # Virtual Router Redundancy Protocol
 
 # The `bpf' pseudo-device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
