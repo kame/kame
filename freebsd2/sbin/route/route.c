@@ -72,6 +72,7 @@ static const char rcsid[] =
 #include <paths.h>
 #include <err.h>
 #include <sysexits.h>
+#include <ifaddrs.h>
 
 struct keytab {
 	char	*kt_cp;
@@ -844,52 +845,31 @@ getaddr(which, s, hpp)
 	case RTA_GATEWAY:
 		su = &so_gate;
 		if (iflag) {
-#define MAX_IFACES	400
-			int			sock, saoff;
-			struct ifreq		iflist[MAX_IFACES];
-			struct ifconf		ifconf;
-			struct ifreq		*ifr, *ifr_end, ifr_flg;
-			struct sockaddr_dl	*dl, *sdl = NULL;
+			struct ifaddrs *ifap, *ifa;
+			struct sockaddr_dl *sdl = NULL;
+			static struct sockaddr_storage ss;
 
-			/* Get socket */
-			if ((sock = socket(PF_INET, SOCK_DGRAM, 0)) < 0)
-				err(1, "socket");
+			if (getifaddrs(&ifap))
+				err(1, "getifaddrs");
 
-			/* Get interface list */
-			ifconf.ifc_req = iflist;
-			ifconf.ifc_len = sizeof(iflist);
-			if (ioctl(sock, SIOCGIFCONF, &ifconf) < 0)
-				err(1, "ioctl(SIOCGIFCONF)");
+			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+				if (ifa->ifa_addr->sa_family != AF_LINK)
+					continue;
 
-			/* Look for this interface in the list */
-			for (ifr = ifconf.ifc_req,
-			    ifr_end = (struct ifreq *)
-				(ifconf.ifc_buf + ifconf.ifc_len);
-			    ifr < ifr_end;
-			    ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
-						    + saoff)) {
-				if (ifr->ifr_addr.sa_len > sizeof(struct sockaddr))
-					saoff = ifr->ifr_addr.sa_len;
-				else
-					saoff = sizeof(struct sockaddr);
+				if (strcmp(s, ifa->ifa_name) ||
+				    (ifa->ifa_flags & IFF_POINTOPOINT) == 0)
+					continue;
 
-				dl = (struct sockaddr_dl *)&ifr->ifr_addr;
-				if (ifr->ifr_addr.sa_family == AF_LINK
-				    && !strncmp(s, dl->sdl_data, dl->sdl_nlen)
-				    && s[dl->sdl_nlen] == 0) {
-					memset(&ifr_flg, 0, sizeof(ifr_flg));
-					strcpy(ifr_flg.ifr_name,
-					       ifr->ifr_name);
-					if (ioctl(sock, SIOCGIFFLAGS,
-						  (caddr_t)&ifr_flg) == 0 &&
-					    ifr_flg.ifr_flags & IFF_POINTOPOINT) {
-						sdl = dl;
-						break;
-					}
-				}
+				/*
+				 * we need a static copy, since the ifaddr
+				 * list will be freed after the loop.
+				 */
+				memcpy(&ss, ifa->ifa_addr,
+				       ifa->ifa_addr->sa_len);
+				sdl = (struct sockaddr_dl *)&ss;
+				
 			}
-			close(sock);
-
+			freeifaddrs(ifap);
 			/* If we found it, then use it */
 			if (sdl) {
 				su->sdl = *sdl;
