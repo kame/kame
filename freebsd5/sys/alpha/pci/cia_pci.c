@@ -23,7 +23,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/pci/cia_pci.c,v 1.15 2002/02/28 18:18:41 gallatin Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -61,7 +60,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
@@ -89,6 +87,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/cia_pci.c,v 1.17 2003/08/22 07:20:27 imp Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -97,8 +98,8 @@
 #include <machine/bus.h>
 #include <machine/md_var.h>
 #include <sys/rman.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <machine/cpuconf.h>
 #include <machine/bwx.h>
 #include <machine/swiz.h>

@@ -29,7 +29,7 @@
  *    Daryll Strauss <daryll@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_fops.h,v 1.7 2003/04/25 01:18:46 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_fops.h,v 1.10 2003/11/12 20:56:30 anholt Exp $
  */
 
 #include "dev/drm/drmP.h"
@@ -45,14 +45,15 @@ drm_file_t *DRM(find_file_by_proc)(drm_device_t *dev, DRM_STRUCTPROC *p)
 #endif
 	drm_file_t *priv;
 
+	DRM_SPINLOCK_ASSERT(&dev->dev_lock);
+
 	TAILQ_FOREACH(priv, &dev->files, link)
 		if (priv->pid == pid && priv->uid == uid)
 			return priv;
 	return NULL;
 }
 
-/* DRM(open) is called whenever a process opens /dev/drm. */
-
+/* DRM(open_helper) is called whenever a process opens /dev/drm. */
 int DRM(open_helper)(dev_t kdev, int flags, int fmt, DRM_STRUCTPROC *p,
 		    drm_device_t *dev)
 {
@@ -65,12 +66,16 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, DRM_STRUCTPROC *p,
 
 	DRM_DEBUG("pid = %d, minor = %d\n", DRM_CURRENTPID, m);
 
-	/* FIXME: linux mallocs and bzeros here */
-	priv = (drm_file_t *) DRM(find_file_by_proc)(dev, p);
+	DRM_LOCK();
+	priv = DRM(find_file_by_proc)(dev, p);
 	if (priv) {
 		priv->refs++;
 	} else {
 		priv = (drm_file_t *) DRM(alloc)(sizeof(*priv), DRM_MEM_FILES);
+		if (priv == NULL) {
+			DRM_UNLOCK();
+			return DRM_ERR(ENOMEM);
+		}
 		bzero(priv, sizeof(*priv));
 #if __FreeBSD_version >= 500000
 		priv->uid		= p->td_ucred->cr_svuid;
@@ -85,10 +90,12 @@ int DRM(open_helper)(dev_t kdev, int flags, int fmt, DRM_STRUCTPROC *p,
 		priv->devXX		= dev;
 		priv->ioctl_count 	= 0;
 		priv->authenticated	= !DRM_SUSER(p);
-		DRM_LOCK;
+
+		DRIVER_OPEN_HELPER( priv, dev );
+
 		TAILQ_INSERT_TAIL(&dev->files, priv, link);
-		DRM_UNLOCK;
 	}
+	DRM_UNLOCK();
 #ifdef __FreeBSD__
 	kdev->si_drv1 = dev;
 #endif

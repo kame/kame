@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 2000 Matthew R. Green
  * All rights reserved.
  *
@@ -26,9 +26,10 @@
  * SUCH DAMAGE.
  *
  *	from: NetBSD: if_hme_pci.c,v 1.4 2001/08/27 22:18:49 augustss Exp
- *
- * $FreeBSD: src/sys/dev/hme/if_hme_pci.c,v 1.6 2003/04/16 03:16:54 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/hme/if_hme_pci.c,v 1.11 2003/09/02 20:24:42 marcel Exp $");
 
 /*
  * PCI front-end device driver for the HME ethernet device.
@@ -42,6 +43,7 @@
 #include <sys/socket.h>
 
 #include <machine/bus.h>
+#include <dev/ofw/openfirm.h>
 #include <machine/ofw_machdep.h>
 #include <machine/resource.h>
 
@@ -53,14 +55,14 @@
 #include <net/if_dl.h>
 #include <net/if_media.h>
 
-#include <mii/mii.h>
-#include <mii/miivar.h>
+#include <dev/mii/mii.h>
+#include <dev/mii/miivar.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
-#include <hme/if_hmereg.h>
-#include <hme/if_hmevar.h>
+#include <dev/hme/if_hmereg.h>
+#include <dev/hme/if_hmevar.h>
 
 #include "miibus_if.h"
 
@@ -132,13 +134,15 @@ hme_pci_attach(device_t dev)
 	struct hme_softc *sc = &hsc->hsc_hme;
 	int error;
 
-	/*
-	 * Enable memory-space and bus master accesses.  This is kinda of
-	 * gross; but the hme comes up with neither enabled.
-	 */
 	pci_enable_busmaster(dev);
+	/*
+	 * Some Sun HMEs do have their intpin register bogusly set to 0,
+	 * although it should be 1. correct that.
+	 */
+	if (pci_get_intpin(dev) == 0)
+		pci_set_intpin(dev, 1);
 
-	sc->sc_pci = 1; /* XXXXX should all be done in bus_dma. */
+	sc->sc_pci = 1;
 	sc->sc_dev = dev;
 
 	/*

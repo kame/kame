@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/brgphyreg.h,v 1.4 2001/09/27 17:32:49 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/brgphyreg.h,v 1.5 2003/06/17 15:02:28 ps Exp $
  */
 
 #ifndef _DEV_MII_BRGPHYREG_H_
@@ -224,8 +224,8 @@
 #define BRGPHY_RES_100FD	0x0500	/* 100baseT full duplex */
 #define BRGPHY_RES_100T4	0x0400	/* 100baseT4 */
 #define BRGPHY_RES_100HD	0x0300	/* 100baseT half duplex */
-#define BRGPHY_RES_10HD		0x0200	/* 10baseT full duplex */
-#define BRGPHY_RES_10FD		0x0100	/* 10baseT half duplex */
+#define BRGPHY_RES_10FD		0x0200	/* 10baseT full duplex */
+#define BRGPHY_RES_10HD		0x0100	/* 10baseT half duplex */
 
 #define BRGPHY_MII_ISR		0x1A	/* interrupt status */
 #define BRGPHY_ISR_PSERR	0x4000	/* Pair swap error */

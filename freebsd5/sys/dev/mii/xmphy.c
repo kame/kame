@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.13 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * driver for the XaQti XMAC II's internal PHY. This is sort of
  * like a 10/100 PHY, except the only thing we're really autoselecting
@@ -37,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.12 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.13 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

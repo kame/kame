@@ -37,6 +37,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/lxtphy.c,v 1.12 2003/08/24 17:54:10 obrien Exp $");
  
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
@@ -73,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/lxtphy.c,v 1.10 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/lxtphy.c,v 1.12 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -239,7 +242,7 @@ lxtphy_service(sc, mii, cmd)
 
 		case IFM_100_FX:
 			lxtphy_set_fx(sc);
-
+			/* XXX: fall though intentional ?? */
 		default:
 			/*
 			 * BMCR data is stored in the ifmedia entry.

@@ -32,7 +32,7 @@
  *
  *	@(#)endian.h	8.1 (Berkeley) 6/10/93
  *	$NetBSD: endian.h,v 1.5 1997/10/09 15:42:19 bouyer Exp $
- * $FreeBSD: src/sys/alpha/include/endian.h,v 1.13 2002/09/23 04:32:16 mike Exp $
+ * $FreeBSD: src/sys/alpha/include/endian.h,v 1.14 2003/08/03 07:50:18 obrien Exp $
  */
 
 #ifndef _MACHINE_ENDIAN_H_
@@ -44,8 +44,8 @@
 /*
  * Define the order of 32-bit words in 64-bit words.
  */
-#define _QUAD_HIGHWORD 1
-#define _QUAD_LOWWORD 0
+#define	_QUAD_HIGHWORD 1
+#define	_QUAD_LOWWORD 0
 
 /*
  * Definitions for byte order, according to byte significance from low
@@ -81,7 +81,7 @@ __bswap64(__uint64_t _x)
 }
 
 static __inline __uint32_t
-__bswap32(__uint32_t __x)
+__bswap32(__uint32_t _x)
 {
 	__uint32_t __r;
 
@@ -95,12 +95,12 @@ __bswap32(__uint32_t __x)
 		"or $4, $1, %0\n\t"
 		"or $2, $3, $2\n\t"
 		"or $2, %0, %0"
-		: "=r" (__r) : "r" (__x) : "$1", "$2", "$3", "$4");
+		: "=r" (__r) : "r" (_x) : "$1", "$2", "$3", "$4");
 	return (__r);
 }
 
-static __inline __uint16_t 
-__bswap16(__uint16_t __x)
+static __inline __uint16_t
+__bswap16(__uint16_t _x)
 {
 	__uint16_t __r;
 
@@ -108,7 +108,7 @@ __bswap16(__uint16_t __x)
 		"insbl %1, 1, $1\n\t"
 		"extbl %1, 1, $2\n\t"
 		"or $1, $2, %0"
-		: "=r" (__r) : "r" (__x) : "$1", "$2");
+		: "=r" (__r) : "r" (_x) : "$1", "$2");
 	return (__r);
 }
 

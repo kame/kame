@@ -24,7 +24,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.12 2003/04/03 21:36:31 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.17 2003/09/28 06:51:47 jake Exp $");
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.17 2003/09/28 06:51:47 jake Exp $");
 
 #include "opt_ddb.h"
 #include "opt_comconsole.h"
@@ -89,15 +92,17 @@ cn_drvinit(void *unused)
 {
 	phandle_t options;
 	char output[32];
+	dev_t dev;
 
-	if (ofw_consdev.cn_dev != NULL) {
+	if (ofw_consdev.cn_pri != CN_DEAD &&
+	    ofw_consdev.cn_name[0] != '\0') {
 		if ((options = OF_finddevice("/options")) == -1 ||
 		    OF_getprop(options, "output-device", output,
 		    sizeof(output)) == -1)
 			return;
-		make_dev(&ofw_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "%s",
+		dev = make_dev(&ofw_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "%s",
 		    output);
-		make_dev_alias(ofw_consdev.cn_dev, "ofwcons");
+		make_dev_alias(dev, "ofwcons");
 	}
 }
 
@@ -272,15 +277,15 @@ ofw_cons_probe(struct consdev *cp)
 		return;
 	}
 
-	cp->cn_dev = NULL;
-	cp->cn_pri = CN_INTERNAL;
+	cp->cn_pri = CN_LOW;
 }
 
 static void
 ofw_cons_init(struct consdev *cp)
 {
 
-	cp->cn_dev = makedev(CDEV_MAJOR, 0);
+	/* XXX: This is the alias, but that should be good enough */
+	sprintf(cp->cn_name, "ofwcons");
 	cp->cn_tp = ofw_tp;
 }
 

@@ -21,9 +21,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/amd64/amd64/elf_machdep.c,v 1.15 2003/05/11 22:40:24 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/elf_machdep.c,v 1.18 2003/09/25 01:10:23 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -69,7 +70,8 @@ struct sysentvec elf64_freebsd_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_setregs
+	exec_setregs,
+	NULL
 };
 
 static Elf64_Brandinfo freebsd_brand_info = {
@@ -77,7 +79,7 @@ static Elf64_Brandinfo freebsd_brand_info = {
 						EM_X86_64,
 						"FreeBSD",
 						"",
-						"/usr/libexec/ld-elf.so.1",
+						"/libexec/ld-elf.so.1",
 						&elf64_freebsd_sysvec
 					  };
 

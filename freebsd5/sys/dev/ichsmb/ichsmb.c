@@ -2,6 +2,7 @@
 /*
  * ichsmb.c
  *
+ * Author: Archie Cobbs <archie@freebsd.org>
  * Copyright (c) 2000 Whistle Communications, Inc.
  * All rights reserved.
  * 
@@ -33,11 +34,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
- *
- * Author: Archie Cobbs <archie@freebsd.org>
- *
- * $FreeBSD: src/sys/dev/ichsmb/ichsmb.c,v 1.7 2002/04/04 21:03:14 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb.c,v 1.8 2003/08/24 17:49:12 obrien Exp $");
 
 /*
  * Support for the SMBus controller logical device which is part of the

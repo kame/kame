@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/support.s,v 1.13 2003/04/04 17:29:54 des Exp $
+ * $FreeBSD: src/sys/alpha/alpha/support.s,v 1.15 2003/07/24 07:49:45 marcel Exp $
  */
 
 /*
@@ -59,7 +59,35 @@
 	.text
 
 /**************************************************************************/
-	
+
+/*
+ * intptr_t
+ * casuptr(intptr_t *p, intptr_t old, intptr_t new)
+ */
+	LEAF(casuptr, 3)
+	LDGP(pv)
+
+	ldiq	t0, VM_MAXUSER_ADDRESS /* verify address validity */
+	cmpult	a0, t0, t1
+	beq	t1, fusufault
+
+	lda	t0, fusufault		/* trap faults */
+	ldq	t2, PC_CURTHREAD(pcpup)
+	ldq	t2, TD_PCB(t2)
+
+	stq	t0, PCB_ONFAULT(t2)
+1:
+	ldq_l	v0, 0(a0)		/* try to load the old value */
+	cmpeq	v0, a1, t0		/* compare */
+	beq	t0, 2f			/* exit if not equal */
+	mov	a2, t0			/* setup value to write */
+	stq_c	t0, 0(a0)		/* write if address still locked */
+	beq	t0, 1b			/* if it failed, spin */
+2:
+	stq	zero, PCB_ONFAULT(t2)	/* clean up */
+	RET
+	END(casuptr)
+
 /*
  * fu{byte,word} : fetch a byte (word) from user memory
  */
@@ -84,7 +112,27 @@
 	mov	zero, v0
 	RET
 	END(suword)
-	
+
+	LEAF(suword32, 2)
+	LDGP(pv)
+
+	ldiq	t0, VM_MAXUSER_ADDRESS /* verify address validity */
+	cmpult	a0, t0, t1
+	beq	t1, fusufault
+
+	lda	t0, fusufault		/* trap faults */
+	ldq	t2, PC_CURTHREAD(pcpup)
+	ldq	t2, TD_PCB(t2)
+	stq	t0, PCB_ONFAULT(t2)
+
+	stl	a1, 0(a0)		/* try the store */
+
+	stq	zero, PCB_ONFAULT(t2)	/* clean up */
+
+	mov	zero, v0
+	RET
+	END(suword32)
+
 	LEAF(subyte, 1)
 	LDGP(pv)
 
@@ -129,6 +177,25 @@
 
 	RET
 	END(fuword)
+
+	LEAF(fuword32, 1)
+	LDGP(pv)
+
+	ldiq	t0, VM_MAXUSER_ADDRESS /* verify address validity */
+	cmpult	a0, t0, t1
+	beq	t1, fusufault
+
+	lda	t0, fusufault		/* trap faults */
+	ldq	t2, PC_CURTHREAD(pcpup)
+	ldq	t2, TD_PCB(t2)
+	stq	t0, PCB_ONFAULT(t2)
+
+	ldl	v0, 0(a0)		/* get the word containing our byte */
+
+	stq	zero, PCB_ONFAULT(t2)	/* clean up */
+
+	RET
+	END(fuword32)
 
 	LEAF(fubyte, 1)
 	LDGP(pv)

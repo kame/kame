@@ -24,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/cs/if_cs_isa.c,v 1.3 2003/04/15 06:37:22 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/cs/if_cs_isa.c,v 1.5 2003/10/31 18:31:58 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -88,7 +90,6 @@ static int
 cs_isa_attach(device_t dev)
 {
         struct cs_softc *sc = device_get_softc(dev);
-        int flags = device_get_flags(dev);
         int error;
         
 	cs_alloc_port(dev, 0, CS_89x0_IO_PORTS);
@@ -104,7 +105,7 @@ cs_isa_attach(device_t dev)
                 return (error);
         }              
 
-        return (cs_attach(sc, device_get_unit(dev), flags));
+        return (cs_attach(dev));
 }
 
 static device_method_t cs_isa_methods[] = {

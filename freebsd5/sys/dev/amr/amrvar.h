@@ -53,7 +53,7 @@
  * SUCH DAMAGE.
  *
  *
- *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.18 2003/04/01 15:06:22 phk Exp $
+ *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.19 2003/10/10 22:49:40 ps Exp $
  */
 
 #if __FreeBSD_version >= 500005
@@ -261,6 +261,7 @@ struct amrd_softc
  * Interface between driver core and disk driver (should be using a bus?)
  */
 extern int	amr_submit_bio(struct amr_softc *sc, struct bio *bio);
+extern int 	amr_dump_blocks(struct amr_softc *sc, int unit, u_int32_t lba, void *data, int blks);
 extern void	amrd_intr(void *data);
 
 /********************************************************************************

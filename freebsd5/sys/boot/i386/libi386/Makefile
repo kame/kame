@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.29 2003/05/01 03:56:29 peter Exp $
+# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.32 2003/07/02 12:45:45 ru Exp $
 #
 LIB=			i386
 INTERNALLIB=		true
@@ -39,11 +39,10 @@ ${SRCS:M*.c:R:S/$/.o/g}: machine
 .if exists(${.CURDIR}/../../../i386/include)
 beforedepend ${OBJS}: machine
 
+CLEANFILES+=	machine
 machine:
 	ln -sf ${.CURDIR}/../../../i386/include machine
 
 .endif
-
-CLEANFILES+=	machine
 
 .include <bsd.lib.mk>

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdInterrupt.c,v 1.12 2002/10/16 17:28:53 jhb Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdInterrupt.c,v 1.15 2003/11/12 16:24:16 jhb Exp $
  */
 
 /*
@@ -45,6 +45,8 @@ ACPI_MODULE_NAME("INTERRUPT")
 
 static void		InterruptWrapper(void *arg);
 static OSD_HANDLER	InterruptHandler;
+
+static UINT32 InterruptOverride = 0;
 
 /*
  * XXX this does not correctly free resources in the case of partically successful
@@ -81,6 +83,12 @@ AcpiOsInstallInterruptHandler(UINT32 InterruptNumber, OSD_HANDLER ServiceRoutine
 	return_ACPI_STATUS(AE_ALREADY_EXISTS);
     }
     sc->acpi_irq_rid = 0;
+    if (InterruptOverride != 0) {
+	    device_printf(sc->acpi_dev,
+		"Overriding SCI Interrupt from IRQ %u to IRQ %u\n",
+		InterruptNumber, InterruptOverride);
+	    InterruptNumber = InterruptOverride;
+    }
     bus_set_resource(sc->acpi_dev, SYS_RES_IRQ, 0, InterruptNumber, 1);
     if ((sc->acpi_irq = bus_alloc_resource(sc->acpi_dev, SYS_RES_IRQ, &sc->acpi_irq_rid, 0, ~0, 1, 
 					   RF_SHAREABLE | RF_ACTIVE)) == NULL) {
@@ -120,6 +128,18 @@ AcpiOsRemoveInterruptHandler (UINT32 InterruptNumber, OSD_HANDLER ServiceRoutine
 
     sc->acpi_irq = NULL;
 
+    return_ACPI_STATUS(AE_OK);
+}
+
+ACPI_STATUS
+acpi_OverrideInterruptLevel(UINT32 InterruptNumber)
+{
+
+    ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
+
+    if (InterruptOverride != 0)
+	return_ACPI_STATUS(AE_ALREADY_EXISTS);
+    InterruptOverride = InterruptNumber;
     return_ACPI_STATUS(AE_OK);
 }
 

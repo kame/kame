@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/alpha/mcbus/mcbus.c,v 1.3 2002/03/26 19:46:40 dfr Exp $ */
 /*
  * Copyright (c) 2000 by Matthew Jacob
  * All rights reserved.
@@ -31,6 +30,9 @@
  * for Rawhide (Alpha 4100) systems.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcbus.c,v 1.5 2003/08/17 06:42:08 marcel Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -38,8 +40,9 @@
 #include <sys/bus.h>
 #include <sys/malloc.h>
 
-#include <machine/rpb.h>
 #include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
 
 #include <alpha/mcbus/mcbusreg.h>
 #include <alpha/mcbus/mcbusvar.h>

@@ -37,10 +37,11 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7770.c#30 $
- *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.12 2003/05/03 23:55:38 gibbs Exp $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7770.c#32 $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7770.c,v 1.15 2003/08/24 17:48:02 obrien Exp $");
 
 #ifdef __linux__
 #include "aic7xxx_osm.h"
@@ -67,8 +68,7 @@ static ahc_device_setup_t ahc_aic7770_VL_setup;
 static ahc_device_setup_t ahc_aic7770_EISA_setup;;
 static ahc_device_setup_t ahc_aic7770_setup;
 
-
-struct aic7770_identity aic7770_ident_table [] =
+struct aic7770_identity aic7770_ident_table[] =
 {
 	{
 		ID_AHA_274x,
@@ -80,6 +80,12 @@ struct aic7770_identity aic7770_ident_table [] =
 		ID_AHA_284xB,
 		0xFFFFFFFE,
 		"Adaptec 284X SCSI adapter",
+		ahc_aic7770_VL_setup
+	},
+	{
+		ID_AHA_284x,
+		0xFFFFFFFE,
+		"Adaptec 284X SCSI adapter (BIOS Disabled)",
 		ahc_aic7770_VL_setup
 	},
 	{
@@ -154,7 +160,7 @@ aic7770_config(struct ahc_softc *ahc, struct aic7770_identity *entry, u_int io)
 	ahc->bus_suspend = aic7770_suspend;
 	ahc->bus_resume = aic7770_resume;
 
-	error = ahc_reset(ahc);
+	error = ahc_reset(ahc, /*reinit*/FALSE);
 	if (error != 0)
 		return (error);
 

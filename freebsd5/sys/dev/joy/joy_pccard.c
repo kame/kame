@@ -25,8 +25,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/joy/joy_pccard.c,v 1.2 2002/06/02 20:05:47 schweikh Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/joy/joy_pccard.c,v 1.3 2003/08/24 17:49:14 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

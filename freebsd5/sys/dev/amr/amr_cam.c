@@ -23,7 +23,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
+ */
+/*
  * Copyright (c) 2002 Eric Moore
  * Copyright (c) 2002 LSI Logic Corporation
  * All rights reserved.
@@ -51,10 +52,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *
- *	$FreeBSD: src/sys/dev/amr/amr_cam.c,v 1.7 2003/04/01 15:06:22 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/amr/amr_cam.c,v 1.9 2003/08/24 17:48:03 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -265,22 +266,7 @@ amr_cam_action(struct cam_sim *sim, union ccb *ccb)
 
     case XPT_CALC_GEOMETRY:
     {
-	struct    ccb_calc_geometry *ccg = &ccb->ccg;
-	u_int32_t size_in_mb;
-	u_int32_t secs_per_cylinder;
-
-	size_in_mb = ccg->volume_size / ((1024L * 1024L) / ccg->block_size);
-
-	if (size_in_mb > 1024) {
-	    ccg->heads = 255;
-	    ccg->secs_per_track = 63;
-	} else {
-	    ccg->heads = 64;
-	    ccg->secs_per_track = 32;
-	}
-	secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-	ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-	ccb->ccb_h.status = CAM_REQ_CMP;
+	cam_calc_geometry(&ccb->ccg, /*extended*/1);
 	break;
     }
 

@@ -29,9 +29,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/buslogic/bt.c,v 1.38 2003/05/27 04:59:57 scottl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt.c,v 1.43 2003/08/25 09:28:54 obrien Exp $");
 
  /*
   * Special thanks to Leonard N. Zubkoff for writing such a complete and
@@ -45,6 +46,8 @@
 #include <sys/systm.h> 
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/sysctl.h>
 #include <sys/bus.h>
  
@@ -248,22 +251,29 @@ bt_free_softc(device_t dev)
 	}
 	case 7:
 		bus_dmamap_unload(bt->ccb_dmat, bt->ccb_dmamap);
+		/* FALLTHROUGH */
 	case 6:
 		bus_dmamem_free(bt->ccb_dmat, bt->bt_ccb_array,
 				bt->ccb_dmamap);
 		bus_dmamap_destroy(bt->ccb_dmat, bt->ccb_dmamap);
+		/* FALLTHROUGH */
 	case 5:
 		bus_dma_tag_destroy(bt->ccb_dmat);
+		/* FALLTHROUGH */
 	case 4:
 		bus_dmamap_unload(bt->mailbox_dmat, bt->mailbox_dmamap);
+		/* FALLTHROUGH */
 	case 3:
 		bus_dmamem_free(bt->mailbox_dmat, bt->in_boxes,
 				bt->mailbox_dmamap);
 		bus_dmamap_destroy(bt->mailbox_dmat, bt->mailbox_dmamap);
+		/* FALLTHROUGH */
 	case 2:
 		bus_dma_tag_destroy(bt->buffer_dmat);
+		/* FALLTHROUGH */
 	case 1:
 		bus_dma_tag_destroy(bt->mailbox_dmat);
+		/* FALLTHROUGH */
 	case 0:
 		break;
 	}
@@ -716,6 +726,8 @@ bt_init(device_t dev)
 				/* nsegments	*/ BT_NSEG,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ BUS_DMA_ALLOCNOW,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&bt->buffer_dmat) != 0) {
 		goto error_exit;
 	}
@@ -735,6 +747,8 @@ bt_init(device_t dev)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&bt->mailbox_dmat) != 0) {
 		goto error_exit;
         }
@@ -775,6 +789,8 @@ bt_init(device_t dev)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&bt->ccb_dmat) != 0) {
 		goto error_exit;
         }
@@ -809,6 +825,8 @@ bt_init(device_t dev)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&bt->sg_dmat) != 0) {
 		goto error_exit;
         }
@@ -944,9 +962,9 @@ bt_find_probe_range(int ioport, int *port_index, int *max_port_index)
 		if ((i >= BT_NUM_ISAPORTS)
 		 || (ioport != bt_isa_ports[i].addr)) {
 			printf(
-"bt_isa_probe: Invalid baseport of 0x%x specified.\n"
-"bt_isa_probe: Nearest valid baseport is 0x%x.\n"
-"bt_isa_probe: Failing probe.\n",
+"bt_find_probe_range: Invalid baseport of 0x%x specified.\n"
+"bt_find_probe_range: Nearest valid baseport is 0x%x.\n"
+"bt_find_probe_range: Failing probe.\n",
 			       ioport,
 			       (i < BT_NUM_ISAPORTS)
 				    ? bt_isa_ports[i].addr

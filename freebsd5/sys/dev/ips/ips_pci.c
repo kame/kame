@@ -24,13 +24,15 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ips/ips_pci.c,v 1.1 2003/05/11 06:36:49 scottl Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips_pci.c,v 1.7 2003/09/11 23:30:28 ps Exp $");
 
 #include <dev/ips/ips.h>
+
 static int ips_pci_free(ips_softc_t *sc);
+static void ips_intrhook(void *arg);
 
 static int ips_pci_probe(device_t dev)
 {
@@ -52,6 +54,12 @@ static int ips_pci_attach(device_t dev)
         u_int32_t command;
         ips_softc_t *sc;
 
+
+	if (resource_disabled(device_get_name(dev), device_get_unit(dev))) {
+		device_printf(dev, "device is disabled\n");
+		/* but return 0 so the !$)$)*!$*) unit isn't reused */
+		return (0);
+	}
         DEVICE_PRINTF(1, dev, "in attach.\n");
         sc = (ips_softc_t *)device_get_softc(dev);
         if(!sc){
@@ -80,15 +88,15 @@ static int ips_pci_attach(device_t dev)
         if(command & PCIM_CMD_MEMEN){
                 PRINTF(10, "trying MEMIO\n");
 		if(pci_get_device(dev) == IPS_MORPHEUS_DEVICE_ID)
-                	sc->rid = PCIR_MAPS;
+                	sc->rid = PCIR_BAR(0);
 		else
-			sc->rid = PCIR_MAPS + 4;
+			sc->rid = PCIR_BAR(1);
                 sc->iotype = SYS_RES_MEMORY;
                 sc->iores = bus_alloc_resource(dev, sc->iotype, &sc->rid, 0, ~0, 1, RF_ACTIVE);
         }
         if(!sc->iores && command & PCIM_CMD_PORTEN){
                 PRINTF(10, "trying PORTIO\n");
-                sc->rid = PCIR_MAPS;
+                sc->rid = PCIR_BAR(0);
                 sc->iotype = SYS_RES_IOPORT;
                 sc->iores = bus_alloc_resource(dev, sc->iotype, &sc->rid, 0, ~0, 1, RF_ACTIVE);
         }
@@ -119,16 +127,34 @@ static int ips_pci_attach(device_t dev)
 				/* numsegs   */	IPS_MAX_SG_ELEMENTS,
 				/* maxsegsize*/	BUS_SPACE_MAXSIZE_32BIT,
 				/* flags     */	0,
+				/* lockfunc  */ busdma_lock_mutex,
+				/* lockarg   */ &Giant,
 				&sc->adapter_dmatag) != 0) {
                 printf("IPS can't alloc dma tag\n");
                 goto error;
         }
-	if(ips_adapter_init(sc))
+	sc->ips_ich.ich_func = ips_intrhook;
+	sc->ips_ich.ich_arg = sc;
+	if (config_intrhook_establish(&sc->ips_ich) != 0) {
+		printf("IPS can't establish configuration hook\n");
 		goto error;
+	}
         return 0;
 error:
 	ips_pci_free(sc);
         return (ENXIO);
+}
+
+static void
+ips_intrhook(void *arg)
+{
+	struct ips_softc *sc = (struct ips_softc *)arg;
+
+	config_intrhook_disestablish(&sc->ips_ich);
+	if (ips_adapter_init(sc))
+		ips_pci_free(sc);
+	else
+		sc->configured = 1;
 }
 
 static int ips_pci_free(ips_softc_t *sc)
@@ -141,6 +167,7 @@ static int ips_pci_free(ips_softc_t *sc)
                bus_release_resource(sc->dev, SYS_RES_IRQ, sc->irqrid, sc->irqres);
         if(sc->iores)
                 bus_release_resource(sc->dev, sc->iotype, sc->rid, sc->iores);
+	sc->configured = 0;
 	return 0;
 }
 
@@ -149,18 +176,23 @@ static int ips_pci_detach(device_t dev)
         ips_softc_t *sc;
         DEVICE_PRINTF(1, dev, "detaching ServeRaid\n");
         sc = (ips_softc_t *) device_get_softc(dev);
-	ips_flush_cache(sc);
-	if(ips_adapter_free(sc))
-		return EBUSY;
-        ips_pci_free(sc);
-	mtx_destroy(&sc->cmd_mtx);
+	if (sc->configured) {
+		sc->configured = 0;
+		ips_flush_cache(sc);
+		if(ips_adapter_free(sc))
+			return EBUSY;
+		ips_pci_free(sc);
+		mtx_destroy(&sc->cmd_mtx);
+	}
 	return 0;
 }
 
 static int ips_pci_shutdown(device_t dev)
 {
 	ips_softc_t *sc = (ips_softc_t *) device_get_softc(dev);
-	ips_flush_cache(sc);
+	if (sc->configured) {
+		ips_flush_cache(sc);
+	}
 	return 0;
 }
 

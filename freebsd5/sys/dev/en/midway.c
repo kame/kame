@@ -31,9 +31,9 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/en/midway.c,v 1.39 2003/05/05 16:35:52 harti Exp $
  */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/en/midway.c,v 1.59 2003/10/31 18:31:59 brooks Exp $");
 
 /*
  *
@@ -132,8 +132,10 @@ enum {
 #include <sys/socket.h>
 #include <sys/mbuf.h>
 #include <sys/endian.h>
-#include <sys/sbuf.h>
 #include <sys/stdint.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#include <sys/condvar.h>
 #include <vm/uma.h>
 
 #include <net/if.h>
@@ -156,6 +158,7 @@ enum {
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
 #include <machine/resource.h>
+#include <dev/utopia/utopia.h>
 #include <dev/en/midwayreg.h>
 #include <dev/en/midwayvar.h>
 
@@ -167,12 +170,6 @@ enum {
 #ifndef EN_TXHIWAT
 #define EN_TXHIWAT	(64 * 1024)	/* max 64 KB waiting to be DMAd out */
 #endif
-
-#define RX_NONE		0xffff		/* recv VC not in use */
-
-#define ENOTHER_FREE	0x01		/* free rxslot */
-#define ENOTHER_DRAIN	0x02		/* almost free (drain DRQ dma) */
-#define ENOTHER_SWSL	0x08		/* in software service list */
 
 SYSCTL_DECL(_hw_atm);
 
@@ -206,6 +203,7 @@ static const struct en_dmatab en_dmaplan[] = {
 int en_dump(int unit, int level);
 int en_dumpmem(int,int,int);
 #endif
+static void en_close_finish(struct en_softc *sc, struct en_vcc *vc);
 
 #define EN_LOCK(SC)	do {				\
 	DBG(SC, LOCK, ("ENLOCK %d\n", __LINE__));	\
@@ -215,6 +213,7 @@ int en_dumpmem(int,int,int);
 	DBG(SC, LOCK, ("ENUNLOCK %d\n", __LINE__));	\
 	mtx_unlock(&sc->en_mtx);			\
     } while (0)
+#define EN_CHECKLOCK(sc)	mtx_assert(&sc->en_mtx, MA_OWNED)
 
 /*
  * While a transmit mbuf is waiting to get transmit DMA resources we
@@ -267,6 +266,11 @@ int en_dumpmem(int,int,int);
 #define EN_DQ_MK(SLOT, LEN)	(((SLOT) << 20) | (LEN) | (0x80000))
 #define EN_DQ_SLOT(X)		((X) >> 20)
 #define EN_DQ_LEN(X)		((X) & 0x3ffff)
+
+/*
+ * Variables
+ */
+static uma_zone_t en_vcc_zone;
 
 /***********************************************************************/
 
@@ -405,7 +409,7 @@ en_dump_packet(struct en_softc *sc, struct mbuf *m)
 		m = m->m_next;
 	}
 	printf("\n");
-	if (totlen != plen);
+	if (totlen != plen)
 		printf("sum of m_len=%u\n", totlen);
 }
 #endif
@@ -582,7 +586,7 @@ en_txdma_load(void *uarg, bus_dma_segment_t *segs, int nseg, bus_size_t mapsize,
 		 */
 		tmp = MID_TBD_MK1((tx->flags & TX_AAL5) ?
 		    MID_TBD_AAL5 : MID_TBD_NOAAL5,
-		    sc->txspeed[tx->vci],
+		    sc->vccs[tx->vci]->txspeed,
 		    tx->m->m_pkthdr.len / MID_ATMDATASZ);
 		en_write(sc, cur, tmp);
 		EN_WRAPADD(slot->start, slot->stop, cur, 4);
@@ -749,7 +753,7 @@ en_txdma(struct en_softc *sc, struct en_txslot *slot)
 	 * Try to load that map
 	 */
 	error = bus_dmamap_load_mbuf(sc->txtag, map->map, tx.m,
-	    en_txdma_load, &tx, 0);
+	    en_txdma_load, &tx, BUS_DMA_NOWAIT);
 
 	if (lastm != NULL)
 		lastm->m_next = NULL;
@@ -772,7 +776,10 @@ en_txdma(struct en_softc *sc, struct en_txslot *slot)
 
 	EN_COUNT(sc->stats.launch);
 	sc->ifatm.ifnet.if_opackets++;
-  
+
+	sc->vccs[tx.vci]->opackets++;
+	sc->vccs[tx.vci]->obytes += tx.datalen;
+
 #ifdef ENABLE_BPF
 	if (sc->ifatm.ifnet.if_bpf != NULL) {
 		/*
@@ -968,11 +975,12 @@ en_start(struct ifnet *ifp)
 	u_int pad;		/* 0-bytes to pad at PDU end */
 	u_int datalen;		/* length of user data */
 	u_int vci;		/* the VCI we are transmitting on */
-	u_int chan;		/* the transmit channel */
 	u_int flags;
 	uint32_t tbd[2];
 	uint32_t pdu[2];
+	struct en_vcc *vc;
 	struct en_map *map;
+	struct en_txslot *tx;
 
 	while (1) {
 		IF_DEQUEUE(&ifp->if_snd, m);
@@ -983,15 +991,17 @@ en_start(struct ifnet *ifp)
 
 	    	ap = mtod(m, struct atm_pseudohdr *);
 		vci = ATM_PH_VCI(ap);
-		if (ATM_PH_FLAGS(ap) & ATM_PH_AAL5)
-			flags |= TX_AAL5;
 
-		if (ATM_PH_VPI(ap) != 0 || vci > MID_N_VC) {
+		if (ATM_PH_VPI(ap) != 0 || vci >= MID_N_VC ||
+		    (vc = sc->vccs[vci]) == NULL ||
+		    (vc->vflags & VCC_CLOSE_RX)) {
 			DBG(sc, TX, ("output vpi=%u, vci=%u -- drop",
 			    ATM_PH_VPI(ap), vci));
 			m_freem(m);
 			continue;
 		}
+		if (vc->vcc.aal == ATMIO_AAL_5)
+			flags |= TX_AAL5;
 		m_adj(m, sizeof(struct atm_pseudohdr));
 
 		/*
@@ -1051,8 +1061,7 @@ en_start(struct ifnet *ifp)
 		if (M_WRITABLE(m) && M_LEADINGSPACE(m) >= MID_TBD_SIZE) {
 			tbd[0] = htobe32(MID_TBD_MK1((flags & TX_AAL5) ?
 			    MID_TBD_AAL5 : MID_TBD_NOAAL5,
-			    sc->txspeed[vci],
-			    m->m_pkthdr.len / MID_ATMDATASZ));
+			    vc->txspeed, m->m_pkthdr.len / MID_ATMDATASZ));
 			tbd[1] = htobe32(MID_TBD_MK2(vci, 0, 0));
 
 			m->m_data -= MID_TBD_SIZE;
@@ -1089,14 +1098,13 @@ en_start(struct ifnet *ifp)
 		}
 
 		/*
-		 * get assigned channel (will be zero unless
-		 * txspeed[atm_vci] is set)
+		 * get assigned channel (will be zero unless txspeed is set)
 		 */
-		chan = sc->txvc2slot[vci];
+		tx = vc->txslot;
 
 		if (m->m_pkthdr.len > EN_TXSZ * 1024) {
-			DBG(sc, TX, ("tx%d: packet larger than xmit buffer "
-			    "(%d > %d)\n", chan, m->m_pkthdr.len,
+			DBG(sc, TX, ("tx%zu: packet larger than xmit buffer "
+			    "(%d > %d)\n", tx - sc->txslot, m->m_pkthdr.len,
 			    EN_TXSZ * 1024));
 			EN_UNLOCK(sc);
 			m_freem(m);
@@ -1104,9 +1112,10 @@ en_start(struct ifnet *ifp)
 			continue;
 		}
 
-		if (sc->txslot[chan].mbsize > EN_TXHIWAT) {
+		if (tx->mbsize > EN_TXHIWAT) {
 			EN_COUNT(sc->stats.txmbovr);
-			DBG(sc, TX, ("tx%d: buffer space shortage", chan));
+			DBG(sc, TX, ("tx%d: buffer space shortage",
+			    tx - sc->txslot));
 			EN_UNLOCK(sc);
 			m_freem(m);
 			uma_zfree(sc->map_zone, map);
@@ -1114,17 +1123,17 @@ en_start(struct ifnet *ifp)
 		}
 
 		/* commit */
-		sc->txslot[chan].mbsize += m->m_pkthdr.len;
+		tx->mbsize += m->m_pkthdr.len;
 
-		DBG(sc, TX, ("tx%d: VCI=%d, speed=0x%x, buflen=%d, mbsize=%d",
-		    chan, vci, sc->txspeed[vci], m->m_pkthdr.len, 
-		    sc->txslot[chan].mbsize));
+		DBG(sc, TX, ("tx%zu: VCI=%d, speed=0x%x, buflen=%d, mbsize=%d",
+		    tx - sc->txslot, vci, sc->vccs[vci]->txspeed,
+		    m->m_pkthdr.len, tx->mbsize));
 
 		MBUF_SET_TX(m, vci, flags, datalen, pad, map);
 
-		_IF_ENQUEUE(&sc->txslot[chan].q, m);
+		_IF_ENQUEUE(&tx->q, m);
 
-		en_txdma(sc, &sc->txslot[chan]);
+		en_txdma(sc, tx);
 
 		EN_UNLOCK(sc);
 	}
@@ -1141,132 +1150,189 @@ en_start(struct ifnet *ifp)
  * LOCK: locked, needed
  */
 static void
-en_loadvc(struct en_softc *sc, int vc)
+en_loadvc(struct en_softc *sc, struct en_vcc *vc)
 {
-	int slot;
-	uint32_t reg = en_read(sc, MID_VC(vc));
+	uint32_t reg = en_read(sc, MID_VC(vc->vcc.vci));
 
 	reg = MIDV_SETMODE(reg, MIDV_TRASH);
-	en_write(sc, MID_VC(vc), reg);
+	en_write(sc, MID_VC(vc->vcc.vci), reg);
 	DELAY(27);
-
-	if ((slot = sc->rxvc2slot[vc]) == RX_NONE)
-		return;
 
 	/* no need to set CRC */
 
 	/* read pointer = 0, desc. start = 0 */
-	en_write(sc, MID_DST_RP(vc), 0);
+	en_write(sc, MID_DST_RP(vc->vcc.vci), 0);
 	/* write pointer = 0 */
-	en_write(sc, MID_WP_ST_CNT(vc), 0);
+	en_write(sc, MID_WP_ST_CNT(vc->vcc.vci), 0);
 	/* set mode, size, loc */
-	en_write(sc, MID_VC(vc), sc->rxslot[slot].mode);
+	en_write(sc, MID_VC(vc->vcc.vci), vc->rxslot->mode);
 
-	sc->rxslot[slot].cur = sc->rxslot[slot].start;
+	vc->rxslot->cur = vc->rxslot->start;
 
-	DBG(sc, VC, ("rx%d: assigned to VCI %d", slot, vc));
+	DBG(sc, VC, ("rx%d: assigned to VCI %d", vc->rxslot - sc->rxslot,
+	    vc->vcc.vci));
 }
 
 /*
- * en_rxctl: turn on and off VCs for recv.
+ * Open the given vcc.
  *
  * LOCK: unlocked, needed
  */
 static int
-en_rxctl(struct en_softc *sc, struct atm_pseudoioctl *pi, int on)
+en_open_vcc(struct en_softc *sc, struct atmio_openvcc *op)
 {
-	u_int vci, flags, slot;
 	uint32_t oldmode, newmode;
+	struct en_rxslot *slot;
+	struct en_vcc *vc;
+	int error = 0;
 
-	vci = ATM_PH_VCI(&pi->aph);
-	flags = ATM_PH_FLAGS(&pi->aph);
+	DBG(sc, IOCTL, ("enable vpi=%d, vci=%d, flags=%#x",
+	    op->param.vpi, op->param.vci, op->param.flags));
 
-	DBG(sc, IOCTL, ("%s vpi=%d, vci=%d, flags=%#x",
-	  (on) ? "enable" : "disable", ATM_PH_VPI(&pi->aph), vci, flags));
-
-	if (ATM_PH_VPI(&pi->aph) || vci >= MID_N_VC)
+	if (op->param.vpi != 0 || op->param.vci >= MID_N_VC)
 		return (EINVAL);
+
+	vc = uma_zalloc(en_vcc_zone, M_NOWAIT | M_ZERO);
+	if (vc == NULL)
+		return (ENOMEM);
 
 	EN_LOCK(sc);
 
-	if (on) {
-		/*
-		 * turn on VCI!
-		 */
-		if (sc->rxvc2slot[vci] != RX_NONE)
-			return (EINVAL);
-		for (slot = 0; slot < sc->en_nrx; slot++)
-			if (sc->rxslot[slot].oth_flags & ENOTHER_FREE)
-				break;
-		if (slot == sc->en_nrx) {
-			EN_UNLOCK(sc);
-			return (ENOSPC);
-		}
+	if (sc->vccs[op->param.vci] != NULL) {
+		error = EBUSY;
+		goto done;
+	}
 
-		sc->rxvc2slot[vci] = slot;
-		sc->rxslot[slot].rxhand = NULL;
-		oldmode = sc->rxslot[slot].mode;
-		newmode = (flags & ATM_PH_AAL5) ? MIDV_AAL5 : MIDV_NOAAL;
-		sc->rxslot[slot].mode = MIDV_SETMODE(oldmode, newmode);
-		sc->rxslot[slot].atm_vci = vci;
-		sc->rxslot[slot].atm_flags = flags;
-		sc->rxslot[slot].oth_flags = 0;
-		sc->rxslot[slot].rxhand = pi->rxhand;
+	/* find a free receive slot */
+	for (slot = sc->rxslot; slot < &sc->rxslot[sc->en_nrx]; slot++)
+		if (slot->vcc == NULL)
+			break;
+	if (slot == &sc->rxslot[sc->en_nrx]) {
+		error = ENOSPC;
+		goto done;
+	}
 
-		if (_IF_QLEN(&sc->rxslot[slot].indma) != 0 ||
-		    _IF_QLEN(&sc->rxslot[slot].q) != 0)
-			panic("en_rxctl: left over mbufs on enable");
-		sc->txspeed[vci] = 0;	/* full speed to start */
-		sc->txvc2slot[vci] = 0;	/* init value */
-		sc->txslot[0].nref++;	/* bump reference count */
-		en_loadvc(sc, vci);	/* does debug printf for us */
+	vc->rxslot = slot;
+	vc->rxhand = op->rxhand;
+	vc->vcc = op->param;
 
-		EN_UNLOCK(sc);
-		return (0);
+	oldmode = slot->mode;
+	newmode = (op->param.aal == ATMIO_AAL_5) ? MIDV_AAL5 : MIDV_NOAAL;
+	slot->mode = MIDV_SETMODE(oldmode, newmode);
+	slot->vcc = vc;
+
+	KASSERT (_IF_QLEN(&slot->indma) == 0 && _IF_QLEN(&slot->q) == 0,
+	    ("en_rxctl: left over mbufs on enable slot=%tu",
+	    vc->rxslot - sc->rxslot));
+
+	vc->txspeed = 0;
+	vc->txslot = sc->txslot;
+	vc->txslot->nref++;	/* bump reference count */
+
+	en_loadvc(sc, vc);	/* does debug printf for us */
+
+	/* don't free below */
+	sc->vccs[vc->vcc.vci] = vc;
+	vc = NULL;
+	sc->vccs_open++;
+
+  done:
+	if (vc != NULL)
+		uma_zfree(en_vcc_zone, vc);
+
+	EN_UNLOCK(sc);
+	return (error);
+}
+
+/*
+ * Close finished
+ */
+static void
+en_close_finish(struct en_softc *sc, struct en_vcc *vc)
+{
+
+	if (vc->rxslot != NULL)
+		vc->rxslot->vcc = NULL;
+
+	DBG(sc, VC, ("vci: %u free (%p)", vc->vcc.vci, vc));
+
+	sc->vccs[vc->vcc.vci] = NULL;
+	uma_zfree(en_vcc_zone, vc);
+	sc->vccs_open--;
+}
+
+/*
+ * LOCK: unlocked, needed
+ */
+static int
+en_close_vcc(struct en_softc *sc, struct atmio_closevcc *cl)
+{
+	uint32_t oldmode, newmode;
+	struct en_vcc *vc;
+	int error = 0;
+
+	DBG(sc, IOCTL, ("disable vpi=%d, vci=%d", cl->vpi, cl->vci));
+
+	if (cl->vpi != 0 || cl->vci >= MID_N_VC)
+		return (EINVAL);
+
+	EN_LOCK(sc);
+	if ((vc = sc->vccs[cl->vci]) == NULL) {
+		error = ENOTCONN;
+		goto done;
 	}
 
 	/*
 	 * turn off VCI
 	 */
-	if (sc->rxvc2slot[vci] == RX_NONE) {
-		EN_UNLOCK(sc);
-		return (EINVAL);
+	if (vc->rxslot == NULL) {
+		error = ENOTCONN;
+		goto done;
 	}
-	slot = sc->rxvc2slot[vci];
-	if ((sc->rxslot[slot].oth_flags & (ENOTHER_FREE|ENOTHER_DRAIN)) != 0) {
-		EN_UNLOCK(sc);
-		return (EINVAL);
+	if (vc->vflags & VCC_DRAIN) {
+		error = EINVAL;
+		goto done;
 	}
 
-	oldmode = en_read(sc, MID_VC(vci));
+	oldmode = en_read(sc, MID_VC(cl->vci));
 	newmode = MIDV_SETMODE(oldmode, MIDV_TRASH) & ~MIDV_INSERVICE;
-	en_write(sc, MID_VC(vci), (newmode | (oldmode & MIDV_INSERVICE)));
+	en_write(sc, MID_VC(cl->vci), (newmode | (oldmode & MIDV_INSERVICE)));
 
 	/* halt in tracks, be careful to preserve inservice bit */
 	DELAY(27);
-	sc->rxslot[slot].rxhand = NULL;
-	sc->rxslot[slot].mode = newmode;
+	vc->rxslot->mode = newmode;
 
-	sc->txslot[sc->txvc2slot[vci]].nref--;
-	sc->txspeed[vci] = 0;
-	sc->txvc2slot[vci] = 0;
+	vc->txslot->nref--;
 
 	/* if stuff is still going on we are going to have to drain it out */
-	if (_IF_QLEN(&sc->rxslot[slot].indma) != 0 ||
-	    _IF_QLEN(&sc->rxslot[slot].q) != 0 ||
-	    (sc->rxslot[slot].oth_flags & ENOTHER_SWSL) != 0) {
-		sc->rxslot[slot].oth_flags |= ENOTHER_DRAIN;
-	} else {
-		sc->rxslot[slot].oth_flags = ENOTHER_FREE;
-		sc->rxslot[slot].atm_vci = RX_NONE;
-		sc->rxvc2slot[vci] = RX_NONE;
+	if (_IF_QLEN(&vc->rxslot->indma) == 0 &&
+	    _IF_QLEN(&vc->rxslot->q) == 0 &&
+	    (vc->vflags & VCC_SWSL) == 0) {
+		en_close_finish(sc, vc);
+		goto done;
 	}
+
+	vc->vflags |= VCC_DRAIN;
+	DBG(sc, IOCTL, ("VCI %u now draining", cl->vci));
+
+	if (vc->vcc.flags & ATMIO_FLAG_ASYNC)
+		goto done;
+
+	vc->vflags |= VCC_CLOSE_RX;
+	while ((sc->ifatm.ifnet.if_flags & IFF_RUNNING) &&
+	    (vc->vflags & VCC_DRAIN))
+		cv_wait(&sc->cv_close, &sc->en_mtx);
+
+	en_close_finish(sc, vc);
+	if (!(sc->ifatm.ifnet.if_flags & IFF_RUNNING)) {
+		error = EIO;
+		goto done;
+	}
+
+
+  done:
 	EN_UNLOCK(sc);
-
-	DBG(sc, IOCTL, ("rx%d: VCI %d is now %s", slot, vci,
-	  (sc->rxslot[slot].oth_flags & ENOTHER_DRAIN) ? "draining" : "free"));
-
-	return (0);
+	return (error);
 }
 
 /*********************************************************************/
@@ -1285,9 +1351,11 @@ en_reset_ul(struct en_softc *sc)
 {
 	struct en_map *map;
 	struct mbuf *m;
-	int lcv, slot;
+	struct en_rxslot *rx;
+	int lcv;
 
 	if_printf(&sc->ifatm.ifnet, "reset\n");
+	sc->ifatm.ifnet.if_flags &= ~IFF_RUNNING;
 
 	if (sc->en_busreset)
 		sc->en_busreset(sc);
@@ -1295,15 +1363,15 @@ en_reset_ul(struct en_softc *sc)
 
 	/*
 	 * recv: dump any mbufs we are dma'ing into, if DRAINing, then a reset
-	 * will free us!
+	 * will free us! Don't release the rxslot from the channel.
 	 */
 	for (lcv = 0 ; lcv < MID_N_VC ; lcv++) {
-		if (sc->rxvc2slot[lcv] == RX_NONE)
+		if (sc->vccs[lcv] == NULL)
 			continue;
-		slot = sc->rxvc2slot[lcv];
+		rx = sc->vccs[lcv]->rxslot;
 
 		for (;;) {
-			_IF_DEQUEUE(&sc->rxslot[slot].indma, m);
+			_IF_DEQUEUE(&rx->indma, m);
 			if (m == NULL)
 				break;
 			map = (void *)m->m_pkthdr.rcvif;
@@ -1311,17 +1379,12 @@ en_reset_ul(struct en_softc *sc)
 			m_freem(m);
 		}
 		for (;;) {
-			_IF_DEQUEUE(&sc->rxslot[slot].q, m);
+			_IF_DEQUEUE(&rx->q, m);
 			if (m == NULL)
 				break;
 			m_freem(m);
 		}
-		sc->rxslot[slot].oth_flags &= ~ENOTHER_SWSL;
-		if (sc->rxslot[slot].oth_flags & ENOTHER_DRAIN) {
-			sc->rxslot[slot].oth_flags = ENOTHER_FREE;
-			sc->rxvc2slot[lcv] = RX_NONE;
-			DBG(sc, INIT, ("rx%d: VCI %d is now free", slot, lcv));
-		}
+		sc->vccs[lcv]->vflags = 0;
 	}
 
 	/*
@@ -1345,6 +1408,14 @@ en_reset_ul(struct en_softc *sc)
 			m_freem(m);
 		}
 		sc->txslot[lcv].mbsize = 0;
+	}
+
+	/*
+	 * Unstop all waiters
+	 */
+	while (!cv_waitq_empty(&sc->cv_close)) {
+		cv_broadcast(&sc->cv_close);
+		DELAY(100);
 	}
 }
 
@@ -1379,7 +1450,6 @@ en_init(struct en_softc *sc)
 	if ((sc->ifatm.ifnet.if_flags & IFF_UP) == 0) {
 		DBG(sc, INIT, ("going down"));
 		en_reset(sc);				/* to be safe */
-		sc->ifatm.ifnet.if_flags &= ~IFF_RUNNING;	/* disable */
 		return;
 	}
 
@@ -1389,6 +1459,10 @@ en_init(struct en_softc *sc)
 	if (sc->en_busreset)
 		sc->en_busreset(sc);
 	en_write(sc, MID_RESID, 0x0);		/* reset */
+
+	/* zero memory */
+	bus_space_set_region_4(sc->en_memt, sc->en_base,
+	    MID_RAMOFF, 0, sc->en_obmemsz / 4);
 
 	/*
 	 * init obmem data structures: vc tab, dma q's, slist.
@@ -1403,10 +1477,6 @@ en_init(struct en_softc *sc)
 	 * us an interrupt for a DTQ/DRQ we have already processes... this helps
 	 * keep that interrupt from messing us up.
 	 */
-
-	for (vc = 0; vc < MID_N_VC; vc++) 
-		en_loadvc(sc, vc);
-
 	bzero(&sc->drq, sizeof(sc->drq));
 	sc->drq_free = MID_DRQ_N - 1;
 	sc->drq_chip = MID_DRQ_REG2A(en_read(sc, MID_DMA_RDRX));
@@ -1442,12 +1512,16 @@ en_init(struct en_softc *sc)
 		    (u_int)en_read(sc, MIDX_PLACE(slot))));
 	}
 
+	for (vc = 0; vc < MID_N_VC; vc++) 
+		if (sc->vccs[vc] != NULL)
+			en_loadvc(sc, sc->vccs[vc]);
+
 	/*
 	 * enable!
 	 */
 	en_write(sc, MID_INTENA, MID_INT_TX | MID_INT_DMA_OVR | MID_INT_IDENT |
 	    MID_INT_LERR | MID_INT_DMA_ERR | MID_INT_DMA_RX | MID_INT_DMA_TX |
-	    MID_INT_SERVICE | /* MID_INT_SUNI | */ MID_INT_STATS);
+	    MID_INT_SERVICE | MID_INT_SUNI | MID_INT_STATS);
 	en_write(sc, MID_MAST_CSR, MID_SETIPL(sc->ipl) | MID_MCSR_ENDMA |
 	    MID_MCSR_ENTX | MID_MCSR_ENRX);
 }
@@ -1456,7 +1530,6 @@ en_init(struct en_softc *sc)
 /*
  * Ioctls
  */
-
 /*
  * en_ioctl: handle ioctl requests
  *
@@ -1474,18 +1547,10 @@ en_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct en_softc *sc = (struct en_softc *)ifp->if_softc;
 	struct ifaddr *ifa = (struct ifaddr *)data;
 	struct ifreq *ifr = (struct ifreq *)data;
-	struct atm_pseudoioctl *api = (struct atm_pseudoioctl *)data;
+	struct atmio_vcctable *vtab;
 	int error = 0;
 
 	switch (cmd) {
-
-	  case SIOCATMENA:		/* enable circuit for recv */
-		error = en_rxctl(sc, api, 1);
-		break;
-
-	  case SIOCATMDIS: 		/* disable circuit for recv */
-		error = en_rxctl(sc, api, 0);
-		break;
 
 	  case SIOCSIFADDR: 
 		EN_LOCK(sc);
@@ -1532,6 +1597,37 @@ en_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
+	  case SIOCSIFMEDIA:
+	  case SIOCGIFMEDIA:
+		error = ifmedia_ioctl(ifp, ifr, &sc->media, cmd);
+		break;
+
+	  case SIOCATMOPENVCC:		/* kernel internal use */
+		error = en_open_vcc(sc, (struct atmio_openvcc *)data);
+		break;
+
+	  case SIOCATMCLOSEVCC:		/* kernel internal use */
+		error = en_close_vcc(sc, (struct atmio_closevcc *)data);
+		break;
+
+	  case SIOCATMGETVCCS:	/* internal netgraph use */
+		vtab = atm_getvccs((struct atmio_vcc **)sc->vccs,
+		    MID_N_VC, sc->vccs_open, &sc->en_mtx, 0);
+		if (vtab == NULL) {
+			error = ENOMEM;
+			break;
+		}
+		*(void **)data = vtab;
+		break;
+
+	  case SIOCATMGVCCS:	/* return vcc table */
+		vtab = atm_getvccs((struct atmio_vcc **)sc->vccs,
+		    MID_N_VC, sc->vccs_open, &sc->en_mtx, 1);
+		error = copyout(vtab, ifr->ifr_data, sizeof(*vtab) +
+		    vtab->count * sizeof(vtab->vccs[0]));
+		free(vtab, M_DEVBUF);
+		break;
+
 	  default: 
 		error = EINVAL;
 		break;
@@ -1553,40 +1649,18 @@ static int
 en_sysctl_istats(SYSCTL_HANDLER_ARGS)
 {
 	struct en_softc *sc = arg1;
-	struct sbuf *sb;
+	uint32_t *ret;
 	int error;
 
-	sb = sbuf_new(NULL, NULL, 0, SBUF_AUTOEXTEND);
-	sbuf_clear(sb);
+	ret = malloc(sizeof(sc->stats), M_TEMP, M_WAITOK);
 
 	EN_LOCK(sc);
-
-#define DO(NAME) sbuf_printf(sb, #NAME": %u\n", sc->stats.NAME)
-	DO(vtrash);
-	DO(otrash);
-	DO(ttrash);
-	DO(mfixaddr);
-	DO(mfixlen);
-	DO(mfixfail);
-	DO(txmbovr);
-	DO(dmaovr);
-	DO(txoutspace);
-	DO(txdtqout);
-	DO(launch);
-	DO(hwpull);
-	DO(swadd);
-	DO(rxqnotus);
-	DO(rxqus);
-	DO(rxdrqout);
-	DO(rxmbufout);
-	DO(txnomap);
-#undef DO
-
+	bcopy(&sc->stats, ret, sizeof(sc->stats));
 	EN_UNLOCK(sc);
 
-	sbuf_finish(sb);
-	error = SYSCTL_OUT(req, sbuf_data(sb), sbuf_len(sb) + 1);
-	sbuf_delete(sb);
+	error = SYSCTL_OUT(req, ret, sizeof(sc->stats));
+	free(ret, M_TEMP);
+
 	return (error);
 }
 
@@ -1699,9 +1773,9 @@ static int
 en_intr_service(struct en_softc *sc)
 {
 	uint32_t chip;
-	uint32_t slot;
 	uint32_t vci;
 	int need_softserv = 0;
+	struct en_vcc *vc;
 
 	chip = MID_SL_REG2A(en_read(sc, MID_SERV_WRITE));
 
@@ -1710,32 +1784,101 @@ en_intr_service(struct en_softc *sc)
 		vci = en_read(sc, sc->hwslistp);
 		EN_WRAPADD(MID_SLOFF, MID_SLEND, sc->hwslistp, 4);
 
-		slot = sc->rxvc2slot[vci];
-		if (slot == RX_NONE) {
-			DBG(sc, INTR, ("unexpected rx interrupt on VCI %d",
-			    vci));
+		if ((vc = sc->vccs[vci]) == NULL ||
+		    (vc->vcc.flags & ATMIO_FLAG_NORX)) {
+			DBG(sc, INTR, ("unexpected rx interrupt VCI %d", vci));
 			en_write(sc, MID_VC(vci), MIDV_TRASH);  /* rx off */
 			continue;
 		}
 
 		/* remove from hwsl */
-		en_write(sc, MID_VC(vci), sc->rxslot[slot].mode);
+		en_write(sc, MID_VC(vci), vc->rxslot->mode);
 		EN_COUNT(sc->stats.hwpull);
 
 		DBG(sc, INTR, ("pulled VCI %d off hwslist", vci));
 
 		/* add it to the software service list (if needed) */
-		if ((sc->rxslot[slot].oth_flags & ENOTHER_SWSL) == 0) {
+		if ((vc->vflags & VCC_SWSL) == 0) {
 			EN_COUNT(sc->stats.swadd);
 			need_softserv = 1;
-			sc->rxslot[slot].oth_flags |= ENOTHER_SWSL;
-			sc->swslist[sc->swsl_tail] = slot;
+			vc->vflags |= VCC_SWSL;
+			sc->swslist[sc->swsl_tail] = vci;
 			EN_WRAPADD(0, MID_SL_N, sc->swsl_tail, 1);
 			sc->swsl_size++;
 			DBG(sc, INTR, ("added VCI %d to swslist", vci));
 		}
 	}
 	return (need_softserv);
+}
+
+/*
+ * Handle a receive DMA completion
+ */
+static void
+en_rx_drain(struct en_softc *sc, u_int drq)
+{
+	struct en_rxslot *slot;
+	struct en_vcc *vc;
+	struct mbuf *m;
+	struct atm_pseudohdr ah;
+
+	slot = &sc->rxslot[EN_DQ_SLOT(drq)];
+
+	m = NULL;	/* assume "JK" trash DMA */
+	if (EN_DQ_LEN(drq) != 0) {
+		_IF_DEQUEUE(&slot->indma, m);
+		KASSERT(m != NULL, ("drqsync: %s: lost mbuf in slot %zu!",
+		    sc->ifatm.ifnet.if_xname, slot - sc->rxslot));
+		uma_zfree(sc->map_zone, (struct en_map *)m->m_pkthdr.rcvif);
+	}
+	if ((vc = slot->vcc) == NULL) {
+		/* ups */
+		if (m != NULL)
+			m_freem(m);
+		return;
+	}
+
+	/* do something with this mbuf */
+	if (vc->vflags & VCC_DRAIN) {
+		/* drain? */
+		if (m != NULL)
+			m_freem(m);
+		if (_IF_QLEN(&slot->indma) == 0 && _IF_QLEN(&slot->q) == 0 &&
+		    (en_read(sc, MID_VC(vc->vcc.vci)) & MIDV_INSERVICE) == 0 &&
+		    (vc->vflags & VCC_SWSL) == 0) {
+			vc->vflags &= ~VCC_CLOSE_RX;
+			if (vc->vcc.flags & ATMIO_FLAG_ASYNC)
+				en_close_finish(sc, vc);
+			else
+				cv_signal(&sc->cv_close);
+		}
+		return;
+	}
+
+	if (m != NULL) {
+		ATM_PH_FLAGS(&ah) = vc->vcc.flags;
+		ATM_PH_VPI(&ah) = 0;
+		ATM_PH_SETVCI(&ah, vc->vcc.vci);
+
+		DBG(sc, INTR, ("rx%zu: rxvci%d: atm_input, mbuf %p, len %d, "
+		    "hand %p", slot - sc->rxslot, vc->vcc.vci, m,
+		    EN_DQ_LEN(drq), vc->rxhand));
+
+		m->m_pkthdr.rcvif = &sc->ifatm.ifnet;
+		sc->ifatm.ifnet.if_ipackets++;
+
+		vc->ipackets++;
+		vc->ibytes += m->m_pkthdr.len;
+
+#ifdef EN_DEBUG
+		if (sc->debug & DBG_IPACKETS)
+			en_dump_packet(sc, m);
+#endif
+#ifdef ENABLE_BPF
+		BPF_MTAP(&sc->ifatm.ifnet, m);
+#endif
+		atm_input(&sc->ifatm.ifnet, &ah, m, vc->rxhand);
+	}
 }
 
 /*
@@ -1749,11 +1892,6 @@ en_intr_rx_dma(struct en_softc *sc)
 	uint32_t val;
 	uint32_t idx;
 	uint32_t drq;
-	uint32_t slot;
-	uint32_t vci;
-	struct atm_pseudohdr ah;
-	struct mbuf *m;
-	struct en_map *map;
 
 	val = en_read(sc, MID_DMA_RDRX); 	/* chip's current location */
 	idx = MID_DRQ_A2REG(sc->drq_chip);	/* where we last saw chip */
@@ -1763,61 +1901,7 @@ en_intr_rx_dma(struct en_softc *sc)
 		if ((drq = sc->drq[idx]) != 0) {
 			/* don't forget to zero it out when done */
 			sc->drq[idx] = 0;
-			slot = EN_DQ_SLOT(drq);
-			if (EN_DQ_LEN(drq) == 0) {  /* "JK" trash DMA? */
-				m = NULL;
-				map = NULL;
-			} else {
-				_IF_DEQUEUE(&sc->rxslot[slot].indma, m);
-				if (m == NULL)
-					panic("enintr: drqsync: %s%d: lost mbuf"
-					    " in slot %d!",
-					    sc->ifatm.ifnet.if_name,
-					    sc->ifatm.ifnet.if_unit, slot);
-				map = (void *)m->m_pkthdr.rcvif;
-				uma_zfree(sc->map_zone, map);
-			}
-			/* do something with this mbuf */
-			if (sc->rxslot[slot].oth_flags & ENOTHER_DRAIN) {
-				/* drain? */
-				if (m != NULL)
-					m_freem(m);
-				vci = sc->rxslot[slot].atm_vci;
-				if (!_IF_QLEN(&sc->rxslot[slot].indma) &&
-				    !_IF_QLEN(&sc->rxslot[slot].q) &&
-				    (en_read(sc, MID_VC(vci)) & MIDV_INSERVICE)
-				    == 0 &&
-				    (sc->rxslot[slot].oth_flags & ENOTHER_SWSL)
-				    == 0) {
-					sc->rxslot[slot].oth_flags =
-					    ENOTHER_FREE; /* done drain */
-					sc->rxslot[slot].atm_vci = RX_NONE;
-					sc->rxvc2slot[vci] = RX_NONE;
-					DBG(sc, INTR, ("rx%d: VCI %d now free",
-					    slot, vci));
-				}
-
-			} else if (m != NULL) {
-				ATM_PH_FLAGS(&ah) = sc->rxslot[slot].atm_flags;
-				ATM_PH_VPI(&ah) = 0;
-				ATM_PH_SETVCI(&ah, sc->rxslot[slot].atm_vci);
-				DBG(sc, INTR, ("rx%d: rxvci%d: atm_input, "
-				    "mbuf %p, len %d, hand %p", slot,
-				    sc->rxslot[slot].atm_vci, m,
-				    EN_DQ_LEN(drq), sc->rxslot[slot].rxhand));
-
-				m->m_pkthdr.rcvif = &sc->ifatm.ifnet;
-				sc->ifatm.ifnet.if_ipackets++;
-#ifdef EN_DEBUG
-				if (sc->debug & DBG_IPACKETS)
-					en_dump_packet(sc, m);
-#endif
-#ifdef ENABLE_BPF
-				BPF_MTAP(&sc->ifatm.ifnet, m);
-#endif
-				atm_input(&sc->ifatm.ifnet, &ah, m,
-				    sc->rxslot[slot].rxhand);
-			}
+			en_rx_drain(sc, drq);
 		}
 		EN_WRAPADD(0, MID_DRQ_N, idx, 1);
 	}
@@ -1896,7 +1980,7 @@ struct rxarg {
 	struct mbuf *m;
 	u_int pre_skip;		/* number of bytes to skip at begin */
 	u_int post_skip;	/* number of bytes to skip at end */
-	struct en_rxslot *slot;	/* slot we are receiving on */
+	struct en_vcc *vc;	/* vc we are receiving on */
 	int wait;		/* wait for DRQ entries */
 };
 
@@ -1912,7 +1996,7 @@ en_rxdma_load(void *uarg, bus_dma_segment_t *segs, int nseg,
 {
 	struct rxarg *rx = uarg;
 	struct en_softc *sc = rx->sc;
-	struct en_rxslot *slot = rx->slot;
+	struct en_rxslot *slot = rx->vc->rxslot;
 	u_int		free;		/* number of free DRQ entries */
 	uint32_t	cur;		/* current buffer offset */
 	uint32_t	drq;		/* DRQ entry pointer */
@@ -1948,8 +2032,8 @@ en_rxdma_load(void *uarg, bus_dma_segment_t *segs, int nseg,
 	}								\
 	last_drq = drq;							\
 	en_write(sc, drq + 0, (ENI || !sc->is_adaptec) ?		\
-	    MID_MK_RXQ_ENI(COUNT, slot->atm_vci, 0, BCODE) :		\
-	    MID_MK_RXQ_ADP(COUNT, slot->atm_vci, 0, BCODE));		\
+	    MID_MK_RXQ_ENI(COUNT, rx->vc->vcc.vci, 0, BCODE) :		\
+	    MID_MK_RXQ_ADP(COUNT, rx->vc->vcc.vci, 0, BCODE));		\
 	en_write(sc, drq + 4, ADDR);					\
 									\
 	EN_WRAPADD(MID_DRQOFF, MID_DRQEND, drq, 8);			\
@@ -2098,8 +2182,9 @@ en_service(struct en_softc *sc)
 	uint32_t	rbd;		/* receive buffer descriptor */
 	uint32_t	pdu;		/* AAL5 trailer */
 	int		mlen;
-	struct en_rxslot *slot;
 	int		error;
+	struct en_rxslot *slot;
+	struct en_vcc *vc;
 
 	rx.sc = sc;
 
@@ -2110,34 +2195,33 @@ en_service(struct en_softc *sc)
 	}
 
 	/*
-	 * get slot to service
+	 * get vcc to service
 	 */
-	rx.slot = slot = &sc->rxslot[sc->swslist[sc->swsl_head]];
-
-	KASSERT (sc->rxvc2slot[slot->atm_vci] == slot - sc->rxslot,
-	    ("en_service: rx slot/vci sync"));
+	rx.vc = vc = sc->vccs[sc->swslist[sc->swsl_head]];
+	slot = vc->rxslot;
+	KASSERT (slot->vcc->rxslot == slot, ("en_service: rx slot/vci sync"));
 
 	/*
 	 * determine our mode and if we've got any work to do
 	 */
 	DBG(sc, SERV, ("rx%td: service vci=%d start/stop/cur=0x%x 0x%x "
-	    "0x%x", slot - sc->rxslot, slot->atm_vci,
-	    slot->start, slot->stop, slot->cur));
+	    "0x%x", slot - sc->rxslot, vc->vcc.vci, slot->start,
+	    slot->stop, slot->cur));
 
   same_vci:
 	cur = slot->cur;
 
-	dstart = MIDV_DSTART(en_read(sc, MID_DST_RP(slot->atm_vci)));
+	dstart = MIDV_DSTART(en_read(sc, MID_DST_RP(vc->vcc.vci)));
 	dstart = (dstart * sizeof(uint32_t)) + slot->start;
 
 	/* check to see if there is any data at all */
 	if (dstart == cur) {
 		EN_WRAPADD(0, MID_SL_N, sc->swsl_head, 1); 
 		/* remove from swslist */
-		slot->oth_flags &= ~ENOTHER_SWSL;
+		vc->vflags &= ~VCC_SWSL;
 		sc->swsl_size--;
 		DBG(sc, SERV, ("rx%td: remove vci %d from swslist",
-		    slot - sc->rxslot, slot->atm_vci));
+		    slot - sc->rxslot, vc->vcc.vci));
 		goto next_vci;
 	}
 
@@ -2156,7 +2240,7 @@ en_service(struct en_softc *sc)
 		EN_COUNT(sc->stats.ttrash);
 		DBG(sc, SERV, ("RX overflow lost %d cells!", MID_RBD_CNT(rbd)));
 
-	} else if (!(slot->atm_flags & ATM_PH_AAL5)) {
+	} else if (vc->vcc.aal != ATMIO_AAL_5) {
 		/* 1 cell (ick!) */
 		mlen = MID_CHDR_SIZE + MID_ATMDATASZ;
 		rx.pre_skip = MID_RBD_SIZE;
@@ -2240,7 +2324,7 @@ en_service(struct en_softc *sc)
 	}
 
 	DBG(sc, SERV, ("rx%td: VCI %d, rbuf %p, mlen %d, skip %u/%u",
-	    slot - sc->rxslot, slot->atm_vci, m, mlen, rx.pre_skip,
+	    slot - sc->rxslot, vc->vcc.vci, m, mlen, rx.pre_skip,
 	    rx.post_skip));
 
 	if (m != NULL) {
@@ -2257,7 +2341,7 @@ en_service(struct en_softc *sc)
 		}
 		rx.m = m;
 		error = bus_dmamap_load_mbuf(sc->txtag, map->map, m,
-		    en_rxdma_load, &rx, 0);
+		    en_rxdma_load, &rx, BUS_DMA_NOWAIT);
 
 		if (error != 0) {
 			if_printf(&sc->ifatm.ifnet, "loading RX map failed "
@@ -2311,11 +2395,11 @@ en_service(struct en_softc *sc)
 	if (sc->is_adaptec)
 		en_write(sc, sc->drq_us,
 		    MID_MK_RXQ_ADP(WORD_IDX(slot->start, cur),
-		    slot->atm_vci, MID_DMA_END, MIDDMA_JK));
+		    vc->vcc.vci, MID_DMA_END, MIDDMA_JK));
 	else
 	  	en_write(sc, sc->drq_us,
 		    MID_MK_RXQ_ENI(WORD_IDX(slot->start, cur),
-		    slot->atm_vci, MID_DMA_END, MIDDMA_JK));
+		    vc->vcc.vci, MID_DMA_END, MIDDMA_JK));
 	en_write(sc, sc->drq_us + 4, 0);
 	EN_WRAPADD(MID_DRQOFF, MID_DRQEND, sc->drq_us, 8);
 	sc->drq_free--;
@@ -2371,11 +2455,8 @@ en_intr(void *arg)
 		return;
 	}
 
-#if 0
 	if (reg & MID_INT_SUNI)
-		if_printf(&sc->ifatm.ifnet, "interrupt from SUNI (probably "
-		    "carrier change)\n");
-#endif
+		utopia_intr(&sc->utopia);
 
 	kick = 0;
 	if (reg & MID_INT_TX)
@@ -2417,6 +2498,50 @@ en_intr(void *arg)
 
 	EN_UNLOCK(sc);
 }
+
+/*
+ * Read at most n SUNI regs starting at reg into val
+ */
+static int
+en_utopia_readregs(struct ifatm *ifatm, u_int reg, uint8_t *val, u_int *n)
+{
+	struct en_softc *sc = ifatm->ifnet.if_softc;
+	u_int i;
+
+	EN_CHECKLOCK(sc);
+	if (reg >= MID_NSUNI)
+		return (EINVAL);
+	if (reg + *n > MID_NSUNI)
+		*n = MID_NSUNI - reg;
+
+	for (i = 0; i < *n; i++)
+		val[i] = en_read(sc, MID_SUNIOFF + 4 * (reg + i));
+
+	return (0);
+}
+
+/*
+ * change the bits given by mask to them in val in register reg
+ */
+static int
+en_utopia_writereg(struct ifatm *ifatm, u_int reg, u_int mask, u_int val)
+{
+	struct en_softc *sc = ifatm->ifnet.if_softc;
+	uint32_t regval;
+
+	EN_CHECKLOCK(sc);
+	if (reg >= MID_NSUNI)
+		return (EINVAL);
+	regval = en_read(sc, MID_SUNIOFF + 4 * reg);
+	regval = (regval & ~mask) | (val & mask);
+	en_write(sc, MID_SUNIOFF + 4 * reg, regval);
+	return (0);
+}
+
+static const struct utopia_methods en_utopia_methods = {
+	en_utopia_readregs,
+	en_utopia_writereg
+};
 
 /*********************************************************************/
 /*
@@ -2611,7 +2736,8 @@ en_dmaprobe(struct en_softc *sc)
 	 */
 	err = bus_dma_tag_create(NULL, MIDDMA_MAXBURST, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    3 * MIDDMA_MAXBURST, 1, 3 * MIDDMA_MAXBURST, 0, &tag);
+	    3 * MIDDMA_MAXBURST, 1, 3 * MIDDMA_MAXBURST, 0,
+	    NULL, NULL, &tag);
 	if (err)
 		panic("%s: cannot create test DMA tag %d", __func__, err);
 
@@ -2620,7 +2746,7 @@ en_dmaprobe(struct en_softc *sc)
 		panic("%s: cannot allocate test DMA memory %d", __func__, err);
 
 	err = bus_dmamap_load(tag, map, buffer, 3 * MIDDMA_MAXBURST,
-	    en_dmaprobe_load, &phys, 0);
+	    en_dmaprobe_load, &phys, BUS_DMA_NOWAIT);
 	if (err)
 		panic("%s: cannot load test DMA map %d", __func__, err);
 	addr = buffer;
@@ -2786,6 +2912,10 @@ en_attach(struct en_softc *sc)
 	ifp->if_ioctl = en_ioctl;
 	ifp->if_start = en_start;
 
+	mtx_init(&sc->en_mtx, device_get_nameunit(sc->dev),
+	    MTX_NETWORK_LOCK, MTX_DEF);
+	cv_init(&sc->cv_close, "VC close");
+
 	/*
 	 * Make the sysctl tree
 	 */
@@ -2798,7 +2928,7 @@ en_attach(struct en_softc *sc)
 
 	if (SYSCTL_ADD_PROC(&sc->sysctl_ctx, SYSCTL_CHILDREN(sc->sysctl_tree),
 	    OID_AUTO, "istats", CTLFLAG_RD, sc, 0, en_sysctl_istats,
-	    "A", "internal statistics") == NULL)
+	    "S", "internal statistics") == NULL)
 		goto fail;
 
 #ifdef EN_DEBUG
@@ -2807,8 +2937,11 @@ en_attach(struct en_softc *sc)
 		goto fail;
 #endif
 
-	mtx_init(&sc->en_mtx, device_get_nameunit(sc->dev),
-	    MTX_NETWORK_LOCK, MTX_DEF);
+	sc->ifatm.phy = &sc->utopia;
+	utopia_attach(&sc->utopia, &sc->ifatm, &sc->media, &sc->en_mtx,
+	    &sc->sysctl_ctx, SYSCTL_CHILDREN(sc->sysctl_tree),
+	    &en_utopia_methods);
+	utopia_init_media(&sc->utopia);
 
 	MGET(sc->padbuf, M_TRYWAIT, MT_DATA);
 	if (sc->padbuf == NULL)
@@ -2817,7 +2950,8 @@ en_attach(struct en_softc *sc)
 
 	if (bus_dma_tag_create(NULL, 1, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
-	    EN_TXSZ * 1024, EN_MAX_DMASEG, EN_TXSZ * 1024, 0, &sc->txtag))
+	    EN_TXSZ * 1024, EN_MAX_DMASEG, EN_TXSZ * 1024, 0,
+	    NULL, NULL, &sc->txtag))
 		goto fail;
 
 	sc->map_zone = uma_zcreate("en dma maps", sizeof(struct en_map),
@@ -2830,11 +2964,8 @@ en_attach(struct en_softc *sc)
 	/*
 	 * init softc
 	 */
-	for (lcv = 0 ; lcv < MID_N_VC ; lcv++) {
-		sc->rxvc2slot[lcv] = RX_NONE;
-		sc->txspeed[lcv] = 0;		/* full */
-		sc->txvc2slot[lcv] = 0;		/* full speed == slot 0 */
-	}
+	sc->vccs = malloc(MID_N_VC * sizeof(sc->vccs[0]),
+	    M_DEVBUF, M_ZERO | M_WAITOK);
 
 	sz = sc->en_obmemsz - (MID_BUFOFF - MID_RAMOFF);
 	ptr = sav = MID_BUFOFF;
@@ -2872,8 +3003,7 @@ en_attach(struct en_softc *sc)
 		sc->en_nrx = MID_N_VC - 1;
 
 	for (lcv = 0 ; lcv < sc->en_nrx ; lcv++) {
-		sc->rxslot[lcv].rxhand = NULL;
-		sc->rxslot[lcv].oth_flags = ENOTHER_FREE;
+		sc->rxslot[lcv].vcc = NULL;
 		midvloc = sc->rxslot[lcv].start = ptr;
 		ptr += (EN_RXSZ * 1024);
 		sz -= (EN_RXSZ * 1024);
@@ -2898,6 +3028,16 @@ en_attach(struct en_softc *sc)
 	    "%6D\n", sc->ifatm.mib.esi, ":");
 
 	/*
+	 * Start SUNI stuff. This will call our readregs/writeregs
+	 * functions and these assume the lock to be held so we must get it
+	 * here.
+	 */
+	EN_LOCK(sc);
+	utopia_start(&sc->utopia);
+	utopia_reset(&sc->utopia);
+	EN_UNLOCK(sc);
+
+	/*
 	 * final commit
 	 */
 	atm_ifattach(ifp); 
@@ -2917,11 +3057,29 @@ en_attach(struct en_softc *sc)
  * Free all internal resources. No access to bus resources here.
  * No locking required here (interrupt is already disabled).
  *
- * LOCK: unlocked, not needed (but destroyed)
+ * LOCK: unlocked, needed (but destroyed)
  */
 void
 en_destroy(struct en_softc *sc)
 {
+	u_int i;
+
+	if (sc->utopia.state & UTP_ST_ATTACHED) {
+		/* these assume the lock to be held */
+		EN_LOCK(sc);
+		utopia_stop(&sc->utopia);
+		utopia_detach(&sc->utopia);
+		EN_UNLOCK(sc);
+	}
+
+	if (sc->vccs != NULL) {
+		/* get rid of sticky VCCs */
+		for (i = 0; i < MID_N_VC; i++)
+			if (sc->vccs[i] != NULL)
+				uma_zfree(en_vcc_zone, sc->vccs[i]);
+		free(sc->vccs, M_DEVBUF);
+	}
+
 	if (sc->padbuf != NULL)
 		m_free(sc->padbuf);
 
@@ -2937,7 +3095,31 @@ en_destroy(struct en_softc *sc)
 
 	(void)sysctl_ctx_free(&sc->sysctl_ctx);
 
+	cv_destroy(&sc->cv_close);
 	mtx_destroy(&sc->en_mtx);
+}
+
+/*
+ * Module loaded/unloaded
+ */
+int
+en_modevent(module_t mod __unused, int event, void *arg __unused)
+{
+
+	switch (event) {
+
+	  case MOD_LOAD:
+		en_vcc_zone = uma_zcreate("EN vccs", sizeof(struct en_vcc),
+		    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
+		if (en_vcc_zone == NULL)
+			return (ENOMEM);
+		break;
+
+	  case MOD_UNLOAD:
+		uma_zdestroy(en_vcc_zone);
+		break;
+	}
+	return (0);
 }
 
 /*********************************************************************/
@@ -3017,14 +3199,15 @@ en_dump_mregs(struct en_softc *sc)
 
 	printf("  unusal txspeeds:");
 	for (cnt = 0 ; cnt < MID_N_VC ; cnt++)
-		if (sc->txspeed[cnt])
-			printf(" vci%d=0x%x", cnt, sc->txspeed[cnt]);
+		if (sc->vccs[cnt]->txspeed)
+			printf(" vci%d=0x%x", cnt, sc->vccs[cnt]->txspeed);
 	printf("\n");
 
 	printf("  rxvc slot mappings:");
 	for (cnt = 0 ; cnt < MID_N_VC ; cnt++)
-		if (sc->rxvc2slot[cnt] != RX_NONE)
-			printf("  %d->%d", cnt, sc->rxvc2slot[cnt]);
+		if (sc->vccs[cnt]->rxslot != NULL)
+			printf("  %d->%zu", cnt,
+			    sc->vccs[cnt]->rxslot - sc->rxslot);
 	printf("\n");
 }
 
@@ -3053,22 +3236,20 @@ en_dump_tx(struct en_softc *sc)
 static void
 en_dump_rx(struct en_softc *sc)
 {
-	u_int slot;
+	struct en_rxslot *slot;
 
 	printf("  recv slots:\n");
-	for (slot = 0 ; slot < sc->en_nrx; slot++) {
-		printf("rx%d: vci=%d: start/stop/cur=0x%x/0x%x/0x%x ",
-		    slot, sc->rxslot[slot].atm_vci,
-		    sc->rxslot[slot].start, sc->rxslot[slot].stop,
-		    sc->rxslot[slot].cur);
-		printf("mode=0x%x, atm_flags=0x%x, oth_flags=0x%x\n", 
-		    sc->rxslot[slot].mode, sc->rxslot[slot].atm_flags, 
-		    sc->rxslot[slot].oth_flags);
-		printf("RXHW: mode=0x%x, DST_RP=0x%x, WP_ST_CNT=0x%x\n",
-		    en_read(sc, MID_VC(sc->rxslot[slot].atm_vci)),
-		    en_read(sc, MID_DST_RP(sc->rxslot[slot].atm_vci)),
-		    en_read(sc,
-		    MID_WP_ST_CNT(sc->rxslot[slot].atm_vci)));
+	for (slot = sc->rxslot ; slot < &sc->rxslot[sc->en_nrx]; slot++) {
+		printf("rx%zu: start/stop/cur=0x%x/0x%x/0x%x mode=0x%x ",
+		    slot - sc->rxslot, slot->start, slot->stop, slot->cur,
+		    slot->mode);
+		if (slot->vcc != NULL) {
+			printf("vci=%u\n", slot->vcc->vcc.vci);
+			printf("RXHW: mode=0x%x, DST_RP=0x%x, WP_ST_CNT=0x%x\n",
+			    en_read(sc, MID_VC(slot->vcc->vcc.vci)),
+			    en_read(sc, MID_DST_RP(slot->vcc->vcc.vci)),
+			    en_read(sc, MID_WP_ST_CNT(slot->vcc->vcc.vci)));
+		}
 	}
 }
 

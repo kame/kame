@@ -23,7 +23,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/pci/apecs.c,v 1.21 2001/12/20 23:48:29 jhb Exp $
  */
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
@@ -55,6 +54,9 @@
  * Additional Copyright (c) 1998 by Andrew Gallatin for Duke University 
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/apecs.c,v 1.24 2003/11/17 06:10:14 peter Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -71,13 +73,15 @@
 #include <alpha/pci/apecsreg.h>
 #include <alpha/pci/apecsvar.h>
 #include <alpha/isa/isavar.h>
-#include <machine/intr.h>
-#include <machine/resource.h>
-#include <machine/intrcnt.h>
+
 #include <machine/cpuconf.h>
-#include <machine/swiz.h>
+#include <machine/intr.h>
+#include <machine/intrcnt.h>
+#include <machine/md_var.h>
+#include <machine/resource.h>
 #include <machine/rpb.h>
 #include <machine/sgmap.h>
+#include <machine/swiz.h>
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
@@ -304,7 +308,7 @@ apecs_attach(device_t dev)
 }
 
 static void
-apecs_disable_intr(int vector)
+apecs_disable_intr(uintptr_t vector)
 {
 	int irq;
 
@@ -315,7 +319,7 @@ apecs_disable_intr(int vector)
 }
 
 static void
-apecs_enable_intr(int vector)
+apecs_enable_intr(uintptr_t vector)
 {
 	int irq;
 

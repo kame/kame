@@ -1,16 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_tuner.c,v 1.9 2000/10/19 07:33:28 roger Exp $ */
-
-/*
- * This is part of the Driver for Video Capture Cards (Frame grabbers)
- * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
- * chipset.
- * Copyright Roger Hardiman and Amancio Hasty.
- *
- * bktr_tuner : This deals with controlling the tuner fitted to TV cards.
- *
- */
-
-/*
+/*-
  * 1. Redistributions of source code must retain the
  * Copyright (c) 1997 Amancio Hasty, 1999 Roger Hardiman
  * All rights reserved.
@@ -43,7 +31,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_tuner.c,v 1.11 2003/08/24 17:46:02 obrien Exp $");
 
+/*
+ * This is part of the Driver for Video Capture Cards (Frame grabbers)
+ * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
+ * chipset.
+ * Copyright Roger Hardiman and Amancio Hasty.
+ *
+ * bktr_tuner : This deals with controlling the tuner fitted to TV cards.
+ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,10 +52,11 @@
 #endif
 
 #ifdef __FreeBSD__
-#include <pci/pcivar.h>
-
 #if (__FreeBSD_version < 500000)
 #include <machine/clock.h>              /* for DELAY */
+#include <pci/pcivar.h>
+#else
+#include <dev/pci/pcivar.h>
 #endif
 
 #if (__FreeBSD_version >=300000)

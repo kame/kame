@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.34 2003/05/01 03:56:29 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.35 2003/08/25 23:28:31 obrien Exp $");
 
 #include <stand.h>
 #include <sys/param.h>

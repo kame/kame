@@ -28,15 +28,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/ahc_pci.c#13 $
- *
- * $FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.53 2003/05/03 23:27:57 gibbs Exp $
+ * $Id: ahc_pci.c,v 1.58 2003/11/03 09:22:16 dfr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/ahc_pci.c,v 1.59 2003/11/28 05:28:27 imp Exp $");
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
 
-#define	AHC_PCI_IOADDR  PCIR_MAPS	/* I/O Address */
-#define	AHC_PCI_MEMADDR (PCIR_MAPS + 4) /* Mem I/O Address */
+#define	AHC_PCI_IOADDR  PCIR_BAR(0)	/* I/O Address */
+#define	AHC_PCI_MEMADDR PCIR_BAR(1)	/* Mem I/O Address */
 
 static int ahc_pci_probe(device_t dev);
 static int ahc_pci_attach(device_t dev);
@@ -112,7 +113,7 @@ ahc_pci_attach(device_t dev)
 	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
 				   /*boundary*/0,
 				   (ahc->flags & AHC_39BIT_ADDRESSING)
-				   ? 0x7FFFFFFFFF
+				   ? 0x7FFFFFFFFFLL
 				   : BUS_SPACE_MAXADDR_32BIT,
 				   /*highaddr*/BUS_SPACE_MAXADDR,
 				   /*filter*/NULL, /*filterarg*/NULL,
@@ -120,6 +121,8 @@ ahc_pci_attach(device_t dev)
 				   /*nsegments*/AHC_NSEG,
 				   /*maxsegsz*/AHC_MAXTRANSFER_SIZE,
 				   /*flags*/0,
+				   /*lockfunc*/busdma_lock_mutex,
+				   /*lockarg*/&Giant,
 				   &ahc->parent_dmat);
 
 	if (error != 0) {

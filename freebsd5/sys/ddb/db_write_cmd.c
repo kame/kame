@@ -22,14 +22,14 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_write_cmd.c,v 1.13 1999/08/28 00:41:12 peter Exp $
  */
-
 /*
  *	Author: David B. Golub,  Carnegie Mellon University
  *	Date:	7/90
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_write_cmd.c,v 1.14 2003/06/10 22:09:23 obrien Exp $");
 
 #include <sys/param.h>
 

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdHardware.c,v 1.9 2003/05/31 06:45:28 peter Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdHardware.c,v 1.11 2003/08/28 21:22:25 jhb Exp $
  */
 
 /*
@@ -69,7 +69,7 @@
 ACPI_STATUS
 AcpiOsReadPort (
     ACPI_IO_ADDRESS	InPort,
-    void		*Value,
+    UINT32		*Value,
     UINT32		Width)
 {
     switch (Width) {
@@ -93,7 +93,7 @@ AcpiOsReadPort (
 ACPI_STATUS
 AcpiOsWritePort (
     ACPI_IO_ADDRESS	OutPort,
-    ACPI_INTEGER	Value,
+    UINT32		Value,
     UINT32		Width)
 {
     switch (Width) {
@@ -213,10 +213,10 @@ acpi_bus_number(ACPI_HANDLE root, ACPI_HANDLE curr, ACPI_PCI_ID *PciId)
         return (bus);
     subclass = pci_cfgregread(bus, slot, func, PCIR_SUBCLASS, 1);
     /* Find the header type, masking off the multifunction bit */
-    header = pci_cfgregread(bus, slot, func, PCIR_HEADERTYPE, 1) & 0x7f;
-    if (header == 1 && subclass == PCIS_BRIDGE_PCI)
+    header = pci_cfgregread(bus, slot, func, PCIR_HDRTYPE, 1) & PCIM_HDRTYPE;
+    if (header == PCIM_HDRTYPE_BRIDGE && subclass == PCIS_BRIDGE_PCI)
         bus = pci_cfgregread(bus, slot, func, PCIR_SECBUS_1, 1);
-    if (header == 2 && subclass == PCIS_BRIDGE_CARDBUS)
+    if (header == PCIM_HDRTYPE_CARDBUS && subclass == PCIS_BRIDGE_CARDBUS)
         bus = pci_cfgregread(bus, slot, func, PCIR_SECBUS_2, 1);
     return (bus);
 }

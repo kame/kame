@@ -22,8 +22,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/pci/cia.c,v 1.39 2002/03/21 06:14:58 imp Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -61,7 +59,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
@@ -89,6 +86,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/cia.c,v 1.42 2003/11/17 06:10:14 peter Exp $");
+
 #include "opt_cpu.h"
 
 #include <sys/param.h>
@@ -107,14 +107,16 @@
 #include <alpha/pci/ciareg.h>
 #include <alpha/pci/ciavar.h>
 #include <alpha/isa/isavar.h>
+
 #include <machine/bwx.h>
-#include <machine/swiz.h>
+#include <machine/cpuconf.h>
 #include <machine/intr.h>
 #include <machine/intrcnt.h>
-#include <machine/cpuconf.h>
-#include <machine/rpb.h>
+#include <machine/md_var.h>
 #include <machine/resource.h>
+#include <machine/rpb.h>
 #include <machine/sgmap.h>
+#include <machine/swiz.h>
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
@@ -513,7 +515,7 @@ cia_attach(device_t dev)
 }
 
 static void
-cia_disable_intr(int vector)
+cia_disable_intr(uintptr_t vector)
 {
 	int irq;
 
@@ -524,7 +526,7 @@ cia_disable_intr(int vector)
 }
 
 static void
-cia_enable_intr(int vector)
+cia_enable_intr(uintptr_t vector)
 {
 	int irq;
 

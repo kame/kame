@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.28 2003/03/03 12:15:38 phk Exp $ */
 /* $NetBSD: promcons.c,v 1.13 1998/03/21 22:52:59 mycroft Exp $ */
-
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
@@ -27,6 +25,9 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.31 2003/09/26 10:52:16 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -249,7 +250,7 @@ void
 promcnattach(int alpha_console)
 {
 	prom_consdev.cn_pri = CN_NORMAL;
-	prom_consdev.cn_dev = makedev(CDEV_MAJOR, 0);
+	sprintf(prom_consdev.cn_name, "promcons");
 	make_dev(&prom_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "promcons");
 	cnadd(&prom_consdev);
 	promcn_attached = 1;

@@ -22,14 +22,15 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_access.c,v 1.15 1999/08/28 00:41:04 peter Exp $
  */
-
 /*
  *	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_access.c,v 1.17 2003/08/12 13:24:21 harti Exp $");
+
 #include <sys/param.h>
 
 #include <ddb/ddb.h>
@@ -53,7 +54,7 @@ db_get_value(addr, size, is_signed)
 	register int	size;
 	boolean_t	is_signed;
 {
-	char		data[sizeof(int)];
+	char		data[sizeof(u_int64_t)];
 	register db_expr_t value;
 	register int	i;
 

@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.12 2003/02/25 00:42:39 marcel Exp $ */
 /* $NetBSD: dec_kn8ae.c,v 1.15 1998/02/13 00:12:50 thorpej Exp $ */
-
 /*
  * Copyright (c) 1997 by Matthew Jacob
  * NASA AMES Research Center.
@@ -31,6 +29,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.14 2003/08/17 06:42:07 marcel Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/termios.h>
@@ -38,8 +39,9 @@
 #include <sys/reboot.h>
 #include <sys/bus.h>
 
-#include <machine/rpb.h>
 #include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
 
 #include <alpha/tlsb/tlsbreg.h>
 #include <alpha/tlsb/gbusreg.h>

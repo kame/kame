@@ -24,8 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.12 2003/04/15 06:37:22 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_isa.c,v 1.15 2003/10/31 18:31:58 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -95,6 +97,11 @@ ed_isa_probe(dev)
 		goto end;
 	ed_release_resources(dev);
 
+	error = ed_probe_SIC(dev, 0, flags);
+	if (error == 0)
+		goto end;
+	ed_release_resources(dev);
+
 	error = ed_probe_Novell(dev, 0, flags);
 	if (error == 0)
 		goto end;
@@ -118,7 +125,6 @@ ed_isa_attach(dev)
 	device_t dev;
 {
 	struct ed_softc *sc = device_get_softc(dev);
-	int flags = device_get_flags(dev);
 	int error;
 	
 	if (sc->port_used > 0)
@@ -135,7 +141,7 @@ ed_isa_attach(dev)
 		return (error);
 	}
 
-	return ed_attach(sc, device_get_unit(dev), flags);
+	return ed_attach(dev);
 }
 
 static device_method_t ed_isa_methods[] = {

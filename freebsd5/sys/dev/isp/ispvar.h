@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.62 2002/10/11 17:28:01 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.63 2003/09/13 01:59:14 mjacob Exp $ */
 /*
  * Soft Definitions for for Qlogic ISP SCSI adapters.
  *
@@ -427,7 +427,7 @@ typedef struct ispsoftc {
 	XS_T **isp_xflist;
 
 	/*
-	 * request/result queue pointers and dma handles for them.
+	 * request/result queue pointers and DMA handles for them.
 	 */
 	caddr_t			isp_rquest;
 	caddr_t			isp_result;

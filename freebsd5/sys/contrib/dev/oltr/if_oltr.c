@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/contrib/dev/oltr/if_oltr.c,v 1.28 2003/03/16 00:24:18 mdodd Exp $
+ * $FreeBSD: src/sys/contrib/dev/oltr/if_oltr.c,v 1.31 2003/10/31 18:31:56 brooks Exp $
  */
 
 #include <sys/param.h>
@@ -74,8 +74,13 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
+#if (__FreeBSD_version < 500000)
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
+#else
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#endif
 
 #include "contrib/dev/oltr/trlld.h"
 
@@ -389,8 +394,7 @@ oltr_pci_attach(device_t dev)
 	 * Do the ifnet initialization
 	 */
 	ifp->if_softc	= sc;
-	ifp->if_unit	= device_get_unit(dev);
-	ifp->if_name	= "oltr";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_init	= oltr_init;
 	ifp->if_start	= oltr_start;
 	ifp->if_ioctl	= oltr_ioctl;
@@ -1497,7 +1501,7 @@ dropped:
 static void
 DriverOutByte(unsigned short IOAddress, unsigned char value)
 {
-	outb(IOAddress, value);
+	outbv(IOAddress, value);
 }
 
 static void
@@ -1533,7 +1537,7 @@ DriverRepOutDword(unsigned short IOAddress, unsigned long *DataPointer, int DWor
 static unsigned char
 DriverInByte(unsigned short IOAddress)
 {
-	return(inb(IOAddress));
+	return(inbv(IOAddress));
 }
 
 static unsigned short

@@ -25,9 +25,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/linux/linux_dummy.c,v 1.35 2002/06/02 20:05:40 schweikh Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_dummy.c,v 1.37 2003/08/22 07:20:26 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

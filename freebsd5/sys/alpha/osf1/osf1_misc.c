@@ -1,5 +1,4 @@
 /*	$NetBSD: osf1_misc.c,v 1.14 1998/05/20 16:34:29 chs Exp $	*/
-
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -26,12 +25,12 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-
 /*
  * Additional Copyright (c) 1999 by Andrew Gallatin
- * $FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.41 2003/04/25 19:51:41 jhb Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.43 2003/08/17 06:42:08 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,13 +69,6 @@
 #include <sys/utsname.h>
 #include <sys/vnode.h>
 
-#include <alpha/osf1/exec_ecoff.h>
-#include <alpha/osf1/osf1_signal.h>
-#include <alpha/osf1/osf1_proto.h>
-#include <alpha/osf1/osf1_syscall.h>
-#include <alpha/osf1/osf1_util.h>
-#include <alpha/osf1/osf1.h>
-
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_param.h>
@@ -87,7 +79,15 @@
 #include <machine/cpu.h>
 #include <machine/cpuconf.h>
 #include <machine/fpu.h>
+#include <machine/md_var.h>
 #include <machine/rpb.h>
+
+#include <alpha/osf1/exec_ecoff.h>
+#include <alpha/osf1/osf1_signal.h>
+#include <alpha/osf1/osf1_proto.h>
+#include <alpha/osf1/osf1_syscall.h>
+#include <alpha/osf1/osf1_util.h>
+#include <alpha/osf1/osf1.h>
 
 static void cvtstat2osf1(struct stat *, struct osf1_stat *);
 static int  osf2bsd_pathconf(int *);

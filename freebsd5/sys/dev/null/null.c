@@ -23,8 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/null/null.c,v 1.17 2003/03/03 12:15:44 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/null/null.c,v 1.23 2003/11/01 09:31:54 markm Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,40 +46,29 @@ static dev_t zero_dev;
 static d_write_t null_write;
 static d_ioctl_t null_ioctl;
 static d_read_t zero_read;
-static d_read_t null_read;
 
 #define CDEV_MAJOR	2
 #define NULL_MINOR	2
 #define ZERO_MINOR	12
 
 static struct cdevsw null_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
-	.d_read =	null_read,
+	.d_read =	(d_read_t *)nullop,
 	.d_write =	null_write,
 	.d_ioctl =	null_ioctl,
 	.d_name =	"null",
 	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_NOGIANT,
 };
 
 static struct cdevsw zero_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
 	.d_read =	zero_read,
 	.d_write =	null_write,
 	.d_name =	"zero",
 	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_MMAP_ANON,
+	.d_flags =	D_MMAP_ANON | D_NOGIANT,
 };
 
 static void *zbuf;
-
-static int
-null_read(dev_t dev __unused, struct uio *uio, int flags __unused)
-{
-
-	return 0;
-}
 
 /* ARGSUSED */
 static int
@@ -87,13 +78,15 @@ null_write(dev_t dev __unused, struct uio *uio, int flags __unused)
 	return 0;
 }
 
+/* ARGSUSED */
 static int
-null_ioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
+null_ioctl(dev_t dev __unused, u_long cmd, caddr_t data __unused,
+    int flags __unused, struct thread *td)
 {
 	int error;
 
 	if (cmd != DIOCSKERNELDUMP)
-		return (noioctl(dev, cmd, data, flags, td));
+		return (ENOIOCTL);
 	error = suser(td);
 	if (error)
 		return (error);

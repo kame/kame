@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.10 2003/04/24 07:29:52 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohcireg.h,v 1.14 2003/10/02 04:06:56 simokawa Exp $
  *
  */
 #define		PCI_CBMEM		0x10
@@ -54,6 +54,7 @@
 #define		FW_DEVICE_TITSB43	(0x8021 << 16)
 #define		FW_DEVICE_TITSB43A	(0x8023 << 16)
 #define		FW_DEVICE_TITSB43AB23	(0x8024 << 16)
+#define		FW_DEVICE_TITSB82AA2	(0x8025 << 16)
 #define		FW_DEVICE_TIPCI4410A	(0x8017 << 16)
 #define		FW_DEVICE_TIPCI4450	(0x8011 << 16)
 #define		FW_DEVICE_TIPCI4451	(0x8027 << 16)
@@ -75,7 +76,7 @@
 #define		OHCI_MAX_DMA_CH		(0x4 + OHCI_DMA_ITCH + OHCI_DMA_IRCH)
 
 
-typedef volatile u_int32_t 	fwohcireg_t;
+typedef u_int32_t 	fwohcireg_t;
 
 /* for PCI */
 #if BYTE_ORDER == BIG_ENDIAN
@@ -93,12 +94,12 @@ typedef volatile u_int32_t 	fwohcireg_t;
 struct fwohcidb {
 	union {
 		struct {
-			volatile u_int32_t cmd;
-			volatile u_int32_t addr;
-			volatile u_int32_t depend;
-			volatile u_int32_t res;
+			u_int32_t cmd;
+			u_int32_t addr;
+			u_int32_t depend;
+			u_int32_t res;
 		} desc;
-		volatile u_int32_t immed[4];
+		u_int32_t immed[4];
 	} db;
 #define OHCI_STATUS_SHIFT	16
 #define OHCI_COUNT_MASK		0xffff
@@ -286,7 +287,7 @@ struct ohci_registers {
 		fwohcireg_t	dummy1;
 		fwohcireg_t	dummy2;
 		fwohcireg_t	dummy3;
-	};
+	} dummy8;
 	/*       0x180, 0x184, 0x188, 0x18c */
 	/*       0x190, 0x194, 0x198, 0x19c */
 	/*       0x1a0, 0x1a4, 0x1a8, 0x1ac */
@@ -304,7 +305,7 @@ struct ohci_registers {
 		fwohcireg_t	cntl_clr;
 		fwohcireg_t	dummy0;
 		fwohcireg_t	cmd;
-	};
+	} dummy9;
 	struct ohci_itdma dma_itch[0x20];
 
 	/*       0x400, 0x404, 0x408, 0x40c */
@@ -316,7 +317,7 @@ struct ohci_registers {
 struct fwohcidb_tr{
 	STAILQ_ENTRY(fwohcidb_tr) link;
 	struct fw_xfer *xfer;
-	volatile struct fwohcidb *db;
+	struct fwohcidb *db;
 	bus_dmamap_t dma_map;
 	caddr_t buf;
 	bus_addr_t bus_addr;
@@ -331,8 +332,7 @@ struct fwohci_txpkthdr{
 		u_int32_t ld[4];
 		struct {
 #if BYTE_ORDER == BIG_ENDIAN
-			u_int32_t :13,
-				  spd:3,
+			u_int32_t spd:16, /* XXX include reserved field */
 				  :8,
 				  tcode:4,
 				  :4;
@@ -340,8 +340,7 @@ struct fwohci_txpkthdr{
 			u_int32_t :4,
 				  tcode:4,
 				  :8,
-				  spd:3,
-				  :13;
+				  spd:16; /* XXX include reserved fields */
 #endif
 		}common;
 		struct {

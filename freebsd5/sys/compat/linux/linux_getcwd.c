@@ -1,7 +1,5 @@
-/* $FreeBSD: src/sys/compat/linux/linux_getcwd.c,v 1.12 2003/03/20 10:40:45 phk Exp $ */
 /* $OpenBSD: linux_getcwd.c,v 1.2 2001/05/16 12:50:21 ho Exp $ */
 /* $NetBSD: vfs_getcwd.c,v 1.3.2.3 1999/07/11 10:24:09 sommerfeld Exp $ */
-
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -37,6 +35,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_getcwd.c,v 1.14 2003/11/17 18:57:20 rwatson Exp $");
+
 #include "opt_compat.h"
 #include "opt_mac.h"
 
@@ -160,7 +162,11 @@ linux_getcwd_scandir(lvpp, uvpp, bpp, bufp, td)
 	 * At this point, lvp is locked and will be unlocked by the lookup.
 	 * On successful return, *uvpp will be locked
 	 */
-	error = VOP_LOOKUP(lvp, uvpp, &cn);
+#ifdef MAC
+	error = mac_check_vnode_lookup(td->td_ucred, lvp, &cn);
+	if (error == 0)
+#endif
+		error = VOP_LOOKUP(lvp, uvpp, &cn);
 	if (error) {
 		vput(lvp);
 		*lvpp = NULL;

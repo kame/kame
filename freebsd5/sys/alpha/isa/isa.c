@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/isa/isa.c,v 1.31 2003/04/11 13:30:32 gallatin Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/isa/isa.c,v 1.34 2003/11/17 06:10:14 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -309,10 +310,11 @@ isa_handle_intr(void *arg)
  */
 
 static void
-isa_disable_intr(int vector)
+isa_disable_intr(uintptr_t vector)
 {
-        int irq = (vector - 0x800) >> 4;
+	int irq;
 
+	irq = (vector - 0x800) >> 4;
 	mtx_lock_spin(&icu_lock);
 	if (irq > 7)
 		outb(IO_ICU2, 0x20 | (irq & 7));
@@ -323,7 +325,7 @@ isa_disable_intr(int vector)
 }
 
 static void
-isa_enable_intr(int vector)
+isa_enable_intr(uintptr_t vector)
 {
 	int irq;
 

@@ -29,7 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 /*
  * Aironet 4500/4800 802.11 PCMCIA/ISA/PCI driver for FreeBSD.
  *
@@ -39,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.20 2003/04/15 06:37:19 mdodd Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.22 2003/10/08 01:20:00 imp Exp $");
 
 #include "opt_inet.h"
 
@@ -113,6 +112,7 @@ static const struct pccard_product an_pccard_products[] = {
 	PCMCIA_CARD(AIRONET, PC4800, 0),
 	PCMCIA_CARD(AIRONET, PC4500, 0),
 	PCMCIA_CARD(AIRONET, 350, 0),
+	PCMCIA_CARD(XIRCOM, CWE1130, 0), 
 	{ NULL }
 };
 

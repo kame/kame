@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.25 2003/03/08 08:01:26 phk Exp $ */
 /*
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
@@ -23,8 +22,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.26 2003/06/10 18:14:05 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/systm.h>

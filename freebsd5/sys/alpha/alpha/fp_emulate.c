@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.11 2001/09/12 08:36:53 julian Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.13 2003/08/17 06:42:07 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -33,6 +34,8 @@
 #include <sys/proc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/user.h>
+
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
@@ -40,10 +43,12 @@
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
-#include <sys/user.h>
-#include <machine/inst.h>
+
 #include <machine/fpu.h>
+#include <machine/inst.h>
+#include <machine/md_var.h>
 #include <machine/reg.h>
+
 #include <alpha/alpha/ieee_float.h>
 
 #define GETREG(regs, i)		(*(fp_register_t*) &regs->fpr_regs[i])

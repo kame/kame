@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/pci_cfgreg.h,v 1.10 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/pci_cfgreg.h,v 1.11 2003/09/22 22:21:21 peter Exp $
  *
  */
 
@@ -32,7 +32,7 @@
 
 #define CONF1_ENABLE       0x80000000ul
 #define CONF1_ENABLE_CHK   0x80000000ul
-#define CONF1_ENABLE_MSK   0x7ff00000ul
+#define CONF1_ENABLE_MSK   0x7f000000ul
 #define CONF1_ENABLE_CHK1  0xff000001ul
 #define CONF1_ENABLE_MSK1  0x80000001ul
 #define CONF1_ENABLE_RES1  0x80000000ul

@@ -25,14 +25,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/dpt/dpt_pci.c,v 1.25 2003/03/29 08:30:45 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_pci.c,v 1.29 2003/09/02 17:30:35 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/bus.h>
 
 #include <machine/bus_memio.h>
@@ -41,8 +44,8 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <cam/scsi/scsi_all.h>
 
@@ -51,8 +54,8 @@
 #define	DPT_VENDOR_ID		0x1044
 #define	DPT_DEVICE_ID		0xa400
 
-#define	DPT_PCI_IOADDR		PCIR_MAPS		/* I/O Address */
-#define	DPT_PCI_MEMADDR		(PCIR_MAPS + 4)		/* Mem I/O Address */
+#define	DPT_PCI_IOADDR		PCIR_BAR(0)		/* I/O Address */
+#define	DPT_PCI_MEMADDR		PCIR_BAR(1)		/* Mem I/O Address */
 
 #define	ISA_PRIMARY_WD_ADDRESS	0x1f8
 
@@ -144,6 +147,8 @@ dpt_pci_attach (device_t dev)
 				/* nsegments */	~0,
 				/* maxsegsz  */	BUS_SPACE_MAXSIZE_32BIT,
 				/* flags     */	0,
+				/* lockfunc  */ busdma_lock_mutex,
+				/* lockarg   */ &Giant,
 				&dpt->parent_dmat) != 0) {
 		dpt_free(dpt);
 		error = ENXIO;

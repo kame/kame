@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)genassym.c	5.11 (Berkeley) 5/10/91
- * $FreeBSD: src/sys/amd64/amd64/genassym.c,v 1.147 2003/05/23 05:04:53 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/genassym.c,v 1.151 2003/11/21 03:01:59 peter Exp $");
 
 #include "opt_compat.h"
 #include "opt_kstack_pages.h"
@@ -67,10 +69,12 @@
 #include <nfs/rpcv2.h>
 #include <nfsclient/nfs.h>
 #include <nfsclient/nfsdiskless.h>
+#include <machine/apicreg.h>
 #include <machine/cpu.h>
 #include <machine/sigframe.h>
 #include <machine/proc.h>
 #include <machine/specialreg.h>
+#include <machine/segments.h>
 
 ASSYM(P_VMSPACE, offsetof(struct proc, p_vmspace));
 ASSYM(VM_PMAP, offsetof(struct vmspace, vm_pmap));
@@ -81,12 +85,6 @@ ASSYM(P_UAREA, offsetof(struct proc, p_uarea));
 ASSYM(TD_FLAGS, offsetof(struct thread, td_flags));
 ASSYM(TD_PCB, offsetof(struct thread, td_pcb));
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
-ASSYM(TD_INTR_NESTING_LEVEL, offsetof(struct thread, td_intr_nesting_level));
-ASSYM(TD_CRITNEST, offsetof(struct thread, td_critnest));
-ASSYM(TD_SWITCHIN, offsetof(struct thread, td_switchin));
-ASSYM(TD_MD, offsetof(struct thread, td_md));
-
-ASSYM(P_MD, offsetof(struct proc, p_md));
 
 ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
 ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
@@ -179,6 +177,7 @@ ASSYM(UC_EFLAGS, offsetof(ucontext_t, uc_mcontext.mc_rflags));
 ASSYM(ENOENT, ENOENT);
 ASSYM(EFAULT, EFAULT);
 ASSYM(ENAMETOOLONG, ENAMETOOLONG);
+ASSYM(MAXCOMLEN, MAXCOMLEN);
 ASSYM(MAXPATHLEN, MAXPATHLEN);
 ASSYM(PC_SIZEOF, sizeof(struct pcpu));
 ASSYM(PC_PRVSPACE, offsetof(struct pcpu, pc_prvspace));
@@ -188,12 +187,24 @@ ASSYM(PC_IDLETHREAD, offsetof(struct pcpu, pc_idlethread));
 ASSYM(PC_CURPCB, offsetof(struct pcpu, pc_curpcb));
 ASSYM(PC_CPUID, offsetof(struct pcpu, pc_cpuid));
 ASSYM(PC_SCRATCH_RSP, offsetof(struct pcpu, pc_scratch_rsp));
+ASSYM(PC_CURPMAP, offsetof(struct pcpu, pc_curpmap));
+ASSYM(PC_TSSP, offsetof(struct pcpu, pc_tssp));
+ASSYM(PC_RSP0, offsetof(struct pcpu, pc_rsp0));
+ 
+ASSYM(LA_VER, offsetof(struct LAPIC, version));
+ASSYM(LA_TPR, offsetof(struct LAPIC, tpr));
+ASSYM(LA_EOI, offsetof(struct LAPIC, eoi));
+ASSYM(LA_SVR, offsetof(struct LAPIC, svr));
+ASSYM(LA_ICR_LO, offsetof(struct LAPIC, icr_lo));
+ASSYM(LA_ICR_HI, offsetof(struct LAPIC, icr_hi));
+ASSYM(LA_ISR, offsetof(struct LAPIC, isr0));
 
 ASSYM(KCSEL, GSEL(GCODE_SEL, SEL_KPL));
 ASSYM(KDSEL, GSEL(GDATA_SEL, SEL_KPL));
 ASSYM(KUCSEL, GSEL(GUCODE_SEL, SEL_UPL));
 ASSYM(KUDSEL, GSEL(GUDATA_SEL, SEL_UPL));
 ASSYM(KUC32SEL, GSEL(GUCODE32_SEL, SEL_UPL));
+ASSYM(SEL_RPL_MASK, SEL_RPL_MASK);
 
 ASSYM(MSR_FSBASE, MSR_FSBASE);
 ASSYM(MSR_GSBASE, MSR_GSBASE);

@@ -22,9 +22,11 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ofw/ofw_disk.c,v 1.6 2003/04/03 16:28:57 des Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_disk.c,v 1.8 2003/10/18 17:25:26 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -96,8 +98,7 @@ ofwd_strategy(struct bio *bp)
 		return;
 	}
 
-	r = OF_seek(sc->ofwd_instance,
-	    (u_quad_t)(bp->bio_blkno * OFWD_BLOCKSIZE));
+	r = OF_seek(sc->ofwd_instance, bp->bio_offset);
 	if (r == -1) {
 		bp->bio_resid = bp->bio_bcount;
 		device_printf(sc->ofwd_dev, "seek failed\n");

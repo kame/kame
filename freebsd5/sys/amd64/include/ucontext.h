@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm
  * Copyright (c) 1999 Marcel Moolenaar
  * All rights reserved.
  *
@@ -25,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/ucontext.h,v 1.13 2003/05/12 18:33:19 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/ucontext.h,v 1.18 2003/11/08 04:39:22 peter Exp $
  */
 
 #ifndef _MACHINE_UCONTEXT_H_
@@ -37,30 +38,31 @@ typedef struct __mcontext {
 	 * sigcontext. So that we can support sigcontext
 	 * and ucontext_t at the same time.
 	 */
-	register_t	mc_onstack;		/* XXX - sigcontext compat. */
-	register_t	mc_rdi;			/* machine state (struct trapframe) */
-	register_t	mc_rsi;
-	register_t	mc_rdx;
-	register_t	mc_rcx;
-	register_t	mc_r8;
-	register_t	mc_r9;
-	register_t	mc_rax;
-	register_t	mc_rbx;
-	register_t	mc_rbp;
-	register_t	mc_r10;
-	register_t	mc_r11;
-	register_t	mc_r12;
-	register_t	mc_r13;
-	register_t	mc_r14;
-	register_t	mc_r15;
-	register_t	mc_trapno;
-	register_t	mc_addr;
-	register_t	mc_err;
-	register_t	mc_rip;
-	register_t	mc_cs;
-	register_t	mc_rflags;
-	register_t	mc_rsp;
-	register_t	mc_ss;
+	__register_t	mc_onstack;		/* XXX - sigcontext compat. */
+	__register_t	mc_rdi;			/* machine state (struct trapframe) */
+	__register_t	mc_rsi;
+	__register_t	mc_rdx;
+	__register_t	mc_rcx;
+	__register_t	mc_r8;
+	__register_t	mc_r9;
+	__register_t	mc_rax;
+	__register_t	mc_rbx;
+	__register_t	mc_rbp;
+	__register_t	mc_r10;
+	__register_t	mc_r11;
+	__register_t	mc_r12;
+	__register_t	mc_r13;
+	__register_t	mc_r14;
+	__register_t	mc_r15;
+	__register_t	mc_trapno;
+	__register_t	mc_addr;
+	__register_t	mc_flags;
+	__register_t	mc_err;
+	__register_t	mc_rip;
+	__register_t	mc_cs;
+	__register_t	mc_rflags;
+	__register_t	mc_rsp;
+	__register_t	mc_ss;
 
 	long	mc_len;			/* sizeof(mcontext_t) */
 #define	_MC_FPFMT_NODEV		0x10000	/* device not present or configured */
@@ -70,12 +72,11 @@ typedef struct __mcontext {
 #define	_MC_FPOWNED_FPU		0x20001	/* FP state came from FPU */
 #define	_MC_FPOWNED_PCB		0x20002	/* FP state came from PCB */
 	long	mc_ownedfp;
-	long	mc_spare1[1];		/* align next field to 16 bytes */
 	/*
-	 * See <machine/npx.h> for the internals of mc_fpstate[].
+	 * See <machine/fpu.h> for the internals of mc_fpstate[].
 	 */
-	long	mc_fpstate[128] __aligned(16);
-	long	mc_spare2[8];
+	long	mc_fpstate[64] __aligned(16);
+	long	mc_spare[8];
 } mcontext_t;
 
 #endif /* !_MACHINE_UCONTEXT_H_ */

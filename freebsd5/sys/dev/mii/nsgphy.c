@@ -37,6 +37,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * Driver for the National Semiconductor DP83891 and DP83861
  * 10/100/1000 PHYs.
@@ -52,7 +55,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.14 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -132,11 +135,9 @@ nsgphy_attach(device_t dev)
 	struct mii_softc *sc;
 	struct mii_attach_args *ma;
 	struct mii_data *mii;
-	const struct mii_phydesc *mpd;
 
 	sc = device_get_softc(dev);
 	ma = device_get_ivars(dev);
-	mpd = mii_phy_match(ma, gphyters);
 	if (bootverbose)
 		device_printf(dev, "<rev. %d>\n", MII_REV(ma->mii_id2));
 	device_printf(dev, " ");

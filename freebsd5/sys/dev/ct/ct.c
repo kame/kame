@@ -1,5 +1,7 @@
-/* $FreeBSD: src/sys/dev/ct/ct.c,v 1.5 2002/03/20 02:04:09 alfred Exp $ */
 /*	$NecBSD: ct.c,v 1.13.12.5 2001/06/26 07:31:53 honda Exp $	*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ct/ct.c,v 1.7 2003/08/24 17:46:03 obrien Exp $");
 /*	$NetBSD$	*/
 
 #define	CT_DEBUG
@@ -255,7 +257,7 @@ cthw_chip_reset(chp, chiprevp, chipclk, hostid)
 		break;
 
 	default:
-		panic("ct: illegal chip clk rate\n");
+		panic("ct: illegal chip clk rate");
 		break;
 	}
 

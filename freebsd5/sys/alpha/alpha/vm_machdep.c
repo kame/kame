@@ -38,7 +38,6 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.84 2003/04/17 21:57:16 jhb Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -67,6 +66,11 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.96 2003/11/16 23:40:05 alc Exp $");
+
+#include "opt_kstack_pages.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -78,6 +82,8 @@
 #include <sys/vnode.h>
 #include <sys/vmmeter.h>
 #include <sys/kernel.h>
+#include <sys/mbuf.h>
+#include <sys/sf_buf.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
 
@@ -96,6 +102,20 @@
 #include <vm/vm_extern.h>
 
 #include <sys/user.h>
+
+static void	sf_buf_init(void *arg);
+SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
+
+/*
+ * Expanded sf_freelist head. Really an SLIST_HEAD() in disguise, with the
+ * sf_freelist head with the sf_lock mutex.
+ */
+static struct {
+	SLIST_HEAD(, sf_buf) sf_head;
+	struct mtx sf_lock;
+} sf_freelist;
+
+static u_int	sf_buf_alloc_want;
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -143,6 +163,7 @@ cpu_fork(td1, p2, td2, flags)
 	 */
 	bcopy(td1->td_pcb, td2->td_pcb, sizeof(struct pcb));
 	td2->td_pcb->pcb_hw.apcb_usp = alpha_pal_rdusp();
+	td2->td_pcb->pcb_hw.apcb_unique = 0;
 	td2->td_pcb->pcb_hw.apcb_flags &= ~ALPHA_PCB_FLAGS_FEN;
 
 	/*
@@ -243,8 +264,6 @@ cpu_sched_exit(td)
 void
 cpu_thread_exit(struct thread *td)
 {
-
-	return;
 }
 
 void
@@ -257,16 +276,32 @@ cpu_thread_setup(struct thread *td)
 {
 
 	td->td_pcb =
-	     (struct pcb *)(td->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
+	    (struct pcb *)(td->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
+	td->td_md.md_pcbpaddr = (void*)vtophys((vm_offset_t)td->td_pcb);
 	td->td_frame = (struct trapframe *)((caddr_t)td->td_pcb) - 1;
 }
 
 void
-cpu_set_upcall(struct thread *td, void *pcb)
+cpu_thread_swapin(struct thread *td)
+{
+	/*
+	 * The pcb may be at a different physical address now so cache the
+	 * new address.
+	 */
+	td->td_md.md_pcbpaddr = (void *)vtophys((vm_offset_t)td->td_pcb);
+}
+
+void
+cpu_thread_swapout(struct thread *td)
+{
+	/* Make sure we aren't fpcurthread. */
+	alpha_fpstate_save(td, 1);
+}
+
+void
+cpu_set_upcall(struct thread *td, struct thread *td0)
 {
 	struct pcb *pcb2;
-
-	td->td_flags |= TDF_UPCALLING;
 
 	/* Point the pcb to the top of the stack. */
 	pcb2 = td->td_pcb;
@@ -282,7 +317,7 @@ cpu_set_upcall(struct thread *td, void *pcb)
 	 * at this time (see the matching comment below for
 	 * more analysis) (need a good safe default).
 	 */
-	bcopy(pcb, pcb2, sizeof(*pcb2));
+	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
 
 	/*
 	 * Create a new fresh stack for the new thread.
@@ -291,7 +326,7 @@ cpu_set_upcall(struct thread *td, void *pcb)
 	 * The contexts are filled in at the time we actually DO the
 	 * upcall as only then do we know which KSE we got.
 	 */
-	td->td_frame = (struct trapframe *)((caddr_t)pcb2) - 1;
+	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
 
 	/*
 	 * Arrange for continuation at fork_return(), which
@@ -314,14 +349,31 @@ cpu_set_upcall(struct thread *td, void *pcb)
 void
 cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 {
+	struct pcb *pcb;
+	struct trapframe *tf;
+	uint64_t stack;
 
-	/* XXX */
-}
+	pcb = td->td_pcb;
+	tf = td->td_frame;
+	stack = ((uint64_t)ku->ku_stack.ss_sp + ku->ku_stack.ss_size) & ~15;
 
-void
-cpu_wait(p)
-	struct proc *p;
-{
+	bzero(tf->tf_regs, FRAME_SIZE * sizeof(tf->tf_regs[0]));
+	bzero(&pcb->pcb_fp, sizeof(pcb->pcb_fp));
+	pcb->pcb_fp_control = 0;
+	pcb->pcb_fp.fpr_cr = FPCR_DYN_NORMAL | FPCR_INVD | FPCR_DZED |
+	    FPCR_OVFD | FPCR_INED | FPCR_UNFD;
+	if (td != curthread) {
+		pcb->pcb_hw.apcb_usp = stack;
+		pcb->pcb_hw.apcb_unique = 0;
+	} else {
+		alpha_pal_wrusp(stack);
+		alpha_pal_wrunique(0);
+	}
+	tf->tf_regs[FRAME_PS] = ALPHA_PSL_USERSET;
+	tf->tf_regs[FRAME_PC] = (u_long)ku->ku_func;
+	tf->tf_regs[FRAME_A0] = (u_long)ku->ku_mailbox;
+	tf->tf_regs[FRAME_T12] = tf->tf_regs[FRAME_PC];	/* aka. PV */
+	tf->tf_regs[FRAME_FLAGS] = 0;			/* full restore */
 }
 
 /*
@@ -331,6 +383,83 @@ void
 cpu_reset()
 {
 	prom_halt(0);
+}
+
+/*
+ * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
+ */
+static void
+sf_buf_init(void *arg)
+{
+	struct sf_buf *sf_bufs;
+	int i;
+
+	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
+	SLIST_INIT(&sf_freelist.sf_head);
+	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
+	    M_NOWAIT | M_ZERO);
+	for (i = 0; i < nsfbufs; i++)
+		SLIST_INSERT_HEAD(&sf_freelist.sf_head, &sf_bufs[i], free_list);
+	sf_buf_alloc_want = 0;
+}
+
+/*
+ * Get an sf_buf from the freelist. Will block if none are available.
+ */
+struct sf_buf *
+sf_buf_alloc(struct vm_page *m)
+{
+	struct sf_buf *sf;
+	int error;
+
+	mtx_lock(&sf_freelist.sf_lock);
+	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
+		sf_buf_alloc_want++;
+		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
+		    "sfbufa", 0);
+		sf_buf_alloc_want--;
+
+		/*
+		 * If we got a signal, don't risk going back to sleep. 
+		 */
+		if (error)
+			break;
+	}
+	if (sf != NULL) {
+		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
+		sf->m = m;
+	}
+	mtx_unlock(&sf_freelist.sf_lock);
+	return (sf);
+}
+
+/*
+ * Detatch mapped page and release resources back to the system.
+ */
+void
+sf_buf_free(void *addr, void *args)
+{
+	struct sf_buf *sf;
+	struct vm_page *m;
+
+	sf = args;
+	m = sf->m;
+	vm_page_lock_queues();
+	vm_page_unwire(m, 0);
+	/*
+	 * Check for the object going away on us. This can
+	 * happen since we don't hold a reference to it.
+	 * If so, we're responsible for freeing the page.
+	 */
+	if (m->wire_count == 0 && m->object == NULL)
+		vm_page_free(m);
+	vm_page_unlock_queues();
+	sf->m = NULL;
+	mtx_lock(&sf_freelist.sf_lock);
+	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
+	if (sf_buf_alloc_want > 0)
+		wakeup_one(&sf_freelist);
+	mtx_unlock(&sf_freelist.sf_lock);
 }
 
 /*

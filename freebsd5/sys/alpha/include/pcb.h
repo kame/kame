@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/pcb.h,v 1.8 2002/10/15 00:02:50 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/pcb.h,v 1.9 2003/08/17 06:42:07 marcel Exp $ */
 /* From: NetBSD: pcb.h,v 1.6 1997/04/06 08:47:33 cgd Exp */
 
 /*
@@ -56,5 +56,9 @@ struct pcb {
 	unsigned long	pcb_onfault;		/* for copy faults	[SW] */
 	unsigned long	pcb_accessaddr;		/* for [fs]uswintr	[SW] */
 };
+
+#ifdef _KERNEL
+void	savectx(struct pcb *);
+#endif
 
 #endif	/* _MACHINE_PCB_H */

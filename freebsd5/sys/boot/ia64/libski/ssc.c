@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ia64/libski/ssc.c,v 1.3 2003/02/01 22:50:08 marcel Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ia64/libski/ssc.c,v 1.4 2003/09/08 09:11:32 obrien Exp $");
 
 #include <stand.h>
 #include "libski.h"

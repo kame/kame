@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/mlx/mlx_pci.c,v 1.14 2003/04/01 15:06:24 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mlx/mlx_pci.c,v 1.17 2003/08/24 17:54:11 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,8 +42,8 @@
 
 #include <geom/geom_disk.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/mlx/mlx_compat.h>
 #include <dev/mlx/mlxio.h>
@@ -196,6 +197,8 @@ mlx_pci_attach(device_t dev)
 			       MAXBSIZE, MLX_NSEG,	/* maxsize, nsegments */
 			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			       BUS_DMA_ALLOCNOW,	/* flags */
+			       NULL,			/* lockfunc */
+			       NULL,			/* lockarg */
 			       &sc->mlx_parent_dmat);
     if (error != 0) {
 	device_printf(dev, "can't allocate parent DMA tag\n");

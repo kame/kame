@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_aali.h,v 1.3 2000/10/12 07:42:29 phk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_aali.h,v 1.4 2003/07/31 14:20:07 harti Exp $
  *
  */
 
@@ -331,6 +331,8 @@ typedef volatile unsigned long	Cmd_code;
 #define	CMD_SET_OC3_REG	0x07		/* Set SUNI OC3 registers */
 #define	CMD_GET_OC3_REG	0x08		/* Get SUNI OC3 registers */
 #define	CMD_GET_PROM	0x09		/* Get PROM data */
+#define	CMD_ZERO_STATS4	0x09		/* FT 4 Zero stats (unimpl) */
+#define	CMD_GET_PROM4	0x0a		/* FT 4 Get PROM data */
 #define	CMD_INTR_REQ	0x80		/* Request host interrupt */
 
 #endif	/* _KERNEL */

@@ -37,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.15 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
@@ -71,7 +74,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.14 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.15 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -22,9 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ia64/libski/sal_stub.c,v 1.1 2003/02/01 22:50:08 marcel Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ia64/libski/sal_stub.c,v 1.2 2003/09/08 09:11:32 obrien Exp $");
 
 #include <sys/types.h>
 #include <machine/md_var.h>

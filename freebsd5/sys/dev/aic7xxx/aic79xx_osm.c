@@ -29,10 +29,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.c#26 $
- *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.12 2003/05/27 04:59:57 scottl Exp $
+ * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic79xx_osm.c#27 $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic79xx_osm.c,v 1.15 2003/08/24 17:48:03 obrien Exp $");
 
 #include <dev/aic7xxx/aic79xx_osm.h>
 #include <dev/aic7xxx/aic79xx_inline.h>
@@ -550,26 +551,10 @@ ahd_action(struct cam_sim *sim, union ccb *ccb)
 	}
 	case XPT_CALC_GEOMETRY:
 	{
-		struct	  ccb_calc_geometry *ccg;
-		uint32_t size_mb;
-		uint32_t secs_per_cylinder;
 		int	  extended;
 
-		ccg = &ccb->ccg;
-		size_mb = ccg->volume_size
-			/ ((1024L * 1024L) / ccg->block_size);
 		extended = ahd->flags & AHD_EXTENDED_TRANS_A;
-		
-		if (size_mb > 1024 && extended) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(&ccb->ccg, extended);
 		xpt_done(ccb);
 		break;
 	}

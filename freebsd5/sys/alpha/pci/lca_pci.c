@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/pci/lca_pci.c,v 1.15 2002/04/17 14:08:22 ticso Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/lca_pci.c,v 1.17 2003/08/22 07:20:27 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -34,8 +35,8 @@
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <machine/cpuconf.h>
 #include <machine/swiz.h>
 #include <machine/md_var.h>

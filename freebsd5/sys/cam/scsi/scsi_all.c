@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.40 2003/04/30 00:35:22 ken Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.44 2003/12/01 10:13:00 obrien Exp $");
 
 #include <sys/param.h>
 
@@ -1394,7 +1395,7 @@ static struct asc_table_entry asc_table[] = {
 			"End of user area encountered on this track") },
 /*      R       */{SST(0x63, 0x01, SS_FATAL|ENOSPC,
 			"Packet does not fit in available space") },
-/*      R       */{SST(0x64, 0x00, SS_RDEF,
+/*      R       */{SST(0x64, 0x00, SS_FATAL|ENXIO,
 			"Illegal mode for this track") },
 /*      R       */{SST(0x64, 0x01, SS_RDEF,
 			"Invalid packet size") },
@@ -2407,6 +2408,7 @@ scsi_request_sense(struct ccb_scsiio *csio, u_int32_t retries,
 	scsi_cmd = (struct scsi_request_sense *)&csio->cdb_io.cdb_bytes;
 	bzero(scsi_cmd, sizeof(*scsi_cmd));
 	scsi_cmd->opcode = REQUEST_SENSE;
+	scsi_cmd->length = dxfer_len;
 }
 
 void
@@ -2453,10 +2455,12 @@ scsi_mode_sense(struct ccb_scsiio *csio, u_int32_t retries,
 		u_int8_t page, u_int8_t *param_buf, u_int32_t param_len,
 		u_int8_t sense_len, u_int32_t timeout)
 {
-	return(scsi_mode_sense_len(csio, retries, cbfcnp, tag_action, dbd,
-				   page_code, page, param_buf, param_len, 0,
-				   sense_len, timeout));
+
+	scsi_mode_sense_len(csio, retries, cbfcnp, tag_action, dbd,
+			    page_code, page, param_buf, param_len, 0,
+			    sense_len, timeout);
 }
+
 void
 scsi_mode_sense_len(struct ccb_scsiio *csio, u_int32_t retries,
 		    void (*cbfcnp)(struct cam_periph *, union ccb *),
@@ -2518,9 +2522,9 @@ scsi_mode_select(struct ccb_scsiio *csio, u_int32_t retries,
 		 u_int8_t *param_buf, u_int32_t param_len, u_int8_t sense_len,
 		 u_int32_t timeout)
 {
-	return(scsi_mode_select_len(csio, retries, cbfcnp, tag_action,
-				    scsi_page_fmt, save_pages, param_buf,
-				    param_len, 0, sense_len, timeout));
+	scsi_mode_select_len(csio, retries, cbfcnp, tag_action,
+			     scsi_page_fmt, save_pages, param_buf,
+			     param_len, 0, sense_len, timeout);
 }
 
 void

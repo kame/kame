@@ -1,5 +1,4 @@
-/*
- *
+/*-
  * Copyright (c) 1996 Stefan Esser <se@freebsd.org>
  * All rights reserved.
  *
@@ -16,9 +15,10 @@
  *    Stefan Esser.
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
- *
- * $FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.30 2003/04/15 06:37:23 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.34 2003/10/31 18:31:58 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -36,8 +36,8 @@
 #include <net/if_arp.h>
 #include <net/if_mib.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/ed/if_edvar.h>
 
@@ -84,7 +84,7 @@ ed_pci_attach(device_t dev)
         int	flags = 0;
         int	error;
 
-        error = ed_probe_Novell(dev, PCIR_MAPS, flags);
+        error = ed_probe_Novell(dev, PCIR_BAR(0), flags);
         if (error)
                 return (error);
 
@@ -101,7 +101,7 @@ ed_pci_attach(device_t dev)
                 return (error);
         }
 
-	error = ed_attach(sc, device_get_unit(dev), flags);
+	error = ed_attach(dev);
 
 	return (error);
 }

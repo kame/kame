@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.10 2003/03/03 09:14:25 des Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.12 2003/10/21 11:00:33 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -99,7 +100,7 @@ linux_setgroups16(struct thread *td, struct linux_setgroups16_args *args)
 #endif
 
 	ngrp = args->gidsetsize;
-	if (ngrp >= NGROUPS)
+	if (ngrp < 0 || ngrp >= NGROUPS)
 		return (EINVAL);
 	error = copyin(args->gidset, linux_gidset, ngrp * sizeof(l_gid16_t));
 	if (error)

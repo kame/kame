@@ -23,9 +23,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/acpica/acpi_pcib_pci.c,v 1.3 2002/10/05 02:16:49 iwasaki Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pcib_pci.c,v 1.5 2003/08/24 17:48:01 obrien Exp $");
+
 #include "opt_acpi.h"
 
 #include <sys/param.h>
@@ -39,9 +41,9 @@
 #include <dev/acpica/acpi_pcibvar.h>
 
 #include <machine/pci_cfgreg.h>
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
-#include <pci/pcib_private.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcib_private.h>
 
 #include "pcib_if.h"
 

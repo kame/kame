@@ -29,9 +29,10 @@
  * SUCH DAMAGE.
  *
  * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_93cx6.c#17 $
- *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.c,v 1.17 2002/08/31 06:45:28 gibbs Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_93cx6.c,v 1.18 2003/08/24 17:48:03 obrien Exp $");
 
 /*
  *   The instruction set of the 93C66/56/46/26/06 chips are as follows:
@@ -64,7 +65,6 @@
  *   is preceded by an initial zero (leading 0, followed by 16-bits, MSB
  *   first).  The clock cycling from low to high initiates the next data
  *   bit to be sent from the chip.
- *
  */
 
 #ifdef __linux__

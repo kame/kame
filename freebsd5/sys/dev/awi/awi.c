@@ -1,6 +1,4 @@
 /*	$NetBSD: awi.c,v 1.26 2000/07/21 04:48:55 onoe Exp $	*/
-/* $FreeBSD: src/sys/dev/awi/awi.c,v 1.26 2003/02/19 05:47:01 imp Exp $ */
-
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -36,13 +34,20 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * Driver for AMD 802.11 firmware.
- * Uses am79c930 chip driver to talk to firmware running on the am79c930.
- *
- * More-or-less a generic ethernet-like if driver, with 802.11 gorp added.
- */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/awi/awi.c,v 1.28 2003/08/24 17:48:06 obrien Exp $");
+
+/*
+ * Driver for AMD 802.11 PCnetMobile firmware.
+ * Uses am79c930 chip driver to talk to firmware running on the am79c930.
+ * More-or-less a generic ethernet-like if driver, with 802.11 gorp added.
+ *
+ * The initial version of the driver was written by
+ * Bill Sommerfeld <sommerfeld@netbsd.org>.
+ * Then the driver module completely rewritten to support cards with DS phy
+ * and to support adhoc mode by Atsushi Onoe <onoe@netbsd.org>
+ */
 /*
  * todo:
  *	- flush tx queue on resynch.
@@ -75,16 +80,6 @@
  *	- common 802.11 media layer.
  */
 
-/*
- * Driver for AMD 802.11 PCnetMobile firmware.
- * Uses am79c930 chip driver to talk to firmware running on the am79c930.
- *
- * The initial version of the driver was written by
- * Bill Sommerfeld <sommerfeld@netbsd.org>.
- * Then the driver module completely rewritten to support cards with DS phy
- * and to support adhoc mode by Atsushi Onoe <onoe@netbsd.org>
- */
-
 #include "opt_inet.h"
 
 #include <sys/param.h>
@@ -112,7 +107,6 @@
 #endif
 #include <net/if_media.h>
 #include <net/if_llc.h>
-#include <net/if_ieee80211.h>
 
 #ifdef INET
 #include <netinet/in.h>
@@ -125,6 +119,9 @@
 #include <netinet/if_ether.h>
 #endif
 #endif
+
+#include <net80211/ieee80211_var.h>
+#include <net80211/ieee80211_ioctl.h>
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 400000
 #define	NBPFILTER	1
@@ -459,7 +456,9 @@ awi_ioctl(ifp, cmd, data)
 	struct ifaddr *ifa = (struct ifaddr *)data;
 	struct ieee80211req *ireq = (struct ieee80211req *)data;
 	int s, error;
+#ifdef SIOCS80211NWID
 	struct ieee80211_nwid nwid;
+#endif
 	u_int8_t *p;
 	int len;
 	u_int8_t tmpstr[IEEE80211_NWID_LEN*2];
@@ -527,6 +526,7 @@ awi_ioctl(ifp, cmd, data)
 		else
 			ifp->if_mtu = ifr->ifr_mtu;
 		break;
+#ifdef SIOCS80211NWID
 	case SIOCS80211NWID:
 #ifdef __FreeBSD__
 		error = suser(mythread);
@@ -561,6 +561,8 @@ awi_ioctl(ifp, cmd, data)
 			p = sc->sc_mib_mac.aDesired_ESS_ID;
 		error = copyout(p + 1, ifr->ifr_data, 1 + IEEE80211_NWID_LEN);
 		break;
+#endif
+#ifdef SIOCS80211NWKEY
 	case SIOCS80211NWKEY:
 #ifdef __FreeBSD__
 		error = suser(mythread);
@@ -572,6 +574,7 @@ awi_ioctl(ifp, cmd, data)
 	case SIOCG80211NWKEY:
 		error = awi_wep_getnwkey(sc, (struct ieee80211_nwkey *)data);
 		break;
+#endif
 #ifdef IFM_IEEE80211
 	case SIOCSIFMEDIA:
 	case SIOCGIFMEDIA:

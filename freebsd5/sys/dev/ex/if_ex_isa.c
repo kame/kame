@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ex/if_ex_isa.c,v 1.6 2003/03/29 15:38:53 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ex/if_ex_isa.c,v 1.7 2003/08/24 17:46:05 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

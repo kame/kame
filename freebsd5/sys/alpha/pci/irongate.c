@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/pci/irongate.c,v 1.6 2001/10/19 19:23:31 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/irongate.c,v 1.9 2003/08/22 07:20:27 imp Exp $");
 
 #include "opt_cpu.h"
 
@@ -37,17 +38,19 @@
 #include <sys/rman.h>
 #include <sys/malloc.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <alpha/isa/isavar.h>
 #include <alpha/pci/irongatereg.h>
 #include <alpha/pci/irongatevar.h>
+
 #include <machine/bwx.h>
+#include <machine/cpuconf.h>
 #include <machine/intr.h>
 #include <machine/intrcnt.h>
-#include <machine/cpuconf.h>
-#include <machine/rpb.h>
+#include <machine/md_var.h>
 #include <machine/resource.h>
+#include <machine/rpb.h>
 #include <machine/sgmap.h>
 
 #include <vm/vm.h>

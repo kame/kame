@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ata/ata-card.c,v 1.12 2003/05/12 15:26:05 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-card.c,v 1.20.2.1 2004/01/27 05:53:18 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -35,25 +36,31 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
+#include <sys/sema.h>
+#include <sys/taskqueue.h>
+#include <vm/uma.h>
 #include <machine/stdarg.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <dev/ata/ata-all.h>
+#include <dev/pccard/pccard_cis.h>
+#include <dev/pccard/pccarddevs.h>
 #include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
 
 static const struct pccard_product ata_pccard_products[] = {
-	/* NetBSD has a few others that need to migrate into pccarddevs */
-	/* XXX */
+	PCMCIA_CARD(FREECOM, PCCARDIDE, 0),
 	PCMCIA_CARD(EXP, EXPMULTIMEDIA, 0),
 	PCMCIA_CARD(IODATA, CBIDE2, 0),
 	PCMCIA_CARD(OEM2, CDROM1, 0),
+	PCMCIA_CARD(OEM2, IDE, 0),
 	PCMCIA_CARD(PANASONIC, KXLC005, 0),
 	PCMCIA_CARD(TEAC, IDECARDII, 0),
 	{NULL}
 };
+
+MALLOC_DECLARE(M_ATA);
 
 static int
 ata_pccard_match(device_t dev)
@@ -70,9 +77,9 @@ ata_pccard_match(device_t dev)
     if (fcn == PCCARD_FUNCTION_DISK)
 	return (0);
 
-    /* Match other devices here, primarily cdrom/dvd rom */
+    /* match other devices here, primarily cdrom/dvd rom */
     if ((pp = pccard_product_lookup(dev, ata_pccard_products,
-      sizeof(ata_pccard_products[0]), NULL)) != NULL) {
+				    sizeof(ata_pccard_products[0]), NULL))) {
 	if (pp->pp_name)
 	    device_set_desc(dev, pp->pp_name);
 	return (0);
@@ -96,8 +103,7 @@ ata_pccard_probe(device_t dev)
 {
     struct ata_channel *ch = device_get_softc(dev);
     struct resource *io, *altio;
-    int i, rid, len, start, end;
-    u_long tmp;
+    int i, rid, len;
 
     /* allocate the io range to get start and length */
     rid = ATA_IOADDR_RID;
@@ -107,56 +113,39 @@ ata_pccard_probe(device_t dev)
     if (!io)
 	return ENXIO;
 
-    /* reallocate the io address to only cover the io ports */
-    start = rman_get_start(io);
-    end = start + ATA_IOSIZE - 1;
-    bus_release_resource(dev, SYS_RES_IOPORT, rid, io);
-    io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-			    start, end, ATA_IOSIZE, RF_ACTIVE);
-
-    /* 
-     * if we got more than the default ATA_IOSIZE ports, this is likely
-     * a pccard system where the altio ports are located at offset 14
-     * otherwise its the normal altio offset
-     */
-    if (bus_get_resource(dev, SYS_RES_IOPORT, ATA_ALTADDR_RID, &tmp, &tmp)) {
-	if (len > ATA_IOSIZE) {
-	    bus_set_resource(dev, SYS_RES_IOPORT, ATA_ALTADDR_RID,
-			     start + ATA_PCCARD_ALTOFFSET, ATA_ALTIOSIZE);
-	}
-	else {
-	    bus_set_resource(dev, SYS_RES_IOPORT, ATA_ALTADDR_RID, 
-			     start + ATA_ALTOFFSET, ATA_ALTIOSIZE);
-	}
-    }
-    else {
-	bus_release_resource(dev, SYS_RES_IOPORT, rid, io);
-	return ENXIO;
-    }
-
-    /* allocate the altport range */
-    rid = ATA_ALTADDR_RID;
-    altio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
-			       ATA_ALTIOSIZE, RF_ACTIVE);
-    if (!altio) {
-	bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, io);
-	return ENXIO;
-    }
-
     /* setup the resource vectors */
     for (i = ATA_DATA; i <= ATA_STATUS; i++) {
 	ch->r_io[i].res = io;
 	ch->r_io[i].offset = i;
     }
-    ch->r_io[ATA_ALTSTAT].res = altio;
-    ch->r_io[ATA_ALTSTAT].offset = 0;
+
+    /*
+     * if we got more than the default ATA_IOSIZE ports, this is a device
+     * where altio is located at offset 14 into "normal" io space.
+     */
+    if (len > ATA_IOSIZE) {
+	ch->r_io[ATA_ALTSTAT].res = io;
+	ch->r_io[ATA_ALTSTAT].offset = 14;
+    }
+    else {
+	rid = ATA_ALTADDR_RID;
+	altio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
+				   ATA_ALTIOSIZE, RF_ACTIVE);
+	if (!altio) {
+	    bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, io);
+	    for (i = ATA_DATA; i < ATA_MAX_RES; i++)
+		ch->r_io[i].res = NULL;
+	    return ENXIO;
+	}
+	ch->r_io[ATA_ALTSTAT].res = altio;
+	ch->r_io[ATA_ALTSTAT].offset = 0;
+    }
 
     /* initialize softc for this channel */
     ch->unit = 0;
     ch->flags |= (ATA_USE_16BIT | ATA_NO_SLAVE);
     ch->locking = ata_pccard_locknoop;
     ch->device[MASTER].setmode = ata_pccard_setmode;
-    ch->device[SLAVE].setmode = ata_pccard_setmode;
     return ata_probe(dev);
 }
 
@@ -166,6 +155,8 @@ ata_pccard_detach(device_t dev)
     struct ata_channel *ch = device_get_softc(dev);
     int i;
 
+    free(ch->device[MASTER].param, M_ATA);
+    ch->device[MASTER].param = NULL;
     ata_detach(dev);
     bus_release_resource(dev, SYS_RES_IOPORT,
 			 ATA_ALTADDR_RID, ch->r_io[ATA_ALTSTAT].res);

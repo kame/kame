@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/iicbus/iicsmb.c,v 1.11 2002/03/23 15:47:17 nsouch Exp $
+ * $FreeBSD: src/sys/dev/iicbus/iicsmb.c,v 1.12 2003/08/10 14:28:24 ticso Exp $
  *
  */
 
@@ -138,7 +138,7 @@ static driver_t iicsmb_driver = {
 static void
 iicsmb_identify(driver_t *driver, device_t parent)
 {
-	BUS_ADD_CHILD(parent, 0, "iicsmb", 0);
+	BUS_ADD_CHILD(parent, 0, "iicsmb", -1);
 }
 
 static int

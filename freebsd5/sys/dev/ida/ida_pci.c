@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.22 2003/04/01 15:06:23 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.26 2003/09/02 17:30:36 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,8 +41,8 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <geom/geom_disk.h>
 
@@ -51,7 +52,7 @@
 #define IDA_PCI_MAX_DMA_ADDR	0xFFFFFFFF
 #define IDA_PCI_MAX_DMA_COUNT	0xFFFFFFFF
 
-#define IDA_PCI_MEMADDR		(PCIR_MAPS + 4)		/* Mem I/O Address */
+#define IDA_PCI_MEMADDR		PCIR_BAR(1)		/* Mem I/O Address */
 
 #define IDA_DEVICEID_SMART		0xAE100E11
 #define IDA_DEVICEID_DEC_SMART		0x00461011
@@ -253,7 +254,7 @@ ida_pci_attach(device_t dev)
 	ida->regs_res_type = SYS_RES_MEMORY;
 	ida->regs_res_id = IDA_PCI_MEMADDR;
 	if (id == IDA_DEVICEID_DEC_SMART)
-		ida->regs_res_id = PCIR_MAPS;
+		ida->regs_res_id = PCIR_BAR(0);
 
 	ida->regs = bus_alloc_resource(dev, ida->regs_res_type,
 	    &ida->regs_res_id, 0, ~0, 1, RF_ACTIVE);
@@ -267,7 +268,7 @@ ida_pci_attach(device_t dev)
 	    /*highaddr*/BUS_SPACE_MAXADDR, /*filter*/NULL, /*filterarg*/NULL,
 	    /*maxsize*/MAXBSIZE, /*nsegments*/IDA_NSEG,
 	    /*maxsegsize*/BUS_SPACE_MAXSIZE_32BIT, /*flags*/BUS_DMA_ALLOCNOW,
-	    &ida->parent_dmat);
+	    /*lockfunc*/NULL, /*lockarg*/NULL, &ida->parent_dmat);
 	if (error != 0) {
 		device_printf(dev, "can't allocate DMA tag\n");
 		ida_free(ida);

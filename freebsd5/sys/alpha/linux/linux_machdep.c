@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.30 2003/04/22 18:23:47 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.32 2003/08/22 07:20:26 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

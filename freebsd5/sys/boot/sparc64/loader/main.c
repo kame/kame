@@ -6,7 +6,7 @@
  * As long as the above copyright statement and this notice remain
  * unchanged, you can do what ever you want with this file. 
  *
- * $FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.19 2003/05/01 04:39:22 peter Exp $
+ * $FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.21 2003/07/11 16:12:50 tmm Exp $
  */
 /*
  * FreeBSD/sparc64 kernel loader - machine dependent part
@@ -115,7 +115,7 @@ struct fs_ops *file_system[] = {
 #ifdef LOADER_BZIP2_SUPPORT
 	&bzipfs_fsops,
 #endif
-#ifdef LOADER_NET_SUPPORT
+#ifdef LOADER_NFS_SUPPORT
 	&nfs_fsops,
 #endif
 #ifdef LOADER_TFTP_SUPPORT
@@ -222,6 +222,7 @@ __elfN(exec)(struct preloaded_file *fp)
 {
 	struct file_metadata *fmp;
 	vm_offset_t mdp;
+	Elf_Addr entry;
 	Elf_Ehdr *e;
 	int error;
 
@@ -238,7 +239,12 @@ __elfN(exec)(struct preloaded_file *fp)
 	pmap_print_tlb('i');
 	pmap_print_tlb('d');
 #endif
-	((kernel_entry_t *)e->e_entry)(mdp, 0, 0, 0, openfirmware);
+
+	entry = e->e_entry;
+
+	OF_release(heapva, HEAPSZ);
+
+	((kernel_entry_t *)entry)(mdp, 0, 0, 0, openfirmware);
 
 	panic("exec returned");
 }

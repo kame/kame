@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/pci/tsunami.c,v 1.19 2002/03/20 18:58:46 obrien Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/tsunami.c,v 1.23 2003/11/17 06:10:14 peter Exp $");
 
 #include "opt_cpu.h"
 
@@ -41,16 +42,18 @@
 #include <sys/interrupt.h>
 #include <sys/malloc.h>
 
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <alpha/isa/isavar.h>
 #include <alpha/pci/tsunamireg.h>
 #include <alpha/pci/tsunamivar.h>
+
 #include <machine/bwx.h>
+#include <machine/cpuconf.h>
 #include <machine/intr.h>
 #include <machine/intrcnt.h>
-#include <machine/cpuconf.h>
-#include <machine/rpb.h>
+#include <machine/md_var.h>
 #include <machine/resource.h>
+#include <machine/rpb.h>
 #include <machine/sgmap.h>
 
 #include <vm/vm.h>
@@ -305,7 +308,7 @@ tsunami_attach(device_t dev)
 }
 
 static void
-tsunami_disable_intr_vec(int vector)
+tsunami_disable_intr_vec(uintptr_t vector)
 {
 	int irq;
 
@@ -316,7 +319,7 @@ tsunami_disable_intr_vec(int vector)
 }
 
 static void
-tsunami_enable_intr_vec(int vector)
+tsunami_enable_intr_vec(uintptr_t vector)
 {
 	int irq;
 

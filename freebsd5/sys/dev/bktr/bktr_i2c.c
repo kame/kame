@@ -22,10 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/bktr/bktr_i2c.c,v 1.22 2002/07/21 05:19:03 peter Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_i2c.c,v 1.24 2003/08/24 17:46:02 obrien Exp $");
 
 /*
  * I2C support for the bti2c chipset.
@@ -51,6 +51,11 @@
 
 #if (__FreeBSD_version < 500000)
 #include <machine/clock.h>              /* for DELAY */
+#include <pci/pcivar.h>
+#include <pci/pcireg.h>
+#else
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #endif
 
 #if (__FreeBSD_version >=300000)
@@ -59,8 +64,6 @@
 #include <sys/bus.h>
 #endif
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
 #include <machine/ioctl_meteor.h>
 #include <machine/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
 

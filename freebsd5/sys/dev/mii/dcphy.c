@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.23 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * Pseudo-driver for internal NWAY support on DEC 21143 and workalike
  * controllers. Technically we're abusing the miibus code to handle
@@ -40,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.20 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.23 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,7 +69,7 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.20 2003/04/03 21:36:30 obrien Ex
 #include <machine/resource.h>
 #include <sys/bus.h>
 
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 
 #include <pci/if_dcreg.h>
 
@@ -285,7 +288,6 @@ dcphy_service(sc, mii, cmd)
 			break;
 		default:
 			return(EINVAL);
-			break;
 		}
 		break;
 

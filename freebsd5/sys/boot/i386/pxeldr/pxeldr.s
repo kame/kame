@@ -13,7 +13,7 @@
 # purpose.
 #
 
-# $FreeBSD: src/sys/boot/i386/pxeldr/pxeldr.s,v 1.8 2001/08/09 20:47:58 mp Exp $
+# $FreeBSD: src/sys/boot/i386/pxeldr/pxeldr.s,v 1.9 2003/09/03 08:12:20 phk Exp $
 
 #
 # This simple program is a preloader for the normal boot3 loader.  It is simply
@@ -110,6 +110,11 @@ start:		cld				# string ops inc
 		orb $KARGS_FLAGS_PXE, 0x8(%bx)	# kargs->bootflags |=
 						#  KARGS_FLAGS_PXE
 		popl 0xc(%bx)			# kargs->pxeinfo = *PXENV+
+ifdef(`ALWAYS_SERIAL',`
+#
+# set the RBX_SERIAL bit in the howto byte.
+		orl $RB_SERIAL, (%bx)		# enable serial console
+')
 ifdef(`PROBE_KEYBOARD',`
 #
 # Look at the BIOS data area to see if we have an enhanced keyboard.  If not,

@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/hfa/hfa_eisa.c,v 1.1 2002/04/17 00:24:48 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/hfa/hfa_eisa.c,v 1.2 2003/08/24 17:46:08 obrien Exp $");
 
 /*
  *

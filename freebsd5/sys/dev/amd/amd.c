@@ -30,7 +30,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************
- * $FreeBSD: src/sys/dev/amd/amd.c,v 1.18 2003/05/27 04:59:57 scottl Exp $
+ * $FreeBSD: src/sys/dev/amd/amd.c,v 1.24 2003/08/22 05:51:24 imp Exp $
  */
 
 /*
@@ -55,6 +55,8 @@
 #include <sys/systm.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -74,8 +76,8 @@
 #include <cam/scsi/scsi_all.h>
 #include <cam/scsi/scsi_message.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <dev/amd/amd.h>
 
 #define PCI_DEVICE_ID_AMD53C974 	0x20201022ul
@@ -393,13 +395,12 @@ static void
 amd_action(struct cam_sim * psim, union ccb * pccb)
 {
 	struct amd_softc *    amd;
-	u_int   target_id, target_lun;
+	u_int   target_id;
 
 	CAM_DEBUG(pccb->ccb_h.path, CAM_DEBUG_TRACE, ("amd_action\n"));
 
 	amd = (struct amd_softc *) cam_sim_softc(psim);
 	target_id = pccb->ccb_h.target_id;
-	target_lun = pccb->ccb_h.target_lun;
 
 	switch (pccb->ccb_h.func_code) {
 	case XPT_SCSI_IO:
@@ -535,6 +536,7 @@ amd_action(struct cam_sim * psim, union ccb * pccb)
 	case XPT_TERM_IO:
 		pccb->ccb_h.status = CAM_REQ_INVALID;
 		xpt_done(pccb);
+		/* XXX: intentional fall-through ?? */
 	case XPT_GET_TRAN_SETTINGS:
 	{
 		struct ccb_trans_settings *cts;
@@ -680,25 +682,10 @@ amd_action(struct cam_sim * psim, union ccb * pccb)
 	}
 	case XPT_CALC_GEOMETRY:
 	{
-		struct ccb_calc_geometry *ccg;
-		u_int32_t size_mb;
-		u_int32_t secs_per_cylinder;
 		int     extended;
 
-		ccg = &pccb->ccg;
-		size_mb = ccg->volume_size/((1024L * 1024L)/ccg->block_size);
 		extended = (amd->eepromBuf[EE_MODE2] & GREATER_1G) != 0;
-
-		if (size_mb > 1024 && extended) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		pccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(&pccb->ccg, extended);
 		xpt_done(pccb);
 		break;
 	}
@@ -927,7 +914,6 @@ amdstart(struct amd_softc *amd, struct amd_srb *pSRB)
 	u_int command;
 	u_int target;
 	u_int lun;
-	int tagged;
 
 	pccb = pSRB->pccb;
 	pcsio = &pccb->csio;
@@ -952,7 +938,6 @@ amdstart(struct amd_softc *amd, struct amd_srb *pSRB)
 		identify_msg |= MSG_IDENTIFY_DISCFLAG;
 
 	amd_write8(amd, SCSIFIFOREG, identify_msg);
-	tagged = 0;
 	if ((targ_info->disc_tag & AMD_CUR_TAGENB) == 0
 	  || (identify_msg & MSG_IDENTIFY_DISCFLAG) == 0)
 		pccb->ccb_h.flags &= ~CAM_TAG_ACTION_VALID;
@@ -966,7 +951,6 @@ amdstart(struct amd_softc *amd, struct amd_srb *pSRB)
 		pSRB->SRBState = SRB_START;
 		amd_write8(amd, SCSIFIFOREG, pcsio->tag_action);
 		amd_write8(amd, SCSIFIFOREG, pSRB->TagNumber);
-		tagged++;
 	} else {
 		command = SEL_W_ATN;
 		pSRB->SRBState = SRB_START;
@@ -1213,7 +1197,6 @@ amd_MsgInPhase0(struct amd_softc *amd, struct amd_srb *pSRB, u_int scsistat)
 static int
 amdparsemsg(struct amd_softc *amd)
 {
-	struct	amd_target_info *targ_info;
 	int	reject;
 	int	done;
 	int	response;
@@ -1221,8 +1204,6 @@ amdparsemsg(struct amd_softc *amd)
 	done = FALSE;
 	response = FALSE;
 	reject = FALSE;
-
-	targ_info = &amd->tinfo[amd->cur_target];
 
 	/*
 	 * Parse as much of the message as is availible,
@@ -1877,12 +1858,9 @@ SRBdone(struct amd_softc *amd, struct amd_srb *pSRB)
 	int	   intflag;
 	struct amd_sg *ptr2;
 	u_int32_t   swlval;
-	u_int   target_id, target_lun;
 
 	pccb = pSRB->pccb;
 	pcsio = &pccb->csio;
-	target_id = pSRB->pccb->ccb_h.target_id;
-	target_lun = pSRB->pccb->ccb_h.target_lun;
 
 	CAM_DEBUG(pccb->ccb_h.path, CAM_DEBUG_TRACE,
 		  ("SRBdone - TagNumber %d\n", pSRB->TagNumber));
@@ -2137,12 +2115,26 @@ amd_linkSRB(struct amd_softc *amd)
 {
 	u_int16_t  count, i;
 	struct amd_srb *psrb;
+	int error;
 
 	count = amd->SRBCount;
 
 	for (i = 0; i < count; i++) {
 		psrb = (struct amd_srb *)&amd->SRB_array[i];
 		psrb->TagNumber = i;
+
+		/*
+		 * Create the dmamap.  This is no longer optional!
+		 *
+		 * XXX Since there is no detach method in this driver,
+		 * this does not get freed!
+		 */
+		if ((error = bus_dmamap_create(amd->buffer_dmat, 0,
+					       &psrb->dmamap)) != 0) {
+			device_printf(amd->dev, "Error %d creating buffer "
+				      "dmamap!\n", error);
+			return;
+		}
 		TAILQ_INSERT_TAIL(&amd->free_srbs, psrb, links);
 	}
 }
@@ -2314,6 +2306,8 @@ amd_init(device_t dev)
 			       /*maxsize*/MAXBSIZE, /*nsegments*/AMD_NSEG,
 			       /*maxsegsz*/AMD_MAXTRANSFER_SIZE,
 			       /*flags*/BUS_DMA_ALLOCNOW,
+			       /*lockfunc*/busdma_lock_mutex,
+			       /*lockarg*/&Giant,
 			       &amd->buffer_dmat) != 0) {
 		if (bootverbose)
 			printf("amd_init: bus_dma_tag_create failure!\n");
@@ -2329,7 +2323,9 @@ amd_init(device_t dev)
 			       sizeof(struct scsi_sense_data) * MAX_SRB_CNT,
 			       /*nsegments*/1,
 			       /*maxsegsz*/AMD_MAXTRANSFER_SIZE,
-			       /*flags*/0, &amd->sense_dmat) != 0) {
+			       /*flags*/0,
+			       /*lockfunc*/busdma_lock_mutex,
+			       /*lockarg*/&Giant, &amd->sense_dmat) != 0) {
 		if (bootverbose)
 			device_printf(dev, "cannot create sense buffer dmat\n");
 		return (ENXIO);
@@ -2515,3 +2511,4 @@ static driver_t amd_driver = {
 
 static devclass_t amd_devclass;
 DRIVER_MODULE(amd, pci, amd_driver, amd_devclass, 0, 0);
+MODULE_DEPEND(amd, cam, 1, 1, 1);

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/common/commands.c,v 1.18 2003/04/04 16:35:14 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/common/commands.c,v 1.19 2003/08/25 23:30:41 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>

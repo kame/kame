@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/buslogic/bt_mca.c,v 1.6 2003/03/29 09:46:10 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_mca.c,v 1.8 2003/08/24 17:46:02 obrien Exp $");
 
 /*
  * Written using the bt_isa/bt_pci code as a reference.
@@ -37,6 +39,8 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
@@ -228,6 +232,8 @@ bt_mca_attach (device_t dev)
 				/* nsegments	*/ ~0,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&bt->parent_dmat) != 0) {
 		bt_mca_release_resources(dev);
 		return (ENOMEM);
@@ -251,6 +257,8 @@ bt_mca_attach (device_t dev)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&bt->sense_dmat) != 0) {
 		bt_mca_release_resources(dev);
 		return (ENOMEM);

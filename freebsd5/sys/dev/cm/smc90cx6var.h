@@ -1,5 +1,5 @@
 /*	$NetBSD: smc90cx6var.h,v 1.5 2000/03/23 07:01:32 thorpej Exp $	*/
-/*	$FreeBSD: src/sys/dev/cm/smc90cx6var.h,v 1.2 2002/03/20 02:04:09 alfred Exp $ */
+/*	$FreeBSD: src/sys/dev/cm/smc90cx6var.h,v 1.3 2003/10/31 18:31:58 brooks Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -87,7 +87,7 @@ struct cm_softc {
 	u_char	sc_retransmits[2];	/* unused at the moment */
 };
 
-int	cm_attach(struct cm_softc *, int unit);
+int	cm_attach(device_t dev);
 void	cmintr(void *);
 
 int	cm_probe(device_t dev);

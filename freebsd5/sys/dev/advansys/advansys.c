@@ -31,8 +31,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/advansys/advansys.c,v 1.24 2003/05/27 04:59:56 scottl Exp $
  */
 /*
  * Ported from:
@@ -46,11 +44,16 @@
  * code retain the above copyright notice and this comment without
  * modification.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/advansys/advansys.c,v 1.27 2003/08/24 17:48:01 obrien Exp $");
  
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
@@ -431,26 +434,10 @@ adv_action(struct cam_sim *sim, union ccb *ccb)
 	}
 	case XPT_CALC_GEOMETRY:
 	{
-		struct	  ccb_calc_geometry *ccg;
-		u_int32_t size_mb;
-		u_int32_t secs_per_cylinder;
 		int	  extended;
 
-		ccg = &ccb->ccg;
-		size_mb = ccg->volume_size
-			/ ((1024L * 1024L) / ccg->block_size);
 		extended = (adv->control & ADV_CNTL_BIOS_GT_1GB) != 0;
-		
-		if (size_mb > 1024 && extended) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(&ccb->ccg, extended); 
 		xpt_done(ccb);
 		break;
 	}
@@ -1347,6 +1334,8 @@ adv_attach(adv)
 			/* nsegments	*/ max_sg,
 			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 			/* flags	*/ BUS_DMA_ALLOCNOW,
+			/* lockfunc	*/ busdma_lock_mutex,
+			/* lockarg	*/ &Giant,
 			&adv->buffer_dmat) != 0) {
 		return (ENXIO);
 	}
@@ -1366,6 +1355,8 @@ adv_attach(adv)
 			/* nsegments	*/ 1,
 			/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 			/* flags	*/ 0,
+			/* lockfunc	*/ busdma_lock_mutex,
+			/* lockarg	*/ &Giant,
 			&adv->sense_dmat) != 0) {
 		return (ENXIO);
         }

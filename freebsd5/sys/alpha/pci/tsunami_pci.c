@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/pci/tsunami_pci.c,v 1.14 2002/04/17 04:31:43 obrien Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/tsunami_pci.c,v 1.16 2003/08/22 07:20:27 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -35,7 +36,7 @@
 #include <machine/bus.h>
 #include <machine/md_var.h>
 #include <sys/rman.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <alpha/pci/tsunamireg.h>
 #include <alpha/pci/tsunamivar.h>
 #include <alpha/pci/pcibus.h>

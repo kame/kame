@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/acpica/acpi_pci_link.c,v 1.5 2003/01/01 18:48:49 schweikh Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pci_link.c,v 1.10.2.1 2003/12/19 00:03:02 njl Exp $");
 
 #include "opt_acpi.h"
 #include <sys/param.h>
@@ -86,10 +87,68 @@ static int	irq_penalty[MAX_ACPI_INTERRUPTS];
  */
 
 static void
+acpi_pci_link_dump_polarity(UINT32 ActiveHighLow)
+{
+
+	switch (ActiveHighLow) {
+	case ACPI_ACTIVE_HIGH:
+		printf("high,");
+		break;
+
+	case ACPI_ACTIVE_LOW:
+		printf("low,");
+		break;
+
+	default:
+		printf("unknown,");
+		break;
+	}
+}
+
+static void
+acpi_pci_link_dump_trigger(UINT32 EdgeLevel)
+{
+
+	switch (EdgeLevel) {
+	case ACPI_EDGE_SENSITIVE:
+		printf("edge,");
+		break;
+
+	case ACPI_LEVEL_SENSITIVE:
+		printf("level,");
+		break;
+
+	default:
+		printf("unknown,");
+		break;
+	}
+}
+
+static void
+acpi_pci_link_dump_sharemode(UINT32 SharedExclusive)
+{
+
+	switch (SharedExclusive) {
+	case ACPI_EXCLUSIVE:
+		printf("exclusive");
+		break;
+
+	case ACPI_SHARED:
+		printf("sharable");
+		break;
+
+	default:
+		printf("unknown");
+		break;
+	}
+}
+
+static void
 acpi_pci_link_entry_dump(struct acpi_prt_entry *entry)
 {
 	UINT8			i;
 	ACPI_RESOURCE_IRQ	*Irq;
+	ACPI_RESOURCE_EXT_IRQ	*ExtIrq;
 
 	if (entry == NULL || entry->pci_link == NULL) {
 		return;
@@ -104,57 +163,21 @@ acpi_pci_link_entry_dump(struct acpi_prt_entry *entry)
 	}
 	printf("] ");
 
-	Irq = NULL;
 	switch (entry->pci_link->possible_resources.Id) {
 	case ACPI_RSTYPE_IRQ:
 		Irq = &entry->pci_link->possible_resources.Data.Irq;
 
-		switch (Irq->ActiveHighLow) {
-		case ACPI_ACTIVE_HIGH:
-			printf("high,");
-			break;
-
-		case ACPI_ACTIVE_LOW:
-			printf("low,");
-			break;
-
-		default:
-			printf("unkown,");
-			break;
-		}
-		
-		switch (Irq->EdgeLevel) {
-		case ACPI_EDGE_SENSITIVE:
-			printf("edge,");
-			break;
-
-		case ACPI_LEVEL_SENSITIVE:
-			printf("level,");
-			break;
-
-		default:
-			printf("unkown,");
-			break;
-		}
-
-		switch (Irq->SharedExclusive) {
-		case ACPI_EXCLUSIVE:
-			printf("exclusive");
-			break;
-
-		case ACPI_SHARED:
-			printf("sharable");
-			break;
-
-		default:
-			printf("unkown");
-			break;
-		}
-
+		acpi_pci_link_dump_polarity(Irq->ActiveHighLow);
+		acpi_pci_link_dump_trigger(Irq->EdgeLevel);
+		acpi_pci_link_dump_sharemode(Irq->SharedExclusive);
 		break;
 
 	case ACPI_RSTYPE_EXT_IRQ:
-		/* TBD */
+		ExtIrq = &entry->pci_link->possible_resources.Data.ExtendedIrq;
+
+		acpi_pci_link_dump_polarity(ExtIrq->ActiveHighLow);
+		acpi_pci_link_dump_trigger(ExtIrq->EdgeLevel);
+		acpi_pci_link_dump_sharemode(ExtIrq->SharedExclusive);
 		break;
 	}
 
@@ -168,7 +191,8 @@ acpi_pci_link_entry_dump(struct acpi_prt_entry *entry)
 static ACPI_STATUS
 acpi_pci_link_get_object_status(ACPI_HANDLE handle, UINT32 *sta)
 {
-	ACPI_DEVICE_INFO	devinfo;
+	ACPI_DEVICE_INFO	*devinfo;
+	ACPI_BUFFER		buf;
 	ACPI_STATUS		error;
 
 	ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
@@ -179,29 +203,34 @@ acpi_pci_link_get_object_status(ACPI_HANDLE handle, UINT32 *sta)
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 
-	error = AcpiGetObjectInfo(handle, &devinfo);
+	buf.Pointer = NULL;
+	buf.Length = ACPI_ALLOCATE_BUFFER;
+	error = AcpiGetObjectInfo(handle, &buf);
 	if (ACPI_FAILURE(error)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 		    "couldn't get object info %s - %s\n",
 		    acpi_name(handle), AcpiFormatException(error)));
 		return_ACPI_STATUS (error);
 	}
+	devinfo = (ACPI_DEVICE_INFO *)buf.Pointer;
 
-	if ((devinfo.Valid & ACPI_VALID_HID) == 0 ||
-	    strcmp(devinfo.HardwareId, "PNP0C0F") != 0) {
+	if ((devinfo->Valid & ACPI_VALID_HID) == 0 ||
+	    strcmp(devinfo->HardwareId.Value, "PNP0C0F") != 0) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "invalid hardware ID - %s\n",
 		    acpi_name(handle)));
+		AcpiOsFree(buf.Pointer);
 		return_ACPI_STATUS (AE_TYPE);
 	}
 
-	if (devinfo.Valid & ACPI_VALID_STA) {
-		*sta = devinfo.CurrentStatus;
+	if ((devinfo->Valid & ACPI_VALID_STA) != 0) {
+		*sta = devinfo->CurrentStatus;
 	} else {
 		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "invalid status - %s\n",
 		    acpi_name(handle)));
 		*sta = 0;
 	}
 
+	AcpiOsFree(buf.Pointer);
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -563,33 +592,34 @@ acpi_pci_link_set_irq(struct acpi_pci_link_entry *link, UINT8 irq)
 
 	bzero(&resbuf, sizeof(resbuf));
 	crsbuf.Pointer = NULL;
-	resbuf.Id = ACPI_RSTYPE_IRQ;
-	resbuf.Length = ACPI_SIZEOF_RESOURCE(ACPI_RESOURCE_IRQ);
 
-	if (link->possible_resources.Id != ACPI_RSTYPE_IRQ &&
-	    link->possible_resources.Id != ACPI_RSTYPE_EXT_IRQ) {
+	switch (link->possible_resources.Id) {
+	default:
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 		    "Resource is not an IRQ entry %s - %d\n",
 		    acpi_name(link->handle), link->possible_resources.Id));
 		return_ACPI_STATUS (AE_TYPE);
-	}
 
-	switch (link->possible_resources.Id) {
 	case ACPI_RSTYPE_IRQ:
+		resbuf.Id = ACPI_RSTYPE_IRQ;
+		resbuf.Length = ACPI_SIZEOF_RESOURCE(ACPI_RESOURCE_IRQ);
+
 		/* structure copy other fields */
 		resbuf.Data.Irq = link->possible_resources.Data.Irq;
+		resbuf.Data.Irq.NumberOfInterrupts = 1;
+		resbuf.Data.Irq.Interrupts[0] = irq;
 		break;
 
 	case ACPI_RSTYPE_EXT_IRQ:
-		/* XXX */
-		resbuf.Data.Irq.EdgeLevel = ACPI_LEVEL_SENSITIVE;
-		resbuf.Data.Irq.ActiveHighLow = ACPI_ACTIVE_LOW;
-		resbuf.Data.Irq.SharedExclusive = ACPI_SHARED;
+		resbuf.Id = ACPI_RSTYPE_EXT_IRQ;
+		resbuf.Length = ACPI_SIZEOF_RESOURCE(ACPI_RESOURCE_EXT_IRQ);
+
+		/* structure copy other fields */
+		resbuf.Data.ExtendedIrq = link->possible_resources.Data.ExtendedIrq;
+		resbuf.Data.ExtendedIrq.NumberOfInterrupts = 1;
+		resbuf.Data.ExtendedIrq.Interrupts[0] = irq;
 		break;
 	}
-
-	resbuf.Data.Irq.NumberOfInterrupts = 1;
-	resbuf.Data.Irq.Interrupts[0] = irq;
 
 	error = acpi_AppendBufferResource(&crsbuf, &resbuf);
 	if (ACPI_FAILURE(error)) {
@@ -899,7 +929,7 @@ acpi_pci_link_fixup_bootdisabled_link(void)
 		}
 
 		/* try with lower penalty IRQ. */
-		for (i = 0; i < link->number_of_interrupts - 1; i++) {
+		for (i = 0; i < link->number_of_interrupts; i++) {
 			irq1 = link->sorted_irq[i];
 			error = acpi_pci_link_set_irq(link, irq1);
 			if (error == AE_OK) {

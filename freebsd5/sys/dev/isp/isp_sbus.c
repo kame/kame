@@ -1,5 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_sbus.c,v 1.7 2003/02/19 05:47:06 imp Exp $ */
-/*
+/*-
  * PCI specific probe and attach routines for Qlogic ISP SCSI adapters.
  * FreeBSD Version.
  *
@@ -27,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/isp/isp_sbus.c,v 1.11 2003/09/02 19:52:31 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -34,10 +35,10 @@
 #include <sys/kernel.h>
 #include <sys/resource.h>
 #include <machine/bus.h>
-#include <machine/ofw_machdep.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
-#include <ofw/openfirm.h>
+#include <dev/ofw/openfirm.h>
+#include <machine/ofw_machdep.h>
 #include <sparc64/sbus/sbusvar.h>
 
 #include <dev/isp/isp_freebsd.h>
@@ -491,7 +492,8 @@ isp_sbus_mbxdma(struct ispsoftc *isp)
 	if (bus_dma_tag_create(NULL, 1, BUS_SPACE_MAXADDR_24BIT-1,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR_32BIT,
 	    NULL, NULL, BUS_SPACE_MAXSIZE_32BIT, ISP_NSEGS,
-	    BUS_SPACE_MAXADDR_24BIT, 0, &sbs->dmat)) {
+	    BUS_SPACE_MAXADDR_24BIT, 0, busdma_lock_mutex, &Giant,
+	    &sbs->dmat)) {
 		isp_prt(isp, ISP_LOGERR, "could not create master dma tag");
 		ISP_LOCK(isp);
 		return(1);
@@ -522,7 +524,8 @@ isp_sbus_mbxdma(struct ispsoftc *isp)
 	ns = (len / PAGE_SIZE) + 1;
 	if (bus_dma_tag_create(sbs->dmat, QENTRY_LEN, BUS_SPACE_MAXADDR_24BIT-1,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR_32BIT, NULL, NULL,
-	    len, ns, BUS_SPACE_MAXADDR_24BIT, 0, &isp->isp_cdmat)) {
+	    len, ns, BUS_SPACE_MAXADDR_24BIT, 0, busdma_lock_mutex, &Giant,
+	    &isp->isp_cdmat)) {
 		isp_prt(isp, ISP_LOGERR,
 		    "cannot create a dma tag for control spaces");
 		free(sbs->dmaps, M_DEVBUF);

@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.107 2003/04/24 23:36:35 anholt Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_ioctl.c,v 1.112 2003/10/31 18:31:55 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -345,7 +346,8 @@ bsd_to_linux_termios(struct termios *bios, struct linux_termios *lios)
 	lios->c_cc[LINUX_VLNEXT] = bios->c_cc[VLNEXT];
 
 	for (i=0; i<LINUX_NCCS; i++) {
-		if (lios->c_cc[i] == _POSIX_VDISABLE)
+		if (i != LINUX_VMIN && i != LINUX_VTIME &&
+		    lios->c_cc[i] == _POSIX_VDISABLE)
 			lios->c_cc[i] = LINUX_POSIX_VDISABLE;
 	}
 	lios->c_line = 0;
@@ -484,7 +486,8 @@ linux_to_bsd_termios(struct linux_termios *lios, struct termios *bios)
 	bios->c_cc[VLNEXT] = lios->c_cc[LINUX_VLNEXT];
 
 	for (i=0; i<NCCS; i++) {
-		if (bios->c_cc[i] == LINUX_POSIX_VDISABLE)
+		if (i != VMIN && i != VTIME &&
+		    bios->c_cc[i] == LINUX_POSIX_VDISABLE)
 			bios->c_cc[i] = _POSIX_VDISABLE;
 	}
 
@@ -1089,18 +1092,6 @@ bsd_to_linux_msf_lba(u_char af, union msf_lba *bp, union linux_cdrom_addr *lp)
 }
 
 static void
-linux_to_bsd_msf_lba(u_char af, union linux_cdrom_addr *lp, union msf_lba *bp)
-{
-	if (af == CD_LBA_FORMAT)
-		bp->lba = lp->lba;
-	else {
-		bp->msf.minute = lp->msf.minute;
-		bp->msf.second = lp->msf.second;
-		bp->msf.frame = lp->msf.frame;
-	}
-}
-
-static void
 set_linux_cdrom_addr(union linux_cdrom_addr *addr, int format, int lba)
 {
 	if (format == LINUX_CDROM_MSF) {
@@ -1405,24 +1396,7 @@ linux_ioctl_cdrom(struct thread *td, struct linux_ioctl_args *args)
 
 	/* LINUX_CDROMREADMODE2 */
 	/* LINUX_CDROMREADMODE1 */
-
-	case LINUX_CDROMREADAUDIO: {
-		struct l_cdrom_read_audio lra;
-		struct ioc_read_audio bra;
-
-		error = copyin((void *)args->arg, &lra, sizeof(lra));
-		if (error)
-			break;
-		bra.address_format = lra.addr_format;
-		linux_to_bsd_msf_lba(bra.address_format, &lra.addr,
-		    &bra.address);
-		bra.nframes = lra.nframes;
-		bra.buffer = lra.buf;
-		error = fo_ioctl(fp, CDIOCREADAUDIO, (caddr_t)&bra,
-		    td->td_ucred, td);
-		break;
-	}
-
+	/* LINUX_CDROMREADAUDIO */
 	/* LINUX_CDROMEJECT_SW */
 	/* LINUX_CDROMMULTISESSION */
 	/* LINUX_CDROM_GET_UPC */
@@ -1907,8 +1881,7 @@ linux_ifname(struct ifnet *ifp, char *buffer, size_t buflen)
 
 	/* Short-circuit non ethernet interfaces */
 	if (!IFP_IS_ETH(ifp))
-		return (snprintf(buffer, buflen, "%s%d", ifp->if_name,
-		    ifp->if_unit));
+		return (strlcpy(buffer, ifp->if_xname, buflen));
 
 	/* Determine the (relative) unit number for ethernet interfaces */
 	ethno = 0;
@@ -1958,15 +1931,14 @@ ifname_linux_to_bsd(const char *lxname, char *bsdname)
 		 * we never have an interface named "eth", so don't make
 		 * the test optional based on is_eth.
 		 */
-		if (ifp->if_unit == unit && ifp->if_name[len] == '\0' &&
-		    strncmp(ifp->if_name, lxname, len) == 0)
+		if (strncmp(ifp->if_xname, lxname, LINUX_IFNAMSIZ) == 0)
 			break;
 		if (is_eth && IFP_IS_ETH(ifp) && unit == index++)
 			break;
 	}
 	IFNET_RUNLOCK();
 	if (ifp != NULL)
-		snprintf(bsdname, IFNAMSIZ, "%s%d", ifp->if_name, ifp->if_unit);
+		strlcpy(bsdname, ifp->if_xname, IFNAMSIZ);
 	return (ifp);
 }
 
@@ -2014,8 +1986,7 @@ linux_ifconf(struct thread *td, struct ifconf *uifc)
 			snprintf(ifr.ifr_name, LINUX_IFNAMSIZ, "eth%d",
 			    ethno++);
 		else
-			snprintf(ifr.ifr_name, LINUX_IFNAMSIZ, "%s%d",
-			    ifp->if_name, ifp->if_unit);
+			strlcpy(ifr.ifr_name, ifp->if_xname, LINUX_IFNAMSIZ);
 
 		/* Walk the address list */
 		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {

@@ -19,7 +19,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fe/if_fevar.h,v 1.1 2000/09/14 12:02:07 nyan Exp $
+ * $FreeBSD: src/sys/dev/fe/if_fevar.h,v 1.2 2003/10/31 18:32:00 brooks Exp $
  */
 
 /* How many registers does an fe-supported adapter have at maximum?  */
@@ -69,6 +69,7 @@ struct fe_softc {
 
 	/* Used by "common" codes.  */
 	struct arpcom arpcom;	/* Ethernet common */
+	int			sc_unit;
 
 	/* Used by config codes.  */
 	int			type;
@@ -118,7 +119,7 @@ struct fe_softc {
 };
 
 #define sc_if		arpcom.ac_if
-#define sc_unit		arpcom.ac_if.if_unit
+#define sc_xname	arpcom.ac_if.if_xname
 #define sc_enaddr	arpcom.ac_enaddr
 
 

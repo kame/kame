@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exfldio - Aml Field I/O
- *              $Revision: 92 $
+ *              $Revision: 96 $
  *
  *****************************************************************************/
 
@@ -220,6 +220,25 @@ AcpiExSetupRegion (
             FieldDatumByteOffset, ObjDesc->CommonField.AccessByteWidth,
             RgnDesc->Region.Node->Name.Ascii, RgnDesc->Region.Length));
 
+#ifndef ACPICA_PEDANTIC
+        {
+            /*
+             * Allow access to the field if it is within the region size
+             * rounded up to a multiple of the access byte width.  This
+             * overcomes "off-by-one" programming errors in the AML often
+             * found in Toshiba laptops.  These errors were allowed by
+             * the Microsoft ASL compiler.
+             */
+            UINT32 rounded_length = ACPI_ROUND_UP(RgnDesc->Region.Length,
+                ObjDesc->CommonField.AccessByteWidth);
+
+            if (rounded_length >= (ObjDesc->CommonField.BaseByteOffset +
+                                   FieldDatumByteOffset +
+                                   ObjDesc->CommonField.AccessByteWidth)) {
+                return_ACPI_STATUS (AE_OK);
+            }
+        }
+#endif
         return_ACPI_STATUS (AE_AML_REGION_LIMIT);
     }
 
@@ -422,10 +441,10 @@ AcpiExFieldDatumIo (
     /*
      * The four types of fields are:
      *
-     * BufferFields - Read/write from/to a Buffer
-     * RegionFields - Read/write from/to a Operation Region.
-     * BankFields   - Write to a Bank Register, then read/write from/to an OpRegion
-     * IndexFields  - Write to an Index Register, then read/write from/to a Data Register
+     * BufferField - Read/write from/to a Buffer
+     * RegionField - Read/write from/to a Operation Region.
+     * BankField   - Write to a Bank Register, then read/write from/to an OpRegion
+     * IndexField  - Write to an Index Register, then read/write from/to a Data Register
      */
     switch (ACPI_GET_OBJECT_TYPE (ObjDesc))
     {
@@ -523,27 +542,37 @@ AcpiExFieldDatumIo (
 
         /* Write the index value to the IndexRegister (itself a RegionField) */
 
+        FieldDatumByteOffset += ObjDesc->IndexField.Value;
+
+        ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+                "Write to Index Register: Value %8.8X\n",
+                FieldDatumByteOffset));
+
         Status = AcpiExInsertIntoField (ObjDesc->IndexField.IndexObj,
-                                &ObjDesc->IndexField.Value,
-                                sizeof (ObjDesc->IndexField.Value));
+                                &FieldDatumByteOffset,
+                                sizeof (FieldDatumByteOffset));
         if (ACPI_FAILURE (Status))
         {
             return_ACPI_STATUS (Status);
         }
+
+        ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+                "I/O to Data Register: ValuePtr %p\n",
+                Value));
 
         if (ReadWrite == ACPI_READ)
         {
             /* Read the datum from the DataRegister */
 
             Status = AcpiExExtractFromField (ObjDesc->IndexField.DataObj,
-                            Value, ObjDesc->CommonField.AccessByteWidth);
+                            Value, sizeof (ACPI_INTEGER));
         }
         else
         {
-            /* Write the datum to the Data register */
+            /* Write the datum to the DataRegister */
 
             Status = AcpiExInsertIntoField (ObjDesc->IndexField.DataObj,
-                            Value, ObjDesc->CommonField.AccessByteWidth);
+                            Value, sizeof (ACPI_INTEGER));
         }
         break;
 
@@ -676,9 +705,10 @@ AcpiExWriteWithUpdateRule (
  *
  * PARAMETERS:  Datum               - Where the Datum is returned
  *              Buffer              - Raw field buffer
+ *              BufferLength        - Entire length (used for big-endian only)
  *              ByteGranularity     - 1/2/4/8 Granularity of the field
  *                                    (aka Datum Size)
- *              Offset              - Datum offset into the buffer
+ *              BufferOffset        - Datum offset into the buffer
  *
  * RETURN:      none
  *
@@ -688,36 +718,45 @@ AcpiExWriteWithUpdateRule (
  ******************************************************************************/
 
 void
-AcpiExGetBufferDatum(
+AcpiExGetBufferDatum (
     ACPI_INTEGER            *Datum,
     void                    *Buffer,
+    UINT32                  BufferLength,
     UINT32                  ByteGranularity,
-    UINT32                  Offset)
+    UINT32                  BufferOffset)
 {
+    UINT32                  Index;
+
 
     ACPI_FUNCTION_ENTRY ();
 
+
+    /* Get proper index into buffer (handles big/little endian) */
+
+    Index = ACPI_BUFFER_INDEX (BufferLength, BufferOffset, ByteGranularity);
+
+    /* Move the requested number of bytes */
 
     switch (ByteGranularity)
     {
     case ACPI_FIELD_BYTE_GRANULARITY:
 
-        *Datum = ((UINT8 *) Buffer) [Offset];
+        *Datum = ((UINT8 *) Buffer) [Index];
         break;
 
     case ACPI_FIELD_WORD_GRANULARITY:
 
-        ACPI_MOVE_UNALIGNED16_TO_32 (Datum, &(((UINT16 *) Buffer) [Offset]));
+        ACPI_MOVE_16_TO_64 (Datum, &(((UINT16 *) Buffer) [Index]));
         break;
 
     case ACPI_FIELD_DWORD_GRANULARITY:
 
-        ACPI_MOVE_UNALIGNED32_TO_32 (Datum, &(((UINT32 *) Buffer) [Offset]));
+        ACPI_MOVE_32_TO_64 (Datum, &(((UINT32 *) Buffer) [Index]));
         break;
 
     case ACPI_FIELD_QWORD_GRANULARITY:
 
-        ACPI_MOVE_UNALIGNED64_TO_64 (Datum, &(((UINT64 *) Buffer) [Offset]));
+        ACPI_MOVE_64_TO_64 (Datum, &(((UINT64 *) Buffer) [Index]));
         break;
 
     default:
@@ -733,9 +772,10 @@ AcpiExGetBufferDatum(
  *
  * PARAMETERS:  MergedDatum         - Value to store
  *              Buffer              - Receiving buffer
+ *              BufferLength        - Entire length (used for big-endian only)
  *              ByteGranularity     - 1/2/4/8 Granularity of the field
  *                                    (aka Datum Size)
- *              Offset              - Datum offset into the buffer
+ *              BufferOffset        - Datum offset into the buffer
  *
  * RETURN:      none
  *
@@ -748,33 +788,41 @@ void
 AcpiExSetBufferDatum (
     ACPI_INTEGER            MergedDatum,
     void                    *Buffer,
+    UINT32                  BufferLength,
     UINT32                  ByteGranularity,
-    UINT32                  Offset)
+    UINT32                  BufferOffset)
 {
+    UINT32                  Index;
 
     ACPI_FUNCTION_ENTRY ();
 
+
+    /* Get proper index into buffer (handles big/little endian) */
+
+    Index = ACPI_BUFFER_INDEX (BufferLength, BufferOffset, ByteGranularity);
+
+    /* Move the requested number of bytes */
 
     switch (ByteGranularity)
     {
     case ACPI_FIELD_BYTE_GRANULARITY:
 
-        ((UINT8 *) Buffer) [Offset] = (UINT8) MergedDatum;
+        ((UINT8 *) Buffer) [Index] = (UINT8) MergedDatum;
         break;
 
     case ACPI_FIELD_WORD_GRANULARITY:
 
-        ACPI_MOVE_UNALIGNED16_TO_16 (&(((UINT16 *) Buffer)[Offset]), &MergedDatum);
+        ACPI_MOVE_64_TO_16 (&(((UINT16 *) Buffer)[Index]), &MergedDatum);
         break;
 
     case ACPI_FIELD_DWORD_GRANULARITY:
 
-        ACPI_MOVE_UNALIGNED32_TO_32 (&(((UINT32 *) Buffer)[Offset]), &MergedDatum);
+        ACPI_MOVE_64_TO_32 (&(((UINT32 *) Buffer)[Index]), &MergedDatum);
         break;
 
     case ACPI_FIELD_QWORD_GRANULARITY:
 
-        ACPI_MOVE_UNALIGNED64_TO_64 (&(((UINT64 *) Buffer)[Offset]), &MergedDatum);
+        ACPI_MOVE_64_TO_64 (&(((UINT64 *) Buffer)[Index]), &MergedDatum);
         break;
 
     default:
@@ -876,8 +924,8 @@ AcpiExExtractFromField (
 
         /* Store the datum to the caller buffer */
 
-        AcpiExSetBufferDatum (MergedDatum, Buffer, ObjDesc->CommonField.AccessByteWidth,
-                DatumOffset);
+        AcpiExSetBufferDatum (MergedDatum, Buffer, BufferLength,
+                ObjDesc->CommonField.AccessByteWidth, DatumOffset);
 
         return_ACPI_STATUS (AE_OK);
     }
@@ -956,7 +1004,7 @@ AcpiExExtractFromField (
          * Store the merged field datum in the caller's buffer, according to
          * the granularity of the field (size of each datum).
          */
-        AcpiExSetBufferDatum (MergedDatum, Buffer,
+        AcpiExSetBufferDatum (MergedDatum, Buffer, BufferLength,
                 ObjDesc->CommonField.AccessByteWidth, DatumOffset);
 
         /*
@@ -1038,7 +1086,7 @@ AcpiExInsertIntoField (
 
     /* Get a single datum from the caller's buffer */
 
-    AcpiExGetBufferDatum (&PreviousRawDatum, Buffer,
+    AcpiExGetBufferDatum (&PreviousRawDatum, Buffer, BufferLength,
             ObjDesc->CommonField.AccessByteWidth, DatumOffset);
 
     /*
@@ -1105,7 +1153,7 @@ AcpiExInsertIntoField (
          * Get the next raw buffer datum.  It may contain bits of the previous
          * field datum
          */
-        AcpiExGetBufferDatum (&ThisRawDatum, Buffer,
+        AcpiExGetBufferDatum (&ThisRawDatum, Buffer, BufferLength,
                 ObjDesc->CommonField.AccessByteWidth, DatumOffset);
 
         /* Create the field datum based on the field alignment */

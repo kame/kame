@@ -23,14 +23,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/aha/aha_mca.c,v 1.6 2003/03/29 09:46:10 mdodd Exp $
- *
  * Based on aha_isa.c
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aha/aha_mca.c,v 1.10 2003/11/09 19:51:16 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -55,9 +58,9 @@ static struct mca_ident aha_mca_devs[] = {
 # define AHA_MCA_IOPORT_MASK2		0xc0
 # define AHA_MCA_IOPORT_SIZE		0x03
 # define AHA_MCA_IOPORT(pos)		(0x30 + \
-					(((u_int32_t)pos & \
+					(((uint32_t)pos & \
 						AHA_MCA_IOPORT_MASK1) << 8) + \
-					(((u_int32_t)pos & \
+					(((uint32_t)pos & \
 						AHA_MCA_IOPORT_MASK2) >> 4))
 
 #define AHA_MCA_DRQ_POS			MCA_ADP_POS(MCA_POS3)
@@ -82,11 +85,11 @@ aha_mca_probe (device_t dev)
 {
 	const char *	desc;
 	mca_id_t	id = mca_get_id(dev);
-	u_int32_t	iobase = 0;
-	u_int32_t	iosize = 0;
-	u_int8_t	drq = 0;
-	u_int8_t	irq = 0;
-	u_int8_t	pos;
+	uint32_t	iobase = 0;
+	uint32_t	iosize = 0;
+	uint8_t	drq = 0;
+	uint8_t	irq = 0;
+	uint8_t	pos;
 
 	desc = mca_match_id(id, aha_mca_devs);
 	if (!desc)
@@ -107,15 +110,13 @@ aha_mca_probe (device_t dev)
 	mca_add_drq(dev, drq);
 	mca_add_irq(dev, irq);
 
-	aha_unit++;
-
 	return (0);
 }
 
 static int
 aha_mca_attach (device_t dev)
 {
-	struct aha_softc *	sc = NULL;
+	struct aha_softc *	sc = device_get_softc(dev);
 	struct resource *	io = NULL;
 	struct resource *	irq = NULL;
 	struct resource *	drq = NULL;
@@ -151,13 +152,7 @@ aha_mca_attach (device_t dev)
 		goto bad;
 	}
 
-	sc = aha_alloc(unit, rman_get_bustag(io), rman_get_bushandle(io));
-	if (sc == NULL) {
-		device_printf(dev, "aha_alloc() failed!\n");
-		error = ENOMEM;
-		goto bad;
-	}
-
+	aha_alloc(sc, unit, rman_get_bustag(io), rman_get_bushandle(io));
 	error = aha_probe(sc);
 	if (error) {
 		device_printf(dev, "aha_probe() failed!\n");
@@ -184,6 +179,8 @@ aha_mca_attach (device_t dev)
 				/* nsegments	*/ ~0,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&sc->parent_dmat);
 	if (error) {
 		device_printf(dev, "bus_dma_tag_create() failed!\n");

@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.143 2003/04/29 13:35:59 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_misc.c,v 1.150 2003/11/16 15:07:10 sobomax Exp $");
 
 #include "opt_mac.h"
 
@@ -74,6 +75,10 @@
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_util.h>
 
+#ifdef __i386__
+#include <machine/cputypes.h>
+#endif
+
 #ifdef __alpha__
 #define BSD_TO_LINUX_SIGNAL(sig)       (sig)
 #else
@@ -92,6 +97,7 @@ static unsigned int linux_to_bsd_resource[LINUX_RLIM_NLIMITS] = {
 struct l_sysinfo {
 	l_long		uptime;		/* Seconds since boot */
 	l_ulong		loads[3];	/* 1, 5, and 15 minute load averages */
+#define LINUX_SYSINFO_LOADS_SCALE 65536
 	l_ulong		totalram;	/* Total usable main memory size */
 	l_ulong		freeram;	/* Available memory size */
 	l_ulong		sharedram;	/* Amount of shared memory */
@@ -99,7 +105,10 @@ struct l_sysinfo {
 	l_ulong		totalswap;	/* Total swap space size */
 	l_ulong		freeswap;	/* swap space still available */
 	l_ushort	procs;		/* Number of current processes */
-	char		_f[22];		/* Pads structure to 64 bytes */
+	l_ulong		totalbig;
+	l_ulong		freebig;
+	l_uint		mem_unit;
+	char		_f[6];		/* Pads structure to 64 bytes */
 };
 #ifndef __alpha__
 int
@@ -107,7 +116,7 @@ linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
 {
 	struct l_sysinfo sysinfo;
 	vm_object_t object;
-	int i;
+	int i, j;
 	struct timespec ts;
 
 	/* Uptime is copied out of print_uptime() in kern_shutdown.c */
@@ -129,7 +138,8 @@ linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
 
 	/* Use the information from the mib to get our load averages */
 	for (i = 0; i < 3; i++)
-		sysinfo.loads[i] = averunnable.ldavg[i];
+		sysinfo.loads[i] = averunnable.ldavg[i] *
+		    LINUX_SYSINFO_LOADS_SCALE / averunnable.fscale;
 
 	sysinfo.totalram = physmem * PAGE_SIZE;
 	sysinfo.freeram = sysinfo.totalram - cnt.v_wire_count * PAGE_SIZE;
@@ -143,15 +153,16 @@ linux_sysinfo(struct thread *td, struct linux_sysinfo_args *args)
 	sysinfo.sharedram *= PAGE_SIZE;
 	sysinfo.bufferram = 0;
 
-	if (swapblist == NULL) {
-		sysinfo.totalswap= 0;
-		sysinfo.freeswap = 0;
-	} else {
-		sysinfo.totalswap = swapblist->bl_blocks * 1024;
-		sysinfo.freeswap = swapblist->bl_root->u.bmu_avail * PAGE_SIZE;
-	}
+	swap_pager_status(&i, &j);
+	sysinfo.totalswap= i * PAGE_SIZE;
+	sysinfo.freeswap = (i - j) * PAGE_SIZE;
 
-	sysinfo.procs = 20; /* Hack */
+	sysinfo.procs = nprocs;
+
+	/* The following are only present in newer Linux kernels. */
+	sysinfo.totalbig = 0;
+	sysinfo.freebig = 0;
+	sysinfo.mem_unit = 1;
 
 	return copyout(&sysinfo, args->info, sizeof(sysinfo));
 }
@@ -313,7 +324,7 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 	if (error)
 		goto cleanup;
 #endif
-	error = VOP_OPEN(vp, FREAD, td->td_ucred, td);
+	error = VOP_OPEN(vp, FREAD, td->td_ucred, td, -1);
 	if (error)
 		goto cleanup;
 
@@ -415,7 +426,7 @@ linux_uselib(struct thread *td, struct linux_uselib_args *args)
 			goto cleanup;
 
 		/* copy from kernel VM space to user space */
-		error = copyout((void *)(buffer + file_offset),
+		error = copyout((void *)(uintptr_t)(buffer + file_offset),
 		    (void *)vmaddr, a_out->a_text + a_out->a_data);
 
 		/* release temporary kernel space */
@@ -692,6 +703,7 @@ linux_newuname(struct thread *td, struct linux_newuname_args *args)
 	struct l_new_utsname utsname;
 	char osname[LINUX_MAX_UTSNAME];
 	char osrelease[LINUX_MAX_UTSNAME];
+	char *p;
 
 #ifdef DEBUG
 	if (ldebug(newuname))
@@ -706,7 +718,32 @@ linux_newuname(struct thread *td, struct linux_newuname_args *args)
 	getcredhostname(td->td_ucred, utsname.nodename, LINUX_MAX_UTSNAME);
 	strlcpy(utsname.release, osrelease, LINUX_MAX_UTSNAME);
 	strlcpy(utsname.version, version, LINUX_MAX_UTSNAME);
+	for (p = utsname.version; *p != '\0'; ++p)
+		if (*p == '\n') {
+			*p = '\0';
+			break;
+		}
+#ifdef __i386__
+	{
+		const char *class;
+		switch (cpu_class) {
+		case CPUCLASS_686:
+			class = "i686";
+			break;
+		case CPUCLASS_586:
+			class = "i586";
+			break;
+		case CPUCLASS_486:
+			class = "i486";
+			break;
+		default:
+			class = "i386";
+		}
+		strlcpy(utsname.machine, class, LINUX_MAX_UTSNAME);
+	}
+#else
 	strlcpy(utsname.machine, machine, LINUX_MAX_UTSNAME);
+#endif
 	strlcpy(utsname.domainname, domainname, LINUX_MAX_UTSNAME);
 
 	return (copyout(&utsname, args->buf, sizeof(utsname)));
@@ -962,7 +999,7 @@ linux_setgroups(struct thread *td, struct linux_setgroups_args *args)
 	struct proc *p;
 
 	ngrp = args->gidsetsize;
-	if (ngrp >= NGROUPS)
+	if (ngrp < 0 || ngrp >= NGROUPS)
 		return (EINVAL);
 	error = copyin(args->grouplist, linux_gidset, ngrp * sizeof(l_gid_t));
 	if (error)

@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/digi/digi_pci.c,v 1.7 2002/02/27 23:47:45 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/digi/digi_pci.c,v 1.9 2003/08/24 17:46:03 obrien Exp $");
 
 #include <sys/param.h>
 
@@ -40,7 +41,7 @@
 #include <machine/resource.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 
 #include <sys/digiio.h>
 #include <dev/digi/digireg.h>

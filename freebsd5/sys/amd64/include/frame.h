@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -34,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)frame.h	5.2 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/amd64/include/frame.h,v 1.24 2003/05/12 18:33:19 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/frame.h,v 1.26 2003/11/08 04:39:22 peter Exp $
  */
 
 #ifndef _MACHINE_FRAME_H_
@@ -69,6 +70,7 @@ struct trapframe {
 	register_t	tf_r15;
 	register_t	tf_trapno;
 	register_t	tf_addr;
+	register_t	tf_flags;
 	/* below portion defined in hardware */
 	register_t	tf_err;
 	register_t	tf_rip;
@@ -98,6 +100,7 @@ struct intrframe {
 	register_t	if_r15;
 	register_t	:64;		/* compat with trap frame - trapno */
 	register_t	:64;		/* compat with trap frame - addr */
+	register_t	:64;		/* compat with trap frame - flags */
 	register_t	:64;		/* compat with trap frame - err */
 	/* below portion defined in hardware */
 	register_t	if_rip;
@@ -127,6 +130,7 @@ struct clockframe {
 	register_t	cf_r15;
 	register_t	:64;		/* compat with trap frame - trapno */
 	register_t	:64;		/* compat with trap frame - addr */
+	register_t	:64;		/* compat with trap frame - flags */
 	register_t	:64;		/* compat with trap frame - err */
 	/* below portion defined in hardware */
 	register_t	cf_rip;

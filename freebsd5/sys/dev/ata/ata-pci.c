@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.61 2003/05/04 09:34:14 sos Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.71.2.2 2004/01/27 05:53:18 scottl Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -35,6 +36,9 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
+#include <sys/sema.h>
+#include <sys/taskqueue.h>
+#include <vm/uma.h>
 #include <machine/stdarg.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
@@ -42,8 +46,8 @@
 #include <machine/md_var.h>
 #endif
 #include <sys/rman.h>
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <dev/ata/ata-all.h>
 #include <dev/ata/ata-pci.h>
 
@@ -55,7 +59,7 @@ static MALLOC_DEFINE(M_ATAPCI, "ATA PCI", "ATA driver PCI");
 
 /* prototypes */
 static int ata_pci_allocate(device_t, struct ata_channel *);
-static int ata_pci_dmainit(struct ata_channel *);
+static void ata_pci_dmainit(struct ata_channel *);
 static void ata_pci_locknoop(struct ata_channel *, int);
 
 static int
@@ -66,40 +70,68 @@ ata_pci_probe(device_t dev)
 
     switch (pci_get_vendor(dev)) {
     case ATA_ACARD_ID: 
-	return ata_acard_ident(dev);
+ 	if (!ata_acard_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_ACER_LABS_ID:
-	return ata_ali_ident(dev);
+ 	if (!ata_ali_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_AMD_ID:
-	return ata_amd_ident(dev);
+ 	if (!ata_amd_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_CYRIX_ID:
-	return ata_cyrix_ident(dev);
+ 	if (!ata_cyrix_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_CYPRESS_ID:
-	return ata_cypress_ident(dev);
+ 	if (!ata_cypress_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_HIGHPOINT_ID: 
-	return ata_highpoint_ident(dev);
+ 	if (!ata_highpoint_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_INTEL_ID:
-	return ata_intel_ident(dev);
+ 	if (!ata_intel_ident(dev))
+ 	    return 0;
+ 	break;
+    case ATA_NATIONAL_ID:
+        if (!ata_national_ident(dev))
+	    return 0;
+	break;
     case ATA_NVIDIA_ID:
-	return ata_nvidia_ident(dev);
+ 	if (!ata_nvidia_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_PROMISE_ID:
-	return ata_promise_ident(dev);
+ 	if (!ata_promise_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_SERVERWORKS_ID: 
-	return ata_serverworks_ident(dev);
+ 	if (!ata_serverworks_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_SILICON_IMAGE_ID:
-	return ata_sii_ident(dev);
+ 	if (!ata_sii_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_SIS_ID:
-	return ata_sis_ident(dev);
+ 	if (!ata_sis_ident(dev))
+ 	    return 0;
+ 	break;
     case ATA_VIA_ID: 
-	return ata_via_ident(dev);
-
+ 	if (!ata_via_ident(dev))
+ 	    return 0;
+ 	break;
     case 0x16ca:
 	if (pci_get_devid(dev) == 0x000116ca) {
 	    ata_generic_ident(dev);
 	    device_set_desc(dev, "Cenatek Rocket Drive controller");
 	    return 0;
 	}
-	return ENXIO;
-
+	break;
     case 0x1042:
 	if (pci_get_devid(dev)==0x10001042 || pci_get_devid(dev)==0x10011042) {
 	    ata_generic_ident(dev);
@@ -107,14 +139,14 @@ ata_pci_probe(device_t dev)
 		"RZ 100? ATA controller !WARNING! buggy HW data loss possible");
 	    return 0;
 	}
-	return ENXIO;
+	break;
+    }
 
     /* unknown chipset, try generic DMA if it seems possible */
-    default:
-	if (pci_get_class(dev) == PCIC_STORAGE &&
-	    (pci_get_subclass(dev) == PCIS_STORAGE_IDE))
-	    return ata_generic_ident(dev);
-    }
+    if ((pci_get_class(dev) == PCIC_STORAGE) &&
+	(pci_get_subclass(dev) == PCIS_STORAGE_IDE))
+	return ata_generic_ident(dev);
+
     return ENXIO;
 }
 
@@ -145,7 +177,6 @@ ata_pci_attach(device_t dev)
     ctlr->allocate = ata_pci_allocate;
     ctlr->dmainit = ata_pci_dmainit;
     ctlr->locking = ata_pci_locknoop;
-    ctlr->chipinit(dev);
 
 #ifdef __sparc64__
     if (!(cmd & PCIM_CMD_BUSMASTEREN)) {
@@ -153,18 +184,15 @@ ata_pci_attach(device_t dev)
 	cmd = pci_read_config(dev, PCIR_COMMAND, 2);
     }
 #endif
-    /* is busmastering supported and configured ? */
+    /* if busmastering configured get the I/O resource */
     if ((cmd & PCIM_CMD_BUSMASTEREN) == PCIM_CMD_BUSMASTEREN) {
 	int rid = ATA_BMADDR_RID;
 
-	if (!ctlr->r_io2) {
-	    if (!(ctlr->r_io1 = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-						    0, ~0, 1, RF_ACTIVE)))
-		device_printf(dev, "Busmastering DMA not configured\n");
-	}
+	ctlr->r_io1 = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
+					 0, ~0, 1, RF_ACTIVE);
     }
-    else
-	device_printf(dev, "Busmastering DMA not supported\n");
+
+    ctlr->chipinit(dev);
 
     /* attach all channels on this controller */
     for (unit = 0; unit < ctlr->channels; unit++)
@@ -411,19 +439,14 @@ ata_pci_allocate(device_t dev, struct ata_channel *ch)
 }
 
 static int
-ata_pci_dmastart(struct ata_channel *ch, caddr_t data, int32_t count, int dir)
+ata_pci_dmastart(struct ata_channel *ch)
 {
-    int error;
-
-    if ((error = ata_dmastart(ch, data, count, dir)))
-	return error;
-
-    ATA_IDX_OUTL(ch, ATA_BMDTP_PORT, ch->dma->mdmatab);
-    ATA_IDX_OUTB(ch, ATA_BMCMD_PORT, dir ? ATA_BMCMD_WRITE_READ : 0);
     ATA_IDX_OUTB(ch, ATA_BMSTAT_PORT, (ATA_IDX_INB(ch, ATA_BMSTAT_PORT) | 
 		 (ATA_BMSTAT_INTERRUPT | ATA_BMSTAT_ERROR)));
-    ATA_IDX_OUTB(ch, ATA_BMCMD_PORT, 
-		 ATA_IDX_INB(ch, ATA_BMCMD_PORT) | ATA_BMCMD_START_STOP);
+    ATA_IDX_OUTL(ch, ATA_BMDTP_PORT, ch->dma->mdmatab);
+    ATA_IDX_OUTB(ch, ATA_BMCMD_PORT,
+		 ((ch->dma->flags & ATA_DMA_READ) ? ATA_BMCMD_WRITE_READ : 0) |
+		 ATA_BMCMD_START_STOP);
     return 0;
 }
 
@@ -432,27 +455,21 @@ ata_pci_dmastop(struct ata_channel *ch)
 {
     int error;
 
-    error = ATA_IDX_INB(ch, ATA_BMSTAT_PORT);
+    error = ATA_IDX_INB(ch, ATA_BMSTAT_PORT) & ATA_BMSTAT_MASK;
     ATA_IDX_OUTB(ch, ATA_BMCMD_PORT, 
 		 ATA_IDX_INB(ch, ATA_BMCMD_PORT) & ~ATA_BMCMD_START_STOP);
     ATA_IDX_OUTB(ch, ATA_BMSTAT_PORT, ATA_BMSTAT_INTERRUPT | ATA_BMSTAT_ERROR);
-
-    ata_dmastop(ch);
-
-    return (error & ATA_BMSTAT_MASK);
+    return error;
 }
 
-static int
+static void
 ata_pci_dmainit(struct ata_channel *ch)
 {
-    int error;
-
-    if ((error = ata_dmainit(ch)))
-	return error;
-
-    ch->dma->start = ata_pci_dmastart;
-    ch->dma->stop = ata_pci_dmastop;
-    return 0;
+    ata_dmainit(ch);
+    if (ch->dma) {
+	ch->dma->start = ata_pci_dmastart;
+	ch->dma->stop = ata_pci_dmastop;
+    }
 }
 
 static void
@@ -464,7 +481,6 @@ static device_method_t ata_pci_methods[] = {
     /* device interface */
     DEVMETHOD(device_probe,		ata_pci_probe),
     DEVMETHOD(device_attach,		ata_pci_attach),
-    DEVMETHOD(device_detach,		ata_pci_attach),
     DEVMETHOD(device_shutdown,		bus_generic_shutdown),
     DEVMETHOD(device_suspend,		bus_generic_suspend),
     DEVMETHOD(device_resume,		bus_generic_resume),
@@ -509,8 +525,6 @@ ata_pcisub_probe(device_t dev)
     if ((error = ctlr->allocate(dev, ch)))
 	return error;
 
-    if (ctlr->chip)
-	ch->chiptype = ctlr->chip->chipid;
     ch->device[MASTER].setmode = ctlr->setmode;
     ch->device[SLAVE].setmode = ctlr->setmode;
     ch->locking = ctlr->locking;

@@ -23,9 +23,11 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hea/eni_init.c,v 1.7 2002/11/06 22:58:55 jhb Exp $
  *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/hea/eni_init.c,v 1.8 2003/08/24 17:46:08 obrien Exp $");
 
 /*
  * Efficient ENI Adapter Support
@@ -50,7 +52,7 @@
 #include <dev/hea/eni_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_init.c,v 1.7 2002/11/06 22:58:55 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_init.c,v 1.8 2003/08/24 17:46:08 obrien Exp $");
 #endif
 
 /*

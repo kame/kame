@@ -1,11 +1,4 @@
-/*
- * $FreeBSD: src/sys/compat/svr4/svr4_ipc.c,v 1.12 2002/12/14 01:56:24 alfred Exp $
- *	Derived from:
- *	$NetBSD: svr4_ipc.c,v 1.7 1998/10/19 22:43:00 tron Exp $	*/
-
 /*-
- * Original copyright:
- *
  * Copyright (c) 1995 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
@@ -40,7 +33,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
 /*
  * Portions of this code have been derived from software contributed
  * to the FreeBSD Project by Mark Newton.
@@ -75,7 +67,11 @@
  * novice might be to MakeItGo, but I have more important fish to fry
  * at present.
  *
+ *	Derived from: $NetBSD: svr4_ipc.c,v 1.7 1998/10/19 22:43:00 tron Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ipc.c,v 1.13 2003/06/10 21:35:15 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>

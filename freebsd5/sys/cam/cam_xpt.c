@@ -25,9 +25,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.132 2003/03/08 08:01:26 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/cam_xpt.c,v 1.135 2003/11/09 02:22:33 scottl Exp $");
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/systm.h>
@@ -1451,6 +1453,8 @@ xpt_add_periph(struct cam_periph *periph)
 	int32_t	 status;
 	struct periph_list *periph_head;
 
+	GIANT_REQUIRED;
+
 	device = periph->path->device;
 
 	periph_head = &device->periphs;
@@ -1485,6 +1489,8 @@ void
 xpt_remove_periph(struct cam_periph *periph)
 {
 	struct cam_ed *device;
+
+	GIANT_REQUIRED;
 
 	device = periph->path->device;
 
@@ -1521,6 +1527,8 @@ xpt_announce_periph(struct cam_periph *periph, char *announce_string)
 	u_int	freq;
 	u_int	mb;
 	int	s;
+
+	GIANT_REQUIRED;
 
 	path = periph->path;
 	/*
@@ -1643,6 +1651,8 @@ xpt_announce_periph(struct cam_periph *periph, char *announce_string)
 	u_int mb;
 	struct cam_path *path;
 	struct ccb_trans_settings cts;
+
+	GIANT_REQUIRED;
 
 	path = periph->path;
 	/*
@@ -2943,6 +2953,8 @@ xpt_action(union ccb *start_ccb)
 {
 	int iopl;
 
+	GIANT_REQUIRED;
+
 	CAM_DEBUG(start_ccb->ccb_h.path, CAM_DEBUG_TRACE, ("xpt_action\n"));
 
 	start_ccb->ccb_h.status = CAM_REQ_INPROG;
@@ -2995,8 +3007,8 @@ xpt_action(union ccb *start_ccb)
 			  	       &path->device->inq_data),
 			  scsi_cdb_string(start_ccb->csio.cdb_io.cdb_bytes,
 					  cdb_str, sizeof(cdb_str))));
-		/* FALLTHROUGH */
 	}
+	/* FALLTHROUGH */
 	case XPT_TARGET_IO:
 	case XPT_CONT_TARGET_IO:
 		start_ccb->csio.sense_resid = 0;
@@ -3111,8 +3123,8 @@ xpt_action(union ccb *start_ccb)
 		 * If we weren't able to take care of the abort request
 		 * in the XPT, pass the request down to the SIM for processing.
 		 */
-		/* FALLTHROUGH */
 	}
+	/* FALLTHROUGH */
 	case XPT_ACCEPT_TARGET_IO:
 	case XPT_EN_LUN:
 	case XPT_IMMED_NOTIFY:
@@ -3271,7 +3283,6 @@ xpt_action(union ccb *start_ccb)
 		int s;
 		dev_pos_type position_type;
 		struct ccb_dev_match *cdm;
-		int ret;
 
 		cdm = &start_ccb->cdm;
 
@@ -3316,10 +3327,10 @@ xpt_action(union ccb *start_ccb)
 
 		switch(position_type & CAM_DEV_POS_TYPEMASK) {
 		case CAM_DEV_POS_EDT:
-			ret = xptedtmatch(cdm);
+			xptedtmatch(cdm);
 			break;
 		case CAM_DEV_POS_PDRV:
-			ret = xptperiphlistmatch(cdm);
+			xptperiphlistmatch(cdm);
 			break;
 		default:
 			cdm->status = CAM_DEV_MATCH_ERROR;
@@ -3577,6 +3588,8 @@ xpt_polled_action(union ccb *start_ccb)
 	struct	  cam_devq *devq;
 	struct	  cam_ed *dev;
 
+	GIANT_REQUIRED;
+
 	timeout = start_ccb->ccb_h.timeout;
 	sim = start_ccb->ccb_h.path->bus->sim;
 	devq = sim->devq;
@@ -3638,6 +3651,8 @@ xpt_schedule(struct cam_periph *perph, u_int32_t new_priority)
 	struct cam_ed *device;
 	int s;
 	int runq;
+
+	GIANT_REQUIRED;
 
 	CAM_DEBUG(perph->path, CAM_DEBUG_TRACE, ("xpt_schedule\n"));
 	device = perph->path->device;
@@ -3935,6 +3950,8 @@ xpt_run_dev_sendq(struct cam_eb *bus)
 void
 xpt_merge_ccb(union ccb *master_ccb, union ccb *slave_ccb)
 {
+	GIANT_REQUIRED;
+
 	/*
 	 * Pull fields that are valid for peripheral drivers to set
 	 * into the master CCB along with the CCB "payload".
@@ -3950,6 +3967,8 @@ xpt_merge_ccb(union ccb *master_ccb, union ccb *slave_ccb)
 void
 xpt_setup_ccb(struct ccb_hdr *ccb_h, struct cam_path *path, u_int32_t priority)
 {
+	GIANT_REQUIRED;
+
 	CAM_DEBUG(path, CAM_DEBUG_TRACE, ("xpt_setup_ccb\n"));
 	ccb_h->pinfo.priority = priority;
 	ccb_h->path = path;
@@ -3975,6 +3994,8 @@ xpt_create_path(struct cam_path **new_path_ptr, struct cam_periph *perph,
 {
 	struct	   cam_path *path;
 	cam_status status;
+
+	GIANT_REQUIRED;
 
 	path = (struct cam_path *)malloc(sizeof(*path), M_DEVBUF, M_NOWAIT);
 
@@ -4086,6 +4107,8 @@ xpt_release_path(struct cam_path *path)
 void
 xpt_free_path(struct cam_path *path)
 {
+	GIANT_REQUIRED;
+
 	CAM_DEBUG(path, CAM_DEBUG_TRACE, ("xpt_free_path\n"));
 	xpt_release_path(path);
 	free(path, M_DEVBUF);
@@ -4099,6 +4122,8 @@ xpt_free_path(struct cam_path *path)
 int
 xpt_path_comp(struct cam_path *path1, struct cam_path *path2)
 {
+	GIANT_REQUIRED;
+
 	int retval = 0;
 
 	if (path1->bus != path2->bus) {
@@ -4133,6 +4158,8 @@ xpt_path_comp(struct cam_path *path1, struct cam_path *path2)
 void
 xpt_print_path(struct cam_path *path)
 {
+	GIANT_REQUIRED;
+
 	if (path == NULL)
 		printf("(nopath): ");
 	else {
@@ -4165,6 +4192,8 @@ int
 xpt_path_string(struct cam_path *path, char *str, size_t str_len)
 {
 	struct sbuf sb;
+
+	GIANT_REQUIRED;
 
 	sbuf_new(&sb, str, str_len, 0);
 
@@ -4202,12 +4231,16 @@ xpt_path_string(struct cam_path *path, char *str, size_t str_len)
 path_id_t
 xpt_path_path_id(struct cam_path *path)
 {
+	GIANT_REQUIRED;
+
 	return(path->bus->path_id);
 }
 
 target_id_t
 xpt_path_target_id(struct cam_path *path)
 {
+	GIANT_REQUIRED;
+
 	if (path->target != NULL)
 		return (path->target->target_id);
 	else
@@ -4217,6 +4250,8 @@ xpt_path_target_id(struct cam_path *path)
 lun_id_t
 xpt_path_lun_id(struct cam_path *path)
 {
+	GIANT_REQUIRED;
+
 	if (path->device != NULL)
 		return (path->device->lun_id);
 	else
@@ -4226,12 +4261,16 @@ xpt_path_lun_id(struct cam_path *path)
 struct cam_sim *
 xpt_path_sim(struct cam_path *path)
 {
+	GIANT_REQUIRED;
+
 	return (path->bus->sim);
 }
 
 struct cam_periph*
 xpt_path_periph(struct cam_path *path)
 {
+	GIANT_REQUIRED;
+
 	return (path->periph);
 }
 
@@ -4248,6 +4287,8 @@ xpt_release_ccb(union ccb *free_ccb)
 	struct	 cam_path *path;
 	struct	 cam_ed *device;
 	struct	 cam_eb *bus;
+
+	GIANT_REQUIRED;
 
 	CAM_DEBUG_PRINT(CAM_DEBUG_XPT, ("xpt_release_ccb\n"));
 	path = free_ccb->ccb_h.path;
@@ -4291,6 +4332,8 @@ xpt_bus_register(struct cam_sim *sim, u_int32_t bus)
 	struct cam_eb *old_bus;
 	struct ccb_pathinq cpi;
 	int s;
+
+	GIANT_REQUIRED;
 
 	sim->bus_id = bus;
 	new_bus = (struct cam_eb *)malloc(sizeof(*new_bus),
@@ -4345,6 +4388,8 @@ xpt_bus_deregister(path_id_t pathid)
 {
 	struct cam_path bus_path;
 	cam_status status;
+
+	GIANT_REQUIRED;
 
 	status = xpt_compile_path(&bus_path, NULL, pathid,
 				  CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD);
@@ -4441,6 +4486,8 @@ xpt_async(u_int32_t async_code, struct cam_path *path, void *async_arg)
 	struct cam_et *target, *next_target;
 	struct cam_ed *device, *next_device;
 	int s;
+
+	GIANT_REQUIRED;
 
 	CAM_DEBUG(path, CAM_DEBUG_TRACE, ("xpt_async\n"));
 
@@ -4607,6 +4654,8 @@ xpt_freeze_devq(struct cam_path *path, u_int count)
 	int s;
 	struct ccb_hdr *ccbh;
 
+	GIANT_REQUIRED;
+
 	s = splcam();
 	path->device->qfrozen_cnt += count;
 
@@ -4633,6 +4682,8 @@ xpt_freeze_devq(struct cam_path *path, u_int count)
 u_int32_t
 xpt_freeze_simq(struct cam_sim *sim, u_int count)
 {
+	GIANT_REQUIRED;
+
 	sim->devq->send_queue.qfrozen_cnt += count;
 	if (sim->devq->active_dev != NULL) {
 		struct ccb_hdr *ccbh;
@@ -4658,6 +4709,8 @@ xpt_release_devq_timeout(void *arg)
 void
 xpt_release_devq(struct cam_path *path, u_int count, int run_queue)
 {
+	GIANT_REQUIRED;
+
 	xpt_release_devq_device(path->device, count, run_queue);
 }
 
@@ -4716,6 +4769,8 @@ xpt_release_simq(struct cam_sim *sim, int run_queue)
 	int	s;
 	struct	camq *sendq;
 
+	GIANT_REQUIRED;
+
 	sendq = &(sim->devq->send_queue);
 	s = splcam();
 	if (sendq->qfrozen_cnt > 0) {
@@ -4764,6 +4819,8 @@ xpt_done(union ccb *done_ccb)
 {
 	int s;
 
+	GIANT_REQUIRED;
+
 	s = splcam();
 
 	CAM_DEBUG(done_ccb->ccb_h.path, CAM_DEBUG_TRACE, ("xpt_done\n"));
@@ -4794,6 +4851,8 @@ union ccb *
 xpt_alloc_ccb()
 {
 	union ccb *new_ccb;
+
+	GIANT_REQUIRED;
 
 	new_ccb = malloc(sizeof(*new_ccb), M_DEVBUF, M_WAITOK);
 	return (new_ccb);
@@ -5639,8 +5698,8 @@ probestart(struct cam_periph *periph, union ccb *start_ccb)
 		xpt_print_path(periph->path);
 		printf("Unable to mode sense control page - malloc failure\n");
 		softc->action = PROBE_SERIAL_NUM;
-		/* FALLTHROUGH */
 	}
+	/* FALLTHROUGH */
 	case PROBE_SERIAL_NUM:
 	{
 		struct scsi_vpd_unit_serial_number *serial_buf;
@@ -6913,7 +6972,6 @@ camisr(void *V_queue)
 
 		if (ccb_h->flags & CAM_HIGH_POWER) {
 			struct highpowerlist	*hphead;
-			struct cam_ed		*device;
 			union ccb		*send_ccb;
 
 			hphead = &highpowerq;
@@ -6929,7 +6987,6 @@ camisr(void *V_queue)
 			 * Any high powered commands queued up?
 			 */
 			if (send_ccb != NULL) {
-				device = send_ccb->ccb_h.path->device;
 
 				STAILQ_REMOVE_HEAD(hphead, xpt_links.stqe);
 

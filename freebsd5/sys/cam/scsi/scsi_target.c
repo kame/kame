@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.53 2003/03/03 16:24:43 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_target.c,v 1.58 2003/11/09 09:17:20 tanimura Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -555,12 +556,12 @@ targwrite(dev_t dev, struct uio *uio, int ioflag)
 				  ("write - uiomove failed (%d)\n", error));
 			break;
 		}
-		priority = fuword(&user_ccb->ccb_h.pinfo.priority);
+		priority = fuword32(&user_ccb->ccb_h.pinfo.priority);
 		if (priority == -1) {
 			error = EINVAL;
 			break;
 		}
-		func_code = fuword(&user_ccb->ccb_h.func_code);
+		func_code = fuword32(&user_ccb->ccb_h.func_code);
 		switch (func_code) {
 		case XPT_ACCEPT_TARGET_IO:
 		case XPT_IMMED_NOTIFY:
@@ -682,10 +683,10 @@ targusermerge(struct targ_softc *softc, struct targ_cmd_descr *descr,
 	 * preserved, the rest we get from the user ccb. (See xpt_merge_ccb)
 	 */
 	xpt_setup_ccb(k_ccbh, softc->path, descr->priority);
-	k_ccbh->retry_count = fuword(&u_ccbh->retry_count);
+	k_ccbh->retry_count = fuword32(&u_ccbh->retry_count);
 	k_ccbh->func_code = descr->func_code;
-	k_ccbh->flags = fuword(&u_ccbh->flags);
-	k_ccbh->timeout = fuword(&u_ccbh->timeout);
+	k_ccbh->flags = fuword32(&u_ccbh->flags);
+	k_ccbh->timeout = fuword32(&u_ccbh->timeout);
 	ccb_len = targccblen(k_ccbh->func_code) - sizeof(struct ccb_hdr);
 	error = copyin(u_ccbh + 1, k_ccbh + 1, ccb_len);
 	if (error != 0) {
@@ -808,6 +809,7 @@ targdone(struct cam_periph *periph, union ccb *done_ccb)
 	/* If we're no longer enabled, throw away CCB */
 	if ((softc->state & TARG_STATE_LUN_ENABLED) == 0) {
 		targfreeccb(softc, done_ccb);
+		TARG_UNLOCK(softc);
 		return;
 	}
 	/* abort_all_pending() waits for pending queue to be empty */
@@ -821,6 +823,7 @@ targdone(struct cam_periph *periph, union ccb *done_ccb)
 	case XPT_CONT_TARGET_IO:
 		TAILQ_INSERT_TAIL(&softc->user_ccb_queue, &done_ccb->ccb_h,
 				  periph_links.tqe);
+		TARG_UNLOCK(softc);
 		notify_user(softc);
 		break;
 	default:
@@ -828,7 +831,6 @@ targdone(struct cam_periph *periph, union ccb *done_ccb)
 		      done_ccb->ccb_h.func_code);
 		/* NOTREACHED */
 	}
-	TARG_UNLOCK(softc);
 }
 
 /* Return CCBs to the user from the user queue and abort queue */
@@ -1094,8 +1096,19 @@ abort_all_pending(struct targ_softc *softc)
 
 	/* If we aborted anything from the work queue, wakeup user. */
 	if (!TAILQ_EMPTY(&softc->user_ccb_queue)
-	 || !TAILQ_EMPTY(&softc->abort_queue))
+	 || !TAILQ_EMPTY(&softc->abort_queue)) {
+		/*
+		 * XXX KNOTE calls back into targreadfilt, causing a
+		 * lock recursion.  So unlock around calls to it although
+		 * this may open up a race allowing a user to submit
+		 * another CCB after we have aborted all pending ones
+		 * A better approach is to mark the softc as dying
+		 * under lock and check for this in targstart().
+		 */
+		TARG_UNLOCK(softc);
 		notify_user(softc);
+		TARG_LOCK(softc);
+	}
 }
 
 /* Notify the user that data is ready */
@@ -1106,7 +1119,7 @@ notify_user(struct targ_softc *softc)
 	 * Notify users sleeping via poll(), kqueue(), and
 	 * blocking read().
 	 */
-	selwakeup(&softc->read_select);
+	selwakeuppri(&softc->read_select, PRIBIO);
 	KNOTE(&softc->read_select.si_note, 0);
 	wakeup(&softc->user_ccb_queue);
 }

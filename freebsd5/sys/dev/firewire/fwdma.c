@@ -31,13 +31,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwdma.c,v 1.1 2003/04/17 03:38:02 simokawa Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/firewire/fwdma.c,v 1.5 2003/08/24 17:46:07 obrien Exp $");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/types.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#if __FreeBSD_version >= 501102 
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#endif
 
 #include <sys/bus.h>
 #include <machine/bus.h>
@@ -74,7 +80,12 @@ fwdma_malloc(struct firewire_comm *fc, int alignment, bus_size_t size,
 		/*maxsize*/ size,
 		/*nsegments*/ 1,
 		/*maxsegsz*/ BUS_SPACE_MAXSIZE_32BIT,
-		/*flags*/ BUS_DMA_ALLOCNOW, &dma->dma_tag);
+		/*flags*/ BUS_DMA_ALLOCNOW,
+#if __FreeBSD_version >= 501102 
+		/*lockfunc*/busdma_lock_mutex,
+		/*lockarg*/&Giant,
+#endif
+		&dma->dma_tag);
 	if (err) {
 		printf("fwdma_malloc: failed(1)\n");
 		return(NULL);
@@ -167,7 +178,12 @@ fwdma_malloc_multiseg(struct firewire_comm *fc, int alignment,
 			/*maxsize*/ ssize,
 			/*nsegments*/ 1,
 			/*maxsegsz*/ BUS_SPACE_MAXSIZE_32BIT,
-			/*flags*/ BUS_DMA_ALLOCNOW, &am->dma_tag)) {
+			/*flags*/ BUS_DMA_ALLOCNOW,
+#if __FreeBSD_version >= 501102
+			/*lockfunc*/busdma_lock_mutex,
+			/*lockarg*/&Giant,
+#endif
+			&am->dma_tag)) {
 		printf("fwdma_malloc_multiseg: tag_create failed\n");
 		free(am, M_FW);
 		return(NULL);

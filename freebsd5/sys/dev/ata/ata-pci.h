@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-pci.h,v 1.11 2003/05/18 16:45:48 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-pci.h,v 1.19.2.3 2004/02/11 08:47:21 scottl Exp $
  */
 
 /* structure holding chipset config info */
@@ -35,7 +35,7 @@ struct ata_chip_id {
     int			 cfg1;
     int			 cfg2;
     u_int8_t		 max_dma;
-    char       		*text;
+    char		*text;
 };
 
 /* structure describing a PCI ATA controller */
@@ -47,7 +47,7 @@ struct ata_pci_controller {
     struct ata_chip_id	 *chip;
     int			(*chipinit)(device_t);
     int			(*allocate)(device_t, struct ata_channel *);
-    int			(*dmainit)(struct ata_channel *);
+    void		(*dmainit)(struct ata_channel *);
     void		(*setmode)(struct ata_device *, int);
     void		(*locking)(struct ata_channel *, int);
     int			  locked_ch;
@@ -55,7 +55,7 @@ struct ata_pci_controller {
     struct {
     void		(*function)(void *);
     void		 *argument;
-    } interrupt[4];	/* XXX SOS max ch# for now */
+    } interrupt[4];	/* SOS max ch# for now XXX */
 };
 
 #define ATA_MASTERDEV(dev)	((pci_get_progif(dev) & 0x80) && \
@@ -88,6 +88,7 @@ struct ata_pci_controller {
 #define ATA_CYPRESS_82C693	0xc6931080
 
 #define ATA_DEC_21150		0x00221011
+#define ATA_DEC_21150_1		0x00231011
 
 #define ATA_HIGHPOINT_ID	0x1103
 #define ATA_HPT366		0x00041103
@@ -115,9 +116,13 @@ struct ata_pci_controller {
 #define ATA_I82801EB		0x24db8086
 #define ATA_I82801EB_1		0x24d18086
 
+#define ATA_NATIONAL_ID		0x100b
+#define ATA_SC1100		0x0502100b
+
 #define ATA_NVIDIA_ID		0x10de
 #define ATA_NFORCE1		0x01bc10de
 #define ATA_NFORCE2		0x006510de
+#define ATA_NFORCE3		0x00d510de
 
 #define ATA_PROMISE_ID		0x105a
 #define ATA_PDC20246		0x4d33105a
@@ -147,12 +152,16 @@ struct ata_pci_controller {
 #define ATA_PDC20621		0x6621105a
 
 #define ATA_SERVERWORKS_ID	0x1166
+#define ATA_ROSB4_ISA		0x02001166
 #define ATA_ROSB4		0x02111166
 #define ATA_CSB5		0x02121166
 #define ATA_CSB6		0x02131166
 #define ATA_CSB6_1		0x02171166
 
 #define ATA_SILICON_IMAGE_ID	0x1095
+#define ATA_SII3114		0x31141095
+#define ATA_SII3112		0x31121095
+#define ATA_SII3112_1		0x02401095
 #define ATA_SII0680		0x06801095
 #define ATA_CMD646		0x06461095
 #define ATA_CMD648		0x06481095
@@ -185,6 +194,7 @@ struct ata_pci_controller {
 #define ATA_SIS652		0x06521039
 #define ATA_SIS655		0x06551039
 #define ATA_SIS658		0x06581039
+#define ATA_SIS661		0x06611039
 #define ATA_SIS730		0x07301039
 #define ATA_SIS733		0x07331039
 #define ATA_SIS735		0x07351039
@@ -199,6 +209,8 @@ struct ata_pci_controller {
 #define ATA_SIS961		0x09611039
 #define ATA_SIS962		0x09621039
 #define ATA_SIS963		0x09631039
+#define ATA_SIS964		0x09641039
+#define ATA_SIS964_1		0x01801039
 
 #define ATA_VIA_ID		0x1106
 #define ATA_VIA82C571		0x05711106
@@ -210,6 +222,8 @@ struct ata_pci_controller {
 #define ATA_VIA8233A		0x31471106
 #define ATA_VIA8233C		0x31091106
 #define ATA_VIA8235		0x31771106
+#define ATA_VIA8237		0x32271106
+#define ATA_VIA8237_1		0x31491106
 #define ATA_VIA8361		0x31121106
 #define ATA_VIA8363		0x03051106
 #define ATA_VIA8371		0x03911106
@@ -231,7 +245,6 @@ struct ata_pci_controller {
 #define PRNEW		1
 #define PRTX		2
 #define PRMIO		3
-#define PRIDX		4
 #define PRTX4		0x01
 #define PRSX4K		0x02
 #define PRSX6K		0x04
@@ -242,17 +255,20 @@ struct ata_pci_controller {
 #define SWKS66		1
 #define SWKS100		2
 
-#define SII_INTR	0x01
-#define SII_SETCLK	0x02
-#define SII_ENINTR	0x04
+#define SIIMEMIO	1
+#define SIIINTR		0x01
+#define SIISETCLK	0x02
+#define SIIBUG		0x04
+#define SII4CH		0x08
 
 #define SIS_SOUTH	1
-#define SIS133NEW	2
-#define SIS133OLD	3
-#define SIS100NEW	4
-#define SIS100OLD	5
-#define SIS66		6
-#define SIS33		7
+#define SISSATA		2
+#define SIS133NEW	3
+#define SIS133OLD	4
+#define SIS100NEW	5
+#define SIS100OLD	6
+#define SIS66		7
+#define SIS33		8
 
 #define VIA33		0
 #define VIA66		1
@@ -266,7 +282,7 @@ struct ata_pci_controller {
 #define VIABUG		0x10
 
 /* global prototypes */
-int ata_dmainit(struct ata_channel *);
+void ata_dmainit(struct ata_channel *);
 int ata_dmastart(struct ata_channel *, caddr_t, int32_t, int);
 int ata_dmastop(struct ata_channel *);
 
@@ -278,6 +294,7 @@ int ata_cyrix_ident(device_t);
 int ata_cypress_ident(device_t);
 int ata_highpoint_ident(device_t);
 int ata_intel_ident(device_t);
+int ata_national_ident(device_t);
 int ata_nvidia_ident(device_t);
 int ata_promise_ident(device_t);
 int ata_serverworks_ident(device_t);

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/common/bcache.c,v 1.11 2002/02/25 03:45:09 bde Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/common/bcache.c,v 1.12 2003/08/25 23:30:41 obrien Exp $");
 
 /*
  * Simple LRU block cache

@@ -1,6 +1,28 @@
 /*-
- * Copyright (c) 2002 Matthew Dillon.  This code is distributed under
- * the BSD copyright, /usr/src/COPYRIGHT.
+ * Copyright (c) 2002 Matthew Dillon.  All Rights Reserved.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+ * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE
+ * GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * This file contains prototypes and high-level inlines related to
  * machine-level critical function support:
@@ -8,11 +30,10 @@
  *	cpu_critical_enter()		- inlined
  *	cpu_critical_exit()		- inlined
  *	cpu_critical_fork_exit()	- prototyped
- *	cpu_thread_link()		- prototyped
  *	related support functions residing
  *	in <arch>/<arch>/critical.c	- prototyped
  *
- * $FreeBSD: src/sys/amd64/include/critical.h,v 1.3 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/critical.h,v 1.6 2003/12/06 23:13:22 peter Exp $
  */
 
 #ifndef _MACHINE_CRITICAL_H_
@@ -24,7 +45,6 @@ __BEGIN_DECLS
  * Prototypes - see <arch>/<arch>/critical.c
  */
 void cpu_critical_fork_exit(void);
-void cpu_thread_link(struct thread *td);
 
 #ifdef	__GNUC__
 
@@ -37,10 +57,7 @@ void cpu_thread_link(struct thread *td);
 static __inline void
 cpu_critical_enter(void)
 {
-	struct thread *td;
-
-	td = curthread;
-	td->td_md.md_savecrit = intr_disable();
+	curthread->td_md.md_savecrit = intr_disable();
 }
 
 /*
@@ -53,10 +70,7 @@ cpu_critical_enter(void)
 static __inline void
 cpu_critical_exit(void)
 {
-	struct thread *td;
-
-	td = curthread;
-	intr_restore(td->td_md.md_savecrit);
+	intr_restore(curthread->td_md.md_savecrit);
 }
 
 #else /* !__GNUC__ */

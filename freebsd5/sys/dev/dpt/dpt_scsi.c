@@ -27,6 +27,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.45 2003/08/24 17:46:04 obrien Exp $");
+
 /*
  * dpt_scsi.c: SCSI dependant code for the DPT driver
  *
@@ -43,7 +46,7 @@
  *	       arrays that span controllers (Wow!).
  */
 
-#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.42 2003/05/27 04:59:57 scottl Exp $"
+#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.45 2003/08/24 17:46:04 obrien Exp $"
 
 #define _DPT_C_
 
@@ -1034,30 +1037,11 @@ dpt_action(struct cam_sim *sim, union ccb *ccb)
 	}
 	case XPT_CALC_GEOMETRY:
 	{
-		struct	  ccb_calc_geometry *ccg;
-		u_int32_t size_mb;
-		u_int32_t secs_per_cylinder;
-		int	  extended;
-
 		/*
 		 * XXX Use Adaptec translation until I find out how to
 		 *     get this information from the card.
 		 */
-		ccg = &ccb->ccg;
-		size_mb = ccg->volume_size
-			/ ((1024L * 1024L) / ccg->block_size);
-		extended = 1;
-		
-		if (size_mb > 1024 && extended) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(&ccb->ccg, /*extended*/1);
 		xpt_done(ccb);
 		break;
 	}
@@ -1323,6 +1307,8 @@ dpt_init(struct dpt_softc *dpt)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&dpt->sg_dmat) != 0) {
 		goto error_exit;
         }
@@ -1450,6 +1436,8 @@ dpt_init(struct dpt_softc *dpt)
 				/* nsegments	*/ dpt->sgsize,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ BUS_DMA_ALLOCNOW,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&dpt->buffer_dmat) != 0) {
 		printf("dpt: bus_dma_tag_create(...,dpt->buffer_dmat) failed\n");
 		goto error_exit;
@@ -1471,6 +1459,8 @@ dpt_init(struct dpt_softc *dpt)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&dpt->dccb_dmat) != 0) {
 		printf("dpt: bus_dma_tag_create(...,dpt->dccb_dmat) failed\n");
 		goto error_exit;

@@ -23,8 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/splash.c,v 1.12 2001/08/02 13:23:17 yokota Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fb/splash.c,v 1.13 2003/08/24 17:46:06 obrien Exp $");
 
 #include "opt_splash.h"
 

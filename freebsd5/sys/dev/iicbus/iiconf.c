@@ -22,10 +22,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/iicbus/iiconf.c,v 1.13 2002/03/23 15:47:17 nsouch Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/iicbus/iiconf.c,v 1.14 2003/08/24 17:49:13 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/module.h>

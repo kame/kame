@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_cbus.c,v 1.9 2003/04/15 06:37:22 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_cbus.c,v 1.12 2003/10/31 18:31:58 brooks Exp $
  */
 
 #include <sys/param.h>
@@ -277,7 +277,7 @@ ed_isa_attach(dev)
 		return (error);
 	}
 
-	return ed_attach(sc, device_get_unit(dev), flags);
+	return ed_attach(dev);
 }
 
 #ifdef PC98
@@ -869,8 +869,8 @@ ed_probe_SIC98(dev, port_rid, flags)
 		return (error);
 	}
 
-	sc->asic_offset = ED_NOVELL_ASIC_OFFSET;
-	sc->nic_offset  = ED_NOVELL_NIC_OFFSET;
+	sc->asic_offset = ED_SIC_ASIC_OFFSET;
+	sc->nic_offset  = ED_SIC_NIC_OFFSET;
 
 	error = ed98_alloc_memory(dev, 0);
 	if (error) {
@@ -916,7 +916,7 @@ ed_probe_SIC98(dev, port_rid, flags)
 		return (ENXIO);
 	}
 
-	sc->vendor   = ED_VENDOR_MISC;
+	sc->vendor   = ED_VENDOR_SIC;
 	sc->type_str = "SIC98";
 	sc->isa16bit = 1;
 	sc->cr_proto = 0;
@@ -975,7 +975,7 @@ ed_reset_CNET98(sc, flags)
 	struct ed_softc *sc;
 	int flags;
 {
-	u_short	init_addr = ED_CNET98_INIT;
+	u_int init_addr = ED_CNET98_INIT;
 	u_char tmp;
 
 	/* Choose initial register address */

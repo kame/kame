@@ -23,24 +23,24 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/runq.h,v 1.2 2002/06/20 06:21:20 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/runq.h,v 1.3 2003/12/06 23:24:18 peter Exp $
  */
 
 #ifndef	_MACHINE_RUNQ_H_
 #define	_MACHINE_RUNQ_H_
 
-#define	RQB_LEN		(2)		/* Number of priority status words. */
-#define	RQB_L2BPW	(5)		/* Log2(sizeof(rqb_word_t) * NBBY)). */
+#define	RQB_LEN		(1)		/* Number of priority status words. */
+#define	RQB_L2BPW	(6)		/* Log2(sizeof(rqb_word_t) * NBBY)). */
 #define	RQB_BPW		(1<<RQB_L2BPW)	/* Bits in an rqb_word_t. */
 
-#define	RQB_BIT(pri)	(1 << ((pri) & (RQB_BPW - 1)))
+#define	RQB_BIT(pri)	(1ul << ((pri) & (RQB_BPW - 1)))
 #define	RQB_WORD(pri)	((pri) >> RQB_L2BPW)
 
-#define	RQB_FFS(word)	(ffs(word) - 1)
+#define	RQB_FFS(word)	(bsfq(word))
 
 /*
  * Type of run queue status word.
  */
-typedef	u_int32_t	rqb_word_t;
+typedef	u_int64_t	rqb_word_t;
 
 #endif

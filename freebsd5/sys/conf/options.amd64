@@ -1,6 +1,8 @@
-# $FreeBSD: src/sys/conf/options.amd64,v 1.8 2003/05/19 22:19:02 peter Exp $
+# $FreeBSD: src/sys/conf/options.amd64,v 1.10 2003/11/17 08:58:16 peter Exp $
 # Options specific to AMD64 platform kernels
 
+AUTO_EOI_1		opt_auto_eoi.h
+AUTO_EOI_2		opt_auto_eoi.h
 MAXMEM
 PERFMON			opt_perfmon.h
 
@@ -10,30 +12,6 @@ KVA_PAGES		opt_global.h
 CLK_CALIBRATION_LOOP	opt_clock.h
 TIMER_FREQ		opt_clock.h
 
-MAXCONS			opt_syscons.h
-SC_ALT_MOUSE_IMAGE	opt_syscons.h
-SC_CUT_SPACES2TABS	opt_syscons.h
-SC_CUT_SEPCHARS		opt_syscons.h
-SC_DEBUG_LEVEL		opt_syscons.h
-SC_DFLT_FONT		opt_syscons.h
-SC_DISABLE_DDBKEY	opt_syscons.h
-SC_DISABLE_REBOOT	opt_syscons.h
-SC_HISTORY_SIZE		opt_syscons.h
-SC_KERNEL_CONS_ATTR	opt_syscons.h
-SC_KERNEL_CONS_REV_ATTR	opt_syscons.h
-SC_MOUSE_CHAR		opt_syscons.h
-SC_NO_CUTPASTE		opt_syscons.h
-SC_NO_FONT_LOADING	opt_syscons.h
-SC_NO_HISTORY		opt_syscons.h
-SC_NO_SYSMOUSE		opt_syscons.h
-SC_NORM_ATTR		opt_syscons.h
-SC_NORM_REV_ATTR	opt_syscons.h
-SC_PIXEL_MODE		opt_syscons.h
-SC_RENDER_DEBUG		opt_syscons.h
-SC_TWOBUTTON_MOUSE	opt_syscons.h
-SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
-DEV_SPLASH		opt_splash.h
-
 VGA_ALT_SEQACCESS	opt_vga.h
 VGA_DEBUG		opt_vga.h
 VGA_NO_FONT_LOADING	opt_vga.h
@@ -42,13 +20,6 @@ VGA_SLOW_IOACCESS	opt_vga.h
 VGA_WIDTH90		opt_vga.h
 
 ATKBD_DFLT_KEYMAP	opt_atkbd.h
-
-KBD_DISABLE_KEYMAP_LOAD	opt_kbd.h
-KBD_INSTALL_CDEV	opt_kbd.h
-KBD_MAXRETRY		opt_kbd.h
-KBD_MAXWAIT		opt_kbd.h
-KBD_RESETDELAY		opt_kbd.h
-KBDIO_DEBUG		opt_kbd.h
 
 # -------------------------------
 # EOF
@@ -60,3 +31,5 @@ PSM_HOOKRESUME		opt_psm.h
 PSM_RESETAFTERSUSPEND	opt_psm.h
 PSM_DEBUG		opt_psm.h
 IA32
+NO_MIXED_MODE
+DEV_ATPIC		opt_atpic.h

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.65 2003/05/31 05:25:17 scottl Exp $
+# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.66 2003/06/26 03:51:57 peter Exp $
 
 PROG=		loader
 STRIP=
@@ -85,7 +85,7 @@ CFLAGS+=	-elf
 
 vers.o:	${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version
 	sh ${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version ${NEWVERSWHAT}
-	${CC} -c vers.c
+	${CC} ${CFLAGS} -c vers.c
 
 ${PROG}: ${PROG}.bin ${BTXLDR} ${BTXKERN} ${BTXCRT}
 	btxld -v -f aout -e ${LOADER_ADDRESS} -o ${.TARGET} -l ${BTXLDR} \

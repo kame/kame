@@ -24,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ar/if_ar_isa.c,v 1.52 2003/04/23 15:40:11 jhay Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar_isa.c,v 1.53 2003/08/24 17:48:04 obrien Exp $");
 
 /*
  * Programming assumptions and other issues.
@@ -42,7 +43,6 @@
  *
  * There should be a way to set/reset Raw HDLC/PPP, Loopback, DCE/DTE,
  * internal/external clock, etc.....
- *
  */
 
 #include <sys/param.h>

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/elf.h,v 1.15 2003/05/14 04:10:49 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/elf.h,v 1.16 2003/09/25 01:10:23 peter Exp $
  */
 
 #ifndef _MACHINE_ELF_H_
@@ -137,16 +137,4 @@ __ElfType(Auxinfo);
 #define	ELF_TARG_MACH	EM_X86_64
 #define	ELF_TARG_VER	1
 
-#ifdef _KERNEL
-
-/*
- * On the i386 we load the dynamic linker where a userland call
- * to mmap(0, ...) would put it.  The rationale behind this
- * calculation is that it leaves room for the heap to grow to
- * its maximum allowed size.
- */
-#define ELF_RTLD_ADDR(vmspace) \
-    (round_page((vm_offset_t)(vmspace)->vm_daddr + maxdsiz))
-
-#endif /* _KERNEL */
 #endif /* !_MACHINE_ELF_H_ */

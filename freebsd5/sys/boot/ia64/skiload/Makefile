@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/ia64/skiload/Makefile,v 1.10 2003/02/26 06:18:52 obrien Exp $
+# $FreeBSD: src/sys/boot/ia64/skiload/Makefile,v 1.12 2003/11/09 06:53:37 marcel Exp $
 
 .PATH: ${.CURDIR}/../common
 
@@ -6,8 +6,9 @@ PROG= 		skiload
 NOMAN=
 NEWVERSWHAT=	"ia64 SKI boot" ${MACHINE_ARCH}
 BINDIR?=	/boot
+STRIP=		# We must not strip skiload at install time.
 
-SRCS+=		main.c conf.c
+SRCS+=		conf.c main.c start.S
 
 CFLAGS+=	-ffreestanding
 

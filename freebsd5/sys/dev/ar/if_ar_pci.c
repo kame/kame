@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 - 2001 John Hay.
  * All rights reserved.
  *
@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ar/if_ar_pci.c,v 1.8 2003/04/23 15:40:11 jhay Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar_pci.c,v 1.10 2003/08/24 17:48:04 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,8 +41,8 @@
 #include <machine/bus_memio.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/ic/hd64570.h>
 #include <dev/ar/if_arregs.h>

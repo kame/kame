@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.27 2003/04/30 01:54:38 imp Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.29 2003/10/30 23:12:24 brooks Exp $
  */
 
 /*
@@ -174,7 +174,7 @@ struct fxp_softc {
 	struct fxp_stats *fxp_stats;	/* Pointer to interface stats */
 	u_int32_t stats_addr;		/* DMA address of the stats structure */
 	int rx_idle_secs;		/* # of seconds RX has been idle */
-	struct callout_handle stat_ch;	/* Handle for canceling our stat timeout */
+	struct callout stat_ch;		/* stat callout */
 	struct fxp_cb_mcs *mcsp;	/* Pointer to mcast setup descriptor */
 	u_int32_t mcs_addr;		/* DMA address of the multicast cmd */
 	struct ifmedia sc_media;	/* media information */
@@ -225,5 +225,3 @@ struct fxp_softc {
 	bus_space_write_4((sc)->sc_st, (sc)->sc_sh, (reg), (val))
 
 #define	sc_if			arpcom.ac_if
-
-#define	FXP_UNIT(_sc)		(_sc)->arpcom.ac_if.if_unit

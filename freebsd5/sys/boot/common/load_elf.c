@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/common/load_elf.c,v 1.28 2003/05/12 05:48:09 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/common/load_elf.c,v 1.29 2003/08/25 23:30:41 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/exec.h>

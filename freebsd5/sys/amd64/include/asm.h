@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)DEFS.h	5.1 (Berkeley) 4/23/90
- * $FreeBSD: src/sys/amd64/include/asm.h,v 1.13 2003/05/24 18:24:03 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/asm.h,v 1.14 2003/06/02 05:59:35 peter Exp $
  */
 
 #ifndef _MACHINE_ASM_H_
@@ -58,7 +58,7 @@
  * to a possibly-modified form that will be invisible to C programs.
  */
 #define CNAME(csym)		csym
-#define HIDENAME(asmsym)	__CONCAT(.,asmsym)
+#define HIDENAME(asmsym)	.asmsym
 
 /* XXX should use .p2align 4,0x90 for -m486. */
 #define _START_ENTRY	.text; .p2align 2,0x90

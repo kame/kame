@@ -24,16 +24,16 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.63 2003/05/13 20:35:57 jhb Exp $
  */
-
 /*
  * SVR4 compatibility module.
  *
  * SVR4 system calls that are implemented differently in BSD are
  * handled here.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.68 2003/11/19 04:12:32 kan Exp $");
 
 #include "opt_mac.h"
 
@@ -254,7 +254,6 @@ svr4_sys_getdents64(td, uap)
 	struct file *fp;
 	struct uio auio;
 	struct iovec aiov;
-	struct vattr va;
 	off_t off;
 	struct svr4_dirent64 svr4_dirent;
 	int buflen, error, eofflag, nbytes, justone;
@@ -272,16 +271,11 @@ svr4_sys_getdents64(td, uap)
 		return (EBADF);
 	}
 
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
 		return (EINVAL);
-	}
-
-	if ((error = VOP_GETATTR(vp, &va, td->td_ucred, td))) {
-		fdrop(fp, td);
-		return error;
 	}
 
 	nbytes = uap->nbytes;
@@ -444,6 +438,9 @@ svr4_sys_getdents(td, uap)
 	u_long *cookiebuf = NULL, *cookie;
 	int ncookies = 0, *retval = td->td_retval;
 
+	if (uap->nbytes < 0)
+		return (EINVAL);
+
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)) != 0)
 		return (error);
 
@@ -452,7 +449,7 @@ svr4_sys_getdents(td, uap)
 		return (EBADF);
 	}
 
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
 		return (EINVAL);
@@ -628,7 +625,7 @@ svr4_sys_fchroot(td, uap)
 		return error;
 	if ((error = getvnode(fdp, uap->fd, &fp)) != 0)
 		return error;
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	if (vp->v_type != VDIR)
 		error = ENOTDIR;
@@ -809,8 +806,6 @@ svr4_sys_sysconfig(td, uap)
 	}
 	return 0;
 }
-
-extern int swap_pager_full;
 
 /* ARGSUSED */
 int
@@ -1736,6 +1731,7 @@ svr4_sys_resolvepath(td, uap)
 {
 	struct nameidata nd;
 	int error, *retval = td->td_retval;
+	unsigned int ncopy;
 
 	NDINIT(&nd, LOOKUP, NOFOLLOW | SAVENAME, UIO_USERSPACE,
 	    uap->path, td);
@@ -1743,12 +1739,11 @@ svr4_sys_resolvepath(td, uap)
 	if ((error = namei(&nd)) != 0)
 		return error;
 
-	if ((error = copyout(nd.ni_cnd.cn_pnbuf, uap->buf,
-	    uap->bufsiz)) != 0)
+	ncopy = min(uap->bufsiz, strlen(nd.ni_cnd.cn_pnbuf) + 1);
+	if ((error = copyout(nd.ni_cnd.cn_pnbuf, uap->buf, ncopy)) != 0)
 		goto bad;
 
-	*retval = strlen(nd.ni_cnd.cn_pnbuf) < uap->bufsiz ? 
-	  strlen(nd.ni_cnd.cn_pnbuf) + 1 : uap->bufsiz;
+	*retval = ncopy;
 bad:
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vput(nd.ni_vp);

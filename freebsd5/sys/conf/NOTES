@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/NOTES,v 1.1149 2003/05/15 02:10:29 jmallett Exp $
+# $FreeBSD: src/sys/conf/NOTES,v 1.1189 2003/11/16 12:26:09 akiyama Exp $
 #
 # NOTES -- Lines that can be cut/pasted into kernel and hints configs.
 #
@@ -29,11 +29,11 @@
 # comment on the same line if possible.  Very detailed descriptions of
 # devices and subsystems belong in manpages.
 #
-# A space followed by a tab separates 'option' from an option name.  Two
+# A space followed by a tab separates 'options' from an option name.  Two
 # spaces followed by a tab separate 'device' from a device name.  Comments
 # after an option or device should use one space after the comment character.
 # To comment out a negative option that disables code and thus should not be
-# enabled for LINT builds, precede 'option' with "#!".
+# enabled for LINT builds, precede 'options' with "#!".
 #
 
 #
@@ -102,6 +102,7 @@ options 	DFLDSIZ=(1024UL*1024*1024)
 options 	BLKDEV_IOSIZE=8192
 
 # Options for the VM subsystem
+# L2 cache size (in KB) can be specified in PQ_CACHESIZE
 options 	PQ_CACHESIZE=512	# color for 512k/16k cache
 # Deprecated options supported for backwards compatibility
 #options 	PQ_NOOPT		# No coloring
@@ -120,6 +121,7 @@ options 	GEOM_AES		# Don't use, use GEOM_BDE
 options 	GEOM_APPLE		# Apple partitioning
 options 	GEOM_BDE		# Disk encryption.
 options 	GEOM_BSD		# BSD disklabels
+options 	GEOM_FOX		# Redundant path mitigation
 options 	GEOM_GPT		# GPT partitioning
 options 	GEOM_MBR		# DOS/MBR partitioning
 options 	GEOM_PC98		# NEC PC9800 partitioning
@@ -149,7 +151,7 @@ options 	ROOTDEVNAME=\"ufs:da0s2e\"
 # but will work just fine on UP too.  Users of this scheduler should expect
 # some hicups and be prepaired to provide feedback.
 #
-options		SCHED_4BSD
+options 	SCHED_4BSD
 #options	SCHED_ULE
 
 #####################################################################
@@ -164,6 +166,13 @@ options 	SMP			# Symmetric MultiProcessor Kernel
 # if the thread that currently owns the mutex is executing on another
 # CPU.
 options 	ADAPTIVE_MUTEXES
+
+# MUTEX_NOINLINE forces mutex operations to call functions to perform each
+# operation rather than inlining the simple cases.  This can be used to
+# shrink the size of the kernel text segment.  Note that this behavior is
+# already implied by the INVARIANT_SUPPORT, INVARIANTS, MUTEX_PROFILING,
+# and WITNESS options.
+options 	MUTEX_NOINLINE
 
 # SMP Debugging Options:
 #
@@ -440,6 +449,14 @@ options 	NETGRAPH_TEE
 options 	NETGRAPH_TTY
 options 	NETGRAPH_UI
 options 	NETGRAPH_VJC
+options 	NETGRAPH_ATM_ATMPIF
+
+# NgATM - Netgraph ATM
+options 	NGATM_ATM
+options 	NGATM_ATMBASE
+options 	NGATM_SSCOP
+options 	NGATM_SSCFU
+options 	NGATM_UNI
 
 device		mn	# Munich32x/Falc54 Nx64kbit/sec cards.
 device		lmc	# tulip based LanMedia WAN cards
@@ -451,7 +468,7 @@ device		musycc	# LMC/SBE LMC1504 quad T1/E1
 #  The `ether' device provides generic code to handle
 #  Ethernets; it is MANDATORY when an Ethernet device driver is
 #  configured or token-ring is enabled.
-#  The 'wlan' device provides generic code to support 802.11
+#  The `wlan' device provides generic code to support 802.11
 #  drivers, including host AP mode; it is MANDATORY for the wi
 #  driver and will eventually be required by all 802.11 drivers.
 #  The `fddi' device provides generic code to support FDDI.
@@ -525,6 +542,9 @@ device		stf			#6to4 IPv6 over IPv4 encapsulation
 # MROUTING enables the kernel multicast packet forwarder, which works
 # with mrouted(8).
 #
+# PIM enables Protocol Independent Multicast in the kernel.
+# Requires MROUTING enabled.
+#
 # IPFIREWALL enables support for IP firewall construction, in
 # conjunction with the `ipfw' program.  IPFIREWALL_VERBOSE sends
 # logged packets to the system logger.  IPFIREWALL_VERBOSE_LIMIT
@@ -553,16 +573,16 @@ device		stf			#6to4 IPv6 over IPv4 encapsulation
 #
 # PFIL_HOOKS enables an abtraction layer which is meant to be used in
 # network code where filtering is required.  See the pfil(9) man page.
-# This option is a subset of the IPFILTER option.
+# This option is required by the IPFILTER option.
 #
 # TCPDEBUG enables code which keeps traces of the TCP state machine
 # for sockets with the SO_DEBUG option set, which can then be examined
 # using the trpt(8) utility.
 #
 options 	MROUTING		# Multicast routing
+options 	PIM			# Protocol Independent Multicast
 options 	IPFIREWALL		#firewall
 options 	IPFIREWALL_VERBOSE	#enable logging to syslogd(8)
-options 	IPFIREWALL_FORWARD	#enable transparent proxy support
 options 	IPFIREWALL_VERBOSE_LIMIT=100	#limit verbosity
 options 	IPFIREWALL_DEFAULT_TO_ACCEPT	#allow everything by default
 options 	IPV6FIREWALL		#firewall for IPv6
@@ -574,14 +594,14 @@ options 	IPFILTER		#ipfilter support
 options 	IPFILTER_LOG		#ipfilter logging
 options 	IPFILTER_DEFAULT_BLOCK	#block all packets by default
 options 	IPSTEALTH		#support for stealth forwarding
-options 	PFIL_HOOKS
+options 	PFIL_HOOKS		#required by IPFILTER
 options 	TCPDEBUG
 
 # The MBUF_STRESS_TEST option enables options which create
 # various random failures / extreme cases related to mbuf
 # functions.  See the mbuf(9) manpage for a list of available
 # test cases.
-options		MBUF_STRESS_TEST
+options 	MBUF_STRESS_TEST
 
 # RANDOM_IP_ID causes the ID field in IP packets to be randomized
 # instead of incremented by 1 with each packet generated.  This
@@ -640,6 +660,8 @@ options 	ZERO_COPY_SOCKETS
 # The `hfa' driver provides support for the FORE Systems, Inc.
 # PCA-200E ATM PCI Adapter.
 #
+# The `harp' pseudo-driver makes all NATM interface drivers available to HARP.
+#
 options 	ATM_CORE		#core ATM protocol family
 options 	ATM_IP			#IP over ATM support
 options 	ATM_SIGPVC		#SIGPVC signalling manager
@@ -648,6 +670,7 @@ options 	ATM_UNI			#UNI signalling manager
 
 device		hea			#Efficient ENI-155p ATM PCI
 device		hfa			#FORE PCA-200E ATM PCI
+device		harp			#Pseudo-interface for NATM
 
 
 #####################################################################
@@ -669,13 +692,13 @@ device		hfa			#FORE PCA-200E ATM PCI
 # One of these is mandatory:
 options 	FFS			#Fast filesystem
 options 	NFSCLIENT		#Network File System
-options 	NFSSERVER		#Network File System
 
 # The rest are optional:
 options 	CD9660			#ISO 9660 filesystem
 options 	FDESCFS			#File descriptor filesystem
 options 	HPFS			#OS/2 File system
 options 	MSDOSFS			#MS DOS File System (FAT, FAT32)
+options 	NFSSERVER		#Network File System
 options 	NTFS			#NT File System
 options 	NULLFS			#NULL filesystem
 #options 	NWFS			#NetWare filesystem
@@ -718,14 +741,6 @@ options 	MD_ROOT_SIZE=10
 # images of type mfs_root or md_root.
 options 	MD_ROOT
 
-# Allow this many swap-devices.
-#
-# In order to manage swap, the system must reserve bitmap space that
-# scales with the largest mounted swap device multiplied by NSWAPDEV, 
-# irregardless of whether other swap devices exist or not.  So it
-# is not a good idea to make this value too large.
-options 	NSWAPDEV=5
-
 # Disk quotas are supported when this option is enabled.
 options 	QUOTA			#enable disk quotas
 
@@ -756,6 +771,9 @@ options 	NFS_DEBUG		# Enable NFS Debugging
 # Coda stuff:
 options 	CODA			#CODA filesystem.
 device		vcoda	4		#coda minicache <-> venus comm.
+# Use the old Coda 5.x venus<->kernel interface instead of the new       
+# realms-aware 6.x protocol.
+#options 	CODA_COMPAT_5
 
 #
 # Add support for the EXT2FS filesystem of Linux fame.  Be a bit
@@ -773,6 +791,13 @@ options 	VFS_AIO
 # Cryptographically secure random number generator; /dev/[u]random
 device		random
 
+# Optional character code conversion support with LIBICONV.
+# Each option requires their base file system and LIBICONV.
+options 	CD9660_ICONV
+options 	MSDOSFS_ICONV
+options 	NTFS_ICONV
+options 	UDF_ICONV
+
 
 #####################################################################
 # POSIX P1003.1B
@@ -783,7 +808,7 @@ device		random
 options 	_KPOSIX_PRIORITY_SCHEDULING
 # p1003_1b_semaphores are very experimental,
 # user should be ready to assist in debugging if problems arise.
-options		P1003_1B_SEMAPHORES
+options 	P1003_1B_SEMAPHORES
 
 
 #####################################################################
@@ -801,6 +826,7 @@ options 	MAC_NONE
 options 	MAC_PARTITION
 options 	MAC_PORTACL
 options 	MAC_SEEOTHERUIDS
+options 	MAC_STUB
 options 	MAC_TEST
 
 
@@ -817,14 +843,6 @@ options 	MAC_TEST
 # the accuracy of operation.
 
 options 	HZ=100
-
-# If you see the "calcru: negative time of %ld usec for pid %d (%s)\n"
-# message you probably have some broken sw/hw which disables interrupts
-# for too long.  You can make the system more resistant to this by
-# choosing a high value for NTIMECOUNTER.  The default is 5, there
-# is no upper limit but more than a couple of hundred are not productive.
-
-options 	NTIMECOUNTER=20
 
 # Enable support for the kernel PLL to use an external PPS signal,
 # under supervision of [x]ntpd(8)
@@ -843,14 +861,15 @@ options 	PPS_SYNC
 # device drivers.  The host adapters are listed in the ISA and PCI
 # device configuration sections below.
 #
-# Beginning with FreeBSD 2.0.5 you can wire down your SCSI devices so
-# that a given bus, target, and LUN always come on line as the same
-# device unit.  In earlier versions the unit numbers were assigned
-# in the order that the devices were probed on the SCSI bus.  This
-# means that if you removed a disk drive, you may have had to rewrite
-# your /etc/fstab file, and also that you had to be careful when adding
-# a new disk as it may have been probed earlier and moved your device
-# configuration around.
+# It is possible to wire down your SCSI devices so that a given bus,
+# target, and LUN always come on line as the same device unit.  In
+# earlier versions the unit numbers were assigned in the order that
+# the devices were probed on the SCSI bus.  This means that if you
+# removed a disk drive, you may have had to rewrite your /etc/fstab
+# file, and also that you had to be careful when adding a new disk
+# as it may have been probed earlier and moved your device configuration
+# around.  (See also option GEOM_VOL for a different solution to this
+# problem.)
 
 # This old behavior is maintained as the default behavior.  The unit
 # assignment begins with the first non-wired down unit for a device
@@ -953,6 +972,12 @@ options 	SCSI_NO_SENSE_STRINGS
 options 	SCSI_NO_OP_STRINGS
 options 	SCSI_DELAY=8000	# Be pessimistic about Joe SCSI device
 
+# Options for the CAM SCSI disk driver:
+# DA_OLD_QUIRKS: Restore old USB and firewire quirks that have been
+#		 deprecated.  Please also email scsi@freebsd.org if you
+#		 have a device that needs this option.
+options 	DA_OLD_QUIRKS
+
 # Options for the CAM CDROM driver:
 # CHANGER_MIN_BUSY_SECONDS: Guaranteed minimum time quantum for a changer LUN
 # CHANGER_MAX_BUSY_SECONDS: Maximum time quantum per changer LUN, only
@@ -1023,7 +1048,7 @@ options 	VINUMDEBUG	#enable Vinum debugging hooks
 # disk devices in the system looking for components that it recognizes (already
 # configured once before) and auto-configured them into arrays.
 device		raidframe
-options		RAID_AUTOCONFIG
+options 	RAID_AUTOCONFIG
 
 # Kernel side iconv library
 options 	LIBICONV
@@ -1321,7 +1346,6 @@ device		dpt
 options 	DPT_TIMEOUT_FACTOR=4
 options 	DPT_LOST_IRQ
 options 	DPT_RESET_HBA
-options 	DPT_ALLOW_MEMIO
 
 #
 # Compaq "CISS" RAID controllers (SmartRAID 5* series)
@@ -1417,51 +1441,76 @@ hint.fd.1.drive="1"
 #
 # sio: serial ports (see sio(4)), including support for various
 #      PC Card devices, such as Modem and NICs (see etc/defaults/pccard.conf)
-
+#
 device		sio
 hint.sio.0.at="isa"
 hint.sio.0.port="0x3F8"
 hint.sio.0.flags="0x10"
 hint.sio.0.irq="4"
 
-#
-# `flags' for serial drivers that support consoles (only for sio now):
-#	0x10	enable console support for this unit.  The other console flags
-#		are ignored unless this is set.  Enabling console support does
-#		not make the unit the preferred console - boot with -h or set
-#		the 0x20 flag for that.  Currently, at most one unit can have
-#		console support; the first one (in config file order) with
-#		this flag set is preferred.  Setting this flag for sio0 gives
-#		the old behaviour.
+# Options for sio:
+options 	COM_ESP			# Code for Hayes ESP.
+options 	COM_MULTIPORT		# Code for some cards with shared IRQs.
+options 	CONSPEED=115200		# Speed for serial console
+					# (default 9600).
+
+# `flags' specific to sio(4).  See below for flags used by both sio(4) and
+# uart(4).
 #	0x20	force this unit to be the console (unless there is another
 #		higher priority console).  This replaces the COMCONSOLE option.
 #	0x40	reserve this unit for low level console operations.  Do not
 #		access the device in any normal way.
-#	0x80	use this port for serial line gdb support in ddb.
-#
 # PnP `flags'
 #	0x1	disable probing of this device.  Used to prevent your modem
 #		from being attached as a PnP modem.
+# Other flags for sio that aren't documented in the man page.
+#	0x20000	enable hardware RTS/CTS and larger FIFOs.  Only works for
+#		ST16650A-compatible UARTs.
+
+#
+# uart: newbusified driver for serial interfaces.  It consolidates the sio(4),
+#	sab(4) and zs(4) drivers.
+#
+device		uart
+
+# Options for uart(4)
+options 	UART_PPS_ON_CTS		# Do time pulse capturing using CTS
+					# instead of DCD.
+
+# The following hint should only be used for pure ISA devices.  It is not
+# needed otherwise.  Use of hints is strongly discouraged.
+hint.uart.0.at="isa"
+
+# The following 3 hints are used when the UART is a system device (i.e., a
+# console or debug port), but only on platforms that don't have any other
+# means to pass the information to the kernel.  The unit number of the hint
+# is only used to bundle the hints together.  There is no relation to the
+# unit number of the probed UART.
+hint.uart.0.port="0x3f8"
+hint.uart.0.flags="0x10"
+hint.uart.0.baud="115200"
+
+# `flags' for serial drivers that support consoles like sio(4) and uart(4):
+#	0x10	enable console support for this unit.  Other console flags
+#		(if applicable) are ignored unless this is set.  Enabling
+#		console support does not make the unit the preferred console.
+#		Boot with -h or set boot_serial=YES in the loader.  For sio(4)
+#		specifically, the 0x20 flag can also be set (see above).
+#		Currently, at most one unit can have console support; the
+#		first one (in config file order) with this flag set is
+#		preferred.  Setting this flag for sio0 gives the old behaviour.
+#	0x80	use this port for serial line gdb support in ddb.  Also known
+#		as debug port.
 #
 
-# Options for serial drivers that support consoles (only for sio now):
-options 	BREAK_TO_DEBUGGER	#a BREAK on a comconsole goes to
-					#DDB, if available.
-options 	CONSPEED=115200		# speed for serial console
-					# (default 9600)
+# Options for serial drivers that support consoles:
+options 	BREAK_TO_DEBUGGER	# A BREAK on a serial console goes to
+					# ddb, if available.
 
 # Solaris implements a new BREAK which is initiated by a character
 # sequence CR ~ ^b which is similar to a familiar pattern used on
 # Sun servers by the Remote Console.
 options 	ALT_BREAK_TO_DEBUGGER
-
-# Options for sio:
-options 	COM_ESP			#code for Hayes ESP
-options 	COM_MULTIPORT		#code for some cards with shared IRQs
-
-# Other flags for sio that aren't documented in the man page.
-#	0x20000	enable hardware RTS/CTS and larger FIFOs.  Only works for
-#		ST16650A-compatible UARTs.
 
 # PCI Universal Communications driver
 # Supports various single and multi port PCI serial cards. Maybe later
@@ -1672,10 +1721,21 @@ options 	MSIZE=512	# mbuf size in bytes
 # The `en' device provides support for Efficient Networks (ENI)
 # ENI-155 PCI midway cards, and the Adaptec 155Mbps PCI ATM cards (ANA-59x0).
 #
+# The `hatm' device provides support for Fore/Marconi HE155 and HE622
+# ATM PCI cards.
+#
+# The `fatm' device provides support for Fore PCA200E ATM PCI cards.
+#
+# The `patm' device provides support for IDT77252 based cards like
+# ProSum's ProATM-155 and ProATM-25 and IDT's evaluation boards.
+#
 # atm device provides generic atm functions and is required for
 # atm devices.
 # NATM enables the netnatm protocol family that can be used to
 # bypass TCP/IP.
+#
+# utopia provides the access to the ATM PHY chips and is required for en,
+# hatm and fatm.
 #
 # the current driver supports only PVC operations (no atm-arp, no multicast).
 # for more details, please read the original documents at
@@ -1683,7 +1743,13 @@ options 	MSIZE=512	# mbuf size in bytes
 #
 device		atm
 device		en
+device		fatm			#Fore PCA200E
+device		hatm			#Fore/Marconi HE155/622
+device		patm			#IDT77252 cards (ProATM and IDT)
+device		utopia			#ATM PHY driver
 options 	NATM			#native ATM
+
+options 	LIBMBPOOL		#needed by patm, iatm
 
 #
 # Audio drivers: `pcm', `sbc', `gusc'
@@ -1888,6 +1954,10 @@ device		nmdm
 # motherboards and motherboards with bad or incomplete PCI 2.1 support.
 # As a rough guess, old = before 1998
 #
+# options 	BKTR_NEW_MSP34XX_DRIVER
+# Use new, more complete initialization scheme for the msp34* soundchip.
+# Should fix stereo autodetection if the old driver does only output
+# mono sound.
 
 device		meteor	1
 
@@ -2049,6 +2119,13 @@ options 	BOOTP_WIRED_TO=fxp0 # Use interface fxp0 for BOOTP
 options 	HW_WDOG
 
 #
+# Add software watchdog routines.  This will add some sysctl OIDs that
+# can be used in combination with an external daemon to create a
+# software-based watchdog solution.
+#
+options 	WATCHDOG
+
+#
 # Disable swapping of upages and stack pages.  This option removes all
 # code which actually performs swapping, so it's not possible to turn
 # it back on at run-time.
@@ -2100,6 +2177,8 @@ device		ukbd
 device		ulpt
 # USB Iomega Zip 100 Drive (Requires scbus and da)
 device		umass
+# USB support for Belkin F5U109 and Magic Control Technology serial adapters
+device		umct
 # USB modem support
 device		umodem
 # USB mouse
@@ -2153,15 +2232,32 @@ options 	USB_DEBUG
 options 	UKBD_DFLT_KEYMAP	# specify the built-in keymap
 makeoptions	UKBD_DFLT_KEYMAP=it.iso
 
+# options for uplcom:
+options 	UPLCOM_INTR_INTERVAL=100	# interrpt pipe interval
+						# in milliseconds
+
 # options for uvscom:
-options		UVSCOM_DEFAULT_OPKTSIZE=8	# default output packet size
+options 	UVSCOM_DEFAULT_OPKTSIZE=8	# default output packet size
+options 	UVSCOM_INTR_INTERVAL=100	# interrpt pipe interval
+						# in milliseconds
 
 #####################################################################
-# Firewire support
+# FireWire support
 
-device		firewire	# Firewire bus code
+device		firewire	# FireWire bus code
 device		sbp		# SCSI over Firewire (Requires scbus and da)
-device		fwe		# Ethernet over Firewire (non-standard!)
+device		sbp_targ	# SBP-2 Target mode  (Requires scbus and targ)
+device		fwe		# Ethernet over FireWire (non-standard!)
+
+#####################################################################
+# dcons support (Dumb Console Device)
+
+device		dcons			# dumb console driver
+device		dcons_crom		# FireWire attachment
+options 	DCONS_BUF_SIZE=16384	# buffer size
+options 	DCONS_POLL_HZ=100	# polling rate
+options 	DCONS_FORCE_CONSOLE=0	# force to be the primary console
+options 	DCONS_FORCE_GDB=1	# force to be the gdb device
 
 #####################################################################
 # crypto subsystem
@@ -2179,12 +2275,12 @@ device		cryptodev	# /dev/crypto for access to h/w
 device		rndtest		# FIPS 140-2 entropy tester
 
 device		hifn		# Hifn 7951, 7781, etc.
-options		HIFN_DEBUG	# enable debugging support: hw.hifn.debug
-options		HIFN_RNDTEST	# enable rndtest support
+options 	HIFN_DEBUG	# enable debugging support: hw.hifn.debug
+options 	HIFN_RNDTEST	# enable rndtest support
 
 device		ubsec		# Broadcom 5501, 5601, 58xx
-options		UBSEC_DEBUG	# enable debugging support: hw.ubsec.debug
-options		UBSEC_RNDTEST	# enable rndtest support
+options 	UBSEC_DEBUG	# enable debugging support: hw.ubsec.debug
+options 	UBSEC_RNDTEST	# enable rndtest support
 
 #####################################################################
 
@@ -2198,6 +2294,7 @@ options 	INIT_PATH=/sbin/init:/stand/sysinstall
 # Debug options
 options 	BUS_DEBUG	# enable newbus debugging
 options 	DEBUG_VFS_LOCKS	# enable vfs lock debugging
+options 	SOCKBUF_DEBUG	# enable sockbuf last record/mb tail checking
 
 #####################################################################
 # SYSV IPC KERNEL PARAMETERS
@@ -2256,13 +2353,13 @@ options 	PANIC_REBOOT_WAIT_TIME=16
 # file.  Both offset and length of the read operation must be
 # multiples of the physical media sector size. 
 #
-#options		DIRECTIO
+#options 	DIRECTIO
 
 # Specify a lower limit for the number of swap I/O buffers.  They are
 # (among other things) used when bypassing the buffer cache due to
 # DIRECTIO kernel option enabled and O_DIRECT flag set on file.
 #
-#options		NSWBUF_MIN=120
+#options 	NSWBUF_MIN=120
 
 #####################################################################
 
@@ -2305,18 +2402,12 @@ options 	SHOW_BUSYBUFS	# List buffers that prevent root unmount
 options 	SLIP_IFF_OPTS
 options 	VFS_BIO_DEBUG	# VFS buffer I/O debugging
 
-options		KSTACK_MAX_PAGES=32 # Maximum pages to give the kernel stack
+options 	KSTACK_MAX_PAGES=32 # Maximum pages to give the kernel stack
 
 # Yet more undocumented options for linting.
 options 	AAC_DEBUG
-options 	ACD_DEBUG
-options 	ACPI_MAX_THREADS=1
-#!options 	ACPI_NO_SEMAPHORES
 # Broken:
 ##options 	ASR_MEASURE_PERFORMANCE
-options 	AST_DEBUG
-options 	ATAPI_DEBUG
-options 	ATA_DEBUG
 # BKTR_ALLOC_PAGES has no effect except to cause warnings, and
 # BROOKTREE_ALLOC_PAGES hasn't actually been superseded by it, since the
 # driver still mostly spells this option BROOKTREE_ALLOC_PAGES.

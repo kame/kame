@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/asmacros.h,v 1.25 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/asmacros.h,v 1.27 2003/11/21 03:02:00 peter Exp $
  */
 
 #ifndef _MACHINE_ASMACROS_H_
@@ -115,7 +115,7 @@
 #define CROSSJUMPTARGET(label) \
 	ALIGN_TEXT; __CONCAT(to,label): ; MCOUNT; jmp label
 #define ENTRY(name)		GEN_ENTRY(name) ; 9: ; MCOUNT
-#define FAKE_MCOUNT(caller)	pushq caller ; call __mcount ; popl %ecx
+#define FAKE_MCOUNT(caller)	pushq caller ; call __mcount ; popq %rcx
 #define MCOUNT			call __mcount
 #define MCOUNT_LABEL(name)	GEN_ENTRY(name) ; nop ; ALIGN_TEXT
 #define MEXITCOUNT		call HIDENAME(mexitcount)
@@ -137,5 +137,14 @@
 #define MCOUNT_LABEL(name)
 #define MEXITCOUNT
 #endif /* GPROF */
+
+#ifdef LOCORE
+/*
+ * Convenience macros for declaring interrupt entry points.
+ */
+#define	IDTVEC(name)	ALIGN_TEXT; .globl __CONCAT(X,name); \
+			.type __CONCAT(X,name),@function; __CONCAT(X,name):
+
+#endif /* LOCORE */
 
 #endif /* !_MACHINE_ASMACROS_H_ */

@@ -1,24 +1,26 @@
 /*
- * Copyright (c) 2002,2003 Hewlett-Packard Company
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
+Copyright (c) 2003 Hewlett-Packard Development Company, L.P.
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #ifndef _KERNEL
 #include <stdlib.h>
@@ -249,22 +251,22 @@ int uwx_ttrace_copyin(
 	if (info->have_ucontext) {
 	    if (regid < UWX_REG_GR(0)) {
 		switch (regid) {
-		    case UWX_REG_PFS:
-			status = __uc_get_ar(&info->ucontext, 64, dp);
-			break;
 		    case UWX_REG_PREDS:
 			status = __uc_get_prs(&info->ucontext, dp);
 			break;
-		    case UWX_REG_RNAT:
+		    case UWX_REG_AR_PFS:
+			status = __uc_get_ar(&info->ucontext, 64, dp);
+			break;
+		    case UWX_REG_AR_RNAT:
 			status = __uc_get_ar(&info->ucontext, 19, dp);
 			break;
-		    case UWX_REG_UNAT:
+		    case UWX_REG_AR_UNAT:
 			status = __uc_get_ar(&info->ucontext, 36, dp);
 			break;
-		    case UWX_REG_FPSR:
+		    case UWX_REG_AR_FPSR:
 			status = __uc_get_ar(&info->ucontext, 40, dp);
 			break;
-		    case UWX_REG_LC:
+		    case UWX_REG_AR_LC:
 			status = __uc_get_ar(&info->ucontext, 65, dp);
 			break;
 		    default:
@@ -283,22 +285,22 @@ int uwx_ttrace_copyin(
 	else {
 	    if (regid < UWX_REG_GR(0)) {
 		switch (regid) {
-		    case UWX_REG_PFS:
-			ttreg = __ar_pfs;
-			break;
 		    case UWX_REG_PREDS:
 			ttreg = __pr;
 			break;
-		    case UWX_REG_RNAT:
+		    case UWX_REG_AR_PFS:
+			ttreg = __ar_pfs;
+			break;
+		    case UWX_REG_AR_RNAT:
 			ttreg = __ar_rnat;
 			break;
-		    case UWX_REG_UNAT:
+		    case UWX_REG_AR_UNAT:
 			ttreg = __ar_unat;
 			break;
-		    case UWX_REG_FPSR:
+		    case UWX_REG_AR_FPSR:
 			ttreg = __ar_fpsr;
 			break;
-		    case UWX_REG_LC:
+		    case UWX_REG_AR_LC:
 			ttreg = __ar_lc;
 			break;
 		    default:

@@ -19,8 +19,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fe/if_fe_pccard.c,v 1.9 2003/04/10 04:36:01 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe_pccard.c,v 1.10 2003/08/24 17:46:06 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

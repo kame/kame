@@ -1,6 +1,7 @@
-/* $FreeBSD: src/sys/dev/iir/iir.c,v 1.6 2003/04/25 05:37:04 scottl Exp $ */
 /*
- *       Copyright (c) 2000-03 Intel Corporation
+ *       Copyright (c) 2000-03 ICP vortex GmbH
+ *       Copyright (c) 2002-03 Intel Corporation
+ *       Copyright (c) 2003    Adaptec Inc.
  *       All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +32,18 @@
 /*
  * iir.c: SCSI dependant code for the Intel Integrated RAID Controller driver
  *
- * Written by: Achim Leubner <achim.leubner@intel.com>
+ * Written by: Achim Leubner <achim_leubner@adaptec.com>
  * Fixes/Additions: Boji Tony Kannanthanam <boji.t.kannanthanam@intel.com>
  *
  * credits:     Niklas Hallqvist;       OpenBSD driver for the ICP Controllers.
  *              Mike Smith;             Some driver source code.
  *              FreeBSD.ORG;            Great O/S to work on and for.
  *
- * TODO:     
+ * $Id: iir.c 1.4 2003/08/26 12:29:44 achim Exp $"
  */
 
-#ident "$Id: iir.c 1.3 2003/03/21 16:28:32 achim Exp $"
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/iir/iir.c,v 1.9 2003/09/26 15:36:47 scottl Exp $");
 
 #define _IIR_C_
 
@@ -212,6 +214,7 @@ iir_init(struct gdt_softc *gdt)
                            /*maxsize*/MAXBSIZE, /*nsegments*/GDT_MAXSG,
                            /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
                            /*flags*/BUS_DMA_ALLOCNOW,
+			   /*lockfunc*/busdma_lock_mutex, /*lockarg*/&Giant,
                            &gdt->sc_buffer_dmat) != 0) {
         printf("iir%d: bus_dma_tag_create(...,gdt->sc_buffer_dmat) failed\n",
                gdt->sc_hanum);
@@ -230,7 +233,8 @@ iir_init(struct gdt_softc *gdt)
                            GDT_MAXCMDS * sizeof(struct gdt_ccb), /* maxsize */
                            /*nsegments*/1,
                            /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-                           /*flags*/0, &gdt->sc_gccb_dmat) != 0) {
+			   /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			   /*lockarg*/&Giant, &gdt->sc_gccb_dmat) != 0) {
         printf("iir%d: bus_dma_tag_create(...,gdt->sc_gccb_dmat) failed\n",
                gdt->sc_hanum);
         return (1);
@@ -1455,7 +1459,10 @@ iir_action( struct cam_sim *sim, union ccb *ccb )
                   (bus == gdt->sc_virt_bus ? 127 : gdt->sc_bus_id[bus]);
               cpi->base_transfer_speed = 3300;
               strncpy(cpi->sim_vid, "FreeBSD", SIM_IDLEN);
-              strncpy(cpi->hba_vid, "Intel Corp.", HBA_IDLEN);
+              if (gdt->sc_vendor == INTEL_VENDOR_ID)
+                  strncpy(cpi->hba_vid, "Intel Corp.", HBA_IDLEN);
+              else
+                  strncpy(cpi->hba_vid, "ICP vortex ", HBA_IDLEN);
               strncpy(cpi->dev_name, cam_sim_name(sim), DEV_IDLEN);
               cpi->ccb_h.status = CAM_REQ_CMP;
               --gdt_stat.io_count_act;

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -33,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/cpu_switch.S,v 1.141 2003/05/15 00:23:39 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/cpu_switch.S,v 1.144 2003/11/17 08:58:12 peter Exp $
  */
 
 #include <machine/asmacros.h>
@@ -58,14 +59,16 @@
  * %rsi = newtd
  */
 ENTRY(cpu_throw)
-	xorq	%rax, %rax
 	movl	PCPU(CPUID), %eax
 	testq	%rdi,%rdi			/* no thread? */
 	jz	1f
 	/* release bit from old pm_active */
 	movq	TD_PROC(%rdi), %rdx		/* oldtd->td_proc */
 	movq	P_VMSPACE(%rdx), %rdx		/* proc->p_vmspace */
-	btrq	%rax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
+#ifdef SMP
+	lock
+#endif
+	btrl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
 1:
 	movq	TD_PCB(%rsi),%rdx		/* newtd->td_proc */
 	movq	PCB_CR3(%rdx),%rdx
@@ -73,7 +76,10 @@ ENTRY(cpu_throw)
 	/* set bit in new pm_active */
 	movq	TD_PROC(%rsi),%rdx
 	movq	P_VMSPACE(%rdx), %rdx
-	btsq	%rax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
+#ifdef SMP
+	lock
+#endif
+	btsl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
 	jmp	sw1
 
 /*
@@ -131,7 +137,7 @@ ENTRY(cpu_switch)
 	pushq	%rsi
 	addq	$PCB_SAVEFPU,%r8		/* h/w bugs make saving complicated */
 	movq	%r8, %rdi
-	call	npxsave				/* do it in a big C function */
+	call	fpusave				/* do it in a big C function */
 	popq	%rsi
 	popq	%rdi
 1:
@@ -142,7 +148,6 @@ ENTRY(cpu_switch)
 	jz	badsw3				/* no, panic */
 #endif
 	movq	TD_PCB(%rsi),%r8
-	xorq	%rax, %rax
 	movl	PCPU(CPUID), %eax
 
 	/* switch address space */
@@ -152,12 +157,18 @@ ENTRY(cpu_switch)
 	/* Release bit from old pmap->pm_active */
 	movq	TD_PROC(%rdi), %rdx		/* oldproc */
 	movq	P_VMSPACE(%rdx), %rdx
-	btrq	%rax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
+#ifdef SMP
+	lock
+#endif
+	btrl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
 
 	/* Set bit in new pmap->pm_active */
 	movq	TD_PROC(%rsi),%rdx		/* newproc */
 	movq	P_VMSPACE(%rdx), %rdx
-	btsq	%rax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
+#ifdef SMP
+	lock
+#endif
+	btsl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
 
 sw1:
 	/*
@@ -190,8 +201,11 @@ sw1:
 	wrmsr
 
 	/* Update the TSS_RSP0 pointer for the next interrupt */
+	movq	PCPU(TSSP), %rax
+	addq	$COMMON_TSS_RSP0, %rax
 	leaq	-16(%r8), %rbx
-	movq	%rbx, common_tss + COMMON_TSS_RSP0
+	movq	%rbx, (%rax)
+	movq	%rbx, PCPU(RSP0)
 
 	/* Restore context. */
 	movq	PCB_RBX(%r8),%rbx
@@ -301,16 +315,16 @@ ENTRY(savectx)
 	popq	PCB_RFLAGS(%rcx)
 
 	/*
-	 * If fpcurthread == NULL, then the npx h/w state is irrelevant and the
+	 * If fpcurthread == NULL, then the fpu h/w state is irrelevant and the
 	 * state had better already be in the pcb.  This is true for forks
 	 * but not for dumps (the old book-keeping with FP flags in the pcb
 	 * always lost for dumps because the dump pcb has 0 flags).
 	 *
-	 * If fpcurthread != NULL, then we have to save the npx h/w state to
+	 * If fpcurthread != NULL, then we have to save the fpu h/w state to
 	 * fpcurthread's pcb and copy it to the requested pcb, or save to the
 	 * requested pcb and reload.  Copying is easier because we would
 	 * have to handle h/w bugs for reloading.  We used to lose the
-	 * parent's npx state for forks by forgetting to reload.
+	 * parent's fpu state for forks by forgetting to reload.
 	 */
 	pushfq
 	cli
@@ -322,7 +336,7 @@ ENTRY(savectx)
 	pushq	%rax
 	movq	TD_PCB(%rax),%rdi
 	leaq	PCB_SAVEFPU(%rdi),%rdi
-	call	npxsave
+	call	fpusave
 	popq	%rax
 	popq	%rcx
 

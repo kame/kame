@@ -71,6 +71,9 @@
 # if defined(_KERNEL) && !defined(IPFILTER_LKM)
 #  include "opt_ipfilter.h"
 # endif
+# if defined(_KERNEL) && (__FreeBSD_version >= 501108) && !defined(KLD_MODULE)
+#  include "opt_pfil_hooks.h"
+# endif
 #endif
 #ifdef __sgi
 #include <sys/debug.h>
@@ -128,7 +131,7 @@ extern	int	ip6_getpmtu(struct route_in6 *, struct route_in6 *,
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_fil.c	2.41 6/5/96 (C) 1993-2000 Darren Reed";
 /* static const char rcsid[] = "@(#)$Id: ip_fil.c,v 2.42.2.34 2001/07/23 13:49:57 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.c,v 1.38 2003/02/19 05:47:00 imp Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.c,v 1.42 2003/10/31 18:31:56 brooks Exp $";
 #endif
 
 extern	struct	protosw	inetsw[];
@@ -307,6 +310,26 @@ int dir;
 }
 # endif
 #endif /* __NetBSD_Version >= 105110000 && _KERNEL */
+#if (__FreeBSD_version >= 501108) && defined(_KERNEL)
+
+static int
+fr_check_wrapper(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
+{
+	struct ip *ip = mtod(*mp, struct ip *);
+	return fr_check(ip, ip->ip_hl << 2, ifp, (dir == PFIL_OUT), mp);
+}
+
+# ifdef USE_INET6
+#  include <netinet/ip6.h>
+
+static int
+fr_check_wrapper6(void *arg, struct mbuf **mp, struct ifnet *ifp, int dir)
+{
+	return (fr_check(mtod(*mp, struct ip *), sizeof(struct ip6_hdr),
+	    ifp, (dir == PFIL_OUT), mp));
+}
+# endif
+#endif /* __FreeBSD_version >= 501108 */
 #ifdef	_KERNEL
 # if	defined(IPFILTER_LKM) && !defined(__sgi)
 int iplidentify(s)
@@ -348,7 +371,8 @@ int iplattach()
   ((__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011)))
 	int error = 0;
 # endif
-#if defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105110000)
+#if (defined(__NetBSD_Version__) && (__NetBSD_Version__ >= 105110000)) || \
+    (__FreeBSD_version >= 501108)
 	struct pfil_head *ph_inet;
 # ifdef USE_INET6
 	struct pfil_head *ph_inet6;
@@ -380,7 +404,7 @@ int iplattach()
 
 # ifdef NETBSD_PF
 #  if (__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011)
-#   if __NetBSD_Version__ >= 105110000
+#   if (__NetBSD_Version__ >= 105110000) || (__FreeBSD_version >= 501108)
 	ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
 #    ifdef USE_INET6
 	ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
@@ -416,7 +440,7 @@ int iplattach()
 	pfil_add_hook((void *)fr_check, PFIL_IN|PFIL_OUT);
 #  endif
 #  ifdef USE_INET6
-#   if __NetBSD_Version__ >= 105110000
+#   if (__NetBSD_Version__ >= 105110000) || (__FreeBSD_version >= 501108)
 	if (ph_inet6 != NULL)
 		error = pfil_add_hook((void *)fr_check_wrapper6, NULL,
 				      PFIL_IN|PFIL_OUT, ph_inet6);
@@ -508,7 +532,7 @@ int ipldetach()
 #if defined(NETBSD_PF) && \
     ((__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011))
 	int error = 0;
-# if __NetBSD_Version__ >= 105150000
+# if (__NetBSD_Version__ >= 105150000) || (__FreeBSD_version >= 501108)
         struct pfil_head *ph_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
 #  ifdef USE_INET6
         struct pfil_head *ph_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
@@ -552,7 +576,7 @@ int ipldetach()
 
 # ifdef NETBSD_PF
 #  if ((__NetBSD_Version__ >= 104200000) || (__FreeBSD_version >= 500011))
-#   if __NetBSD_Version__ >= 105110000
+#   if (__NetBSD_Version__ >= 105110000) || (__FreeBSD_version >= 501108)
 	if (ph_inet != NULL)
 		error = pfil_remove_hook((void *)fr_check_wrapper, NULL,
 					 PFIL_IN|PFIL_OUT, ph_inet);
@@ -570,7 +594,7 @@ int ipldetach()
 	pfil_remove_hook((void *)fr_check, PFIL_IN|PFIL_OUT);
 #  endif
 #  ifdef USE_INET6
-#   if __NetBSD_Version__ >= 105110000
+#   if (__NetBSD_Version__ >= 105110000) || (__FreeBSD_version >= 501108)
 	if (ph_inet6 != NULL)
 		error = pfil_remove_hook((void *)fr_check_wrapper6, NULL,
 					 PFIL_IN|PFIL_OUT, ph_inet6);
@@ -1994,7 +2018,11 @@ frdest_t *fdp;
 		error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu);
 		if (error == 0) {
 #else
+#ifdef ND_IFINFO
+			mtu = ND_IFINFO(ifp)->linkmtu;
+#else
 			mtu = nd_ifinfo[ifp->if_index].linkmtu;
+#endif
 #endif
 			if (m0->m_pkthdr.len <= mtu)
 				error = nd6_output(ifp, fin->fin_ifp, m0,
@@ -2047,7 +2075,8 @@ ip_t *ip;
 	int fd;
 
 # if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
+	(defined(OpenBSD) && (OpenBSD >= 199603)) || \
+	(defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	sprintf(fname, "%s", ifp->if_xname);
 # else
 	sprintf(fname, "%s%d", ifp->if_name, ifp->if_unit);
@@ -2067,7 +2096,8 @@ char *get_ifname(ifp)
 struct ifnet *ifp;
 {
 # if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-     (defined(OpenBSD) && (OpenBSD >= 199603))
+     (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	return ifp->if_xname;
 # else
 	static char fullifname[LIFNAMSIZ];
@@ -2086,7 +2116,8 @@ int v;
 
 	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
 # if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-     (defined(OpenBSD) && (OpenBSD >= 199603))
+     (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 		if (!strncmp(ifname, ifp->if_xname, sizeof(ifp->if_xname)))
 # else
 		char fullname[LIFNAMSIZ];
@@ -2128,7 +2159,8 @@ int v;
 	ifp = ifneta[nifs - 1];
 
 # if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-     (defined(OpenBSD) && (OpenBSD >= 199603))
+     (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+     (defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	strncpy(ifp->if_xname, ifname, sizeof(ifp->if_xname));
 # else
 	ifp->if_name = strdup(ifname);
@@ -2155,7 +2187,8 @@ void init_ifp()
 	int fd;
 
 # if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
+	(defined(OpenBSD) && (OpenBSD >= 199603)) || \
+	(defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	for (ifa = ifneta; ifa && (ifp = *ifa); ifa++) {
 		ifp->if_output = write_output;
 		sprintf(fname, "/tmp/%s", ifp->if_xname);

@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/amd64/acpica/OsdEnvironment.c,v 1.9 2003/05/31 06:47:05 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/acpica/OsdEnvironment.c,v 1.11 2003/08/28 16:30:31 njl Exp $");
 
 /*
  * 6.1 : Environmental support
@@ -39,7 +40,7 @@
 u_long amd64_acpi_root;
 
 SYSCTL_ULONG(_machdep, OID_AUTO, acpi_root, CTLFLAG_RD, &amd64_acpi_root, 0,
-    "The physical address of the RSDP");
+	     "The physical address of the RSDP");
 
 ACPI_STATUS
 AcpiOsInitialize(void)

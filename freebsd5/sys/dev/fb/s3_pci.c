@@ -24,10 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/fb/s3_pci.c,v 1.4 2003/02/25 03:21:19 mux Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fb/s3_pci.c,v 1.6 2003/08/24 17:46:06 obrien Exp $");
 
 /* Enable LFB on S3 cards that has only VESA 1.2 BIOS */
 
@@ -52,8 +52,8 @@
 #include <sys/malloc.h>
 #include <sys/fbio.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <machine/md_var.h>
 #include <machine/vm86.h>

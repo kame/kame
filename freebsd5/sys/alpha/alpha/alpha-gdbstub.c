@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/alpha/alpha/alpha-gdbstub.c,v 1.13 2003/02/16 19:22:20 phk Exp $ */
 /****************************************************************************
 
 		THIS SOFTWARE IS NOT COPYRIGHTED
@@ -93,20 +92,23 @@
  *
  ****************************************************************************/
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/alpha-gdbstub.c,v 1.15 2003/08/17 06:42:07 marcel Exp $");
+
+#include "opt_ddb.h"
+
 #include <sys/param.h>
 #include <sys/reboot.h>
 #include <sys/systm.h>
 #include <sys/signal.h>
 #include <sys/cons.h>
 
+#include <machine/md_var.h>
 #include <machine/prom.h>
 #include <machine/reg.h>
-
-#include <ddb/ddb.h>
-
 #include <machine/setjmp.h>
 
-#include "opt_ddb.h"
+#include <ddb/ddb.h>
 
 /************************************************************************/
 

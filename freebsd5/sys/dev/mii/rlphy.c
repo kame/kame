@@ -30,12 +30,15 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/rlphy.c,v 1.18 2003/09/08 02:11:24 wpaul Exp $");
+
 /*
  * driver for RealTek 8139 internal PHYs
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/rlphy.c,v 1.16 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/rlphy.c,v 1.18 2003/09/08 02:11:24 wpaul Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -107,9 +110,10 @@ rlphy_probe(dev)
 		return (ENXIO);
 
 	/*
-	 * Make sure the parent is an `rl'.
+	 * Make sure the parent is an `rl' or an `re'.
 	 */
-	if (strcmp(device_get_name(parent), "rl") != 0)
+	if (strcmp(device_get_name(parent), "rl") != 0 &&
+	    strcmp(device_get_name(parent), "re") != 0)
 		return (ENXIO);
 
 	device_set_desc(dev, "RealTek internal media interface");

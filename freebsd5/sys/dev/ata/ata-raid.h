@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-raid.h,v 1.24 2003/05/04 16:17:54 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-raid.h,v 1.25 2003/08/24 09:22:26 sos Exp $
  */
 
 /* misc defines */
@@ -36,7 +36,7 @@
 #define AR_WRITE	0x02
 #define AR_WAIT		0x04
 #define AR_STRATEGY(x)	(x)->bio_disk->d_strategy((x))
-#define AD_SOFTC(x)	((struct ad_softc *)(x.device->driver))
+#define AD_SOFTC(x)	((struct ad_softc *)(x.device->softc))
 #define ATA_MAGIC	"FreeBSD ATA driver RAID "
 
 struct ar_disk {

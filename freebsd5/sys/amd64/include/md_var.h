@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/md_var.h,v 1.66 2003/05/14 04:10:49 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/md_var.h,v 1.69 2003/11/17 08:58:14 peter Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -38,6 +38,7 @@
 
 extern	long	Maxmem;
 extern	u_long	atdevbase;	/* offset in virtual memory of ISA io mem */
+extern	u_int	basemem;
 extern	int	busdma_swi_pending;
 extern	u_int	cpu_exthigh;
 extern	u_int	cpu_feature;
@@ -51,6 +52,8 @@ extern	char	kstack[];
 extern	char	sigcode[];
 extern	int	szsigcode;
 
+extern	struct pcpu __pcpu[];
+
 typedef void alias_for_inthand_t(u_int cs, u_int ef, u_int esp, u_int ss);
 struct	thread;
 struct	reg;
@@ -58,8 +61,6 @@ struct	fpreg;
 struct  dbreg;
 
 void	busdma_swi(void);
-void	cpu_halt(void);
-void	cpu_reset(void);
 void	cpu_setregs(void);
 void	doreti_iret(void) __asm(__STRING(doreti_iret));
 void	doreti_iret_fault(void) __asm(__STRING(doreti_iret_fault));
@@ -67,8 +68,8 @@ void	enable_sse(void);
 void	fillw(int /*u_short*/ pat, void *base, size_t cnt);
 void	pagezero(void *addr);
 int	is_physical_memory(vm_offset_t addr);
+int	isa_nmi(int cd);
 void	setidt(int idx, alias_for_inthand_t *func, int typ, int dpl, int ist);
-void	swi_vm(void *);
 void	fpstate_drop(struct thread *td);
 
 #endif /* !_MACHINE_MD_VAR_H_ */

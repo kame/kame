@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/common/Makefile.inc,v 1.15 2003/05/01 03:56:29 peter Exp $
+# $FreeBSD: src/sys/boot/common/Makefile.inc,v 1.16 2003/06/26 03:51:57 peter Exp $
 
 SRCS+=	bcache.c boot.c commands.c console.c devopen.c interp.c 
 SRCS+=	interp_backslash.c interp_parse.c ls.c misc.c 
@@ -34,7 +34,3 @@ MAN+=	../forth/loader.4th.8
 .endif
 
 MAN+=	loader.8
-
-.if ${MACHINE_ARCH} == "amd64"
-CFLAGS+= -m32
-.endif

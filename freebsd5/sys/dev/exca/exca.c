@@ -1,5 +1,3 @@
-/* $FreeBSD: src/sys/dev/exca/exca.c,v 1.7 2003/02/14 06:21:18 imp Exp $ */
-
 /*
  * Copyright (c) 2002 M Warner Losh.  All rights reserved.
  *
@@ -54,13 +52,19 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/exca/exca.c,v 1.15 2003/10/07 04:29:04 imp Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/condvar.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
 #include <sys/module.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/conf.h>
 
 #include <sys/bus.h>
@@ -148,7 +152,7 @@ exca_mem_getb(struct exca_softc *sc, int reg)
 static void
 exca_mem_putb(struct exca_softc *sc, int reg, uint8_t val)
 {
-	return (bus_space_write_1(sc->bst, sc->bsh, sc->offset + reg, val));
+	bus_space_write_1(sc->bst, sc->bsh, sc->offset + reg, val);
 }
 
 static uint8_t
@@ -183,7 +187,7 @@ exca_do_mem_map(struct exca_softc *sc, int win)
 	    (mem->addr >> EXCA_SYSMEM_ADDRX_SHIFT) & 0xff);
 	exca_putb(sc, map->sysmem_start_msb,
 	    ((mem->addr >> (EXCA_SYSMEM_ADDRX_SHIFT + 8)) &
-	    EXCA_SYSMEM_ADDRX_START_MSB_ADDR_MASK) | 0x80);
+	    EXCA_SYSMEM_ADDRX_START_MSB_ADDR_MASK));
 
 	exca_putb(sc, map->sysmem_stop_lsb,
 	    ((mem->addr + mem->realsize - 1) >>
@@ -191,22 +195,27 @@ exca_do_mem_map(struct exca_softc *sc, int win)
 	exca_putb(sc, map->sysmem_stop_msb,
 	    (((mem->addr + mem->realsize - 1) >>
 	    (EXCA_SYSMEM_ADDRX_SHIFT + 8)) &
-	    EXCA_SYSMEM_ADDRX_STOP_MSB_ADDR_MASK) |
-	    EXCA_SYSMEM_ADDRX_STOP_MSB_WAIT2);
+	    EXCA_SYSMEM_ADDRX_STOP_MSB_ADDR_MASK));
 
 	exca_putb(sc, map->sysmem_win,
 	    (mem->addr >> EXCA_MEMREG_WIN_SHIFT) & 0xff);
 
 	exca_putb(sc, map->cardmem_lsb,
-	    (mem->offset >> EXCA_CARDMEM_ADDRX_SHIFT) & 0xff);
+	    (mem->cardaddr >> EXCA_CARDMEM_ADDRX_SHIFT) & 0xff);
 	exca_putb(sc, map->cardmem_msb,
-	    ((mem->offset >> (EXCA_CARDMEM_ADDRX_SHIFT + 8)) &
+	    ((mem->cardaddr >> (EXCA_CARDMEM_ADDRX_SHIFT + 8)) &
 	    EXCA_CARDMEM_ADDRX_MSB_ADDR_MASK) |
-	    ((mem->kind == PCCARD_MEM_ATTR) ?
+	    ((mem->kind == PCCARD_A_MEM_ATTR) ?
 	    EXCA_CARDMEM_ADDRX_MSB_REGACTIVE_ATTR : 0));
 
-	exca_setb(sc, EXCA_ADDRWIN_ENABLE, EXCA_ADDRWIN_ENABLE_MEMCS16 |
-	    map->memenable);
+	exca_setb(sc, EXCA_ADDRWIN_ENABLE, map->memenable);
+#ifdef EXCA_DEBUG
+	if (mem->kind == PCCARD_A_MEM_ATTR)
+		printf("attribtue memory\n");
+	else
+		printf("common memory\n");
+#endif
+	exca_setb(sc, EXCA_ADDRWIN_ENABLE, EXCA_ADDRWIN_ENABLE_MEMCS16);
 
 	DELAY(100);
 #ifdef EXCA_DEBUG
@@ -220,10 +229,10 @@ exca_do_mem_map(struct exca_softc *sc, int win)
 		r6 = exca_getb(sc, map->cardmem_lsb);
 		r7 = exca_getb(sc, map->sysmem_win);
 		printf("exca_do_mem_map window %d: %02x%02x %02x%02x "
-		    "%02x%02x %02x (%08x+%08x.%08x*%08lx)\n",
+		    "%02x%02x %02x (%08x+%08x.%08x*%08x)\n",
 		    win, r1, r2, r3, r4, r5, r6, r7,
 		    mem->addr, mem->size, mem->realsize,
-		    mem->offset);
+		    mem->cardaddr);
 	}
 #endif
 }
@@ -249,7 +258,7 @@ exca_mem_map(struct exca_softc *sc, int kind, struct resource *res)
 	}
 	if (win >= EXCA_MEM_WINS)
 		return (1);
-	if (((rman_get_start(res) >> EXCA_CARDMEM_ADDRX_SHIFT) & 0xff) != 0 &&
+	if (((rman_get_start(res) >> EXCA_MEMREG_WIN_SHIFT) & 0xff) != 0 &&
 	    (sc->flags & EXCA_HAS_MEMREG_WIN) == 0) {
 		device_printf(sc->dev, "Does not support mapping above 24M.");
 		return (1);
@@ -263,11 +272,9 @@ exca_mem_map(struct exca_softc *sc, int kind, struct resource *res)
 	sc->mem[win].realsize = sc->mem[win].size + EXCA_MEM_PAGESIZE - 1;
 	sc->mem[win].realsize = sc->mem[win].realsize -
 	    (sc->mem[win].realsize % EXCA_MEM_PAGESIZE);
-	sc->mem[win].offset = (long)(sc->mem[win].addr);
 	sc->mem[win].kind = kind;
-	DPRINTF("exca_mem_map window %d bus %x+%x+%lx card addr %x\n",
-	    win, sc->mem[win].addr, sc->mem[win].size,
-	    sc->mem[win].offset, sc->mem[win].cardaddr);
+	DPRINTF("exca_mem_map window %d bus %x+%x card addr %x\n",
+	    win, sc->mem[win].addr, sc->mem[win].size, sc->mem[win].cardaddr);
 	exca_do_mem_map(sc, win);
 
 	return (0);
@@ -358,12 +365,7 @@ exca_mem_unmap_res(struct exca_softc *sc, struct resource *res)
  * Set the offset of the memory.  We use this for reading the CIS and
  * frobbing the pccard's pccard registers (POR, etc).  Some drivers
  * need to access this functionality as well, since they have receive
- * buffers defined in the attribute memory.  Thankfully, these cards
- * are few and fare between.  Some cards also have common memory that
- * is large and only map a small portion of it at a time (but these cards
- * are rare, the more common case being to have just a small amount
- * of common memory that the driver needs to bcopy data from in order to
- * get at it.
+ * buffers defined in the attribute memory.
  */
 int
 exca_mem_set_offset(struct exca_softc *sc, struct resource *res,
@@ -378,16 +380,14 @@ exca_mem_set_offset(struct exca_softc *sc, struct resource *res,
 		    "set_memory_offset: specified resource not active\n");
 		return (ENOENT);
 	}
-	sc->mem[win].cardaddr = cardaddr;
+	sc->mem[win].cardaddr = cardaddr & ~(EXCA_MEM_PAGESIZE - 1);
 	delta = cardaddr % EXCA_MEM_PAGESIZE;
 	if (deltap)
 		*deltap = delta;
-	cardaddr -= delta;
 	sc->mem[win].realsize = sc->mem[win].size + delta +
 	    EXCA_MEM_PAGESIZE - 1;
 	sc->mem[win].realsize = sc->mem[win].realsize -
 	    (sc->mem[win].realsize % EXCA_MEM_PAGESIZE);
-	sc->mem[win].offset = cardaddr - sc->mem[win].addr;
 	exca_do_mem_map(sc, win);
 	return (0);
 }
@@ -576,7 +576,6 @@ exca_wait_ready(struct exca_softc *sc)
 void
 exca_reset(struct exca_softc *sc, device_t child)
 {
-	int cardtype;
 	int win;
 
 	/* enable socket i/o */
@@ -595,11 +594,8 @@ exca_reset(struct exca_softc *sc, device_t child)
 	/* disable all address windows */
 	exca_putb(sc, EXCA_ADDRWIN_ENABLE, 0);
 
-	CARD_GET_TYPE(child, &cardtype);
-	exca_setb(sc, EXCA_INTR, (cardtype == PCCARD_IFTYPE_IO) ?
-	    EXCA_INTR_CARDTYPE_IO : EXCA_INTR_CARDTYPE_MEM);
-	DEVPRINTF(sc->dev, "card type is %s\n",
-	    (cardtype == PCCARD_IFTYPE_IO) ? "io" : "mem");
+	exca_setb(sc, EXCA_INTR, EXCA_INTR_CARDTYPE_IO);
+	DEVPRINTF(sc->dev, "card type is io\n");
 
 	/* reinstall all the memory and io mappings */
 	for (win = 0; win < EXCA_MEM_WINS; ++win)
@@ -635,6 +631,9 @@ static int
 exca_valid_slot(struct exca_softc *exca)
 {
 	uint8_t c;
+
+	/* Assume the worst */
+	exca->chipset = EXCA_BOGUS;
 
 	/*
 	 * see if there's a PCMCIA controller here
@@ -757,6 +756,72 @@ exca_probe_slots(device_t dev, struct exca_softc *exca, bus_space_tag_t iot,
 			err = 0;
 	}
 	return (err);
+}
+
+void
+exca_insert(struct exca_softc *exca)
+{
+	if (exca->pccarddev != NULL) {
+		if (CARD_ATTACH_CARD(exca->pccarddev) != 0)
+			device_printf(exca->dev,
+			    "PC Card card activation failed\n");
+	} else {
+		device_printf(exca->dev,
+		    "PC Card inserted, but no pccard bus.\n");
+	}
+}
+  
+
+void
+exca_removal(struct exca_softc *exca)
+{
+	if (exca->pccarddev != NULL)
+		CARD_DETACH_CARD(exca->pccarddev);
+}
+
+int
+exca_activate_resource(struct exca_softc *exca, device_t child, int type,
+    int rid, struct resource *res)
+{
+	int err;
+	if (!(rman_get_flags(res) & RF_ACTIVE)) { /* not already activated */
+		switch (type) {
+		case SYS_RES_IOPORT:
+			err = exca_io_map(exca, PCCARD_WIDTH_AUTO, res);
+			break;
+		case SYS_RES_MEMORY:
+			err = exca_mem_map(exca, PCCARD_A_MEM_COM, res);
+			break;
+		default:
+			err = 0;
+			break;
+		}
+		if (err)
+			return (err);
+
+	}
+	return (BUS_ACTIVATE_RESOURCE(device_get_parent(exca->dev), child,
+		  type, rid, res));
+}
+
+int
+exca_deactivate_resource(struct exca_softc *exca, device_t child, int type,
+    int rid, struct resource *res)
+{
+	if (rman_get_flags(res) & RF_ACTIVE) { /* if activated */
+		switch (type) {
+		case SYS_RES_IOPORT:
+			if (exca_io_unmap_res(exca, res))
+				return (ENOENT);
+			break;
+		case SYS_RES_MEMORY:
+			if (exca_mem_unmap_res(exca, res))
+				return (ENOENT);
+			break;
+		}
+	}
+	return (BUS_DEACTIVATE_RESOURCE(device_get_parent(exca->dev), child,
+	    type, rid, res));
 }
 
 static int

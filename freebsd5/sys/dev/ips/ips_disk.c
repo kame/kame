@@ -1,8 +1,7 @@
 /*-
+ * Written by: David Jeffery
  * Copyright (c) 2002 Adaptec Inc.
  * All rights reserved.
- *
- * Written by: David Jeffery
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,10 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ips/ips_disk.c,v 1.1 2003/05/11 06:36:49 scottl Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips_disk.c,v 1.4 2003/09/22 04:59:07 njl Exp $");
 
 #include <dev/ips/ips.h>
 #include <dev/ips/ips_disk.h>
@@ -97,7 +96,7 @@ static void ipsd_strategy(struct bio *iobuf)
 
 	dsc = iobuf->bio_disk->d_drv1;	
 	DEVICE_PRINTF(8,dsc->dev,"in strategy\n");
-	(uint32_t)iobuf->bio_driver1 = dsc->sc->drives[dsc->disk_number].drivenum;
+	iobuf->bio_driver1 = (void *)(uintptr_t)dsc->sc->drives[dsc->disk_number].drivenum;
 	ips_start_io_request(dsc->sc, iobuf);
 }
 
@@ -122,7 +121,7 @@ static int ipsd_attach(device_t dev)
 	dsc->dev = dev;
 	dsc->sc = device_get_softc(adapter);
 	dsc->unit = device_get_unit(dev);
-	dsc->disk_number = (int) device_get_ivars(dev);
+	dsc->disk_number = (uintptr_t) device_get_ivars(dev);
 	dsc->ipsd_disk.d_drv1 = dsc;
 	dsc->ipsd_disk.d_name = "ipsd";
 	dsc->ipsd_disk.d_maxsize = IPS_MAX_IO_SIZE;
@@ -140,7 +139,7 @@ static int ipsd_attach(device_t dev)
       		dsc->ipsd_disk.d_fwsectors = IPS_COMP_SECTORS;
    	}
 	dsc->ipsd_disk.d_sectorsize = IPS_BLKSIZE;
-	dsc->ipsd_disk.d_mediasize = totalsectors * IPS_BLKSIZE;
+	dsc->ipsd_disk.d_mediasize = (off_t)totalsectors * IPS_BLKSIZE;
 	disk_create(dsc->unit, &dsc->ipsd_disk, 0, NULL, NULL);
 
 	device_printf(dev, "Logical Drive  (%dMB)\n",

@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/cfs/coda_vfsops.h,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $ 
- * $FreeBSD: src/sys/coda/coda_vfsops.h,v 1.6 2001/09/12 08:36:56 julian Exp $
+ * $FreeBSD: src/sys/coda/coda_vfsops.h,v 1.8 2003/09/07 07:43:09 tjr Exp $
  * 
  */
 
@@ -40,25 +40,25 @@
 struct cfid {
     u_short	cfid_len;
     u_short     padding;
-    ViceFid	cfid_fid;
+    CodaFid	cfid_fid;
 };
 
 struct mbuf;
 struct mount;
 
 int coda_vfsopstats_init(void);
-int coda_mount(struct mount *, char *, caddr_t, struct nameidata *, 
-		       struct thread *);
-int coda_start(struct mount *, int, struct thread *);
-int coda_unmount(struct mount *, int, struct thread *);
-int coda_root(struct mount *, struct vnode **);
-int coda_quotactl(struct mount *, int, uid_t, caddr_t, struct thread *);
-int coda_nb_statfs(struct mount *, struct statfs *, struct thread *);
-int coda_sync(struct mount *, int, struct ucred *, struct thread *);
-int coda_vget(struct mount *, ino_t, struct vnode **);
 int coda_fhtovp(struct mount *, struct fid *, struct mbuf *, struct vnode **,
-		       int *, struct ucred **);
-int coda_vptofh(struct vnode *, struct fid *);
-int coda_init(struct vfsconf *vfsp);
+                      int *, struct ucred **);
+
+vfs_mount_t	coda_mount;
+vfs_start_t	coda_start;
+vfs_unmount_t	coda_unmount;
+vfs_root_t	coda_root;
+vfs_quotactl_t	coda_quotactl;
+vfs_statfs_t	coda_nb_statfs;
+vfs_sync_t	coda_sync;
+vfs_vget_t	coda_vget;
+vfs_vptofh_t	coda_vptofh;
+vfs_init_t	coda_init;
 
 int getNewVnode(struct vnode **vpp);

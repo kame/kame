@@ -26,6 +26,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * Driver for the TDK 78Q2120 MII
  *
@@ -41,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.13 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

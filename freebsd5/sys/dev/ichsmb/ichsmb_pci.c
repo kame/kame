@@ -1,9 +1,10 @@
-
-/*
+/*-
  * ichsmb_pci.c
  *
+ * Author: Archie Cobbs <archie@freebsd.org>
  * Copyright (c) 2000 Whistle Communications, Inc.
  * All rights reserved.
+ * Author: Archie Cobbs <archie@freebsd.org>
  * 
  * Subject to the following obligations and disclaimer of warranty, use and
  * redistribution of this software, in source or object code forms, with or
@@ -33,15 +34,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
- *
- * Author: Archie Cobbs <archie@freebsd.org>
- *
- * $FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.6 2002/10/18 12:06:01 nyan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.10 2003/08/31 19:23:00 njl Exp $");
 
 /*
  * Support for the SMBus controller logical device which is part of the
- * Intel 81801AA/AB/BA/CA/DC (ICH/ICH[0234]) I/O controller hub chips.
+ * Intel 81801AA/AB/BA/CA/DC/EB (ICH/ICH[02345]) I/O controller hub chips.
  */
 
 #include <sys/param.h>
@@ -57,8 +57,8 @@
 #include <sys/rman.h>
 #include <machine/resource.h>
 
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 #include <dev/smbus/smbconf.h>
 
@@ -71,6 +71,7 @@
 #define ID_82801BA			0x24438086
 #define ID_82801CA			0x24838086
 #define ID_82801DC			0x24C38086
+#define ID_82801EB			0x24D38086
 
 #define PCIS_SERIALBUS_SMBUS_PROGIF	0x00
 
@@ -131,6 +132,9 @@ ichsmb_pci_probe(device_t dev)
 		break;
 	case ID_82801DC:
 		device_set_desc(dev, "Intel 82801DC (ICH4) SMBus controller");
+		break;
+	case ID_82801EB:
+		device_set_desc(dev, "Intel 82801EB (ICH5) SMBus controller");
 		break;
 	default:
 		if (pci_get_class(dev) == PCIC_SERIALBUS

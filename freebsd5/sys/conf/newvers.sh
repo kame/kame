@@ -32,12 +32,12 @@
 # SUCH DAMAGE.
 #
 #	@(#)newvers.sh	8.1 (Berkeley) 4/20/94
-# $FreeBSD: src/sys/conf/newvers.sh,v 1.50.2.2 2003/06/04 05:51:10 scottl Exp $
+# $FreeBSD: src/sys/conf/newvers.sh,v 1.56.2.7 2004/02/23 05:20:41 scottl Exp $
 
 TYPE="FreeBSD"
-REVISION="5.1"
+REVISION="5.2.1"
 BRANCH="RELEASE"
-RELEASE=5.1-RELEASE
+RELEASE=5.2.1-RELEASE
 VERSION="${TYPE} ${RELEASE}"
 
 if [ "X${PARAMFILE}" != "X" ]; then
@@ -86,6 +86,7 @@ fi
 
 touch version
 v=`cat version` u=${USER-root} d=`pwd` h=`hostname` t=`date`
+i=`make -V KERN_IDENT`
 cat << EOF > vers.c
 $COPYRIGHT
 char sccspad[32 - 4 /* sizeof(sccs) */] = { '\\0' };
@@ -94,6 +95,7 @@ char version[] = "${VERSION} #${v}: ${t}\\n    ${u}@${h}:${d}\\n";
 char ostype[] = "${TYPE}";
 char osrelease[] = "${RELEASE}";
 int osreldate = ${RELDATE};
+char kern_ident[] = "${i}";
 EOF
 
 echo `expr ${v} + 1` > version

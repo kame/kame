@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_3000_500.c,v 1.4 2000/12/08 22:11:07 msmith Exp $ */
 /*
  * Copyright (c) 1997 by Matthew Jacob
  * NASA AMES Research Center.
@@ -29,6 +28,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_3000_500.c,v 1.6 2003/08/17 06:42:07 marcel Exp $");
+
 #include "opt_cpu.h"
 
 #include <sys/param.h>
@@ -36,8 +38,9 @@
 #include <sys/termios.h>
 #include <sys/bus.h>
 
-#include <machine/rpb.h>
 #include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
 
 #include <alpha/tlsb/tlsbreg.h>
 #include <alpha/tlsb/gbusreg.h>

@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: aic79xx.h,v 1.11 2003/05/26 21:10:58 gibbs Exp $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#94 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.12 2003/05/30 02:14:22 scottl Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.16 2003/09/02 17:30:34 jhb Exp $
  */
 
 #ifndef _AIC79XX_H_
@@ -231,6 +231,7 @@ typedef enum {
 	AHD_NEW_DFCNTRL_OPTS	= 0x10000,/* SCSIENWRDIS bit */
 	AHD_REMOVABLE		= 0x00000,/* Hot-Swap supported - None so far*/
 	AHD_AIC7901_FE		= AHD_FENONE,
+	AHD_AIC7901A_FE		= AHD_FENONE,
 	AHD_AIC7902_FE		= AHD_MULTI_FUNC
 } ahd_feature;
 
@@ -372,7 +373,8 @@ typedef enum {
 	AHD_HP_BOARD	      = 0x100000,
 	AHD_RESET_POLL_ACTIVE = 0x200000,
 	AHD_UPDATE_PEND_CMDS  = 0x400000,
-	AHD_RUNNING_QOUTFIFO  = 0x800000
+	AHD_RUNNING_QOUTFIFO  = 0x800000,
+	AHD_HAD_FIRST_SEL     = 0x1000000
 } ahd_flag;
 
 /************************* Hardware  SCB Definition ***************************/
@@ -1296,9 +1298,9 @@ struct ahd_devinfo {
 };
 
 /****************************** PCI Structures ********************************/
-#define AHD_PCI_IOADDR0	PCIR_MAPS	/* I/O BAR*/
-#define AHD_PCI_MEMADDR	(PCIR_MAPS + 4)	/* Memory BAR */
-#define AHD_PCI_IOADDR1	(PCIR_MAPS + 12)/* Second I/O BAR */
+#define AHD_PCI_IOADDR0	PCIR_BAR(0)	/* I/O BAR*/
+#define AHD_PCI_MEMADDR	PCIR_BAR(1)	/* Memory BAR */
+#define AHD_PCI_IOADDR1	PCIR_BAR(3)	/* Second I/O BAR */
 
 typedef int (ahd_device_setup_t)(struct ahd_softc *);
 
@@ -1379,13 +1381,13 @@ struct scb		*ahd_get_scb(struct ahd_softc *ahd, u_int col_idx);
 void			 ahd_free_scb(struct ahd_softc *ahd, struct scb *scb);
 void			 ahd_alloc_scbs(struct ahd_softc *ahd);
 void			 ahd_free(struct ahd_softc *ahd);
-int			 ahd_reset(struct ahd_softc *ahd);
+int			 ahd_reset(struct ahd_softc *ahd, int reinit);
 void			 ahd_shutdown(void *arg);
-int			ahd_write_flexport(struct ahd_softc *ahd,
-					   u_int addr, u_int value);
-int			ahd_read_flexport(struct ahd_softc *ahd, u_int addr,
-					  uint8_t *value);
-int			ahd_wait_flexport(struct ahd_softc *ahd);
+int			 ahd_write_flexport(struct ahd_softc *ahd,
+					    u_int addr, u_int value);
+int			 ahd_read_flexport(struct ahd_softc *ahd, u_int addr,
+					   uint8_t *value);
+int			 ahd_wait_flexport(struct ahd_softc *ahd);
 
 /*************************** Interrupt Services *******************************/
 void			ahd_pci_intr(struct ahd_softc *ahd);

@@ -30,6 +30,9 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ofw/openfirm.c,v 1.11 2003/08/24 17:54:14 obrien Exp $");
 /*
  * Copyright (C) 2000 Benno Rice.
  * All rights reserved.
@@ -54,7 +57,6 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ofw/openfirm.c,v 1.9 2003/02/19 05:47:09 imp Exp $
  */
 
 #include <sys/param.h>
@@ -125,6 +127,38 @@ OF_test(char *name)
 	if (openfirmware(&args) == -1)
 		return -1;
 	return args.missing;
+}
+
+int
+OF_interpret(char *cmd, int nreturns, ...)
+{
+	va_list ap;
+	static struct {
+		cell_t name;
+		cell_t nargs;
+		cell_t nreturns;
+		cell_t slot[16];
+	} args = {
+		(cell_t)"interpret",
+		1
+	};
+	cell_t status;
+	int i = 0;
+
+	args.nreturns = ++nreturns;
+	args.slot[i++] = (cell_t)cmd;
+	va_start(ap, nreturns);
+	while (i < 1)
+		args.slot[i++] = va_arg(ap, cell_t);
+	if (openfirmware(&args) == -1) {
+		va_end(ap);
+		return (-1);
+	}
+	status = args.slot[i++];
+	while (i < 1 + nreturns)
+		*va_arg(ap, cell_t *) = args.slot[i++];
+	va_end(ap);
+	return (status);
 }
 
 /* Return firmware millisecond count. */

@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/compat/linux/linux_sysctl.c,v 1.11 2003/03/03 09:17:12 des Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_sysctl.c,v 1.12 2003/06/10 21:27:40 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>

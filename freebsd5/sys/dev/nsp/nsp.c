@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.9 2002/08/22 21:24:00 archie Exp $	*/
 /*	$NecBSD: nsp.c,v 1.21.12.6 2001/06/29 06:27:52 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -39,6 +38,9 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.10 2003/08/24 17:54:13 obrien Exp $");
 #include "opt_ddb.h"
 
 #include <sys/param.h>

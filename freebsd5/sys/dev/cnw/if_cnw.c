@@ -1,6 +1,8 @@
 /*	$NetBSD: if_cnw.c,v 1.15 2000/10/16 10:26:41 itojun Exp $	*/
-/* $FreeBSD: src/sys/dev/cnw/if_cnw.c,v 1.11 2003/04/15 06:37:21 mdodd Exp $ */
 
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/cnw/if_cnw.c,v 1.13 2003/10/31 18:31:58 brooks Exp $");
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -1630,8 +1632,7 @@ static int cnw_pccard_attach(device_t dev)
 		sc->arpcom.ac_enaddr, ":");
 
 	ifp->if_softc = sc;
-	ifp->if_name = "cnw";
-	ifp->if_unit = device_get_unit(dev);
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_timer = 0;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);

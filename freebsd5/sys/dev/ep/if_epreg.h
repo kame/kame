@@ -19,7 +19,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_epreg.h,v 1.30 2000/07/18 06:37:08 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ep/if_epreg.h,v 1.36 2003/11/02 20:08:58 imp Exp $
  */
 
 /*
@@ -35,34 +35,14 @@
 #define TX_INIT_RATE         16
 #define TX_INIT_MAX_RATE     64
 #define RX_INIT_LATENCY      64
-#define RX_INIT_EARLY_THRESH 208 /* not less than MINCLSIZE */
+#define RX_INIT_EARLY_THRESH 208/* not less than MINCLSIZE */
 #define RX_NEXT_EARLY_THRESH 500
 
 #define EEPROMSIZE      0x40
 #define MAX_EEPROMBUSY  1000
 #define EP_LAST_TAG     0xd7
 #define EP_MAX_BOARDS   16
-/*
- * This `ID' port is a mere hack.  There's currently no chance to register
- * it with config's idea of the ports that are in use.
- *
- * "After the automatic configuration is completed, the IDS is in its initial
- * state (ID-WAIT), and it monitors all write access to I/O port 01x0h, where
- * 'x' is any hex digit.  If a zero is written to any one of these ports, then
- * that address is remembered and becomes the ID port.  A second zero written
- * to that port resets the ID sequence to its initial state.  The IDS watches
- * for the ID sequence to be written to the ID port."
- *
- * We prefer 0x110 over 0x100 so to not conflict with the Plaque&Pray
- * ports.
- */
-#define EP_ID_PORT      0x110
 #define EP_IOSIZE	16	/* 16 bytes of I/O space used. */
-
-/*
- * some macros to acces long named fields
- */
-#define BASE 	(sc->ep_io_addr)
 
 /*
  * Commands to read/write EEPROM trough EEPROM command register (Window 0,
@@ -79,8 +59,8 @@
 /*
  * Some short functions, worth to let them be a macro
  */
-#define is_eeprom_busy(b) (inw((b)+EP_W0_EEPROM_COMMAND)&EEPROM_BUSY)
-#define GO_WINDOW(x)      outw(BASE+EP_COMMAND, WINDOW_SELECT|(x))
+#define is_eeprom_busy(sc) (CSR_READ_2(sc, EP_W0_EEPROM_COMMAND)&EEPROM_BUSY)
+#define GO_WINDOW(sc, x)	CSR_WRITE_2(sc, EP_COMMAND, WINDOW_SELECT|(x))
 
 /**************************************************************************
  *									  *
@@ -94,13 +74,13 @@
 #define EEPROM_NODE_ADDR_1	0x1	/* Word */
 #define EEPROM_NODE_ADDR_2	0x2	/* Word */
 #define EEPROM_PROD_ID		0x3	/* 0x9[0-f]50 */
-#define EEPROM_MFG_DATE         0x4     /* Manufacturing date */
-#define EEPROM_MFG_DIVSION      0x5     /* Manufacturing division */
-#define EEPROM_MFG_PRODUCT      0x6     /* Product code */
+#define EEPROM_MFG_DATE         0x4	/* Manufacturing date */
+#define EEPROM_MFG_DIVSION      0x5	/* Manufacturing division */
+#define EEPROM_MFG_PRODUCT      0x6	/* Product code */
 #define EEPROM_MFG_ID		0x7	/* 0x6d50 */
 #define EEPROM_ADDR_CFG		0x8	/* Base addr */
-# define ADDR_CFG_EISA		0x1f
-# define ADDR_CFG_MASK		0x1f
+#define ADDR_CFG_EISA		0x1f
+#define ADDR_CFG_MASK		0x1f
 #define EEPROM_RESOURCE_CFG	0x9	/* IRQ. Bits 12-15 */
 #define EEPROM_OEM_ADDR0        0xa
 #define EEPROM_OEM_ADDR1        0xb
@@ -109,22 +89,24 @@
 #define EEPROM_COMPAT           0xe
 #define EEPROM_SOFTINFO2        0xf
 #define EEPROM_CAP              0x10
-# define CAP_ISA		0x2083
-# define CAP_PCMCIA		0x2082
+#define CAP_ISA		0x2083
+#define CAP_PCMCIA		0x2082
 #define EEPROM_INT_CONFIG_0	0x12
 #define EEPROM_INT_CONFIG_1	0x13
 /* RAM Partition TX FIFO/RX FIFO */
-# define ICW1_RAM_PART_MASK	0x03
-# define ICW1_RAM_PART_35	0x00	/* 2:5 (only legal if RAM size == 000b default power-up/reset */
-# define ICW1_RAM_PART_13	0x01	/* 1:3 (only legal if RAM size == 000b) */
-# define ICW1_RAM_PART_11	0x10	/* 1:1		*/
-# define ICW1_RAM_PART_RESV	0x11	/* Reserved	*/
+#define ICW1_RAM_PART_MASK	0x03
+#define ICW1_RAM_PART_35	0x00	/* 2:5 (only legal if RAM size == 000b
+					 * default power-up/reset */
+#define ICW1_RAM_PART_13	0x01	/* 1:3 (only legal if RAM size ==
+					 * 000b) */
+#define ICW1_RAM_PART_11	0x10	/* 1:1		 */
+#define ICW1_RAM_PART_RESV	0x11	/* Reserved	 */
 /* ISA Adapter Selection */
-# define ICW1_IAS_MASK		0x0c
-# define ICW1_IAS_DIS		0x00	/* Both mechanisms disabled (default) */
-# define ICW1_IAS_ISA		0x04	/* ISA contention only */
-# define ICW1_IAS_PNP		0x08	/* ISA Plug and Play only */
-# define ICW1_IAS_BOTH		0x0c	/* Both mechanisms enabled */
+#define ICW1_IAS_MASK		0x0c
+#define ICW1_IAS_DIS		0x00	/* Both mechanisms disabled (default) */
+#define ICW1_IAS_ISA		0x04	/* ISA contention only */
+#define ICW1_IAS_PNP		0x08	/* ISA Plug and Play only */
+#define ICW1_IAS_BOTH		0x0c	/* Both mechanisms enabled */
 
 #define EEPROM_CHECKSUM_EL3     0x17
 
@@ -152,7 +134,7 @@
 #define EP_W0_RESOURCE_CFG	0x08
 #define EP_W0_ADDRESS_CFG	0x06
 #define EP_W0_CONFIG_CTRL	0x04
-/* Read */
+	/* Read */
 #define EP_W0_PRODUCT_ID	0x02
 #define EP_W0_MFG_ID		0x00
 
@@ -174,6 +156,7 @@
  * Window 2 registers. Station Address Setup/Read
  */
 /* Read/Write */
+#define EP_W2_ALT_EEPROM	0x0a
 #define EP_W2_ADDR_5		0x05
 #define EP_W2_ADDR_4		0x04
 #define EP_W2_ADDR_3		0x03
@@ -233,13 +216,13 @@
  *
  ****************************************/
 
-/* 
+/*
  * Command parameter that disables threshold interrupts
  *   PIO (3c509) cards use 2044.  The fifo word-oriented and 2044--2047 work.
  *  "busmastering" cards need 8188.
  * The implicit two-bit upshift done by busmastering cards means
  * a value of 2047 disables threshold interrupts on both.
- */   
+ */
 #define EP_THRESH_DISABLE    2047
 
 /*
@@ -268,33 +251,32 @@
 #define TX_DISABLE		(u_short) (0xa<<11)
 #define TX_RESET		(u_short) (0xb<<11)
 #define REQ_INTR		(u_short) (0xc<<11)
+/*
+ * The following C_* acknowledge the various interrupts. Some of them don't
+ * do anything.  See the manual.
+ */
+#define ACK_INTR		(u_short) (0x6800)
+#	define C_INTR_LATCH	(u_short) (ACK_INTR|0x1)
+#	define C_CARD_FAILURE	(u_short) (ACK_INTR|0x2)
+#	define C_TX_COMPLETE	(u_short) (ACK_INTR|0x4)
+#	define C_TX_AVAIL	(u_short) (ACK_INTR|0x8)
+#	define C_RX_COMPLETE	(u_short) (ACK_INTR|0x10)
+#	define C_RX_EARLY	(u_short) (ACK_INTR|0x20)
+#	define C_INT_RQD		(u_short) (ACK_INTR|0x40)
+#	define C_UPD_STATS	(u_short) (ACK_INTR|0x80)
 #define SET_INTR_MASK		(u_short) (0xe<<11)
 #define SET_RD_0_MASK		(u_short) (0xf<<11)
 #define SET_RX_FILTER		(u_short) (0x10<<11)
-#define FIL_INDIVIDUAL		(u_short) (0x1)
-#define FIL_GROUP		(u_short) (0x2)
-#define FIL_BRDCST		(u_short) (0x4)
-#define FIL_ALL			(u_short) (0x8)
+#	define FIL_INDIVIDUAL	(u_short) (0x1)
+#	define FIL_MULTICAST     (u_short) (0x02)
+#	define FIL_BRDCST        (u_short) (0x04)
+#	define FIL_PROMISC       (u_short) (0x08)
 #define SET_RX_EARLY_THRESH	(u_short) (0x11<<11)
 #define SET_TX_AVAIL_THRESH	(u_short) (0x12<<11)
 #define SET_TX_START_THRESH	(u_short) (0x13<<11)
 #define STATS_ENABLE		(u_short) (0x15<<11)
 #define STATS_DISABLE		(u_short) (0x16<<11)
 #define STOP_TRANSCEIVER	(u_short) (0x17<<11)
-/*
- * The following C_* acknowledge the various interrupts. Some of them don't
- * do anything.  See the manual.
- */
-#define ACK_INTR		(u_short) (0x6800)
-#define C_INTR_LATCH	(u_short) (ACK_INTR|0x1)
-#define C_CARD_FAILURE	(u_short) (ACK_INTR|0x2)
-#define C_TX_COMPLETE	(u_short) (ACK_INTR|0x4)
-#define C_TX_AVAIL	(u_short) (ACK_INTR|0x8)
-#define C_RX_COMPLETE	(u_short) (ACK_INTR|0x10)
-#define C_RX_EARLY	(u_short) (ACK_INTR|0x20)
-#define C_INT_RQD		(u_short) (ACK_INTR|0x40)
-#define C_UPD_STATS	(u_short) (ACK_INTR|0x80)
-#define C_MASK	(u_short) 0xFF /* mask of C_* */
 
 /*
  * Status register. All windows.
@@ -322,10 +304,12 @@
 #define S_RX_EARLY		(u_short) (0x20)
 #define S_INT_RQD		(u_short) (0x40)
 #define S_UPD_STATS		(u_short) (0x80)
-#define S_MASK	(u_short) 0xFF /* mask of S_* */
+#define S_MASK	(u_short) 0xFF	/* mask of S_* */
 #define S_5_INTS                (S_CARD_FAILURE|S_TX_COMPLETE|\
 				 S_TX_AVAIL|S_RX_COMPLETE|S_RX_EARLY)
 #define S_COMMAND_IN_PROGRESS	(u_short) (0x1000)
+
+#define EP_BUSY_WAIT(sc) while (CSR_READ_2(sc, EP_STATUS) & S_COMMAND_IN_PROGRESS)
 
 /* Address Config. Register.
  * Window 0/Port 06
@@ -341,9 +325,9 @@
  *
  */
 
-#define SET_IRQ(base,irq)     outw((base) + EP_W0_RESOURCE_CFG, \
-                              ((inw((base) + EP_W0_RESOURCE_CFG) & 0x0fff) | \
-                              ((u_short)(irq)<<12))  ) /* set IRQ i */
+#define SET_IRQ(sc, irq) CSR_WRITE_2((sc), EP_W0_RESOURCE_CFG, \
+			((CSR_READ_2((sc), EP_W0_RESOURCE_CFG) & 0x0fff) | \
+			((u_short)(irq)<<12))  )	/* set IRQ i */
 
 /*
  * FIFO Registers.
@@ -408,18 +392,22 @@
 #define ENABLE_DRQ_IRQ			0x0001
 #define W0_P4_CMD_RESET_ADAPTER       0x4
 #define W0_P4_CMD_ENABLE_ADAPTER      0x1
+
 /*
  * Media type and status.
  * Window 4/Port 0A
  */
-#define ENABLE_UTP			0xc0
-#define DISABLE_UTP			0x0
+#define JABBER_GUARD_ENABLE	0x40
+#define LINKBEAT_ENABLE		0x80
+#define	ENABLE_UTP		(JABBER_GUARD_ENABLE | LINKBEAT_ENABLE)
+#define DISABLE_UTP		0x0
 
 /*
  * Misc defines for various things.
  */
-#define ACTIVATE_ADAPTER_TO_CONFIG 	0xff /* to the id_port */
-#define MFG_ID 				0x6d50 /* in EEPROM and W0 ADDR_CONFIG */
+#define ACTIVATE_ADAPTER_TO_CONFIG 	0xff	/* to the id_port */
+#define MFG_ID 				0x6d50	/* in EEPROM and W0
+						 * ADDR_CONFIG */
 #define PROD_ID 			0x9150
 
 #define AUI 				0x1
@@ -427,8 +415,3 @@
 #define UTP 				0x4
 
 #define RX_BYTES_MASK			(u_short) (0x07ff)
-
-/*
- * Config flags
- */
-#define EP_FLAGS_100TX			0x1

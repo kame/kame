@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.53 2003/04/29 17:03:22 mbr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.56 2003/11/05 23:52:54 anholt Exp $");
 
 #include "opt_mac.h"
 
@@ -267,8 +268,13 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 	linux_statfs.f_bavail = bsd_statfs->f_bavail;
 	linux_statfs.f_ffree = bsd_statfs->f_ffree;
 	linux_statfs.f_files = bsd_statfs->f_files;
-	linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
-	linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	if (suser(td)) {
+		linux_statfs.f_fsid.val[0] = 0;
+		linux_statfs.f_fsid.val[1] = 0;
+	} else {
+		linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
+		linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	}
 	linux_statfs.f_namelen = MAXNAMLEN;
 	return copyout(&linux_statfs, args->buf, sizeof(linux_statfs));
 }
@@ -289,7 +295,7 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 	error = getvnode(td->td_proc->p_fd, args->fd, &fp);
 	if (error)
 		return error;
-	mp = ((struct vnode *)fp->f_data)->v_mount;
+	mp = fp->f_vnode->v_mount;
 #ifdef MAC
 	error = mac_check_mount_stat(td->td_ucred, mp);
 	if (error) {
@@ -311,8 +317,13 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 	linux_statfs.f_bavail = bsd_statfs->f_bavail;
 	linux_statfs.f_ffree = bsd_statfs->f_ffree;
 	linux_statfs.f_files = bsd_statfs->f_files;
-	linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
-	linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	if (suser(td)) {
+		linux_statfs.f_fsid.val[0] = 0;
+		linux_statfs.f_fsid.val[1] = 0;
+	} else {
+		linux_statfs.f_fsid.val[0] = bsd_statfs->f_fsid.val[0];
+		linux_statfs.f_fsid.val[1] = bsd_statfs->f_fsid.val[1];
+	}
 	linux_statfs.f_namelen = MAXNAMLEN;
 	error = copyout(&linux_statfs, args->buf, sizeof(linux_statfs));
 	fdrop(fp, td);

@@ -1,8 +1,7 @@
 /*-
+ * Written by: David Jeffery
  * Copyright (c) 2002 Adaptec Inc.
  * All rights reserved.
- *
- * Written by: David Jeffery
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,10 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ips/ips.c,v 1.1 2003/05/11 06:36:49 scottl Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips.c,v 1.6 2003/11/27 08:37:36 mbr Exp $");
 
 #include <dev/ips/ips.h>
 #include <sys/stat.h>
@@ -45,6 +44,25 @@ static struct cdevsw ips_cdevsw = {
 	.d_ioctl = ips_ioctl,
 	.d_name = "ips",
 	.d_maj = IPS_CDEV_MAJOR,
+};
+
+static const char* ips_adapter_name[] = {
+	"N/A",
+	"ServeRAID (copperhead)",
+	"ServeRAID II (copperhead refresh)",
+	"ServeRAID onboard (copperhead)",
+	"ServeRAID onboard (copperhead)",
+	"ServeRAID 3H (clarinet)",
+	"ServeRAID 3L (clarinet lite)",
+	"ServeRAID 4H (trombone)",
+	"ServeRAID 4M (morpheus)",
+	"ServeRAID 4L (morpheus lite)",
+	"ServeRAID 4Mx (neo)",
+	"ServeRAID 4Lx (neo lite)",
+	"ServeRAID 5i II (sarasota)",
+	"ServeRAID 5i (sarasota)",
+	"ServeRAID 6M (marco)",
+	"ServeRAID 6i (sebring)"
 };
 
 
@@ -241,14 +259,46 @@ void ips_insert_free_cmd(ips_softc_t *sc, ips_command_t *command)
 	if(!(sc->state & IPS_TIMEOUT))
 		ips_run_waiting_command(sc);
 }
+static const char* ips_diskdev_statename(u_int8_t state)
+{
+	static char statebuf[20];
+	switch(state){
+		case IPS_LD_OFFLINE:
+			return("OFFLINE");
+			break;
+		case IPS_LD_OKAY:
+			return("OK");
+			break;
+		case IPS_LD_DEGRADED:
+			return("DEGRADED");
+			break;
+		case IPS_LD_FREE:
+			return("FREE");
+			break;
+		case IPS_LD_SYS:
+			return("SYS");
+			break;
+		case IPS_LD_CRS:
+			return("CRS");
+			break;
+	}
+	sprintf(statebuf,"UNKNOWN(0x%02x)", state);
+	return(statebuf);
+}
 
 static int ips_diskdev_init(ips_softc_t *sc)
 {
 	int i;
 	for(i=0; i < IPS_MAX_NUM_DRIVES; i++){
-		if(sc->drives[i].state & IPS_LD_OKAY){
+		if(sc->drives[i].state == IPS_LD_FREE) continue;
+		device_printf(sc->dev, "Logical Drive %d: RAID%d sectors: %u, state %s\n",
+			i, sc->drives[i].raid_lvl,
+			sc->drives[i].sector_count,
+			ips_diskdev_statename(sc->drives[i].state));
+		if(sc->drives[i].state == IPS_LD_OKAY ||
+		   sc->drives[i].state == IPS_LD_DEGRADED){
 			sc->diskdev[i] = device_add_child(sc->dev, NULL, -1);
-			device_set_ivars(sc->diskdev[i],(void *) i);
+			device_set_ivars(sc->diskdev[i],(void *)(uintptr_t) i);
 		}
 	}
 	if(bus_generic_attach(sc->dev)){
@@ -322,6 +372,7 @@ static void ips_timeout(void *arg)
 /* check card and initialize it */
 int ips_adapter_init(ips_softc_t *sc)
 {
+        int i;
         DEVICE_PRINTF(1,sc->dev, "initializing\n");
         if (bus_dma_tag_create(	/* parent    */	sc->adapter_dmatag,
 				/* alignemnt */	1,
@@ -336,6 +387,8 @@ int ips_adapter_init(ips_softc_t *sc)
 				/* maxsegsize*/	IPS_COMMAND_LEN + 
 						    IPS_MAX_SG_LEN,
 				/* flags     */	0,
+				/* lockfunc  */ busdma_lock_mutex,
+				/* lockarg   */ &Giant,
 				&sc->command_dmatag) != 0) {
                 device_printf(sc->dev, "can't alloc command dma tag\n");
 		goto error;
@@ -351,6 +404,8 @@ int ips_adapter_init(ips_softc_t *sc)
 				/* numsegs   */	IPS_MAX_SG_ELEMENTS,
 				/* maxsegsize*/	IPS_MAX_IOBUF_SIZE,
 				/* flags     */	0,
+				/* lockfunc  */ busdma_lock_mutex,
+				/* lockarg   */ &Giant,
 				&sc->sg_dmatag) != 0) {
 		device_printf(sc->dev, "can't alloc SG dma tag\n");
 		goto error;
@@ -359,16 +414,32 @@ int ips_adapter_init(ips_softc_t *sc)
            can handle */
 	sc->max_cmds = 1;
 	ips_cmdqueue_init(sc);
+	callout_handle_init(&sc->timer);
 
 	if(sc->ips_adapter_reinit(sc, 0))
 		goto error;
 
 	mtx_init(&sc->cmd_mtx, "ips command mutex", NULL, MTX_DEF);
-	if(ips_get_adapter_info(sc) || ips_get_drive_info(sc)){
-		device_printf(sc->dev, "failed to get configuration data from device\n");
+
+	/* initialize ffdc values */
+	microtime(&sc->ffdc_resettime);
+	sc->ffdc_resetcount = 1;
+	if ((i = ips_ffdc_reset(sc)) != 0) {
+		device_printf(sc->dev, "failed to send ffdc reset to device (%d)\n", i);
+		goto error;
+	}
+	if ((i = ips_get_adapter_info(sc)) != 0) {
+		device_printf(sc->dev, "failed to get adapter configuration data from device (%d)\n", i);
 		goto error;
 	}
 	ips_update_nvram(sc); /* no error check as failure doesn't matter */
+	if(sc->adapter_type > 0 && sc->adapter_type <= IPS_ADAPTER_MAX_T){
+		device_printf(sc->dev, "adapter type: %s\n", ips_adapter_name[sc->adapter_type]);
+	}
+ 	if ((i = ips_get_drive_info(sc)) != 0) {
+		device_printf(sc->dev, "failed to get drive configuration data from device (%d)\n", i);
+		goto error;
+	}
 
         ips_cmdqueue_free(sc);
 	if(sc->adapter_info.max_concurrent_cmds)
@@ -540,6 +611,8 @@ static int ips_copperhead_queue_init(ips_softc_t *sc)
 				/* numsegs   */	1,
 				/* maxsegsize*/	sizeof(ips_copper_queue_t),
 				/* flags     */	0,
+				/* lockfunc  */ busdma_lock_mutex,
+				/* lockarg   */ &Giant,
 				&dmatag) != 0) {
                 device_printf(sc->dev, "can't alloc dma tag for statue queue\n");
 		error = ENOMEM;

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2002, 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 2002 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ata/ata-cbus.c,v 1.5 2003/03/29 13:37:09 sos Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-cbus.c,v 1.8.2.1 2004/01/27 05:53:18 scottl Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -35,6 +36,9 @@
 #include <sys/ata.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
+#include <sys/sema.h>
+#include <sys/taskqueue.h>
+#include <vm/uma.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
@@ -71,14 +75,14 @@ ata_cbus_probe(device_t dev)
 
     /* dont probe PnP devices */
     if (isa_get_vendorid(dev))
-       return (ENXIO);
+	return (ENXIO);
 
     /* allocate the ioport range */
     rid = ATA_IOADDR_RID;
     io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
 			    ATA_PC98_IOSIZE, RF_ACTIVE);
     if (!io)
-       return ENOMEM;
+	return ENOMEM;
 
     /* calculate & set the altport range */
     rid = ATA_PC98_ALTADDR_RID;
@@ -123,8 +127,8 @@ ata_cbus_attach(device_t dev)
 
     rid = ATA_PC98_BANKADDR_RID;
     ctlr->bankio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				     ATA_PC98_BANK, ~0,
-				     ATA_PC98_BANKIOSIZE, RF_ACTIVE);
+				      ATA_PC98_BANK, ~0,
+				      ATA_PC98_BANKIOSIZE, RF_ACTIVE);
     if (!ctlr->bankio) {
 	bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, ctlr->io);
 	bus_release_resource(dev, SYS_RES_IOPORT, ATA_ALTADDR_RID, ctlr->altio);
@@ -142,7 +146,7 @@ ata_cbus_attach(device_t dev)
 	return ENXIO;
     }
 
-    if ((bus_setup_intr(dev, ctlr->irq, INTR_TYPE_BIO | INTR_ENTROPY,
+    if ((bus_setup_intr(dev, ctlr->irq, ATA_INTR_FLAGS,
 			ata_cbus_intr, ctlr, &ctlr->ih))) {
 	device_printf(dev, "unable to setup interrupt\n");
 	bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, ctlr->io);
@@ -179,9 +183,8 @@ ata_cbus_alloc_resource(device_t dev, device_t child, int type, int *rid,
 	    return ctlr->altio;
 	}
     }
-    if (type == SYS_RES_IRQ) {
+    if (type == SYS_RES_IRQ)
 	return ctlr->irq;
-    }
     return 0;
 }
 

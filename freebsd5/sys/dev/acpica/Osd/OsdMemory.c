@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdMemory.c,v 1.8 2002/03/19 11:01:52 peter Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdMemory.c,v 1.10 2003/07/14 02:42:15 marcel Exp $
  */
 
 /*
@@ -80,13 +80,13 @@ AcpiOsGetPhysicalAddress(void *LogicalAddress, ACPI_PHYSICAL_ADDRESS *PhysicalAd
  * that callers will not pass garbage to us.
  */
 BOOLEAN
-AcpiOsReadable (void *Pointer, UINT32 Length)
+AcpiOsReadable (void *Pointer, ACPI_SIZE Length)
 {
     return(TRUE);
 }
 
 BOOLEAN
-AcpiOsWritable (void *Pointer, UINT32 Length)
+AcpiOsWritable (void *Pointer, ACPI_SIZE Length)
 {
     return(TRUE);
 }
@@ -94,7 +94,7 @@ AcpiOsWritable (void *Pointer, UINT32 Length)
 ACPI_STATUS
 AcpiOsReadMemory (
     ACPI_PHYSICAL_ADDRESS	Address,
-    void			*Value,
+    UINT32			*Value,
     UINT32			Width)
 {
     void	*LogicalAddress;
@@ -129,7 +129,7 @@ AcpiOsReadMemory (
 ACPI_STATUS
 AcpiOsWriteMemory (
     ACPI_PHYSICAL_ADDRESS	Address,
-    ACPI_INTEGER		Value,
+    UINT32			Value,
     UINT32			Width)
 {
     void	*LogicalAddress;

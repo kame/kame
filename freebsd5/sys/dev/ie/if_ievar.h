@@ -1,5 +1,5 @@
 /*-
- * $FreeBSD: src/sys/dev/ie/if_ievar.h,v 1.1 2003/03/29 13:36:41 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ie/if_ievar.h,v 1.2 2003/08/06 17:28:33 bde Exp $
  */
 
 enum ie_hardware {
@@ -40,7 +40,7 @@ struct ie_softc {
 	bus_space_tag_t		mem_bt;
 	bus_space_handle_t	mem_bh;
 
-	u_short	 port;		/* i/o base address for this interface */
+	u_int	 port;		/* i/o base address for this interface */
 	caddr_t	 iomem;		/* memory size */
 	caddr_t	 iomembot;	/* memory base address */
 	unsigned iosize;

@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/ruephy.c,v 1.1 2003/05/03 10:16:56 akiyama Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/ruephy.c,v 1.2 2003/08/24 17:54:10 obrien Exp $");
 
 /*
  * driver for RealTek RTL8150 internal PHY

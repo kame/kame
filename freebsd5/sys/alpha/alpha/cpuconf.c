@@ -1,6 +1,3 @@
-/* $FreeBSD: src/sys/alpha/alpha/cpuconf.c,v 1.14 2002/07/09 19:20:16 obrien Exp $ */
-/*	$NetBSD: cpuconf.c,v 1.10 1998/03/20 21:48:21 thorpej Exp $	*/
-
 /*
  * Copyright (c) 1996 Christopher G. Demetriou.  All rights reserved.
  *
@@ -29,15 +26,22 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ *	$NetBSD: cpuconf.c,v 1.10 1998/03/20 21:48:21 thorpej Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/cpuconf.c,v 1.16 2003/08/17 06:42:07 marcel Exp $");
+
+#include "opt_cpu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <machine/cpuconf.h>
-#include <machine/rpb.h>
 
-#include "opt_cpu.h"
+#include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
 
 #ifdef DEC_AXPPCI_33
 extern void dec_axppci_33_init(int);

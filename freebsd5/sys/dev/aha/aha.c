@@ -2,11 +2,11 @@
  * Generic register and struct definitions for the Adaptech 154x/164x
  * SCSI host adapters. Product specific probe and attach routines can
  * be found in:
- *      aha 1540/1542B/1542C/1542CF/1542CP	aha_isa.c
+ *      aha 1542B/1542C/1542CF/1542CP	aha_isa.c
+ *      aha 1640			aha_mca.c
  *
  * Copyright (c) 1998 M. Warner Losh.
  * All Rights Reserved.
- *
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,15 +54,19 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/aha/aha.c,v 1.47 2003/05/27 04:59:56 scottl Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aha/aha.c,v 1.55 2003/11/13 04:14:53 imp Exp $");
+
 #include <sys/param.h>
-#include <sys/systm.h> 
+#include <sys/bus.h>
+#include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
- 
+#include <sys/lock.h>
+#include <sys/mutex.h>
+
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 
@@ -76,7 +80,7 @@
 
 #include <dev/aha/ahareg.h>
 
-#define	PRVERB(x) if (bootverbose) printf x
+#define	PRVERB(x) do { if (bootverbose) device_printf x; } while (0)
 
 /* Macro to determine that a rev is potentially a new valid one
  * so that the driver doesn't keep breaking on new revs as it
@@ -87,6 +91,8 @@
 /* MailBox Management functions */
 static __inline void	ahanextinbox(struct aha_softc *aha);
 static __inline void	ahanextoutbox(struct aha_softc *aha);
+
+#define aha_name(aha)	device_get_nameunit(aha->dev)
 
 static __inline void
 ahanextinbox(struct aha_softc *aha)
@@ -115,19 +121,19 @@ ahanextoutbox(struct aha_softc *aha)
 	(((s3)[0] << 16) | ((s3)[1] << 8) | (s3)[2])
 
 /* CCB Mangement functions */
-static __inline u_int32_t		ahaccbvtop(struct aha_softc *aha,
+static __inline uint32_t		ahaccbvtop(struct aha_softc *aha,
 						  struct aha_ccb *accb);
 static __inline struct aha_ccb*		ahaccbptov(struct aha_softc *aha,
-						  u_int32_t ccb_addr);
+						  uint32_t ccb_addr);
 
-static __inline u_int32_t
+static __inline uint32_t
 ahaccbvtop(struct aha_softc *aha, struct aha_ccb *accb)
 {
 	return (aha->aha_ccb_physbase
-	      + (u_int32_t)((caddr_t)accb - (caddr_t)aha->aha_ccb_array));
+	      + (uint32_t)((caddr_t)accb - (caddr_t)aha->aha_ccb_array));
 }
 static __inline struct aha_ccb *
-ahaccbptov(struct aha_softc *aha, u_int32_t ccb_addr)
+ahaccbptov(struct aha_softc *aha, uint32_t ccb_addr)
 {
 	return (aha->aha_ccb_array +
 	      + ((struct aha_ccb*)(uintptr_t)ccb_addr -
@@ -163,48 +169,12 @@ static void	ahapoll(struct cam_sim *sim);
 /* Our timeout handler */
 static timeout_t ahatimeout;
 
-u_long aha_unit = 0;
-
-/*
- * Do our own re-probe protection until a configuration
- * manager can do it for us.  This ensures that we don't
- * reprobe a card already found by the EISA or PCI probes.
- */
-static struct aha_isa_port aha_isa_ports[] =
-{
-	{ 0x130, 4 },
-	{ 0x134, 5 },
-	{ 0x230, 2 },
-	{ 0x234, 3 },
-	{ 0x330, 0 },
-	{ 0x334, 1 }
-};
-
-/*
- * I/O ports listed in the order enumerated by the
- * card for certain op codes.
- */
-static u_int16_t aha_board_ports[] =
-{
-	0x330,
-	0x334,
-	0x230,
-	0x234,
-	0x130,
-	0x134
-};
-
 /* Exported functions */
-struct aha_softc *
-aha_alloc(int unit, bus_space_tag_t tag, bus_space_handle_t bsh)
+void
+aha_alloc(struct aha_softc *aha, int unit, bus_space_tag_t tag,
+  bus_space_handle_t bsh)
 {
-	struct  aha_softc *aha;  
 
-	aha = malloc(sizeof(struct aha_softc), M_DEVBUF, M_NOWAIT | M_ZERO);
-	if (!aha) {
-		printf("aha%d: cannot malloc!\n", unit);
-		return NULL;    
-	}
 	SLIST_INIT(&aha->free_aha_ccbs);
 	LIST_INIT(&aha->pending_ccbs);
 	SLIST_INIT(&aha->sg_maps);
@@ -213,7 +183,6 @@ aha_alloc(int unit, bus_space_tag_t tag, bus_space_handle_t bsh)
 	aha->bsh = bsh;
 	aha->ccb_sg_opcode = INITIATOR_SG_CCB_WRESID;
 	aha->ccb_ccb_opcode = INITIATOR_CCB_WRESID;
-	return (aha);
 }
 
 void
@@ -227,10 +196,9 @@ aha_free(struct aha_softc *aha)
 
 		while ((sg_map = SLIST_FIRST(&aha->sg_maps))!= NULL) {
 			SLIST_REMOVE_HEAD(&aha->sg_maps, links);
-			bus_dmamap_unload(aha->sg_dmat,
-					  sg_map->sg_dmamap);
+			bus_dmamap_unload(aha->sg_dmat, sg_map->sg_dmamap);
 			bus_dmamem_free(aha->sg_dmat, sg_map->sg_vaddr,
-					sg_map->sg_dmamap);
+			    sg_map->sg_dmamap);
 			free(sg_map, M_DEVBUF);
 		}
 		bus_dma_tag_destroy(aha->sg_dmat);
@@ -240,14 +208,14 @@ aha_free(struct aha_softc *aha)
 	case 6:
 		bus_dmamap_destroy(aha->ccb_dmat, aha->ccb_dmamap);
 		bus_dmamem_free(aha->ccb_dmat, aha->aha_ccb_array,
-				aha->ccb_dmamap);
+		    aha->ccb_dmamap);
 	case 5:
 		bus_dma_tag_destroy(aha->ccb_dmat);
 	case 4:
 		bus_dmamap_unload(aha->mailbox_dmat, aha->mailbox_dmamap);
 	case 3:
 		bus_dmamem_free(aha->mailbox_dmat, aha->in_boxes,
-				aha->mailbox_dmamap);
+		    aha->mailbox_dmamap);
 		bus_dmamap_destroy(aha->mailbox_dmat, aha->mailbox_dmamap);
 	case 2:
 		bus_dma_tag_destroy(aha->buffer_dmat);
@@ -256,7 +224,6 @@ aha_free(struct aha_softc *aha)
 	case 0:
 		break;
 	}
-	free(aha, M_DEVBUF);
 }
 
 /*
@@ -276,17 +243,15 @@ aha_probe(struct aha_softc* aha)
 	 * failure case.
 	 */
 	status = aha_inb(aha, STATUS_REG);
-	if ((status == 0)
-	 || (status & (DIAG_ACTIVE|CMD_REG_BUSY|
-		       STATUS_REG_RSVD)) != 0) {
-		PRVERB(("%s: status reg test failed %x\n", aha_name(aha),
-			status));
+	if ((status == 0) ||
+	    (status & (DIAG_ACTIVE|CMD_REG_BUSY | STATUS_REG_RSVD)) != 0) {
+		PRVERB((aha->dev, "status reg test failed %x\n", status));
 		return (ENXIO);
 	}
 
 	intstat = aha_inb(aha, INTSTAT_REG);
 	if ((intstat & INTSTAT_REG_RSVD) != 0) {
-		PRVERB(("%s: Failed Intstat Reg Test\n", aha_name(aha)));
+		PRVERB((aha->dev, "Failed Intstat Reg Test\n"));
 		return (ENXIO);
 	}
 
@@ -296,7 +261,7 @@ aha_probe(struct aha_softc* aha)
 	 * looking at a BusLogic.
 	 */
 	if ((error = ahareset(aha, /*hard_reset*/TRUE)) != 0) {
-		PRVERB(("%s: Failed Reset\n", aha_name(aha)));
+		PRVERB((aha->dev, "Failed Reset\n"));
 		return (ENXIO);
 	}
 
@@ -305,10 +270,9 @@ aha_probe(struct aha_softc* aha)
 	 * a buslogic card or an aha card (or clone).
 	 */
 	error = aha_cmd(aha, AOP_INQUIRE_BOARD_ID, NULL, /*parmlen*/0,
-		       (u_int8_t*)&board_id, sizeof(board_id),
-		       DEFAULT_CMD_TIMEOUT);
+	    (uint8_t*)&board_id, sizeof(board_id), DEFAULT_CMD_TIMEOUT);
 	if (error != 0) {
-		PRVERB(("%s: INQUIRE failed %x\n", aha_name(aha), error));
+		PRVERB((aha->dev, "INQUIRE failed %x\n", error));
 		return (ENXIO);
 	}
 	aha->fw_major = board_id.firmware_rev_major;
@@ -332,7 +296,7 @@ aha_probe(struct aha_softc* aha)
 	 * Some compatible cards return 0 here.  Some cards also
 	 * seem to return 0x7f.
 	 *
-	 * XXX I'm not sure how this will impact other cloned cards 
+	 * XXX I'm not sure how this will impact other cloned cards
 	 *
 	 * This really should be replaced with the esetup command, since
 	 * that appears to be more reliable.  This becomes more and more
@@ -344,12 +308,12 @@ aha_probe(struct aha_softc* aha)
 		DELAY(10000);
 		status = aha_inb(aha, GEOMETRY_REG);
 		if (status != 0xff && status != 0x00 && status != 0x7f) {
-			PRVERB(("%s: Geometry Register test failed 0x%x\n",
-				aha_name(aha), status));
+			PRVERB((aha->dev, "Geometry Register test failed %#x\n",
+				status));
 			return (ENXIO);
 		}
 	}
-	
+
 	return (0);
 }
 
@@ -361,10 +325,10 @@ aha_fetch_adapter_info(struct aha_softc *aha)
 {
 	setup_data_t	setup_info;
 	config_data_t config_data;
-	u_int8_t length_param;
+	uint8_t length_param;
 	int	 error;
 	struct	aha_extbios extbios;
-	
+
 	switch (aha->boardid) {
 	case BOARD_1540_16HEAD_BIOS:
 		snprintf(aha->model, sizeof(aha->model), "1540 16 head BIOS");
@@ -405,17 +369,25 @@ aha_fetch_adapter_info(struct aha_softc *aha)
 	 */
 	if (PROBABLY_NEW_BOARD(aha->boardid) ||
 		(aha->boardid == 0x41
-		&& aha->fw_major == 0x31 && 
+		&& aha->fw_major == 0x31 &&
 		aha->fw_minor >= 0x34)) {
 		error = aha_cmd(aha, AOP_RETURN_EXT_BIOS_INFO, NULL,
-			/*paramlen*/0, (u_char *)&extbios, sizeof(extbios),
-			DEFAULT_CMD_TIMEOUT);
-		error = aha_cmd(aha, AOP_MBOX_IF_ENABLE, (u_int8_t *)&extbios,
-			/*paramlen*/2, NULL, 0, DEFAULT_CMD_TIMEOUT);
+		    /*paramlen*/0, (u_char *)&extbios, sizeof(extbios),
+		    DEFAULT_CMD_TIMEOUT);
+		if (error != 0) {
+			device_printf(aha->dev,
+			    "AOP_RETURN_EXT_BIOS_INFO - Failed.");
+			return (error);
+		}
+		error = aha_cmd(aha, AOP_MBOX_IF_ENABLE, (uint8_t *)&extbios,
+		    /*paramlen*/2, NULL, 0, DEFAULT_CMD_TIMEOUT);
+		if (error != 0) {
+			device_printf(aha->dev, "AOP_MBOX_IF_ENABLE - Failed.");
+			return (error);
+		}
 	}
 	if (aha->boardid < 0x41)
-		printf("%s: Warning: aha-1542A won't likely work.\n",
-			aha_name(aha));
+		device_printf(aha->dev, "Warning: aha-1542A won't work.\n");
 
 	aha->max_sg = 17;		/* Need >= 17 to do 64k I/O */
 	aha->diff_bus = 0;
@@ -425,11 +397,11 @@ aha_fetch_adapter_info(struct aha_softc *aha)
 	/* Determine Sync/Wide/Disc settings */
 	length_param = sizeof(setup_info);
 	error = aha_cmd(aha, AOP_INQUIRE_SETUP_INFO, &length_param,
-		       /*paramlen*/1, (u_int8_t*)&setup_info,
-		       sizeof(setup_info), DEFAULT_CMD_TIMEOUT);
+	    /*paramlen*/1, (uint8_t*)&setup_info, sizeof(setup_info),
+	    DEFAULT_CMD_TIMEOUT);
 	if (error != 0) {
-		printf("%s: aha_fetch_adapter_info - Failed "
-		       "Get Setup Info\n", aha_name(aha));
+		device_printf(aha->dev, "aha_fetch_adapter_info - Failed "
+		    "Get Setup Info\n");
 		return (error);
 	}
 	if (setup_info.initiate_sync != 0) {
@@ -441,13 +413,11 @@ aha_fetch_adapter_info(struct aha_softc *aha)
 	aha->num_boxes = aha->max_ccbs;
 
 	/* Determine our SCSI ID */
-	
 	error = aha_cmd(aha, AOP_INQUIRE_CONFIG, NULL, /*parmlen*/0,
-		       (u_int8_t*)&config_data, sizeof(config_data),
-		       DEFAULT_CMD_TIMEOUT);
+	    (uint8_t*)&config_data, sizeof(config_data), DEFAULT_CMD_TIMEOUT);
 	if (error != 0) {
-		printf("%s: aha_fetch_adapter_info - Failed Get Config\n",
-		       aha_name(aha));
+		device_printf(aha->dev,
+		    "aha_fetch_adapter_info - Failed Get Config\n");
 		return (error);
 	}
 	aha->scsi_id = config_data.scsi_id;
@@ -461,18 +431,18 @@ int
 aha_init(struct aha_softc* aha)
 {
 	/* Announce the Adapter */
-	printf("%s: AHA-%s FW Rev. %c.%c (ID=%x) ", aha_name(aha),
-	       aha->model, aha->fw_major, aha->fw_minor, aha->boardid);
+	device_printf(aha->dev, "AHA-%s FW Rev. %c.%c (ID=%x) ",
+	    aha->model, aha->fw_major, aha->fw_minor, aha->boardid);
 
 	if (aha->diff_bus != 0)
 		printf("Diff ");
 
 	printf("SCSI Host Adapter, SCSI ID %d, %d CCBs\n", aha->scsi_id,
-	       aha->max_ccbs);
+	    aha->max_ccbs);
 
 	/*
 	 * Create our DMA tags.  These tags define the kinds of device
-	 * accessible memory allocations and memory mappings we will 
+	 * accessible memory allocations and memory mappings we will
 	 * need to perform during normal operation.
 	 *
 	 * Unless we need to further restrict the allocation, we rely
@@ -481,7 +451,7 @@ aha_init(struct aha_softc* aha)
 	 */
 
 	/* DMA tag for mapping buffers into device visible space. */
-	if (bus_dma_tag_create(	/* parent	*/ aha->parent_dmat,
+	if (bus_dma_tag_create( /* parent	*/ aha->parent_dmat,
 				/* alignment	*/ 1,
 				/* boundary	*/ 0,
 				/* lowaddr	*/ BUS_SPACE_MAXADDR,
@@ -492,6 +462,8 @@ aha_init(struct aha_softc* aha)
 				/* nsegments	*/ AHA_NSEG,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
 				/* flags	*/ BUS_DMA_ALLOCNOW,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&aha->buffer_dmat) != 0) {
 		goto error_exit;
 	}
@@ -511,6 +483,8 @@ aha_init(struct aha_softc* aha)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&aha->mailbox_dmat) != 0) {
 		goto error_exit;
         }
@@ -519,18 +493,15 @@ aha_init(struct aha_softc* aha)
 
 	/* Allocation for our mailboxes */
 	if (bus_dmamem_alloc(aha->mailbox_dmat, (void **)&aha->out_boxes,
-			     BUS_DMA_NOWAIT, &aha->mailbox_dmamap) != 0) {
+	    BUS_DMA_NOWAIT, &aha->mailbox_dmamap) != 0)
 		goto error_exit;
-	}
 
 	aha->init_level++;
 
 	/* And permanently map them */
 	bus_dmamap_load(aha->mailbox_dmat, aha->mailbox_dmamap,
-       			aha->out_boxes,
-			aha->num_boxes * (sizeof(aha_mbox_in_t)
-				       + sizeof(aha_mbox_out_t)),
-			ahamapmboxes, aha, /*flags*/0);
+	    aha->out_boxes, aha->num_boxes * (sizeof(aha_mbox_in_t) +
+	    sizeof(aha_mbox_out_t)), ahamapmboxes, aha, /*flags*/0);
 
 	aha->init_level++;
 
@@ -551,6 +522,8 @@ aha_init(struct aha_softc* aha)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&aha->ccb_dmat) != 0) {
 		goto error_exit;
         }
@@ -559,17 +532,14 @@ aha_init(struct aha_softc* aha)
 
 	/* Allocation for our ccbs */
 	if (bus_dmamem_alloc(aha->ccb_dmat, (void **)&aha->aha_ccb_array,
-			     BUS_DMA_NOWAIT, &aha->ccb_dmamap) != 0) {
+	    BUS_DMA_NOWAIT, &aha->ccb_dmamap) != 0)
 		goto error_exit;
-	}
 
 	aha->init_level++;
 
 	/* And permanently map them */
-	bus_dmamap_load(aha->ccb_dmat, aha->ccb_dmamap,
-       			aha->aha_ccb_array,
-			aha->max_ccbs * sizeof(struct aha_ccb),
-			ahamapccbs, aha, /*flags*/0);
+	bus_dmamap_load(aha->ccb_dmat, aha->ccb_dmamap, aha->aha_ccb_array,
+	    aha->max_ccbs * sizeof(struct aha_ccb), ahamapccbs, aha, /*flags*/0);
 
 	aha->init_level++;
 
@@ -585,9 +555,10 @@ aha_init(struct aha_softc* aha)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
 				/* flags	*/ 0,
-				&aha->sg_dmat) != 0) {
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
+				&aha->sg_dmat) != 0)
 		goto error_exit;
-        }
 
 	aha->init_level++;
 
@@ -596,15 +567,15 @@ aha_init(struct aha_softc* aha)
 	ahaallocccbs(aha);
 
 	if (aha->num_ccbs == 0) {
-		printf("%s: aha_init - Unable to allocate initial ccbs\n",
-		       aha_name(aha));
+		device_printf(aha->dev,
+		    "aha_init - Unable to allocate initial ccbs\n");
 		goto error_exit;
 	}
 
 	/*
 	 * Note that we are going and return (to probe)
 	 */
-	return 0;
+	return (0);
 
 error_exit:
 
@@ -633,73 +604,24 @@ aha_attach(struct aha_softc *aha)
 	/*
 	 * Construct our SIM entry
 	 */
-	aha->sim = cam_sim_alloc(ahaaction, ahapoll, "aha", aha, aha->unit,
-				2, tagged_dev_openings, devq);
+	aha->sim = cam_sim_alloc(ahaaction, ahapoll, "aha", aha, aha->unit, 2,
+	    tagged_dev_openings, devq);
 	if (aha->sim == NULL) {
 		cam_simq_free(devq);
 		return (ENOMEM);
 	}
-	
 	if (xpt_bus_register(aha->sim, 0) != CAM_SUCCESS) {
 		cam_sim_free(aha->sim, /*free_devq*/TRUE);
 		return (ENXIO);
 	}
-	
-	if (xpt_create_path(&aha->path, /*periph*/NULL,
-			    cam_sim_path(aha->sim), CAM_TARGET_WILDCARD,
-			    CAM_LUN_WILDCARD) != CAM_REQ_CMP) {
+	if (xpt_create_path(&aha->path, /*periph*/NULL, cam_sim_path(aha->sim),
+	    CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD) != CAM_REQ_CMP) {
 		xpt_bus_deregister(cam_sim_path(aha->sim));
 		cam_sim_free(aha->sim, /*free_devq*/TRUE);
 		return (ENXIO);
 	}
-		
+
 	return (0);
-}
-
-char *
-aha_name(struct aha_softc *aha)
-{
-	static char name[10];
-
-	snprintf(name, sizeof(name), "aha%d", aha->unit);
-	return (name);
-}
-
-void
-aha_find_probe_range(int ioport, int *port_index, int *max_port_index)
-{
-	if (ioport > 0) {
-		int i;
-
-		for (i = 0;i < AHA_NUM_ISAPORTS; i++)
-			if (ioport <= aha_isa_ports[i].addr)
-				break;
-		if ((i >= AHA_NUM_ISAPORTS)
-		 || (ioport != aha_isa_ports[i].addr)) {
-			printf("\n"
-"aha_isa_probe: Invalid baseport of 0x%x specified.\n"
-"aha_isa_probe: Nearest valid baseport is 0x%x.\n"
-"aha_isa_probe: Failing probe.\n",
-			       ioport,
-			       (i < AHA_NUM_ISAPORTS)
-				    ? aha_isa_ports[i].addr
-				    : aha_isa_ports[AHA_NUM_ISAPORTS - 1].addr);
-			*port_index = *max_port_index = -1;
-			return;
-		}
-		*port_index = *max_port_index = aha_isa_ports[i].bio;
-	} else {
-		*port_index = 0;
-		*max_port_index = AHA_NUM_ISAPORTS - 1;
-	}
-}
-
-int
-aha_iop_from_bio(isa_compat_io_t bio_index)
-{
-	if (bio_index >= 0 && bio_index < AHA_NUM_ISAPORTS)
-		return (aha_board_ports[bio_index]);
-	return (-1);
 }
 
 static void
@@ -721,7 +643,7 @@ ahaallocccbs(struct aha_softc *aha)
 
 	/* Allocate S/G space for the next batch of CCBS */
 	if (bus_dmamem_alloc(aha->sg_dmat, (void **)&sg_map->sg_vaddr,
-			     BUS_DMA_NOWAIT, &sg_map->sg_dmamap) != 0) {
+	    BUS_DMA_NOWAIT, &sg_map->sg_dmamap) != 0) {
 		free(sg_map, M_DEVBUF);
 		return;
 	}
@@ -729,8 +651,8 @@ ahaallocccbs(struct aha_softc *aha)
 	SLIST_INSERT_HEAD(&aha->sg_maps, sg_map, links);
 
 	bus_dmamap_load(aha->sg_dmat, sg_map->sg_dmamap, sg_map->sg_vaddr,
-			PAGE_SIZE, ahamapsgs, aha, /*flags*/0);
-	
+	    PAGE_SIZE, ahamapsgs, aha, /*flags*/0);
+
 	segs = sg_map->sg_vaddr;
 	physaddr = sg_map->sg_physaddr;
 
@@ -742,7 +664,7 @@ ahaallocccbs(struct aha_softc *aha)
 		next_ccb->sg_list_phys = physaddr;
 		next_ccb->flags = ACCB_FREE;
 		error = bus_dmamap_create(aha->buffer_dmat, /*flags*/0,
-					  &next_ccb->dmamap);
+		    &next_ccb->dmamap);
 		if (error != 0)
 			break;
 		SLIST_INSERT_HEAD(&aha->free_aha_ccbs, next_ccb, links);
@@ -768,7 +690,7 @@ ahafreeccb(struct aha_softc *aha, struct aha_ccb *accb)
 	if ((accb->flags & ACCB_ACTIVE) != 0)
 		LIST_REMOVE(&accb->ccb->ccb_h, sim_links.le);
 	if (aha->resource_shortage != 0
-	 && (accb->ccb->ccb_h.status & CAM_RELEASE_SIMQ) == 0) {
+	    && (accb->ccb->ccb_h.status & CAM_RELEASE_SIMQ) == 0) {
 		accb->ccb->ccb_h.status |= CAM_RELEASE_SIMQ;
 		aha->resource_shortage = FALSE;
 	}
@@ -792,7 +714,7 @@ ahagetccb(struct aha_softc *aha)
 		ahaallocccbs(aha);
 		accb = SLIST_FIRST(&aha->free_aha_ccbs);
 		if (accb == NULL)
-			printf("%s: Can't malloc ACCB\n", aha_name(aha));
+			device_printf(aha->dev, "Can't malloc ACCB\n");
 		else {
 			SLIST_REMOVE_HEAD(&aha->free_aha_ccbs, links);
 			aha->active_ccbs++;
@@ -807,16 +729,16 @@ static void
 ahaaction(struct cam_sim *sim, union ccb *ccb)
 {
 	struct	aha_softc *aha;
+	int s;
 
 	CAM_DEBUG(ccb->ccb_h.path, CAM_DEBUG_TRACE, ("ahaaction\n"));
-	
+
 	aha = (struct aha_softc *)cam_sim_softc(sim);
-	
+
 	switch (ccb->ccb_h.func_code) {
 	/* Common cases first */
 	case XPT_SCSI_IO:	/* Execute the requested I/O operation */
-	case XPT_RESET_DEV:	/* Bus Device Reset the specified SCSI device */
-	{
+	case XPT_RESET_DEV:	/* Bus Device Reset the specified SCSI device */	{
 		struct	aha_ccb	*accb;
 		struct	aha_hccb *hccb;
 
@@ -824,8 +746,6 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 		 * Get an accb to use.
 		 */
 		if ((accb = ahagetccb(aha)) == NULL) {
-			int s;
-
 			s = splcam();
 			aha->resource_shortage = TRUE;
 			splx(s);
@@ -834,7 +754,6 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 			xpt_done(ccb);
 			return;
 		}
-		
 		hccb = &accb->hccb;
 
 		/*
@@ -896,7 +815,6 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 					 * to a single buffer.
 					 */
 					if ((ccbh->flags & CAM_DATA_PHYS)==0) {
-						int s;
 						int error;
 
 						s = splsoftvm();
@@ -923,7 +841,7 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 						}
 						splx(s);
 					} else {
-						struct bus_dma_segment seg; 
+						struct bus_dma_segment seg;
 
 						/* Pointer to physical buffer */
 						seg.ds_addr =
@@ -974,12 +892,10 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 		xpt_done(ccb);
 		break;
 	case XPT_SET_TRAN_SETTINGS:
-	{
 		/* XXX Implement */
 		ccb->ccb_h.status = CAM_PROVIDE_FAIL;
 		xpt_done(ccb);
 		break;
-	}
 	case XPT_GET_TRAN_SETTINGS:
 	/* Get default/user set transfer settings for the target */
 	{
@@ -1020,13 +936,12 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 	case XPT_CALC_GEOMETRY:
 	{
 		struct	  ccb_calc_geometry *ccg;
-		u_int32_t size_mb;
-		u_int32_t secs_per_cylinder;
+		uint32_t size_mb;
+		uint32_t secs_per_cylinder;
 
 		ccg = &ccb->ccg;
 		size_mb = ccg->volume_size
 			/ ((1024L * 1024L) / ccg->block_size);
-		
 		if (size_mb >= 1024 && (aha->extended_trans != 0)) {
 			if (size_mb >= 2048) {
 				ccg->heads = 255;
@@ -1046,12 +961,10 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 		break;
 	}
 	case XPT_RESET_BUS:		/* Reset the specified SCSI bus */
-	{
 		ahareset(aha, /*hardreset*/TRUE);
 		ccb->ccb_h.status = CAM_REQ_CMP;
 		xpt_done(ccb);
 		break;
-	}
 	case XPT_TERM_IO:		/* Terminate the I/O process */
 		/* XXX Implement */
 		ccb->ccb_h.status = CAM_REQ_INVALID;
@@ -1060,7 +973,7 @@ ahaaction(struct cam_sim *sim, union ccb *ccb)
 	case XPT_PATH_INQ:		/* Path routing inquiry */
 	{
 		struct ccb_pathinq *cpi = &ccb->cpi;
-		
+
 		cpi->version_num = 1; /* XXX??? */
 		cpi->hba_inquiry = PI_SDTR_ABLE;
 		cpi->target_sprt = 0;
@@ -1093,7 +1006,7 @@ ahaexecuteccb(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 	union	 ccb *ccb;
 	struct	 aha_softc *aha;
 	int	 s;
-	u_int32_t paddr;
+	uint32_t paddr;
 
 	accb = (struct aha_ccb *)arg;
 	ccb = accb->ccb;
@@ -1101,8 +1014,9 @@ ahaexecuteccb(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 
 	if (error != 0) {
 		if (error != EFBIG)
-			printf("%s: Unexepected error 0x%x returned from "
-			       "bus_dmamap_load\n", aha_name(aha), error);
+			device_printf(aha->dev,
+			    "Unexepected error 0x%x returned from "
+			    "bus_dmamap_load\n", error);
 		if (ccb->ccb_h.status == CAM_REQ_INPROG) {
 			xpt_freeze_devq(ccb->ccb_h.path, /*count*/1);
 			ccb->ccb_h.status = CAM_REQ_TOO_BIG|CAM_DEV_QFRZN;
@@ -1111,7 +1025,7 @@ ahaexecuteccb(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 		xpt_done(ccb);
 		return;
 	}
-		
+
 	if (nseg != 0) {
 		aha_sg_t *sg;
 		bus_dma_segment_t *end_seg;
@@ -1131,7 +1045,7 @@ ahaexecuteccb(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 		if (nseg > 1) {
 			accb->hccb.opcode = aha->ccb_sg_opcode;
 			ahautoa24((sizeof(aha_sg_t) * nseg),
-				  accb->hccb.data_len);
+			    accb->hccb.data_len);
 			ahautoa24(accb->sg_list_phys, accb->hccb.data_addr);
 		} else {
 			bcopy(accb->sg_list->len, accb->hccb.data_len, 3);
@@ -1165,14 +1079,13 @@ ahaexecuteccb(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 		splx(s);
 		return;
 	}
-		
+
 	accb->flags = ACCB_ACTIVE;
 	ccb->ccb_h.status |= CAM_SIM_QUEUED;
 	LIST_INSERT_HEAD(&aha->pending_ccbs, &ccb->ccb_h, sim_links.le);
 
-	ccb->ccb_h.timeout_ch =
-	    timeout(ahatimeout, (caddr_t)accb,
-		    (ccb->ccb_h.timeout * hz) / 1000);
+	ccb->ccb_h.timeout_ch = timeout(ahatimeout, (caddr_t)accb,
+	    (ccb->ccb_h.timeout * hz) / 1000);
 
 	/* Tell the adapter about this command */
 	if (aha->cur_outbox->action_code != AMBO_FREE) {
@@ -1183,9 +1096,9 @@ ahaexecuteccb(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 		 * hung, one of the pending transactions will
 		 * timeout causing us to start recovery operations.
 		 */
-		printf("%s: Encountered busy mailbox with %d out of %d "
-		       "commands active!!!", aha_name(aha), aha->active_ccbs,
-		       aha->max_ccbs);
+		device_printf(aha->dev,
+		    "Encountered busy mailbox with %d out of %d "
+		    "commands active!!!", aha->active_ccbs, aha->max_ccbs);
 		untimeout(ahatimeout, accb, ccb->ccb_h.timeout_ch);
 		if (nseg != 0)
 			bus_dmamap_unload(aha->buffer_dmat, accb->dmamap);
@@ -1198,7 +1111,7 @@ ahaexecuteccb(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 	}
 	paddr = ahaccbvtop(aha, accb);
 	ahautoa24(paddr, aha->cur_outbox->ccb_addr);
-	aha->cur_outbox->action_code = AMBO_START;	
+	aha->cur_outbox->action_code = AMBO_START;
 	aha_outb(aha, COMMAND_REG, AOP_START_MBOX);
 
 	ahanextoutbox(aha);
@@ -1210,6 +1123,7 @@ aha_intr(void *arg)
 {
 	struct	aha_softc *aha;
 	u_int	intstat;
+	uint32_t paddr;
 
 	aha = (struct aha_softc *)arg;
 	while (((intstat = aha_inb(aha, INTSTAT_REG)) & INTR_PENDING) != 0) {
@@ -1222,11 +1136,9 @@ aha_intr(void *arg)
 
 		if ((intstat & IMB_LOADED) != 0) {
 			while (aha->cur_inbox->comp_code != AMBI_FREE) {
-				u_int32_t	paddr;
 				paddr = aha_a24tou(aha->cur_inbox->ccb_addr);
-				ahadone(aha,
-				       ahaccbptov(aha, paddr),
-				       aha->cur_inbox->comp_code);
+				ahadone(aha, ahaccbptov(aha, paddr),
+				    aha->cur_inbox->comp_code);
 				aha->cur_inbox->comp_code = AMBI_FREE;
 				ahanextinbox(aha);
 			}
@@ -1248,8 +1160,9 @@ ahadone(struct aha_softc *aha, struct aha_ccb *accb, aha_mbi_comp_code_t comp_co
 	csio = &accb->ccb->csio;
 
 	if ((accb->flags & ACCB_ACTIVE) == 0) {
-		printf("%s: ahadone - Attempt to free non-active ACCB %p\n",
-		       aha_name(aha), (void *)accb);
+		device_printf(aha->dev, 
+		    "ahadone - Attempt to free non-active ACCB %p\n",
+		    (void *)accb);
 		return;
 	}
 
@@ -1279,10 +1192,9 @@ ahadone(struct aha_softc *aha, struct aha_ccb *accb, aha_mbi_comp_code_t comp_co
 
 		/* Notify all clients that a BDR occured */
 		error = xpt_create_path(&path, /*periph*/NULL,
-					cam_sim_path(aha->sim),
-					accb->hccb.target,
-					CAM_LUN_WILDCARD);
-		
+		    cam_sim_path(aha->sim), accb->hccb.target,
+		    CAM_LUN_WILDCARD);
+
 		if (error == CAM_REQ_CMP)
 			xpt_async(AC_SENT_BDR, path, NULL);
 
@@ -1296,13 +1208,13 @@ ahadone(struct aha_softc *aha, struct aha_ccb *accb, aha_mbi_comp_code_t comp_co
 				ccb_h = LIST_NEXT(ccb_h, sim_links.le);
 				ahadone(aha, pending_accb, AMBI_ERROR);
 			} else {
-				ccb_h->timeout_ch =
-				    timeout(ahatimeout, (caddr_t)pending_accb,
-					    (ccb_h->timeout * hz) / 1000);
+				ccb_h->timeout_ch = timeout(ahatimeout,
+				    (caddr_t)pending_accb,
+				    (ccb_h->timeout * hz) / 1000);
 				ccb_h = LIST_NEXT(ccb_h, sim_links.le);
 			}
 		}
-		printf("%s: No longer in timeout\n", aha_name(aha));
+		device_printf(aha->dev, "No longer in timeout\n");
 		return;
 	}
 
@@ -1310,12 +1222,12 @@ ahadone(struct aha_softc *aha, struct aha_ccb *accb, aha_mbi_comp_code_t comp_co
 
 	switch (comp_code) {
 	case AMBI_FREE:
-		printf("%s: ahadone - CCB completed with free status!\n",
-		       aha_name(aha));
+		device_printf(aha->dev,
+		    "ahadone - CCB completed with free status!\n");
 		break;
 	case AMBI_NOT_FOUND:
-		printf("%s: ahadone - CCB Abort failed to find CCB\n",
-		       aha_name(aha));
+		device_printf(aha->dev,
+		    "ahadone - CCB Abort failed to find CCB\n");
 		break;
 	case AMBI_ABORT:
 	case AMBI_ERROR:
@@ -1345,9 +1257,9 @@ ahadone(struct aha_softc *aha, struct aha_ccb *accb, aha_mbi_comp_code_t comp_co
 				 * offsets based on the scsi cmd len
 				 */
 				bcopy((caddr_t) &accb->hccb.scsi_cdb +
-					accb->hccb.cmd_len, 
-					(caddr_t) &csio->sense_data,
-					accb->hccb.sense_len);
+				    accb->hccb.cmd_len,
+				    (caddr_t) &csio->sense_data,
+				    accb->hccb.sense_len);
 				break;
 			default:
 				break;
@@ -1371,10 +1283,10 @@ ahadone(struct aha_softc *aha, struct aha_ccb *accb, aha_mbi_comp_code_t comp_co
 		case AHASTAT_INVALID_OPCODE:
 			if (accb->hccb.opcode < INITIATOR_CCB_WRESID)
 				panic("%s: Invalid CCB Opcode %x hccb = %p",
-					aha_name(aha), accb->hccb.opcode,
-					&accb->hccb);
-			printf("%s: AHA-1540A detected, compensating\n",
-				aha_name(aha));
+				    aha_name(aha), accb->hccb.opcode,
+				    &accb->hccb);
+			device_printf(aha->dev,
+			    "AHA-1540A detected, maybe compensating\n");
 			aha->ccb_sg_opcode = INITIATOR_SG_CCB;
 			aha->ccb_ccb_opcode = INITIATOR_CCB;
 			xpt_freeze_devq(ccb->ccb_h.path, /*count*/1);
@@ -1427,7 +1339,7 @@ ahareset(struct aha_softc* aha, int hard_reset)
 	struct	 ccb_hdr *ccb_h;
 	u_int	 status;
 	u_int	 timeout;
-	u_int8_t reset_type;
+	uint8_t reset_type;
 
 	if (hard_reset != 0)
 		reset_type = HARD_RESET;
@@ -1444,9 +1356,8 @@ ahareset(struct aha_softc* aha, int hard_reset)
 		DELAY(100);
 	}
 	if (timeout == 0) {
-		PRVERB(("%s: ahareset - Diagnostic Active failed to "
-			"assert. status = 0x%x\n", aha_name(aha),
-			status));
+		PRVERB((aha->dev, "ahareset - Diagnostic Active failed to "
+		    "assert. status = %#x\n", status));
 		return (ETIMEDOUT);
 	}
 
@@ -1460,7 +1371,7 @@ ahareset(struct aha_softc* aha, int hard_reset)
 	}
 	if (timeout == 0) {
 		panic("%s: ahareset - Diagnostic Active failed to drop. "
-		       "status = 0x%x\n", aha_name(aha), status);
+		    "status = 0x%x\n", aha_name(aha), status);
 		return (ETIMEDOUT);
 	}
 
@@ -1473,27 +1384,21 @@ ahareset(struct aha_softc* aha, int hard_reset)
 		DELAY(100);
 	}
 	if (timeout == 0) {
-		printf("%s: ahareset - Host adapter failed to come ready. "
-		       "status = 0x%x\n", aha_name(aha), status);
+		device_printf(aha->dev, "ahareset - Host adapter failed to "
+		    "come ready. status = 0x%x\n", status);
 		return (ETIMEDOUT);
 	}
 
 	/* If the diagnostics failed, tell the user */
 	if ((status & DIAG_FAIL) != 0
 	 || (status & HA_READY) == 0) {
-		printf("%s: ahareset - Adapter failed diagnostics\n",
-		       aha_name(aha));
+		device_printf(aha->dev, "ahareset - Adapter failed diag\n");
 
 		if ((status & DATAIN_REG_READY) != 0)
-			printf("%s: ahareset - Host Adapter Error "
-			       "code = 0x%x\n", aha_name(aha),
-			       aha_inb(aha, DATAIN_REG));
+			device_printf(aha->dev, "ahareset - Host Adapter "
+			    "Error code = 0x%x\n", aha_inb(aha, DATAIN_REG));
 		return (ENXIO);
 	}
-
-	/* If we've allocated mailboxes, initialize them */
-	if (aha->init_level > 4)
-		ahainitmboxes(aha);
 
 	/* If we've attached to the XPT, tell it about the event */
 	if (aha->path != NULL)
@@ -1510,6 +1415,11 @@ ahareset(struct aha_softc* aha, int hard_reset)
 		ahadone(aha, pending_accb, AMBI_ERROR);
 	}
 
+	/* If we've allocated mailboxes, initialize them */
+	/* Must be done after we've aborted our queue, or aha_cmd fails */
+	if (aha->init_level > 4)
+		ahainitmboxes(aha);
+
 	return (0);
 }
 
@@ -1517,8 +1427,8 @@ ahareset(struct aha_softc* aha, int hard_reset)
  * Send a command to the adapter.
  */
 int
-aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params, 
-	u_int param_len, u_int8_t *reply_data, u_int reply_len, 
+aha_cmd(struct aha_softc *aha, aha_op_t opcode, uint8_t *params,
+	u_int param_len, uint8_t *reply_data, u_int reply_len,
 	u_int cmd_timeout)
 {
 	u_int	timeout;
@@ -1544,20 +1454,20 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 	 * while there are pending transactions.  Freeze our SIMQ
 	 * and wait for all completions to occur if necessary.
 	 */
-	timeout = 100000;
+	timeout = 10000;
 	s = splcam();
 	while (LIST_FIRST(&aha->pending_ccbs) != NULL && --timeout) {
 		/* Fire the interrupt handler in case interrupts are blocked */
 		aha_intr(aha);
 		splx(s);
-		DELAY(100);
+		DELAY(10);
 		s = splcam();
 	}
 	splx(s);
 
 	if (timeout == 0) {
-		printf("%s: aha_cmd: Timeout waiting for adapter idle\n",
-		       aha_name(aha));
+		device_printf(aha->dev, 
+		    "aha_cmd: Timeout waiting for adapter idle\n");
 		return (ETIMEDOUT);
 	}
 	aha->command_cmp = 0;
@@ -1567,10 +1477,8 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 	 */
 	timeout = 100000;
 	while (--timeout) {
-
 		status = aha_inb(aha, STATUS_REG);
-		if ((status & HA_READY) != 0
-		 && (status & CMD_REG_BUSY) == 0)
+		if ((status & HA_READY) != 0 && (status & CMD_REG_BUSY) == 0)
 			break;
 		/*
 		 * Throw away any pending data which may be
@@ -1582,8 +1490,8 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 		DELAY(100);
 	}
 	if (timeout == 0) {
-		printf("%s: aha_cmd: Timeout waiting for adapter ready, "
-		       "status = 0x%x\n", aha_name(aha), status);
+		device_printf(aha->dev, "aha_cmd: Timeout waiting for adapter"
+		    " ready, status = 0x%x\n", status);
 		return (ETIMEDOUT);
 	}
 
@@ -1624,8 +1532,8 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 		}
 	}
 	if (timeout == 0) {
-		printf("%s: aha_cmd: Timeout sending parameters, "
-		       "status = 0x%x\n", aha_name(aha), status);
+		device_printf(aha->dev, "aha_cmd: Timeout sending parameters, "
+		    "status = 0x%x\n", status);
 		error = ETIMEDOUT;
 	}
 
@@ -1653,15 +1561,15 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 			saved_status = status;
 		}
 		if ((status & DATAIN_REG_READY) != 0) {
-			u_int8_t data;
+			uint8_t data;
 
 			data = aha_inb(aha, DATAIN_REG);
 			if (reply_len < reply_buf_size) {
 				*reply_data++ = data;
 			} else {
-				printf("%s: aha_cmd - Discarded reply data "
-				       "byte for opcode 0x%x\n", aha_name(aha),
-				       opcode);
+				device_printf(aha->dev, 
+				    "aha_cmd - Discarded reply data "
+				    "byte for opcode 0x%x\n", opcode);
 			}
 			/*
 			 * Reset timeout to ensure at least a second
@@ -1673,10 +1581,9 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 		DELAY(100);
 	}
 	if (cmd_timeout == 0) {
-		printf("%s: aha_cmd: Timeout waiting for reply data and "
-		       "command complete.\n%s: status = 0x%x, intstat = 0x%x, "
-		       "reply_len = %d\n", aha_name(aha), aha_name(aha), status,
-		       intstat, reply_len);
+		device_printf(aha->dev, "aha_cmd: Timeout: status = 0x%x, "
+		    "intstat = 0x%x, reply_len = %d\n", status, intstat,
+		    reply_len);
 		return (ETIMEDOUT);
 	}
 
@@ -1687,7 +1594,7 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 	s = splcam();
 	aha_intr(aha);
 	splx(s);
-	
+
 	if (error != 0)
 		return (error);
 
@@ -1695,7 +1602,7 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 	 * If the command was rejected by the controller, tell the caller.
 	 */
 	if ((saved_status & CMD_INVALID) != 0) {
-		PRVERB(("%s: Invalid Command 0x%x\n", aha_name(aha), opcode));
+		PRVERB((aha->dev, "Invalid Command 0x%x\n", opcode));
 		/*
 		 * Some early adapters may not recover properly from
 		 * an invalid command.  If it appears that the controller
@@ -1707,24 +1614,22 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 		if ((status & (CMD_INVALID|STATUS_REG_RSVD|DATAIN_REG_READY|
 			      CMD_REG_BUSY|DIAG_FAIL|DIAG_ACTIVE)) != 0
 		 || (status & (HA_READY|INIT_REQUIRED))
-		  != (HA_READY|INIT_REQUIRED)) {
+		  != (HA_READY|INIT_REQUIRED))
 			ahareset(aha, /*hard_reset*/FALSE);
-		}
 		return (EINVAL);
 	}
 
 	if (param_len > 0) {
 		/* The controller did not accept the full argument list */
-		PRVERB(("%s: Controller did not accept full argument list "
-			"(%d > 0)\n",
-			aha_name(aha), param_len));
+		PRVERB((aha->dev, "Controller did not accept full argument "
+		    "list (%d > 0)\n", param_len));
 	 	return (E2BIG);
 	}
 
 	if (reply_len != reply_buf_size) {
 		/* Too much or too little data received */
-		PRVERB(("%s: Too much or too little data received (%d != %d)\n",
-			aha_name(aha), reply_len, reply_buf_size));
+		PRVERB((aha->dev, "data received mismatch (%d != %d)\n",
+		    reply_len, reply_buf_size));
 		return (EMSGSIZE);
 	}
 
@@ -1733,7 +1638,7 @@ aha_cmd(struct aha_softc *aha, aha_op_t opcode, u_int8_t *params,
 }
 
 static int
-ahainitmboxes(struct aha_softc *aha) 
+ahainitmboxes(struct aha_softc *aha)
 {
 	int error;
 	init_24b_mbox_params_t init_mbox;
@@ -1748,9 +1653,9 @@ ahainitmboxes(struct aha_softc *aha)
 	/* Tell the adapter about them */
 	init_mbox.num_mboxes = aha->num_boxes;
 	ahautoa24(aha->mailbox_physbase, init_mbox.base_addr);
-	error = aha_cmd(aha, AOP_INITIALIZE_MBOX, (u_int8_t *)&init_mbox,
-		       /*parmlen*/sizeof(init_mbox), /*reply_buf*/NULL,
-		       /*reply_len*/0, DEFAULT_CMD_TIMEOUT);
+	error = aha_cmd(aha, AOP_INITIALIZE_MBOX, (uint8_t *)&init_mbox,
+	    /*parmlen*/sizeof(init_mbox), /*reply_buf*/NULL,
+	    /*reply_len*/0, DEFAULT_CMD_TIMEOUT);
 
 	if (error != 0)
 		printf("ahainitmboxes: Initialization command failed\n");
@@ -1769,7 +1674,7 @@ ahafetchtransinfo(struct aha_softc *aha, struct ccb_trans_settings* cts)
 	u_int		targ_offset;
 	u_int		sync_period;
 	int		error;
-	u_int8_t	param;
+	uint8_t	param;
 	targ_syncinfo_t	sync_info;
 
 	target = cts->ccb_h.target_id;
@@ -1781,12 +1686,12 @@ ahafetchtransinfo(struct aha_softc *aha, struct ccb_trans_settings* cts)
 	 */
 	param = sizeof(setup_info);
 	error = aha_cmd(aha, AOP_INQUIRE_SETUP_INFO, &param, /*paramlen*/1,
-		       (u_int8_t*)&setup_info, sizeof(setup_info),
-		       DEFAULT_CMD_TIMEOUT);
+	    (uint8_t*)&setup_info, sizeof(setup_info), DEFAULT_CMD_TIMEOUT);
 
 	if (error != 0) {
-		printf("%s: ahafetchtransinfo - Inquire Setup Info Failed %d\n",
-		       aha_name(aha), error);
+		device_printf(aha->dev,
+		    "ahafetchtransinfo - Inquire Setup Info Failed %d\n",
+		    error);
 		return;
 	}
 
@@ -1810,7 +1715,7 @@ ahafetchtransinfo(struct aha_softc *aha, struct ccb_trans_settings* cts)
 		cts->sync_period = scsi_calc_syncparam(sync_period);
 	else
 		cts->sync_period = 0;
-	
+
 	cts->valid = CCB_TRANS_SYNC_RATE_VALID
 		   | CCB_TRANS_SYNC_OFFSET_VALID
 		   | CCB_TRANS_BUS_WIDTH_VALID;
@@ -1858,7 +1763,8 @@ ahatimeout(void *arg)
 	union  ccb	*ccb;
 	struct aha_softc *aha;
 	int		 s;
-	u_int32_t	paddr;
+	uint32_t	paddr;
+	struct ccb_hdr *ccb_h;
 
 	accb = (struct aha_ccb *)arg;
 	ccb = accb->ccb;
@@ -1871,7 +1777,7 @@ ahatimeout(void *arg)
 	if ((accb->flags & ACCB_ACTIVE) == 0) {
 		xpt_print_path(ccb->ccb_h.path);
 		printf("CCB %p - timed out CCB already completed\n",
-		       (void *)accb);
+		    (void *)accb);
 		splx(s);
 		return;
 	}
@@ -1887,8 +1793,6 @@ ahatimeout(void *arg)
 	 * be reinstated when the recovery process ends.
 	 */
 	if ((accb->flags & ACCB_DEVICE_RESET) == 0) {
-		struct ccb_hdr *ccb_h;
-
 		if ((accb->flags & ACCB_RELEASE_SIMQ) == 0) {
 			xpt_freeze_simq(aha->sim, /*count*/1);
 			accb->flags |= ACCB_RELEASE_SIMQ;
@@ -1914,9 +1818,9 @@ ahatimeout(void *arg)
 		 */
 		ccb->ccb_h.status = CAM_CMD_TIMEOUT;
 		ahareset(aha, /*hardreset*/TRUE);
-		printf("%s: No longer in timeout\n", aha_name(aha));
+		device_printf(aha->dev, "No longer in timeout\n");
 	} else {
-		/*    
+		/*
 		 * Send a Bus Device Reset message:
 		 * The target that is holding up the bus may not
 		 * be the same as the one that triggered this timeout

@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/compat/linux/linux_file.c,v 1.80 2003/04/23 18:13:26 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_file.c,v 1.83 2003/11/19 04:12:31 kan Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -254,7 +255,6 @@ getdents_common(struct thread *td, struct linux_getdents64_args *args,
 	struct file *fp;
 	struct uio auio;
 	struct iovec aiov;
-	struct vattr va;
 	off_t off;
 	struct l_dirent linux_dirent;
 	struct l_dirent64 linux_dirent64;
@@ -270,15 +270,10 @@ getdents_common(struct thread *td, struct linux_getdents64_args *args,
 		return (EBADF);
 	}
 
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 	if (vp->v_type != VDIR) {
 		fdrop(fp, td);
 		return (EINVAL);
-	}
-
-	if ((error = VOP_GETATTR(vp, &va, td->td_ucred, td))) {
-		fdrop(fp, td);
-		return (error);
 	}
 
 	nbytes = args->count;

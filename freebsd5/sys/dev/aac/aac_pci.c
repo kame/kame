@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.34 2003/05/30 09:22:19 scottl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.40 2003/11/01 00:13:43 scottl Exp $");
 
 /*
  * PCI bus interface and resource allocation.
@@ -49,8 +50,8 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/aac/aacreg.h>
 #include <dev/aac/aac_ioctl.h>
@@ -104,8 +105,6 @@ struct aac_ident
 	"Dell PERC 3/Di"},
 	{0x1028, 0x0002, 0x1028, 0x00d9, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
-	{0x1028, 0x0008, 0x1028, 0x00cf, AAC_HWIF_I960RX, 0,
-	"Dell PERC 3/Di"},
 	{0x1028, 0x000a, 0x1028, 0x0106, AAC_HWIF_I960RX, 0,
 	"Dell PERC 3/Di"},
 	{0x1028, 0x000a, 0x1028, 0x011b, AAC_HWIF_I960RX, 0,
@@ -114,8 +113,8 @@ struct aac_ident
 	"Dell PERC 3/Di"},
 	{0x1011, 0x0046, 0x9005, 0x0364, AAC_HWIF_STRONGARM, 0,
 	"Adaptec AAC-364"},
-	{0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM, 0,
-	 "Adaptec SCSI RAID 5400S"},
+	{0x1011, 0x0046, 0x9005, 0x0365, AAC_HWIF_STRONGARM,
+	 AAC_FLAGS_BROKEN_MEMMAP, "Adaptec SCSI RAID 5400S"},
 	{0x1011, 0x0046, 0x9005, 0x1364, AAC_HWIF_STRONGARM, AAC_FLAGS_PERC2QC,
 	 "Dell PERC 2/QC"},
 	{0x1011, 0x0046, 0x103c, 0x10c2, AAC_HWIF_STRONGARM, 0,
@@ -197,7 +196,7 @@ aac_pci_attach(device_t dev)
 	/*
 	 * Allocate the PCI register window.
 	 */
-	sc->aac_regs_rid = 0x10;	/* first base address register */
+	sc->aac_regs_rid = PCIR_BAR(0);
 	if ((sc->aac_regs_resource = bus_alloc_resource(sc->aac_dev,
 							SYS_RES_MEMORY,
 							&sc->aac_regs_rid,
@@ -248,6 +247,7 @@ aac_pci_attach(device_t dev)
 			       AAC_MAXSGENTRIES,	/* nsegments */
 			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			       0,			/* flags */
+			       NULL, NULL,		/* No locking needed */
 			       &sc->aac_parent_dmat)) {
 		device_printf(sc->aac_dev, "can't allocate parent DMA tag\n");
 		goto out;

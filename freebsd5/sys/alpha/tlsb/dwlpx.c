@@ -22,10 +22,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/tlsb/dwlpx.c,v 1.24 2003/02/25 00:42:39 marcel Exp $
  */
-
 /*
  * Based very closely on NetBSD version-
  *
@@ -58,6 +55,9 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/dwlpx.c,v 1.26 2003/08/22 07:20:27 imp Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -89,7 +89,7 @@
 #include <alpha/tlsb/dwlpxreg.h>
 #include <alpha/tlsb/dwlpxvar.h>
 #include <alpha/pci/pcibus.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 
 #include "alphapci_if.h"
 #include "pcib_if.h"

@@ -1,4 +1,7 @@
 /*	OpenBSD: qsphy.c,v 1.6 2000/08/26 20:04:18 nate Exp */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/qsphy.c,v 1.12 2003/08/24 17:54:10 obrien Exp $");
 /*	NetBSD: qsphy.c,v 1.19 2000/02/02 23:34:57 thorpej Exp 	*/
 
 /*-
@@ -73,7 +76,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/qsphy.c,v 1.11 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/qsphy.c,v 1.12 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -34,16 +35,16 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)pcb.h	5.10 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/pcb.h,v 1.53 2003/05/15 00:23:40 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/pcb.h,v 1.56 2003/11/08 04:39:22 peter Exp $
  */
 
-#ifndef _I386_PCB_H_
-#define _I386_PCB_H_
+#ifndef _AMD64_PCB_H_
+#define _AMD64_PCB_H_
 
 /*
- * Intel 386 process control block
+ * AMD64 process control block
  */
-#include <machine/npx.h>
+#include <machine/fpu.h>
 
 struct pcb {
 	register_t	padxx[8];
@@ -66,9 +67,8 @@ struct pcb {
 
 	struct	savefpu	pcb_save;
 	u_long	pcb_flags;
-#define	PCB_NPXTRAP	0x01	/* npx trap pending */
-#define	PCB_NPXINITDONE	0x02	/* fpu state is initialized */
-#define	PCB_FULLCTX	0x04	/* full context restore on sysret */
+#define	PCB_FPUINITDONE	0x01	/* fpu state is initialized */
+#define	PCB_FULLCTX	0x02	/* full context restore on sysret */
 
 	caddr_t	pcb_onfault;	/* copyin/out fault recovery */
 };
@@ -77,4 +77,4 @@ struct pcb {
 void	savectx(struct pcb *);
 #endif
 
-#endif /* _I386_PCB_H_ */
+#endif /* _AMD64_PCB_H_ */

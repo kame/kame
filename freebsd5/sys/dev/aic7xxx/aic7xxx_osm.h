@@ -29,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aic7xxx_osm.h#14 $
+ * $Id: aic7xxx_osm.h,v 1.23 2003/07/01 15:51:52 scottl Exp $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.h,v 1.21 2003/05/26 21:43:29 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_osm.h,v 1.24 2003/08/22 05:51:24 imp Exp $
  */
 
 #ifndef _AIC7XXX_FREEBSD_H_
@@ -69,8 +69,13 @@
 #include <sys/rman.h>
 
 #if NPCI > 0
+#if __FreeBSD_version < 500000
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
+#else
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#endif
 #endif
 
 #include <cam/cam.h>
@@ -122,7 +127,7 @@ typedef union ccb *ahc_io_ctx_t;
 	bus_dma_tag_create(parent_tag, alignment, boundary,		\
 			   lowaddr, highaddr, filter, filterarg,	\
 			   maxsize, nsegments, maxsegsz, flags,		\
-			   dma_tagp)
+			   busdma_lock_mutex, &Giant, dma_tagp)
 
 #define ahc_dma_tag_destroy(ahc, tag)					\
 	bus_dma_tag_destroy(tag)

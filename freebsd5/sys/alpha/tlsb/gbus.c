@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/alpha/tlsb/gbus.c,v 1.10 2000/03/27 08:22:23 mjacob Exp $ */
 /* $NetBSD: gbus.c,v 1.8 1998/05/13 22:13:35 thorpej Exp $ */
-
 /*
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
@@ -33,6 +31,9 @@
  * Autoconfiguration and support routines for the Gbus: the internal
  * bus on AlphaServer CPU modules.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/gbus.c,v 1.12 2003/08/22 07:20:27 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

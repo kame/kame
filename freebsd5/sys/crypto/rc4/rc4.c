@@ -1,4 +1,3 @@
-
 /*
  * rc4.c
  *
@@ -33,9 +32,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/crypto/rc4/rc4.c,v 1.4 2003/01/15 19:55:16 sam Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/crypto/rc4/rc4.c,v 1.5 2003/06/10 21:43:12 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

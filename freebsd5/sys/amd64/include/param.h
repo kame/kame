@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/amd64/include/param.h,v 1.5 2003/05/23 05:04:54 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/param.h,v 1.9 2003/11/17 08:58:14 peter Exp $
  */
 
 /*
@@ -83,11 +83,15 @@
 #define	MACHINE_ARCH	"amd64"
 #endif
 
+#ifdef SMP
+#define MAXCPU		8
+#else
 #define MAXCPU		1
+#endif
 
 #define	ALIGNBYTES		_ALIGNBYTES
 #define	ALIGN(p)		_ALIGN(p)
-#define	ALIGNED_POINTER(p,t)	_ALIGNED_POINTER((p),(t))
+#define	ALIGNED_POINTER(p,t)	_ALIGNED_POINTER(p,t)
 
 
 /* Size of the level 1 page table units */
@@ -117,10 +121,12 @@
 
 #define IOPAGES	2		/* pages of i/o permission bitmap */
 
+#ifndef	KSTACK_PAGES
 #define	KSTACK_PAGES	4	/* pages of kstack (with pcb) */
+#endif
+#define	KSTACK_GUARD_PAGES 1	/* pages of kstack guard; 0 disables */
 #define UAREA_PAGES	1	/* holds struct user WITHOUT PCB (see def.) */
 
-#define KSTACK_GUARD	1	/* compile in the kstack guard page */
 
 /*
  * Ceiling on amount of swblock kva space, can be changed via

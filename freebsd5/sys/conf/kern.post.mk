@@ -1,13 +1,17 @@
-# Part of unified Makefile for building kernels.  This includes all
-# the definitions that need to be included after all the % directives,
-# except %RULES and things that act like they are part of %RULES
+# $FreeBSD: src/sys/conf/kern.post.mk,v 1.53 2003/11/25 04:12:43 imp Exp $
+
+# Part of a unified Makefile for building kernels.  This part includes all
+# the definitions that need to be after all the % directives except %RULES
+# and ones that act like they are part of %RULES.
 #
 # Most make variables should not be defined in this file.  Instead, they
 # should be defined in the kern.pre.mk so that port makefiles can
 # override or augment them.
-#
-# $FreeBSD: src/sys/conf/kern.post.mk,v 1.41 2003/04/30 12:19:25 markm Exp $
-#
+
+# In case the config had a makeoptions DESTDIR...
+.if defined(DESTDIR)
+MKMODULESENV+=	DESTDIR="${DESTDIR}"
+.endif
 
 .MAIN: all
 
@@ -47,8 +51,16 @@ FULLKERNEL=	${KERNEL_KO}
 FULLKERNEL=	${KERNEL_KO}.debug
 ${KERNEL_KO}: ${FULLKERNEL}
 	${OBJCOPY} --strip-debug ${FULLKERNEL} ${KERNEL_KO}
-install.debug reinstall.debug:
+install.debug reinstall.debug: gdbinit
 	cd ${.CURDIR}; ${MAKE} -DINSTALL_DEBUG ${.TARGET:R}
+
+gdbinit:
+	sed < ${S}/../tools/debugscripts/dot.gdbinit > .gdbinit \
+		"s:MODPATH:${.OBJDIR}/modules:"
+	cp ${S}/../tools/debugscripts/gdbinit.kernel \
+		${S}/../tools/debugscripts/gdbinit.vinum ${.CURDIR}
+	cp ${S}/../tools/debugscripts/gdbinit.${MACHINE_ARCH} \
+		${.CURDIR}/gdbinit.machine
 .endif
 
 ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
@@ -57,9 +69,12 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	${SYSTEM_LD}
 	${SYSTEM_LD_TAIL}
 
-.if !exists(.depend)
-${SYSTEM_OBJS}: assym.s vnode_if.h ${BEFORE_DEPEND:M*.h} ${MFILES:T:S/.m$/.h/}
+.if !exists(${.OBJDIR}/.depend)
+${SYSTEM_OBJS}: assym.s miidevs.h vnode_if.h ${BEFORE_DEPEND:M*.h} \
+    ${MFILES:T:S/.m$/.h/}
 .endif
+
+LNFILES=	${CFILES:T:S/.c$/.ln/}
 
 .for mfile in ${MFILES}
 # XXX the low quality .m.o rules gnerated by config are normally used
@@ -70,12 +85,6 @@ ${mfile:T:S/.m$/.h/}: ${mfile}
 	${AWK} -f $S/tools/makeobjops.awk ${mfile} -h
 .endfor
 
-.if !exists(.depend)
-acphy.o amphy.o bmtphy.o brgphy.o dcphy.o e1000phy.o exphy.o if_bge.o if_tx.o \
-inphy.o lxtphy.o nsgphy.o nsphy.o pnaphy.o pnphy.o qsphy.o rlphy.o tdkphy.o \
-tlphy.o xmphy.o: miidevs.h
-.endif
-
 kernel-clean:
 	rm -f *.o *.so *.So *.ko *.s eddep errs \
 	      ${FULLKERNEL} ${KERNEL_KO} linterrs makelinks tags \
@@ -83,8 +92,9 @@ kernel-clean:
 	      ${MFILES:T:S/.m$/.c/} ${MFILES:T:S/.m$/.h/} \
 	      ${CLEAN}
 
-lint: ${CFILES}
-	${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC}
+lint: ${LNFILES}
+	${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC} \
+	      2>&1 | tee -a linterrs
 
 # This is a hack.  BFD "optimizes" away dynamic mode if there are no
 # dynamic references.  We could probably do a '-Bforcedynamic' mode like
@@ -104,7 +114,7 @@ assym.s: $S/kern/genassym.sh genassym.o
 # XXX used to force -elf after CFLAGS to work around breakage of cc -aout
 # (genassym.sh makes some assumptions and cc stopped satisfying them).
 genassym.o: $S/$M/$M/genassym.c
-	${CC} -c ${CFLAGS:N-fno-common} $S/$M/$M/genassym.c
+	${CC} -c ${CFLAGS:N-fno-common} -Wno-inline $S/$M/$M/genassym.c
 
 ${SYSTEM_OBJS} genassym.o vers.o: opt_global.h
 
@@ -121,7 +131,7 @@ GEN_M_CFILES=	${MFILES:T:S/.m$/.c/}
 
 # The argument list can be very long, so use make -V and xargs to
 # pass it to mkdep.
-_kernel-depend: assym.s vnode_if.h miidevs.h ${BEFORE_DEPEND} \
+_kernel-depend: assym.s miidevs.h vnode_if.h ${BEFORE_DEPEND} \
 	    ${CFILES} ${SYSTEM_CFILES} ${GEN_CFILES} ${GEN_M_CFILES} \
 	    ${SFILES} ${MFILES:T:S/.m$/.h/}
 	if [ -f .olddep ]; then mv .olddep .depend; fi
@@ -167,7 +177,7 @@ kernel-install:
 	fi
 .if exists(${DESTDIR}${KODIR})
 	-thiskernel=`sysctl -n kern.bootfile` ; \
-	if [ "$$thiskernel" = ${DESTDIR}${KODIR}.old/${KERNEL_KO} ] ; then \
+	if [ "`dirname "$$thiskernel"`" != ${DESTDIR}${KODIR} ] ; then \
 		chflags -R noschg ${DESTDIR}${KODIR} ; \
 		rm -rf ${DESTDIR}${KODIR} ; \
 	else \
@@ -176,9 +186,7 @@ kernel-install:
 			rm -rf ${DESTDIR}${KODIR}.old ; \
 		fi ; \
 		mv ${DESTDIR}${KODIR} ${DESTDIR}${KODIR}.old ; \
-		if [ "$$thiskernel" = ${DESTDIR}${KODIR}/${KERNEL_KO} ] ; then \
-			sysctl kern.bootfile=${DESTDIR}${KODIR}.old/${KERNEL_KO} ; \
-		fi; \
+		sysctl kern.bootfile=${DESTDIR}${KODIR}.old/"`basename "$$thiskernel"`" ; \
 	fi
 .endif
 	mkdir -p ${DESTDIR}${KODIR}
@@ -196,22 +204,17 @@ kernel-reinstall:
 	${INSTALL} -p -m 555 -o root -g wheel ${KERNEL_KO} ${DESTDIR}${KODIR}
 .endif
 
-config.o:
+config.o env.o hints.o majors.o vers.o vnode_if.o:
 	${NORMAL_C}
 
-env.o:	env.c
-	${NORMAL_C}
+config.ln env.ln hints.ln majors.ln vers.ln vnode_if.ln:
+	${NORMAL_LINT}
 
-hints.o:	hints.c
-	${NORMAL_C}
+majors.c: $S/conf/majors $S/conf/majors.awk
+	${AWK} -f $S/conf/majors.awk $S/conf/majors > ${.TARGET}
 
 vers.c: $S/conf/newvers.sh $S/sys/param.h ${SYSTEM_DEP}
 	sh $S/conf/newvers.sh ${KERN_IDENT}
-
-# XXX strictly, everything depends on Makefile because changes to ${PROF}
-# only appear there, but we don't handle that.
-vers.o:
-	${NORMAL_C}
 
 vnode_if.c: $S/tools/vnode_if.awk $S/kern/vnode_if.src
 	${AWK} -f $S/tools/vnode_if.awk $S/kern/vnode_if.src -c
@@ -219,13 +222,7 @@ vnode_if.c: $S/tools/vnode_if.awk $S/kern/vnode_if.src
 vnode_if.h: $S/tools/vnode_if.awk $S/kern/vnode_if.src
 	${AWK} -f $S/tools/vnode_if.awk $S/kern/vnode_if.src -h
 
-vnode_if.o:
-	${NORMAL_C}
-
-majors.c: $S/conf/majors $S/conf/majors.awk
-	${AWK} -f $S/conf/majors.awk $S/conf/majors > majors.c
-
-majors.o:
-	${NORMAL_C}
+# XXX strictly, everything depends on Makefile because changes to ${PROF}
+# only appear there, but we don't handle that.
 
 .include "kern.mk"

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/conf/ldscript.i386,v 1.7 2003/01/06 07:37:15 phk Exp $ */
+/* $FreeBSD: src/sys/conf/ldscript.i386,v 1.9 2003/12/03 07:40:03 phk Exp $ */
 OUTPUT_FORMAT("elf32-i386-freebsd", "elf32-i386-freebsd", "elf32-i386-freebsd")
 OUTPUT_ARCH(i386)
 ENTRY(btext)
@@ -6,7 +6,7 @@ SEARCH_DIR(/usr/lib);
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
-  . = kernbase + 0x00100000 + SIZEOF_HEADERS;
+  . = kernbase + kernload + SIZEOF_HEADERS;
   .interp     : { *(.interp) 	}
   .hash          : { *(.hash)		}
   .dynsym        : { *(.dynsym)		}
@@ -65,6 +65,7 @@ SECTIONS
     CONSTRUCTORS
   }
   .data1   : { *(.data1) }
+  . = ALIGN(32 / 8);
   _start_ctors = .;
   PROVIDE (start_ctors = .);
   .ctors         :

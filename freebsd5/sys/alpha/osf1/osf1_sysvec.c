@@ -27,9 +27,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/osf1/osf1_sysvec.c,v 1.8 2002/09/01 21:41:22 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_sysvec.c,v 1.11 2003/09/25 01:10:22 peter Exp $");
 
 /* XXX we use functions that might not exist. */
 #include "opt_compat.h"
@@ -86,7 +87,8 @@ struct sysentvec osf1_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_setregs
+	exec_setregs,
+	NULL
 };
 
 /*

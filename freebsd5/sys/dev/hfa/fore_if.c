@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_if.c,v 1.10 2002/06/24 05:03:44 arr Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_if.c,v 1.12 2003/08/22 06:00:26 imp Exp $
  *
  */
 
@@ -51,7 +51,7 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <dev/hfa/fore.h>
 #include <dev/hfa/fore_aali.h>
 #include <dev/hfa/fore_slave.h>
@@ -60,7 +60,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_if.c,v 1.10 2002/06/24 05:03:44 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_if.c,v 1.12 2003/08/22 06:00:26 imp Exp $");
 #endif
 
 
@@ -89,7 +89,9 @@ fore_atm_ioctl(code, data, arg)
 	Fore_unit		*fup;
 	caddr_t			buf = aip->air_buf_addr;
 	struct air_vinfo_rsp	*avr;
-	int			count, len, buf_len = aip->air_buf_len;
+	size_t count;
+	size_t len;
+	size_t buf_len = aip->air_buf_len;
 	int			err = 0;
 	char			ifname[2*IFNAMSIZ];
  
@@ -165,7 +167,7 @@ fore_atm_ioctl(code, data, arg)
 		/*
 		 * Record amount we're returning as vendor info...
 		 */
-		if ((err = copyout(&count, &avr->avsp_len, sizeof(int))) != 0)
+		if ((err = copyout(&count, &avr->avsp_len, sizeof(count))) != 0)
 			break;
 
 		/*

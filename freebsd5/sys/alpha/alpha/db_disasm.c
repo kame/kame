@@ -1,6 +1,3 @@
-/* $FreeBSD: src/sys/alpha/alpha/db_disasm.c,v 1.7 2002/08/25 13:16:45 charnier Exp $ */
-/* $NetBSD: db_disasm.c,v 1.4 1997/09/16 22:52:40 thorpej Exp $ */
-
 /* 
  * Mach Operating System
  * Copyright (c) 1991,1990,1989,1988,1987 Carnegie Mellon University
@@ -48,8 +45,8 @@
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-
 /* __KERNEL_RCSID(0, "$NetBSD: db_disasm.c,v 1.4 1997/09/16 22:52:40 thorpej Exp $"); */
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/db_disasm.c,v 1.9 2003/08/22 07:20:25 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

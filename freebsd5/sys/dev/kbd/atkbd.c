@@ -23,8 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.38 2003/04/30 12:57:38 markm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.42 2003/10/07 09:21:59 fjoe Exp $");
 
 #include "opt_kbd.h"
 #include "opt_atkbd.h"
@@ -277,8 +279,7 @@ atkbd_configure(int flags)
 	atkbdc_configure();
 
 	/* if the driver is disabled, unregister the keyboard if any */
-	if ((resource_int_value("atkbd", ATKBD_DEFAULT, "disabled", &i) == 0)
-	    && i != 0) {
+	if (resource_disabled("atkbd", ATKBD_DEFAULT)) {
 		i = kbd_find_keyboard(ATKBD_DRIVER_NAME, ATKBD_DEFAULT);
 		if (i >= 0) {
 			kbd = kbd_get_keyboard(i);
@@ -418,8 +419,10 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		kbd->kb_config = flags & ~KB_CONF_PROBE_ONLY;
 		if (KBD_HAS_DEVICE(kbd)
 	    	    && init_keyboard(state->kbdc, &kbd->kb_type, kbd->kb_config)
-	    	    && (kbd->kb_config & KB_CONF_FAIL_IF_NO_KBD))
+	    	    && (kbd->kb_config & KB_CONF_FAIL_IF_NO_KBD)) {
+			kbd_unregister(kbd);
 			return ENXIO;
+		}
 		atkbd_ioctl(kbd, KDSETLED, (caddr_t)&state->ks_state);
 		get_typematic(kbd);
 		delay[0] = kbd->kb_delay1;
@@ -676,6 +679,15 @@ next_code:
 		case 0x5d:	/* menu key */
 	    		keycode = 0x6b;
 	    		break;
+		case 0x5e:	/* power key */
+			keycode = 0x6d;
+			break;
+		case 0x5f:	/* sleep key */
+			keycode = 0x6e;
+			break;
+		case 0x63:	/* wake key */
+			keycode = 0x6f;
+			break;
 		default:	/* ignore everything else */
 	    		goto next_code;
 		}

@@ -22,9 +22,10 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/amd64/amd64/db_disasm.c,v 1.26 2002/03/23 14:27:06 bde Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/db_disasm.c,v 1.27 2003/07/25 21:15:44 obrien Exp $");
 
 /*
  * Instruction disassembler.

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSynch.c,v 1.16 2002/11/27 18:09:20 iwasaki Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSynch.c,v 1.18 2003/09/26 21:22:10 njl Exp $
  */
 
 /*
@@ -79,8 +79,9 @@ struct acpi_semaphore {
 #endif
 static int	acpi_semaphore_debug = 0;
 TUNABLE_INT("debug.acpi_semaphore_debug", &acpi_semaphore_debug);
-SYSCTL_INT(_debug, OID_AUTO, acpi_semaphore_debug, CTLFLAG_RW,
-    &acpi_semaphore_debug, 0, "");
+SYSCTL_DECL(_debug_acpi);
+SYSCTL_INT(_debug_acpi, OID_AUTO, semaphore_debug, CTLFLAG_RW,
+	   &acpi_semaphore_debug, 0, "Enable ACPI semaphore debug messages");
 #endif
 
 ACPI_STATUS
@@ -337,4 +338,55 @@ AcpiOsSignalSemaphore(ACPI_HANDLE Handle, UINT32 Units)
 #else
     return(AE_OK);
 #endif
+}
+
+ACPI_STATUS
+AcpiOsCreateLock (ACPI_HANDLE *OutHandle)
+{
+    struct mtx *m;
+
+    if (OutHandle == NULL)
+	return (AE_BAD_PARAMETER);
+    MALLOC(m, struct mtx *, sizeof(*m), M_ACPISEM, M_NOWAIT | M_ZERO);
+    if (m == NULL)
+	return (AE_NO_MEMORY);
+
+    mtx_init(m, "acpica subsystem lock", NULL, MTX_DEF);
+    *OutHandle = (ACPI_HANDLE)m;
+    return (AE_OK);
+}
+
+void
+AcpiOsDeleteLock (ACPI_HANDLE Handle)
+{
+    struct mtx *m = (struct mtx *)Handle;
+
+    if (Handle == NULL)
+        return;
+    mtx_destroy(m);
+}
+
+/*
+ * The Flags parameter seems to state whether or not caller is an ISR
+ * (and thus can't block) but since we have ithreads, we don't worry
+ * about potentially blocking.
+ */
+void
+AcpiOsAcquireLock (ACPI_HANDLE Handle, UINT32 Flags)
+{
+    struct mtx *m = (struct mtx *)Handle;
+
+    if (Handle == NULL)
+        return;
+    mtx_lock(m);
+}
+
+void
+AcpiOsReleaseLock (ACPI_HANDLE Handle, UINT32 Flags)
+{
+    struct mtx *m = (struct mtx *)Handle;
+
+    if (Handle == NULL)
+        return;
+    mtx_unlock(m);
 }

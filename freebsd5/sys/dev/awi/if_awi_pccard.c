@@ -21,9 +21,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/awi/if_awi_pccard.c,v 1.10 2003/04/10 04:36:01 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/awi/if_awi_pccard.c,v 1.14 2003/10/31 18:31:57 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,7 +42,8 @@
 #include <net/if_arp.h>
 #include <net/if_media.h>
 #include <net/ethernet.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211.h>
 
 #include <dev/awi/am79c930reg.h>
 #include <dev/awi/am79c930var.h>
@@ -139,15 +141,9 @@ awi_pccard_attach(device_t dev)
 	psc->sc_mem_res = 0;
 	psc->sc_intrhand = 0;
 
-	ifp->if_name = "awi";
-	ifp->if_unit = device_get_unit(dev);
-	if (ifp->if_name == NULL) {
-		printf("awi%d: awi_pccard_attach: cannot get device name\n",
-		    device_get_unit(dev));
-		goto fail;
-	}
-	snprintf(sc->sc_dev.dv_xname, sizeof(sc->sc_dev.dv_xname),
-	    "%s%d", ifp->if_name, ifp->if_unit);
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
+	strlcpy(sc->sc_dev.dv_xname, ifp->if_xname,
+	    sizeof(sc->sc_dev.dv_xname));
 
 	psc->sc_port_rid = 0;
 	psc->sc_port_res = bus_alloc_resource(dev, SYS_RES_IOPORT,

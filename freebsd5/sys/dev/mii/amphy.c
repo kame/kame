@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/amphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * driver for AMD AM79c873 PHYs
  * This driver also works for the Davicom DM9101 PHY, which appears to
@@ -37,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/amphy.c,v 1.13 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/amphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

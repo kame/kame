@@ -25,9 +25,10 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/amd64/amd64/nexus.c,v 1.52 2003/05/23 05:04:53 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/nexus.c,v 1.58 2003/12/06 23:19:47 peter Exp $");
 
 /*
  * This code implements a `root nexus' for Intel Architecture
@@ -49,6 +50,7 @@
 #include <sys/malloc.h>
 #include <sys/module.h>
 #include <machine/bus.h>
+#include <machine/intr_machdep.h>
 #include <sys/rman.h>
 #include <sys/interrupt.h>
 
@@ -63,8 +65,6 @@
 #include <isa/isavar.h>
 #include <amd64/isa/isa.h>
 #endif
-#include <amd64/isa/icu.h>
-#include <amd64/isa/intr_machdep.h>
 #include <sys/rtprio.h>
 
 static MALLOC_DEFINE(M_NEXUSDEV, "nexusdev", "Nexus device");
@@ -135,6 +135,7 @@ DRIVER_MODULE(nexus, root, nexus_driver, nexus_devclass, 0, 0);
 static int
 nexus_probe(device_t dev)
 {
+	int irq, last;
 
 	device_quiet(dev);	/* suppress attach message for neatness */
 
@@ -155,18 +156,30 @@ nexus_probe(device_t dev)
 	 * multi-ISA-bus systems.  PCI interrupts are routed to the ISA
 	 * component, so in a way, PCI can be a partial child of an ISA bus(!).
 	 * APIC interrupts are global though.
-	 *
-	 * XXX We depend on the AT PIC driver correctly claiming IRQ 2
-	 *     to prevent its reuse elsewhere.
 	 */
 	irq_rman.rm_start = 0;
 	irq_rman.rm_type = RMAN_ARRAY;
 	irq_rman.rm_descr = "Interrupt request lines";
-	irq_rman.rm_end = 15;
-	if (rman_init(&irq_rman)
-	    || rman_manage_region(&irq_rman,
-				  irq_rman.rm_start, irq_rman.rm_end))
+	irq_rman.rm_end = NUM_IO_INTS - 1;
+	if (rman_init(&irq_rman))
 		panic("nexus_probe irq_rman");
+
+	/*
+	 * We search for regions of existing IRQs and add those to the IRQ
+	 * resource manager.
+	 */
+	last = -1;
+	for (irq = 0; irq < NUM_IO_INTS; irq++)
+		if (intr_lookup_source(irq) != NULL) {
+			if (last == -1)
+				last = irq;
+		} else if (last != -1) {
+			if (rman_manage_region(&irq_rman, last, irq - 1) != 0)
+				panic("nexus_probe irq_rman add");
+			last = -1;
+		}
+	if (last != -1 && rman_manage_region(&irq_rman, last, irq - 1) != 0)
+		panic("nexus_probe irq_rman add");
 
 	/*
 	 * ISA DMA on PCI systems is implemented in the ISA part of each
@@ -267,7 +280,6 @@ nexus_add_child(device_t bus, int order, const char *name, int unit)
 /*
  * Allocate a resource on behalf of child.  NB: child is usually going to be a
  * child of one of our descendants, not a direct child of nexus0.
- * (Exceptions include npx.)
  */
 static struct resource *
 nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
@@ -411,7 +423,6 @@ static int
 nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 		 int flags, void (*ihand)(void *), void *arg, void **cookiep)
 {
-	driver_t	*driver;
 	int		error;
 
 	/* somebody tried to setup an irq that failed to allocate! */
@@ -422,8 +433,6 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 	if ((irq->r_flags & RF_SHAREABLE) == 0)
 		flags |= INTR_EXCL;
 
-	driver = device_get_driver(child);
-
 	/*
 	 * We depend here on rman_activate_resource() being idempotent.
 	 */
@@ -431,7 +440,7 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 	if (error)
 		return (error);
 
-	error = inthand_add(device_get_nameunit(child), irq->r_start,
+	error = intr_add_handler(device_get_nameunit(child), irq->r_start,
 	    ihand, arg, flags, cookiep);
 
 	return (error);
@@ -440,7 +449,7 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 static int
 nexus_teardown_intr(device_t dev, device_t child, struct resource *r, void *ih)
 {
-	return (inthand_remove(ih));
+	return (intr_remove_handler(ih));
 }
 
 static int

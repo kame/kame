@@ -1,6 +1,5 @@
 /*	$NetBSD: osf1_signal.c,v 1.4 1998/05/20 16:35:01 chs Exp $
  */
-
 /*
  * Copyright (c) 1998-1999 Andrew Gallatin
  * 
@@ -30,8 +29,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/osf1/osf1_signal.c,v 1.33 2003/05/13 20:35:56 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_signal.c,v 1.35 2003/08/22 07:20:27 imp Exp $");
 
 #include "opt_compat.h"
 #ifndef COMPAT_43

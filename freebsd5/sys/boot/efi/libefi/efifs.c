@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/efi/libefi/efifs.c,v 1.7 2003/02/26 09:13:05 marcel Exp $
+ * $FreeBSD: src/sys/boot/efi/libefi/efifs.c,v 1.8 2003/08/02 08:22:03 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -291,7 +291,18 @@ struct fs_ops efi_fsops = {
 };
 
 static EFI_HANDLE *fs_handles;
-UINTN fs_handle_count;;
+UINTN fs_handle_count;
+
+int
+efifs_get_unit(EFI_HANDLE h)
+{
+	UINTN u;
+
+	u = 0;
+	while (u < fs_handle_count && fs_handles[u] != h)
+		u++;
+	return ((u < fs_handle_count) ? u : -1);
+}
 
 static int
 efifs_dev_init(void) 

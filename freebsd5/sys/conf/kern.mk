@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/kern.mk,v 1.36 2003/05/30 01:06:58 peter Exp $
+# $FreeBSD: src/sys/conf/kern.mk,v 1.37 2003/11/04 23:29:17 peter Exp $
 
 #
 # Warning flags for compiling the kernel and components of the kernel.
@@ -24,6 +24,7 @@ CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 #
 .if ${MACHINE_ARCH} == "i386"
 CFLAGS+=	-mno-align-long-strings -mpreferred-stack-boundary=2
+INLINE_LIMIT?=	15000
 .endif
 
 #
@@ -33,6 +34,7 @@ CFLAGS+=	-mno-align-long-strings -mpreferred-stack-boundary=2
 #
 .if ${MACHINE_ARCH} == "alpha"
 CFLAGS+=	-mno-fp-regs -ffixed-8 -Wa,-mev6
+INLINE_LIMIT?=	15000
 .endif
 
 #
@@ -41,6 +43,7 @@ CFLAGS+=	-mno-fp-regs -ffixed-8 -Wa,-mev6
 #
 .if ${MACHINE_ARCH} == "ia64"
 CFLAGS+=	-ffixed-r13 -mfixed-range=f32-f127 -mno-sdata
+INLINE_LIMIT?=	15000
 .endif
 
 #
@@ -50,6 +53,7 @@ CFLAGS+=	-ffixed-r13 -mfixed-range=f32-f127 -mno-sdata
 #
 .if ${MACHINE_ARCH} == "sparc64"
 CFLAGS+=	-mcmodel=medlow -msoft-float
+INLINE_LIMIT?=	15000
 .endif
 
 #
@@ -60,6 +64,7 @@ CFLAGS+=	-mcmodel=medlow -msoft-float
 CFLAGS+=	-mcmodel=kernel -mno-red-zone \
 		-mfpmath=387 -mno-sse -mno-sse2 -mno-mmx -mno-3dnow \
 		-msoft-float -fno-asynchronous-unwind-tables
+INLINE_LIMIT?=	20000
 .endif
 
 #

@@ -1,5 +1,3 @@
-/* $FreeBSD: src/sys/alpha/tlsb/tlsb.c,v 1.14 2003/02/25 00:42:40 marcel Exp $ */
-
 /*
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
@@ -36,6 +34,9 @@
  * found on AlphaServer 8200 and 8400 systems.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/tlsb.c,v 1.16 2003/08/17 06:42:08 marcel Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -43,8 +44,9 @@
 #include <sys/bus.h>
 #include <sys/malloc.h>
 
-#include <machine/rpb.h>
 #include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
 
 #include <alpha/tlsb/tlsbreg.h>
 #include <alpha/tlsb/tlsbvar.h>

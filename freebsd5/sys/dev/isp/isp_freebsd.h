@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.71 2002/09/23 05:00:14 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.73 2003/10/21 21:52:23 mjacob Exp $ */
 /*
  * Qlogic ISP SCSI Host Adapter FreeBSD Wrapper Definitions
  * Copyright (c) 1997, 1998, 1999, 2000, 2001, 2002 by Matthew Jacob
@@ -76,8 +76,7 @@
 #endif
 
 #define	HANDLE_LOOPSTATE_IN_OUTER_LAYERS	1
-/* turn this off for now */
-/* #define	ISP_SMPLOCK			1	*/
+/* #define	ISP_SMPLOCK			1 */
 
 #ifdef	ISP_SMPLOCK
 #define	ISP_IFLAGS	INTR_TYPE_CAM | INTR_ENTROPY | INTR_MPSAFE

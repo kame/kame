@@ -26,13 +26,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/buslogic/bt_eisa.c,v 1.15 2003/03/29 09:46:10 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_eisa.c,v 1.18 2003/08/24 17:46:02 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/bus.h>
 
 #include <machine/bus_pio.h>
@@ -162,25 +166,18 @@ bt_match(eisa_id_t type)
 	switch(type) {
 		case EISA_DEVICE_ID_BUSLOGIC_74X_B:
 			return ("Buslogic 74xB SCSI host adapter");
-			break;
 		case EISA_DEVICE_ID_BUSLOGIC_74X_C:
 			return ("Buslogic 74xC SCSI host adapter");
-			break;
 		case EISA_DEVICE_ID_SDC3222B:
 			return ("Storage Dimensions SDC3222B SCSI host adapter");
-			break;
 		case EISA_DEVICE_ID_SDC3222F:
 			return ("Storage Dimensions SDC3222F SCSI host adapter");
-			break;
 		case EISA_DEVICE_ID_SDC3222WS:
 			return ("Storage Dimensions SDC3222WS SCSI host adapter");
-			break;
 		case EISA_DEVICE_ID_SDC3222WB:
 			return ("Storage Dimensions SDC3222WB SCSI host adapter");
-			break;
 		case EISA_DEVICE_ID_AMI_4801:
 			return ("AMI Series 48 SCSI host adapter");
-			break;
 		default:
 			break;
 	}
@@ -320,6 +317,8 @@ bt_eisa_attach(device_t dev)
 				/* nsegments	*/ ~0,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg,	*/ &Giant,
 				&bt->parent_dmat) != 0) {
 		bt_eisa_release_resources(dev);
 		return -1;

@@ -1,8 +1,7 @@
 /*-
+ * Written by: David Jeffery
  * Copyright (c) 2002 Adaptec Inc.
  * All rights reserved.
- *
- * Written by: David Jeffery
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,13 +23,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ips/ips_ioctl.c,v 1.1 2003/05/11 06:36:49 scottl Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips_ioctl.c,v 1.4 2003/08/24 17:49:14 obrien Exp $");
 
 #include <dev/ips/ips.h>
 #include <dev/ips/ips_ioctl.h>
+
 static void ips_ioctl_finish(ips_command_t *command)
 {
 	ips_ioctl_t *ioctl_cmd = command->arg;
@@ -86,18 +86,21 @@ static int ips_ioctl_start(ips_command_t *command)
 static int ips_ioctl_cmd(ips_softc_t *sc, ips_ioctl_t *ioctl_cmd, ips_user_request *user_request)
 {
 	int error = EINVAL;
-	       	if (bus_dma_tag_create(	/* parent    */	sc->adapter_dmatag,
-				/* alignment */	1,
-				/* boundary  */	0,
-				/* lowaddr   */	BUS_SPACE_MAXADDR_32BIT,
-				/* highaddr  */	BUS_SPACE_MAXADDR,
-				/* filter    */	NULL,
-				/* filterarg */	NULL,
-				/* maxsize   */	ioctl_cmd->datasize,
-				/* numsegs   */	1,
-				/* maxsegsize*/	ioctl_cmd->datasize,
-				/* flags     */	0,
-				&ioctl_cmd->dmatag) != 0) {
+
+	if (bus_dma_tag_create(	/* parent    */	sc->adapter_dmatag,
+			/* alignment */	1,
+			/* boundary  */	0,
+			/* lowaddr   */	BUS_SPACE_MAXADDR_32BIT,
+			/* highaddr  */	BUS_SPACE_MAXADDR,
+			/* filter    */	NULL,
+			/* filterarg */	NULL,
+			/* maxsize   */	ioctl_cmd->datasize,
+			/* numsegs   */	1,
+			/* maxsegsize*/	ioctl_cmd->datasize,
+			/* flags     */	0,
+			/* lockfunc  */ busdma_lock_mutex,
+			/* lockarg   */ &Giant,
+			&ioctl_cmd->dmatag) != 0) {
 		return ENOMEM;
         }
 	if(bus_dmamem_alloc(ioctl_cmd->dmatag, &ioctl_cmd->data_buffer, 

@@ -1,6 +1,4 @@
-/*	$FreeBSD: src/sys/crypto/sha1.c,v 1.8 2002/03/20 05:13:50 alfred Exp $	*/
 /*	$KAME: sha1.c,v 1.5 2000/11/08 06:13:08 itojun Exp $	*/
-
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -29,11 +27,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 /*
  * FIPS pub 180-1: Secure Hash Algorithm (SHA-1)
  * based on: http://csrc.nist.gov/fips/fip180-1.txt
  * implemented by Jun-ichiro itojun Itoh <itojun@itojun.org>
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/crypto/sha1.c,v 1.9 2003/06/10 21:36:57 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/cdefs.h>

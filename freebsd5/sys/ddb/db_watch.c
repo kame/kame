@@ -22,14 +22,14 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_watch.c,v 1.24 2002/09/28 17:14:19 phk Exp $
  */
-
 /*
  * 	Author: Richard P. Draves, Carnegie Mellon University
  *	Date:	10/90
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_watch.c,v 1.25 2003/06/10 22:09:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>

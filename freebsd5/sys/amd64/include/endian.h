@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)endian.h	7.8 (Berkeley) 4/3/91
- * $FreeBSD: src/sys/amd64/include/endian.h,v 1.4 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/endian.h,v 1.5 2003/09/22 22:37:49 peter Exp $
  */
 
 #ifndef _MACHINE_ENDIAN_H_
@@ -69,25 +69,91 @@
 
 #ifdef __GNUC__
 
-#define __word_swap_int(x) \
+#define __word_swap_int_var(x) \
 __extension__ ({ register __uint32_t __X = (x); \
    __asm ("rorl $16, %0" : "+r" (__X)); \
    __X; })
 
-#define __byte_swap_int(x) \
+#ifdef __OPTIMIZE__
+
+#define	__word_swap_int_const(x) \
+	((((x) & 0xffff0000) >> 16) | \
+	 (((x) & 0x0000ffff) << 16))
+#define	__word_swap_int(x) (__builtin_constant_p(x) ? \
+	__word_swap_int_const(x) : __word_swap_int_var(x))
+
+#else	/* __OPTIMIZE__ */
+
+#define	__word_swap_int(x) __word_swap_int_var(x)
+
+#endif	/* __OPTIMIZE__ */
+
+#define __byte_swap_int_var(x) \
 __extension__ ({ register __uint32_t __X = (x); \
    __asm ("bswap %0" : "+r" (__X)); \
    __X; })
 
-#define __byte_swap_long(x) \
+#ifdef __OPTIMIZE__
+
+#define	__byte_swap_int_const(x) \
+	((((x) & 0xff000000) >> 24) | \
+	 (((x) & 0x00ff0000) >>  8) | \
+	 (((x) & 0x0000ff00) <<  8) | \
+	 (((x) & 0x000000ff) << 24))
+#define	__byte_swap_int(x) (__builtin_constant_p(x) ? \
+	__byte_swap_int_const(x) : __byte_swap_int_var(x))
+
+#else	/* __OPTIMIZE__ */
+
+#define	__byte_swap_int(x) __byte_swap_int_var(x)
+
+#endif	/* __OPTIMIZE__ */
+
+#define __byte_swap_long_var(x) \
 __extension__ ({ register __uint64_t __X = (x); \
    __asm ("bswap %0" : "+r" (__X)); \
    __X; })
 
-#define __byte_swap_word(x) \
+#ifdef __OPTIMIZE__
+
+#define	__byte_swap_long_const(x) \
+	(((x >> 56) | \
+	 ((x >> 40) & 0xff00) | \
+	 ((x >> 24) & 0xff0000) | \
+	 ((x >> 8) & 0xff000000) | \
+	 ((x << 8) & (0xfful << 32)) | \
+	 ((x << 24) & (0xfful << 40)) | \
+	 ((x << 40) & (0xfful << 48)) | \
+	 ((x << 56))))
+
+#define	__byte_swap_long(x) (__builtin_constant_p(x) ? \
+	__byte_swap_long_const(x) : __byte_swap_long_var(x))
+
+#else	/* __OPTIMIZE__ */
+
+#define	__byte_swap_long(x) __byte_swap_long_var(x)
+
+#endif	/* __OPTIMIZE__ */
+
+#define __byte_swap_word_var(x) \
 __extension__ ({ register __uint16_t __X = (x); \
    __asm ("xchgb %h0, %b0" : "+Q" (__X)); \
    __X; })
+
+#ifdef __OPTIMIZE__
+
+#define	__byte_swap_word_const(x) \
+	((((x) & 0xff00) >> 8) | \
+	 (((x) & 0x00ff) << 8))
+
+#define	__byte_swap_word(x) (__builtin_constant_p(x) ? \
+	__byte_swap_word_const(x) : __byte_swap_word_var(x))
+
+#else	/* __OPTIMIZE__ */
+
+#define	__byte_swap_word(x) __byte_swap_word_var(x)
+
+#endif	/* __OPTIMIZE__ */
 
 static __inline __uint64_t
 __bswap64(__uint64_t _x)

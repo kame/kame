@@ -35,9 +35,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: NetBSD: hme.c,v 1.20 2000/12/14 06:27:25 thorpej Exp
- *
- * $FreeBSD: src/sys/dev/hme/if_hme.c,v 1.13 2003/02/19 05:47:05 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/hme/if_hme.c,v 1.17 2003/10/31 18:32:01 brooks Exp $");
 
 /*
  * HME Ethernet module driver.
@@ -82,8 +83,8 @@
 
 #include <machine/bus.h>
 
-#include <hme/if_hmereg.h>
-#include <hme/if_hmevar.h>
+#include <dev/hme/if_hmereg.h>
+#include <dev/hme/if_hmevar.h>
 
 static void	hme_start(struct ifnet *);
 static void	hme_stop(struct hme_softc *);
@@ -191,27 +192,28 @@ hme_config(struct hme_softc *sc)
 
 	error = bus_dma_tag_create(NULL, 1, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, size, HME_NTXDESC + HME_NRXDESC + 1,
-	    BUS_SPACE_MAXSIZE_32BIT, 0, &sc->sc_pdmatag);
+	    BUS_SPACE_MAXSIZE_32BIT, 0, NULL, NULL, &sc->sc_pdmatag);
 	if (error)
 		return (error);
 
 	error = bus_dma_tag_create(sc->sc_pdmatag, 2048, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL, size,
-	    1, BUS_SPACE_MAXSIZE_32BIT, BUS_DMA_ALLOCNOW, &sc->sc_cdmatag);
+	    1, BUS_SPACE_MAXSIZE_32BIT, BUS_DMA_ALLOCNOW, busdma_lock_mutex,
+	    &Giant, &sc->sc_cdmatag);
 	if (error)
 		goto fail_ptag;
 
 	error = bus_dma_tag_create(sc->sc_pdmatag, max(0x10, sc->sc_burst), 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL, MCLBYTES,
 	    HME_NRXDESC, BUS_SPACE_MAXSIZE_32BIT, BUS_DMA_ALLOCNOW,
-	    &sc->sc_rdmatag);
+	    NULL, NULL, &sc->sc_rdmatag);
 	if (error)
 		goto fail_ctag;
 
 	error = bus_dma_tag_create(sc->sc_pdmatag, max(0x10, sc->sc_burst), 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL, MCLBYTES,
 	    HME_NTXDESC, BUS_SPACE_MAXSIZE_32BIT, BUS_DMA_ALLOCNOW,
-	    &sc->sc_tdmatag);
+	    NULL, NULL, &sc->sc_tdmatag);
 	if (error)
 		goto fail_rtag;
 
@@ -266,8 +268,8 @@ hme_config(struct hme_softc *sc)
 
 	/* Initialize ifnet structure. */
 	ifp->if_softc = sc;
-	ifp->if_unit = device_get_unit(sc->sc_dev);
-	ifp->if_name = "hme";
+	if_initname(ifp, device_get_name(sc->sc_dev),
+	    device_get_unit(sc->sc_dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX |IFF_MULTICAST;
 	ifp->if_start = hme_start;

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hea/eni.h,v 1.8 2003/01/01 18:48:50 schweikh Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hea/eni.h,v 1.10 2003/08/22 15:35:37 imp Exp $
  *
  */
 
@@ -37,8 +37,8 @@
 #ifndef	_ENI_ENI_H
 #define	_ENI_ENI_H
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 /*
  * Physical device name - used to configure HARP devices
@@ -234,7 +234,7 @@
  */
 
 /*
- * Part of PCI configuration registers but not defined in <pci/pcireg.h>
+ * Part of PCI configuration registers but not defined in <dev/pci/pcireg.h>
  */
 #define	PCI_CONTROL_REG		0x60
 #define	ENDIAN_SWAP_DMA		0x80		/* Enable endian swaps on DMA */

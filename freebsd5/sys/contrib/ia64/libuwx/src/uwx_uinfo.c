@@ -1,24 +1,26 @@
 /*
- * Copyright (c) 2002,2003 Hewlett-Packard Company
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
+Copyright (c) 2003 Hewlett-Packard Development Company, L.P.
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #include "uwx_env.h"
 #include "uwx_uinfo.h"
@@ -233,8 +235,9 @@ int uwx_decode_rhdr(
 	    TRACE_I_DECODE_RHDR_1("(R1) prologue", b0)
 	    rhdr->is_prologue = 1;
 	}
-	else
+	else {
 	    TRACE_I_DECODE_RHDR_1("(R1) body", b0)
+	}
 	rhdr->rlen = b0 & 0x1f;
     }
 
@@ -264,8 +267,9 @@ int uwx_decode_rhdr(
 	    TRACE_I_DECODE_RHDR_1L("(R3) prologue", b0, val)
 	    rhdr->is_prologue = 1;
 	}
-	else
+	else {
 	    TRACE_I_DECODE_RHDR_1L("(R3) body", b0, val)
+	}
 	rhdr->rlen = (unsigned int) val;
     }
 
@@ -863,7 +867,7 @@ int uwx_decode_prologue(
 	if (fr_mem_mask & 1) {
 	    newrstate[SBREG_FR + i] = UWX_DISP_PSPREL(fr_base);
 	    tspill[SBREG_FR + i] = 0;
-	    fr_base -= 8;
+	    fr_base -= 16;
 	    nfr--;
 	}
 	fr_mem_mask = fr_mem_mask >> 1;
@@ -872,7 +876,7 @@ int uwx_decode_prologue(
     /* Update the scoreboard. */
 
     for (i = 0; i < env->nsbreg; i++) {
-	if (ip_slot > tspill[i])
+	if (ip_slot >= rhdr->rlen || ip_slot > tspill[i])
 	    scoreboard->rstate[i] = newrstate[i];
     }
     if (priunat_mem_rstate != UWX_DISP_NONE && ip_slot > t_priunat_mem)

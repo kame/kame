@@ -27,7 +27,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/r128_cce.c,v 1.6 2003/04/25 01:18:46 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128_cce.c,v 1.9 2003/11/12 20:56:30 anholt Exp $
  */
 
 #include "dev/drm/r128.h"
@@ -82,8 +82,6 @@ static u32 r128_cce_microcode[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-
-int r128_do_wait_for_idle( drm_r128_private_t *dev_priv );
 
 int R128_READ_PLL(drm_device_t *dev, int addr)
 {
@@ -153,7 +151,7 @@ static int r128_do_wait_for_fifo( drm_r128_private_t *dev_priv, int entries )
 	return DRM_ERR(EBUSY);
 }
 
-int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
+static int r128_do_wait_for_idle( drm_r128_private_t *dev_priv )
 {
 	int i, ret;
 
@@ -216,7 +214,7 @@ int r128_do_cce_idle( drm_r128_private_t *dev_priv )
 	int i;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		if ( GET_RING_HEAD( &dev_priv->ring ) == dev_priv->ring.tail ) {
+		if ( GET_RING_HEAD( dev_priv ) == dev_priv->ring.tail ) {
 			int pm4stat = R128_READ( R128_PM4_STAT );
 			if ( ( (pm4stat & R128_PM4_FIFOCNT_MASK) >=
 			       dev_priv->cce_fifo_size ) &&
@@ -242,7 +240,8 @@ static void r128_do_cce_start( drm_r128_private_t *dev_priv )
 	r128_do_wait_for_idle( dev_priv );
 
 	R128_WRITE( R128_PM4_BUFFER_CNTL,
-		    dev_priv->cce_mode | dev_priv->ring.size_l2qw );
+		    dev_priv->cce_mode | dev_priv->ring.size_l2qw
+		    | R128_PM4_BUFFER_CNTL_NOUPDATE );
 	R128_READ( R128_PM4_BUFFER_ADDR ); /* as per the sample code */
 	R128_WRITE( R128_PM4_MICRO_CNTL, R128_PM4_MICRO_FREERUN );
 
@@ -257,7 +256,6 @@ static void r128_do_cce_reset( drm_r128_private_t *dev_priv )
 {
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, 0 );
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR, 0 );
-	SET_RING_HEAD( &dev_priv->ring, 0 );
 	dev_priv->ring.tail = 0;
 }
 
@@ -268,7 +266,8 @@ static void r128_do_cce_reset( drm_r128_private_t *dev_priv )
 static void r128_do_cce_stop( drm_r128_private_t *dev_priv )
 {
 	R128_WRITE( R128_PM4_MICRO_CNTL, 0 );
-	R128_WRITE( R128_PM4_BUFFER_CNTL, R128_PM4_NONPM4 );
+	R128_WRITE( R128_PM4_BUFFER_CNTL,
+		    R128_PM4_NONPM4 | R128_PM4_BUFFER_CNTL_NOUPDATE );
 
 	dev_priv->cce_running = 0;
 }
@@ -336,26 +335,6 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev,
 
 	R128_WRITE( R128_PM4_BUFFER_DL_WPTR, 0 );
 	R128_WRITE( R128_PM4_BUFFER_DL_RPTR, 0 );
-
-	/* DL_RPTR_ADDR is a physical address in AGP space. */
-	SET_RING_HEAD( &dev_priv->ring, 0 );
-
-	if ( !dev_priv->is_pci ) {
-		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
-			    dev_priv->ring_rptr->offset );
-	} else {
-		drm_sg_mem_t *entry = dev->sg;
-		unsigned long tmp_ofs, page_ofs;
-
-		tmp_ofs = dev_priv->ring_rptr->offset - dev->sg->handle;
-		page_ofs = tmp_ofs >> PAGE_SHIFT;
-
-		R128_WRITE( R128_PM4_BUFFER_DL_RPTR_ADDR,
-     			    entry->busaddr[page_ofs]);
-		DRM_DEBUG( "ring rptr: offset=0x%08lx handle=0x%08lx\n",
-			   entry->busaddr[page_ofs],
-     			   entry->handle + tmp_ofs );
-	}
 
 	/* Set watermark control */
 	R128_WRITE( R128_PM4_BUFFER_WM_CNTL,
@@ -541,10 +520,11 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		(drm_r128_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				     init->sarea_priv_offset);
 
+#if __REALLY_HAVE_AGP
 	if ( !dev_priv->is_pci ) {
-		DRM_IOREMAP( dev_priv->cce_ring );
-		DRM_IOREMAP( dev_priv->ring_rptr );
-		DRM_IOREMAP( dev_priv->buffers );
+		DRM_IOREMAP( dev_priv->cce_ring, dev );
+		DRM_IOREMAP( dev_priv->ring_rptr, dev );
+		DRM_IOREMAP( dev_priv->buffers, dev );
 		if(!dev_priv->cce_ring->handle ||
 		   !dev_priv->ring_rptr->handle ||
 		   !dev_priv->buffers->handle) {
@@ -553,7 +533,9 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			r128_do_cleanup_cce( dev );
 			return DRM_ERR(ENOMEM);
 		}
-	} else {
+	} else
+#endif
+	{
 		dev_priv->cce_ring->handle =
 			(void *)dev_priv->cce_ring->offset;
 		dev_priv->ring_rptr->handle =
@@ -568,9 +550,6 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 #endif
 		dev_priv->cce_buffers_offset = dev->sg->handle;
 
-	dev_priv->ring.head = ((__volatile__ u32 *)
-			       dev_priv->ring_rptr->handle);
-
 	dev_priv->ring.start = (u32 *)dev_priv->cce_ring->handle;
 	dev_priv->ring.end = ((u32 *)dev_priv->cce_ring->handle
 			      + init->ring_size / sizeof(u32));
@@ -581,7 +560,6 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		(dev_priv->ring.size / sizeof(u32)) - 1;
 
 	dev_priv->ring.high_mark = 128;
-	dev_priv->ring.ring_rptr = dev_priv->ring_rptr;
 
 	dev_priv->sarea_priv->last_frame = 0;
 	R128_WRITE( R128_LAST_FRAME_REG, dev_priv->sarea_priv->last_frame );
@@ -590,8 +568,9 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	R128_WRITE( R128_LAST_DISPATCH_REG,
 		    dev_priv->sarea_priv->last_dispatch );
 
-#if __REALLY_HAVE_SG
+#if __REALLY_HAVE_AGP
 	if ( dev_priv->is_pci ) {
+#endif
 		if (!DRM(ati_pcigart_init)( dev, &dev_priv->phys_pci_gart,
      					    &dev_priv->bus_pci_gart) ) {
 			DRM_ERROR( "failed to init PCI GART!\n" );
@@ -600,6 +579,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			return DRM_ERR(ENOMEM);
 		}
 		R128_WRITE( R128_PCI_GART_PAGE, dev_priv->bus_pci_gart );
+#if __REALLY_HAVE_AGP
 	}
 #endif
 
@@ -615,26 +595,34 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 
 int r128_do_cleanup_cce( drm_device_t *dev )
 {
+
+#if __HAVE_IRQ
+	/* Make sure interrupts are disabled here because the uninstall ioctl
+	 * may not have been called from userspace and after dev_private
+	 * is freed, it's too late.
+	 */
+	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
+#endif
+
 	if ( dev->dev_private ) {
 		drm_r128_private_t *dev_priv = dev->dev_private;
 
-#if __REALLY_HAVE_SG
+#if __REALLY_HAVE_AGP
 		if ( !dev_priv->is_pci ) {
-#endif
 			if ( dev_priv->cce_ring != NULL )
-				DRM_IOREMAPFREE( dev_priv->cce_ring );
+				DRM_IOREMAPFREE( dev_priv->cce_ring, dev );
 			if ( dev_priv->ring_rptr != NULL )
-				DRM_IOREMAPFREE( dev_priv->ring_rptr );
+				DRM_IOREMAPFREE( dev_priv->ring_rptr, dev );
 			if ( dev_priv->buffers != NULL )
-				DRM_IOREMAPFREE( dev_priv->buffers );
-#if __REALLY_HAVE_SG
-		} else {
+				DRM_IOREMAPFREE( dev_priv->buffers, dev );
+		} else
+#endif
+		{
 			if (!DRM(ati_pcigart_cleanup)( dev,
 						dev_priv->phys_pci_gart,
 						dev_priv->bus_pci_gart ))
 				DRM_ERROR( "failed to cleanup PCI GART!\n" );
 		}
-#endif
 
 		DRM(free)( dev->dev_private, sizeof(drm_r128_private_t),
 			   DRM_MEM_DRIVER );
@@ -650,6 +638,8 @@ int r128_cce_init( DRM_IOCTL_ARGS )
 	drm_r128_init_t init;
 
 	DRM_DEBUG( "\n" );
+
+	LOCK_TEST_WITH_RETURN( dev, filp );
 
 	DRM_COPY_FROM_USER_IOCTL( init, (drm_r128_init_t *)data, sizeof(init) );
 
@@ -771,59 +761,8 @@ int r128_engine_reset( DRM_IOCTL_ARGS )
 	return r128_do_engine_reset( dev );
 }
 
-
-/* ================================================================
- * Fullscreen mode
- */
-
-static int r128_do_init_pageflip( drm_device_t *dev )
-{
-	drm_r128_private_t *dev_priv = dev->dev_private;
-	DRM_DEBUG( "\n" );
-
-	dev_priv->crtc_offset =      R128_READ( R128_CRTC_OFFSET );
-	dev_priv->crtc_offset_cntl = R128_READ( R128_CRTC_OFFSET_CNTL );
-
-	R128_WRITE( R128_CRTC_OFFSET, dev_priv->front_offset );
-	R128_WRITE( R128_CRTC_OFFSET_CNTL,
-		    dev_priv->crtc_offset_cntl | R128_CRTC_OFFSET_FLIP_CNTL );
-
-	dev_priv->page_flipping = 1;
-	dev_priv->current_page = 0;
-
-	return 0;
-}
-
-int r128_do_cleanup_pageflip( drm_device_t *dev )
-{
-	drm_r128_private_t *dev_priv = dev->dev_private;
-	DRM_DEBUG( "\n" );
-
-	R128_WRITE( R128_CRTC_OFFSET,      dev_priv->crtc_offset );
-	R128_WRITE( R128_CRTC_OFFSET_CNTL, dev_priv->crtc_offset_cntl );
-
-	dev_priv->page_flipping = 0;
-	dev_priv->current_page = 0;
-
-	return 0;
-}
-
 int r128_fullscreen( DRM_IOCTL_ARGS )
 {
-	DRM_DEVICE;
-	drm_r128_fullscreen_t fs;
-
-	LOCK_TEST_WITH_RETURN( dev, filp );
-
-	DRM_COPY_FROM_USER_IOCTL( fs, (drm_r128_fullscreen_t *)data, sizeof(fs) );
-
-	switch ( fs.func ) {
-	case R128_INIT_FULLSCREEN:
-		return r128_do_init_pageflip( dev );
-	case R128_CLEANUP_FULLSCREEN:
-		return r128_do_cleanup_pageflip( dev );
-	}
-
 	return DRM_ERR(EINVAL);
 }
 
@@ -916,7 +855,7 @@ drm_buf_t *r128_freelist_get( drm_device_t *dev )
 		DRM_UDELAY( 1 );
 	}
 
-	DRM_ERROR( "returning NULL!\n" );
+	DRM_DEBUG( "returning NULL!\n" );
 	return NULL;
 }
 
@@ -943,7 +882,7 @@ int r128_wait_ring( drm_r128_private_t *dev_priv, int n )
 	int i;
 
 	for ( i = 0 ; i < dev_priv->usec_timeout ; i++ ) {
-		r128_update_ring_snapshot( ring );
+		r128_update_ring_snapshot( dev_priv );
 		if ( ring->space >= n )
 			return 0;
 		DRM_UDELAY( 1 );

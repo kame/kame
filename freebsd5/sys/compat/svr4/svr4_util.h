@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_util.h,v 1.6 2002/03/20 05:41:38 alfred Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_util.h,v 1.7 2003/10/20 10:38:48 tjr Exp $
  */
 
 #ifndef	_SVR4_UTIL_H_
@@ -63,7 +63,10 @@ stackgap_alloc(sgp, sz)
 	size_t   sz;
 {
 	void	*p = (void *) *sgp;
-	*sgp += ALIGN(sz);
+	sz = ALIGN(sz);
+	if (*sgp + sz > (caddr_t)(PS_STRINGS - szsigcode))
+		return NULL;
+	*sgp += sz;
 	return p;
 }
 

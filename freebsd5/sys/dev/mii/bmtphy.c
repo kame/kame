@@ -35,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.6 2003/09/09 18:17:23 wpaul Exp $");
+
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
@@ -65,7 +68,6 @@
  *
  *	from: NetBSD: bmtphy.c,v 1.8 2002/07/03 06:25:50 simonb Exp
  *
- * $FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.3 2003/01/19 02:59:32 obrien Exp $
  */
 
 /*
@@ -144,9 +146,11 @@ bmtphy_probe(device_t dev)
 	case MII_MODEL_BROADCOM_BCM5221:
 		device_set_desc(dev, MII_STR_BROADCOM_BCM5221);
 		break;
+	case MII_MODEL_BROADCOM_BCM4401:
+		device_set_desc(dev, MII_STR_BROADCOM_BCM4401);
+		break;
 	default:
 		return (ENXIO);
-		break;
 	}
 
 	return (rval);

@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mca/mca_bus.c,v 1.12 2003/04/29 13:35:59 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mca/mca_bus.c,v 1.13 2003/08/24 17:54:09 obrien Exp $");
 
 /*
  * References:

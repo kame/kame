@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aacreg.h,v 1.16 2003/03/26 17:50:11 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aacreg.h,v 1.17 2003/10/17 21:44:06 scottl Exp $
  */
 
 /*
@@ -851,9 +851,10 @@ struct aac_aif_command {
 	u_int32_t	seqNumber;	/* To allow ordering of
 					 * reports (if necessary) */
 	union {
-	struct aac_AifEventNotify	EN;	/* Event notify structure */
-	struct aac_AifJobProgressReport	PR[1];	/* Progress report */
-	u_int8_t			AR[AAC_AIF_REPORT_MAX_SIZE];
+		struct aac_AifEventNotify	EN;	/* Event notify */
+		struct aac_AifJobProgressReport	PR[1];	/* Progress report */
+		u_int8_t			AR[AAC_AIF_REPORT_MAX_SIZE];
+		u_int8_t			data[AAC_FIB_DATASIZE - 8];
 	} data;
 } __packed;
 

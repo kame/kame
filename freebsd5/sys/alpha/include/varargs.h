@@ -38,11 +38,11 @@
  *
  *	@(#)varargs.h	8.2 (Berkeley) 3/22/94
  *	$NetBSD: varargs.h,v 1.7 1997/04/06 08:47:46 cgd Exp $
- * $FreeBSD: src/sys/alpha/include/varargs.h,v 1.5 2002/10/06 22:02:06 mike Exp $
+ * $FreeBSD: src/sys/alpha/include/varargs.h,v 1.6 2003/09/01 03:01:45 kan Exp $
  */
 
-#ifndef _ALPHA_VARARGS_H_
-#define	_ALPHA_VARARGS_H_
+#ifndef _MACHINE_VARARGS_H_
+#define	_MACHINE_VARARGS_H_
 
 #if defined(__GNUC__) && (__GNUC__ == 2 && __GNUC_MINOR__ > 95 || __GNUC__ >= 3)
 
@@ -80,4 +80,4 @@ typedef int __builtin_va_alist_t __attribute__((__mode__(__word__)));
 
 #endif /* __GNUC__ post GCC 2.95 */
 
-#endif /* !_ALPHA_VARARGS_H_ */
+#endif /* !_MACHINE_VARARGS_H_ */

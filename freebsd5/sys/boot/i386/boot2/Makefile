@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.46 2003/02/25 15:41:49 ru Exp $
+# $FreeBSD: src/sys/boot/i386/boot2/Makefile,v 1.47 2003/06/26 03:51:57 peter Exp $
 
 PROG=		boot2
 NOMAN=
@@ -109,3 +109,15 @@ install:
 		boot2 ${DESTDIR}${BINDIR}/boot2
 
 .include <bsd.prog.mk>
+
+.if defined(REALLY_AMD64)
+boot2.o: machine
+
+beforedepend ${OBJS}: machine
+
+machine:
+	ln -sf ${.CURDIR}/../../../i386/include machine
+
+CLEANFILES+=	machine
+.endif
+

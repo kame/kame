@@ -33,9 +33,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/amd64/ia32/ia32_syscall.c,v 1.2 2003/05/31 06:49:53 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/ia32/ia32_syscall.c,v 1.6 2003/11/17 08:58:14 peter Exp $");
 
 /*
  * 386 Trap and System call handling
@@ -75,15 +76,13 @@
 #include <vm/vm_extern.h>
 
 #include <machine/cpu.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
-
-#include <amd64/isa/icu.h>
-#include <amd64/isa/intr_machdep.h>
 
 #define	IDTVEC(name)	__CONCAT(X,name)
 
 extern inthand_t IDTVEC(int0x80_syscall), IDTVEC(rsvd);
-extern const char *ia32_syscallnames[];
+extern const char *freebsd32_syscallnames[];
 
 void ia32_syscall(struct trapframe frame);	/* Called from asm code */
 
@@ -252,7 +251,7 @@ ia32_syscall(struct trapframe frame)
 	cred_free_thread(td);
 #endif
 	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
-	    (code >= 0 && code < SYS_MAXSYSCALL) ? ia32_syscallnames[code] : "???");
+	    (code >= 0 && code < SYS_MAXSYSCALL) ? freebsd32_syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);
 	mtx_assert(&Giant, MA_NOTOWNED);
 }
@@ -262,14 +261,14 @@ static void
 ia32_syscall_enable(void *dummy)
 {
 
- 	setidt(0x80, &IDTVEC(int0x80_syscall), SDT_SYSIGT, SEL_UPL, 0);
+ 	setidt(IDT_SYSCALL, &IDTVEC(int0x80_syscall), SDT_SYSIGT, SEL_UPL, 0);
 }
 
 static void
 ia32_syscall_disable(void *dummy)
 {
 
- 	setidt(0x80, &IDTVEC(rsvd), SDT_SYSIGT, SEL_KPL, 0);
+ 	setidt(IDT_SYSCALL, &IDTVEC(rsvd), SDT_SYSIGT, SEL_KPL, 0);
 }
 
 SYSINIT(ia32_syscall, SI_SUB_EXEC, SI_ORDER_ANY, ia32_syscall_enable, NULL);

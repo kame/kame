@@ -27,10 +27,13 @@
  * Copyright (c) 2000 Andrew Miklic, Andrew Gallatin, and Thomas V. Crimi
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.9 2003/09/26 10:41:43 phk Exp $");
+
 #include "opt_fb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.6 2003/03/25 00:07:01 jake Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.9 2003/09/26 10:41:43 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,8 +59,8 @@ __FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.6 2003/03/25 00:07:01 jake Exp
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/fb/fbreg.h>
 #include <dev/fb/gfb.h>
@@ -207,7 +210,7 @@ pcigfb_attach(device_t dev)
 	       sc->adp->va_info.vi_depth, sc->gfbc->ramdac_name);
 #ifdef FB_INSTALL_CDEV
 	/* attach a virtual frame buffer device */
-	error = fb_attach(makedev(0, unit), sc->adp, sc->cdevsw);
+	error = fb_attach(unit, sc->adp, sc->cdevsw);
 	if(error)
 		goto fail;
 	if(bootverbose)
@@ -246,9 +249,6 @@ pcigfb_detach(device_t dev)
 	int rid;
 
 	sc = device_get_softc(dev);
-#ifdef FB_INSTALL_CDEV
-	destroy_dev(sc->devt);
-#endif /*FB_INSTALL_CDEV*/
 	bus_teardown_intr(dev, sc->irq, sc->intrhand);
 	rid = 0x0;
 	bus_release_resource(dev, SYS_RES_IRQ, rid, sc->irq);

@@ -1,5 +1,4 @@
 /*
- * 
  *             Coda: an Experimental Distributed File System
  *                              Release 3.1
  * 
@@ -27,10 +26,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_psdev.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_psdev.c,v 1.26 2003/03/31 22:49:14 jeff Exp $
- * 
  */
-
 /* 
  * Mach Operating System
  * Copyright (c) 1989 Carnegie-Mellon University
@@ -51,6 +47,10 @@
  */
 
 /* These routines are the device entry points for Venus. */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/coda/coda_psdev.c,v 1.29 2003/11/09 09:17:20 tanimura Exp $");
+
 
 extern int coda_nc_initialized;    /* Set if cache has been initialized */
 
@@ -526,7 +526,7 @@ coda_call(mntinfo, inSize, outSize, buffer)
 
 	/* Append msg to request queue and poke Venus. */
 	INSQUE(vmp->vm_chain, vcp->vc_requests);
-	selwakeup(&(vcp->vc_selproc));
+	selwakeuppri(&(vcp->vc_selproc), coda_call_sleep);
 
 	/* We can be interrupted while we wait for Venus to process
 	 * our request.  If the interrupt occurs before Venus has read
@@ -580,8 +580,10 @@ coda_call(mntinfo, inSize, outSize, buffer)
 #endif
 				}
 				else {
+#ifdef	CODA_VERBOSE
 					printf("coda_call: tsleep returns %d, cnt %d\n",
 					       error, i);
+#endif
 
 #if notyet
 					tempset = td->td_siglist;
@@ -662,7 +664,7 @@ coda_call(mntinfo, inSize, outSize, buffer)
 		
 		/* insert at head of queue! */
 		INSQUE(svmp->vm_chain, vcp->vc_requests);
-		selwakeup(&(vcp->vc_selproc));
+		selwakeuppri(&(vcp->vc_selproc), coda_call_sleep);
 	    }
 	}
 

@@ -1,7 +1,6 @@
 /*
  * Downloadable microcode for Advanced Systems Inc. SCSI controllers
  *
- * $FreeBSD: src/sys/dev/advansys/advmcode.c,v 1.7 2000/01/14 03:33:38 gibbs Exp $
  *
  * Obtained from:
  * advansys.c - Linux Host Driver for AdvanSys SCSI Adapters
@@ -13,8 +12,10 @@
  * modification, are permitted provided that redistributions of source
  * code retain the above copyright notice and this comment without
  * modification.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/advansys/advmcode.c,v 1.8 2003/08/24 17:48:02 obrien Exp $");
 
 #include <sys/param.h>
 

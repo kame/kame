@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/alpha/autoconf.c,v 1.55 2003/03/08 08:01:26 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/autoconf.c,v 1.57 2003/08/22 07:20:25 imp Exp $");
 
 #include "opt_bootp.h"
 #include "opt_isa.h"

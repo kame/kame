@@ -31,17 +31,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/exception.S,v 1.110 2003/05/14 04:10:47 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/exception.S,v 1.115 2003/11/17 08:58:12 peter Exp $
  */
 
 #include <machine/asmacros.h>
-#include <sys/mutex.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
 
 #include "assym.s"
-
-#define	SEL_RPL_MASK	0x0003
 
 	.text
 
@@ -72,8 +69,6 @@
  * %ss segment registers, but does not mess with %ds, %es, or %fs.  Thus we
  * must load them with appropriate values for supervisor mode operation.
  */
-#define	IDTVEC(name)	ALIGN_TEXT; .globl __CONCAT(X,name); \
-			.type __CONCAT(X,name),@function; __CONCAT(X,name):
 
 MCOUNT_LABEL(user)
 MCOUNT_LABEL(btrap)
@@ -172,11 +167,8 @@ alltraps_pushregs_no_rdi:
 	movq	%r14,TF_R14(%rsp)
 	movq	%r15,TF_R15(%rsp)
 alltraps_with_regs_pushed:
-	FAKE_MCOUNT(13*4(%rsp))
 calltrap:
-	FAKE_MCOUNT(btrap)		/* init "from" btrap -> calltrap */
 	call	trap
-	MEXITCOUNT
 	jmp	doreti			/* Handle any pending ASTs */
 
 	/*
@@ -226,8 +218,8 @@ IDTVEC(page)
 IDTVEC(fast_syscall)
 	swapgs
 	movq	%rsp,PCPU(SCRATCH_RSP)
-	movq	common_tss+COMMON_TSS_RSP0,%rsp
-	/* Now emulate a trapframe. Ugh. */
+	movq	PCPU(RSP0),%rsp
+	/* Now emulate a trapframe. Make the 8 byte alignment odd for call. */
 	subq	$TF_SIZE,%rsp
 	/* defer TF_RSP till we have a spare register */
 	movq	%r11,TF_RFLAGS(%rsp)
@@ -298,16 +290,7 @@ ENTRY(fork_trampoline)
 	movq	%rbx, %rsi		/* arg1 */
 	movq	%rsp, %rdx		/* trapframe pointer */
 	call	fork_exit
-	MEXITCOUNT
 	jmp	doreti			/* Handle any ASTs */
-
-
-/*
- * Include what was once config+isa-dependent code.
- * XXX it should be in a stand-alone file.  It's still icu-dependent and
- * belongs in i386/isa.
- */
-#include "amd64/isa/vector.S"
 
 	.data
 	ALIGN_DATA
@@ -322,7 +305,6 @@ ENTRY(fork_trampoline)
 	.globl	doreti
 	.type	doreti,@function
 doreti:
-	FAKE_MCOUNT(bintr)		/* init "from" bintr -> doreti */
 	/*
 	 * Check if ASTs can be handled now.
 	 */
@@ -332,7 +314,7 @@ doreti:
 doreti_ast:
 	/*
 	 * Check for ASTs atomically with returning.  Disabling CPU
-	 * interrupts provides sufficient locking evein the SMP case,
+	 * interrupts provides sufficient locking eve in the SMP case,
 	 * since we will be informed of any new ASTs by an IPI.
 	 */
 	cli
@@ -352,8 +334,6 @@ doreti_ast:
 	 *	registers.  The fault is handled in trap.c.
 	 */
 doreti_exit:
-	MEXITCOUNT
-
 	movq	TF_RDI(%rsp),%rdi
 	movq	TF_RSI(%rsp),%rsi
 	movq	TF_RDX(%rsp),%rdx
@@ -413,5 +393,3 @@ doreti_iret_fault:
 	movq	$T_PROTFLT,TF_TRAPNO(%rsp)
 	movq	$0,TF_ERR(%rsp)	/* XXX should be the error code */
 	jmp	alltraps_with_regs_pushed
-
-#include "amd64/isa/icu_ipl.S"

@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/efi/libefi/efiboot.h,v 1.7 2002/10/24 07:53:12 marcel Exp $
+ * $FreeBSD: src/sys/boot/efi/libefi/efiboot.h,v 1.8 2003/08/02 08:22:03 marcel Exp $
  */
 
 /*
@@ -68,6 +68,9 @@ extern struct netif_driver efi_net;
 
 /* Find EFI network resources */
 extern void efinet_init_driver(void);
+
+/* Map handles to units */
+int efifs_get_unit(EFI_HANDLE);
 
 /* Wrapper over EFI filesystems. */
 extern struct fs_ops efi_fsops;

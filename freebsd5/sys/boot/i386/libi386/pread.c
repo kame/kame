@@ -1,9 +1,8 @@
 /*
- * $FreeBSD: src/sys/boot/i386/libi386/pread.c,v 1.2 1999/08/28 00:40:16 peter Exp $
- * From: $NetBSD: pread.c,v 1.2 1997/03/22 01:48:38 thorpej Exp $
+ * $NetBSD: pread.c,v 1.2 1997/03/22 01:48:38 thorpej Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1996
  *	Matthias Drochner.  All rights reserved.
  *
@@ -32,8 +31,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/pread.c,v 1.3 2003/08/25 23:28:31 obrien Exp $");
 
 /* read into destination in flat addr space */
 

@@ -24,10 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/acpica/acpi_pci.c,v 1.3 2003/02/17 21:20:34 imp Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_pci.c,v 1.6 2003/09/17 08:32:44 iwasaki Exp $");
 
 #include "opt_bus.h"
 
@@ -79,7 +79,7 @@ static device_method_t acpi_pci_methods[] = {
 	DEVMETHOD(device_attach,	acpi_pci_attach),
 	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
 	DEVMETHOD(device_suspend,	bus_generic_suspend),
-	DEVMETHOD(device_resume,	bus_generic_resume),
+	DEVMETHOD(device_resume,	pci_resume),
 
 	/* Bus interface */
 	DEVMETHOD(bus_print_child,	pci_print_child),
@@ -111,6 +111,7 @@ static device_method_t acpi_pci_methods[] = {
 	/* XXX: We should override these two. */
 	DEVMETHOD(pci_get_powerstate,	pci_get_powerstate_method),
 	DEVMETHOD(pci_set_powerstate,	pci_set_powerstate_method),
+	DEVMETHOD(pci_assign_interrupt, pci_assign_interrupt_method),
 
 	{ 0, 0 }
 };

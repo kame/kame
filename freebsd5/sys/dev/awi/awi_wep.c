@@ -1,6 +1,4 @@
 /*	$NetBSD: awi_wep.c,v 1.4 2000/08/14 11:28:03 onoe Exp $	*/
-/* $FreeBSD: src/sys/dev/awi/awi_wep.c,v 1.12 2003/02/19 05:47:01 imp Exp $ */
-
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -36,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/awi/awi_wep.c,v 1.15 2003/09/05 11:09:26 phk Exp $");
 
 /*
  * WEP support framework for the awi driver.
@@ -74,7 +75,8 @@
 #include <net/if_ether.h>
 #endif
 #include <net/if_media.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -238,7 +240,7 @@ awi_wep_setalgo(sc, algo)
 	int ctxlen;
 
 	awi_crc_init();	/* XXX: not belongs here */
-	if (algo < 0 || algo > sizeof(awi_wep_algo)/sizeof(awi_wep_algo[0]))
+	if (algo < 0 || algo >= sizeof(awi_wep_algo)/sizeof(awi_wep_algo[0]))
 		return EINVAL;
 	awa = &awi_wep_algo[algo];
 	if (awa->awa_name == NULL)

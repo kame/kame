@@ -26,8 +26,6 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.44 2003/02/19 05:46:59 imp Exp $
  */
 
 /*
@@ -36,6 +34,9 @@
  *
  * ToDo: The state machine for getmsg needs re-thinking
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.46 2003/10/20 10:38:48 tjr Exp $");
 
 #define COMPAT_43 1
 
@@ -405,22 +406,32 @@ show_ioc(str, ioc)
 	const char		*str;
 	struct svr4_strioctl	*ioc;
 {
-	u_char *ptr = (u_char *) malloc(ioc->len, M_TEMP, M_WAITOK);
+	u_char *ptr = NULL;
+	int len;
 	int error;
+
+	len = ioc->len;
+	if (len > 1024)
+		len = 1024;
+
+	if (len > 0) {
+		ptr = (u_char *) malloc(len, M_TEMP, M_WAITOK);
+		if ((error = copyin(ioc->buf, ptr, len)) != 0) {
+			free((char *) ptr, M_TEMP);
+			return error;
+		}
+	}
 
 	uprintf("%s cmd = %ld, timeout = %d, len = %d, buf = %p { ",
 	    str, ioc->cmd, ioc->timeout, ioc->len, ioc->buf);
 
-	if ((error = copyin(ioc->buf, ptr, ioc->len)) != 0) {
-		free((char *) ptr, M_TEMP);
-		return error;
-	}
-
-	bufprint(ptr, ioc->len);
+	if (ptr != NULL)
+		bufprint(ptr, len);
 
 	uprintf("}\n");
 
-	free((char *) ptr, M_TEMP);
+	if (ptr != NULL)
+		free((char *) ptr, M_TEMP);
 	return 0;
 }
 
@@ -433,6 +444,9 @@ show_strbuf(str)
 	u_char *ptr = NULL;
 	int maxlen = str->maxlen;
 	int len = str->len;
+
+	if (maxlen > 8192)
+		maxlen = 8192;
 
 	if (maxlen < 0)
 		maxlen = 0;
@@ -520,7 +534,8 @@ clean_pipe(td, path)
 	size_t l = strlen(path) + 1;
 	void *tpath;
 
-	tpath = stackgap_alloc(&sg, l);
+	if ((tpath = stackgap_alloc(&sg, l)) == NULL)
+		return ENAMETOOLONG;
 	la.ub = stackgap_alloc(&sg, sizeof(struct stat));
 
 	if ((error = copyout(path, tpath, l)) != 0)
@@ -759,6 +774,9 @@ si_listen(fp, fd, ioc, td)
 	if (st == NULL)
 		return EINVAL;
 
+	if (ioc->len < 0 || ioc->len > sizeof(lst))
+		return EINVAL;
+
 	if ((error = copyin(ioc->buf, &lst, ioc->len)) != 0)
 		return error;
 
@@ -960,6 +978,9 @@ ti_getinfo(fp, fd, ioc, td)
 
 	memset(&info, 0, sizeof(info));
 
+	if (ioc->len < 0 || ioc->len > sizeof(info))
+		return EINVAL;
+
 	if ((error = copyin(ioc->buf, &info, ioc->len)) != 0)
 		return error;
 
@@ -1007,6 +1028,9 @@ ti_bind(fp, fd, ioc, td)
 		DPRINTF(("ti_bind: bad file descriptor\n"));
 		return EINVAL;
 	}
+
+	if (ioc->len < 0 || ioc->len > sizeof(bnd))
+		return EINVAL;
 
 	if ((error = copyin(ioc->buf, &bnd, ioc->len)) != 0)
 		return error;
@@ -1136,7 +1160,7 @@ svr4_stream_ti_ioctl(fp, td, retval, fd, cmd, dat)
 	struct sockaddr_in sain;
 	struct sockaddr_un saun;
 	struct svr4_strmcmd sc;
-	int sasize;
+	int sasize, oldsasize;
 	caddr_t sg;
 	int *lenp;
 
@@ -1224,10 +1248,15 @@ svr4_stream_ti_ioctl(fp, td, retval, fd, cmd, dat)
 		return error;
 	}
 
+	oldsasize = sasize;
+
 	if ((error = copyin(lenp, &sasize, sizeof(*lenp))) != 0) {
 		DPRINTF(("ti_ioctl: error copying in socket size\n"));
 		return error;
 	}
+
+	if (sasize < 0 || sasize > oldsasize)
+		return EINVAL;
 
 	switch (st->s_family) {
 	case AF_INET:
@@ -1793,7 +1822,7 @@ svr4_do_putmsg(td, uap, fp)
 		return EINVAL;
 	}
 
-	if (ctl.len > sizeof(sc)) {
+	if (ctl.len < 0 || ctl.len > sizeof(sc)) {
 		DPRINTF(("putmsg: Bad control size %d != %d\n", ctl.len,
 			 sizeof(struct svr4_strmcmd)));
 		return EINVAL;
@@ -1961,6 +1990,8 @@ svr4_do_getmsg(td, uap, fp)
 	if (uap->ctl != NULL) {
 		if ((error = copyin(uap->ctl, &ctl, sizeof(ctl))) != 0)
 			return error;
+		if (ctl.len < 0)
+			return EINVAL;
 	}
 	else {
 		ctl.len = -1;
@@ -2145,6 +2176,9 @@ svr4_do_getmsg(td, uap, fp)
 		DPRINTF(("getmsg: TI_SENDTO_REQUEST\n"));
 		if (ctl.maxlen > 36 && ctl.len < 36)
 		    ctl.len = 36;
+
+		if (ctl.len > sizeof(sc))
+			ctl.len = sizeof(sc);
 
 		if ((error = copyin(ctl.buf, &sc, ctl.len)) != 0)
 			return error;

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (C) 2001 Eduardo Horvath.
  * Copyright (c) 2001-2003 Thomas Moestl
  * All rights reserved.
@@ -25,9 +25,10 @@
  * SUCH DAMAGE.
  *
  *	from: NetBSD: gem.c,v 1.21 2002/06/01 23:50:58 lukem Exp
- *
- * $FreeBSD: src/sys/dev/gem/if_gem.c,v 1.16 2003/05/15 16:57:55 tmm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/gem/if_gem.c,v 1.20 2003/10/31 18:32:01 brooks Exp $");
 
 /*
  * Driver for Sun GEM ethernet controllers.
@@ -60,8 +61,8 @@
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <gem/if_gemreg.h>
-#include <gem/if_gemvar.h>
+#include <dev/gem/if_gemreg.h>
+#include <dev/gem/if_gemvar.h>
 
 #define TRIES	10000
 
@@ -133,13 +134,13 @@ gem_attach(sc)
 
 	error = bus_dma_tag_create(NULL, 1, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, MCLBYTES, GEM_NSEGS,
-	    BUS_SPACE_MAXSIZE_32BIT, 0, &sc->sc_pdmatag);
+	    BUS_SPACE_MAXSIZE_32BIT, 0, NULL, NULL, &sc->sc_pdmatag);
 	if (error)
 		return (error);
 
 	error = bus_dma_tag_create(sc->sc_pdmatag, 1, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL, MAXBSIZE,
-	    1, BUS_SPACE_MAXSIZE_32BIT, BUS_DMA_ALLOCNOW,
+	    1, BUS_SPACE_MAXSIZE_32BIT, BUS_DMA_ALLOCNOW, NULL, NULL,
 	    &sc->sc_rdmatag);
 	if (error)
 		goto fail_ptag;
@@ -147,7 +148,7 @@ gem_attach(sc)
 	error = bus_dma_tag_create(sc->sc_pdmatag, 1, 0,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    GEM_TD_BUFSIZE, GEM_NTXDESC, BUS_SPACE_MAXSIZE_32BIT,
-	    BUS_DMA_ALLOCNOW, &sc->sc_tdmatag);
+	    BUS_DMA_ALLOCNOW, NULL, NULL, &sc->sc_tdmatag);
 	if (error)
 		goto fail_rtag;
 
@@ -155,7 +156,7 @@ gem_attach(sc)
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
 	    sizeof(struct gem_control_data), 1,
 	    sizeof(struct gem_control_data), BUS_DMA_ALLOCNOW,
-	    &sc->sc_cdmatag);
+	    busdma_lock_mutex, &Giant, &sc->sc_cdmatag);
 	if (error)
 		goto fail_ttag;
 
@@ -249,8 +250,8 @@ gem_attach(sc)
 
 	/* Initialize ifnet structure. */
 	ifp->if_softc = sc;
-	ifp->if_unit = device_get_unit(sc->sc_dev);
-	ifp->if_name = "gem";
+	if_initname(ifp, device_get_name(sc->sc_dev),
+	    device_get_unit(sc->sc_dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_start = gem_start;

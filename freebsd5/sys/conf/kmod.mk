@@ -1,5 +1,5 @@
 #	From: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD: src/sys/conf/kmod.mk,v 1.137 2003/03/03 22:51:22 ru Exp $
+# $FreeBSD: src/sys/conf/kmod.mk,v 1.150 2003/11/19 05:08:26 imp Exp $
 #
 # The include file <bsd.kmod.mk> handles installing Kernel Loadable Device
 # drivers (KLD's).
@@ -79,11 +79,14 @@ CFLAGS+=	-DKLD_MODULE
 # add to the front of `make' variable.
 _ICFLAGS:=	${CFLAGS:M-I*}
 CFLAGS+=	-nostdinc -I- ${INCLMAGIC} ${_ICFLAGS}
+.if defined(KERNBUILDDIR)
+CFLAGS+=       -include ${KERNBUILDDIR}/opt_global.h
+.endif
 
 # Add -I paths for system headers.  Individual KLD makefiles don't
 # need any -I paths for this.  Similar defaults for .PATH can't be
 # set because there are no standard paths for non-headers.
-CFLAGS+=	-I. -I@ -I@/dev
+CFLAGS+=	-I. -I@
 
 # Add a -I path to standard headers like <stddef.h>.  Use a relative
 # path to src/include if possible.  If the @ symlink hasn't been built
@@ -98,6 +101,8 @@ CFLAGS+=	-I${DESTDIR}/usr/include
 .else # !@
 CFLAGS+=	-I@/../include -I${DESTDIR}/usr/include
 .endif # @
+
+CFLAGS+=	-finline-limit=${INLINE_LIMIT}
 
 # Disallow common variables, and if we end up with commons from
 # somewhere unexpected, allocate storage for them in the module itself.
@@ -162,7 +167,7 @@ ${OBJS}: ${_link}
 
 # Search for kernel source tree in standard places.
 .for _dir in ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
-.if !defined(SYSDIR) && exists(${_dir}/kern/)
+.if !defined(SYSDIR) && exists(${_dir}/kern)
 SYSDIR=	${_dir}
 .endif
 .endfor
@@ -238,6 +243,17 @@ unload:
 	${KMODUNLOAD} -v ${KMOD}
 .endif
 
+.if defined(KERNBUILDDIR)
+.PATH: ${KERNBUILDDIR}
+CFLAGS += -I${KERNBUILDDIR}
+.for _src in ${SRCS:Mopt_*.h}
+CLEANFILES+=	${_src}
+.if !target(${_src})
+${_src}:
+	ln -s ${KERNBUILDDIR}/${_src} ${.TARGET}
+.endif
+.endfor
+.else
 .for _src in ${SRCS:Mopt_*.h}
 CLEANFILES+=	${_src}
 .if !target(${_src})
@@ -245,6 +261,7 @@ ${_src}:
 	touch ${.TARGET}
 .endif
 .endfor
+.endif
 
 MFILES?= kern/bus_if.m kern/device_if.m dev/iicbus/iicbb_if.m \
     dev/iicbus/iicbus_if.m isa/isa_if.m \
@@ -254,7 +271,7 @@ MFILES?= kern/bus_if.m kern/device_if.m dev/iicbus/iicbb_if.m \
     dev/pci/pcib_if.m dev/ppbus/ppbus_if.m dev/smbus/smbus_if.m \
     dev/usb/usb_if.m dev/sound/pcm/ac97_if.m dev/sound/pcm/channel_if.m \
     dev/sound/pcm/feeder_if.m dev/sound/pcm/mixer_if.m pci/agp_if.m \
-    opencrypto/crypto_if.m pc98/pc98/canbus_if.m
+    opencrypto/crypto_if.m pc98/pc98/canbus_if.m dev/uart/uart_if.m
 
 .for _srcsrc in ${MFILES}
 .for _ext in c h

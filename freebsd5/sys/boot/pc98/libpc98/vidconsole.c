@@ -24,10 +24,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * 	From Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
- *
- * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.10 2001/10/17 15:15:01 nyan Exp $
+ * 	Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.11 2003/09/08 09:11:20 obrien Exp $");
 
 #include <stand.h>
 #include <bootstrap.h>

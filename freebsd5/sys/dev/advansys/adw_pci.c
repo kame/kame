@@ -31,14 +31,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/advansys/adw_pci.c,v 1.15 2003/03/29 09:46:10 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adw_pci.c,v 1.19 2003/09/02 17:30:33 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/bus.h>
 
 #include <machine/bus_pio.h>
@@ -47,8 +50,8 @@
 
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <cam/cam.h>
 #include <cam/scsi/scsi_all.h>
@@ -57,8 +60,8 @@
 #include <dev/advansys/adwlib.h>
 #include <dev/advansys/adwmcode.h>
 
-#define ADW_PCI_IOBASE	PCIR_MAPS		/* I/O Address */
-#define ADW_PCI_MEMBASE	PCIR_MAPS + 4		/* Mem I/O Address */
+#define ADW_PCI_IOBASE	PCIR_BAR(0)		/* I/O Address */
+#define ADW_PCI_MEMBASE	PCIR_BAR(1)		/* Mem I/O Address */
 
 #define	PCI_ID_ADVANSYS_3550		0x230010CD00000000ull
 #define	PCI_ID_ADVANSYS_38C0800_REV1	0x250010CD00000000ull
@@ -268,6 +271,8 @@ adw_pci_attach(device_t dev)
 			/* nsegments	*/ ~0,
 			/* maxsegsz	*/ ADW_PCI_MAX_DMA_COUNT,
 			/* flags	*/ 0,
+			/* lockfunc	*/ busdma_lock_mutex,
+			/* lockarg	*/ &Giant,
 			&adw->parent_dmat);
 
 	adw->init_level++;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/digi/digi.h,v 1.12 2002/04/10 14:32:55 brian Exp $
+ * $FreeBSD: src/sys/dev/digi/digi.h,v 1.14 2003/08/07 15:04:24 jhb Exp $
  */
 
 #define	W(p)				(*(u_int16_t *)(p))
@@ -67,8 +67,8 @@ struct digi_p {
 #define PAUSE_RX 16
 
 	int opencnt;
-	ushort txbufsize;
-	ushort rxbufsize;
+	u_short txbufsize;
+	u_short rxbufsize;
 	volatile struct board_chan *bc;
 	struct tty *tp;
 
@@ -151,9 +151,9 @@ struct digi_softc {
 
 	const char *name;
 	enum digi_board_status status;
-	ushort numports;		/* number of ports on card */
-	ushort port;			/* I/O port */
-	ushort wport;			/* window select I/O port */
+	u_short numports;		/* number of ports on card */
+	u_int port;			/* I/O port */
+	u_int wport;			/* window select I/O port */
 
 	struct {
 		struct resource *mem;

@@ -1,8 +1,11 @@
 /*
  * mjs copyright
  *
- * $FreeBSD: src/sys/boot/common/pnp.c,v 1.15 2000/12/30 20:40:16 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/common/pnp.c,v 1.16 2003/08/25 23:30:41 obrien Exp $");
+
 /*
  * "Plug and Play" functionality.
  *

@@ -22,10 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/iicbus/iicbb.c,v 1.11 2002/03/23 15:47:17 nsouch Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/iicbus/iicbb.c,v 1.13 2003/08/24 17:49:13 obrien Exp $");
 
 /*
  * Generic I2C bit-banging code
@@ -96,13 +96,13 @@ static device_method_t iicbb_methods[] = {
 	{ 0, 0 }
 };
 
-static driver_t iicbb_driver = {
+driver_t iicbb_driver = {
 	"iicbb",
 	iicbb_methods,
 	sizeof(struct iicbb_softc),
 };
 
-static devclass_t iicbb_devclass;
+devclass_t iicbb_devclass;
 
 static int iicbb_probe(device_t dev)
 {

@@ -23,9 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_print.c,v 1.26 1999/08/28 00:41:09 peter Exp $
  */
-
 /*
  * 	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
@@ -34,6 +32,10 @@
 /*
  * Miscellaneous printing.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_print.c,v 1.27 2003/06/10 22:09:23 obrien Exp $");
+
 #include <sys/param.h>
 
 #include <ddb/ddb.h>

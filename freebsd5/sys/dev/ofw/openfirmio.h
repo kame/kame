@@ -43,7 +43,7 @@
  *
  *	@(#)openpromio.h	8.1 (Berkeley) 6/11/93
  *
- * $FreeBSD: src/sys/dev/ofw/openfirmio.h,v 1.1 2002/10/18 15:23:43 tmm Exp $
+ * $FreeBSD: src/sys/dev/ofw/openfirmio.h,v 1.2 2003/06/11 18:33:03 tmm Exp $
  */
 
 #ifndef _DEV_OFW_OPENFIRMIO_H_
@@ -77,5 +77,7 @@ struct ofiocdesc {
 #define	OFIOCGETCHILD	_IOWR(OFIOC_BASE, 6, phandle_t)
 /* Find a specific device. */
 #define	OFIOCFINDDEVICE	_IOWR(OFIOC_BASE, 7, struct ofiocdesc)
+/* Retrieve the size of a property. */
+#define	OFIOCGETPROPLEN	_IOWR(OFIOC_BASE, 8, struct ofiocdesc)
 
 #endif /* _DEV_OFW_OPENFIRMIO_H_ */

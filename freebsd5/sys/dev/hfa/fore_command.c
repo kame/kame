@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.14 2003/03/02 16:54:33 des Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.16 2003/08/22 06:00:26 imp Exp $
  *
  */
 
@@ -54,7 +54,7 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <dev/hfa/fore.h>
 #include <dev/hfa/fore_aali.h>
 #include <dev/hfa/fore_slave.h>
@@ -63,7 +63,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.14 2003/03/02 16:54:33 des Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_command.c,v 1.16 2003/08/22 06:00:26 imp Exp $");
 #endif
 
 /*
@@ -235,8 +235,9 @@ fore_cmd_drain(fup)
 
 	/*
 	 * Process each completed entry
+	 * ForeThought 4 may set QSTAT_ERROR without QSTAT_COMPLETED.
 	 */
-	while (*fup->fu_cmd_head->hcq_status & QSTAT_COMPLETED) {
+	while (*fup->fu_cmd_head->hcq_status & (QSTAT_COMPLETED | QSTAT_ERROR)) {
 
 		hcp = fup->fu_cmd_head;
 
@@ -333,6 +334,14 @@ fore_cmd_drain(fup)
 			break;
 
 		case CMD_GET_PROM:
+			if (fup->fu_ft4)
+				goto unknown;
+			goto prom;
+
+		case CMD_GET_PROM4:
+			if (!fup->fu_ft4)
+				goto unknown;
+		prom:
 			if (*hcp->hcq_status & QSTAT_ERROR) {
 				/*
 				 * Couldn't get PROM data
@@ -371,6 +380,7 @@ fore_cmd_drain(fup)
 			break;
 
 		default:
+		unknown:
 			log(LOG_ERR, "fore_cmd_drain: unknown command %ld\n",
 				hcp->hcq_code);
 		}

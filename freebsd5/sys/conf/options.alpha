@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.alpha,v 1.40 2002/11/18 06:17:07 jmallett Exp $
+# $FreeBSD: src/sys/conf/options.alpha,v 1.42 2003/08/25 03:43:08 marcel Exp $
 # Options specific to the Alpha platform kernels
 
 EV5			opt_global.h
@@ -16,33 +16,13 @@ DEC_AXPPCI_33		opt_cpu.h
 DEC_1000A		opt_cpu.h
 API_UP1000		opt_cpu.h
 
+NO_SIO			opt_global.h
+
 MAXMEM
 
 PPC_PROBE_CHIPSET       opt_ppc.h
 PPC_DEBUG               opt_ppc.h
 
-MAXCONS			opt_syscons.h
-SC_ALT_MOUSE_IMAGE	opt_syscons.h
-SC_CUT_SPACES2TABS	opt_syscons.h
-SC_CUT_SEPCHARS		opt_syscons.h
-SC_DEBUG_LEVEL		opt_syscons.h
-SC_DFLT_FONT		opt_syscons.h
-SC_DISABLE_DDBKEY	opt_syscons.h
-SC_DISABLE_REBOOT	opt_syscons.h
-SC_HISTORY_SIZE		opt_syscons.h
-SC_KERNEL_CONS_ATTR	opt_syscons.h
-SC_KERNEL_CONS_REV_ATTR	opt_syscons.h
-SC_MOUSE_CHAR		opt_syscons.h
-SC_NO_CUTPASTE		opt_syscons.h
-SC_NO_FONT_LOADING	opt_syscons.h
-SC_NO_HISTORY		opt_syscons.h
-SC_NO_SYSMOUSE		opt_syscons.h
-SC_NORM_ATTR		opt_syscons.h
-SC_NORM_REV_ATTR	opt_syscons.h
-SC_PIXEL_MODE		opt_syscons.h
-SC_RENDER_DEBUG		opt_syscons.h
-SC_TWOBUTTON_MOUSE	opt_syscons.h
-SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
 DEV_SC
 
 VGA_ALT_SEQACCESS	opt_vga.h
@@ -67,14 +47,6 @@ PSM_DEBUG		opt_psm.h
 # Atkbd options
 ATKBD_DFLT_KEYMAP	opt_atkbd.h
 
-# Kbd options
-KBD_DISABLE_KEYMAP_LOAD	opt_kbd.h
-KBD_INSTALL_CDEV	opt_kbd.h
-KBD_MAXRETRY		opt_kbd.h
-KBD_MAXWAIT		opt_kbd.h
-KBD_RESETDELAY		opt_kbd.h
-KBDIO_DEBUG		opt_kbd.h
-
 # Clock options
 CLK_USE_I8254_CALIBRATION	opt_clock.h
 TIMER_FREQ			opt_clock.h
@@ -84,6 +56,3 @@ TIMER_FREQ			opt_clock.h
 # (see src/sys/conf/options).
 COMPAT_LINUX		opt_dontuse.h
 COMPAT_OSF1		opt_dontuse.h
-
-# Device options
-DEV_SPLASH		opt_splash.h

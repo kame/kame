@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/r128_state.c,v 1.6 2003/04/25 01:18:46 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128_state.c,v 1.8.2.1 2004/02/23 05:19:46 rwatson Exp $
  */
 
 #include "dev/drm/r128.h"
@@ -47,7 +47,7 @@ static void r128_emit_clip_rects( drm_r128_private_t *dev_priv,
 	RING_LOCALS;
 	DRM_DEBUG( "    %s\n", __FUNCTION__ );
 
-	BEGIN_RING( 17 );
+	BEGIN_RING( (count < 3? count: 3) * 5 + 2 );
 
 	if ( count >= 1 ) {
 		OUT_RING( CCE_PACKET0( R128_AUX1_SC_LEFT, 3 ) );
@@ -502,8 +502,16 @@ static void r128_cce_dispatch_swap( drm_device_t *dev )
 			  R128_GMC_AUX_CLIP_DIS |
 			  R128_GMC_WR_MSK_DIS );
 
-		OUT_RING( dev_priv->back_pitch_offset_c );
-		OUT_RING( dev_priv->front_pitch_offset_c );
+		/* Make this work even if front & back are flipped:
+		 */
+		if (dev_priv->current_page == 0) {
+			OUT_RING( dev_priv->back_pitch_offset_c );
+			OUT_RING( dev_priv->front_pitch_offset_c );
+		} 
+		else {
+			OUT_RING( dev_priv->front_pitch_offset_c );
+			OUT_RING( dev_priv->back_pitch_offset_c );
+		}
 
 		OUT_RING( (x << 16) | y );
 		OUT_RING( (x << 16) | y );
@@ -530,7 +538,10 @@ static void r128_cce_dispatch_flip( drm_device_t *dev )
 {
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	RING_LOCALS;
-	DRM_DEBUG( "page=%d\n", dev_priv->current_page );
+	DRM_DEBUG("%s: page=%d pfCurrentPage=%d\n", 
+		__FUNCTION__,
+		dev_priv->current_page,
+		dev_priv->sarea_priv->pfCurrentPage);
 
 #if R128_PERFORMANCE_BOXES
 	/* Do some trivial performance monitoring...
@@ -545,10 +556,8 @@ static void r128_cce_dispatch_flip( drm_device_t *dev )
 
 	if ( dev_priv->current_page == 0 ) {
 		OUT_RING( dev_priv->back_offset );
-		dev_priv->current_page = 1;
 	} else {
 		OUT_RING( dev_priv->front_offset );
-		dev_priv->current_page = 0;
 	}
 
 	ADVANCE_RING();
@@ -558,6 +567,8 @@ static void r128_cce_dispatch_flip( drm_device_t *dev )
 	 * performing the swapbuffer ioctl.
 	 */
 	dev_priv->sarea_priv->last_frame++;
+	dev_priv->sarea_priv->pfCurrentPage = dev_priv->current_page =
+					      1 - dev_priv->current_page;
 
 	BEGIN_RING( 2 );
 
@@ -804,6 +815,8 @@ static int r128_cce_dispatch_blit( DRMFILE filp,
 	case R128_DATATYPE_ARGB1555:
 	case R128_DATATYPE_RGB565:
 	case R128_DATATYPE_ARGB4444:
+	case R128_DATATYPE_YVYU422:
+	case R128_DATATYPE_VYUY422:
 		dword_shift = 1;
 		break;
 	case R128_DATATYPE_CI8:
@@ -904,6 +917,9 @@ static int r128_cce_dispatch_write_span( drm_device_t *dev,
 	DRM_DEBUG( "\n" );
 
 	count = depth->n;
+	if ( count > 4096 || count <= 0 ) {
+		return DRM_ERR(EMSGSIZE);
+	}
 	if ( DRM_COPY_FROM_USER( &x, depth->x, sizeof(x) ) ) {
 		return DRM_ERR(EFAULT);
 	}
@@ -997,9 +1013,16 @@ static int r128_cce_dispatch_write_pixels( drm_device_t *dev,
 	DRM_DEBUG( "\n" );
 
 	count = depth->n;
+	if ( count > 4096 || count <= 0 ) {
+		return DRM_ERR(EMSGSIZE);
+	}
 
 	xbuf_size = count * sizeof(*x);
 	ybuf_size = count * sizeof(*y);
+	if ( xbuf_size <= 0 || ybuf_size <= 0 ) {
+		return DRM_ERR(EMSGSIZE);
+	}
+
 	x = DRM_MALLOC( xbuf_size );
 	if ( x == NULL ) {
 		return DRM_ERR(ENOMEM);
@@ -1114,6 +1137,10 @@ static int r128_cce_dispatch_read_span( drm_device_t *dev,
 	DRM_DEBUG( "\n" );
 
 	count = depth->n;
+
+	if ( count > 4096 || count <= 0 ) {
+		return DRM_ERR(EMSGSIZE);
+	}
 	if ( DRM_COPY_FROM_USER( &x, depth->x, sizeof(x) ) ) {
 		return DRM_ERR(EFAULT);
 	}
@@ -1162,6 +1189,9 @@ static int r128_cce_dispatch_read_pixels( drm_device_t *dev,
 
 	xbuf_size = count * sizeof(*x);
 	ybuf_size = count * sizeof(*y);
+	if ( xbuf_size <= 0 || ybuf_size <= 0 ) {
+		return DRM_ERR(EMSGSIZE);
+	}
 	x = DRM_MALLOC( xbuf_size );
 	if ( x == NULL ) {
 		return DRM_ERR(ENOMEM);
@@ -1258,11 +1288,71 @@ int r128_cce_clear( DRM_IOCTL_ARGS )
 		sarea_priv->nbox = R128_NR_SAREA_CLIPRECTS;
 
 	r128_cce_dispatch_clear( dev, &clear );
+	COMMIT_RING();
 
 	/* Make sure we restore the 3D state next time.
 	 */
 	dev_priv->sarea_priv->dirty |= R128_UPLOAD_CONTEXT | R128_UPLOAD_MASKS;
 
+	return 0;
+}
+
+static int r128_do_init_pageflip( drm_device_t *dev )
+{
+	drm_r128_private_t *dev_priv = dev->dev_private;
+	DRM_DEBUG( "\n" );
+
+	dev_priv->crtc_offset =      R128_READ( R128_CRTC_OFFSET );
+	dev_priv->crtc_offset_cntl = R128_READ( R128_CRTC_OFFSET_CNTL );
+
+	R128_WRITE( R128_CRTC_OFFSET, dev_priv->front_offset );
+	R128_WRITE( R128_CRTC_OFFSET_CNTL,
+		    dev_priv->crtc_offset_cntl | R128_CRTC_OFFSET_FLIP_CNTL );
+
+	dev_priv->page_flipping = 1;
+	dev_priv->current_page = 0;
+	dev_priv->sarea_priv->pfCurrentPage = dev_priv->current_page;
+
+	return 0;
+}
+
+int r128_do_cleanup_pageflip( drm_device_t *dev )
+{
+	drm_r128_private_t *dev_priv = dev->dev_private;
+	DRM_DEBUG( "\n" );
+
+	R128_WRITE( R128_CRTC_OFFSET,      dev_priv->crtc_offset );
+	R128_WRITE( R128_CRTC_OFFSET_CNTL, dev_priv->crtc_offset_cntl );
+
+	if (dev_priv->current_page != 0) {
+		r128_cce_dispatch_flip( dev );
+		COMMIT_RING();
+	}
+
+	dev_priv->page_flipping = 0;
+	return 0;
+}
+
+/* Swapping and flipping are different operations, need different ioctls.
+ * They can & should be intermixed to support multiple 3d windows.  
+ */
+
+int r128_cce_flip( DRM_IOCTL_ARGS )
+{
+	DRM_DEVICE;
+	drm_r128_private_t *dev_priv = dev->dev_private;
+	DRM_DEBUG( "%s\n", __FUNCTION__ );
+
+	LOCK_TEST_WITH_RETURN( dev, filp );
+
+	RING_SPACE_TEST_WITH_RETURN( dev_priv );
+
+	if (!dev_priv->page_flipping) 
+		r128_do_init_pageflip( dev );
+
+	r128_cce_dispatch_flip( dev );
+
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1280,14 +1370,11 @@ int r128_cce_swap( DRM_IOCTL_ARGS )
 	if ( sarea_priv->nbox > R128_NR_SAREA_CLIPRECTS )
 		sarea_priv->nbox = R128_NR_SAREA_CLIPRECTS;
 
-	if ( !dev_priv->page_flipping ) {
-		r128_cce_dispatch_swap( dev );
-		dev_priv->sarea_priv->dirty |= (R128_UPLOAD_CONTEXT |
-						R128_UPLOAD_MASKS);
-	} else {
-		r128_cce_dispatch_flip( dev );
-	}
+	r128_cce_dispatch_swap( dev );
+	dev_priv->sarea_priv->dirty |= (R128_UPLOAD_CONTEXT |
+					R128_UPLOAD_MASKS);
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1347,6 +1434,7 @@ int r128_cce_vertex( DRM_IOCTL_ARGS )
 
 	r128_cce_dispatch_vertex( dev, buf );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1418,6 +1506,7 @@ int r128_cce_indices( DRM_IOCTL_ARGS )
 
 	r128_cce_dispatch_indices( dev, buf, elts.start, elts.end, count );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1427,6 +1516,7 @@ int r128_cce_blit( DRM_IOCTL_ARGS )
 	drm_device_dma_t *dma = dev->dma;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	drm_r128_blit_t blit;
+	int ret;
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
@@ -1444,7 +1534,10 @@ int r128_cce_blit( DRM_IOCTL_ARGS )
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
 
-	return r128_cce_dispatch_blit( filp, dev, &blit );
+	ret = r128_cce_dispatch_blit( filp, dev, &blit );
+
+	COMMIT_RING();
+	return ret;
 }
 
 int r128_cce_depth( DRM_IOCTL_ARGS )
@@ -1452,6 +1545,7 @@ int r128_cce_depth( DRM_IOCTL_ARGS )
 	DRM_DEVICE;
 	drm_r128_private_t *dev_priv = dev->dev_private;
 	drm_r128_depth_t depth;
+	int ret;
 
 	LOCK_TEST_WITH_RETURN( dev, filp );
 
@@ -1460,18 +1554,20 @@ int r128_cce_depth( DRM_IOCTL_ARGS )
 
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 
+	ret = DRM_ERR(EINVAL);
 	switch ( depth.func ) {
 	case R128_WRITE_SPAN:
-		return r128_cce_dispatch_write_span( dev, &depth );
+		ret = r128_cce_dispatch_write_span( dev, &depth );
 	case R128_WRITE_PIXELS:
-		return r128_cce_dispatch_write_pixels( dev, &depth );
+		ret = r128_cce_dispatch_write_pixels( dev, &depth );
 	case R128_READ_SPAN:
-		return r128_cce_dispatch_read_span( dev, &depth );
+		ret = r128_cce_dispatch_read_span( dev, &depth );
 	case R128_READ_PIXELS:
-		return r128_cce_dispatch_read_pixels( dev, &depth );
+		ret = r128_cce_dispatch_read_pixels( dev, &depth );
 	}
 
-	return DRM_ERR(EINVAL);
+	COMMIT_RING();
+	return ret;
 }
 
 int r128_cce_stipple( DRM_IOCTL_ARGS )
@@ -1494,6 +1590,7 @@ int r128_cce_stipple( DRM_IOCTL_ARGS )
 
 	r128_cce_dispatch_stipple( dev, mask );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1569,6 +1666,7 @@ int r128_cce_indirect( DRM_IOCTL_ARGS )
 	 */
 	r128_cce_dispatch_indirect( dev, buf, indirect.start, indirect.end );
 
+	COMMIT_RING();
 	return 0;
 }
 

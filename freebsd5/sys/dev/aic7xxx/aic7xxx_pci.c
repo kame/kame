@@ -39,10 +39,11 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#66 $
- *
- * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.26 2003/05/26 21:45:09 gibbs Exp $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#72 $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/aic7xxx_pci.c,v 1.31 2003/09/25 23:36:41 scottl Exp $");
 
 #ifdef __linux__
 #include "aic7xxx_osm.h"
@@ -54,8 +55,8 @@
 #include <dev/aic7xxx/aic7xxx_93cx6.h>
 #endif
 
-#define AHC_PCI_IOADDR	PCIR_MAPS	/* I/O Address */
-#define AHC_PCI_MEMADDR	(PCIR_MAPS + 4)	/* Mem I/O Address */
+#define AHC_PCI_IOADDR	PCIR_BAR(0)	/* I/O Address */
+#define AHC_PCI_MEMADDR	PCIR_BAR(1)	/* Mem I/O Address */
 
 static __inline uint64_t
 ahc_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
@@ -877,7 +878,7 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 		scsiseq = 0;
 	}
 
-	error = ahc_reset(ahc);
+	error = ahc_reset(ahc, /*reinit*/FALSE);
 	if (error != 0)
 		return (ENXIO);
 
@@ -1284,11 +1285,21 @@ ahc_pci_test_register_access(struct ahc_softc *ahc)
 	 * or read prefetching could be initiated by the
 	 * CPU or host bridge.  Our device does not support
 	 * either, so look for data corruption and/or flagged
-	 * PCI errors.
+	 * PCI errors.  First pause without causing another
+	 * chip reset.
 	 */
+	hcntrl &= ~CHIPRST;
 	ahc_outb(ahc, HCNTRL, hcntrl|PAUSE);
 	while (ahc_is_paused(ahc) == 0)
 		;
+
+	/* Clear any PCI errors that occurred before our driver attached. */
+	status1 = ahc_pci_read_config(ahc->dev_softc,
+				      PCIR_STATUS + 1, /*bytes*/1);
+	ahc_pci_write_config(ahc->dev_softc, PCIR_STATUS + 1,
+			     status1, /*bytes*/1);
+	ahc_outb(ahc, CLRINT, CLRPARERR);
+
 	ahc_outb(ahc, SEQCTL, PERRORDIS);
 	ahc_outb(ahc, SCBPTR, 0);
 	ahc_outl(ahc, SCB_BASE, 0x5aa555aa);

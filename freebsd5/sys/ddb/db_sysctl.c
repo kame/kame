@@ -1,4 +1,3 @@
-
 /*
  * db_sysctl.c
  *
@@ -35,9 +34,10 @@
  * OF SUCH DAMAGE.
  *
  * Author: Archie Cobbs <archie@whistle.com>
- *
- * $FreeBSD: src/sys/ddb/db_sysctl.c,v 1.3 2000/07/04 11:25:16 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_sysctl.c,v 1.4 2003/06/10 22:09:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

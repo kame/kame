@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/stdarg.h,v 1.5 2003/05/10 00:55:15 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/stdarg.h,v 1.6 2003/10/24 02:50:39 peter Exp $
  */
 
 #ifndef _MACHINE_STDARG_H_
@@ -46,9 +46,12 @@ typedef	__va_list	va_list;
 #define	va_arg(ap, type) \
 	__builtin_va_arg((ap), type)
 
+#define	__va_copy(dest, src) \
+	__builtin_va_copy((dest), (src))
+
 #if __ISO_C_VISIBLE >= 1999
 #define	va_copy(dest, src) \
-	__builtin_va_copy((dest), (src))
+	__va_copy(dest, src)
 #endif
 
 #define	va_end(ap) \

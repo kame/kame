@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *      $FreeBSD: src/sys/amd64/acpica/acpi_machdep.c,v 1.9 2003/05/01 01:05:21 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/acpica/acpi_machdep.c,v 1.12 2003/09/22 22:12:46 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -32,16 +33,27 @@
 #include "acpi.h"
 #include <dev/acpica/acpivar.h>
 
+static int intr_model = ACPI_INTR_PIC;
+
 int
 acpi_machdep_init(device_t dev)
 {
 	struct	acpi_softc *sc;
 
-	if ((sc = device_get_softc(dev)) == NULL) {
+	if ((sc = device_get_softc(dev)) == NULL)
 		return (ENXIO);
-	}
 
 	acpi_install_wakeup_handler(sc);
 
+	if (intr_model != ACPI_INTR_PIC)
+		acpi_SetIntrModel(intr_model);
+
 	return (0);
+}
+
+void
+acpi_SetDefaultIntrModel(int model)
+{
+
+	intr_model = model;
 }

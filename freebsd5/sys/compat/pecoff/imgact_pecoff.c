@@ -1,6 +1,3 @@
-/* $NetBSD$	 */
-/* $FreeBSD: src/sys/compat/pecoff/imgact_pecoff.c,v 1.30 2003/02/19 05:46:58 imp Exp $       */
-
 /*
  * Copyright (c) 2000 Masaru OKI
  * Copyright (c) 1994, 1995, 1998 Scott Bartram
@@ -42,6 +39,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/pecoff/imgact_pecoff.c,v 1.32 2003/09/25 01:10:23 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -114,7 +114,8 @@ static struct sysentvec pecoff_sysvec = {
 	PS_STRINGS,
 	VM_PROT_ALL,
 	exec_copyout_strings,
-	exec_setregs
+	exec_setregs,
+	NULL
 	
 };
 

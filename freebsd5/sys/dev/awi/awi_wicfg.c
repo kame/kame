@@ -1,6 +1,4 @@
 /*	$NetBSD: awi_wicfg.c,v 1.3 2000/07/06 17:22:25 onoe Exp $	*/
-/* $FreeBSD: src/sys/dev/awi/awi_wicfg.c,v 1.8 2002/04/19 22:28:09 imp Exp $ */
-
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -37,6 +35,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/awi/awi_wicfg.c,v 1.10 2003/08/24 17:48:06 obrien Exp $");
+
 /*
  * WaveLAN compatible configuration support routines for the awi driver.
  */
@@ -65,7 +66,8 @@
 #include <net/if_ether.h>
 #endif
 #include <net/if_media.h>
-#include <net/if_ieee80211.h>
+
+#include <net80211/ieee80211.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>

@@ -29,9 +29,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/ddb/db_ps.c,v 1.41 2003/04/10 17:35:43 julian Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_ps.c,v 1.49 2003/08/30 19:06:57 phk Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -43,8 +45,8 @@
 #include <vm/pmap.h>
 
 #include <ddb/ddb.h>
-static void
-dumpthread(volatile struct proc *p, volatile struct thread *td);
+
+static void	dumpthread(volatile struct proc *p, volatile struct thread *td);
 
 void
 db_ps(dummy1, dummy2, dummy3, dummy4)
@@ -53,13 +55,13 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
 	db_expr_t	dummy3;
 	char *		dummy4;
 {
-	int np;
-	int nl = 0;
 	volatile struct proc *p, *pp;
 	volatile struct thread *td;
 	char *state;
+	int np, quit;
 
 	np = nprocs;
+	quit = 0;
 
 	/* sx_slock(&allproc_lock); */
 	if (!LIST_EMPTY(&allproc))
@@ -67,32 +69,9 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
 	else
 		p = &proc0;
 
-	db_printf("  pid   proc     addr    uid  ppid  pgrp  flag   stat  wmesg    wchan  cmd\n");
-	while (--np >= 0) {
-		/*
-		 * XXX just take 20 for now...
-		 */
-		if (nl++ == 20) {
-			int c;
-
-			db_printf("--More--");
-			c = cngetc();
-			db_printf("\r");
-			/*
-			 * A whole screenfull or just one line?
-			 */
-			switch (c) {
-			case '\n':		/* just one line */
-				nl = 20;
-				break;
-			case ' ':
-				nl = 0;		/* another screenfull */
-				break;
-			default:		/* exit */
-				db_printf("\n");
-				return;
-			}
-		}
+	db_setup_paging(db_simple_pager, &quit, DB_LINES_PER_PAGE);
+	db_printf("  pid   proc     uarea   uid  ppid  pgrp  flag   stat  wmesg    wchan  cmd\n");
+	while (--np >= 0 && !quit) {
 		if (p == NULL) {
 			printf("oops, ran out of processes early!\n");
 			break;
@@ -108,7 +87,7 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
 			if (P_SHOULDSTOP(p))
 				state = "stop";
 			else
-				state = "norm";
+				state = "";
 			break;
 		case PRS_NEW:
 			state = "new ";
@@ -120,15 +99,17 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
 			state = "Unkn";
 			break;
 		}
-		db_printf("%5d %8p %8p %4d %5d %5d %07x %-4s",
+		db_printf("%5d %8p %8p %4d %5d %5d %07x %s",
 		    p->p_pid, (volatile void *)p, (void *)p->p_uarea, 
 		    p->p_ucred != NULL ? p->p_ucred->cr_ruid : 0, pp->p_pid,
 		    p->p_pgrp != NULL ? p->p_pgrp->pg_id : 0, p->p_flag,
 		    state);
-		if (p->p_flag & P_THREADED) 
+		if (p->p_flag & P_SA) 
 			db_printf("(threaded)  %s\n", p->p_comm);
 		FOREACH_THREAD_IN_PROC(p, td) {
 			dumpthread(p, td);
+			if (quit)
+				break;
 		}
 		/* PROC_UNLOCK(p); */
 
@@ -138,17 +119,25 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
     	}
 	/* sx_sunlock(&allproc_lock); */
 }
+
 static void
 dumpthread(volatile struct proc *p, volatile struct thread *td)
 {
-	if (p->p_flag & P_THREADED) 
+
+	if (p->p_flag & P_SA) 
 		db_printf( "   thread %p ksegrp %p ", td, td->td_ksegrp);
 	if (TD_ON_SLEEPQ(td)) {
 		if (td->td_flags & TDF_CVWAITQ)
-			db_printf("[CVQ ");
+			if (TD_IS_SLEEPING(td))
+				db_printf("[CV]");
+			else
+				db_printf("[CVQ");
 		else
-			db_printf("[SLPQ ");
-		db_printf(" %6s %8p]", td->td_wmesg,
+			if (TD_IS_SLEEPING(td))
+				db_printf("[SLP]");
+			else
+				db_printf("[SLPQ");
+		db_printf("%s %p]", td->td_wmesg,
 		    (void *)td->td_wchan);
 	}
 	switch (td->td_state) {
@@ -158,9 +147,11 @@ dumpthread(volatile struct proc *p, volatile struct thread *td)
 			    td->td_lockname,
 			    (void *)td->td_blocked);
 		}
+#if 0 /* covered above */
 		if (TD_IS_SLEEPING(td)) {
 			db_printf("[SLP]");
 		}  
+#endif
 		if (TD_IS_SWAPPED(td)) {
 			db_printf("[SWAP]");
 		}
@@ -180,10 +171,13 @@ dumpthread(volatile struct proc *p, volatile struct thread *td)
 	case TDS_RUNNING:
 		db_printf("[CPU %d]", td->td_oncpu);
 		break;
+	case TDS_INACTIVE:
+		db_printf("[INACTIVE]");
+		break;
 	default:
-		panic("unknown thread state");
+		db_printf("[UNK: %#x]", td->td_state);
 	}
-	if (p->p_flag & P_THREADED) {
+	if (p->p_flag & P_SA) {
 		if (td->td_kse)
 			db_printf("[kse %p]", td->td_kse);
 		db_printf("\n");

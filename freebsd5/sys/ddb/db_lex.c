@@ -22,10 +22,7 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_lex.c,v 1.20 2002/03/20 05:14:28 alfred Exp $
  */
-
 /*
  *	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
@@ -33,6 +30,10 @@
 /*
  * Lexical analyzer.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_lex.c,v 1.21 2003/06/10 22:09:23 obrien Exp $");
+
 #include <sys/param.h>
 
 #include <ddb/ddb.h>

@@ -30,8 +30,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nmdm/nmdm.c,v 1.14 2003/03/05 08:16:28 das Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/nmdm/nmdm.c,v 1.17 2003/11/09 09:17:21 tanimura Exp $");
 
 /*
  * Pseudo-nulmodem driver
@@ -449,11 +451,11 @@ wakeup_other(struct tty *tp, int flag)
 
 	GETPARTS(tp, ourpart, otherpart);
 	if (flag & FREAD) {
-		selwakeup(&otherpart->nm_tty.t_rsel);
+		selwakeuppri(&otherpart->nm_tty.t_rsel, TTIPRI);
 		wakeup(TSA_PTC_READ((&otherpart->nm_tty)));
 	}
 	if (flag & FWRITE) {
-		selwakeup(&otherpart->nm_tty.t_wsel);
+		selwakeuppri(&otherpart->nm_tty.t_wsel, TTOPRI);
 		wakeup(TSA_PTC_WRITE((&otherpart->nm_tty)));
 	}
 }
@@ -602,8 +604,8 @@ nmdmshutdown(void)
 		nextdev2 = makedev(CDEV_MAJOR, (i+i) + 1);
 		ptr1 = nextdev1->si_drv1;
 		if (ptr1) {
-			revoke_and_destroy_dev(nextdev1);
-			revoke_and_destroy_dev(nextdev2);
+			destroy_dev(nextdev1);
+			destroy_dev(nextdev2);
 			free(ptr1, M_NLMDM);
 		} else {
 			freedev(nextdev1);

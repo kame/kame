@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/db_machdep.h,v 1.7 2003/02/25 00:42:39 marcel Exp $ */
+/* $FreeBSD: src/sys/alpha/include/db_machdep.h,v 1.8 2003/09/07 05:33:46 marcel Exp $ */
 /* $NetBSD: db_machdep.h,v 1.6 1997/09/06 02:02:25 thorpej Exp $ */
 
 /*
@@ -34,8 +34,9 @@
 /*
  * Machine-dependent defines for new kernel debugger.
  */
-
+#ifndef KLD_MODULE
 #include "opt_ddb.h"
+#endif
 
 #include <sys/param.h>
 #include <vm/vm.h>

@@ -31,9 +31,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.24 2003/04/25 20:04:02 jhb Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/sys_machdep.c,v 1.26 2003/08/22 07:20:25 imp Exp $");
 
 #include "opt_mac.h"
 

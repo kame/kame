@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/pcpu.h,v 1.36 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/pcpu.h,v 1.42 2003/11/20 23:49:28 peter Exp $
  */
 
 #ifndef _MACHINE_PCPU_H_
@@ -40,7 +40,12 @@
  */
 #define	PCPU_MD_FIELDS							\
 	struct	pcpu *pc_prvspace;	/* Self-reference */		\
-	register_t pc_scratch_rsp;	/* User %rsp in syscall */
+	struct	pmap *pc_curpmap;					\
+	struct	amd64tss *pc_tssp;					\
+	register_t pc_rsp0;						\
+	register_t pc_scratch_rsp;	/* User %rsp in syscall */	\
+	u_int	pc_apic_id;						\
+	u_int   pc_acpi_id		/* ACPI CPU id */
 
 #if defined(lint)
  
@@ -67,7 +72,7 @@ extern struct pcpu *pcpup;
 /*
  * Evaluates to the address of the per-cpu variable name.
  */
-#define	__PCPU_PTR(name) ({						\
+#define	__PCPU_PTR(name) __extension__ ({				\
 	__pcpu_type(name) *__p;						\
 									\
 	__asm __volatile("movq %%gs:%1,%0; addq %2,%0"			\
@@ -81,7 +86,7 @@ extern struct pcpu *pcpup;
 /*
  * Evaluates to the value of the per-cpu variable name.
  */
-#define	__PCPU_GET(name) ({						\
+#define	__PCPU_GET(name) __extension__ ({				\
 	__pcpu_type(name) __result;					\
 									\
 	if (sizeof(__result) == 1) {					\
@@ -118,7 +123,7 @@ extern struct pcpu *pcpup;
 /*
  * Sets the value of the per-cpu variable name to value val.
  */
-#define	__PCPU_SET(name, val) ({					\
+#define	__PCPU_SET(name, val) {						\
 	__pcpu_type(name) __val = (val);				\
 									\
 	if (sizeof(__val) == 1) {					\
@@ -148,11 +153,21 @@ extern struct pcpu *pcpup;
 	} else {							\
 		*__PCPU_PTR(name) = __val;				\
 	}								\
-})
+}
 
 #define	PCPU_GET(member)	__PCPU_GET(pc_ ## member)
 #define	PCPU_PTR(member)	__PCPU_PTR(pc_ ## member)
 #define	PCPU_SET(member, val)	__PCPU_SET(pc_ ## member, val)
+
+static __inline struct thread *
+__curthread(void)
+{
+	struct thread *td;
+
+	__asm __volatile("movq %%gs:0,%0" : "=r" (td));
+	return (td);
+}
+#define	curthread (__curthread())
 
 #else
 #error gcc or lint is required to use this file

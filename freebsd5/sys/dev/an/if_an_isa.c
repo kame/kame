@@ -29,7 +29,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 /*
  * Aironet 4500/4800 802.11 PCMCIA/ISA/PCI driver for FreeBSD.
  *
@@ -39,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.12 2003/04/15 06:37:19 mdodd Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.13 2003/08/24 17:48:04 obrien Exp $");
 
 #include "opt_inet.h"
 

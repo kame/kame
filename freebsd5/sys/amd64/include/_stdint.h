@@ -34,10 +34,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/_stdint.h,v 1.1 2002/07/29 17:41:23 mike Exp $
+ * $FreeBSD: src/sys/amd64/include/_stdint.h,v 1.2 2003/11/21 03:02:00 peter Exp $
  */
 
-#ifndef	_MACHINE__STDINT_H_
+#ifndef _MACHINE__STDINT_H_
 #define	_MACHINE__STDINT_H_
 
 #if !defined(__cplusplus) || defined(__STDC_CONSTANT_MACROS)

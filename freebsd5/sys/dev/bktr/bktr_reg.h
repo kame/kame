@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/dev/bktr/bktr_reg.h,v 1.44 2002/03/25 21:22:33 nsouch Exp $
+ * $FreeBSD: src/sys/dev/bktr/bktr_reg.h,v 1.46 2003/12/01 19:03:50 truckman Exp $
  *
  * Copyright (c) 1999 Roger Hardiman
  * Copyright (c) 1998 Amancio Hasty
@@ -542,6 +542,9 @@ struct bktr_softc {
     dev_t           tunerdev_alias;	/* alias /dev/tuner to /dev/tuner0 */
     dev_t           vbidev_alias;	/* alias /dev/vbi to /dev/vbi0 */
     #endif
+    #if (__FreeBSD_version >= 500000)
+    struct mtx      vbimutex;  /* Mutex protecting vbi buffer */
+    #endif
     #if (__FreeBSD_version >= 310000)
     bus_space_tag_t	memt;	/* Bus space register access functions */
     bus_space_handle_t	memh;	/* Bus space register access functions */
@@ -694,6 +697,15 @@ struct bktr_softc {
     int                 msp_use_mono_source;   /* use Tuner's Mono audio output via the MSP chip */
     int                 audio_mux_present;     /* 1 = has audio mux on GPIO lines, 0 = no audio mux */
     int                 msp_source_selected;   /* 0 = TV source, 1 = Line In source, 2 = FM Radio Source */
+
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+    /* msp3400c related data */
+    void *		msp3400c_info;
+    int			stereo_once;
+    int			amsound;
+    int			mspsimple;
+    int			dolby;
+#endif
 
 };
 

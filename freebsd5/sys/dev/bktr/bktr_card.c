@@ -1,20 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_card.c,v 1.19 2003/02/03 18:59:12 orion Exp $ */
-
-/*
- * This is part of the Driver for Video Capture Cards (Frame grabbers)
- * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
- * chipset.
- * Copyright Roger Hardiman and Amancio Hasty.
- *
- * bktr_card : This deals with identifying TV cards.
- *               trying to find the card make and model of card.
- *               trying to find the type of tuner fitted.
- *               reading the configuration EEPROM.
- *               locating i2c devices.
- *
- */
-
-/*
+/*-
  * 1. Redistributions of source code must retain the
  * Copyright (c) 1997 Amancio Hasty, 1999 Roger Hardiman
  * All rights reserved.
@@ -47,6 +31,22 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_card.c,v 1.22 2003/08/24 17:46:01 obrien Exp $");
+
+/*
+ * This is part of the Driver for Video Capture Cards (Frame grabbers)
+ * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
+ * chipset.
+ * Copyright Roger Hardiman and Amancio Hasty.
+ *
+ * bktr_card : This deals with identifying TV cards.
+ *               trying to find the card make and model of card.
+ *               trying to find the type of tuner fitted.
+ *               reading the configuration EEPROM.
+ *               locating i2c devices.
+ */
+
 #include "opt_bktr.h"		/* Include any kernel config options */
 
 #include <sys/param.h>
@@ -57,9 +57,10 @@
 
 #if (__FreeBSD_version < 500000)
 #include <machine/clock.h>              /* for DELAY */
-#endif
-
 #include <pci/pcivar.h>
+#else
+#include <dev/pci/pcivar.h>
+#endif
 
 #if (__FreeBSD_version >=300000)
 #include <machine/bus_memio.h>	/* for bus space */
@@ -550,6 +551,8 @@ static int locate_eeprom_address( bktr_ptr_t bktr) {
 /* Following not confirmed with http://members.hyperlink.net.au/~chart,
    so not added to NetBSD's pcidevs */
 #define PCI_VENDOR_LEADTEK_ALT	0x6606
+#define PCI_VENDOR_LEADTEK_ALT_2	0x6607
+#define PCI_VENDOR_LEADTEK_ALT_3	0x107d
 #define PCI_VENDOR_FLYVIDEO	0x1851
 #define PCI_VENDOR_FLYVIDEO_2	0x1852
 #define PCI_VENDOR_PINNACLE_ALT	0xBD11
@@ -675,7 +678,9 @@ probeCard( bktr_ptr_t bktr, int verbose, int unit )
                     goto checkTuner;
                 }
 
-                if (subsystem_vendor_id == PCI_VENDOR_LEADTEK_ALT) {
+                if ((subsystem_vendor_id == PCI_VENDOR_LEADTEK_ALT)
+		 || (subsystem_vendor_id == PCI_VENDOR_LEADTEK_ALT_2)
+		 || (subsystem_vendor_id == PCI_VENDOR_LEADTEK_ALT_3)) {
                     bktr->card = cards[ (card = CARD_LEADTEK) ];
 		    bktr->card.eepromAddr = eeprom_i2c_address;
 		    bktr->card.eepromSize = (u_char)(256 / EEPROMBLOCKSIZE);

@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
  *
@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.25 2003/09/02 17:30:34 jhb Exp $");
+
 /*
  * This is a PCI shim for the Aironet PC4500/4800 wireless network
  * driver. Aironet makes PCMCIA, ISA and PCI versions of these devices,
@@ -49,9 +52,6 @@
  * more, you need a datasheet for the 9050 from PLX, but you have
  * to go through their sales office to get it. Bleh.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.20 2003/04/15 06:37:19 mdodd Exp $");
 
 #include "opt_inet.h"
 
@@ -80,8 +80,8 @@ __FBSDID("$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.20 2003/04/15 06:37:19 mdodd 
 #include <net/if_dl.h>
 #include <net/if_media.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/an/if_aironet_ieee.h>
 #include <dev/an/if_anreg.h>
@@ -156,7 +156,7 @@ an_attach_pci(dev)
 	if (pci_get_vendor(dev) == AIRONET_VENDORID &&
 	    pci_get_device(dev) == AIRONET_DEVICEID_MPI350) {
 		sc->mpi350 = 1;
-		sc->port_rid = PCIR_MAPS;
+		sc->port_rid = PCIR_BAR(0);
 	} else {
 		/*
 		 * Map control/status registers.
@@ -186,7 +186,7 @@ an_attach_pci(dev)
 	/* Allocate memory for MPI350 */
 	if (sc->mpi350) {
 		/* Allocate memory */
-		sc->mem_rid = PCIR_MAPS + 4;
+		sc->mem_rid = PCIR_BAR(1);
 		error = an_alloc_memory(dev, sc->mem_rid, 1);
 		if (error) {
 			printf("an%d: couldn't map memory\n", unit);
@@ -196,9 +196,9 @@ an_attach_pci(dev)
 		sc->an_mem_bhandle = rman_get_bushandle(sc->mem_res);
 
 		/* Allocate aux. memory */
-		sc->mem_aux_rid = PCIR_MAPS + 8;
+		sc->mem_aux_rid = PCIR_BAR(2);
 		error = an_alloc_aux_memory(dev, sc->mem_aux_rid, 
-		    AN_AUXMEMSIZE);
+		    AN_AUX_MEM_SIZE);
 		if (error) {
 			printf("an%d: couldn't map aux memory\n", unit);
 			goto fail;
@@ -216,6 +216,8 @@ an_attach_pci(dev)
 			       1,			/* nsegments */
 			       0xffff,			/* maxsegsize XXX */
 			       BUS_DMA_ALLOCNOW,	/* flags */
+			       NULL,			/* lockfunc */
+			       NULL,			/* lockarg */
 			       &sc->an_dtag);
 		if (error) {
 			printf("an%d: couldn't get DMA region\n", unit);

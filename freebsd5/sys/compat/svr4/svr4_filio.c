@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/compat/svr4/svr4_filio.c,v 1.28 2003/05/13 20:35:57 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_filio.c,v 1.30 2003/10/20 10:38:48 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -39,6 +40,8 @@
 #include <sys/poll.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/resource.h>
+#include <sys/resourcevar.h>
 
 #include <sys/sysproto.h>
 
@@ -62,6 +65,11 @@ svr4_sys_poll(td, uap)
      struct pollfd *pfd;
      int idx = 0, cerr;
      u_long siz;
+
+	mtx_assert(&Giant, MA_OWNED);
+	if (uap->nfds > td->td_proc->p_rlimit[RLIMIT_NOFILE].rlim_cur &&
+	    uap->nfds > FD_SETSIZE)
+		return (EINVAL);
 
      pa.fds = uap->fds;
      pa.nfds = uap->nfds;

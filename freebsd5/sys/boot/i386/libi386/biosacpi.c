@@ -22,15 +22,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/i386/libi386/biosacpi.c,v 1.4 2003/04/29 18:50:34 njl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/biosacpi.c,v 1.7 2003/08/25 23:28:31 obrien Exp $");
 
 #include <stand.h>
 #include <machine/stdarg.h>
 #include <bootstrap.h>
 
 #include "acfreebsd.h"
+#include "acconfig.h"
 #define ACPI_SYSTEM_XFACE
 #include "actypes.h"
 #include "actbl.h"
@@ -65,6 +67,7 @@ biosacpi_detect(void)
     sprintf(buf, "%d", revision);
     setenv("hint.acpi.0.revision", buf, 1);
     sprintf(buf, "%6s", rsdp->OemId);
+    buf[6] = '\0';
     setenv("hint.acpi.0.oem", buf, 1);
     sprintf(buf, "0x%08x", rsdp->RsdtPhysicalAddress);
     setenv("hint.acpi.0.rsdt", buf, 1);

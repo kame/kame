@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ips/ips_disk.h,v 1.1 2003/05/11 06:36:49 scottl Exp $
+ * $FreeBSD: src/sys/dev/ips/ips_disk.h,v 1.2 2003/08/22 06:00:27 imp Exp $
  */
 
 
@@ -46,8 +46,8 @@
 #include <sys/rman.h>
 #include <machine/resource.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #define IPS_MAX_IO_SIZE		0x10000
 

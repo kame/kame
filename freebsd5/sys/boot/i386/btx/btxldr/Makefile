@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/btx/btxldr/Makefile,v 1.11 2002/09/17 01:48:55 peter Exp $
+# $FreeBSD: src/sys/boot/i386/btx/btxldr/Makefile,v 1.12 2003/06/26 03:51:57 peter Exp $
 
 M4?=	m4
 M4FLAGS+=	-DLOADER_ADDRESS=${LOADER_ADDRESS}
@@ -19,5 +19,4 @@ btxldr.o: btxldr.s
 
 CLEANFILES+= btxldr btxldr.out btxldr.o
 
-.include <${.CURDIR}/../../Makefile.inc>
 .include <bsd.prog.mk>

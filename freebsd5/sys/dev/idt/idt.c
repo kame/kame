@@ -74,9 +74,10 @@
  *  2.  The memory allocation could be cleaned up quite a bit.
  *
  ******************************************************************************
- *
- * $FreeBSD: src/sys/dev/idt/idt.c,v 1.5 2003/02/19 05:47:06 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/idt/idt.c,v 1.7 2003/11/16 22:33:42 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,6 +105,14 @@
 
 #include <net/if.h>
 #include <net/if_arp.h>
+
+/* Gross kludge to make lint compile again.  This sucks, but oh well */
+#ifdef COMPILING_LINT
+#undef MCLBYTES
+#undef MCLSHIFT
+#define MCLBYTES 2048
+#define MCLSHIFT 11
+#endif
 
 #if MCLBYTES != 2048
 #error "This nicstar driver depends on 2048 byte mbuf clusters."

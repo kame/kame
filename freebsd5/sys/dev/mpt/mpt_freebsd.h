@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/mpt/mpt_freebsd.h,v 1.8 2002/09/24 21:33:43 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/mpt/mpt_freebsd.h,v 1.9 2003/06/03 17:47:47 mjacob Exp $ */
 /*
  * LSI MPT Host Adapter FreeBSD Wrapper Definitions (CAM version)
  *
@@ -233,11 +233,11 @@ typedef struct mpt_softc {
 	 */
 	union {
 		struct mpt_spi_cfg {
-			fCONFIG_PAGE_SCSI_PORT_0	_port_page0;
-			fCONFIG_PAGE_SCSI_PORT_1	_port_page1;
-			fCONFIG_PAGE_SCSI_PORT_2	_port_page2;
-			fCONFIG_PAGE_SCSI_DEVICE_0	_dev_page0[16];
-			fCONFIG_PAGE_SCSI_DEVICE_1	_dev_page1[16];
+			CONFIG_PAGE_SCSI_PORT_0		_port_page0;
+			CONFIG_PAGE_SCSI_PORT_1		_port_page1;
+			CONFIG_PAGE_SCSI_PORT_2		_port_page2;
+			CONFIG_PAGE_SCSI_DEVICE_0	_dev_page0[16];
+			CONFIG_PAGE_SCSI_DEVICE_1	_dev_page1[16];
 			uint16_t			_tag_enable;
 			uint16_t			_disc_enable;
 			uint16_t			_update_params0;

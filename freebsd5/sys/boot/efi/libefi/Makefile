@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/efi/libefi/Makefile,v 1.11 2002/12/10 06:22:25 marcel Exp $
+# $FreeBSD: src/sys/boot/efi/libefi/Makefile,v 1.12 2003/07/02 11:53:55 ru Exp $
 
 .PATH: ${.CURDIR}/../../../${MACHINE_ARCH}/${MACHINE_ARCH}
 
@@ -6,7 +6,7 @@ LIB=		efi
 INTERNALLIB=	true
 
 SRCS=	libefi.c efi_console.c time.c copy.c devicename.c module.c
-SRCS+=	delay.c efifs.c efinet.c elf_freebsd.c bootinfo.c pal.s
+SRCS+=	delay.c efifs.c efinet.c elf_freebsd.c bootinfo.c pal.S
 
 .if ${MACHINE_ARCH} == "ia64"
 SRCS+=	efifpswa.c

@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/dev/isp/isp_freebsd.c,v 1.89 2003/03/03 12:15:42 phk Exp $ */
 /*
  * Platform (FreeBSD) dependent common attachment code for Qlogic adapters.
  *
@@ -25,6 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/isp/isp_freebsd.c,v 1.94 2003/09/27 12:00:58 phk Exp $");
+
 #include <dev/isp/isp_freebsd.h>
 #include <sys/unistd.h>
 #include <sys/kthread.h>
@@ -36,6 +39,7 @@
 
 
 MODULE_VERSION(isp, 1);
+MODULE_DEPEND(isp, cam, 1, 1, 1);
 int isp_announced = 0;
 ispfwfunc *isp_get_firmware_p = NULL;
 
@@ -50,8 +54,6 @@ static void isp_action(struct cam_sim *, union ccb *);
 
 #define ISP_CDEV_MAJOR	248
 static struct cdevsw isp_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
 	.d_ioctl =	ispioctl,
 	.d_name =	"isp",
 	.d_maj =	ISP_CDEV_MAJOR,
@@ -396,8 +398,10 @@ ispioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 		hba->fc_scsi_supported = 1;
 		hba->fc_topology = FCPARAM(isp)->isp_topo + 1;
 		hba->fc_loopid = FCPARAM(isp)->isp_loopid;
-		hba->active_node_wwn = FCPARAM(isp)->isp_nodewwn;
-		hba->active_port_wwn = FCPARAM(isp)->isp_portwwn;
+		hba->nvram_node_wwn = FCPARAM(isp)->isp_nodewwn;
+		hba->nvram_port_wwn = FCPARAM(isp)->isp_portwwn;
+		hba->active_node_wwn = ISP_NODEWWN(isp);
+		hba->active_port_wwn = ISP_PORTWWN(isp);
 		ISP_UNLOCK(isp);
 		retval = 0;
 		break;
@@ -2532,8 +2536,6 @@ isp_action(struct cam_sim *sim, union ccb *ccb)
 	case XPT_CALC_GEOMETRY:
 	{
 		struct ccb_calc_geometry *ccg;
-		u_int32_t secs_per_cylinder;
-		u_int32_t size_mb;
 
 		ccg = &ccb->ccg;
 		if (ccg->block_size == 0) {
@@ -2544,17 +2546,7 @@ isp_action(struct cam_sim *sim, union ccb *ccb)
 			xpt_done(ccb);
 			break;
 		}
-		size_mb = ccg->volume_size /((1024L * 1024L) / ccg->block_size);
-		if (size_mb > 1024) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(ccg, /*extended*/1);
 		xpt_done(ccb);
 		break;
 	}

@@ -31,6 +31,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.13 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * driver for homePNA PHYs
  * This is really just a stub that allows us to identify homePNA-based
@@ -41,7 +44,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.12 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnaphy.c,v 1.13 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

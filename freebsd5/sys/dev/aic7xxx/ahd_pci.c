@@ -28,16 +28,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/ahd_pci.c#13 $
- *
- * $FreeBSD: src/sys/dev/aic7xxx/ahd_pci.c,v 1.8 2003/05/03 23:27:57 gibbs Exp $
+ * $Id: ahd_pci.c,v 1.13 2003/11/03 09:22:17 dfr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/ahd_pci.c,v 1.14 2003/11/28 05:28:27 imp Exp $");
 
 #include <dev/aic7xxx/aic79xx_osm.h>
 
-#define	AHD_PCI_IOADDR0 PCIR_MAPS	/* Primary I/O BAR */
-#define	AHD_PCI_MEMADDR (PCIR_MAPS + 4) /* Mem I/O Address */
-#define	AHD_PCI_IOADDR1 (PCIR_MAPS + 12)/* Secondary I/O BAR */
+#define	AHD_PCI_IOADDR0 PCIR_BAR(0)	/* Primary I/O BAR */
+#define	AHD_PCI_MEMADDR PCIR_BAR(1)	/* Mem I/O Address */
+#define	AHD_PCI_IOADDR1 PCIR_BAR(3)	/* Secondary I/O BAR */
 
 static int ahd_pci_probe(device_t dev);
 static int ahd_pci_attach(device_t dev);
@@ -115,7 +116,7 @@ ahd_pci_attach(device_t dev)
 	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
 				   /*boundary*/0,
 				   (ahd->flags & AHD_39BIT_ADDRESSING)
-				   ? 0x7FFFFFFFFF
+				   ? 0x7FFFFFFFFFLL
 				   : BUS_SPACE_MAXADDR_32BIT,
 				   /*highaddr*/BUS_SPACE_MAXADDR,
 				   /*filter*/NULL, /*filterarg*/NULL,
@@ -123,6 +124,8 @@ ahd_pci_attach(device_t dev)
 				   /*nsegments*/AHD_NSEG,
 				   /*maxsegsz*/AHD_MAXTRANSFER_SIZE,
 				   /*flags*/0,
+				   /*lockfunc*/busdma_lock_mutex,
+				   /*lockarg*/&Giant,
 				   &ahd->parent_dmat);
 
 	if (error != 0) {

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.28 2003/05/27 04:59:56 scottl Exp $
+ * $FreeBSD: src/sys/dev/ahb/ahb.c,v 1.31 2003/07/30 20:09:22 gallatin Exp $
  */
 
 #include <sys/param.h>
@@ -33,6 +33,8 @@
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/bus.h>
 
 #include <machine/bus_pio.h>
@@ -138,7 +140,8 @@ static __inline struct ecb*
 ahbecbptov(struct ahb_softc *ahb, u_int32_t ecb_addr)
 {
 	return (ahb->ecb_array
-	      + ((struct ecb*)ecb_addr - (struct ecb*)ahb->ecb_physbase));
+	      + ((struct ecb*)(uintptr_t)ecb_addr 
+		- (struct ecb*)(uintptr_t)ahb->ecb_physbase));
 }
 
 static __inline u_int32_t
@@ -303,6 +306,8 @@ ahbattach(device_t dev)
 				/* nsegments	*/ AHB_NSEG,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ BUS_DMA_ALLOCNOW,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&ahb->buffer_dmat) != 0)
 		goto error_exit;
 
@@ -322,6 +327,8 @@ ahbattach(device_t dev)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&ahb->ecb_dmat) != 0)
 		goto error_exit;
 
@@ -1171,24 +1178,7 @@ ahbaction(struct cam_sim *sim, union ccb *ccb)
 	}
 	case XPT_CALC_GEOMETRY:
 	{
-		struct	  ccb_calc_geometry *ccg;
-		u_int32_t size_mb;
-		u_int32_t secs_per_cylinder;
-
-		ccg = &ccb->ccg;
-		size_mb = ccg->volume_size
-			/ ((1024L * 1024L) / ccg->block_size);
-		
-		if (size_mb > 1024 && (ahb->extended_trans != 0)) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(&ccb->ccg, ahb->extended_trans); 
 		xpt_done(ccb);
 		break;
 	}

@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/cs/if_csvar.h,v 1.1 2001/01/21 04:56:12 imp Exp $
+ * $FreeBSD: src/sys/dev/cs/if_csvar.h,v 1.2 2003/10/31 18:31:58 brooks Exp $
  */
 
 #ifndef _IF_CSVAR_H
@@ -70,7 +70,7 @@ struct cs_softc {
 int	cs_alloc_port(device_t dev, int rid, int size);
 int	cs_alloc_memory(device_t dev, int rid, int size);
 int	cs_alloc_irq(device_t dev, int rid, int flags);
-int	cs_attach(struct cs_softc *, int, int);
+int	cs_attach(device_t dev);
 int	cs_cs89x0_probe(device_t dev);
 void	cs_release_resources(device_t dev);
 driver_intr_t	csintr;

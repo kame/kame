@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/alpha/tlsb/kftxx.c,v 1.10 2000/08/28 21:48:06 dfr Exp $ */
 /* $NetBSD: kftxx.c,v 1.9 1998/05/14 00:01:32 thorpej Exp $ */
-
 /*
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
@@ -35,6 +33,9 @@
  *
  * i.e., handler for all TLSB I/O nodes.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/kftxx.c,v 1.12 2003/08/22 07:20:27 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

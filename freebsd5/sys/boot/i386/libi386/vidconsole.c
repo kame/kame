@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1998 Michael Smith (msmith@freebsd.org)
  * Copyright (c) 1997 Kazutaka YOKOTA (yokota@zodiac.mech.utsunomiya-u.ac.jp)
  * All rights reserved.
@@ -24,10 +24,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * 	From Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
- *
- * $FreeBSD: src/sys/boot/i386/libi386/vidconsole.c,v 1.18 2001/10/02 13:11:35 yokota Exp $
+ * 	Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/vidconsole.c,v 1.19 2003/08/25 23:28:31 obrien Exp $");
 
 #include <stand.h>
 #include <bootstrap.h>

@@ -24,7 +24,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
+ */
+/*
  * Copyright (c) 2002 Eric Moore
  * Copyright (c) 2002 LSI Logic Corporation
  * All rights reserved.
@@ -52,10 +53,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *
- * $FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.28 2003/04/01 15:06:22 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.30 2003/10/10 22:49:40 ps Exp $");
 
 /*
  * Disk driver for AMI MegaRaid controllers
@@ -141,6 +142,33 @@ amrd_open(struct disk *dp)
 
     return (0);
 }
+/********************************************************************************
+ * System crashdump support
+ */
+
+static int
+amrd_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t length)
+{
+
+    struct amrd_softc	*amrd_sc;
+    struct amr_softc	*amr_sc;
+    int			error;
+    struct disk		*dp;
+
+    dp = arg;
+    amrd_sc = (struct amrd_softc *)dp->d_drv1;
+    amr_sc  = (struct amr_softc *)amrd_sc->amrd_controller;
+    if (!amrd_sc || !amr_sc)
+	return(ENXIO);
+
+    if (length > 0) {
+	int	driveno = amrd_sc->amrd_drive - amr_sc->amr_drive;
+	if ((error = amr_dump_blocks(amr_sc,driveno,offset / AMR_BLKSIZE ,(void *)virtual,(int) length / AMR_BLKSIZE  )) != 0)
+	    	return(error);
+
+    }
+    return(0);
+}
 
 /*
  * Read/write routine for a buffer.  Finds the proper unit, range checks
@@ -224,6 +252,7 @@ amrd_attach(device_t dev)
     sc->amrd_disk.d_open = amrd_open;
     sc->amrd_disk.d_strategy = amrd_strategy;
     sc->amrd_disk.d_name = "amrd";
+    sc->amrd_disk.d_dump = (dumper_t *)amrd_dump;
     disk_create(sc->amrd_unit, &sc->amrd_disk, 0, NULL, NULL);
 #ifdef FREEBSD_4
     disks_registered++;

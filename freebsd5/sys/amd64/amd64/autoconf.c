@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)autoconf.c	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/amd64/amd64/autoconf.c,v 1.173 2003/05/01 01:05:21 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/autoconf.c,v 1.177 2003/11/21 03:01:59 peter Exp $");
 
 /*
  * Setup the system to run on the current machine.
@@ -74,7 +76,6 @@
 #include <nfsclient/nfsdiskless.h>
 
 #include <machine/md_var.h>
-#include <amd64/isa/icu.h>
 
 #ifdef DEV_ISA
 #include <isa/isavar.h>
@@ -107,23 +108,11 @@ configure(dummy)
 {
 
 	/*
-	 * Activate the ICU's.  Note that we are explicitly at splhigh()
-	 * at present as we have no way to disable stray PCI level triggered
-	 * interrupts until the devices have had a driver attached.  This
-	 * is particularly a problem when the interrupts are shared.  For
-	 * example, if IRQ 10 is shared between a disk and network device
-	 * and the disk device generates an interrupt, if we "activate"
-	 * IRQ 10 when the network driver is set up, then we will get
-	 * recursive interrupt 10's as nothing will know how to turn off
-	 * the disk device's interrupt.
-	 *
-	 * Having the ICU's active means we can probe interrupt routing to
-	 * see if a device causes the corresponding pending bit to be set.
-	 *
-	 * This is all rather inconvenient.
+	 * Enable interrupts on the processor.  The interrupts are still
+	 * disabled in the interrupt controllers until interrupt handlers
+	 * are registered.
 	 */
 	enable_intr();
-	INTREN(IRQ_SLAVE);
 
 	/* nexus0 is the top of the i386 device tree */
 	device_add_child(root_bus, "nexus", 0);
@@ -139,12 +128,6 @@ configure(dummy)
 	if (isa_bus_device)
 		isa_probe_children(isa_bus_device);
 #endif
-
-	/*
-	 * Now we're ready to handle (pending) interrupts.
-	 * XXX this is slightly misplaced.
-	 */
-	spl0();
 }
 
 static void
@@ -153,6 +136,8 @@ configure_final(dummy)
 {
 
 	cninit_finish(); 
+	if (bootverbose)
+		printf("Device configuration finished.\n");
 	cold = 0;
 }
 

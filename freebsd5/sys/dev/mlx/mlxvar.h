@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mlx/mlxvar.h,v 1.19 2003/03/08 08:01:29 phk Exp $
+ *	$FreeBSD: src/sys/dev/mlx/mlxvar.h,v 1.20 2003/09/02 08:30:31 scottl Exp $
  */
 
 /*
@@ -98,6 +98,7 @@ struct mlx_command
 
     void			(* mc_complete)(struct mlx_command *mc);	/* completion handler */
     void			*mc_private;	/* submitter-private data or wait channel */
+    int				mc_command;
 };
 
 /*

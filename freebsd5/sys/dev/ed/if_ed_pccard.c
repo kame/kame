@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.48 2003/04/15 06:37:23 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.54 2003/10/31 18:31:58 brooks Exp $
  */
 
 #include "opt_ed.h"
@@ -127,6 +127,7 @@ static const struct ed_product {
 	{ PCMCIA_CARD(BILLIONTON, LNT10TN, 0), 0},
 	{ PCMCIA_CARD(BILLIONTON, CFLT10N, 0), 0},
 	{ PCMCIA_CARD(BUFFALO, LPC3_CLT,  0), 0},
+	{ PCMCIA_CARD(BUFFALO, LPC3_CLX,  0), NE2000DVF_AX88190},
 	{ PCMCIA_CARD(BUFFALO, LPC_CF_CLT,  0), 0},
 	{ PCMCIA_CARD(CNET, NE2000, 0), 0},
 	{ PCMCIA_CARD(COMPEX, LINKPORT_ENET_B, 0), 0},
@@ -147,6 +148,7 @@ static const struct ed_product {
 	{ PCMCIA_CARD(DYNALINK, L10C, 0), 0},
 	{ PCMCIA_CARD(EDIMAX, EP4000A, 0), 0},
 	{ PCMCIA_CARD(EPSON, EEN10B, 0), 0},
+	{ PCMCIA_CARD(EXP, THINLANCOMBO, 0), 0},
 	{ PCMCIA_CARD(IBM, INFOMOVER, 0), 0},
 	{ PCMCIA_CARD(IODATA, PCLAT, 0), 0},
 	{ PCMCIA_CARD(IODATA, PCLATE, 0), 0},
@@ -160,6 +162,7 @@ static const struct ed_product {
 	{ PCMCIA_CARD(LINKSYS, TRUST_COMBO_ECARD, 0), 0},
 	{ PCMCIA_CARD(LINKSYS, ETHERFAST, 0), NE2000DVF_DL10019 },
 	{ PCMCIA_CARD(MACNICA, ME1_JEIDA, 0), 0},
+	{ PCMCIA_CARD(MELCO, LPC3_CLX,  0), NE2000DVF_AX88190},
 	{ PCMCIA_CARD(MELCO, LPC3_TX, 0), NE2000DVF_AX88190 },
 	{ PCMCIA_CARD(NDC, ND5100_E, 0), 0},
 	{ PCMCIA_CARD(NETGEAR, FA410TXC, 0), NE2000DVF_DL10019},
@@ -172,6 +175,7 @@ static const struct ed_product {
 	{ PCMCIA_CARD(SOCKET, EA_ETHER, 0), 0},
 	{ PCMCIA_CARD(SOCKET, LP_ETHER, 0), 0},
 	{ PCMCIA_CARD(SOCKET, LP_ETHER_CF, 0), 0},
+	{ PCMCIA_CARD(SOCKET, LP_ETH_10_100_CF, 0), NE2000DVF_DL10019},
 	{ PCMCIA_CARD(SVEC, COMBOCARD, 0), 0},
 	{ PCMCIA_CARD(SVEC, LANCARD, 0), 0},
 	{ PCMCIA_CARD(SYNERGY21, S21810, 0), 0},
@@ -242,7 +246,6 @@ static int
 ed_pccard_attach(device_t dev)
 {
 	int error;
-	int	flags = device_get_flags(dev);
 	int i;
 	struct ed_softc *sc = device_get_softc(dev);
 	u_char sum;
@@ -270,7 +273,7 @@ ed_pccard_attach(device_t dev)
 			bcopy(ether_addr, sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 	}
 
-	error = ed_attach(sc, device_get_unit(dev), flags);
+	error = ed_attach(dev);
 #ifndef ED_NO_MIIBUS
 	if (error == 0 && sc->vendor == ED_VENDOR_LINKSYS) {
 		/* Probe for an MII bus, but ignore errors. */
@@ -413,7 +416,8 @@ ed_pccard_ax88190(device_t dev)
 	sc->chip_type = ED_CHIP_TYPE_AX88190;
 
 	/*
-	 * Set Attribute Memory IOBASE Register
+	 * Set Attribute Memory IOBASE Register.  Is this a deficiency in
+	 * the PC Card layer, or an ax88190 specific issue? xxx
 	 */
 	iobase = rman_get_start(sc->port_res);
 	ed_pccard_memwrite(dev, ED_AX88190_IOBASE0, iobase & 0xff);

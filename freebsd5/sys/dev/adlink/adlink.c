@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/adlink/adlink.c,v 1.2 2003/04/08 19:12:48 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/adlink/adlink.c,v 1.6 2003/09/27 12:00:58 phk Exp $");
 
 #ifdef _KERNEL
 #include <sys/param.h>
@@ -40,8 +41,8 @@
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <pci_if.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -273,7 +274,7 @@ adlink_open(dev_t dev, int oflags, int devtype, struct thread *td)
 	/* Sample CH0 only */
 	bus_space_write_4(sc->t1, sc->h1, 0x00, 1);
 
-	/* Divide clock by ten */
+	/* Divide clock by four */
 	bus_space_write_4(sc->t1, sc->h1, 0x04, 4);
 
 	/* Software trigger mode: software */
@@ -393,7 +394,6 @@ adlink_intr(void *arg)
 
 static struct cdevsw adlink_cdevsw = {
 	.d_open =	adlink_open,
-	.d_close =	nullclose,
 	.d_ioctl =	adlink_ioctl,
 	.d_mmap =	adlink_mmap,
 	.d_name =	"adlink",

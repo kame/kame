@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_drawable.h,v 1.2 2003/03/09 02:08:28 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_drawable.h,v 1.3 2003/08/19 02:57:31 anholt Exp $
  */
 
 #include "dev/drm/drmP.h"

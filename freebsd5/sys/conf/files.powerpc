@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.powerpc,v 1.30 2003/02/28 21:59:13 ru Exp $
+# $FreeBSD: src/sys/conf/files.powerpc,v 1.31 2003/06/28 08:53:49 grehan Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -74,6 +74,8 @@ powerpc/ofw/ofw_pcib_pci.c	optional	pci
 
 powerpc/powermac/uninorth.c	optional	powermac pci
 powerpc/powermac/macio.c	optional	powermac pci
+powerpc/powermac/grackle.c	optional	powermac pci
+powerpc/powermac/hrowpic.c	optional	powermac pci
 powerpc/powermac/ata_macio.c	optional	powermac ata
 powerpc/powermac/pswitch.c	optional	pswitch powermac
 

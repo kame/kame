@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/hea/hea_freebsd.c,v 1.6 2002/10/02 04:42:24 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/hea/hea_freebsd.c,v 1.7 2003/08/24 17:46:08 obrien Exp $");
 
 /*
  *

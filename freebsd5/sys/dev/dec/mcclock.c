@@ -1,5 +1,7 @@
-/* $FreeBSD: src/sys/dev/dec/mcclock.c,v 1.7 2001/11/03 17:22:50 gallatin Exp $ */
 /* $NetBSD: mcclock.c,v 1.11 1998/04/19 07:50:25 jonathan Exp $ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/dec/mcclock.c,v 1.8 2003/08/24 17:46:03 obrien Exp $");
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.

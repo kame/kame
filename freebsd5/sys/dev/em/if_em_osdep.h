@@ -31,7 +31,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.11 2003/05/02 21:17:08 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em_osdep.h,v 1.13 2003/08/22 05:54:51 imp Exp $*/
 
 #ifndef _FREEBSD_OS_H_
 #define _FREEBSD_OS_H_
@@ -51,8 +51,8 @@ POSSIBILITY OF SUCH DAMAGE.
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <machine/clock.h>
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 
 
 #define ASSERT(x) if(!(x)) panic("EM: x")
@@ -89,38 +89,36 @@ struct em_osdep
 	struct device     *dev;
 };
 
-#define E1000_WRITE_FLUSH(a) E1000_READ_REG(a, STATUS)
+#define E1000_WRITE_FLUSH(hw) E1000_READ_REG(hw, STATUS)
 
-#define E1000_READ_REG(a, reg) (\
-   bus_space_read_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                     ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                     ((a)->mac_type >= em_82543) ? E1000_##reg : E1000_82542_##reg))
+/* Read from an absolute offset in the adapter's memory space */
+#define E1000_READ_OFFSET(hw, offset) \
+    bus_space_read_4( ((struct em_osdep *)(hw)->back)->mem_bus_space_tag, \
+                      ((struct em_osdep *)(hw)->back)->mem_bus_space_handle, \
+                      offset)
 
-#define E1000_WRITE_REG(a, reg, value) (\
-   bus_space_write_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                     ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-		     ((a)->mac_type >= em_82543) ? E1000_##reg : E1000_82542_##reg, \
-                     value))
+/* Write to an absolute offset in the adapter's memory space */
+#define E1000_WRITE_OFFSET(hw, offset, value) \
+    bus_space_write_4( ((struct em_osdep *)(hw)->back)->mem_bus_space_tag, \
+                       ((struct em_osdep *)(hw)->back)->mem_bus_space_handle, \
+                       offset, \
+                       value)
 
-#define E1000_READ_REG_ARRAY(a, reg, offset) (\
- ((a)->mac_type >= em_82543) ? \
-   bus_space_read_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                     ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                     (E1000_##reg + ((offset) << 2))): \
-   bus_space_read_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                      ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                       (E1000_82542_##reg + ((offset) << 2))))
+/* Convert a register name to its offset in the adapter's memory space */
+#define E1000_REG_OFFSET(hw, reg) \
+    ((hw)->mac_type >= em_82543 ? E1000_##reg : E1000_82542_##reg)
 
+#define E1000_READ_REG(hw, reg) \
+    E1000_READ_OFFSET(hw, E1000_REG_OFFSET(hw, reg))
 
-#define E1000_WRITE_REG_ARRAY(a, reg, offset, value) (\
-  ((a)->mac_type >= em_82543) ? \
-      bus_space_write_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                      ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                      (E1000_##reg + ((offset) << 2)), value): \
-      bus_space_write_4( ((struct em_osdep *)(a)->back)->mem_bus_space_tag, \
-                      ((struct em_osdep *)(a)->back)->mem_bus_space_handle, \
-                      (E1000_82542_##reg + ((offset) << 2)), value))
+#define E1000_WRITE_REG(hw, reg, value) \
+    E1000_WRITE_OFFSET(hw, E1000_REG_OFFSET(hw, reg), value)
 
+#define E1000_READ_REG_ARRAY(hw, reg, index) \
+    E1000_READ_OFFSET(hw, E1000_REG_OFFSET(hw, reg) + ((index) << 2))
+
+#define E1000_WRITE_REG_ARRAY(hw, reg, index, value) \
+    E1000_WRITE_OFFSET(hw, E1000_REG_OFFSET(hw, reg) + ((index) << 2), value)
 
 #endif  /* _FREEBSD_OS_H_ */
 

@@ -26,9 +26,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/compat/svr4/svr4_sysvec.c,v 1.30 2003/03/21 19:49:34 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_sysvec.c,v 1.35 2003/10/20 10:38:48 tjr Exp $");
 
 /* XXX we use functions that might not exist. */
 #include "opt_compat.h"
@@ -61,7 +62,6 @@
 #include <compat/svr4/svr4_syscall.h>
 #include <compat/svr4/svr4_signal.h>
 #include <compat/svr4/svr4_sockio.h>
-#include <compat/svr4/svr4_socket.h>
 #include <compat/svr4/svr4_errno.h>
 #include <compat/svr4/svr4_proto.h>
 #include <compat/svr4/svr4_siginfo.h>
@@ -189,7 +189,8 @@ struct sysentvec svr4_sysvec = {
   PS_STRINGS,
   VM_PROT_ALL,
   exec_copyout_strings,
-  exec_setregs
+  exec_setregs,
+  NULL
 };
 
 Elf32_Brandinfo svr4_brand = {
@@ -210,7 +211,7 @@ svr4_fixup(register_t **stack_base, struct image_params *imgp)
 	register_t *pos;
              
 	KASSERT(curthread->td_proc == imgp->proc &&
-	    (curthread->td_proc->p_flag & P_THREADED) == 0,
+	    (curthread->td_proc->p_flag & P_SA) == 0,
 	    ("unsafe svr4_fixup(), should be curproc"));
 	args = (Elf32_Auxargs *)imgp->auxargs;
 	pos = *stack_base + (imgp->argc + imgp->envc + 2);  
@@ -363,8 +364,10 @@ svr4_emul_find(td, sgp, prefix, path, pbuf, cflag)
 		*pbuf = buf;
 	else {
 		sz = &ptr[len] - buf;
-		*pbuf = stackgap_alloc(sgp, sz + 1);
-		error = copyout(buf, *pbuf, sz);
+		if ((*pbuf = stackgap_alloc(sgp, sz + 1)) != NULL)
+			error = copyout(buf, *pbuf, sz);
+		else
+			error = ENAMETOOLONG;
 		free(buf, M_TEMP);
 	}
 

@@ -22,10 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.31 2002/02/28 18:18:41 gallatin Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.33 2003/08/22 07:20:27 imp Exp $");
 
 #include "opt_isa.h"
 
@@ -40,7 +40,7 @@
 #include <sys/sysctl.h>
 #include <sys/rman.h>
 
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <machine/chipset.h>
 #include <machine/cpuconf.h>
 #include <machine/resource.h>

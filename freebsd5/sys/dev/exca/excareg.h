@@ -1,5 +1,5 @@
 /*	$NetBSD: i82365reg.h,v 1.3 1998/12/20 17:53:28 nathanw Exp $	*/
-/* $FreeBSD: src/sys/dev/exca/excareg.h,v 1.3 2003/02/14 06:21:18 imp Exp $ */
+/* $FreeBSD: src/sys/dev/exca/excareg.h,v 1.4 2003/06/06 06:00:48 imp Exp $ */
 
 /*
  * Copyright (c) 2002 M Warner Losh.  All rights reserved.
@@ -394,6 +394,13 @@
 #define EXCA_RICOH_ID				0x3a
 #define EXCA_RID_296				0x32
 #define EXCA_RID_396				0xb2
+
+/*
+ * o2 micro specific registers
+ */
+#define EXCA_O2MICRO_CTRL_C			0x3a
+#define EXCA_O2CC_IREQ_INTC			0x80
+#define EXCA_O2CC_STSCHG_INTC			0x20
 
 /* Plug and play */
 #define EXCA_PNP_ACTIONTEC	0x1802A904	/* AEI0218 */

@@ -27,13 +27,13 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_subr.h,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $ 
- * $FreeBSD: src/sys/coda/coda_subr.h,v 1.7 1999/08/28 00:40:56 peter Exp $
+ * $FreeBSD: src/sys/coda/coda_subr.h,v 1.8 2003/09/07 07:43:09 tjr Exp $
  * 
  */
 
 struct cnode *coda_alloc(void);
 void  coda_free(struct cnode *cp);
-struct cnode *coda_find(ViceFid *fid);
+struct cnode *coda_find(CodaFid *fid);
 void coda_flush(enum dc_status dcstat);
 void coda_testflush(void);
 void coda_checkunmounting(struct mount *mp);

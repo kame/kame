@@ -40,8 +40,10 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mcd/mcd.c,v 1.136 2003/04/01 15:06:24 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mcd/mcd.c,v 1.139 2003/10/18 17:44:01 phk Exp $");
 static const char COPYRIGHT[] = "mcd-driver (C)1993 by H.Veit & B.Moore";
 
 #include <sys/param.h>
@@ -64,7 +66,7 @@ static const char COPYRIGHT[] = "mcd-driver (C)1993 by H.Veit & B.Moore";
 #include <dev/mcd/mcdreg.h>
 #include <dev/mcd/mcdvar.h>
 
-#define	MCD_TRACE(format, args...)						\
+#define	MCD_TRACE(format, args...)					\
 {									\
 	if (sc->debug) {						\
 		device_printf(sc->dev, "status=0x%02x: ",		\
@@ -295,18 +297,6 @@ mcdstrategy(struct bio *bp)
 
 	sc = (struct mcd_softc *)bp->bio_dev->si_drv1;
 
-	/* test validity */
-/*MCD_TRACE("strategy: buf=0x%lx, unit=%ld, block#=%ld bcount=%ld\n",
-	bp,unit,bp->bio_blkno,bp->bio_bcount);*/
-
-	if (bp->bio_blkno < 0) {
-		device_printf(sc->dev, "strategy failure: blkno = %ld, bcount = %ld\n",
-			(long)bp->bio_blkno, bp->bio_bcount);
-		bp->bio_error = EINVAL;
-		bp->bio_flags |= BIO_ERROR;
-		goto bad;
-	}
-
 	/* if device invalidated (e.g. media change, door open), error */
 	if (!(sc->data.flags & MCDVALID)) {
 		device_printf(sc->dev, "media changed\n");
@@ -329,7 +319,6 @@ mcdstrategy(struct bio *bp)
 		goto bad;
 	}
 
-	bp->bio_pblkno = bp->bio_blkno;
 	bp->bio_resid = 0;
 
 	/* queue it */
@@ -446,11 +435,9 @@ MCD_TRACE("ioctl called 0x%lx\n", cmd);
 	case DIOCGMEDIASIZE:
 		*(off_t *)addr = (off_t)sc->data.disksize * sc->data.blksize;
 		return (0);
-		break;
 	case DIOCGSECTORSIZE:
 		*(u_int *)addr = sc->data.blksize;
 		return (0);
-		break;
 
 	case CDIOCPLAYTRACKS:
 		return mcd_playtracks(sc, (struct ioc_play_track *) addr);
@@ -542,11 +529,9 @@ twiddle_thumbs(struct mcd_softc *sc, int count, char *whine)
 int
 mcd_probe(struct mcd_softc *sc)
 {
-	int unit;
 	int i, j;
 	unsigned char stbytes[3];
 
-	unit = device_get_unit(sc->dev);
 	sc->data.flags = MCDPROBING;
 
 #ifdef NOTDEF
@@ -894,8 +879,7 @@ modedone:
 		mbx->skip = 0;
 
 nextblock:
-		blknum 	= (bp->bio_blkno / (mbx->sz/DEV_BSIZE))
-			+ mbx->skip/mbx->sz;
+		blknum 	= bp->bio_offset / mbx->sz + mbx->skip/mbx->sz;
 
 		MCD_TRACE("mcd_doread: read blknum=%d for bp=%p\n",
 			blknum, bp);

@@ -23,8 +23,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/dpt/dpt_isa.c,v 1.5 2003/03/29 14:50:14 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_isa.c,v 1.7 2003/08/24 17:46:04 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -189,6 +191,8 @@ dpt_isa_attach (device_t dev)
 				/* nsegments */	~0,
 				/* maxsegsz  */	BUS_SPACE_MAXSIZE_32BIT,
 				/* flags     */	0,
+				/* lockfunc  */ busdma_lock_mutex,
+				/* lockarg   */ &Giant,
 				&dpt->parent_dmat) != 0) {
 		error = ENXIO;
 		goto bad;

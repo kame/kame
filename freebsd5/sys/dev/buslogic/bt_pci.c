@@ -1,4 +1,4 @@
-/*
+/*-
  * Product specific probe and attach routines for:
  *      Buslogic BT946, BT948, BT956, BT958 SCSI controllers
  *
@@ -25,17 +25,20 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/buslogic/bt_pci.c,v 1.13 2003/03/29 09:46:10 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_pci.c,v 1.17 2003/09/02 17:30:35 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/bus.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
@@ -45,8 +48,8 @@
 
 #include <dev/buslogic/btreg.h>
 
-#define BT_PCI_IOADDR	PCIR_MAPS
-#define BT_PCI_MEMADDR	PCIR_MAPS + 4
+#define BT_PCI_IOADDR	PCIR_BAR(0)
+#define BT_PCI_MEMADDR	PCIR_BAR(1)
 
 #define PCI_DEVICE_ID_BUSLOGIC_MULTIMASTER	0x1040104Bul
 #define PCI_DEVICE_ID_BUSLOGIC_MULTIMASTER_NC	0x0140104Bul
@@ -184,6 +187,8 @@ bt_pci_attach(device_t dev)
 				/* nsegments	*/ ~0,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&bt->parent_dmat) != 0) {
 		bt_pci_release_resources(dev);
 		return (ENOMEM);

@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/compat/svr4/svr4_sockio.c,v 1.14 2002/12/22 05:35:01 hsu Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_sockio.c,v 1.15 2003/06/10 21:35:15 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>

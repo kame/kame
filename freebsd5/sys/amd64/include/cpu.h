@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cpu.h	5.4 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/amd64/include/cpu.h,v 1.68 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/cpu.h,v 1.70 2003/09/23 00:18:45 peter Exp $
  */
 
 #ifndef _MACHINE_CPU_H_
@@ -78,9 +78,11 @@
 #ifdef _KERNEL
 extern char	btext[];
 extern char	etext[];
-extern u_int	tsc_present;
 
+void	cpu_halt(void);
+void	cpu_reset(void);
 void	fork_trampoline(void);
+void	swi_vm(void *);
 
 /*
  * Return contents of in-cpu fast counter as a sort of "bogo-time"

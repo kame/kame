@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/i386/libi386/biospnp.c,v 1.7 2002/09/23 18:54:26 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/biospnp.c,v 1.9 2003/08/25 23:28:31 obrien Exp $");
 
 /*
  * PnP BIOS enumerator.
@@ -263,7 +264,7 @@ biospnp_call(int func, const char *fmt, ...)
 	switch(*p) {
 
 	case 'w':
-	    i = va_arg(ap, uint);
+	    i = va_arg(ap, u_int);
 	    *(u_int16_t *)argp = i;
 	    argp += sizeof(u_int16_t);
 	    break;

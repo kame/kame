@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_st550.c,v 1.12 2002/08/22 19:52:16 peter Exp $ */
 /*
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
  * All rights reserved.
@@ -32,7 +31,11 @@
  * Additional Copyright (c) 1998 by Andrew Gallatin for Duke University
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_st550.c,v 1.16 2003/08/25 03:43:07 marcel Exp $");
+
 #include "opt_ddb.h"
+#include "opt_dev_sc.h"
 
 #include <sys/param.h>
 #include <sys/reboot.h>
@@ -40,24 +43,30 @@
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
-#include <machine/intr.h>
-
 #include <sys/termios.h>
 
-#include <machine/rpb.h>
-#include <machine/cpuconf.h>
 #include <machine/clock.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <machine/cpuconf.h>
+#include <machine/intr.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
+
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <alpha/pci/ciareg.h>
 #include <alpha/pci/ciavar.h>
 
-#include "opt_dev_sc.h"
-
+#ifndef NO_SIO
 #ifndef	CONSPEED
 #define	CONSPEED TTYDEF_SPEED
 #endif
 static int comcnrate = CONSPEED;
+extern int comconsole;
+extern int siocnattach(int, int);
+extern int siogdbattach(int, int);
+#endif
+
+extern int sccnattach(void);
 
 void st550_init(void);
 static void st550_cons_init(void);
@@ -69,10 +78,6 @@ static void st550_intr_disable(int);
 static void st550_intr_map(void *);
 #define ST550_PCI_IRQ_BEGIN 8
 #define ST550_PCI_MAX_IRQ  47
-
-extern int siocnattach(int, int);
-extern int siogdbattach(int, int);
-extern int sccnattach(void);
 
 void
 st550_init()
@@ -93,8 +98,6 @@ st550_init()
 	platform.pci_intr_enable = st550_intr_enable;
 }
 
-extern int comconsole;
-
 static void
 st550_cons_init()
 {
@@ -102,14 +105,17 @@ st550_cons_init()
 
 	cia_init();
 
+#ifndef NO_SIO
 #ifdef DDB
 	siogdbattach(0x2f8, 57600);
+#endif
 #endif
 
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
 	case 2:
+#ifndef NO_SIO
 		/* serial console ... */
 		/* XXX */
 		/*
@@ -123,6 +129,7 @@ st550_cons_init()
 			panic("can't init serial console");
 
 		boothowto |= RB_SERIAL;
+#endif
 		break;
 
 	case 3:

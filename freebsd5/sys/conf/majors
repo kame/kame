@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/majors,v 1.174 2003/05/11 06:18:33 scottl Exp $
+# $FreeBSD: src/sys/conf/majors,v 1.183 2003/12/02 04:40:33 imp Exp $
 #
 # This list is semi-obsoleted by DEVFS, but for now it still contains
 # the current allocation of device major numbers.
@@ -28,7 +28,6 @@
 11	*spigot		Video capture?
 12	*sc		syscons/pcvt virtual consoles
 14	*sa		SCSI "sequential access devices"
-15	*cd		SCSI "CDROM type"
 16	*lpt		PC parallel printer port
 17	*ch		SCSI changer
 18	*nmdm		nullmodem back-to-back tty ports
@@ -37,7 +36,6 @@
 21	*psm		PS/2 Mouse
 22	*fd		(/dev/stdin etc)
 23	*bpf		Berkeley Packet Filter
-24	*pca		PC speaker (/dev/pcaudio)
 26	*spkr		PC speaker (/dev/spkr)
 27	*mse		Microsoft bus-mouse
 28	*sio		16450/16550 serial
@@ -107,7 +105,6 @@
 97	*prom		Alpha PROM console
 98	loe		Loopback pseudo-ethernet (sbabkin@dcn.att.com)
 99	ct		Cronyx/Tau serial adaptor
-100	*xrpu		Xilinx Reprogrammable Processing Unit
 103	*streams	SVR4 Streams emulation <newton@atdot.dotat.org>
 104	*xpt		CAM Transport Layer Services
 105	*iic		I2C bus generic i/o
@@ -149,7 +146,6 @@
 146	*twe		3ware Escalade ATA RAID (controller)
 148	*agp		AGP <dfr>
 149	*tap		Ethernet tunneling device <myevmenkin@att.com>
-150	*aac		Adaptec FSA RAID (controller)
 152	*acpi		ACPI bios support (Takanori Watanabe takawata@shidahara1.planet.sci.kobe-u.ac.jp)
 153	*ti		Tigon Gigabit Ethernet driver (ken@FreeBSD.ORG)
 154	*asr		Adaptec SCSI RAID <msmith@freebsd.org>
@@ -170,12 +166,12 @@
 173	*devctl		Devd control device <imp>
 174	pciwd		Berkshire Watchdog PCI <marcel@progressix.com>
 175	ips		IBM/Adaptec ServeRAID (control device)
-177	*openfirm	OpenFirmware control device <tmm>
-178	raidctl		RAIDframe (control device)
-179	raid		RAIDframe (disk device)
 180	nvidia		NVIDIA (nvidiaN/nvidiactl) <mdodd>
 181	casm		HP/Compaq ProLiant Advanced Server Management <peter>
 183	*smapi		SMAPI BIOS interface <mdodd>
+184	dcons		Dumb console driver <simokawa>
+185	ce		Cronyx Tau-32 E1 adapter <rik@cronyx.ru>
+186	sx		Specialix I/O8+ driver <frank@exit.com>
 200	??		entries from 200-252 are reserved for local use
 248	*isp		dev/isp/isp_freebsd.c
 252	??		entries from 200-252 are reserved for local use

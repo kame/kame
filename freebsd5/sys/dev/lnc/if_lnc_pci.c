@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1994-2000
  *	Paul Richards. All rights reserved.
  *
@@ -26,9 +26,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/lnc/if_lnc_pci.c,v 1.27 2003/04/15 06:37:25 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_pci.c,v 1.31 2003/09/02 17:30:36 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,8 +46,8 @@
 #include <net/if.h>
 #include <net/if_arp.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/lnc/if_lncreg.h>
 #include <dev/lnc/if_lncvar.h>
@@ -101,7 +102,7 @@ lnc_pci_attach(device_t dev)
 	command |= PCIM_CMD_PORTEN | PCIM_CMD_BUSMASTEREN;
 	pci_write_config(dev, PCIR_COMMAND, command, 4);
 
-	rid = PCIR_MAPS;
+	rid = PCIR_BAR(0);
 	sc->portres = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1,
 	                                 RF_ACTIVE);
 
@@ -154,6 +155,8 @@ lnc_pci_attach(device_t dev)
 				 1,			/* nsegments */
 				 BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 				 0,			/* flags */
+				 busdma_lock_mutex,	/* lockfunc */
+				 &Giant,		/* lockarg */
 				 &sc->dmat);
 
 	if (err) {
@@ -192,7 +195,7 @@ lnc_pci_detach(device_t dev)
 	lnc_stop(sc);
 	bus_teardown_intr(dev, sc->irqres, sc->intrhand);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irqres);
-	bus_release_resource(dev, SYS_RES_IOPORT, PCIR_MAPS, sc->portres);
+	bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0), sc->portres);
 
 	bus_dmamap_unload(sc->dmat, sc->dmamap);
 	bus_dmamem_free(sc->dmat, sc->recv_ring, sc->dmamap);

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)segments.h	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/amd64/include/segments.h,v 1.35 2003/05/14 04:10:49 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/segments.h,v 1.37 2003/11/17 08:58:14 peter Exp $
  */
 
 #ifndef _MACHINE_SEGMENTS_H_
@@ -49,6 +49,7 @@
  * Selectors
  */
 
+#define	SEL_RPL_MASK	3	/* requester priv level */
 #define	ISPL(s)	((s)&3)		/* what is the priority level of a selector */
 #define	SEL_KPL	0		/* kernel priority level */
 #define	SEL_UPL	3		/* user priority level */
@@ -170,6 +171,31 @@ struct region_descriptor {
 #define	NRSVIDT	32		/* reserved entries for cpu exceptions */
 
 /*
+ * Entries in the Interrupt Descriptor Table (IDT)
+ */
+#define	IDT_DE		0	/* #DE: Divide Error */
+#define	IDT_DB		1	/* #DB: Debug */
+#define	IDT_NMI		2	/* Nonmaskable External Interrupt */
+#define	IDT_BP		3	/* #BP: Breakpoint */
+#define	IDT_OF		4	/* #OF: Overflow */
+#define	IDT_BR		5	/* #BR: Bound Range Exceeded */
+#define	IDT_UD		6	/* #UD: Undefined/Invalid Opcode */
+#define	IDT_NM		7	/* #NM: No Math Coprocessor */
+#define	IDT_DF		8	/* #DF: Double Fault */
+#define	IDT_FPUGP	9	/* Coprocessor Segment Overrun */
+#define	IDT_TS		10	/* #TS: Invalid TSS */
+#define	IDT_NP		11	/* #NP: Segment Not Present */
+#define	IDT_SS		12	/* #SS: Stack Segment Fault */
+#define	IDT_GP		13	/* #GP: General Protection Fault */
+#define	IDT_PF		14	/* #PF: Page Fault */
+#define	IDT_MF		16	/* #MF: FPU Floating-Point Error */
+#define	IDT_AC		17	/* #AC: Alignment Check */
+#define	IDT_MC		18	/* #MC: Machine Check */
+#define	IDT_XF		19	/* #XF: SIMD Floating-Point Exception */
+#define	IDT_IO_INTS	NRSVIDT	/* Base of IDT entries for I/O interrupts. */
+#define	IDT_SYSCALL	0x80	/* System Call Interrupt Vector */
+
+/*
  * Entries in the Global Descriptor Table (GDT)
  */
 #define	GNULL_SEL	0	/* Null Descriptor */
@@ -186,6 +212,7 @@ struct region_descriptor {
 extern struct user_segment_descriptor gdt[];
 extern struct soft_segment_descriptor gdt_segs[];
 extern struct gate_descriptor *idt;
+extern struct region_descriptor r_gdt, r_idt;
 
 void	lgdt(struct region_descriptor *rdp);
 void	sdtossd(struct user_segment_descriptor *sdp,

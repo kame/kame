@@ -1,32 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.124 2002/12/07 09:00:19 roger Exp $ */
-
-/*
- * This is part of the Driver for Video Capture Cards (Frame grabbers)
- * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
- * chipset.
- * Copyright Roger Hardiman and Amancio Hasty.
- *
- * bktr_core : This deals with the Bt848/849/878/879 PCI Frame Grabber,
- *               Handles all the open, close, ioctl and read userland calls.
- *               Sets the Bt848 registers and generates RISC pograms.
- *               Controls the i2c bus and GPIO interface.
- *               Contains the interface to the kernel.
- *               (eg probe/attach and open/close/ioctl)
- *
- */
-
- /*
-   The Brooktree BT848 Driver driver is based upon Mark Tinguely and
-   Jim Lowe's driver for the Matrox Meteor PCI card . The 
-   Philips SAA 7116 and SAA 7196 are very different chipsets than
-   the BT848.
-
-   The original copyright notice by Mark and Jim is included mostly
-   to honor their fantastic work in the Matrox Meteor driver!
-
- */
-
-/*
+/*-
  * 1. Redistributions of source code must retain the 
  * Copyright (c) 1997 Amancio Hasty, 1999 Roger Hardiman
  * All rights reserved.
@@ -58,11 +30,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-
-
-
-/*
+/*-
  * 1. Redistributions of source code must retain the 
  * Copyright (c) 1995 Mark Tinguely and Jim Lowe
  * All rights reserved.
@@ -92,6 +60,33 @@
  * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.132 2003/12/01 19:03:50 truckman Exp $");
+
+/*
+ * This is part of the Driver for Video Capture Cards (Frame grabbers)
+ * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
+ * chipset.
+ * Copyright Roger Hardiman and Amancio Hasty.
+ *
+ * bktr_core : This deals with the Bt848/849/878/879 PCI Frame Grabber,
+ *               Handles all the open, close, ioctl and read userland calls.
+ *               Sets the Bt848 registers and generates RISC pograms.
+ *               Controls the i2c bus and GPIO interface.
+ *               Contains the interface to the kernel.
+ *               (eg probe/attach and open/close/ioctl)
+ */
+
+ /*
+   The Brooktree BT848 Driver driver is based upon Mark Tinguely and
+   Jim Lowe's driver for the Matrox Meteor PCI card . The 
+   Philips SAA 7116 and SAA 7196 are very different chipsets than
+   the BT848.
+
+   The original copyright notice by Mark and Jim is included mostly
+   to honor their fantastic work in the Matrox Meteor driver!
  */
 
 #include "opt_bktr.h"		/* Include any kernel config options */
@@ -131,9 +126,11 @@
 #include <machine/clock.h>              /* for DELAY */
 #define	PROC_LOCK(p)
 #define	PROC_UNLOCK(p)
+#include <pci/pcivar.h>
+#else
+#include <dev/pci/pcivar.h>
 #endif
 
-#include <pci/pcivar.h>
 
 #if (__FreeBSD_version >=300000)
 #include <machine/bus_memio.h>	/* for bus space */
@@ -221,7 +218,6 @@ bktr_name(bktr_ptr_t bktr)
 #define	PROC_UNLOCK(p)
 
 #endif /* __NetBSD__ || __OpenBSD__ */
-
 
 
 typedef u_char bool_t;
@@ -471,6 +467,9 @@ common_bktr_attach( bktr_ptr_t bktr, int unit, u_long pci_id, u_int rev )
 {
 	vm_offset_t	buf = 0;
 	int		need_to_allocate_memory = 1;
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+	int 		err;
+#endif
 
 /***************************************/
 /* *** OS Specific memory routines *** */
@@ -527,6 +526,9 @@ common_bktr_attach( bktr_ptr_t bktr, int unit, u_long pci_id, u_int rev )
 	}
 #endif	/* FreeBSD or BSDi */
 
+#ifdef USE_VBIMUTEX
+	mtx_init(&bktr->vbimutex, "bktr vbi lock", NULL, MTX_DEF);
+#endif
 
 /* If this is a module, save the current contiguous memory */
 #if defined(BKTR_FREEBSD_MODULE)
@@ -612,10 +614,28 @@ bktr_store_address(unit, BKTR_MEM_BUF,          buf);
         bktr->msp_source_selected = -1;
 	bktr->audio_mux_present = 1;
 
+#if defined(__FreeBSD__) 
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+	/* get hint on short programming of the msp34xx, so we know */
+	/* if the decision what thread to start should be overwritten */
+	if ( (err = resource_int_value("bktr", unit, "mspsimple",
+			&(bktr->mspsimple)) ) != 0 )
+		bktr->mspsimple = -1;	/* fall back to default */
+#endif
+#endif
+
 	probeCard( bktr, TRUE, unit );
 
 	/* Initialise any MSP34xx or TDA98xx audio chips */
 	init_audio_devices( bktr );
+
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+	/* setup the kenrel thread */
+	err = msp_attach( bktr );
+	if ( err != 0 ) /* error doing kernel thread stuff, disable msp3400c */
+		bktr->card.msp3400c = 0;
+#endif
+
 
 }
 
@@ -790,6 +810,7 @@ common_bktr_intr( void *arg )
 	 * both Odd and Even VBI data is captured. Therefore we do this
 	 * in the Even field interrupt handler.
 	 */
+	LOCK_VBI(bktr);
 	if (  (bktr->vbiflags & VBI_CAPTURE)
 	    &&(bktr->vbiflags & VBI_OPEN)
             &&(field==EVEN_F)) {
@@ -804,11 +825,12 @@ common_bktr_intr( void *arg )
 
 		/* If someone has a select() on /dev/vbi, inform them */
 		if (SEL_WAITING(&bktr->vbi_select)) {
-			selwakeup(&bktr->vbi_select);
+			selwakeuppri(&bktr->vbi_select, VBIPRI);
 		}
 
 
 	}
+	UNLOCK_VBI(bktr);
 
 	/*
 	 *  Register the completed field
@@ -898,10 +920,9 @@ common_bktr_intr( void *arg )
 		 * let them know the frame is complete.
 		 */
 
-		if (bktr->proc && !(bktr->signal & METEOR_SIG_MODE_MASK)) {
+		if (bktr->proc != NULL) {
 			PROC_LOCK(bktr->proc);
-			psignal( bktr->proc,
-				 bktr->signal&(~METEOR_SIG_MODE_MASK) );
+			psignal( bktr->proc, bktr->signal);
 			PROC_UNLOCK(bktr->proc);
 		}
 
@@ -1050,8 +1071,13 @@ video_open( bktr_ptr_t bktr )
 int
 vbi_open( bktr_ptr_t bktr )
 {
-	if (bktr->vbiflags & VBI_OPEN)		/* device is busy */
+
+	LOCK_VBI(bktr);
+
+	if (bktr->vbiflags & VBI_OPEN) {	/* device is busy */
+		UNLOCK_VBI(bktr);
 		return( EBUSY );
+	}
 
 	bktr->vbiflags |= VBI_OPEN;
 
@@ -1064,6 +1090,8 @@ vbi_open( bktr_ptr_t bktr )
 
 	bzero((caddr_t) bktr->vbibuffer, VBI_BUFFER_SIZE);
 	bzero((caddr_t) bktr->vbidata,  VBI_DATA_SIZE);
+
+	UNLOCK_VBI(bktr);
 
 	return( 0 );
 }
@@ -1150,7 +1178,11 @@ int
 vbi_close( bktr_ptr_t bktr )
 {
 
+	LOCK_VBI(bktr);
+
 	bktr->vbiflags &= ~VBI_OPEN;
+
+	UNLOCK_VBI(bktr);
 
 	return( 0 );
 }
@@ -1216,19 +1248,32 @@ video_read(bktr_ptr_t bktr, int unit, dev_t dev, struct uio *uio)
 int
 vbi_read(bktr_ptr_t bktr, struct uio *uio, int ioflag)
 {
-	int             readsize, readsize2;
+	int             readsize, readsize2, start;
 	int             status;
 
+	/*
+	 * XXX - vbi_read() should be protected against being re-entered
+	 * while it is unlocked for the uiomove.
+	 */
+	LOCK_VBI(bktr);
 
 	while(bktr->vbisize == 0) {
 		if (ioflag & IO_NDELAY) {
-			return EWOULDBLOCK;
+			status = EWOULDBLOCK;
+			goto out;
 		}
 
 		bktr->vbi_read_blocked = TRUE;
-		if ((status = tsleep(VBI_SLEEP, VBIPRI, "vbi", 0))) {
-			return status;
+#ifdef USE_VBIMUTEX
+		if ((status = msleep(VBI_SLEEP, &bktr->vbimutex, VBIPRI, "vbi",
+		    0))) {
+			goto out;
 		}
+#else
+		if ((status = tsleep(VBI_SLEEP, VBIPRI, "vbi", 0))) {
+			goto out;
+		}
+#endif
 	}
 
 	/* Now we have some data to give to the user */
@@ -1246,12 +1291,18 @@ vbi_read(bktr_ptr_t bktr, struct uio *uio, int ioflag)
 		/* We need to wrap around */
 
 		readsize2 = VBI_BUFFER_SIZE - bktr->vbistart;
-               	status = uiomove((caddr_t)bktr->vbibuffer + bktr->vbistart, readsize2, uio);
-		status += uiomove((caddr_t)bktr->vbibuffer, (readsize - readsize2), uio);
+		start =  bktr->vbistart;
+		UNLOCK_VBI(bktr);
+               	status = uiomove((caddr_t)bktr->vbibuffer + start, readsize2, uio);
+		if (status == 0)
+			status = uiomove((caddr_t)bktr->vbibuffer, (readsize - readsize2), uio);
 	} else {
+		UNLOCK_VBI(bktr);
 		/* We do not need to wrap around */
 		status = uiomove((caddr_t)bktr->vbibuffer + bktr->vbistart, readsize, uio);
 	}
+
+	LOCK_VBI(bktr);
 
 	/* Update the number of bytes left to read */
 	bktr->vbisize -= readsize;
@@ -1259,6 +1310,9 @@ vbi_read(bktr_ptr_t bktr, struct uio *uio, int ioflag)
 	/* Update vbistart */
 	bktr->vbistart += readsize;
 	bktr->vbistart = bktr->vbistart % VBI_BUFFER_SIZE; /* wrap around if needed */
+
+out:
+	UNLOCK_VBI(bktr);
 
 	return( status );
 
@@ -1282,6 +1336,7 @@ video_ioctl( bktr_ptr_t bktr, int unit, ioctl_cmd_t cmd, caddr_t arg, struct thr
 	struct bktr_capture_area *cap_area;
 	vm_offset_t		buf;
 	int                     i;
+	int			sig;
 	char                    char_temp;
 
 	switch ( cmd ) {
@@ -1553,12 +1608,16 @@ video_ioctl( bktr_ptr_t bktr, int unit, ioctl_cmd_t cmd, caddr_t arg, struct thr
 		break;
 
 	case METEORSSIGNAL:
-		if(*(int *)arg == 0 || *(int *)arg >= NSIG) {
-			return( EINVAL );
-			break;
-		}
-		bktr->signal = *(int *) arg;
-		bktr->proc = td->td_proc;
+		sig = *(int *)arg;
+		/* Historically, applications used METEOR_SIG_MODE_MASK
+		 * to reset signal delivery.
+		 */
+		if (sig == METEOR_SIG_MODE_MASK)
+			sig = 0;
+		if (sig < 0 || sig > _SIG_MAXSIG)
+			return (EINVAL);
+		bktr->signal = sig;
+		bktr->proc = sig ? td->td_proc : NULL;
 		break;
 
 	case METEORGSIGNAL:
@@ -3187,8 +3246,8 @@ yuv422_prog( bktr_ptr_t bktr, char i_flag,
 
 	OUTB(bktr, BKTR_E_VSCALE_HI, INB(bktr, BKTR_E_VSCALE_HI) & ~0x80); /* clear Ycomb */
 	OUTB(bktr, BKTR_O_VSCALE_HI, INB(bktr, BKTR_O_VSCALE_HI) & ~0x80);
-	OUTB(bktr, BKTR_E_VSCALE_HI, INB(bktr, BKTR_E_VSCALE_HI) | ~0x40); /* set chroma comb */
-	OUTB(bktr, BKTR_O_VSCALE_HI, INB(bktr, BKTR_O_VSCALE_HI) | ~0x40);
+	OUTB(bktr, BKTR_E_VSCALE_HI, INB(bktr, BKTR_E_VSCALE_HI) | 0x40); /* set chroma comb */
+	OUTB(bktr, BKTR_O_VSCALE_HI, INB(bktr, BKTR_O_VSCALE_HI) | 0x40);
 
 	/* disable gamma correction removal */
 	OUTB(bktr, BKTR_COLOR_CTL, INB(bktr, BKTR_COLOR_CTL) | BT848_COLOR_CTL_GAMMA);

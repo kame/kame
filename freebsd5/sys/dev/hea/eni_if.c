@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hea/eni_if.c,v 1.11 2002/03/20 02:07:22 alfred Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hea/eni_if.c,v 1.12 2003/07/29 13:33:14 harti Exp $
  *
  */
 
@@ -58,7 +58,7 @@
 #include <dev/hea/eni_var.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_if.c,v 1.11 2002/03/20 02:07:22 alfred Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_if.c,v 1.12 2003/07/29 13:33:14 harti Exp $");
 #endif
 
 static void	eni_get_stats(Eni_unit *);
@@ -194,7 +194,9 @@ eni_atm_ioctl ( code, data, arg )
 	Eni_unit		*eup = (Eni_unit *)pip;
 	caddr_t			buf = aip->air_buf_addr;
 	struct air_vinfo_rsp	*avr;
-	int			count, len, buf_len = aip->air_buf_len;
+	size_t len;
+	size_t count;
+	size_t buf_len = aip->air_buf_len;
 	int			err = 0;
 	char			ifname[2*IFNAMSIZ];
 
@@ -264,7 +266,7 @@ eni_atm_ioctl ( code, data, arg )
 		/*
 		 * Record amount we're returning as vendor info...
 		 */
-		if ((err = copyout(&count, &avr->avsp_len, sizeof(int))) != 0)
+		if ((err = copyout(&count, &avr->avsp_len, sizeof(count))) != 0)
 			break;
 
 		/*

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/acpi_pcib_acpi.c,v 1.27 2002/11/25 21:55:04 jhb Exp $
+ *	$FreeBSD: src/sys/dev/acpica/acpi_pcib_acpi.c,v 1.29 2003/08/22 06:06:16 imp Exp $
  */
 #include "opt_acpi.h"
 #include <sys/param.h>
@@ -37,8 +37,8 @@
 #include <dev/acpica/acpivar.h>
 
 #include <machine/pci_cfgreg.h>
-#include <pci/pcivar.h>
-#include <pci/pcib_private.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcib_private.h>
 #include "pcib_if.h"
 
 #include <dev/acpica/acpi_pcibvar.h>
@@ -132,7 +132,7 @@ acpi_pcib_acpi_attach(device_t dev)
 {
     struct acpi_hpcib_softc	*sc;
     ACPI_STATUS			status;
-    uint addr, slot, func, busok;
+    u_int addr, slot, func, busok;
     uint8_t busno;
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);

@@ -1,10 +1,12 @@
-/* $FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.10 2003/02/23 19:49:30 obrien Exp $ */
-/*
+/*-
  * PCI specific probe and attach routines for LSI Fusion Adapters
  * FreeBSD Version.
  *
- * Copyright (c)  2000, 2001 by Greg Ansley
+ * Copyright (c) 2000, 2001 by Greg Ansley
  * Partially derived from Matt Jacob's ISP driver.
+ * Copyright (c) 1997, 1998, 1999, 2000, 2001, 2002 by Matthew Jacob
+ * Feral Software
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,9 +29,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * Additional Copyright (c) 2002 by Matthew Jacob under same license.
- */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.14 2003/09/02 17:30:36 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -37,8 +39,8 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
@@ -502,7 +504,7 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 	if (bus_dma_tag_create(NULL, PAGE_SIZE, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, BUS_SPACE_MAXSIZE_32BIT,
 	    BUS_SPACE_MAXSIZE_32BIT, BUS_SPACE_UNRESTRICTED, 0,
-	    &mpt->parent_dmat) != 0) {
+	    busdma_lock_mutex, &Giant, &mpt->parent_dmat) != 0) {
 		device_printf(dev, "cannot create parent dma tag\n");
 		return (1);
 	}
@@ -511,7 +513,7 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 	if (bus_dma_tag_create(mpt->parent_dmat, PAGE_SIZE,
 	    0, BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR,
 	    NULL, NULL, PAGE_SIZE, 1, BUS_SPACE_MAXSIZE_32BIT, 0,
-	    &mpt->reply_dmat) != 0) {
+	    busdma_lock_mutex, &Giant, &mpt->reply_dmat) != 0) {
 		device_printf(dev, "cannot create a dma tag for replies\n");
 		return (1);
 	}
@@ -542,7 +544,7 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 	if (bus_dma_tag_create(mpt->parent_dmat, PAGE_SIZE,
 	    0, BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR,
 	    NULL, NULL, MAXBSIZE, MPT_SGL_MAX, BUS_SPACE_MAXSIZE_32BIT, 0,
-	    &mpt->buffer_dmat) != 0) {
+	    busdma_lock_mutex, &Giant, &mpt->buffer_dmat) != 0) {
 		device_printf(dev,
 		    "cannot create a dma tag for data buffers\n");
 		return (1);
@@ -552,7 +554,7 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 	if (bus_dma_tag_create(mpt->parent_dmat, PAGE_SIZE,
 	    0, BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR,
 	    NULL, NULL, MPT_REQ_MEM_SIZE(mpt), 1, BUS_SPACE_MAXSIZE_32BIT, 0,
-	    &mpt->request_dmat) != 0) {
+	    busdma_lock_mutex, &Giant, &mpt->request_dmat) != 0) {
 		device_printf(dev, "cannot create a dma tag for requests\n");
 		return (1);
 	}
@@ -651,11 +653,11 @@ mpt_read_config_regs(mpt_softc_t *mpt)
 	mpt->pci_cfg.Command = pci_read_config(mpt->dev, PCIR_COMMAND, 2);
 	mpt->pci_cfg.LatencyTimer_LineSize =
 	    pci_read_config(mpt->dev, PCIR_CACHELNSZ, 2);
-	mpt->pci_cfg.IO_BAR = pci_read_config(mpt->dev, PCIR_MAPS, 4);
-	mpt->pci_cfg.Mem0_BAR[0] = pci_read_config(mpt->dev, PCIR_MAPS+0x4, 4);
-	mpt->pci_cfg.Mem0_BAR[1] = pci_read_config(mpt->dev, PCIR_MAPS+0x8, 4);
-	mpt->pci_cfg.Mem1_BAR[0] = pci_read_config(mpt->dev, PCIR_MAPS+0xC, 4);
-	mpt->pci_cfg.Mem1_BAR[1] = pci_read_config(mpt->dev, PCIR_MAPS+0x10, 4);
+	mpt->pci_cfg.IO_BAR = pci_read_config(mpt->dev, PCIR_BAR(0), 4);
+	mpt->pci_cfg.Mem0_BAR[0] = pci_read_config(mpt->dev, PCIR_BAR(1), 4);
+	mpt->pci_cfg.Mem0_BAR[1] = pci_read_config(mpt->dev, PCIR_BAR(2), 4);
+	mpt->pci_cfg.Mem1_BAR[0] = pci_read_config(mpt->dev, PCIR_BAR(3), 4);
+	mpt->pci_cfg.Mem1_BAR[1] = pci_read_config(mpt->dev, PCIR_BAR(4), 4);
 	mpt->pci_cfg.ROM_BAR = pci_read_config(mpt->dev, PCIR_BIOS, 4);
 	mpt->pci_cfg.IntLine = pci_read_config(mpt->dev, PCIR_INTLINE, 1);
 	mpt->pci_cfg.PMCSR = pci_read_config(mpt->dev, 0x44, 4);
@@ -678,11 +680,11 @@ mpt_set_config_regs(mpt_softc_t *mpt)
 	if (mpt->verbose) {
 		MPT_CHECK(Command, PCIR_COMMAND, 2);
 		MPT_CHECK(LatencyTimer_LineSize, PCIR_CACHELNSZ, 2);
-		MPT_CHECK(IO_BAR, PCIR_MAPS, 4);
-		MPT_CHECK(Mem0_BAR[0], PCIR_MAPS+0x4, 4);
-		MPT_CHECK(Mem0_BAR[1], PCIR_MAPS+0x8, 4);
-		MPT_CHECK(Mem1_BAR[0], PCIR_MAPS+0xC, 4);
-		MPT_CHECK(Mem1_BAR[1], PCIR_MAPS+0x10, 4);
+		MPT_CHECK(IO_BAR, PCIR_BAR(0), 4);
+		MPT_CHECK(Mem0_BAR[0], PCIR_BAR(1), 4);
+		MPT_CHECK(Mem0_BAR[1], PCIR_BAR(2), 4);
+		MPT_CHECK(Mem1_BAR[0], PCIR_BAR(3), 4);
+		MPT_CHECK(Mem1_BAR[1], PCIR_BAR(4), 4);
 		MPT_CHECK(ROM_BAR, PCIR_BIOS, 4);
 		MPT_CHECK(IntLine, PCIR_INTLINE, 1);
 		MPT_CHECK(PMCSR, 0x44, 4);
@@ -692,11 +694,11 @@ mpt_set_config_regs(mpt_softc_t *mpt)
 	pci_write_config(mpt->dev, PCIR_COMMAND, mpt->pci_cfg.Command, 2);
 	pci_write_config(mpt->dev, PCIR_CACHELNSZ,
 	    mpt->pci_cfg.LatencyTimer_LineSize, 2);
-	pci_write_config(mpt->dev, PCIR_MAPS, mpt->pci_cfg.IO_BAR, 4);
-	pci_write_config(mpt->dev, PCIR_MAPS+0x4, mpt->pci_cfg.Mem0_BAR[0], 4);
-	pci_write_config(mpt->dev, PCIR_MAPS+0x8, mpt->pci_cfg.Mem0_BAR[1], 4);
-	pci_write_config(mpt->dev, PCIR_MAPS+0xC, mpt->pci_cfg.Mem1_BAR[0], 4);
-	pci_write_config(mpt->dev, PCIR_MAPS+0x10, mpt->pci_cfg.Mem1_BAR[1], 4);
+	pci_write_config(mpt->dev, PCIR_BAR(0), mpt->pci_cfg.IO_BAR, 4);
+	pci_write_config(mpt->dev, PCIR_BAR(1), mpt->pci_cfg.Mem0_BAR[0], 4);
+	pci_write_config(mpt->dev, PCIR_BAR(2), mpt->pci_cfg.Mem0_BAR[1], 4);
+	pci_write_config(mpt->dev, PCIR_BAR(3), mpt->pci_cfg.Mem1_BAR[0], 4);
+	pci_write_config(mpt->dev, PCIR_BAR(4), mpt->pci_cfg.Mem1_BAR[1], 4);
 	pci_write_config(mpt->dev, PCIR_BIOS, mpt->pci_cfg.ROM_BAR, 4);
 	pci_write_config(mpt->dev, PCIR_INTLINE, mpt->pci_cfg.IntLine, 1);
 	pci_write_config(mpt->dev, 0x44, mpt->pci_cfg.PMCSR, 4);

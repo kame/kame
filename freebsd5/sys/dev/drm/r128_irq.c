@@ -29,7 +29,7 @@
  *    Keith Whitwell <keith@tungstengraphics.com>
  *    Eric Anholt <anholt@FreeBSD.org>
  *
- * $FreeBSD: src/sys/dev/drm/r128_irq.c,v 1.1 2003/03/09 02:08:28 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128_irq.c,v 1.3 2003/10/24 01:48:16 anholt Exp $
  */
 
 #include "dev/drm/r128.h"
@@ -38,7 +38,7 @@
 #include "dev/drm/r128_drm.h"
 #include "dev/drm/r128_drv.h"
 
-void r128_dma_service( DRM_IRQ_ARGS )
+irqreturn_t r128_irq_handler( DRM_IRQ_ARGS )
 {
 	drm_device_t *dev = (drm_device_t *) arg;
 	drm_r128_private_t *dev_priv = 
@@ -53,7 +53,9 @@ void r128_dma_service( DRM_IRQ_ARGS )
 		atomic_inc(&dev->vbl_received);
 		DRM_WAKEUP(&dev->vbl_queue);
 		DRM(vbl_send_signals)( dev );
+		return IRQ_HANDLED;
 	}
+	return IRQ_NONE;
 }
 
 int DRM(vblank_wait)(drm_device_t *dev, unsigned int *sequence)
@@ -95,8 +97,9 @@ void r128_driver_irq_postinstall( drm_device_t *dev ) {
 void r128_driver_irq_uninstall( drm_device_t *dev ) {
   	drm_r128_private_t *dev_priv = 
 	   (drm_r128_private_t *)dev->dev_private;
-	if ( dev_priv ) {
-		/* Disable *all* interrupts */
-		R128_WRITE( R128_GEN_INT_CNTL, 0 );
-	}
+	if (!dev_priv)
+		return;
+
+	/* Disable *all* interrupts */
+	R128_WRITE( R128_GEN_INT_CNTL, 0 );
 }

@@ -27,7 +27,7 @@
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/radeon_drv.h,v 1.5 2003/04/25 01:18:46 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/radeon_drv.h,v 1.8 2003/11/12 20:56:30 anholt Exp $
  */
 
 #ifndef __RADEON_DRV_H__
@@ -75,9 +75,11 @@ typedef struct drm_radeon_private {
 	drm_radeon_ring_buffer_t ring;
 	drm_radeon_sarea_t *sarea_priv;
 
-	int agp_size;
-	u32 agp_vm_start;
-	unsigned long agp_buffers_offset;
+	u32 fb_location;
+
+	int gart_size;
+	u32 gart_vm_start;
+	unsigned long gart_buffers_offset;
 
 	int cp_mode;
 	int cp_running;
@@ -132,7 +134,7 @@ typedef struct drm_radeon_private {
 	unsigned long ring_offset;
 	unsigned long ring_rptr_offset;
 	unsigned long buffers_offset;
-	unsigned long agp_textures_offset;
+	unsigned long gart_textures_offset;
 
 	drm_local_map_t *sarea;
 	drm_local_map_t *fb;
@@ -140,9 +142,9 @@ typedef struct drm_radeon_private {
 	drm_local_map_t *cp_ring;
 	drm_local_map_t *ring_rptr;
 	drm_local_map_t *buffers;
-	drm_local_map_t *agp_textures;
+	drm_local_map_t *gart_textures;
 
-	struct mem_block *agp_heap;
+	struct mem_block *gart_heap;
 	struct mem_block *fb_heap;
 
 	/* SW interrupt */
@@ -161,6 +163,7 @@ extern int radeon_cp_start( DRM_IOCTL_ARGS );
 extern int radeon_cp_stop( DRM_IOCTL_ARGS );
 extern int radeon_cp_reset( DRM_IOCTL_ARGS );
 extern int radeon_cp_idle( DRM_IOCTL_ARGS );
+extern int radeon_cp_resume( DRM_IOCTL_ARGS );
 extern int radeon_engine_reset( DRM_IOCTL_ARGS );
 extern int radeon_fullscreen( DRM_IOCTL_ARGS );
 extern int radeon_cp_buffers( DRM_IOCTL_ARGS );
@@ -185,6 +188,7 @@ extern int radeon_cp_indirect( DRM_IOCTL_ARGS );
 extern int radeon_cp_vertex2( DRM_IOCTL_ARGS );
 extern int radeon_cp_cmdbuf( DRM_IOCTL_ARGS );
 extern int radeon_cp_getparam( DRM_IOCTL_ARGS );
+extern int radeon_cp_setparam( DRM_IOCTL_ARGS );
 extern int radeon_cp_flip( DRM_IOCTL_ARGS );
 
 extern int radeon_mem_alloc( DRM_IOCTL_ARGS );
@@ -240,6 +244,7 @@ extern void radeon_do_release(drm_device_t *dev);
 #define RADEON_CRTC2_OFFSET		0x0324
 #define RADEON_CRTC2_OFFSET_CNTL	0x0328
 
+#define RADEON_RB3D_COLOROFFSET		0x1c40
 #define RADEON_RB3D_COLORPITCH		0x1c48
 
 #define RADEON_DP_GUI_MASTER_CNTL	0x146c
@@ -333,6 +338,7 @@ extern void radeon_do_release(drm_device_t *dev);
 #define RADEON_PP_MISC			0x1c14
 #define RADEON_PP_ROT_MATRIX_0		0x1d58
 #define RADEON_PP_TXFILTER_0		0x1c54
+#define RADEON_PP_TXOFFSET_0		0x1c5c
 #define RADEON_PP_TXFILTER_1		0x1c6c
 #define RADEON_PP_TXFILTER_2		0x1c84
 
@@ -583,6 +589,7 @@ extern void radeon_do_release(drm_device_t *dev);
 #define RADEON_TXFORMAT_ARGB4444	5
 #define RADEON_TXFORMAT_ARGB8888	6
 #define RADEON_TXFORMAT_RGBA8888	7
+#define RADEON_TXFORMAT_Y8		8
 #define RADEON_TXFORMAT_VYUY422         10
 #define RADEON_TXFORMAT_YVYU422         11
 #define RADEON_TXFORMAT_DXT1            12
@@ -668,6 +675,10 @@ extern void radeon_do_release(drm_device_t *dev);
 #define R200_SE_VTX_STATE_CNTL            0x2180
 #define R200_RE_POINTSIZE                 0x2648
 #define R200_SE_TCL_INPUT_VTX_VECTOR_ADDR_0 0x2254
+
+#define RADEON_PP_TEX_SIZE_0                0x1d04  /* NPOT */
+#define RADEON_PP_TEX_SIZE_1                0x1d0c
+#define RADEON_PP_TEX_SIZE_2                0x1d14
 
 
 #define SE_VAP_CNTL__TCL_ENA_MASK                          0x00000001
@@ -854,7 +865,7 @@ do {									\
 
 #define COMMIT_RING() do {						\
 	/* Flush writes to ring */					\
-	DRM_READMEMORYBARRIER( dev_priv->mmio );			\
+	DRM_MEMORYBARRIER();						\
 	GET_RING_HEAD( dev_priv );					\
 	RADEON_WRITE( RADEON_CP_RB_WPTR, dev_priv->ring.tail );		\
 	/* read from PCI bus to ensure correct posting */		\

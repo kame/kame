@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/trap.c,v 1.113 2003/04/30 17:59:26 jhb Exp $ */
 /* $NetBSD: trap.c,v 1.31 1998/03/26 02:21:46 thorpej Exp $ */
-
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
@@ -28,6 +26,9 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/trap.c,v 1.117 2003/10/09 10:17:15 robert Exp $");
+
 /* #include "opt_fix_unaligned_vax_fp.h" */
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
@@ -44,6 +45,7 @@
 #include <sys/smp.h>
 #include <sys/vmmeter.h>
 #include <sys/sysent.h>
+#include <sys/signalvar.h>
 #include <sys/syscall.h>
 #include <sys/pioctl.h>
 #include <vm/vm.h>
@@ -657,7 +659,7 @@ syscall(code, framep)
 	sticks = td->td_sticks;
 	if (td->td_ucred != p->p_ucred)
 		cred_update_thread(td);
-	if (p->p_flag & P_THREADED)
+	if (p->p_flag & P_SA)
 		thread_user_enter(p, td);
 #ifdef DIAGNOSTIC
 	alpha_fpstate_check(td);
@@ -728,6 +730,8 @@ syscall(code, framep)
 
 		STOPEVENT(p, S_SCE, (callp->sy_narg & SYF_ARGMASK));
 
+		PTRACESTOP_SC(p, td, S_PT_SCE);
+
 		error = (*callp->sy_call)(td, args + hidden);
 	}
 
@@ -773,6 +777,8 @@ syscall(code, framep)
 	 * is not the case, this code will need to be revisited.
 	 */
 	STOPEVENT(p, S_SCX, code);
+
+	PTRACESTOP_SC(p, td, S_PT_SCX);
 
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);

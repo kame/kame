@@ -31,14 +31,17 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/advansys/adv_eisa.c,v 1.13 2003/03/29 09:46:10 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adv_eisa.c,v 1.15 2003/08/24 17:48:01 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/bus.h>
 
 #include <machine/bus_pio.h>
@@ -183,6 +186,8 @@ adv_eisa_attach(device_t dev)
 				/* nsegments	*/ ~0,
 				/* maxsegsz	*/ ADV_EISA_MAX_DMA_COUNT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&adv_b->parent_dmat);
  
 		if (error != 0) {
@@ -221,6 +226,8 @@ adv_eisa_attach(device_t dev)
 				/* nsegments	*/ ~0,
 				/* maxsegsz	*/ ADV_EISA_MAX_DMA_COUNT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&adv->parent_dmat);
  
 		if (error != 0) {
@@ -252,6 +259,8 @@ adv_eisa_attach(device_t dev)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&overrun_dmat) != 0) {
 			adv_free(adv);
 			goto bad;

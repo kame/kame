@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/digi/digi.c,v 1.34 2003/03/03 16:24:43 phk Exp $
+ * $FreeBSD: src/sys/dev/digi/digi.c,v 1.36 2003/09/26 09:05:57 phk Exp $
  */
 
 /*-
@@ -1815,7 +1815,7 @@ fepcmd(struct digi_p *port, int cmd, int op1, int ncmds)
 	head = port->sc->gdata->cin;
 	mem[head + 0] = cmd;
 	mem[head + 1] = port->pnum;
-	*(ushort *)(mem + head + 2) = op1;
+	*(u_short *)(mem + head + 2) = op1;
 
 	head = (head + 4) & port->sc->gdata->cmax;
 	port->sc->gdata->cin = head;
@@ -1933,8 +1933,7 @@ digi_detach(device_t dev)
 
 	digi_free_state(sc);
 
-	destroy_dev(makedev(CDEV_MAJOR,
-	    (sc->res.unit << 16) | CTRL_DEV));
+	destroy_dev(sc->res.ctldev);
 
 	if (sc->res.mem != NULL) {
 		bus_release_resource(dev, SYS_RES_MEMORY, sc->res.mrid,

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)tss.h	5.4 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/amd64/include/tss.h,v 1.14 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/tss.h,v 1.15 2003/11/17 08:58:14 peter Exp $
  */
 
 #ifndef _MACHINE_TSS_H_
@@ -69,7 +69,7 @@ struct amd64tss {
 };
 
 #ifdef _KERNEL
-extern struct amd64tss common_tss;
+extern struct amd64tss common_tss[];
 #endif
 
 #endif /* _MACHINE_TSS_H_ */

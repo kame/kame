@@ -56,13 +56,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/advansys/adv_pci.c,v 1.18 2003/03/29 09:46:10 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adv_pci.c,v 1.22 2003/09/02 17:30:33 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
@@ -70,13 +73,13 @@
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/advansys/advansys.h>
 
-#define PCI_BASEADR0	PCIR_MAPS		/* I/O Address */
-#define PCI_BASEADR1	PCIR_MAPS + 4		/* Mem I/O Address */
+#define PCI_BASEADR0	PCIR_BAR(0)		/* I/O Address */
+#define PCI_BASEADR1	PCIR_BAR(1)		/* Mem I/O Address */
 
 #define	PCI_DEVICE_ID_ADVANSYS_1200A	0x110010CD
 #define	PCI_DEVICE_ID_ADVANSYS_1200B	0x120010CD
@@ -197,6 +200,8 @@ adv_pci_attach(device_t dev)
 			/* nsegments	*/ ~0,
 			/* maxsegsz	*/ ADV_PCI_MAX_DMA_COUNT,
 			/* flags	*/ 0,
+			/* lockfunc	*/ busdma_lock_mutex,
+			/* lockarg	*/ &Giant,
 			&adv->parent_dmat);
  
 	if (error != 0) {
@@ -223,6 +228,8 @@ adv_pci_attach(device_t dev)
 				/* nsegments	*/ 1,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_32BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&overrun_dmat) != 0) {
 			bus_dma_tag_destroy(adv->parent_dmat);
 			adv_free(adv);

@@ -22,11 +22,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/alpha/dec_2100_a500.c,v 1.13 2003/04/21 16:34:18 obrien Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_2100_a500.c,v 1.17 2003/08/25 03:43:07 marcel Exp $");
+
 #include "opt_ddb.h"
+#include "opt_dev_sc.h"
 
 #include <sys/param.h>
 #include <sys/reboot.h>
@@ -34,28 +36,32 @@
 #include <sys/termios.h>
 #include <sys/bus.h>
 
-#include <machine/rpb.h>
-#include <machine/cpuconf.h>
-#include <machine/clock.h>
 #include <machine/bus.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <machine/clock.h>
+#include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
+
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <alpha/pci/t2var.h>
 #include <alpha/pci/t2reg.h>
 
-#include "opt_dev_sc.h"
+#ifndef NO_SIO
 #ifndef	CONSPEED
 #define	CONSPEED TTYDEF_SPEED
 #endif
 static int comcnrate = CONSPEED;
+extern int comconsole; 
+extern int siocnattach(int, int);
+extern int siogdbattach(int, int);
+#endif
+
+extern int sccnattach(void);
 
 void dec_2100_a500_init(int);
 static void dec_2100_a500_cons_init(void);
 static void dec_2100_a500_intr_init(void);
-
-extern int siocnattach(int, int);
-extern int siogdbattach(int, int);
-extern int sccnattach(void);
 
 void
 dec_2100_a500_init(int cputype)
@@ -88,8 +94,6 @@ dec_2100_a500_init(int cputype)
 	t2_init();
 }
 
-/* XXX for forcing comconsole when srm serial console is used */
-extern int comconsole; 
 
 static void
 dec_2100_a500_cons_init()
@@ -97,15 +101,18 @@ dec_2100_a500_cons_init()
 	struct ctb *ctb;
 	t2_init();
 
+#ifndef NO_SIO
 #ifdef DDB
 	siogdbattach(0x2f8, 9600);
 #endif
+#endif
+
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
 	case 2:
+#ifndef NO_SIO
 		/* serial console ... */
-		/* XXX */
 		/*
 		 * Delay to allow PROM putchars to complete.
 		 * FIFO depth * character time,
@@ -120,6 +127,7 @@ dec_2100_a500_cons_init()
 			panic("can't init serial console");
 
 		boothowto |= RB_SERIAL;
+#endif
 		break;
 
 	case 3:

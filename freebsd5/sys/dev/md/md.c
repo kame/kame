@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/dev/md/md.c,v 1.99 2003/05/16 07:28:27 alc Exp $
+ * $FreeBSD: src/sys/dev/md/md.c,v 1.108.2.1 2003/12/17 19:48:00 phk Exp $
  *
  */
 
@@ -107,6 +107,8 @@ static u_char mfs_root[MD_ROOT_SIZE*1024] = "MFS Filesystem goes here";
 static u_char end_mfs_root[] __unused = "MFS Filesystem had better STOP here";
 #endif
 
+static g_init_t md_drvinit;
+
 static int	mdrootready;
 static int	mdunits;
 static dev_t	status_dev = 0;
@@ -116,8 +118,6 @@ static dev_t	status_dev = 0;
 static d_ioctl_t mdctlioctl;
 
 static struct cdevsw mdctl_cdevsw = {
-	.d_open =	nullopen,
-	.d_close =	nullclose,
 	.d_ioctl =	mdctlioctl,
 	.d_name =	MD_NAME,
 	.d_maj =	CDEV_MAJOR
@@ -132,9 +132,9 @@ static int nshift;
 
 struct indir {
 	uintptr_t	*array;
-	uint		total;
-	uint		used;
-	uint		shift;
+	u_int		total;
+	u_int		used;
+	u_int		shift;
 };
 
 struct md_s {
@@ -174,7 +174,7 @@ struct md_s {
 static int mddestroy(struct md_s *sc, struct thread *td);
 
 static struct indir *
-new_indir(uint shift)
+new_indir(u_int shift)
 {
 	struct indir *ip;
 
@@ -341,7 +341,7 @@ s_write(struct indir *ip, off_t offset, uintptr_t ptr)
 
 struct g_class g_md_class = {
 	.name = "MD",
-	G_CLASS_INITIALIZER
+	.init = md_drvinit,
 };
 
 static int
@@ -370,7 +370,6 @@ g_md_start(struct bio *bp)
 
 	sc = bp->bio_to->geom->softc;
 
-	bp->bio_blkno = bp->bio_offset >> DEV_BSHIFT;
 	bp->bio_pblkno = bp->bio_offset / sc->secsize;
 	bp->bio_bcount = bp->bio_length;
 	mtx_lock(&sc->queue_mtx);
@@ -491,14 +490,15 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 	auio.uio_segflg = UIO_SYSSPACE;
 	if(bp->bio_cmd == BIO_READ)
 		auio.uio_rw = UIO_READ;
-	else
+	else if(bp->bio_cmd == BIO_WRITE)
 		auio.uio_rw = UIO_WRITE;
+	else
+		panic("wrong BIO_OP in mdstart_vnode");
 	auio.uio_resid = bp->bio_bcount;
 	auio.uio_td = curthread;
 	/*
 	 * When reading set IO_DIRECT to try to avoid double-caching
-	 * the data.  When writing IO_DIRECT is not optimal, but we
-	 * must set IO_NOWDRAIN to avoid a wdrain deadlock.
+	 * the data.  When writing IO_DIRECT is not optimal.
 	 */
 	if (bp->bio_cmd == BIO_READ) {
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY, curthread);
@@ -506,7 +506,7 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 	} else {
 		(void) vn_start_write(sc->vnode, &mp, V_WAIT);
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY, curthread);
-		error = VOP_WRITE(sc->vnode, &auio, IO_NOWDRAIN, sc->cred);
+		error = VOP_WRITE(sc->vnode, &auio, 0, sc->cred);
 		vn_finished_write(mp);
 	}
 	VOP_UNLOCK(sc->vnode, 0, curthread);
@@ -514,34 +514,68 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 	return (error);
 }
 
-static void
-mddone_swap(struct bio *bp)
-{
-
-	bp->bio_completed = bp->bio_length - bp->bio_resid;
-	g_std_done(bp);
-}
+#include <vm/vm_extern.h>
+#include <vm/vm_kern.h>
 
 static int
 mdstart_swap(struct md_s *sc, struct bio *bp)
 {
 	{
-	struct bio *bp2;
+		int i, o, rv;
+		vm_page_t m;
+		u_char *p;
+		vm_offset_t kva;
 
-	bp2 = g_clone_bio(bp);
-	bp2->bio_done = mddone_swap;
-	bp2->bio_blkno = bp2->bio_offset >> DEV_BSHIFT;
-	bp2->bio_pblkno = bp2->bio_offset / sc->secsize;
-	bp2->bio_bcount = bp2->bio_length;
-	bp = bp2;
+		p = bp->bio_data;
+		o = bp->bio_offset / sc->secsize;
+		mtx_lock(&Giant);
+		kva = kmem_alloc_nofault(kernel_map, sc->secsize);
+		
+		VM_OBJECT_LOCK(sc->object);
+		vm_object_pip_add(sc->object, 1);
+		for (i = 0; i < bp->bio_length / sc->secsize; i++) {
+			m = vm_page_grab(sc->object, i + o,
+			    VM_ALLOC_NORMAL|VM_ALLOC_RETRY);
+			pmap_qenter(kva, &m, 1);
+			if (bp->bio_cmd == BIO_READ) {
+				if (m->valid != VM_PAGE_BITS_ALL) {
+					rv = vm_pager_get_pages(sc->object,
+					    &m, 1, 0);
+				}
+				bcopy((void *)kva, p, sc->secsize);
+			} else if (bp->bio_cmd == BIO_WRITE) {
+				bcopy(p, (void *)kva, sc->secsize);
+				m->valid = VM_PAGE_BITS_ALL;
+#if 0
+			} else if (bp->bio_cmd == BIO_DELETE) {
+				bzero((void *)kva, sc->secsize);
+				vm_page_dirty(m);
+				m->valid = VM_PAGE_BITS_ALL;
+#endif
+			} 
+			pmap_qremove(kva, 1);
+			vm_page_lock_queues();
+			vm_page_wakeup(m);
+			vm_page_activate(m);
+			if (bp->bio_cmd == BIO_WRITE) {
+				vm_page_dirty(m);
+			}
+			vm_page_unlock_queues();
+			p += sc->secsize;
+#if 0
+if (bootverbose || o < 17)
+printf("wire_count %d busy %d flags %x hold_count %d act_count %d queue %d valid %d dirty %d @ %d\n",
+    m->wire_count, m->busy, 
+    m->flags, m->hold_count, m->act_count, m->queue, m->valid, m->dirty, o + i);
+#endif
+		}
+		vm_object_pip_subtract(sc->object, 1);
+		vm_object_set_writeable_dirty(sc->object);
+		VM_OBJECT_UNLOCK(sc->object);
+		kmem_free(kernel_map, kva, sc->secsize);
+		mtx_unlock(&Giant);
+		return (0);
 	}
-
-	bp->bio_resid = 0;
-	if ((bp->bio_cmd == BIO_DELETE) && (sc->flags & MD_RESERVE))
-		biodone(bp);
-	else
-		vm_pager_strategy(sc->object, bp);
-	return (-1);
 }
 
 static void
@@ -652,8 +686,6 @@ mdnew(int unit)
 	}
 	if (unit == -1)
 		unit = max + 1;
-	if (unit > 255)
-		return (NULL);
 	sc = (struct md_s *)malloc(sizeof *sc, M_MD, M_WAITOK | M_ZERO);
 	sc->unit = unit;
 	bioq_init(&sc->bio_queue);
@@ -844,13 +876,13 @@ mdcreate_vnode(struct md_ioctl *mdio, struct thread *td)
 
 	flags = FREAD|FWRITE;
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, mdio->md_file, td);
-	error = vn_open(&nd, &flags, 0);
+	error = vn_open(&nd, &flags, 0, -1);
 	if (error) {
 		if (error != EACCES && error != EPERM && error != EROFS)
 			return (error);
 		flags &= ~FWRITE;
 		NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, mdio->md_file, td);
-		error = vn_open(&nd, &flags, 0);
+		error = vn_open(&nd, &flags, 0, -1);
 		if (error)
 			return (error);
 	}
@@ -1131,7 +1163,7 @@ md_preloaded(u_char *image, unsigned length)
 }
 
 static void
-md_drvinit(void *unused)
+md_drvinit(struct g_class *mp __unused)
 {
 
 	caddr_t mod;
@@ -1139,6 +1171,7 @@ md_drvinit(void *unused)
 	u_char *ptr, *name, *type;
 	unsigned len;
 
+	g_topology_unlock();
 #ifdef MD_ROOT_SIZE
 	md_preloaded(mfs_root, MD_ROOT_SIZE*1024);
 #endif
@@ -1162,6 +1195,7 @@ md_drvinit(void *unused)
 	}
 	status_dev = make_dev(&mdctl_cdevsw, 0xffff00ff, UID_ROOT, GID_WHEEL,
 	    0600, MDCTL_NAME);
+	g_topology_lock();
 }
 
 static int
@@ -1172,7 +1206,6 @@ md_modevent(module_t mod, int type, void *data)
 
 	switch (type) {
 	case MOD_LOAD:
-		md_drvinit(NULL);
 		break;
 	case MOD_UNLOAD:
 		LIST_FOREACH(sc, &md_softc_list, list) {

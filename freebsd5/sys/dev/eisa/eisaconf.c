@@ -28,8 +28,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/eisa/eisaconf.c,v 1.64 2003/04/29 13:35:59 kan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/eisa/eisaconf.c,v 1.65 2003/08/24 17:46:04 obrien Exp $");
 
 #include "opt_eisa.h"
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/hfa/hfa_freebsd.h,v 1.1 2002/04/17 00:24:48 mdodd Exp $
+ * $FreeBSD: src/sys/dev/hfa/hfa_freebsd.h,v 1.2 2003/07/31 14:52:44 harti Exp $
  */
 
 struct hfa_softc {
@@ -40,6 +40,10 @@ struct hfa_softc {
         struct mtx              mtx;
 
 	Fore_unit		fup;
+
+	/* sysctl support */
+	struct sysctl_ctx_list	sysctl_ctx;
+	struct sysctl_oid *	sysctl_tree;
 };
 
 #define	HFA_LOCK(_sc)	mtx_lock(&(_sc)->mtx)

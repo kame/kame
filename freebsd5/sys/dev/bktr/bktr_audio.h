@@ -1,5 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_audio.h,v 1.2 1999/10/28 13:58:14 roger Exp $ */
-
+/* $FreeBSD: src/sys/dev/bktr/bktr_audio.h,v 1.3 2003/08/12 09:45:34 alex Exp $ */
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
  * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
@@ -65,6 +64,12 @@ void	init_audio_devices( bktr_ptr_t bktr );
  */
 void	msp_autodetect( bktr_ptr_t bktr );
 void	msp_read_id( bktr_ptr_t bktr );
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+int	msp_attach(bktr_ptr_t bktr);
+int	msp_detach(bktr_ptr_t bktr);
+void	msp_wake_thread(bktr_ptr_t bktr);
+void	msp_halt_thread(bktr_ptr_t bktr);
+#endif
 
 
 /*

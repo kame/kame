@@ -26,8 +26,10 @@
  *
  *	from: NetBSD: if_gem_pci.c,v 1.7 2001/10/18 15:09:15 thorpej Exp
  *
- * $FreeBSD: src/sys/dev/gem/if_gem_pci.c,v 1.9 2003/04/16 03:16:54 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/gem/if_gem_pci.c,v 1.12 2003/09/02 20:24:42 marcel Exp $");
 
 /*
  * PCI bindings for Sun GEM ethernet controllers.
@@ -51,6 +53,7 @@
 
 #include <machine/bus.h>
 #include <machine/resource.h>
+#include <dev/ofw/openfirm.h>
 #include <machine/ofw_machdep.h>
 
 #include <sys/rman.h>
@@ -158,11 +161,14 @@ gem_pci_attach(dev)
 	struct gem_pci_softc *gsc = device_get_softc(dev);
 	struct gem_softc *sc = &gsc->gsc_gem;
 
-	/*
-	 * Enable bus master and memory access. The firmware does in some
-	 * cases not do this for us on sparc64 machines.
-	 */
 	pci_enable_busmaster(dev);
+
+	/*
+	 * Some Sun GEMs/ERIs do have their intpin register bogusly set to 0,
+	 * although it should be 1. correct that.
+	 */
+	if (pci_get_intpin(dev) == 0)
+		pci_set_intpin(dev, 1);
 
 	sc->sc_dev = dev;
 	sc->sc_pci = 1;		/* XXX */

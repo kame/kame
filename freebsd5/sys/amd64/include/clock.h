@@ -3,7 +3,7 @@
  * Garrett Wollman, September 1994.
  * This file is in the public domain.
  *
- * $FreeBSD: src/sys/amd64/include/clock.h,v 1.45 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/clock.h,v 1.49 2003/11/17 08:58:14 peter Exp $
  */
 
 #ifndef _MACHINE_CLOCK_H_
@@ -15,6 +15,7 @@
  * XXX large parts of the driver and its interface are misplaced.
  */
 extern int	adjkerntz;
+extern int	clkintr_pending;
 extern int	disable_rtc_set;
 extern int	pscnt;
 extern int	psdiv;
@@ -30,13 +31,12 @@ extern int	wall_cmos_clock;
  */
 struct clockframe;
 
-int	acquire_timer0(int rate, void (*function)(struct clockframe *frame));
 int	acquire_timer2(int mode);
-int	release_timer0(void);
 int	release_timer2(void);
 int	rtcin(int val);
 int	sysbeep(int pitch, int period);
 void	init_TSC(void);
+void	init_TSC_tc(void);
 
 #endif /* _KERNEL */
 

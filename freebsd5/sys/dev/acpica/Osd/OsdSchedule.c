@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSchedule.c,v 1.23 2002/10/31 17:58:39 iwasaki Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSchedule.c,v 1.26 2003/10/02 05:09:37 njl Exp $
  */
 
 /*
@@ -243,7 +243,7 @@ AcpiOsExecuteQueue(void *arg, int pending)
  * make do with that.
  */
 void
-AcpiOsSleep (UINT32 Seconds, UINT32 Milliseconds)
+AcpiOsSleep(UINT32 Seconds, UINT32 Milliseconds)
 {
     int		timo;
     static int	dummy;
@@ -251,14 +251,21 @@ AcpiOsSleep (UINT32 Seconds, UINT32 Milliseconds)
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
     timo = (Seconds * hz) + Milliseconds * hz / 1000;
-    if (timo == 0)
-	timo = 1;
-    tsleep(&dummy, 0, "acpislp", timo);
+
+    /* 
+     * If requested sleep time is less than our hz resolution, use
+     * DELAY instead for better granularity.
+     */
+    if (timo > 0)
+	tsleep(&dummy, 0, "acpislp", timo);
+    else
+	DELAY(Milliseconds * 1000);
+
     return_VOID;
 }
 
 void
-AcpiOsStall (UINT32 Microseconds)
+AcpiOsStall(UINT32 Microseconds)
 {
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
@@ -267,7 +274,7 @@ AcpiOsStall (UINT32 Microseconds)
 }
 
 UINT32
-AcpiOsGetThreadId (void)
+AcpiOsGetThreadId(void)
 {
     struct proc *p;
     /* XXX do not add FUNCTION_TRACE here, results in recursive call */

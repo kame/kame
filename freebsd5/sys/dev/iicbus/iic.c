@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/iicbus/iic.c,v 1.27 2003/03/03 12:15:42 phk Exp $
+ * $FreeBSD: src/sys/dev/iicbus/iic.c,v 1.28 2003/08/10 14:28:24 ticso Exp $
  *
  */
 #include <sys/param.h>
@@ -106,7 +106,7 @@ static struct cdevsw iic_cdevsw = {
 static void
 iic_identify(driver_t *driver, device_t parent)
 {
-	BUS_ADD_CHILD(parent, 0, "iic", 0);
+	BUS_ADD_CHILD(parent, 0, "iic", -1);
 }
 
 static int

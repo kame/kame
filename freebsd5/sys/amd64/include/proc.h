@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)proc.h	7.1 (Berkeley) 5/15/91
- * $FreeBSD: src/sys/amd64/include/proc.h,v 1.20 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/proc.h,v 1.21 2003/11/21 03:02:00 peter Exp $
  */
 
 #ifndef _MACHINE_PROC_H_
@@ -41,7 +41,7 @@
  * Machine-dependent part of the proc structure for AMD64.
  */
 struct mdthread {
-	register_t	md_savecrit;
+	register_t md_savecrit;
 };
 
 struct mdproc {

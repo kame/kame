@@ -67,7 +67,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-/* $FreeBSD: src/sys/amd64/include/bus_amd64.h,v 1.25 2003/05/23 05:04:54 peter Exp $ */
+/* $FreeBSD: src/sys/amd64/include/bus_amd64.h,v 1.26 2003/09/23 08:22:33 nyan Exp $ */
 
 #ifndef _AMD64_BUS_AMD64_H_
 #define _AMD64_BUS_AMD64_H_
@@ -114,11 +114,19 @@ typedef	uint64_t bus_space_handle_t;
  * Map a region of device bus space into CPU virtual address space.
  */
 
-#define	BUS_SPACE_MAP_CACHEABLE		0x01
-#define	BUS_SPACE_MAP_LINEAR		0x02
+static __inline int bus_space_map(bus_space_tag_t t, bus_addr_t addr,
+				  bus_size_t size, int flags,
+				  bus_space_handle_t *bshp);
 
-int	bus_space_map(bus_space_tag_t t, bus_addr_t addr, bus_size_t size,
-		      int flags, bus_space_handle_t *bshp);
+static __inline int
+bus_space_map(bus_space_tag_t t __unused, bus_addr_t addr,
+	      bus_size_t size __unused, int flags __unused,
+	      bus_space_handle_t *bshp)
+{
+
+	*bshp = addr;
+	return (0);
+}
 
 /*
  * Unmap a region of device bus space.

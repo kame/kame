@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/atomic.h,v 1.30 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/atomic.h,v 1.32 2003/11/21 03:02:00 peter Exp $
  */
 #ifndef _MACHINE_ATOMIC_H_
 #define _MACHINE_ATOMIC_H_
@@ -82,7 +82,7 @@ void		atomic_store_rel_##TYPE(volatile u_##TYPE *p, u_##TYPE v)
  * For userland, assume the SMP case and use lock prefixes so that
  * the binaries will run on both types of systems.
  */
-#if !defined(_KERNEL)
+#if defined(SMP) || !defined(_KERNEL)
 #define MPLOCKED	lock ;
 #else
 #define MPLOCKED
@@ -99,7 +99,8 @@ atomic_##NAME##_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 	__asm __volatile(__XSTRING(MPLOCKED) OP		\
 			 : "+m" (*p)			\
 			 : CONS (V));			\
-}
+}							\
+struct __hack
 
 #else /* !__GNUC__ */
 
@@ -150,7 +151,7 @@ atomic_cmpset_long(volatile u_long *dst, u_long exp, u_long src)
 	"	movzbq	%%al,%0 ;	"
 	"1:				"
 	"# atomic_cmpset_long"
-	: "+a" (res)			/* 0 (result) %rax, XXX check */
+	: "+a" (res)			/* 0 (result) */
 	: "r" (src),			/* 1 */
 	  "m" (*(dst))			/* 2 */
 	: "memory");				 
@@ -185,7 +186,8 @@ atomic_store_rel_##TYPE(volatile u_##TYPE *p, u_##TYPE v)\
 	: "+m" (*p),			/* 0 */		\
 	  "+r" (v)			/* 1 */		\
 	: : "memory");				 	\
-}
+}							\
+struct __hack
 
 #else /* !defined(__GNUC__) */
 
@@ -330,7 +332,11 @@ atomic_cmpset_ptr(volatile void *dst, void *exp, void *src)
 static __inline void *
 atomic_load_acq_ptr(volatile void *p)
 {
-	return (void *)atomic_load_acq_long((volatile u_long *)p);
+	/*
+	 * The apparently-bogus cast to intptr_t in the following is to
+	 * avoid a warning from "gcc -Wbad-function-cast".
+	 */
+	return ((void *)(intptr_t)atomic_load_acq_long((volatile u_long *)p));
 }
 
 static __inline void

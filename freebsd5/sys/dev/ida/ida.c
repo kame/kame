@@ -26,9 +26,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ida/ida.c,v 1.27 2003/05/27 04:59:57 scottl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ida/ida.c,v 1.29 2003/08/24 17:49:12 obrien Exp $");
 
 /*
  * Generic driver for Compaq SMART RAID adapters.
@@ -205,7 +206,8 @@ ida_init(struct ida_softc *ida)
 	    /*filter*/NULL, /*filterarg*/NULL,
 	    IDA_QCB_MAX * sizeof(struct ida_hardware_qcb),
 	    /*nsegments*/1, /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-	    /*flags*/0, &ida->hwqcb_dmat);
+	    /*flags*/0, /*lockfunc*/busdma_lock_mutex, /*lockarg*/&Giant,
+	    &ida->hwqcb_dmat);
 	if (error)
                 return (ENOMEM);
 
@@ -215,7 +217,8 @@ ida_init(struct ida_softc *ida)
 	    /*lowaddr*/BUS_SPACE_MAXADDR, /*highaddr*/BUS_SPACE_MAXADDR,
 	    /*filter*/NULL, /*filterarg*/NULL,
 	    /*maxsize*/MAXBSIZE, /*nsegments*/IDA_NSEG,
-	    /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT, /*flags*/0, &ida->buffer_dmat);
+	    /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT, /*flags*/0,
+	    /*lockfunc*/busdma_lock_mutex, /*lockarg*/&Giant, &ida->buffer_dmat);
 	if (error)
                 return (ENOMEM);
 

@@ -23,9 +23,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lmc/if_lmc_fbsd3.c,v 1.5 2002/06/02 20:05:44 schweikh Exp $
  *	$Id: if_lmc_fbsd.c,v 1.3 1999/01/12 13:27:42 explorer Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/lmc/if_lmc_fbsd3.c,v 1.6 2003/08/24 17:49:15 obrien Exp $");
 
 /*
  * This file is INCLUDED (gross, I know, but...)

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_os.h,v 1.6 2001/12/18 00:27:15 jhb Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_os.h,v 1.7 2003/12/01 19:03:50 truckman Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -61,9 +61,10 @@ void            free_bktr_mem(bktr_ptr_t, bus_dmamap_t, vm_offset_t);
 /************************************/
 #if defined(__FreeBSD__)
 #if (__FreeBSD_version >=500000)
+#define USE_VBIMUTEX
 #define	DECLARE_INTR_MASK(s)	/* no need to declare 's' */
-#define DISABLE_INTR(s)		critical_enter()
-#define	ENABLE_INTR(s)		critical_exit()
+#define DISABLE_INTR(s)
+#define ENABLE_INTR(s)
 #else
 #define DECLARE_INTR_MASK(s)	intrmask_t s
 #define DISABLE_INTR(s)		s=spltty()
@@ -75,4 +76,10 @@ void            free_bktr_mem(bktr_ptr_t, bus_dmamap_t, vm_offset_t);
 #define ENABLE_INTR(s)		enable_intr()
 #endif
 
-
+#ifdef USE_VBIMUTEX
+#define LOCK_VBI(bktr)		mtx_lock(&bktr->vbimutex)
+#define UNLOCK_VBI(bktr)	mtx_unlock(&bktr->vbimutex)
+#else
+#define LOCK_VBI(bktr)
+#define UNLOCK_VBI(bktr)
+#endif

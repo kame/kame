@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/intr.h,v 1.10 2001/12/20 23:48:29 jhb Exp $
+ * $FreeBSD: src/sys/alpha/include/intr.h,v 1.11 2003/11/17 06:10:14 peter Exp $
  */
 
 #ifndef _MACHINE_INTR_H_
@@ -31,9 +31,10 @@
 
 extern struct mtx icu_lock;
 
-int	alpha_setup_intr(const char *name, int vector, driver_intr_t handler,
-	    void *arg, enum intr_type flags, void **cookiep,
-	    volatile long *cntp, void (*disable)(int), void (*enable)(int));
+int	alpha_setup_intr(const char *name, uintptr_t vector,
+	    driver_intr_t handler, void *arg, enum intr_type flags,
+	    void **cookiep, volatile long *cntp,
+	    void (*disable)(uintptr_t), void (*enable)(uintptr_t));
 int	alpha_teardown_intr(void *cookie);
 void	alpha_dispatch_intr(void *frame, unsigned long vector);
 

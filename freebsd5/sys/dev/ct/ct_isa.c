@@ -1,5 +1,7 @@
-/* $FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.7 2003/05/03 02:04:58 nyan Exp $ */
 /*	$NecBSD: ct_isa.c,v 1.6 1999/07/26 06:32:01 honda Exp $	*/
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.9 2003/08/24 17:46:03 obrien Exp $");
 /*	$NetBSD$	*/
 
 /*
@@ -240,7 +242,8 @@ ct_isa_attach(device_t dev)
 			       BUS_SPACE_MAXADDR_24BIT, BUS_SPACE_MAXADDR,
 			       NULL, NULL, MAXBSIZE, 1,
 			       BUS_SPACE_MAXSIZE_32BIT,
-			       BUS_DMA_ALLOCNOW, &ct->sc_dmat) != 0) {
+			       BUS_DMA_ALLOCNOW, NULL, NULL,
+			       &ct->sc_dmat) != 0) {
 		device_printf(dev, "can't set up ISA DMA map\n");
 		ct_space_unmap(dev, ct);
 		return ENXIO;
@@ -254,7 +257,7 @@ ct_isa_attach(device_t dev)
 	}
 
 	bus_dmamap_load(ct->sc_dmat, ct->sc_dmamapt, vaddr, MAXBSIZE,
-			ct_dmamap, &addr, 0);
+			ct_dmamap, &addr, BUS_DMA_NOWAIT);
 
 	/* setup machdep softc */
 	bs->sc_hw = hw;

@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -24,12 +24,12 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.14 2003/03/29 13:37:09 sos Exp $
  */
 
-#include "opt_ata.h"
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.18.2.1 2004/01/27 05:53:18 scottl Exp $");
 
+#include "opt_ata.h"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/ata.h>
@@ -37,6 +37,9 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
+#include <sys/sema.h>
+#include <sys/taskqueue.h>
+#include <vm/uma.h>
 #include <machine/stdarg.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
@@ -94,10 +97,10 @@ ata_isa_probe(device_t dev)
     /* allocate the altport range */
     rid = ATA_ALTADDR_RID; 
     altio = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0,
-                               ATA_ALTIOSIZE, RF_ACTIVE);
+			       ATA_ALTIOSIZE, RF_ACTIVE);
     if (!altio) {
-        bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, io);
-        return ENXIO;
+	bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, io);
+	return ENXIO;
     }
 
     /* setup the resource vectors */

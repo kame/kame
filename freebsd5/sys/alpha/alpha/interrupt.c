@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.72 2003/02/03 17:53:14 jake Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
-
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
@@ -36,8 +34,8 @@
 #include "opt_ddb.h"
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-
 /* __KERNEL_RCSID(0, "$NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $");*/
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.76 2003/11/17 06:10:14 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,11 +51,12 @@
 #include <sys/unistd.h>
 #include <sys/vmmeter.h>
 
-#include <machine/reg.h>
-#include <machine/frame.h>
-#include <machine/cpuconf.h>
 #include <machine/bwx.h>
+#include <machine/cpuconf.h>
+#include <machine/frame.h>
 #include <machine/intr.h>
+#include <machine/md_var.h>
+#include <machine/reg.h>
 #include <machine/rpb.h>
 #include <machine/smp.h>
 
@@ -108,7 +107,7 @@ interrupt(a0, a1, a2, framep)
 	intr_restore(s);
 #endif
 	atomic_add_int(&td->td_intr_nesting_level, 1);
-#ifndef KSTACK_GUARD
+#if KSTACK_GUARD_PAGES == 0
 #ifndef SMP
 	{
 		if ((caddr_t) framep < (caddr_t) td->td_pcb + 1024) {
@@ -328,7 +327,7 @@ LIST_HEAD(alpha_intr_list, alpha_intr);
 
 struct alpha_intr {
     LIST_ENTRY(alpha_intr) list; /* chain handlers in this hash bucket */
-    int			vector;	/* vector to match */
+    uintptr_t		vector;	/* vector to match */
     struct ithd		*ithd;  /* interrupt thread */
     volatile long	*cntp;  /* interrupt counter */
 };
@@ -347,9 +346,9 @@ ithds_init(void *dummy)
 SYSINIT(ithds_init, SI_SUB_INTR, SI_ORDER_SECOND, ithds_init, NULL);
 
 int
-alpha_setup_intr(const char *name, int vector, driver_intr_t handler, void *arg,
+alpha_setup_intr(const char *name, uintptr_t vector, driver_intr_t handler, void *arg,
 		 enum intr_type flags, void **cookiep, volatile long *cntp,
-    		 void (*disable)(int), void (*enable)(int))
+    		 void (*disable)(uintptr_t), void (*enable)(uintptr_t))
 {
 	int h = HASHVEC(vector);
 	struct alpha_intr *i;

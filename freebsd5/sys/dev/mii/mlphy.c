@@ -29,8 +29,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/mlphy.c,v 1.16 2002/10/14 22:31:52 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/mlphy.c,v 1.18 2003/08/24 17:54:10 obrien Exp $");
 
 /*
  * driver for Micro Linear 6692 PHYs
@@ -243,7 +245,6 @@ mlphy_service(xsc, mii, cmd)
 			(void) mii_phy_auto(sc);
 			msc->ml_linked = 0;
 			return(0);
-			break;
 		case IFM_10_T:
 			/*
 			 * For 10baseT modes, reset and program the

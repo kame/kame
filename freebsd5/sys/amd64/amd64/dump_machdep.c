@@ -31,9 +31,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/amd64/amd64/dump_machdep.c,v 1.8 2003/05/01 01:05:21 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/dump_machdep.c,v 1.9 2003/07/25 21:15:44 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,6 +1,7 @@
-/* $FreeBSD: src/sys/dev/iir/iir_pci.c,v 1.7 2003/04/25 05:37:04 scottl Exp $ */
-/*
- *       Copyright (c) 2000-01 Intel Corporation
+/*-
+ *       Copyright (c) 2000-03 ICP vortex GmbH
+ *       Copyright (c) 2002-03 Intel Corporation
+ *       Copyright (c) 2003    Adaptec Inc.
  *       All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,19 +27,21 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
+
+#ident "$Id: iir_pci.c 1.2 2003/08/26 12:29:55 achim Exp $"
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/iir/iir_pci.c,v 1.12 2003/09/26 15:36:47 scottl Exp $");
 
 /*
  *  iir_pci.c:  PCI Bus Attachment for Intel Integrated RAID Controller driver
  *
  *  Written by: Achim Leubner <achim.leubner@intel.com>
+ *  Written by: Achim Leubner <achim_leubner@adaptec.com>
  *  Fixes/Additions: Boji Tony Kannanthanam <boji.t.kannanthanam@intel.com>
  *
  *  TODO:
  */
-
-#ident "$Id: iir_pci.c 1.1 2001/05/22 20:14:12 achim Exp $"
 
 /* #include "opt_iir.h" */
 
@@ -46,6 +49,8 @@
 #include <sys/systm.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 #include <sys/module.h>
 #include <sys/bus.h> 
 
@@ -56,15 +61,15 @@
 #include <machine/clock.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <cam/scsi/scsi_all.h>
 
 #include <dev/iir/iir.h>
 
 /* Mapping registers for various areas */
-#define PCI_DPMEM       PCIR_MAPS
+#define PCI_DPMEM       PCIR_BAR(0)
 
 /* Product numbers for Fibre-Channel are greater than or equal to 0x200 */
 #define GDT_PCI_PRODUCT_FC      0x200
@@ -322,7 +327,8 @@ iir_pci_attach(device_t dev)
                            /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
                            /*nsegments*/GDT_MAXSG,
                            /*maxsegsz*/BUS_SPACE_MAXSIZE_32BIT,
-                           /*flags*/0, &gdt->sc_parent_dmat) != 0) {
+			   /*flags*/0, /*lockfunc*/busdma_lock_mutex,
+			   /*lockarg*/&Giant, &gdt->sc_parent_dmat) != 0) {
         error = ENXIO;
         goto err;
     }

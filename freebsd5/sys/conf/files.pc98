@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.270 2003/05/01 13:44:24 nyan Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.281 2003/12/03 21:44:44 imp Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -42,6 +42,12 @@ trlld.o				optional	oltr			\
 	dependency	"$S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
 	compile-with	"uudecode < $S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
 	no-implicit-rule
+#
+hal.o				optional	ath_hal			\
+	dependency	"$S/contrib/dev/ath/freebsd/i386-elf.hal.o.uu"	\
+	compile-with	"uudecode < $S/contrib/dev/ath/freebsd/i386-elf.hal.o.uu" \
+	no-implicit-rule
+#
 #
 compat/linux/linux_file.c	optional	compat_linux
 compat/linux/linux_getcwd.c	optional	compat_linux
@@ -109,6 +115,7 @@ dev/kbd/kbd.c			optional	sc
 dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	pckbd
 dev/lnc/if_lnc_cbus.c		optional	lnc isa
+dev/ppc/ppc_puc.c		optional	ppc puc pci
 dev/sbni/if_sbni.c		optional	sbni
 dev/sbni/if_sbni_pci.c		optional	sbni pci
 dev/snc/dp83932.c		optional	snc
@@ -122,44 +129,15 @@ dev/syscons/scmouse.c		optional	sc
 dev/syscons/scterm.c		optional	sc
 dev/syscons/scterm-dumb.c	optional	sc
 dev/syscons/scvidctl.c		optional	sc
+dev/syscons/syscons.c		optional	sc
 dev/syscons/sysmouse.c		optional	sc
+dev/uart/uart_cpu_pc98.c	optional	uart
 geom/geom_bsd.c			standard
 geom/geom_bsd_enc.c		standard
 geom/geom_pc98.c		standard
 geom/geom_pc98_enc.c		standard
-gnu/i386/fpemul/div_small.s	optional	gpl_math_emulate \
-	warning "kernel contains GPL contaminated math emulator"
-gnu/i386/fpemul/errors.c	optional	gpl_math_emulate
-gnu/i386/fpemul/fpu_arith.c	optional	gpl_math_emulate
-gnu/i386/fpemul/fpu_aux.c	optional	gpl_math_emulate
-gnu/i386/fpemul/fpu_entry.c	optional	gpl_math_emulate
-gnu/i386/fpemul/fpu_etc.c	optional	gpl_math_emulate
-gnu/i386/fpemul/fpu_trig.c	optional	gpl_math_emulate
-gnu/i386/fpemul/get_address.c	optional	gpl_math_emulate
-gnu/i386/fpemul/load_store.c	optional	gpl_math_emulate
-gnu/i386/fpemul/poly_2xm1.c	optional	gpl_math_emulate
-gnu/i386/fpemul/poly_atan.c	optional	gpl_math_emulate
-gnu/i386/fpemul/poly_div.s	optional	gpl_math_emulate
-gnu/i386/fpemul/poly_l2.c	optional	gpl_math_emulate
-gnu/i386/fpemul/poly_mul64.s	optional	gpl_math_emulate
-gnu/i386/fpemul/poly_sin.c	optional	gpl_math_emulate
-gnu/i386/fpemul/poly_tan.c	optional	gpl_math_emulate
-gnu/i386/fpemul/polynomial.s	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_add_sub.c	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_compare.c	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_constant.c	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_div.s	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_ld_str.c	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_mul.c	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_norm.s	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_round.s	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_u_add.s	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_u_div.s	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_u_mul.s	optional	gpl_math_emulate
-gnu/i386/fpemul/reg_u_sub.s	optional	gpl_math_emulate
-gnu/i386/fpemul/wm_shrx.s	optional	gpl_math_emulate
-gnu/i386/fpemul/wm_sqrt.s	optional	gpl_math_emulate
 i386/bios/apm.c			optional	apm
+i386/i386/apic_vector.s		optional	apic
 i386/i386/atomic.c		standard				\
 	compile-with	"${CC} -c ${CFLAGS} ${DEFINED_PROF:S/^$/-fomit-frame-pointer/} ${.IMPSRC}"
 i386/i386/autoconf.c		standard
@@ -178,15 +156,18 @@ i386/i386/i686_mem.c		standard
 i386/i386/identcpu.c		standard
 i386/i386/in_cksum.c		optional	inet
 i386/i386/initcpu.c		standard
+i386/i386/intr_machdep.c	standard
+i386/i386/io_apic.c		optional	apic
 i386/i386/k6_mem.c		standard
 i386/i386/legacy.c		standard
+i386/i386/local_apic.c		optional	apic
 i386/i386/locore.s		standard	no-obj
-i386/i386/math_emulate.c	optional	math_emulate
 i386/i386/mem.c			standard
 i386/i386/mp_clock.c		optional	smp
 i386/i386/mp_machdep.c		optional	smp
-i386/i386/mpapic.c		optional	smp
 i386/i386/mpboot.s		optional	smp
+i386/i386/mptable.c		optional	apic
+i386/i386/mptable_pci.c		optional	apic pci
 i386/i386/nexus.c		standard
 i386/i386/perfmon.c		optional	perfmon
 i386/i386/perfmon.c		optional	perfmon	profiling-routine
@@ -217,23 +198,20 @@ i386/ibcs2/ibcs2_util.c		optional	ibcs2
 i386/ibcs2/ibcs2_xenix.c	optional	ibcs2
 i386/ibcs2/ibcs2_xenix_sysent.c	optional	ibcs2
 i386/ibcs2/imgact_coff.c	optional	ibcs2
+i386/isa/atpic.c		standard
+i386/isa/atpic_vector.s		standard
 i386/isa/bs/bs.c		optional	bs
 i386/isa/bs/bsfunc.c		optional	bs
 i386/isa/bs/bshw.c		optional	bs
 i386/isa/bs/bsif.c		count		bs
-i386/isa/cronyx.c		optional	cx
-i386/isa/ctx.c			count		ctx
-i386/isa/cx.c			count		cx
+i386/isa/ctx.c			optional	ctx
 i386/isa/cy.c			count		cy
 i386/isa/elink.c		optional	ep
 i386/isa/elink.c		optional	ie
 i386/isa/gpib.c			optional	gp
-i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		count		el
 i386/isa/if_le.c		count		le
 i386/isa/if_rdp.c		count		rdp
-i386/isa/intr_machdep.c		standard
-i386/isa/ithread.c		standard
 i386/isa/isa.c			optional	isa
 i386/isa/isa_compat.c		optional	isa compat_oldisa	\
 	warning "Old ISA driver compatibility shims present."
@@ -369,11 +347,11 @@ pc98/pc98/clock.c		standard
 pc98/pc98/fd.c			optional	fdc
 pc98/pc98/isa_dma.c		optional	isa
 pc98/pc98/mse.c			optional	mse
+pc98/pc98/nmi.c			standard
 pc98/pc98/olpt.c		optional	olpt
 pc98/pc98/pc98gdc.c		optional	gdc
 pc98/pc98/pc98kbd.c		optional	pckbd
 pc98/pc98/pc98_machdep.c	standard
-pc98/pc98/pcaudio.c		optional	pca
 pc98/pc98/pmc.c			optional	pmc
 pc98/pc98/ppc.c			optional	ppc
 pc98/pc98/scgdcrndr.c		optional	sc gdc
@@ -381,7 +359,6 @@ pc98/pc98/scterm-sck.c		optional	sc
 pc98/pc98/scvtbpc98.c		optional	sc
 pc98/pc98/sio.c			optional	sio
 pc98/pc98/sio_cbus.c		optional	sio isa
-pc98/pc98/syscons.c		optional	sc
 pc98/pc98/syscons_pc98.c	optional	sc
 pc98/pc98/wd.c			count		wdc
 pc98/pc98/wd_cd.c		count		wcd wdc
@@ -393,3 +370,4 @@ pci/agp_sis.c			optional	agp
 pci/agp_ali.c			optional	agp
 pci/agp_amd.c			optional	agp
 pci/agp_i810.c			optional	agp
+pci/agp_nvidia.c		optional	agp

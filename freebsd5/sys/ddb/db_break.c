@@ -23,9 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_break.c,v 1.21 2002/12/31 06:51:19 jake Exp $
  */
-
 /*
  *	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
@@ -33,6 +31,10 @@
 /*
  * Breakpoints.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_break.c,v 1.23 2003/06/10 22:09:23 obrien Exp $");
+
 #include "opt_comconsole.h"
 
 #include <sys/param.h>
@@ -400,6 +402,7 @@ db_alt_break(int data, int *state)
 	case KEY_CRTLB:
 		if (*state == KEY_CRTLB)
 			brk = 1;
+		/* FALLTHROUGH */
 	default:
 		*state = 0;
 		break;

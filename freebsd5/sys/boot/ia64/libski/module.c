@@ -24,9 +24,8 @@
  * SUCH DAMAGE.
  */
 
-
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/ia64/libski/module.c,v 1.2 2003/04/03 21:36:29 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/ia64/libski/module.c,v 1.3 2003/09/08 09:11:32 obrien Exp $");
 
 #include <stand.h>
 

@@ -24,6 +24,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fb/tga.c,v 1.4 2003/08/24 17:46:06 obrien Exp $");
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
@@ -52,7 +55,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fb/tga.c,v 1.2 2002/04/13 22:34:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fb/tga.c,v 1.4 2003/08/24 17:46:06 obrien Exp $");
 
 #include <machine/stdarg.h>
 
@@ -85,8 +88,8 @@ __FBSDID("$FreeBSD: src/sys/dev/fb/tga.c,v 1.2 2002/04/13 22:34:15 obrien Exp $"
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/fb/fbreg.h>
 #include <dev/syscons/syscons.h>

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/acpica_machdep.h,v 1.2 2003/05/31 06:43:55 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/acpica_machdep.h,v 1.4 2003/11/21 03:02:00 peter Exp $
  */
 
 /******************************************************************************
@@ -102,5 +102,7 @@
 #define ACPI_MACHINE_WIDTH             64
 #define COMPILER_DEPENDENT_INT64       long
 #define COMPILER_DEPENDENT_UINT64      unsigned long
+
+void    acpi_SetDefaultIntrModel(int model);
 
 #endif /* __ACPICA_MACHDEP_H__ */

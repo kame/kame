@@ -35,8 +35,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/amd64/amd64/trap.c,v 1.259.2.1 2003/06/02 21:57:08 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/trap.c,v 1.271 2003/11/21 03:01:59 peter Exp $");
 
 /*
  * AMD64 Trap and System call handling
@@ -53,6 +55,7 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/pioctl.h>
+#include <sys/ptrace.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -77,16 +80,15 @@
 #include <vm/vm_extern.h>
 
 #include <machine/cpu.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
+#ifdef SMP
+#include <machine/smp.h>
+#endif
 #include <machine/tss.h>
 
-#include <amd64/isa/icu.h>
-#include <amd64/isa/intr_machdep.h>
-
 #include <ddb/ddb.h>
-
-#include <sys/sysctl.h>
 
 extern void trap(struct trapframe frame);
 extern void syscall(struct trapframe frame);
@@ -237,12 +239,13 @@ trap(frame)
 
 		case T_BPTFLT:		/* bpt instruction fault */
 		case T_TRCTRAP:		/* trace trap */
+			enable_intr();
 			frame.tf_rflags &= ~PSL_T;
 			i = SIGTRAP;
 			break;
 
 		case T_ARITHTRAP:	/* arithmetic trap */
-			ucode = npxtrap();
+			ucode = fputrap();
 			if (ucode == -1)
 				goto userout;
 			i = SIGFPE;
@@ -259,6 +262,8 @@ trap(frame)
 			break;
 
 		case T_PAGEFLT:		/* page fault */
+			if (td->td_flags & TDF_SA)
+				thread_user_enter(p, td);
 			i = trap_pfault(&frame, TRUE);
 			if (i == -1)
 				goto userout;
@@ -306,7 +311,7 @@ trap(frame)
 
 		case T_DNA:
 			/* transparent fault (due to context switch "late") */
-			if (npxdna())
+			if (fpudna())
 				goto userout;
 			i = SIGFPE;
 			ucode = FPE_FPU_NP_TRAP;
@@ -334,12 +339,12 @@ trap(frame)
 
 		case T_DNA:
 			/*
-			 * The kernel is apparently using npx for copying.
+			 * The kernel is apparently using fpu for copying.
 			 * XXX this should be fatal unless the kernel has
 			 * registered such use.
 			 */
-			if (npxdna()) {
-				printf("npxdna in kernel mode!\n");
+			if (fpudna()) {
+				printf("fpudna in kernel mode!\n");
 				goto out;
 			}
 			break;
@@ -560,6 +565,11 @@ trap_fatal(frame, eva)
 		printf("\n\nFatal trap %d: %s while in %s mode\n",
 			type, trap_msg[type],
 			ISPL(frame->tf_cs) == SEL_UPL ? "user" : "kernel");
+#ifdef SMP
+	/* two separate prints in case of a trap on an unmapped page */
+	printf("cpuid = %d; ", PCPU_GET(cpuid));
+	printf("apic id = %02x\n", PCPU_GET(apic_id));
+#endif
 	if (type == T_PAGEFLT) {
 		printf("fault virtual address	= 0x%lx\n", eva);
 		printf("fault code		= %s %s, %s\n",
@@ -627,6 +637,11 @@ void
 dblfault_handler()
 {
 	printf("\nFatal double fault\n");
+#ifdef SMP
+	/* two separate prints in case of a trap on an unmapped page */
+	printf("cpuid = %d; ", PCPU_GET(cpuid));
+	printf("apic id = %02x\n", PCPU_GET(apic_id));
+#endif
 	panic("double fault");
 }
 
@@ -673,7 +688,7 @@ syscall(frame)
 	td->td_frame = &frame;
 	if (td->td_ucred != p->p_ucred) 
 		cred_update_thread(td);
-	if (p->p_flag & P_THREADED)
+	if (p->p_flag & P_SA)
 		thread_user_enter(p, td);
 	params = (caddr_t)frame.tf_rsp + sizeof(register_t);
 	code = frame.tf_rax;
@@ -738,6 +753,8 @@ syscall(frame)
 		td->td_retval[1] = frame.tf_rdx;
 
 		STOPEVENT(p, S_SCE, narg);
+
+		PTRACESTOP_SC(p, td, S_PT_SCE);
 
 		error = (*callp->sy_call)(td, argp);
 	}
@@ -806,6 +823,8 @@ syscall(frame)
 	 * is not the case, this code will need to be revisited.
 	 */
 	STOPEVENT(p, S_SCX, code);
+
+	PTRACESTOP_SC(p, td, S_PT_SCX);
 
 #ifdef DIAGNOSTIC
 	cred_free_thread(td);

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/pci/irongate_pci.c,v 1.8 2002/05/10 16:56:14 gallatin Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/irongate_pci.c,v 1.10 2003/08/22 07:20:27 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -36,8 +37,8 @@
 #include <machine/md_var.h>
 #include <machine/bwx.h>
 #include <sys/rman.h>
-#include <pci/pcivar.h>
-#include <pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
 #include <alpha/pci/irongatereg.h>
 #include <alpha/pci/irongatevar.h>
 #include <alpha/pci/pcibus.h>

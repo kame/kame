@@ -3,6 +3,8 @@
  * All rights reserved.
  * Copyright (c) 1994 John S. Dyson
  * All rights reserved.
+ * Copyright (c) 2003 Peter Wemm
+ * All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * William Jolitz.
@@ -36,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vmparam.h	5.9 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/vmparam.h,v 1.38 2003/05/23 06:36:46 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/vmparam.h,v 1.43 2003/11/08 04:39:22 peter Exp $
  */
 
 
@@ -55,13 +57,13 @@
 #define	DFLDSIZ		(128UL*1024*1024)	/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		(512UL*1024*1024)	/* max data size */
+#define	MAXDSIZ		(8192UL*1024*1024)	/* max data size */
 #endif
 #ifndef	DFLSSIZ
 #define	DFLSSIZ		(8UL*1024*1024)		/* initial stack size limit */
 #endif
 #ifndef	MAXSSIZ
-#define	MAXSSIZ		(64UL*1024*1024)	/* max stack size */
+#define	MAXSSIZ		(512UL*1024*1024)	/* max stack size */
 #endif
 #ifndef SGROWSIZ
 #define	SGROWSIZ	(128UL*1024)		/* amount to grow stack */
@@ -92,18 +94,18 @@
  * messy at times, but hey, we'll do anything to save a page :-)
  */
 
-#define	VM_MAX_KERNEL_ADDRESS	VADDR(KPML4I, NPDPEPG-1, NKPDE-1, NPTEPG-1)
-#define	VM_MIN_KERNEL_ADDRESS	VADDR(KPML4I, KPDPI, 0, 0)
+#define	VM_MAX_KERNEL_ADDRESS	KVADDR(KPML4I, NPDPEPG-1, NKPDE-1, NPTEPG-1)
+#define	VM_MIN_KERNEL_ADDRESS	KVADDR(KPML4I, KPDPI, 0, 0)
 
-#define	DMAP_MIN_ADDRESS	VADDR(DMPML4I, 0, 0, 0)
-#define	DMAP_MAX_ADDRESS	VADDR(DMPML4I+1, 0, 0, 0)
+#define	DMAP_MIN_ADDRESS	KVADDR(DMPML4I, 0, 0, 0)
+#define	DMAP_MAX_ADDRESS	KVADDR(DMPML4I+1, 0, 0, 0)
 
-#define	KERNBASE		VADDR(KPML4I, KPDPI, 0, 0)
+#define	KERNBASE		KVADDR(KPML4I, KPDPI, 0, 0)
 
-#define	UPT_MAX_ADDRESS		VADDR(PML4PML4I, PML4PML4I, PML4PML4I, PML4PML4I)
-#define	UPT_MIN_ADDRESS		VADDR(PML4PML4I, 0, 0, 0)
+#define	UPT_MAX_ADDRESS		KVADDR(PML4PML4I, PML4PML4I, PML4PML4I, PML4PML4I)
+#define	UPT_MIN_ADDRESS		KVADDR(PML4PML4I, 0, 0, 0)
 
-#define	VM_MAXUSER_ADDRESS	VADDR(NUPML4E, 0, 0, 0)
+#define	VM_MAXUSER_ADDRESS	UVADDR(NUPML4E, 0, 0, 0)
 
 #define	USRSTACK		VM_MAXUSER_ADDRESS
 

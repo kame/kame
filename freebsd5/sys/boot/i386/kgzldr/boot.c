@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1999 Global Technology Associates, Inc.
  * All rights reserved.
  *
@@ -22,9 +22,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/i386/kgzldr/boot.c,v 1.2 1999/08/28 00:40:10 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/i386/kgzldr/boot.c,v 1.3 2003/08/25 23:28:31 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/reboot.h>

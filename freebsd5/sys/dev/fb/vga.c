@@ -26,8 +26,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/vga.c,v 1.27 2003/05/23 05:10:49 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.28 2003/08/24 17:46:06 obrien Exp $");
 
 #include "opt_vga.h"
 #include "opt_fb.h"

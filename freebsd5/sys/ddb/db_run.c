@@ -22,10 +22,7 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_run.c,v 1.22 2002/06/23 20:03:03 mux Exp $
  */
-
 /*
  * 	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
@@ -34,6 +31,10 @@
 /*
  * Commands to run process.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_run.c,v 1.23 2003/06/10 22:09:23 obrien Exp $");
+
 #include <sys/param.h>
 
 #include <vm/vm.h>

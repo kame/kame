@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.25 2003/04/29 13:27:13 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.31 2003/10/31 04:58:03 simokawa Exp $
  *
  */
 
@@ -70,8 +70,6 @@ struct fw_device{
 struct firewire_softc {
 #if __FreeBSD_version >= 500000
 	dev_t dev;
-#else
-	dev_t dev[FWMAXNDMA+1];
 #endif
 	struct firewire_comm *fc;
 };
@@ -121,6 +119,7 @@ struct firewire_comm{
 	SLIST_HEAD(, csrdir) ongocsr;
 	SLIST_HEAD(, csrdir) csrfree;
 	u_int32_t status;
+#define	FWBUSNOTREADY	(-1)
 #define	FWBUSRESET	0
 #define	FWBUSINIT	1
 #define	FWBUSCYMELECT	2
@@ -143,6 +142,9 @@ struct firewire_comm{
 	u_int32_t csr_arc[CSRSIZE/4];
 #define CROMSIZE 0x400
 	u_int32_t *config_rom;
+	struct crom_src_buf *crom_src_buf;
+	struct crom_src *crom_src;
+	struct crom_chunk *crom_root;
 	struct fw_topology_map *topology_map;
 	struct fw_speed_map *speed_map;
 	struct callout busprobe_callout;
@@ -187,8 +189,8 @@ struct fw_xferq {
 
 #define FWXFERQ_HANDLER (1 << 16)
 #define FWXFERQ_WAKEUP (1 << 17)
-
 	void (*start) __P((struct firewire_comm*));
+	int dmach;
 	STAILQ_HEAD(, fw_xfer) q;
 	u_int queued;
 	u_int maxq;
@@ -222,7 +224,8 @@ struct tlabel{
 };
 
 struct fw_bind{
-	u_int32_t start_hi, start_lo, addrlen;
+	u_int64_t start;
+	u_int64_t end;
 	STAILQ_HEAD(, fw_xfer) xferlist;
 	STAILQ_ENTRY(fw_bind) fclist;
 	STAILQ_ENTRY(fw_bind) chlist;
@@ -238,9 +241,6 @@ struct fw_xfer{
 	struct firewire_comm *fc;
 	struct fw_xferq *q;
 	struct timeval tv;
-	/* XXX should be removed */
-	u_int32_t dst; /* XXX for if_fwe */
-	u_int8_t spd;
 	int8_t resp;
 #define FWXF_INIT 0
 #define FWXF_INQ 1
@@ -257,16 +257,28 @@ struct fw_xfer{
 		void (*hand) __P((struct fw_xfer *));
 	} act;
 	struct {
-		int len;
-		caddr_t buf;
+		struct fw_pkt hdr;
+		u_int32_t *payload;
+		u_int16_t pay_len;
+		u_int8_t spd;
 	} send, recv;
 	struct mbuf *mbuf;
 	STAILQ_ENTRY(fw_xfer) link;
 	struct malloc_type *malloc;
 };
+
+struct fw_rcv_buf {
+	struct firewire_comm *fc;
+	struct fw_xfer *xfer;
+	struct iovec *vec;
+	u_int nvec;
+	u_int8_t spd;
+};
+
 void fw_sidrcv __P((struct firewire_comm *, u_int32_t *, u_int));
-void fw_rcv __P((struct firewire_comm *, struct iovec *, int, u_int, u_int));
+void fw_rcv __P((struct fw_rcv_buf *));
 void fw_xfer_unload __P(( struct fw_xfer*));
+void fw_xfer_free_buf __P(( struct fw_xfer*));
 void fw_xfer_free __P(( struct fw_xfer*));
 struct fw_xfer *fw_xfer_alloc __P((struct malloc_type *));
 struct fw_xfer *fw_xfer_alloc_buf __P((struct malloc_type *, int, int));
@@ -282,11 +294,14 @@ u_int16_t fw_crc16 __P((u_int32_t *, u_int32_t));
 void fw_xfer_timeout __P((void *));
 void fw_xfer_done __P((struct fw_xfer *));
 void fw_asy_callback __P((struct fw_xfer *));
+void fw_asy_callback_free __P((struct fw_xfer *));
 struct fw_device *fw_noderesolve_nodeid __P((struct firewire_comm *, int));
 struct fw_device *fw_noderesolve_eui64 __P((struct firewire_comm *, struct fw_eui64 *));
-struct fw_bind *fw_bindlookup __P((struct firewire_comm *, u_int32_t, u_int32_t));
+struct fw_bind *fw_bindlookup __P((struct firewire_comm *, u_int16_t, u_int32_t));
 void fw_drain_txq __P((struct firewire_comm *));
-
+int fwdev_makedev __P((struct firewire_softc *));
+int fwdev_destroydev __P((struct firewire_softc *));
+void fwdev_clone __P((void *, char *, int, dev_t *));
 
 extern int firewire_debug;
 extern devclass_t firewire_devclass;
@@ -297,6 +312,25 @@ extern devclass_t firewire_devclass;
 #define CALLOUT_INIT(x) callout_init(x, 0 /* mpsafe */)
 #else
 #define CALLOUT_INIT(x) callout_init(x)
+#endif
+
+#if __FreeBSD_version < 500000
+/* compatibility shim for 4.X */
+#define bio buf
+#define bio_bcount b_bcount
+#define bio_cmd b_flags
+#define bio_count b_count
+#define bio_data b_data
+#define bio_dev b_dev
+#define bio_error b_error
+#define bio_flags b_flags
+#define bio_offset b_offset
+#define bio_resid b_resid
+#define BIO_ERROR B_ERROR
+#define BIO_READ B_READ
+#define BIO_WRITE B_WRITE
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
 #endif
 
 MALLOC_DECLARE(M_FW);

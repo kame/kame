@@ -34,9 +34,10 @@
  * some of the original driver still exists here.  Those portions are...
  *   Copyright (c) 1996, 1997, 1998, 1999 Mark Tinguely
  *   All rights reserved.
- *
- * $FreeBSD: src/sys/dev/idt/idt_pci.c,v 1.2 2002/10/02 04:47:46 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/idt/idt_pci.c,v 1.3 2003/08/24 17:49:13 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

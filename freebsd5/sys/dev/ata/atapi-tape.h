@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.19 2003/03/08 21:32:59 phk Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.20 2003/08/24 09:22:26 sos Exp $
  */
 
 /* ATAPI tape drive Capabilities and Mechanical Status Page */
@@ -154,6 +154,7 @@ struct ast_softc {
 #define		F_ONSTREAM		0x0100	/* OnStream ADR device */
 
     int				blksize;	/* block size (512 | 1024) */
+    struct mtx			queue_mtx;	/* queue lock */
     struct bio_queue_head	queue;		/* queue of i/o requests */
     struct atapi_params		*param;		/* drive parameters table */
     struct ast_cappage		cap;		/* capabilities page info */

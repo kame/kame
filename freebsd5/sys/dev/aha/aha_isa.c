@@ -2,7 +2,31 @@
  * Product specific probe and attach routines for:
  *      Adaptec 154x.
  *
- * Derived from code written by:
+ * Copyright (c) 1999-2003 M. Warner Losh
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions, and the following disclaimer,
+ *    without modification, immediately at the beginning of the file.
+ * 2. The name of the author may not be used to endorse or promote products
+ *    derived from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * Derived from bt isa from end, written by:
  *
  * Copyright (c) 1998 Justin T. Gibbs
  * All rights reserved.
@@ -27,13 +51,16 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.21 2003/03/29 09:46:10 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.28 2003/11/13 04:14:53 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
 
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
@@ -50,7 +77,7 @@
 
 static struct isa_pnp_id aha_ids[] = {
 	{ADP0100_PNP,		"Adaptec 1540/1542 ISA SCSI"},	/* ADP0100 */
-	{AHA1540_PNP,		"Adaptec 1540/aha-1640/aha-1535"},/* ADP1542 */
+	{AHA1540_PNP,		"Adaptec 1540/aha-1640/aha-1535"},/* ADP1540 */
 	{AHA1542_PNP,		"Adaptec 1542/aha-1535"},	/* ADP1542 */
 	{AHA1542_PNPCOMPAT,	"Adaptec 1542 compatible"},	/* PNP00A0 */
 	{ICU0091_PNP,		"Adaptec AHA-1540/1542 SCSI"},	/* ICU0091 */
@@ -58,10 +85,20 @@ static struct isa_pnp_id aha_ids[] = {
 };
 
 /*
+ * I/O ports listed in the order enumerated by the card for certain op codes.
+ */
+static bus_addr_t aha_board_ports[] =
+{
+	0x330,
+	0x334,
+	0x230,
+	0x234,
+	0x130,
+	0x134
+};
+
+/*
  * Check if the device can be found at the port given
- * and if so, set it up ready for further work
- * as an argument, takes the isa_device structure from
- * autoconf.c
  */
 static int
 aha_isa_probe(device_t dev)
@@ -69,126 +106,79 @@ aha_isa_probe(device_t dev)
 	/*
 	 * find unit and check we have that many defined
 	 */
-	struct	aha_softc **sc = device_get_softc(dev);
-	struct	aha_softc *aha;
-	int	port_index;
-	int	max_port_index;
+	struct	aha_softc *aha = device_get_softc(dev);
 	int	error;
-	u_long	port_start, port_count;
+	u_long	port_start;
 	struct resource *port_res;
 	int	port_rid;
 	int	drq;
 	int	irq;
+	config_data_t config_data;
 
-	aha = NULL;
-
+	aha->dev = dev;
 	/* Check isapnp ids */
 	if (ISA_PNP_PROBE(device_get_parent(dev), dev, aha_ids) == ENXIO)
 		return (ENXIO);
 
-	error = bus_get_resource(dev, SYS_RES_IOPORT, 0,
-				 &port_start, &port_count);
-	if (error != 0)
-		port_start = 0;
+	port_rid = 0;
+	port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &port_rid,
+	  0, ~0, AHA_NREGS, RF_ACTIVE);
 
-	/*
-	 * Bound our board search if the user has
-	 * specified an exact port.
-	 */
-	aha_find_probe_range(port_start, &port_index, &max_port_index);
+	if (port_res == NULL)
+		return (ENXIO);
 
-	if (port_index < 0)
-		return ENXIO;
+	port_start = rman_get_start(port_res);
+	aha_alloc(aha, device_get_unit(dev), rman_get_bustag(port_res),
+	    rman_get_bushandle(port_res));
 
-	/* Attempt to find an adapter */
-	for (;port_index <= max_port_index; port_index++) {
-		config_data_t config_data;
-		u_int ioport;
-		int error;
-
-		ioport = aha_iop_from_bio(port_index);
-
-		error = bus_set_resource(dev, SYS_RES_IOPORT, 0,
-					 ioport, AHA_NREGS);
-		if (error)
-			return error;
-		
-		port_rid = 0;
-		port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &port_rid,
-		    0, ~0, AHA_NREGS, RF_ACTIVE);
-		if (!port_res)
-			continue;
-
-		/* Allocate a softc for use during probing */
-		aha = aha_alloc(device_get_unit(dev), rman_get_bustag(port_res),
-		    rman_get_bushandle(port_res));
-
-		if (aha == NULL) {
-			bus_release_resource(dev, SYS_RES_IOPORT, port_rid, 
-			    port_res);
-			break;
-		}
-
-		/* See if there is really a card present */
-		if (aha_probe(aha) || aha_fetch_adapter_info(aha)) {
-			aha_free(aha);
-			bus_release_resource(dev, SYS_RES_IOPORT, port_rid,
-			    port_res);
-			continue;
-		}
-
-		/*
-		 * Determine our IRQ, and DMA settings and
-		 * export them to the configuration system.
-		 */
-		error = aha_cmd(aha, AOP_INQUIRE_CONFIG, NULL, /*parmlen*/0,
-		    (u_int8_t*)&config_data, sizeof(config_data), 
-		    DEFAULT_CMD_TIMEOUT);
-
-		if (error != 0) {
-			printf("aha_isa_probe: Could not determine IRQ or DMA "
-			    "settings for adapter at 0x%x.  Failing probe\n",
-			    ioport);
-			aha_free(aha);
-			bus_release_resource(dev, SYS_RES_IOPORT, port_rid, 
-			    port_res);
-			continue;
-		}
-
+	/* See if there is really a card present */
+	if (aha_probe(aha) || aha_fetch_adapter_info(aha)) {
+		aha_free(aha);
 		bus_release_resource(dev, SYS_RES_IOPORT, port_rid, port_res);
-
-		switch (config_data.dma_chan) {
-		case DMA_CHAN_5:
-			drq = 5;
-			break;
-		case DMA_CHAN_6:
-			drq = 6;
-			break;
-		case DMA_CHAN_7:
-			drq = 7;
-			break;
-		default:
-			printf("aha_isa_probe: Invalid DMA setting "
-			    "detected for adapter at 0x%x.  "
-			    "Failing probe\n", ioport);
-			return (ENXIO);
-		}
-		error = bus_set_resource(dev, SYS_RES_DRQ, 0, drq, 1);
-		if (error)
-			return error;
-
-		irq = ffs(config_data.irq) + 8;
-		error = bus_set_resource(dev, SYS_RES_IRQ, 0, irq, 1);
-		if (error)
-			return error;
-
-		*sc = aha;
-		aha_unit++;
-
-		return (0);
+		return (ENXIO);
 	}
 
-	return (ENXIO);
+	/*
+	 * Determine our IRQ, and DMA settings and
+	 * export them to the configuration system.
+	 */
+	error = aha_cmd(aha, AOP_INQUIRE_CONFIG, NULL, /*parmlen*/0,
+	    (uint8_t*)&config_data, sizeof(config_data), DEFAULT_CMD_TIMEOUT);
+
+	if (error != 0) {
+		device_printf(dev, "Could not determine IRQ or DMA "
+		    "settings for adapter at %#jx.  Failing probe\n",
+		    (uintmax_t)port_start);
+		aha_free(aha);
+		bus_release_resource(dev, SYS_RES_IOPORT, port_rid, 
+		    port_res);
+		return (ENXIO);
+	}
+
+	bus_release_resource(dev, SYS_RES_IOPORT, port_rid, port_res);
+
+	switch (config_data.dma_chan) {
+	case DMA_CHAN_5:
+		drq = 5;
+		break;
+	case DMA_CHAN_6:
+		drq = 6;
+		break;
+	case DMA_CHAN_7:
+		drq = 7;
+		break;
+	default:
+		device_printf(dev, "Invalid DMA setting for adapter at %#jx.",
+		    (uintmax_t)port_start);
+		return (ENXIO);
+	}
+	error = bus_set_resource(dev, SYS_RES_DRQ, 0, drq, 1);
+	if (error)
+		return error;
+
+	irq = ffs(config_data.irq) + 8;
+	error = bus_set_resource(dev, SYS_RES_IRQ, 0, irq, 1);
+	return (error);
 }
 
 /*
@@ -197,15 +187,14 @@ aha_isa_probe(device_t dev)
 static int
 aha_isa_attach(device_t dev)
 {
-	struct	aha_softc **sc = device_get_softc(dev);
-	struct	aha_softc *aha;
+	struct	aha_softc *aha = device_get_softc(dev);
 	bus_dma_filter_t *filter;
 	void		 *filter_arg;
 	bus_addr_t	 lowaddr;
 	void		 *ih;
 	int		 error;
 
-	aha = *sc;
+	aha->dev = dev;
 	aha->portrid = 0;
 	aha->port = bus_alloc_resource(dev, SYS_RES_IOPORT, &aha->portrid,
 	    0, ~0, AHA_NREGS, RF_ACTIVE);
@@ -255,6 +244,8 @@ aha_isa_attach(device_t dev)
 				/* nsegments	*/ ~0,
 				/* maxsegsz	*/ BUS_SPACE_MAXSIZE_24BIT,
 				/* flags	*/ 0,
+				/* lockfunc	*/ busdma_lock_mutex,
+				/* lockarg	*/ &Giant,
 				&aha->parent_dmat) != 0) {
                 aha_free(aha);
 		bus_release_resource(dev, SYS_RES_IOPORT, aha->portrid, aha->port);
@@ -299,7 +290,7 @@ aha_isa_attach(device_t dev)
 static int
 aha_isa_detach(device_t dev)
 {
-	struct aha_softc *aha = *(struct aha_softc **) device_get_softc(dev);
+	struct aha_softc *aha = (struct aha_softc *)device_get_softc(dev);
 	int error;
 
 	error = bus_teardown_intr(dev, aha->irq, aha->ih);
@@ -324,6 +315,44 @@ aha_isa_detach(device_t dev)
 static void
 aha_isa_identify(driver_t *driver, device_t parent)
 {
+	int i;
+	bus_addr_t ioport;
+	struct aha_softc aha;
+	int rid;
+	struct resource *res;
+	device_t child;
+
+	/* Attempt to find an adapter */
+	for (i = 0; i < sizeof(aha_board_ports) / sizeof(aha_board_ports[0]);
+	    i++) {
+		bzero(&aha, sizeof(aha));
+		ioport = aha_board_ports[i];
+		/*
+		 * XXX Check to see if we have a hard-wired aha device at
+		 * XXX this port, if so, skip.  This should also cover the
+		 * XXX case where we are run multiple times due to, eg,
+		 * XXX kldload/kldunload.
+		 */
+		rid = 0;
+		res = bus_alloc_resource(parent, SYS_RES_IOPORT, &rid,
+		    ioport, ioport, AHA_NREGS, RF_ACTIVE);
+		if (res == NULL)
+			continue;
+		aha_alloc(&aha, -1, rman_get_bustag(res),
+		    rman_get_bushandle(res));
+		/* See if there is really a card present */
+		if (aha_probe(&aha) || aha_fetch_adapter_info(&aha))
+			goto not_this_one;
+		child = BUS_ADD_CHILD(parent, ISA_ORDER_SPECULATIVE, "aha", -1);
+		bus_set_resource(child, SYS_RES_IOPORT, 0, ioport, AHA_NREGS);
+		/*
+		 * Could query the board and set IRQ/DRQ, but probe does
+		 * that.
+		 */
+	not_this_one:;
+		bus_release_resource(parent, SYS_RES_IOPORT, rid, res);
+		aha_free(&aha);
+	}
 }
 
 static device_method_t aha_isa_methods[] = {
@@ -339,7 +368,7 @@ static device_method_t aha_isa_methods[] = {
 static driver_t aha_isa_driver = {
 	"aha",
 	aha_isa_methods,
-	sizeof(struct aha_softc*),
+	sizeof(struct aha_softc),
 };
 
 static devclass_t aha_devclass;

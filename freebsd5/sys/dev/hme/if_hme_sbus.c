@@ -34,9 +34,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: NetBSD: if_hme_sbus.c,v 1.9 2001/11/13 06:58:17 lukem Exp
- *
- * $FreeBSD: src/sys/dev/hme/if_hme_sbus.c,v 1.4 2003/04/15 06:37:24 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/hme/if_hme_sbus.c,v 1.8 2003/09/02 20:24:42 marcel Exp $");
 
 /*
  * SBus front-end device driver for the HME ethernet device.
@@ -50,12 +51,13 @@
 #include <sys/socket.h>
 
 #include <machine/bus.h>
+#include <dev/ofw/openfirm.h>
 #include <machine/ofw_machdep.h>
 #include <machine/resource.h>
 
 #include <sys/rman.h>
 
-#include <ofw/openfirm.h>
+#include <dev/ofw/openfirm.h>
 
 #include <net/ethernet.h>
 #include <net/if.h>
@@ -63,13 +65,13 @@
 #include <net/if_dl.h>
 #include <net/if_media.h>
 
-#include <mii/mii.h>
-#include <mii/miivar.h>
+#include <dev/mii/mii.h>
+#include <dev/mii/miivar.h>
 
 #include <sparc64/sbus/sbusvar.h>
 
-#include <hme/if_hmereg.h>
-#include <hme/if_hmevar.h>
+#include <dev/hme/if_hmereg.h>
+#include <dev/hme/if_hmevar.h>
 
 #include "miibus_if.h"
 

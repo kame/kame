@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/pxeldr/Makefile,v 1.8 2002/09/17 01:48:56 peter Exp $
+# $FreeBSD: src/sys/boot/i386/pxeldr/Makefile,v 1.9 2003/09/03 08:12:20 phk Exp $
 
 MAINTAINER=jhb@FreeBSD.org
 
@@ -16,6 +16,11 @@ M4?=		m4
 .if defined(BOOT_PXELDR_PROBE_KEYBOARD)
 M4FLAGS+=	-DPROBE_KEYBOARD
 .endif
+
+.if defined(BOOT_PXELDR_ALWAYS_SERIAL)
+M4FLAGS+=	-DALWAYS_SERIAL
+.endif
+
 
 .if exists(${.OBJDIR}/../loader)
 LOADERBIN=	${.OBJDIR}/../loader/loader.bin

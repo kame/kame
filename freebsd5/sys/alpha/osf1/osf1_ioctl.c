@@ -1,5 +1,4 @@
 /*	$NetBSD: osf1_ioctl.c,v 1.5 1996/10/13 00:46:53 christos Exp $	*/
-
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -26,11 +25,12 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-
 /*
  * Additional Copyright (c) 1999 by Andrew Gallatin
- * $FreeBSD: src/sys/alpha/osf1/osf1_ioctl.c,v 1.8 2002/03/20 18:58:46 obrien Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_ioctl.c,v 1.12 2003/10/31 18:31:55 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -207,7 +207,7 @@ osf1_ioctl_i(td, uap, cmd, dir, len)
 			 * because osf/1 doesn't know about most of them.
 			 */
 			if (ifp->if_type == IFT_ETHER 
-			    && strcmp(ifp->if_name, "ti")) {	/* looks good */
+			    && strcmp(ifp->if_dname, "ti") != 0) {	/* looks good */
 				/* walk the address list */
 				TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 					if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr)	/* we have an address structure */

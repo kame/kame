@@ -1,6 +1,4 @@
 /* $NetBSD: am79c930.c,v 1.5 2000/03/23 13:57:58 onoe Exp $ */
-/* $FreeBSD: src/sys/dev/awi/am79c930.c,v 1.4 2003/04/21 16:27:45 obrien Exp $ */
-
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -36,6 +34,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/awi/am79c930.c,v 1.5 2003/08/24 17:48:06 obrien Exp $");
 
 /*
  * Am79c930 chip driver.

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aacvar.h,v 1.33 2003/04/01 15:06:22 phk Exp $
+ *	$FreeBSD: src/sys/dev/aac/aacvar.h,v 1.36.2.1 2004/02/18 06:20:50 scottl Exp $
  */
 
 #include <sys/bio.h>
@@ -58,7 +58,7 @@
  */
 #define AAC_FIB_COUNT		(PAGE_SIZE/sizeof(struct aac_fib))
 #define AAC_PREALLOCATE_FIBS	128
-#define AAC_MAX_FIBS		512
+#define AAC_MAX_FIBS		504
 
 /*
  * The controller reports status events in AIFs.  We hang on to a number of
@@ -167,6 +167,8 @@ struct aac_command
 #define AAC_ON_AACQ_BUSY	(1<<7)
 #define AAC_ON_AACQ_COMPLETE	(1<<8)
 #define AAC_ON_AACQ_MASK	((1<<5)|(1<<6)|(1<<7)|(1<<8))
+#define AAC_QUEUE_FRZN		(1<<9)		/* Freeze the processing of
+						 * commands on the queue. */
 
 	void			(* cm_complete)(struct aac_command *cm);
 	void			*cm_private;
@@ -312,7 +314,7 @@ struct aac_softc
 	/* command/fib resources */
 	bus_dma_tag_t		aac_fib_dmat;	/* DMA tag for allocing FIBs */
 	TAILQ_HEAD(,aac_fibmap)	aac_fibmap_tqh;
-	uint			total_fibs;
+	u_int			total_fibs;
 	struct aac_command	*aac_commands;
 
 	/* command management */
@@ -369,6 +371,7 @@ struct aac_softc
 						 * 2GB-4GB range */
 #define	AAC_FLAGS_NO4GB		(1 << 6)	/* Can't access host mem >2GB */
 #define	AAC_FLAGS_256FIBS	(1 << 7)	/* Can only do 256 commands */
+#define	AAC_FLAGS_BROKEN_MEMMAP (1 << 8)	/* Broken HostPhysMemPages */
 
 	u_int32_t		supported_options;
 	int			aac_max_fibs;

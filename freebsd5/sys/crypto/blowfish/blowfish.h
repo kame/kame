@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/crypto/blowfish/blowfish.h,v 1.6 2002/03/20 05:13:51 alfred Exp $	*/
+/*	$FreeBSD: src/sys/crypto/blowfish/blowfish.h,v 1.7 2003/10/13 19:26:08 ume Exp $	*/
 /*	$KAME: blowfish.h,v 1.12 2002/02/27 01:33:59 itojun Exp $	*/
 
 /* crypto/bf/blowfish.h */
@@ -83,8 +83,8 @@ typedef struct bf_key_st {
 void BF_set_key(BF_KEY *, int, unsigned char *);
 void BF_encrypt(BF_LONG *, BF_KEY *);
 void BF_decrypt(BF_LONG *, BF_KEY *);
-void BF_cbc_encrypt(const unsigned char *, unsigned char *, long,
-		    const BF_KEY *, unsigned char *, int);
+void BF_ecb_encrypt(const unsigned char *, unsigned char *,
+		    BF_KEY *, int);
 
 #ifdef  __cplusplus
 }

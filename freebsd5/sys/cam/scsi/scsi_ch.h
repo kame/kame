@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/cam/scsi/scsi_ch.h,v 1.3 2000/05/01 20:21:29 peter Exp $ */
+/* $FreeBSD: src/sys/cam/scsi/scsi_ch.h,v 1.4 2003/05/31 16:54:37 phk Exp $ */
 /*	$NetBSD: scsi_changer.h,v 1.11 1998/02/13 08:28:32 enami Exp $	*/
 
 /*
@@ -339,10 +339,7 @@ struct page_device_capabilities {
 	 * MOVE MEDIUM command is legal.  The top four bits of each
 	 * of these values are reserved.
 	 */
-	u_int8_t	move_from_mt;
-	u_int8_t	move_from_st;
-	u_int8_t	move_from_ie;
-	u_int8_t	move_from_dt;
+	u_int8_t	move_from[CHET_MAX + 1];
 #define MOVE_TO_MT	0x01
 #define MOVE_TO_ST	0x02
 #define MOVE_TO_IE	0x04
@@ -353,10 +350,7 @@ struct page_device_capabilities {
 	/*
 	 * Similar to above, but for EXCHANGE MEDIUM.
 	 */
-	u_int8_t	exchange_with_mt;
-	u_int8_t	exchange_with_st;
-	u_int8_t	exchange_with_ie;
-	u_int8_t	exchange_with_dt;
+	u_int8_t	exchange_with[CHET_MAX + 1];
 #define EXCHANGE_WITH_MT	0x01
 #define EXCHANGE_WITH_ST	0x02
 #define EXCHANGE_WITH_IE	0x04

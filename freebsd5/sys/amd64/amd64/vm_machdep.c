@@ -38,8 +38,10 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/amd64/amd64/vm_machdep.c,v 1.209 2003/05/23 05:04:54 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/vm_machdep.c,v 1.224 2003/11/21 03:02:00 peter Exp $");
 
 #include "opt_isa.h"
 #include "opt_kstack_pages.h"
@@ -55,7 +57,10 @@
 #include <sys/vmmeter.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
+#include <sys/mbuf.h>
 #include <sys/mutex.h>
+#include <sys/sf_buf.h>
+#include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
 
@@ -76,6 +81,24 @@
 #include <amd64/isa/isa.h>
 
 static void	cpu_reset_real(void);
+#ifdef SMP
+static void	cpu_reset_proxy(void);
+static u_int	cpu_reset_proxyid;
+static volatile u_int	cpu_reset_proxy_active;
+#endif
+static void	sf_buf_init(void *arg);
+SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
+
+/*
+ * Expanded sf_freelist head. Really an SLIST_HEAD() in disguise, with the
+ * sf_freelist head with the sf_lock mutex.
+ */
+static struct {
+	SLIST_HEAD(, sf_buf) sf_head;
+	struct mtx sf_lock;
+} sf_freelist;
+
+static u_int	sf_buf_alloc_want;
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -101,7 +124,7 @@ cpu_fork(td1, p2, td2, flags)
 	/* Ensure that p1's pcb is up to date. */
 	savecrit = intr_disable();
 	if (PCPU_GET(fpcurthread) == td1)
-		npxsave(&td1->td_pcb->pcb_save);
+		fpusave(&td1->td_pcb->pcb_save);
 	intr_restore(savecrit);
 
 	/* Point the pcb to the top of the stack */
@@ -188,11 +211,22 @@ void
 cpu_thread_exit(struct thread *td)
 {
 
-	npxexit(td);
+	if (td == PCPU_GET(fpcurthread))
+		fpudrop();
 }
 
 void
 cpu_thread_clean(struct thread *td)
+{
+}
+
+void
+cpu_thread_swapin(struct thread *td)
+{
+}
+
+void
+cpu_thread_swapout(struct thread *td)
 {
 }
 
@@ -219,8 +253,54 @@ cpu_thread_setup(struct thread *td)
  * such as those generated in thread_userret() itself.
  */
 void
-cpu_set_upcall(struct thread *td, void *pcb)
+cpu_set_upcall(struct thread *td, struct thread *td0)
 {
+	struct pcb *pcb2;
+
+	/* Point the pcb to the top of the stack. */
+	pcb2 = td->td_pcb;
+
+	/*
+	 * Copy the upcall pcb.  This loads kernel regs.
+	 * Those not loaded individually below get their default
+	 * values here.
+	 *
+	 * XXXKSE It might be a good idea to simply skip this as
+	 * the values of the other registers may be unimportant.
+	 * This would remove any requirement for knowing the KSE
+	 * at this time (see the matching comment below for
+	 * more analysis) (need a good safe default).
+	 */
+	bcopy(td0->td_pcb, pcb2, sizeof(*pcb2));
+	pcb2->pcb_flags &= ~PCB_FPUINITDONE;
+
+	/*
+	 * Create a new fresh stack for the new thread.
+	 * Don't forget to set this stack value into whatever supplies
+	 * the address for the fault handlers.
+	 * The contexts are filled in at the time we actually DO the
+	 * upcall as only then do we know which KSE we got.
+	 */
+	bcopy(td0->td_frame, td->td_frame, sizeof(struct trapframe));
+
+	/*
+	 * Set registers for trampoline to user mode.  Leave space for the
+	 * return address on stack.  These are the kernel mode register values.
+	 */
+	pcb2->pcb_cr3 = vtophys(vmspace_pmap(td->td_proc->p_vmspace)->pm_pml4);
+	pcb2->pcb_r12 = (register_t)fork_return;	    /* trampoline arg */
+	pcb2->pcb_rbp = 0;
+	pcb2->pcb_rsp = (register_t)td->td_frame - sizeof(void *);	/* trampoline arg */
+	pcb2->pcb_rbx = (register_t)td;			    /* trampoline arg */
+	pcb2->pcb_rip = (register_t)fork_trampoline;
+	pcb2->pcb_rflags = PSL_KERNEL; /* ints disabled */
+	/*
+	 * If we didn't copy the pcb, we'd need to do the following registers:
+	 * pcb2->pcb_savefpu:	cloned above.
+	 * pcb2->pcb_rflags:	cloned above.
+	 * pcb2->pcb_onfault:	cloned above (always NULL here?).
+	 * pcb2->pcb_[fg]sbase: cloned above
+	 */
 }
 
 /*
@@ -231,22 +311,100 @@ cpu_set_upcall(struct thread *td, void *pcb)
 void
 cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 {
+
+	/* 
+	 * Do any extra cleaning that needs to be done.
+	 * The thread may have optional components
+	 * that are not present in a fresh thread.
+	 * This may be a recycled thread so make it look
+	 * as though it's newly allocated.
+	 */
+	cpu_thread_clean(td);
+
+	/*
+	 * Set the trap frame to point at the beginning of the uts
+	 * function.
+	 */
+	td->td_frame->tf_rsp =
+	    ((register_t)ku->ku_stack.ss_sp + ku->ku_stack.ss_size) & ~0x0f;
+	td->td_frame->tf_rsp -= 8;
+	td->td_frame->tf_rip = (register_t)ku->ku_func;
+
+	/*
+	 * Pass the address of the mailbox for this kse to the uts
+	 * function as a parameter on the stack.
+	 */
+	td->td_frame->tf_rdi = (register_t)ku->ku_mailbox;
 }
 
-void
-cpu_wait(p)
-	struct proc *p;
-{
-}
 
 /*
  * Force reset the processor by invalidating the entire address space!
  */
 
+#ifdef SMP
+static void
+cpu_reset_proxy()
+{
+
+	cpu_reset_proxy_active = 1;
+	while (cpu_reset_proxy_active == 1)
+		;	 /* Wait for other cpu to see that we've started */
+	stop_cpus((1<<cpu_reset_proxyid));
+	printf("cpu_reset_proxy: Stopped CPU %d\n", cpu_reset_proxyid);
+	DELAY(1000000);
+	cpu_reset_real();
+}
+#endif
+
 void
 cpu_reset()
 {
+#ifdef SMP
+	if (smp_active == 0) {
+		cpu_reset_real();
+		/* NOTREACHED */
+	} else {
+
+		u_int map;
+		int cnt;
+		printf("cpu_reset called on cpu#%d\n", PCPU_GET(cpuid));
+
+		map = PCPU_GET(other_cpus) & ~ stopped_cpus;
+
+		if (map != 0) {
+			printf("cpu_reset: Stopping other CPUs\n");
+			stop_cpus(map);		/* Stop all other CPUs */
+		}
+
+		if (PCPU_GET(cpuid) == 0) {
+			DELAY(1000000);
+			cpu_reset_real();
+			/* NOTREACHED */
+		} else {
+			/* We are not BSP (CPU #0) */
+
+			cpu_reset_proxyid = PCPU_GET(cpuid);
+			cpustop_restartfunc = cpu_reset_proxy;
+			cpu_reset_proxy_active = 0;
+			printf("cpu_reset: Restarting BSP\n");
+			started_cpus = (1<<0);		/* Restart CPU #0 */
+
+			cnt = 0;
+			while (cpu_reset_proxy_active == 0 && cnt < 10000000)
+				cnt++;	/* Wait for BSP to announce restart */
+			if (cpu_reset_proxy_active == 0)
+				printf("cpu_reset: Failed to restart BSP\n");
+			enable_intr();
+			cpu_reset_proxy_active = 2;
+
+			while (1);
+			/* NOTREACHED */
+		}
+	}
+#else
 	cpu_reset_real();
+#endif
 }
 
 static void
@@ -270,6 +428,83 @@ cpu_reset_real()
 	invltlb();
 	/* NOTREACHED */
 	while(1);
+}
+
+/*
+ * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
+ */
+static void
+sf_buf_init(void *arg)
+{
+	struct sf_buf *sf_bufs;
+	int i;
+
+	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
+	SLIST_INIT(&sf_freelist.sf_head);
+	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
+	    M_NOWAIT | M_ZERO);
+	for (i = 0; i < nsfbufs; i++)
+		SLIST_INSERT_HEAD(&sf_freelist.sf_head, &sf_bufs[i], free_list);
+	sf_buf_alloc_want = 0;
+}
+
+/*
+ * Get an sf_buf from the freelist. Will block if none are available.
+ */
+struct sf_buf *
+sf_buf_alloc(struct vm_page *m)
+{
+	struct sf_buf *sf;
+	int error;
+
+	mtx_lock(&sf_freelist.sf_lock);
+	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
+		sf_buf_alloc_want++;
+		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
+		    "sfbufa", 0);
+		sf_buf_alloc_want--;
+
+		/*
+		 * If we got a signal, don't risk going back to sleep. 
+		 */
+		if (error)
+			break;
+	}
+	if (sf != NULL) {
+		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
+		sf->m = m;
+	}
+	mtx_unlock(&sf_freelist.sf_lock);
+	return (sf);
+}
+
+/*
+ * Detatch mapped page and release resources back to the system.
+ */
+void
+sf_buf_free(void *addr, void *args)
+{
+	struct sf_buf *sf;
+	struct vm_page *m;
+
+	sf = args;
+	m = sf->m;
+	vm_page_lock_queues();
+	vm_page_unwire(m, 0);
+	/*
+	 * Check for the object going away on us. This can
+	 * happen since we don't hold a reference to it.
+	 * If so, we're responsible for freeing the page.
+	 */
+	if (m->wire_count == 0 && m->object == NULL)
+		vm_page_free(m);
+	vm_page_unlock_queues();
+	sf->m = NULL;
+	mtx_lock(&sf_freelist.sf_lock);
+	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
+	if (sf_buf_alloc_want > 0)
+		wakeup_one(&sf_freelist);
+	mtx_unlock(&sf_freelist.sf_lock);
 }
 
 /*

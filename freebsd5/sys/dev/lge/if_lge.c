@@ -31,6 +31,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.26 2003/11/14 17:16:56 obrien Exp $");
+
 /*
  * Level 1 LXT1001 gigabit ethernet driver for FreeBSD. Public
  * documentation not available, but ask me nicely.
@@ -66,9 +69,6 @@
  *   if in fact he did me much of a favor)
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.20 2003/04/16 03:16:55 mdodd Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -98,8 +98,8 @@ __FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.20 2003/04/16 03:16:55 mdodd Ex
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #define LGE_USEIOSPACE
 
@@ -149,7 +149,7 @@ static int lge_miibus_writereg(device_t, int, int, int);
 static void lge_miibus_statchg(device_t);
 
 static void lge_setmulti(struct lge_softc *);
-static u_int32_t lge_crc(struct lge_softc *, caddr_t);
+static u_int32_t lge_mchash(caddr_t);
 static void lge_reset(struct lge_softc *);
 static int lge_list_rx_init(struct lge_softc *);
 static int lge_list_tx_init(struct lge_softc *);
@@ -368,23 +368,20 @@ lge_miibus_statchg(dev)
 }
 
 static u_int32_t
-lge_crc(sc, addr)
-	struct lge_softc	*sc;
-	caddr_t			addr;
+lge_mchash(addr)
+	caddr_t		addr;
 {
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -423,7 +420,7 @@ lge_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = lge_crc(sc, LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = lge_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -501,7 +498,7 @@ lge_attach(dev)
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
 	bzero(sc, sizeof(struct lge_softc));
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -524,7 +521,7 @@ lge_attach(dev)
 		pci_write_config(dev, LGE_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, LGE_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -612,8 +609,7 @@ lge_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "lge";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = lge_ioctl;

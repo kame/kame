@@ -33,9 +33,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/amd64/ia32/ia32_signal.c,v 1.2 2003/05/23 05:07:33 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/ia32/ia32_signal.c,v 1.7 2003/12/03 07:00:30 peter Exp $");
 
 #include "opt_compat.h"
 
@@ -70,9 +71,9 @@
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 
-#include <amd64/ia32/ia32_util.h>
-#include <amd64/ia32/ia32_proto.h>
-#include <amd64/ia32/ia32_signal.h>
+#include <compat/freebsd32/freebsd32_util.h>
+#include <compat/freebsd32/freebsd32_proto.h>
+#include <compat/ia32/ia32_signal.h>
 #include <machine/psl.h>
 #include <machine/segments.h>
 #include <machine/specialreg.h>
@@ -107,7 +108,7 @@ ia32_get_fpcontext(struct thread *td, struct ia32_mcontext *mcp)
 	 *
 	 * XXX unpessimize most cases by only aligning when fxsave might be
 	 * called, although this requires knowing too much about
-	 * npxgetregs()'s internals.
+	 * fpugetregs()'s internals.
 	 */
 	addr = (struct savefpu *)&mcp->mc_fpstate;
 	if (td == PCPU_GET(fpcurthread) && ((uintptr_t)(void *)addr & 0xF)) {
@@ -115,12 +116,12 @@ ia32_get_fpcontext(struct thread *td, struct ia32_mcontext *mcp)
 			addr = (void *)((char *)addr + 4);
 		while ((uintptr_t)(void *)addr & 0xF);
 	}
-	mcp->mc_ownedfp = npxgetregs(td, addr);
+	mcp->mc_ownedfp = fpugetregs(td, addr);
 	if (addr != (struct savefpu *)&mcp->mc_fpstate) {
 		bcopy(addr, &mcp->mc_fpstate, sizeof(mcp->mc_fpstate));
 		bzero(&mcp->mc_spare2, sizeof(mcp->mc_spare2));
 	}
-	mcp->mc_fpformat = npxformat();
+	mcp->mc_fpformat = fpuformat();
 }
 
 static int
@@ -147,10 +148,10 @@ ia32_set_fpcontext(struct thread *td, const struct ia32_mcontext *mcp)
 			bcopy(&mcp->mc_fpstate, addr, sizeof(mcp->mc_fpstate));
 		}
 		/*
-		 * XXX we violate the dubious requirement that npxsetregs()
+		 * XXX we violate the dubious requirement that fpusetregs()
 		 * be called with interrupts disabled.
 		 */
-		npxsetregs(td, addr);
+		fpusetregs(td, addr);
 		/*
 		 * Don't bother putting things back where they were in the
 		 * misaligned case, since we know that the caller won't use
@@ -186,6 +187,7 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	p = td->td_proc;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 	regs = td->td_frame;
 	oonstack = sigonstack(regs->tf_rsp);
 
@@ -249,6 +251,7 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		sf.sf_addr = regs->tf_addr;
 		sf.sf_ah = (u_int32_t)(uintptr_t)catcher;
 	}
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/*
@@ -263,7 +266,7 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	}
 
 	regs->tf_rsp = (uintptr_t)sfp;
-	regs->tf_rip = IA32_PS_STRINGS - sz_freebsd4_ia32_sigcode;
+	regs->tf_rip = FREEBSD32_PS_STRINGS - sz_freebsd4_ia32_sigcode;
 	regs->tf_rflags &= ~PSL_T;
 	regs->tf_cs = _ucode32sel;
 	regs->tf_ss = _udatasel;
@@ -273,6 +276,7 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	td->td_pcb->pcb_es = _udatasel;
 	/* leave user %fs and %gs untouched */
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 #endif	/* COMPAT_FREEBSD4 */
 
@@ -297,6 +301,7 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		return;
 	}
 #endif
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
 	regs = td->td_frame;
 	oonstack = sigonstack(regs->tf_rsp);
 
@@ -365,6 +370,7 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		sf.sf_addr = regs->tf_addr;
 		sf.sf_ah = (u_int32_t)(uintptr_t)catcher;
 	}
+	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(p);
 
 	/*
@@ -379,7 +385,7 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	}
 
 	regs->tf_rsp = (uintptr_t)sfp;
-	regs->tf_rip = IA32_PS_STRINGS - *(p->p_sysent->sv_szsigcode);
+	regs->tf_rip = FREEBSD32_PS_STRINGS - *(p->p_sysent->sv_szsigcode);
 	regs->tf_rflags &= ~PSL_T;
 	regs->tf_cs = _ucode32sel;
 	regs->tf_ss = _udatasel;
@@ -389,6 +395,7 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	td->td_pcb->pcb_es = _udatasel;
 	/* leave user %fs and %gs untouched */
 	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 
 /*
@@ -405,10 +412,10 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
  * MPSAFE
  */
 int
-freebsd4_ia32_sigreturn(td, uap)
+freebsd4_freebsd32_sigreturn(td, uap)
 	struct thread *td;
-	struct freebsd4_ia32_sigreturn_args /* {
-		const struct freebsd4_ucontext *sigcntxp;
+	struct freebsd4_freebsd32_sigreturn_args /* {
+		const struct freebsd4_freebsd32_ucontext *sigcntxp;
 	} */ *uap;
 {
 	struct ia32_ucontext4 uc;
@@ -437,7 +444,7 @@ freebsd4_ia32_sigreturn(td, uap)
 	 * one less debugger trap, so allowing it is fairly harmless.
 	 */
 	if (!EFL_SECURE(eflags & ~PSL_RF, regs->tf_rflags & ~PSL_RF)) {
-		printf("freebsd4_ia32_sigreturn: eflags = 0x%x\n", eflags);
+		printf("freebsd4_freebsd32_sigreturn: eflags = 0x%x\n", eflags);
 		return (EINVAL);
 	}
 
@@ -482,10 +489,10 @@ freebsd4_ia32_sigreturn(td, uap)
  * MPSAFE
  */
 int
-ia32_sigreturn(td, uap)
+freebsd32_sigreturn(td, uap)
 	struct thread *td;
-	struct ia32_sigreturn_args /* {
-		const struct ia32_ucontext *sigcntxp;
+	struct freebsd32_sigreturn_args /* {
+		const struct freebsd32_ucontext *sigcntxp;
 	} */ *uap;
 {
 	struct ia32_ucontext uc;
@@ -514,7 +521,7 @@ ia32_sigreturn(td, uap)
 	 * one less debugger trap, so allowing it is fairly harmless.
 	 */
 	if (!EFL_SECURE(eflags & ~PSL_RF, regs->tf_rflags & ~PSL_RF)) {
-		printf("ia32_sigreturn: eflags = 0x%x\n", eflags);
+		printf("freebsd32_sigreturn: eflags = 0x%x\n", eflags);
 		return (EINVAL);
 	}
 
@@ -556,4 +563,45 @@ ia32_sigreturn(td, uap)
 	signotify(td);
 	PROC_UNLOCK(p);
 	return (EJUSTRETURN);
+}
+
+/*
+ * Clear registers on exec
+ */
+void
+ia32_setregs(td, entry, stack, ps_strings)
+	struct thread *td;
+	u_long entry;
+	u_long stack;
+	u_long ps_strings;
+{
+	struct trapframe *regs = td->td_frame;
+	struct pcb *pcb = td->td_pcb;
+	
+	wrmsr(MSR_FSBASE, 0);
+	wrmsr(MSR_KGSBASE, 0);	/* User value while we're in the kernel */
+	pcb->pcb_fsbase = 0;
+	pcb->pcb_gsbase = 0;
+	load_ds(_udatasel);
+	load_es(_udatasel);
+	load_fs(_udatasel);
+	load_gs(_udatasel);
+	pcb->pcb_ds = _udatasel;
+	pcb->pcb_es = _udatasel;
+	pcb->pcb_fs = _udatasel;
+	pcb->pcb_gs = _udatasel;
+
+	bzero((char *)regs, sizeof(struct trapframe));
+	regs->tf_rip = entry;
+	regs->tf_rsp = stack;
+	regs->tf_rflags = PSL_USER | (regs->tf_rflags & PSL_T);
+	regs->tf_ss = _udatasel;
+	regs->tf_cs = _ucode32sel;
+	regs->tf_rbx = ps_strings;
+	load_cr0(rcr0() | CR0_MP | CR0_TS);
+	fpstate_drop(td);
+
+	/* Return via doreti so that we can change to a different %cs */
+	pcb->pcb_flags |= PCB_FULLCTX;
+	td->td_retval[1] = 0;
 }

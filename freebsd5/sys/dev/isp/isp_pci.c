@@ -1,5 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_pci.c,v 1.92 2003/02/19 05:47:06 imp Exp $ */
-/*
+/*-
  * PCI specific probe and attach routines for Qlogic ISP SCSI adapters.
  * FreeBSD Version.
  *
@@ -27,14 +26,17 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/isp/isp_pci.c,v 1.95 2003/08/24 17:49:14 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
 #include <sys/bus.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <machine/bus_memio.h>
 #include <machine/bus_pio.h>
@@ -1097,7 +1099,8 @@ isp_pci_mbxdma(struct ispsoftc *isp)
 
 	ISP_UNLOCK(isp);
 	if (bus_dma_tag_create(NULL, 1, slim+1, alim, alim,
-	    NULL, NULL, BUS_SPACE_MAXSIZE, ISP_NSEGS, slim, 0, &pcs->dmat)) {
+	    NULL, NULL, BUS_SPACE_MAXSIZE, ISP_NSEGS, slim, 0, 
+	    busdma_lock_mutex, &Giant, &pcs->dmat)) {
 		isp_prt(isp, ISP_LOGERR, "could not create master dma tag");
 		ISP_LOCK(isp);
 		return(1);
@@ -1131,7 +1134,8 @@ isp_pci_mbxdma(struct ispsoftc *isp)
 
 	ns = (len / PAGE_SIZE) + 1;
 	if (bus_dma_tag_create(pcs->dmat, QENTRY_LEN, slim+1, alim, alim,
-	    NULL, NULL, len, ns, slim, 0, &isp->isp_cdmat)) {
+	    NULL, NULL, len, ns, slim, 0, busdma_lock_mutex, &Giant,
+	    &isp->isp_cdmat)) {
 		isp_prt(isp, ISP_LOGERR,
 		    "cannot create a dma tag for control spaces");
 		free(pcs->dmaps, M_DEVBUF);

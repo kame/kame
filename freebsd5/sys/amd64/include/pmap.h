@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1991 Regents of the University of California.
  * All rights reserved.
  *
@@ -42,7 +43,7 @@
  *
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/pmap.h,v 1.103 2003/05/23 06:35:45 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/pmap.h,v 1.109 2003/11/17 08:58:14 peter Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -86,14 +87,18 @@
  * Pte related macros.  This is complicated by having to deal with
  * the sign extension of the 48th bit.
  */
-#define VADDR_SIGN(l4) \
-	((l4) >= NPML4EPG/2 ? ((unsigned long)-1 << 47) : 0ul)
-#define VADDR(l4, l3, l2, l1) ( \
-	((unsigned long)(l4) << PML4SHIFT) | VADDR_SIGN(l4) | \
+#define KVADDR(l4, l3, l2, l1) ( \
+	((unsigned long)-1 << 47) | \
+	((unsigned long)(l4) << PML4SHIFT) | \
 	((unsigned long)(l3) << PDPSHIFT) | \
 	((unsigned long)(l2) << PDRSHIFT) | \
 	((unsigned long)(l1) << PAGE_SHIFT))
 
+#define UVADDR(l4, l3, l2, l1) ( \
+	((unsigned long)(l4) << PML4SHIFT) | \
+	((unsigned long)(l3) << PDPSHIFT) | \
+	((unsigned long)(l2) << PDRSHIFT) | \
+	((unsigned long)(l1) << PAGE_SHIFT))
 
 #ifndef NKPT
 #define	NKPT		120	/* initial number of kernel page tables */
@@ -103,7 +108,7 @@
 #define NKPDPE		1		/* number of kernel PDP slots */
 #define	NKPDE		(NKPDPE*NPDEPG)	/* number of kernel PD slots */
 
-#define	NUPML4E		1		/* number of userland PML4 pages */
+#define	NUPML4E		(NPML4EPG/2)	/* number of userland PML4 pages */
 #define	NUPDPE		(NUPML4E*NPDPEPG)/* number of userland PDP pages */
 #define	NUPDE		(NUPDPE*NPDEPG)	/* number of userland PD entries */
 
@@ -117,7 +122,7 @@
 #define	KPML4I		(NPML4EPG-1)	/* Top 512GB for KVM */
 #define	DMPML4I		(KPML4I-1)	/* Next 512GB down for direct map */
 
-#define	KPDPI		(NPDPEPG-1)	/* kernbase at -1GB */
+#define	KPDPI		(NPDPEPG-2)	/* kernbase at -2GB */
 
 /*
  * XXX doesn't really belong here I guess...
@@ -149,10 +154,10 @@ typedef u_int64_t pml4_entry_t;
  * in the page tables and the evil overlapping.
  */
 #ifdef _KERNEL
-#define	addr_PTmap	(VADDR(PML4PML4I, 0, 0, 0))
-#define	addr_PDmap	(VADDR(PML4PML4I, PML4PML4I, 0, 0))
-#define	addr_PDPmap	(VADDR(PML4PML4I, PML4PML4I, PML4PML4I, 0))
-#define	addr_PML4map	(VADDR(PML4PML4I, PML4PML4I, PML4PML4I, PML4PML4I))
+#define	addr_PTmap	(KVADDR(PML4PML4I, 0, 0, 0))
+#define	addr_PDmap	(KVADDR(PML4PML4I, PML4PML4I, 0, 0))
+#define	addr_PDPmap	(KVADDR(PML4PML4I, PML4PML4I, PML4PML4I, 0))
+#define	addr_PML4map	(KVADDR(PML4PML4I, PML4PML4I, PML4PML4I, PML4PML4I))
 #define	addr_PML4pml4e	(addr_PML4map + (PML4PML4I * sizeof(pml4_entry_t)))
 #define	PTmap		((pt_entry_t *)(addr_PTmap))
 #define	PDmap		((pd_entry_t *)(addr_PDmap))
@@ -215,15 +220,14 @@ struct md_page {
 
 struct pmap {
 	pml4_entry_t		*pm_pml4;	/* KVA of level 4 page table */
-	vm_object_t		pm_pteobj;	/* Container for pte's */
 	TAILQ_HEAD(,pv_entry)	pm_pvlist;	/* list of mappings in pmap */
-	u_long			pm_active;	/* active on cpus */
+	u_int			pm_active;	/* active on cpus */
+	/* spare u_int here due to padding */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
 	LIST_ENTRY(pmap) 	pm_list;	/* List of all pmaps */
 };
 
 #define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
-#define pmap_resident_count(pmap) (pmap)->pm_stats.resident_count
 
 typedef struct pmap	*pmap_t;
 

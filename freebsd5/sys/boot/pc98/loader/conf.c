@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/pc98/loader/conf.c,v 1.1 2003/05/01 13:17:06 nyan Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/pc98/loader/conf.c,v 1.2 2003/09/08 09:11:21 obrien Exp $");
 
 #include <stand.h>
 #include <bootstrap.h>

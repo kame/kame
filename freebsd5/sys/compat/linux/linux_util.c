@@ -27,8 +27,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  *	from: svr4_util.c,v 1.5 1995/01/22 23:44:50 christos Exp
- * $FreeBSD: src/sys/compat/linux/linux_util.c,v 1.22 2003/02/19 05:46:58 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_util.c,v 1.23 2003/06/10 21:27:40 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

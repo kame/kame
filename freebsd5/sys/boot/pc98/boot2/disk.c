@@ -24,9 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:49  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.9 2003/04/04 16:35:15 phk Exp $
  */
-
 /*
  * Ported to PC-9801 by Yoshio Kimura
  */
@@ -40,6 +38,9 @@
  *	Fixed reading of bad sector table.  It is at the end of the 'c'
  *	partition, which is not always at the end of the disk.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.10 2003/09/08 09:11:20 obrien Exp $");
 
 #include "boot.h"
 #include <sys/disklabel.h>

@@ -1,4 +1,5 @@
-/* $FreeBSD: src/sys/alpha/linux/linux_genassym.c,v 1.17 2002/09/17 07:22:23 peter Exp $ */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_genassym.c,v 1.19 2003/08/22 07:20:26 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/assym.h>

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/mpt/mpt.h,v 1.3 2002/09/01 23:07:09 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/mpt/mpt.h,v 1.4 2003/06/03 17:47:47 mjacob Exp $ */
 /*
  * Generic defines for LSI '909 FC  adapters.
  * FreeBSD Version.
@@ -163,8 +163,8 @@ void mpt_free_request(mpt_softc_t *mpt, request_t *req);
 int mpt_intr(void *dummy);
 void mpt_check_doorbell(mpt_softc_t * mpt);
 
-int mpt_read_cfg_page(mpt_softc_t *, int, fCONFIG_PAGE_HEADER *);
-int mpt_write_cfg_page(mpt_softc_t *, int, fCONFIG_PAGE_HEADER *);
+int mpt_read_cfg_page(mpt_softc_t *, int, CONFIG_PAGE_HEADER *);
+int mpt_write_cfg_page(mpt_softc_t *, int, CONFIG_PAGE_HEADER *);
 
 /* mpt_debug.c functions */
 void mpt_print_reply(void *vmsg);

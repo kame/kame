@@ -26,7 +26,7 @@
  * Authors:
  *   Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/ati_pcigart.h,v 1.1 2003/03/09 02:08:28 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/ati_pcigart.h,v 1.3 2003/10/24 01:48:16 anholt Exp $
  */
 
 #include "dev/drm/drmP.h"
@@ -60,7 +60,7 @@ int DRM(ati_pcigart_init)( drm_device_t *dev,
 	}
 
 	address = (long)contigmalloc((1 << ATI_PCIGART_TABLE_ORDER) * PAGE_SIZE, 
-	    DRM(M_DRM), M_WAITOK, 0ul, 0xfffffffful, PAGE_SIZE, 0);
+	    DRM(M_DRM), M_NOWAIT, 0ul, 0xfffffffful, PAGE_SIZE, 0);
 	if ( !address ) {
 		DRM_ERROR( "cannot allocate PCI GART page!\n" );
 		goto done;
@@ -85,6 +85,8 @@ int DRM(ati_pcigart_init)( drm_device_t *dev,
 			page_base += ATI_PCIGART_PAGE_SIZE;
 		}
 	}
+
+	DRM_MEMORYBARRIER();
 
 	ret = 1;
 

@@ -13,7 +13,7 @@
 # purpose.
 #
 
-# $FreeBSD: src/sys/boot/i386/cdboot/cdboot.s,v 1.9 2001/11/07 01:20:33 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/cdboot/cdboot.s,v 1.9.8.1 2004/01/25 01:20:36 jhb Exp $
 
 #
 # This program is a freestanding boot program to load an a.out binary
@@ -379,6 +379,7 @@ ff.match:	add $2,%sp			# Discard saved %si
 # Trashes: EAX
 #
 read:		push %si			# Save
+		push %cx			# Save since some BIOSs trash
 		mov %eax,edd_lba		# LBA to read from
 		mov %ebx,%eax			# Convert address
 		shr $4,%eax			#  to segment
@@ -392,7 +393,8 @@ read.retry:	call twiddle			# Entertain the user
 		int $0x13			# Call BIOS
 		pop %dx				# Restore
 		jc read.fail			# Worked?
-		pop %si				# Restore
+		pop %cx				# Restore
+		pop %si
 		ret				# Return
 read.fail:	cmp $ERROR_TIMEOUT,%ah		# Timeout?
 		je read.retry			# Yes, Retry.
@@ -439,6 +441,7 @@ twiddle:	push %ax			# Save
 		mov twiddle_chars,%bx		# Address table
 		inc %al				# Next
 		and $3,%al			#  char
+		mov %al,twiddle_index		# Save index for next call
 		xlat				# Get char
 		call putc			# Output it
 		mov $8,%al			# Backspace

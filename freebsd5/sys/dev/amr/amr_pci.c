@@ -23,7 +23,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
+ */
+/*
  * Copyright (c) 2002 Eric Moore
  * Copyright (c) 2002 LSI Logic Corporation
  * All rights reserved.
@@ -51,10 +52,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *
- *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.16 2003/04/01 15:06:22 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.20 2003/09/02 17:30:34 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -70,8 +71,8 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/amr/amrio.h>
 #include <dev/amr/amrreg.h>
@@ -209,7 +210,7 @@ amr_pci_attach(device_t dev)
     /*
      * Allocate the PCI register window.
      */
-    rid = PCIR_MAPS;
+    rid = PCIR_BAR(0);
     rtype = AMR_IS_QUARTZ(sc) ? SYS_RES_MEMORY : SYS_RES_IOPORT;
     sc->amr_reg = bus_alloc_resource(dev, rtype, &rid, 0, ~0, 1, RF_ACTIVE);
     if (sc->amr_reg == NULL) {
@@ -249,6 +250,7 @@ amr_pci_attach(device_t dev)
 			   MAXBSIZE, AMR_NSEG,		/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL, NULL,			/* lockfunc, lockarg */
 			   &sc->amr_parent_dmat)) {
 	device_printf(dev, "can't allocate parent DMA tag\n");
 	goto out;
@@ -265,6 +267,7 @@ amr_pci_attach(device_t dev)
 			   MAXBSIZE, AMR_NSEG,		/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   0,				/* flags */
+			   busdma_lock_mutex, &Giant,	/* lockfunc, lockarg */
 			   &sc->amr_buffer_dmat)) {
         device_printf(sc->amr_dev, "can't allocate buffer DMA tag\n");
 	goto out;
@@ -465,7 +468,7 @@ amr_pci_free(struct amr_softc *sc)
     if (sc->amr_reg != NULL)
 	bus_release_resource(sc->amr_dev,
 			     AMR_IS_QUARTZ(sc) ? SYS_RES_MEMORY : SYS_RES_IOPORT,
-			     PCIR_MAPS, sc->amr_reg);
+			     PCIR_BAR(0), sc->amr_reg);
 }
 
 /********************************************************************************
@@ -505,6 +508,8 @@ amr_sglist_map(struct amr_softc *sc)
 			       segsize, 1,		/* maxsize, nsegments */
 			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			       0,			/* flags */
+			       busdma_lock_mutex,	/* lockfunc */
+			       &Giant,			/* lockarg */
 			       &sc->amr_sg_dmat);
     if (error != 0) {
 	device_printf(sc->amr_dev, "can't allocate scatter/gather DMA tag\n");
@@ -575,6 +580,8 @@ amr_setup_mbox(struct amr_softc *sc)
 			       sizeof(struct amr_mailbox) + 16, 1, /* maxsize, nsegments */
 			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			       0,			/* flags */
+			       busdma_lock_mutex,	/* lockfunc */
+			       &Giant,			/* lockarg */
 			       &sc->amr_mailbox_dmat);
     if (error != 0) {
 	device_printf(sc->amr_dev, "can't allocate mailbox tag\n");

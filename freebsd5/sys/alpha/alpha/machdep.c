@@ -23,7 +23,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.202 2003/05/13 20:35:56 jhb Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -88,8 +87,12 @@
  * rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.215 2003/11/14 04:04:14 jeff Exp $");
+
 #include "opt_compat.h"
 #include "opt_ddb.h"
+#include "opt_kstack_pages.h"
 #include "opt_msgbuf.h"
 #include "opt_maxmem.h"
 
@@ -119,6 +122,7 @@
 #include <sys/sysctl.h>
 #include <sys/uio.h>
 #include <sys/linker.h>
+#include <sys/cons.h>
 #include <net/netisr.h>
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -546,6 +550,9 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	alpha_pal_wrmces(alpha_pal_rdmces() &
 			 ~(ALPHA_MCES_DSC|ALPHA_MCES_DPC));
 
+	/* Clear userland thread pointer */
+	alpha_pal_wrunique(0);
+
 	/*
 	 * Find out what hardware we're on, and do basic initialization.
 	 */
@@ -579,10 +586,18 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	 * Initalize the real console, so the the bootstrap console is
 	 * no longer necessary.
 	 */
+#ifndef NO_SIO
 	if (platform.cons_init) {
 		platform.cons_init();
 		promcndetach();
 	}
+#else
+	if (platform.cons_init)
+		platform.cons_init();
+	promcndetach();
+	cninit();
+#endif
+
 	/* NO MORE FIRMWARE ACCESS ALLOWED */
 #ifdef _PMAP_MAY_USE_PROM_CONSOLE
 	/*
@@ -1460,6 +1475,25 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 }
 
 /*
+ * Build siginfo_t for SA thread
+ */
+void
+cpu_thread_siginfo(int sig, u_long code, siginfo_t *si)
+{
+	struct proc *p;
+	struct thread *td;
+
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	bzero(si, sizeof(*si));
+	si->si_signo = sig;
+	si->si_code = code;
+	/* XXXKSE fill other fields */
+}
+
+/*
  * System call to cleanup state after a signal
  * has been taken.  Reset signal mask and
  * stack state from context left by sendsig (above).
@@ -1697,6 +1731,12 @@ cpu_halt(void)
 	prom_halt(1);
 }
 
+void
+cpu_idle(void)
+{
+	/* Insert code to halt (until next interrupt) for the idle loop */
+}
+
 /*
  * Clear registers on exec
  */
@@ -1861,9 +1901,10 @@ ptrace_single_step(struct thread *td)
 	if (td->td_md.md_flags & (MDTD_STEP1|MDTD_STEP2))
 		panic("ptrace_single_step: step breakpoints not removed");
 
+	PROC_UNLOCK(td->td_proc);
 	error = ptrace_read_int(td, pc, &ins.bits);
 	if (error)
-		return error;
+		goto err;
 
 	switch (ins.branch_format.opcode) {
 
@@ -1903,19 +1944,21 @@ ptrace_single_step(struct thread *td)
 	td->td_md.md_sstep[0].addr = addr[0];
 	error = ptrace_set_bpt(td, &td->td_md.md_sstep[0]);
 	if (error)
-		return error;
+		goto err;
 	if (count == 2) {
 		td->td_md.md_sstep[1].addr = addr[1];
 		error = ptrace_set_bpt(td, &td->td_md.md_sstep[1]);
 		if (error) {
 			ptrace_clear_bpt(td, &td->td_md.md_sstep[0]);
-			return error;
+			goto err;
 		}
 		td->td_md.md_flags |= MDTD_STEP2;
 	} else
 		td->td_md.md_flags |= MDTD_STEP1;
 
-	return 0;
+err:
+	PROC_LOCK(td->td_proc);
+	return (error);
 }
 
 int
@@ -1987,24 +2030,28 @@ set_regs(td, regs)
 }
 
 int
-get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
+get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
 	/*
 	 * Use a trapframe for getsetcontext, so just copy the
 	 * threads trapframe.
 	 */
 	bcopy(td->td_frame, &mcp->mc_regs, sizeof(struct trapframe));
-	if (clear_ret != 0) {
+	if (flags & GET_MC_CLEAR_RET) {
 		mcp->mc_regs[FRAME_V0] = 0;
 		mcp->mc_regs[FRAME_A4] = 0;
+		mcp->mc_regs[FRAME_A3] = 0;
 	}
 
 	/*
 	 * When the thread is the current thread, the user stack pointer
 	 * is not in the PCB; it must be read from the PAL.
 	 */
-	if (td == curthread)
+	if (td == curthread) {
 		mcp->mc_regs[FRAME_SP] = alpha_pal_rdusp();
+		mcp->mc_thrptr = alpha_pal_rdunique();
+	} else
+		mcp->mc_thrptr = 0;
 
 	mcp->mc_format = _MC_REV0_TRAPFRAME;
 	PROC_LOCK(curthread->td_proc);
@@ -2026,6 +2073,12 @@ set_mcontext(struct thread *td, const mcontext_t *mcp)
 	else if ((ret = set_fpcontext(td, mcp)) != 0)
 		return (ret);
 
+	/*
+	 * NOTE: We only need to restore mc_thrptr when the ucontext format
+	 * is _MC_REV0_TRAPFRAME. Only get_mcontext() above creates such
+	 * contexts and that's also the only place where we save the thread
+	 * pointer in the context.
+	 */
 	if (mcp->mc_format == _MC_REV0_SIGFRAME) {
 		set_regs(td, (struct reg *)&mcp->mc_regs);
 		val = (mcp->mc_regs[R_PS] | ALPHA_PSL_USERSET) &
@@ -2035,10 +2088,15 @@ set_mcontext(struct thread *td, const mcontext_t *mcp)
 		td->td_frame->tf_regs[FRAME_FLAGS] = 0;
 		if (td == curthread)
 			alpha_pal_wrusp(mcp->mc_regs[R_SP]);
-
 	} else {
-		if (td == curthread)
+		if (td == curthread) {
 			alpha_pal_wrusp(mcp->mc_regs[FRAME_SP]);
+			alpha_pal_wrunique(mcp->mc_thrptr);
+		} else {
+			td->td_pcb->pcb_hw.apcb_usp = mcp->mc_regs[FRAME_SP];
+			td->td_pcb->pcb_hw.apcb_unique = mcp->mc_thrptr;
+		}
+
 		/*
 		 * The context is a trapframe, so just copy it over the
 		 * threads frame.
@@ -2339,10 +2397,4 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t sz)
 		((caddr_t) pcpu + sz - sizeof(struct trapframe));
 	pcpu->pc_idlepcb.apcb_ptbr = thread0.td_pcb->pcb_hw.apcb_ptbr;
 	pcpu->pc_current_asngen = 1;
-}
-
-intptr_t
-casuptr(intptr_t *p, intptr_t old, intptr_t new)
-{
-	return (-1);
 }

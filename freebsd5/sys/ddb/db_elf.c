@@ -1,6 +1,4 @@
-/* $FreeBSD: src/sys/ddb/db_elf.c,v 1.15 2002/09/15 22:28:39 bde Exp $ */
 /*	$NetBSD: db_elf.c,v 1.4 1998/05/03 18:49:54 thorpej Exp $	*/
-
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -37,6 +35,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_elf.c,v 1.17 2003/09/28 06:02:33 bde Exp $");
 
 #include "opt_ddb.h"
 
@@ -265,6 +266,11 @@ X_db_search_symbol(symtab, off, strategy, diffp)
 	for (symp = symtab_start; symp < symtab_end; symp++) {
 		if (symp->st_name == 0)
 			continue;
+		if (ELF_ST_TYPE(symp->st_info) != STT_OBJECT &&
+		    ELF_ST_TYPE(symp->st_info) != STT_FUNC &&
+		    ELF_ST_TYPE(symp->st_info) != STT_NOTYPE)
+			continue;
+
 		if (off >= symp->st_value) {
 			if ((off - symp->st_value) < diff) {
 				diff = off - symp->st_value;

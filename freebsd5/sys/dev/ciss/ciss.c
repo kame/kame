@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/ciss.c,v 1.21 2003/05/21 07:17:06 ps Exp $
+ *	$FreeBSD: src/sys/dev/ciss/ciss.c,v 1.31 2003/11/07 03:01:48 ps Exp $
  */
 
 /*
@@ -91,8 +91,8 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/ciss/cissreg.h>
 #include <dev/ciss/cissvar.h>
@@ -243,6 +243,7 @@ static struct
     { 0x0e11, 0x4080, CISS_BOARD_SA5B,	"Compaq Smart Array 5i" },
     { 0x0e11, 0x4082, CISS_BOARD_SA5B,	"Compaq Smart Array 532" },
     { 0x0e11, 0x4083, CISS_BOARD_SA5B,	"HP Smart Array 5312" },
+    { 0x0e11, 0x4091, CISS_BOARD_SA5,	"HP Smart Array 6i" },
     { 0x0e11, 0x409A, CISS_BOARD_SA5,	"HP Smart Array 641" },
     { 0x0e11, 0x409B, CISS_BOARD_SA5,	"HP Smart Array 642" },
     { 0x0e11, 0x409C, CISS_BOARD_SA5,	"HP Smart Array 6400" },
@@ -594,12 +595,14 @@ ciss_init_pci(struct ciss_softc *sc)
      */
     if (bus_dma_tag_create(NULL, 			/* parent */
 			   1, 0, 			/* alignment, boundary */
-			   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
+			   BUS_SPACE_MAXADDR,		/* lowaddr */
 			   BUS_SPACE_MAXADDR, 		/* highaddr */
 			   NULL, NULL, 			/* filter, filterarg */
-			   MAXBSIZE, CISS_COMMAND_SG_LENGTH,	/* maxsize, nsegments */
+			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsize */
+			   CISS_COMMAND_SG_LENGTH,	/* nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL, NULL,			/* lockfunc, lockarg */
 			   &sc->ciss_parent_dmat)) {
 	ciss_printf(sc, "can't allocate parent DMA tag\n");
 	return(ENOMEM);
@@ -617,6 +620,7 @@ ciss_init_pci(struct ciss_softc *sc)
 			   MAXBSIZE, CISS_COMMAND_SG_LENGTH,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   0,				/* flags */
+			   busdma_lock_mutex, &Giant,	/* lockfunc, lockarg */
 			   &sc->ciss_buffer_dmat)) {
 	ciss_printf(sc, "can't allocate buffer DMA tag\n");
 	return(ENOMEM);
@@ -729,7 +733,7 @@ ciss_init_requests(struct ciss_softc *sc)
      */
     sc->ciss_max_requests = min(CISS_MAX_REQUESTS, sc->ciss_cfg->max_outstanding_commands);
     
-    if (1/*bootverbose*/)
+    if (bootverbose)
 	ciss_printf(sc, "using %d of %d available commands\n",
 		    sc->ciss_max_requests, sc->ciss_cfg->max_outstanding_commands);
 
@@ -738,13 +742,14 @@ ciss_init_requests(struct ciss_softc *sc)
      */
     if (bus_dma_tag_create(sc->ciss_parent_dmat,	/* parent */
 			   1, 0, 			/* alignment, boundary */
-			   BUS_SPACE_MAXADDR,		/* lowaddr */
+			   BUS_SPACE_MAXADDR_32BIT,	/* lowaddr */
 			   BUS_SPACE_MAXADDR, 		/* highaddr */
 			   NULL, NULL, 			/* filter, filterarg */
 			   CISS_COMMAND_ALLOC_SIZE * 
 			   sc->ciss_max_requests, 1,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			   0,				/* flags */
+			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL, NULL,			/* lockfunc, lockarg */
 			   &sc->ciss_command_dmat)) {
 	ciss_printf(sc, "can't allocate command DMA tag\n");
 	return(ENOMEM);
@@ -758,7 +763,7 @@ ciss_init_requests(struct ciss_softc *sc)
 	return(ENOMEM);
     }
     bus_dmamap_load(sc->ciss_command_dmat, sc->ciss_command_map, sc->ciss_command, 
-		    sizeof(struct ciss_command) * sc->ciss_max_requests,
+		    CISS_COMMAND_ALLOC_SIZE * sc->ciss_max_requests,
 		    ciss_command_map_helper, sc, 0);
     bzero(sc->ciss_command, CISS_COMMAND_ALLOC_SIZE * sc->ciss_max_requests);
 
@@ -846,7 +851,7 @@ ciss_identify_adapter(struct ciss_softc *sc)
     sc->ciss_flags |= CISS_FLAG_BMIC_ABORT;
     
     /* print information */
-    if (1/*bootverbose*/) {
+    if (bootverbose) {
 	ciss_printf(sc, "  %d logical drive%s configured\n",
 		    sc->ciss_id->configured_logical_drives,
 		    (sc->ciss_id->configured_logical_drives == 1) ? "" : "s");
@@ -973,7 +978,7 @@ ciss_init_logical(struct ciss_softc *sc)
 
     /* sanity-check reply */
     ndrives = (ntohl(cll->list_size) / sizeof(union ciss_device_address));
-    if ((ndrives < 0) || (ndrives > CISS_MAX_LOGICAL)) {
+    if ((ndrives < 0) || (ndrives >= CISS_MAX_LOGICAL)) {
 	ciss_printf(sc, "adapter claims to report absurd number of logical drives (%d > %d)\n",
 		    ndrives, CISS_MAX_LOGICAL);
 	return(ENXIO);
@@ -982,7 +987,7 @@ ciss_init_logical(struct ciss_softc *sc)
     /*
      * Save logical drive information.
      */
-    if (1/*bootverbose*/)
+    if (bootverbose)
 	ciss_printf(sc, "%d logical drive%s\n", ndrives, (ndrives > 1) ? "s" : "");
     if (ndrives != sc->ciss_id->configured_logical_drives)
 	ciss_printf(sc, "logical drive map claims %d drives, but adapter claims %d\n",
@@ -1146,9 +1151,10 @@ ciss_identify_logical(struct ciss_softc *sc, struct ciss_ldrive *ld)
     /*
      * Print the drive's basic characteristics.
      */
-    if (1/*bootverbose*/) {
+    if (bootverbose) {
 	ciss_printf(sc, "logical drive %d: %s, %dMB ",
-		    cbc->log_drive, ciss_name_ldrive_org(ld->cl_ldrive->fault_tolerance),
+		    ld->cl_address.logical.lun,
+		    ciss_name_ldrive_org(ld->cl_ldrive->fault_tolerance),
 		    ((ld->cl_ldrive->blocks_available / (1024 * 1024)) *
 		     ld->cl_ldrive->block_size));
 
@@ -1429,12 +1435,6 @@ ciss_start(struct ciss_request *cr)
 #if 0
     ciss_print_request(cr);
 #endif
-
-    /*
-     * Post the command to the adapter.
-     */
-    ciss_enqueue_busy(cr);
-    CISS_TL_SIMPLE_POST_CMD(cr->cr_sc, CISS_FIND_COMMANDPHYS(cr));
 
     return(0);
 }
@@ -1785,6 +1785,7 @@ ciss_get_request(struct ciss_softc *sc, struct ciss_request **crp)
     cr->cr_data = NULL;
     cr->cr_flags = 0;
     cr->cr_complete = NULL;
+    cr->cr_private = NULL;
     
     ciss_preen_command(cr);
     *crp = cr;
@@ -1919,7 +1920,7 @@ ciss_user_command(struct ciss_softc *sc, IOCTL_Command_struct *ioc)
     struct ciss_request		*cr;
     struct ciss_command		*cc;
     struct ciss_error_info	*ce;
-    int				error;
+    int				error = 0;
 
     debug_called(1);
 
@@ -1964,9 +1965,17 @@ ciss_user_command(struct ciss_softc *sc, IOCTL_Command_struct *ioc)
     }
 
     /*
-     * Copy the results back to the user.
+     * Check to see if the command succeeded.
      */
     ce = (struct ciss_error_info *)&(cc->sg[0]);
+    if (ciss_report_request(cr, NULL, NULL) == 0)
+	bzero(ce, sizeof(*ce));
+    else
+	error = EIO;
+
+    /*
+     * Copy the results back to the user.
+     */
     bcopy(ce, &ioc->error_info, sizeof(*ce));
     if ((ioc->buf_size > 0) &&
 	(error = copyout(cr->cr_data, ioc->buf, ioc->buf_size))) {
@@ -1993,24 +2002,35 @@ static int
 ciss_map_request(struct ciss_request *cr)
 {
     struct ciss_softc	*sc;
+    int			error = 0;
 
     debug_called(2);
     
     sc = cr->cr_sc;
 
     /* check that mapping is necessary */
-    if ((cr->cr_flags & CISS_REQ_MAPPED) || (cr->cr_data == NULL))
+    if (cr->cr_flags & CISS_REQ_MAPPED)
 	return(0);
-    
-    bus_dmamap_load(sc->ciss_buffer_dmat, cr->cr_datamap, cr->cr_data, cr->cr_length,
-		    ciss_request_map_helper, CISS_FIND_COMMAND(cr), 0);
-	
-    if (cr->cr_flags & CISS_REQ_DATAIN)
-	bus_dmamap_sync(sc->ciss_buffer_dmat, cr->cr_datamap, BUS_DMASYNC_PREREAD);
-    if (cr->cr_flags & CISS_REQ_DATAOUT)
-	bus_dmamap_sync(sc->ciss_buffer_dmat, cr->cr_datamap, BUS_DMASYNC_PREWRITE);
 
     cr->cr_flags |= CISS_REQ_MAPPED;
+
+    bus_dmamap_sync(sc->ciss_command_dmat, sc->ciss_command_map,
+		    BUS_DMASYNC_PREWRITE);
+
+    if (cr->cr_data != NULL) {
+	error = bus_dmamap_load(sc->ciss_buffer_dmat, cr->cr_datamap,
+				cr->cr_data, cr->cr_length,
+				ciss_request_map_helper, cr, 0);
+	if (error != 0)
+	    return (error);
+    } else {
+	/*
+	 * Post the command to the adapter.
+	 */
+	ciss_enqueue_busy(cr);
+	CISS_TL_SIMPLE_POST_CMD(cr->cr_sc, CISS_FIND_COMMANDPHYS(cr));
+    }
+	
     return(0);
 }
 
@@ -2018,11 +2038,16 @@ static void
 ciss_request_map_helper(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
     struct ciss_command	*cc;
+    struct ciss_request *cr;
+    struct ciss_softc	*sc;
     int			i;
 
     debug_called(2);
     
-    cc = (struct ciss_command *)arg;
+    cr = (struct ciss_request *)arg;
+    sc = cr->cr_sc;
+    cc = CISS_FIND_COMMAND(cr);
+
     for (i = 0; i < nseg; i++) {
 	cc->sg[i].address = segs[i].ds_addr;
 	cc->sg[i].length = segs[i].ds_len;
@@ -2031,6 +2056,17 @@ ciss_request_map_helper(void *arg, bus_dma_segment_t *segs, int nseg, int error)
     /* we leave the s/g table entirely within the command */
     cc->header.sg_in_list = nseg;
     cc->header.sg_total = nseg;
+
+    if (cr->cr_flags & CISS_REQ_DATAIN)
+	bus_dmamap_sync(sc->ciss_buffer_dmat, cr->cr_datamap, BUS_DMASYNC_PREREAD);
+    if (cr->cr_flags & CISS_REQ_DATAOUT)
+	bus_dmamap_sync(sc->ciss_buffer_dmat, cr->cr_datamap, BUS_DMASYNC_PREWRITE);
+
+    /*
+     * Post the command to the adapter.
+     */
+    ciss_enqueue_busy(cr);
+    CISS_TL_SIMPLE_POST_CMD(cr->cr_sc, CISS_FIND_COMMANDPHYS(cr));
 }
 
 /************************************************************************
@@ -2046,8 +2082,14 @@ ciss_unmap_request(struct ciss_request *cr)
     sc = cr->cr_sc;
 
     /* check that unmapping is necessary */
-    if (!(cr->cr_flags & CISS_REQ_MAPPED) || (cr->cr_data == NULL))
+    if ((cr->cr_flags & CISS_REQ_MAPPED) == 0)
 	return;
+    
+    bus_dmamap_sync(sc->ciss_command_dmat, sc->ciss_command_map,
+		    BUS_DMASYNC_POSTWRITE);
+
+    if (cr->cr_data == NULL)
+	goto out;
 
     if (cr->cr_flags & CISS_REQ_DATAIN)
 	bus_dmamap_sync(sc->ciss_buffer_dmat, cr->cr_datamap, BUS_DMASYNC_POSTREAD);
@@ -2055,6 +2097,7 @@ ciss_unmap_request(struct ciss_request *cr)
 	bus_dmamap_sync(sc->ciss_buffer_dmat, cr->cr_datamap, BUS_DMASYNC_POSTWRITE);
 
     bus_dmamap_unload(sc->ciss_buffer_dmat, cr->cr_datamap);
+out:
     cr->cr_flags &= ~CISS_REQ_MAPPED;
 }
 
@@ -2139,7 +2182,7 @@ ciss_cam_rescan_target(struct ciss_softc *sc, int target)
 static void
 ciss_cam_rescan_all(struct ciss_softc *sc)
 {
-    return(ciss_cam_rescan_target(sc, 0));
+    ciss_cam_rescan_target(sc, 0);
 }
 
 static void
@@ -2271,8 +2314,7 @@ ciss_cam_action_io(struct cam_sim *sim, struct ccb_scsiio *csio)
 
     /* check for I/O attempt to nonexistent device */
     if ((bus != 0) ||
-	(target > CISS_MAX_LOGICAL) ||
-	(sc->ciss_logical[target].cl_status == CISS_LD_NONEXISTENT)) {
+	(target >= CISS_MAX_LOGICAL)) {
 	debug(3, "  device does not exist");
 	csio->ccb_h.status = CAM_REQ_CMP_ERR;
     }
@@ -2362,8 +2404,13 @@ ciss_cam_action_io(struct cam_sim *sim, struct ccb_scsiio *csio)
      */
     if ((error = ciss_start(cr)) != 0) {
 	xpt_freeze_simq(sc->ciss_cam_sim, 1);
-	csio->ccb_h.status |= CAM_REQUEUE_REQ;
-	ciss_release_request(cr);
+	if (error == EINPROGRESS) {
+	    csio->ccb_h.status |= CAM_RELEASE_SIMQ;
+	    error = 0;
+	} else {
+	    csio->ccb_h.status |= CAM_REQUEUE_REQ;
+	    ciss_release_request(cr);
+	}
 	return(error);
     }
 	

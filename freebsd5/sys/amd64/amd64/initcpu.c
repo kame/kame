@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) KATO Takenori, 1997, 1998.
  * 
  * All rights reserved.  Unpublished rights reserved under the copyright
@@ -25,9 +25,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/amd64/amd64/initcpu.c,v 1.45 2003/05/01 01:05:21 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/initcpu.c,v 1.47 2003/11/21 03:01:59 peter Exp $");
 
 #include "opt_cpu.h"
 

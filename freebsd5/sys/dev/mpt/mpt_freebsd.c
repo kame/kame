@@ -1,5 +1,7 @@
-/* $FreeBSD: src/sys/dev/mpt/mpt_freebsd.c,v 1.11 2003/05/27 18:32:24 jhb Exp $ */
 /*
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_freebsd.c,v 1.15 2003/08/24 17:54:11 obrien Exp $");
  * FreeBSD/CAM specific routines for LSI '909 FC  adapters.
  * FreeBSD Version.
  *
@@ -512,7 +514,8 @@ mpt_start(union ccb *ccb)
 				 * physical buffer.
 				 */
 				struct bus_dma_segment seg;
-				seg.ds_addr = (bus_addr_t)csio->data_ptr;
+				seg.ds_addr = 
+				    (bus_addr_t)(vm_offset_t)csio->data_ptr;
 				seg.ds_len = csio->dxfer_len;
 				mpt_execute_req(req, &seg, 1, 0);
 			}
@@ -1289,7 +1292,7 @@ mpt_action(struct cam_sim *sim, union ccb *ccb)
 			 * problems with reading NVRAM data.
 			 */
 			if (IS_CURRENT_SETTINGS(cts)) {
-				fCONFIG_PAGE_SCSI_DEVICE_0 tmp;
+				CONFIG_PAGE_SCSI_DEVICE_0 tmp;
 				dval = 0;
 
 				tmp = mpt->mpt_dev_page0[tgt];
@@ -1399,8 +1402,6 @@ mpt_action(struct cam_sim *sim, union ccb *ccb)
 	case XPT_CALC_GEOMETRY:
 	{
 		struct ccb_calc_geometry *ccg;
-		u_int32_t secs_per_cylinder;
-		u_int32_t size_mb;
 
 		ccg = &ccb->ccg;
 		if (ccg->block_size == 0) {
@@ -1409,17 +1410,7 @@ mpt_action(struct cam_sim *sim, union ccb *ccb)
 			break;
 		}
 
-		size_mb = ccg->volume_size /((1024L * 1024L) / ccg->block_size);
-		if (size_mb > 1024) {
-			ccg->heads = 255;
-			ccg->secs_per_track = 63;
-		} else {
-			ccg->heads = 64;
-			ccg->secs_per_track = 32;
-		}
-		secs_per_cylinder = ccg->heads * ccg->secs_per_track;
-		ccg->cylinders = ccg->volume_size / secs_per_cylinder;
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		cam_calc_geometry(ccg, /*extended*/1);
 		xpt_done(ccb);
 		break;
 	}
@@ -1464,7 +1455,7 @@ mpt_action(struct cam_sim *sim, union ccb *ccb)
 static int
 mpt_setwidth(mpt_softc_t *mpt, int tgt, int onoff)
 {
-	fCONFIG_PAGE_SCSI_DEVICE_1 tmp;
+	CONFIG_PAGE_SCSI_DEVICE_1 tmp;
 	tmp = mpt->mpt_dev_page1[tgt];
 	if (onoff) {
 		tmp.RequestedParameters |= MPI_SCSIDEVPAGE1_RP_WIDE;
@@ -1490,7 +1481,7 @@ mpt_setwidth(mpt_softc_t *mpt, int tgt, int onoff)
 static int
 mpt_setsync(mpt_softc_t *mpt, int tgt, int period, int offset)
 {
-	fCONFIG_PAGE_SCSI_DEVICE_1 tmp;
+	CONFIG_PAGE_SCSI_DEVICE_1 tmp;
 	tmp = mpt->mpt_dev_page1[tgt];
 	tmp.RequestedParameters &=
 	    ~MPI_SCSIDEVPAGE1_RP_MIN_SYNC_PERIOD_MASK;

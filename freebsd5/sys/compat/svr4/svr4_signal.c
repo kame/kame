@@ -24,9 +24,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/compat/svr4/svr4_signal.c,v 1.27 2003/04/22 18:23:48 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_signal.c,v 1.29 2003/10/20 10:38:48 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -268,6 +269,9 @@ svr4_sys_sigaction(td, uap)
 	struct sigaction *nbsap;
 	int error;
 
+	if (uap->signum < 0 || uap->signum >= SVR4_NSIG)
+		return (EINVAL);
+
 	DPRINTF(("@@@ svr4_sys_sigaction(%d, %d, %d)\n", td->td_proc->p_pid,
 			uap->signum,
 			SVR4_SVR42BSD_SIG(uap->signum)));
@@ -336,9 +340,14 @@ svr4_sys_signal(td, uap)
 	p = td->td_proc;
 	DPRINTF(("@@@ svr4_sys_signal(%d)\n", p->p_pid));
 
-	signum = SVR4_SVR42BSD_SIG(SVR4_SIGNO(uap->signum));
-	if (signum <= 0 || signum > SVR4_NSIG)
+	signum = SVR4_SIGNO(uap->signum);
+	if (signum < 0 || signum >= SVR4_NSIG) {
+		if (SVR4_SIGCALL(uap->signum) == SVR4_SIGNAL_MASK ||
+		    SVR4_SIGCALL(uap->signum) == SVR4_SIGDEFER_MASK)
+			td->td_retval[0] = (int)SVR4_SIG_ERR;
 		return (EINVAL);
+	}
+	signum = SVR4_SVR42BSD_SIG(signum);
 
 	switch (SVR4_SIGCALL(uap->signum)) {
 	case SVR4_SIGDEFER_MASK:
@@ -508,6 +517,8 @@ svr4_sys_kill(td, uap)
 {
 	struct kill_args ka;
 
+	if (uap->signum < 0 || uap->signum >= SVR4_NSIG)
+		return (EINVAL);
 	ka.pid = uap->pid;
 	ka.signum = SVR4_SVR42BSD_SIG(uap->signum);
 	return kill(td, &ka);

@@ -1,8 +1,6 @@
-/*
+/*-
  * Copyright (c) 2000 Alfred Perlstein <alfred@freebsd.org>
- * All rights reserved.
  * Copyright (c) 2000 Paul Saab <ps@freebsd.org>
- * All rights reserved.
  * Copyright (c) 2000 John Baldwin <jhb@freebsd.org>
  * All rights reserved.
  *
@@ -26,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/i386/libi386/pxe.c,v 1.18 2001/03/14 23:53:25 ps Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/pxe.c,v 1.20 2003/08/25 23:28:31 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>
@@ -286,10 +285,10 @@ pxe_open(struct open_file *f, ...)
 		if (!rootpath[1])
 			strcpy(rootpath, PXENFSROOTPATH);
 
-		for (i = 0; i < FNAME_SIZE; i++)
+		for (i = 0; rootpath[i] != '\0' && i < FNAME_SIZE; i++)
 			if (rootpath[i] == ':')
 				break;
-		if (i && i != FNAME_SIZE) {
+		if (i && i != FNAME_SIZE && rootpath[i] == ':') {
 			rootpath[i++] = '\0';
 			if (inet_addr(&rootpath[0]) != INADDR_NONE)
 				rootip.s_addr = inet_addr(&rootpath[0]);

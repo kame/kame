@@ -29,9 +29,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/alpha/osf1/imgact_osf1.c,v 1.18 2003/03/21 21:49:52 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/imgact_osf1.c,v 1.20 2003/08/22 07:20:27 imp Exp $");
 
 #include <sys/types.h>
 #include <sys/malloc.h>

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.11 2003/03/26 17:50:11 scottl Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.14 2003/12/03 15:42:12 scottl Exp $");
 
 /*
  * CAM front-end for communicating with non-DASD devices
@@ -115,11 +116,15 @@ aac_cam_detach(device_t dev)
 
 	camsc = (struct aac_cam *)device_get_softc(dev);
 
+	mtx_lock(&Giant);
+
 	xpt_async(AC_LOST_DEVICE, camsc->path, NULL);
 	xpt_free_path(camsc->path);
 	xpt_bus_deregister(cam_sim_path(camsc->sim));
 	cam_sim_free(camsc->sim, /*free_devq*/TRUE);
-	
+
+	mtx_unlock(&Giant);
+
 	return (0);
 }
 
@@ -339,9 +344,14 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 			if ((ccb->ccb_h.flags & CAM_SCATTER_VALID) == 0) {
 				srb->data_len = csio->dxfer_len;
 				if (ccb->ccb_h.flags & CAM_DATA_PHYS) {
+					/*
+					 * XXX This isn't 64-bit clean.
+					 * However, this condition is not
+					 * normally used in CAM.
+					 */
 					srb->sg_map32.SgCount = 1;
 					srb->sg_map32.SgEntry[0].SgAddress =
-					    (u_int32_t)csio->data_ptr;
+					    (uint32_t)(uintptr_t)csio->data_ptr;
 					srb->sg_map32.SgEntry[0].SgByteCount =
 					    csio->dxfer_len;
 				} else {
@@ -485,7 +495,11 @@ aac_cam_complete(struct aac_command *cm)
 
 	aac_release_command(cm);
 
+	AAC_LOCK_RELEASE(&sc->aac_io_lock);
+	mtx_lock(&Giant);
 	xpt_done(ccb);
+	mtx_unlock(&Giant);
+	AAC_LOCK_ACQUIRE(&sc->aac_io_lock);
 
 	return;
 }

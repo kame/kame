@@ -1,9 +1,8 @@
 /*
- * $FreeBSD: src/sys/boot/common/ls.c,v 1.10 2000/05/01 18:03:15 peter Exp $
- * From: $NetBSD: ls.c,v 1.3 1997/06/13 13:48:47 drochner Exp $
+ * $NetBSD: ls.c,v 1.3 1997/06/13 13:48:47 drochner Exp $
  */
 
-/*
+/*-
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
  * Copyright (c) 1996
@@ -38,6 +37,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/common/ls.c,v 1.11 2003/08/25 23:30:41 obrien Exp $");
 
 #include <sys/param.h>
 #include <ufs/ufs/dinode.h>

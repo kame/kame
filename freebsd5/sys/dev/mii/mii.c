@@ -37,6 +37,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/mii.c,v 1.17 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * MII bus layer, glues MII-capable network interface drivers to sharable
  * PHY drivers.  This exports an interface compatible with BSD/OS 3.0's,
@@ -44,7 +47,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/mii.c,v 1.16 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/mii.c,v 1.17 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

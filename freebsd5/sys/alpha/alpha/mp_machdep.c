@@ -22,9 +22,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/alpha/alpha/mp_machdep.c,v 1.41 2003/02/20 20:54:42 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/mp_machdep.c,v 1.51 2003/12/03 14:57:25 jhb Exp $");
+
+#include "opt_kstack_pages.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,17 +42,18 @@
 #include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/bus.h>
+#include <sys/user.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
-#include <sys/user.h>
 
 #include <machine/atomic.h>
-#include <machine/pmap.h>
-#include <machine/rpb.h>
 #include <machine/clock.h>
+#include <machine/md_var.h>
+#include <machine/pmap.h>
 #include <machine/prom.h>
+#include <machine/rpb.h>
 #include <machine/smp.h>
 
 /* Set to 1 once we're ready to let the APs out of the pen. */
@@ -60,6 +64,7 @@ static struct mtx ap_boot_mtx;
 u_int boot_cpu_id;
 
 static void	release_aps(void *dummy);
+static int	smp_cpu_enabled(struct pcs *pcsp);
 extern void	smp_init_secondary_glue(void);
 static int	smp_send_secondary_command(const char *command, int cpuid);
 static int	smp_start_secondary(int cpuid);
@@ -136,6 +141,9 @@ smp_init_secondary(void)
 	 */
 	alpha_pal_wrval((u_int64_t) pcpup);
 
+	/* Clear userland thread pointer. */
+	alpha_pal_wrunique(0);
+
 	/*
 	 * Point interrupt/exception vectors to our own.
 	 */
@@ -202,7 +210,7 @@ smp_init_secondary(void)
 
 	/* ok, now grab sched_lock and enter the scheduler */
 	mtx_lock_spin(&sched_lock);
-	cpu_throw();	/* doesn't return */
+	cpu_throw(NULL, choosethread());	/* doesn't return */
 
 	panic("scheduler returned us to %s", __func__);
 }
@@ -294,10 +302,48 @@ smp_start_secondary(int cpuid)
 
 /* Other stuff */
 
+static int
+smp_cpu_enabled(struct pcs *pcsp)
+{
+
+	/* Is this CPU present? */
+	if ((pcsp->pcs_flags & PCS_PP) == 0)
+		return (0);
+
+	/* Is this CPU available? */
+	if ((pcsp->pcs_flags & PCS_PA) == 0)
+		/*
+		 * The TurboLaser PCS_PA bit doesn't seem to be set
+		 * correctly.
+		 */
+		if (hwrpb->rpb_type != ST_DEC_21000) 
+			return (0);
+
+	/* Is this CPU's PALcode valid? */
+	if ((pcsp->pcs_flags & PCS_PV) == 0)
+		return (0);
+
+	return (1);
+}
+
+void
+cpu_mp_setmaxid(void)
+{
+	int i;
+
+	mp_maxid = 0;
+	for (i = 0; i < hwrpb->rpb_pcs_cnt && i < MAXCPU; i++) {
+		if (i == PCPU_GET(cpuid))
+			continue;
+		if (!smp_cpu_enabled(LOCATE_PCS(hwrpb, i)))
+			continue;
+		mp_maxid = i;
+	}
+}
+
 int
 cpu_mp_probe(void)
 {
-	struct pcs *pcsp;
 	int i, cpus;
 
 	/* XXX: Need to check for valid platforms here. */
@@ -308,33 +354,16 @@ cpu_mp_probe(void)
 	all_cpus = 1 << boot_cpu_id;
 
 	mp_ncpus = 1;
-	mp_maxid = 0;
 
 	/* Make sure we have at least one secondary CPU. */
 	cpus = 0;
 	for (i = 0; i < hwrpb->rpb_pcs_cnt; i++) {
 		if (i == PCPU_GET(cpuid))
 			continue;
-		pcsp = (struct pcs *)((char *)hwrpb + hwrpb->rpb_pcs_off +
-		    (i * hwrpb->rpb_pcs_size));
-		if ((pcsp->pcs_flags & PCS_PP) == 0) {
+		if (!smp_cpu_enabled(LOCATE_PCS(hwrpb, i)))
 			continue;
-		}
-		if ((pcsp->pcs_flags & PCS_PA) == 0) {
-			/*
-			 * The TurboLaser PCS_PA bit doesn't seem to be set
-			 * correctly.
-			 */
-			if (hwrpb->rpb_type != ST_DEC_21000) 
-				continue;
-		}
-		if ((pcsp->pcs_flags & PCS_PV) == 0) {
+		if (i > MAXCPU)
 			continue;
-		}
-		if (i > MAXCPU) {
-			continue;
-		}
-		mp_maxid = i;
 		cpus++;
 	}
 	return (cpus);
@@ -348,13 +377,11 @@ cpu_mp_start(void)
 	mtx_init(&ap_boot_mtx, "ap boot", NULL, MTX_SPIN);
 
 	for (i = 0; i < hwrpb->rpb_pcs_cnt; i++) {
-		int dv;
 		struct pcs *pcsp;
 
 		if (i == boot_cpu_id)
 			continue;
-		pcsp = (struct pcs *)((char *)hwrpb + hwrpb->rpb_pcs_off +
-		    (i * hwrpb->rpb_pcs_size));
+		pcsp = LOCATE_PCS(hwrpb, i);
 		if ((pcsp->pcs_flags & PCS_PP) == 0)
 			continue;
 		if ((pcsp->pcs_flags & PCS_PA) == 0) {
@@ -379,8 +406,7 @@ cpu_mp_start(void)
 			}
 			continue;
 		}
-		dv = 0;
-		if (resource_int_value("cpu", i, "disable", &dv) == 0 && dv) {
+		if (resource_disabled("cpu", i)) {
 			printf("CPU %d disabled by loader.\n", i);
 			continue;
 		}

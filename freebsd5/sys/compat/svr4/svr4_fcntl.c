@@ -27,9 +27,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
- * $FreeBSD: src/sys/compat/svr4/svr4_fcntl.c,v 1.30 2003/01/13 00:28:57 dillon Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_fcntl.c,v 1.32 2003/06/22 08:41:41 phk Exp $");
 
 #include "opt_mac.h"
 
@@ -311,7 +312,7 @@ fd_truncate(td, fd, flp)
 	if ((error = fget(td, fd, &fp)) != 0)
 		return (error);
 
-	vp = fp->f_data;
+	vp = fp->f_vnode;
 
 	if (fp->f_type != DTYPE_VNODE || vp->v_type == VFIFO) {
 		fdrop(fp, td);

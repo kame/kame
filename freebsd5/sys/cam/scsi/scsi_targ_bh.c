@@ -24,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.16 2003/02/02 13:17:27 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_targ_bh.c,v 1.20 2003/09/30 08:03:52 simokawa Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -166,7 +167,7 @@ targbhinit(void)
 
 		xpt_setup_ccb(&csa.ccb_h, path, /*priority*/5);
 		csa.ccb_h.func_code = XPT_SASYNC_CB;
-		csa.event_enable = AC_PATH_REGISTERED;
+		csa.event_enable = AC_PATH_REGISTERED | AC_PATH_DEREGISTERED;
 		csa.callback = targbhasync;
 		csa.callback_arg = NULL;
 		xpt_action((union ccb *)&csa);
@@ -184,51 +185,56 @@ static void
 targbhasync(void *callback_arg, u_int32_t code,
 	    struct cam_path *path, void *arg)
 {
-	struct cam_periph *periph;
+	struct cam_path *new_path;
+	struct ccb_pathinq *cpi;
+	path_id_t bus_path_id;
+	cam_status status;
 
-	periph = (struct cam_periph *)callback_arg;
+	cpi = (struct ccb_pathinq *)arg;
+	if (code == AC_PATH_REGISTERED)
+		bus_path_id = cpi->ccb_h.path_id;
+	else
+		bus_path_id = xpt_path_path_id(path);
+	/*
+	 * Allocate a peripheral instance for
+	 * this target instance.
+	 */
+	status = xpt_create_path(&new_path, NULL,
+				 bus_path_id,
+				 CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD);
+	if (status != CAM_REQ_CMP) {
+		printf("targbhasync: Unable to create path "
+			"due to status 0x%x\n", status);
+		return;
+	}
+
 	switch (code) {
 	case AC_PATH_REGISTERED:
 	{
-		struct ccb_pathinq *cpi;
-		struct cam_path *new_path;
-		cam_status status;
- 
-		cpi = (struct ccb_pathinq *)arg;
-
 		/* Only attach to controllers that support target mode */
 		if ((cpi->target_sprt & PIT_PROCESSOR) == 0)
 			break;
 
-		/*
-		 * Allocate a peripheral instance for
-		 * this target instance.
-		 */
-		status = xpt_create_path(&new_path, NULL,
-					 xpt_path_path_id(path),
-					 CAM_TARGET_WILDCARD, CAM_LUN_WILDCARD);
-		if (status != CAM_REQ_CMP) {
-			printf("targbhasync: Unable to create path "
-				"due to status 0x%x\n", status);
-			break;
-		}
 		status = cam_periph_alloc(targbhctor, NULL, targbhdtor,
 					  targbhstart,
 					  "targbh", CAM_PERIPH_BIO,
 					  new_path, targbhasync,
 					  AC_PATH_REGISTERED,
 					  cpi);
-		xpt_free_path(new_path);
 		break;
 	}
 	case AC_PATH_DEREGISTERED:
 	{
-		targbhdislun(periph);
+		struct cam_periph *periph;
+
+		if ((periph = cam_periph_find(new_path, "targbh")) != NULL)
+			cam_periph_invalidate(periph);
 		break;
 	}
 	default:
 		break;
 	}
+	xpt_free_path(new_path);
 }
 
 /* Attempt to enable our lun */
@@ -399,10 +405,7 @@ targbhdislun(struct cam_periph *periph)
 static cam_status
 targbhctor(struct cam_periph *periph, void *arg)
 {
-	struct ccb_pathinq *cpi;
 	struct targbh_softc *softc;
-
-	cpi = (struct ccb_pathinq *)arg;
 
 	/* Allocate our per-instance private storage */
 	softc = (struct targbh_softc *)malloc(sizeof(*softc),
@@ -436,13 +439,15 @@ targbhdtor(struct cam_periph *periph)
 	targbhdislun(periph);
 
 	switch (softc->init_level) {
-	default:
-		/* FALLTHROUGH */
-	case 1:
-		free(softc, M_DEVBUF);
-		break;
 	case 0:
 		panic("targdtor - impossible init level");;
+	case 1:
+		/* FALLTHROUGH */
+	default:
+		/* XXX Wait for callback of targbhdislun() */
+		tsleep(softc, PRIBIO, "targbh", hz/2);
+		free(softc, M_DEVBUF);
+		break;
 	}
 }
 

@@ -25,9 +25,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/cam_periph.c,v 1.48 2003/04/06 22:21:03 alc Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/cam_periph.c,v 1.56 2003/11/08 10:56:57 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -214,10 +215,13 @@ failure:
 		TAILQ_REMOVE(&(*p_drv)->units, periph, unit_links);
 		splx(s);
 		xpt_remove_periph(periph);
+		/* FALLTHROUGH */
 	case 2:
 		xpt_free_path(periph->path);
+		/* FALLTHROUGH */
 	case 1:
 		free(periph, M_DEVBUF);
+		/* FALLTHROUGH */
 	case 0:
 		/* No cleanup to perform. */
 		break;
@@ -634,9 +638,6 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		/* set the transfer length, we know it's < DFLTPHYS */
 		mapinfo->bp[i]->b_bufsize = lengths[i];
 
-		/* set the flags */
-		mapinfo->bp[i]->b_flags = B_PHYS;
-
 		/* set the direction */
 		mapinfo->bp[i]->b_iocmd = flags[i];
 
@@ -649,16 +650,12 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		 * vmapbuf() after the useracc() check.
 		 */
 		if (vmapbuf(mapinfo->bp[i]) < 0) {
-			printf("cam_periph_mapmem: error, "
-				"address %p, length %lu isn't "
-				"user accessible any more\n",
-				(void *)*data_ptrs[i],
-				(u_long)lengths[i]);
 			for (j = 0; j < i; ++j) {
 				*data_ptrs[j] = mapinfo->bp[j]->b_saveaddr;
-				mapinfo->bp[j]->b_flags &= ~B_PHYS;
+				vunmapbuf(mapinfo->bp[j]);
 				relpbuf(mapinfo->bp[j], NULL);
 			}
+			relpbuf(mapinfo->bp[i], NULL);
 			PRELE(curproc);
 			return(EACCES);
 		}
@@ -717,9 +714,6 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 
 		/* unmap the buffer */
 		vunmapbuf(mapinfo->bp[i]);
-
-		/* clear the flags we set above */
-		mapinfo->bp[i]->b_flags &= ~B_PHYS;
 
 		/* release the buffer */
 		relpbuf(mapinfo->bp[i], NULL);
@@ -973,15 +967,15 @@ camperiphdone(struct cam_periph *periph, union ccb *done_ccb)
 				sense_key = saved_ccb->csio.sense_data.flags;
 				sense_key &= SSD_KEY;
 				if (sense_key != SSD_KEY_NO_SENSE) {
-					saved_ccb->ccb_h.flags |=
+					saved_ccb->ccb_h.status |=
 					    CAM_AUTOSNS_VALID;
+#if 0
 					xpt_print_path(saved_ccb->ccb_h.path);
 					printf("Recovered Sense\n");
-#if 0
 					scsi_sense_print(&saved_ccb->csio);
-#endif
 					cam_error_print(saved_ccb, CAM_ESF_ALL,
 							CAM_EPF_ALL);
+#endif
 					xpt_done_ccb = TRUE;
 				}
 			}
@@ -1000,12 +994,24 @@ camperiphdone(struct cam_periph *periph, union ccb *done_ccb)
 		scsi_cmd = (struct scsi_start_stop_unit *)
 				&done_ccb->csio.cdb_io.cdb_bytes;
 		if (sense != 0) {
+			struct ccb_getdev cgd;
 			struct scsi_sense_data *sense;
 			int    error_code, sense_key, asc, ascq;	
+			scsi_sense_action err_action;
 
 			sense = &done_ccb->csio.sense_data;
 			scsi_extract_sense(sense, &error_code, 
 					   &sense_key, &asc, &ascq);
+
+			/*
+			 * Grab the inquiry data for this device.
+			 */
+			xpt_setup_ccb(&cgd.ccb_h, done_ccb->ccb_h.path,
+				      /*priority*/ 1);
+			cgd.ccb_h.func_code = XPT_GDEV_TYPE;
+			xpt_action((union ccb *)&cgd);
+			err_action = scsi_error_action(&done_ccb->csio,
+						       &cgd.inq_data, 0);
 
 			/*
 	 		 * If the error is "invalid field in CDB", 
@@ -1034,12 +1040,15 @@ camperiphdone(struct cam_periph *periph, union ccb *done_ccb)
 
 				xpt_action(done_ccb);
 
-			} else if (done_ccb->ccb_h.retry_count > 1) {
+			} else if ((done_ccb->ccb_h.retry_count > 1)
+				&& ((err_action & SS_MASK) != SS_FAIL)) {
+
 				/*
 				 * In this case, the error recovery
 				 * command failed, but we've got 
 				 * some retries left on it.  Give
-				 * it another try.
+				 * it another try unless this is an
+				 * unretryable error.
 				 */
 
 				/* set the timeout to .5 sec */
@@ -1550,24 +1559,28 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 			printf("Request completed with CAM_REQ_CMP_ERR\n");
 			printed++;
 		}
+		/* FALLTHROUGH */
 	case CAM_CMD_TIMEOUT:
 		if (bootverbose && printed == 0) {
 			xpt_print_path(ccb->ccb_h.path);
 			printf("Command timed out\n");
 			printed++;
 		}
+		/* FALLTHROUGH */
 	case CAM_UNEXP_BUSFREE:
 		if (bootverbose && printed == 0) {
 			xpt_print_path(ccb->ccb_h.path);
 			printf("Unexpected Bus Free\n");
 			printed++;
 		}
+		/* FALLTHROUGH */
 	case CAM_UNCOR_PARITY:
 		if (bootverbose && printed == 0) {
 			xpt_print_path(ccb->ccb_h.path);
 			printf("Uncorrected Parity Error\n");
 			printed++;
 		}
+		/* FALLTHROUGH */
 	case CAM_DATA_RUN_ERR:
 		if (bootverbose && printed == 0) {
 			xpt_print_path(ccb->ccb_h.path);

@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.24 2003/02/20 20:54:43 phk Exp $ */
 /*
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
@@ -23,8 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.28 2003/11/17 06:10:14 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -57,7 +58,8 @@
 #include <alpha/mcbus/mcpciareg.h>
 #include <alpha/mcbus/mcpciavar.h>
 #include <alpha/pci/pcibus.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include "alphapci_if.h"
 #include "pcib_if.h"
@@ -302,13 +304,13 @@ mcpcia_disable_intr(struct mcpcia_softc *sc, int irq)
 }
 
 static void
-mcpcia_disable_intr_vec(int vector)
+mcpcia_disable_intr_vec(uintptr_t vector)
 {
 	int mid, irq;
 	struct mcpcia_softc *sc = mcpcia_root;
 
 	if (vector < MCPCIA_VEC_PCI) {
-		printf("EISA disable (0x%x)\n", vector);
+		printf("EISA disable (0x%lx)\n", vector);
 		return;
 	}
 
@@ -322,7 +324,7 @@ mcpcia_disable_intr_vec(int vector)
 		tmp &= (MCPCIA_VECWIDTH_PER_MCPCIA - 1);
 		slot = tmp / MCPCIA_VECWIDTH_PER_SLOT;
 		if (slot < 2 || slot > 5) {
-			printf("Bad slot (%d) for vector %x\n", slot, vector);
+			printf("Bad slot (%d) for vector %lx\n", slot, vector);
 			return;
 		}
 		tmp -= (2 * MCPCIA_VECWIDTH_PER_SLOT);
@@ -336,7 +338,7 @@ mcpcia_disable_intr_vec(int vector)
 		sc = sc->next;
 	}
 	if (sc == NULL) {
-		panic("couldn't find MCPCIA softc for vector 0x%x", vector);
+		panic("couldn't find MCPCIA softc for vector 0x%lx", vector);
 	}
 	mtx_lock_spin(&icu_lock);
 	mcpcia_disable_intr(sc, irq);
@@ -344,13 +346,13 @@ mcpcia_disable_intr_vec(int vector)
 }
 
 static void
-mcpcia_enable_intr_vec(int vector)
+mcpcia_enable_intr_vec(uintptr_t vector)
 {
 	int mid, irq;
 	struct mcpcia_softc *sc = mcpcia_root;
 
 	if (vector < MCPCIA_VEC_PCI) {
-		printf("EISA ensable (0x%x)\n", vector);
+		printf("EISA ensable (0x%lx)\n", vector);
 		return;
 	}
 
@@ -364,7 +366,7 @@ mcpcia_enable_intr_vec(int vector)
 		tmp &= (MCPCIA_VECWIDTH_PER_MCPCIA - 1);
 		slot = tmp / MCPCIA_VECWIDTH_PER_SLOT;
 		if (slot < 2 || slot > 5) {
-			printf("Bad slot (%d) for vector %x\n", slot, vector);
+			printf("Bad slot (%d) for vector %lx\n", slot, vector);
 			return;
 		}
 		tmp -= (2 * MCPCIA_VECWIDTH_PER_SLOT);
@@ -378,7 +380,7 @@ mcpcia_enable_intr_vec(int vector)
 		sc = sc->next;
 	}
 	if (sc == NULL) {
-		panic("couldn't find MCPCIA softc for vector 0x%x", vector);
+		panic("couldn't find MCPCIA softc for vector 0x%lx", vector);
 	}
 	mtx_lock_spin(&icu_lock);
 	mcpcia_enable_intr(sc, irq);
@@ -386,43 +388,49 @@ mcpcia_enable_intr_vec(int vector)
 }
 
 static int
-mcpcia_setup_intr(device_t dev, device_t child, struct resource *ir, int flags,
-       driver_intr_t *intr, void *arg, void **cp)
+mcpcia_pci_route_interrupt(device_t bus, device_t dev, int pin)
 {
-	struct mcpcia_softc *sc = MCPCIA_SOFTC(dev);
-	int slot, mid, gid, birq, irq, error, intpin, h;
-	
-	intpin = pci_get_intpin(child);
-	if (intpin == 0) {
-		/* No IRQ used */
-		return (0);
-	}
-	if (intpin < 1 || intpin > 4) {
-		/* Bad IRQ */
-		return (ENXIO);
+	int irq, slot, mid;
+
+	/*
+	 * Validate requested pin number.
+	 */
+	if ((pin < 1) || (pin > 4)) {
+		printf("mcpcia_pci_route_interrupt: bad interrupt pin %d\n",
+		    pin);
+		return(255);
 	}
 
-	slot = pci_get_slot(child);
-	mid = mcbus_get_mid(dev);
-	gid = mcbus_get_gid(dev);
+	slot = pci_get_slot(dev);
+	mid = mcbus_get_mid(bus);
 
-	if (slot == 0) {
-		device_t bdev; 
-		/* bridged - get slot from grandparent */
-		/* note that this is broken for all but the most trival case */
-		bdev = device_get_parent(device_get_parent(child));
-		slot = pci_get_slot(bdev);
-	}
+#if 0
+	printf("mcpcia_pci_route_interrupt: called for slot=%d, pin=%d, mid=%d\n", slot, pin, mid);
+#endif
 
 	if (mid == 5 && slot == 1) {
 		irq = 16;	/* MID 5, slot 1, is the internal NCR 53c810 */
 	} else if (slot >= 2 && slot <= 5) {
-		irq = ((slot - 2) * 4) + (intpin - 1);
+		irq = ((slot - 2) * 4) + (pin - 1);
 	} else {
-		device_printf(child, "weird slot number (%d); can't make irq\n",
+		printf("mcpcia_pci_route_interrupt: weird device number %d\n",
 		    slot);
-		return (ENXIO);
+		return (255);
 	}
+
+	return(irq);
+}
+
+static int
+mcpcia_setup_intr(device_t dev, device_t child, struct resource *ir, int flags,
+       driver_intr_t *intr, void *arg, void **cp)
+{
+	struct mcpcia_softc *sc = MCPCIA_SOFTC(dev);
+	int mid, birq, irq, error, h;
+	
+	irq = ir->r_start;
+	mid = mcbus_get_mid(dev);
+
 	error = rman_activate_resource(ir);
 	if (error)
 		return error;
@@ -436,8 +444,8 @@ mcpcia_setup_intr(device_t dev, device_t child, struct resource *ir, int flags,
 	} else {
 		h = MCPCIA_VEC_PCI +
 		    ((mid - MCPCIA_PCI_MIDMIN) * MCPCIA_VECWIDTH_PER_MCPCIA) +
-		    (slot * MCPCIA_VECWIDTH_PER_SLOT) +
-		    ((intpin - 1) * MCPCIA_VECWIDTH_PER_INTPIN);
+		    irq * MCPCIA_VECWIDTH_PER_INTPIN +
+		    2 * MCPCIA_VECWIDTH_PER_SLOT;
 	}
 	birq = irq + INTRCNT_KN300_IRQ;
 	error = alpha_setup_intr(device_get_nameunit(child), h,
@@ -448,8 +456,8 @@ mcpcia_setup_intr(device_t dev, device_t child, struct resource *ir, int flags,
 	mtx_lock_spin(&icu_lock);
 	mcpcia_enable_intr(sc, irq);
 	mtx_unlock_spin(&icu_lock);
-	device_printf(child, "interrupting at IRQ 0x%x int%c (vec 0x%x)\n",
-	    irq, intpin - 1 + 'A' , h);
+	device_printf(child, "interrupting at IRQ 0x%x (vec 0x%x)\n",
+	    irq , h);
 	return (0);
 }
 
@@ -457,30 +465,9 @@ static int
 mcpcia_teardown_intr(device_t dev, device_t child, struct resource *i, void *c)
 {
 	struct mcpcia_softc *sc = MCPCIA_SOFTC(dev);
-	int slot, mid, intpin, irq;
 
-	intpin = pci_get_intpin(child);
-	if (intpin == 0) {
-		/* No IRQ used */
-		return (0);
-	}
-	if (intpin < 1 || intpin > 4) {
-		/* Bad IRQ */
-		return (ENXIO);
-	}
-
-	slot = pci_get_slot(child);
-	mid = mcbus_get_mid(dev);
-
-	if (mid == 5 && slot == 1) {
-		irq = 16;
-	} else if (slot >= 2 && slot <= 5) {
-		irq = ((slot - 2) << 4) + (intpin - 1);
-	} else {
-		return (ENXIO);
-	}
 	mtx_lock_spin(&icu_lock);
-	mcpcia_disable_intr(sc, irq);
+	mcpcia_disable_intr(sc, i->r_start);
 	mtx_unlock_spin(&icu_lock);
 	alpha_teardown_intr(c);
 	return (rman_deactivate_resource(i));
@@ -552,6 +539,11 @@ mcpcia_read_config(device_t dev, int bus, int slot, int func,
 	struct mcpcia_softc *sc = MCPCIA_SOFTC(dev);
 	u_int32_t *dp, data, rvp;
 	u_int64_t paddr;
+
+	if ((off == PCIR_INTLINE) && (sz == 1)) {
+		/* SRM left bad value; let intr_route fill them in later */
+		return ~0;
+	}
 
 	rvp = data = ~0;
 
@@ -788,7 +780,7 @@ static device_method_t mcpcia_methods[] = {
 	DEVMETHOD(pcib_maxslots,		mcpcia_maxslots),
 	DEVMETHOD(pcib_read_config,		mcpcia_read_config),
 	DEVMETHOD(pcib_write_config,		mcpcia_write_config),
-	DEVMETHOD(pcib_route_interrupt,		alpha_pci_route_interrupt),
+	DEVMETHOD(pcib_route_interrupt,		mcpcia_pci_route_interrupt),
 
 	{ 0, 0 }
 };

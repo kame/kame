@@ -1,29 +1,33 @@
 /*
- * Copyright (c) 2002,2003 Hewlett-Packard Company
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included
- * in all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
- * THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- */
+Copyright (c) 2003 Hewlett-Packard Development Company, L.P.
+Permission is hereby granted, free of charge, to any person
+obtaining a copy of this software and associated documentation
+files (the "Software"), to deal in the Software without
+restriction, including without limitation the rights to use,
+copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following
+conditions:
+
+The above copyright notice and this permission notice shall be
+included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+*/
 
 #include "uwx_env.h"
 #include "uwx_uinfo.h"
 #include "uwx_scoreboard.h"
 #include "uwx_trace.h"
+
+#ifdef UWX_TRACE_ENABLE
 
 void uwx_trace_init(struct uwx_env *env)
 {
@@ -96,9 +100,9 @@ void uwx_dump_rstate(int regid, uint64_t rstate)
 	    break;
 	case UWX_DISP_REG(0):
 	    reg = UWX_GET_DISP_REGID(rstate);
-	    if (reg == UWX_REG_PFS)
+	    if (reg == UWX_REG_AR_PFS)
 		printf("    [AR.PFS]\n");
-	    else if (reg == UWX_REG_UNAT)
+	    else if (reg == UWX_REG_AR_UNAT)
 		printf("    [AR.UNAT]\n");
 	    else if (reg >= UWX_REG_GR(0) && reg < UWX_REG_GR(128))
 		printf("    [GR%d]\n", reg - UWX_REG_GR(0));
@@ -136,3 +140,4 @@ void uwx_dump_scoreboard(
 	uwx_dump_rstate(i, scoreboard->rstate[i]);
 }
 
+#endif /* UWX_TRACE_ENABLE */

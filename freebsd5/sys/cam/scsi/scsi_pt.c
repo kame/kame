@@ -24,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/scsi/scsi_pt.c,v 1.37 2003/04/01 15:06:22 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_pt.c,v 1.39 2003/06/10 18:14:05 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -458,8 +459,8 @@ ptasync(void *callback_arg, u_int32_t code, struct cam_path *path, void *arg)
 		LIST_FOREACH(ccbh, &softc->pending_ccbs, periph_links.le)
 			ccbh->ccb_state |= PT_CCB_RETRY_UA;
 		splx(s);
-		/* FALLTHROUGH */
 	}
+	/* FALLTHROUGH */
 	default:
 		cam_periph_async(periph, code, path, arg);
 		break;

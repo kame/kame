@@ -1,5 +1,3 @@
-/* $FreeBSD: src/sys/alpha/tlsb/tlsbcpu.c,v 1.3 2001/10/11 21:47:27 mjacob Exp $ */
-
 /*
  * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
@@ -32,6 +30,9 @@
  * Node for TLSB CPU Modules found on
  * AlphaServer 8200 and 8400 systems.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/tlsbcpu.c,v 1.5 2003/08/22 07:20:27 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

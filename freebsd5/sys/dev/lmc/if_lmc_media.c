@@ -23,9 +23,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lmc/if_lmc_media.c,v 1.3 2002/06/02 20:05:44 schweikh Exp $
  *	$Id: if_lmc_media.c,v 1.23 1999/03/01 15:12:24 explorer Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/lmc/if_lmc_media.c,v 1.4 2003/08/24 17:49:15 obrien Exp $");
 
 /*
  * For lack of a better place, put the SSI cable stuff here.

@@ -22,14 +22,15 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_sym.c,v 1.33 2002/03/20 05:14:28 alfred Exp $
  */
-
 /*
  * 	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_sym.c,v 1.34 2003/06/10 22:09:23 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 

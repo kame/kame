@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.28.2.1 2003/06/04 15:58:31 scottl Exp $
+# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.30 2003/06/08 03:34:49 nyan Exp $
 
 PROG=		loader
 STRIP=
@@ -100,15 +100,16 @@ ${PROG}.bin: ${PROG}.sym
 	cp ${.ALLSRC} ${.TARGET}
 	strip -R .comment -R .note ${.TARGET}
 
-${PROG}.help: help.common help.i386
+${PROG}.help: help.common help.pc98
 	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}
 
 .PATH: ${.CURDIR}/../../forth 
 FILES=	${PROG}.help loader.4th support.4th loader.conf
+FILES+= screen.4th frames.4th beastie.4th
 FILESDIR_loader.conf=	/boot/defaults
 
 .if !exists(${DESTDIR}/boot/loader.rc)
-FILES+=	${.CURDIR}/../../forth/loader.rc
+FILES+=	${.CURDIR}/../../i386/loader/loader.rc
 .endif
 
 .include <${.CURDIR}/../Makefile.inc>

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -31,9 +32,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/amd64/amd64/sys_machdep.c,v 1.83 2003/05/12 02:37:29 peter Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/sys_machdep.c,v 1.87 2003/11/21 03:01:59 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -77,7 +79,7 @@ sysarch(td, uap)
 	case AMD64_SET_GSBASE:
 		error = copyin(uap->parms, &pcb->pcb_gsbase, sizeof(pcb->pcb_gsbase));
 		if (!error)
-			wrmsr(MSR_KGSBASE, pcb->pcb_fsbase);
+			wrmsr(MSR_KGSBASE, pcb->pcb_gsbase);
 		break;
 
 	default:

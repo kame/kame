@@ -31,8 +31,10 @@
  * Rewritten by:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_state.c,v 1.6 2003/04/25 01:18:46 anholt Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/drm/mga_state.c,v 1.8 2003/08/24 22:04:12 anholt Exp $");
 
 #include "dev/drm/mga.h"
 #include "dev/drm/drmP.h"
@@ -159,7 +161,7 @@ static __inline__ void mga_g200_emit_tex0( drm_mga_private_t *dev_priv )
 	ADVANCE_DMA();
 }
 
-static __inline__ void mga_g400_emit_tex0( drm_mga_private_t *dev_priv )
+static /*__inline__*/ void mga_g400_emit_tex0( drm_mga_private_t *dev_priv )
 {
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	drm_mga_texture_regs_t *tex = &sarea_priv->tex_state[0];
@@ -274,7 +276,7 @@ static __inline__ void mga_g200_emit_pipe( drm_mga_private_t *dev_priv )
 	ADVANCE_DMA();
 }
 
-static __inline__ void mga_g400_emit_pipe( drm_mga_private_t *dev_priv )
+static /*__inline__*/ void mga_g400_emit_pipe( drm_mga_private_t *dev_priv )
 {
 	drm_mga_sarea_t *sarea_priv = dev_priv->sarea_priv;
 	unsigned int pipe = sarea_priv->warp_pipe;

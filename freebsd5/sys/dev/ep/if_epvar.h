@@ -19,66 +19,93 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_epvar.h,v 1.7 2003/03/29 22:27:41 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ep/if_epvar.h,v 1.13 2003/10/25 21:28:40 imp Exp $
  */
 
 struct ep_board {
-	u_short		prod_id;	/* product ID */
-	int		cmd_off;	/* command offset (bit shift) */
-	int		mii_trans;	/* activate MII transiever */
-	u_short		res_cfg;	/* resource configuration */
+	u_short prod_id;	/* product ID */
+	int cmd_off;		/* command offset (bit shift) */
+	int mii_trans;		/* activate MII transiever */
+	u_short res_cfg;	/* resource configuration */
 };
 
 /*
  * Ethernet software status per interface.
  */
 struct ep_softc {
-	struct arpcom		arpcom;		/* Ethernet common part	*/
-	struct ifmedia		ifmedia;	/* media info		*/
+	struct arpcom arpcom;	/* Ethernet common part	 */
+	struct ifmedia ifmedia;	/* media info		 */
 
-	device_t		dev;
+	device_t dev;
 
-	struct resource *	iobase;
-	struct resource *	irq;
+	struct mtx sc_mtx;
+	struct resource *iobase;
+	struct resource *irq;
 
-	bus_space_handle_t	ep_bhandle;
-	bus_space_tag_t		ep_btag;
-	void *			ep_intrhand;
+	bus_space_handle_t bsh;
+	bus_space_tag_t bst;
+	void *ep_intrhand;
 
-	int			ep_io_addr;	/* i/o bus address	*/
+	u_short ep_connectors;	/* Connectors on this card. */
+	u_char ep_connector;	/* Configured connector. */
 
-	u_short			ep_connectors;	/* Connectors on this card. */
-	u_char			ep_connector;	/* Configured connector.*/
+	struct mbuf *top;
+	struct mbuf *mcur;
+	short cur_len;
 
-	struct mbuf *		top;
-	struct mbuf *		mcur;
-	short			cur_len;
-
-	int			stat;		/* some flags */
+	int stat;		/* some flags */
 #define	F_RX_FIRST		0x001
 #define	F_PROMISC		0x008
 #define	F_ACCESS_32_BITS	0x100
 
-	int			gone;		/* adapter is not present (for PCCARD) */
+	int gone;		/* adapter is not present (for PCCARD) */
 
-	struct ep_board		epb;
+	struct ep_board epb;
 
-	int			unit;
+	int unit;
 
 #ifdef  EP_LOCAL_STATS
-	short		tx_underrun;
-	short		rx_no_first;
-	short		rx_no_mbuf;
-	short		rx_overrunf;
-	short		rx_overrunl;
+	short tx_underrun;
+	short rx_no_first;
+	short rx_no_mbuf;
+	short rx_overrunf;
+	short rx_overrunl;
 #endif
 };
 
-int		ep_alloc	(device_t);
-void		ep_free		(device_t);
-int		ep_detach	(device_t);
-void		ep_get_media	(struct ep_softc *);
-int		ep_attach	(struct ep_softc *);
-void		ep_intr		(void *);
-int		get_e		(struct ep_softc *, u_int16_t, u_int16_t *);
-int		ep_get_macaddr	(struct ep_softc *, u_char *);
+int ep_alloc(device_t);
+void ep_free(device_t);
+int ep_detach(device_t);
+void ep_get_media(struct ep_softc *);
+int ep_attach(struct ep_softc *);
+void ep_intr(void *);
+int get_e(struct ep_softc *, u_int16_t, u_int16_t *);
+int ep_get_macaddr(struct ep_softc *, u_char *);
+
+#define CSR_READ_1(sc, off) (bus_space_read_1((sc)->bst, (sc)->bsh, off))
+#define CSR_READ_2(sc, off) (bus_space_read_2((sc)->bst, (sc)->bsh, off))
+#define CSR_WRITE_1(sc, off, val) \
+	bus_space_write_1(sc->bst, sc->bsh, off, val)
+#define CSR_WRITE_2(sc, off, val) \
+	bus_space_write_2(sc->bst, sc->bsh, off, val)
+#define CSR_WRITE_MULTI_1(sc, off, addr, count) \
+	bus_space_write_multi_1(sc->bst, sc->bsh, off, addr, count)
+#define CSR_WRITE_MULTI_2(sc, off, addr, count) \
+	bus_space_write_multi_2(sc->bst, sc->bsh, off, addr, count)
+#define CSR_WRITE_MULTI_4(sc, off, addr, count) \
+	bus_space_write_multi_4(sc->bst, sc->bsh, off, addr, count)
+#define CSR_READ_MULTI_1(sc, off, addr, count) \
+	bus_space_read_multi_1(sc->bst, sc->bsh, off, addr, count)
+#define CSR_READ_MULTI_2(sc, off, addr, count) \
+	bus_space_read_multi_2(sc->bst, sc->bsh, off, addr, count)
+#define CSR_READ_MULTI_4(sc, off, addr, count) \
+	bus_space_read_multi_4(sc->bst, sc->bsh, off, addr, count)
+
+#define EP_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
+#define	EP_UNLOCK(_sc)		mtx_unlock(&(_sc)->sc_mtx)
+#define EP_LOCK_INIT(_sc) \
+	mtx_init(&_sc->sc_mtx, device_get_nameunit(_sc->dev), \
+	    MTX_NETWORK_LOCK, MTX_DEF)
+#define EP_LOCK_DESTORY(_sc)	mtx_destroy(&_sc->sc_mtx);
+#define EP_ASSERT_LOCKED(_sc)	mtx_assert(&_sc->sc_mtx, MA_OWNED);
+#define EP_ASSERT_UNLOCKED(_sc)	mtx_assert(&_sc->sc_mtx, MA_NOTOWNED);

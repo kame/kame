@@ -5,7 +5,7 @@
  *
  * @(#)ip_compat.h	1.8 1/14/96
  * $Id: ip_compat.h,v 2.26.2.9 2001/01/14 14:58:01 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_compat.h,v 1.20 2003/02/15 06:23:45 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_compat.h,v 1.21 2003/10/31 18:31:56 brooks Exp $
  */
 
 #ifndef	__IP_COMPAT_H__
@@ -542,7 +542,8 @@ extern	ill_t	*get_unit __P((char *, int));
 #  ifndef	linux
 #   define	GETUNIT(n, v)	ifunit(n)
 #   if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199606)) || \
-        (defined(OpenBSD) && (OpenBSD >= 199603))
+        (defined(OpenBSD) && (OpenBSD >= 199603)) || \
+	(defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 #    define	IFNAME(x)	((struct ifnet *)x)->if_xname
 #   else
 #    define	USE_GETIFNAME	1

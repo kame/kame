@@ -30,13 +30,16 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.28 2003/10/31 18:32:02 brooks Exp $");
+
 /*
  * Driver for the Broadcom BCR5400 1000baseTX PHY. Speed is always
  * 1000mbps; all we need to negotiate here is full or half duplex.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.21 2003/05/04 02:03:20 ps Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.28 2003/10/31 18:32:02 brooks Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,6 +57,12 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.21 2003/05/04 02:03:20 ps Exp $
 #include "miidevs.h"
 
 #include <dev/mii/brgphyreg.h>
+#include <net/if_arp.h>
+#include <machine/bus.h>
+#include <dev/bge/if_bgereg.h>
+
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include "miibus_if.h"
 
@@ -133,6 +142,12 @@ brgphy_probe(dev)
 		return(0);
 	}
 
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_xxBROADCOM &&
+	    MII_MODEL(ma->mii_id2) == MII_MODEL_xxBROADCOM_BCM5705) {
+		device_set_desc(dev, MII_STR_xxBROADCOM_BCM5705);
+		return(0);
+	}
+
 	return(ENXIO);
 }
 
@@ -144,6 +159,8 @@ brgphy_attach(dev)
 	struct mii_attach_args *ma;
 	struct mii_data *mii;
 	const char *sep = "";
+	struct bge_softc *bge_sc;
+	int fast_ether_only = FALSE;
 
 	sc = device_get_softc(dev);
 	ma = device_get_ivars(dev);
@@ -177,11 +194,26 @@ brgphy_attach(dev)
 	sc->mii_capabilities &= ~BMSR_ANEG;
 	device_printf(dev, " ");
 	mii_add_media(sc);
-	ADD(IFM_MAKEWORD(IFM_ETHER, IFM_1000_T, 0, sc->mii_inst),
-	    BRGPHY_BMCR_FDX);
-	PRINT(", 1000baseTX");
-	ADD(IFM_MAKEWORD(IFM_ETHER, IFM_1000_T, IFM_FDX, sc->mii_inst), 0);
-	PRINT("1000baseTX-FDX");
+
+	/* The 590x chips are 10/100 only. */
+
+	bge_sc = mii->mii_ifp->if_softc;
+
+	if (strcmp(mii->mii_ifp->if_dname, "bge") == 0 &&
+	    pci_get_vendor(bge_sc->bge_dev) == BCOM_VENDORID &&
+	    (pci_get_device(bge_sc->bge_dev) == BCOM_DEVICEID_BCM5901 ||
+	    pci_get_device(bge_sc->bge_dev) == BCOM_DEVICEID_BCM5901A2))
+		fast_ether_only = TRUE;
+
+	if (fast_ether_only == FALSE) {
+		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_1000_T, 0,
+		    sc->mii_inst), BRGPHY_BMCR_FDX);
+		PRINT(", 1000baseTX");
+		ADD(IFM_MAKEWORD(IFM_ETHER, IFM_1000_T,
+		    IFM_FDX, sc->mii_inst), 0);
+		PRINT("1000baseTX-FDX");
+	}
+
 	ADD(IFM_MAKEWORD(IFM_ETHER, IFM_AUTO, 0, sc->mii_inst), 0);
 	PRINT("auto");
 
@@ -552,6 +584,8 @@ static void
 brgphy_reset(struct mii_softc *sc)
 {
 	u_int32_t	val;
+	struct ifnet	*ifp;
+	struct bge_softc	*bge_sc;
 
 	mii_phy_reset(sc);
 
@@ -570,8 +604,30 @@ brgphy_reset(struct mii_softc *sc)
 		break;
 	}
 
+	ifp = sc->mii_pdata->mii_ifp;
+	bge_sc = ifp->if_softc;
+
+	/*
+	 * Don't enable Ethernet@WireSpeed for the 5700 or the
+	 * 5705 A1 and A2 chips. Make sure we only do this test
+	 * on "bge" NICs, since other drivers may use this same
+	 * PHY subdriver.
+	 */
+	if (strcmp(ifp->if_dname, "bge") == 0 &&
+	    (bge_sc->bge_asicrev == BGE_ASICREV_BCM5700 ||
+	    bge_sc->bge_chipid == BGE_CHIPID_BCM5705_A1 ||
+	    bge_sc->bge_chipid == BGE_CHIPID_BCM5705_A2))
+		return;
+
 	/* Enable Ethernet@WireSpeed. */
 	PHY_WRITE(sc, BRGPHY_MII_AUXCTL, 0x7007);
 	val = PHY_READ(sc, BRGPHY_MII_AUXCTL);
-	PHY_WRITE(sc, BRGPHY_MII_AUXCTL, val | (1 << 15) || (1 << 4));
+	PHY_WRITE(sc, BRGPHY_MII_AUXCTL, val | (1 << 15) | (1 << 4));
+
+	/* Enable Link LED on Dell boxes */
+	if (bge_sc->bge_no_3_led) {
+		PHY_WRITE(sc, BRGPHY_MII_PHY_EXTCTL, 
+		    PHY_READ(sc, BRGPHY_MII_PHY_EXTCTL)
+		    & ~BRGPHY_PHY_EXTCTL_3_LED);
+	}
 }

@@ -22,14 +22,14 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_input.c,v 1.33 2003/04/04 12:10:04 des Exp $
  */
-
 /*
  *	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_input.c,v 1.35 2003/06/10 22:09:23 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -267,6 +267,7 @@ db_inputchar(c)
 		 */
 		c = '\r';
 	    case '\n':
+		/* FALLTHROUGH */
 	    case '\r':
 		*db_le++ = c;
 		return (1);

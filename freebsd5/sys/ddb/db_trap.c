@@ -22,10 +22,7 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_trap.c,v 1.15 2001/07/08 04:56:05 julian Exp $
  */
-
 /*
  * 	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
@@ -34,6 +31,10 @@
 /*
  * Trap entry point to kernel debugger.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_trap.c,v 1.16 2003/06/10 22:09:23 obrien Exp $");
+
 #include <sys/param.h>
 #include <sys/systm.h>
 

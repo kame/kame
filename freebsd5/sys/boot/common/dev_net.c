@@ -1,6 +1,5 @@
 /*	
- * $FreeBSD: src/sys/boot/common/dev_net.c,v 1.11 2002/07/31 20:17:06 jake Exp $
- * From: $NetBSD: dev_net.c,v 1.12 1997/12/10 20:38:37 gwr Exp $
+ * $NetBSD: dev_net.c,v 1.12 1997/12/10 20:38:37 gwr Exp $
  */
 
 /*-
@@ -39,7 +38,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/common/dev_net.c,v 1.13 2003/11/03 19:45:05 iedowse Exp $");
+
+/*-
  * This module implements a "raw device" interface suitable for
  * use by the stand-alone I/O library NFS code.  This interface
  * does not support any "block" access, and exists only for the
@@ -268,22 +270,22 @@ net_getparams(sock)
 	return (EIO);
     }
  exit:
-    printf("net_open: server addr: %s\n", inet_ntoa(rootip));
-
     /*  
      * If present, strip the server's address off of the rootpath
      * before passing it along.  This allows us to be compatible with
      * the kernel's diskless (BOOTP_NFSROOT) booting conventions
      */
-
-    for(i=0; i<FNAME_SIZE; i++)
-	    if(rootpath[i] == ':')
+    for (i = 0; rootpath[i] != '\0' && i < FNAME_SIZE; i++)
+	    if (rootpath[i] == ':')
 		    break;
-    if(i && i != FNAME_SIZE) {
-	    i++;
+    if (i && i != FNAME_SIZE && rootpath[i] == ':') {
+	    rootpath[i++] = '\0';
+	    if (inet_addr(&rootpath[0]) != INADDR_NONE)
+		    rootip.s_addr = inet_addr(&rootpath[0]);
 	    bcopy(&rootpath[i], &temp[0], strlen(&rootpath[i])+1);
 	    bcopy(&temp[0], &rootpath[0], strlen(&rootpath[i])+1);	    
     }
+    printf("net_open: server addr: %s\n", inet_ntoa(rootip));
     printf("net_open: server path: %s\n", rootpath);	    
 
     d = socktodesc(sock);
@@ -292,6 +294,8 @@ net_getparams(sock)
     setenv("boot.netif.netmask", intoa(netmask), 1);
     setenv("boot.netif.gateway", inet_ntoa(gateip), 1);
     setenv("boot.netif.hwaddr", temp, 1);
+    setenv("boot.nfsroot.server", inet_ntoa(rootip), 1);
+    setenv("boot.nfsroot.path", rootpath, 1);
 
     return (0);
 }

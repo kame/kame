@@ -44,13 +44,14 @@
  * *   without express or implied warranty.                        *
  * *                                                               *
  * *****************************************************************
- *
- * $FreeBSD: src/sys/alpha/pci/t2.c,v 1.16 2002/03/21 18:48:00 gallatin Exp $
  */
 
 /*
  * T2 CBUS to PCI bridge
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/pci/t2.c,v 1.20 2003/11/17 06:10:14 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,16 +66,18 @@
 #include <sys/rman.h>
 #include <sys/interrupt.h>
 
+#include <dev/pci/pcivar.h>
 #include <alpha/pci/t2reg.h>
 #include <alpha/pci/t2var.h>
 #include <alpha/isa/isavar.h>
-#include <machine/intr.h>
-#include <machine/resource.h>
-#include <machine/intrcnt.h>
+
 #include <machine/cpuconf.h>
-#include <machine/swiz.h>
+#include <machine/intr.h>
+#include <machine/intrcnt.h>
+#include <machine/md_var.h>
+#include <machine/resource.h>
 #include <machine/sgmap.h>
-#include <pci/pcivar.h>
+#include <machine/swiz.h>
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
@@ -454,7 +457,7 @@ t2_eoi( int vector)
 }
 
 static void
-t2_enable_vec(int vector)
+t2_enable_vec(uintptr_t vector)
 {
 	int irq, hose;
 	u_long IC_mask, scratch;
@@ -488,7 +491,7 @@ t2_enable_vec(int vector)
 }
 
 static void
-t2_disable_vec(int vector)
+t2_disable_vec(uintptr_t vector)
 {
 	int hose, irq;
 	u_long scratch, IC_mask;

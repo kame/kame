@@ -1,5 +1,3 @@
-/* $NetBSD: prom.c,v 1.22 1998/02/27 04:03:00 thorpej Exp $ */
-
 /* 
  * Copyright (c) 1992, 1994, 1995, 1996 Carnegie Mellon University
  * All Rights Reserved.
@@ -24,12 +22,11 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/alpha/alpha/prom.c,v 1.26 2003/02/25 00:42:39 marcel Exp $
  */
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
-
 /* __KERNEL_RCSID(0, "$NetBSD: prom.c,v 1.22 1998/02/27 04:03:00 thorpej Exp $"); */
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/prom.c,v 1.28 2003/08/17 06:42:07 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,8 +38,9 @@
 #include <sys/user.h>
 #include <sys/cons.h>
 
-#include <machine/rpb.h>
+#include <machine/md_var.h>
 #include <machine/prom.h>
+#include <machine/rpb.h>
 #include <machine/vmparam.h>
 
 struct rpb	*hwrpb;

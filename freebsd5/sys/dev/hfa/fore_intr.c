@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.9 2000/12/07 22:19:03 phk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.11 2003/08/22 06:00:26 imp Exp $
  *
  */
 
@@ -45,7 +45,7 @@
 #include <netatm/atm_sys.h>
 #include <netatm/atm_cm.h>
 #include <netatm/atm_if.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <dev/hfa/fore.h>
 #include <dev/hfa/fore_aali.h>
 #include <dev/hfa/fore_slave.h>
@@ -54,7 +54,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.9 2000/12/07 22:19:03 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_intr.c,v 1.11 2003/08/22 06:00:26 imp Exp $");
 #endif
 
 #if defined(sun)
@@ -170,6 +170,10 @@ fore_intr(arg)
 		 * Device initialization handled separately
 		 */
 		if ((fup->fu_flags & CUF_INITED) == 0) {
+
+			if (fup->fu_ft4)
+				/* may not happen */
+				goto done;
 
 			/*
 			 * We're just initializing device now, so see if

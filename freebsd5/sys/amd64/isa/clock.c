@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)clock.c	7.2 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/isa/clock.c,v 1.199 2003/05/01 01:05:24 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/isa/clock.c,v 1.207 2003/11/21 02:53:49 peter Exp $");
 
 /*
  * Routines to handle clock hardware.
@@ -67,8 +69,12 @@
 
 #include <machine/clock.h>
 #include <machine/frame.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/psl.h>
+#ifdef SMP
+#include <machine/smp.h>
+#endif
 #include <machine/specialreg.h>
 
 #include <amd64/isa/icu.h>
@@ -79,32 +85,14 @@
 #endif
 #include <amd64/isa/timerreg.h>
 
-#include <amd64/isa/intr_machdep.h>
-
 /*
  * 32-bit time_t's can't reach leap years before 1904 or after 2036, so we
  * can use a simple formula for leap years.
  */
-#define	LEAPYEAR(y) ((u_int)(y) % 4 == 0)
+#define	LEAPYEAR(y) (((u_int)(y) % 4 == 0) ? 1 : 0)
 #define DAYSPERYEAR   (31+28+31+30+31+30+31+31+30+31+30+31)
 
 #define	TIMER_DIV(x) ((timer_freq + (x) / 2) / (x))
-
-/*
- * Time in timer cycles that it takes for microtime() to disable interrupts
- * and latch the count.  microtime() currently uses "cli; outb ..." so it
- * normally takes less than 2 timer cycles.  Add a few for cache misses.
- * Add a few more to allow for latency in bogus calls to microtime() with
- * interrupts already disabled.
- */
-#define	TIMER0_LATCH_COUNT	20
-
-/*
- * Maximum frequency that we are willing to allow for timer0.  Must be
- * low enough to guarantee that the timer interrupt handler returns
- * before the next timer interrupt.
- */
-#define	TIMER0_MAX_FREQ		20000
 
 int	adjkerntz;		/* local offset from GMT in seconds */
 int	clkintr_pending;
@@ -126,17 +114,9 @@ static	u_int	hardclock_max_count;
 static	u_int32_t i8254_lastcount;
 static	u_int32_t i8254_offset;
 static	int	i8254_ticked;
-/*
- * XXX new_function and timer_func should not handle clockframes, but
- * timer_func currently needs to hold hardclock to handle the
- * timer0_state == 0 case.  We should use inthand_add()/inthand_remove()
- * to switch between clkintr() and a slightly different timerintr().
- */
-static	void	(*new_function)(struct clockframe *frame);
-static	u_int	new_rate;
+static	struct intsrc *i8254_intsrc;
 static	u_char	rtc_statusa = RTCSA_DIVIDER | RTCSA_NOPROF;
 static	u_char	rtc_statusb = RTCSB_24HR | RTCSB_PINTR;
-static	u_int	timer0_prescaler_count;
 
 /* Values for timerX_state: */
 #define	RELEASED	0
@@ -144,9 +124,7 @@ static	u_int	timer0_prescaler_count;
 #define	ACQUIRED	2
 #define	ACQUIRE_PENDING	3
 
-static	u_char	timer0_state;
 static	u_char	timer2_state;
-static	void	(*timer_func)(struct clockframe *frame) = hardclock;
 
 static	unsigned i8254_get_timecount(struct timecounter *tc);
 static	void	set_timer_freq(u_int freq, int intr_freq);
@@ -156,11 +134,12 @@ static struct timecounter i8254_timecounter = {
 	0,			/* no poll_pps */
 	~0u,			/* counter_mask */
 	0,			/* frequency */
-	"i8254"			/* name */
+	"i8254",		/* name */
+	0			/* quality */
 };
 
 static void
-clkintr(struct clockframe frame)
+clkintr(struct clockframe *frame)
 {
 
 	if (timecounter->tc_get_timecount == i8254_get_timecount) {
@@ -174,88 +153,10 @@ clkintr(struct clockframe frame)
 		clkintr_pending = 0;
 		mtx_unlock_spin(&clock_lock);
 	}
-	timer_func(&frame);
-	switch (timer0_state) {
-
-	case RELEASED:
-		break;
-
-	case ACQUIRED:
-		if ((timer0_prescaler_count += timer0_max_count)
-		    >= hardclock_max_count) {
-			timer0_prescaler_count -= hardclock_max_count;
-			hardclock(&frame);
-		}
-		break;
-
-	case ACQUIRE_PENDING:
-		mtx_lock_spin(&clock_lock);
-		i8254_offset = i8254_get_timecount(NULL);
-		i8254_lastcount = 0;
-		timer0_max_count = TIMER_DIV(new_rate);
-		outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
-		outb(TIMER_CNTR0, timer0_max_count & 0xff);
-		outb(TIMER_CNTR0, timer0_max_count >> 8);
-		mtx_unlock_spin(&clock_lock);
-		timer_func = new_function;
-		timer0_state = ACQUIRED;
-		break;
-
-	case RELEASE_PENDING:
-		if ((timer0_prescaler_count += timer0_max_count)
-		    >= hardclock_max_count) {
-			mtx_lock_spin(&clock_lock);
-			i8254_offset = i8254_get_timecount(NULL);
-			i8254_lastcount = 0;
-			timer0_max_count = hardclock_max_count;
-			outb(TIMER_MODE,
-			     TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
-			outb(TIMER_CNTR0, timer0_max_count & 0xff);
-			outb(TIMER_CNTR0, timer0_max_count >> 8);
-			mtx_unlock_spin(&clock_lock);
-			timer0_prescaler_count = 0;
-			timer_func = hardclock;
-			timer0_state = RELEASED;
-			hardclock(&frame);
-		}
-		break;
-	}
-}
-
-/*
- * The acquire and release functions must be called at ipl >= splclock().
- */
-int
-acquire_timer0(int rate, void (*function)(struct clockframe *frame))
-{
-	static int old_rate;
-
-	if (rate <= 0 || rate > TIMER0_MAX_FREQ)
-		return (-1);
-	switch (timer0_state) {
-
-	case RELEASED:
-		timer0_state = ACQUIRE_PENDING;
-		break;
-
-	case RELEASE_PENDING:
-		if (rate != old_rate)
-			return (-1);
-		/*
-		 * The timer has been released recently, but is being
-		 * re-acquired before the release completed.  In this
-		 * case, we simply reclaim it as if it had not been
-		 * released at all.
-		 */
-		timer0_state = ACQUIRED;
-		break;
-
-	default:
-		return (-1);	/* busy */
-	}
-	new_function = function;
-	old_rate = new_rate = rate;
-	return (0);
+	hardclock(frame);
+#ifdef SMP
+	forward_hardclock();
+#endif
 }
 
 int
@@ -275,26 +176,6 @@ acquire_timer2(int mode)
 	 */
 	outb(TIMER_MODE, TIMER_SEL2 | (mode & 0x3f));
 
-	return (0);
-}
-
-int
-release_timer0()
-{
-	switch (timer0_state) {
-
-	case ACQUIRED:
-		timer0_state = RELEASE_PENDING;
-		break;
-
-	case ACQUIRE_PENDING:
-		/* Nothing happened yet, release quickly. */
-		timer0_state = RELEASED;
-		break;
-
-	default:
-		return (-1);
-	}
 	return (0);
 }
 
@@ -331,16 +212,19 @@ release_timer2()
  * in the statistics, but the stat clock will no longer stop.
  */
 static void
-rtcintr(struct clockframe frame)
+rtcintr(struct clockframe *frame)
 {
 	while (rtcin(RTC_INTR) & RTCIR_PERIOD) {
 		if (profprocs != 0) {
 			if (--pscnt == 0)
 				pscnt = psdiv;
-			profclock(&frame);
+			profclock(frame);
 		}
 		if (pscnt == psdiv)
-			statclock(&frame);
+			statclock(frame);
+#ifdef SMP
+		forward_statclock();
+#endif
 	}
 }
 
@@ -411,8 +295,18 @@ DELAY(int n)
 	 * takes about 1.5 usec for each of the i/o's in getit().  The loop
 	 * takes about 6 usec on a 486/33 and 13 usec on a 386/20.  The
 	 * multiplications and divisions to scale the count take a while).
+	 *
+	 * However, if ddb is active then use a fake counter since reading
+	 * the i8254 counter involves acquiring a lock.  ddb must not go
+	 * locking for many reasons, but it calls here for at least atkbd
+	 * input.
 	 */
-	prev_tick = getit();
+#ifdef DDB
+	if (db_active)
+		prev_tick = 0;
+	else
+#endif
+		prev_tick = getit();
 	n -= 0;			/* XXX actually guess no initial overhead */
 	/*
 	 * Calculate (n * (timer_freq / 1e6)) without using floating point
@@ -439,7 +333,13 @@ DELAY(int n)
 			     / 1000000;
 
 	while (ticks_left > 0) {
-		tick = getit();
+#ifdef DDB
+		if (db_active) {
+			inb(0x84);
+			tick = prev_tick + 1;
+		} else
+#endif
+			tick = getit();
 #ifdef DELAYDEBUG
 		++getit_calls;
 #endif
@@ -827,7 +727,6 @@ void
 cpu_initclocks()
 {
 	int diag;
-	register_t crit;
 
 	if (statclock_disable) {
 		/*
@@ -843,41 +742,28 @@ cpu_initclocks()
 		profhz = RTC_PROFRATE;
         }
 
-	/* Finish initializing 8253 timer 0. */
-	/*
-	 * XXX Check the priority of this interrupt handler.  I
-	 * couldn't find anything suitable in the BSD/OS code (grog,
-	 * 19 July 2000).
-	 */
-	inthand_add("clk", 0, (driver_intr_t *)clkintr, NULL,
+	/* Finish initializing 8254 timer 0. */
+	intr_add_handler("clk", 0, (driver_intr_t *)clkintr, NULL,
 	    INTR_TYPE_CLK | INTR_FAST, NULL);
-	crit = intr_disable();
-	mtx_lock_spin(&icu_lock);
-	INTREN(IRQ0);
-	mtx_unlock_spin(&icu_lock);
-	intr_restore(crit);
 
 	/* Initialize RTC. */
 	writertc(RTC_STATUSA, rtc_statusa);
 	writertc(RTC_STATUSB, RTCSB_24HR);
 
 	/* Don't bother enabling the statistics clock. */
-	if (statclock_disable)
-		return;
-	diag = rtcin(RTC_DIAG);
-	if (diag != 0)
-		printf("RTC BIOS diagnostic error %b\n", diag, RTCDG_BITS);
+	if (!statclock_disable) {
+		diag = rtcin(RTC_DIAG);
+		if (diag != 0)
+			printf("RTC BIOS diagnostic error %b\n", diag, RTCDG_BITS);
 
-	inthand_add("rtc", 8, (driver_intr_t *)rtcintr, NULL,
-	    INTR_TYPE_CLK | INTR_FAST, NULL);
+		intr_add_handler("rtc", 8, (driver_intr_t *)rtcintr, NULL,
+		    INTR_TYPE_CLK | INTR_FAST, NULL);
+		i8254_intsrc = intr_lookup_source(8);
 
-	crit = intr_disable();
-	mtx_lock_spin(&icu_lock);
-	INTREN(IRQ8);
-	mtx_unlock_spin(&icu_lock);
-	intr_restore(crit);
+		writertc(RTC_STATUSB, rtc_statusb);
+	}
 
-	writertc(RTC_STATUSB, rtc_statusb);
+	init_TSC_tc();
 }
 
 void
@@ -911,8 +797,6 @@ sysctl_machdep_i8254_freq(SYSCTL_HANDLER_ARGS)
 	freq = timer_freq;
 	error = sysctl_handle_int(oidp, &freq, sizeof(freq), req);
 	if (error == 0 && req->newptr != NULL) {
-		if (timer0_state != RELEASED)
-			return (EBUSY);	/* too much trouble to handle */
 		set_timer_freq(freq, hz);
 		i8254_timecounter.tc_frequency = freq;
 	}
@@ -941,8 +825,8 @@ i8254_get_timecount(struct timecounter *tc)
 	if (count < i8254_lastcount ||
 	    (!i8254_ticked && (clkintr_pending ||
 	    ((count < 20 || (!(rflags & PSL_I) && count < timer0_max_count / 2u)) &&
-	    (inb(IO_ICU1) & 1)))
-	    )) {
+	    i8254_intsrc != NULL &&
+	    i8254_intsrc->is_pic->pic_source_pending(i8254_intsrc))))) {
 		i8254_ticked = 1;
 		i8254_offset += timer0_max_count;
 	}

@@ -1,6 +1,4 @@
 /* $NetBSD: dec_2100_a50.c,v 1.39 1998/04/17 02:45:19 mjacob Exp $ */
-/* $FreeBSD: src/sys/alpha/alpha/dec_2100_a50.c,v 1.14 2002/10/04 15:58:03 keramida Exp $ */
-
 /*
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
  * All rights reserved.
@@ -34,7 +32,11 @@
  * Additional Copyright (c) 1998 by Andrew Gallatin for Duke University.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/dec_2100_a50.c,v 1.18 2003/08/25 03:43:07 marcel Exp $");
+
 #include "opt_ddb.h"
+#include "opt_dev_sc.h"
 
 #include <sys/param.h>
 #include <sys/reboot.h>
@@ -42,30 +44,31 @@
 #include <sys/termios.h>
 #include <sys/bus.h>
 
-#include <machine/rpb.h>
-#include <machine/cpuconf.h>
 #include <machine/clock.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>
+
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include <alpha/pci/apecsreg.h>
 #include <alpha/pci/apecsvar.h>
 
-#include "opt_dev_sc.h"
+#ifndef NO_SIO
 #ifndef	CONSPEED
 #define	CONSPEED TTYDEF_SPEED
 #endif
 static int comcnrate = CONSPEED;
+extern int comconsole;
+extern int siocnattach(int, int);
+extern int siogdbattach(int, int);
+#endif
+
+extern int sccnattach(void);
 
 void dec_2100_a50_init(void);
 static void dec_2100_a50_cons_init(void);
 static void dec_2100_a50_intr_map(void *);
-void sio_intr_establish(int);
-void sio_intr_disestablish(int);
-void sio_intr_setup(void);
-
-extern int siocnattach(int, int);
-extern int siogdbattach(int, int);
-extern int sccnattach(void);
 
 const struct alpha_variation_table dec_2100_a50_variations[] = {
 	{ SV_ST_AVANTI,	"AlphaStation 400 4/233 (\"Avanti\")" },
@@ -100,9 +103,6 @@ dec_2100_a50_init()
 	platform.pci_intr_map  = dec_2100_a50_intr_map;
 }
 
-/* XXX for forcing comconsole when srm serial console is used */
-extern int comconsole;
-
 static void
 dec_2100_a50_cons_init()
 {
@@ -110,32 +110,34 @@ dec_2100_a50_cons_init()
 
 	apecs_init();
 
+#ifndef NO_SIO
 #ifdef DDB
 	siogdbattach(0x2f8, 9600);
 #endif
+#endif
+
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
 	case 2:
+#ifndef NO_SIO
 		/* serial console ... */
-		/* XXX */
-		{
-			/*
-			 * Delay to allow PROM putchars to complete.
-			 * FIFO depth * character time,
-			 * character time = (1000000 / (defaultrate / 10)).
-			 */
-			DELAY(160000000 / comcnrate);
-			/*
-			 * Force a comconsole on com1 if the SRM has a serial console.
-			 */
-			comconsole = 0;
-			if (siocnattach(0x3f8, comcnrate))
-				panic("can't init serial console");
+		/*
+		 * Delay to allow PROM putchars to complete.
+		 * FIFO depth * character time,
+		 * character time = (1000000 / (defaultrate / 10)).
+		 */
+		DELAY(160000000 / comcnrate);
+		/*
+		 * Force a comconsole on com1 if the SRM has a serial console.
+		 */
+		comconsole = 0;
+		if (siocnattach(0x3f8, comcnrate))
+			panic("can't init serial console");
 
-			boothowto |= RB_SERIAL;
-			break;
-		}
+		boothowto |= RB_SERIAL;
+#endif
+		break;
 
 	case 3:
 		/* display console ... */

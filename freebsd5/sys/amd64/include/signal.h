@@ -1,4 +1,5 @@
 /*
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1986, 1989, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -31,7 +32,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signal.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/amd64/include/signal.h,v 1.21 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/signal.h,v 1.26 2003/11/08 04:39:22 peter Exp $
  */
 
 #ifndef _MACHINE_SIGNAL_H_
@@ -74,22 +75,24 @@ typedef long sig_atomic_t;
 struct sigcontext {
 	struct __sigset sc_mask;	/* signal mask to restore */
 	long	sc_onstack;		/* sigstack state to restore */
-	long	sc_r15;		/* machine state (struct trapframe) */
-	long	sc_r14;
-	long	sc_r13;
-	long	sc_r12;
-	long	sc_r11;
-	long	sc_r10;
-	long	sc_r9;
-	long	sc_r8;
-	long	sc_rdi;
+	long	sc_rdi;		/* machine state (struct trapframe) */
 	long	sc_rsi;
-	long	sc_rbp;
-	long	sc_rbx;
 	long	sc_rdx;
 	long	sc_rcx;
+	long	sc_r8;
+	long	sc_r9;
 	long	sc_rax;
+	long	sc_rbx;
+	long	sc_rbp;
+	long	sc_r10;
+	long	sc_r11;
+	long	sc_r12;
+	long	sc_r13;
+	long	sc_r14;
+	long	sc_r15;
 	long	sc_trapno;
+	long	sc_addr;
+	long	sc_flags;
 	long	sc_err;
 	long	sc_rip;
 	long	sc_cs;
@@ -98,14 +101,13 @@ struct sigcontext {
 	long	sc_ss;
 	long	sc_len;			/* sizeof(mcontext_t) */
 	/*
-	 * XXX - See <machine/ucontext.h> and <machine/npx.h> for
+	 * XXX - See <machine/ucontext.h> and <machine/fpu.h> for
 	 *       the following fields.
 	 */
 	long	sc_fpformat;
 	long	sc_ownedfp;
-	long	sc_spare1[1];
-	long	sc_fpstate[128] __aligned(16);
-	long	sc_spare2[8];
+	long	sc_fpstate[64] __aligned(16);
+	long	sc_spare[8];
 };
 #endif /* __BSD_VISIBLE */
 

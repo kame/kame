@@ -1,5 +1,4 @@
 /*
- * 
  *             Coda: an Experimental Distributed File System
  *                              Release 3.1
  * 
@@ -27,10 +26,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  *  	@(#) src/sys/cfs/coda_vfsops.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_vfsops.c,v 1.43 2003/03/07 09:18:15 tjr Exp $
- * 
  */
-
 /* 
  * Mach Operating System
  * Copyright (c) 1989 Carnegie-Mellon University
@@ -43,6 +39,9 @@
  * University.  Contributers include David Steere, James Kistler, and
  * M. Satyanarayanan.  
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/coda/coda_vfsops.c,v 1.47 2003/09/13 01:13:56 tjr Exp $");
 
 #include <vcoda.h>
 
@@ -118,8 +117,8 @@ coda_mount(vfsp, path, data, ndp, td)
     dev_t dev;
     struct coda_mntinfo *mi;
     struct vnode *rootvp;
-    ViceFid rootfid;
-    ViceFid ctlfid;
+    CodaFid rootfid = INVAL_FID;
+    CodaFid ctlfid = CTL_FID;
     int error;
 
     ENTRY;
@@ -188,16 +187,10 @@ coda_mount(vfsp, path, data, ndp, td)
      * actually make the CODA_ROOT call to venus until the first call
      * to coda_root in case a server is down while venus is starting.
      */
-    rootfid.Volume = 0;
-    rootfid.Vnode = 0;
-    rootfid.Unique = 0;
     cp = make_coda_node(&rootfid, vfsp, VDIR);
     rootvp = CTOV(cp);
     rootvp->v_vflag |= VV_ROOT;
 	
-    ctlfid.Volume = CTL_VOL;
-    ctlfid.Vnode = CTL_VNO;
-    ctlfid.Unique = CTL_UNI;
 /*  cp = make_coda_node(&ctlfid, vfsp, VCHR);
     The above code seems to cause a loop in the cnode links.
     I don't totally understand when it happens, it is caught
@@ -256,12 +249,13 @@ coda_unmount(vfsp, mntflags, td)
 	printf("coda_unmount: ROOT: vp %p, cp %p\n", mi->mi_rootvp, VTOC(mi->mi_rootvp));
 #endif
 	vrele(mi->mi_rootvp);
-
 	active = coda_kill(vfsp, NOT_DOWNCALL);
 	ASSERT_VOP_LOCKED(mi->mi_rootvp, "coda_unmount");
 	mi->mi_rootvp->v_vflag &= ~VV_ROOT;
 	error = vflush(mi->mi_vfsp, 0, FORCECLOSE);
+#ifdef CODA_VERBOSE
 	printf("coda_unmount: active = %d, vflush active %d\n", active, error);
+#endif
 	error = 0;
 	/* I'm going to take this out to allow lookups to go through. I'm
 	 * not sure it's important anyway. -- DCS 2/2/94
@@ -295,7 +289,8 @@ coda_root(vfsp, vpp)
     int error;
     struct thread *td = curthread;    /* XXX - bnoble */
     struct proc *p = td->td_proc;
-    ViceFid VFid;
+    CodaFid VFid;
+    static const CodaFid invalfid = INVAL_FID;
  
     ENTRY;
     MARK_ENTRY(CODA_ROOT_STATS);
@@ -313,10 +308,8 @@ coda_root(vfsp, vpp)
 	 * node to avoid a deadlock. This bug is fixed in the Coda CVS
 	 * repository but not in any released versions as of 6 Mar 2003.
 	 */
-	if ((VTOC(mi->mi_rootvp)->c_fid.Volume != 0) ||
-	    (VTOC(mi->mi_rootvp)->c_fid.Vnode != 0) ||
-	    (VTOC(mi->mi_rootvp)->c_fid.Unique != 0) ||
-	    mi->mi_started == 0)
+	if (memcmp(&VTOC(mi->mi_rootvp)->c_fid, &invalfid,
+	    sizeof(CodaFid)) != 0 || mi->mi_started == 0)
 	    { /* Found valid root. */
 		*vpp = mi->mi_rootvp;
 		/* On Mach, this is vref.  On NetBSD, VOP_LOCK */
@@ -470,7 +463,7 @@ coda_fhtovp(vfsp, fhp, nam, vpp, exflagsp, creadanonp)
     int error;
     struct thread *td = curthread; /* XXX -mach */
     struct proc *p = td->td_proc;
-    ViceFid VFid;
+    CodaFid VFid;
     int vtype;
 
     ENTRY;
@@ -491,9 +484,8 @@ coda_fhtovp(vfsp, fhp, nam, vpp, exflagsp, creadanonp)
 	    *vpp = (struct vnode *)0;
     } else {
 	CODADEBUG(CODA_VGET, 
-		 myprintf(("vget: vol %lx vno %lx uni %lx type %d result %d\n",
-			VFid.Volume, VFid.Vnode, VFid.Unique, vtype, error)); )
-	    
+		 myprintf(("vget: %s type %d result %d\n",
+			coda_f2s(&VFid), vtype, error)); )	    
 	cp = make_coda_node(&VFid, vfsp, vtype);
 	*vpp = CTOV(cp);
     }
@@ -515,7 +507,7 @@ getNewVnode(vpp)
     
     ENTRY;
 
-    cfid.cfid_len = (short)sizeof(ViceFid);
+    cfid.cfid_len = (short)sizeof(CodaFid);
     cfid.cfid_fid = VTOC(*vpp)->c_fid;	/* Structure assignment. */
     /* XXX ? */
 
@@ -551,20 +543,12 @@ struct mount *devtomp(dev)
 }
 
 struct vfsops coda_vfsops = {
-    coda_mount,
-    coda_start,
-    coda_unmount,
-    coda_root,
-    vfs_stdquotactl,
-    coda_nb_statfs,
-    coda_sync,
-    vfs_stdvget,
-    vfs_stdfhtovp,
-    vfs_stdcheckexp,
-    vfs_stdvptofh,
-    vfs_stdinit,
-    vfs_stduninit,
-    vfs_stdextattrctl,
+    .vfs_mount =		coda_mount,
+    .vfs_root = 		coda_root,
+    .vfs_start =		coda_start,
+    .vfs_statfs =		coda_nb_statfs,
+    .vfs_sync = 		coda_sync,
+    .vfs_unmount =		coda_unmount,
 };
 
 VFS_SET(coda_vfsops, coda, VFCF_NETWORK);

@@ -1,6 +1,4 @@
-/*	$FreeBSD: src/sys/crypto/md5.c,v 1.6 2003/01/25 22:41:22 silby Exp $	*/
 /*	$KAME: md5.c,v 1.5 2000/11/08 06:13:08 itojun Exp $	*/
-
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -29,6 +27,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/crypto/md5.c,v 1.7 2003/06/10 21:36:57 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/cdefs.h>

@@ -4,7 +4,7 @@
  * See the IPFILTER.LICENCE file for details on licencing.
  *
  * $Id: ip_log.c,v 2.5.2.1 2000/07/19 13:11:47 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_log.c,v 1.24 2003/02/15 06:23:45 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_log.c,v 1.26 2003/12/02 18:28:00 brooks Exp $
  */
 #include <sys/param.h>
 #if defined(KERNEL) && !defined(_KERNEL)
@@ -253,7 +253,8 @@ mb_t *m;
 	mlen = (flags & FR_LOGBODY) ? MIN(msgdsize(m) - hlen, 128) : 0;
 # else
 #  if (defined(NetBSD) && (NetBSD <= 1991011) && (NetBSD >= 199603)) || \
-	(defined(OpenBSD) && (OpenBSD >= 199603))
+	(defined(OpenBSD) && (OpenBSD >= 199603)) || \
+	(defined(__FreeBSD__) && (__FreeBSD_version >= 501113))
 	strncpy(ipfl.fl_ifname, ifp->if_xname, IFNAMSIZ);
 #  else
 	ipfl.fl_unit = (u_char)ifp->if_unit;

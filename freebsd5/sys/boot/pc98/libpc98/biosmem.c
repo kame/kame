@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/pc98/libpc98/biosmem.c,v 1.5 2002/09/23 18:54:27 alfred Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/pc98/libpc98/biosmem.c,v 1.6 2003/09/08 09:11:20 obrien Exp $");
 
 /*
  * Obtain memory configuration information from the BIOS

@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/dev/ncv/ncr53c500.c,v 1.7 2002/03/20 02:07:32 alfred Exp $	*/
 /*	$NecBSD: ncr53c500.c,v 1.30.12.3 2001/06/26 07:31:41 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -36,6 +35,9 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500.c,v 1.8 2003/08/24 17:54:12 obrien Exp $");
 #include "opt_ddb.h"
 
 #include <sys/param.h>

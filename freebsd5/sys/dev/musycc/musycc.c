@@ -1,15 +1,16 @@
-/*
+/*-
  * ----------------------------------------------------------------------------
  * "THE BEER-WARE LICENSE" (Revision 42):
  * <phk@FreeBSD.org> wrote this file.  As long as you retain this notice you
  * can do whatever you want with this stuff. If we meet some day, and you think
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
- *
- * $FreeBSD: src/sys/dev/musycc/musycc.c,v 1.26 2003/03/18 08:45:21 phk Exp $
- *
- *
- *
+ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/musycc/musycc.c,v 1.30 2003/09/02 17:30:37 jhb Exp $");
+
+/*
  * Card state machine:
  * -------------------
  *
@@ -35,7 +36,6 @@
  *                       |   |
  *                       |   v
  *                       FAULT
- *
  */
 
 #include <sys/param.h>
@@ -51,8 +51,8 @@
 #include <machine/clock.h>
 #include <sys/rman.h>
 #include <machine/resource.h>
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 #include "pci_if.h"
 
 
@@ -339,13 +339,11 @@ static LIST_HEAD(, csoftc) sc_list = LIST_HEAD_INITIALIZER(&sc_list);
 static void
 poke_847x(void *dummy)
 {
-	static int count;
 	int i;
 	struct csoftc *csc;
 
 	timeout(poke_847x, NULL, 1);
 	LIST_FOREACH(csc, &sc_list, list)  {
-		count++;
 		i = (csc->creg >> 24 & 0xf);
 		csc->creg &= ~0xf000000;
 		i++;
@@ -814,6 +812,7 @@ musycc_intr0(void *arg)
 					sc->chan[ch]->short_error++;
 					break;
 				}
+				/* FALLTHROUGH */
 			default:
 				musycc_intr0_tx_eom(sc, ch);
 				musycc_intr0_rx_eom(sc, ch);
@@ -1094,14 +1093,13 @@ musycc_rcvdata(hook_p hook, item_p item)
 	struct csoftc *csc;
 	struct schan *sch;
 	struct mdesc *md, *md0;
-	u_int32_t ch, u, u0, len;
+	u_int32_t u, u0, len;
 	struct mbuf *m2;
 	struct mbuf *m;
 
 	sch = NG_HOOK_PRIVATE(hook);
 	sc = sch->sc;
 	csc = sc->csc;
-	ch = sch->chan;
 
 	if (csc->state != C_RUNNING) {
 		printf("csc->state = %d\n", csc->state);
@@ -1469,7 +1467,7 @@ musycc_attach(device_t self)
 	}
 	csc->f[f] = self;
 	device_set_softc(self, csc);
-	rid = PCIR_MAPS;
+	rid = PCIR_BAR(0);
 	res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
 	    0, ~0, 1, RF_ACTIVE);
 	if (res == NULL) {

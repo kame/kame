@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/crypto/blowfish/bf_skey.c,v 1.5 2002/03/05 09:19:01 ume Exp $	*/
 /*	$KAME: bf_skey.c,v 1.7 2002/02/27 01:33:59 itojun Exp $	*/
 
 /* crypto/bf/bf_skey.c */
+
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
  * All rights reserved.
  *
@@ -58,6 +58,9 @@
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/crypto/blowfish/bf_skey.c,v 1.6 2003/06/10 21:38:38 obrien Exp $");
 
 #include <sys/types.h>
 #include <sys/time.h>

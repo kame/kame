@@ -1,5 +1,7 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_mem.c,v 1.6 2001/11/26 04:06:47 rwatson Exp $ */
 
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_mem.c,v 1.7 2003/08/24 17:46:02 obrien Exp $");
 /*
  * This is prt of the Driver for Video Capture Cards (Frame grabbers)
  * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879

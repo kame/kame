@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mly/mly.c,v 1.27 2003/03/08 08:01:29 phk Exp $
+ *	$FreeBSD: src/sys/dev/mly/mly.c,v 1.31 2003/09/02 17:30:36 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -50,8 +50,8 @@
 #include <cam/scsi/scsi_all.h>
 #include <cam/scsi/scsi_message.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/mly/mlyreg.h>
 #include <dev/mly/mlyio.h>
@@ -368,7 +368,7 @@ mly_pci_attach(struct mly_softc *sc)
     /*
      * Allocate the PCI register window.
      */
-    sc->mly_regs_rid = PCIR_MAPS;	/* first base address register */
+    sc->mly_regs_rid = PCIR_BAR(0);	/* first base address register */
     if ((sc->mly_regs_resource = bus_alloc_resource(sc->mly_dev, SYS_RES_MEMORY, &sc->mly_regs_rid, 
 						    0, ~0, 1, RF_ACTIVE)) == NULL) {
 	mly_printf(sc, "can't allocate register window\n");
@@ -407,6 +407,8 @@ mly_pci_attach(struct mly_softc *sc)
 			   MAXBSIZE, MLY_MAX_SGENTRIES,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL,			/* lockfunc */
+			   NULL,			/* lockarg */
 			   &sc->mly_parent_dmat)) {
 	mly_printf(sc, "can't allocate parent DMA tag\n");
 	goto fail;
@@ -423,6 +425,8 @@ mly_pci_attach(struct mly_softc *sc)
 			   MAXBSIZE, MLY_MAX_SGENTRIES,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 			   0,				/* flags */
+			   busdma_lock_mutex,		/* lockfunc */
+			   &Giant,			/* lockarg */
 			   &sc->mly_buffer_dmat)) {
 	mly_printf(sc, "can't allocate buffer DMA tag\n");
 	goto fail;
@@ -438,7 +442,8 @@ mly_pci_attach(struct mly_softc *sc)
 			   NULL, NULL, 			/* filter, filterarg */
 			   sizeof(union mly_command_packet) * MLY_MAX_COMMANDS, 1,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			   0,				/* flags */
+			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL, NULL,			/* lockfunc, lockarg */
 			   &sc->mly_packet_dmat)) {
 	mly_printf(sc, "can't allocate command packet DMA tag\n");
 	goto fail;
@@ -577,15 +582,16 @@ mly_sg_map(struct mly_softc *sc)
      * Create a single tag describing a region large enough to hold all of
      * the s/g lists we will need.
      */
-    segsize = sizeof(struct mly_sg_entry) * MLY_MAX_COMMANDS * MLY_MAX_SGENTRIES;
+    segsize = sizeof(struct mly_sg_entry) * MLY_MAX_COMMANDS *MLY_MAX_SGENTRIES;
     if (bus_dma_tag_create(sc->mly_parent_dmat,		/* parent */
-			   1, 0, 			/* alignment, boundary */
+			   1, 0, 			/* alignment,boundary */
 			   BUS_SPACE_MAXADDR,		/* lowaddr */
 			   BUS_SPACE_MAXADDR, 		/* highaddr */
 			   NULL, NULL, 			/* filter, filterarg */
 			   segsize, 1,			/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			   0,				/* flags */
+			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL, NULL,			/* lockfunc, lockarg */
 			   &sc->mly_sg_dmat)) {
 	mly_printf(sc, "can't allocate scatter/gather DMA tag\n");
 	return(ENOMEM);
@@ -598,11 +604,14 @@ mly_sg_map(struct mly_softc *sc)
      * XXX this assumes we can get enough space for all the s/g maps in one 
      * contiguous slab.
      */
-    if (bus_dmamem_alloc(sc->mly_sg_dmat, (void **)&sc->mly_sg_table, BUS_DMA_NOWAIT, &sc->mly_sg_dmamap)) {
+    if (bus_dmamem_alloc(sc->mly_sg_dmat, (void **)&sc->mly_sg_table,
+			 BUS_DMA_NOWAIT, &sc->mly_sg_dmamap)) {
 	mly_printf(sc, "can't allocate s/g table\n");
 	return(ENOMEM);
     }
-    bus_dmamap_load(sc->mly_sg_dmat, sc->mly_sg_dmamap, sc->mly_sg_table, segsize, mly_sg_map_helper, sc, 0);
+    if (bus_dmamap_load(sc->mly_sg_dmat, sc->mly_sg_dmamap, sc->mly_sg_table,
+			segsize, mly_sg_map_helper, sc, BUS_DMA_NOWAIT) != 0)
+	return (ENOMEM);
     return(0);
 }
 
@@ -632,13 +641,14 @@ mly_mmbox_map(struct mly_softc *sc)
      * memory mailbox structure.
      */
     if (bus_dma_tag_create(sc->mly_parent_dmat,		/* parent */
-			   1, 0, 			/* alignment, boundary */
+			   1, 0, 			/* alignment,boundary */
 			   BUS_SPACE_MAXADDR,		/* lowaddr */
 			   BUS_SPACE_MAXADDR, 		/* highaddr */
 			   NULL, NULL, 			/* filter, filterarg */
 			   sizeof(struct mly_mmbox), 1,	/* maxsize, nsegments */
 			   BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			   0,				/* flags */
+			   BUS_DMA_ALLOCNOW,		/* flags */
+			   NULL, NULL,			/* lockfunc, lockarg */
 			   &sc->mly_mmbox_dmat)) {
 	mly_printf(sc, "can't allocate memory mailbox DMA tag\n");
 	return(ENOMEM);
@@ -651,8 +661,10 @@ mly_mmbox_map(struct mly_softc *sc)
 	mly_printf(sc, "can't allocate memory mailbox\n");
 	return(ENOMEM);
     }
-    bus_dmamap_load(sc->mly_mmbox_dmat, sc->mly_mmbox_dmamap, sc->mly_mmbox, sizeof(struct mly_mmbox), 
-		    mly_mmbox_map_helper, sc, 0);
+    if (bus_dmamap_load(sc->mly_mmbox_dmat, sc->mly_mmbox_dmamap, sc->mly_mmbox,
+			sizeof(struct mly_mmbox), mly_mmbox_map_helper, sc, 
+			BUS_DMA_NOWAIT) != 0)
+	return (ENOMEM);
     bzero(sc->mly_mmbox, sizeof(*sc->mly_mmbox));
     return(0);
 
@@ -1745,9 +1757,10 @@ mly_alloc_commands(struct mly_softc *sc)
 			 BUS_DMA_NOWAIT, &sc->mly_packetmap)) {
 	return(ENOMEM);
     }
-    bus_dmamap_load(sc->mly_packet_dmat, sc->mly_packetmap, sc->mly_packet, 
-		    ncmd * sizeof(union mly_command_packet), 
-		    mly_alloc_commands_map, sc, 0);
+    if (bus_dmamap_load(sc->mly_packet_dmat, sc->mly_packetmap, sc->mly_packet, 
+			ncmd * sizeof(union mly_command_packet), 
+			mly_alloc_commands_map, sc, BUS_DMA_NOWAIT) != 0)
+	return (ENOMEM);
 
     for (i = 0; i < ncmd; i++) {
 	mc = &sc->mly_command[i];

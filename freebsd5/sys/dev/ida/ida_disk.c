@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.40 2003/04/01 15:06:23 phk Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.41 2003/08/08 23:01:12 mdodd Exp $
  */
 
 /*
@@ -104,6 +104,7 @@ idad_strategy(struct bio *bp)
 		goto bad;
 	}
 
+	bp->bio_driver1 = drv;
 	s = splbio();
 	ida_submit_buf(drv->controller, bp);
 	splx(s);

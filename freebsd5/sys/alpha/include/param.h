@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/param.h,v 1.30 2003/03/29 18:22:29 gallatin Exp $ */
+/* $FreeBSD: src/sys/alpha/include/param.h,v 1.32 2003/07/31 01:31:31 peter Exp $ */
 /* From: NetBSD: param.h,v 1.20 1997/09/19 13:52:53 leo Exp */
 
 /*
@@ -117,10 +117,12 @@
 #define	SSIZE		1		/* initial stack size/NBPG */
 #define	SINCR		1		/* increment of stack/NBPG */
 
+#ifndef	KSTACK_PAGES
 #define	KSTACK_PAGES	2		/* pages of kstack (with pcb) */
+#endif
+#define	KSTACK_GUARD_PAGES	1	/* pages of kstack guard; 0 disables */
 #define	UAREA_PAGES	1		/* pages of u-area */
 
-#define	KSTACK_GUARD			/* compile in kstack guard page */
 
 /*
  * Mach derived conversion macros

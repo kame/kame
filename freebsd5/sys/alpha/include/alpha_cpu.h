@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/alpha_cpu.h,v 1.9 2002/10/25 20:22:12 jhb Exp $ */
+/* $FreeBSD: src/sys/alpha/include/alpha_cpu.h,v 1.10 2003/07/24 07:41:08 marcel Exp $ */
 /* From: NetBSD: alpha_cpu.h,v 1.15 1997/09/20 19:02:34 mjacob Exp */
 
 /*
@@ -458,6 +458,23 @@ alpha_pal_rdval(void)
 	return v0;
 }
 
+static __inline void
+alpha_pal_wrunique(u_int64_t tp)
+{
+	register u_int64_t a0 __asm__("$16") = tp;
+	__asm__ __volatile__("call_pal 0x9f # PAL_wrunique"
+	    : "+r" (a0) : : "$1", "$22", "$23", "$24", "$25");
+}
+ 
+static __inline u_int64_t
+alpha_pal_rdunique(void)
+{
+	register u_int64_t v0 __asm__("$0");
+	__asm__ __volatile__("call_pal 0x9e # PAL_rdunique"
+	    : "=r" (v0) : : "$1", "$22", "$23", "$24", "$25");
+        return (v0);
+}
+ 
 static __inline void
 alpha_pal_tbi(u_int64_t op, u_int64_t va)
 {

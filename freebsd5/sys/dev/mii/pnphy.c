@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * Pseudo-driver for media selection on the Lite-On PNIC 82c168
  * chip. The NWAY support on this chip is horribly broken, so we
@@ -38,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.14 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -170,10 +173,7 @@ pnphy_service(sc, mii, cmd)
 	struct mii_data *mii;
 	int cmd;
 {
-	struct dc_softc		*dc_sc;
 	struct ifmedia_entry *ife = mii->mii_media.ifm_cur;
-
-	dc_sc = mii->mii_ifp->if_softc;
 
 	switch (cmd) {
 	case MII_POLLSTAT:
@@ -215,17 +215,14 @@ pnphy_service(sc, mii, cmd)
 				mii->mii_media_active |= IFM_FDX;
 			MIIBUS_STATCHG(sc->mii_dev);
 			return(0);
-			break;
 		case IFM_10_T:
 			mii->mii_media_active = IFM_ETHER|IFM_10_T;
 			if ((ife->ifm_media & IFM_GMASK) == IFM_FDX)
 				mii->mii_media_active |= IFM_FDX;
 			MIIBUS_STATCHG(sc->mii_dev);
 			return(0);
-			break;
 		default:
 			return(EINVAL);
-			break;
 		}
 		break;
 

@@ -38,8 +38,10 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/alpha/alpha/mem.c,v 1.44 2003/03/25 00:06:59 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/mem.c,v 1.46 2003/08/17 06:42:07 marcel Exp $");
 
 /*
  * Memory special file
@@ -59,6 +61,7 @@
 #include <sys/signalvar.h>
 #include <sys/uio.h>
 
+#include <machine/md_var.h>
 #ifdef PERFMON
 #include <machine/perfmon.h>
 #endif

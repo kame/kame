@@ -1,4 +1,4 @@
-/*
+/*-
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
  * Copyright (c) 1997 KATO Takenori.
@@ -38,8 +38,10 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/amd64/amd64/identcpu.c,v 1.125 2003/05/27 21:59:56 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/identcpu.c,v 1.128 2003/11/21 03:01:59 peter Exp $");
 
 #include "opt_cpu.h"
 
@@ -53,12 +55,13 @@
 #include <machine/asmacros.h>
 #include <machine/clock.h>
 #include <machine/cputypes.h>
+#include <machine/frame.h>
+#include <machine/intr_machdep.h>
 #include <machine/segments.h>
 #include <machine/specialreg.h>
 #include <machine/md_var.h>
 
 #include <amd64/isa/icu.h>
-#include <amd64/isa/intr_machdep.h>
 
 /* XXX - should be in header file: */
 void printcpuinfo(void);

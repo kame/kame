@@ -22,18 +22,18 @@
  *
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
- *
- * $FreeBSD: src/sys/ddb/db_command.c,v 1.48 2003/02/16 19:22:21 phk Exp $
  */
-
 /*
  *	Author: David B. Golub, Carnegie Mellon University
  *	Date:	7/90
  */
-
 /*
  * Command dispatcher.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/ddb/db_command.c,v 1.52 2003/08/16 16:57:56 marcel Exp $");
+
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/lock.h>
@@ -49,7 +49,7 @@
 #include <ddb/db_lex.h>
 #include <ddb/db_output.h>
 
-#include <machine/md_var.h>
+#include <machine/cpu.h>
 #include <machine/setjmp.h>
 
 /*
@@ -344,6 +344,7 @@ db_command(last_cmdp, cmd_table, aux_cmd_tablep, aux_cmd_tablep_end)
 	     * Execute the command.
 	     */
 	    (*cmd->fcn)(addr, have_addr, count, modif);
+	    db_setup_paging(NULL, NULL, -1);
 
 	    if (cmd->flag & CS_SET_DOT) {
 		/*
@@ -414,6 +415,7 @@ static struct command db_command_table[] = {
 	{ "next",	db_trace_until_matching_cmd,0,	0 },
 	{ "match",	db_trace_until_matching_cmd,0,	0 },
 	{ "trace",	db_stack_trace_cmd,	0,	0 },
+	{ "where",	db_stack_trace_cmd,	0,	0 },
 	{ "call",	db_fncall,		CS_OWN,	0 },
 	{ "show",	0,			0,	db_show_cmds },
 	{ "ps",		db_ps,			0,	0 },

@@ -1,5 +1,7 @@
 /*	$NetBSD: if_bah_zbus.c,v 1.6 2000/01/23 21:06:12 aymeric Exp $ */
-/*	$FreeBSD: src/sys/dev/cm/if_cm_isa.c,v 1.3 2003/04/15 06:37:21 mdodd Exp $ */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/cm/if_cm_isa.c,v 1.5 2003/10/31 18:31:58 brooks Exp $");
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -94,7 +96,7 @@ cm_isa_attach(dev)
 		return (error);
 	}
 
-	return cm_attach(sc, device_get_unit(dev));
+	return cm_attach(dev);
 }
 
 static int

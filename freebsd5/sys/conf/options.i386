@@ -1,23 +1,21 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.191 2003/04/12 09:40:37 des Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.204 2003/12/03 23:06:30 imp Exp $
 # Options specific to the i386 platform kernels
 
-MATH_EMULATE		opt_math_emulate.h
-GPL_MATH_EMULATE	opt_math_emulate.h
-DISABLE_PSE		opt_pmap.h
-PMAP_SHPGPERPROC	opt_pmap.h
-DISABLE_PG_G		opt_pmap.h
-LAZY_SWITCH		opt_swtch.h
-SWTCH_OPTIM_STATS	opt_swtch.h
-PPC_PROBE_CHIPSET	opt_ppc.h
-PPC_DEBUG		opt_ppc.h
-MAXMEM
-PERFMON			opt_perfmon.h
-POWERFAIL_NMI		opt_trap.h
 AUTO_EOI_1		opt_auto_eoi.h
 AUTO_EOI_2		opt_auto_eoi.h
-I586_PMC_GUPROF		opt_i586_guprof.h
-COMPAT_OLDISA
 BROKEN_KEYBOARD_RESET	opt_reset.h
+COMPAT_OLDISA
+I586_PMC_GUPROF		opt_i586_guprof.h
+MAXMEM
+MPTABLE_FORCE_HTT
+NO_MIXED_MODE
+PERFMON
+DISABLE_PSE		opt_pmap.h
+DISABLE_PG_G		opt_pmap.h
+PMAP_SHPGPERPROC	opt_pmap.h
+PPC_PROBE_CHIPSET	opt_ppc.h
+PPC_DEBUG		opt_ppc.h
+POWERFAIL_NMI		opt_trap.h
 
 # Options for emulators.  These should only be used at config time, so
 # they are handled like options for static filesystems
@@ -29,8 +27,6 @@ COMPAT_SVR4		opt_dontuse.h
 DEBUG_SVR4		opt_svr4.h
 PECOFF_SUPPORT		opt_dontuse.h
 PECOFF_DEBUG		opt_pecoff.h
-# i386 SMP options
-APIC_IO			opt_global.h
 
 # Change KVM size.  Changes things all over the kernel.
 KVA_PAGES		opt_global.h
@@ -43,64 +39,41 @@ CLK_USE_I8254_CALIBRATION	opt_clock.h
 CLK_USE_TSC_CALIBRATION		opt_clock.h
 TIMER_FREQ			opt_clock.h
 
-NO_F00F_HACK			opt_cpu.h
-CPU_BLUELIGHTNING_FPU_OP_CACHE	opt_cpu.h
+CPU_ATHLON_SSE_HACK		opt_cpu.h
 CPU_BLUELIGHTNING_3X		opt_cpu.h
+CPU_BLUELIGHTNING_FPU_OP_CACHE	opt_cpu.h
 CPU_BTB_EN			opt_cpu.h
 CPU_CYRIX_NO_LOCK		opt_cpu.h
 CPU_DIRECT_MAPPED_CACHE		opt_cpu.h
 CPU_DISABLE_5X86_LSSER		opt_cpu.h
+CPU_DISABLE_CMPXCHG		opt_global.h	# XXX global, unlike other CPU_*
+CPU_DISABLE_SSE			opt_cpu.h
 CPU_ELAN			opt_cpu.h
+CPU_ELAN_XTAL			opt_cpu.h
+CPU_ELAN_PPS			opt_cpu.h
+CPU_ENABLE_SSE			opt_cpu.h
 CPU_FASTER_5X86_FPU		opt_cpu.h
+CPU_GEODE			opt_cpu.h
 CPU_I486_ON_386			opt_cpu.h
 CPU_IORT			opt_cpu.h
 CPU_L2_LATENCY			opt_cpu.h
 CPU_LOOP_EN			opt_cpu.h
 CPU_PPRO2CELERON		opt_cpu.h
 CPU_RSTK_EN			opt_cpu.h
+CPU_SOEKRIS			opt_cpu.h
 CPU_SUSP_HLT			opt_cpu.h
 CPU_UPGRADE_HW_CACHE		opt_cpu.h
 CPU_WT_ALLOC			opt_cpu.h
-CYRIX_CACHE_WORKS		opt_cpu.h
 CYRIX_CACHE_REALLY_WORKS	opt_cpu.h
+CYRIX_CACHE_WORKS		opt_cpu.h
+NO_F00F_HACK			opt_cpu.h
 NO_MEMORY_HOLE			opt_cpu.h
-CPU_ENABLE_SSE			opt_cpu.h
-CPU_ATHLON_SSE_HACK		opt_cpu.h
-CPU_DISABLE_SSE			opt_cpu.h
-CPU_DISABLE_CMPXCHG		opt_global.h
-
-# Options for the AMD Elan CPU
-ELAN_PPS		opt_cpu.h
-ELAN_XTAL		opt_cpu.h
 
 # The CPU type affects the endian conversion functions all over the kernel.
 I386_CPU		opt_global.h
 I486_CPU		opt_global.h
 I586_CPU		opt_global.h
 I686_CPU		opt_global.h
-
-MAXCONS			opt_syscons.h
-SC_ALT_MOUSE_IMAGE	opt_syscons.h
-SC_CUT_SPACES2TABS	opt_syscons.h
-SC_CUT_SEPCHARS		opt_syscons.h
-SC_DEBUG_LEVEL		opt_syscons.h
-SC_DFLT_FONT		opt_syscons.h
-SC_DISABLE_DDBKEY	opt_syscons.h
-SC_DISABLE_REBOOT	opt_syscons.h
-SC_HISTORY_SIZE		opt_syscons.h
-SC_KERNEL_CONS_ATTR	opt_syscons.h
-SC_KERNEL_CONS_REV_ATTR	opt_syscons.h
-SC_MOUSE_CHAR		opt_syscons.h
-SC_NO_CUTPASTE		opt_syscons.h
-SC_NO_FONT_LOADING	opt_syscons.h
-SC_NO_HISTORY		opt_syscons.h
-SC_NO_SYSMOUSE		opt_syscons.h
-SC_NORM_ATTR		opt_syscons.h
-SC_NORM_REV_ATTR	opt_syscons.h
-SC_PIXEL_MODE		opt_syscons.h
-SC_RENDER_DEBUG		opt_syscons.h
-SC_TWOBUTTON_MOUSE	opt_syscons.h
-SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
 
 VGA_ALT_SEQACCESS	opt_vga.h
 VGA_DEBUG		opt_vga.h
@@ -118,15 +91,6 @@ PSM_DEBUG		opt_psm.h
 
 ATKBD_DFLT_KEYMAP	opt_atkbd.h
 
-KBD_DISABLE_KEYMAP_LOAD	opt_kbd.h
-KBD_INSTALL_CDEV	opt_kbd.h
-KBD_MAXRETRY		opt_kbd.h
-KBD_MAXWAIT		opt_kbd.h
-KBD_RESETDELAY		opt_kbd.h
-KBDIO_DEBUG		opt_kbd.h
-
-EISA_SLOTS		opt_eisa.h
-
 # pcvt(4) has a bunch of options
 FAT_CURSOR		opt_pcvt.h
 XSERVER			opt_pcvt.h
@@ -143,6 +107,9 @@ PCVT_GREENSAVER		opt_pcvt.h
 
 # Video spigot
 SPIGOT_UNSECURE		opt_spigot.h
+
+# Enables NETGRAPH support for Cronyx adapters
+NETGRAPH_CRONYX		opt_ng_cronyx.h
 
 # -------------------------------
 # isdn4bsd: passive ISA cards
@@ -181,8 +148,9 @@ IPR_VJ			opt_i4b.h
 IPR_LOG			opt_i4b.h
 
 # Device options
+DEV_ACPI		opt_acpi.h
+DEV_APIC		opt_apic.h
 DEV_NPX			opt_npx.h
-DEV_SPLASH		opt_splash.h
 
 # -------------------------------
 # EOF

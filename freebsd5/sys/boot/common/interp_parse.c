@@ -1,4 +1,4 @@
-/*
+/*-
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -11,10 +11,11 @@
  * Jordan K. Hubbard
  * 29 August 1998
  *
- * $FreeBSD: src/sys/boot/common/interp_parse.c,v 1.9 2000/08/03 09:13:54 jhb Exp $
- * 
  * The meat of the simple parser.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/common/interp_parse.c,v 1.10 2003/08/25 23:30:41 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>

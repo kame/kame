@@ -1,11 +1,10 @@
-# $FreeBSD: src/sys/boot/Makefile,v 1.16 2003/04/30 22:13:36 peter Exp $
+# $FreeBSD: src/sys/boot/Makefile,v 1.18 2003/08/16 02:48:20 obrien Exp $
 
 .if ${MACHINE_ARCH} == "amd64"
-MACHINE_ARCH=i386
-MACHINE=i386
+.MAKEFLAGS:  MACHINE_ARCH=i386 MACHINE=i386 REALLY_AMD64=true
 .endif
 
-.if !defined(NOFORTH)
+.if !defined(NOFORTH) && ${MACHINE_ARCH} != "powerpc"
 # Build the add-in FORTH interpreter
 SUBDIR+=		ficl
 .endif

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ia64/libski/skifs.c,v 1.1 2001/09/12 08:34:27 dfr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ia64/libski/skifs.c,v 1.2 2003/09/08 09:11:32 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/time.h>

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.14 2003/05/01 13:17:06 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.18 2003/07/02 12:45:45 ru Exp $
 #
 LIB=			pc98
 INTERNALLIB=		true
@@ -28,7 +28,6 @@ CFLAGS+= -DTERM_EMU
 CFLAGS+=	-DPC98
 CFLAGS+=	-I${.CURDIR}/../../common -I${.CURDIR}/../btx/lib \
 		-I${.CURDIR}/../../i386/libi386 \
-		-I${.CURDIR}/../../../contrib/dev/acpica \
 		-I${.CURDIR}/../../.. -I.
 # the location of libstand
 CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
@@ -41,11 +40,10 @@ ${SRCS:M*.c:R:S/$/.o/g}: machine
 .if exists(${.CURDIR}/../../../i386/include)
 beforedepend ${OBJS}: machine
 
+CLEANFILES+=	machine
 machine:
 	ln -sf ${.CURDIR}/../../../i386/include machine
 
 .endif
-
-CLEANFILES+=	machine
 
 .include <bsd.lib.mk>

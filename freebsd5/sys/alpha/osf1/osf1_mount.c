@@ -1,5 +1,4 @@
 /*	$NetBSD: osf1_mount.c,v 1.7 1998/05/20 16:34:29 chs Exp $	*/
-
 /*
  * Copyright (c) 1994, 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -26,11 +25,12 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-
 /*
  * Additional Copyright (c) 1999 by Andrew Gallatin
- * $FreeBSD: src/sys/alpha/osf1/osf1_mount.c,v 1.14 2003/03/20 21:17:38 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_mount.c,v 1.18 2003/11/16 21:53:05 kris Exp $");
 
 #include "opt_mac.h"
 #include "opt_nfs.h"
@@ -58,6 +58,7 @@
 #include <nfs/xdr_subs.h>
 #include <nfs/rpcv2.h>
 #include <nfs/nfsproto.h>
+#include <rpc/rpcclnt.h>
 #include <nfsclient/nfs.h>
 #include <nfsclient/nfsmount.h>
 #include <nfsclient/nfsargs.h>
@@ -159,7 +160,7 @@ osf1_fstatfs(td, uap)
 
 	if ((error = getvnode(td->td_proc->p_fd, uap->fd, &fp)))
 		return (error);
-	mp = ((struct vnode *)fp->f_data)->v_mount;
+	mp = fp->f_vnode->v_mount;
 #ifdef MAC
 	error = mac_check_mount_stat(td->td_ucred, mp);
 	if (error) {

@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.11 2003/04/01 15:06:23 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.13 2003/08/24 17:49:12 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -303,6 +304,8 @@ ida_eisa_attach(device_t dev)
 		/* nsegments	*/	IDA_NSEG,
 		/* maxsegsize	*/	BUS_SPACE_MAXSIZE_32BIT,
 		/* flags	*/	BUS_DMA_ALLOCNOW,
+		/* lockfunc	*/	NULL,
+		/* lockarg	*/	NULL,
 		&ida->parent_dmat);
 
 	if (error != 0) {

@@ -1,9 +1,7 @@
-/*
- *
+/*-
  * ===================================
  * HARP  |  Host ATM Research Platform
  * ===================================
- *
  *
  * This Host ATM Research Platform ("HARP") file (the "Software") is
  * made available by Network Computing Services, Inc. ("NetworkCS")
@@ -22,10 +20,10 @@
  *
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
- *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_transmit.c,v 1.9 2002/06/24 05:03:44 arr Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/hfa/fore_transmit.c,v 1.11 2003/08/24 17:46:08 obrien Exp $");
 
 /*
  * FORE Systems 200-Series Adapter Support
@@ -53,7 +51,7 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <dev/hfa/fore.h>
 #include <dev/hfa/fore_aali.h>
 #include <dev/hfa/fore_slave.h>
@@ -62,7 +60,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_transmit.c,v 1.9 2002/06/24 05:03:44 arr Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_transmit.c,v 1.11 2003/08/24 17:46:08 obrien Exp $");
 #endif
 
 

@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
  *
@@ -34,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)reg.h	5.5 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/amd64/include/reg.h,v 1.31 2003/05/23 06:31:56 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/reg.h,v 1.33 2003/11/08 04:39:22 peter Exp $
  */
 
 #ifndef _MACHINE_REG_H_
@@ -73,7 +74,7 @@ struct reg {
  */
 struct fpreg {
 	/*
-	 * XXX should get struct from npx.h.  Here we give a slightly
+	 * XXX should get struct from fpu.h.  Here we give a slightly
 	 * simplified struct.  This may be too much detail.  Perhaps
 	 * an array of unsigned longs is best.
 	 */

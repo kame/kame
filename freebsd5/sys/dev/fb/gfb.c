@@ -23,6 +23,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/fb/gfb.c,v 1.5 2003/08/24 17:46:06 obrien Exp $");
 /*
  * Copyright (c) 1995, 1996 Carnegie-Mellon University.
  * All rights reserved.
@@ -51,7 +54,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fb/gfb.c,v 1.3 2003/02/25 03:21:19 mux Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fb/gfb.c,v 1.5 2003/08/24 17:46:06 obrien Exp $");
 
 #include <machine/stdarg.h>
 
@@ -80,8 +83,8 @@ __FBSDID("$FreeBSD: src/sys/dev/fb/gfb.c,v 1.3 2003/02/25 03:21:19 mux Exp $");
 #include <sys/bus.h>
 #include <sys/rman.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #include <dev/fb/fbreg.h>
 #include <dev/fb/gfb.h>

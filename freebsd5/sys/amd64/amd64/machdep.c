@@ -1,4 +1,5 @@
 /*-
+ * Copyright (c) 2003 Peter Wemm.
  * Copyright (c) 1992 Terrence R. Lambert.
  * Copyright (c) 1982, 1987, 1990 The Regents of the University of California.
  * All rights reserved.
@@ -35,20 +36,23 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/amd64/amd64/machdep.c,v 1.582 2003/05/31 07:00:08 peter Exp $
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/machdep.c,v 1.601 2003/12/06 23:19:47 peter Exp $");
+
 #include "opt_atalk.h"
+#include "opt_atpic.h"
 #include "opt_compat.h"
 #include "opt_cpu.h"
 #include "opt_ddb.h"
 #include "opt_inet.h"
 #include "opt_ipx.h"
 #include "opt_isa.h"
+#include "opt_kstack_pages.h"
 #include "opt_maxmem.h"
 #include "opt_msgbuf.h"
 #include "opt_perfmon.h"
-#include "opt_kstack_pages.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -98,6 +102,7 @@
 #include <machine/reg.h>
 #include <machine/clock.h>
 #include <machine/specialreg.h>
+#include <machine/intr_machdep.h>
 #include <machine/md_var.h>
 #include <machine/metadata.h>
 #include <machine/proc.h>
@@ -105,12 +110,19 @@
 #include <machine/perfmon.h>
 #endif
 #include <machine/tss.h>
+#ifdef SMP
+#include <machine/smp.h>
+#endif
 
 #include <amd64/isa/icu.h>
-#include <amd64/isa/intr_machdep.h>
+
+#include <isa/isareg.h>
 #include <isa/rtc.h>
 #include <sys/ptrace.h>
 #include <machine/sigframe.h>
+
+/* Sanity check for __curthread() */
+CTASSERT(offsetof(struct pcpu, pc_curthread) == 0);
 
 extern u_int64_t hammer_time(u_int64_t, u_int64_t);
 extern void dblfault_handler(void);
@@ -143,7 +155,9 @@ vm_paddr_t phys_avail[10];
 struct kva_md_info kmi;
 
 static struct trapframe proc0_tf;
-static struct pcpu __pcpu;
+struct region_descriptor r_gdt, r_idt;
+
+struct pcpu __pcpu[MAXCPU];
 
 struct mtx icu_lock;
 
@@ -193,7 +207,6 @@ cpu_startup(dummy)
 	bufinit();
 	vm_pager_bufferinit();
 
-	/* For SMP, we delay the cpu_setregs() until after SMP startup. */
 	cpu_setregs();
 }
 
@@ -297,6 +310,28 @@ sendsig(catcher, sig, mask, code)
 	regs->tf_cs = _ucodesel;
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
+}
+
+/*
+ * Build siginfo_t for SA thread
+ */
+void
+cpu_thread_siginfo(int sig, u_long code, siginfo_t *si)
+{
+	struct proc *p;
+	struct thread *td;
+	struct trapframe *regs;
+
+	td = curthread;
+	p = td->td_proc;
+	regs = td->td_frame;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	bzero(si, sizeof(*si));
+	si->si_signo = sig;
+	si->si_code = code;
+	si->si_addr = (void *)regs->tf_addr;
+	/* XXXKSE fill other fields */
 }
 
 /*
@@ -431,6 +466,17 @@ static int	cpu_idle_hlt = 1;
 SYSCTL_INT(_machdep, OID_AUTO, cpu_idle_hlt, CTLFLAG_RW,
     &cpu_idle_hlt, 0, "Idle loop HLT enable");
 
+static void
+cpu_idle_default(void)
+{
+	/*
+	 * we must absolutely guarentee that hlt is the
+	 * absolute next instruction after sti or we
+	 * introduce a timing window.
+	 */
+	__asm __volatile("sti; hlt");
+}
+
 /*
  * Note that we have to be careful here to avoid a race between checking
  * sched_runnable() and actually halting.  If we don't do this, we may waste
@@ -443,18 +489,15 @@ cpu_idle(void)
 
 	if (cpu_idle_hlt) {
 		disable_intr();
-  		if (sched_runnable()) {
+  		if (sched_runnable())
 			enable_intr();
-		} else {
-			/*
-			 * we must absolutely guarentee that hlt is the
-			 * absolute next instruction after sti or we
-			 * introduce a timing window.
-			 */
-			__asm __volatile("sti; hlt");
-		}
+		else
+			(*cpu_idle_hook)();
 	}
 }
+
+/* Other subsystems (e.g., ACPI) can hook this later. */
+void (*cpu_idle_hook)(void) = cpu_idle_default;
 
 /*
  * Clear registers on exec
@@ -484,7 +527,6 @@ exec_setregs(td, entry, stack, ps_strings)
 
 	bzero((char *)regs, sizeof(struct trapframe));
 	regs->tf_rip = entry;
-	/* This strangeness is to ensure alignment after the implied return address */
 	regs->tf_rsp = ((stack - 8) & ~0xF) + 8;
 	regs->tf_rdi = stack;		/* argv */
 	regs->tf_rflags = PSL_USER | (regs->tf_rflags & PSL_T);
@@ -492,20 +534,20 @@ exec_setregs(td, entry, stack, ps_strings)
 	regs->tf_cs = _ucodesel;
 
 	/*
-	 * Arrange to trap the next npx or `fwait' instruction (see npx.c
-	 * for why fwait must be trapped at least if there is an npx or an
+	 * Arrange to trap the next fpu or `fwait' instruction (see fpu.c
+	 * for why fwait must be trapped at least if there is an fpu or an
 	 * emulator).  This is mainly to handle the case where npx0 is not
-	 * configured, since the npx routines normally set up the trap
+	 * configured, since the fpu routines normally set up the trap
 	 * otherwise.  It should be done only at boot time, but doing it
-	 * here allows modifying `npx_exists' for testing the emulator on
-	 * systems with an npx.
+	 * here allows modifying `fpu_exists' for testing the emulator on
+	 * systems with an fpu.
 	 */
 	load_cr0(rcr0() | CR0_MP | CR0_TS);
 
-	/* Initialize the npx (if any) for the current process. */
+	/* Initialize the fpu (if any) for the current process. */
 	/*
 	 * XXX the above load_cr0() also initializes it and is a layering
-	 * violation if NPX is configured.  It drops the npx partially
+	 * violation.  It drops the fpu state partially
 	 * and this would be fatal if we were interrupted now, and decided
 	 * to force the state to the pcb, and checked the invariant
 	 * (CR0_TS clear) if and only if PCPU_GET(fpcurthread) != NULL).
@@ -523,7 +565,7 @@ cpu_setregs(void)
 	register_t cr0;
 
 	cr0 = rcr0();
-	cr0 |= CR0_NE;			/* Done by npxinit() */
+	cr0 |= CR0_NE;			/* Done by fpuinit() */
 	cr0 |= CR0_MP | CR0_TS;		/* Done at every execve() too. */
 	cr0 |= CR0_WP | CR0_AM;
 	load_cr0(cr0);
@@ -557,13 +599,13 @@ SYSCTL_INT(_machdep, CPU_WALLCLOCK, wall_cmos_clock,
  * Initialize segments & interrupt table
  */
 
-struct user_segment_descriptor gdt[NGDT];/* global descriptor table */
+struct user_segment_descriptor gdt[NGDT * MAXCPU];/* global descriptor table */
 static struct gate_descriptor idt0[NIDT];
 struct gate_descriptor *idt = &idt0[0];	/* interrupt descriptor table */
 
 static char dblfault_stack[PAGE_SIZE] __aligned(16);
 
-struct amd64tss common_tss;
+struct amd64tss common_tss[MAXCPU];
 
 /* software prototypes -- in more palatable form */
 struct soft_segment_descriptor gdt_segs[] = {
@@ -723,6 +765,15 @@ ssdtosyssd(ssd, sd)
 	sd->sd_gran  = ssd->ssd_gran;
 }
 
+#if !defined(DEV_ATPIC) && defined(DEV_ISA)
+#include <isa/isavar.h>
+u_int
+isa_irq_pending(void)
+{
+
+	return (0);
+}
+#endif
 
 #define PHYSMAP_SIZE	(2 * 8)
 
@@ -731,6 +782,8 @@ struct bios_smap {
 	u_int64_t	length;
 	u_int32_t	type;
 } __packed;
+
+u_int basemem;
 
 /*
  * Populate the (physmap) array with base/bound pairs describing the
@@ -749,7 +802,6 @@ static void
 getmemsize(caddr_t kmdp, u_int64_t first)
 {
 	int i, physmap_idx, pa_indx;
-	u_int basemem, extmem;
 	vm_paddr_t pa, physmap[PHYSMAP_SIZE];
 	pt_entry_t *pte;
 	char *cp;
@@ -768,12 +820,9 @@ getmemsize(caddr_t kmdp, u_int64_t first)
 	 * ie: an int32_t immediately precedes smap.
 	 */
 	smapbase = (struct bios_smap *)preload_search_info(kmdp, MODINFO_METADATA | MODINFOMD_SMAP);
-	if (smapbase == 0)
-		smapbase = (struct bios_smap *)preload_search_info(kmdp, MODINFO_METADATA | 0x0009);	/* Old value for MODINFOMD_SMAP */
-	if (smapbase == 0) {
+	if (smapbase == NULL)
 		panic("No BIOS smap info from loader!");
-		goto deep_shit;
-	}
+
 	smapsize = *((u_int32_t *)smapbase - 1);
 	smapend = (struct bios_smap *)((uintptr_t)smapbase + smapsize);
 
@@ -782,14 +831,11 @@ getmemsize(caddr_t kmdp, u_int64_t first)
 			printf("SMAP type=%02x base=%016lx len=%016lx\n",
 			    smap->type, smap->base, smap->length);
 
-		if (smap->type != 0x01) {
+		if (smap->type != 0x01)
 			continue;
-		}
 
-		if (smap->length == 0) {
-next_run:
+		if (smap->length == 0)
 			continue;
-		}
 
 		for (i = 0; i <= physmap_idx; i += 2) {
 			if (smap->base < physmap[i + 1]) {
@@ -802,6 +848,7 @@ next_run:
 
 		if (smap->base == physmap[physmap_idx + 1]) {
 			physmap[physmap_idx + 1] += smap->length;
+next_run:
 			continue;
 		}
 
@@ -816,69 +863,23 @@ next_run:
 	}
 
 	/*
-	 * Perform "base memory" related probes & setup based on SMAP
+	 * Find the 'base memory' segment for SMP
 	 */
-deep_shit:
-	if (basemem == 0) {
-		for (i = 0; i <= physmap_idx; i += 2) {
-			if (physmap[i] == 0x00000000) {
-				basemem = physmap[i + 1] / 1024;
-				break;
-			}
+	basemem = 0;
+	for (i = 0; i <= physmap_idx; i += 2) {
+		if (physmap[i] == 0x00000000) {
+			basemem = physmap[i + 1] / 1024;
+			break;
 		}
-
-		if (basemem == 0) {
-			basemem = rtcin(RTC_BASELO) + (rtcin(RTC_BASEHI) << 8);
-		}
-
-		if (basemem == 0) {
-			basemem = 640;
-		}
-
-		if (basemem > 640) {
-			printf("Preposterous BIOS basemem of %uK, truncating to 640K\n",
-				basemem);
-			basemem = 640;
-		}
-
-#if 0
-		for (pa = trunc_page(basemem * 1024);
-		     pa < ISA_HOLE_START; pa += PAGE_SIZE)
-			pmap_kenter(KERNBASE + pa, pa);
-#endif
 	}
+	if (basemem == 0)
+		panic("BIOS smap did not include a basemem segment!");
 
-	if (physmap[1] != 0)
-		goto physmap_done;
+#ifdef SMP
+	/* make hole for AP bootstrap code */
+	physmap[1] = mp_bootaddress(physmap[1] / 1024);
+#endif
 
-	/*
-	 * Prefer the RTC value for extended memory.
-	 */
-	extmem = rtcin(RTC_EXTLO) + (rtcin(RTC_EXTHI) << 8);
-
-	/*
-	 * Special hack for chipsets that still remap the 384k hole when
-	 * there's 16MB of memory - this really confuses people that
-	 * are trying to use bus mastering ISA controllers with the
-	 * "16MB limit"; they only have 16MB, but the remapping puts
-	 * them beyond the limit.
-	 *
-	 * If extended memory is between 15-16MB (16-17MB phys address range),
-	 *	chop it to 15MB.
-	 */
-	if ((extmem > 15 * 1024) && (extmem < 16 * 1024))
-		extmem = 15 * 1024;
-
-	physmap[0] = 0;
-	physmap[1] = basemem * 1024;
-	physmap_idx = 2;
-	physmap[physmap_idx] = 0x100000;
-	physmap[physmap_idx + 1] = physmap[physmap_idx] + extmem * 1024;
-
-physmap_done:
-	/*
-	 * Now, physmap contains a map of physical memory.
-	 */
 	/*
 	 * Maxmem isn't the "maximum memory", it's one larger than the
 	 * highest page of the physical address space.  It should be
@@ -895,7 +896,8 @@ physmap_done:
 	 * hw.physmem is a size in bytes; we also allow k, m, and g suffixes
 	 * for the appropriate modifiers.  This overrides MAXMEM.
 	 */
-	if ((cp = getenv("hw.physmem")) != NULL) {
+	cp = getenv("hw.physmem");
+	if (cp != NULL) {
 		u_int64_t AllowMem, sanity;
 		char *ep;
 
@@ -1072,10 +1074,17 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 {
 	caddr_t kmdp;
 	int gsel_tss, off, x;
-	struct region_descriptor r_gdt, r_idt;
 	struct pcpu *pc;
 	u_int64_t msr;
 	char *env;
+
+#ifdef DEV_ISA
+	/* Preemptively mask the atpics and leave them shut down */
+	outb(IO_ICU1 + ICU_IMR_OFFSET, 0xff);
+	outb(IO_ICU2 + ICU_IMR_OFFSET, 0xff);
+#else
+#error "have you forgotten the isa device?";
+#endif
 
 	/* Turn on PTE NX (no execute) bit */
 	msr = rdmsr(MSR_EFER) | EFER_NXE;
@@ -1112,7 +1121,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	/*
 	 * make gdt memory segments
 	 */
-	gdt_segs[GPROC0_SEL].ssd_base = (uintptr_t)&common_tss;
+	gdt_segs[GPROC0_SEL].ssd_base = (uintptr_t)&common_tss[0];
 
 	for (x = 0; x < NGDT; x++) {
 		if (x != GPROC0_SEL && x != (GPROC0_SEL + 1))
@@ -1123,7 +1132,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	r_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
 	r_gdt.rd_base =  (long) gdt;
 	lgdt(&r_gdt);
-	pc = &__pcpu;
+	pc = &__pcpu[0];
 
 	wrmsr(MSR_FSBASE, 0);		/* User value */
 	wrmsr(MSR_GSBASE, (u_int64_t)pc);
@@ -1132,6 +1141,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	pcpu_init(pc, 0, sizeof(struct pcpu));
 	PCPU_SET(prvspace, pc);
 	PCPU_SET(curthread, &thread0);
+	PCPU_SET(tssp, &common_tss[0]);
 
 	/*
 	 * Initialize mutexes.
@@ -1142,32 +1152,31 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	 *	     under witness.
 	 */
 	mutex_init();
-	mtx_init(&clock_lock, "clk", NULL, MTX_SPIN | MTX_RECURSE);
+	mtx_init(&clock_lock, "clk", NULL, MTX_SPIN);
 	mtx_init(&icu_lock, "icu", NULL, MTX_SPIN | MTX_NOWITNESS);
 
 	/* exceptions */
 	for (x = 0; x < NIDT; x++)
 		setidt(x, &IDTVEC(rsvd), SDT_SYSIGT, SEL_KPL, 0);
-	setidt(0, &IDTVEC(div),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(1, &IDTVEC(dbg),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(2, &IDTVEC(nmi),  SDT_SYSIGT, SEL_KPL, 0);
- 	setidt(3, &IDTVEC(bpt),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(4, &IDTVEC(ofl),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(5, &IDTVEC(bnd),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(6, &IDTVEC(ill),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(7, &IDTVEC(dna),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(8, &IDTVEC(dblfault), SDT_SYSIGT, SEL_KPL, 1);
-	setidt(9, &IDTVEC(fpusegm),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(10, &IDTVEC(tss),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(11, &IDTVEC(missing),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(12, &IDTVEC(stk),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(13, &IDTVEC(prot),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(14, &IDTVEC(page),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(15, &IDTVEC(rsvd),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(16, &IDTVEC(fpu),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(17, &IDTVEC(align), SDT_SYSIGT, SEL_KPL, 0);
-	setidt(18, &IDTVEC(mchk),  SDT_SYSIGT, SEL_KPL, 0);
-	setidt(19, &IDTVEC(xmm), SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_DE, &IDTVEC(div),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_DB, &IDTVEC(dbg),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_NMI, &IDTVEC(nmi),  SDT_SYSIGT, SEL_KPL, 0);
+ 	setidt(IDT_BP, &IDTVEC(bpt),  SDT_SYSIGT, SEL_UPL, 0);
+	setidt(IDT_OF, &IDTVEC(ofl),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_BR, &IDTVEC(bnd),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_UD, &IDTVEC(ill),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_NM, &IDTVEC(dna),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_DF, &IDTVEC(dblfault), SDT_SYSIGT, SEL_KPL, 1);
+	setidt(IDT_FPUGP, &IDTVEC(fpusegm),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_TS, &IDTVEC(tss),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_NP, &IDTVEC(missing),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_SS, &IDTVEC(stk),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_GP, &IDTVEC(prot),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_PF, &IDTVEC(page),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_MF, &IDTVEC(fpu),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_AC, &IDTVEC(align), SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_MC, &IDTVEC(mchk),  SDT_SYSIGT, SEL_KPL, 0);
+	setidt(IDT_XF, &IDTVEC(xmm), SDT_SYSIGT, SEL_KPL, 0);
 
 	r_idt.rd_limit = sizeof(idt0) - 1;
 	r_idt.rd_base = (long) idt;
@@ -1178,8 +1187,8 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	 */
 	cninit();
 
-#ifdef DEV_ISA
-	isa_defaultirq();
+#ifdef DEV_ATPIC
+	atpic_startup();
 #endif
 
 #ifdef DDB
@@ -1192,10 +1201,14 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	initializecpu();	/* Initialize CPU registers */
 
 	/* make an initial tss so cpu can get interrupt stack on syscall! */
-	common_tss.tss_rsp0 = thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE - sizeof(struct pcb);
+	common_tss[0].tss_rsp0 = thread0.td_kstack + \
+	    KSTACK_PAGES * PAGE_SIZE - sizeof(struct pcb);
+	/* Ensure the stack is aligned to 16 bytes */
+	common_tss[0].tss_rsp0 &= ~0xF;
+	PCPU_SET(rsp0, common_tss[0].tss_rsp0);
 
 	/* doublefault stack space, runs on ist1 */
-	common_tss.tss_ist1 = (long)&dblfault_stack[sizeof(dblfault_stack)];
+	common_tss[0].tss_ist1 = (long)&dblfault_stack[sizeof(dblfault_stack)];
 
 	gsel_tss = GSEL(GPROC0_SEL, SEL_KPL);
 	ltr(gsel_tss);
@@ -1220,6 +1233,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 		pmap_kenter((vm_offset_t)msgbufp + off, avail_end + off);
 
 	msgbufinit(msgbufp, MSGBUF_SIZE);
+	fpuinit();
 
 	/* transfer to user mode */
 
@@ -1243,6 +1257,8 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 void
 cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 {
+
+	pcpu->pc_acpi_id = 0xffffffff;
 }
 
 int
@@ -1405,12 +1421,11 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
  * Get machine context.
  */
 int
-get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
+get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
 	struct trapframe *tp;
 
 	tp = td->td_frame;
-
 	PROC_LOCK(curthread->td_proc);
 	mcp->mc_onstack = sigonstack(tp->tf_rsp);
 	PROC_UNLOCK(curthread->td_proc);
@@ -1427,7 +1442,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_rbp = tp->tf_rbp;
 	mcp->mc_rbx = tp->tf_rbx;
 	mcp->mc_rcx = tp->tf_rcx;
-	if (clear_ret != 0) {
+	if (flags & GET_MC_CLEAR_RET) {
 		mcp->mc_rax = 0;
 		mcp->mc_rdx = 0;
 	} else {
@@ -1462,66 +1477,42 @@ set_mcontext(struct thread *td, const mcontext_t *mcp)
 		return (EINVAL);
 	rflags = (mcp->mc_rflags & PSL_USERCHANGE) |
 	    (tp->tf_rflags & ~PSL_USERCHANGE);
-	if ((ret = set_fpcontext(td, mcp)) == 0) {
-		tp->tf_r15 = mcp->mc_r15;
-		tp->tf_r14 = mcp->mc_r14;
-		tp->tf_r13 = mcp->mc_r13;
-		tp->tf_r12 = mcp->mc_r12;
-		tp->tf_r11 = mcp->mc_r11;
-		tp->tf_r10 = mcp->mc_r10;
-		tp->tf_r9  = mcp->mc_r9;
-		tp->tf_r8  = mcp->mc_r8;
-		tp->tf_rdi = mcp->mc_rdi;
-		tp->tf_rsi = mcp->mc_rsi;
-		tp->tf_rbp = mcp->mc_rbp;
-		tp->tf_rbx = mcp->mc_rbx;
-		tp->tf_rdx = mcp->mc_rdx;
-		tp->tf_rcx = mcp->mc_rcx;
-		tp->tf_rax = mcp->mc_rax;
-		tp->tf_rip = mcp->mc_rip;
-		tp->tf_rflags = rflags;
-		tp->tf_rsp = mcp->mc_rsp;
-		tp->tf_ss = mcp->mc_ss;
-		ret = 0;
-	}
-	return (ret);
+	ret = set_fpcontext(td, mcp);
+	if (ret != 0)
+		return (ret);
+	tp->tf_r15 = mcp->mc_r15;
+	tp->tf_r14 = mcp->mc_r14;
+	tp->tf_r13 = mcp->mc_r13;
+	tp->tf_r12 = mcp->mc_r12;
+	tp->tf_r11 = mcp->mc_r11;
+	tp->tf_r10 = mcp->mc_r10;
+	tp->tf_r9  = mcp->mc_r9;
+	tp->tf_r8  = mcp->mc_r8;
+	tp->tf_rdi = mcp->mc_rdi;
+	tp->tf_rsi = mcp->mc_rsi;
+	tp->tf_rbp = mcp->mc_rbp;
+	tp->tf_rbx = mcp->mc_rbx;
+	tp->tf_rdx = mcp->mc_rdx;
+	tp->tf_rcx = mcp->mc_rcx;
+	tp->tf_rax = mcp->mc_rax;
+	tp->tf_rip = mcp->mc_rip;
+	tp->tf_rflags = rflags;
+	tp->tf_rsp = mcp->mc_rsp;
+	tp->tf_ss = mcp->mc_ss;
+	return (0);
 }
 
 static void
 get_fpcontext(struct thread *td, mcontext_t *mcp)
 {
-	struct savefpu *addr;
 
-	/*
-	 * XXX mc_fpstate might be misaligned, since its declaration is not
-	 * unportabilized using __attribute__((aligned(16))) like the
-	 * declaration of struct savemm, and anyway, alignment doesn't work
-	 * for auto variables since we don't use gcc's pessimal stack
-	 * alignment.  Work around this by abusing the spare fields after
-	 * mcp->mc_fpstate.
-	 *
-	 * XXX unpessimize most cases by only aligning when fxsave might be
-	 * called, although this requires knowing too much about
-	 * npxgetregs()'s internals.
-	 */
-	addr = (struct savefpu *)&mcp->mc_fpstate;
-	if (td == PCPU_GET(fpcurthread) && ((uintptr_t)(void *)addr & 0xF)) {
-		do
-			addr = (void *)((char *)addr + 4);
-		while ((uintptr_t)(void *)addr & 0xF);
-	}
-	mcp->mc_ownedfp = npxgetregs(td, addr);
-	if (addr != (struct savefpu *)&mcp->mc_fpstate) {
-		bcopy(addr, &mcp->mc_fpstate, sizeof(mcp->mc_fpstate));
-		bzero(&mcp->mc_spare2, sizeof(mcp->mc_spare2));
-	}
-	mcp->mc_fpformat = npxformat();
+	mcp->mc_ownedfp = fpugetregs(td, (struct savefpu *)&mcp->mc_fpstate);
+	mcp->mc_fpformat = fpuformat();
 }
 
 static int
 set_fpcontext(struct thread *td, const mcontext_t *mcp)
 {
-	struct savefpu *addr;
 
 	if (mcp->mc_fpformat == _MC_FPFMT_NODEV)
 		return (0);
@@ -1532,25 +1523,12 @@ set_fpcontext(struct thread *td, const mcontext_t *mcp)
 		fpstate_drop(td);
 	else if (mcp->mc_ownedfp == _MC_FPOWNED_FPU ||
 	    mcp->mc_ownedfp == _MC_FPOWNED_PCB) {
-		/* XXX align as above. */
-		addr = (struct savefpu *)&mcp->mc_fpstate;
-		if (td == PCPU_GET(fpcurthread) &&
-		    ((uintptr_t)(void *)addr & 0xF)) {
-			do
-				addr = (void *)((char *)addr + 4);
-			while ((uintptr_t)(void *)addr & 0xF);
-			bcopy(&mcp->mc_fpstate, addr, sizeof(mcp->mc_fpstate));
-		}
 		/*
-		 * XXX we violate the dubious requirement that npxsetregs()
+		 * XXX we violate the dubious requirement that fpusetregs()
 		 * be called with interrupts disabled.
+		 * XXX obsolete on trap-16 systems?
 		 */
-		npxsetregs(td, addr);
-		/*
-		 * Don't bother putting things back where they were in the
-		 * misaligned case, since we know that the caller won't use
-		 * them again.
-		 */
+		fpusetregs(td, (struct savefpu *)&mcp->mc_fpstate);
 	} else
 		return (EINVAL);
 	return (0);
@@ -1563,18 +1541,18 @@ fpstate_drop(struct thread *td)
 
 	s = intr_disable();
 	if (PCPU_GET(fpcurthread) == td)
-		npxdrop();
+		fpudrop();
 	/*
-	 * XXX force a full drop of the npx.  The above only drops it if we
+	 * XXX force a full drop of the fpu.  The above only drops it if we
 	 * owned it.
 	 *
-	 * XXX I don't much like npxgetregs()'s semantics of doing a full
+	 * XXX I don't much like fpugetregs()'s semantics of doing a full
 	 * drop.  Dropping only to the pcb matches fnsave's behaviour.
 	 * We only need to drop to !PCB_INITDONE in sendsig().  But
-	 * sendsig() is the only caller of npxgetregs()... perhaps we just
+	 * sendsig() is the only caller of fpugetregs()... perhaps we just
 	 * have too many layers.
 	 */
-	curthread->td_pcb->pcb_flags &= ~PCB_NPXINITDONE;
+	curthread->td_pcb->pcb_flags &= ~PCB_FPUINITDONE;
 	intr_restore(s);
 }
 

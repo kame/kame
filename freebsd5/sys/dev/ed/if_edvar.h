@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.14 2002/03/20 02:07:18 alfred Exp $
+ * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.16 2003/10/31 18:31:58 brooks Exp $
  */
 
 #ifndef SYS_DEV_ED_IF_EDVAR_H
@@ -199,11 +199,12 @@ int	ed_probe_generic8390	(struct ed_softc *);
 int	ed_probe_WD80x3		(device_t, int, int);
 int	ed_probe_WD80x3_generic	(device_t, int, unsigned short *[]);
 int	ed_probe_3Com		(device_t, int, int);
+int	ed_probe_SIC		(device_t, int, int);
 int	ed_probe_Novell		(device_t, int, int);
 int	ed_probe_Novell_generic	(device_t, int);
 int	ed_probe_HP_pclanp	(device_t, int, int);
 
-int	ed_attach		(struct ed_softc *, int, int);
+int	ed_attach		(device_t);
 void	ed_stop			(struct ed_softc *);
 void	ed_pio_readmem		(struct ed_softc *, int, unsigned char *,
 				     unsigned short);

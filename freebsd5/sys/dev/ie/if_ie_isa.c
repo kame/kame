@@ -34,9 +34,10 @@
  * Copyright (c) 1997, Aaron C. Smith
  *
  * See if_ie.c for applicable license.
- *
- * $FreeBSD: src/sys/dev/ie/if_ie_isa.c,v 1.1 2003/03/29 13:36:41 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ie/if_ie_isa.c,v 1.2 2003/08/24 17:49:13 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/alpha/alpha/busspace.c,v 1.2 2000/08/29 08:50:17 dfr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/busspace.c,v 1.4 2003/08/22 07:20:25 imp Exp $");
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 

@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/en/midwayvar.h,v 1.8 2003/05/05 16:35:52 harti Exp $
+ * $FreeBSD: src/sys/dev/en/midwayvar.h,v 1.13 2003/08/07 15:04:25 jhb Exp $
  */
 
 /*
@@ -124,18 +124,31 @@ struct en_txslot {
  * card.
  */
 struct en_rxslot {
-	void		*rxhand;	/* recv. handle for direct delivery */
 	uint32_t	mode;		/* saved copy of mode info */
 	uint32_t	start;		/* begin of my buffer area */
 	uint32_t	stop;		/* end of my buffer area */
 	uint32_t	cur;		/* where I am at in the buffer */
-	uint16_t	atm_vci;	/* backpointer to VCI */
-	uint8_t		atm_flags;	/* copy of atm_flags from atm_ph */
-	uint8_t		oth_flags;	/* other flags */
-	uint32_t	raw_threshold;	/* for raw mode */
+	struct en_vcc	*vcc;		/* backpointer to VCI */
 	struct ifqueue	q;		/* mbufs waiting for dma now */
 	struct ifqueue	indma;		/* mbufs being dma'd now */
 };
+
+struct en_vcc {
+	struct atmio_vcc vcc;		/* required by common code */
+	void		*rxhand;
+	u_int		vflags;
+	uint32_t	ipackets;
+	uint32_t	opackets;
+	uint32_t	ibytes;
+	uint32_t	obytes;
+
+	uint8_t		txspeed;
+	struct en_txslot *txslot;	/* transmit slot */
+	struct en_rxslot *rxslot;	/* receive slot */
+};
+#define	VCC_DRAIN	0x0001		/* closed, but draining rx */
+#define	VCC_SWSL	0x0002		/* on rx software service list */
+#define	VCC_CLOSE_RX	0x0004		/* currently closing */
 
 /*
  * softc
@@ -176,16 +189,14 @@ struct en_softc {
 	/* xmit buf ctrl. (per channel) */
 	struct en_txslot txslot[MID_NTX_CH];
 
-	/* xmit vc ctrl. (per vc) */
-	uint8_t txspeed[MID_N_VC];	/* speed of tx on a VC */
-	uint8_t txvc2slot[MID_N_VC];	/* map VC to slot */
-
-	/* recv vc ctrl. (per vc).   maps VC number to recv slot */
-	uint16_t rxvc2slot[MID_N_VC];
-	int en_nrx;			/* # of active rx slots */
-
 	/* recv buf ctrl. (per recv slot) */
 	struct en_rxslot rxslot[EN_MAXNRX];
+	int en_nrx;			/* # of active rx slots */
+
+	/* vccs */
+	struct en_vcc **vccs;
+	u_int vccs_open;
+	struct cv cv_close;		/* close CV */
 
 	/* stats */
 	struct en_stats stats;
@@ -211,6 +222,10 @@ struct en_softc {
 	/* memory zones */
 	uma_zone_t map_zone;
 
+	/* media and phy */
+	struct ifmedia media;
+	struct utopia utopia;
+
 #ifdef EN_DEBUG
 	/* debugging */
 	u_int debug;
@@ -224,3 +239,4 @@ int	en_attach(struct en_softc *);
 void	en_destroy(struct en_softc *);
 void	en_intr(void *);
 void	en_reset(struct en_softc *);
+int	en_modevent(module_t, int, void *arg);

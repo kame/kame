@@ -1,19 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.9 2003/02/02 17:46:00 orion Exp $ */
-/*
- * This is part of the Driver for Video Capture Cards (Frame grabbers)
- * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
- * chipset.
- * Copyright Roger Hardiman and Amancio Hasty.
- *
- * bktr_audio : This deals with controlling the audio on TV cards,
- *                controlling the Audio Multiplexer (audio source selector).
- *                controlling any MSP34xx stereo audio decoders.
- *                controlling any DPL35xx dolby surroud sound audio decoders.    
- *                initialising TDA98xx audio devices.
- *
- */
-
-/*
+/*-
  * 1. Redistributions of source code must retain the
  * Copyright (c) 1997 Amancio Hasty, 1999 Roger Hardiman
  * All rights reserved.
@@ -46,6 +31,25 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.12 2003/08/24 17:46:01 obrien Exp $");
+
+/*
+ * This is part of the Driver for Video Capture Cards (Frame grabbers)
+ * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
+ * chipset.
+ * Copyright Roger Hardiman and Amancio Hasty.
+ *
+ * bktr_audio : This deals with controlling the audio on TV cards,
+ *                controlling the Audio Multiplexer (audio source selector).
+ *                controlling any MSP34xx stereo audio decoders.
+ *                controlling any DPL35xx dolby surroud sound audio decoders.
+ *                initialising TDA98xx audio devices.
+ *
+ */
+
+#include "opt_bktr.h"               /* Include any kernel config options */
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -55,9 +59,10 @@
 
 #if (__FreeBSD_version < 500000)
 #include <machine/clock.h>              /* for DELAY */
-#endif
-
 #include <pci/pcivar.h>
+#else
+#include <dev/pci/pcivar.h>
+#endif
 
 #if (__FreeBSD_version >=300000)
 #include <machine/bus_memio.h>		/* for bus space */
@@ -472,6 +477,13 @@ void msp_read_id( bktr_ptr_t bktr ){
  *     the chip and re-programs it if needed.
  */
 void msp_autodetect( bktr_ptr_t bktr ) {
+
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+
+  /* Just wake up the (maybe) sleeping thread, it'll do everything for us */
+  msp_wake_thread(bktr);
+
+#else
   int auto_detect, loops;
   int stereo;
 
@@ -596,6 +608,8 @@ void msp_autodetect( bktr_ptr_t bktr ) {
   /* uncomment the following line to enable the MSP34xx 1Khz Tone Generator */
   /* turn your speaker volume down low before trying this */
   /* msp_dpl_write(bktr, bktr->msp_addr, 0x12, 0x0014, 0x7f40); */
+
+#endif /* BKTR_NEW_MSP34XX_DRIVER */
 }
 
 /* Read the DPL version string */

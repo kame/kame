@@ -37,12 +37,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.19 2003/08/24 17:54:10 obrien Exp $");
+
 /*
  * Subroutines common to all PHYs.
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.17 2003/04/03 21:36:30 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.19 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -520,10 +523,8 @@ int
 mii_phy_detach(device_t dev)
 {
 	struct mii_softc *sc;
-	struct mii_data *mii;
 
 	sc = device_get_softc(dev);
-	mii = device_get_softc(device_get_parent(dev));
 	mii_phy_down(sc);
 	sc->mii_dev = NULL;
 	LIST_REMOVE(sc, mii_list);

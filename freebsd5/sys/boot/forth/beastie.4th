@@ -1,4 +1,5 @@
 \ Copyright (c) 2003 Scott Long <scottl@freebsd.org>
+\ Copyright (c) 2003 Aleksander Fafula <alex@fafula.com>
 \ All rights reserved.
 \
 \ Redistribution and use in source and binary forms, with or without
@@ -22,7 +23,7 @@
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
 \
-\ $FreeBSD: src/sys/boot/forth/beastie.4th,v 1.2 2003/05/31 11:19:11 scottl Exp $
+\ $FreeBSD: src/sys/boot/forth/beastie.4th,v 1.7.2.1 2004/01/10 03:36:14 scottl Exp $
 
 marker task-beastie.4th
 
@@ -48,26 +49,62 @@ variable rebootkey
 46 constant dot
 
 \ The BSD Daemon.  He is 19 rows high and 34 columns wide
-: print-beastie ( x y -- )
+: technicolor-beastie ( x y -- )
+2dup at-xy ."               [1;31m,        ," 1+
+2dup at-xy ."              /(        )`" 1+
+2dup at-xy ."              \ \___   / |" 1+
+2dup at-xy ."              /- [37m_[31m  `-/  '" 1+
+2dup at-xy ."             ([37m/\/ \[31m \   /\" 1+
+2dup at-xy ."             [37m/ /   |[31m `    \" 1+
+2dup at-xy ."             [34mO O   [37m) [31m/    |" 1+
+2dup at-xy ."             [37m`-^--'[31m`<     '" 1+
+2dup at-xy ."            (_.)  _  )   /" 1+
+2dup at-xy ."             `.___/`    /       " 1+
+2dup at-xy ."               `-----' /" 1+
+2dup at-xy ."  [33m<----.[31m     __ / __   \" 1+
+2dup at-xy ."  [33m<----|====[31mO)))[33m==[31m) \) /[33m====|" 1+
+2dup at-xy ."  [33m<----'[31m    `--' `.__,' \" 1+
+2dup at-xy ."               |        |" 1+
+2dup at-xy ."                \       /       /\" 1+
+2dup at-xy ."           [36m______[31m( (_  / \______/" 1+
+2dup at-xy ."         [36m,'  ,-----'   |" 1+
+at-xy ."         `--{__________) [0m" 1+
+;
+
+: boring-beastie ( x y -- )
 	2dup at-xy ."              ,        ," 1+
 	2dup at-xy ."             /(        )`" 1+
-	2dup at-xy ."             \\ \\___ / |" 1+
+	2dup at-xy ."             \ \___   / |" 1+
 	2dup at-xy ."             /- _  `-/  '" 1+
-	2dup at-xy ."            (/\\/ \\ \\ /\\" 1+
-	2dup at-xy ."            / /   | `    \\" 1+
+	2dup at-xy ."            (/\/ \ \   /\" 1+
+	2dup at-xy ."            / /   | `    \" 1+
 	2dup at-xy ."            O O   ) /    |" 1+
 	2dup at-xy ."            `-^--'`<     '" 1+
 	2dup at-xy ."           (_.)  _  )   /" 1+
 	2dup at-xy ."            `.___/`    /" 1+
 	2dup at-xy ."              `-----' /" 1+
-	2dup at-xy ." <----.     __ / __   \\" 1+
-	2dup at-xy ." <----|====O)))==) \\) /====" 1+
-	2dup at-xy ." <----'    `--' `.__,' \\" 1+
+	2dup at-xy ." <----.     __ / __   \" 1+
+	2dup at-xy ." <----|====O)))==) \) /====" 1+
+	2dup at-xy ." <----'    `--' `.__,' \" 1+
 	2dup at-xy ."              |        |" 1+
-	2dup at-xy ."               \\       /       /\\" 1+
-	2dup at-xy ."          ______( (_  / \\______/" 1+
+	2dup at-xy ."               \       /       /\" 1+
+	2dup at-xy ."          ______( (_  / \______/" 1+
 	2dup at-xy ."        ,'  ,-----'   |" 1+
 	     at-xy ."        `--{__________)"
+;
+
+: print-beastie ( x y -- )
+	s" loader_color" getenv
+	dup -1 = if
+		drop
+		boring-beastie
+		exit
+	then
+	s" YES" compare-insensitive 0<> if
+		boring-beastie
+		exit
+	then
+	technicolor-beastie
 ;
 
 : acpienabled? ( -- flag )
@@ -154,6 +191,12 @@ variable rebootkey
 set-current
 
 : beastie-start
+	s" beastie_disable" getenv
+	dup -1 <> if
+		s" YES" compare-insensitive 0= if
+			exit
+		then
+	then
 	beastie-menu
 	s" autoboot_delay" getenv
 	dup -1 = if
@@ -166,9 +209,9 @@ set-current
 		dup tkey
 		0 25 at-xy
 		dup 32 = if nip 0 swap then
-		dup -1 = if s" boot" evaluate then
-		dup 13 = if s" boot" evaluate then
-		dup bootkey @ = if s" boot" evaluate then
+		dup -1 = if 0 boot then
+		dup 13 = if 0 boot then
+		dup bootkey @ = if 0 boot then
 		dup bootacpikey @ = if
 			acpienabled? if
 				s" acpi_load" unsetenv
@@ -178,30 +221,35 @@ set-current
 				s" YES" s" acpi_load" setenv
 				s" 0" s" hint.acpi.0.disabled" setenv
 			then
-			s" boot" evaluate
+			0 boot
 		then
 		dup bootsafekey @ = if
 			s" arch-i386" environment? if
 				s" acpi_load" unsetenv
 				s" 1" s" hint.acpi.0.disabled" setenv
 				s" 1" s" loader.acpi_disabled_by_user" setenv
+				s" 1" s" hint.apic.0.disabled" setenv
 			then
 			s" 0" s" hw.ata.ata_dma" setenv
 			s" 0" s" hw.ata.atapi_dma" setenv
 			s" 0" s" hw.ata.wc" setenv
 			s" 0" s" hw.eisa_slots" setenv
-			s" boot" evaluate
+			0 boot
 		then
 		dup bootverbosekey @ = if
 			s" YES" s" boot_verbose" setenv
-			s" boot" evaluate
+			0 boot
 		then
 		dup bootsinglekey @ = if
 			s" YES" s" boot_single" setenv
-			s" boot" evaluate
+			0 boot
 		then
-		dup escapekey @ = if 2drop exit then
-		rebootkey @ = if s" reboot" evaluate then
+		dup escapekey @ = if
+			2drop
+			s" NO" s" autoboot_delay" setenv
+			exit
+		then
+		rebootkey @ = if 0 reboot then
 	repeat
 ;
 

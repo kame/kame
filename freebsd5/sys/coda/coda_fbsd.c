@@ -1,5 +1,4 @@
 /*
- * 
  *             Coda: an Experimental Distributed File System
  *                              Release 3.1
  * 
@@ -27,9 +26,10 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_fbsd.cr,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_fbsd.c,v 1.29 2003/03/27 12:47:53 tjr Exp $
- * 
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/coda/coda_fbsd.c,v 1.31 2003/07/26 07:32:20 phk Exp $");
 
 #include "vcoda.h"
 
@@ -127,7 +127,7 @@ coda_fbsd_getpages(v)
     if (cfvp == NULL) {
 	opened_internally = 1;
 
-	error = VOP_OPEN(vp, FREAD,  cred, p);
+	error = VOP_OPEN(vp, FREAD,  cred, p, -1);
 printf("coda_getp: Internally Opening %p\n", vp);
 
 	if (error) {

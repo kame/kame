@@ -23,9 +23,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *      $FreeBSD: src/sys/amd64/acpica/acpi_wakeup.c,v 1.19 2003/05/01 01:05:21 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/amd64/acpica/acpi_wakeup.c,v 1.21 2003/08/28 16:30:31 njl Exp $");
+
 #include <sys/param.h>
 #include <sys/bus.h>
 
@@ -35,7 +37,6 @@
 int
 acpi_sleep_machdep(struct acpi_softc *sc, int state)
 {
-
 	return (0);
 }
 

@@ -24,9 +24,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/cam/cam_sim.c,v 1.6 2003/02/19 05:46:56 imp Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/cam/cam_sim.c,v 1.7 2003/06/10 17:50:20 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

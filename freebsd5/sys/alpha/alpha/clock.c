@@ -1,6 +1,3 @@
-/* $FreeBSD: src/sys/alpha/alpha/clock.c,v 1.32 2003/02/03 17:53:14 jake Exp $ */
-/* $NetBSD: clock.c,v 1.20 1998/01/31 10:32:47 ross Exp $ */
-
 /*
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1992, 1993
@@ -41,7 +38,11 @@
  * from: Utah Hdr: clock.c 1.18 91/01/21
  *
  *	@(#)clock.c	8.1 (Berkeley) 6/10/93
+ *	$NetBSD: clock.c,v 1.20 1998/01/31 10:32:47 ross Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/clock.c,v 1.35 2003/11/13 09:24:21 jeff Exp $");
 
 #include "opt_clock.h"
 
@@ -57,13 +58,15 @@
 #include <sys/bus.h>
 #include <sys/timetc.h>
 
-#include <machine/cpuconf.h>
 #include <machine/bus.h>
 #include <machine/clock.h>
 #include <machine/clockvar.h>
+#include <machine/cpuconf.h>
+#include <machine/md_var.h>
+#include <machine/rpb.h>	/* for CPU definitions, etc */
+
 #include <isa/isareg.h>
 #include <alpha/alpha/timerreg.h>
-#include <machine/rpb.h>	/* for CPU definitions, etc */
 
 #define	SECMIN	((unsigned)60)			/* seconds per minute */
 #define	SECHOUR	((unsigned)(60*SECMIN))		/* seconds per hour */
@@ -734,13 +737,13 @@ sysbeep(int pitch, int period)
 
 	outb(TIMER_CNTR2, pitch);
 	outb(TIMER_CNTR2, (pitch>>8));
+	mtx_unlock_spin(&clock_lock);
 	if (!beeping) {
 		/* enable counter2 output to speaker */
 		if (pitch) outb(IO_PPI, inb(IO_PPI) | 3);
 		beeping = period;
 		timeout(sysbeepstop, (void *)NULL, period);
 	}
-	mtx_unlock_spin(&clock_lock);
 	return (0);
 }
 

@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwohci_pci.c,v 1.22 2003/04/24 07:29:52 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwohci_pci.c,v 1.36 2003/11/28 05:28:27 imp Exp $
  */
 
 #define BOUNCE_BUFFER_TEST	0
@@ -45,10 +45,23 @@
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <sys/malloc.h>
+#if __FreeBSD_version >= 501102
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#endif
 #include <machine/resource.h>
 
+#if __FreeBSD_version < 500000
+#include <machine/clock.h>		/* for DELAY() */
+#endif
+
+#if __FreeBSD_version < 500000
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
+#else
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#endif
 
 #include <dev/firewire/firewire.h>
 #include <dev/firewire/firewirereg.h>
@@ -108,6 +121,10 @@ fwohci_pci_probe( device_t dev )
 	}
 	if (id == (FW_VENDORID_TI | FW_DEVICE_TITSB43AB23)) {
 		device_set_desc(dev, "Texas Instruments TSB43AB23");
+		return 0;
+	}
+	if (id == (FW_VENDORID_TI | FW_DEVICE_TITSB82AA2)) {
+		device_set_desc(dev, "Texas Instruments TSB82AA2");
 		return 0;
 	}
 	if (id == (FW_VENDORID_TI | FW_DEVICE_TIPCI4450)) {
@@ -271,6 +288,9 @@ fwohci_pci_attach(device_t self)
 	/* XXX splcam() should mask this irq for sbp.c*/
 	err = bus_setup_intr(self, sc->irq_res, INTR_TYPE_CAM,
 		     (driver_intr_t *) fwohci_dummy_intr, sc, &sc->ih_cam);
+	/* XXX splbio() should mask this irq for physio()/fwmem_strategy() */
+	err = bus_setup_intr(self, sc->irq_res, INTR_TYPE_BIO,
+		     (driver_intr_t *) fwohci_dummy_intr, sc, &sc->ih_bio);
 #endif
 	if (err) {
 		device_printf(self, "Could not setup irq, %d\n", err);
@@ -291,6 +311,10 @@ fwohci_pci_attach(device_t self)
 				/*nsegments*/0x20,
 				/*maxsegsz*/0x8000,
 				/*flags*/BUS_DMA_ALLOCNOW,
+#if __FreeBSD_version >= 501102
+				/*lockfunc*/busdma_lock_mutex,
+				/*lockarg*/&Giant,
+#endif
 				&sc->fc.dmat);
 	if (err != 0) {
 		printf("fwohci_pci_attach: Could not allocate DMA tag "
@@ -313,8 +337,9 @@ fwohci_pci_attach(device_t self)
 	 * Clear the bus reset event flag to start transactions even when
 	 * interrupt is disabled during the boot process.
 	 */
+	DELAY(250); /* 2 cycles */
 	s = splfw();
-	fwohci_intr((void *)sc);
+	fwohci_poll((void *)sc, 0, -1);
 	splx(s);
 
 	return 0;
@@ -329,8 +354,14 @@ fwohci_pci_detach(device_t self)
 
 	s = splfw();
 
-	fwohci_stop(sc, self);
+	if (sc->bsr)
+		fwohci_stop(sc, self);
+
 	bus_generic_detach(self);
+	if (sc->fc.bdev) {
+		device_delete_child(self, sc->fc.bdev);
+		sc->fc.bdev = NULL;
+	}
 
 	/* disable interrupts that might have been switched on */
 	if (sc->bst && sc->bsh)
@@ -344,14 +375,10 @@ fwohci_pci_detach(device_t self)
 			device_printf(self, "Could not tear down irq, %d\n",
 				      err);
 #if __FreeBSD_version < 500000
-		err = bus_teardown_intr(self, sc->irq_res, sc->ih_cam);
+		bus_teardown_intr(self, sc->irq_res, sc->ih_cam);
+		bus_teardown_intr(self, sc->irq_res, sc->ih_bio);
 #endif
 		sc->ih = NULL;
-	}
-
-	if (sc->fc.bdev) {
-		device_delete_child(self, sc->fc.bdev);
-		sc->fc.bdev = NULL;
 	}
 
 	if (sc->irq_res) {
@@ -375,13 +402,14 @@ fwohci_pci_detach(device_t self)
 static int
 fwohci_pci_suspend(device_t dev)
 {
+	fwohci_softc_t *sc = device_get_softc(dev);
 	int err;
 
 	device_printf(dev, "fwohci_pci_suspend\n");
 	err = bus_generic_suspend(dev);
 	if (err)
 		return err;
-	/* fwohci_stop(dev); */
+	fwohci_stop(sc, dev);
 	return 0;
 }
 
@@ -390,8 +418,11 @@ fwohci_pci_resume(device_t dev)
 {
 	fwohci_softc_t *sc = device_get_softc(dev);
 
+#ifndef BURN_BRIDGES
 	device_printf(dev, "fwohci_pci_resume: power_state = 0x%08x\n",
 					pci_get_powerstate(dev));
+	pci_set_powerstate(dev, PCI_POWERSTATE_D0);
+#endif
 	fwohci_pci_init(dev);
 	fwohci_resume(sc, dev);
 	return 0;

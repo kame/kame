@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.24 2003/04/30 00:35:22 ken Exp $
+ * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.26 2003/07/28 06:15:58 njl Exp $
  */
 
 #ifndef _CAM_CAM_CCB_H
@@ -513,7 +513,8 @@ typedef enum {
 	PIM_SCANHILO	= 0x80,	/* Bus scans from high ID to low ID */
 	PIM_NOREMOVE	= 0x40,	/* Removeable devices not included in scan */
 	PIM_NOINITIATOR	= 0x20,	/* Initiator role not supported. */
-	PIM_NOBUSRESET  = 0x10  /* User has disabled initial BUS RESET */
+	PIM_NOBUSRESET	= 0x10,	/* User has disabled initial BUS RESET */
+	PIM_NO_6_BYTE	= 0x08	/* Do not send 6-byte commands */
 } pi_miscflag;
 
 #ifdef CAM_NEW_TRAN_CODE
@@ -978,6 +979,8 @@ cam_fill_ctio(struct ccb_scsiio *csio, u_int32_t retries,
 	csio->tag_id = tag_id;
 	csio->init_id = init_id;
 }
+
+void cam_calc_geometry(struct ccb_calc_geometry *ccg, int extended);
 
 __END_DECLS
 

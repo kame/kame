@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.14 2002/11/06 22:58:55 jhb Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.16 2003/08/22 06:00:26 imp Exp $
  *
  */
 
@@ -55,7 +55,7 @@
 #include <netatm/atm_stack.h>
 #include <netatm/atm_pcb.h>
 #include <netatm/atm_var.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcivar.h>
 #include <dev/hfa/fore.h>
 #include <dev/hfa/fore_aali.h>
 #include <dev/hfa/fore_slave.h>
@@ -64,7 +64,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.14 2002/11/06 22:58:55 jhb Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.16 2003/08/22 06:00:26 imp Exp $");
 #endif
 
 
@@ -196,7 +196,7 @@ fore_output(cup, cvp, m)
 	xdp = hxp->hxq_descr;
 	xdp->xd_cell_hdr = ATM_HDR_SET(vcp->vc_vpi, vcp->vc_vci, 0, 0);
 	xdp->xd_spec = XDS_SET_SPEC(0, fvp->fv_aal, nsegs, pdulen);
-	xdp->xd_rate = FORE_DEF_RATE;
+	xdp->xd_rate = fvp->rate;
 
 	/*
 	 * Everything is ready to go, so officially claim the host queue

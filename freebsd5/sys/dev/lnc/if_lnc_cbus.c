@@ -29,8 +29,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lnc/if_lnc_cbus.c,v 1.3 2003/04/15 06:37:25 mdodd Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_cbus.c,v 1.5 2003/08/24 17:49:15 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -215,6 +217,8 @@ lnc_isa_attach(device_t dev)
 				 1,			/* nsegments */
 				 BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
 				 0,			/* flags */
+				 busdma_lock_mutex,	/* lockfunc */
+				 &Giant,		/* lockarg */
 				 &sc->dmat);
 
 	if (err) {

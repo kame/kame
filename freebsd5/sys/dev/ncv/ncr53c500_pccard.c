@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.16 2003/04/10 04:36:01 imp Exp $	*/
 /*	$NecBSD: ncr53c500_pisa.c,v 1.28 1998/11/26 01:59:11 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -36,6 +35,9 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.18 2003/10/26 00:51:40 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -204,8 +206,8 @@ ncv_alloc_resource(DEVPORT_PDEVICE dev)
 static int ncv_pccard_match(device_t dev)
 {
 	const struct ncv_product *pp;
-	char *vendorstr;
-	char *prodstr;
+	const char *vendorstr;
+	const char *prodstr;
 
 	if ((pp = (const struct ncv_product *) pccard_product_lookup(dev, 
 	    (const struct pccard_product *) ncv_products,

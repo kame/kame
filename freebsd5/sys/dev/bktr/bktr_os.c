@@ -1,20 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.34 2003/03/25 00:07:00 jake Exp $ */
-
-/*
- * This is part of the Driver for Video Capture Cards (Frame grabbers)
- * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
- * chipset.
- * Copyright Roger Hardiman and Amancio Hasty.
- *
- * bktr_os : This has all the Operating System dependant code,
- *             probe/attach and open/close/ioctl/read/mmap
- *             memory allocation
- *             PCI bus interfacing
- *             
- *
- */
-
-/*
+/*-
  * 1. Redistributions of source code must retain the 
  * Copyright (c) 1997 Amancio Hasty, 1999 Roger Hardiman
  * All rights reserved.
@@ -47,6 +31,20 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.40 2003/12/01 19:03:50 truckman Exp $");
+
+/*
+ * This is part of the Driver for Video Capture Cards (Frame grabbers)
+ * and TV Tuner cards using the Brooktree Bt848, Bt848A, Bt849A, Bt878, Bt879
+ * chipset.
+ * Copyright Roger Hardiman and Amancio Hasty.
+ *
+ * bktr_os : This has all the Operating System dependant code,
+ *             probe/attach and open/close/ioctl/read/mmap
+ *             memory allocation
+ *             PCI bus interfacing
+ */
 
 #include "opt_bktr.h"		/* include any kernel config options */
 
@@ -96,10 +94,12 @@
 
 #if (__FreeBSD_version < 500000)
 #include <machine/clock.h>              /* for DELAY */
-#endif
-
 #include <pci/pcivar.h>
 #include <pci/pcireg.h>
+#else
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#endif
 
 #include <sys/sysctl.h>
 int bt848_card = -1; 
@@ -107,6 +107,12 @@ int bt848_tuner = -1;
 int bt848_reverse_mute = -1; 
 int bt848_format = -1;
 int bt848_slow_msp_audio = -1;
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+int bt848_stereo_once = 0;	/* no continuous stereo monitoring */
+int bt848_amsound = 0;		/* hard-wire AM sound at 6.5 Hz (france),
+				   the autoscan seems work well only with FM... */
+int bt848_dolby = 0;
+#endif
 
 SYSCTL_NODE(_hw, OID_AUTO, bt848, CTLFLAG_RW, 0, "Bt848 Driver mgmt");
 SYSCTL_INT(_hw_bt848, OID_AUTO, card, CTLFLAG_RW, &bt848_card, -1, "");
@@ -114,6 +120,11 @@ SYSCTL_INT(_hw_bt848, OID_AUTO, tuner, CTLFLAG_RW, &bt848_tuner, -1, "");
 SYSCTL_INT(_hw_bt848, OID_AUTO, reverse_mute, CTLFLAG_RW, &bt848_reverse_mute, -1, "");
 SYSCTL_INT(_hw_bt848, OID_AUTO, format, CTLFLAG_RW, &bt848_format, -1, "");
 SYSCTL_INT(_hw_bt848, OID_AUTO, slow_msp_audio, CTLFLAG_RW, &bt848_slow_msp_audio, -1, "");
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+SYSCTL_INT(_hw_bt848, OID_AUTO, stereo_once, CTLFLAG_RW, &bt848_stereo_once, 0, "");
+SYSCTL_INT(_hw_bt848, OID_AUTO, amsound, CTLFLAG_RW, &bt848_amsound, 0, "");
+SYSCTL_INT(_hw_bt848, OID_AUTO, dolby, CTLFLAG_RW, &bt848_dolby, 0, "");
+#endif
 
 #endif /* end freebsd section */
 
@@ -332,7 +343,7 @@ bktr_attach( device_t dev )
 	/*
 	 * Map control/status registers.
 	 */
-	bktr->mem_rid = PCIR_MAPS;
+	bktr->mem_rid = PCIR_BAR(0);
 	bktr->res_mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &bktr->mem_rid,
 					0, ~0, 1, RF_ACTIVE);
 
@@ -471,11 +482,13 @@ fail:
 static int
 bktr_detach( device_t dev )
 {
-	unsigned int	unit;
-
 	struct bktr_softc *bktr = device_get_softc(dev);
 
-	unit = device_get_unit(dev);
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+	/* Disable the soundchip and kernel thread */
+	if (bktr->msp3400c_info != NULL)
+		msp_detach(bktr);
+#endif
 
 	/* Disable the brooktree device */
 	OUTL(bktr, BKTR_INT_MASK, ALL_INTS_DISABLED);
@@ -483,7 +496,11 @@ bktr_detach( device_t dev )
 
 #if defined(BKTR_USE_FREEBSD_SMBUS)
 	if (bt848_i2c_detach(dev))
-		printf("bktr%d: i2c_attach: can't attach\n", unit);
+		printf("bktr%d: i2c_attach: can't attach\n",
+		     device_get_unit(dev));
+#endif
+#ifdef USE_VBIMUTEX
+        mtx_destroy(&bktr->vbimutex);
 #endif
 
 	/* Note: We do not free memory for RISC programs, grab buffer, vbi buffers */
@@ -613,6 +630,26 @@ bktr_open( dev_t dev, int flags, int fmt, struct thread *td )
 	      bktr->slow_msp_audio = (bt848_slow_msp_audio & 0xff);
 	  }
 	}
+
+#ifdef BKTR_NEW_MSP34XX_DRIVER
+	if (bt848_stereo_once != 0) {
+	  if ((bt848_stereo_once >> 8) == unit ) {
+	      bktr->stereo_once = (bt848_stereo_once & 0xff);
+	  }
+	}
+
+	if (bt848_amsound != -1) {
+	  if ((bt848_amsound >> 8) == unit ) {
+	      bktr->amsound = (bt848_amsound & 0xff);
+	  }
+	}
+
+	if (bt848_dolby != -1) {
+	  if ((bt848_dolby >> 8) == unit ) {
+	      bktr->dolby = (bt848_dolby & 0xff);
+	  }
+	}
+#endif
 
 	switch ( FUNCTION( minor(dev) ) ) {
 	case VIDEO_DEV:
@@ -796,6 +833,7 @@ bktr_poll( dev_t dev, int events, struct thread *td)
 		return (ENXIO);
 	}
 
+	LOCK_VBI(bktr);
 	DISABLE_INTR(s);
 
 	if (events & (POLLIN | POLLRDNORM)) {
@@ -811,6 +849,7 @@ bktr_poll( dev_t dev, int events, struct thread *td)
 	}
 
 	ENABLE_INTR(s);
+	UNLOCK_VBI(bktr);
 
 	return (revents);
 }
