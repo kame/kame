@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.91 2002/06/08 21:42:37 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.92 2002/06/13 05:09:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -438,6 +438,10 @@ gif_encapcheck(m, off, proto, arg)
 		return 0;
 	}
 
+	/* Bail on short packets */
+	if (m->m_pkthdr.len < sizeof(ip))
+		return 0;
+
 	/* LINTED const cast */
 	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
 
@@ -451,6 +455,8 @@ gif_encapcheck(m, off, proto, arg)
 #endif
 #ifdef INET6
 	case 6:
+		if (m->m_pkthdr.len < sizeof(struct ip6_hdr))
+			return 0;
 		if (sc->gif_psrc->sa_family != AF_INET6 ||
 		    sc->gif_pdst->sa_family != AF_INET6)
 			return 0;
@@ -744,6 +750,9 @@ gif_ioctl(ifp, cmd, data)
 	struct ifreq     *ifr = (struct ifreq*)data;
 	int error = 0, size;
 	struct sockaddr *dst, *src;
+#ifdef	SIOCSIFMTU /* xxx */
+	u_long mtu;
+#endif
 
 	switch (cmd) {
 	case SIOCSIFADDR:
@@ -777,19 +786,14 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCSIFMTU:
-		{
 #ifdef __bsdi__
-			short mtu;
-			mtu = *(short *)ifr->ifr_data;
+		mtu = *(short *)ifr->ifr_data;
 #else
-			u_long mtu;
-			mtu = ifr->ifr_mtu;
+		mtu = ifr->ifr_mtu;
 #endif
-			if (mtu < GIF_MTU_MIN || mtu > GIF_MTU_MAX) {
-				return (EINVAL);
-			}
-			ifp->if_mtu = mtu;
-		}
+		if (mtu < GIF_MTU_MIN || mtu > GIF_MTU_MAX)
+			return (EINVAL);
+		ifp->if_mtu = mtu;
 		break;
 #endif /* SIOCSIFMTU */
 
