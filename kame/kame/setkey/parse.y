@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.14 1999/12/30 15:13:27 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.15 2000/02/06 10:56:10 itojun Exp $ */
 
 %{
 #include <sys/types.h>
@@ -35,7 +35,7 @@
 
 #include <net/route.h>
 #include <netinet/in.h>
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/key_var.h>
 #include <netinet6/ipsec.h>
 #include <arpa/inet.h>
