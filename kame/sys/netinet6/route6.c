@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.18 2000/08/21 02:58:21 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.19 2000/08/22 10:01:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,6 +132,9 @@ route6_input(mp, offp, proto)
 
 /*
  * Type0 routing header processing
+ *
+ * RFC2292 backward compatibility warning: no support for strict/loose bitmap,
+ * as it was dropped between RFC1883 and RFC2460.
  */
 static int
 ip6_rthdr0(m, ip6, rh0)
@@ -171,6 +174,11 @@ ip6_rthdr0(m, ip6, rh0)
 	index = addrs - rh0->ip6r0_segleft;
 	rh0->ip6r0_segleft--;
 #ifdef COMPAT_RFC2292
+	/*
+	 * The secition is just for source code level compatibility.
+	 * (i.e. use the section with RFC2292-based struct ip6_rthdr0)
+	 * this does not affect binary backward compatibility to RFC2292.
+	 */
 	nextaddr = rh0->ip6r0_addr + index;
 #else
 	nextaddr = ((struct in6_addr *)(rh0 + 1)) + index;
