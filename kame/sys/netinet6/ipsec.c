@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.122 2001/08/05 04:52:58 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.123 2001/08/05 06:37:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -287,6 +287,8 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 		ipsec_invalpcbcache(pcbsp, dir);
 		return NULL;
 	}
+	if (!pcbsp->cache[dir])
+		return NULL;
 	if ((pcbsp->cacheflags & IPSEC_PCBSP_CONNECTED) == 0) {
 		if (!pcbsp->cache[dir])
 			return NULL;
@@ -299,8 +301,16 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 			pcbsp->cacheidx[dir] = spidx;
 		}
 	} else {
-		if (!pcbsp->cache[dir])
-			return NULL;
+		/*
+		 * The pcb is connected, and the L4 code is sure that:
+		 * - outgoing side uses inp_[lf]addr
+		 * - incoming side looks up policy after inpcb lookup
+		 * and address pair is known to be stable.  We do not need
+		 * to generate spidx again, nor check the address match again.
+		 *
+		 * For IPv4/v6 SOCK_STREAM sockets, this assumption holds
+		 * and there are calls to ipsec_pcbconn() from in_pcbconnect().
+		 */
 	}
 
 	pcbsp->cache[dir]->lastused = mono_time.tv_sec;
