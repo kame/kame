@@ -486,12 +486,12 @@ struct icmp6_filter {
 
 #ifdef _KERNEL
 #define	ICMP6_FILTER_SETPASSALL(filterp) \
-    {								\
+do {								\
 	int i; u_char *p;					\
 	p = (u_char *)filterp;					\
 	for (i = 0; i < sizeof(struct icmp6_filter); i++)	\
 		p[i] = 0xff;					\
-    }
+} while (0)
 #define	ICMP6_FILTER_SETBLOCKALL(filterp) \
 	bzero(filterp, sizeof(struct icmp6_filter))
 #else /* _KERNEL */
