@@ -88,7 +88,8 @@ struct ipsecrequest {
 	struct ipsecrequest *next;
 				/* pointer to next structure */
 				/* If NULL, it means the end of chain. */
-	struct secasindex saidx;
+	struct secasindex saidx;/* hint for search proper SA */
+				/* if __ss_len == 0 then no address specified.*/
 	u_int level;		/* IPsec level defined below. */
 
 	struct secasvar *sav;	/* place holder of SA for use */

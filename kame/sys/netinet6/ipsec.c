@@ -2381,6 +2381,7 @@ ipsec4_output(state, sp, flags)
 {
 	struct ip *ip = NULL;
 	struct ipsecrequest *isr = NULL;
+	struct secasindex saidx;
 	int s;
 	int error;
 #ifdef IPSEC_SRCSEL
@@ -2396,8 +2397,6 @@ ipsec4_output(state, sp, flags)
 		panic("state->ro == NULL in ipsec4_output");
 	if (!state->dst)
 		panic("state->dst == NULL in ipsec4_output");
-
-	ip = mtod(state->m, struct ip *);
 
 	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
 		printf("ipsec4_output: applyed SP\n");
@@ -2416,7 +2415,25 @@ ipsec4_output(state, sp, flags)
 			continue;
 #endif
 
-		if ((error = key_checkrequest(isr)) != 0) {
+		/* make SA idnex for search proper SA */
+		ip = mtod(state->m, struct ip *);
+		bcopy(&isr->saidx, &saidx, sizeof(saidx));
+		if (saidx.src.__ss_len == 0) {
+			saidx.src.__ss_len = _SALENBYAF(AF_INET);
+			saidx.src.__ss_family = AF_INET;
+			_INPORTBYSA(&saidx.src) = IPSEC_PORT_ANY;
+			bcopy(&ip->ip_src, _INADDRBYSA(&saidx.src),
+				sizeof(ip->ip_src));
+		}
+		if (saidx.dst.__ss_len == 0) {
+			saidx.dst.__ss_len = _SALENBYAF(AF_INET);
+			saidx.dst.__ss_family = AF_INET;
+			_INPORTBYSA(&saidx.dst) = IPSEC_PORT_ANY;
+			bcopy(&ip->ip_dst, _INADDRBYSA(&saidx.dst),
+				sizeof(ip->ip_dst));
+		}
+
+		if ((error = key_checkrequest(isr, &saidx)) != 0) {
 			/*
 			 * IPsec processing is required, but no SA found.
 			 * I assume that key_acquire() had been called
@@ -2594,6 +2611,7 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 {
 	struct ip6_hdr *ip6;
 	struct ipsecrequest *isr = NULL;
+	struct secasindex saidx;
 	int error = 0;
 	int plen;
 
@@ -2621,7 +2639,25 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			break;
 		}
 
-		if (key_checkrequest(isr) == ENOENT) {
+		/* make SA idnex for search proper SA */
+		ip6 = mtod(state->m, struct ip6_hdr *);
+		bcopy(&isr->saidx, &saidx, sizeof(saidx));
+		if (saidx.src.__ss_len == 0) {
+			saidx.src.__ss_len = _SALENBYAF(AF_INET6);
+			saidx.src.__ss_family = AF_INET6;
+			_INPORTBYSA(&saidx.src) = IPSEC_PORT_ANY;
+			bcopy(&ip6->ip6_src, _INADDRBYSA(&saidx.src),
+				sizeof(ip6->ip6_src));
+		}
+		if (saidx.dst.__ss_len == 0) {
+			saidx.dst.__ss_len = _SALENBYAF(AF_INET6);
+			saidx.dst.__ss_family = AF_INET6;
+			_INPORTBYSA(&saidx.dst) = IPSEC_PORT_ANY;
+			bcopy(&ip6->ip6_dst, _INADDRBYSA(&saidx.dst),
+				sizeof(ip6->ip6_dst));
+		}
+
+		if (key_checkrequest(isr, &saidx) == ENOENT) {
 			/*
 			 * IPsec processing is required, but no SA found.
 			 * I assume that key_acquire() had been called
@@ -2712,6 +2748,7 @@ ipsec6_output_tunnel(state, sp, flags)
 {
 	struct ip6_hdr *ip6;
 	struct ipsecrequest *isr = NULL;
+	struct secasindex saidx;
 	int error = 0;
 	int plen;
 #ifdef IPSEC_SRCSEL
@@ -2741,7 +2778,9 @@ ipsec6_output_tunnel(state, sp, flags)
 	}
 
 	for (/*already initialized*/; isr; isr = isr->next) {
-		if (key_checkrequest(isr) == ENOENT) {
+		/* When tunnel mode, SA peers must be specified. */
+		bzero(&saidx, sizeof(saidx));
+		if (key_checkrequest(isr, &saidx) == ENOENT) {
 			/*
 			 * IPsec processing is required, but no SA found.
 			 * I assume that key_acquire() had been called

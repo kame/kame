@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key.h,v 1.3 1999/11/03 13:22:16 sakane Exp $ */
+/* $Id: key.h,v 1.4 1999/11/10 13:42:37 sakane Exp $ */
 
 #ifndef _NETKEY_KEY_H_
 #define _NETKEY_KEY_H_
@@ -53,7 +53,8 @@ struct sadb_x_policy;
 
 extern struct secpolicy *key_allocsp __P((struct secpolicyindex *spidx,
 					u_int dir));
-extern int key_checkrequest __P((struct ipsecrequest *isr));
+extern int key_checkrequest
+	__P((struct ipsecrequest *isr, struct secasindex *saidx));
 extern struct secasvar *key_allocsa __P((u_int family, caddr_t src, caddr_t dst,
 					u_int proto, u_int32_t spi));
 extern void key_freesp __P((struct secpolicy *sp));

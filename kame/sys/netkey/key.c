@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.25 1999/11/04 00:32:24 sakane Exp $ */
+/* KAME $Id: key.c,v 1.26 1999/11/10 13:42:37 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -248,7 +248,7 @@ struct _keystat {
 	u_long getspi_count; /* the avarage of count to try to get new SPI */
 } keystat;
 
-static struct secasvar *key_allocsa_policy __P((struct ipsecrequest *isr));
+static struct secasvar *key_allocsa_policy __P((struct secasindex *saidx));
 static void key_freesp_so __P((struct secpolicy **sp));
 static struct secasvar *key_do_allocsa_policy __P((struct secashead *sah,
 						u_int state));
@@ -409,18 +409,19 @@ found:
  *	ENOENT: policy may be valid, but SA with REQUIRE is on acquiring.
  */
 int
-key_checkrequest(isr)
+key_checkrequest(isr, saidx)
 	struct ipsecrequest *isr;
+	struct secasindex *saidx;
 {
 	u_int level;
 	int error;
 
 	/* sanity check */
-	if (isr == NULL)
+	if (isr == NULL || saidx == NULL)
 		panic("key_checkrequest: NULL pointer is passed.\n");
 
 	/* check mode */
-	switch (isr->saidx.mode) {
+	switch (saidx->mode) {
 	case IPSEC_MODE_TRANSPORT:
 	case IPSEC_MODE_TUNNEL:
 		break;
@@ -458,14 +459,14 @@ key_checkrequest(isr)
 
 	/* new SA allocation if no SA found. */
 	if (isr->sav == NULL)
-		isr->sav = key_allocsa_policy(isr);
+		isr->sav = key_allocsa_policy(saidx);
 
 	/* When there is SA. */
 	if (isr->sav != NULL)
 		return 0;
 
 	/* there is no SA */
-	if ((error = key_acquire(&isr->saidx, &isr->sp->spidx)) != 0) {
+	if ((error = key_acquire(saidx, &isr->sp->spidx)) != 0) {
 		/* XXX What I do ? */
 		printf("key_checkrequest: error %d returned "
 			"from key_acquire.\n", error);
@@ -482,8 +483,8 @@ key_checkrequest(isr)
  *	others:	found and return the pointer.
  */
 static struct secasvar *
-key_allocsa_policy(isr)
-	struct ipsecrequest *isr;
+key_allocsa_policy(saidx)
+	struct secasindex *saidx;
 {
 	struct secashead *sah;
 	struct secasvar *sav;
@@ -492,7 +493,7 @@ key_allocsa_policy(isr)
 	__LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
-		if (key_cmpsaidx_withmode(&sah->saidx, &isr->saidx))
+		if (key_cmpsaidx_withmode(&sah->saidx, saidx))
 			goto found;
 	}
 
