@@ -93,6 +93,7 @@
  * System initialization
  */
 
+static void if_attachdomain1 __P((struct ifnet *));
 static int ifconf __P((int, caddr_t));
 static void ifinit __P((void *));
 #ifdef ALTQ
@@ -244,7 +245,29 @@ if_attach(ifp)
 	ifp->if_snd.altq_ifp  = ifp;
 #endif
 
-	/* address family dependent data region */
+	if (domains)
+		if_attachdomain1(ifp);
+}
+
+void
+if_attachdomain()
+{
+	struct ifnet *ifp;
+
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+		if_attachdomain1(ifp);
+}
+
+static void
+if_attachdomain1(ifp)
+	struct ifnet *ifp;
+{
+	struct domain *dp;
+
+	/*
+	 * address family dependent data region - effective only
+	 * after domaininit()
+	 */
 	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
 	for (dp = domains; dp; dp = dp->dom_next) {
 		if (dp->dom_ifattach)

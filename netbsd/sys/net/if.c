@@ -254,7 +254,6 @@ if_attach(ifp)
 	struct sockaddr_dl *sdl;
 	struct ifaddr *ifa;
 	static size_t if_indexlim = 8;
-	struct domain *dp;
 
 	if (if_index == 0)
 		TAILQ_INIT(&ifnet);
@@ -346,6 +345,28 @@ if_attach(ifp)
 	ifp->if_snd.altq_ifp  = ifp;
 #endif
 
+	if (domains)
+		if_attachdomain1(ifp);
+
+	/* Announce the interface. */
+	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
+}
+
+void
+if_attachdomain()
+{
+	struct ifnet *ifp;
+
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
+		if_attachdomain1(ifp);
+}
+
+void
+if_attachdomain1(ifp)
+	struct ifnet *ifp;
+{
+	struct domain *dp;
+
 	/* address family dependent data region */
 	memset(ifp->if_afdata, 0, sizeof(ifp->if_afdata));
 	for (dp = domains; dp; dp = dp->dom_next) {
@@ -353,9 +374,6 @@ if_attach(ifp)
 			ifp->if_afdata[dp->dom_family] =
 			    (*dp->dom_ifattach)(ifp);
 	}
-
-	/* Announce the interface. */
-	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 }
 
 /*

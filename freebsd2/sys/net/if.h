@@ -574,6 +574,7 @@ int	ether_output __P((struct ifnet *,
 int	ether_ioctl __P((struct ifnet *, int , caddr_t ));
 
 void	if_attach __P((struct ifnet *));
+void	if_attachdomain __P((void));
 void	if_down __P((struct ifnet *));
 void	if_up __P((struct ifnet *));
 #ifdef vax

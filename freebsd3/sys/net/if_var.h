@@ -435,6 +435,7 @@ int	if_addmulti __P((struct ifnet *, struct sockaddr *,
 			 struct ifmultiaddr **));
 int	if_allmulti __P((struct ifnet *, int));
 void	if_attach __P((struct ifnet *));
+void	if_attachdomain __P((void));
 int	if_delmulti __P((struct ifnet *, struct sockaddr *));
 void	if_down __P((struct ifnet *));
 void	if_route __P((struct ifnet *, int flag, int fam));

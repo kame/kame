@@ -42,6 +42,8 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 
+#include <net/if.h>
+
 /*
  * System initialization
  *
@@ -120,6 +122,8 @@ domaininit(dummy)
 	max_datalen = MHLEN - max_hdr;
 	timeout(pffasttimo, (void *)0, 1);
 	timeout(pfslowtimo, (void *)0, 1);
+
+	if_attachdomain();
 }
 
 

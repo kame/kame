@@ -698,6 +698,8 @@ void	ether_ifdetach __P((struct ifnet *));
 char	*ether_sprintf __P((const u_char *));
 
 void	if_attach __P((struct ifnet *));
+void	if_attachdomain __P((void));
+void	if_attachdomain1 __P((struct ifnet *));
 void	if_deactivate __P((struct ifnet *));
 void	if_detach __P((struct ifnet *));
 void	if_down __P((struct ifnet *));

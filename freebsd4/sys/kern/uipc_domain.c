@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_domain.c	8.2 (Berkeley) 10/18/93
- * $FreeBSD: src/sys/kern/uipc_domain.c,v 1.22 1999/08/28 00:46:21 peter Exp $
+ * $FreeBSD: src/sys/kern/uipc_domain.c,v 1.22.2.1 2001/07/03 11:01:37 ume Exp $
  */
 
 #include <sys/param.h>
@@ -43,6 +43,8 @@
 #include <sys/socketvar.h>
 #include <sys/systm.h>
 #include <vm/vm_zone.h>
+
+#include <net/if.h>
 
 /*
  * System initialization
@@ -139,6 +141,8 @@ domaininit(void *dummy)
 
 	timeout(pffasttimo, (void *)0, 1);
 	timeout(pfslowtimo, (void *)0, 1);
+
+	if_attachdomain();
 }
 
 
@@ -201,6 +205,32 @@ pfctlinput(cmd, sa)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_ctlinput)
 				(*pr->pr_ctlinput)(cmd, sa, (void *)0);
+}
+
+void
+pfctlinput2(cmd, sa, ctlparam)
+	int cmd;
+	struct sockaddr *sa;
+	void *ctlparam;
+{
+	struct domain *dp;
+	struct protosw *pr;
+
+	if (!sa)
+		return;
+	for (dp = domains; dp; dp = dp->dom_next) {
+		/*
+		 * the check must be made by xx_ctlinput() anyways, to
+		 * make sure we use data item pointed to by ctlparam in
+		 * correct way.  the following check is made just for safety.
+		 */
+		if (dp->dom_family != sa->sa_family)
+			continue;
+
+		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
+			if (pr->pr_ctlinput)
+				(*pr->pr_ctlinput)(cmd, sa, ctlparam);
+	}
 }
 
 static void
