@@ -1220,8 +1220,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 					 */
 					if (ctl->dest1 == NULL &&
 					    (prevdest1 &&
-					     (prevdestlen == elen ||
-					     bcmp(ip6e, prevdest1, elen) == 0)))
+					     prevdestlen == elen &&
+					     bcmp(ip6e, prevdest1, elen) == 0))
 						break;
 
 					*mp = sbcreatecontrol((caddr_t)ip6e,
@@ -1248,8 +1248,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 					/* see the above comment */
 					if (ctl->dest2 == NULL &&
 					    (prevdest2 &&
-					     (prevdestlen == elen ||
-					     bcmp(ip6e, prevdest2, elen) == 0)))
+					     prevdestlen == elen &&
+					     bcmp(ip6e, prevdest2, elen) == 0))
 						break;
 
 					*mp = sbcreatecontrol((caddr_t)ip6e,
@@ -1280,16 +1280,23 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 					prevrhlen =
 						(prevrth->ip6r_len + 1) << 3;
 				}
-				if (prevrth == NULL || prevrhlen != elen ||
-				    bcmp(ip6e, prevrth, elen)) {
-					*mp = sbcreatecontrol((caddr_t)ip6e, elen,
-							      IPV6_RTHDR,
-							      IPPROTO_IPV6);
-					if (ctl->rthdr == NULL)
-						ctl->rthdr = *mp;
-					if (*mp)
-						mp = &(*mp)->m_next;
-				}
+
+				/*
+				 * Check if the rthdr should be passed to
+				 * a user. See the comments for dstopt hdr.
+				 */
+				if (ctl->rthdr == NULL && prevrth &&
+				    prevrhlen == elen &&
+				    bcmp(ip6e, prevrth, elen) == 0)
+					break;
+
+				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
+						      IPV6_RTHDR,
+						      IPPROTO_IPV6);
+				if (ctl->rthdr == NULL)
+					ctl->rthdr = *mp;
+				if (*mp)
+					mp = &(*mp)->m_next;
 				break;   
 			}
 			case IPPROTO_UDP:
