@@ -320,14 +320,15 @@ main_listen_accept()
 		      (struct sockaddr *)&bnp->rp_myaddr, &myaddrlen) != 0)
 	fatal("<main_listen_accept>: getsockname");
 
-      if (in6_is_addr_onlink(&fromaddr.sin6_addr, &ife_dummy)) {
+      if (in6_is_addr_onlink(&fromaddr.sin6_addr, &ife_dummy))
+	bnp->rp_mode |= BGPO_ONLINK;	      
+
+      {
 #ifdef ADVANCEDAPI
 	struct msghdr rcvmh;
 	struct cmsghdr     *cmsgp, *cm;
 	struct in6_pktinfo *pktinfo = NULL;
 #endif
-
-	bnp->rp_mode |= BGPO_ONLINK;
 
 	/* set receive interface if the connection is on-link */
 #ifdef ADVANCEDAPI

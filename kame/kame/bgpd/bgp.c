@@ -315,7 +315,6 @@ connect_process(struct rpcb *bnp)
       return;
     }
 
-
     /*  my address  (insufficient information, for debug) */
     myaddrlen = sizeof(bnp->rp_myaddr);
     if (getsockname(bnp->rp_socket,
@@ -326,32 +325,54 @@ connect_process(struct rpcb *bnp)
 
 #ifdef ADVANCEDAPI
     {
-      int off;
-#ifndef IPV6_PKTOPTIONS		/* XXX almost unnecessary */
-      struct cmsghdr     *cmsgp;   /* Adv. API */
-      struct in6_pktinfo *pktinfo; /* Adv. API */
+      struct msghdr rcvmh;
+      struct cmsghdr     *cmsgp, *cm;
+      struct in6_pktinfo *pktinfo = NULL;
       struct ifinfo      *ife;     /* ours     */ 
-      int                 optlen;
+      int                 off;
+#ifndef IPV6_RECVPKTINFO
+      int optlen;
+#endif
+
       if ((cmsgp =
 	   (struct cmsghdr *)malloc(CMSG_SPACE(sizeof(struct in6_pktinfo))))
 	  == 0)
 	fatalx("<connect_process>: malloc");
 
+      memset(&rcvmh, 0, sizeof(rcvmh));
       memset(cmsgp, 0, CMSG_SPACE(sizeof(struct in6_pktinfo)));
-      cmsgp->cmsg_len   = CMSG_LEN(sizeof(struct in6_pktinfo));
-      cmsgp->cmsg_level = IPPROTO_IPV6;
-      cmsgp->cmsg_type  = IPV6_PKTINFO;
-      pktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
+      rcvmh.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+      rcvmh.msg_control = (caddr_t)cmsgp;
+
+#ifdef IPV6_RECVPKTINFO		/* new advanced API */
+      /* just receive ancillary data */
+      if (recvmsg(bnp->rp_socket, &rcvmh, 0) < 0)
+	fatal("<connect_process>: recvmsg");
+#else  /* old advanced API */
       optlen  = CMSG_SPACE(sizeof(struct in6_pktinfo));
       if (getsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTOPTIONS,
-		     (void *)cmsgp, &optlen)
-	  < 0) {
-	      syslog(LOG_INFO, "<%s>: failed to getsockopt(IPV6_PKTOPTIONS)", __FUNCTION__);
-	      CONNECT_RETRY(bnp);
+		     (void *)cmsgp, &optlen))
+	fatal("<connect_process>: getsockopt(IPV6_PKTOPTIONS)");
+#endif
+
+      for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&rcvmh); cm;
+	   cm = (struct cmsghdr *)CMSG_NXTHDR(&rcvmh, cm)) {
+	if (cm->cmsg_level != IPPROTO_IPV6 ||
+	    (cm->cmsg_type != IPV6_PKTINFO) ||
+	    cm->cmsg_len != CMSG_LEN(sizeof(struct in6_pktinfo)))
+	  continue;
+
+	pktinfo = (struct in6_pktinfo *)CMSG_DATA(cm);
+	break;
       }
+
+      if (pktinfo == NULL)
+	fatalx("<connect_process>: can't get connecting interface");
 
       if (!(ife = find_if_by_index(pktinfo->ipi6_ifindex)))
 	fatalx("<connect_process>: find_if_by_index: Unknown I/F");
+
+      free(cmsgp);		/* XXX: ugly, but important */
 
       if (bnp->rp_mode & BGPO_IFSTATIC) {
 	if (bnp->rp_ife != ife)
@@ -359,7 +380,6 @@ connect_process(struct rpcb *bnp)
       } else {
 	bnp->rp_ife = ife; /* overwrite */
       }
-#endif
 
       off = 0;
 #ifdef IPV6_RECVPKTINFO
@@ -1960,7 +1980,6 @@ bgp_selectroute(rte, bnp)
 	return(0);		/* sucess */
 }
 
-
 /*
  *    bgp_process_notification()
  *       process received KEEPALIVE msg.
@@ -2020,8 +2039,6 @@ bgp_process_notification (struct rpcb *bnp) {
   /* no means of reporting error in NOTIFICATION msg */
 }
 
-
-
 /*
  *    bgp_process_keepalive()
  *       process received KEEPALIVE msg.
@@ -2036,65 +2053,6 @@ bgp_process_keepalive (struct rpcb *bnp)
   rtehead = rte = NULL;
 
   bh = (struct bgphdr *)bnp->rp_inpkt;
-
-  if (( bnp->rp_mode & BGPO_PASSIVE) && 
-      !(bnp->rp_ife))
-#ifdef ADVANCEDAPI
-    {
-      struct cmsghdr     *cmsgp;        /* Adv. API */
-      struct in6_pktinfo *pktinfo;      /* Adv. API */
-      int                 off, optlen;  /* Adv. API */
-      struct in6_addr     llhackaddr;
-
-      if ((cmsgp =
-	   (struct cmsghdr *)malloc(CMSG_SPACE(sizeof(struct in6_pktinfo))))
-	  == 0)
-	fatalx("<bgp_process_keepalive>: malloc");
-
-      memset(cmsgp, 0, CMSG_SPACE(sizeof(struct in6_pktinfo)));
-      cmsgp->cmsg_len   = CMSG_LEN(sizeof(struct in6_pktinfo));
-      cmsgp->cmsg_level = IPPROTO_IPV6;
-      cmsgp->cmsg_type  = IPV6_PKTINFO;
-      pktinfo = (struct in6_pktinfo *)CMSG_DATA(cmsgp);
-      optlen  = CMSG_SPACE(sizeof(struct in6_pktinfo));
-
-      if (getsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTOPTIONS,
-		     (void *)cmsgp, &optlen) == 0) {
-	if ((bnp->rp_ife = find_if_by_index(pktinfo->ipi6_ifindex)) == NULL)
-	  fatalx("<bgp_process_keepalive>: find_if_by_index: Unknown I/F");
-      } else {
-	dperror("<bgp_process_keepalive>: getsockopt: IPV6_PKTOPTIONS");
-	if ((bnp->rp_ife = find_if_by_addr(&bnp->rp_myaddr.sin6_addr)) == NULL)
-	  fatalx("<bgp_process_keepalive>: find_if_by_addr");
-      }
-
-      off = 0;
-#ifdef IPV6_RECVPKTINFO
-      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO, /* off */
-		     &off, sizeof(off)) < 0)
-	      fatal("<bgp_process_keepalive>: setsockopt(IPV6_RECVPKTINFO)");
-#else  /* old adv. API */
-      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO, /* off */
-		     &off, sizeof(off)) < 0)
-	      fatal("<bgp_process_keepalive>: setsockopt(IPV6_PKTINFO)");
-#endif 
-
-      free(cmsgp);
-      llhackaddr = bnp->rp_addr.sin6_addr;
-      if (IN6_IS_ADDR_LINKLOCAL(&llhackaddr))
-	SET_IN6_LINKLOCAL_IFINDEX(&llhackaddr,
-				  bnp->rp_ife->ifi_ifn->if_index);
-      if (find_apeer_by_addr(&llhackaddr) == NULL) {
-	bgp_notify(bnp, BGP_CEASE, BGP_ERR_UNSPEC, 0, NULL);
-	return;
-      }
-    }
-#else  /* !ADVANCEDAPI */
-    {
-	if ((bnp->rp_ife = find_if_by_addr(&bnp->rp_myaddr.sin6_addr)) == NULL)
-	    fatalx("<bgp_process_keepalive>: find_if_by_addr Unknown I/F");
-    }  
-#endif /* ADVANCEDAPI */
 
   BGP_MARKER_CHECK;
 
@@ -2171,7 +2129,6 @@ bgp_holdtimer_expired(task *t)
   bgp_notify(t->tsk_bgp, BGP_ERR_HOLDTIME, BGP_ERR_UNSPEC, 0, NULL);
 }
 
-
 /*
  *   bgp_notify()
  */
@@ -2181,9 +2138,6 @@ bgp_notify(struct rpcb *bnp, byte errcode, byte subcode, int len, byte *data)
   bgp_send_notification(bnp, errcode, subcode, len, data);
   bgp_cease(bnp);
 }
-
-
-
 
 /*
  *   bgp_cease()
@@ -2261,7 +2215,6 @@ bgp_cease(struct rpcb *bnp)
 
   /* End of bgp_cease() */
 }
-
 
 void
 bgp_flush(struct rpcb *bnp)
