@@ -3,7 +3,7 @@
 # Date created:         5 January 1995
 # Whom:                 jmz
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:11 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/08 03:15:13 sumikawa Exp $
 #
 
 DISTNAME=	xc
@@ -41,12 +41,12 @@ pre-fetch:
 	@false
 .elif defined(USA_RESIDENT)
 .if ${USA_RESIDENT} == NO
-pre-fetch:
-MASTER_SITES+=	ftp://psych.psy.uq.oz.au/pub/X11R5/ \
-		ftp://ftp.internat.freebsd.org/pub/FreeBSD/X11-Crypto/ \
-		ftp://ftp3.za.freebsd.org/pub/FreeBSD/X11-Crypto/
-DISTFILES+=	Wraphelp.c
-IGNOREFILES=	Wraphelp.c
+#pre-fetch:
+#MASTER_SITES+=	ftp://psych.psy.uq.oz.au/pub/X11R5/ \
+#		ftp://ftp.internat.freebsd.org/pub/FreeBSD/X11-Crypto/ \
+#		ftp://ftp3.za.freebsd.org/pub/FreeBSD/X11-Crypto/
+#DISTFILES+=	Wraphelp.c
+#IGNOREFILES=	Wraphelp.c
 .endif
 .if ${USA_RESIDENT} == YES
 pre-fetch:
