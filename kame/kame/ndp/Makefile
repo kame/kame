@@ -30,10 +30,10 @@ MAN=	ndp.8 # ndp.4
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-DINET6
-CFLAGS+=-I. -I${.CURDIR}/../tcpdump
+CFLAGS+=-I.
 .else
 CPPFLAGS+=-DINET6
-CPPFLAGS+=-I. -I${.CURDIR}/../tcpdump
+CPPFLAGS+=-I.
 .endif
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
