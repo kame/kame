@@ -1148,10 +1148,10 @@ tcp6_ctlinput(cmd, sa, d)
 	void (*notify) __P((struct in6pcb *, int)) = tcp6_notify;
 	int nmatch;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sa6_src = NULL, *sa6 = (struct sockaddr_in6 *)sa;
+	const struct sockaddr_in6 *sa6_src = NULL;
+	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;
-	struct in6_addr finaldst;
 	struct {
 		u_int16_t th_sport;
 		u_int16_t th_dport;
@@ -1211,7 +1211,8 @@ tcp6_ctlinput(cmd, sa, d)
 			 * payload.
 			 */
 			if (!in6_pcblookup_connect(&tcb6, &sa6->sin6_addr,
-			    th.th_dport, &sa6_src->sin6_addr, th.th_sport, 0))
+			    th.th_dport, (struct in6_addr *)&sa6_src->sin6_addr,
+			    th.th_sport, 0))
 				return;
 
 			/*
@@ -1225,8 +1226,8 @@ tcp6_ctlinput(cmd, sa, d)
 			return;
 		}
 
-		nmatch = in6_pcbnotify(&tcb6, sa, th.th_dport, sa6_src,
-				       th.th_sport, cmd, NULL, notify);
+		nmatch = in6_pcbnotify(&tcb6, sa, th.th_dport,
+		    (struct sockaddr *)sa6_src, th.th_sport, cmd, NULL, notify);
 		if (nmatch == 0 && syn_cache_count &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
@@ -1234,8 +1235,8 @@ tcp6_ctlinput(cmd, sa, d)
 			syn_cache_unreach((struct sockaddr *)sa6_src,
 					  sa, &th);
 	} else {
-		(void) in6_pcbnotify(&tcb6, sa, 0, sa6_src, 0, cmd,
-				     NULL, notify);
+		(void) in6_pcbnotify(&tcb6, sa, 0, (struct sockaddr *)sa6_src,
+		    0, cmd, NULL, notify);
 	}
 }
 #endif
@@ -1380,13 +1381,17 @@ tcp6_mtudisc_callback(faddr)
 	struct in6_addr *faddr;
 {
 	struct sockaddr_in6 sin6;
+	struct sockaddr_in6 zero;
 
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *faddr;
+	bzero(&zero, sizeof(zero));
+	zero.sin6_family = AF_INET6;
+	zero.sin6_len = sizeof(struct sockaddr_in6);
 	(void) in6_pcbnotify(&tcb6, (struct sockaddr *)&sin6, 0,
-	    &zeroin6_addr, 0, EMSGSIZE, NULL, tcp6_mtudisc);
+	    (struct sockaddr *)&zero, 0, EMSGSIZE, NULL, tcp6_mtudisc);
 }
 
 void
