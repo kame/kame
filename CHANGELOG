@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.718 2000/03/22 12:05:51 jinmei Exp $
+$Id: CHANGELOG,v 1.719 2000/03/22 12:09:46 jinmei Exp $
 
 <200003>
+2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd2/sbin/route/route.c (getaddr): use getifaddrs() instead
+	of SIOCGIFCONF to examine all interface addresses.
+
 2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {freebsd[23], bsdi[34]}/sbin/route/route.c: supported extended
 	format for IPv6 scoped addresses. For example, you can install an
