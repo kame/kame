@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1789 2001/07/20 21:32:06 itojun Exp $
+$KAME: CHANGELOG,v 1.1790 2001/07/20 21:36:17 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -44,7 +44,7 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  will fix it soon.
 
 	  L3 TODO: more clever hash/gw selection policy, bypassing failing
-	  gateways
+	  gateways, revisit issues with cached route on struct route/sendto(3)
 
 Fri Jul 20 14:20:51 JST 2001  itojun@iijlab.net
 	* nodeinfod: a daemon that responds to node information queries.
