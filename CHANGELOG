@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2332 2003/02/05 16:38:09 suz Exp $
+$KAME: CHANGELOG,v 1.2333 2003/02/06 07:08:52 jinmei Exp $
 
 <200302>
+2003-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: the client now sends Request to establish an IA
+	when receiving a NoBinding for the IA in response to a Renew or
+	Reply.  The behavior is compliant to Section 18.1.8 of dhcpv6-28.
+
 Thu Feb  6 01:36:12 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd/vif.c: fixed pim6sd crash by SIGHUP
 	(reported by SUDOH Yoshiaki <sudo@iij.ad.jp>)
