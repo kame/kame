@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.27 2000/03/01 10:51:37 nik Exp $
-# $KAME: GENERIC.v6,v 1.30 2001/01/28 06:17:43 suz Exp $
+# $KAME: GENERIC.v6,v 1.31 2001/02/04 06:02:07 itojun Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -83,6 +83,7 @@ options 	ALTQ		#alternate queueing
 
 # mobile-ip6 options
 # NOTE: Don't define with IPsec options
+# NOTE: may not work due to prefix management changes (Feb2001)
 #options 	"MIP6"
 ##options 	"MIP6_DEBUG"
 
