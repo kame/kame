@@ -181,9 +181,6 @@ int	tcbhashsize = TCBHASHSIZE;
 
 int	tcp_freeq __P((struct tcpcb *));
 
-#ifdef INET
-void	tcp_mtudisc_callback __P((struct in_addr));
-#endif
 #ifdef INET6
 void	tcp6_mtudisc_callback __P((struct in6_addr *));
 #endif
@@ -221,9 +218,6 @@ tcp_init()
 	if (max_linkhdr + hlen > MHLEN)
 		panic("tcp_init");
 	
-#ifdef INET
-	icmp_mtudisc_callback_register(tcp_mtudisc_callback);
-#endif
 #ifdef INET6
 	icmp6_mtudisc_callback_register(tcp6_mtudisc_callback);
 #endif
@@ -1271,17 +1265,15 @@ tcp6_ctlinput(cmd, sa, d)
 }
 #endif
 
-#ifdef INET
 /* assumes that ip header and tcp header are contiguous on mbuf */
 void *
 tcp_ctlinput(cmd, sa, v)
 	int cmd;
 	struct sockaddr *sa;
-	void *v;
+	register void *v;
 {
-	struct ip *ip = v;
-	struct tcphdr *th;
-	struct icmp *icp;
+	register struct ip *ip = v;
+	register struct tcphdr *th;
 	extern int inetctlerrmap[];
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 	int errno;
@@ -1297,30 +1289,9 @@ tcp_ctlinput(cmd, sa, v)
 		notify = tcp_quench;
 	else if (PRC_IS_REDIRECT(cmd))
 		notify = in_rtchange, ip = 0;
-	else if (cmd == PRC_MSGSIZE && ip_mtudisc && ip && ip->ip_v == 4) {
-		/*
-		 * Check to see if we have a valid TCP connection
-		 * corresponding to the address in the ICMP message
-		 * payload.
-		 */
-		th = (struct tcphdr *)((caddr_t)ip + (ip->ip_hl << 2));
-		if (in_pcblookup_connect(&tcbtable,
-					 ip->ip_dst, th->th_dport,
-					 ip->ip_src, th->th_sport) == NULL)
-			return NULL;
-
-		/*
-		 * Now that we've validated that we are actually communicating
-		 * with the host indicated in the ICMP message, locate the
-		 * ICMP header, recalculate the new MTU, and create the
-		 * corresponding routing entry.
-		 */
-		icp = (struct icmp *)((caddr_t)ip -
-		    offsetof(struct icmp, icmp_ip));
-		icmp_mtudisc(icp, ip->ip_dst);
-
-		return NULL;
-	} else if (cmd == PRC_HOSTDEAD)
+	else if (cmd == PRC_MSGSIZE && ip_mtudisc)
+		notify = tcp_mtudisc, ip = 0;
+	else if (cmd == PRC_HOSTDEAD)
 		ip = 0;
 	else if (errno == 0)
 		return NULL;
@@ -1342,9 +1313,11 @@ tcp_ctlinput(cmd, sa, v)
 		}
 
 		/* XXX mapped address case */
-	} else
-		in_pcbnotifyall(&tcbtable, satosin(sa)->sin_addr, errno,
+	}
+	else {
+		(void)in_pcbnotifyall(&tcbtable, satosin(sa)->sin_addr, errno,
 		    notify);
+	}
 	return NULL;
 }
 
@@ -1363,7 +1336,6 @@ tcp_quench(inp, errno)
 	if (tp)
 		tp->snd_cwnd = tp->t_segsz;
 }
-#endif
 
 #if defined(INET6) && !defined(TCP6)
 void
@@ -1377,18 +1349,6 @@ tcp6_quench(in6p, errno)
 		tp->snd_cwnd = tp->t_segsz;
 }
 #endif
-
-#ifdef INET
-/*
- * Path MTU Discovery handlers.
- */
-void
-tcp_mtudisc_callback(faddr)
-	struct in_addr faddr;
-{
-
-	in_pcbnotifyall(&tcbtable, faddr, EMSGSIZE, tcp_mtudisc);
-}
 
 /*
  * On receipt of path MTU corrections, flush old route and replace it
@@ -1435,7 +1395,6 @@ tcp_mtudisc(inp, errno)
 		tcp_output(tp);
 	}
 }
-#endif
 
 #if defined(INET6) && !defined(TCP6)
 /*
