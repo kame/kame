@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.16 2000/09/20 16:16:14 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.17 2000/09/20 16:19:33 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -177,3 +177,11 @@ vs NxNetworks
 	- fragmented packets did not get through NxNet gw.
 	- phase 2 ID: (KAME) the gw itself (NxNet) net10 addr behind NxNet
 
+vs Intel (Packet Protect Pro/100S)
+	phase 1: responder, main
+	    preshared, 3des-cbc, sha1, DH group 2
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-md5, transport mode, no PFS
+
+	Notes:
+	- fragmented ping works fine, large ftp transfer went well too
