@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.330 2003/03/18 04:05:00 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.331 2003/03/18 23:49:35 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -202,6 +202,7 @@ RFC3376: Internet Group Management Protocol, Version 3
 RFC3484: Default Address Selection for IPv6
     * the selection algorithm for both source and destination addresses
       is implemented based on the RFC, though some rules are still omitted.
+RFC 3493: Basic Socket Interface Extensions for IPv6 (revised)
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-28.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
@@ -212,8 +213,6 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
       (and extensions can appear unaligned).  our code follows the comment.
     * Some parts of the 24 draft, especially the relay agent function,
       have not been implemented.
-draft-ietf-ipngwg-rfc2553bis-04.txt:
-	Basic Socket Interface Extensions for IPv6 (revised)
 draft-ietf-ipngwg-rfc2292bis-09.txt:
 	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
