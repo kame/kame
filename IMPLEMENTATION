@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.319 2002/11/11 03:19:21 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.320 2002/11/20 03:38:32 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -548,8 +548,11 @@ routes, in order to avoid configuration mistakes.)
 Some applications have command line options for specifying an
 appropriate zone of a scoped address (like "ping6 -I ne0 ff02::1" to
 specify the outgoing interface).  However, you can't always expect such
-options.  Thus, we recommend you to use the extended format described
-above.
+options.  Additionally, specifying the outgoing "interface" is in
+theory an overspecification as a way to specify the outgoing "link"
+(see above).  Thus, we recommend you to use the extended format
+described above.  This should apply to the case where the outgoing
+interface is specified.
 
 In any case, when you specify a scoped address to the command line,
 NEVER write the embedded form (such as ff02:1::1 or fe80:2::fedc),
