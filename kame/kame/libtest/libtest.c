@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: libtest.c,v 1.6 1999/11/03 20:13:53 itojun Exp $
+ * $Id: libtest.c,v 1.7 1999/11/03 23:01:46 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -97,11 +97,11 @@ test_pton()
 	int success = 0;
 
 	/* test for broken inet_pton() (pre BIND82) */
-	if (inet_pton(AF_INET6, "0:1:2:3:4:5:6:7:", &a) == 0)
+	if (inet_pton(AF_INET6, "0:1:2:3:4:5:6:7:", &a) != 1)
 		success++;
 	else
 		printf("%s: test 1 failed\n", FUNCNAME);
-	if (inet_pton(AF_INET6, "0:1:2:3:4:5:6:7@", &a) == 0)
+	if (inet_pton(AF_INET6, "0:1:2:3:4:5:6:7@", &a) != 1)
 		success++;
 	else
 		printf("%s: test 2 failed\n", FUNCNAME);
