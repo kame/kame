@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.193 2001/06/28 06:11:47 sakane Exp $	*/
+/*	$KAME: key.c,v 1.194 2001/07/26 20:14:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,6 +70,7 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <net/raw_cb.h>
+#include <net/if_sec.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -1679,6 +1680,7 @@ key_spdadd(so, m, mhp)
 	struct sadb_lifetime *lft = NULL;
 	struct secpolicyindex spidx;
 	struct secpolicy *newsp;
+	struct ipsecrequest *req;
 	struct timeval tv;
 	int error;
 
@@ -1812,19 +1814,53 @@ key_spdadd(so, m, mhp)
 		keydb_delsecpolicy(newsp);
 		return key_senderror(so, m, EINVAL);
 	}
-#if 1
-	if (newsp->req && newsp->req->saidx.src.ss_family) {
-		struct sockaddr *sa;
-		sa = (struct sockaddr *)(src0 + 1);
-		if (sa->sa_family != newsp->req->saidx.src.ss_family) {
-			keydb_delsecpolicy(newsp);
-			return key_senderror(so, m, EINVAL);
+
+	/*
+	 * bark if we have different address family on tunnel address
+	 * specification.
+	 * XXX the check has to be removed in the future
+	 */
+	for (req = newsp->req; req; req = req->next) {
+		if (req->saidx.src.ss_family) {
+			struct sockaddr *sa;
+			sa = (struct sockaddr *)(src0 + 1);
+			if (sa->sa_family != req->saidx.src.ss_family) {
+				keydb_delsecpolicy(newsp);
+				return key_senderror(so, m, EINVAL);
+			}
+		}
+		if (req->saidx.dst.ss_family) {
+			struct sockaddr *sa;
+			sa = (struct sockaddr *)(dst0 + 1);
+			if (sa->sa_family != req->saidx.dst.ss_family) {
+				keydb_delsecpolicy(newsp);
+				return key_senderror(so, m, EINVAL);
+			}
 		}
 	}
-	if (newsp->req && newsp->req->saidx.dst.ss_family) {
-		struct sockaddr *sa;
-		sa = (struct sockaddr *)(dst0 + 1);
-		if (sa->sa_family != newsp->req->saidx.dst.ss_family) {
+
+#if 0	/* XXX the fragment is ongoing work - itojun */
+	/*
+	 * based on newsp->req, create/configure tunnels.
+	 */
+	for (req = newsp->req; req; req = req->next) {
+		struct ifnet *ifp;
+
+		if (req->saidx.mode != IPSEC_MODE_TUNNEL)
+			continue;
+
+		ifp = sec_create(0);	/* I don't care about the unit number */
+		error = gif_set_tunnel(ifp, (struct sockaddr *)&req->saidx.src,
+		    (struct sockaddr *)&req->saidx.dst);
+		switch (error) {
+		case 0:
+			req->tunifp = ifp;
+			/* XXX reference count */
+			break;
+		case EEXIST:
+			/* XXX find another tunnel for the same outer pair */
+		default:
+			(void)sec_destroy(ifp);
 			keydb_delsecpolicy(newsp);
 			return key_senderror(so, m, EINVAL);
 		}
