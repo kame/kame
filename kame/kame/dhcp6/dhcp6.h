@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.42 2003/07/31 21:44:11 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.43 2003/09/29 04:01:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -218,14 +218,25 @@ struct dhcp6_relay {
 #define DH6OPT_RECONF_MSG 19
 
 /*
+ * The following values have been assigned by IANA very recently.  In order to
+ * ensure interoperability with prior experimental implementation, we still
+ * provide a way to configure these values.  It is highly recommended to use
+ * the standard values whenever possible, of course.
+ */
+#ifndef DH6OPT_DNS
+#define DH6OPT_DNS 23
+#endif
+#ifndef DH6OPT_DNSNAME
+#define DH6OPT_DNSNAME 24
+#endif
+
+/*
  * The option type has not been assigned for the following options.
  * We temporarily adopt values used in the service specification document
  * (200206xx version) by NTT Communications as default values.
  * Note that we'll fix the following definitions when official values are
  * assigned.
  */
-#define DH6OPT_DNS CONF_DH6OPT_DNS
-#define DH6OPT_DNSNAME CONF_DH6OPT_DNSNAME
 #define DH6OPT_PREFIX_DELEGATION CONF_DH6OPT_PREFIX_DELEGATION
 #define DH6OPT_PREFIX_INFORMATION CONF_DH6OPT_PREFIX_INFORMATION
 #define DH6OPT_PREFIX_REQUEST CONF_DH6OPT_PREFIX_REQUEST
