@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.36 2003/02/05 11:28:35 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.37 2003/02/14 12:21:46 t-momose Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -8,10 +8,6 @@ KAME project
 
 - Known bugs
 	- Simultaniously use with the privacy extention doesn't work.
-	- Incorrect auth data calculation of the BU message
-	  when a mobile node is home.
-	- Incorrect lifetime calculation at a correspondent node
-	  when a binding cache is already exists.
 	- The value of a flowlabel field is not updated when a
 	  communicating mobile node has moved.
 
