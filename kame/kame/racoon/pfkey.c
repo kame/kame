@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.11 2000/01/11 17:16:11 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.12 2000/01/12 00:45:57 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -1328,7 +1328,6 @@ pk_recvacquire(mhp)
 		/* make a dummy SA for getspidx_r */
 		struct ph2handle iph2_dummy;
 		memset(&iph2_dummy, 0, sizeof(iph2_dummy));
-		/* NOTE: dst/src are flipped as it is inbound */
 		iph2_dummy.dst =
 			dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]));
 		iph2_dummy.src =
