@@ -553,7 +553,7 @@ open_socket()
 	}
 	else {
 		/* XXX: consider interface? */
-		get_my_sockaddr(grp_sock->sa_family, dst_sock);
+		get_my_sockaddr(grp_sock->sa_family, rcv_sock);
 	}
 
 	if ((mldsoc = socket(hints.ai_family, hints.ai_socktype,
