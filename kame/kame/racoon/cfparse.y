@@ -121,6 +121,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 	struct policyindex *spidx;
 	struct remoteconf *rmconf;
 	struct sockaddr *saddr;
+	struct sainfoalg *alg;
 }
 
 	/* path */
@@ -177,6 +178,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
 %type <saddr> remote_index
+%type <alg> algorithm
 
 %%
 
@@ -375,7 +377,8 @@ timer_stmt
 
 	/* algorithm */
 algorithm_statement
-	:	ALGORITHM_LEVEL
+	:	ALGORITHM_DEFAULT BOC algorithm_stmts EOC
+	|	ALGORITHM_LEVEL
 		{
 			yywarn("algorithm_strength directive are obsoleted.");
 		} BOC algorithm_stmts EOC
@@ -778,25 +781,31 @@ sainfo_spec
 
 algorithms
 	:	algorithm
-	|	algorithm COMMA algorithm
+		{
+			inssainfoalg(&cur_sainfo->algs[cur_algclass], $1);
+		}
+	|	algorithm
+		{
+			inssainfoalg(&cur_sainfo->algs[cur_algclass], $1);
+		}
+		COMMA algorithms
 	;
 algorithm
 	:	ALGORITHMTYPE keylength
 		{
-			struct sainfoalg *alg;
 			int defklen;
 
-			alg = newsainfoalg();
-			if (alg == NULL) {
+			$$ = newsainfoalg();
+			if ($$ == NULL) {
 				yyerror("sainfo's algorithm alocation "
 					"failed (%s)", strerror(errno));
 				return -1;
 			}
 
-			alg->alg = algtype2doi(cur_algclass, $1);
-			if (alg->alg == -1) {
+			$$->alg = algtype2doi(cur_algclass, $1);
+			if ($$->alg == -1) {
 				yyerror("algorithm mismatched");
-				free(alg);
+				free($$);
 				return -1;
 			}
 
@@ -804,22 +813,20 @@ algorithm
 			if (defklen == 0) {
 				if ($2) {
 					yyerror("keylen not allowed");
-					free(alg);
+					free($$);
 					return -1;
 				}
 			} else {
 				if ($2 && check_keylen(cur_algclass, $1, $2) < 0) {
 					yyerror("invalid keylen %d", $2);
-					free(alg);
+					free($$);
 					return -1;
 				}
 			}
 			if ($2)
-				alg->encklen = $2;
+				$$->encklen = $2;
 			else
-				alg->encklen = defklen;
-
-			inssainfoalg(&cur_sainfo->algs[cur_algclass], alg);
+				$$->encklen = defklen;
 		}
 	;
 
