@@ -91,6 +91,9 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/errno.h>
+#ifdef __FreeBSD__
+#include <sys/syslog.h>
+#endif
 
 #include <net/if.h>
 #include <net/route.h>
@@ -131,6 +134,10 @@ struct	in6pcb *tcp6_last_in6pcb = &tcb6;
 
 int tcp6_msltime;
 struct tcp6_delacks tcp6_delacks;
+
+#ifdef __FreeBSD__
+extern int tcp_log_in_vain;
+#endif
 
 #endif /* TUBA_INCLUDE */
 #define TCP6_PAWS_IDLE	(24 * 24 * 60 * 60 * PR_SLOWHZ)
@@ -569,8 +576,20 @@ findpcb:
 	 * If the TCB6 exists but is in CLOSED state, it is embryonic,
 	 * but should either do a listen or a connect soon.
 	 */
-	if (in6p == 0)
+	if (in6p == 0) {
+#ifdef __FreeBSD__
+		if (tcp_log_in_vain && thflags & TH_SYN) {
+			char buf[INET6_ADDRSTRLEN];
+
+			strcpy(buf, ip6_sprintf(&ip6->ip6_dst));
+			log(LOG_INFO,
+			    "Connection attempt to TCP %s:%d from %s:%d\n",
+			    buf, ntohs(th->th_dport),
+			    ip6_sprintf(&ip6->ip6_src), ntohs(th->th_sport));
+		}
+#endif
 		goto dropwithreset;
+	}
 	t6p = intotcp6cb(in6p);
 	if (t6p == 0)
 		goto dropwithreset;
@@ -602,6 +621,10 @@ findpcb:
 		if (so->so_options & SO_ACCEPTCONN) {
 			struct in6pcb *oin6p = sotoin6pcb(so);
 			struct socket *oso;
+			/*
+			 * XXX need to defer this check for IPsec
+			 * see netinet/tcp_input.c
+			 */
 			if ((thflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
 				if (thflags & TH_RST)
 					syn_cache_reset6(ip6, th);
@@ -2019,7 +2042,11 @@ tcp6_rtlookup(in6p)
 		ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
 		((struct sockaddr_in6 *) &ro->ro_dst)->sin6_addr =
 			in6p->in6p_faddr;
+#ifdef __FreeBSD__
+		rtcalloc((struct route *)ro);
+#else
 		rtalloc((struct route *)ro);
+#endif
 	}
 	return(ro->ro_rt);
 }
@@ -2091,6 +2118,7 @@ tcp6_peer_mss(t6p, offer)
 		if (tcp6_pmtu == 0 && !in6_localaddr(&in6p->in6p_faddr))
 			mss = min(mss, tcp6_mssdflt);
 	}
+	mss -= ip6_optlen(in6p);
 #ifdef IPSEC
     {
 	int tmp;
@@ -2191,6 +2219,7 @@ tcp6_send_mss(t6p)
 	}
 
 	mss -= sizeof(struct ip6tcp);
+	mss -= ip6_optlen(in6p);
 #ifdef IPSEC
     {
 	int tmp;

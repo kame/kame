@@ -95,6 +95,7 @@
 #ifdef __NetBSD__
 #include <sys/pool.h>
 #endif
+#include <sys/syslog.h>
 
 #include <net/route.h>
 #include <net/if.h>
@@ -539,6 +540,7 @@ tcp6_ctlinput(cmd, sa, ip6, m, off)
 	struct tcp6hdr th;
 	void (*notify) __P((struct in6pcb *, int)) = tcp6_notify;
 	int nmatch;
+	struct sockaddr_in6 sa6;
 
 	if (cmd == PRC_QUENCH)
 		notify = tcp6_quench;
@@ -547,11 +549,31 @@ tcp6_ctlinput(cmd, sa, ip6, m, off)
 	else if (!PRC_IS_REDIRECT(cmd) &&
 		 ((unsigned)cmd > PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
 		return;
+
+	/* translate addresses into internal form */
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		log(LOG_ERR, "tcp6_ctlinput: arg sa is not for IPv6,"
+		    "sa->sa_family = %d, len = %d", sa->sa_family, sa->sa_len);
+	sa6 = *(struct sockaddr_in6 *)sa;
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
+		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	if (ip6) {
 		/*
 		 * XXX: We assume that when IPV6 is non NULL,
 		 * M and OFF are valid.
 		 */
+		struct ip6_hdr ip6_tmp;
+
+		/* translate addresses into internal form */
+		ip6_tmp = *ip6;
+		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_src))
+			ip6_tmp.ip6_src.s6_addr16[1] =
+				htons(m->m_pkthdr.rcvif->if_index);
+		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_dst))
+			ip6_tmp.ip6_dst.s6_addr16[1] =
+				htons(m->m_pkthdr.rcvif->if_index);
+
 		if (m->m_len < off + sizeof(th)) {
 			/*
 			 * this should be rare case,
@@ -561,16 +583,17 @@ tcp6_ctlinput(cmd, sa, ip6, m, off)
 			thp = &th;
 		} else
 			thp = (struct tcp6hdr *)(mtod(m, caddr_t) + off);
-		nmatch = in6_pcbnotify(&tcb6, sa, thp->th_dport, &ip6->ip6_src,
-		    thp->th_sport, cmd, notify);
+		nmatch = in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6,
+				       thp->th_dport, &ip6_tmp.ip6_src,
+				       thp->th_sport, cmd, notify);
 		if (nmatch == 0 && syn_cache_count6 &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
 		     inet6ctlerrmap[cmd] == EHOSTDOWN))
-			syn_cache_unreach6(ip6, thp);
+			syn_cache_unreach6(&ip6_tmp, thp);
 	} else {
-		(void) in6_pcbnotify(&tcb6, sa, 0, &zeroin6_addr,
-				     0, cmd, notify);
+		(void) in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6, 0,
+				     &zeroin6_addr, 0, cmd, notify);
 	}
 }
 
@@ -624,7 +647,11 @@ tcp6_mtudisc(in6p, errno)
 	 */
 	if ((ro->ro_rt->rt_flags & RTF_HOST) == 0) {
 		in6_rtchange(in6p, 0);
+#ifdef __FreeBSD__
+		rtcalloc((struct route *)ro);
+#else
 		rtalloc((struct route *)ro);
+#endif
 		if (ro->ro_rt == NULL) {
 			printf("tcp6_mtudisc: no new route?\n");
 			tcp6_changemss(t6p, TCP6_MSS);

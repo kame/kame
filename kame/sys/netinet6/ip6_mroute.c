@@ -74,6 +74,10 @@
 #include <netinet6/pim6.h>
 #include <netinet6/pim6_var.h>
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+static MALLOC_DEFINE(M_MRTABLE, "mf6c", "multicast forwarding cache entry");
+#endif
+
 #define M_HASCL(m) ((m)->m_flags & M_EXT)
 
 static int ip6_mdq __P((struct mbuf *, struct ifnet *, struct mf6c *));
@@ -139,6 +143,10 @@ static mifi_t nummifs = 0;
 static mifi_t reg_mif_num = (mifi_t)-1;
 
 static struct pim6stat pim6stat;
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+static struct callout_handle expire_upcalls_ch;
+#endif
 
 /*
  * one-back cache used by ipip_input to locate a tunnel's mif
@@ -402,6 +410,9 @@ ip6_mrouter_init(so, m)
 
 	pim6 = 0;/* used for stubbing out/in pim stuff */
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	expire_upcalls_ch =
+#endif
 	timeout(expire_upcalls, (caddr_t)NULL, EXPIRE_TIMEOUT);
 
 #ifdef MRT6DEBUG
@@ -468,7 +479,11 @@ ip6_mrouter_done()
 
 	pim6 = 0; /* used to stub out/in pim specific code */
 
-	untimeout(expire_upcalls, (caddr_t)NULL);
+	untimeout(expire_upcalls, (caddr_t)NULL
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		  , expire_upcalls_ch
+#endif
+		  );
 
 	/*
 	 * Free all multicast forwarding cache entries.
@@ -1201,6 +1216,9 @@ expire_upcalls(unused)
 		}
 	}
 	splx(s);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	expire_upcalls_ch =
+#endif
 	timeout(expire_upcalls, (caddr_t)NULL, EXPIRE_TIMEOUT);
 }
 
@@ -1710,9 +1728,14 @@ pim6_input(mp, offp, proto)
 		}
 #endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+ 		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
+			      (struct sockaddr *) &dst, NULL);
+#else
  		rc = looutput(mif6table[reg_mif_num].m6_ifp, m,
 			      (struct sockaddr *) &dst,
 			      (struct rtentry *) NULL);
+#endif
 	
 		/* prepare the register head to send to the mrouting daemon */
 		m = mcp;
