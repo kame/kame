@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.6 2004/12/27 05:41:16 itojun Exp $	*/
+/*	$KAME: if_ist.c,v 1.7 2005/03/23 10:03:22 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1069,6 +1069,10 @@ ist_ioctl(ifp, cmd, data)
 		}
 
 		bcopy(GET_V4(sc, &sin6->sin6_addr), &addr, sizeof(addr));
+		if (ist_checkaddr4(sc, &addr, NULL)) {
+			error = EINVAL;
+			break;
+		}
 		ifa->ifa_rtrequest = ist_rtrequest;
 		ifp->if_flags |= IFF_UP | IFF_RUNNING;
 		break;
