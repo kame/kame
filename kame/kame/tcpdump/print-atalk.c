@@ -23,7 +23,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: print-atalk.c,v 1.48 97/05/28 12:50:58 leres Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-atalk.c,v 1.1.1.1 1999/08/08 23:32:02 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -67,13 +67,13 @@ static struct tok type2str[] = {
 };
 
 struct aarp {
-	u_short htype, ptype;
-	u_char	halen, palen;
-	u_short op;
-	u_char	hsaddr[6];
-	u_char	psaddr[4];
-	u_char	hdaddr[6];
-	u_char	pdaddr[4];
+	u_int16_t	htype, ptype;
+	u_int8_t	halen, palen;
+	u_int16_t	op;
+	u_int8_t	hsaddr[6];
+	u_int8_t	psaddr[4];
+	u_int8_t	hdaddr[6];
+	u_int8_t	pdaddr[4];
 };
 
 static char tstr[] = "[|atalk]";
@@ -162,9 +162,9 @@ aarp_print(register const u_char *bp, u_int length)
 
 	printf("aarp ");
 	ap = (const struct aarp *)bp;
-	if (ap->htype == 1 && ap->ptype == ETHERTYPE_ATALK &&
+	if (ntohs(ap->htype) == 1 && ntohs(ap->ptype) == ETHERTYPE_ATALK &&
 	    ap->halen == 6 && ap->palen == 4 )
-		switch (ap->op) {
+		switch (ntohs(ap->op)) {
 
 		case 1:				/* request */
 			(void)printf("who-has %s tell %s",
