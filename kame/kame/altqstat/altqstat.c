@@ -1,4 +1,4 @@
-/*	$KAME: altqstat.c,v 1.6 2001/08/16 07:43:14 itojun Exp $	*/
+/*	$KAME: altqstat.c,v 1.7 2001/11/19 09:14:22 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -60,15 +60,17 @@ static void usage(void);
 static void
 sig_handler(int sig)
 {
-	fprintf(stderr, "Exiting on signal %d\n", sig);
+	char buf[8192];
 
-	close(qdiscfd);  /* close altq device */
-	quip_closeserver();  /* clocse socket to altqd */
+	snprintf(buf, sizeof buf, "Exiting on signal %d\n", sig);
+	write(STDERR_FILENO, buf, strlen(buf));
+
 #ifndef NO_CURSES
+	/* XXX signal race */
 	if (qdisc_name != NULL && strcmp(qdisc_name, "wfq") == 0)
 		endwin();	/* wfqstat uses curses */
 #endif
-	exit(0);
+	_exit(0);
 }
 
 static void 

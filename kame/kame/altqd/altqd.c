@@ -1,4 +1,4 @@
-/*	$KAME: altqd.c,v 1.6 2001/08/20 08:25:23 kjc Exp $	*/
+/*	$KAME: altqd.c,v 1.7 2001/11/19 09:14:22 kjc Exp $	*/
 /*
  * Copyright (c) 2001 Theo de Raadt
  * All rights reserved.
@@ -107,7 +107,7 @@ sig_pipe(int sig)
 	 */
 }
 
-int gotsig_hup, gotsig_int, gotsig_term;
+volatile sig_atomic_t gotsig_hup, gotsig_int, gotsig_term;
 
 void
 sig_hup(int sig)

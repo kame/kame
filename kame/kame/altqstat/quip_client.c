@@ -1,4 +1,4 @@
-/*	$KAME: quip_client.c,v 1.5 2001/08/20 06:41:33 kjc Exp $	*/
+/*	$KAME: quip_client.c,v 1.6 2001/11/19 09:14:22 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <signal.h>
 #include <errno.h>
 #include <err.h>
 
