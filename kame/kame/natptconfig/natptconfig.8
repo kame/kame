@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.13 2002/01/25 07:18:24 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.14 2002/01/25 08:39:55 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -198,7 +198,53 @@ This section describes a table format indicated with
 .Dl # natptconfig show xlate
 command.
 .Pp
-.Pq to be written
+Here is an example of command output with v6->v4 translation.  Because
+this command's output is too long, line is bent over to two lines.
+.Bd -literal -offset
+tcp 3ffe=fe20:c157.1095 3ffe=:caf9:b2a.23
+    10.0.0.102.32768  202.249.11.42.23  1  2  00:00:18  CLOSED
+.Ed
+.Pp
+This entry has 9 fields.  Meaning of each field is as follows.
+.Bl -bullet -compact
+.It
+The leftmost field shows protocol
+.Pq icmp|icmp6|tcp|udp .
+.It
+The second and third field shows source.port and destination.port of
+incoming packet.
+.It
+The fourth and
+fifth field shows source.port and destination.port of outgoing packet.
+.It
+The sixth and seventh field shows each packet count of incoming and
+outgoing.
+.It
+The eighth field shows the time (seconds) from last packet matches
+this entry.
+.It
+The last field has TCP status that is kept in the kernel.  Of course,
+the last field appears TCP only.
+.El
+.Pp
+This entry is same as the next example, but IPv6 address was shrunk to
+14 columns, in order to keep total length in 128 characters.  Each
+IPv6 address was shown as first 4 characters and last 9 characters
+connecting with
+.Sq =
+character.
+.Pp
+When you invoke command as follows,
+.Dl # natptconfig show xlate long
+the output seems to be next.  This line is more long than above
+example, line is bent over to two lines, too.
+.Bd -literal -offset
+tcp 3ffe:501:ffff:face:203:47ff:fe20:c157.1095 3ffe:501:ffff:c1ad::caf9:b2a.23
+    10.0.0.102.32768  202.249.11.42.23  1  2  00:00:28  CLOSED
+.Ed
+.Pp
+Meaning of each field is same as the above example, but IPv6 address
+is not shortening.
 .\"
 .Sh SEE ALSO
 .Xr natpt.conf 5 ,
