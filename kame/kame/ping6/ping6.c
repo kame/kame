@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.160 2002/09/08 14:28:18 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.161 2002/09/23 12:51:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -127,6 +127,9 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 
 #ifdef IPSEC
 #include <netinet6/ah.h>
@@ -295,10 +298,21 @@ main(argc, argv)
 {
 	struct itimerval itimer;
 	struct sockaddr_in6 from;
+#ifndef HAVE_ARC4RANDOM
+	struct timeval seed;
+#endif
+#ifdef HAVE_POLL_H
+	int timeout;
+#else
 	struct timeval timeout, *tv;
+#endif
 	struct addrinfo hints;
+#ifdef HAVE_POLL_H
+	struct pollfd fdmaskp[1];
+#else
 	fd_set *fdmaskp;
 	int fdmasks;
+#endif
 	int cc, i;
 	int ch, hold, packlen, preload, optval, ret_ga;
 	u_char *datap, *packet;
@@ -711,9 +725,9 @@ main(argc, argv)
 			*datap++ = i;
 
 	ident = getpid() & 0xFFFF;
-#ifndef __OpenBSD__
-	gettimeofday(&timeout, NULL);
-	srand((unsigned int)(timeout.tv_sec ^ timeout.tv_usec ^ (long)ident));
+#ifndef HAVE_ARC4RANDOM
+	gettimeofday(&seed, NULL);
+	srand((unsigned int)(seed.tv_sec ^ seed.tv_usec ^ (long)ident));
 	memset(nonce, 0, sizeof(nonce));
 	for (i = 0; i < sizeof(nonce); i += sizeof(int))
 		*((int *)&nonce[i]) = rand();
@@ -1056,9 +1070,11 @@ main(argc, argv)
 			retransmit();
 	}
 
+#ifndef HAVE_POLL_H
 	fdmasks = howmany(s + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdmaskp = malloc(fdmasks)) == NULL)
 		err(1, "malloc");
+#endif
 
 	seenalrm = seenint = 0;
 #ifdef SIGINFO
@@ -1092,17 +1108,36 @@ main(argc, argv)
 
 		if (options & F_FLOOD) {
 			(void)pinger();
+#ifdef HAVE_POLL_H
+			timeout = 10;
+#else
 			timeout.tv_sec = 0;
 			timeout.tv_usec = 10000;
 			tv = &timeout;
-		} else
+#endif
+		} else {
+#ifdef HAVE_POLL_H
+			timeout = INFTIM;
+#else
 			tv = NULL;
+#endif
+		}
+#ifdef HAVE_POLL_H
+		fdmaskp[0].fd = s;
+		fdmaskp[0].events = POLLIN;
+		cc = poll(fdmaskp, 1, timeout);
+#else
 		memset(fdmaskp, 0, fdmasks);
 		FD_SET(s, fdmaskp);
 		cc = select(s + 1, fdmaskp, NULL, NULL, tv);
+#endif
 		if (cc < 0) {
 			if (errno != EINTR) {
+#ifdef HAVE_POLL_H
+				warn("poll");
+#else
 				warn("select");
+#endif
 				sleep(1);
 			}
 			continue;
