@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1974 2001/11/08 06:00:01 itojun Exp $
+$KAME: CHANGELOG,v 1.1975 2001/11/10 08:55:13 jinmei Exp $
 
 <200111>
+2001-11-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet6/in6_pcb.c (in6_pcbladdr, in6_pcbbind):
+	set the default scope zone ID when unspecified.
+	* freebsd4/sys/netinet6/in6_pcb.c (in6_setsockaddr,
+	in6_setpeeraddr): use in6_recoverscope(), which is more generic.
+
 Thu Nov  8 14:59:31 JST 2001  itojun@iijlab.net
 	* bsdi4/sbin/ifconfig/ifconfig.c: support "tunnel" and "deletetunnel"
 	  keyword for setting/removing gif physical address.
