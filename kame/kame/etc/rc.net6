@@ -13,6 +13,11 @@ ip6mrouter=NO
 #iface="ed0 ep0"
 #prefix_ed0="fec0:0000:0000:0001"
 #prefix_ep0="fec0:0000:0000:0002"
+#
+## list of outer ip addresses for gif.
+#gifs="gif0 gif1"
+#gifconfig_gif0="10.1.1.1 10.1.2.1"
+#gifconfig_gif1="10.1.1.2 10.1.2.2"
 
 #----------
 # manual configurations - in case ip6router=NO
@@ -41,6 +46,7 @@ route6d=/usr/local/v6/sbin/route6d
 mroute6d=/usr/local/v6/sbin/pim6dd
 rtsol=/usr/local/v6/sbin/rtsol
 rtadvd=/usr/local/v6/sbin/rtadvd
+gifconfig=/usr/local/v6/sbin/gifconfig
 if [ -x /usr/local/v6/sbin/sysctl ]; then
 	sysctl=/usr/local/v6/sbin/sysctl
 else
@@ -91,6 +97,15 @@ if [ X"${ip6router}" = X"YES" ]; then
 	# again, wait for DAD's completion (for global addrs)
 	sleep `$sysctl net.inet6.ip6.dad_count | awk '{print $NF}'`
 	sleep 1
+
+	# gifconfig
+	for i in $gifs; do
+		eval peers=\$gifconfig_$i
+		if [ X"$peers" = X"" ]; then
+			continue
+		fi
+		$gifconfig $i $peers
+	done
 
 	# route6d
 	[ -x $route6d ] && $route6d $route6dflags
