@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.314 2002/09/25 02:27:31 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.315 2002/09/25 09:43:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -800,12 +800,15 @@ in6_control(so, cmd, data, ifp)
 		struct nd_prefix pr0, *pr;
 
 		/* reject read-only flags */
-		if ((ifra->ifra_flags & IN6_IFF_READONLY) != 
-		    (ia->ia6_flags & IN6_IFF_READONLY))
+		if ((ifra->ifra_flags & IN6_IFF_READONLY))
 			return (EINVAL);
 
-		ifra->ifra_flags &= ~IN6_IFF_READONLY;
-		ifra->ifra_flags |= (ia->ia6_flags & IN6_IFF_READONLY);
+		/*
+		 * when trying to change flags on an existing interface
+		 * address, make sure to preserve old read-only ones.
+		 */
+		if (ia)
+			ifra->ifra_flags |= (ia->ia6_flags & IN6_IFF_READONLY);
 
 		/*
 		 * first, make or update the interface address structure,
