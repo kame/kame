@@ -1,9 +1,20 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.128 1999/09/22 05:50:26 sumikawa Exp $
+$Id: CHANGELOG,v 1.129 1999/09/22 06:24:35 itojun Exp $
 
 
 <199909>
+Wed Sep 22 15:22:21 JST 1999  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp* (tcp4/6)
+	* bsdi/sys/netinet/tcp* (tcp4)
+	* freebsd2/sys/netinet/tcp* (tcp4)
+	* kame/sys/netinet6/tcp6* (tcp6 for bsdi/freebsd2)
+	  fix TCP MSS computation with IPsec headers.  (1) TCP MSS option
+	  must be mtu - iphdrlen - tcphdrlen.  it is a violation of protocol
+	  spec to decrement option value further.  (2) simplify IPsec header
+	  size offset handling.  this may, or may not come with some
+	  performance hit.
+
 Wed Sep 22 14:43:20 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/sys: upgraded base version to FreeBSD 3.3-RELEASE.
 	  TODO: tcp_getcred() and udp_getcred() need more work to support
