@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.606 2000/02/24 10:10:54 jinmei Exp $
+$Id: CHANGELOG,v 1.607 2000/02/24 16:35:47 sumikawa Exp $
 
 <200002>
+Fri Feb 25 01:34:37 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd2/ports/openssh: make buildable.
+	* freebsd3/ports/heimdal: upgrade to 0.2q.
+
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/{traceroute6, ping6}/Makefile: enabled IPsec
 	related	definitions.
