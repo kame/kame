@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.2 2003/08/07 09:02:24 keiichi Exp $
+# $Id: mobileip6,v 1.3 2003/09/30 12:33:32 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -16,9 +16,25 @@ mobileip6_start()
 {
 	echo -n 'Doing Mobile IPv6 network setup:'
 
+	case ${ipv6_mobile_debug_enable} in
+	[Yy][Ee][Ss])
+		sysctl net.inet6.mip6.debug=1
+		;;
+	esac
+
+	case ${ipv6_mobile_security_enable} in
+	[Yy][Ee][Ss])
+		sysctl net.inet6.mip6.use_ipsec=1
+		;;
+	esac
+
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		echo -n ' Mobile Node:'
+
+		if [ "X${ipv6_mobile_home_prefix}" == 'X' ]; then
+			break;
+		fi
 
 		# setup SPD/SA
 		echo -n ' security'
@@ -30,13 +46,13 @@ mobileip6_start()
 			setkey -f ${node_dir}/add
 			setkey -f ${node_dir}/spdadd_mobile_node
 		done
-		mip6control -S 1
 
 		# home prefixes
 		ipv6_mobile_home_prefixes_0=${ipv6_mobile_home_prefixes}
-		home_network=0
+		ipv6_mobile_site_prefixes_0=${ipv6_mobile_site_prefixes}
+		network=0
 		while : ; do
-			eval ipv6_mobile_home_prefixes_arg=\$ipv6_mobile_home_prefixes_${home_network}
+			eval ipv6_mobile_home_prefixes_arg=\$ipv6_mobile_home_prefixes_${network}
 			if [ -z "${ipv6_mobile_home_prefixes_arg}" ]; then
 				break;
 			fi
@@ -44,9 +60,21 @@ mobileip6_start()
 			do
 				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
 				prefixlen=`expr "${home_prefix}" : ".*/\(.*\)"`
-				mip6control -ihif${home_network} -H ${prefix} -P ${prefixlen}
+				mip6control -ihif${network} -H ${prefix} -P ${prefixlen}
 			done
-			home_network=$((${home_network} + 1))
+
+			eval ipv6_mobile_site_prefixes_arg=\$ipv6_mobile_site_prefixes_${network}
+			if [ ! -z "${ipv6_mobile_site_prefixes_arg}" ]; then
+				for site_prefix in ${ipv6_mobile_site_prefixes_arg}
+				do
+					prefix=`expr "${site_prefix}" : "\(.*\)/.*"`
+					prefixlen=`expr "${site_prefix}" : ".*/\(.*\)"`
+					mip6control -ihif${network} -O ${prefix} -P ${prefixlen}
+					
+				done
+			fi
+
+			network=$((${network} + 1))
 		done
 
 		echo -n ' enable'
@@ -61,7 +89,7 @@ mobileip6_start()
 		*)
 			echo -n ' Home Agent:'
 			# setup SPD/SA
-			echo ' security'
+			echo -n ' security'
 			for node_dir in ${ipv6_mobile_config_dir}/*
 			do
 				if [ ! -e ${node_dir}/add ]; then
@@ -70,8 +98,8 @@ mobileip6_start()
 				setkey -f ${node_dir}/add
 				setkey -f ${node_dir}/spdadd_home_agent
 			done
-			mip6control -S 1
 			echo -n ' enable'
+
 			for home_prefix in ${ipv6_mobile_home_prefixes}
 			do
 				prefix=`expr "${home_prefix}" : "\(.*\)::/.*"`
