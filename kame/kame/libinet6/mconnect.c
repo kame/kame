@@ -1,4 +1,4 @@
-/*	$KAME: mconnect.c,v 1.1 2000/11/06 12:47:49 jinmei Exp $ */
+/*	$KAME: mconnect.c,v 1.2 2000/11/06 12:48:20 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -159,7 +159,6 @@ mconnect(ai0, errorp)
 					/*
 					 * this happens if the server and the
 					 * client are on the same node.
-					 * 
 					 */
 					conn->conn_status = CONN_ESTABLISHED;
 					goto done;
