@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.188 2001/06/22 18:13:15 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.189 2001/06/22 19:19:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1919,9 +1919,9 @@ do { \
 					 * available only prior to bind(2).
 					 * see ipng mailing list, Jun 22 2001.
 					 */
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+#ifdef HAVE_NRL_INPCB
 					if (inp->inp_lport ||
-					    !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr))
+					    !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
 #else
 					if (in6p->in6p_lport ||
 					    !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
