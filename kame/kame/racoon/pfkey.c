@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.26 2000/04/05 09:12:06 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.27 2000/04/20 09:29:00 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -95,6 +95,12 @@ static int pk_recvadd __P((caddr_t *mhp));
 static int pk_recvdelete __P((caddr_t *mhp));
 static int pk_recvacquire __P((caddr_t *mhp));
 static int pk_recvexpire __P((caddr_t *mhp));
+static int pk_recvspdupdate __P((caddr_t *mhp));
+static int pk_recvspdadd __P((caddr_t *mhp));
+static int pk_recvspddelete __P((caddr_t *mhp));
+static int pk_recvspdget __P((caddr_t *mhp));
+static int pk_recvspddump __P((caddr_t *mhp));
+static int pk_recvspdflush __P((caddr_t *mhp));
 static struct sadb_msg *pk_recv __P((int so, int *lenp));
 
 static int (*pkrecvf[]) __P((caddr_t *)) = {
@@ -111,13 +117,13 @@ NULL,	/* SADB_FLUSH */
 NULL,	/* SADB_DUMP */
 NULL,	/* SADB_X_PROMISC */
 NULL,	/* SADB_X_PCHANGE */
-NULL,	/* SADB_X_SPDUPDATE */
-NULL,	/* SADB_X_SPDADD */
-NULL,	/* SADB_X_SPDDELETE */
-NULL,	/* SADB_X_SPDGET */
+pk_recvspdupdate,
+pk_recvspdadd,
+pk_recvspddelete,
+pk_recvspdget,
 NULL,	/* SADB_X_SPDACQUIRE */
-NULL,	/* SADB_X_SPDDUMP */
-NULL,	/* SADB_X_SPDFLUSH */
+pk_recvspddump,
+pk_recvspdflush,
 NULL,	/* SADB_X_SPDSETIDX */
 NULL,	/* SADB_X_SPDEXPIRE */
 NULL,	/* SADB_X_SPDDELETE2 */
@@ -1441,6 +1447,90 @@ pk_recvdelete(mhp)
 		return -1;
 	}
 	isakmp_info_send_d2_pf((struct sadb_msg *)mhp[0]);
+
+	return 0;
+}
+
+static int
+pk_recvspdupdate(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+pk_recvspdadd(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+pk_recvspddelete(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+pk_recvspdget(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+pk_recvspddump(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+pk_recvspdflush(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
 
 	return 0;
 }
