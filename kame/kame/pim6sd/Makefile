@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.7 1999/10/29 09:51:23 jinmei Exp $
+# $Id: Makefile,v 1.8 2000/02/25 06:32:22 itojun Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -95,9 +95,9 @@ CC=	gcc
 CFLAGS+=-Wall
 .endif
 .if (${OPSYS} != "NetBSD")
-CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET
+CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DHAVE_GETIFADDRS
 .else
-CPPFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET
+CPPFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DHAVE_GETIFADDRS
 .endif
 CFLAGS+=-g
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
