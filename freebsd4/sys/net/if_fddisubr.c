@@ -128,11 +128,13 @@ fddi_output(ifp, m, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t type;
-	int s, loop_copy = 0, error = 0, hdrcmplt = 0;
+	int s, len, loop_copy = 0, error = 0, hdrcmplt = 0;
  	u_char esrc[6], edst[6];
 	register struct rtentry *rt;
 	register struct fddi_header *fh;
 	struct arpcom *ac = (struct arpcom *)ifp;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
+	short mflags;
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -161,6 +163,13 @@ fddi_output(ifp, m, dst, rt0)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
 #endif
+
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -349,20 +358,22 @@ fddi_output(ifp, m, dst, rt0)
 		}
 	}
 
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	if (m->m_flags & M_MCAST)
+	ifp->if_obytes += len;
+	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
-	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);

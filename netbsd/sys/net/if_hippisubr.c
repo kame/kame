@@ -91,12 +91,13 @@ hippi_output(ifp, m0, dst, rt0)
 {
 	u_int16_t htype;
 	u_int32_t ifield = 0;
-	int s, error = 0;
+	int s, len, error = 0;
 	struct mbuf *m = m0;
 	struct rtentry *rt;
 	struct hippi_header *hh;
 	u_int32_t *cci;
 	u_int32_t d2_len;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -137,6 +138,13 @@ hippi_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -203,18 +211,19 @@ hippi_output(ifp, m0, dst, rt0)
 		m_copyback(m, m->m_pkthdr.len, 8 - d2_len % 8, (caddr_t) buffer);
 	}
 
+	len = m->m_pkthdr.len;
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already free */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	ifp->if_obytes += len;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);

@@ -217,6 +217,7 @@ vlan_clone_create(struct if_clone *ifc, int unit)
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_start = vlan_start;
 	ifp->if_ioctl = vlan_ioctl;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if_attach(ifp);
 
@@ -669,11 +670,13 @@ vlan_start(struct ifnet *ifp)
 	struct ifnet *p = ifv->ifv_p;
 	struct ethercom *ec = (void *) ifv->ifv_p;
 	struct mbuf *m;
+	int error;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	ifp->if_flags |= IFF_OACTIVE;
 
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == NULL)
 			break;
 
@@ -681,6 +684,18 @@ vlan_start(struct ifnet *ifp)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
+
+#ifdef ALTQ
+		/*
+		 * If ALTQ is enabled on the parent interface, do
+		 * classification; the queueing discipline might
+		 * not require classification, but might require
+		 * the address family/header pointer in the pktattr.
+		 */
+		if (ALTQ_IS_ENABLED(&p->if_snd))
+			altq_etherclassify(&p->if_snd, m, &pktattr);
+#endif
+
 		/*
 		 * If the parent can insert the tag itself, just mark
 		 * the tag in the mbuf header.
@@ -747,15 +762,12 @@ vlan_start(struct ifnet *ifp)
 		 * Send it, precisely as the parent's output routine
 		 * would have.  We are already running at splimp.
 		 */
-		if (IF_QFULL(&p->if_snd)) {
-			IF_DROP(&p->if_snd);
-			/* XXX stats */
+		IFQ_ENQUEUE(&p->if_snd, m, NULL, error);
+		if (error) {
+			/* mbuf is already freed */
 			ifp->if_oerrors++;
-			m_freem(m);
 			continue;
 		}
-	
-		IF_ENQUEUE(&p->if_snd, m);
 		ifp->if_opackets++;
 		if ((p->if_flags & IFF_OACTIVE) == 0) {
 			(*p->if_start)(p);

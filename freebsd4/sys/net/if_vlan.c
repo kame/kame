@@ -274,7 +274,8 @@ vlan_clone_create(struct if_clone *ifc, int *unit)
 	ifp->if_start = vlan_start;
 	ifp->if_ioctl = vlan_ioctl;
 	ifp->if_output = ether_output;
-	ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
+	IFQ_SET_READY(&ifp->if_snd);
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	/* Now undo some of the damage... */
 	ifp->if_data.ifi_type = IFT_L2VLAN;
@@ -315,13 +316,16 @@ vlan_start(struct ifnet *ifp)
 	struct ifnet *p;
 	struct ether_vlan_header *evl;
 	struct mbuf *m;
+	int error, len;
+	short mflags;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	ifv = ifp->if_softc;
 	p = ifv->ifv_p;
 
 	ifp->if_flags |= IFF_OACTIVE;
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 		if (ifp->if_bpf)
@@ -338,6 +342,16 @@ vlan_start(struct ifnet *ifp)
 			continue;
 		}
 
+#ifdef ALTQ
+		/*
+		 * If ALTQ is enabled on the parent interface, do
+		 * classification; the queueing discipline might
+		 * not require classification, but might require
+		 * the address family/header pointer in the pktattr.
+		 */
+		if (ALTQ_IS_ENABLED(&p->if_snd))
+			altq_etherclassify(&p->if_snd, m, &pktattr);
+#endif
 		/*
 		 * If the LINK0 flag is set, it means the underlying interface
 		 * can do VLAN tag insertion itself and doesn't require us to
@@ -395,17 +409,17 @@ vlan_start(struct ifnet *ifp)
 		 * Send it, precisely as ether_output() would have.
 		 * We are already running at splimp.
 		 */
-		if (IF_QFULL(&p->if_snd)) {
-			IF_DROP(&p->if_snd);
-				/* XXX stats */
+		mflags = m->m_flags;
+		len = m->m_pkthdr.len;
+		IFQ_ENQUEUE(&p->if_snd, m, NULL, error);
+		if (error) {
+			/* mbuf is already freed */
 			ifp->if_oerrors++;
-			m_freem(m);
 			continue;
 		}
-		IF_ENQUEUE(&p->if_snd, m);
 		ifp->if_opackets++;
-		p->if_obytes += m->m_pkthdr.len;
-		if (m->m_flags & M_MCAST)
+		p->if_obytes += len;
+		if (mflags & M_MCAST)
 			p->if_omcasts++;
 		if ((p->if_flags & IFF_OACTIVE) == 0)
 			p->if_start(p);

@@ -77,6 +77,9 @@ int	tun_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 		       struct rtentry *rt));
 
 static void tuninit __P((struct tun_softc *));
+#ifdef ALTQ
+static void tunstart __P((struct ifnet *));
+#endif
 
 void
 tunattach(unused)
@@ -94,8 +97,12 @@ tunattach(unused)
 		ifp->if_mtu = TUNMTU;
 		ifp->if_ioctl = tun_ioctl;
 		ifp->if_output = tun_output;
+#ifdef ALTQ
+		ifp->if_start = tunstart;
+#endif
 		ifp->if_flags = IFF_POINTOPOINT;
-		ifp->if_snd.ifq_maxlen = ifqmaxlen;
+		IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
+		IFQ_SET_READY(&ifp->if_snd);
 		ifp->if_collisions = 0;
 		ifp->if_ierrors = 0;
 		ifp->if_oerrors = 0;
@@ -304,6 +311,8 @@ tun_output(ifp, m0, dst, rt)
 #ifdef INET
 	int		s;
 #endif
+	int		error;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	TUNDEBUG ("%s: tun_output\n", ifp->if_xname);
 
@@ -314,6 +323,12 @@ tun_output(ifp, m0, dst, rt)
 		return (EHOSTDOWN);
 	}
 
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
+ 
 #if NBPFILTER > 0
 	if (tp->tun_bpf) {
 		/*
@@ -349,14 +364,12 @@ tun_output(ifp, m0, dst, rt)
 		/* FALLTHROUGH */
 	case AF_UNSPEC:
 		s = splimp();
-		if (IF_QFULL(&ifp->if_snd)) {
-			IF_DROP(&ifp->if_snd);
-			m_freem(m0);
+		IFQ_ENQUEUE(&ifp->if_snd, m0, &pktattr, error);
+		if (error) {
 			splx(s);
 			ifp->if_collisions++;
-			return (ENOBUFS);
+			return (error);
 		}
-		IF_ENQUEUE(&ifp->if_snd, m0);
 		splx(s);
 		ifp->if_opackets++;
 		break;
@@ -493,7 +506,7 @@ tunread(dev, uio, ioflag)
 
 	s = splimp();
 	do {
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (m0 == 0) {
 			if (tp->tun_flags & TUN_NBIO) {
 				splx(s);
@@ -685,4 +698,38 @@ tunpoll(dev, events, p)
 	return (revents);
 }
 
+#ifdef ALTQ
+/*
+ * Start packet transmission on the interface.
+ * when the interface queue is rate-limited by ALTQ or TBR,
+ * if_start is needed to drain packets from the queue in order
+ * to notify readers when outgoing packets become ready.
+ */
+static void
+tunstart(ifp)
+	struct ifnet *ifp;
+{
+	struct tun_softc *tp = ifp->if_softc;
+	struct mbuf *m;
+	struct proc	*p;
+
+	if (!ALTQ_IS_ENABLED(&ifp->if_snd) && !TBR_IS_ENABLED(&ifp->if_snd))
+		return;
+
+	IFQ_POLL(&ifp->if_snd, m);
+	if (m != NULL) {
+		if (tp->tun_flags & TUN_RWAIT) {
+			tp->tun_flags &= ~TUN_RWAIT;
+			wakeup((caddr_t)tp);
+		}
+		if (tp->tun_flags & TUN_ASYNC && tp->tun_pgrp) {
+			if (tp->tun_pgrp > 0)
+				gsignal(tp->tun_pgrp, SIGIO);
+			else if ((p = pfind(-tp->tun_pgrp)) != NULL)
+				psignal(p, SIGIO);
+		}
+		selwakeup(&tp->tun_rsel);
+	}
+}
+#endif /* ALTQ */
 #endif  /* NTUN */
