@@ -1,4 +1,4 @@
-# $FreeBSD: src/usr.bin/netstat/Makefile,v 1.14.2.1 2000/07/15 07:29:29 kris Exp $
+# $FreeBSD: src/usr.bin/netstat/Makefile,v 1.14.2.2 2001/03/22 13:48:42 des Exp $
 #	@(#)Makefile	8.1 (Berkeley) 6/12/93
 
 PROG=	netstat
@@ -11,8 +11,8 @@ CFLAGS+=-DIPSEC
 #.PATH:	${.CURDIR}/../../sys/netiso
 BINGRP=	kmem
 BINMODE=2555
-DPADD=	${LIBKVM} ${LIBIPX} ${LIBNETGRAPH}
-LDADD=	-lkvm -lipx -lnetgraph
+DPADD=	${LIBKVM} ${LIBIPX} ${LIBNETGRAPH} ${LIBUTIL}
+LDADD=	-lkvm -lipx -lnetgraph -lutil
 CFLAGS+=-DINET6 -DIPSEC
 
 .include <bsd.prog.mk>

@@ -31,7 +31,7 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.bin/netstat/netgraph.c,v 1.3 1999/10/24 02:58:39 dillon Exp $
+ * $FreeBSD: src/usr.bin/netstat/netgraph.c,v 1.3.2.1 2001/03/22 13:48:42 des Exp $
  */
 
 #ifndef lint
@@ -134,7 +134,7 @@ netgraphprotopr(u_long off, char *name)
 
 		/* Read in ngpcb structure */
 		kread((u_long)this, (char *)&ngpcb, sizeof(ngpcb));
-		next = ngpcb.socks.le_next;
+		next = LIST_NEXT(&ngpcb, socks);
 
 		/* Read in socket structure */
 		kread((u_long)ngpcb.ng_socket, (char *)&sockb, sizeof(sockb));

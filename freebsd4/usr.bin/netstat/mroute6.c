@@ -64,7 +64,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mroute.c	8.2 (Berkeley) 4/28/95
- *	$FreeBSD: src/usr.bin/netstat/mroute6.c,v 1.1.2.2 2000/08/07 16:45:42 ume Exp $
+ *	$FreeBSD: src/usr.bin/netstat/mroute6.c,v 1.1.2.3 2001/04/17 17:48:57 jesper Exp $
  */
 
 #ifdef INET6
@@ -110,7 +110,7 @@ mroute6pr(mfcaddr, mifaddr)
 
 	if (mfcaddr == 0 || mifaddr == 0) {
 		printf("No IPv6 multicast routing compiled into this"
-		       "system.\n");
+		       " system.\n");
 		return;
 	}
 

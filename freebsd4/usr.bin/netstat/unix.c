@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)unix.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/unix.c,v 1.12 1999/08/28 01:04:31 peter Exp $";
+  "$FreeBSD: src/usr.bin/netstat/unix.c,v 1.12.2.1 2001/03/22 13:48:44 des Exp $";
 #endif /* not lint */
 
 /*
@@ -152,7 +152,7 @@ unixdomainpr(xunp, so)
 	       (long)so->so_pcb, socktype[so->so_type], so->so_rcv.sb_cc,
 	       so->so_snd.sb_cc,
 	       (long)unp->unp_vnode, (long)unp->unp_conn,
-	       (long)unp->unp_refs.lh_first, (long)unp->unp_reflink.le_next);
+	       (long)LIST_FIRST(&unp->unp_refs), (long)LIST_NEXT(unp, unp_reflink));
 	if (sa)
 		printf(" %.*s",
 		    (int)(sa->sun_len - offsetof(struct sockaddr_un, sun_path)),

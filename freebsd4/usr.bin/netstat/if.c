@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)if.c	8.3 (Berkeley) 4/28/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.32.2.2 2000/10/31 07:38:58 guido Exp $";
+  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.32.2.6 2001/03/28 21:07:55 des Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -125,6 +125,33 @@ bdg_stats(u_long dummy, char *name) /* print bridge statistics */
     }
 }
 
+
+
+
+/*
+ * Display a formatted value, or a '-' in the same space.
+ */
+void
+show_stat(fmt, width, value, showvalue)
+	char *fmt;
+	int width;
+	u_long value;
+	short showvalue;
+{
+	char newfmt[32];
+
+	/* Construct the format string */
+	if (showvalue) {
+		sprintf(newfmt, "%%%d%s", width, fmt);
+		printf(newfmt, value);
+	} else {
+		sprintf(newfmt, "%%%ds", width);
+		printf(newfmt, "-");
+	}
+}
+
+
+
 /*
  * Print a description of the network interfaces.
  */
@@ -153,8 +180,19 @@ intpr(interval, ifnetaddr, pfunc)
 	u_long ifaddraddr;
 	u_long ifaddrfound;
 	u_long ifnetfound;
+	u_long opackets;
+	u_long ipackets;
+	u_long obytes;
+	u_long ibytes;
+	u_long oerrors;
+	u_long ierrors;
+	u_long collisions;
+	short timer;
+	int drops;
 	struct sockaddr *sa = NULL;
 	char name[32], tname[16];
+	short network_layer;
+	short link_layer;
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");
@@ -166,7 +204,7 @@ intpr(interval, ifnetaddr, pfunc)
 	}
 	if (kread(ifnetaddr, (char *)&ifnethead, sizeof ifnethead))
 		return;
-	ifnetaddr = (u_long)ifnethead.tqh_first;
+	ifnetaddr = (u_long)TAILQ_FIRST(&ifnethead);
 	if (kread(ifnetaddr, (char *)&ifnet, sizeof ifnet))
 		return;
 
@@ -194,13 +232,16 @@ intpr(interval, ifnetaddr, pfunc)
 		register char *cp;
 		int n, m;
 
+		network_layer = 0;
+		link_layer = 0;
+
 		if (ifaddraddr == 0) {
 			ifnetfound = ifnetaddr;
 			if (kread(ifnetaddr, (char *)&ifnet, sizeof ifnet) ||
 			    kread((u_long)ifnet.if_name, tname, 16))
 				return;
 			tname[15] = '\0';
-			ifnetaddr = (u_long)ifnet.if_link.tqe_next;
+			ifnetaddr = (u_long)TAILQ_NEXT(&ifnet, if_link);
 			snprintf(name, 32, "%s%d", tname, ifnet.if_unit);
 			if (interface != 0 && (strcmp(name, interface) != 0))
 				continue;
@@ -214,10 +255,25 @@ intpr(interval, ifnetaddr, pfunc)
 			if ((ifnet.if_flags&IFF_UP) == 0)
 				*cp++ = '*';
 			*cp = '\0';
-			ifaddraddr = (u_long)ifnet.if_addrhead.tqh_first;
+			ifaddraddr = (u_long)TAILQ_FIRST(&ifnet.if_addrhead);
 		}
 		printf("%-5.5s %-5lu ", name, ifnet.if_mtu);
 		ifaddrfound = ifaddraddr;
+
+		/*
+		 * Get the interface stats.  These may get
+		 * overriden below on a per-interface basis.
+		 */
+		opackets = ifnet.if_opackets;
+		ipackets = ifnet.if_ipackets;
+		obytes = ifnet.if_obytes;
+		ibytes = ifnet.if_ibytes;
+		oerrors = ifnet.if_oerrors;
+		ierrors = ifnet.if_ierrors;
+		collisions = ifnet.if_collisions;
+		timer = ifnet.if_timer;
+		drops = ifnet.if_snd.ifq_drops;
+
 		if (ifaddraddr == 0) {
 			printf("%-13.13s ", "none");
 			printf("%-15.15s ", "none");
@@ -252,6 +308,8 @@ intpr(interval, ifnetaddr, pfunc)
 #endif
 				printf("%-15.15s ",
 				    routename(sin->sin_addr.s_addr));
+
+				network_layer = 1;
 				break;
 #ifdef INET6
 			case AF_INET6:
@@ -263,6 +321,8 @@ intpr(interval, ifnetaddr, pfunc)
 				    (char *)inet_ntop(AF_INET6,
 					&sin6->sin6_addr,
 					ntop_buf, sizeof(ntop_buf)));
+
+				network_layer = 1;
 				break;
 #endif /*INET6*/
 			case AF_IPX:
@@ -326,23 +386,50 @@ intpr(interval, ifnetaddr, pfunc)
 				m = 30 - m;
 				while (m-- > 0)
 					putchar(' ');
+
+				link_layer = 1;
 				break;
 			}
-			ifaddraddr = (u_long)ifaddr.ifa.ifa_link.tqe_next;
+
+			/*
+			 * Fixup the statistics for interfaces that
+			 * update stats for their network addresses
+			 */
+			if (network_layer) {
+				opackets = ifaddr.in.ia_ifa.if_opackets;
+				ipackets = ifaddr.in.ia_ifa.if_ipackets;
+				obytes = ifaddr.in.ia_ifa.if_obytes;
+				ibytes = ifaddr.in.ia_ifa.if_ibytes;
+			}
+
+			ifaddraddr = (u_long)TAILQ_NEXT(&ifaddr.ifa, ifa_link);
 		}
-		printf("%8lu %5lu ",
-		    ifnet.if_ipackets, ifnet.if_ierrors);
-		if (bflag)
-			printf("%10lu ", ifnet.if_ibytes);
-		printf("%8lu %5lu ",
-		    ifnet.if_opackets, ifnet.if_oerrors);
-		if (bflag)
-			printf("%10lu ", ifnet.if_obytes);
-		printf("%5lu", ifnet.if_collisions);
-		if (tflag)
-			printf(" %3d", ifnet.if_timer);
-		if (dflag)
-			printf(" %3d", ifnet.if_snd.ifq_drops);
+
+		show_stat("lu", 8, ipackets, link_layer|network_layer);
+		printf(" ");
+		show_stat("lu", 5, ierrors, link_layer);
+		printf(" ");
+		if (bflag) {
+			show_stat("lu", 10, ibytes, link_layer|network_layer);
+			printf(" ");
+		}
+		show_stat("lu", 8, opackets, link_layer|network_layer);
+		printf(" ");
+		show_stat("lu", 5, oerrors, link_layer);
+		printf(" ");
+		if (bflag) {
+			show_stat("lu", 10, obytes, link_layer|network_layer);
+			printf(" ");
+		}
+		show_stat("lu", 5, collisions, link_layer);
+		if (tflag) {
+			printf(" ");
+			show_stat("d", 3, timer, link_layer);
+		}
+		if (dflag) {
+			printf(" ");
+			show_stat("d", 3, drops, link_layer);
+		}
 		putchar('\n');
 		if (aflag && ifaddrfound) {
 			/*
@@ -405,7 +492,7 @@ intpr(interval, ifnetaddr, pfunc)
 }
 
 struct	iftot {
-	struct iftot *ift_next;		/* next element list*/
+	SLIST_ENTRY(iftot) chain;
 	char	ift_name[16];		/* interface name */
 	u_long	ift_ip;			/* input packets */
 	u_long	ift_ie;			/* input errors */
@@ -441,7 +528,7 @@ sidewaysintpr(interval, off)
 
 	if (kread(off, (char *)&ifnethead, sizeof ifnethead))
 		return;
-	firstifnet = (u_long)ifnethead.tqh_first;
+	firstifnet = (u_long)TAILQ_FIRST(&ifnethead);
 
 	if ((iftot = malloc(sizeof(struct iftot))) == NULL) {
 		printf("malloc failed\n");
@@ -470,9 +557,9 @@ sidewaysintpr(interval, off)
 			exit(1);
 		}
 		memset(ipn, 0, sizeof(struct iftot));
-		ip->ift_next = ipn;
+		SLIST_NEXT(ip, chain) = ipn;
 		ip = ipn;
-		off = (u_long) ifnet.if_link.tqe_next;
+		off = (u_long)TAILQ_NEXT(&ifnet, if_link);
 	}
 	if ((total = malloc(sizeof(struct iftot))) == NULL) {
 		printf("malloc failed\n");
@@ -537,8 +624,9 @@ loop:
 		sum->ift_ob = 0;
 		sum->ift_co = 0;
 		sum->ift_dr = 0;
-		for (off = firstifnet, ip = iftot; off && ip->ift_next != NULL;
-		     ip = ip->ift_next) {
+		for (off = firstifnet, ip = iftot;
+		     off && SLIST_NEXT(ip, chain) != NULL;
+		     ip = SLIST_NEXT(ip, chain)) {
 			if (kread(off, (char *)&ifnet, sizeof ifnet)) {
 				off = 0;
 				continue;
@@ -551,7 +639,7 @@ loop:
 			sum->ift_ob += ifnet.if_obytes;
 			sum->ift_co += ifnet.if_collisions;
 			sum->ift_dr += ifnet.if_snd.ifq_drops;
-			off = (u_long) ifnet.if_link.tqe_next;
+			off = (u_long)TAILQ_NEXT(&ifnet, if_link);
 		}
 		if (!first) {
 			printf("%10lu %5lu %10lu %10lu %5lu %10lu %5lu",
