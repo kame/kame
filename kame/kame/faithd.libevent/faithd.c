@@ -284,6 +284,7 @@ doaccept(parent, event, arg)
 	    sbuf, sizeof(sbuf), NI_NUMERICHOST);
 	logmsg(LOG_INFO, "relaying %s -> %s, service %s", h1, h2, sbuf);
 
+	/* XXX this shouldn't happen, but the symptom happens on freebsd45 */
 	if (IN6_IS_ADDR_V4MAPPED(&from.sin6_addr)) {
 		close(relay->r.s);
 		free(relay);
