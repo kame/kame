@@ -178,90 +178,91 @@ struct protox {
 	u_char	pr_wanted;		/* 1 if wanted, 0 otherwise */
 	void	(*pr_cblocks)();	/* control blocks printing routine */
 	void	(*pr_stats)();		/* statistics printing routine */
+	void	(*pr_istats)();		/* per/if statistics printing routine */
 	char	*pr_name;		/* well-known name */
 } protox[] = {
 	{ N_TCB,	N_TCPSTAT,	1,	protopr,
-	  tcp_stats,	"tcp" },
+	  tcp_stats,	NULL,		"tcp" },
 	{ N_UDB,	N_UDPSTAT,	1,	protopr,
-	  udp_stats,	"udp" },
+	  udp_stats,	NULL,		"udp" },
 	{ N_DIVPCB,	N_DIVSTAT,	1,	protopr,
-	  NULL,		"divert" }, 	/* no stat structure yet */
+	  NULL,		NULL,		"divert" }, 	/* no stat structure yet */
 	{ -1,		N_IPSTAT,	1,	0,
-	  ip_stats,	"ip" },
+	  ip_stats,	NULL,		"ip" },
 	{ -1,		N_ICMPSTAT,	1,	0,
-	  icmp_stats,	"icmp" },
+	  icmp_stats,	NULL,		"icmp" },
 	{ -1,		N_IGMPSTAT,	1,	0,
-	  igmp_stats,	"igmp" },
+	  igmp_stats,	NULL,		"igmp" },
 #ifdef IPSEC
 	{ -1,		N_IPSECSTAT,	1,	0,
-	  ipsec_stats,	"ipsec" },
+	  ipsec_stats,	NULL,		"ipsec" },
 #endif
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 
 #ifdef INET6
 struct protox ip6protox[] = {
 	{ -1,		N_IP6STAT,	1,	0,
-	  ip6_stats,	"ip6" },
+	  ip6_stats,	ip6_ifstat,	"ip6" },
 	{ -1,		N_ICMP6STAT,	1,	0,
-	  icmp6_stats,	"icmp6" },
+	  icmp6_stats,	NULL,		"icmp6" },
 	{ N_TCB6,	N_TCP6STAT,	1,	ip6protopr,
-	  tcp6_stats,	"tcp6" },
+	  tcp6_stats,	NULL,		"tcp6" },
 	{ N_UDB6,	N_UDP6STAT,	1,	ip6protopr,
-	  udp6_stats,	"udp6" },
+	  udp6_stats,	NULL,		"udp6" },
 #ifdef IPSEC
 	{ -1,		N_IPSEC6STAT,	1,	0,
-	  ipsec_stats,	"ipsec6" },
+	  ipsec_stats,	NULL,		"ipsec6" },
 #endif
 	{ -1,		N_PIM6STAT,	1,	0,
-	  pim6_stats,	"pim6" },
+	  pim6_stats,	NULL,		"pim6" },
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 #endif /*INET6*/
 
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
-	  ddp_stats,	"ddp" },
+	  ddp_stats,	NULL,		"ddp" },
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 
 struct protox ipxprotox[] = {
 	{ N_IPX,	N_IPXSTAT,	1,	ipxprotopr,
-	  ipx_stats,	"ipx" },
+	  ipx_stats,	NULL,		"ipx" },
 	{ N_IPX,	N_SPXSTAT,	1,	ipxprotopr,
-	  spx_stats,	"spx" },
+	  spx_stats,	NULL,		"spx" },
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 
 #ifdef NS
 struct protox nsprotox[] = {
 	{ N_IDP,	N_IDPSTAT,	1,	nsprotopr,
-	  idp_stats,	"idp" },
+	  idp_stats,	NULL,		"idp" },
 	{ N_IDP,	N_SPPSTAT,	1,	nsprotopr,
-	  spp_stats,	"spp" },
+	  spp_stats,	NULL,		"spp" },
 	{ -1,		N_NSERR,	1,	0,
-	  nserr_stats,	"ns_err" },
+	  nserr_stats,	NULL,		"ns_err" },
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 #endif
 
 #ifdef ISO
 struct protox isoprotox[] = {
 	{ ISO_TP,	N_TPSTAT,	1,	iso_protopr,
-	  tp_stats,	"tp" },
+	  tp_stats,	NULL,		"tp" },
 	{ N_CLTP,	N_CLTPSTAT,	1,	iso_protopr,
-	  cltp_stats,	"cltp" },
+	  cltp_stats,	NULL,		"cltp" },
 	{ -1,		N_CLNPSTAT,	1,	 0,
-	  clnp_stats,	"clnp"},
+	  clnp_stats,	NULL,		"clnp"},
 	{ -1,		N_ESISSTAT,	1,	 0,
-	  esis_stats,	"esis"},
+	  esis_stats,	NULL,		"esis"},
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 #endif
 
@@ -448,7 +449,9 @@ main(argc, argv)
 		exit(0);
 	}
 	if (pflag) {
-		if (tp->pr_stats)
+		if (iflag && tp->pr_istats)
+			intpr(interval, nl[N_IFNET].n_value, tp->pr_istats);
+		else if (tp->pr_stats)
 			(*tp->pr_stats)(nl[tp->pr_sindex].n_value,
 				tp->pr_name);
 		else
@@ -470,7 +473,10 @@ main(argc, argv)
 	 */
 #endif
 	if (iflag) {
-		intpr(interval, nl[N_IFNET].n_value);
+		if (af != AF_UNSPEC)
+			goto protostat;
+
+		intpr(interval, nl[N_IFNET].n_value, NULL);
 		exit(0);
 	}
 	if (rflag) {
@@ -501,6 +507,8 @@ main(argc, argv)
 		}
 		exit(0);
 	}
+
+  protostat:
 #if 0
 	if (af == AF_INET || af == AF_UNSPEC) {
 		setprotoent(1);
@@ -560,8 +568,16 @@ printproto(tp, name)
 	u_long off;
 
 	if (sflag) {
-		pr = tp->pr_stats;
-		off = nl[tp->pr_sindex].n_value;
+		if (iflag) {
+			if (tp->pr_istats)
+				intpr(interval, nl[N_IFNET].n_value,
+				      tp->pr_istats);
+			return;
+		}
+		else {
+			pr = tp->pr_stats;
+			off = nl[tp->pr_sindex].n_value;
+		}
 	} else {
 		pr = tp->pr_cblocks;
 		off = nl[tp->pr_index].n_value;

@@ -81,9 +81,10 @@ static char ntop_buf[INET6_ADDRSTRLEN];		/* for inet_ntop() */
  * Print a description of the network interfaces.
  */
 void
-intpr(interval, ifnetaddr)
+intpr(interval, ifnetaddr, pfunc)
 	int interval;
 	u_long ifnetaddr;
+	void (*pfunc)(char *);
 {
 	struct ifnet ifnet;
 	union {
@@ -116,19 +117,21 @@ intpr(interval, ifnetaddr)
 	}
 	if (kread(ifnetaddr, (char *)&ifnetaddr, sizeof ifnetaddr))
 		return;
-	printf("%-5.5s %-5.5s %-13.13s %-15.15s %8.8s %5.5s",
-		"Name", "Mtu", "Network", "Address", "Ipkts", "Ierrs");
-	if (bflag)
-		printf(" %10.10s","Ibytes");
-	printf(" %8.8s %5.5s", "Opkts", "Oerrs");
-	if (bflag)
-		printf(" %10.10s","Obytes");
-	printf(" %5s", "Coll");
-	if (tflag)
-		printf(" %s", "Time");
-	if (dflag)
-		printf(" %s", "Drop");
-	putchar('\n');
+	if (!sflag) {
+		printf("%-5.5s %-5.5s %-13.13s %-15.15s %8.8s %5.5s",
+		       "Name", "Mtu", "Network", "Address", "Ipkts", "Ierrs");
+		if (bflag)
+			printf(" %10.10s","Ibytes");
+		printf(" %8.8s %5.5s", "Opkts", "Oerrs");
+		if (bflag)
+			printf(" %10.10s","Obytes");
+		printf(" %5s", "Coll");
+		if (tflag)
+			printf(" %s", "Time");
+		if (dflag)
+			printf(" %s", "Drop");
+		putchar('\n');
+	}
 	ifaddraddr = 0;
 	while (ifnetaddr || ifaddraddr) {
 		struct sockaddr_in *sin;
@@ -149,6 +152,12 @@ intpr(interval, ifnetaddr)
 			if (interface != 0 && (strcmp(name, interface) != 0))
 				continue;
 			cp = index(name, '\0');
+
+			if (pfunc) {
+				(*pfunc)(name);
+				continue;
+			}
+
 			if ((ifnet.if_flags&IFF_UP) == 0)
 				*cp++ = '*';
 			*cp = '\0';
