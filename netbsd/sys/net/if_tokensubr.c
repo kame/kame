@@ -67,12 +67,12 @@
 #include <net/if_types.h>
 
 #include <net/if_ether.h>
+#include <net/if_token.h>
 
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/if_inarp.h>
-#include <net/if_token.h>
 #endif
 
 #ifdef NS

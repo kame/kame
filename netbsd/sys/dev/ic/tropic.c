@@ -55,13 +55,14 @@
 #include <net/netisr.h>
 #include <net/route.h>
 
+#include <net/if_token.h>
+
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/if_inarp.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_var.h>
-#include <net/if_token.h>
 #endif
 
 #ifdef NS
