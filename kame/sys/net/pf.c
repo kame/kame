@@ -121,6 +121,9 @@
 #ifdef __FreeBSD__
 #undef KASSERT
 #define KASSERT(x)
+#define splsoftnet()	splnet()
+#define UID_MAX	-1
+#define GID_MAX	-1
 
 MALLOC_DEFINE(M_PF, "pf", "PF packet filter");
 #endif
