@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.28 2001/02/14 13:41:20 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.29 2001/02/14 13:42:10 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -88,6 +88,7 @@
 #endif
 
 #ifndef __NetBSD__
+/* can't call it m_dup(), as freebsd[34] uses m_dup() with different arg */
 static struct mbuf *m_dup1 __P((struct mbuf *, int, int, int));
 #endif
 
