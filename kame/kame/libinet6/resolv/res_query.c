@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_query.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_query.c,v 1.9 2000/04/27 16:33:02 itojun Exp $";
+static char rcsid[] = "$Id: res_query.c,v 1.10 2000/05/01 02:35:44 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -89,6 +89,12 @@ const char *hostalias __P((const char *));
 extern int res_opt __P((int, u_char *, int, int));
 #endif
 
+#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+int	res_queryN __P((const char *, struct res_target *));
+int	res_searchN __P((const char *, struct res_target *));
+int	res_querydomainN __P((const char *, const char *, struct res_target *));
+#endif
+
 int h_errno;
 
 /*
@@ -101,6 +107,110 @@ int h_errno;
  *
  * Caller must parse answer and determine whether it answers the question.
  */
+int
+res_queryN(name, target)
+	const char *name;	/* domain name */
+	struct res_target *target;
+{
+	u_char buf[MAXPACKET];
+	HEADER *hp;
+	int n;
+	struct res_target *t;
+	int rcode;
+	int ancount;
+
+	rcode = NOERROR;	/* default */
+	ancount = 0;
+	n = -1;
+
+	if ((_res.options & RES_INIT) == 0 && res_init() == -1) {
+		h_errno = NETDB_INTERNAL;
+		return (-1);
+	}
+
+	for (t = target; t; t = t->next) {
+		int class, type;	/* class and type of query */
+		u_char *answer;		/* buffer to put answer */
+		int anslen;		/* size of answer buffer */
+
+		hp = (HEADER *)t->answer;
+		hp->rcode = NOERROR;	/* default */
+
+		/* make it easier... */
+		class = t->class;
+		type = t->type;
+		answer = t->answer;
+		anslen = t->anslen;
+
+#ifdef DEBUG
+		if (_res.options & RES_DEBUG)
+			printf(";; res_query(%s, %d, %d)\n", name, class, type);
+#endif
+
+		n = res_mkquery(QUERY, name, class, type, NULL, 0, NULL,
+				buf, sizeof(buf));
+#ifdef RES_USE_EDNS0
+		if (n > 0 && (_res.options & RES_USE_EDNS0) != 0)
+			n = res_opt(n, buf, sizeof(buf), anslen);
+#endif
+		if (n <= 0) {
+#ifdef DEBUG
+			if (_res.options & RES_DEBUG)
+				printf(";; res_query: mkquery failed\n");
+#endif
+			h_errno = NO_RECOVERY;
+			return (n);
+		}
+		n = res_send(buf, n, answer, anslen);
+#if 0
+		if (n < 0) {
+#ifdef DEBUG
+			if (_res.options & RES_DEBUG)
+				printf(";; res_query: send error\n");
+#endif
+			h_errno = TRY_AGAIN;
+			return (n);
+		}
+#endif
+		if (n < 0 || hp->rcode != NOERROR || ntohs(hp->ancount) == 0) {
+			rcode = hp->rcode;
+#ifdef DEBUG
+			if (_res.options & RES_DEBUG)
+				printf(";; rcode = %d, ancount=%d\n", hp->rcode,
+				    ntohs(hp->ancount));
+#endif
+			continue;
+		}
+
+		ancount += ntohs(hp->ancount);
+
+		t->n = n;
+	}
+
+	if (ancount == 0) {
+		switch (rcode) {
+		case NXDOMAIN:
+			h_errno = HOST_NOT_FOUND;
+			break;
+		case SERVFAIL:
+			h_errno = TRY_AGAIN;
+			break;
+		case NOERROR:
+			h_errno = NO_DATA;
+			break;
+		case FORMERR:
+		case NOTIMP:
+		case REFUSED:
+		default:
+			h_errno = NO_RECOVERY;
+			break;
+		}
+		return (-1);
+	}
+	return (n);
+}
+
+/* XXX code duplicate due to differences in error hanlding */
 int
 res_query(name, class, type, answer, anslen)
 	const char *name;	/* domain name */
@@ -182,14 +292,12 @@ res_query(name, class, type, answer, anslen)
  * is detected.  Error code, if any, is left in h_errno.
  */
 int
-res_search(name, class, type, answer, anslen)
-	const char *name;	/* domain name */
-	int class, type;	/* class and type of query */
-	u_char *answer;		/* buffer to put answer */
-	int anslen;		/* size of answer */
+res_searchN(name, target)
+	const char *name;
+	struct res_target *target;
 {
 	register const char *cp, * const *domain;
-	HEADER *hp = (HEADER *) answer;
+	HEADER *hp = (HEADER *) target->answer;
 	u_int dots;
 	int trailing_dot, ret, saved_herrno;
 	int got_nodata = 0, got_servfail = 0, tried_as_is = 0;
@@ -211,7 +319,7 @@ res_search(name, class, type, answer, anslen)
 	 * if there aren't any dots, it could be a user-level alias
 	 */
 	if (!dots && (cp = __hostalias(name)) != NULL)
-		return (res_query(cp, class, type, answer, anslen));
+		return (res_queryN(cp, target));
 
 	/*
 	 * If there are dots in the name already, let's just give it a try
@@ -219,7 +327,7 @@ res_search(name, class, type, answer, anslen)
 	 */
 	saved_herrno = -1;
 	if (dots >= _res.ndots) {
-		ret = res_querydomain(name, NULL, class, type, answer, anslen);
+		ret = res_querydomainN(name, NULL, target);
 		if (ret > 0)
 			return (ret);
 		saved_herrno = h_errno;
@@ -240,8 +348,7 @@ res_search(name, class, type, answer, anslen)
 		     *domain && !done;
 		     domain++) {
 
-			ret = res_querydomain(name, *domain, class, type,
-					      answer, anslen);
+			ret = res_querydomainN(name, *domain, target);
 			if (ret > 0)
 				return (ret);
 
@@ -299,7 +406,7 @@ res_search(name, class, type, answer, anslen)
 	    && (dots || !(_res.options & RES_NOTLDQUERY))
 #endif
 	    ) {
-		ret = res_querydomain(name, NULL, class, type, answer, anslen);
+		ret = res_querydomainN(name, NULL, target);
 		if (ret > 0)
 			return (ret);
 	}
@@ -320,16 +427,32 @@ res_search(name, class, type, answer, anslen)
 	return (-1);
 }
 
+int
+res_search(name, class, type, answer, anslen)
+	const char *name;	/* domain name */
+	int class, type;	/* class and type of query */
+	u_char *answer;		/* buffer to put answer */
+	int anslen;		/* size of answer */
+{
+	struct res_target target;
+
+	memset(&target, 0, sizeof(target));
+	target.class = class;
+	target.type = type;
+	target.answer = answer;
+	target.anslen = anslen;
+
+	return res_searchN(name, &target);
+}
+
 /*
  * Perform a call on res_query on the concatenation of name and domain,
  * removing a trailing dot from name if domain is NULL.
  */
 int
-res_querydomain(name, domain, class, type, answer, anslen)
+res_querydomainN(name, domain, target)
 	const char *name, *domain;
-	int class, type;	/* class and type of query */
-	u_char *answer;		/* buffer to put answer */
-	int anslen;		/* size of answer */
+	struct res_target *target;
 {
 	char nbuf[MAXDNAME];
 	const char *longname = nbuf;
@@ -341,8 +464,8 @@ res_querydomain(name, domain, class, type, answer, anslen)
 	}
 #ifdef DEBUG
 	if (_res.options & RES_DEBUG)
-		printf(";; res_querydomain(%s, %s, %d, %d)\n",
-		       name, domain?domain:"<Nil>", class, type);
+		printf(";; res_querydomain(%s, %s)\n",
+		       name, domain?domain:"<Nil>");
 #endif
 	if (domain == NULL) {
 		/*
@@ -369,7 +492,25 @@ res_querydomain(name, domain, class, type, answer, anslen)
 		}
 		sprintf(nbuf, "%s.%s", name, domain);
 	}
-	return (res_query(longname, class, type, answer, anslen));
+	return (res_queryN(longname, target));
+}
+
+int
+res_querydomain(name, domain, class, type, answer, anslen)
+	const char *name, *domain;
+	int class, type;	/* class and type of query */
+	u_char *answer;		/* buffer to put answer */
+	int anslen;		/* size of answer */
+{
+	struct res_target target;
+
+	memset(&target, 0, sizeof(target));
+	target.class = class;
+	target.type = type;
+	target.answer = answer;
+	target.anslen = anslen;
+
+	return res_querydomainN(name, domain, &target);
 }
 
 const char *
