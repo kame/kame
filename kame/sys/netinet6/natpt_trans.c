@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.160 2003/03/28 06:07:30 suz Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.161 2004/02/19 17:56:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2802,16 +2802,14 @@ natpt_updateSeqAck(struct pcv *cv, caddr_t tcphdr, int delta)
 	if (ts->delta[0]) {
 		if (cv->fromto == NATPT_FROM)
 			natpt_incrementSeq(th, ts->delta[0]);
-		else if ((cv->fromto == NATPT_TO)
-			 && (th->th_flags & TH_ACK))
+		else if ((cv->fromto == NATPT_TO) && (th->th_flags & TH_ACK))
 			natpt_decrementAck(th, ts->delta[0]);
 	}
 
 	if (ts->delta[1]) {
 		if (cv->fromto == NATPT_TO)
 			natpt_incrementSeq(th, ts->delta[1]);
-		else if ((cv->fromto == NATPT_FROM)
-			 && (th->th_flags & TH_ACK))
+		else if ((cv->fromto == NATPT_FROM) && (th->th_flags & TH_ACK))
 			natpt_decrementAck(th, ts->delta[1]);
 	}
 

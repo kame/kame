@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.49 2003/09/06 05:15:43 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.50 2004/02/19 17:56:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,8 +108,8 @@ esp_hdrsiz(isr)
 
 	if (sav == NULL)
 		goto estimate;
-	if (sav->state != SADB_SASTATE_MATURE
-	 && sav->state != SADB_SASTATE_DYING)
+	if (sav->state != SADB_SASTATE_MATURE &&
+	    sav->state != SADB_SASTATE_DYING)
 		goto estimate;
 
 	/* we need transport mode ESP. */

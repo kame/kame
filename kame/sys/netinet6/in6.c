@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.365 2004/02/17 11:35:36 suz Exp $	*/
+/*	$KAME: in6.c,v 1.366 2004/02/19 17:56:28 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -699,12 +699,12 @@ in6_control(so, cmd, data, ifp)
 			return (EADDRNOTAVAIL);
 		/* sanity for overflow - beware unsigned */
 		lt = &ifr->ifr_ifru.ifru_lifetime;
-		if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
-		 && lt->ia6t_vltime + time_second < time_second) {
+		if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME &&
+		    lt->ia6t_vltime + time_second < time_second) {
 			return EINVAL;
 		}
-		if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME
-		 && lt->ia6t_pltime + time_second < time_second) {
+		if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME &&
+		    lt->ia6t_pltime + time_second < time_second) {
 			return EINVAL;
 		}
 		break;

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.145 2004/02/16 05:37:44 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.146 2004/02/19 17:56:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -744,8 +744,8 @@ nd6_na_input(m, off, icmp6len)
 	 *
 	 * Otherwise, process as defined in RFC 2461.
 	 */
-	if (ifa
-	 && (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_TENTATIVE)) {
+	if (ifa &&
+	    (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_TENTATIVE)) {
 		nd6_dad_na_input(ifa);
 		goto freeit;
 	}
@@ -1479,9 +1479,9 @@ nd6_dad_timer(ifa)
 			 * we may have a faulty network card/driver which
 			 * loops back multicasts to myself.
 			 */
-			if (3 < dp->dad_count
-			 && dp->dad_ns_icount == dp->dad_count
-			 && dp->dad_na_icount == 0) {
+			if (3 < dp->dad_count &&
+			    dp->dad_ns_icount == dp->dad_count &&
+			    dp->dad_na_icount == 0) {
 				log(LOG_INFO, "DAD questionable for %s(%s): "
 				    "network card loops back multicast?\n",
 				    ip6_sprintf(&ia->ia_addr.sin6_addr),

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.214 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.215 2004/02/19 17:56:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1895,9 +1895,9 @@ ipsec_in_reject(sp, m)
 			if (level == IPSEC_LEVEL_REQUIRE) {
 				need_conf++;
 
-				if (isr->sav != NULL
-				 && isr->sav->flags == SADB_X_EXT_NONE
-				 && isr->sav->alg_auth != SADB_AALG_NONE)
+				if (isr->sav != NULL &&
+				    isr->sav->flags == SADB_X_EXT_NONE &&
+				    isr->sav->alg_auth != SADB_AALG_NONE)
 					need_icv++;
 			}
 			break;
@@ -2931,8 +2931,8 @@ ipsec4_output(state, sp, flags)
 		 * some of the IPsec operation must be performed only in
 		 * originating case.
 		 */
-		if (isr->saidx.mode == IPSEC_MODE_TRANSPORT
-		 && (flags & IP_FORWARDING))
+		if (isr->saidx.mode == IPSEC_MODE_TRANSPORT &&
+		    (flags & IP_FORWARDING))
 			continue;
 #endif
 		error = ipsec4_checksa(isr, state);
@@ -2966,8 +2966,8 @@ ipsec4_output(state, sp, flags)
 		 * send to the receiver by dead SA, the receiver can
 		 * not decode a packet because SA has been dead.
 		 */
-		if (isr->sav->state != SADB_SASTATE_MATURE
-		 && isr->sav->state != SADB_SASTATE_DYING) {
+		if (isr->sav->state != SADB_SASTATE_MATURE &&
+		    isr->sav->state != SADB_SASTATE_DYING) {
 			ipsecstat.out_nosa++;
 			error = EINVAL;
 			goto bad;
@@ -3014,9 +3014,9 @@ ipsec4_output(state, sp, flags)
 			state->ro = &isr->sav->sah->sa_route;
 			state->dst = (struct sockaddr *)&state->ro->ro_dst;
 			dst4 = (struct sockaddr_in *)state->dst;
-			if (state->ro->ro_rt
-			 && ((state->ro->ro_rt->rt_flags & RTF_UP) == 0
-			  || dst4->sin_addr.s_addr != ip->ip_dst.s_addr)) {
+			if (state->ro->ro_rt &&
+			    ((state->ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+			     dst4->sin_addr.s_addr != ip->ip_dst.s_addr)) {
 				RTFREE(state->ro->ro_rt);
 				state->ro->ro_rt = NULL;
 			}
@@ -3241,8 +3241,8 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 		 * If there is no valid SA, we give up to process.
 		 * see same place at ipsec4_output().
 		 */
-		if (isr->sav->state != SADB_SASTATE_MATURE
-		 && isr->sav->state != SADB_SASTATE_DYING) {
+		if (isr->sav->state != SADB_SASTATE_MATURE &&
+		    isr->sav->state != SADB_SASTATE_DYING) {
 			ipsec6stat.out_nosa++;
 			error = EINVAL;
 			goto bad;
@@ -3371,8 +3371,8 @@ ipsec6_output_tunnel(state, sp, flags)
 		 * If there is no valid SA, we give up to process.
 		 * see same place at ipsec4_output().
 		 */
-		if (isr->sav->state != SADB_SASTATE_MATURE
-		 && isr->sav->state != SADB_SASTATE_DYING) {
+		if (isr->sav->state != SADB_SASTATE_MATURE &&
+		    isr->sav->state != SADB_SASTATE_DYING) {
 			ipsec6stat.out_nosa++;
 			error = EINVAL;
 			goto bad;

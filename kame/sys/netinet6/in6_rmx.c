@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.18 2002/06/09 14:43:59 itojun Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.19 2004/02/19 17:56:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -227,10 +227,9 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 				RTF_CLONING | RTF_PRCLONING);
 		if (rt2) {
 			if ((rt2->rt_flags & (RTF_CLONING|RTF_HOST|RTF_GATEWAY))
-					== RTF_CLONING
-			 && rt2->rt_gateway
-			 && rt2->rt_gateway->sa_family == AF_LINK
-			 && rt2->rt_ifp == rt->rt_ifp) {
+			    == RTF_CLONING && rt2->rt_gateway &&
+			    rt2->rt_gateway->sa_family == AF_LINK &&
+			    rt2->rt_ifp == rt->rt_ifp) {
 				ret = rt2->rt_nodes;
 			}
 			RTFREE(rt2);

@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.38 2003/09/06 05:15:43 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.39 2004/02/19 17:56:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,8 +105,8 @@ ah_hdrsiz(isr)
 
 	if (isr->sav == NULL)
 		goto estimate;
-	if (isr->sav->state != SADB_SASTATE_MATURE
-	 && isr->sav->state != SADB_SASTATE_DYING)
+	if (isr->sav->state != SADB_SASTATE_MATURE &&
+	    isr->sav->state != SADB_SASTATE_DYING)
 		goto estimate;
 
 	/* we need transport mode AH. */
