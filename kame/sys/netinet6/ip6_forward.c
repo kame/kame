@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.90 2002/01/21 03:18:28 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.91 2002/01/21 03:23:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -395,7 +395,7 @@ ip6_forward(m, srcrt)
 		struct mip6_bc *mbc;
 
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-						   &ip6->ip6_dst);
+						   &sa6_dst->sin6_addr);
 		if (mbc &&
 		    (mbc->mbc_flags & IP6_BUF_HOME) &&
 		    (mbc->mbc_encap != NULL)) {
@@ -423,9 +423,7 @@ ip6_forward(m, srcrt)
 		ctr_beg = read_tsc();
 #endif
 
-		/*
-		 * ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst
-		 */
+		/* ip6_forward_rt.ro_dst.sin6_addr is equal to ip6->ip6_dst */
 		if (ip6_forward_rt.ro_rt == 0 ||
 		    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) == 0
 #ifdef MEASURE_PERFORMANCE
