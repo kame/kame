@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 /*
- * KAME $Id: scanner.l,v 1.7 2000/05/09 13:20:20 itojun Exp $
+ * KAME $Id: scanner.l,v 1.8 2000/08/23 05:32:51 sakane Exp $
  */
 
 /*
@@ -89,9 +89,9 @@
 #include <netdb.h>
 #include <err.h>
 
+#define YY_NO_UNPUT
 #ifndef YY_MAIN
 #ifdef FLEX_SCANNER
-#define YY_NO_UNPUT
 #undef YY_INPUT
 #define YY_INPUT(buf, result, max)\
 do {\
@@ -240,7 +240,6 @@ main(argc, argv)
 	char **argv;
 {
 	int i;
-	const char *result;
 	struct in_addr in;
 	struct in6_addr in6;
 	struct addrinfo hints, *res;
