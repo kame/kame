@@ -859,7 +859,7 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %llu\n", icmp6names[i],
 				(unsigned long long)icmp6stat.icp6s_outhist[i]);
 		}
-#endif
+#undef NELEM
 	p(icp6s_badcode, "\t%llu message%s with bad code fields\n");
 	p(icp6s_tooshort, "\t%llu message%s < minimum length\n");
 	p(icp6s_checksum, "\t%llu bad checksum%s\n");
