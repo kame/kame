@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.755.2.5 2000/04/18 11:27:48 itojun Exp $
+$Id: CHANGELOG,v 1.755.2.6 2000/04/20 12:28:58 jinmei Exp $
 
 <200004>
+2000-04-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/ripng.c (rip_sockinit): do not bind ff02::9 on
+	the RIPng socket. Without this fix, bgpd can't accept unicasted
+	RIPng messages.
+	In response to a report from masahito_endo@ydc.co.jp
+
 2000-04-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/udp6_usrreq.c (udp6_output): 
 	* bsdi4/sys/netinet/udp_usrreq.c (udp6_output):
