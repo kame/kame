@@ -560,6 +560,9 @@ udp4_sendup(m, off, src, so)
 	/* check AH/ESP integrity. */
 	if (so != NULL && ipsec4_in_reject_so(m, so)) {
 		ipsecstat.in_polvio++;
+		if ((n = m_copy(m, 0, M_COPYALL)) != NULL)
+			icmp_error(n, ICMP_UNREACH, ICMP_UNREACH_ADMIN_PROHIBIT,
+			    0, 0);
 		return;
 	}
 #endif /*IPSEC*/
@@ -606,6 +609,9 @@ udp6_sendup(m, off, src, so)
 	/* check AH/ESP integrity. */
 	if (so != NULL && ipsec6_in_reject_so(m, so)) {
 		ipsec6stat.in_polvio++;
+		if ((n = m_copy(n, 0, M_COPYALL)) != NULL)
+			icmp6_error(n, ICMP6_DST_UNREACH,
+			    ICMP6_DST_UNREACH_ADMIN, 0);
 		return;
 	}
 #endif /*IPSEC*/
