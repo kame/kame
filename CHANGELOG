@@ -1,9 +1,20 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.107 1999/09/12 14:46:50 itojun Exp $
+$Id: CHANGELOG,v 1.108 1999/09/12 17:07:23 jinmei Exp $
 
 
 <199909>
+1999-09-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/mtrace6: implemented in order to trace IPv6
+	multicast routing.
+	Notes:
+	- kernel and multicast routing daemons should be updated as well.
+	- if you use cvsup, please be sure to `make clean' on the
+	  directory `pim6sd' before update.
+	- mtrace6 feature is currently VERY experimental (we have no
+	  official specification). You can't expect interoperability with
+	  other implementations.
+
 Sun Sep 12 23:44:00 JST 1999  itojun@iijlab.net
 	* kame/dhcp6: experimental DHCPv6 client/server.  many restrictions
 	  due to incomplete implementation (and we may not be improving this
