@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.176 1999/10/08 03:38:11 itojun Exp $
+$Id: CHANGELOG,v 1.177 1999/10/08 08:24:49 itojun Exp $
 
 <199910>
+Fri Oct  8 17:26:09 JST 1999  itojun@iijlab.net
+	* openbsd/ports/net/bind8: bind 812 with IPv6 support.
+
 Fri Oct  8 12:21:39 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/audio/mpg123, freebsd2/ports/mpg123:
 	  upgrade to latest IPv6 patch.
