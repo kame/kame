@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.13 2001/09/20 08:31:52 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.14 2001/09/20 11:35:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -223,6 +223,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	struct icmp6_hdr *icmp6, *nicmp6;
 	int plen;
 	struct mip6_bc *mbc;
+	int error = 0;
 
 	if (!MIP6_IS_HA) {
 		/*
@@ -278,13 +279,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		return (0);
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	n = m_dup(m, M_DONTWAIT);
-#elif defined(__NetBSD__)
-	n = m_dup(m, 0, M_COPYALL, M_DONTWAIT);
-#else
-#error no m_dup
-#endif
+	n = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
 	if (n == NULL) {
 		mip6log((LOG_ERR,
 			 "%s: mbuf allocation failed.\n",
@@ -293,38 +288,33 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		return (0);
 	}
 	m_adj(n, off + sizeof(*icmp6) + sizeof(otip6));
-	M_PREPEND(n, sizeof(struct icmp6_hdr), M_DONTWAIT);
+	M_PREPEND(n, sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr),
+		  M_DONTWAIT);
 	if (n == NULL) {
 		mip6log((LOG_ERR,
-			 "%s: mbuf prepend for icmp6 failed.\n",
+			 "%s: mbuf prepend for ip6/icmp6 failed.\n",
 			 __FUNCTION__));
 		/* continue */
 		return (0);
 	}
-	nicmp6 = mtod(n, struct icmp6_hdr *);
-	/* fill the icmp6 hdr */
-	nicmp6->icmp6_type = icmp6->icmp6_type;
-	nicmp6->icmp6_code = icmp6->icmp6_code;
-	nicmp6->icmp6_data32[0] = icmp6->icmp6_data32[0];
-
-	M_PREPEND(n, sizeof(struct ip6_hdr), M_DONTWAIT);
-	if (n == NULL) {
-		mip6log((LOG_ERR,
-			 "%s: mbuf prepend for ip6 failed.\n",
-			 __FUNCTION__));
-		/* continue */
-		return (0);
-	}
-	nip6 = mtod(n, struct ip6_hdr *);
 	/* fill the ip6 hdr */
+	nip6 = mtod(n, struct ip6_hdr *);
 	nip6->ip6_flow = 0;
 	nip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	nip6->ip6_vfc |= IPV6_VERSION;
 	nip6->ip6_plen = htons(n->m_pkthdr.len - sizeof(struct ip6_hdr));
 	nip6->ip6_nxt = IPPROTO_ICMPV6;
-	nip6->ip6_hlim = 255;
+	nip6->ip6_hlim = IPV6_DEFHLIM;
 	nip6->ip6_src = ip6->ip6_dst;
 	nip6->ip6_dst = oip6.ip6_src;
+
+	/* fill the icmp6 hdr */
+	nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
+	nicmp6->icmp6_type = icmp6->icmp6_type;
+	nicmp6->icmp6_code = icmp6->icmp6_code;
+	nicmp6->icmp6_data32[0] = icmp6->icmp6_data32[0];
+
+	/* XXX modify icmp data in some case.  (ex. TOOBIG) */
 
 	/* calculate checksum */
 	nicmp6->icmp6_cksum = 0;
@@ -333,8 +323,15 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	/* XXX IPSEC? */
 
-	ip6_output(n, NULL, NULL, 0, NULL, NULL);
-	/* XXX stat? */
+	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s: send failed. (errno = %d)\n",
+			 __FUNCTION__, error));
+		m_freem(n);
+		/* continue processing 'm' (the original icmp) */
+		return (0);
+	}
 
 	return (0);
 }
