@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.6 2000/11/14 12:54:26 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.7 2000/11/14 17:27:46 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -46,6 +46,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <err.h>
+
+#include "common.h"
 
 #define DEFPORT 9079
 
@@ -223,6 +225,7 @@ main(argc, argv)
 		err(1, "sendmsg");
 
 	if (mflag) {
+		int cc;		/* almost unused */
 		struct sockaddr_storage ss_from;
 		u_char cbuf[1024]; /* XXX: do not hardcode */
 
@@ -293,111 +296,6 @@ setopthdr(optlen, hdrtype)
 	free(optbuf);
 
 	cmsgp = CMSG_NXTHDR(&msg, cmsgp);
-}
-
-/* should be a library */
-void
-print_options(mh)
-	struct msghdr *mh;
-{
-	struct cmsghdr *cm;
-	struct in6_pktinfo *pi = NULL;
-	int *hlimp = NULL;
-	char ntop_buf[INET6_ADDRSTRLEN];
-	void *hbh = NULL, *dst1 = NULL, *dst2 = NULL, *rthdr = NULL;
-	char ifnambuf[IF_NAMESIZE];
-	/* XXX: KAME specific at this moment */
-	struct ip6_mtuinfo *mtuinfo = NULL;
-
-	if (mh->msg_controllen == 0) {
-		printf("No IPv6 option is received\n");
-		return;
-	}
-	
-	/* extract optional information via Advanced API */
-	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mh);
-	     cm;
-	     cm = (struct cmsghdr *)CMSG_NXTHDR(mh, cm)) {
-		if (cm->cmsg_level != IPPROTO_IPV6)
-			continue;
-
-		switch(cm->cmsg_type) {
-		case IPV6_PKTINFO:
-			if (cm->cmsg_len ==
-			    CMSG_LEN(sizeof(struct in6_pktinfo)))
-				pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
-		break;
-
-		case IPV6_HOPLIMIT:
-			if (cm->cmsg_len == CMSG_LEN(sizeof(int)))
-				hlimp = (int *)CMSG_DATA(cm);
-			break;
-
-		case IPV6_RTHDR:
-			if (rthdr)
-				printf("there're more than one rthdr (ignored).\n");
-			else
-				rthdr = CMSG_DATA(cm);
-			break;
-
-		case IPV6_HOPOPTS:
-			hbh = CMSG_DATA(cm);
-			break;
-
-		case IPV6_RTHDRDSTOPTS:
-			if (dst1)
-				printf("there's more than one dstopt hdr "
-				       "before a rthdr (ignored)\n");
-			else
-				dst1 = CMSG_DATA(cm);
-			break;
-
-		case IPV6_DSTOPTS:
-			if (dst2)
-				printf("there's more than one dstopt hdr "
-				       "after a rthdr (ignored)\n");
-			else
-				dst2 = CMSG_DATA(cm);
-			break;
-
-		case IPV6_PATHMTU:
-			if (cm->cmsg_len == CMSG_LEN(sizeof(*mtuinfo)))
-				mtuinfo = (struct ip6_mtuinfo *)CMSG_DATA(cm);
-		}
-	}
-
-	printf("Received IPv6 options (size %d):\n", mh->msg_controllen);
-	if (pi) {
-		printf("  Packetinfo: dst=%s, I/F=(%s, id=%d)\n",
-		       inet_ntop(AF_INET6, &pi->ipi6_addr, ntop_buf,
-				 sizeof(ntop_buf)),
-		       if_indextoname(pi->ipi6_ifindex, ifnambuf),
-		       pi->ipi6_ifindex);
-	}
-	if (hlimp)
-		printf("  Hoplimit = %d\n", *hlimp);
-	if (hbh) {
-		printf("  HbH Options Header\n");
-		print_opthdr(hbh);
-	}
-	if (dst1) {
-		printf("  Destination Options Header (before rthdr)\n");
-		print_opthdr(dst1);
-	}
-	if (rthdr) {
-		printf("  Routing Header\n");
-		print_rthdr(rthdr);
-	}
-	if (dst2) {
-		printf("  Destination Options Header (after rthdr)\n");
-		print_opthdr(dst2);
-	}
-	if (mtuinfo) {
-#ifdef notyet
-		printf("  Path MTU: destination=%s, from=%s, mtu=%lu",
-		       );
-#endif
-	}
 }
 
 static void
