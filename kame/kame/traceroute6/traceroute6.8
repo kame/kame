@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: traceroute6.8,v 1.6 2000/06/05 12:56:11 itojun Exp $
+.\"     $Id: traceroute6.8,v 1.7 2000/06/05 14:04:27 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt TRACEROUTE6 8
@@ -42,6 +42,9 @@
 .Ek
 .Bk -words
 .Op Fl f Ar firsthop
+.Ek
+.Bk -words
+.Op Fl g Ar gateway
 .Ek
 .Bk -words
 .Op Fl m Ar hoplimit
@@ -69,6 +72,12 @@
 Debug mode.
 .It Fl f Ar firsthop
 Specify how many hops to skip in trace.
+.It Fl g Ar gateway
+Specify intermediate gateway
+.Po
+.Nm
+uses routing header
+.Pc .
 .It Fl m Ar hoplimit
 Specify maximum hoplimit.
 .It Fl l
