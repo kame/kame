@@ -157,6 +157,7 @@ pfsyncattach(int npfsync)
 #endif
 	if_attach(ifp);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+	ifp->if_addrlen = 0;
 	if_alloc_sadl(ifp);
 #endif
 

@@ -147,6 +147,7 @@ pflogattach(int npflog)
 		ifp->if_hdrlen = PFLOG_HDRLEN;
 		if_attach(ifp);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+		ifp->if_addrlen = 0;
 		if_alloc_sadl(ifp);
 #endif
 
