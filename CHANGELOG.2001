@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG.2001,v 1.1 2002/01/02 07:07:59 jinmei Exp $
+$KAME: CHANGELOG.2001,v 1.2 2002/01/02 07:47:49 jinmei Exp $
 
 <200112>
 2001-12-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -138,10 +138,10 @@ Fri Dec 14 17:19:56 JST 2001	suz@sdl.hitachi.co.jp
 
 Thu Dec 13 00:31:47 JST 2001 sakane@kame.net
 	* kame/racoon:
-	the retransmission logic has been improved.  racoon stores the packet
-	that have been sent.  when racoon receives a packet that have been
-	processed already, racoon reply a saved packet simply.
-	the default timer for waiting each negotiation also has been changed.
+	the retransmission logic has been improved.  racoon stores packets
+	that have been sent.  when racoon receives a packet that has been
+	processed already, racoon will reply the saved packet simply.
+	the default timer for waiting each negotiation has also been changed.
 
 2001-12-12 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{dispatch,tslot,var}.[ch]:
