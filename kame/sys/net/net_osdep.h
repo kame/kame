@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.41 2001/04/27 23:45:05 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.42 2001/04/27 23:51:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,15 +49,15 @@
  *   others: sockaddr * (note that sys/net/route.c:rtrequest() has an unsafe
  *	typecast code, from 4.3BSD-reno)
  *
- * - side effects of rtrequest[1](RTM_DELETE)
+ * - side effects of rtrequest{,1}(RTM_DELETE)
  *	BSDI[34]: delete all cloned routes underneath the route.
  *	FreeBSD[234]: delete all protocol-cloned routes underneath the route.
  *		      note that cloned routes from an interface direct route
  *		      still remain.
- *	NetBSD: 1.5 have no side effects.  KAME/netbsd15, and 1.5R, have
+ *	NetBSD: 1.5 have no side effects.  KAME/netbsd15, and post-1.5R, have
  *		the same effects as of BSDI.
- *	OpenBSD: 2.8 have no side effects.  KAME/openbsd28, and 2.9 have
- *		the same effects as of BSDI.
+ *	OpenBSD: have no side effects.  KAME/openbsd has the same effects as
+ *		of BSDI (the change is not merged - yet).
  *
  * - privileged process
  *	NetBSD, FreeBSD 3
@@ -81,7 +81,7 @@
  * - bpf:
  *	OpenBSD, NetBSD 1.5, BSDI [34]
  *		need caddr_t * (= if_bpf **) and struct ifnet *
- *	FreeBSD 2, FreeBSD 3, NetBSD 1.6? (1.5N and later)
+ *	FreeBSD 2, FreeBSD 3, NetBSD post-1.5N
  *		need only struct ifnet * as argument
  *
  * - struct ifnet
@@ -120,7 +120,8 @@
  *	NetBSD, OpenBSD
  *		foo_sysctl()
  *	BSDI [34]
- *		foo_sysctl() but with different style
+ *		foo_sysctl() but with different style.  sysctl_int_arr() takes
+ *		care of most of the cases.
  *	FreeBSD
  *		linker hack.  however, there are freebsd version differences
  *		(how wonderful!).
@@ -134,6 +135,7 @@
  *			#ifdef SYSCTL_DECL
  *			SYSCTL_DECL(net_inet_ip6);
  *			#endif
+ *		it is hard to share functions between freebsd and non-freebsd.
  *
  * - if_ioctl
  *	NetBSD, FreeBSD 3, BSDI [34]
