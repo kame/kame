@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.40 2000/09/15 21:00:10 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.41 2000/09/15 21:03:07 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -213,9 +213,11 @@ defined exchange mode of phase 1.
 .\"
 .It Ic doi Ar ipsec_doi ;
 means to use IPSEC-DOI specifyed RFC 2407.
+You can ommit it.
 .\"
 .It Ic situation Ic identity_only ;
 means to use SIT_IDENTITY_ONLY specifyed RFC 2407.
+You can ommit it.
 .\"
 .It Ic identifier Ar idtype ;
 specifies ID type to use in phase 1 negotiation.
@@ -484,12 +486,6 @@ The following shows how remote directive should be configured.
 remote 172.168.2.2 [7000]
 {
 	exchange_mode main;
-
-	# default doi is "ipsec_doi".
-	doi ipsec_doi;
-
-	# default situation is "identity_only".
-	situation identity_only;
 
 	# specify the identifier type
 	# "address", "fqdn", "user_fqdn", "keyid"
