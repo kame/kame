@@ -13,8 +13,6 @@ MASTER_SITES=	http://www.tcpdump.org/weekly/
 
 MAINTAINER=	sumikawa@kame.net
 
-HOMEPAGE=	http://www.tcpdump.org/
-
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS+=	--enable-ipv6
 

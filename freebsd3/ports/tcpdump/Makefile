@@ -15,8 +15,6 @@ MAINTAINER=	sumikawa@kame.net
 
 BUILD_DEPENDS=	${LOCALBASE}/lib/libpcap.a:../libpcap
 
-HOMEPAGE=	http://www.tcpdump.org/
-
 GNU_CONFIGURE=	yes
 CONFIGURE_ENV+=	LIBS="-L${PREFIX}/lib"
 CONFIGURE_ARGS+=--enable-ipv6
