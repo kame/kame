@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.69 2001/10/19 16:03:00 keiichi Exp $	*/
+/*	$KAME: if_stf.c,v 1.70 2001/10/22 04:49:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -180,7 +180,7 @@ static int ip_gif_ttl = 40;	/*XXX*/
 extern struct domain inetdomain;
 struct protosw in_stf_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_stf_input, rip_input,	0,		rip_ctloutput,
+  in_stf_input,	rip_output,	0,		rip_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
