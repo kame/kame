@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.63 2001/08/22 10:28:04 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.64 2001/08/23 08:45:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -672,9 +672,11 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	case AF_INET:
 		l = sizeof(*pack4);
 		break;
+#ifdef INET6
 	case AF_INET6:
 		l = sizeof(*pack6);
 		break;
+#endif
 	default:
 		goto fail;
 	}
@@ -717,6 +719,7 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 		ep->srcmask = (struct sockaddr *)&pack4->mine;
 		ep->dstmask = (struct sockaddr *)&pack4->yours;
 		break;
+#ifdef INET6
 	case AF_INET6:
 		pack6 = (struct pack6 *)ep->addrpack;
 		ep->src = (struct sockaddr *)&pack6->mine;
@@ -725,6 +728,7 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 		ep->srcmask = (struct sockaddr *)&pack6->mine;
 		ep->dstmask = (struct sockaddr *)&pack6->yours;
 		break;
+#endif
 	}
 
 	bcopy(sp, ep->src, sp->sa_len);
