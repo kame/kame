@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.83 2002/03/22 05:19:32 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.84 2002/03/25 07:12:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1243,7 +1243,7 @@ natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 	 * Start real work.
 	 */
 	hdrsz = sizeof(struct ip6_hdr);
-	if (isFragment(cv4))
+	if (isFragment(cv4) || isNoDF(cv4))
 		hdrsz += sizeof(struct ip6_frag);
 	if ((m6 = natpt_mgethdr(hdrsz, cv4->plen)) == NULL)
 		return (NULL);
