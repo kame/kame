@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.79 2000/12/17 21:46:52 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.80 2000/12/22 03:12:55 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -253,13 +253,12 @@ identifier_statement
 identifier_stmt
 	:	VENDORID
 		{
-			yywarn("vendorid directive is obsoleted.");
+			/*XXX to be deleted */
 		}
 		QUOTEDSTRING EOS
 	|	IDENTIFIERTYPE QUOTEDSTRING EOS
 		{
-			yywarn("identifier should be defined at each remote directives.");
-			yywarn("it will be obsoleted near future.");
+			/*XXX to be deleted */
 			$2->l--;	/* nuke '\0' */
 			lcconf->ident[$1] = $2;
 			if (lcconf->ident[$1] == NULL) {
@@ -396,7 +395,7 @@ timer_stmt
 algorithm_statement
 	:	ALGORITHM_LEVEL
 		{
-			yywarn("algorithm_strength directive is obsoleted.");
+			/*XXX to be deleted.XXX*/
 		} BOC algorithm_stmts EOC
 	;
 algorithm_stmts
@@ -428,7 +427,7 @@ algorithm_type
 policy_statement
 	:	POLICY policy_index
 		{
-			yywarn("policy directive is obsoleted.");
+			/*XXX to be deleted*/
 			cur_spidx = $2;
 		}
 		policy_specswrap
@@ -853,7 +852,7 @@ sainfo_spec
 		algorithms EOS
 	|	IDENTIFIER IDENTIFIERTYPE
 		{
-			yywarn("identifier should not be used, instead use \"my_identifier\".");
+			/*XXX to be deleted */
 			if ($2 == IDTYPE_ASN1DN) {
 				yyerror("id type forbidden: %d", $2);
 				return -1;
@@ -1052,7 +1051,7 @@ remote_spec
 	|	SEND_CR SWITCH EOS { cur_rmconf->send_cr = $2; }
 	|	IDENTIFIER IDENTIFIERTYPE EOS
 		{
-			yywarn("identifier should not be used, instead use \"my_identifier\".");
+			/*XXX to be deleted */
 			cur_rmconf->idvtype = $2;
 		}
 	|	MY_IDENTIFIER IDENTIFIERTYPE identifierstring EOS

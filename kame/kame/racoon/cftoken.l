@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.46 2000/12/17 21:55:07 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.47 2000/12/22 03:12:55 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -129,17 +129,17 @@ octetstring	{octet}({dot}{octet})+
 <S_INI>include		{ YYDB; return(INCLUDE); }
 
 	/* self information */
-<S_INI>identifier	{ BEGIN S_INF; YYDB; return(IDENTIFIER); }
+<S_INI>identifier	{ BEGIN S_INF; YYDB; yywarn("it is obsoleted.  use \"my_identifier\" in each remote directives."); return(IDENTIFIER); }
 <S_INF>{semi}		{ BEGIN S_INI; return(EOS); }
 
 	/* logging */
 <S_INI>log		{ BEGIN S_LOG; YYDB; return(LOGGING); }
-<S_LOG>info		{ YYD; yywarn("use notify, it will be obsoleted in the future."); yylval.num = 0; return(LOGLEV); }
+<S_LOG>info		{ YYD; yywarn("it is obsoleted.  use \"notify\""); yylval.num = 0; return(LOGLEV); }
 <S_LOG>notify		{ YYD; yylval.num = 0; return(LOGLEV); }
 <S_LOG>debug		{ YYD; yylval.num = 1; return(LOGLEV); }
 <S_LOG>debug2		{ YYD; yylval.num = 2; return(LOGLEV); }
-<S_LOG>debug3		{ YYD; yywarn("use debug2, it will be obsoleted in the future."); yylval.num = 2; return(LOGLEV); }
-<S_LOG>debug4		{ YYD; yywarn("use debug2, it will be obsoleted in the future."); yylval.num = 2; return(LOGLEV); }
+<S_LOG>debug3		{ YYD; yywarn("it is osboleted.  use \"debug2\""); yylval.num = 2; return(LOGLEV); }
+<S_LOG>debug4		{ YYD; yywarn("it is obsoleted.  use \"debug2\""); yylval.num = 2; return(LOGLEV); }
 <S_LOG>{semi}		{ BEGIN S_INI; return(EOS); }
 
 	/* padding */
@@ -171,7 +171,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RTRY>{ecl}		{ BEGIN S_INI; return(EOC); }
 
 	/* algorithm_level */
-<S_INI>algorithm_strength	{ BEGIN S_ALGST; YYDB; return(ALGORITHM_LEVEL); }
+<S_INI>algorithm_strength	{ BEGIN S_ALGST; YYDB; yywarn("it is obsoleted."); return(ALGORITHM_LEVEL); }
 <S_ALGST>{bcl}			{ return(BOC); }
 <S_ALGST>isakmp_encryption	{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_isakmp_enc; return(ALGORITHM_CLASS); }
 <S_ALGST>isakmp_hash		{ BEGIN S_ALGCL; YYDB; yylval.num = algclass_isakmp_hash; return(ALGORITHM_CLASS); }
@@ -190,7 +190,7 @@ octetstring	{octet}({dot}{octet})+
 <S_ALGCL>{ecl}		{ BEGIN S_ALGST; return(EOC); }
 
 	/* policy */
-<S_INI>policy		{ BEGIN S_PLCY; YYDB; return(POLICY); }
+<S_INI>policy		{ BEGIN S_PLCY; YYDB; yywarn("it is obsoleted"); return(POLICY); }
 <S_PLCY>any		{ YYD; return(ANY); }
 <S_PLCY>{blcl}any{elcl}	{ YYD; return(PORTANY); }
 <S_PLCY>in		{ YYD; yylval.num = IPSEC_DIR_INBOUND; return(DIRTYPE); }
@@ -241,7 +241,7 @@ octetstring	{octet}({dot}{octet})+
 <S_SAINF>{semi}		{ BEGIN S_INI; return(EOS); }
 <S_SAINFS>{ecl}		{ BEGIN S_INI; return(EOC); }
 <S_SAINFS>pfs_group	{ YYD; return(PFS_GROUP); }
-<S_SAINFS>identifier	{ YYD; return(IDENTIFIER); }
+<S_SAINFS>identifier	{ YYD; yywarn("it is obsoleted.  use \"my_identifier\"."); return(IDENTIFIER); }
 <S_SAINFS>my_identifier	{ YYD; return(MY_IDENTIFIER); }
 <S_SAINFS>lifetime	{ YYD; return(LIFETIME); }
 <S_SAINFS>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }
@@ -268,7 +268,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>identity_only	{ YYD; yylval.num = IPSECDOI_SIT_IDENTITY_ONLY; return(SITUATIONTYPE); }
 <S_RMTS>secrecy		{ YYD; yylval.num = IPSECDOI_SIT_SECRECY; return(SITUATIONTYPE); }
 <S_RMTS>integrity	{ YYD; yylval.num = IPSECDOI_SIT_INTEGRITY; return(SITUATIONTYPE); }
-<S_RMTS>identifier	{ YYD; return(IDENTIFIER); }
+<S_RMTS>identifier	{ YYD; yywarn("it is obsoleted.  use \"my_identifier\"."); return(IDENTIFIER); }
 <S_RMTS>my_identifier	{ YYD; return(MY_IDENTIFIER); }
 <S_RMTS>peers_identifier	{ YYD; return(PEERS_IDENTIFIER); }
 <S_RMTS>certificate_type	{ YYD; return(CERTIFICATE_TYPE); }
@@ -400,6 +400,7 @@ rsarev		{ YYD; yylval.num = algtype_rsarev;	return(ALGORITHMTYPE); }
 gssapi_krb	{ YYD; yylval.num = algtype_gssapikrb;	return(ALGORITHMTYPE); }
 
 	/* identifier type */
+vendor_id	{ YYD; yywarn("it is obsoleted."); return(VENDORID); }
 user_fqdn	{ YYD; yylval.num = IDTYPE_USERFQDN; return(IDENTIFIERTYPE); }
 fqdn		{ YYD; yylval.num = IDTYPE_FQDN; return(IDENTIFIERTYPE); }
 keyid		{ YYD; yylval.num = IDTYPE_KEYID; return(IDENTIFIERTYPE); }
