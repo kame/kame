@@ -24,7 +24,14 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-CFLAGS = -DINET6 -DKAME_SCOPEID -Wall -Werror
+.if exists(${.CURDIR}/../Makefile.opsys)
+.include "${.CURDIR}/../Makefile.opsys"
+.endif
+
+CFLAGS = -DINET6 -DKAME_SCOPEID -Wall
+.if (${OPSYS} != "BSD/OS")
+CFLAGS+=-Werror
+.endif
 LIBS = -linet6
 TARGET = sender receiver accept connect
 LDFLAGS = -L/usr/local/v6/lib
