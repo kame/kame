@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1543 2001/02/08 11:26:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1544 2001/02/08 15:20:13 itojun Exp $
 
 <200102>
+Fri Feb  9 00:18:46 JST 2001  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: negative {mtudisc,redirect}_{hi,lo}wat
+	  value will turn off the checks.  See changelog on 2000/12/09.
+
 2001-02-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_free): returned the pointer to the
 	next entry of the freed one.  Since pfxlist_onlink_check() called
