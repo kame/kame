@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1746 2001/06/27 17:34:38 sakane Exp $
+$KAME: CHANGELOG,v 1.1747 2001/06/27 17:37:31 sakane Exp $
 
 <200106>
+Thu Jun 28 02:35:18 JST 2001 sakane@kame.net
+	* kame/racoon:
+	- fixed to set the inbound policy in the case of "generate_policy".
+	- supported sadb_x_spdexpire().
+	above two things are from <lab@gta.com>.
+
 Thu Jun 28 02:33:32 JST 2001 sakane@kame.net
 	* kame/setkey:
 	enabled to use a service name as a port number.
