@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.217 2004/04/08 13:08:23 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.218 2004/04/08 13:26:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3568,7 +3568,6 @@ ipsec6_output_tunnel(state, sp, flags)
 			/* XXX */
 			in6_clearscope(addr);
 
-		{
 			/* XXX duplicated code. */
 
 			state->ro = &isr->sav->sah->sa_route;
@@ -3600,7 +3599,6 @@ ipsec6_output_tunnel(state, sp, flags)
 				state->dst = (struct sockaddr *)state->ro->ro_rt->rt_gateway;
 				dst6 = (struct sockaddr_in6 *)state->dst;
 			}
-		}
 		}
 #endif /* MIP6 && MIP6_MOBILE_NODE && MIP6_NOHAIPSEC */
 	}
