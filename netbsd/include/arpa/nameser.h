@@ -183,6 +183,7 @@
 #define T_NAPTR		35		/* Naming Authority PoinTeR */
 #define T_A6		38
 #define T_DNAME		39
+#define T_OPT		41		/* OPT pseudo-RR, RFC2761 */
 	/* non standard */
 #define T_UINFO		100		/* user (finger) information */
 #define T_UID		101		/* user ID */
