@@ -88,7 +88,7 @@ struct esp_algorithm {
 		struct secasvar *, struct esp_algorithm *, int));
 };
 
-#ifdef KERNEL
+#ifdef _KERNEL
 extern struct esp_algorithm esp_algorithms[];
 
 /* crypt routines */
@@ -101,7 +101,7 @@ extern int esp6_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *));
 extern int esp6_input __P((struct mbuf **, int *, int));
 #endif /* INET6 */
-#endif /*KERNEL*/
+#endif /*_KERNEL*/
 
 struct secasvar;
 extern int esp_auth __P((struct mbuf *, size_t, size_t,

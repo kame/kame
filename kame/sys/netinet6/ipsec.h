@@ -43,7 +43,7 @@
 #include <netkey/keyv2.h>
 #include <netkey/keydb.h>
 
-#ifdef KERNEL
+#ifdef _KERNEL
 
 /*
  * Security Policy Index
@@ -102,7 +102,7 @@ struct inpcbpolicy {
 	struct secpolicy *sp_out;
 	int priv;			/* privileged socket ? */
 };
-#endif /*KERNEL*/
+#endif /*_KERNEL*/
 
 #define IPSEC_PORT_ANY		65535
 #define IPSEC_ULPROTO_ANY	255
@@ -261,7 +261,7 @@ struct ipsecstat {
 	&ip6_ipsec_ecn, \
 }
 
-#ifdef KERNEL
+#ifdef _KERNEL
 struct ipsec_output_state {
 	struct mbuf *m;
 	struct route *ro;
@@ -396,14 +396,14 @@ extern int ipsec_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 extern int ipsec6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif /* __bsdi__ || __NetBSD__ */
 
-#endif /*KERNEL*/
+#endif /*_KERNEL*/
 
-#ifndef KERNEL
+#ifndef _KERNEL
 extern caddr_t ipsec_set_policy __P((char *policy, int buflen));
 extern int ipsec_get_policylen __P((caddr_t buf));
 extern char *ipsec_dump_policy __P((caddr_t buf, char *delimiter));
 
 extern char *ipsec_strerror __P((void));
-#endif /*!KERNEL*/
+#endif /*!_KERNEL*/
 
 #endif /*_NETINET6_IPSEC_H_*/

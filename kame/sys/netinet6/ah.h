@@ -76,7 +76,7 @@ struct ah_algorithm {
 
 #define	AH_MAXSUMSIZE	16
 
-#ifdef KERNEL
+#ifdef _KERNEL
 extern struct ah_algorithm ah_algorithms[];
 
 struct inpcb;
@@ -101,6 +101,6 @@ extern int ah6_calccksum __P((struct mbuf *, caddr_t,
 			      struct ah_algorithm *, struct secasvar *));
 #endif /* INET6 */
 
-#endif /*KERNEL*/
+#endif /*_KERNEL*/
 
 #endif /*_NETINET6_AH_H_*/
