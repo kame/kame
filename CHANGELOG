@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.797 2000/04/20 12:28:11 jinmei Exp $
+$Id: CHANGELOG,v 1.798 2000/04/20 12:32:50 itojun Exp $
 
 <200004>
+Thu Apr 20 21:32:02 JST 2000  itojun@iijlab.net
+	* sbin/route/route.c (freebsd[23], netbsd, bsdi[34]):
+	  use scoped address notation when printing IPv6 link-local multicast
+	  addresses.
+
 2000-04-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/ripng.c (rip_sockinit): do not bind ff02::9 on
 	the RIPng socket. Without this fix, bgpd can't accept unicasted
