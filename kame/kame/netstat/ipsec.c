@@ -140,7 +140,7 @@ static const char *pfkey_msgtypenames[] = {
 	"get", "acquire", "register", "expire", "flush",
 	"dump", "x_promisc", "x_pchange", "x_spdupdate", "x_spdadd",
 	"x_spddelete", "x_spdget", "x_spdacquire", "x_spddump", "x_spdflush",
-	"x_spdsetidx", "x_spdexpire",
+	"x_spdsetidx", "x_spdexpire", "x_spddelete2"
 };
 
 static struct ipsecstat ipsecstat;
