@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.47 2000/08/23 13:53:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.48 2000/08/24 06:57:50 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1628,9 +1628,6 @@ quick_ir1sendmx(iph2, body)
 	/* send HDR*;HASH(1);SA;Nr to responder */
 	if (isakmp_send(iph2->ph1, buf) < 0)
 		goto end;
-
-	/* synchronization IV */
-	memcpy(iph2->ivm->ivd->v, iph2->ivm->iv->v, iph2->ivm->iv->l);
 
 	error = 0;
 

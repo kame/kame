@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.35 2000/07/04 16:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.36 2000/08/24 06:57:50 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -555,6 +555,10 @@ ident_i4recv(iph1, msg0)
 	}
 
 	/* payload existency check */
+
+	/* see handler.h about IV synchronization. */
+	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
+
 	/* validate authentication value */
     {
 	int type;
@@ -617,8 +621,7 @@ ident_i4send(iph1, msg)
 		goto end;
 	}
 
-	/* synchronization IV */
-	memcpy(iph1->ivm->ivd->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
+	/* see handler.h about IV synchronization. */
 	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
 
 	iph1->status = PHASE1ST_ESTABLISHED;
@@ -1074,6 +1077,9 @@ ident_r3recv(iph1, msg0)
 	}
     }
 
+	/* see handler.h about IV synchronization. */
+	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->ive->l);
+
 	/* validate authentication value */
     {
 	int type;
@@ -1412,9 +1418,8 @@ ident_ir3sendmx(iph1)
 	if (isakmp_send(iph1, buf) < 0)
 		goto end;
 
-	/* synchronization IV */
+	/* see handler.h about IV synchronization. */
 	memcpy(iph1->ivm->ive->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
-	memcpy(iph1->ivm->ivd->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
 
 	error = 0;
 

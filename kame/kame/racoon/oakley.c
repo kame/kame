@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.45 2000/08/24 05:14:36 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.46 2000/08/24 06:57:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1955,8 +1955,7 @@ oakley_newiv(iph1)
 	newivm->iv->l = CBC_BLOCKLEN;
 
 	/* create buffer to save iv */
-	if ((newivm->ive = vdup(newivm->iv)) == NULL
-	 || (newivm->ivd = vdup(newivm->iv)) == NULL) {
+	if ((newivm->ive = vdup(newivm->iv)) == NULL) {
 		plog(logp, LOCATION, NULL,
 			"vdup (%s)\n", strerror(errno));
 		vfree(buf);
@@ -2031,8 +2030,7 @@ oakley_newiv2(iph1, msgid)
 	newivm->iv->l = CBC_BLOCKLEN;
 
 	/* create buffer to save new iv */
-	if ((newivm->ive = vdup(newivm->iv)) == NULL
-	 || (newivm->ivd = vdup(newivm->iv)) == NULL) {
+	if ((newivm->ive = vdup(newivm->iv)) == NULL) {
 		plog(logp, LOCATION, NULL, "vdup (%s)\n", strerror(errno));
 		goto end;
 	}
@@ -2062,8 +2060,6 @@ oakley_delivm(ivm)
 		free(ivm->iv);
 	if (ivm->ive != NULL)
 		free(ivm->ive);
-	if (ivm->ivd != NULL)
-		free(ivm->ivd);
 	free(ivm);
 
 	return;

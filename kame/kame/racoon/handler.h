@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.28 2000/08/02 20:33:54 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.29 2000/08/24 06:57:50 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -284,11 +284,55 @@ struct isakmp_parse_t {
 	struct isakmp_gen *ptr;
 };
 
-/* for IV management */
+/*
+ * for IV management.
+ *
+ * - normal case
+ * initiator                                     responder
+ * -------------------------                     --------------------------
+ * initialize iv(A), ive(A).                     initialize iv(A), ive(A).
+ * encode by ive(A).
+ * save to iv(B).            ---[packet(B)]-->   save to ive(B).
+ *                                               decode by iv(A).
+ *                                               packet consistency.
+ *                                               sync iv(B) with ive(B).
+ *                                               check auth, integrity.
+ *                                               encode by ive(B).
+ * save to ive(C).          <--[packet(C)]---    save to iv(C).
+ * decoded by iv(B).
+ *      :
+ *
+ * - In the case that a error is found while cipher processing,
+ * initiator                                     responder
+ * -------------------------                     --------------------------
+ * initialize iv(A), ive(A).                     initialize iv(A), ive(A).
+ * encode by ive(A).
+ * save to iv(B).            ---[packet(B)]-->   save to ive(B).
+ *                                               decode by iv(A).
+ *                                               packet consistency.
+ *                                               sync iv(B) with ive(B).
+ *                                               check auth, integrity.
+ *                                               error found.
+ *                                               create notify.
+ *                                               get ive2(X) from iv(B).
+ *                                               encode by ive2(X).
+ * get iv2(X) from iv(B).   <--[packet(Y)]---    save to iv2(Y).
+ * save to ive2(Y).
+ * decoded by iv2(X).
+ *      :
+ *
+ * The reason why the responder synchronizes iv with ive after checking the
+ * packet consistency is that it is required to leave the IV for decoding
+ * packet.  Because there is a potential of error while checking the packet
+ * consistency.  Also the reason why that is before authentication and
+ * integirty check is that the IV for informational exchange has to be made
+ * by the IV which is after packet decoded and checking the packet consistency.
+ * Otherwise IV mismatched happens between the intitiator and the responder.
+ */
 struct isakmp_ivm {
-	vchar_t *iv;
-	vchar_t *ive;
-	vchar_t *ivd;
+	vchar_t *iv;	/* for decoding packet */
+			/* if phase 1, it's for computing phase2 iv */
+	vchar_t *ive;	/* for encoding packet */
 };
 
 /* for dumping */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.35 2000/07/04 16:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.36 2000/08/24 06:57:50 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -983,11 +983,10 @@ agg_r2send(iph1, msg)
 		goto end;
 	}
 
-	/* synchronization IV when packet encrypted. */
-	if (ISSET(((struct isakmp *)msg->v)->flags, ISAKMP_FLAG_E)) {
-		memcpy(iph1->ivm->ivd->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
+	/* IV synchronized when packet encrypted. */
+	/* see handler.h about IV synchronization. */
+	if (ISSET(((struct isakmp *)msg->v)->flags, ISAKMP_FLAG_E))
 		memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
-	}
 
 	/* set encryption flag */
 	iph1->flags |= ISAKMP_FLAG_E;

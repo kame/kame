@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.27 2000/07/04 16:35:59 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.28 2000/08/24 06:57:50 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -527,8 +527,7 @@ base_i3recv(iph1, msg)
 	if (oakley_newiv(iph1) < 0)
 		goto end;
 
-	/* synchronization IV */
-	memcpy(iph1->ivm->ivd->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
+	/* see handler.h about IV synchronization. */
 	memcpy(iph1->ivm->iv->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
 
 	/* set encryption flag */
