@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.77 2002/02/01 01:32:05 itojun Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.78 2002/02/01 04:46:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2144,12 +2144,16 @@ mip6_bc_proxy_control(target, local, cmd)
 
 		{
 			/* very XXX */
-			struct sockaddr_in6 daddr;
+			struct sockaddr_in6 daddr, taddr;
 
 			bzero(&daddr, sizeof(daddr));
 			daddr.sin6_family = AF_INET6;
 			daddr.sin6_len = sizeof(daddr);
 			daddr.sin6_addr = in6addr_linklocal_allnodes;
+			bzero(&taddr, sizeof(taddr));
+			taddr.sin6_family = AF_INET6;
+			taddr.sin6_len = sizeof(taddr);
+			taddr.sin6_addr = *target;
 			if (in6_addr2zoneid(ifp, &daddr.sin6_addr,
 					    &daddr.sin6_scope_id)) {
 				/* XXX: should not happen */
@@ -2157,14 +2161,29 @@ mip6_bc_proxy_control(target, local, cmd)
 					 "%s:%d: in6_addr2zoneid failed\n",
 					 __FILE__, __LINE__));
 				error = EIO; /* XXX */
-			} else {
-				if ((error = in6_embedscope(&daddr.sin6_addr,
-							    &daddr)) == 0) {
-					nd6_na_output(ifp, &daddr, target,
-						      ND_NA_FLAG_OVERRIDE,
-						      1,
-						      (struct sockaddr *)sdl);
-				}
+			}
+			if (error == 0) {
+				error = in6_embedscope(&daddr.sin6_addr,
+						       &daddr);
+			}
+			if (error == 0 &&
+			    in6_addr2zoneid(ifp, &taddr.sin6_addr,
+					    &taddr.sin6_scope_id)) {
+				/* XXX: should not happen */
+				mip6log((LOG_ERR,
+					 "%s:%d: in6_addr2zoneid failed\n",
+					 __FILE__, __LINE__));
+				error = EIO; /* XXX */
+			}
+			if (error == 0) {
+				error = in6_embedscope(&taddr.sin6_addr,
+						       &taddr);
+			}
+			if (error == 0) {
+				nd6_na_output(ifp, &daddr, &taddr,
+					      ND_NA_FLAG_OVERRIDE,
+					      1,
+					      (struct sockaddr *)sdl);
 			}
 		}
 
@@ -2625,13 +2644,14 @@ success:
 
 			/* XXX: send a unsolicited na. */
 		{
-			struct sockaddr_in6 sa6, daddr;
+			struct sockaddr_in6 sa6, daddr, taddr; /* XXX */
 			struct ifaddr *ifa;
 
 			bzero(&sa6, sizeof(sa6));
 			sa6.sin6_family = AF_INET6;
 			sa6.sin6_len = sizeof(sa6);
-			sa6.sin6_addr = mbu->mbu_coa;	/* XXX or mbu_haddr */
+			/* XXX or mbu_haddr.  XXX scope consideration  */
+			sa6.sin6_addr = mbu->mbu_coa;
 
 			ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
 
@@ -2655,8 +2675,27 @@ success:
 					 __FILE__, __LINE__));
 				return(error);
 			}
+
+			bzero(&taddr, sizeof(taddr));
+			taddr.sin6_family = AF_INET6;
+			taddr.sin6_len = sizeof(taddr);
+			taddr.sin6_addr = mbu->mbu_haddr;
+			if (error == 0 &&
+			    in6_addr2zoneid(ifa->ifa_ifp, &taddr.sin6_addr,
+					    &taddr.sin6_scope_id)) {
+				/* XXX: should not happen */
+				mip6log((LOG_ERR,
+					 "%s:%d: in6_addr2zoneid failed\n",
+					 __FILE__, __LINE__));
+				error = EIO; /* XXX */
+			}
+			if (error == 0) {
+				error = in6_embedscope(&taddr.sin6_addr,
+						       &taddr);
+			}
+
 			nd6_na_output(ifa->ifa_ifp, &daddr,
-					      &mbu->mbu_haddr,
+					      &taddr,
 					      ND_NA_FLAG_OVERRIDE,
 					      1, NULL);
 			mip6log((LOG_INFO,
