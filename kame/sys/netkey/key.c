@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.66 2000/03/04 09:23:01 itojun Exp $	*/
+/*	$KAME: key.c,v 1.67 2000/03/05 02:38:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.66 2000/03/04 09:23:01 itojun Exp $ */
+/* KAME $Id: key.c,v 1.67 2000/03/05 02:38:25 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -480,7 +480,7 @@ key_checkrequest(isr, saidx)
 	/* get current level */
 	level = ipsec_get_reqlevel(isr);
 
-#if 1
+#if 0
 	/*
 	 * We do allocate new SA only if the state of SA in the holder is
 	 * SADB_SASTATE_DEAD.  The SA for outbound must be the oldest.
@@ -508,9 +508,6 @@ key_checkrequest(isr, saidx)
 	 * The operation may have negative impact to performance.  We may
 	 * want to check cached SA carefully, rather than picking new SA
 	 * every time.
-	 *
-	 * Also, not sure if the following code respects rekey consideration
-	 * (see above).
 	 */
 	if (isr->sav != NULL) {
 		key_freesav(isr->sav);
@@ -518,7 +515,11 @@ key_checkrequest(isr, saidx)
 	}
 #endif
 
-	/* new SA allocation if no SA found. */
+	/*
+	 * new SA allocation if no SA found.
+	 * key_allocsa_policy should allocate the oldest SA available.
+	 * See key_do_allocsa_policy(), and draft-jenkins-ipsec-rekeying-03.txt.
+	 */
 	if (isr->sav == NULL)
 		isr->sav = key_allocsa_policy(saidx);
 
