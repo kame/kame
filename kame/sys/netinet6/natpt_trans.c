@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.161 2004/02/19 17:56:28 itojun Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.162 2004/04/16 04:42:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -64,20 +64,6 @@
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 #include <machine/in_cksum.h>
-#endif
-
-/*
- *
- */
-
-/* for backward compatibility */
-#define HAVE_IP6_SETPKTADDRS	(1)
-#ifndef MLD_LISTENER_QUERY
-#define	MLD_LISTENER_QUERY	MLD6_LISTENER_QUERY
-#define	MLD_LISTENER_REPORT	MLD6_LISTENER_REPORT
-#define	MLD_LISTENER_DONE	MLD6_LISTENER_DONE
-
-#undef HAVE_IP6_SETPKTADDRS
 #endif
 
 
@@ -1673,29 +1659,6 @@ natpt_sendFragmentedTail(struct pcv *cv4, struct ip6_hdr *ip6save, struct ip6_fr
 void
 natpt_ip6_forward(struct mbuf *m)
 {
-#ifdef HAVE_IP6_SETPKTADDRS
-	struct sockaddr_in6 sa6_src, sa6_dst;
-
-	/*
-	 * record the sockaddr_in6 structures of the source and
-	 * destination addresses for ip6_forward().
-	 * XXX: not care about scope zone ambiguity.
-	 */
-	bzero(&sa6_src, sizeof(sa6_src));
-	bzero(&sa6_dst, sizeof(sa6_dst));
-	sa6_src.sin6_family = sa6_dst.sin6_family = AF_INET6;
-	sa6_src.sin6_len =
-		sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
-	sa6_src.sin6_addr =
-		mtod(m, struct ip6_hdr *)->ip6_src;
-	sa6_dst.sin6_addr =
-		mtod(m, struct ip6_hdr *)->ip6_dst;
-	if (!ip6_setpktaddrs(m, &sa6_src, &sa6_dst)) {
-		m_freem(m);
-		return;
-	}
-#endif
-
 	ip6_forward(m, 1);
 }
 
