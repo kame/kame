@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.124 2001/02/16 12:23:40 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.125 2001/02/16 12:27:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2309,10 +2309,6 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	void *newp;
 	size_t newlen;
 {
-	struct in6_defrouter *d, *de;
-	struct in6_prefix *p, *pe;
-	struct nd_defrouter *dr;
-	struct nd_prefix *pr;
 	size_t ol, l;
 	int error;
 
@@ -2324,9 +2320,11 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	if (oldp && !oldlenp)
 		return EINVAL;
 	ol = oldlenp ? *oldlenp : 0;
-	switch (name) {
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
-	case ICMPV6CTL_ND6_DRLIST:
+#ifdef ICMPV6CTL_ND6_DRLIST
+	if (name == ICMPV6CTL_ND6_DRLIST) {
+		struct in6_defrouter *d, *de;
+		struct nd_defrouter *dr;
+
 		if (oldp) {
 			d = (struct in6_defrouter *)oldp;
 			de = (struct in6_defrouter *)((caddr_t)oldp + *oldlenp);
@@ -2360,8 +2358,13 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 				error = ENOMEM;
 		} else
 			*oldlenp = l;
-		break;
-	case ICMPV6CTL_ND6_PRLIST:
+	} else
+#endif
+#ifdef ICMPV6CTL_ND6_PRLIST
+	if (name == ICMPV6CTL_ND6_PRLIST) {
+		struct in6_prefix *p, *pe;
+		struct nd_prefix *pr;
+
 		if (oldp) {
 			p = (struct in6_prefix *)oldp;
 			pe = (struct in6_prefix *)((caddr_t)oldp + *oldlenp);
@@ -2433,11 +2436,10 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 				error = ENOMEM;
 		} else
 			*oldlenp = l;
-		break;
+	} else
 #endif
-	default:
+	{
 		error = ENOPROTOOPT;
-		break;
 	}
 	return error;
 }
