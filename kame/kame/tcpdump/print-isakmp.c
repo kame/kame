@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.15 2000/12/13 07:32:30 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.16 2000/12/13 20:00:22 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -775,7 +775,6 @@ isakmp_id_print(struct isakmp_gen *ext, u_char *ep, u_int32_t phase,
 	    }
 	}
 	if (data && len) {
-		len -= sizeof(*p);
 		printf(" len=%d", len);
 		if (2 < vflag) {
 			printf(" ");
