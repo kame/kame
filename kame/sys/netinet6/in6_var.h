@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.34 2000/07/03 17:18:56 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.35 2000/07/04 09:58:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -640,7 +640,7 @@ do {						\
 #endif /* not FreeBSD3 */
 
 int	in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
-			struct sockaddr_in6 *, int, int, int));
+			struct sockaddr_in6 *, int, int));
 struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *,
 				     int *));
 void	in6_delmulti __P((struct in6_multi *));

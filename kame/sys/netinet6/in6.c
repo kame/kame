@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.93 2000/07/04 08:55:30 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.94 2000/07/04 09:58:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -966,7 +966,7 @@ in6_control(so, cmd, data, ifp)
 		}
 
 		/* reset the interface and routing table appropriately. */
-		if ((error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0,
+		if ((error = in6_ifinit(ifp, ia, &ifra->ifra_addr,
 					hostIsNew, prefixIsNew)) != 0)
 			goto unlink;
 
@@ -1497,17 +1497,15 @@ in6_ifscrub(ifp, ia, delloop)
  * and routing table entry.
  */
 int
-in6_ifinit(ifp, ia, sin6, scrub, newhost, newprefix)
+in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 	struct ifnet *ifp;
 	struct in6_ifaddr *ia;
 	struct sockaddr_in6 *sin6;
-	int scrub, newhost, newprefix;
+	int newhost, newprefix;
 {
-	struct	sockaddr_in6 oldaddr;
 	int	error = 0;
 	int	s = splimp();
 
-	oldaddr = ia->ia_addr;
 	ia->ia_addr = *sin6;
 	/*
 	 * Give the interface a chance to initialize
@@ -1517,11 +1515,6 @@ in6_ifinit(ifp, ia, sin6, scrub, newhost, newprefix)
 	if (newhost && ifp->if_ioctl &&
 	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia))) {
 		splx(s);
-		/*
-		 * XXX: this restore is meaningful only for SIOCSxxx
-		 * operations, the operations which should be obsoleted. 
-		 */
-		ia->ia_addr = oldaddr;
 		return(error);
 	}
 
@@ -1539,11 +1532,6 @@ in6_ifinit(ifp, ia, sin6, scrub, newhost, newprefix)
 	}
 
 	splx(s);
-	if (scrub) {
-		ia->ia_ifa.ifa_addr = (struct sockaddr *)&oldaddr;
-		in6_ifscrub(ifp, ia, 1); /* XXX */
-		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
-	}
 	/* xxx
 	 * in(6)_socktrim...why omitted?
 	 */
