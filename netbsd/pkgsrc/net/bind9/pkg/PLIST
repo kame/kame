@@ -103,6 +103,7 @@ include/isc/bufferlist.h
 include/isc/commandline.h
 include/isc/condition.h
 include/isc/dir.h
+include/isc/entropy.h
 include/isc/error.h
 include/isc/event.h
 include/isc/eventclass.h
@@ -178,10 +179,12 @@ include/omapi/types.h
 @dirrm include/isc
 @dirrm include/lwres
 @dirrm include/omapi
-@comment man/man5/rndc.conf.5
-@comment man/man8/dnssec-keygen.8
-@comment man/man8/dnssec-makekeyset.8
-@comment man/man8/dnssec-signkey.8
-@comment man/man8/lwresd.8
-@comment man/man8/named.8
-@comment man/man8/rndc.8
+man/man1/host.1
+man/man5/rndc.conf.5
+man/man8/dnssec-keygen.8
+man/man8/dnssec-makekeyset.8
+man/man8/dnssec-signkey.8
+man/man8/lwresd.8
+man/man8/named.8
+man/man8/nsupdate.8
+man/man8/rndc.8
