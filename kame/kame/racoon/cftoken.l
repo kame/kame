@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.52 2001/02/22 03:10:40 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.53 2001/03/15 11:44:08 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -212,8 +212,8 @@ octetstring	{octet}({dot}{octet})+
 <S_PLCYP>{bcl}		{ return(BOC); }
 <S_PLCYP>{ecl}		{ BEGIN S_PLCYS; return(EOC); }
 <S_PLCYP>lifetime	{ YYD; return(LIFETIME); }
-<S_PLCYP>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }
-<S_PLCYP>byte		{ YYD; yylval.num = CF_LIFETYPE_BYTE; return(LIFETYPE); }
+<S_PLCYP>time		{ YYD; return(LIFETYPE_TIME); }
+<S_PLCYP>byte		{ YYD; return(LIFETYPE_BYTE); }
 	/* policy protocol */
 <S_PLCYP>protocol	{ BEGIN S_PLCYT; YYDB; return(PROTOCOL); }
 <S_PLCYT>{bcl}		{ return(BOC); }
@@ -247,8 +247,8 @@ octetstring	{octet}({dot}{octet})+
 <S_SAINFS>identifier	{ YYD; yywarn("it is obsoleted.  use \"my_identifier\"."); return(IDENTIFIER); }
 <S_SAINFS>my_identifier	{ YYD; return(MY_IDENTIFIER); }
 <S_SAINFS>lifetime	{ YYD; return(LIFETIME); }
-<S_SAINFS>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }
-<S_SAINFS>byte		{ YYD; yylval.num = CF_LIFETYPE_BYTE; return(LIFETYPE); }
+<S_SAINFS>time		{ YYD; return(LIFETYPE_TIME); }
+<S_SAINFS>byte		{ YYD; return(LIFETYPE_BYTE); }
 <S_SAINFS>encryption_algorithm { YYD; yylval.num = algclass_ipsec_enc; return(ALGORITHM_CLASS); }
 <S_SAINFS>authentication_algorithm { YYD; yylval.num = algclass_ipsec_auth; return(ALGORITHM_CLASS); }
 <S_SAINFS>compression_algorithm	{ YYD; yylval.num = algclass_ipsec_comp; return(ALGORITHM_CLASS); }
@@ -292,15 +292,15 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>claim		{ YYD; yylval.num = PROP_CHECK_CLAIM; return(PROPOSAL_CHECK_LEVEL); }
 <S_RMTS>keepalive	{ YYD; return(KEEPALIVE); }
 <S_RMTS>lifetime	{ YYD; return(LIFETIME); }
-<S_RMTS>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }
-<S_RMTS>byte		{ YYD; yylval.num = CF_LIFETYPE_BYTE; return(LIFETYPE); }
+<S_RMTS>time		{ YYD; return(LIFETYPE_TIME); }
+<S_RMTS>byte		{ YYD; return(LIFETYPE_BYTE); }
 	/* remote proposal */
 <S_RMTS>proposal	{ BEGIN S_RMTP; YYDB; return(PROPOSAL); }
 <S_RMTP>{bcl}		{ return(BOC); }
 <S_RMTP>{ecl}		{ BEGIN S_RMTS; return(EOC); }
 <S_RMTP>lifetime	{ YYD; return(LIFETIME); }
-<S_RMTP>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }
-<S_RMTP>byte		{ YYD; yylval.num = CF_LIFETYPE_BYTE; return(LIFETYPE); }
+<S_RMTP>time		{ YYD; return(LIFETYPE_TIME); }
+<S_RMTP>byte		{ YYD; return(LIFETYPE_BYTE); }
 <S_RMTP>strength	{ YYD; return(STRENGTH); }
 <S_RMTP>extra_high	{ YYD; yylval.num = algstrength_ehigh; return(STRENGTHTYPE); }
 <S_RMTP>high		{ YYD; yylval.num = algstrength_high; return(STRENGTHTYPE); }
@@ -390,13 +390,13 @@ asn1dn		{ YYD; yylval.num = IDTYPE_ASN1DN; return(IDENTIFIERTYPE); }
 certname	{ YYD; yywarn("certname will be obsoleted in near future."); yylval.num = IDTYPE_ASN1DN; return(IDENTIFIERTYPE); }
 
 	/* units */
-B|byte|bytes		{ YYD; yylval.num = CF_UNITTYPE_B; return(UNITTYPE); }
-KB			{ YYD; yylval.num = CF_UNITTYPE_KB; return(UNITTYPE); }
-MB			{ YYD; yylval.num = CF_UNITTYPE_MB; return(UNITTYPE); }
-TB			{ YYD; yylval.num = CF_UNITTYPE_TB; return(UNITTYPE); }
-sec|secs|second|seconds	{ YYD; yylval.num = CF_UNITTYPE_S; return(UNITTYPE); }
-min|mins|minute|minutes	{ YYD; yylval.num = CF_UNITTYPE_M; return(UNITTYPE); }
-hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
+B|byte|bytes		{ YYD; return(UNITTYPE_BYTE); }
+KB			{ YYD; return(UNITTYPE_KBYTES); }
+MB			{ YYD; return(UNITTYPE_MBYTES); }
+TB			{ YYD; return(UNITTYPE_TBYTES); }
+sec|secs|second|seconds	{ YYD; return(UNITTYPE_SEC); }
+min|mins|minute|minutes	{ YYD; return(UNITTYPE_MIN); }
+hour|hours		{ YYD; return(UNITTYPE_HOUR); }
 
 	/* boolean */
 yes		{ YYD; yylval.num = TRUE; return(BOOLEAN); }

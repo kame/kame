@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.90 2001/03/14 11:40:42 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.91 2001/03/15 11:44:08 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -104,6 +104,8 @@ static int set_isakmp_proposal
 static void clean_tmpalgtype __P((void));
 static int expand_isakmpspec __P((int, int, int *,
 	int, int, time_t, int, int, char *, struct remoteconf *));
+
+static int fix_lifebyte __P((u_long));
 %}
 
 %union {
@@ -152,10 +154,12 @@ static int expand_isakmpspec __P((int, int, int *,
 %token GSSAPI_ID
 
 %token PREFIX PORT PORTANY UL_PROTO ANY
-%token PFS_GROUP LIFETIME LIFETYPE UNITTYPE STRENGTH
+%token PFS_GROUP LIFETIME LIFETYPE_TIME LIFETYPE_BYTE STRENGTH
 
 %token NUMBER SWITCH BOOLEAN
 %token HEXSTRING QUOTEDSTRING ADDRSTRING
+%token UNITTYPE_BYTE UNITTYPE_KBYTES UNITTYPE_MBYTES UNITTYPE_TBYTES
+%token UNITTYPE_SEC UNITTYPE_MIN UNITTYPE_HOUR
 %token EOS BOC EOC COMMA
 
 %type <num> NUMBER BOOLEAN SWITCH keylength
@@ -164,10 +168,10 @@ static int expand_isakmpspec __P((int, int, int *,
 %type <num> ALGORITHMTYPE STRENGTHTYPE
 %type <num> PREFIX prefix PORT port ike_port DIRTYPE ACTION PLADDRTYPE WHICHSIDE
 %type <num> ul_proto UL_PROTO secproto
-%type <num> LIFETYPE UNITTYPE
 %type <num> SECLEVELTYPE SECMODETYPE 
 %type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE
 %type <num> CERTTYPE CERT_X509 PROPOSAL_CHECK_LEVEL
+%type <num> unittype_time unittype_byte
 %type <val> QUOTEDSTRING HEXSTRING ADDRSTRING sainfo_id
 %type <val> identifierstring
 %type <spidx> policy_index
@@ -369,7 +373,7 @@ timer_stmt
 			lcconf->retry_counter = $2;
 		}
 		EOS
-	|	RETRY_INTERVAL NUMBER UNITTYPE
+	|	RETRY_INTERVAL NUMBER unittype_time
 		{
 			lcconf->retry_interval = $2 * $3;
 		}
@@ -379,12 +383,12 @@ timer_stmt
 			lcconf->count_persend = $2;
 		}
 		EOS
-	|	RETRY_PHASE1 NUMBER UNITTYPE
+	|	RETRY_PHASE1 NUMBER unittype_time
 		{
 			lcconf->retry_checkph1 = $2 * $3;
 		}
 		EOS
-	|	RETRY_PHASE2 NUMBER UNITTYPE
+	|	RETRY_PHASE2 NUMBER unittype_time
 		{
 			lcconf->wait_ph2complete = $2 * $3;
 		}
@@ -547,20 +551,16 @@ ipsecproposal_specs
 	|	ipsecproposal_specs ipsecproposal_spec
 	;
 ipsecproposal_spec
-	:	LIFETIME LIFETYPE NUMBER UNITTYPE
+	:	LIFETIME LIFETYPE_TIME NUMBER unittype_time
 		{
-			if ($2 == CF_LIFETYPE_TIME)
-				prhead->lifetime = $3 * $4;
-			else {
-				/* i.e. CF_LIFETYPE_BYTE */
-				prhead->lifebyte = $3 * $4;
-				if (prhead->lifebyte < 1024) {
-					yyerror("byte size should be more "
-						"than 1024B.");
-					return -1;
-				}
-				prhead->lifebyte /= 1024;
-			}
+			prhead->lifetime = $3 * $4;
+		}
+		EOS
+	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
+		{
+			prhead->lifebyte = fix_lifebyte($3 * $4);
+			if (prhead->lifebyte == 0)
+				return -1;
 		}
 		EOS
 	|	PROTOCOL secproto
@@ -832,20 +832,16 @@ sainfo_spec
 			cur_sainfo->pfs_group = doi;
 		}
 		EOS
-	|	LIFETIME LIFETYPE NUMBER UNITTYPE
+	|	LIFETIME LIFETYPE_TIME NUMBER unittype_time
 		{
-			if ($2 == CF_LIFETYPE_TIME)
-				cur_sainfo->lifetime = $3 * $4;
-			else {
-				/* i.e. CF_LIFETYPE_BYTE */
-				cur_sainfo->lifebyte = $3 * $4;
-				if (cur_sainfo->lifebyte < 1024) {
-					yyerror("byte size should be more "
-						"than 1024B.");
-					return -1;
-				}
-				cur_sainfo->lifebyte /= 1024;
-			}
+			cur_sainfo->lifetime = $3 * $4;
+		}
+		EOS
+	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
+		{
+			cur_sainfo->lifebyte = fix_lifebyte($3 * $4);
+			if (cur_sainfo->lifebyte == 0)
+				return -1;
 		}
 		EOS
 	|	ALGORITHM_CLASS {
@@ -1093,25 +1089,16 @@ remote_spec
 	|	SUPPORT_MIP6 SWITCH { cur_rmconf->support_mip6 = $2; } EOS
 	|	INITIAL_CONTACT SWITCH { cur_rmconf->ini_contact = $2; } EOS
 	|	PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL { cur_rmconf->pcheck_level = $2; } EOS
-	|	LIFETIME LIFETYPE NUMBER UNITTYPE
+	|	LIFETIME LIFETYPE_TIME NUMBER unittype_time
 		{
-			if ($2 == CF_LIFETYPE_TIME)
-				prhead->lifetime = $3 * $4;
-			else {
-				/* i.e. CF_LIFETYPE_BYTE */
-				prhead->lifebyte = $3 * $4;
-				/*
-				 * check size.
-				 * Must be more than 1024B because its unit
-				 * is kilobytes.  That is defined RFC2407.
-				 */
-				if (prhead->lifebyte < 1024) {
-					yyerror("byte size should be more "
-						"than 1024B.");
-					return -1;
-				}
-				prhead->lifebyte /= 1024;
-			}
+			prhead->lifetime = $3 * $4;
+		}
+		EOS
+	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
+		{
+			prhead->lifebyte = fix_lifebyte($3 * $4);
+			if (prhead->lifebyte == 0)
+				return -1;
 		}
 		EOS
 	|	PROPOSAL
@@ -1197,25 +1184,16 @@ isakmpproposal_spec
 		{
 			yyerror("strength directive is obsoleted.");
 		} STRENGTHTYPE EOS
-	|	LIFETIME LIFETYPE NUMBER UNITTYPE
+	|	LIFETIME LIFETYPE_TIME NUMBER unittype_time
 		{
-			if ($2 == CF_LIFETYPE_TIME)
-				prhead->spspec->lifetime = $3 * $4;
-			else {
-				/* i.e. CF_LIFETYPE_BYTE */
-				prhead->spspec->lifebyte = $3 * $4;
-				/*
-				 * check size.
-				 * Must be more than 1024B because its unit
-				 * is kilobytes.  That is defined RFC2407.
-				 */
-				if (prhead->spspec->lifebyte < 1024) {
-					yyerror("byte size should be "
-						"more than 1024B.");
-					return -1;
-				}
-				prhead->spspec->lifebyte /= 1024;
-			}
+			prhead->spspec->lifetime = $3 * $4;
+		}
+		EOS
+	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
+		{
+			prhead->spspec->lifebyte = fix_lifebyte($3 * $4);
+			if (prhead->spspec->lifebyte == 0)
+				return -1;
 		}
 		EOS
 	|	DH_GROUP dh_group_num
@@ -1289,6 +1267,17 @@ isakmpproposal_spec
 		EOS
 	;
 
+unittype_time
+	:	UNITTYPE_SEC	{ $$ = 1; }
+	|	UNITTYPE_MIN	{ $$ = 60; }
+	|	UNITTYPE_HOUR	{ $$ = (60 * 60); }
+	;
+unittype_byte
+	:	UNITTYPE_BYTE	{ $$ = 1; }
+	|	UNITTYPE_KBYTES	{ $$ = 1024; }
+	|	UNITTYPE_MBYTES	{ $$ = (1024 * 1024); }
+	|	UNITTYPE_TBYTES	{ $$ = (1024 * 1024 * 1024); }
+	;
 %%
 
 static struct proposalspec *
@@ -1541,6 +1530,23 @@ expand_isakmpspec(prop_no, trns_no, types,
 	insisakmpsa(new, rmconf);
 
 	return trns_no;
+}
+
+/*
+ * fix lifebyte.
+ * Must be more than 1024B because its unit is kilobytes.
+ * That is defined RFC2407.
+ */
+static int
+fix_lifebyte(t)
+	unsigned long t;
+{
+	if (t < 1024) {
+		yyerror("byte size should be more than 1024B.");
+		return 0;
+	}
+
+	return(t / 1024);
 }
 
 int
