@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.66 2001/01/23 14:27:06 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.67 2001/01/23 14:47:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1090,7 +1090,6 @@ prelist_update(new, dr, m)
 			storedlifetime = lt6->ia6t_expire > time_second ?
 				lt6->ia6t_expire - time_second : 0;
 
-			printf("RA two hours rule check: vltime=%ul, stored=%ul, auth=%d, expire=%ul, second=%ul, mflag=%x\n", new->ndpr_vltime, storedlifetime, auth, lt6->ia6t_expire, time_second, m ? m->m_flags : 0xffffff);  
 			if (TWOHOUR < new->ndpr_vltime ||
 			    storedlifetime < new->ndpr_vltime) {
 				lt6->ia6t_vltime = new->ndpr_vltime;
