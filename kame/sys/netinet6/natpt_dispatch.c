@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.61 2002/06/23 08:26:52 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.62 2002/07/01 04:20:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -252,6 +252,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		/* regular packet */
 		cv4.ats = natpt_lookForHash4(&cv4);
 		if ((cv4.ats == NULL)
+		    && (cv4.ip_p == IPPROTO_ICMP)
 		    && ((ats = natpt_checkICMP(&cv4)) != NULL)) {
 			cv4.fromto = NATPT_TO;
 			cv4.flags |= NATPT_TRACEROUTE;

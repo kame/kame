@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.54 2002/06/23 08:00:38 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.55 2002/07/01 04:20:17 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -454,11 +454,6 @@ natpt_checkICMP(struct pcv *cv4)
 	struct sockaddr_in	 src, dst;
 	struct tslhash		*thr;
 	struct tSlot		*ats;
-
-	if ((cv4->ip_p != IPPROTO_ICMP)
-	    || ((cv4->pyld.icmp4->icmp_type != ICMP_UNREACH)
-		&& (cv4->pyld.icmp4->icmp_type != ICMP_TIMXCEED)))
-		return (NULL);
 
 	bzero(&src, sizeof(struct sockaddr_in));
 	bzero(&dst, sizeof(struct sockaddr_in));
