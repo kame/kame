@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.301 1999/11/29 07:55:20 itojun Exp $
+$Id: CHANGELOG,v 1.302 1999/11/29 12:27:27 itojun Exp $
 
 <199911>
+Mon Nov 29 21:24:25 JST 1999  itojun@iijlab.net
+	* netbsd/sys/dev/pcmcia/if_cnw.c: implement ioctls and multicast for
+	  cnw driver.  support Canadian card.  ioctl is compatible with bsdi
+	  and FreeBSD/PAO (bsdi driver has lots of stabilization code, which
+	  I would like to bring in).
+	* netbsd/usr.sbin/cnwctl: controlling program for cnw device.
+	  compatible with bsdi and FreeBSD/PAO.
+
 Mon Nov 29 16:53:28 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/smtpfeed: add pkgsrc directory for smtpfeed 1.02.
 
