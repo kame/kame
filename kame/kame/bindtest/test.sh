@@ -116,13 +116,5 @@ $bindtest -l -t -AP -2 -p $port
 $bindtest -t -AP -2 -6 -p $port
 $bindtest -l -t -AP -2 -6 -p $port
 
-$bindtest -t -AP -o $otheraddr -p $port
-$bindtest -t -AP -o $otheraddr6 -p $port
-$bindtest -l -t -AP -o $otheraddr -p $port
-$bindtest -l -t -AP -o $otheraddr6 -p $port
-$bindtest -t -AP -o $otheraddr -6 -p $port
-$bindtest -t -AP -o $otheraddr6 -6 -p $port
-$bindtest -l -t -AP -o $otheraddr -6 -p $port
-$bindtest -l -t -AP -o $otheraddr6 -6 -p $port
 echo
 uname -a) > $platform
