@@ -948,6 +948,7 @@ file netinet6/mip6_prefix.c		inet6 & mip6 & mip6_mobile_node
 file netinet6/mip6_halist.c		inet6 & mip6 & mip6_mobile_node
 file netinet6/mip6_fsm.c		inet6 & mip6 & mip6_mobile_node
 file netinet6/mld6.c			inet6
+file netinet6/mldv2.c			inet6 & mldv2
 file netinet6/nd6.c			inet6
 file netinet6/nd6_nbr.c			inet6
 file netinet6/nd6_rtr.c			inet6
