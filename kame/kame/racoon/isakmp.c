@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.101 2000/09/18 19:26:15 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.102 2000/09/21 03:46:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.101 2000/09/18 19:26:15 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.102 2000/09/21 03:46:31 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1085,7 +1085,6 @@ isakmp_parsewoh(np0, gen, len)
 				vfree(result);
 				return NULL;
 			}
-			result->l *= 2;
 			ep = (struct isakmp_parse_t *)
 				(result->v + result->l - sizeof(*ep));
 			p = (struct isakmp_parse_t *)result->v;
