@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.1 2001/01/24 00:24:37 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.2 2001/01/24 02:18:16 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -102,10 +102,10 @@
  * the value in [1].
  *
  * To add an entry to the table, we need to fill in the table entries under the
- * prefix we need to set.  For exapmle, if we need to configure route to 2/2,
+ * prefix we need to set.  For exapmle, if we need to configure route to 4/2,
  * we need to fill [6], [12] and [13] with the value we need.
  * To remove an entry, we need to undo it by overwriting it by parent;
- * to remove route to 2/2, copy value of [3] into [6], [12] and [13].
+ * to remove route to 4/2, copy value of [3] into [6], [12] and [13].
  *
  * When we need to concatenate tables (so that we can handle addresses longer
  * than ART_BITLEN), we do so by putting pointer to child table into
