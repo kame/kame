@@ -158,6 +158,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
 #include <netinet/icmp6.h>
+#include <netinet6/nd6.h>
 #endif
 
 #ifdef PULLDOWN_TEST
@@ -194,16 +195,17 @@ int	tcprexmtthresh = 3;
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
-#ifdef INET6
 /*
- * Neighbor Discovery, Neighbor Unreachability Detection
- * Upper layer hint.
+ * Neighbor Discovery, Neighbor Unreachability Detection Upper layer hint.
  */
+#ifdef INET6
 #define ND6_HINT(tp) \
 do { \
 	if (tp && tp->t_in6pcb && tp->t_in6pcb->in6p_route.ro_rt) \
-		nd6_nud_hint(t6p->t_in6pcb->in6p_route.ro_rt, NULL); \
+		nd6_nud_hint(tp->t_in6pcb->in6p_route.ro_rt, NULL); \
 } while (0)
+#else
+#define ND6_HINT(tp)
 #endif
 
 /*
@@ -477,6 +479,7 @@ present:
 
 	tp->rcv_nxt += q->ipqe_len;
 	pkt_flags = q->ipqe_flags & TH_FIN;
+	ND6_HINT(tp);
 
 	LIST_REMOVE(q, ipqe_q);
 	LIST_REMOVE(q, ipqe_timeq);
@@ -1143,6 +1146,7 @@ after_listen:
 				acked = th->th_ack - tp->snd_una;
 				tcpstat.tcps_rcvackpack++;
 				tcpstat.tcps_rcvackbyte += acked;
+				ND6_HINT(tp);
 				sbdrop(&so->so_snd, acked);
 				tp->snd_una = th->th_ack;
 				m_freem(m);
@@ -1182,6 +1186,7 @@ after_listen:
 			tp->rcv_nxt += tlen;
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += tlen;
+			ND6_HINT(tp);
 			/*
 			 * Drop TCP, IP headers and TCP options then add data
 			 * to socket buffer.
@@ -1704,6 +1709,7 @@ after_listen:
 		if (!tcp_do_newreno || SEQ_GEQ(th->th_ack, tp->snd_recover))
 			tp->snd_cwnd = min(cw + incr,TCP_MAXWIN<<tp->snd_scale);
 		}
+		ND6_HINT(tp);
 		if (acked > so->so_snd.sb_cc) {
 			tp->snd_wnd -= so->so_snd.sb_cc;
 			sbdrop(&so->so_snd, (int)so->so_snd.sb_cc);
@@ -1896,6 +1902,7 @@ dodata:							/* XXX */
 			tiflags = th->th_flags & TH_FIN;
 			tcpstat.tcps_rcvpack++;
 			tcpstat.tcps_rcvbyte += tlen;
+			ND6_HINT(tp);
 			m_adj(m, hdroptlen);
 			sbappend(&(so)->so_rcv, m);
 			sorwakeup(so);
