@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.219 2001/09/19 10:05:43 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.220 2001/09/20 06:17:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,6 +131,9 @@
 #include <netinet6/nd6.h>
 #ifdef __bsdi__
 #include <netinet6/raw_ip6.h>
+#endif
+#ifdef MIP6
+#include <netinet6/mip6.h>
 #endif
 
 #if defined(IPSEC) && !defined(__OpenBSD__)

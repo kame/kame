@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.31 2001/08/03 11:56:01 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.32 2001/09/20 06:15:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,6 +60,9 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
 
 /*
  * Destination options header processing.
