@@ -1,11 +1,12 @@
-$Id: CHANGELOG,v 1.505 2000/02/01 03:45:39 itojun Exp $
+$Id: CHANGELOG,v 1.506 2000/02/01 16:21:15 sumikawa Exp $
 
 <200002>
 Tue Feb  1 12:45:02 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/games/quake6: quake over IPv6.
+	* {netbsd/pkgsrc/games/quake6, freebsd3/ports}: quake over IPv6.
 
 Tue Feb  1 01:52:20 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/echoping: echoping 2.2.0 with IPv6 support.
+	* freebsd3/ports/lynx: upgrade 2.8.2rel1 with current IPv6 patch.
 
 Tue Feb  1 01:11:34 JST 2000  itojun@iijlab.net
 	* {netbsd/pkgsrc/mail,freebsd3/ports}/soldpop3d: pop3 daemon from
