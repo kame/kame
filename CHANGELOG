@@ -1,9 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.112 1999/09/13 16:39:10 itojun Exp $
+$Id: CHANGELOG,v 1.113 1999/09/14 12:18:09 jinmei Exp $
 
 
 <199909>
+1999-09-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/bgp_output.c (bgp_send_update): added a sanity
+	check of the origin of a route before sending UPDATE for the
+	route. This will prevent SEGV when sending update of a non-BGP
+	route. It is strongly recommended to apply this fix if you use
+	the KAME bgpd as an EBGP router.
+	Thanks to: Nobumichi Ozoe <nobumichi_ozoe@ydc.co.jp> for reporting
+	the problem.
+
 Tue Sep 14 01:37:37 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra, freebsd[23]/ports/zebra:
 	  upgrade to 0.79.
