@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1017 2000/06/14 17:09:39 itojun Exp $
+$Id: CHANGELOG,v 1.1018 2000/06/14 17:26:49 sumikawa Exp $
 <200006>
+Thu Jun 15 02:18:24 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/zebra: upgrade to 0.87.
+	* freebsd3/ports/ruby: use 1.4.4.
+
 Thu Jun 15 02:07:53 JST 2000  itojun@iijlab.net
 	* kame/man/man4/inet6.4, *bsd*/usr.sbin/inetd/inetd.8:
 	  update wording on IPv4 mapped address and tcp4/tcp6 interaction.
