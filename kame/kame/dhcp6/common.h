@@ -47,3 +47,11 @@ extern int in6_addrscopebyif __P((struct in6_addr *, char *));
 extern int in6_scope __P((struct in6_addr *));
 extern void setloglevel __P((int));
 extern void dprintf __P((int, const char *, ...));
+
+/* missing */
+#ifndef HAVE_STRLCAT
+extern size_t strlcat __P((char *, const char *, size_t));
+#endif
+#ifndef HAVE_STRLCPY
+extern size_t strlcpy __P((char *, const char *, size_t));
+#endif
