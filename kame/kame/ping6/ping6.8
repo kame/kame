@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.17 2000/05/09 17:34:27 itojun Exp $
+.\"     $Id: ping6.8,v 1.18 2000/05/18 13:16:11 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -338,15 +338,9 @@ using the
 option of
 .Nm Ns .
 .Sh RETURN VALUES
-The
 .Nm
-command returns an exit status of zero if at least one response was
-heard from the specified
-.Ar host ;
-a status of two if the transmission was successful but no responses
-were received; or another value
-.Pq from Aq Pa sysexits.h
-if an error occurred.
+returns 0 on success (the host is alive),
+and non-zero if the arguments are incorrect or the host is not responding.
 .Sh SEE ALSO
 .Xr netstat 1 ,
 .Xr ifconfig 8 ,
