@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2625 2004/06/10 12:44:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.2626 2004/06/10 12:44:56 jinmei Exp $
 
 <200406>
 2004-06-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/dhcp6/dhcp6c.c: supported the delayed authentication
-	protocol as specified in RFC3315 for secure DHCPv6 exchanges
-	between the client and the server(s).
+	* kame/kame/dhcp6: supported the delayed authentication protocol
+	as specified in RFC3315 for secure DHCPv6 exchanges between the
+	client and the server(s).
 
 2004-06-09  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/pim6sd/vif.[ch], mld6v2_proto.c mld6_proto.c:
