@@ -89,12 +89,6 @@ laddr_to_eui64(dst, src, len)
 	bzero(zero, sizeof(zero));
 
 	switch (len) {
-	case 1:
-		bzero(dst, 7);
-		dst[7] = src[0];
-		/* raise u bit to indicate that this is not globally unique */
-		dst[0] |= 0x02;
-		break;
 	case 6:
 		if (bcmp(zero, src, 6) == 0)
 			return EINVAL;
@@ -498,13 +492,10 @@ in6_ifattach(ifp, type, laddr, noloop)
 		rtflag = RTF_CLONING;
 		if (laddr == NULL)
 			break;
-		if (laddr_to_eui64(&ia->ia_addr.sin6_addr.s6_addr8[8],
-				laddr, 1) != 0) {
-			break;
-		}
-		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
-		ia->ia_addr.sin6_addr.s6_addr8[8] ^= 0x02;
-		break;
+
+		/* make non-global IF id out of link-level address */
+		bzero(&ia->ia_addr.sin6_addr.s6_addr8[8], 7);
+		ia->ia_addr.sin6_addr.s6_addr8[15] = *laddr;
 	}
 
 	ia->ia_ifa.ifa_metric = ifp->if_metric;

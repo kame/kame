@@ -1314,6 +1314,7 @@ in6_ifinit(ifp, ia, sin6, scrub)
 	}
 
 	switch (ifp->if_type) {
+	case IFT_ARCNET:
 	case IFT_ETHER:
 	case IFT_FDDI:
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
