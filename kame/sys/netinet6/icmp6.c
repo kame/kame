@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.177 2000/12/23 02:35:18 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.178 2000/12/27 02:18:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,7 +167,9 @@ extern u_char ip6_protox[];
 
 struct icmp6stat icmp6stat;
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined (__OpenBSD__)
+struct inpcbtable rawin6pcbtable;
+#elif !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 extern struct in6pcb rawin6pcb;
 #else
 extern struct inpcbhead ripcb;
@@ -249,6 +251,9 @@ icmp6_init()
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	icmp6_mtudisc_timeout_q = rt_timer_queue_create(pmtu_expire);
 	icmp6_redirect_timeout_q = rt_timer_queue_create(icmp6_redirtimeout);
+#endif
+#ifdef __OpenBSD__
+	in_pcbinit(&rawin6pcbtable, 1);
 #endif
 }
 
