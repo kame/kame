@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.376 2003/06/20 15:29:05 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.377 2003/06/26 07:34:23 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1462,7 +1462,8 @@ skip_ipsec2:;
 		mtu32 = (u_int32_t)mtu;
 		bzero(&ip6cp, sizeof(ip6cp));
 		ip6cp.ip6c_cmdarg = (void *)&mtu32;
-		pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst, (void *)&ip6cp);
+		pfctlinput2(PRC_MSGSIZE, (struct sockaddr *)&ro_pmtu->ro_dst,
+		    (void *)&ip6cp);
 
 		error = EMSGSIZE;
 		goto bad;
@@ -1531,7 +1532,8 @@ skip_ipsec2:;
 		mtu32 = (u_int32_t)mtu;
 		bzero(&ip6cp, sizeof(ip6cp));
 		ip6cp.ip6c_cmdarg = (void *)&mtu32;
-		pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst, (void *)&ip6cp);
+		pfctlinput2(PRC_MSGSIZE, (struct sockaddr *)&ro_pmtu->ro_dst,
+		    (void *)&ip6cp);
 
 		len = (mtu - hlen - sizeof(struct ip6_frag)) & ~7;
 		if (len < 8) {

@@ -392,11 +392,7 @@ struct syn_cache {
 	union {					/* cached route */
 		struct route route4;
 #ifdef INET6
-#if 1 /*def NEW_STRUCT_ROUTE*/
-		struct route route6;
-#else
 		struct route_in6 route6;
-#endif
 #endif
 	} sc_route_u;
 #define sc_route4	sc_route_u.route4

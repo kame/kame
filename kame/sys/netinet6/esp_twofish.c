@@ -1,4 +1,4 @@
-/*	$KAME: esp_twofish.c,v 1.5 2003/01/20 00:55:27 itojun Exp $	*/
+/*	$KAME: esp_twofish.c,v 1.6 2003/06/26 07:34:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -44,6 +44,8 @@
 
 #include <net/if.h>
 #include <net/route.h>
+
+#include <netinet/in.h>
 
 #include <netinet6/ipsec.h>
 #include <netinet6/esp.h>

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.179 2003/04/28 06:38:03 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.180 2003/06/26 07:34:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,7 +57,6 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
-#include <net/if_stf.h>
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -67,6 +66,8 @@
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet/in_pcb.h>
 #endif
+
+#include <net/if_stf.h>
 
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>

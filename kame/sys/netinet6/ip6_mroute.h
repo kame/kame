@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.20 2003/06/19 07:56:23 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.21 2003/06/26 07:34:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -217,7 +217,7 @@ struct mif6 {
 	u_quad_t	m6_pkt_out;	/* # pkts out on interface           */
 	u_quad_t	m6_bytes_in;	/* # bytes in on interface	     */
 	u_quad_t	m6_bytes_out;	/* # bytes out on interface	     */
-#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__OpenBSD__)  || defined(__FreeBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__OpenBSD__)  || defined(__FreeBSD__)
 	struct route m6_route;/* cached route if this is a tunnel */
 #else
 	struct route_in6 m6_route;/* cached route if this is a tunnel */

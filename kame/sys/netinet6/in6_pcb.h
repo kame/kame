@@ -99,7 +99,7 @@ struct	in6pcb {
 	u_int32_t in6p_flowinfo;	/* priority and flowlabel */
 	struct	socket *in6p_socket;	/* back pointer to socket */
 	caddr_t	in6p_ppcb;		/* pointer to per-protocol pcb */
-#if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__FreeBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__FreeBSD__)
 	struct	route in6p_route;	/* placeholder for routing entry */
 #else
 	struct	route_in6 in6p_route;	/* placeholder for routing entry */
