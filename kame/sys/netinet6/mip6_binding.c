@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.135 2002/09/20 05:13:47 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.136 2002/09/25 11:41:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2670,7 +2670,11 @@ mip6_tunnel_input(mp, offp, proto)
 
 		mip6stat.mip6s_revtunnel++;
 
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		if (IF_QFULL(&ip6intrq)) {
 			IF_DROP(&ip6intrq);	/* update statistics */
 			splx(s);

@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.c,v 1.3 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_priq.c,v 1.4 2002/09/25 11:41:19 itojun Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -212,7 +212,11 @@ priq_class_create(pif, pri, qlimit, flags)
 
 	if ((cl = pif->pif_classes[pri]) != NULL) {
 		/* modify the class instead of creating a new one */
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		if (!qempty(cl->cl_q))
 			priq_purgeq(cl);
 		splx(s);
@@ -312,7 +316,11 @@ priq_class_destroy(cl)
 	struct priq_if *pif;
 	int s, pri;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 
 	/* delete filters referencing to this class */
 	acc_discard_filters(&cl->cl_pif->pif_classifier, cl, 0);

@@ -1,4 +1,4 @@
-/*      $KAME: if_vrrp.c,v 1.3 2002/09/11 02:34:15 itojun Exp $ */
+/*      $KAME: if_vrrp.c,v 1.4 2002/09/25 11:41:21 itojun Exp $ */
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -560,7 +560,11 @@ vrrp_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if (ifindex  == 0) {
 			vrrp_unconfig(ifp);
 			if (ifp->if_flags & IFF_UP) {
+#ifdef __NetBSD__
+				int s = splnet();
+#else
 				int s = splimp();
+#endif
 				if_down(ifp);
 				splx(s);
 			}		
@@ -588,7 +592,11 @@ vrrp_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		ifp->if_flags |= IFF_RUNNING;
 		{
+#ifdef __NetBSD__
+			int s = splnet();
+#else
 			int s = splimp();
+#endif
 			if_up(ifp);
 			splx(s);
 		}

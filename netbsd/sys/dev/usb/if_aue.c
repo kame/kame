@@ -1,4 +1,4 @@
-/*	$NetBSD: if_aue.c,v 1.42.2.2 2001/03/13 20:45:36 he Exp $	*/
+/*	$NetBSD: if_aue.c,v 1.75 2002/03/18 14:01:05 christos Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -34,8 +34,8 @@
  */
 
 /*
- * ADMtek AN986 Pegasus USB to ethernet driver. Datasheet is available
- * from http://www.admtek.com.tw.
+ * ADMtek AN986 Pegasus and AN8511 Pegasus II USB to ethernet driver.
+ * Datasheet is available from http://www.admtek.com.tw.
  *
  * Written by Bill Paul <wpaul@ee.columbia.edu>
  * Electrical Engineering Department
@@ -76,6 +76,9 @@
  * proper cleanup on errors
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_aue.c,v 1.75 2002/03/18 14:01:05 christos Exp $");
+
 #if defined(__NetBSD__)
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -88,42 +91,27 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
+#include <sys/lock.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
-
-#if defined(__FreeBSD__)
-
-#include <net/ethernet.h>
-#include <machine/clock.h>	/* for DELAY */
-#include <sys/bus.h>
-/* "controller miibus0" required.  See GENERIC if you get errors here. */
-#include "miibus_if.h"
-
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 
 #include <sys/device.h>
 #if NRND > 0
 #include <sys/rnd.h>
 #endif
 
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
-
 #include <net/if.h>
-#if defined(__NetBSD__) || defined(__FreeBSD__)
+#if defined(__NetBSD__)
 #include <net/if_arp.h>
 #endif
 #include <net/if_dl.h>
 #include <net/if_media.h>
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 #define BPF_MTAP(ifp, m) bpf_mtap((ifp)->if_bpf, (m))
-#else
-#define BPF_MTAP(ifp, m) bpf_mtap((ifp), (m))
-#endif
 
-#if defined(__FreeBSD__) || NBPFILTER > 0
+#if NBPFILTER > 0
 #include <net/bpf.h>
 #endif
 
@@ -145,12 +133,10 @@
 #endif
 #endif /* defined(__OpenBSD__) */
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 #ifdef NS
 #include <netns/ns.h>
 #include <netns/ns_if.h>
 #endif
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -159,10 +145,6 @@
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdevs.h>
-
-#ifdef __FreeBSD__
-#include <dev/usb/usb_ethersubr.h>
-#endif
 
 #include <dev/usb/if_auereg.h>
 
@@ -179,29 +161,70 @@ int	auedebug = 0;
  * Various supported device vendors/products.
  */
 struct aue_type {
-	u_int16_t		aue_vid;
-	u_int16_t		aue_did;
-	char			aue_linksys;
+	struct usb_devno	aue_dev;
+	u_int16_t		aue_flags;
+#define LSYS	0x0001		/* use Linksys reset */
+#define PNA	0x0002		/* has Home PNA */
+#define PII	0x0004		/* Pegasus II chip */
 };
 
-Static struct aue_type aue_devs[] = {
-  { USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USB100,	0 },
-  { USB_VENDOR_MELCO, 		USB_PRODUCT_MELCO_LUATX, 	0 },
-  { USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB100TX,	1 },
-  { USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB100H1,	1 },
-  { USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10TA,	1 },
-  { USB_VENDOR_ADMTEK,		USB_PRODUCT_ADMTEK_PEGASUS,	0 },
-  { USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX,	1 },
-  { USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX_PNA,	0 },
-  { USB_VENDOR_SMC,		USB_PRODUCT_SMC_2202USB,	0 },
-  { USB_VENDOR_COREGA,		USB_PRODUCT_COREGA_FETHER_USB_TX, 0 },
-  { USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTX,	0 },
-  { 0, 0, 0 }
+Static const struct aue_type aue_devs[] = {
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX1},	  PNA|PII },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX2},	  PII },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_UFE1000},	  LSYS },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX4},	  PNA },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX5},	  PNA },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX6},	  PII },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX7},	  PII },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX8},	  PII },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX9},	  PNA },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_XX10},	  0 },
+ {{ USB_VENDOR_ABOCOM,		USB_PRODUCT_ABOCOM_DSB650TX_PNA}, 0 },
+ {{ USB_VENDOR_ACCTON,		USB_PRODUCT_ACCTON_USB320_EC},	  0 },
+ {{ USB_VENDOR_ACCTON,		USB_PRODUCT_ACCTON_SS1001},	  PII },
+ {{ USB_VENDOR_ADMTEK,		USB_PRODUCT_ADMTEK_PEGASUS},	  PNA },
+ {{ USB_VENDOR_ADMTEK,		USB_PRODUCT_ADMTEK_PEGASUSII},	  PII },
+ {{ USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USB100},	  0 },
+ {{ USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USBLP100}, PNA },
+ {{ USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USBEL100}, 0 },
+ {{ USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USBE100},  PII },
+ {{ USB_VENDOR_COREGA,		USB_PRODUCT_COREGA_FETHER_USB_TX}, 0 },
+ {{ USB_VENDOR_COREGA,		USB_PRODUCT_COREGA_FETHER_USB_TXS},PII },
+ {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX4},	  LSYS|PII },
+ {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX1},	  LSYS },
+ {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX},	  LSYS },
+ {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX_PNA},  PNA },
+ {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX3},	  LSYS|PII },
+ {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650TX2},	  LSYS|PII },
+ {{ USB_VENDOR_DLINK,		USB_PRODUCT_DLINK_DSB650},	  0 },
+ {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX0},	  0 },
+ {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX1},	  0 },
+ {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX2},	  0 },
+ {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBTX3},	  PII },
+ {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBLTX},	  PII },
+ {{ USB_VENDOR_ELSA,		USB_PRODUCT_ELSA_USB2ETHERNET},	  0 },
+ {{ USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTX},	  0 },
+ {{ USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTXS},	  PII },
+ {{ USB_VENDOR_KINGSTON,	USB_PRODUCT_KINGSTON_KNU101TX},   0 },
+ {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10TX1},	  LSYS|PII },
+ {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10T},	  LSYS },
+ {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB100TX},	  LSYS },
+ {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB100H1},	  LSYS|PNA },
+ {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10TA},	  LSYS },
+ {{ USB_VENDOR_LINKSYS,		USB_PRODUCT_LINKSYS_USB10TX2},	  LSYS|PII },
+ {{ USB_VENDOR_MELCO, 		USB_PRODUCT_MELCO_LUATX1}, 	  0 },
+ {{ USB_VENDOR_MELCO, 		USB_PRODUCT_MELCO_LUATX5}, 	  0 },
+ {{ USB_VENDOR_MELCO, 		USB_PRODUCT_MELCO_LUA2TX5}, 	  PII },
+ {{ USB_VENDOR_SIEMENS,		USB_PRODUCT_SIEMENS_SPEEDSTREAM}, PII },
+ {{ USB_VENDOR_SMARTBRIDGES,	USB_PRODUCT_SMARTBRIDGES_SMARTNIC},PII },
+ {{ USB_VENDOR_SMC,		USB_PRODUCT_SMC_2202USB},	  0 },
+ {{ USB_VENDOR_SOHOWARE,	USB_PRODUCT_SOHOWARE_NUB100},	  0 },
 };
+#define aue_lookup(v, p) ((struct aue_type *)usb_lookup(aue_devs, v, p))
 
 USB_DECLARE_DRIVER(aue);
 
-Static struct aue_type *aue_lookup(u_int16_t vendor, u_int16_t product);
+Static void aue_reset_pegasus_II(struct aue_softc *sc);
 Static int aue_tx_list_init(struct aue_softc *);
 Static int aue_rx_list_init(struct aue_softc *);
 Static int aue_newbuf(struct aue_softc *, struct aue_chain *, struct mbuf *);
@@ -210,14 +233,12 @@ Static void aue_intr(usbd_xfer_handle, usbd_private_handle, usbd_status);
 Static void aue_rxeof(usbd_xfer_handle, usbd_private_handle, usbd_status);
 Static void aue_txeof(usbd_xfer_handle, usbd_private_handle, usbd_status);
 Static void aue_tick(void *);
+Static void aue_tick_task(void *);
 Static void aue_start(struct ifnet *);
 Static int aue_ioctl(struct ifnet *, u_long, caddr_t);
 Static void aue_init(void *);
 Static void aue_stop(struct aue_softc *);
 Static void aue_watchdog(struct ifnet *);
-#ifdef __FreeBSD__
-Static void aue_shutdown(device_ptr_t);
-#endif
 Static int aue_openpipes(struct aue_softc *);
 Static int aue_ifmedia_upd(struct ifnet *);
 Static void aue_ifmedia_sts(struct ifnet *, struct ifmediareq *);
@@ -225,12 +246,11 @@ Static void aue_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 Static int aue_eeprom_getword(struct aue_softc *, int);
 Static void aue_read_mac(struct aue_softc *, u_char *);
 Static int aue_miibus_readreg(device_ptr_t, int, int);
-#if defined(__FreeBSD__)
-Static int aue_miibus_writereg(device_ptr_t, int, int, int);
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 Static void aue_miibus_writereg(device_ptr_t, int, int, int);
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 Static void aue_miibus_statchg(device_ptr_t);
+
+Static void aue_lock_mii(struct aue_softc *);
+Static void aue_unlock_mii(struct aue_softc *);
 
 Static void aue_setmulti(struct aue_softc *);
 Static u_int32_t aue_crc(caddr_t);
@@ -240,51 +260,6 @@ Static int aue_csr_read_1(struct aue_softc *, int);
 Static int aue_csr_write_1(struct aue_softc *, int, int);
 Static int aue_csr_read_2(struct aue_softc *, int);
 Static int aue_csr_write_2(struct aue_softc *, int, int);
-
-#if defined(__FreeBSD__)
-#if !defined(lint)
-static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.11 2000/01/14 01:36:14 wpaul Exp $";
-#endif
-
-Static void aue_rxstart(struct ifnet *);
-
-Static struct usb_qdat aue_qdat;
-
-Static device_method_t aue_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		aue_match),
-	DEVMETHOD(device_attach,	aue_attach),
-	DEVMETHOD(device_detach,	aue_detach),
-	DEVMETHOD(device_shutdown,	aue_shutdown),
-
-	/* bus interface */
-	DEVMETHOD(bus_print_child,	bus_generic_print_child),
-	DEVMETHOD(bus_driver_added,	bus_generic_driver_added),
-
-	/* MII interface */
-	DEVMETHOD(miibus_readreg,	aue_miibus_readreg),
-	DEVMETHOD(miibus_writereg,	aue_miibus_writereg),
-	DEVMETHOD(miibus_statchg,	aue_miibus_statchg),
-
-	{ 0, 0 }
-};
-
-Static driver_t aue_driver = {
-	"aue",
-	aue_methods,
-	sizeof(struct aue_softc)
-};
-
-Static devclass_t aue_devclass;
-
-DRIVER_MODULE(if_aue, uhub, aue_driver, aue_devclass, usbd_driver_load, 0);
-DRIVER_MODULE(miibus, aue, miibus_driver, miibus_devclass, 0, 0);
-
-#endif /* __FreeBSD__ */
-
-#define AUE_DO_REQUEST(dev, req, data)			\
-	usbd_do_request_flags(dev, req, data, USBD_NO_TSLEEP, NULL)
 
 #define AUE_SETBIT(sc, reg, x)				\
 	aue_csr_write_1(sc, reg, aue_csr_read_1(sc, reg) | (x))
@@ -298,7 +273,6 @@ aue_csr_read_1(struct aue_softc *sc, int reg)
 	usb_device_request_t	req;
 	usbd_status		err;
 	uByte			val = 0;
-	int			s;
 
 	if (sc->aue_dying)
 		return (0);
@@ -309,9 +283,7 @@ aue_csr_read_1(struct aue_softc *sc, int reg)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 1);
 
-	s = splusb();
-	err = AUE_DO_REQUEST(sc->aue_udev, &req, &val);
-	splx(s);
+	err = usbd_do_request(sc->aue_udev, &req, &val);
 
 	if (err) {
 		DPRINTF(("%s: aue_csr_read_1: reg=0x%x err=%s\n",
@@ -328,7 +300,6 @@ aue_csr_read_2(struct aue_softc *sc, int reg)
 	usb_device_request_t	req;
 	usbd_status		err;
 	uWord			val;
-	int			s;
 
 	if (sc->aue_dying)
 		return (0);
@@ -339,9 +310,7 @@ aue_csr_read_2(struct aue_softc *sc, int reg)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 2);
 
-	s = splusb();
-	err = AUE_DO_REQUEST(sc->aue_udev, &req, &val);
-	splx(s);
+	err = usbd_do_request(sc->aue_udev, &req, &val);
 
 	if (err) {
 		DPRINTF(("%s: aue_csr_read_2: reg=0x%x err=%s\n",
@@ -357,7 +326,6 @@ aue_csr_write_1(struct aue_softc *sc, int reg, int aval)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
-	int			s;
 	uByte			val;
 
 	if (sc->aue_dying)
@@ -370,9 +338,7 @@ aue_csr_write_1(struct aue_softc *sc, int reg, int aval)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 1);
 
-	s = splusb();
-	err = AUE_DO_REQUEST(sc->aue_udev, &req, &val);
-	splx(s);
+	err = usbd_do_request(sc->aue_udev, &req, &val);
 
 	if (err) {
 		DPRINTF(("%s: aue_csr_write_1: reg=0x%x err=%s\n",
@@ -388,7 +354,6 @@ aue_csr_write_2(struct aue_softc *sc, int reg, int aval)
 {
 	usb_device_request_t	req;
 	usbd_status		err;
-	int			s;
 	uWord			val;
 
 	if (sc->aue_dying)
@@ -401,9 +366,7 @@ aue_csr_write_2(struct aue_softc *sc, int reg, int aval)
 	USETW(req.wIndex, reg);
 	USETW(req.wLength, 2);
 
-	s = splusb();
-	err = AUE_DO_REQUEST(sc->aue_udev, &req, &val);
-	splx(s);
+	err = usbd_do_request(sc->aue_udev, &req, &val);
 
 	if (err) {
 		DPRINTF(("%s: aue_csr_write_2: reg=0x%x err=%s\n",
@@ -457,6 +420,22 @@ aue_read_mac(struct aue_softc *sc, u_char *dest)
 	}
 }
 
+/* Get exclusive access to the MII registers */
+Static void
+aue_lock_mii(struct aue_softc *sc)
+{
+	sc->aue_refcnt++;
+	lockmgr(&sc->aue_mii_lock, LK_EXCLUSIVE, NULL);
+}
+
+Static void
+aue_unlock_mii(struct aue_softc *sc)
+{
+	lockmgr(&sc->aue_mii_lock, LK_RELEASE, NULL);
+	if (--sc->aue_refcnt < 0)
+		usb_detach_wakeup(USBDEV(sc->aue_dev));
+}
+
 Static int
 aue_miibus_readreg(device_ptr_t dev, int phy, int reg)
 {
@@ -464,6 +443,14 @@ aue_miibus_readreg(device_ptr_t dev, int phy, int reg)
 	int			i;
 	u_int16_t		val;
 
+	if (sc->aue_dying) {
+#ifdef DIAGNOSTIC
+		printf("%s: dying\n", USBDEVNAME(sc->aue_dev));
+#endif
+		return 0;
+	}
+
+#if 0
 	/*
 	 * The Am79C901 HomePNA PHY actually contains
 	 * two transceivers: a 1Mbps HomePNA PHY and a
@@ -476,10 +463,12 @@ aue_miibus_readreg(device_ptr_t dev, int phy, int reg)
 	 */
 	if (sc->aue_vendor == USB_VENDOR_ADMTEK &&
 	    sc->aue_product == USB_PRODUCT_ADMTEK_PEGASUS) {
-		if (phy != 1)
+		if (phy == 3)
 			return (0);
 	}
+#endif
 
+	aue_lock_mii(sc);
 	aue_csr_write_1(sc, AUE_PHY_ADDR, phy);
 	aue_csr_write_1(sc, AUE_PHY_CTL, reg | AUE_PHYCTL_READ);
 
@@ -489,8 +478,7 @@ aue_miibus_readreg(device_ptr_t dev, int phy, int reg)
 	}
 
 	if (i == AUE_TIMEOUT) {
-		printf("%s: MII read timed out\n",
-		    USBDEVNAME(sc->aue_dev));
+		printf("%s: MII read timed out\n", USBDEVNAME(sc->aue_dev));
 	}
 
 	val = aue_csr_read_2(sc, AUE_PHY_DATA);
@@ -498,32 +486,28 @@ aue_miibus_readreg(device_ptr_t dev, int phy, int reg)
 	DPRINTFN(11,("%s: %s: phy=%d reg=%d => 0x%04x\n",
 		     USBDEVNAME(sc->aue_dev), __FUNCTION__, phy, reg, val));
 
+	aue_unlock_mii(sc);
 	return (val);
 }
 
-#if defined(__FreeBSD__)
-Static int
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 Static void
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 aue_miibus_writereg(device_ptr_t dev, int phy, int reg, int data)
 {
 	struct aue_softc	*sc = USBGETSOFTC(dev);
 	int			i;
 
+#if 0
 	if (sc->aue_vendor == USB_VENDOR_ADMTEK &&
 	    sc->aue_product == USB_PRODUCT_ADMTEK_PEGASUS) {
 		if (phy == 3)
-#if defined(__FreeBSD__)
-			return (0);
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 			return;
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 	}
+#endif
 
 	DPRINTFN(11,("%s: %s: phy=%d reg=%d data=0x%04x\n",
 		     USBDEVNAME(sc->aue_dev), __FUNCTION__, phy, reg, data));
 
+	aue_lock_mii(sc);
 	aue_csr_write_2(sc, AUE_PHY_DATA, data);
 	aue_csr_write_1(sc, AUE_PHY_ADDR, phy);
 	aue_csr_write_1(sc, AUE_PHY_CTL, reg | AUE_PHYCTL_WRITE);
@@ -537,10 +521,7 @@ aue_miibus_writereg(device_ptr_t dev, int phy, int reg, int data)
 		printf("%s: MII read timed out\n",
 		    USBDEVNAME(sc->aue_dev));
 	}
-
-#if defined(__FreeBSD__)
-	return (0);
-#endif
+	aue_unlock_mii(sc);
 }
 
 Static void
@@ -551,6 +532,7 @@ aue_miibus_statchg(device_ptr_t dev)
 
 	DPRINTFN(5,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev), __FUNCTION__));
 
+	aue_lock_mii(sc);
 	AUE_CLRBIT(sc, AUE_CTL0, AUE_CTL0_RX_ENB | AUE_CTL0_TX_ENB);
 
 	if (IFM_SUBTYPE(mii->mii_media_active) == IFM_100_TX) {
@@ -565,17 +547,19 @@ aue_miibus_statchg(device_ptr_t dev)
 		AUE_CLRBIT(sc, AUE_CTL1, AUE_CTL1_DUPLEX);
 
 	AUE_SETBIT(sc, AUE_CTL0, AUE_CTL0_RX_ENB | AUE_CTL0_TX_ENB);
+	aue_unlock_mii(sc);
 
 	/*
 	 * Set the LED modes on the LinkSys adapter.
 	 * This turns on the 'dual link LED' bin in the auxmode
 	 * register of the Broadcom PHY.
 	 */
-	if (sc->aue_linksys) {
+	if (!sc->aue_dying && (sc->aue_flags & LSYS)) {
 		u_int16_t auxmode;
 		auxmode = aue_miibus_readreg(dev, 0, 0x1b);
 		aue_miibus_writereg(dev, 0, 0x1b, auxmode | 0x04);
 	}
+	DPRINTFN(5,("%s: %s: exit\n", USBDEVNAME(sc->aue_dev), __FUNCTION__));
 }
 
 #define AUE_POLY	0xEDB88320
@@ -601,12 +585,8 @@ Static void
 aue_setmulti(struct aue_softc *sc)
 {
 	struct ifnet		*ifp;
-#if defined(__FreeBSD__)
-	struct ifmultiaddr	*ifma;
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 	struct ether_multi	*enm;
 	struct ether_multistep	step;
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 	u_int32_t		h = 0, i;
 
 	DPRINTFN(5,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev), __FUNCTION__));
@@ -627,15 +607,6 @@ allmulti:
 		aue_csr_write_1(sc, AUE_MAR0 + i, 0);
 
 	/* now program new ones */
-#if defined(__FreeBSD__)
-	for (ifma = ifp->if_multiaddrs.lh_first; ifma != NULL;
-	    ifma = ifma->ifma_link.le_next) {
-		if (ifma->ifma_addr->sa_family != AF_LINK)
-			continue;
-		h = aue_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
-		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0x7));
-	}
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 #if defined(__NetBSD__)
 	ETHER_FIRST_MULTI(step, &sc->aue_ec, enm);
 #else
@@ -652,7 +623,20 @@ allmulti:
 	}
 
 	ifp->if_flags &= ~IFF_ALLMULTI;
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
+}
+
+Static void
+aue_reset_pegasus_II(struct aue_softc *sc)
+{
+	/* Magic constants taken from Linux driver. */
+	aue_csr_write_1(sc, AUE_REG_1D, 0);
+	aue_csr_write_1(sc, AUE_REG_7B, 2);
+#if 0
+	if ((sc->aue_flags & HAS_HOME_PNA) && mii_mode)
+		aue_csr_write_1(sc, AUE_REG_81, 6);
+	else
+#endif
+		aue_csr_write_1(sc, AUE_REG_81, 2);
 }
 
 Static void
@@ -672,6 +656,14 @@ aue_reset(struct aue_softc *sc)
 	if (i == AUE_TIMEOUT)
 		printf("%s: reset failed\n", USBDEVNAME(sc->aue_dev));
 
+#if 0
+	/* XXX what is mii_mode supposed to be */
+	if (sc->aue_mii_mode && (sc->aue_flags & PNA))
+		aue_csr_write_1(sc, AUE_GPIO1, 0x34);
+	else
+		aue_csr_write_1(sc, AUE_GPIO1, 0x26);
+#endif
+
 	/*
 	 * The PHY(s) attached to the Pegasus chip may be held
 	 * in reset until we flip on the GPIO outputs. Make sure
@@ -681,32 +673,22 @@ aue_reset(struct aue_softc *sc)
 	 * Note: We force all of the GPIO pins low first, *then*
 	 * enable the ones we want.
   	 */
-	aue_csr_write_1(sc, AUE_GPIO0, 
-	    AUE_GPIO_OUT0 | AUE_GPIO_SEL0);
-  	aue_csr_write_1(sc, AUE_GPIO0,
-	    AUE_GPIO_OUT0 | AUE_GPIO_SEL0 | AUE_GPIO_SEL1);
-  
-	/* Grrr. LinkSys has to be different from everyone else. */
-	if (sc->aue_linksys) {
+	if (sc->aue_flags & LSYS) {
+		/* Grrr. LinkSys has to be different from everyone else. */
 		aue_csr_write_1(sc, AUE_GPIO0, 
 		    AUE_GPIO_SEL0 | AUE_GPIO_SEL1);
-		aue_csr_write_1(sc, AUE_GPIO0,
-		    AUE_GPIO_SEL0 | AUE_GPIO_SEL1 | AUE_GPIO_OUT0);
+	} else {
+		aue_csr_write_1(sc, AUE_GPIO0, 
+		    AUE_GPIO_OUT0 | AUE_GPIO_SEL0);
 	}
+  	aue_csr_write_1(sc, AUE_GPIO0,
+	    AUE_GPIO_OUT0 | AUE_GPIO_SEL0 | AUE_GPIO_SEL1);
+
+	if (sc->aue_flags & PII)
+		aue_reset_pegasus_II(sc);
 
 	/* Wait a little while for the chip to get its brains in order. */
 	delay(10000);		/* XXX */
-}
-
-Static struct aue_type *
-aue_lookup(u_int16_t vendor, u_int16_t product)
-{
-	struct aue_type	*t;
-
-	for (t = aue_devs; t->aue_vid != 0; t++)
-		if (vendor == t->aue_vid && product == t->aue_did)
-			return (t);
-	return (NULL);
 }
 
 /*
@@ -742,22 +724,22 @@ USB_ATTACH(aue)
 	usb_endpoint_descriptor_t	*ed;
 	int			i;
 
-#ifdef __FreeBSD__
-	bzero(sc, sizeof(struct aue_softc));
-#endif
-
 	DPRINTFN(5,(" : aue_attach: sc=%p", sc));
 
 	usbd_devinfo(dev, 0, devinfo);
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", USBDEVNAME(sc->aue_dev), devinfo);
 
-	err = usbd_set_config_no(dev, AUE_CONFIG_NO, 0);
+	err = usbd_set_config_no(dev, AUE_CONFIG_NO, 1);
 	if (err) {
 		printf("%s: setting config no failed\n",
 		    USBDEVNAME(sc->aue_dev));
 		USB_ATTACH_ERROR_RETURN;
 	}
+
+	usb_init_task(&sc->aue_tick_task, aue_tick_task, sc);
+	usb_init_task(&sc->aue_stop_task, (void (*)(void *))aue_stop, sc);
+	lockinit(&sc->aue_mii_lock, PZERO, "auemii", 0, 0);
 
 	err = usbd_device2interface_handle(dev, AUE_IFACE_IDX, &iface);
 	if (err) {
@@ -766,7 +748,7 @@ USB_ATTACH(aue)
 		USB_ATTACH_ERROR_RETURN;
 	}
 
-	sc->aue_linksys = aue_lookup(uaa->vendor, uaa->product)->aue_linksys;
+	sc->aue_flags = aue_lookup(uaa->vendor, uaa->product)->aue_flags;
 
 	sc->aue_udev = dev;
 	sc->aue_iface = iface;
@@ -802,7 +784,7 @@ USB_ATTACH(aue)
 	}
 
 
-	s = splimp();
+	s = splnet();
 
 	/* Reset the adapter. */
 	aue_reset(sc);
@@ -816,58 +798,6 @@ USB_ATTACH(aue)
 	 * A Pegasus chip was detected. Inform the world.
 	 */
 	ifp = GET_IFP(sc);
-#if defined(__FreeBSD__)
-	printf("%s: Ethernet address: %6D\n", USBDEVNAME(sc->aue_dev),
-	    eaddr, ":");
-
-	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
-
-	ifp->if_softc = sc;
-	ifp->if_unit = sc->aue_unit;
-	ifp->if_name = "aue";
-	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_ioctl = aue_ioctl;
-	ifp->if_output = ether_output;
-	ifp->if_start = aue_start;
-	ifp->if_watchdog = aue_watchdog;
-	ifp->if_init = aue_init;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-
-	/*
-	 * Do MII setup.
-	 * NOTE: Doing this causes child devices to be attached to us,
-	 * which we would normally disconnect at in the detach routine
-	 * using device_delete_child(). However the USB code is set up
-	 * such that when this driver is removed, all childred devices
-	 * are removed as well. In effect, the USB code ends up detaching
-	 * all of our children for us, so we don't have to do is ourselves
-	 * in aue_detach(). It's important to point this out since if
-	 * we *do* try to detach the child devices ourselves, we will
-	 * end up getting the children deleted twice, which will crash
-	 * the system.
-	 */
-	if (mii_phy_probe(self, &sc->aue_miibus,
-	    aue_ifmedia_upd, aue_ifmedia_sts)) {
-		printf("%s: MII without any PHY!\n", USBDEVNAME(sc->aue_dev));
-		splx(s);
-		USB_ATTACH_ERROR_RETURN;
-	}
-
-	aue_qdat.ifp = ifp;
-	aue_qdat.if_rxstart = aue_rxstart;
-
-	/*
-	 * Call MI attach routines.
-	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
-
-	usb_register_netisr();
-
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
-
 	printf("%s: Ethernet address %s\n", USBDEVNAME(sc->aue_dev),
 	    ether_sprintf(eaddr));
 
@@ -891,6 +821,7 @@ USB_ATTACH(aue)
 	mii->mii_readreg = aue_miibus_readreg;
 	mii->mii_writereg = aue_miibus_writereg;
 	mii->mii_statchg = aue_miibus_statchg;
+	mii->mii_flags = MIIF_AUTOTSLEEP;
 	ifmedia_init(&mii->mii_media, 0, aue_ifmedia_upd, aue_ifmedia_sts);
 	mii_attach(self, mii, 0xffffffff, MII_PHY_ANY, MII_OFFSET_ANY, 0);
 	if (LIST_FIRST(&mii->mii_phys) == NULL) {
@@ -902,17 +833,10 @@ USB_ATTACH(aue)
 	/* Attach the interface. */
 	if_attach(ifp);
 	Ether_ifattach(ifp, eaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB,
-		  sizeof(struct ether_header));
-#endif
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, USBDEVNAME(sc->aue_dev),
 	    RND_TYPE_NET, 0);
 #endif
-
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
 	usb_callout_init(sc->aue_stat_ch);
 
@@ -933,15 +857,20 @@ USB_DETACH(aue)
 
 	DPRINTFN(2,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev), __FUNCTION__));
 
-	s = splusb();
-
-	usb_uncallout(sc->aue_stat_ch, aue_tick, sc);
-
 	if (!sc->aue_attached) {
 		/* Detached before attached finished, so just bail out. */
-		splx(s);
 		return (0);
 	}
+
+	usb_uncallout(sc->aue_stat_ch, aue_tick, sc);
+	/*
+	 * Remove any pending tasks.  They cannot be executing because they run
+	 * in the same thread as detach.
+	 */
+	usb_rem_task(sc->aue_udev, &sc->aue_tick_task);
+	usb_rem_task(sc->aue_udev, &sc->aue_stop_task);
+
+	s = splusb();
 
 	if (ifp->if_flags & IFF_RUNNING)
 		aue_stop(sc);
@@ -952,9 +881,6 @@ USB_DETACH(aue)
 #endif
 	mii_detach(&sc->aue_mii, MII_PHY_ANY, MII_OFFSET_ANY);
 	ifmedia_delete_instance(&sc->aue_mii.mii_media, IFM_INST_ANY);
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
 	ether_ifdetach(ifp);
 #endif /* __NetBSD__ */
 
@@ -969,6 +895,11 @@ USB_DETACH(aue)
 #endif
 
 	sc->aue_attached = 0;
+
+	if (--sc->aue_refcnt >= 0) {
+		/* Wait for processes to go away. */
+		usb_detach_wait(USBDEV(sc->aue_dev));
+	}
 	splx(s);
 
 	usbd_add_drv_event(USB_EVENT_DRIVER_DETACH, sc->aue_udev, 
@@ -977,7 +908,6 @@ USB_DETACH(aue)
 	return (0);
 }
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 int
 aue_activate(device_ptr_t self, enum devact act)
 {
@@ -997,7 +927,6 @@ aue_activate(device_ptr_t self, enum devact act)
 	}
 	return (0);
 }
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
 /*
  * Initialize an RX descriptor and attach an MBUF cluster.
@@ -1116,7 +1045,7 @@ aue_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 		sc->aue_intr_errs++;
 		if (usbd_ratecheck(&sc->aue_rx_notice)) {
 			printf("%s: %u usb errors on intr: %s\n",
-			    USBDEVNAME(sc->aue_dev), sc->aue_rx_errs,
+			    USBDEVNAME(sc->aue_dev), sc->aue_intr_errs,
 			    usbd_errstr(status));
 			sc->aue_intr_errs = 0;
 		}
@@ -1132,29 +1061,6 @@ aue_intr(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 		ifp->if_collisions++;
 }
 
-#if defined(__FreeBSD__)
-Static void
-aue_rxstart(struct ifnet *ifp)
-{
-	struct aue_softc	*sc;
-	struct aue_chain	*c;
-
-	sc = ifp->if_softc;
-	c = &sc->aue_cdata.aue_rx_chain[sc->aue_cdata.aue_rx_prod];
-
-	if (aue_newbuf(sc, c, NULL) == ENOBUFS) {
-		ifp->if_ierrors++;
-		return;
-	}
-
-	/* Setup new transfer. */
-	usbd_setup_xfer(c->aue_xfer, sc->aue_ep[AUE_ENDPT_RX],
-	    c, mtod(c->aue_mbuf, char *), AUE_BUFSZ, USBD_SHORT_XFER_OK,
-	    USBD_NO_TIMEOUT, aue_rxeof);
-	usbd_transfer(c->aue_xfer);
-}
-#endif
-
 /*
  * A frame has been uploaded: pass the resulting mbuf chain up to
  * the higher level protocols.
@@ -1168,9 +1074,7 @@ aue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	struct mbuf		*m;
 	u_int32_t		total_len;
 	struct aue_rxpkt	r;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int			s;
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
 	DPRINTFN(10,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev),__FUNCTION__));
 
@@ -1197,7 +1101,7 @@ aue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	usbd_get_xfer_status(xfer, NULL, NULL, &total_len, NULL);
 
-	memcpy(mtod(c->aue_mbuf, char*), c->aue_buf, total_len);
+	memcpy(mtod(c->aue_mbuf, char *), c->aue_buf, total_len);
 
 	if (total_len <= 4 + ETHER_CRC_LEN) {
 		ifp->if_ierrors++;
@@ -1219,17 +1123,9 @@ aue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	m->m_pkthdr.len = m->m_len = total_len;
 	ifp->if_ipackets++;
 
-#if defined(__FreeBSD__)
-	m->m_pkthdr.rcvif = (struct ifnet *)&kue_qdat;
-	/* Put the packet on the special USB input queue. */
-	usb_ether_input(m);
-
-	return;
-
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 	m->m_pkthdr.rcvif = ifp;
 
-	s = splimp();
+	s = splnet();
 
 	/* XXX ugly */
 	if (aue_newbuf(sc, c, NULL) == ENOBUFS) {
@@ -1244,21 +1140,8 @@ aue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	 * a broadcast packet, multicast packet, matches our ethernet
 	 * address or the interface is in promiscuous mode.
 	 */
-	if (ifp->if_bpf) {
-#if defined(__NetBSD__)
-		struct ether_header *eh = mtod(m, struct ether_header *);
+	if (ifp->if_bpf)
 		BPF_MTAP(ifp, m);
-		if ((ifp->if_flags & IFF_PROMISC) &&
-		    memcmp(eh->ether_dhost, LLADDR(ifp->if_sadl),
-			   ETHER_ADDR_LEN) &&
-		    !(eh->ether_dhost[0] & 1)) {
-			m_freem(m);
-			goto done1;
-		}
-#else
-		BPF_MTAP(ifp, m);
-#endif
-	}
 #endif
 
 	DPRINTFN(10,("%s: %s: deliver %d\n", USBDEVNAME(sc->aue_dev),
@@ -1266,7 +1149,6 @@ aue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	IF_INPUT(ifp, m);
  done1:
 	splx(s);
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
  done:
 
@@ -1297,7 +1179,7 @@ aue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	if (sc->aue_dying)
 		return;
 
-	s = splimp();
+	s = splnet();
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", USBDEVNAME(sc->aue_dev),
 		    __FUNCTION__, status));
@@ -1321,17 +1203,11 @@ aue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	ifp->if_opackets++;
 
-#if defined(__FreeBSD__)
-	c->aue_mbuf->m_pkthdr.rcvif = ifp;
-	usb_tx_done(c->aue_mbuf);
-  	c->aue_mbuf = NULL;
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 	m_freem(c->aue_mbuf);
 	c->aue_mbuf = NULL;
 
 	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		aue_start(ifp);
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
 	splx(s);
 }
@@ -1340,9 +1216,6 @@ Static void
 aue_tick(void *xsc)
 {
 	struct aue_softc	*sc = xsc;
-	struct ifnet		*ifp;
-	struct mii_data		*mii;
-	int			s;
 
 	DPRINTFN(15,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev),__FUNCTION__));
 
@@ -1352,16 +1225,33 @@ aue_tick(void *xsc)
 	if (sc->aue_dying)
 		return;
 
+	/* Perform periodic stuff in process context. */
+	usb_add_task(sc->aue_udev, &sc->aue_tick_task);
+}
+
+Static void
+aue_tick_task(void *xsc)
+{
+	struct aue_softc	*sc = xsc;
+	struct ifnet		*ifp;
+	struct mii_data		*mii;
+	int			s;
+
+	DPRINTFN(15,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev),__FUNCTION__));
+
+	if (sc->aue_dying)
+		return;
+
 	ifp = GET_IFP(sc);
 	mii = GET_MII(sc);
 	if (mii == NULL)
 		return;
 
-	s = splimp();
+	s = splnet();
 
 	mii_tick(mii);
 	if (!sc->aue_link) {
-		mii_pollstat(mii);
+		mii_pollstat(mii); /* XXX FreeBSD has removed this call */
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 			DPRINTFN(2,("%s: %s: got link\n",
@@ -1414,7 +1304,8 @@ aue_send(struct aue_softc *sc, struct mbuf *m, int idx)
 	if (err != USBD_IN_PROGRESS) {
 		printf("%s: aue_send error=%s\n", USBDEVNAME(sc->aue_dev),
 		       usbd_errstr(err));
-		aue_stop(sc);
+		/* Stop the interface from process context. */
+		usb_add_task(sc->aue_udev, &sc->aue_stop_task);
 		return (EIO);
 	}
 	DPRINTFN(5,("%s: %s: send %d bytes\n", USBDEVNAME(sc->aue_dev),
@@ -1488,14 +1379,14 @@ aue_init(void *xsc)
 	if (ifp->if_flags & IFF_RUNNING)
 		return;
 
-	s = splimp();
+	s = splnet();
 
 	/*
 	 * Cancel pending I/O and free all RX/TX buffers.
 	 */
 	aue_reset(sc);
 
-#if defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__OpenBSD__)
 	eaddr = sc->arpcom.ac_enaddr;
 #elif defined(__NetBSD__)
 	eaddr = LLADDR(ifp->if_sadl);
@@ -1641,9 +1532,7 @@ Static int
 aue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	struct aue_softc	*sc = ifp->if_softc;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 	struct ifaddr 		*ifa = (struct ifaddr *)data;
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 	struct ifreq		*ifr = (struct ifreq *)data;
 	struct mii_data		*mii;
 	int			s, error = 0;
@@ -1651,16 +1540,9 @@ aue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	if (sc->aue_dying)
 		return (EIO);
 
-	s = splimp();
+	s = splnet();
 
 	switch(command) {
-#if defined(__FreeBSD__)
-	case SIOCSIFADDR:
-	case SIOCGIFADDR:
-	case SIOCSIFMTU:
-		error = ether_ioctl(ifp, command, data);
-		break;
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
 	case SIOCSIFADDR:
 		ifp->if_flags |= IFF_UP;
 		aue_init(sc);
@@ -1700,7 +1582,6 @@ aue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			ifp->if_mtu = ifr->ifr_mtu;
 		break;
 
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_flags & IFF_RUNNING &&
@@ -1722,14 +1603,12 @@ aue_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 		error = (command == SIOCADDMULTI) ?
 			ether_addmulti(ifr, &sc->aue_ec) :
 			ether_delmulti(ifr, &sc->aue_ec);
 		if (error == ENETRESET) {
 			aue_init(sc);
 		}
-#endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 		aue_setmulti(sc);
 		error = 0;
 		break;
@@ -1752,25 +1631,23 @@ Static void
 aue_watchdog(struct ifnet *ifp)
 {
 	struct aue_softc	*sc = ifp->if_softc;
+	struct aue_chain	*c;
+	usbd_status		stat;
+	int			s;
 
 	DPRINTFN(5,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev), __FUNCTION__));
 
 	ifp->if_oerrors++;
 	printf("%s: watchdog timeout\n", USBDEVNAME(sc->aue_dev));
 
-	/*
-	 * The polling business is a kludge to avoid allowing the
-	 * USB code to call tsleep() in usbd_delay_ms(), which will
-	 * kill us since the watchdog routine is invoked from
-	 * interrupt context.
-	 */
-	usbd_set_polling(sc->aue_udev, 1);
-	aue_stop(sc);
-	aue_init(sc);
-	usbd_set_polling(sc->aue_udev, 0);
+	s = splusb();
+	c = &sc->aue_cdata.aue_tx_chain[0];
+	usbd_get_xfer_status(c->aue_xfer, NULL, NULL, NULL, &stat);
+	aue_txeof(c->aue_xfer, c, stat);
 
 	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		aue_start(ifp);
+	splx(s);
 }
 
 /*
@@ -1865,20 +1742,3 @@ aue_stop(struct aue_softc *sc)
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 }
-
-#ifdef __FreeBSD__
-/*
- * Stop all chip I/O so that the kernel's probe routines don't
- * get confused by errant DMAs when rebooting.
- */
-Static void
-aue_shutdown(device_ptr_t dev)
-{
-	struct aue_softc	*sc = USBGETSOFTC(dev);
-
-	DPRINTFN(5,("%s: %s: enter\n", USBDEVNAME(sc->aue_dev), __FUNCTION__));
-
-	aue_reset(sc);
-	aue_stop(sc);
-}
-#endif

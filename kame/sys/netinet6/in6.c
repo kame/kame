@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.315 2002/09/25 09:43:46 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.316 2002/09/25 11:41:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2012,7 +2012,11 @@ in6_ifinit(ifp, ia, sin6, newhost)
 	int newhost;
 {
 	int	error = 0, plen, ifacount = 0;
+#ifdef __NetBSD__
+	int	s = splnet();
+#else
 	int	s = splimp();
+#endif
 	struct ifaddr *ifa;
 
 	/*

@@ -1,5 +1,10 @@
-/*	$NetBSD: if_xi.c,v 1.2.2.2 2001/06/11 19:17:03 he Exp $	*/
+/*	$NetBSD: if_xi.c,v 1.21 2002/05/05 03:19:26 takemura Exp $ */
 /*	OpenBSD: if_xe.c,v 1.9 1999/09/16 11:28:42 niklas Exp 	*/
+
+/*
+ * XXX THIS DRIVER IS BROKEN WRT. MULTICAST LISTS AND PROMISC/ALLMULTI
+ * XXX FLAGS!
+ */
 
 /*
  * Copyright (c) 1999 Niklas Hallqvist, Brandon Creighton, Job de Haas
@@ -43,6 +48,9 @@
  * 2) Slow. ~450KB/s.  Memory access would be better.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_xi.c,v 1.21 2002/05/05 03:19:26 takemura Exp $");
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -53,6 +61,11 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>
+
+#include "rnd.h"
+#if NRND > 0
+#include <sys/rnd.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -100,8 +113,6 @@
 #include <dev/pcmcia/pcmciavar.h>
 #include <dev/pcmcia/pcmciadevs.h>
 
-#define XI_IOSIZ	16
-
 #include <dev/pcmcia/if_xireg.h>
 
 #ifdef __GNUC__
@@ -144,12 +155,15 @@ struct xi_softc {
 
 	bus_space_tag_t		sc_bst;		/* Bus cookie */
 	bus_space_handle_t	sc_bsh;		/* Bus I/O handle */
-	bus_addr_t		sc_offset;	/* Offset of registers */
+	bus_size_t		sc_offset;	/* Offset of registers */
 
 	u_int8_t	sc_rev;			/* Chip revision */
 	u_int32_t	sc_flags;		/* Misc. flags */
 	int		sc_all_mcasts;		/* Receive all multicasts */
 	u_int8_t 	sc_enaddr[ETHER_ADDR_LEN];
+#if NRND > 0
+	rndsource_element_t	sc_rnd_source;
+#endif
 };
 
 struct xi_pcmcia_softc {
@@ -160,16 +174,20 @@ struct xi_pcmcia_softc {
 	struct	pcmcia_io_handle sc_pcioh;	/* iospace info */
 	int	sc_io_window;			/* io window info */
 	void	*sc_ih;				/* Interrupt handler */
-
+	void	*sc_powerhook;			/* power hook descriptor */
 	int	sc_resource;			/* resource allocated */
 #define XI_RES_PCIC	1
-#define XI_RES_IO	2
+#define XI_RES_IO_ALLOC	2
+#define XI_RES_IO_MAP	4
 #define XI_RES_MI	8
 };
 
 struct cfattach xi_pcmcia_ca = {
-	sizeof(struct xi_pcmcia_softc), xi_pcmcia_match, xi_pcmcia_attach,
-	xi_pcmcia_detach, xi_pcmcia_activate
+	sizeof(struct xi_pcmcia_softc),
+	xi_pcmcia_match,
+	xi_pcmcia_attach,
+	xi_pcmcia_detach,
+	xi_pcmcia_activate
 };
 
 static int xi_pcmcia_cis_quirks __P((struct pcmcia_function *));
@@ -193,15 +211,18 @@ static void xi_start __P((struct ifnet *));
 static void xi_statchg __P((struct device *));
 static void xi_stop __P((struct xi_softc *));
 static void xi_watchdog __P((struct ifnet *));
-struct xi_pcmcia_product *xi_pcmcia_identify __P((struct device *,
+const struct xi_pcmcia_product *xi_pcmcia_identify __P((struct device *,
 						struct pcmcia_attach_args *));
+static int xi_pcmcia_enable __P((struct xi_pcmcia_softc *));
+static void xi_pcmcia_disable __P((struct xi_pcmcia_softc *));
+static void xi_pcmcia_power __P((int, void *));
 
 /* flags */
 #define XIFLAGS_MOHAWK	0x001		/* 100Mb capabilities (has phy) */
 #define XIFLAGS_DINGO	0x002		/* realport cards ??? */
 #define XIFLAGS_MODEM	0x004		/* modem also present */
 
-struct xi_pcmcia_product {
+const struct xi_pcmcia_product {
 	u_int32_t	xpp_vendor;	/* vendor ID */
 	u_int32_t	xpp_product;	/* product ID */
 	int		xpp_expfunc;	/* expected function number */
@@ -228,6 +249,12 @@ struct xi_pcmcia_product {
 	{ PCMCIA_VENDOR_INTEL,		0x0143,
 	  0,				XIFLAGS_MOHAWK | XIFLAGS_MODEM,
 	  PCMCIA_STR_INTEL_EEPRO100 },
+	{ PCMCIA_VENDOR_XIRCOM,		PCMCIA_PRODUCT_XIRCOM_XE2000,
+	  0,				XIFLAGS_MOHAWK,
+	  PCMCIA_STR_XIRCOM_XE2000 },
+	{ PCMCIA_VENDOR_XIRCOM,		PCMCIA_PRODUCT_XIRCOM_REM56,
+	  0,				XIFLAGS_MOHAWK | XIFLAGS_DINGO | XIFLAGS_MODEM,
+	  PCMCIA_STR_XIRCOM_REM56 },
 #ifdef NOT_SUPPORTED
 	{ PCMCIA_VENDOR_XIRCOM,		0x1141,
 	  0,				XIFLAGS_MODEM,
@@ -257,12 +284,12 @@ struct xi_pcmcia_product {
 };
 
 
-struct xi_pcmcia_product *
+const struct xi_pcmcia_product *
 xi_pcmcia_identify(dev, pa)
 	struct device *dev;
         struct pcmcia_attach_args *pa;
 {
-	struct xi_pcmcia_product *xpp;
+	const struct xi_pcmcia_product *xpp;
         u_int8_t id;
 	u_int32_t prod;
 
@@ -287,9 +314,8 @@ xi_pcmcia_identify(dev, pa)
 }
 
 /*
- * If someone can determine which manufacturers/products require cis_quirks,
- * then the proper infrastucture can be used.  Until then...
- * This also becomes a pain with detaching.
+ * The quirks are done here instead of the traditional framework because
+ * of the difficulty in identifying the devices.
  */
 static int
 xi_pcmcia_cis_quirks(pf)
@@ -303,11 +329,10 @@ xi_pcmcia_cis_quirks(pf)
 
 	/* Fake a cfe. */
 	SIMPLEQ_FIRST(&pf->cfe_head) = cfe = (struct pcmcia_config_entry *)
-	    malloc(sizeof(*cfe), M_DEVBUF, M_NOWAIT);
+	    malloc(sizeof(*cfe), M_DEVBUF, M_NOWAIT|M_ZERO);
 
 	if (cfe == NULL)
 		return -1;
-	bzero(cfe, sizeof(*cfe));
 
 	/*
 	 * XXX Use preprocessor symbols instead.
@@ -332,6 +357,9 @@ xi_pcmcia_match(parent, match, aux)
 {
 	struct pcmcia_attach_args *pa = aux;
 	
+	if (pa->manufacturer == PCMCIA_VENDOR_XIRCOM &&
+	    pa->product == 0x110a)
+		return (2); /* prevent attach to com_pcmcia */
 	if (pa->pf->function != PCMCIA_FUNCTION_NETWORK)
 		return (0);
 
@@ -360,7 +388,7 @@ xi_pcmcia_attach(parent, self, aux)
 	struct xi_softc *sc = &psc->sc_xi;
 	struct pcmcia_attach_args *pa = aux;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
-	struct xi_pcmcia_product *xpp;
+	const struct xi_pcmcia_product *xpp;
 
 	if (xi_pcmcia_cis_quirks(pa->pf) < 0) {
 		printf(": function enable failed\n");
@@ -377,20 +405,23 @@ xi_pcmcia_attach(parent, self, aux)
 	psc->sc_resource |= XI_RES_PCIC;
 
 	/* allocate/map ISA I/O space */
-	if (pcmcia_io_alloc(psc->sc_pf, 0, XI_IOSIZ, XI_IOSIZ,
+	if (pcmcia_io_alloc(psc->sc_pf, 0, XI_IOSIZE, XI_IOSIZE,
 		&psc->sc_pcioh) != 0) {
-		printf(": i/o allocation failed\n");
+		printf(": I/O allocation failed\n");
 		goto fail;
 	}
-	if (pcmcia_io_map(psc->sc_pf, PCMCIA_WIDTH_IO16, 0, XI_IOSIZ,
-		&psc->sc_pcioh, &psc->sc_io_window)) {
-		printf(": can't map i/o space\n");
-		goto fail;
-	}
+	psc->sc_resource |= XI_RES_IO_ALLOC;
+
 	sc->sc_bst = psc->sc_pcioh.iot;
 	sc->sc_bsh = psc->sc_pcioh.ioh;
 	sc->sc_offset = 0;
-	psc->sc_resource |= XI_RES_IO;
+
+	if (pcmcia_io_map(psc->sc_pf, PCMCIA_WIDTH_AUTO, 0, XI_IOSIZE,
+		&psc->sc_pcioh, &psc->sc_io_window)) {
+		printf(": can't map I/O space\n");
+		goto fail;
+	}
+	psc->sc_resource |= XI_RES_IO_MAP;
 
 	xpp = xi_pcmcia_identify(parent,pa);
 	if (xpp == NULL) {
@@ -402,7 +433,7 @@ xi_pcmcia_attach(parent, self, aux)
 	printf(": %s\n", xpp->xpp_name);
 
 	/*
-	 * Configuration as adviced by DINGO documentation.
+	 * Configuration as advised by DINGO documentation.
 	 * Dingo has some extra configuration registers in the CCR space.
 	 */
 	if (sc->sc_flags & XIFLAGS_DINGO) {
@@ -410,12 +441,12 @@ xi_pcmcia_attach(parent, self, aux)
 		int ccr_window;
 		bus_addr_t ccr_offset;
 
+		/* get access to the DINGO CCR space */
 		if (pcmcia_mem_alloc(psc->sc_pf, PCMCIA_CCR_SIZE_DINGO,
 			&pcmh)) {
 			DPRINTF(XID_CONFIG, ("xi: bad mem alloc\n"));
 			goto fail;
 		}
-
 		if (pcmcia_mem_map(psc->sc_pf, PCMCIA_MEM_ATTR,
 			psc->sc_pf->ccr_base, PCMCIA_CCR_SIZE_DINGO,
 			&pcmh, &ccr_offset, &ccr_window)) {
@@ -424,6 +455,7 @@ xi_pcmcia_attach(parent, self, aux)
 			goto fail;
 		}
 
+		/* enable the second function - usually modem */
 		bus_space_write_1(pcmh.memt, pcmh.memh,
 		    ccr_offset + PCMCIA_CCR_DCOR0, PCMCIA_CCR_DCOR0_SFINT);
 		bus_space_write_1(pcmh.memt, pcmh.memh,
@@ -442,7 +474,7 @@ xi_pcmcia_attach(parent, self, aux)
 	}
 
 	/*
-	 * Try to get the ethernet address from FUNCE/LAN_NID tuple.
+	 * Get the ethernet address from FUNCE/LAN_NID tuple.
 	 */
 	xi_pcmcia_funce_enaddr(parent, sc->sc_enaddr);
 	if (!sc->sc_enaddr) {
@@ -462,7 +494,6 @@ xi_pcmcia_attach(parent, self, aux)
 	ifp->if_watchdog = xi_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_NOTRAILERS | IFF_SIMPLEX | IFF_MULTICAST;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
 	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Reset and initialize the card. */
@@ -486,16 +517,17 @@ xi_pcmcia_attach(parent, self, aux)
 		    NULL);
 	ifmedia_set(&sc->sc_mii.mii_media, IFM_ETHER | IFM_AUTO);
 
-	/*
-	 * Attach the interface.
-	 */
+	/* 802.1q capability */
+	sc->sc_ethercom.ec_capabilities |= ETHERCAP_VLAN_MTU;
+	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
 	psc->sc_resource |= XI_RES_MI;
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif	/* NBPFILTER > 0 */
+#if NRND > 0
+	rnd_attach_source(&sc->sc_rnd_source, sc->sc_dev.dv_xname,
+	    RND_TYPE_NET, 0);
+#endif
 
 	/*
 	 * Reset and initialize the card again for DINGO (as found in Linux
@@ -511,23 +543,22 @@ xi_pcmcia_attach(parent, self, aux)
 		xi_stop(sc);
 	}
 
-	/* Establish the interrupt. */
-	psc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, xi_intr, sc);
-	if (psc->sc_ih == NULL) {
-		printf("%s: couldn't establish interrupt\n",
-			sc->sc_dev.dv_xname);
-		goto fail;
-	}
+	psc->sc_powerhook = powerhook_establish(xi_pcmcia_power, sc);
+
+	pcmcia_function_disable(psc->sc_pf);
+	psc->sc_resource &= ~XI_RES_PCIC;
 
 	return;
 
 fail:
-	if ((psc->sc_resource & XI_RES_IO) != 0) {
-		/* Unmap our i/o windows. */
+	if ((psc->sc_resource & XI_RES_IO_MAP) != 0) {
 		pcmcia_io_unmap(psc->sc_pf, psc->sc_io_window);
-                pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
+		psc->sc_resource &= ~XI_RES_IO_MAP;
         }
-        psc->sc_resource &= ~XI_RES_IO;
+	if ((psc->sc_resource & XI_RES_IO_ALLOC) != 0) {
+		pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
+		psc->sc_resource &= ~XI_RES_IO_ALLOC;
+        }
 	if (psc->sc_resource & XI_RES_PCIC) {
 		pcmcia_function_disable(pa->pf);
 		psc->sc_resource &= ~XI_RES_PCIC;
@@ -546,36 +577,32 @@ xi_pcmcia_detach(self, flags)
 
 	DPRINTF(XID_CONFIG, ("xi_pcmcia_detach()\n"));
 
-	if ((ifp->if_flags & IFF_RUNNING) == 0) {
-		xi_stop(sc);
-	}
+	if (psc->sc_powerhook != NULL)
+		powerhook_disestablish(psc->sc_powerhook);
 
-	pcmcia_function_disable(psc->sc_pf);
-	psc->sc_resource &= ~XI_RES_PCIC;
-	pcmcia_intr_disestablish(psc->sc_pf, psc->sc_ih);
-	ifp->if_flags &= ~IFF_RUNNING;
-	ifp->if_timer = 0;
+#if NRND > 0
+	rnd_detach_source(&sc->sc_rnd_source);
+#endif
 
 	if ((psc->sc_resource & XI_RES_MI) != 0) {
-
 		mii_detach(&sc->sc_mii, MII_PHY_ANY, MII_OFFSET_ANY);
-
 		ifmedia_delete_instance(&sc->sc_mii.mii_media, IFM_INST_ANY);
-#if NBPFILTER > 0
-		bpfdetach(ifp);
-#endif
 		ether_ifdetach(ifp);
 		if_detach(ifp);
 		psc->sc_resource &= ~XI_RES_MI;
 	}
-
-	if ((psc->sc_resource & XI_RES_IO) != 0) {
-		/* Unmap our i/o windows. */
+	if (psc->sc_resource & XI_RES_IO_MAP) {
 		pcmcia_io_unmap(psc->sc_pf, psc->sc_io_window);
+		psc->sc_resource &= ~XI_RES_IO_MAP;
+	}
+	if ((psc->sc_resource & XI_RES_IO_ALLOC) != 0) {
                 pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
+	        psc->sc_resource &= ~XI_RES_IO_ALLOC;
         }
+
+	xi_pcmcia_disable(psc);
+
         free(SIMPLEQ_FIRST(&psc->sc_pf->cfe_head), M_DEVBUF);
-	psc->sc_resource &= ~XI_RES_IO;
 
 	return 0;
 }
@@ -603,6 +630,85 @@ xi_pcmcia_activate(self, act)
 	}
 	splx(s);
 	return (rv);
+}
+
+static int
+xi_pcmcia_enable(psc)
+        struct xi_pcmcia_softc *psc;
+{
+	struct xi_softc *sc = &psc->sc_xi;
+
+	DPRINTF(XID_CONFIG,("xi_pcmcia_enable()\n"));
+
+	if (pcmcia_function_enable(psc->sc_pf))
+		return (1);
+	psc->sc_resource |= XI_RES_PCIC;
+
+	/* establish the interrupt. */
+	psc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, xi_intr, sc);
+	if (psc->sc_ih == NULL) {
+		printf("%s: couldn't establish interrupt\n",
+		    sc->sc_dev.dv_xname);
+		pcmcia_function_disable(psc->sc_pf);
+		psc->sc_resource &= ~XI_RES_PCIC;
+		return (1);
+	}
+
+	xi_full_reset(sc);
+
+        return (0);
+}
+
+
+static void
+xi_pcmcia_disable(psc)
+	struct xi_pcmcia_softc *psc;
+{
+	DPRINTF(XID_CONFIG,("xi_pcmcia_disable()\n"));
+
+	if (psc->sc_resource & XI_RES_PCIC) {
+		pcmcia_intr_disestablish(psc->sc_pf, psc->sc_ih);
+		pcmcia_function_disable(psc->sc_pf);
+		psc->sc_resource &= ~XI_RES_PCIC;
+	}
+}
+
+
+static void
+xi_pcmcia_power(why, arg)
+	int why;
+	void *arg;
+{
+	struct xi_pcmcia_softc *psc = arg;
+	struct xi_softc *sc = &psc->sc_xi;
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+	int s;
+
+	DPRINTF(XID_CONFIG,("xi_pcmcia_power()\n"));
+
+	s = splnet();
+
+	switch (why) {
+	case PWR_SUSPEND:
+	case PWR_STANDBY:
+		if (ifp->if_flags & IFF_RUNNING) {
+			xi_stop(sc);
+		}
+		ifp->if_flags &= ~IFF_RUNNING;
+		ifp->if_timer = 0;
+		break;
+	case PWR_RESUME:
+		if ((ifp->if_flags & IFF_RUNNING) == 0) {
+			xi_init(sc);
+		}
+		ifp->if_flags |= IFF_RUNNING;
+		break;
+	case PWR_SOFTSUSPEND:
+	case PWR_SOFTSTANDBY:
+	case PWR_SOFTRESUME:
+		break;
+	}
+	splx(s);
 }
 
 /*
@@ -685,8 +791,6 @@ xi_pcmcia_manfid_ciscallback(tuple, arg)
 	return (1);
 }
 
-
-
 static int
 xi_intr(arg)
 	void *arg;
@@ -731,7 +835,7 @@ xi_intr(arg)
 	rx_status =
 	    bus_space_read_1(sc->sc_bst, sc->sc_bsh, sc->sc_offset + RXST0);
 	tx_status =
-	    bus_space_read_2(sc->sc_bst, sc->sc_bsh, sc->sc_offset + TXST0);
+	    bus_space_read_1(sc->sc_bst, sc->sc_bsh, sc->sc_offset + TXST0);
 
 	/*
 	 * XXX Linux writes to RXST0 and TXST* here.  My CE2 works just fine
@@ -806,6 +910,11 @@ end:
 	PAGE(sc, savedpage);
 	bus_space_write_1(sc->sc_bst, sc->sc_bsh, sc->sc_offset + CR,
 	    ENABLE_INT);
+
+	/* have handled the interrupt */
+#if NRND > 0    
+	rnd_add_uint32(&sc->sc_rnd_source, tx_status);  
+#endif
 
 	return (1);
 }
@@ -885,7 +994,7 @@ xi_get(sc)
 		if (len > 1) {
 		        len &= ~1;
 			bus_space_read_multi_2(sc->sc_bst, sc->sc_bsh,
-			    sc->sc_offset + EDP, data, len>>1);
+			    sc->sc_offset + EDP, (u_int16_t *)data, len>>1);
 		} else
 			*data = bus_space_read_1(sc->sc_bst, sc->sc_bsh,
 			    sc->sc_offset + EDP);
@@ -965,7 +1074,7 @@ xi_mdi_probe(sc)
 {
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	bus_addr_t offset = sc->sc_offset;
+	bus_size_t offset = sc->sc_offset;
 	u_int8_t x;
 
 	/* Pull clock bit MDCK low... */
@@ -1143,12 +1252,16 @@ static void
 xi_init(sc)
 	struct xi_softc *sc;
 {
+	struct xi_pcmcia_softc *psc = (struct xi_pcmcia_softc *)sc;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	int s;
 
 	DPRINTF(XID_CONFIG, ("xi_init()\n"));
 
-	s = splimp();
+	if ((psc->sc_resource & XI_RES_PCIC) == 0)
+		xi_pcmcia_enable(psc);
+
+	s = splnet();
 
 	xi_set_address(sc);
 
@@ -1226,7 +1339,7 @@ xi_start(ifp)
 	for (m = m0; m; ) {
 		if (m->m_len > 1)
 			bus_space_write_multi_2(bst, bsh, offset + EDP,
-			    mtod(m, u_int8_t *), m->m_len>>1);
+			    mtod(m, u_int16_t *), m->m_len>>1);
 		if (m->m_len & 1)
 			bus_space_write_1(bst, bsh, offset + EDP,
 			    *(mtod(m, u_int8_t *) + m->m_len - 1));
@@ -1281,8 +1394,7 @@ xi_ether_ioctl(ifp, cmd, data)
 				ina->x_host = *(union ns_host *)
 					LLADDR(ifp->if_sadl);
 			else
-				bcopy(ina->x_host.c_host,
-					LLADDR(ifp->if_sadl),
+				memcpy(LLADDR(ifp->if_sadl), ina->x_host.c_host,
 					ifp->if_addrlen);
 			/* Set new address. */
 			xi_init(sc);
@@ -1309,13 +1421,14 @@ xi_ioctl(ifp, command, data)
 	u_long command;
 	caddr_t data;
 {
-	struct xi_softc *sc = ifp->if_softc;
+	struct xi_pcmcia_softc *psc = ifp->if_softc;
+	struct xi_softc *sc = &psc->sc_xi;
 	struct ifreq *ifr = (struct ifreq *)data;
 	int s, error = 0;
 
 	DPRINTF(XID_CONFIG, ("xi_ioctl()\n"));
 
-	s = splimp();
+	s = splnet();
 
 	switch (command) {
 	case SIOCSIFADDR:
@@ -1345,6 +1458,7 @@ xi_ioctl(ifp, command, data)
 			xi_init(sc);
 		} else {
 			if (ifp->if_flags & IFF_RUNNING) {
+				xi_pcmcia_disable(psc);
 				xi_stop(sc);
 				ifp->if_flags &= ~IFF_RUNNING;
 			}
@@ -1398,21 +1512,30 @@ xi_set_address(sc)
 	bus_space_handle_t bsh = sc->sc_bsh;
 	bus_addr_t offset = sc->sc_offset;
 	struct ethercom *ether = &sc->sc_ethercom;
-	struct ether_multi *enm;
-	struct ether_multistep step;
+#if 0
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
-	int i, page, pos, num;
+#endif
+#if WORKING_MULTICAST
+	struct ether_multistep step;
+	struct ether_multi *enm;
+	int page, pos, num;
+#endif
+	int i;
 
 	DPRINTF(XID_CONFIG, ("xi_set_address()\n"));
 
 	PAGE(sc, 0x50);
-	for (i = 0; i < 6; i++) {
+	for (i = 0; i < ETHER_ADDR_LEN; i++) {
 		bus_space_write_1(bst, bsh, offset + IA + i,
 		    sc->sc_enaddr[(sc->sc_flags & XIFLAGS_MOHAWK) ?  5-i : i]);
 	}
-		
+
 	if (ether->ec_multicnt > 0) {
+#ifdef WORKING_MULTICAST
 		if (ether->ec_multicnt > 9) {
+#else
+		{
+#endif
 			PAGE(sc, 0x42);
 			bus_space_write_1(sc->sc_bst, sc->sc_bsh,
 			    sc->sc_offset + SWC1,
@@ -1420,24 +1543,29 @@ xi_set_address(sc)
 			return;
 		}
 
+#ifdef WORKING_MULTICAST
+
 		ETHER_FIRST_MULTI(step, ether, enm);
 
 		pos = IA + 6;
 		for (page = 0x50, num = ether->ec_multicnt; num > 0 && enm;
 		    num--) {
-			if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
+			if (memcmp(enm->enm_addrlo, enm->enm_addrhi,
 			    sizeof(enm->enm_addrlo)) != 0) {
 				/*
 				 * The multicast address is really a range;
 				 * it's easier just to accept all multicasts.
 				 * XXX should we be setting IFF_ALLMULTI here?
 				 */
+#if 0
 				ifp->if_flags |= IFF_ALLMULTI;
+#endif
 				sc->sc_all_mcasts=1;
 				break;
 			}
 
-			for (i = 0; i < 6; i++) {
+			for (i = 0; i < ETHER_ADDR_LEN; i++) {
+				printf("%x:", enm->enm_addrlo[i]);
 				bus_space_write_1(bst, bsh, offset + pos,
 				    enm->enm_addrlo[
 				    (sc->sc_flags & XIFLAGS_MOHAWK) ? 5-i : i]);
@@ -1448,7 +1576,10 @@ xi_set_address(sc)
 					PAGE(sc, page);
 				}
 			}
+			printf("\n");
+			ETHER_NEXT_MULTI(step, enm);
 		}
+#endif
 	}
 }
 
@@ -1518,14 +1649,16 @@ xi_full_reset(sc)
 
 	/* Setup the ethernet interrupt mask. */
 	PAGE(sc, 1);
+#if 1
 	bus_space_write_1(bst, bsh, offset + IMR0,
 	    ISR_TX_OFLOW | ISR_PKT_TX | ISR_MAC_INT | /* ISR_RX_EARLY | */
 	    ISR_RX_FULL | ISR_RX_PKT_REJ | ISR_FORCED_INT);
-#if 0
+#else
 	bus_space_write_1(bst, bsh, offset + IMR0, 0xff);
 #endif
 	if (!(sc->sc_flags & XIFLAGS_DINGO)) {
 		/* XXX What is this?  Not for Dingo at least. */
+		/* Unmask TX underrun detection */
 		bus_space_write_1(bst, bsh, offset + IMR1, 1);
 	}
 

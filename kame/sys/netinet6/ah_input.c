@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.76 2002/09/11 03:45:31 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.77 2002/09/25 11:41:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -494,7 +494,11 @@ ah4_input(m, va_alist)
 			goto fail;
 		}
 
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		if (IF_QFULL(&ipintrq)) {
 			ipsecstat.in_inval++;
 			splx(s);
@@ -960,7 +964,11 @@ ah6_input(mp, offp, proto)
 			goto fail;
 		}
 
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		if (IF_QFULL(&ip6intrq)) {
 			ipsec6stat.in_inval++;
 			splx(s);

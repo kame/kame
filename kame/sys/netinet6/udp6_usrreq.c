@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.107 2002/09/11 02:34:19 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.108 2002/09/25 11:41:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -842,7 +842,6 @@ udp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 #endif /* __bsdi__ */
 
 #ifdef __NetBSD__
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 int

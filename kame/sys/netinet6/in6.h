@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.132 2002/09/12 08:31:25 suz Exp $	*/
+/*	$KAME: in6.h,v 1.133 2002/09/25 11:41:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -873,6 +873,59 @@ struct ip6_mtuinfo {
 
 #ifdef _KERNEL
 struct cmsghdr;
+
+#ifdef __NetBSD__
+/*
+ * in6_cksum_phdr:
+ *
+ *	Compute significant parts of the IPv6 checksum pseudo-header
+ *	for use in a delayed TCP/UDP checksum calculation.
+ *
+ *	Args:
+ *
+ *		src		Source IPv6 address
+ *		dst		Destination IPv6 address
+ *		len		htonl(proto-hdr-len)
+ *		nxt		htonl(next-proto-number)
+ *
+ *	NOTE: We expect the src and dst addresses to be 16-bit
+ *	aligned!
+ */
+static __inline u_int16_t __attribute__((__unused__))
+in6_cksum_phdr(const struct in6_addr *src, const struct in6_addr *dst,
+    u_int32_t len, u_int32_t nxt)
+{
+	u_int32_t sum = 0;
+	const u_int16_t *w;
+
+	/*LINTED*/
+	w = (const u_int16_t *) src;
+	sum += w[0];
+	if (!IN6_IS_SCOPE_LINKLOCAL(src))
+		sum += w[1];
+	sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
+	sum += w[6]; sum += w[7]; 
+
+	/*LINTED*/
+	w = (const u_int16_t *) dst;
+	sum += w[0];
+	if (!IN6_IS_SCOPE_LINKLOCAL(dst))
+		sum += w[1];
+	sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
+	sum += w[6]; sum += w[7];
+
+	sum += (u_int16_t)(len >> 16) + (u_int16_t)(len /*& 0xffff*/);
+
+	sum += (u_int16_t)(nxt >> 16) + (u_int16_t)(nxt /*& 0xffff*/);
+
+	sum = (u_int16_t)(sum >> 16) + (u_int16_t)(sum /*& 0xffff*/);
+
+	if (sum > 0xffff)
+		sum -= 0xffff;
+
+	return (sum);
+}
+#endif
 
 int	in6_cksum __P((struct mbuf *, u_int8_t, u_int32_t, u_int32_t));
 #if defined(__FreeBSD__) || defined(__bsdi__)

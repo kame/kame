@@ -1,4 +1,4 @@
-/*	$NetBSD: igmp.c,v 1.25 2000/06/16 20:21:26 matt Exp $	*/
+/*	$NetBSD: igmp.c,v 1.28 2002/05/12 20:33:50 matt Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -76,6 +76,9 @@
  * MULTICAST Revision: 1.3
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: igmp.c,v 1.28 2002/05/12 20:33:50 matt Exp $");
+
 #include "opt_mrouting.h"
 
 #include <sys/param.h>
@@ -99,6 +102,7 @@
 
 #define IP_MULTICASTOPTS	0
 
+struct igmpstat igmpstat;
 int igmp_timers_are_running;
 struct router_info *rti_head;
 
@@ -196,9 +200,6 @@ igmp_init()
 {
 	struct ipoption *ra;
 
-	/*
-	 * To avoid byte-swapping the same value over and over again.
-	 */
 	igmp_timers_are_running = 0;
 	interface_timers_are_running = 0; /* used only by IGMPv3 */
 	state_change_timers_are_running = 0; /* used only by IGMPv3 */

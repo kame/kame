@@ -1,4 +1,4 @@
-/*	$NetBSD: mb86960.c,v 1.40 2000/05/29 17:37:13 jhawk Exp $	*/
+/*	$NetBSD: mb86960.c,v 1.50 2001/11/13 13:14:41 lukem Exp $	*/
 
 /*
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
@@ -30,6 +30,9 @@
  * software, nor does the author assume any responsibility for damages
  * incurred with its use.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: mb86960.c,v 1.50 2001/11/13 13:14:41 lukem Exp $");
 
 #define FE_VERSION "if_fe.c ver. 0.8"
 
@@ -180,7 +183,7 @@ mb86960_attach(sc, type, myea)
 		panic("NULL ethernet address");
 	}
 #endif
-	bcopy(myea, sc->sc_enaddr, sizeof(sc->sc_enaddr));
+	memcpy(sc->sc_enaddr, myea, sizeof(sc->sc_enaddr));
 
 	/* Disable all interrupts. */
 	bus_space_write_1(bst, bsh, FE_DLCR2, 0);
@@ -203,7 +206,7 @@ mb86960_config(sc, media, nmedia, defmedia)
 	mb86960_stop(sc);
 
 	/* Initialize ifnet structure. */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = mb86960_start;
 	ifp->if_ioctl = mb86960_ioctl;
@@ -266,10 +269,6 @@ mb86960_config(sc, media, nmedia, defmedia)
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
 
-#if NBPFILTER > 0
-	/* If BPF is in the kernel, call the attach for it. */
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
 	    RND_TYPE_NET, 0);
@@ -435,7 +434,7 @@ mb86960_stop(sc)
 	if (sc->stop_card)
 		(*sc->stop_card)(sc);
 
-#if DEBUG >= 3
+#if FE_DEBUG >= 3
 	log(LOG_INFO, "%s: end of mb86960_stop()\n", sc->sc_dev.dv_xname);
 	mb86960_dump(LOG_INFO, sc);
 #endif
@@ -896,7 +895,7 @@ mb86960_tint(sc, tstat)
 		 * packet transmission.  When we send two or more packets
 		 * with one start command (that's what we do when the
 		 * transmission queue is clauded), 86960 informs us number
-		 * of collisions occured on the last packet on the
+		 * of collisions occurred on the last packet on the
 		 * transmission only.  Number of collisions on previous
 		 * packets are lost.  I have told that the fact is clearly
 		 * stated in the Fujitsu document.
@@ -982,8 +981,11 @@ mb86960_rint(sc, rstat)
 	if (rstat & (FE_D1_OVRFLO | FE_D1_CRCERR | FE_D1_ALGERR |
 	    FE_D1_SRTPKT)) {
 #if FE_DEBUG >= 3
-		log(LOG_WARNING, "%s: receive error: %b\n",
-		    sc->sc_dev.dv_xname, rstat, FE_D1_ERRBITS);
+		char sbuf[sizeof(FE_D1_ERRBITS) + 64];
+
+		bitmask_snprintf(rstat, FE_D1_ERRBITS, sbuf, sizeof(sbuf));
+		log(LOG_WARNING, "%s: receive error: %s\n",
+		    sc->sc_dev.dv_xname, sbuf);
 #endif
 		ifp->if_ierrors++;
 	}
@@ -1230,8 +1232,8 @@ mb86960_ioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else {
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
-				    ETHER_ADDR_LEN);
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host, ETHER_ADDR_LEN);
 			}
 			/* Set new address. */
 			mb86960_init(sc);
@@ -1270,7 +1272,7 @@ mb86960_ioctl(ifp, cmd, data)
 			 */
 			mb86960_setmode(sc);
 		}
-#if DEBUG >= 1
+#if FE_DEBUG >= 1
 		/* "ifconfig fe0 debug" to print register dump. */
 		if (ifp->if_flags & IFF_DEBUG) {
 			log(LOG_INFO, "%s: SIOCSIFFLAGS(DEBUG)\n",
@@ -1317,7 +1319,7 @@ mb86960_ioctl(ifp, cmd, data)
 }
 
 /*
- * Retreive packet from receive buffer and send to the next level up via
+ * Retrieve packet from receive buffer and send to the next level up via
  * ether_input(). If there is a BPF listener, give a copy to BPF, too.
  * Returns 0 if success, -1 if error (i.e., mbuf allocation failure).
  */
@@ -1329,7 +1331,6 @@ mb86960_get_packet(sc, len)
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
-	struct ether_header *eh;
 	struct mbuf *m;
 
 	/* Allocate a header mbuf. */
@@ -1368,7 +1369,6 @@ mb86960_get_packet(sc, len)
 	 * header mbuf.
 	 */
 	m->m_data += EOFF;
-	eh = mtod(m, struct ether_header *);
 
 	/* Set the length of this packet. */
 	m->m_len = len;
@@ -1382,22 +1382,8 @@ mb86960_get_packet(sc, len)
 	 * Check if there's a BPF listener on this interface.  If so, hand off
 	 * the raw packet to bpf.
 	 */
-	if (ifp->if_bpf) {
+	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
-
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-		if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-	  	    bcmp(eh->ether_dhost, sc->sc_enaddr,
-			sizeof(eh->ether_dhost)) != 0) {
-			m_freem(m);
-			return (1);
-		}
-	}
 #endif
 
 	(*ifp->if_input)(ifp, m);
@@ -1415,7 +1401,7 @@ mb86960_get_packet(sc, len)
  *
  * I wrote a code for an experimental "delayed padding" technique.
  * When employed, it postpones the padding process for short packets.
- * If xmit() occured at the moment, the padding process is omitted, and
+ * If xmit() occurred at the moment, the padding process is omitted, and
  * garbages are sent as pad data.  If next packet is stored in the
  * transmission buffer before xmit(), write_mbuf() pads the previous
  * packet before transmitting new packet.  This *may* gain the
@@ -1587,7 +1573,7 @@ mb86960_getmcaf(ec, af)
 	af[0] = af[1] = af[2] = af[3] = af[4] = af[5] = af[6] = af[7] = 0x00;
 	ETHER_FIRST_MULTI(step, ec, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi,
 		    sizeof(enm->enm_addrlo)) != 0) {
 			/*
 			 * We must listen to a range of multicast addresses.
@@ -1852,9 +1838,6 @@ mb86960_detach(sc)
 #if NRND > 0
 	/* Unhook the entropy source. */
 	rnd_detach_source(&sc->rnd_source);
-#endif
-#if NBPFILTER > 0
-	bpfdetach(ifp);
 #endif
 	ether_ifdetach(ifp);
 	if_detach(ifp);

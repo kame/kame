@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.82.2.1 2000/08/31 14:57:24 minoura Exp $	*/
+/*	$NetBSD: machdep.c,v 1.105 2002/03/20 17:59:27 christos Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,15 +43,10 @@
  */
 
 #include "opt_ddb.h"
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-#include "opt_compat_hpux.h"
+#include "opt_kgdb.h"
 #include "opt_compat_netbsd.h"
 #include "opt_m680x0.h"
-#include "opt_fpuemulate.h"
+#include "opt_fpu_emulate.h"
 #include "opt_m060sp.h"
 #include "opt_panicbutton.h"
 #include "opt_extmem.h"
@@ -81,6 +76,13 @@
 #include <sys/core.h>
 #include <sys/kcore.h>
 
+#if defined(DDB) && defined(__ELF__)
+#include <sys/exec_elf.h>
+#endif
+
+#include <net/netisr.h>
+#undef PS	/* XXX netccitt/pk.h conflict with machine/reg.h? */
+
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_extern.h>
@@ -91,14 +93,9 @@
 #include <machine/pte.h>
 #include <machine/kcore.h>
 
-#include <net/netisr.h>
 #include <dev/cons.h>
 
 #define	MAXMEM	64*1024	/* XXX - from cmap.h */
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-
 #include <uvm/uvm_extern.h>
 
 #include <sys/sysctl.h>
@@ -121,28 +118,24 @@ char	machine[] = MACHINE;	/* from <machine/param.h> */
 /* Our exported CPU info; we can have only one. */  
 struct cpu_info cpu_info_store;
 
-vm_map_t exec_map = NULL;  
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+struct vm_map *exec_map = NULL;  
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 extern paddr_t avail_start, avail_end;
 extern vaddr_t virtual_avail;
+extern u_int lowram;
+extern int end, *esym;
 
 caddr_t	msgbufaddr;
 int	maxmem;			/* max memory per process */
 int	physmem = MAXMEM;	/* max supported memory, changes to actual */
+
 /*
  * safepri is a safe priority for sleep to set for a spin-wait
  * during autoconfiguration or after a panic.
  */
 int	safepri = PSL_LOWIPL;
-
-extern	u_int lowram;
-extern	short exframesize[];
-
-#ifdef COMPAT_HPUX
-extern struct emul emul_hpux;
-#endif
 
 /* prototypes for local functions */
 void    identifycpu __P((void));
@@ -201,12 +194,12 @@ consinit()
 	zs_kgdb_init();			/* XXX */
 #endif
 #ifdef DDB
-	{
-		extern int end;
-		extern int *esym;
-
-		ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
-	}
+#ifndef __ELF__
+	ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
+#else
+	ddb_init((int)esym - (int)&end - sizeof(Elf32_Ehdr),
+		 (void *)&end, esym);
+#endif
 	if (boothowto & RB_KDB)
 		Debugger();
 #endif
@@ -253,6 +246,7 @@ cpu_startup()
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
 		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
 
 	/*
@@ -284,9 +278,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 #if 0
@@ -322,6 +316,8 @@ cpu_startup()
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
+
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
@@ -384,7 +380,7 @@ setregs(p, pack, stack)
 	frame->f_regs[D7] = 0;
 	frame->f_regs[A0] = 0;
 	frame->f_regs[A1] = 0;
-	frame->f_regs[A2] = (int)PS_STRINGS;
+	frame->f_regs[A2] = (int)p->p_psstr;
 	frame->f_regs[A3] = 0;
 	frame->f_regs[A4] = 0;
 	frame->f_regs[A5] = 0;
@@ -592,12 +588,11 @@ cpu_reboot(howto, bootstr)
 void
 cpu_init_kcore_hdr()
 {
-	extern int end;
 	cpu_kcore_hdr_t *h = &cpu_kcore_hdr;
 	struct m68k_kcore_hdr *m = &h->un._m68k;
 	int i;
 
-	bzero(&cpu_kcore_hdr, sizeof(cpu_kcore_hdr));
+	memset(&cpu_kcore_hdr, 0, sizeof(cpu_kcore_hdr));
 
 	/*
 	 * Initialize the `dispatcher' portion of the header.
@@ -687,7 +682,7 @@ cpu_dump(dump, blknop)
 	CORE_SETMAGIC(*kseg, KCORE_MAGIC, MID_MACHINE, CORE_CPU);
 	kseg->c_size = dbtob(1) - ALIGN(sizeof(kcore_seg_t));
 
-	bcopy(&cpu_kcore_hdr, chdr, sizeof(cpu_kcore_hdr_t));
+	memcpy(chdr, &cpu_kcore_hdr, sizeof(cpu_kcore_hdr_t));
 	error = (*dump)(dumpdev, *blknop, (caddr_t)buf, sizeof(buf));
 	*blknop += btodb(sizeof(buf));
 	return (error);
@@ -696,7 +691,7 @@ cpu_dump(dump, blknop)
 /*
  * These variables are needed by /sbin/savecore
  */
-u_long	dumpmag = 0x8fca0101;	/* magic number */
+u_int32_t dumpmag = 0x8fca0101;	/* magic number */
 int	dumpsize = 0;		/* pages */
 long	dumplo = 0;		/* blocks */
 
@@ -814,6 +809,7 @@ dumpsys()
 		}
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, maddr,
 		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
+		pmap_update(pmap_kernel());
 
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
  bad:
@@ -867,7 +863,6 @@ initcpu()
 #endif
 
 #ifdef MAPPEDCOPY
-	extern u_int mappedcopysize;
 
 	/*
 	 * Initialize lower bound for doing copyin/copyout using
@@ -953,18 +948,7 @@ badbaddr(addr)
 	return(0);
 }
 
-/*
- * XXX Why on earth isn't this in a common file?!
- */
-void	netintr __P((void));
-void	arpintr __P((void));
-void	atintr __P((void));
-void	ipintr __P((void));
-void	ip6intr __P((void));
-void	nsintr __P((void));
-void	clnlintr __P((void));
-void	ccittintr __P((void));
-void	pppintr __P((void));
+void netintr __P((void));
 
 void
 netintr()
@@ -999,7 +983,9 @@ int crashandburn = 0;
 int candbdelay = 50;	/* give em half a second */
 void candbtimer __P((void *));
 
+#ifndef DDB
 static struct callout candbtimer_ch = CALLOUT_INITIALIZER;
+#endif
 
 void
 candbtimer(arg)
@@ -1144,6 +1130,7 @@ mem_exists(mem, basemax)
 	DPRINTF ((" pmap_enter(%p, %p) for target... ", mem_v, mem));
 	pmap_enter(pmap_kernel(), mem_v, (paddr_t)mem,
 		   VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	DPRINTF ((" done.\n"));
 
 	/* only 24bits are significant on normal X680x0 systems */
@@ -1151,14 +1138,15 @@ mem_exists(mem, basemax)
 	DPRINTF ((" pmap_enter(%p, %p) for shadow... ", base_v, base));
 	pmap_enter(pmap_kernel(), base_v, (paddr_t)base,
 		   VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	DPRINTF ((" done.\n"));
 
 	m = (void*)mem_v;
 	b = (void*)base_v;
 
 	/* This is somewhat paranoid -- avoid overwriting myself */
-	asm("lea pc@(begin_check_mem),%0" : "=a"(begin_check));
-	asm("lea pc@(end_check_mem),%0" : "=a"(end_check));
+	asm("lea %%pc@(begin_check_mem),%0" : "=a"(begin_check));
+	asm("lea %%pc@(end_check_mem),%0" : "=a"(end_check));
 	if (base >= begin_check && base < end_check) {
 		size_t off = end_check - begin_check;
 
@@ -1172,6 +1160,7 @@ mem_exists(mem, basemax)
 		nofault = (int *) 0;
 		pmap_remove(pmap_kernel(), mem_v, mem_v+NBPG);
 		pmap_remove(pmap_kernel(), base_v, base_v+NBPG);
+		pmap_update(pmap_kernel());
 		DPRINTF (("Fault!!! Returning 0.\n"));
 		return 0;
 	}
@@ -1225,6 +1214,7 @@ asm("end_check_mem:");
 	nofault = (int *)0;
 	pmap_remove(pmap_kernel(), mem_v, mem_v+NBPG);
 	pmap_remove(pmap_kernel(), base_v, base_v+NBPG);
+	pmap_update(pmap_kernel());
 
 	DPRINTF ((" End.\n"));
 
@@ -1263,7 +1253,7 @@ setmemrange(void)
 			cacr = CACHE60_OFF;
 			break;
 		}
-		asm volatile ("movc %0,cacr"::"d"(cacr));
+		asm volatile ("movc %0,%%cacr"::"d"(cacr));
 	}
 
 	/* discover extended memory */
@@ -1307,7 +1297,7 @@ setmemrange(void)
 			cacr = CACHE60_ON;
 			break;
 		}
-		asm volatile ("movc %0,cacr"::"d"(cacr));
+		asm volatile ("movc %0,%%cacr"::"d"(cacr));
 	}
 
 	physmem = m68k_btop(mem_size);

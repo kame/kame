@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.10 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_red.c,v 1.11 2002/09/25 11:41:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -428,7 +428,11 @@ redioctl(dev, cmd, addr, flag, p)
 				break;
 			}
 
+#ifdef __NetBSD__
+			s = splnet();
+#else
 			s = splimp();
+#endif
 			red_purgeq(rqp);
 			limit = fc->red_limit;
 			if (limit < fc->red_thmax)

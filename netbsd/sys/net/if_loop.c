@@ -1,4 +1,4 @@
-/*	$NetBSD: if_loop.c,v 1.30 2000/03/30 09:45:36 augustss Exp $	*/
+/*	$NetBSD: if_loop.c,v 1.40 2001/11/12 23:49:40 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,6 +67,9 @@
 /*
  * Loopback interface driver for protocol testing and timing.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_loop.c,v 1.40 2001/11/12 23:49:40 lukem Exp $");
 
 #include "opt_inet.h"
 #include "opt_atalk.h"
@@ -140,7 +143,7 @@
 struct	ifnet loif[NLOOP];
 
 #ifdef ALTQ
-static void lo_altqstart __P((struct ifnet *));
+void	lostart(struct ifnet *);
 #endif
 
 void
@@ -158,16 +161,18 @@ loopattach(n)
 		ifp->if_flags = IFF_LOOPBACK | IFF_MULTICAST;
 		ifp->if_ioctl = loioctl;
 		ifp->if_output = looutput;
+#ifdef ALTQ
+		ifp->if_start = lostart;
+#endif
 		ifp->if_type = IFT_LOOP;
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
+		ifp->if_dlt = DLT_NULL;
 		IFQ_SET_READY(&ifp->if_snd);
-#ifdef ALTQ
-		ifp->if_start = lo_altqstart;
-#endif
 		if_attach(ifp);
+		if_alloc_sadl(ifp);
 #if NBPFILTER > 0
-		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int));
+		bpfattach(ifp, DLT_NULL, sizeof(u_int));
 #endif
 	}
 }
@@ -194,7 +199,7 @@ looutput(ifp, m, dst, rt)
 		 * try to free it or keep a pointer to it).
 		 */
 		struct mbuf m0;
-		u_int af = dst->sa_family;
+		u_int32_t af = dst->sa_family;
 
 		m0.m_next = m;
 		m0.m_len = 4;
@@ -265,37 +270,36 @@ looutput(ifp, m, dst, rt)
 
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
+
 #ifdef ALTQ
 	/*
-	 * altq for loop is just for debugging.
-	 * only used when called for loop interface (not for
-	 * a simplex interface).
+	 * ALTQ on the loopback interface is just for debugging.  It's
+	 * used only for loopback interfaces, not for a simplex interface.
 	 */
-	if ((ALTQ_IS_ENABLED(&ifp->if_snd) || TBR_IS_ENABLED(&ifp->if_snd))
-	    && ifp->if_start == lo_altqstart) {
+	if ((ALTQ_IS_ENABLED(&ifp->if_snd) || TBR_IS_ENABLED(&ifp->if_snd)) &&
+	    ifp->if_start == lostart) {
 		struct altq_pktattr pktattr;
-		int32_t *afp;
-	        int error;
+		int error;
 
 		/*
-		 * if the queueing discipline needs packet classification,
-		 * do it before prepending link headers.
+		 * If the queueing discipline needs packet classification,
+		 * do it before prepending the link headers.
 		 */
 		IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
-		M_PREPEND(m, sizeof(int32_t), M_DONTWAIT);
-		if (m == 0)
-			return(ENOBUFS);
-		afp = mtod(m, int32_t *);
-		*afp = (int32_t)dst->sa_family;
+		M_PREPEND(m, sizeof(uint32_t), M_DONTWAIT);
+		if (m == NULL)
+			return (ENOBUFS);
+		*(mtod(m, uint32_t *)) = dst->sa_family;
 
-	        s = splimp();
+		s = splnet();
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
 		(*ifp->if_start)(ifp);
 		splx(s);
 		return (error);
 	}
 #endif /* ALTQ */
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -341,7 +345,7 @@ looutput(ifp, m, dst, rt)
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);
@@ -357,25 +361,21 @@ looutput(ifp, m, dst, rt)
 }
 
 #ifdef ALTQ
-static void
-lo_altqstart(ifp)
-	struct ifnet *ifp;
+void
+lostart(struct ifnet *ifp)
 {
 	struct ifqueue *ifq;
 	struct mbuf *m;
-	int32_t af, *afp;
+	uint32_t af;
 	int s, isr;
-	
-	while (1) {
-		s = splimp();
+
+	for (;;) {
 		IFQ_DEQUEUE(&ifp->if_snd, m);
-		splx(s);
 		if (m == NULL)
 			return;
 
-		afp = mtod(m, int32_t *);
-		af = *afp;
-		m_adj(m, sizeof(int32_t));
+		af = *(mtod(m, uint32_t *));
+		m_adj(m, sizeof(uint32_t));
 
 		switch (af) {
 #ifdef INET
@@ -414,18 +414,18 @@ lo_altqstart(ifp)
 			ifq = &atintrq2;
 			isr = NETISR_ATALK;
 			break;
-#endif NETATALK
+#endif
 		default:
-			printf("lo_altqstart: can't handle af%d\n", af);
+			printf("%s: can't handle af%d\n", ifp->if_xname, af);
 			m_freem(m);
 			return;
 		}
 
-		s = splimp();
+		s = splnet();
 		if (IF_QFULL(ifq)) {
 			IF_DROP(ifq);
-			m_freem(m);
 			splx(s);
+			m_freem(m);
 			return;
 		}
 		IF_ENQUEUE(ifq, m);

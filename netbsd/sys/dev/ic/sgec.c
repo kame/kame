@@ -1,4 +1,4 @@
-/*      $NetBSD: sgec.c,v 1.6.2.1 2001/04/21 21:31:10 he Exp $ */
+/*      $NetBSD: sgec.c,v 1.18 2001/11/13 13:14:44 lukem Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -44,6 +44,9 @@
  *	Use imperfect filtering when many multicast addresses.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: sgec.c,v 1.18 2001/11/13 13:14:44 lukem Exp $");
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -53,6 +56,8 @@
 #include <sys/device.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
@@ -103,7 +108,7 @@ sgec_attach(sc)
          * Allocate DMA safe memory for descriptors and setup memory.
          */
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
-	    sizeof(struct ze_cdata), NBPG, 0, &seg, 1, &rseg,
+	    sizeof(struct ze_cdata), PAGE_SIZE, 0, &seg, 1, &rseg,
 	    BUS_DMA_NOWAIT)) != 0) {
 		printf(": unable to allocate control data, error = %d\n",
 		    error);
@@ -137,7 +142,7 @@ sgec_attach(sc)
 	/*
 	 * Zero the newly allocated memory.
 	 */
-	bzero(sc->sc_zedata, sizeof(struct ze_cdata));
+	memset(sc->sc_zedata, 0, sizeof(struct ze_cdata));
 	/*
 	 * Create the transmit descriptor DMA maps.
 	 */
@@ -212,9 +217,6 @@ sgec_attach(sc)
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 	printf("\n%s: hardware address %s\n", sc->sc_dev.dv_xname,
 	    ether_sprintf(sc->sc_enaddr));
 	return;
@@ -315,11 +317,10 @@ zestart(ifp)
 	struct ze_cdata *zc = sc->sc_zedata;
 	paddr_t	buffer;
 	struct mbuf *m, *m0;
-	int idx, len, s, i, totlen, error;
+	int idx, len, i, totlen, error;
 	int old_inq = sc->sc_inq;
 	short orword;
 
-	s = splimp();
 	while (sc->sc_inq < (TXDESCS - 1)) {
 
 		if (sc->sc_setup) {
@@ -357,7 +358,7 @@ zestart(ifp)
 		totlen = 0;
 		for (m0 = m; m0; m0 = m0->m_next) {
 			error = bus_dmamap_load(sc->sc_dmat, sc->sc_xmtmap[idx],
-			    mtod(m0, void *), m0->m_len, 0, 0);
+			    mtod(m0, void *), m0->m_len, 0, BUS_DMA_WRITE);
 			buffer = sc->sc_xmtmap[idx]->dm_segs[0].ds_addr;
 			len = m0->m_len;
 			if (len == 0)
@@ -401,7 +402,6 @@ zestart(ifp)
 
 out:	if (old_inq < sc->sc_inq)
 		ifp->if_timer = 5; /* If transmit logic dies */
-	splx(s);
 }
 
 int
@@ -410,7 +410,6 @@ sgec_intr(sc)
 {
 	struct ze_cdata *zc = sc->sc_zedata;
 	struct ifnet *ifp = &sc->sc_if;
-	struct ether_header *eh;
 	struct mbuf *m;
 	int csr, len;
 
@@ -432,29 +431,10 @@ sgec_intr(sc)
 			m->m_flags |= M_HASFCS;
 			if (++sc->sc_nextrx == RXDESCS)
 				sc->sc_nextrx = 0;
-			eh = mtod(m, struct ether_header *);
 #if NBPFILTER > 0
-			if (ifp->if_bpf) {
+			if (ifp->if_bpf)
 				bpf_mtap(ifp->if_bpf, m);
-				if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-				    ((eh->ether_dhost[0] & 1) == 0) &&
-				    bcmp(LLADDR(ifp->if_sadl), eh->ether_dhost,
-				    ETHER_ADDR_LEN) != 0) {
-					m_freem(m);
-					continue;
-				}
-			}
 #endif
-			/*
-			 * ALLMULTI means PROMISC in this driver.
-			 */
-			if ((ifp->if_flags & IFF_ALLMULTI) &&
-			    ((eh->ether_dhost[0] & 1) == 0) &&
-			    bcmp(LLADDR(ifp->if_sadl), eh->ether_dhost,
-			    ETHER_ADDR_LEN)) {
-				m_freem(m);
-				continue;
-			}
 			(*ifp->if_input)(ifp, m);
 		}
 
@@ -595,7 +575,8 @@ ze_add_rxbuf(sc, i)
 		bus_dmamap_unload(sc->sc_dmat, sc->sc_rcvmap[i]);
 
 	error = bus_dmamap_load(sc->sc_dmat, sc->sc_rcvmap[i],
-	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL, BUS_DMA_NOWAIT);
+	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL,
+	    BUS_DMA_READ|BUS_DMA_NOWAIT);
 	if (error)
 		panic("%s: can't load rx DMA map %d, error = %d\n",
 		    sc->sc_dev.dv_xname, i, error);
@@ -629,12 +610,10 @@ ze_setup(sc)
 	struct ze_cdata *zc = sc->sc_zedata;
 	struct ifnet *ifp = &sc->sc_if;
 	u_int8_t *enaddr = LLADDR(ifp->if_sadl);
-	int j, idx, s, reg;
+	int j, idx, reg;
 
-	s = splimp();
 	if (sc->sc_inq == (TXDESCS - 1)) {
 		sc->sc_setup = 1;
-		splx(s);
 		return;
 	}
 	sc->sc_setup = 0;
@@ -642,7 +621,7 @@ ze_setup(sc)
 	 * Init the setup packet with valid info.
 	 */
 	memset(zc->zc_setup, 0xff, sizeof(zc->zc_setup)); /* Broadcast */
-	bcopy(enaddr, zc->zc_setup, ETHER_ADDR_LEN);
+	memcpy(zc->zc_setup, enaddr, ETHER_ADDR_LEN);
 
 	/*
 	 * Multicast handling. The SGEC can handle up to 16 direct 
@@ -652,11 +631,11 @@ ze_setup(sc)
 	ifp->if_flags &= ~IFF_ALLMULTI;
 	ETHER_FIRST_MULTI(step, &sc->sc_ec, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, 6)) {
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi, 6)) {
 			ifp->if_flags |= IFF_ALLMULTI;
 			break;
 		}
-		bcopy(enm->enm_addrlo, &zc->zc_setup[j], ETHER_ADDR_LEN);
+		memcpy(&zc->zc_setup[j], enm->enm_addrlo, ETHER_ADDR_LEN);
 		j += 8;
 		ETHER_NEXT_MULTI(step, enm);
 		if ((enm != NULL)&& (j == 128)) {
@@ -664,6 +643,14 @@ ze_setup(sc)
 			break;
 		}
 	}
+
+	/*
+	 * ALLMULTI implies PROMISC in this driver.
+	 */
+	if (ifp->if_flags & IFF_ALLMULTI)
+		ifp->if_flags |= IFF_PROMISC;
+	else if (ifp->if_pcount == 0)
+		ifp->if_flags &= ~IFF_PROMISC;
 
 	/*
 	 * Fiddle with the receive logic.
@@ -695,7 +682,6 @@ ze_setup(sc)
 		if (++sc->sc_nexttx == TXDESCS)
 			sc->sc_nexttx = 0;
 	}
-	splx(s);
 }
 
 /*
@@ -729,7 +715,7 @@ int
 zereset(sc)
 	struct ze_softc *sc;
 {
-	int reg, i, s;
+	int reg, i;
 
 	ZE_WCSR(ZE_CSR6, ZE_NICSR6_RE);
 	DELAY(50000);
@@ -745,16 +731,13 @@ zereset(sc)
 	 */
 	reg = ZE_NICSR0_IPL14 | sc->sc_intvec | 0x1fff0003; /* SYNC/ASYNC??? */
 	i = 10;
-	s = splimp();
 	do {
 		if (i-- == 0) {
 			printf("Failing SGEC CSR0 init\n");
-			splx(s);
 			return 1;
 		}
 		ZE_WCSR(ZE_CSR0, reg);
 	} while (ZE_RCSR(ZE_CSR0) != reg);
-	splx(s);
 
 	ZE_WCSR(ZE_CSR3, (vaddr_t)sc->sc_pzedata->zc_recv);
 	ZE_WCSR(ZE_CSR4, (vaddr_t)sc->sc_pzedata->zc_xmit);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.334 2002/09/23 13:20:28 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.335 2002/09/25 11:41:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -173,6 +173,10 @@ extern int ipsec_ipcomp_default_level;
 
 #include <net/net_osdep.h>
 
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+extern struct pfil_head inet6_pfil_hook;	/* XXX */
+#endif
+
 #ifndef M_IPMOPTS
 static MALLOC_DEFINE(M_IPMOPTS, "ip6_moptions", "internet multicast options");
 #endif
@@ -289,11 +293,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #else
 	int needipsec = 0;
 #endif
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
-	struct packet_filter_hook *pfh;
-	struct mbuf *m1;
-	int rv;
-#endif /* PFIL_HOOKS */
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
@@ -1358,20 +1357,12 @@ skip_ipsec2:;
 	/*
 	 * Run through list of hooks for output packets.
 	 */
-	m1 = m;
-	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
-	for (; pfh; pfh = pfh->pfil_link.tqe_next)
-		if (pfh->pfil_func) {
-		    	rv = pfh->pfil_func(ip6, sizeof(*ip6), ifp, 1, &m1);
-			if (rv) {
-				error = EHOSTUNREACH;
-				goto done;
-			}
-			m = m1;
-			if (m == NULL)
-				goto done;
-			ip6 = mtod(m, struct ip6_hdr *);
-		}
+	if ((error = pfil_run_hooks(&inet6_pfil_hook, &m, ifp,
+				    PFIL_OUT)) != 0)
+		goto done;
+	if (m == NULL)
+		goto done;
+	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* PFIL_HOOKS */
 
 #if defined(__OpenBSD__) && NPF > 0

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.c,v 1.9 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_cdnr.c,v 1.10 2002/09/25 11:41:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999-2002
@@ -1256,8 +1256,12 @@ cdnrioctl(dev, cmd, addr, flag, p)
 			return (error);
 		break;
 	}
-    
+
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	switch (cmd) {
 		
 	case CDNR_IF_ATTACH:

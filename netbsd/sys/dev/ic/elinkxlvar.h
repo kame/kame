@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxlvar.h,v 1.6.2.2 2001/03/20 17:24:54 he Exp $	*/
+/*	$NetBSD: elinkxlvar.h,v 1.12 2001/12/28 20:35:47 christos Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -137,14 +137,19 @@ struct ex_softc {
 };
 
 #define ex_waitcmd(sc) \
-	while (bus_space_read_2((sc)->sc_iot, (sc)->sc_ioh, ELINK_STATUS) \
-		& S_COMMAND_IN_PROGRESS);
+	do { \
+		int stat; \
+		do { \
+			stat = bus_space_read_2((sc)->sc_iot, (sc)->sc_ioh, \
+			    ELINK_STATUS); \
+		} while ((stat & COMMAND_IN_PROGRESS) && (stat != 0xffff)); \
+	} while (0)\
 
 u_int16_t exreadeeprom __P((bus_space_tag_t, bus_space_handle_t, int));
 void	ex_config __P((struct ex_softc *));
 
 int	ex_intr __P((void *));
-void	ex_stop __P((struct ex_softc *));
+void	ex_stop __P((struct ifnet *, int));
 void	ex_watchdog __P((struct ifnet *));
 int	ex_ioctl __P((struct ifnet *ifp, u_long, caddr_t));
 int	ex_activate __P((struct device *, enum devact));

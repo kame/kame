@@ -1,4 +1,4 @@
-/*	$NetBSD: igmp_var.h,v 1.11 1999/11/19 10:41:42 bouyer Exp $	*/
+/*	$NetBSD: igmp_var.h,v 1.12 2002/05/12 20:33:50 matt Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -155,7 +155,7 @@ struct igmpstat {
 #define	IGMP_DEF_QUERY		10	/* v1 Max. Response Time (sec.) */
 
 #ifdef _KERNEL
-struct igmpstat igmpstat;
+extern	struct igmpstat igmpstat;
 extern	struct router_info *rti_head;
 
 /*

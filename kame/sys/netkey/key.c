@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.259 2002/09/11 02:34:19 itojun Exp $	*/
+/*	$KAME: key.c,v 1.260 2002/09/25 11:41:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1169,7 +1169,11 @@ key_delsp(sp)
 		if (isr->tunifp) {
 			int s;
 
+#ifdef __NetBSD__
+			s = splnet();
+#else
 			s = splimp();
+#endif
 			sec_demolish(isr->tunifp);
 			splx(s);
 
@@ -7682,7 +7686,6 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 #endif /*__bsdi__*/
 
 #ifdef __NetBSD__
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 int

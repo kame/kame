@@ -1,4 +1,4 @@
-/*	$NetBSD: if_cnw.c,v 1.11.2.2 2000/10/17 23:20:53 tv Exp $	*/
+/*	$NetBSD: if_cnw.c,v 1.20 2001/12/15 13:23:22 soren Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -112,6 +112,9 @@
  * multicast. Volunteers are welcome, of course :-).
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_cnw.c,v 1.20 2001/12/15 13:23:22 soren Exp $");
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -204,7 +207,7 @@ struct cnw_softc {
 	bus_space_handle_t sc_ioh;	    /*   ...bus_space handle */
 #endif
 	struct pcmcia_mem_handle sc_pcmemh; /* PCMCIA memory handle */
-	bus_addr_t sc_memoff;		    /*   ...offset */
+	bus_size_t sc_memoff;		    /*   ...offset */
 	int sc_memwin;			    /*   ...window */
 	bus_space_tag_t sc_memt;	    /*   ...bus_space tag */
 	bus_space_handle_t sc_memh;	    /*   ...bus_space handle */
@@ -580,21 +583,19 @@ cnw_attach(parent, self, aux)
 	    ether_sprintf(macaddr));
 
 	/* Set up ifnet structure */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = cnw_start;
 	ifp->if_ioctl = cnw_ioctl;
 	ifp->if_watchdog = cnw_watchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_MULTICAST | IFF_SIMPLEX |
 	    IFF_NOTRAILERS;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface */
 	if_attach(ifp);
 	ether_ifattach(ifp, macaddr);
-#if NBPFILTER > 0
-	bpfattach(&sc->sc_ethercom.ec_if.if_bpf, ifp, DLT_EN10MB,
-	    sizeof(struct ether_header));
-#endif
+
 	sc->sc_resource |= CNW_RES_NET;
 
 	ifp->if_baudrate = IF_Mbps(1);
@@ -700,7 +701,7 @@ cnw_start(ifp)
 
 		sc->sc_stats.nws_tx++;
 
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (m0 == 0)
 			break;
 
@@ -875,7 +876,6 @@ cnw_recv(sc)
 	int rser;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	struct mbuf *m;
-	struct ether_header *eh;
 
 	for (;;) {
 		WAIT_WOC(sc);
@@ -901,19 +901,6 @@ cnw_recv(sc)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
-
-		/*
-		 * Check that the packet is for us or {multi,broad}cast. Maybe
-		 * there's a fool-poof hardware check for this, but I don't
-		 * really know...
-		 */
-		eh = mtod(m, struct ether_header *);
-		if ((eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    bcmp(LLADDR(sc->sc_ethercom.ec_if.if_sadl),
-		    eh->ether_dhost, sizeof(eh->ether_dhost)) != 0) {
-			m_freem(m);
-			continue;
-		}
 
 		/* Pass the packet up. */
 		(*ifp->if_input)(ifp, m);
@@ -1146,9 +1133,8 @@ cnw_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCGCNWSTATS:
-		bcopy((void *)&sc->sc_stats,
-		    (void *)&(((struct cnwistats *)data)->stats),
-		    sizeof(struct cnwstats));
+		memcpy((void *)&(((struct cnwistats *)data)->stats),
+		    (void *)&sc->sc_stats, sizeof(struct cnwstats));
 			break;
 
 	default:
@@ -1246,9 +1232,6 @@ cnw_detach(self, flags)
 	cnw_disable(sc);
 
 	if ((sc->sc_resource & CNW_RES_NET) != 0) {
-#if NBPFILTER > 0
-		bpfdetach(ifp);
-#endif
 		ether_ifdetach(ifp);
 		if_detach(ifp);
 	}

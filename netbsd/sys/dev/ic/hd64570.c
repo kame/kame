@@ -1,4 +1,4 @@
-/*	$NetBSD: hd64570.c,v 1.11 2000/01/09 17:32:58 chopps Exp $	*/
+/*	$NetBSD: hd64570.c,v 1.21 2002/03/05 04:12:57 itojun Exp $	*/
 
 /*
  * Copyright (c) 1999 Christian E. Hopps
@@ -63,6 +63,9 @@
  *	   if not using dma.  currently the assumption is that
  *	   rx uses a page and tx uses a page.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: hd64570.c,v 1.21 2002/03/05 04:12:57 itojun Exp $");
 
 #include "bpfilter.h"
 #include "opt_inet.h"
@@ -184,7 +187,7 @@ static	void sca_frame_print(sca_port_t *, sca_desc_t *, u_int8_t *);
 #define	sca_write_1(sc, reg, val)	(sc)->sc_write_1(sc, reg, val)
 #define	sca_write_2(sc, reg, val)	(sc)->sc_write_2(sc, reg, val)
 
-#define	sca_page_addr(sc, addr)	((bus_addr_t)(addr) & (sc)->scu_pagemask)
+#define	sca_page_addr(sc, addr)	((bus_addr_t)(u_long)(addr) & (sc)->scu_pagemask)
 
 static inline void
 msci_write_1(sca_port_t *scp, u_int reg, u_int8_t val)
@@ -457,9 +460,10 @@ sca_port_attach(struct sca_softc *sc, u_int port)
 #endif
 	IFQ_SET_READY(&ifp->if_snd);
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 
 #if NBPFILTER > 0
-	bpfattach(&scp->sp_bpf, ifp, DLT_HDLC, HDLC_HDRLEN);
+	bpfattach(ifp, DLT_HDLC, HDLC_HDRLEN);
 #endif
 
 	if (sc->sc_parent == NULL)
@@ -801,12 +805,10 @@ sca_output(ifp, m, dst, rt0)
 	struct hdlc_llc_header *llc;
 #endif
 	struct hdlc_header *hdlc;
-	struct ifqueue *ifq;
+	struct ifqueue *ifq = NULL;
 	int s, error, len;
 	short mflags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	error = 0;
 
@@ -815,14 +817,11 @@ sca_output(ifp, m, dst, rt0)
 		goto bad;
 	}
 
-#ifdef ALTQ
 	/*
-	 * if the queueing discipline needs packet classification,
+	 * If the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
-	ifq = NULL;
 
 	/*
 	 * determine address family, and priority for this packet
@@ -1126,7 +1125,7 @@ X
 			    ("TX: about to mbuf len %d\n", m->m_len));
 
 			if (sc->sc_usedma)
-				bcopy(mtod(m, u_int8_t *), buf, m->m_len);
+				memcpy(buf, mtod(m, u_int8_t *), m->m_len);
 			else
 				bus_space_write_region_1(sc->scu_memt,
 				    sc->scu_memh, sca_page_addr(sc, buf_p),
@@ -1146,8 +1145,8 @@ X
 	/*
 	 * Pass packet to bpf if there is a listener.
 	 */
-	if (scp->sp_bpf)
-		bpf_mtap(scp->sp_bpf, mb_head);
+	if (ifp->if_bpf)
+		bpf_mtap(ifp->if_bpf, mb_head);
 #endif
 
 	m_freem(mb_head);
@@ -1413,7 +1412,7 @@ sca_msci_intr(sca_port_t *scp, u_int8_t isr)
 			/* underrun -- try to increase ready control */
 			trc0 = msci_read_1(scp, SCA_TRC00);
 			if (trc0 == 0x1f)
-				printf("TX: underun - fifo depth maxed\n");
+				printf("TX: underrun - fifo depth maxed\n");
 			else {
 				if ((trc0 += 2) > 0x1f)
 					trc0 = 0x1f;
@@ -1608,8 +1607,8 @@ sca_frame_process(sca_port_t *scp)
 	}
 
 #if NBPFILTER > 0
-	if (scp->sp_bpf)
-		bpf_mtap(scp->sp_bpf, m);
+	if (scp->sp_if.if_bpf)
+		bpf_mtap(scp->sp_if.if_bpf, m);
 #endif
 
 	scp->sp_if.if_ipackets++;
@@ -2040,7 +2039,7 @@ sca_mbuf_alloc(struct sca_softc *sc, caddr_t p, u_int len)
 	if (p != NULL) {
 		/* XXX do we need to sync here? */
 		if (sc->sc_usedma)
-			bcopy(p, mtod(m, caddr_t), len);
+			memcpy(mtod(m, caddr_t), p, len);
 		else
 			bus_space_read_region_1(sc->scu_memt, sc->scu_memh,
 			    sca_page_addr(sc, p), mtod(m, u_int8_t *), len);

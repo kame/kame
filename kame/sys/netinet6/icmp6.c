@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.324 2002/09/23 13:16:30 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.325 2002/09/25 11:41:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3768,9 +3768,6 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 #endif /* __bsdi__ */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-#ifdef __NetBSD__
-#include <vm/vm.h>
-#endif
 #include <sys/sysctl.h>
 int
 icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)

@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.9 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_rio.c,v 1.10 2002/09/25 11:41:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -388,7 +388,11 @@ rioioctl(dev, cmd, addr, flag, p)
 				break;
 			}
 
+#ifdef __NetBSD__
+			s = splnet();
+#else
 			s = splimp();
+#endif
 			_flushq(rqp->rq_q);
 			limit = fc->rio_limit;
 			if (limit < fc->q_params[RIO_NDROPPREC-1].th_max)

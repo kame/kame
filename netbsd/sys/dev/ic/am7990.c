@@ -1,4 +1,4 @@
-/*	$NetBSD: am7990.c,v 1.58 2000/04/16 17:03:42 matt Exp $	*/
+/*	$NetBSD: am7990.c,v 1.64 2001/11/13 13:14:34 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -75,6 +75,9 @@
  *	@(#)if_le.c	8.2 (Berkeley) 11/16/93
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: am7990.c,v 1.64 2001/11/13 13:14:34 lukem Exp $");
+
 #include "bpfilter.h"
 #include "rnd.h"
 
@@ -109,7 +112,7 @@
 void am7990_meminit __P((struct lance_softc *));
 void am7990_start __P((struct ifnet *));
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_ddb.h"
 #endif
 
@@ -186,7 +189,7 @@ am7990_meminit(sc)
 	 * Update our private copy of the Ethernet address.
 	 * We NEED the copy so we can ensure its alignment!
 	 */
-	bcopy(LLADDR(ifp->if_sadl), sc->sc_enaddr, 6);
+	memcpy(sc->sc_enaddr, LLADDR(ifp->if_sadl), ETHER_ADDR_LEN);
 	myaddr = sc->sc_enaddr;
 
 	init.init_padr[0] = (myaddr[1] << 8) | myaddr[0];
@@ -405,7 +408,7 @@ am7990_intr(arg)
 
 	isr = (*sc->sc_rdcsr)(sc, LE_CSR0) | sc->sc_saved_csr0;
 	sc->sc_saved_csr0 = 0;
-#ifdef LEDEBUG
+#if defined(LEDEBUG) && LEDEBUG > 1
 	if (sc->sc_debug)
 		printf("%s: am7990_intr entering with isr=%04x\n",
 		    sc->sc_dev.dv_xname, isr);

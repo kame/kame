@@ -1,4 +1,4 @@
-/*      $NetBSD: if_atmsubr.c,v 1.22 2000/03/30 09:45:35 augustss Exp $       */
+/*      $NetBSD: if_atmsubr.c,v 1.31 2001/11/12 23:49:36 lukem Exp $       */
 
 /*
  *
@@ -35,9 +35,15 @@
 /*
  * if_atmsubr.c
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_atmsubr.c,v 1.31 2001/11/12 23:49:36 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_gateway.h"
 #include "opt_natm.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,6 +65,10 @@
 #include <net/if_types.h>
 #include <net/if_atm.h>
 #include <net/ethertypes.h> /* XXX: for ETHERTYPE_* */
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/if_atm.h>
@@ -104,16 +114,15 @@ atm_output(ifp, m0, dst, rt0)
 	u_int32_t atm_flags;
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 
-
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
 
 	/*
-	 * if the queueing discipline needs packet classification,
+	 * If the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m,
-		     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
+	     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
 
 	/*
 	 * check route
@@ -222,8 +231,9 @@ atm_output(ifp, m0, dst, rt0)
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
+
 	len = m->m_pkthdr.len;
-	s = splimp();
+	s = splnet();
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
 	if (error) {
 		splx(s);
@@ -265,7 +275,7 @@ atm_input(ifp, ah, m, rxhand)
 	if (rxhand) {
 #ifdef NATM
 	  struct natmpcb *npcb = rxhand;
-	  s = splimp();			/* in case 2 atm cards @ diff lvls */
+	  s = splnet();			/* in case 2 atm cards @ diff lvls */
 	  npcb->npcb_inq++;			/* count # in queue */
 	  splx(s);
 	  schednetisr(NETISR_NATM);
@@ -350,7 +360,7 @@ atm_input(ifp, ah, m, rxhand)
 	  }
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -366,43 +376,23 @@ void
 atm_ifattach(ifp)
 	struct ifnet *ifp;
 {
-	struct ifaddr *ifa;
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ATM;
 	ifp->if_addrlen = 0;
 	ifp->if_hdrlen = 0;
+	ifp->if_dlt = DLT_ATM_RFC1483;
 	ifp->if_mtu = ATMMTU;
 	ifp->if_output = atm_output;
 #if 0 /* XXX XXX XXX */
 	ifp->if_input = atm_input;
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-	    ifa = ifa->ifa_list.tqe_next)
-#elif defined(__FreeBSD__) && ((__FreeBSD__ > 2) || defined(_NET_IF_VAR_H_))
-/*
- * for FreeBSD-3.0.  3.0-SNAP-970124 still sets -D__FreeBSD__=2!
- * XXX -- for now, use newly-introduced "net/if_var.h" as an identifier.
- * need a better way to identify 3.0.  -- kjc
- */
-	for (ifa = ifp->if_addrhead.tqh_first; ifa; 
-	    ifa = ifa->ifa_link.tqe_next)
-#elif defined(__FreeBSD__) || defined(__bsdi__)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next) 
-#endif
+	if_alloc_sadl(ifp);
+	/* XXX Store LLADDR for ATMARP. */
 
-		if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
-		    sdl->sdl_family == AF_LINK) {
-			sdl->sdl_type = IFT_ATM;
-			sdl->sdl_alen = ifp->if_addrlen;
-#ifdef notyet /* if using ATMARP, store hardware address using the next line */
-			bcopy(ifp->hw_addr, LLADDR(sdl), ifp->if_addrlen);
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_ATM_RFC1483, sizeof(struct atmllc));
 #endif
-			break;
-		}
-
 }
 
 #ifdef ATM_PVCEXT
@@ -421,7 +411,7 @@ pvcsif_alloc()
 	       M_DEVBUF, M_WAITOK);
 	if (pvcsif == NULL)
 		return (NULL);
-	bzero(pvcsif, sizeof(struct pvcsif));
+	memset(pvcsif, 0, sizeof(struct pvcsif));
 
 #ifdef __NetBSD__
 	sprintf(pvcsif->sif_if.if_xname, "pvc%d", pvc_number++);

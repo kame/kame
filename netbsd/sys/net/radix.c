@@ -1,4 +1,4 @@
-/*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
+/*	$NetBSD: radix.c,v 1.18 2001/11/12 23:49:47 lukem Exp $	*/
 
 /*
  * Copyright (c) 1988, 1989, 1993
@@ -38,6 +38,10 @@
 /*
  * Routines to build and maintain radix trees for routing lookups.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: radix.c,v 1.18 2001/11/12 23:49:47 lukem Exp $");
+
 #ifndef _NET_RADIX_H_
 #include <sys/param.h>
 #ifdef	_KERNEL
@@ -303,7 +307,7 @@ on1:
 					while (x && x->rn_mask != m->rm_mask)
 						x = x->rn_dupedkey;
 					if (x && rn_satisfies_leaf(v, x, off))
-						    return x;
+						return x;
 				}
 				m = m->rm_mklist;
 			} while (m);
@@ -452,7 +456,7 @@ rn_addmask(n_arg, search, skip)
 	Bcopy(addmask_key, cp, mlen);
 	x = rn_insert(cp, mask_rnhead, &maskduplicated, x);
 	if (maskduplicated) {
-		log(LOG_ERR, "rn_addmask: mask impossibly already in tree");
+		log(LOG_ERR, "rn_addmask: mask impossibly already in tree\n");
 		Free(saved_x);
 		return (x);
 	}
@@ -662,8 +666,8 @@ on2:
 		if (m->rm_flags & RNF_NORMAL) {
 			mmask = m->rm_leaf->rn_mask;
 			if (tt->rn_flags & RNF_NORMAL) {
-				log(LOG_ERR,
-				   "Non-unique normal route, mask not entered\n");
+				log(LOG_ERR, "Non-unique normal route,"
+				    " mask not entered\n");
 				return tt;
 			}
 		} else
@@ -816,7 +820,7 @@ on1:
 				}
 			if (m)
 				log(LOG_ERR, "%s %p at %p\n",
-					    "rn_delete: Orphaned Mask", m, x);
+				    "rn_delete: Orphaned Mask", m, x);
 		}
 	}
 	/*

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.110 2002/09/19 04:46:22 k-sugyou Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.111 2002/09/25 11:41:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,6 +115,10 @@ extern int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf 
 struct	route ip6_forward_rt;
 #else
 struct	route_in6 ip6_forward_rt;
+#endif
+
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+extern struct pfil_head inet6_pfil_hook;	/* XXX */
 #endif
 
 /*
@@ -703,29 +707,15 @@ ip6_forward(m, srcrt)
 #endif
 
 #if defined(__NetBSD__) && defined(PFIL_HOOKS)
-    {
-	struct packet_filter_hook *pfh;
-	struct mbuf *m1;
-	int rv;
-
 	/*
 	 * Run through list of hooks for output packets.
 	 */
-	m1 = m;
-	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
-	for (; pfh; pfh = pfh->pfil_link.tqe_next)
-		if (pfh->pfil_func) {
-			rv = pfh->pfil_func(ip6, sizeof(*ip6), rt->rt_ifp, 1, &m1);
-			if (rv) {
-				error = EHOSTUNREACH;
-				goto senderr;
-			}
-			m = m1;
-			if (m == NULL)
-				goto freecopy;
-			ip6 = mtod(m, struct ip6_hdr *);
-		}
-    }
+	if ((error = pfil_run_hooks(&inet6_pfil_hook, &m, rt->rt_ifp,
+				    PFIL_OUT)) != 0)
+		goto senderr;
+	if (m == NULL)
+		goto freecopy;
+	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* PFIL_HOOKS */
 
 #if defined(__FreeBSD__) && __FreeBSD__ > 4

@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.45 2002/09/11 02:34:16 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.46 2002/09/25 11:41:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,7 +88,15 @@ ip6q_lock_try()
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s;
 
+#ifdef __NetBSD__
+	/*
+	 * Use splvm() -- we're bloking things that would cause
+	 * mbuf allocation.
+	 */
+	s = splvm();
+#else
 	s = splimp();
+#endif
 	if (ip6q_locked) {
 		splx(s);
 		return (0);
@@ -110,7 +118,11 @@ ip6q_unlock()
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s;
 
+#ifdef __NetBSD__
+	s = splvm();
+#else
 	s = splimp();
+#endif
 	ip6q_locked = 0;
 	splx(s);
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.13 2002/05/16 11:02:58 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.14 2002/09/25 11:41:19 itojun Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -376,7 +376,11 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
 	cl->cl_hif = hif;
 	cl->cl_parent = parent;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	hif->hif_classes++;
 	if (flags & HFCF_DEFAULTCLASS)
 		hif->hif_defaultclass = cl;
@@ -428,7 +432,11 @@ hfsc_class_destroy(cl)
 	if (is_a_parent_class(cl))
 		return (EBUSY);
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 
 	/* delete filters referencing to this class */
 	acc_discard_filters(&cl->cl_hif->hif_classifier, cl, 0);
@@ -499,7 +507,11 @@ hfsc_class_modify(cl, rsc, fsc)
 			return (ENOMEM);
 	}
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	if (!qempty(cl->cl_q))
 		hfsc_purgeq(cl);
 

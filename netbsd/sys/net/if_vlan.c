@@ -1,7 +1,7 @@
-/*	$NetBSD: if_vlan.c,v 1.26.2.1 2000/12/31 20:14:32 jhawk Exp $	*/
+/*	$NetBSD: if_vlan.c,v 1.33 2001/11/12 23:49:45 lukem Exp $	*/
 
 /*-
- * Copyright (c) 2000 The NetBSD Foundation, Inc.
+ * Copyright (c) 2000, 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
@@ -84,6 +84,9 @@
  *	  interface changes MTU.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_vlan.c,v 1.33 2001/11/12 23:49:45 lukem Exp $");
+
 #include "opt_inet.h"
 #include "bpfilter.h"
 
@@ -109,8 +112,6 @@
 #include <netinet/in.h>
 #include <netinet/if_inarp.h>
 #endif
-
-extern struct	ifaddr **ifnet_addrs;	/* XXX if.c */
 
 struct vlan_mc_entry {
 	LIST_ENTRY(vlan_mc_entry)	mc_entries;
@@ -196,6 +197,23 @@ vlanattach(int n)
 	if_clone_attach(&vlan_cloner);
 }
 
+static void
+vlan_reset_linkname(struct ifnet *ifp)
+{
+
+	/*
+	 * We start out with a "802.1Q VLAN" type and zero-length
+	 * addresses.  When we attach to a parent interface, we
+	 * inherit its type, address length, address, and data link
+	 * type.
+	 */
+
+	ifp->if_type = IFT_L2VLAN;
+	ifp->if_addrlen = 0;
+	ifp->if_dlt = DLT_NULL;
+	if_alloc_sadl(ifp);
+}
+
 static int
 vlan_clone_create(struct if_clone *ifc, int unit)
 {
@@ -220,6 +238,7 @@ vlan_clone_create(struct if_clone *ifc, int unit)
 	IFQ_SET_READY(&ifp->if_snd);
 
 	if_attach(ifp);
+	vlan_reset_linkname(ifp);
 
 	return (0);
 }
@@ -235,10 +254,6 @@ vlan_clone_destroy(struct ifnet *ifp)
 	vlan_unconfig(ifp);
 	splx(s);
 
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
-	ether_ifdetach(ifp);
 	if_detach(ifp);
 	free(ifv, M_DEVBUF);
 }
@@ -301,14 +316,21 @@ vlan_config(struct ifvlan *ifv, struct ifnet *p)
 		}
 
 		/*
+		 * If the parent interface can do hardware-assisted
+		 * VLAN encapsulation, then propagate its hardware-
+		 * assisted checksumming flags.
+		 */
+		if (ec->ec_capabilities & ETHERCAP_VLAN_HWTAGGING)
+			ifp->if_capabilities = p->if_capabilities &
+			    (IFCAP_CSUM_IPv4|IFCAP_CSUM_TCPv4|
+			     IFCAP_CSUM_UDPv4|IFCAP_CSUM_TCPv6|
+			     IFCAP_CSUM_UDPv6);
+
+		/*
 		 * We inherit the parent's Ethernet address.
 		 */
 		ether_ifattach(ifp, LLADDR(p->if_sadl));
 		ifp->if_hdrlen = sizeof(struct ether_vlan_header); /* XXX? */
-#if NBPFILTER > 0
-		bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB,
-		    sizeof(struct ether_header));
-#endif
 		break;
 	    }
 
@@ -368,10 +390,8 @@ vlan_unconfig(struct ifnet *ifp)
 			}
 		}
 
-#if NBPFILTER > 0
-		bpfdetach(ifp); 
-#endif
 		ether_ifdetach(ifp);
+		vlan_reset_linkname(ifp);
 		break;
 	    }
 
@@ -387,6 +407,7 @@ vlan_unconfig(struct ifnet *ifp)
 
 	if_down(ifp);
 	ifp->if_flags &= ~(IFF_UP|IFF_RUNNING);
+	ifp->if_capabilities = 0;
 }
 
 /*
@@ -468,7 +489,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	case SIOCGIFADDR:
 		sa = (struct sockaddr *)&ifr->ifr_data;
-		memcpy(sa->sa_data, LLADDR(ifp->if_sadl), ETHER_ADDR_LEN);
+		memcpy(sa->sa_data, LLADDR(ifp->if_sadl), ifp->if_addrlen);
 		break;
 
 	case SIOCSIFMTU:
@@ -680,6 +701,26 @@ vlan_start(struct ifnet *ifp)
 		if (m == NULL)
 			break;
 
+#ifdef ALTQ
+		/*
+		 * If ALTQ is enabled on the parent interface, do
+		 * classification; the queueing discipline might
+		 * not require classification, but might require
+		 * the address family/header pointer in the pktattr.
+		 */
+		if (ALTQ_IS_ENABLED(&p->if_snd)) {
+			switch (p->if_type) {
+			case IFT_ETHER:
+				altq_etherclassify(&p->if_snd, m, &pktattr);
+				break;
+#ifdef DIAGNOSTIC
+			default:
+				panic("vlan_start: impossible (altq)");
+#endif
+			}
+		}
+#endif /* ALTQ */
+
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
@@ -762,16 +803,16 @@ vlan_start(struct ifnet *ifp)
 		 * Send it, precisely as the parent's output routine
 		 * would have.  We are already running at splimp.
 		 */
-		IFQ_ENQUEUE(&p->if_snd, m, NULL, error);
+		IFQ_ENQUEUE(&p->if_snd, m, &pktattr, error);
 		if (error) {
 			/* mbuf is already freed */
 			ifp->if_oerrors++;
 			continue;
 		}
+
 		ifp->if_opackets++;
-		if ((p->if_flags & IFF_OACTIVE) == 0) {
+		if ((p->if_flags & IFF_OACTIVE) == 0)
 			(*p->if_start)(p);
-		}
 	}
 
 	ifp->if_flags &= ~IFF_OACTIVE;

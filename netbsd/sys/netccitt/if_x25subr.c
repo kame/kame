@@ -1,4 +1,4 @@
-/*	$NetBSD: if_x25subr.c,v 1.22 2000/03/30 13:53:33 augustss Exp $	*/
+/*	$NetBSD: if_x25subr.c,v 1.28 2002/05/12 21:30:35 matt Exp $	*/
 
 /*
  * Copyright (c) 1990, 1993
@@ -34,6 +34,9 @@
  *
  *	@(#)if_x25subr.c	8.1 (Berkeley) 6/10/93
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_x25subr.c,v 1.28 2002/05/12 21:30:35 matt Exp $");
 
 #include "opt_inet.h"
 #include "opt_iso.h"
@@ -216,7 +219,7 @@ x25_ifinput(m, v)
 		ifp->if_noproto++;
 		return 0;
 	}
-	s = splimp();
+	s = splnet();
 	schednetisr(isr);
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
@@ -421,7 +424,7 @@ x25_iftimeout(ifp)
 {
 	struct pkcb *pkcb = 0;
 	struct pklcd **lcpp, *lcp;
-	int             s = splimp();
+	int             s = splnet();
 
 	FOR_ALL_PKCBS(pkcb)
 		if (pkcb->pk_ia->ia_ifp == ifp)
@@ -697,11 +700,11 @@ x25_dg_rtinit(dst, ia, af)
 
 
 int x25_startproto = 1;
+struct pklcdhead pk_listenhead;
 
 void
 pk_init()
 {
-
 	TAILQ_INIT(&pk_listenhead);
 	if (x25_startproto) {
 		pk_protolisten(0xcc, 1, x25_dgram_incoming);
@@ -767,7 +770,7 @@ pk_rtattach(so, m0)
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define transfer_sockbuf(s, f, l) \
 	while ((m = (s)->sb_mb) != NULL) \
-		{(s)->sb_mb = m->m_act; m->m_act = 0; sbfree((s), m); f;}
+		{(s)->sb_mb = m->m_nextpkt; m->m_nextpkt = 0; sbfree((s), m); f;}
 
 	if (rt)
 		rt->rt_refcnt--;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_tokensubr.c,v 1.10 2000/06/14 05:10:28 mycroft Exp $	*/
+/*	$NetBSD: if_tokensubr.c,v 1.19 2001/11/12 23:49:45 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997-1999
@@ -38,6 +38,10 @@
  *
  *	from: NetBSD: if_fddisubr.c,v 1.2 1995/08/19 04:35:29 cgd Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_tokensubr.c,v 1.19 2001/11/12 23:49:45 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
@@ -45,6 +49,8 @@
 #include "opt_iso.h"
 #include "opt_ns.h"
 #include "opt_gateway.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,6 +71,10 @@
 #include <net/if_llc.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #include <net/if_ether.h>
 #include <net/if_token.h>
@@ -452,7 +462,7 @@ send:
 
 	mflags = m->m_flags;
 	len = m->m_pkthdr.len;
-	s = splimp();
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
@@ -668,7 +678,7 @@ token_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -686,11 +696,11 @@ token_ifattach(ifp, lla)
 	struct ifnet *ifp;
 	caddr_t	lla;
 {
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_ISO88025;
 	ifp->if_addrlen = ISO88025_ADDR_LEN;
 	ifp->if_hdrlen = 14;
+	ifp->if_dlt = DLT_IEEE802;
 	ifp->if_mtu = ISO88025_MTU;
 	ifp->if_output = token_output;
 	ifp->if_input = token_input;
@@ -698,11 +708,13 @@ token_ifattach(ifp, lla)
 #ifdef IFF_NOTRAILERS
 	ifp->if_flags |= IFF_NOTRAILERS;
 #endif
-	if ((sdl = ifp->if_sadl) != NULL && sdl->sdl_family == AF_LINK) {
-		sdl->sdl_type = IFT_ISO88025;
-		sdl->sdl_alen = ifp->if_addrlen;
-		bcopy(lla, LLADDR(sdl), ifp->if_addrlen);
-	}
+
+	if_alloc_sadl(ifp);
+	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
+
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_IEEE802, sizeof(struct token_header));
+#endif
 }
 
 void    
@@ -710,5 +722,8 @@ token_ifdetach(ifp)
         struct ifnet *ifp;
 {
 
-        /* Nothing. */
+#if NBPFILTER > 0
+	bpfdetach(ifp);
+#endif
+	if_free_sadl(ifp);
 }

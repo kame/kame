@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.294 2002/09/11 02:40:48 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.295 2002/09/25 11:41:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,6 +206,10 @@ int ip6_sourcecheck_interval;		/* XXX */
 const int int6intrq_present = 1;
 #endif
 
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+struct pfil_head inet6_pfil_hook;
+#endif
+
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 /* firewall hooks */
 ip6_fw_chk_t *ip6_fw_chk_ptr;
@@ -296,6 +300,16 @@ ip6_init()
 #ifdef MIP6
 	mip6_init();
 #endif /* MIP6 */
+
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+	/* Register our Packet Filter hook. */
+	inet6_pfil_hook.ph_type = PFIL_TYPE_AF;
+	inet6_pfil_hook.ph_af   = AF_INET6;
+	i = pfil_head_register(&inet6_pfil_hook);
+	if (i != 0)
+		printf("ip6_init: WARNING: unable to register pfil hook, "
+		    "error %d\n", i);
+#endif /* PFIL_HOOKS */
 }
 
 static void
@@ -354,7 +368,11 @@ ip6intr()
 	struct mbuf *m;
 
 	for (;;) {
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		IF_DEQUEUE(&ip6intrq, m);
 		splx(s);
 		if (m == 0)
@@ -397,11 +415,6 @@ ip6_input(m)
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
-	struct packet_filter_hook *pfh;
-	struct mbuf *m0;
-	int rv;
-#endif	/* PFIL_HOOKS */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 	/*
@@ -530,25 +543,16 @@ ip6_input(m)
 #ifdef IPSEC
 	if (!ipsec_getnhist(m))
 #else
-	if (1 /* CONSTCOND */)
+	if (1)
 #endif
 	{
-		m0 = m;
-		pfh = pfil_hook_get(PFIL_IN,
-		    &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
-	} else
-		pfh = NULL;
-	for (; pfh; pfh = pfh->pfil_link.tqe_next)
-		if (pfh->pfil_func) {
-			rv = pfh->pfil_func(ip6, sizeof(*ip6),
-					    m->m_pkthdr.rcvif, 0, &m0);
-			if (rv)
-				return;
-			m = m0;
-			if (m == NULL)
-				return;
-			ip6 = mtod(m, struct ip6_hdr *);
-		}
+		if (pfil_run_hooks(&inet6_pfil_hook, &m, m->m_pkthdr.rcvif,
+				   PFIL_IN) != 0)
+			return;
+		if (m == NULL)
+			return;
+		ip6 = mtod(m, struct ip6_hdr *);
+	}
 #endif /* PFIL_HOOKS */
 
 	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
@@ -2089,7 +2093,7 @@ ip6_lasthdr(m, off, proto, nxtp)
 	}
 }
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4) && !defined(__NetBSD__)
 void
 pfctlinput2(cmd, sa, ctlparam)
 	int cmd;
@@ -2182,9 +2186,6 @@ u_char	inet6ctlerrmap[PRC_NCMDS] = {
 };
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-#ifdef __NetBSD__
-#include <vm/vm.h>
-#endif
 #include <sys/sysctl.h>
 
 int

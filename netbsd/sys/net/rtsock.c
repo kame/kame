@@ -1,4 +1,4 @@
-/*	$NetBSD: rtsock.c,v 1.40.4.1 2000/10/19 13:38:13 he Exp $	*/
+/*	$NetBSD: rtsock.c,v 1.55 2002/02/22 17:26:31 christos Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,6 +64,9 @@
  *	@(#)rtsock.c	8.7 (Berkeley) 10/12/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: rtsock.c,v 1.55 2002/02/22 17:26:31 christos Exp $");
+
 #include "opt_inet.h"
 #include "opt_sctp.h"
 
@@ -75,8 +78,6 @@
 #include <sys/socketvar.h>
 #include <sys/domain.h>
 #include <sys/protosw.h>
-
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -108,7 +109,7 @@ struct walkarg {
 static struct mbuf *rt_msg1 __P((int, struct rt_addrinfo *, caddr_t, int));
 static int rt_msg2 __P((int, struct rt_addrinfo *, caddr_t, struct walkarg *,
     int *));
-static void rt_xaddrs __P((caddr_t, caddr_t, struct rt_addrinfo *));
+static int rt_xaddrs __P((caddr_t, caddr_t, struct rt_addrinfo *));
 static int sysctl_dumpentry __P((struct radix_node *, void *));
 static int sysctl_iflist __P((int, struct walkarg *, int));
 static int sysctl_rtable __P((int *, u_int, void *, size_t *, void *, size_t));
@@ -164,7 +165,7 @@ route_usrreq(so, req, m, nam, control, p)
 	if (req == PRU_ATTACH) {
 		MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
 		if ((so->so_pcb = rp) != NULL)
-			bzero(so->so_pcb, sizeof(*rp));
+			memset(so->so_pcb, 0, sizeof(*rp));
 
 	}
 	if (req == PRU_DETACH && rp)
@@ -222,6 +223,7 @@ route_output(m, va_alist)
 	struct ifaddr *ifa = 0;
 	struct socket *so;
 	va_list ap;
+	sa_family_t family;
 
 	va_start(ap, m);
 	so = va_arg(ap, struct socket *);
@@ -250,9 +252,10 @@ route_output(m, va_alist)
 		senderr(EPROTONOSUPPORT);
 	}
 	rtm->rtm_pid = curproc->p_pid;
-	bzero(&info, sizeof(info));
+	memset(&info, 0, sizeof(info));
 	info.rti_addrs = rtm->rtm_addrs;
-	rt_xaddrs((caddr_t)(rtm + 1), len + (caddr_t)rtm, &info);
+	if (rt_xaddrs((caddr_t)(rtm + 1), len + (caddr_t)rtm, &info))
+		senderr(EINVAL);
 	info.rti_flags = rtm->rtm_flags;
 	if (dst == 0 || (dst->sa_family >= AF_MAX))
 		senderr(EINVAL);
@@ -339,7 +342,7 @@ route_output(m, va_alist)
 			genmask = rt->rt_genmask;
 			if (rtm->rtm_addrs & (RTA_IFP | RTA_IFA)) {
 				if ((ifp = rt->rt_ifp) != NULL) {
-					ifpaddr = ifp->if_addrlist.tqh_first->ifa_addr;
+					ifpaddr = TAILQ_FIRST(&ifp->if_addrlist)->ifa_addr;
 					ifaaddr = rt->rt_ifa->ifa_addr;
 					if (ifp->if_flags & IFF_POINTOPOINT)
 						brdaddr = rt->rt_ifa->ifa_dstaddr;
@@ -429,6 +432,7 @@ flush:
 		else 
 			rtm->rtm_flags |= RTF_DONE;
 	}
+	family = dst ? dst->sa_family : 0;
 	if (rt)
 		rtfree(rt);
     {
@@ -457,8 +461,8 @@ flush:
 	}
 	if (rp)
 		rp->rcb_proto.sp_family = 0; /* Avoid us */
-	if (dst)
-		route_proto.sp_protocol = dst->sa_family;
+	if (family)
+		route_proto.sp_protocol = family;
 	if (m)
 		raw_input(m, &route_proto, &route_src, &route_dst);
 	if (rp)
@@ -488,7 +492,7 @@ rt_setmetrics(which, in, out)
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
-static void
+static int
 rt_xaddrs(cp, cplim, rtinfo)
 	caddr_t cp, cplim;
 	struct rt_addrinfo *rtinfo;
@@ -496,13 +500,30 @@ rt_xaddrs(cp, cplim, rtinfo)
 	struct sockaddr *sa;
 	int i;
 
-	bzero(rtinfo->rti_info, sizeof(rtinfo->rti_info));
 	for (i = 0; (i < RTAX_MAX) && (cp < cplim); i++) {
 		if ((rtinfo->rti_addrs & (1 << i)) == 0)
 			continue;
 		rtinfo->rti_info[i] = sa = (struct sockaddr *)cp;
 		ADVANCE(cp, sa);
 	}
+
+	/* Check for extra addresses specified.  */
+	if ((rtinfo->rti_addrs & (~0 << i)) != 0)
+		return (1);
+	/* Check for bad data length.  */
+	if (cp != cplim) {
+		if (i == RTAX_NETMASK + 1 &&
+		    cp - ROUNDUP(sa->sa_len) + sa->sa_len == cplim)
+			/*
+			 * The last sockaddr was netmask.
+			 * We accept this for now for the sake of old
+			 * binaries or third party softwares.
+			 */
+			;
+		else
+			return (1);
+	}
+	return (0);
 }
 
 static struct mbuf *
@@ -678,7 +699,7 @@ again:
 
 /*
  * This routine is called to generate a message from the routing
- * socket indicating that a redirect has occured, a routing lookup
+ * socket indicating that a redirect has occurred, a routing lookup
  * has failed, or that a protocol has detected timeouts to a particular
  * destination.
  */
@@ -693,7 +714,7 @@ rt_missmsg(type, rtinfo, flags, error)
 
 	if (route_cb.any_count == 0)
 		return;
-	bzero(&rtm, sizeof(rtm));
+	memset(&rtm, 0, sizeof(rtm));
 	rtm.rtm_flags = RTF_DONE | flags;
 	rtm.rtm_errno = error;
 	m = rt_msg1(type, rtinfo, (caddr_t)&rtm, sizeof(rtm));
@@ -721,8 +742,8 @@ rt_ifmsg(ifp)
 
 	if (route_cb.any_count == 0)
 		return;
-	bzero(&info, sizeof(info));
-	bzero(&ifm, sizeof(ifm));
+	memset(&info, 0, sizeof(info));
+	memset(&ifm, 0, sizeof(ifm));
 	ifm.ifm_index = ifp->if_index;
 	ifm.ifm_flags = ifp->if_flags;
 	ifm.ifm_data = ifp->if_data;
@@ -733,8 +754,8 @@ rt_ifmsg(ifp)
 	route_proto.sp_protocol = 0;
 	raw_input(m, &route_proto, &route_src, &route_dst);
 #ifdef COMPAT_14
-	bzero(&info, sizeof(info));
-	bzero(&oifm, sizeof(oifm));
+	memset(&info, 0, sizeof(info));
+	memset(&oifm, 0, sizeof(oifm));
 	oifm.ifm_index = ifp->if_index;
 	oifm.ifm_flags = ifp->if_flags;
 	oifm.ifm_data.ifi_type = ifp->if_data.ifi_type;
@@ -800,17 +821,17 @@ rt_newaddrmsg(cmd, ifa, error, rt)
 	if (route_cb.any_count == 0)
 		return;
 	for (pass = 1; pass < 3; pass++) {
-		bzero(&info, sizeof(info));
+		memset(&info, 0, sizeof(info));
 		if ((cmd == RTM_ADD && pass == 1) ||
 		    (cmd == RTM_DELETE && pass == 2)) {
 			struct ifa_msghdr ifam;
 			int ncmd = cmd == RTM_ADD ? RTM_NEWADDR : RTM_DELADDR;
 
 			ifaaddr = sa = ifa->ifa_addr;
-			ifpaddr = ifp->if_addrlist.tqh_first->ifa_addr;
+			ifpaddr = TAILQ_FIRST(&ifp->if_addrlist)->ifa_addr;
 			netmask = ifa->ifa_netmask;
 			brdaddr = ifa->ifa_dstaddr;
-			bzero(&ifam, sizeof(ifam));
+			memset(&ifam, 0, sizeof(ifam));
 			ifam.ifam_index = ifp->if_index;
 			ifam.ifam_metric = ifa->ifa_metric;
 			ifam.ifam_flags = ifa->ifa_flags;
@@ -829,7 +850,7 @@ rt_newaddrmsg(cmd, ifa, error, rt)
 			netmask = rt_mask(rt);
 			dst = sa = rt_key(rt);
 			gate = rt->rt_gateway;
-			bzero(&rtm, sizeof(rtm));
+			memset(&rtm, 0, sizeof(rtm));
 			rtm.rtm_index = ifp->if_index;
 			rtm.rtm_flags |= rt->rt_flags;
 			rtm.rtm_errno = error;
@@ -858,8 +879,8 @@ rt_ifannouncemsg(ifp, what)
 
 	if (route_cb.any_count == 0)
 		return;
-	bzero(&info, sizeof(info));
-	bzero(&ifan, sizeof(ifan));
+	memset(&info, 0, sizeof(info));
+	memset(&ifan, 0, sizeof(ifan));
 	ifan.ifan_index = ifp->if_index;
 	strcpy(ifan.ifan_name, ifp->if_xname);
 	ifan.ifan_what = what;
@@ -885,13 +906,13 @@ sysctl_dumpentry(rn, v)
 
 	if (w->w_op == NET_RT_FLAGS && !(rt->rt_flags & w->w_arg))
 		return 0;
-	bzero(&info, sizeof(info));
+	memset(&info, 0, sizeof(info));
 	dst = rt_key(rt);
 	gate = rt->rt_gateway;
 	netmask = rt_mask(rt);
 	genmask = rt->rt_genmask;
 	if (rt->rt_ifp) {
-		ifpaddr = rt->rt_ifp->if_addrlist.tqh_first->ifa_addr;
+		ifpaddr = TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
 		ifaaddr = rt->rt_ifa->ifa_addr;
 		if (rt->rt_ifp->if_flags & IFF_POINTOPOINT)
 			brdaddr = rt->rt_ifa->ifa_dstaddr;
@@ -926,11 +947,11 @@ sysctl_iflist(af, w, type)
 	struct	rt_addrinfo info;
 	int	len, error = 0;
 
-	bzero(&info, sizeof(info));
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next) {
+	memset(&info, 0, sizeof(info));
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		if (w->w_arg && w->w_arg != ifp->if_index)
 			continue;
-		ifa = ifp->if_addrlist.tqh_first;
+		ifa = TAILQ_FIRST(&ifp->if_addrlist);
 		ifpaddr = ifa->ifa_addr;
 		switch(type) {
 		case NET_RT_IFLIST:
@@ -1019,7 +1040,7 @@ sysctl_iflist(af, w, type)
 				panic("sysctl_iflist(2)");
 			}
 		}
-		while ((ifa = ifa->ifa_list.tqe_next) != NULL) {
+		while ((ifa = TAILQ_NEXT(ifa, ifa_list)) != NULL) {
 			if (af && af != ifa->ifa_addr->sa_family)
 				continue;
 			ifaaddr = ifa->ifa_addr;

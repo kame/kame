@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.74.2.2 2002/03/07 17:49:04 he Exp $	*/
+/*	$NetBSD: machdep.c,v 1.113.4.2 2002/07/06 14:05:49 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -33,14 +33,11 @@
 
 #include "opt_compat_netbsd.h"
 #include "opt_ddb.h"
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-#include "opt_natm.h"
-#include "adb.h"
+#include "opt_kgdb.h"
 #include "opt_ipkdb.h"
+#include "opt_multiprocessor.h"
+#include "adb.h"
+#include "zsc.h"
 
 #include <sys/param.h>
 #include <sys/buf.h>
@@ -57,33 +54,31 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/user.h>
-
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <sys/boot_flag.h>
 
 #include <uvm/uvm_extern.h>
 
 #include <net/netisr.h>
 
-#ifdef INET
-#include <net/if.h>
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#include <netinet/ip_var.h>
+#ifdef DDB
+#include <machine/db_machdep.h>
+#include <ddb/db_extern.h>
 #endif
 
-#ifdef INET6
-# ifndef INET
-#  include <netinet/in.h>
-# endif
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
+#ifdef KGDB
+#include <sys/kgdb.h>
+#endif
+ 
+#ifdef IPKDB
+#include <ipkdb/ipkdb.h>
 #endif
 
+#include <machine/autoconf.h>
 #include <machine/bat.h>
 #include <machine/powerpc.h>
 #include <machine/trap.h>
 #include <machine/bus.h>
+#include <machine/fpu.h>
 
 #include <dev/cons.h>
 #include <dev/ofw/openfirm.h>
@@ -93,67 +88,83 @@
 
 #include <dev/usb/ukbdvar.h>
 
-vm_map_t exec_map = NULL;
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+#include <macppc/dev/adbvar.h>
 
-/* Our exported CPU info; we can have only one. */  
-struct cpu_info cpu_info_store;
+#if NZSC > 0
+#include <machine/z8530var.h>
+#endif
+
+struct vm_map *exec_map = NULL;
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 /*
  * Global variables used here and there
  */
+#ifndef MULTIPROCESSOR
 struct pcb *curpcb;
 struct pmap *curpm;
 struct proc *fpuproc;
+#endif
 
 extern struct user *proc0paddr;
 extern int ofmsr;
 
 struct bat battable[16];
-int astpending;
 char bootpath[256];
 paddr_t msgbuf_paddr;
 static int chosen;
 struct pmap ofw_pmap;
-
-int	ofkbd_ihandle;
-int	ofkbd_cngetc __P((dev_t));
-void	ofkbd_cnpollc __P((dev_t, int));
-int	lcsplx __P((int));
-
-int msgbufmapped = 0;
-
-void install_extint __P((void (*)(void)));
+int ofkbd_ihandle;
 
 #ifdef DDB
 void *startsym, *endsym;
 #endif
+
+struct ofw_translations {
+	vaddr_t va;
+	int len;
+	paddr_t pa;
+	int mode;
+};
+
+int ofkbd_cngetc(dev_t);
+void cninit_kd(void);
+int lcsplx(int);
+int save_ofmap(struct ofw_translations *, int);
+void restore_ofmap(struct ofw_translations *, int);
+static void dumpsys(void);
 
 void
 initppc(startkernel, endkernel, args)
 	u_int startkernel, endkernel;
 	char *args;
 {
-	extern trapcode, trapsize;
-	extern alitrap, alisize;
-	extern dsitrap, dsisize;
-	extern isitrap, isisize;
-	extern decrint, decrsize;
-	extern tlbimiss, tlbimsize;
-	extern tlbdlmiss, tlbdlmsize;
-	extern tlbdsmiss, tlbdsmsize;
-#ifdef DDB
-	extern ddblow, ddbsize;
+	extern int trapcode, trapsize;
+	extern int alitrap, alisize;
+	extern int dsitrap, dsisize;
+	extern int isitrap, isisize;
+	extern int decrint, decrsize;
+	extern int tlbimiss, tlbimsize;
+	extern int tlbdlmiss, tlbdlmsize;
+	extern int tlbdsmiss, tlbdsmsize;
+#if defined(DDB) || defined(KGDB)
+	extern int ddblow, ddbsize;
 #endif
 #ifdef IPKDB
-	extern ipkdblow, ipkdbsize;
+	extern int ipkdblow, ipkdbsize;
 #endif
-	extern void consinit __P((void));
-	extern void callback __P((void *));
-	extern void ext_intr __P((void));
 	int exc, scratch;
 	struct mem_region *allmem, *availmem, *mp;
+	struct ofw_translations *ofmap;
+	int ofmaplen;
+#ifdef MULTIPROCESSOR
+	struct cpu_info *ci = &cpu_info[0];
+#else
+	struct cpu_info *ci = &cpu_info_store;
+#endif
+
+	asm volatile ("mtsprg 0,%0" :: "r"(ci));
 
 	/*
 	 * Initialize BAT registers to unmapped to not generate
@@ -171,8 +182,8 @@ initppc(startkernel, endkernel, args)
 	/*
 	 * Set up BAT0 to only map the lowest 256 MB area
 	 */
-	battable[0].batl = BATL(0x00000000, BAT_M, BAT_PP_RW);
-	battable[0].batu = BATU(0x00000000, BAT_BL_256M, BAT_Vs);
+	battable[0x0].batl = BATL(0x00000000, BAT_M, BAT_PP_RW);
+	battable[0x0].batu = BATU(0x00000000, BAT_BL_256M, BAT_Vs);
 
 	/*
 	 * Map PCI memory space.
@@ -185,6 +196,9 @@ initppc(startkernel, endkernel, args)
 
 	battable[0xa].batl = BATL(0xa0000000, BAT_I|BAT_G, BAT_PP_RW);
 	battable[0xa].batu = BATU(0xa0000000, BAT_BL_256M, BAT_Vs);
+
+	battable[0xb].batl = BATL(0xb0000000, BAT_I|BAT_G, BAT_PP_RW);
+	battable[0xb].batu = BATU(0xb0000000, BAT_BL_256M, BAT_Vs);
 
 	/*
 	 * Map obio devices.
@@ -202,6 +216,9 @@ initppc(startkernel, endkernel, args)
 	asm volatile ("mtibatl 0,%0; mtibatu 0,%1;"
 		      "mtdbatl 0,%0; mtdbatu 0,%1;"
 		      :: "r"(battable[0].batl), "r"(battable[0].batu));
+	/* BAT1 used for primary I/O 256 MB segment */
+	asm volatile ("mtdbatl 1,%0; mtdbatu 1,%1;"
+		      :: "r"(battable[8].batl), "r"(battable[8].batu));
 
 	/*
 	 * Set up battable to map all RAM regions.
@@ -222,10 +239,14 @@ initppc(startkernel, endkernel, args)
 	}
 
 	chosen = OF_finddevice("/chosen");
-	save_ofw_mapping();
 
+	ofmaplen = save_ofmap(NULL, 0);
+	ofmap = alloca(ofmaplen);
+	save_ofmap(ofmap, ofmaplen);
+
+	proc0.p_cpu = ci;
 	proc0.p_addr = proc0paddr;
-	bzero(proc0.p_addr, sizeof *proc0.p_addr);
+	memset(proc0.p_addr, 0, sizeof *proc0.p_addr);
 
 	curpcb = &proc0paddr->u_pcb;
 
@@ -241,7 +262,7 @@ initppc(startkernel, endkernel, args)
 	for (exc = EXC_RSVD; exc <= EXC_LAST; exc += 0x100)
 		switch (exc) {
 		default:
-			bcopy(&trapcode, (void *)exc, (size_t)&trapsize);
+			memcpy((void *)exc, &trapcode, (size_t)&trapsize);
 			break;
 		case EXC_EXI:
 			/*
@@ -249,39 +270,43 @@ initppc(startkernel, endkernel, args)
 			 */
 			break;
 		case EXC_ALI:
-			bcopy(&alitrap, (void *)EXC_ALI, (size_t)&alisize);
+			memcpy((void *)EXC_ALI, &alitrap, (size_t)&alisize);
 			break;
 		case EXC_DSI:
-			bcopy(&dsitrap, (void *)EXC_DSI, (size_t)&dsisize);
+			memcpy((void *)EXC_DSI, &dsitrap, (size_t)&dsisize);
 			break;
 		case EXC_ISI:
-			bcopy(&isitrap, (void *)EXC_ISI, (size_t)&isisize);
+			memcpy((void *)EXC_ISI, &isitrap, (size_t)&isisize);
 			break;
 		case EXC_DECR:
-			bcopy(&decrint, (void *)EXC_DECR, (size_t)&decrsize);
+			memcpy((void *)EXC_DECR, &decrint, (size_t)&decrsize);
 			break;
 		case EXC_IMISS:
-			bcopy(&tlbimiss, (void *)EXC_IMISS, (size_t)&tlbimsize);
+			memcpy((void *)EXC_IMISS, &tlbimiss, (size_t)&tlbimsize);
 			break;
 		case EXC_DLMISS:
-			bcopy(&tlbdlmiss, (void *)EXC_DLMISS, (size_t)&tlbdlmsize);
+			memcpy((void *)EXC_DLMISS, &tlbdlmiss, (size_t)&tlbdlmsize);
 			break;
 		case EXC_DSMISS:
-			bcopy(&tlbdsmiss, (void *)EXC_DSMISS, (size_t)&tlbdsmsize);
+			memcpy((void *)EXC_DSMISS, &tlbdsmiss, (size_t)&tlbdsmsize);
 			break;
-#if defined(DDB) || defined(IPKDB)
+#if defined(DDB) || defined(IPKDB) || defined(KGDB)
 		case EXC_PGM:
 		case EXC_TRC:
 		case EXC_BPT:
-#if defined(DDB)
-			bcopy(&ddblow, (void *)exc, (size_t)&ddbsize);
+#if defined(DDB) || defined(KGDB)
+			memcpy((void *)exc, &ddblow, (size_t)&ddbsize);
+#if defined(IPKDB)
+#error "cannot enable IPKDB with DDB or KGDB"
+#endif
 #else
-			bcopy(&ipkdblow, (void *)exc, (size_t)&ipkdbsize);
+			memcpy((void *)exc, &ipkdblow, (size_t)&ipkdbsize);
 #endif
 			break;
-#endif /* DDB || IPKDB */
+#endif /* DDB || IPKDB || KGDB */
 		}
 
+	cpu_probe_cache();
 	/*
 	 * external interrupt handler install
 	 */
@@ -298,18 +323,11 @@ initppc(startkernel, endkernel, args)
 	ofmsr &= ~PSL_IP;
 
 	/*
-	 * i386 port says, that this shouldn't be here,
-	 * but I really think the console should be initialized
-	 * as early as possible.
-	 */
-	consinit();
-
-	/*
 	 * Parse arg string.
 	 */
 #ifdef DDB
-	bcopy(args + strlen(args) + 1, &startsym, sizeof(startsym));
-	bcopy(args + strlen(args) + 5, &endsym, sizeof(endsym));
+	memcpy(&startsym, args + strlen(args) + 1, sizeof(startsym));
+	memcpy(&endsym, args + strlen(args) + 5, sizeof(endsym));
 	if (startsym == NULL || endsym == NULL)
 		startsym = endsym = NULL;
 #endif
@@ -319,32 +337,53 @@ initppc(startkernel, endkernel, args)
 	while (*++args && *args != ' ');
 	if (*args) {
 		*args++ = 0;
-		while (*args) {
-			switch (*args++) {
-			case 'a':
-				boothowto |= RB_ASKNAME;
-				break;
-			case 's':
-				boothowto |= RB_SINGLE;
-				break;
-			case 'd':
-				boothowto |= RB_KDB;
-				break;
+		while (*args)
+			BOOT_FLAG(*args++, boothowto);
+	}
+
+	/*
+	 * If the bootpath doesn't start with a / then it isn't
+	 * an OFW path and probably is an alias, so look up the alias
+	 * and regenerate the full bootpath so device_register will work.
+	 */
+	if (bootpath[0] != '/' && bootpath[0] != '\0') {
+		int aliases = OF_finddevice("/aliases");
+		char tmpbuf[100];
+		char aliasbuf[256];
+		if (aliases != 0) {
+			char *cp1, *cp2, *cp;
+			char saved_ch = 0;
+			int len;
+			cp1 = strchr(bootpath, ':');
+			cp2 = strchr(bootpath, ',');
+			cp = cp1;
+			if (cp1 == NULL || (cp2 != NULL && cp2 < cp1))
+				cp = cp2;
+			tmpbuf[0] = '\0';
+			if (cp != NULL) {
+				strcpy(tmpbuf, cp);
+				saved_ch = *cp;
+				*cp = '\0';
+			}
+			len = OF_getprop(aliases, bootpath, aliasbuf,
+			    sizeof(aliasbuf));
+			if (len > 0) {
+				if (aliasbuf[len-1] == '\0')
+					len--;
+				memcpy(bootpath, aliasbuf, len);
+				strcpy(&bootpath[len], tmpbuf);
+			} else {
+				*cp = saved_ch;
 			}
 		}
 	}
 
-#ifdef DDB
-	ddb_init((int)((u_int)endsym - (u_int)startsym), startsym, endsym);
-#endif
-#ifdef IPKDB
 	/*
-	 * Now trap to IPKDB
+	 * i386 port says, that this shouldn't be here,
+	 * but I really think the console should be initialized
+	 * as early as possible.
 	 */
-	ipkdb_init();
-	if (boothowto & RB_KDB)
-		ipkdb_connect(0);
-#endif
+	consinit();
 
 	/*
 	 * Set the page size.
@@ -354,125 +393,72 @@ initppc(startkernel, endkernel, args)
 	/*
 	 * Initialize pmap module.
 	 */
-	pmap_bootstrap(startkernel, endkernel);
+	pmap_bootstrap(startkernel, endkernel, NULL);
 
-	restore_ofw_mapping();
+	restore_ofmap(ofmap, ofmaplen);
 }
 
-static int N_mapping;
-static struct {
-	vaddr_t va;
-	int len;
-	paddr_t pa;
-	int mode;
-} ofw_mapping[256];
-
 int
-save_ofw_mapping()
+save_ofmap(ofmap, maxlen)
+	struct ofw_translations *ofmap;
+	int maxlen;
 {
-	int mmui, mmu;
+	int mmui, mmu, len;
 
-	OF_getprop(chosen, "mmu", &mmui, 4);
+	OF_getprop(chosen, "mmu", &mmui, sizeof mmui);
 	mmu = OF_instance_to_package(mmui);
-	bzero(ofw_mapping, sizeof(ofw_mapping));
-	N_mapping =
-	    OF_getprop(mmu, "translations", ofw_mapping, sizeof(ofw_mapping));
-	N_mapping /= sizeof(ofw_mapping[0]);
 
-	return 0;
+	if (ofmap) {
+		memset(ofmap, 0, maxlen);	/* to be safe */
+		len = OF_getprop(mmu, "translations", ofmap, maxlen);
+	} else
+		len = OF_getproplen(mmu, "translations");
+
+	return len;
 }
 
-int
-restore_ofw_mapping()
+void
+restore_ofmap(ofmap, len)
+	struct ofw_translations *ofmap;
+	int len;
 {
+	int n = len / sizeof(struct ofw_translations);
 	int i;
 
 	pmap_pinit(&ofw_pmap);
 
 	ofw_pmap.pm_sr[KERNEL_SR] = KERNEL_SEGMENT;
 
-	for (i = 0; i < N_mapping; i++) {
-		paddr_t pa = ofw_mapping[i].pa;
-		vaddr_t va = ofw_mapping[i].va;
-		int size = ofw_mapping[i].len;
+	for (i = 0; i < n; i++) {
+		paddr_t pa = ofmap[i].pa;
+		vaddr_t va = ofmap[i].va;
+		int len = ofmap[i].len;
 
 		if (va < 0xf0000000)			/* XXX */
 			continue;
 
-		while (size > 0) {
+		while (len > 0) {
 			pmap_enter(&ofw_pmap, va, pa, VM_PROT_ALL,
 			    VM_PROT_ALL|PMAP_WIRED);
 			pa += NBPG;
 			va += NBPG;
-			size -= NBPG;
+			len -= NBPG;
 		}
 	}
-
-	return 0;
+	pmap_update(&ofw_pmap);
 }
 
 /*
  * This should probably be in autoconf!				XXX
  */
-int cpu;
-char cpu_model[80];
 char machine[] = MACHINE;		/* from <machine/param.h> */
 char machine_arch[] = MACHINE_ARCH;	/* from <machine/param.h> */
-
-void
-identifycpu()
-{
-	int pvr;
-
-	/*
-	 * Find cpu type (Do it by OpenFirmware?)
-	 */
-	asm ("mfpvr %0" : "=r"(pvr));
-	cpu = pvr >> 16;
-	switch (cpu) {
-	case 1:
-		sprintf(cpu_model, "601");
-		break;
-	case 3:
-		sprintf(cpu_model, "603");
-		break;
-	case 4:
-		sprintf(cpu_model, "604");
-		break;
-	case 5:
-		sprintf(cpu_model, "602");
-		break;
-	case 6:
-		sprintf(cpu_model, "603e");
-		break;
-	case 7:
-		sprintf(cpu_model, "603ev");
-		break;
-	case 8:
-		sprintf(cpu_model, "750");
-		break;
-	case 9:
-		sprintf(cpu_model, "604ev");
-		break;
-	case 12:
-		sprintf(cpu_model, "7400");
-		break;
-	case 20:
-		sprintf(cpu_model, "620");
-		break;
-	default:
-		sprintf(cpu_model, "Version %x", cpu);
-		break;
-	}
-	sprintf(cpu_model + strlen(cpu_model), " (Revision %x)", pvr & 0xffff);
-	printf("CPU: %s\n", cpu_model);
-}
 
 void
 install_extint(handler)
 	void (*handler) __P((void));
 {
-	extern extint, extsize;
+	extern int extint, extsize;
 	extern u_long extint_call;
 	u_long offset = (u_long)handler - (u_long)&extint_call;
 	int omsr, msr;
@@ -484,7 +470,7 @@ install_extint(handler)
 	asm volatile ("mfmsr %0; andi. %1,%0,%2; mtmsr %1"
 		      : "=r"(omsr), "=r"(msr) : "K"((u_short)~PSL_EE));
 	extint_call = (extint_call & 0xfc000003) | offset;
-	bcopy(&extint, (void *)EXC_EXI, (size_t)&extsize);
+	memcpy((void *)EXC_EXI, &extint, (size_t)&extsize);
 	__syncicache((void *)&extint_call, sizeof extint_call);
 	__syncicache((void *)EXC_EXI, (int)&extsize);
 	asm volatile ("mtmsr %0" :: "r"(omsr));
@@ -508,9 +494,9 @@ cpu_startup()
 	v = (caddr_t)proc0paddr + USPACE;
 
 	printf("%s", version);
-	identifycpu();
+	cpu_identify(NULL, 0);
 
-	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
+	format_bytes(pbuf, sizeof(pbuf), ctob((u_int)physmem));
 	printf("total memory = %s\n", pbuf);
 
 	/*
@@ -530,9 +516,9 @@ cpu_startup()
 	sz = MAXBSIZE * nbuf;
 	minaddr = 0;
 	if (uvm_map(kernel_map, (vaddr_t *)&minaddr, round_page(sz),
-		NULL, UVM_UNKNOWN_OFFSET,
+		NULL, UVM_UNKNOWN_OFFSET, 0,
 		UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-			    UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+			    UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	buffers = (char *)minaddr;
 	base = bufpages / nbuf;
@@ -555,13 +541,13 @@ cpu_startup()
 			if (pg == NULL)
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(pmap_kernel());
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -576,11 +562,15 @@ cpu_startup()
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				 VM_PHYS_SIZE, 0, FALSE, NULL);
 
+#ifndef PMAP_MAP_POOLPAGE
 	/*
 	 * No need to allocate an mbuf cluster submap.  Mbuf clusters
 	 * are allocated via the pool allocator, and we use direct-mapped
 	 * pool pages.
 	 */
+	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    mclbytes*nmbclusters, VM_MAP_INTRSAFE, FALSE, NULL);
+#endif
 
 	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
 	printf("avail memory = %s\n", pbuf);
@@ -606,87 +596,31 @@ consinit()
 		return;
 	initted = 1;
 	cninit();
-}
 
-/*
- * Set set up registers on exec.
- */
-void
-setregs(p, pack, stack)
-	struct proc *p;
-	struct exec_package *pack;
-	u_long stack;
-{
-	struct trapframe *tf = trapframe(p);
-	struct ps_strings arginfo;
-	paddr_t pa;
+#ifdef DDB
+	ddb_init((int)((u_int)endsym - (u_int)startsym), startsym, endsym);
+	if (boothowto & RB_KDB)
+		Debugger();
+#endif
 
-	bzero(tf, sizeof *tf);
-	tf->fixreg[1] = -roundup(-stack + 8, 16);
+#ifdef IPKDB
+	ipkdb_init();
+	if (boothowto & RB_KDB)
+		ipkdb_connect(0);
+#endif
 
-	/*
-	 * XXX Machine-independent code has already copied arguments and
-	 * XXX environment to userland.  Get them back here.
-	 */
-	(void)copyin((char *)PS_STRINGS, &arginfo, sizeof(arginfo));
-
-	/*
-	 * Set up arguments for _start():
-	 *	_start(argc, argv, envp, obj, cleanup, ps_strings);
-	 *
-	 * Notes:
-	 *	- obj and cleanup are the auxilliary and termination
-	 *	  vectors.  They are fixed up by ld.elf_so.
-	 *	- ps_strings is a NetBSD extention, and will be
-	 * 	  ignored by executables which are strictly
-	 *	  compliant with the SVR4 ABI.
-	 *
-	 * XXX We have to set both regs and retval here due to different
-	 * XXX calling convention in trap.c and init_main.c.
-	 */
-	tf->fixreg[3] = arginfo.ps_nargvstr;
-	tf->fixreg[4] = (register_t)arginfo.ps_argvstr;
-	tf->fixreg[5] = (register_t)arginfo.ps_envstr;
-	tf->fixreg[6] = 0;			/* auxillary vector */
-	tf->fixreg[7] = 0;			/* termination vector */
-	tf->fixreg[8] = (register_t)PS_STRINGS;	/* NetBSD extension */
-
-	tf->srr0 = pack->ep_entry;
-	tf->srr1 = PSL_MBO | PSL_USERSET | PSL_FE_DFLT;
-	p->p_addr->u_pcb.pcb_flags = 0;
-}
-
-/*
- * Machine dependent system variables.
- */
-int
-cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
-{
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
-		return ENOTDIR;
-
-	switch (name[0]) {
-	case CPU_CACHELINE:
-		return sysctl_rdint(oldp, oldlenp, newp, CACHELINESIZE);
-	default:
-		return EOPNOTSUPP;
-	}
+#ifdef KGDB
+#if NZSC > 0
+	zs_kgdb_init();
+#endif
+	if (boothowto & RB_KDB)
+		kgdb_connect(1);
+#endif
 }
 
 /*
  * Crash dump handling.
  */
-u_long dumpmag = 0x8fca0101;		/* magic number */
-int dumpsize = 0;			/* size of dump in pages */
-long dumplo = -1;			/* blocks */
 
 void
 dumpsys()
@@ -726,13 +660,14 @@ void
 softserial()
 {
 #if NZSC > 0
-	zssoft();
+	zssoft(NULL);
 #endif
 #if NCOM > 0
 	comsoft();
 #endif
 }
 
+#if 0
 /*
  * Stray interrupts.
  */
@@ -742,6 +677,7 @@ strayintr(irq)
 {
 	log(LOG_ERR, "stray interrupt %d\n", irq);
 }
+#endif
 
 /*
  * Halt or reboot the machine after syncing/dumping according to howto.
@@ -761,6 +697,12 @@ cpu_reboot(howto, what)
 		vfs_shutdown();		/* sync */
 		resettodr();		/* set wall clock */
 	}
+
+#ifdef MULTIPROCESSOR
+	/* Halt other CPU.  XXX for now... */
+	macppc_send_ipi(&cpu_info[1 - cpu_number()], MACPPC_IPI_HALT);
+	delay(100000);	/* XXX */
+#endif
 
 	splhigh();
 
@@ -811,9 +753,10 @@ cpu_reboot(howto, what)
 #if NADB > 0
 	adb_restart();	/* not return */
 #endif
-	ppc_boot(str);
+	ppc_exit();
 }
 
+#if 0
 /*
  * OpenFirmware callback routine
  */
@@ -823,6 +766,7 @@ callback(p)
 {
 	panic("callback");	/* for now			XXX */
 }
+#endif
 
 int
 lcsplx(ipl)
@@ -878,158 +822,39 @@ mapiodev(pa, len)
 		return NULL;
 
 	for (; len > 0; len -= NBPG) {
-		pmap_enter(pmap_kernel(), taddr, faddr,
-			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+		pmap_kenter_pa(taddr, faddr, VM_PROT_READ | VM_PROT_WRITE);
 		faddr += NBPG;
 		taddr += NBPG;
 	}
+	pmap_update(pmap_kernel());
 	return (void *)(va + off);
 }
 
 #include "akbd.h"
 #include "ukbd.h"
-#include "uhci.h"
-#include "ohci.h"
 #include "ofb.h"
 #include "ite.h"
 #include "zstty.h"
-
-
-int console_node = -1;
 
 void
 cninit()
 {
 	struct consdev *cp;
-	int l, node;
-	int stdout;
-	int akbd_ih, akbd;
+	int stdout, node;
 	char type[16];
 
-	l = OF_getprop(chosen, "stdout", &stdout, sizeof(stdout));
-	if (l != sizeof(stdout))
+	if (OF_getprop(chosen, "stdout", &stdout, sizeof(stdout))
+	    != sizeof(stdout))
 		goto nocons;
+
 	node = OF_instance_to_package(stdout);
-
-	bzero(type, sizeof(type));
-	l = OF_getprop(node, "device_type", type, sizeof(type));
-	if (l == -1 || l >= sizeof(type) - 1)
+	memset(type, 0, sizeof(type));
+	if (OF_getprop(node, "device_type", type, sizeof(type)) == -1)
 		goto nocons;
-
-	console_node = node;
 
 #if NOFB > 0
 	if (strcmp(type, "display") == 0) {
-		int stdin;
-
-		/*
-		 * Attach the console output now (so we can see
-		 * debugging messages, if any).
-		 */
-		ofb_cnattach();
-
-		/*
-		 * We must determine which keyboard type we have.
-		 */
-		l = OF_getprop(chosen, "stdin", &stdin, sizeof(stdin));
-		if (l != sizeof(stdin)) {
-			printf("WARNING: no `stdin' property in /chosen\n");
-			return;
-		}
-
-		node = OF_instance_to_package(stdin);
-		bzero(type, sizeof(type));
-		l = OF_getprop(node, "name", type, sizeof(type));
-		if (l == -1 || l >= sizeof(type) - 1) {
-			printf("WARNING: bad `name' property for stdin\n");
-			return;
-		}
-
-		if (strcmp(type, "keyboard") != 0) {
-			printf("WARNING: stdin is not a keyboard: %s\n",
-			    type);
-			return;
-		}
-
-		/*
-		 * Newer PowerBook G3 has /psuedo-hid and ADB keyboard.
-		 * So, test "`adb-kbd-ihandle" method and use the value if
-		 * it succeeded.
-		 */
-#if NUKBD > 0
-		if (OF_call_method("`usb-kbd-ihandle", stdin, 0, 1, &akbd_ih)
-		    != -1 && (akbd = OF_instance_to_package(akbd_ih)) != -1) {
-			stdin = akbd_ih;
-			node = akbd;
-		}
-#endif
-#if NAKBD > 0
-		if (OF_call_method("`adb-kbd-ihandle", stdin, 0, 1, &akbd_ih)
-		    != -1 && (akbd = OF_instance_to_package(akbd_ih)) != -1) {
-			stdin = akbd_ih;
-			node = akbd;
-		}
-#endif
-
-		node = OF_parent(node);
-		bzero(type, sizeof(type));
-		l = OF_getprop(node, "name", type, sizeof(type));
-		if (l == -1 || l >= sizeof(type) - 1) { 
-			printf("WARNING: bad `name' property keyboard "
-			    "parent\n");
-			return;
-		}
-
-		if (strcmp(type, "adb") == 0) {
-#if NAKBD > 0
-			printf("console keyboard type: ADB\n");
-			akbd_cnattach();
-#else
-			panic("akbd support not in kernel");
-#endif
-			return;
-		}
-
-		/*
-		 * We're not an ADB keyboard; must be USB.  Unfortunately,
-		 * we have a few problems:
-		 *
-		 *	(1) The stupid Macintosh firmware uses a
-		 *	    `psuedo-hid' (yes, they even spell it
-		 *	    incorrectly!) which apparently merges
-		 *	    all USB keyboard input into a single
-		 *	    input stream.  Because of this, we can't
-		 *	    actually determine which USB controller
-		 *	    or keyboard is really the console keyboard!
-		 *
-		 *	(2) Even if we could, USB requires a lot of
-		 *	    the kernel to be running in order for it
-		 *	    to work.
-		 *
-		 * So, what we do is this:
-		 *
-		 *	(1) Tell the ukbd driver that it is the console.
-		 *	    At autoconfiguration time, it will attach the
-		 *	    first USB keyboard instance as the console
-		 *	    keyboard.
-		 *
-		 *	(2) Until then, so that we have _something_, we
-		 *	    use the OpenFirmware I/O facilities to read
-		 *	    the keyboard.
-		 */
-#if NUKBD > 0
-		printf("console keyboard type: USB\n");
-		ukbd_cnattach();
-#else
-		panic("ukbd support not in kernel");
-#endif
-
-		/*
-		 * XXX This is a little gross, but we don't get to
-		 * XXX call wskbd_cnattach() twice.
-		 */
-		ofkbd_ihandle = stdin;
-		wsdisplay_set_cons_kbd(ofkbd_cngetc, ofkbd_cnpollc, NULL);
+		cninit_kd();
 		return;
 	}
 #endif /* NOFB > 0 */
@@ -1064,6 +889,151 @@ nocons:
 	return;
 }
 
+#if NOFB > 0
+struct usb_kbd_ihandles {
+	struct usb_kbd_ihandles *next;
+	int ihandle;
+};
+
+void
+cninit_kd()
+{
+	int stdin, node;
+	char name[16];
+#if NAKBD > 0
+	int akbd;
+#endif
+#if NUKBD > 0
+	struct usb_kbd_ihandles *ukbds;
+	int ukbd;
+#endif
+
+	/*
+	 * Attach the console output now (so we can see debugging messages,
+	 * if any).
+	 */
+	ofb_cnattach();
+
+	/*
+	 * We must determine which keyboard type we have.
+	 */
+	if (OF_getprop(chosen, "stdin", &stdin, sizeof(stdin))
+	    != sizeof(stdin)) {
+		printf("WARNING: no `stdin' property in /chosen\n");
+		return;
+	}
+
+	node = OF_instance_to_package(stdin);
+	memset(name, 0, sizeof(name));
+	OF_getprop(node, "name", name, sizeof(name));
+	if (strcmp(name, "keyboard") != 0) {
+		printf("WARNING: stdin is not a keyboard: %s\n", name);
+		return;
+	}
+
+#if NAKBD > 0
+	memset(name, 0, sizeof(name));
+	OF_getprop(OF_parent(node), "name", name, sizeof(name));
+	if (strcmp(name, "adb") == 0) {
+		printf("console keyboard type: ADB\n");
+		akbd_cnattach();
+		goto kbd_found;
+	}
+#endif
+
+	/*
+	 * We're not an ADB keyboard; must be USB.  Unfortunately,
+	 * we have a few problems:
+	 *
+	 *	(1) The stupid Macintosh firmware uses a
+	 *	    `psuedo-hid' (yes, they even spell it
+	 *	    incorrectly!) which apparently merges
+	 *	    all USB keyboard input into a single
+	 *	    input stream.  Because of this, we can't
+	 *	    actually determine which USB controller
+	 *	    or keyboard is really the console keyboard!
+	 *
+	 *	(2) Even if we could, USB requires a lot of
+	 *	    the kernel to be running in order for it
+	 *	    to work.
+	 *
+	 * So, what we do is this:
+	 *
+	 *	(1) Tell the ukbd driver that it is the console.
+	 *	    At autoconfiguration time, it will attach the
+	 *	    first USB keyboard instance as the console
+	 *	    keyboard.
+	 *
+	 *	(2) Until then, so that we have _something_, we
+	 *	    use the OpenFirmware I/O facilities to read
+	 *	    the keyboard.
+	 */
+
+	/*
+	 * stdin is /psuedo-hid/keyboard.  Test `adb-kbd-ihandle and
+	 * `usb-kbd-ihandles to figure out the real keyboard(s).
+	 *
+	 * XXX This must be called before pmap_bootstrap().
+	 */
+
+#if NUKBD > 0
+	if (OF_call_method("`usb-kbd-ihandles", stdin, 0, 1, &ukbds) >= 0 &&
+	    ukbds != NULL && ukbds->ihandle != 0 &&
+	    OF_instance_to_package(ukbds->ihandle) != -1) {
+		printf("console keyboard type: USB\n");
+		ukbd_cnattach();
+		goto kbd_found;
+	}
+	/* Try old method name. */
+	if (OF_call_method("`usb-kbd-ihandle", stdin, 0, 1, &ukbd) >= 0 &&
+	    ukbd != 0 &&
+	    OF_instance_to_package(ukbd) != -1) {
+		printf("console keyboard type: USB\n");
+		stdin = ukbd;
+		ukbd_cnattach();
+		goto kbd_found;
+	}
+#endif
+
+#if NAKBD > 0
+	if (OF_call_method("`adb-kbd-ihandle", stdin, 0, 1, &akbd) >= 0 &&
+	    akbd != 0 &&
+	    OF_instance_to_package(akbd) != -1) {
+		printf("console keyboard type: ADB\n");
+		stdin = akbd;
+		akbd_cnattach();
+		goto kbd_found;
+	}
+#endif
+
+#if NUKBD > 0
+	/*
+	 * XXX Old firmware does not have `usb-kbd-ihandles method.  Assume
+	 * XXX USB keyboard anyway.
+	 */
+	printf("console keyboard type: USB\n");
+	ukbd_cnattach();
+	goto kbd_found;
+#endif
+
+	/*
+	 * No keyboard is found.  Just return.
+	 */
+	printf("no console keyboard\n");
+	return;
+
+#if NAKBD + NUKBD > 0
+kbd_found:
+	/*
+	 * XXX This is a little gross, but we don't get to call
+	 * XXX wskbd_cnattach() twice.
+	 */
+	ofkbd_ihandle = stdin;
+	wsdisplay_set_cons_kbd(ofkbd_cngetc, NULL, NULL);
+#endif
+}
+#endif
+
 /*
  * Bootstrap console keyboard routines, using OpenFirmware I/O.
  */
@@ -1072,20 +1042,53 @@ ofkbd_cngetc(dev)
 	dev_t dev;
 {
 	u_char c = '\0';
-	int l;
+	int len;
 
 	do {
-		l = OF_read(ofkbd_ihandle, &c, 1);
-	} while (l != 1);
+		len = OF_read(ofkbd_ihandle, &c, 1);
+	} while (len != 1);
 
-	return (c);
+	return c;
 }
 
+#ifdef MULTIPROCESSOR
 void
-ofkbd_cnpollc(dev, on)
-	dev_t dev;
-	int on;
+save_fpu_proc(p)
+	struct proc *p;
 {
+	volatile struct cpu_info *fpcpu;
+	int i;
+	extern volatile int IPI[];	/* XXX */
 
-	/* Nothing to do; always polled. */
+	fpcpu = p->p_addr->u_pcb.pcb_fpcpu;
+	if (fpcpu == curcpu()) {
+		save_fpu(p);
+		return;
+	}
+
+#if 0
+	printf("save_fpu_proc{%d} pid = %d, fpcpu->ci_cpuid = %d\n",
+	    cpu_number(), p->p_pid, fpcpu->ci_cpuid);
+#endif
+
+	macppc_send_ipi(fpcpu, MACPPC_IPI_FLUSH_FPU);
+
+	/* Wait for flush. */
+#if 0
+	while (fpcpu->ci_fpuproc);
+#else
+	for (i = 0; i < 0x3fffffff; i++) {
+		if (fpcpu->ci_fpuproc == NULL)
+			goto done;
+	}
+	printf("save_fpu_proc{%d} pid = %d, fpcpu->ci_cpuid = %d\n",
+	    cpu_number(), p->p_pid, fpcpu->ci_cpuid);
+	printf("IPI[0] = 0x%x, IPI[1] = 0x%x\n", IPI[0], IPI[1]);
+	printf("cpl 0x%x 0x%x\n", cpu_info[0].ci_cpl, cpu_info[1].ci_cpl);
+	printf("ipending 0x%x 0x%x\n", cpu_info[0].ci_ipending, cpu_info[1].ci_ipending);
+	panic("save_fpu_proc");
+done:;
+
+#endif
 }
+#endif /* MULTIPROCESSOR */

@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.45 2000/05/09 20:29:28 pk Exp $ */
+/*	$NetBSD: intr.c,v 1.58 2001/12/04 00:05:06 darrenr Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -43,73 +43,44 @@
  *
  *	@(#)intr.c	8.3 (Berkeley) 11/11/93
  */
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_iso.h"
+
 #include "opt_multiprocessor.h"
-#include "opt_ns.h"
-#include "opt_natm.h"
+#include "opt_sparc_arch.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/socket.h>
+#include <sys/malloc.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
 
 #include <net/netisr.h>
-#include <net/if.h>
 
 #include <machine/cpu.h>
 #include <machine/ctlreg.h>
 #include <machine/instr.h>
+#include <machine/intr.h>
 #include <machine/trap.h>
 #include <machine/promlib.h>
+
 #include <sparc/sparc/asm.h>
 #include <sparc/sparc/cpuvar.h>
 
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#include <netinet/ip_var.h>
-#endif
-#ifdef INET6
-# ifndef INET
-#  include <netinet/in.h>
-# endif
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#endif
-#ifdef NS
-#include <netns/ns_var.h>
-#endif
-#ifdef ISO
-#include <netiso/iso.h>
-#include <netiso/clnp.h>
-#endif
-#ifdef NETATALK
-#include <netatalk/at_extern.h>
-#endif
-#include "ppp.h"
-#if NPPP > 0
-#include <net/ppp_defs.h>
-#include <net/if_ppp.h>
-#endif
-#include "com.h"
-#if NCOM > 0
-extern void comsoft __P((void));
+#if defined(MULTIPROCESSOR) && defined(DDB)
+#include <machine/db_machdep.h>
 #endif
 
-union sir	sir;
+void *softnet_cookie;
 
 void	strayintr __P((struct clockframe *));
-int	soft01intr __P((void *));
+void	softnet __P((void *));
 
 /*
  * Stray interrupt handler.  Clear it if possible.
  * If not, and if we get 10 interrupts in 10 seconds, panic.
+ * XXXSMP: We are holding the kernel lock at entry & exit.
  */
 void
 strayintr(fp)
@@ -134,68 +105,45 @@ strayintr(fp)
 }
 
 /*
- * Level 1 software interrupt (could also be Sbus level 1 interrupt).
- * Three possible reasons:
- *	ROM console input needed
- *	Network software interrupt
- *	Soft clock interrupt
+ * Process software network interrupts.
  */
-int
-soft01intr(fp)
+void
+softnet(fp)
 	void *fp;
 {
+	int n, s;
 
-	if (sir.sir_any) {
-		/*
-		 * XXX	this is bogus: should just have a list of
-		 *	routines to call, a la timeouts.  Mods to
-		 *	netisr are not atomic and must be protected (gah).
-		 */
-		if (sir.sir_which[SIR_NET]) {
-			int n, s;
+	s = splhigh();
+	n = netisr;
+	netisr = 0;
+	splx(s);
 
-			s = splhigh();
-			n = netisr;
-			netisr = 0;
-			splx(s);
-			sir.sir_which[SIR_NET] = 0;
+	if (n == 0)
+		return;
 
 #define DONETISR(bit, fn) do {		\
 	if (n & (1 << bit))		\
 		fn();			\
-} while (0)
+	} while (0)
 
 #include <net/netisr_dispatch.h>
 
 #undef DONETISR
-
-		}
-		if (sir.sir_which[SIR_CLOCK]) {
-			sir.sir_which[SIR_CLOCK] = 0;
-			softclock();
-		}
-#if NCOM > 0
-		/*
-		 * XXX - consider using __GENERIC_SOFT_INTERRUPTS instead
-		 */
-		if (sir.sir_which[SIR_SERIAL]) {
-			sir.sir_which[SIR_SERIAL] = 0;
-			comsoft();
-		}
-#endif
-	}
-	return (1);
 }
 
 #if defined(SUN4M)
 void	nmi_hard __P((void));
-void	nmi_soft __P((void));
+void	nmi_soft __P((struct trapframe *));
 
 int	(*memerr_handler) __P((void));
 int	(*sbuserr_handler) __P((void));
 int	(*vmeerr_handler) __P((void));
 int	(*moduleerr_handler) __P((void));
 
+#if defined(MULTIPROCESSOR)
+volatile int nmi_hard_wait = 0;
+struct simplelock nmihard_lock = SIMPLELOCK_INITIALIZER;
+#endif
 
 void
 nmi_hard()
@@ -216,19 +164,34 @@ nmi_hard()
 			(afsr & AFSR_AFA) >> AFSR_AFA_RSHIFT, afva);
 	}
 
+#if defined(MULTIPROCESSOR)
+	/*
+	 * Increase nmi_hard_wait.  If we aren't the master, loop while this
+	 * variable is non-zero.  If we are the master, loop while this
+	 * variable is less than the number of cpus.
+	 */
+	simple_lock(&nmihard_lock);
+	nmi_hard_wait++;
+	simple_unlock(&nmihard_lock);
+
 	if (cpuinfo.master == 0) {
-		/*
-		 * For now, just return.
-		 * Should wait on damage analysis done by the master.
-		 */
+		while (nmi_hard_wait)
+			;
 		return;
+	} else {
+		int n = 0;
+
+		while (nmi_hard_wait < ncpu)
+			if (n++ > 100000)
+				panic("nmi_hard: SMP botch.");
 	}
+#endif
 
 	/*
 	 * Examine pending system interrupts.
 	 */
 	si = *((u_int32_t *)ICR_SI_PEND);
-	printf("NMI: system interrupts: %s\n",
+	printf("cpu%d: NMI: system interrupts: %s\n", cpu_number(),
 		bitmask_snprintf(si, SINTR_BITS, bits, sizeof(bits)));
 
 	if ((si & SINTR_M) != 0) {
@@ -252,80 +215,154 @@ nmi_hard()
 			fatal |= (*moduleerr_handler)();
 	}
 
+#if defined(MULTIPROCESSOR)
+	/*
+	 * Tell everyone else we've finished dealing with the hard NMI.
+	 */
+	simple_lock(&nmihard_lock);
+	nmi_hard_wait = 0;
+	simple_unlock(&nmihard_lock);
+#endif
+
 	if (fatal)
 		panic("nmi");
 }
 
 void
-nmi_soft()
+nmi_soft(tf)
+	struct trapframe *tf;
 {
 
 #ifdef MULTIPROCESSOR
 	switch (cpuinfo.msg.tag) {
-	case XPMSG_SAVEFPU: {
+	case XPMSG_SAVEFPU:
 		savefpstate(cpuinfo.fpproc->p_md.md_fpstate);
-		}
+		cpuinfo.fpproc->p_md.md_fpumid = -1;
+		cpuinfo.fpproc = NULL;
 		break;
-	case XPMSG_PAUSECPU: {
-		cpuinfo.flags |= 0x4000;
-		while (cpuinfo.flags & 0x4000) {
-			simple_unlock(&cpuinfo.msg.lock);
-			delay(1);
-			simple_lock(&cpuinfo.msg.lock);
-		}
-		}
+	case XPMSG_PAUSECPU:
+	    {
+#if defined(DDB)
+		db_regs_t regs;
+
+		regs.db_tf = *tf;
+		regs.db_fr = *(struct frame *)tf->tf_out[6];
+		cpuinfo.ci_ddb_regs = &regs;
+#endif
+		cpuinfo.flags |= CPUFLG_PAUSED|CPUFLG_GOTMSG;
+		while (cpuinfo.flags & CPUFLG_PAUSED)
+			cpuinfo.cache_flush((caddr_t)&cpuinfo.flags,
+			    sizeof(cpuinfo.flags));
+#if defined(DDB)
+		cpuinfo.ci_ddb_regs = 0;
+#endif
+		return;
+	    }
+	case XPMSG_FUNC:
+	    {
+		struct xpmsg_func *p = &cpuinfo.msg.u.xpmsg_func;
+
+		p->retval = (*p->func)(p->arg0, p->arg1, p->arg2, p->arg3); 
 		break;
-	case XPMSG_RESUMECPU: {
-		cpuinfo.flags &= ~0x4000;
-		}
-		break;
-	case XPMSG_VCACHE_FLUSH_PAGE: {
+	    }
+	case XPMSG_VCACHE_FLUSH_PAGE:
+	    {
 		struct xpmsg_flush_page *p = &cpuinfo.msg.u.xpmsg_flush_page;
 		int ctx = getcontext();
+
 		setcontext(p->ctx);
 		cpuinfo.sp_vcache_flush_page(p->va);
 		setcontext(ctx);
-		}
 		break;
-	case XPMSG_VCACHE_FLUSH_SEGMENT: {
+	    }
+	case XPMSG_VCACHE_FLUSH_SEGMENT:
+	    {
 		struct xpmsg_flush_segment *p = &cpuinfo.msg.u.xpmsg_flush_segment;
 		int ctx = getcontext();
+
 		setcontext(p->ctx);
 		cpuinfo.sp_vcache_flush_segment(p->vr, p->vs);
 		setcontext(ctx);
-		}
 		break;
-	case XPMSG_VCACHE_FLUSH_REGION: {
+	    }
+	case XPMSG_VCACHE_FLUSH_REGION:
+	    {
 		struct xpmsg_flush_region *p = &cpuinfo.msg.u.xpmsg_flush_region;
 		int ctx = getcontext();
+
 		setcontext(p->ctx);
 		cpuinfo.sp_vcache_flush_region(p->vr);
 		setcontext(ctx);
-		}
 		break;
-	case XPMSG_VCACHE_FLUSH_CONTEXT: {
+	    }
+	case XPMSG_VCACHE_FLUSH_CONTEXT:
+	    {
 		struct xpmsg_flush_context *p = &cpuinfo.msg.u.xpmsg_flush_context;
 		int ctx = getcontext();
+
 		setcontext(p->ctx);
 		cpuinfo.sp_vcache_flush_context();
 		setcontext(ctx);
-		}
 		break;
-	case XPMSG_VCACHE_FLUSH_RANGE: {
+	    }
+	case XPMSG_VCACHE_FLUSH_RANGE:
+	    {
 		struct xpmsg_flush_range *p = &cpuinfo.msg.u.xpmsg_flush_range;
 		int ctx = getcontext();
+
 		setcontext(p->ctx);
 		cpuinfo.sp_cache_flush(p->va, p->size);
 		setcontext(ctx);
-		}
+		break;
+	    }
+	case XPMSG_DEMAP_TLB_PAGE:
+	    {
+		struct xpmsg_flush_page *p = &cpuinfo.msg.u.xpmsg_flush_page;
+		int ctx = getcontext();
+
+		setcontext(p->ctx);
+		tlb_flush_page_real(p->va);
+		setcontext(ctx);
+		break;
+	    }
+	case XPMSG_DEMAP_TLB_SEGMENT:
+	    {
+		struct xpmsg_flush_segment *p = &cpuinfo.msg.u.xpmsg_flush_segment;
+		int ctx = getcontext();
+
+		setcontext(p->ctx);
+		tlb_flush_segment_real(p->vr, p->vs);
+		setcontext(ctx);
+		break;
+	    }
+	case XPMSG_DEMAP_TLB_REGION:
+	    {
+		struct xpmsg_flush_region *p = &cpuinfo.msg.u.xpmsg_flush_region;
+		int ctx = getcontext();
+
+		setcontext(p->ctx);
+		tlb_flush_region_real(p->vr);
+		setcontext(ctx);
+		break;
+	    }
+	case XPMSG_DEMAP_TLB_CONTEXT:
+	    {
+		struct xpmsg_flush_context *p = &cpuinfo.msg.u.xpmsg_flush_context;
+		int ctx = getcontext();
+
+		setcontext(p->ctx);
+		tlb_flush_context_real();
+		setcontext(ctx);
+		break;
+	    }
+	case XPMSG_DEMAP_TLB_ALL:
+		tlb_flush_all_real();
 		break;
 	}
-	simple_unlock(&cpuinfo.msg.lock);
+	cpuinfo.flags |= CPUFLG_GOTMSG;
 #endif
 }
 #endif
-
-static struct intrhand level01 = { soft01intr };
 
 /*
  * Level 15 interrupts are special, and not vectored here.
@@ -334,7 +371,7 @@ static struct intrhand level01 = { soft01intr };
  */
 struct intrhand *intrhand[15] = {
 	NULL,			/*  0 = error */
-	&level01,		/*  1 = software level 1 + Sbus */
+	NULL,			/*  1 = software level 1 + Sbus */
 	NULL,	 		/*  2 = Sbus level 2 (4m: Sbus L1) */
 	NULL,			/*  3 = SCSI + DMA + Sbus level 3 (4m: L2,lpt)*/
 	NULL,			/*  4 = software level 4 (tty softint) (scsi) */
@@ -378,7 +415,7 @@ intr_establish(level, ih)
 		    level);
 #ifdef DIAGNOSTIC
 	/* double check for legal hardware interrupt */
-	if ((level != 1 && level != 4 && level != 6) || CPU_ISSUN4M ) {
+	if ((level != 1 && level != 4 && level != 6) || CPU_ISSUN4M) {
 		tv = &trapbase[T_L1INT - 1 + level];
 		displ = (CPU_ISSUN4M)
 			? &sparc_interrupt4m[0] - &tv->tv_instr[1]
@@ -403,6 +440,23 @@ intr_establish(level, ih)
 	*p = ih;
 	ih->ih_next = NULL;
 	splx(s);
+}
+
+void
+intr_disestablish(level, ih)
+	int level;
+	struct intrhand *ih;
+{
+	struct intrhand **p, *q;
+
+	for (p = &intrhand[level]; (q = *p) != ih; p = &q->ih_next)
+		continue;
+	if (q == NULL)
+		panic("intr_disestablish: level %d intrhand %p fun %p arg %p\n",
+		    level, ih, ih->ih_fun, ih->ih_arg);
+
+	*p = q->ih_next;
+	q->ih_next = NULL;
 }
 
 /*
@@ -454,3 +508,66 @@ intr_fasttrap(level, vec)
 	fastvec |= 1 << level;
 	splx(s);
 }
+
+/*
+ * softintr_init(): initialise the MI softintr system.
+ */
+void
+softintr_init()
+{
+
+	softnet_cookie = softintr_establish(IPL_SOFTNET, softnet, NULL);
+}
+
+/*
+ * softintr_establish(): MI interface.  establish a func(arg) as a
+ * software interrupt.
+ */
+void *
+softintr_establish(level, fun, arg)
+	int level; 
+	void (*fun) __P((void *));
+	void *arg;
+{
+	struct intrhand *ih;
+
+	ih = malloc(sizeof(*ih), M_DEVBUF, 0);
+	bzero(ih, sizeof(*ih));
+	ih->ih_fun = (int (*) __P((void *)))fun;
+	ih->ih_arg = arg;
+	ih->ih_next = 0;
+	intr_establish(1, ih);
+	return (void *)ih;
+}
+
+/*
+ * softintr_disestablish(): MI interface.  disestablish the specified
+ * software interrupt.
+ */
+void
+softintr_disestablish(cookie)
+	void *cookie;
+{
+
+	intr_disestablish(1, cookie);
+	free(cookie, M_DEVBUF);
+}
+
+#ifdef MULTIPROCESSOR
+/*
+ * Called by interrupt stubs, etc., to lock/unlock the kernel.
+ */
+void
+intr_lock_kernel()
+{
+
+	KERNEL_LOCK(LK_CANRECURSE|LK_EXCLUSIVE);
+}
+
+void
+intr_unlock_kernel()
+{
+
+	KERNEL_UNLOCK();
+}
+#endif

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.29 2002/06/19 13:21:54 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.30 2002/09/25 11:41:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,6 +70,10 @@ struct gif_softc {
 	LIST_ENTRY(gif_softc) gif_list; /* all gif's are linked */
 
 	time_t rtcache_expire;	/* expiration time of the cached route */
+
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	void	*gif_si;	/* softintr handle */
+#endif
 };
 
 #define gif_ro gifsc_gifscr.gifscr_ro

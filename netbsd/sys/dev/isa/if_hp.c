@@ -1,4 +1,4 @@
-/*	$NetBSD: if_hp.c,v 1.30 2000/03/30 12:45:33 augustss Exp $	*/
+/*	$NetBSD: if_hp.c,v 1.34 2002/03/05 04:12:58 itojun Exp $	*/
 
 /* XXX THIS DRIVER IS BROKEN.  IT WILL NOT EVEN COMPILE. */
 
@@ -51,6 +51,9 @@
  * Mostly rewritten for HP-labelled EISA controllers by Charles Hannum,
  * 18JAN1993.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_hp.c,v 1.34 2002/03/05 04:12:58 itojun Exp $");
 
 #include "hp.h"
 #if NHP > 0
@@ -837,9 +840,9 @@ hpread(ns, buf, len)
 #endif
 
 	if ((ns->ns_if.if_flags & IFF_PROMISC)
-	    && bcmp(eh->ether_dhost, ns->ns_addrp,
+	    && memcmp(eh->ether_dhost, ns->ns_addrp,
 		sizeof(eh->ether_dhost)) != 0
-	    && bcmp(eh->ether_dhost, etherbroadcastaddr,
+	    && memcmp(eh->ether_dhost, etherbroadcastaddr,
 		sizeof(eh->ether_dhost)) != 0)
 		return;
 
@@ -924,7 +927,7 @@ hpget(buf, totlen, off0, ifp)
 			} else
 				len = m->m_len;
 		}
-		bcopy(cp, mtod(m, caddr_t), (unsigned) len);
+		memcpy(mtod(m, caddr_t), cp, (unsigned) len);
 		cp += len;
 		*mp = m;
 		mp = &m->m_next;
@@ -976,8 +979,9 @@ hpioctl(ifp, cmd, data)
 							 * so reset everything
 							 */
 					ifp->if_flags &= ~IFF_RUNNING;
-					bcopy((caddr_t) ina->x_host.c_host,
-					    (caddr_t) ns->ns_addrp, sizeof(ns->ns_addrp));
+					memcpy((caddr_t) ns->ns_addrp,
+					    (caddr_t) ina->x_host.c_host,
+					    sizeof(ns->ns_addrp));
 				}
 				hpinit(ifp->if_unit);	/* does hp_setaddr() */
 				break;
@@ -1007,7 +1011,7 @@ hpioctl(ifp, cmd, data)
 
 #ifdef notdef
 	case SIOCGHWADDR:
-		bcopy((caddr_t) ns->ns_addrp, (caddr_t) & ifr->ifr_data,
+		memcpy((caddr_t) & ifr->ifr_data, (caddr_t) ns->ns_addrp,
 		    sizeof(ns->ns_addrp));
 		break;
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ppp.c,v 1.58 2000/03/30 09:45:36 augustss Exp $	*/
+/*	$NetBSD: if_ppp.c,v 1.77 2002/05/12 20:38:15 matt Exp $	*/
 /*	Id: if_ppp.c,v 1.6 1997/03/04 03:33:00 paulus Exp 	*/
 
 /*
@@ -75,9 +75,20 @@
 /* from if_sl.c,v 1.11 84/10/04 12:54:47 rick Exp */
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 
-#include "ppp.h"
+/*
+ * XXX IMP ME HARDER
+ *
+ * This is an explanation of that comment.  This code used to use
+ * splimp() to block both network and tty interrupts.  However,
+ * that call is deprecated.  So, we have replaced the uses of
+ * splimp() with splhigh() in order to applomplish what it needs
+ * to accomplish, and added that happy little comment.
+ */
 
-#if NPPP > 0
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_ppp.c,v 1.77 2002/05/12 20:38:15 matt Exp $");
+
+#include "ppp.h"
 
 #include "opt_inet.h"
 #include "opt_gateway.h"
@@ -106,17 +117,13 @@
 #include <net/bpf.h>
 #endif
 
+#include <machine/intr.h>
+
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #ifdef INET
 #include <netinet/ip.h>
-#else
-#ifdef _KERNEL
-#ifdef VJC
-#error ppp device with VJC assumes INET
-#endif
-#endif
 #endif
 
 #include "bpfilter.h"
@@ -153,6 +160,11 @@ static void	pppdumpm __P((struct mbuf *m0));
 static void	ppp_ifstart __P((struct ifnet *ifp));
 #endif
 
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+void		pppnetisr(void);
+#endif
+void		pppintr(void *);
+
 /*
  * Some useful mbuf macros not in mbuf.h.
  */
@@ -173,6 +185,8 @@ static void	ppp_ifstart __P((struct ifnet *ifp));
  */
 #define	M_HIGHPRI	M_LINK0	/* output packet for sc_fastq */
 #define	M_ERRMARK	M_LINK1	/* rx packet following lost/corrupted pkt */
+
+struct	ppp_softc ppp_softc[NPPP];
 
 #ifdef PPP_COMPRESS
 /*
@@ -214,6 +228,7 @@ pppattach()
 	sc->sc_if.if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
 	sc->sc_if.if_type = IFT_PPP;
 	sc->sc_if.if_hdrlen = PPP_HDRLEN;
+	sc->sc_if.if_dlt = DLT_NULL;
 	sc->sc_if.if_ioctl = pppsioctl;
 	sc->sc_if.if_output = pppoutput;
 #ifdef ALTQ
@@ -225,8 +240,9 @@ pppattach()
 	sc->sc_rawq.ifq_maxlen = IFQ_MAXLEN;
 	IFQ_SET_READY(&sc->sc_if.if_snd);
 	if_attach(&sc->sc_if);
+	if_alloc_sadl(&sc->sc_if);
 #if NBPFILTER > 0
-	bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_NULL, 0);
+	bpfattach(&sc->sc_if, DLT_NULL, 0);
 #endif
     }
 }
@@ -252,10 +268,18 @@ pppalloc(pid)
     if (nppp >= NPPP)
 	return NULL;
 
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+    sc->sc_si = softintr_establish(IPL_SOFTNET, pppintr, sc);
+    if (sc->sc_si == NULL) {
+	printf("ppp%d: unable to establish softintr\n", sc->sc_unit);
+	return (NULL);
+    }
+#endif
+
     sc->sc_flags = 0;
     sc->sc_mru = PPP_MRU;
     sc->sc_relinq = NULL;
-    bzero((char *)&sc->sc_stats, sizeof(sc->sc_stats));
+    memset((char *)&sc->sc_stats, 0, sizeof(sc->sc_stats));
 #ifdef VJC
     MALLOC(sc->sc_comp, struct slcompress *, sizeof(struct slcompress),
 	   M_DEVBUF, M_NOWAIT);
@@ -284,6 +308,9 @@ pppdealloc(sc)
 {
     struct mbuf *m;
 
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+    softintr_disestablish(sc->sc_si);
+#endif
     if_down(&sc->sc_if);
     sc->sc_if.if_flags &= ~(IFF_UP|IFF_RUNNING);
     sc->sc_devp = NULL;
@@ -397,7 +424,7 @@ pppioctl(sc, cmd, data, flag, p)
 	if (sc->sc_flags & SC_CCP_OPEN && !(flags & SC_CCP_OPEN))
 	    ppp_ccp_closed(sc);
 #endif
-	splimp();
+	splhigh();	/* XXX IMP ME HARDER */
 	sc->sc_flags = (sc->sc_flags & ~SC_MASK) | flags;
 	splx(s);
 	break;
@@ -406,7 +433,7 @@ pppioctl(sc, cmd, data, flag, p)
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 	    return (error);
 	mru = *(int *)data;
-	if (mru >= PPP_MRU && mru <= PPP_MAXMRU)
+	if (mru >= PPP_MINMRU && mru <= PPP_MAXMRU)
 	    sc->sc_mru = mru;
 	break;
 
@@ -463,7 +490,7 @@ pppioctl(sc, cmd, data, flag, p)
 				sc->sc_if.if_xname);
 			error = ENOBUFS;
 		    }
-		    splimp();
+		    splhigh();	/* XXX IMP ME HARDER */
 		    sc->sc_flags &= ~SC_COMP_RUN;
 		    splx(s);
 		} else {
@@ -478,7 +505,7 @@ pppioctl(sc, cmd, data, flag, p)
 				sc->sc_if.if_xname);
 			error = ENOBUFS;
 		    }
-		    splimp();
+		    splhigh();	/* XXX IMP ME HARDER */
 		    sc->sc_flags &= ~SC_DECOMP_RUN;
 		    splx(s);
 		}
@@ -510,7 +537,7 @@ pppioctl(sc, cmd, data, flag, p)
 	    if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 		return (error);
 	    if (npi->mode != sc->sc_npmode[npx]) {
-		s = splimp();
+		s = splnet();
 		sc->sc_npmode[npx] = npi->mode;
 		if (npi->mode != NPMODE_QUEUE) {
 		    ppp_requeue(sc);
@@ -575,7 +602,7 @@ pppioctl(sc, cmd, data, flag, p)
 	    break;
 	}
 	oldcode = bp->bf_insns;
-	s = splimp();
+	s = splnet();
 	bp->bf_len = nbp->bf_len;
 	bp->bf_insns = newcode;
 	splx(s);
@@ -585,7 +612,7 @@ pppioctl(sc, cmd, data, flag, p)
 #endif /* PPP_FILTER */
 
     default:
-	return (-1);
+	return (EPASSTHROUGH);
     }
     return (0);
 }
@@ -607,7 +634,7 @@ pppsioctl(ifp, cmd, data)
 #ifdef	PPP_COMPRESS
     struct ppp_comp_stats *pcp;
 #endif
-    int s = splimp(), error = 0;
+    int s = splnet(), error = 0;
 
     switch (cmd) {
     case SIOCSIFFLAGS:
@@ -680,7 +707,7 @@ pppsioctl(ifp, cmd, data)
 
     case SIOCGPPPSTATS:
 	psp = &((struct ifpppstatsreq *) data)->stats;
-	bzero(psp, sizeof(*psp));
+	memset(psp, 0, sizeof(*psp));
 	psp->p = sc->sc_stats;
 #if defined(VJC) && !defined(SL_NO_STATS)
 	if (sc->sc_comp) {
@@ -699,7 +726,7 @@ pppsioctl(ifp, cmd, data)
 #ifdef PPP_COMPRESS
     case SIOCGPPPCSTATS:
 	pcp = &((struct ifpppcstatsreq *) data)->stats;
-	bzero(pcp, sizeof(*pcp));
+	memset(pcp, 0, sizeof(*pcp));
 	if (sc->sc_xc_state != NULL)
 	    (*sc->sc_xcomp->comp_stat)(sc->sc_xc_state, &pcp->c);
 	if (sc->sc_rc_state != NULL)
@@ -871,14 +898,14 @@ pppoutput(ifp, m0, dst, rtp)
     /*
      * See if bpf wants to look at the packet.
      */
-    if (sc->sc_bpf)
-	bpf_mtap(sc->sc_bpf, m0);
+    if (sc->sc_if.if_bpf)
+	bpf_mtap(sc->sc_if.if_bpf, m0);
 #endif
 
     /*
      * Put the packet on the appropriate queue.
      */
-    s = splimp();
+    s = splnet();
     if (mode == NPMODE_QUEUE) {
 	/* XXX we should limit the number of packets on this queue */
 	*sc->sc_npqtail = m0;
@@ -887,16 +914,16 @@ pppoutput(ifp, m0, dst, rtp)
     } else {
 	if ((m0->m_flags & M_HIGHPRI)
 #ifdef ALTQ
-	    && !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+	    && ALTQ_IS_ENABLED(&sc->sc_if.if_snd) == 0
 #endif
 	    ) {
 	    ifq = &sc->sc_fastq;
 	    if (IF_QFULL(ifq) && dst->sa_family != AF_UNSPEC) {
-		IF_DROP(ifq);
-		m_freem(m0);
+	        IF_DROP(ifq);
+		splx(s);
 		error = ENOBUFS;
-	    }
-	    else {
+		goto bad;
+	    } else {
 		IF_ENQUEUE(ifq, m0);
 		error = 0;
 	    }
@@ -924,7 +951,7 @@ bad:
 /*
  * After a change in the NPmode for some NP, move packets from the
  * npqueue to the send queue or the fast queue as appropriate.
- * Should be called at splimp, since we muck with the queues.
+ * Should be called at splnet, since we muck with the queues.
  */
 static void
 ppp_requeue(sc)
@@ -956,7 +983,7 @@ ppp_requeue(sc)
 	    m->m_nextpkt = NULL;
 	    if ((m->m_flags & M_HIGHPRI)
 #ifdef ALTQ
-		&& !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+		&& ALTQ_IS_ENABLED(&sc->sc_if.if_snd) == 0
 #endif
 		) {
 		ifq = &sc->sc_fastq;
@@ -964,8 +991,7 @@ ppp_requeue(sc)
 		    IF_DROP(ifq);
 		    m_freem(m);
 		    error = ENOBUFS;
-		}
-		else {
+		} else {
 		    IF_ENQUEUE(ifq, m);
 		    error = 0;
 		}
@@ -999,10 +1025,14 @@ void
 ppp_restart(sc)
     struct ppp_softc *sc;
 {
-    int s = splimp();
+    int s = splhigh();	/* XXX IMP ME HARDER */
 
     sc->sc_flags &= ~SC_TBUSY;
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+    softintr_schedule(sc->sc_si);
+#else
     schednetisr(NETISR_PPP);
+#endif
     splx(s);
 }
 
@@ -1025,7 +1055,7 @@ ppp_dequeue(sc)
      * Grab a packet to send: first try the fast queue, then the
      * normal queue.
      */
-    s = splimp();    
+    s = splnet();    
     IF_DEQUEUE(&sc->sc_fastq, m);
     if (m == NULL)
 	IFQ_DEQUEUE(&sc->sc_if.if_snd, m);
@@ -1141,37 +1171,46 @@ ppp_dequeue(sc)
     return m;
 }
 
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+void
+pppnetisr(void)
+{
+	struct ppp_softc *sc;
+	int i;
+
+	for (i = 0; i < NPPP; i++) {
+		sc = &ppp_softc[i];
+		pppintr(sc);
+	}
+}
+#endif
+
 /*
  * Software interrupt routine, called at splsoftnet.
  */
 void
-pppintr()
+pppintr(void *arg)
 {
-    struct ppp_softc *sc;
-    int i, s, s2;
-    struct mbuf *m;
+	struct ppp_softc *sc = arg;
+	struct mbuf *m;
+	int s;
 
-    sc = ppp_softc;
-    s = splsoftnet();
-    for (i = 0; i < NPPP; ++i, ++sc) {
 	if (!(sc->sc_flags & SC_TBUSY)
-	    && (!IFQ_IS_EMPTY(&sc->sc_if.if_snd) || sc->sc_fastq.ifq_head
+	    && (IFQ_IS_EMPTY(&sc->sc_if.if_snd) == 0 || sc->sc_fastq.ifq_head
 		|| sc->sc_outm)) {
-	    s2 = splimp();
-	    sc->sc_flags |= SC_TBUSY;
-	    splx(s2);
-	    (*sc->sc_start)(sc);
+		s = splhigh();	/* XXX IMP ME HARDER */
+		sc->sc_flags |= SC_TBUSY;
+		splx(s);
+		(*sc->sc_start)(sc);
 	}
 	for (;;) {
-	    s2 = splimp();
-	    IF_DEQUEUE(&sc->sc_rawq, m);
-	    splx(s2);
-	    if (m == NULL)
-		break;
-	    ppp_inproc(sc, m);
+		s = splnet();
+		IF_DEQUEUE(&sc->sc_rawq, m);
+		splx(s);
+		if (m == NULL)
+			break;
+		ppp_inproc(sc, m);
 	}
-    }
-    splx(s);
 }
 
 #ifdef PPP_COMPRESS
@@ -1219,7 +1258,7 @@ ppp_ccp(sc, m, rcvd)
     case CCP_TERMACK:
 	/* CCP must be going down - disable compression */
 	if (sc->sc_flags & SC_CCP_UP) {
-	    s = splimp();
+	    s = splhigh();	/* XXX IMP ME HARDER */
 	    sc->sc_flags &= ~(SC_CCP_UP | SC_COMP_RUN | SC_DECOMP_RUN);
 	    splx(s);
 	}
@@ -1235,7 +1274,7 @@ ppp_ccp(sc, m, rcvd)
 		    && (*sc->sc_xcomp->comp_init)
 			(sc->sc_xc_state, dp + CCP_HDRLEN, slen - CCP_HDRLEN,
 			 sc->sc_unit, 0, sc->sc_flags & SC_DEBUG)) {
-		    s = splimp();
+		    s = splhigh();	/* XXX IMP ME HARDER */
 		    sc->sc_flags |= SC_COMP_RUN;
 		    splx(s);
 		}
@@ -1246,7 +1285,7 @@ ppp_ccp(sc, m, rcvd)
 			(sc->sc_rc_state, dp + CCP_HDRLEN, slen - CCP_HDRLEN,
 			 sc->sc_unit, 0, sc->sc_mru,
 			 sc->sc_flags & SC_DEBUG)) {
-		    s = splimp();
+		    s = splhigh();	/* XXX IMP ME HARDER */
 		    sc->sc_flags |= SC_DECOMP_RUN;
 		    sc->sc_flags &= ~(SC_DC_ERROR | SC_DC_FERROR);
 		    splx(s);
@@ -1263,7 +1302,7 @@ ppp_ccp(sc, m, rcvd)
 	    } else {
 		if (sc->sc_rc_state && (sc->sc_flags & SC_DECOMP_RUN)) {
 		    (*sc->sc_rcomp->decomp_reset)(sc->sc_rc_state);
-		    s = splimp();
+		    s = splhigh();	/* XXX IMP ME HARDER */
 		    sc->sc_flags &= ~SC_DC_ERROR;
 		    splx(s);
 		}
@@ -1303,12 +1342,16 @@ ppppktin(sc, m, lost)
     struct mbuf *m;
     int lost;
 {
-    int s = splimp();
+    int s = splhigh();	/* XXX IMP ME HARDER */
 
     if (lost)
 	m->m_flags |= M_ERRMARK;
     IF_ENQUEUE(&sc->sc_rawq, m);
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+    softintr_schedule(sc->sc_si);
+#else
     schednetisr(NETISR_PPP);
+#endif
     splx(s);
 }
 
@@ -1352,7 +1395,7 @@ ppp_inproc(sc, m)
 
     if (m->m_flags & M_ERRMARK) {
 	m->m_flags &= ~M_ERRMARK;
-	s = splimp();
+	s = splhigh();	/* XXX IMP ME HARDER */
 	sc->sc_flags |= SC_VJ_RESET;
 	splx(s);
     }
@@ -1384,7 +1427,7 @@ ppp_inproc(sc, m)
 	     */
 	    if (sc->sc_flags & SC_DEBUG)
 		printf("%s: decompress failed %d\n", ifp->if_xname, rv);
-	    s = splimp();
+	    s = splhigh();	/* XXX IMP ME HARDER */
 	    sc->sc_flags |= SC_VJ_RESET;
 	    if (rv == DECOMP_ERROR)
 		sc->sc_flags |= SC_DC_ERROR;
@@ -1415,7 +1458,7 @@ ppp_inproc(sc, m)
 	 */
 	if (sc->sc_comp)
 	    sl_uncompress_tcp(NULL, 0, TYPE_ERROR, sc->sc_comp);
-	s = splimp();
+	s = splhigh();	/* XXX IMP ME HARDER */
 	sc->sc_flags &= ~SC_VJ_RESET;
 	splx(s);
     }
@@ -1538,8 +1581,8 @@ ppp_inproc(sc, m)
 
 #if NBPFILTER > 0
     /* See if bpf wants to look at the packet. */
-    if (sc->sc_bpf)
-	bpf_mtap(sc->sc_bpf, m);
+    if (sc->sc_if.if_bpf)
+	bpf_mtap(sc->sc_if.if_bpf, m);
 #endif
 
     rv = 0;
@@ -1598,7 +1641,7 @@ ppp_inproc(sc, m)
     /*
      * Put the packet on the appropriate input queue.
      */
-    s = splimp();
+    s = splnet();
     if (IF_QFULL(inq)) {
 	IF_DROP(inq);
 	splx(s);
@@ -1674,5 +1717,3 @@ ppp_ifstart(ifp)
 	(*sc->sc_start)(sc);
 }
 #endif
-
-#endif	/* NPPP > 0 */

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_pppvar.h,v 1.11 2000/03/23 07:03:25 thorpej Exp $	*/
+/*	$NetBSD: if_pppvar.h,v 1.14 2002/05/12 20:38:16 matt Exp $	*/
 /*	Id: if_pppvar.h,v 1.3 1996/07/01 01:04:37 paulus Exp	 */
 
 /*
@@ -77,7 +77,6 @@ struct ppp_softc {
 	struct	mbuf *sc_npqueue;	/* output packets not to be sent yet */
 	struct	mbuf **sc_npqtail;	/* ptr to last next ptr in npqueue */
 	struct	pppstat sc_stats;	/* count of bytes/pkts sent/rcvd */
-	caddr_t	sc_bpf;			/* hook for BPF */
 	enum	NPmode sc_npmode[NUM_NP]; /* what to do with each NP */
 	struct	compressor *sc_xcomp;	/* transmit compressor */
 	void	*sc_xc_state;		/* transmit compressor state */
@@ -85,6 +84,9 @@ struct ppp_softc {
 	void	*sc_rc_state;		/* receive decompressor state */
 	time_t	sc_last_sent;		/* time (secs) last NP pkt sent */
 	time_t	sc_last_recv;		/* time (secs) last NP pkt rcvd */
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	void	*sc_si;			/* software interrupt handle */
+#endif
 #ifdef PPP_FILTER
 	/* Filter for packets to pass. */
 	struct	bpf_program sc_pass_filt_in;
@@ -113,7 +115,7 @@ struct ppp_softc {
 };
 
 #ifdef _KERNEL
-struct	ppp_softc ppp_softc[NPPP];
+extern	struct	ppp_softc ppp_softc[];
 
 struct	ppp_softc *pppalloc __P((pid_t pid));
 void	pppdealloc __P((struct ppp_softc *sc));

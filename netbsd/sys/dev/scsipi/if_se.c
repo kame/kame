@@ -1,4 +1,4 @@
-/*	$NetBSD: if_se.c,v 1.30 2000/06/09 08:54:22 enami Exp $	*/
+/*	$NetBSD: if_se.c,v 1.39 2001/11/15 09:48:16 lukem Exp $	*/
 
 /*
  * Copyright (c) 1997 Ian W. Dall <ian.dall@dsto.defence.gov.au>
@@ -58,6 +58,9 @@
  * Normal operation does not require any special userland program.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_se.c,v 1.39 2001/11/15 09:48:16 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
@@ -65,7 +68,6 @@
 #include "opt_ns.h"
 #include "bpfilter.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -184,7 +186,7 @@ PROTOCMD_DECL_SPECIAL(ctron_ether_set_mode, {CTRON_ETHER_SET_MODE});
 struct se_softc {
 	struct device sc_dev;
 	struct ethercom sc_ethercom;	/* Ethernet common part */
-	struct scsipi_link *sc_link;	/* contains our targ, lun, etc. */
+	struct scsipi_periph *sc_periph;/* contains our targ, lun, etc. */
 
 	struct callout sc_ifstart_ch;
 	struct callout sc_recv_ch;
@@ -210,7 +212,7 @@ static int	sematch __P((struct device *, struct cfdata *, void *));
 static void	seattach __P((struct device *, struct device *, void *));
 
 static void	se_ifstart __P((struct ifnet *));
-static void	sestart __P((void *));
+static void	sestart __P((struct scsipi_periph *));
 
 static void	sedone __P((struct scsipi_xfer *));
 static int	se_ioctl __P((struct ifnet *, u_long, caddr_t));
@@ -231,7 +233,7 @@ static int	se_remove_multi __P((struct se_softc *, u_int8_t *));
 static int	sc_set_all_multi __P((struct se_softc *, int));
 #endif
 static void	se_stop __P((struct se_softc *));
-static __inline int se_scsipi_cmd __P((struct scsipi_link *sc_link,
+static __inline int se_scsipi_cmd __P((struct scsipi_periph *periph,
 			struct scsipi_generic *scsipi_cmd,
 			int cmdlen, u_char *data_addr, int datalen,
 			int retries, int timeout, struct buf *bp,
@@ -248,7 +250,7 @@ struct cfattach se_ca = {
 
 extern struct cfdriver se_cd;
 
-struct scsipi_device se_switch = {
+const struct scsipi_periphsw se_switch = {
 	NULL,			/* Use default error handler */
 	sestart,		/* have a queue, served by this */
 	NULL,			/* have no async handler */
@@ -265,7 +267,7 @@ struct scsipi_inquiry_pattern se_patterns[] = {
 /*
  * Compare two Ether/802 addresses for equality, inlined and
  * unrolled for speed.
- * Note: use this like bcmp()
+ * Note: use this like memcmp()
  */
 static __inline u_int16_t
 ether_cmp(one, two)
@@ -308,24 +310,25 @@ seattach(parent, self, aux)
 {
 	struct se_softc *sc = (void *)self;
 	struct scsipibus_attach_args *sa = aux;
-	struct scsipi_link *sc_link = sa->sa_sc_link;
+	struct scsipi_periph *periph = sa->sa_periph;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	u_int8_t myaddr[ETHER_ADDR_LEN];
 
 	printf("\n");
-	SC_DEBUG(sc_link, SDEV_DB2, ("seattach: "));
+	SC_DEBUG(periph, SCSIPI_DB2, ("seattach: "));
 
 	callout_init(&sc->sc_ifstart_ch);
 	callout_init(&sc->sc_recv_ch);
 
+
 	/*
 	 * Store information needed to contact our base driver
 	 */
-	sc->sc_link = sc_link;
-	sc_link->device = &se_switch;
-	sc_link->device_softc = sc;
-	if (sc_link->openings > SEOUTSTANDING)
-		sc_link->openings = SEOUTSTANDING;
+	sc->sc_periph = periph;
+	periph->periph_dev = &sc->sc_dev;
+	periph->periph_switch = &se_switch;
+
+	/* XXX increase openings? */
 
 	se_poll = (SE_POLL * hz) / 1000;
 	se_poll = se_poll? se_poll: 1;
@@ -347,7 +350,7 @@ seattach(parent, self, aux)
 	se_get_addr(sc, myaddr);
 
 	/* Initialize ifnet structure. */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = se_ifstart;
 	ifp->if_ioctl = se_ioctl;
@@ -359,17 +362,13 @@ seattach(parent, self, aux)
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, myaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 }
 
 
 static __inline int
-se_scsipi_cmd(sc_link, scsipi_cmd, cmdlen, data_addr, datalen,
+se_scsipi_cmd(periph, scsipi_cmd, cmdlen, data_addr, datalen,
 		       retries, timeout, bp, flags)
-	struct scsipi_link *sc_link;
+	struct scsipi_periph *periph;
 	struct scsipi_generic *scsipi_cmd;
 	int cmdlen;
 	u_char *data_addr;
@@ -382,7 +381,7 @@ se_scsipi_cmd(sc_link, scsipi_cmd, cmdlen, data_addr, datalen,
 	int error;
 	int s = splbio();
 
-	error = scsipi_command(sc_link, scsipi_cmd, cmdlen, data_addr,
+	error = scsipi_command(periph, scsipi_cmd, cmdlen, data_addr,
 	    datalen, retries, timeout, bp, flags);
 	splx(s);
 	return (error);
@@ -390,10 +389,10 @@ se_scsipi_cmd(sc_link, scsipi_cmd, cmdlen, data_addr, datalen,
 
 /* Start routine for calling from scsi sub system */
 static void
-sestart(v)
-	void *v;
+sestart(periph)
+	struct scsipi_periph *periph;
 {
-	struct se_softc *sc = (struct se_softc *) v;
+	struct se_softc *sc = (void *)periph->periph_dev;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	int s = splnet();
 
@@ -457,7 +456,7 @@ se_ifstart(ifp)
 	/* Chain; copy into linear buffer we allocated at attach time. */
 	cp = sc->sc_tbuf;
 	for (m = m0; m != NULL; ) {
-		bcopy(mtod(m, u_char *), cp, m->m_len);
+		memcpy(cp, mtod(m, u_char *), m->m_len);
 		cp += m->m_len;
 		MFREE(m, m0);
 		m = m0;
@@ -468,7 +467,7 @@ se_ifstart(ifp)
 			printf("se: packet size %d (%d) < %d\n", len,
 			    cp - (u_char *)sc->sc_tbuf, SEMINSIZE);
 #endif
-		bzero(cp, SEMINSIZE - len);
+		memset(cp, 0, SEMINSIZE - len);
 		len = SEMINSIZE;
 	}
 
@@ -477,7 +476,7 @@ se_ifstart(ifp)
 	_lto2b(len, send_cmd.length);
 
 	/* Send command to device. */
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *)&send_cmd, sizeof(send_cmd),
 	    sc->sc_tbuf, len, SERETRIES,
 	    SETIMEOUT, NULL, XS_CTL_NOSLEEP|XS_CTL_ASYNC|XS_CTL_DATA_OUT);
@@ -503,7 +502,7 @@ sedone(xs)
 	struct scsipi_xfer *xs;
 {
 	int error;
-	struct se_softc *sc = xs->sc_link->device_softc;
+	struct se_softc *sc = (void *)xs->xs_periph->periph_dev;
 	struct scsipi_generic *cmd = xs->cmd;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	int s;
@@ -576,7 +575,7 @@ se_recv(v)
 
 	PROTOCMD(ctron_ether_recv, recv_cmd);
 
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *)&recv_cmd, sizeof(recv_cmd),
 	    sc->sc_rbuf, RBUF_LEN, SERETRIES, SETIMEOUT, NULL,
 	    XS_CTL_NOSLEEP|XS_CTL_ASYNC|XS_CTL_DATA_IN);
@@ -623,7 +622,7 @@ se_get(sc, data, totlen)
 		}
 
 		m->m_len = len = min(totlen, len);
-		bcopy(data, mtod(m, caddr_t), len);
+		memcpy(mtod(m, caddr_t), data, len);
 		data += len;
 
 		totlen -= len;
@@ -653,7 +652,6 @@ se_read(sc, data, datalen)
 	int datalen;
 {
 	struct mbuf *m;
-	struct ether_header *eh;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	int n;
 
@@ -696,30 +694,13 @@ se_read(sc, data, datalen)
 		}
 		ifp->if_ipackets++;
 
-		/* We assume that the header fit entirely in one mbuf. */
-		eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 		/*
 		 * Check if there's a BPF listener on this interface.
 		 * If so, hand off the raw packet to BPF.
 		 */
-		if (ifp->if_bpf) {
+		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
-
-			/* Note that the interface cannot be in
-			 * promiscuous mode if there are no BPF
-			 * listeners.  And if we are in promiscuous
-			 * mode, we have to check if this packet is
-			 * really ours.
-			 */
-			if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-			    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-			    ETHER_CMP(eh->ether_dhost, LLADDR(ifp->if_sadl))) {
-				m_freem(m);
-				goto next_packet;
-			}
-		}
 #endif
 
 		/* Pass the packet up. */
@@ -758,7 +739,7 @@ se_reset(sc)
 	 * "BUS DEVICE RESET" message, but don't think the ctron
 	 * understands it.
 	 */
-	error = se_scsipi_cmd(sc->sc_link, 0, 0, 0, 0, SERETRIES, 2000, NULL,
+	error = se_scsipi_cmd(sc->sc_periph, 0, 0, 0, 0, SERETRIES, 2000, NULL,
 	    XS_CTL_RESET);
 #endif
 	error = se_init(sc);
@@ -782,7 +763,7 @@ se_add_proto(sc, proto)
 
 	PROTOCMD(ctron_ether_add_proto, add_proto_cmd);
 	_lto2b(sizeof(data), add_proto_cmd.length);
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *) &add_proto_cmd, sizeof(add_proto_cmd),
 	    data, sizeof(data), SERETRIES, SETIMEOUT, NULL,
 	    XS_CTL_DATA_OUT | XS_CTL_DATA_ONSTACK);
@@ -799,7 +780,7 @@ se_get_addr(sc, myaddr)
 
 	PROTOCMD(ctron_ether_get_addr, get_addr_cmd);
 	_lto2b(ETHER_ADDR_LEN, get_addr_cmd.length);
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *) &get_addr_cmd, sizeof(get_addr_cmd),
 	    myaddr, ETHER_ADDR_LEN, SERETRIES, SETIMEOUT, NULL,
 	    XS_CTL_DATA_IN | XS_CTL_DATA_ONSTACK);
@@ -819,7 +800,7 @@ se_set_media(sc, type)
 
 	PROTOCMD(ctron_ether_set_media, set_media_cmd);
 	set_media_cmd.byte3 = type;
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *) &set_media_cmd, sizeof(set_media_cmd),
 	    0, 0, SERETRIES, SETIMEOUT, NULL, 0);
 	return (error);
@@ -837,7 +818,7 @@ se_set_mode(sc, len, mode)
 	PROTOCMD(ctron_ether_set_mode, set_mode_cmd);
 	set_mode_cmd.mode = mode;
 	_lto2b(len, set_mode_cmd.length);
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *) &set_mode_cmd, sizeof(set_mode_cmd),
 	    0, 0, SERETRIES, SETIMEOUT, NULL, 0);
 	return (error);
@@ -865,7 +846,7 @@ se_init(sc)
 
 	PROTOCMD(ctron_ether_set_addr, set_addr_cmd);
 	_lto2b(ETHER_ADDR_LEN, set_addr_cmd.length);
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *) &set_addr_cmd, sizeof(set_addr_cmd),
 	    LLADDR(ifp->if_sadl), ETHER_ADDR_LEN, SERETRIES, SETIMEOUT, NULL,
 	    XS_CTL_DATA_OUT);
@@ -913,7 +894,7 @@ se_set_multi(sc, addr)
 
 	PROTOCMD(ctron_ether_set_multi, set_multi_cmd);
 	_lto2b(sizeof(addr), set_multi_cmd.length);
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *) &set_multi_cmd, sizeof(set_multi_cmd),
 	    addr, sizeof(addr), SERETRIES, SETIMEOUT, NULL, XS_CTL_DATA_OUT);
 	return (error);
@@ -933,7 +914,7 @@ se_remove_multi(sc, addr)
 
 	PROTOCMD(ctron_ether_remove_multi, remove_multi_cmd);
 	_lto2b(sizeof(addr), remove_multi_cmd.length);
-	error = se_scsipi_cmd(sc->sc_link,
+	error = se_scsipi_cmd(sc->sc_periph,
 	    (struct scsipi_generic *) &remove_multi_cmd,
 	    sizeof(remove_multi_cmd),
 	    addr, sizeof(addr), SERETRIES, SETIMEOUT, NULL, XS_CTL_DATA_OUT);
@@ -1038,8 +1019,8 @@ se_ioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else
-				bcopy(ina->x_host.c_host,
-				    LLADDR(ifp->if_sadl), ETHER_ADDR_LEN);
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host, ETHER_ADDR_LEN);
 			/* Set new address. */
 
 			error = se_init(sc);
@@ -1143,10 +1124,12 @@ int
 se_enable(sc)
 	struct se_softc *sc;
 {
+	struct scsipi_periph *periph = sc->sc_periph;
+	struct scsipi_adapter *adapt = periph->periph_channel->chan_adapter;
 	int error = 0;
 
 	if (sc->sc_enabled == 0 &&
-	    (error = scsipi_adapter_addref(sc->sc_link)) == 0)
+	    (error = scsipi_adapter_addref(adapt)) == 0)
 		sc->sc_enabled = 1;
 	else
 		printf("%s: device enable failed\n",
@@ -1162,9 +1145,11 @@ void
 se_disable(sc)
 	struct se_softc *sc;
 {
+	struct scsipi_periph *periph = sc->sc_periph;
+	struct scsipi_adapter *adapt = periph->periph_channel->chan_adapter;
 
 	if (sc->sc_enabled != 0) {
-		scsipi_adapter_delref(sc->sc_link);
+		scsipi_adapter_delref(adapt);
 		sc->sc_enabled = 0;
 	}
 }
@@ -1181,7 +1166,8 @@ seopen(dev, flag, fmt, p)
 {
 	int unit, error;
 	struct se_softc *sc;
-	struct scsipi_link *sc_link;
+	struct scsipi_periph *periph;
+	struct scsipi_adapter *adapt;
 
 	unit = SEUNIT(dev);
 	if (unit >= se_cd.cd_ndevs)
@@ -1190,18 +1176,19 @@ seopen(dev, flag, fmt, p)
 	if (sc == NULL)
 		return (ENXIO);
 
-	sc_link = sc->sc_link;
+	periph = sc->sc_periph;
+	adapt = periph->periph_channel->chan_adapter;
 
-	if ((error = scsipi_adapter_addref(sc_link)) != 0)
+	if ((error = scsipi_adapter_addref(adapt)) != 0)
 		return (error);
 
-	SC_DEBUG(sc_link, SDEV_DB1,
+	SC_DEBUG(periph, SCSIPI_DB1,
 	    ("scopen: dev=0x%x (unit %d (of %d))\n", dev, unit,
 	    se_cd.cd_ndevs));
 
-	sc_link->flags |= SDEV_OPEN;
+	periph->periph_flags |= PERIPH_OPEN;
 
-	SC_DEBUG(sc_link, SDEV_DB3, ("open complete\n"));
+	SC_DEBUG(periph, SCSIPI_DB3, ("open complete\n"));
 	return (0);
 }
 
@@ -1216,13 +1203,15 @@ seclose(dev, flag, fmt, p)
 	struct proc *p;
 {
 	struct se_softc *sc = se_cd.cd_devs[SEUNIT(dev)];
+	struct scsipi_periph *periph = sc->sc_periph;
+	struct scsipi_adapter *adapt = periph->periph_channel->chan_adapter;
 
-	SC_DEBUG(sc->sc_link, SDEV_DB1, ("closing\n"));
+	SC_DEBUG(sc->sc_periph, SCSIPI_DB1, ("closing\n"));
 
-	scsipi_wait_drain(sc->sc_link);
+	scsipi_wait_drain(periph);
 
-	scsipi_adapter_delref(sc->sc_link);
-	sc->sc_link->flags &= ~SDEV_OPEN;
+	scsipi_adapter_delref(adapt);
+	periph->periph_flags &= ~PERIPH_OPEN;
 
 	return (0);
 }
@@ -1241,5 +1230,5 @@ seioctl(dev, cmd, addr, flag, p)
 {
 	struct se_softc *sc = se_cd.cd_devs[SEUNIT(dev)];
 
-	return (scsipi_do_ioctl(sc->sc_link, dev, cmd, addr, flag, p));
+	return (scsipi_do_ioctl(sc->sc_periph, dev, cmd, addr, flag, p));
 }

@@ -1,6 +1,4 @@
-/*	$NetBSD: pcmcia.c,v 1.22 2000/05/08 13:51:36 augustss Exp $	*/
-
-#define	PCMCIADEBUG
+/*	$NetBSD: pcmcia.c,v 1.28 2001/12/15 13:23:22 soren Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -31,13 +29,14 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: pcmcia.c,v 1.28 2001/12/15 13:23:22 soren Exp $");
+
 #include "opt_pcmciaverbose.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-
 
 #include <dev/pcmcia/pcmciareg.h>
 #include <dev/pcmcia/pcmciachip.h>
@@ -297,7 +296,7 @@ pcmcia_print(arg, pnp)
 
 	if (pnp) {
 		pcmcia_devinfo(card, 1, devinfo, sizeof devinfo);
-		printf("%s", devinfo);
+		printf("%s at %s, ", devinfo, pnp);
 	}
 	printf(" function %d", pa->pf->number);
 
@@ -314,7 +313,7 @@ pcmcia_devinfo(card, showhex, cp, cplen)
 	int i, n;
 
 	for (i = 0; i < 4 && card->cis1_info[i] != NULL && cplen > 0; i++) {
-		n = snprintf(cp, cplen, "%s%s", i ? ", " : "",
+		n = snprintf(cp, cplen, "%s%s", (i && i != 3) ? ", " : "",
 		        card->cis1_info[i]);
 		cp += n;
 		cplen -= n;

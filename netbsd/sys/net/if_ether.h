@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ether.h,v 1.17.2.2 2001/06/07 17:00:01 he Exp $	*/
+/*	$NetBSD: if_ether.h,v 1.27 2002/03/05 04:13:00 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -47,6 +47,7 @@
 #define	ETHER_HDR_LEN	((ETHER_ADDR_LEN * 2) + ETHER_TYPE_LEN)
 #define	ETHER_MIN_LEN	64	/* minimum frame length, including CRC */
 #define	ETHER_MAX_LEN	1518	/* maximum frame length, including CRC */
+#define	ETHER_MAX_LEN_JUMBO 9018 /* maximum jumbo frame len, including CRC */
 
 /*
  * Some Ethernet extensions.
@@ -74,6 +75,7 @@ struct	ether_header {
 
 #define	ETHER_IS_MULTICAST(addr) (*(addr) & 0x01) /* is address mcast/bcast? */
 
+#define	ETHERMTU_JUMBO	(ETHER_MAX_LEN_JUMBO - ETHER_HDR_LEN - ETHER_CRC_LEN)
 #define	ETHERMTU	(ETHER_MAX_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
 #define	ETHERMIN	(ETHER_MIN_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
 
@@ -155,12 +157,14 @@ struct	ethercom {
 
 #define	ETHERCAP_VLAN_MTU	0x00000001	/* VLAN-compatible MTU */
 #define	ETHERCAP_VLAN_HWTAGGING	0x00000002	/* hardware VLAN tag support */
+#define	ETHERCAP_JUMBO_MTU	0x00000004	/* 9000 byte MTU supported */
 
 #ifdef	_KERNEL
 extern u_int8_t etherbroadcastaddr[ETHER_ADDR_LEN];
 extern u_int8_t ether_ipmulticast_min[ETHER_ADDR_LEN];
 extern u_int8_t ether_ipmulticast_max[ETHER_ADDR_LEN];
 
+int	ether_ioctl(struct ifnet *, u_long, caddr_t);
 int	ether_addmulti (struct ifreq *, struct ethercom *);
 int	ether_delmulti (struct ifreq *, struct ethercom *);
 int	ether_changeaddr (struct ifreq *, struct ethercom *);
@@ -200,11 +204,11 @@ struct ether_multistep {
 	/* struct ethercom *ec; */					\
 	/* struct ether_multi *enm; */					\
 {									\
-	for ((enm) = (ec)->ec_multiaddrs.lh_first;			\
+	for ((enm) = LIST_FIRST(&(ec)->ec_multiaddrs);			\
 	    (enm) != NULL &&						\
 	    (bcmp((enm)->enm_addrlo, (addrlo), ETHER_ADDR_LEN) != 0 ||	\
 	     bcmp((enm)->enm_addrhi, (addrhi), ETHER_ADDR_LEN) != 0);	\
-		(enm) = (enm)->enm_list.le_next);			\
+		(enm) = LIST_NEXT((enm), enm_list));			\
 }
 
 /*
@@ -219,7 +223,7 @@ struct ether_multistep {
 	/* struct ether_multi *enm; */  \
 { \
 	if (((enm) = (step).e_enm) != NULL) \
-		(step).e_enm = (enm)->enm_list.le_next; \
+		(step).e_enm = LIST_NEXT((enm), enm_list); \
 }
 
 #define ETHER_FIRST_MULTI(step, ec, enm) \
@@ -227,13 +231,19 @@ struct ether_multistep {
 	/* struct ethercom *ec; */ \
 	/* struct ether_multi *enm; */ \
 { \
-	(step).e_enm = (ec)->ec_multiaddrs.lh_first; \
+	(step).e_enm = LIST_FIRST(&(ec)->ec_multiaddrs); \
 	ETHER_NEXT_MULTI((step), (enm)); \
 }
 
 #ifdef _KERNEL
-u_int32_t ether_crc32_le (const u_int8_t *, size_t);
-u_int32_t ether_crc32_be (const u_int8_t *, size_t);
+void	ether_ifattach(struct ifnet *, const u_int8_t *);
+void	ether_ifdetach(struct ifnet *);
+
+char	*ether_sprintf(const u_int8_t *);
+
+u_int32_t ether_crc32_le(const u_int8_t *, size_t);
+u_int32_t ether_crc32_be(const u_int8_t *, size_t);
+
 #else
 /*
  * Prototype ethers(3) functions.

@@ -1,4 +1,4 @@
-#	$NetBSD: genassym.cf,v 1.21 2000/06/05 00:09:20 matt Exp $
+#	$NetBSD: genassym.cf,v 1.24 2000/07/26 11:48:51 ragge Exp $
 #
 # Copyright (c) 1997 Ludd, University of Lule}, Sweden.
 # All rights reserved.
@@ -38,11 +38,7 @@ include	<sys/syscall.h>
 include	<sys/sched.h>
 include	<sys/device.h>
 
-include	<net/netisr.h>
-
-include <vm/vm.h>
 include <uvm/uvm.h>
-include <uvm/uvm_extern.h>
 
 include	<machine/mtpr.h>
 include	<machine/pcb.h>
@@ -72,6 +68,7 @@ define	SSP		offsetof(struct pcb, SSP)
 
 define	MCHK		offsetof(struct cpu_dep, cpu_mchk)
 define	MEMERR		offsetof(struct cpu_dep, cpu_memerr)
+define	BADADDR		offsetof(struct cpu_dep, cpu_badaddr)
 
 define	KERNBASE	KERNBASE
 
@@ -115,18 +112,6 @@ define	T_ARITHFLT	T_ARITHFLT
 define	T_SYSCALL	T_SYSCALL
 define	T_ASTFLT	T_ASTFLT
 define	T_KDBTRAP	T_KDBTRAP
-
-# software net interrupts
-define	NETISR_IP	NETISR_IP
-define	NETISR_ISO	NETISR_ISO
-define	NETISR_CCITT	NETISR_CCITT
-define	NETISR_ATALK	NETISR_ATALK
-define	NETISR_IPX	NETISR_IPX
-define	NETISR_IPV6	NETISR_IPV6
-define	NETISR_NS	NETISR_NS
-define	NETISR_ISDN	NETISR_ISDN
-define	NETISR_ARP	NETISR_ARP
-define	NETISR_PPP	NETISR_PPP
 
 define	USPACE		USPACE
 

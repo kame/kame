@@ -1,4 +1,4 @@
-/*	$NetBSD: nfs_syscalls.c,v 1.41.2.3 2002/02/09 19:20:51 he Exp $	*/
+/*	$NetBSD: nfs_syscalls.c,v 1.51 2002/05/12 23:04:36 matt Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -38,7 +38,11 @@
  *	@(#)nfs_syscalls.c	8.5 (Berkeley) 3/30/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: nfs_syscalls.c,v 1.51 2002/05/12 23:04:36 matt Exp $");
+
 #include "fs_nfs.h"
+#include "opt_nfs.h"
 #include "opt_nfsserver.h"
 #include "opt_iso.h"
 #include "opt_inet.h"
@@ -89,13 +93,13 @@
 extern int32_t (*nfsrv3_procs[NFS_NPROCS]) __P((struct nfsrv_descript *,
 						struct nfssvc_sock *,
 						struct proc *, struct mbuf **));
-extern int nfs_numasync;
 extern time_t nqnfsstarttime;
-extern int nqsrv_writeslack;
-extern int nfsrtton;
-extern struct nfsstats nfsstats;
 extern int nfsrvw_procrastinate;
-struct nfssvc_sock *nfs_udpsock, *nfs_cltpsock;
+
+struct nfssvc_sock *nfs_udpsock;
+#ifdef ISO
+struct nfssvc_sock *nfs_cltpsock;
+#endif
 #ifdef INET6
 struct nfssvc_sock *nfs_udp6sock;
 #endif
@@ -107,6 +111,12 @@ static int notstarted = 1;
 static int modify_flag = 0;
 static struct nfsdrt nfsdrt;
 #endif
+
+struct nfssvc_sockhead nfssvc_sockhead;
+struct nfsdhead nfsd_head;
+
+int nfssvc_sockhead_flag;
+int nfsd_head_flag;
 
 #define	TRUE	1
 #define	FALSE	0
@@ -645,8 +655,14 @@ nfssvc_nfsd(nsd, argp, p)
 				 * locking errors (usually, it's due to
 				 * forgetting to vput() something).
 				 */
-				panic("nfsd: locking botch in op %d",
-				    nd ? nd->nd_procnum : -1);
+#ifdef DEBUG
+				extern void printlockedvnodes(void);
+				printlockedvnodes();
+#endif
+				printf("nfsd: locking botch in op %d"
+				    " (before %d, after %d)\n",
+				    nd ? nd->nd_procnum : -1,
+				    lockcount, p->p_locks);
 			}
 #endif
 			if (mreq == NULL)
@@ -871,11 +887,13 @@ nfsrv_init(terminating)
 	TAILQ_INSERT_TAIL(&nfssvc_sockhead, nfs_udp6sock, ns_chain);
 #endif
 
+#ifdef ISO
 	nfs_cltpsock = (struct nfssvc_sock *)
 	    malloc(sizeof (struct nfssvc_sock), M_NFSSVC, M_WAITOK);
 	memset((caddr_t)nfs_cltpsock, 0, sizeof (struct nfssvc_sock));
 	TAILQ_INIT(&nfs_cltpsock->ns_uidlruhead);
 	TAILQ_INSERT_TAIL(&nfssvc_sockhead, nfs_cltpsock, ns_chain);
+#endif
 }
 
 /*
@@ -947,7 +965,7 @@ nfssvc_iod(p)
 	nfs_numasync++;
 	p->p_holdcnt++;
 	/*
-	 * Just loop around doin our stuff until SIGKILL
+	 * Just loop around doing our stuff until SIGKILL
 	 */
 	for (;;) {
 	    while (((nmp = nfs_iodmount[myiod]) == NULL
@@ -968,10 +986,7 @@ nfssvc_iod(p)
 		    nmp->nm_bufqwant = FALSE;
 		    wakeup(&nmp->nm_bufq);
 		}
-		if (bp->b_flags & B_READ)
-		    (void) nfs_doio(bp, bp->b_rcred, (struct proc *)0);
-		else
-		    (void) nfs_doio(bp, bp->b_wcred, (struct proc *)0);
+		(void) nfs_doio(bp, NULL);
 		/*
 		 * If there are more than one iod on this mount, then defect
 		 * so that the iods can be shared out fairly between the mounts

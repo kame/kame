@@ -1,4 +1,4 @@
-/*	$NetBSD: if_vr.c,v 1.34.4.2 2001/03/13 20:44:29 he Exp $	*/
+/*	$NetBSD: if_vr.c,v 1.53 2001/11/13 07:48:45 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -103,7 +103,8 @@
  * 2 bytes so that the payload is aligned on a 4-byte boundary.
  */
 
-#include "opt_inet.h"
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_vr.c,v 1.53 2001/11/13 07:48:45 lukem Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -115,18 +116,13 @@
 #include <sys/socket.h>
 #include <sys/device.h>
 
-#include <vm/vm.h>		/* for PAGE_SIZE */
+#include <uvm/uvm_extern.h>		/* for PAGE_SIZE */
 
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
 #include <net/if_ether.h>
-
-#if defined(INET)
-#include <netinet/in.h>
-#include <netinet/if_inarp.h>
-#endif
 
 #include "bpfilter.h"
 #if NBPFILTER > 0
@@ -301,8 +297,8 @@ static void vr_txeof		__P((struct vr_softc *));
 static int vr_intr		__P((void *));
 static void vr_start		__P((struct ifnet *));
 static int vr_ioctl		__P((struct ifnet *, u_long, caddr_t));
-static int vr_init		__P((struct vr_softc *));
-static void vr_stop		__P((struct vr_softc *, int));
+static int vr_init		__P((struct ifnet *));
+static void vr_stop		__P((struct ifnet *, int));
 static void vr_rxdrain		__P((struct vr_softc *));
 static void vr_watchdog		__P((struct ifnet *));
 static void vr_tick		__P((void *));
@@ -314,7 +310,6 @@ static int vr_mii_readreg	__P((struct device *, int, int));
 static void vr_mii_writereg	__P((struct device *, int, int, int));
 static void vr_mii_statchg	__P((struct device *));
 
-static u_int8_t vr_calchash	__P((u_int8_t *));
 static void vr_setmulti		__P((struct vr_softc *));
 static void vr_reset		__P((struct vr_softc *));
 
@@ -431,34 +426,8 @@ vr_mii_statchg(self)
 		VR_SETBIT16(sc, VR_COMMAND, VR_CMD_TX_ON|VR_CMD_RX_ON);
 }
 
-/*
- * Calculate CRC of a multicast group address, return the lower 6 bits.
- */
-static u_int8_t
-vr_calchash(addr)
-	u_int8_t *addr;
-{
-	u_int32_t crc, carry;
-	int i, j;
-	u_int8_t c;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
-			crc <<= 1;
-			c >>= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/* return the filter bit position */
-	return ((crc >> 26) & 0x0000003F);
-}
+#define	vr_calchash(addr) \
+	(ether_crc32_be((addr), ETHER_ADDR_LEN) >> 26)
 
 /*
  * Program the 64-bit multicast hash filter.
@@ -575,7 +544,8 @@ vr_add_rxbuf(sc, i)
 	ds->ds_mbuf = m_new;
 
 	error = bus_dmamap_load(sc->vr_dmat, ds->ds_dmamap,
-	    m_new->m_ext.ext_buf, m_new->m_ext.ext_size, NULL, BUS_DMA_NOWAIT);
+	    m_new->m_ext.ext_buf, m_new->m_ext.ext_size, NULL,
+	    BUS_DMA_READ|BUS_DMA_NOWAIT);
 	if (error) {
 		printf("%s: unable to load rx DMA map %d, error = %d\n",
 		    sc->vr_dev.dv_xname, i, error);
@@ -598,7 +568,6 @@ static void
 vr_rxeof(sc)
 	struct vr_softc *sc;
 {
-	struct ether_header *eh;
 	struct mbuf *m;
 	struct ifnet *ifp;
 	struct vr_desc *d;
@@ -673,15 +642,6 @@ vr_rxeof(sc)
 		/* No errors; receive the packet. */
 		total_len = VR_RXBYTES(le32toh(d->vr_status));
 
-		/*
-		 * XXX The VIA Rhine chip includes the CRC with every
-		 * received frame, and there's no way to turn this
-		 * behavior off (at least, I can't find anything in
-		 * the manual that explains how to do it) so we have
-		 * to trim off the CRC manually.
-		 */
-		total_len -= ETHER_CRC_LEN;
-
 #ifdef __NO_STRICT_ALIGNMENT
 		/*
 		 * If the packet is small enough to fit in a
@@ -749,14 +709,19 @@ vr_rxeof(sc)
 		memcpy(mtod(m, caddr_t), mtod(ds->ds_mbuf, caddr_t),
 		    total_len);
 
-		/* Allow the recieve descriptor to continue using its mbuf. */
+		/* Allow the receive descriptor to continue using its mbuf. */
 		VR_INIT_RXDESC(sc, i);
 		bus_dmamap_sync(sc->vr_dmat, ds->ds_dmamap, 0,
 		    ds->ds_dmamap->dm_mapsize, BUS_DMASYNC_PREREAD);
 #endif /* __NO_STRICT_ALIGNMENT */
 
+		/*
+		 * The Rhine chip includes the FCS with every
+		 * received packet.
+		 */
+		m->m_flags |= M_HASFCS;
+
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = total_len;
 #if NBPFILTER > 0
@@ -766,16 +731,8 @@ vr_rxeof(sc)
 		 * a broadcast packet, multicast packet, matches our ethernet
 		 * address or the interface is in promiscuous mode.
 		 */
-		if (ifp->if_bpf) {
+		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
-			if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-			    ETHER_IS_MULTICAST(eh->ether_dhost) == 0 &&
-			    memcmp(eh->ether_dhost, LLADDR(ifp->if_sadl),
-				   ETHER_ADDR_LEN) != 0) {
-				m_freem(m);
-				continue;
-			}
-		}
 #endif
 		/* Pass it on. */
 		(*ifp->if_input)(ifp, m);
@@ -871,7 +828,7 @@ vr_intr(arg)
 
 	/* Suppress unwanted interrupts. */
 	if ((ifp->if_flags & IFF_UP) == 0) {
-		vr_stop(sc, 1);
+		vr_stop(ifp, 1);
 		return (0);
 	}
 
@@ -921,7 +878,7 @@ vr_intr(arg)
 			printf("%s: PCI bus error\n", sc->vr_dev.dv_xname);
 			/* vr_init() calls vr_start() */
 			dotx = 0;
-			(void) vr_init(sc);
+			(void) vr_init(ifp);
 		}
 	}
 
@@ -969,6 +926,7 @@ vr_start(ifp)
 		IFQ_POLL(&ifp->if_snd, m0);
 		if (m0 == NULL)
 			break;
+		m = NULL;
 
 		/*
 		 * Get the next available transmit descriptor.
@@ -982,9 +940,9 @@ vr_start(ifp)
 		 * fit in one DMA segment, and we need to copy.  Note,
 		 * the packet must also be aligned.
 		 */
-		if ((mtod(m0, bus_addr_t) & 3) != 0 ||
+		if ((mtod(m0, uintptr_t) & 3) != 0 ||
 		    bus_dmamap_load_mbuf(sc->vr_dmat, ds->ds_dmamap, m0,
-		     BUS_DMA_NOWAIT) != 0) {
+		     BUS_DMA_WRITE|BUS_DMA_NOWAIT) != 0) {
 			MGETHDR(m, M_DONTWAIT, MT_DATA);
 			if (m == NULL) {
 				printf("%s: unable to allocate Tx mbuf\n",
@@ -1002,20 +960,20 @@ vr_start(ifp)
 			}
 			m_copydata(m0, 0, m0->m_pkthdr.len, mtod(m, caddr_t));
 			m->m_pkthdr.len = m->m_len = m0->m_pkthdr.len;
-			m0 = m;
 			error = bus_dmamap_load_mbuf(sc->vr_dmat,
-			    ds->ds_dmamap, m0, BUS_DMA_NOWAIT);
+			    ds->ds_dmamap, m, BUS_DMA_WRITE|BUS_DMA_NOWAIT);
 			if (error) {
 				printf("%s: unable to load Tx buffer, "
 				    "error = %d\n", sc->vr_dev.dv_xname, error);
-				/* ick!  discard the new mbuf */
-				m_freem(m);
 				break;
 			}
 		}
 
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
+		if (m != NULL) {
+			m_freem(m0);
+			m0 = m;
+		}
 
 		/* Sync the DMA map. */
 		bus_dmamap_sync(sc->vr_dmat, ds->ds_dmamap, 0,
@@ -1105,16 +1063,16 @@ vr_start(ifp)
  * Initialize the interface.  Must be called at splnet.
  */
 static int
-vr_init(sc)
-	struct vr_softc *sc;
+vr_init(ifp)
+	struct ifnet *ifp;
 {
-	struct ifnet *ifp = &sc->vr_ec.ec_if;
+	struct vr_softc *sc = ifp->if_softc;
 	struct vr_desc *d;
 	struct vr_descsoft *ds;
 	int i, error = 0;
 
 	/* Cancel pending I/O. */
-	vr_stop(sc, 0);
+	vr_stop(ifp, 0);
 
 	/* Reset the Rhine to a known state. */
 	vr_reset(sc);
@@ -1157,7 +1115,8 @@ vr_init(sc)
 				vr_rxdrain(sc);
 				goto out;
 			}
-		}
+		} else
+			VR_INIT_RXDESC(sc, i);
 	}
 	sc->vr_rxptr = 0;
 
@@ -1176,7 +1135,7 @@ vr_init(sc)
 	/* Program the multicast filter, if necessary. */
 	vr_setmulti(sc);
 
-	/* Give the transmit and recieve rings to the Rhine. */
+	/* Give the transmit and receive rings to the Rhine. */
 	CSR_WRITE_4(sc, VR_RXADDR, VR_CDRXADDR(sc, sc->vr_rxptr));
 	CSR_WRITE_4(sc, VR_TXADDR, VR_CDTXADDR(sc, VR_NEXTTX(sc->vr_txlast)));
 
@@ -1244,73 +1203,18 @@ vr_ioctl(ifp, command, data)
 {
 	struct vr_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
-	struct ifaddr *ifa = (struct ifaddr *)data;
 	int s, error = 0;
 
 	s = splnet();
 
 	switch (command) {
-	case SIOCSIFADDR:
-		ifp->if_flags |= IFF_UP;
-
-		switch (ifa->ifa_addr->sa_family) {
-#ifdef INET
-		case AF_INET:
-			if ((error = vr_init(sc)) != 0)
-				break;
-			arp_ifinit(ifp, ifa);
-			break;
-#endif /* INET */
-		default:
-			error = vr_init(sc);
-			break;
-		}
+	case SIOCGIFMEDIA:
+	case SIOCSIFMEDIA:
+		error = ifmedia_ioctl(ifp, ifr, &sc->vr_mii.mii_media, command);
 		break;
 
-	case SIOCGIFADDR:
-		bcopy((caddr_t) sc->vr_enaddr,
-			(caddr_t) ((struct sockaddr *)&ifr->ifr_data)->sa_data,
-			ETHER_ADDR_LEN);
-		break;
-
-	case SIOCSIFMTU:
-		if (ifr->ifr_mtu > ETHERMTU)
-			error = EINVAL;
-		else
-			ifp->if_mtu = ifr->ifr_mtu;
-		break;
-
-	case SIOCSIFFLAGS:
-		if ((ifp->if_flags & IFF_UP) == 0 &&
-		    (ifp->if_flags & IFF_RUNNING) != 0) {
-			/*
-			 * If interface is marked down and it is running, then
-			 * stop it.
-			 */
-			vr_stop(sc, 1);
-		} else if ((ifp->if_flags & IFF_UP) != 0 &&
-			   (ifp->if_flags & IFF_RUNNING) == 0) {
-			/*
-			 * If interface is marked up and it is stopped, then
-			 * start it.
-			 */
-			error = vr_init(sc);
-		} else if ((ifp->if_flags & IFF_UP) != 0) {
-			/*
-			 * Reset the interface to pick up changes in any other
-			 * flags that affect the hardware state.
-			 */
-			error = vr_init(sc);
-		}
-		break;
-
-	case SIOCADDMULTI:
-	case SIOCDELMULTI:
-		if (command == SIOCADDMULTI)
-			error = ether_addmulti(ifr, &sc->vr_ec);
-		else
-			error = ether_delmulti(ifr, &sc->vr_ec);
-
+	default:
+		error = ether_ioctl(ifp, command, data);
 		if (error == ENETRESET) {
 			/*
 			 * Multicast list has changed; set the hardware filter
@@ -1319,15 +1223,6 @@ vr_ioctl(ifp, command, data)
 			vr_setmulti(sc);
 			error = 0;
 		}
-		break;
-
-	case SIOCGIFMEDIA:
-	case SIOCSIFMEDIA:
-		error = ifmedia_ioctl(ifp, ifr, &sc->vr_mii.mii_media, command);
-		break;
-
-	default:
-		error = EINVAL;
 		break;
 	}
 
@@ -1344,7 +1239,7 @@ vr_watchdog(ifp)
 	printf("%s: device timeout\n", sc->vr_dev.dv_xname);
 	ifp->if_oerrors++;
 
-	(void) vr_init(sc);
+	(void) vr_init(ifp);
 }
 
 /*
@@ -1389,12 +1284,12 @@ vr_rxdrain(sc)
  * transmit lists.
  */
 static void
-vr_stop(sc, drain)
-	struct vr_softc *sc;
-	int drain;
-{
-	struct vr_descsoft *ds;
+vr_stop(ifp, disable)
 	struct ifnet *ifp;
+	int disable;
+{
+	struct vr_softc *sc = ifp->if_softc;
+	struct vr_descsoft *ds;
 	int i;
 
 	/* Cancel one second timer. */
@@ -1424,12 +1319,8 @@ vr_stop(sc, drain)
 		}
 	}
 
-	if (drain) {
-		/*
-		 * Release the receive buffers.
-		 */
+	if (disable)
 		vr_rxdrain(sc);
-	}
 
 	/*
 	 * Mark the interface down and cancel the watchdog timer.
@@ -1485,7 +1376,7 @@ vr_shutdown(arg)
 {
 	struct vr_softc *sc = (struct vr_softc *)arg;
 
-	vr_stop(sc, 1);
+	vr_stop(&sc->vr_ec.ec_if, 1);
 }
 
 /*
@@ -1594,8 +1485,7 @@ vr_attach(parent, self, aux)
 		}
 
 		/* Allocate interrupt */
-		if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-				pa->pa_intrline, &intrhandle)) {
+		if (pci_intr_map(pa, &intrhandle)) {
 			printf("%s: couldn't map interrupt\n",
 				sc->vr_dev.dv_xname);
 			return;
@@ -1635,7 +1525,7 @@ vr_attach(parent, self, aux)
 	printf("%s: Ethernet address: %s\n",
 		sc->vr_dev.dv_xname, ether_sprintf(eaddr));
 
-	bcopy(eaddr, sc->vr_enaddr, ETHER_ADDR_LEN);
+	memcpy(sc->vr_enaddr, eaddr, ETHER_ADDR_LEN);
 
 	sc->vr_dmat = pa->pa_dmat;
 
@@ -1710,8 +1600,11 @@ vr_attach(parent, self, aux)
 	ifp->if_ioctl = vr_ioctl;
 	ifp->if_start = vr_start;
 	ifp->if_watchdog = vr_watchdog;
-	bcopy(sc->vr_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	ifp->if_init = vr_init;
+	ifp->if_stop = vr_stop;
 	IFQ_SET_READY(&ifp->if_snd);
+
+	strcpy(ifp->if_xname, sc->vr_dev.dv_xname);
 
 	/*
 	 * Initialize MII/media info.
@@ -1734,11 +1627,6 @@ vr_attach(parent, self, aux)
 	 */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->vr_enaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&sc->vr_ec.ec_if.if_bpf,
-		ifp, DLT_EN10MB, sizeof (struct ether_header));
-#endif
 
 	sc->vr_ats = shutdownhook_establish(vr_shutdown, sc);
 	if (sc->vr_ats == NULL)

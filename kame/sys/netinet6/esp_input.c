@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.71 2002/09/11 03:45:31 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.72 2002/09/25 11:41:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -419,7 +419,11 @@ noreplaycheck:
 			goto bad;
 		}
 
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		if (IF_QFULL(&ipintrq)) {
 			ipsecstat.in_inval++;
 			splx(s);
@@ -853,7 +857,11 @@ noreplaycheck:
 			goto bad;
 		}
 
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		if (IF_QFULL(&ip6intrq)) {
 			ipsec6stat.in_inval++;
 			splx(s);

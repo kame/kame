@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.13 2000/02/21 20:38:48 erh Exp $	*/
+/*	$NetBSD: intr.c,v 1.17 2001/04/12 18:26:26 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -40,18 +40,10 @@
  * Link and dispatch interrupts.
  */
 
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ccitt.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/vmmeter.h>
-
-#include <vm/vm.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -67,6 +59,7 @@
 #define	ISRLOC	0x18
 
 static int intr_noint __P((void *));
+void netintr __P((void));
 
 static int ((*intr_func[NISR]) __P((void *))) = {
 	intr_noint,
@@ -288,26 +281,13 @@ intr_noint(arg)
 	return 0;
 }
 
-/*
- * XXX Why on earth isn't this in a common file?!
- */
-void	netintr __P((void));
-void	arpintr __P((void));
-void	atintr __P((void));
-void	ipintr __P((void));
-void	ip6intr __P((void));
-void	nsintr __P((void));
-void	clnlintr __P((void));
-void	ccittintr __P((void));
-void	pppintr __P((void));
-
 void
 netintr()
 {
 	int s, isr;
 
 	for (;;) {
-		s = splimp();
+		s = splhigh();
 		isr = netisr;
 		netisr = 0;
 		splx(s);

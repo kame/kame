@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.95 2000/06/05 23:44:57 jhawk Exp $	*/
+/*	$NetBSD: machdep.c,v 1.115 2002/04/09 13:04:43 leo Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -43,11 +43,8 @@
  */
 
 #include "opt_ddb.h"
-#include "opt_atalk.h"
-#include "opt_inet.h"
-#include "opt_iso.h"
-#include "opt_ns.h"
 #include "opt_compat_netbsd.h"
+#include "opt_mbtype.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -65,16 +62,20 @@
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
 #include <sys/user.h>
-#include <sys/exec.h>            /* for PS_STRINGS */
 #include <sys/vnode.h>
 #include <sys/queue.h>
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
-#include <net/netisr.h>
-#define	MAXMEM	64*1024	/* XXX - from cmap.h */
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
 
+#include <sys/exec.h>
+#if defined(DDB) && defined(__ELF__)
+#include <sys/exec_elf.h>
+#endif
+
+#include <net/netisr.h>
+#undef PS	/* XXX netccitt/pk.h conflict with machine/reg.h? */
+
+#define	MAXMEM	64*1024	/* XXX - from cmap.h */
 #include <uvm/uvm_extern.h>
 
 #include <sys/sysctl.h>
@@ -97,9 +98,13 @@ static void netintr __P((void));
 void	straymfpint __P((int, u_short));
 void	straytrap __P((int, u_short));
 
-vm_map_t exec_map = NULL;  
-vm_map_t mb_map = NULL;
-vm_map_t phys_map = NULL;
+#ifdef _MILANHW_
+void	nmihandler __P((void));
+#endif
+
+struct vm_map *exec_map = NULL;  
+struct vm_map *mb_map = NULL;
+struct vm_map *phys_map = NULL;
 
 caddr_t	msgbufaddr;
 vaddr_t	msgbufpa;
@@ -143,10 +148,17 @@ consinit()
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
 		    msgbufpa + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
 		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+	pmap_update(pmap_kernel());
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
 
 	/*
-	 * Initialize the console before we print anything out.
+	 * Initialize hardware that support various console types like
+	 * the grf and PCI busses.
+	 */
+	config_console();
+
+	/*
+	 * Now pick the best console candidate.
 	 */
 	cninit();
 
@@ -155,7 +167,12 @@ consinit()
 		extern int end;
 		extern int *esym;
 
+#ifndef __ELF__
 		ddb_init(*(int *)&end, ((int *)&end) + 1, esym);
+#else
+		ddb_init((int)esym - (int)&end - sizeof(Elf32_Ehdr),
+			(void *)&end, esym);
+#endif
 	}
         if(boothowto & RB_KDB)
                 Debugger();
@@ -213,9 +230,9 @@ cpu_startup()
 	 */
 	size = MAXBSIZE * nbuf;
 	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
-		    NULL, UVM_UNKNOWN_OFFSET,
+		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
-				UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
+				UVM_ADV_NORMAL, 0)) != 0)
 		panic("startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
@@ -243,13 +260,13 @@ cpu_startup()
 			if (pg == NULL) 
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+			    VM_PROT_READ | VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
 	}
+	pmap_update(kernel_map->pmap);
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
@@ -277,8 +294,7 @@ cpu_startup()
 	 * XXX This is bogus; should just fix KERNBASE and
 	 * XXX VM_MIN_KERNEL_ADDRESS, but not right now.
 	 */
-	if (uvm_map_protect(kernel_map, 0, NBPG, UVM_PROT_NONE, TRUE)
-	    != KERN_SUCCESS)
+	if (uvm_map_protect(kernel_map, 0, NBPG, UVM_PROT_NONE, TRUE) != 0)
 		panic("can't mark page 0 off-limits");
 
 	/*
@@ -289,7 +305,7 @@ cpu_startup()
 	 * XXX of NBPG.
 	 */
 	if (uvm_map_protect(kernel_map, NBPG, m68k_round_page(&etext),
-	    UVM_PROT_READ|UVM_PROT_EXEC, TRUE) != KERN_SUCCESS)
+	    UVM_PROT_READ|UVM_PROT_EXEC, TRUE) != 0)
 		panic("can't protect kernel text");
 
 #ifdef DEBUG
@@ -334,7 +350,7 @@ setregs(p, pack, stack)
 	frame->f_regs[D7] = 0;
 	frame->f_regs[A0] = 0;
 	frame->f_regs[A1] = 0;
-	frame->f_regs[A2] = (int)PS_STRINGS;
+	frame->f_regs[A2] = (int)p->p_psstr;
 	frame->f_regs[A3] = 0;
 	frame->f_regs[A4] = 0;
 	frame->f_regs[A5] = 0;
@@ -367,6 +383,9 @@ identifycpu()
 		case ATARI_HADES:
 				mach = "Atari Hades";
 				break;
+		case ATARI_MILAN:
+				mach = "Atari Milan";
+				break;
 		default:
 				mach = "Atari UNKNOWN";
 				break;
@@ -384,7 +403,7 @@ identifycpu()
 			char		cputxt[30];
 
 			asm(".word 0x4e7a,0x0808;"
-			    "movl d0,%0" : "=d"(pcr) : : "d0");
+			    "movl %%d0,%0" : "=d"(pcr) : : "d0");
 			sprintf(cputxt, "68%s060 rev.%d",
 				pcr & 0x10000 ? "LC/EC" : "", (pcr>>8)&0xff);
 			cpu = cputxt;
@@ -507,7 +526,7 @@ vaddr_t	p;
 	return(p + BYTES_PER_DUMP);
 }
 
-unsigned	dumpmag  = 0x8fca0101;	/* magic number for savecore	*/
+u_int32_t	dumpmag  = 0x8fca0101;	/* magic number for savecore	*/
 int		dumpsize = 0;		/* also for savecore (pages)	*/
 long		dumplo   = 0;		/* (disk blocks)		*/
 
@@ -699,12 +718,14 @@ u_short evec;
 {
 	static int	prev_evec;
 
-	printf("unexpected trap (vector offset %x) from %x\n",evec & 0xFFF, pc);
+	printf("unexpected trap (vector offset 0x%x) from 0x%x\n",
+						evec & 0xFFF, pc);
 
 	if(prev_evec == evec) {
 		delay(1000000);
 		prev_evec = 0;
 	}
+	else prev_evec = evec;
 }
 
 void
@@ -712,7 +733,7 @@ straymfpint(pc, evec)
 int		pc;
 u_short	evec;
 {
-	printf("unexpected mfp-interrupt (vector offset %x) from %x\n",
+	printf("unexpected mfp-interrupt (vector offset 0x%x) from 0x%x\n",
 	       evec & 0xFFF, pc);
 }
 
@@ -731,7 +752,7 @@ softint()
 		siroff(SIR_CLOCK);
 		uvmexp.softs++;
 		/* XXXX softclock(&frame.f_stackadj); */
-		softclock();
+		softclock(NULL);
 	}
 	if (ssir & SIR_CBACK) {
 		siroff(SIR_CBACK);
@@ -778,38 +799,6 @@ badbaddr(addr, size)
 /*
  * Network interrupt handling
  */
-#include "arp.h"
-#include "ppp.h"
-
-#ifdef NPPP
-void	pppintr __P((void));
-#endif
-#ifdef INET
-void	ipintr __P((void));
-#endif
-#ifdef INET6
-void	ip6intr __P((void));
-#endif
-#ifdef NETATALK
-void	atintr __P((void));
-#endif
-#if NARP > 0
-void	arpintr __P((void));
-#endif
-#ifdef NS
-void	nsintr __P((void));
-#endif
-#ifdef ISO
-void	clnlintr __P((void));
-#endif
-#ifdef CCITT
-void	ccittintr __P((void));
-#endif
-#ifdef NATM
-void	natmintr __P((void));
-#endif
-
-
 static void
 netintr()
 {
@@ -991,3 +980,22 @@ cpu_exec_aout_makecmds(p, epp)
 #endif
 	return(error);
 }
+
+#ifdef _MILANHW_
+
+/*
+ * Currently the only source of NMI interrupts on the Milan is the PLX9080.
+ * On access errors to the PCI bus, an NMI is generated. This NMI is shorted
+ * in locore in case of a PCI config cycle to a non-existing address to allow
+ * for probes. On other occaisions, it ShouldNotHappen(TM).
+ * Note: The handler in locore clears the errors, to make further PCI access
+ * possible.
+ */
+void
+nmihandler()
+{
+	extern unsigned long	plx_status;
+
+	printf("nmihandler: plx_status = 0x%08lx\n", plx_status);
+}
+#endif

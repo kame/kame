@@ -1,4 +1,4 @@
-/*	$NetBSD: dp8390.c,v 1.37.2.1 2000/12/31 20:14:43 jhawk Exp $	*/
+/*	$NetBSD: dp8390.c,v 1.49 2001/11/13 13:14:36 lukem Exp $	*/
 
 /*
  * Device driver for National Semiconductor DS8390/WD83C690 based ethernet
@@ -12,6 +12,9 @@
  * the author responsible for the proper functioning of this software, nor does
  * the author assume any responsibility for damages incurred with its use.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dp8390.c,v 1.49 2001/11/13 13:14:36 lukem Exp $");
 
 #include "opt_ipkdb.h"
 #include "opt_inet.h"
@@ -80,21 +83,29 @@ static __inline__ int	dp8390_write_mbuf __P((struct dp8390_softc *,
 
 static int		dp8390_test_mem __P((struct dp8390_softc *));
 
-int	dp8390_mediachange __P((struct ifnet *));
-void	dp8390_mediastatus __P((struct ifnet *, struct ifmediareq *));
-
 int	dp8390_debug = 0;
+
+/*
+ * Standard media init routine for the dp8390.
+ */
+void
+dp8390_media_init(struct dp8390_softc *sc)
+{
+
+	ifmedia_init(&sc->sc_media, 0, dp8390_mediachange, dp8390_mediastatus);
+	ifmedia_add(&sc->sc_media, IFM_ETHER|IFM_MANUAL, 0, NULL);
+	ifmedia_set(&sc->sc_media, IFM_ETHER|IFM_MANUAL);
+}
 
 /*
  * Do bus-independent setup.
  */
 int
-dp8390_config(sc, media, nmedia, defmedia)
+dp8390_config(sc)
 	struct dp8390_softc *sc;
-	int *media, nmedia, defmedia;
 {
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
-	int i, rv;
+	int rv;
 
 	rv = 1;
 
@@ -124,7 +135,7 @@ dp8390_config(sc, media, nmedia, defmedia)
 	dp8390_stop(sc);
 
 	/* Initialize ifnet structure. */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = dp8390_start;
 	ifp->if_ioctl = dp8390_ioctl;
@@ -132,18 +143,14 @@ dp8390_config(sc, media, nmedia, defmedia)
 		ifp->if_watchdog = dp8390_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
+
+	/* Print additional info when attached. */
+	printf("%s: Ethernet address %s\n", sc->sc_dev.dv_xname,
+	    ether_sprintf(sc->sc_enaddr));
 
 	/* Initialize media goo. */
-	ifmedia_init(&sc->sc_media, 0, dp8390_mediachange, dp8390_mediastatus);
-	if (media != NULL) {
-		for (i = 0; i < nmedia; i++)
-			ifmedia_add(&sc->sc_media, media[i], 0, NULL);
-		ifmedia_set(&sc->sc_media, defmedia);
-	} else {
-		ifmedia_add(&sc->sc_media, IFM_ETHER|IFM_MANUAL, 0, NULL);
-		ifmedia_set(&sc->sc_media, IFM_ETHER|IFM_MANUAL);
-	}
-	IFQ_SET_READY(&ifp->if_snd);
+	(*sc->sc_media_init)(sc);
 
 	/*
 	 * We can support 802.1Q VLAN-sized frames.
@@ -153,18 +160,11 @@ dp8390_config(sc, media, nmedia, defmedia)
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 
 #if NRND > 0
 	rnd_attach_source(&sc->rnd_source, sc->sc_dev.dv_xname,
 	    RND_TYPE_NET, 0);
 #endif
-
-	/* Print additional info when attached. */
-	printf("%s: Ethernet address %s\n", sc->sc_dev.dv_xname,
-	    ether_sprintf(sc->sc_enaddr));
 
 	/* The attach is successful. */
 	sc->sc_flags |= DP8390_ATTACHED;
@@ -248,6 +248,9 @@ dp8390_stop(sc)
 	while (((NIC_GET(regt, regh,
 	    ED_P0_ISR) & ED_ISR_RST) == 0) && --n)
 		DELAY(1);
+
+	if (sc->stop_card != NULL)
+		(*sc->stop_card)(sc);
 }
 
 /*
@@ -757,7 +760,7 @@ dp8390_intr(arg)
 
 			/*
 			 * Decrement buffer in-use count if not zero (can only
-			 * be zero if a transmitter interrupt occured while not
+			 * be zero if a transmitter interrupt occurred while not
 			 * actually transmitting).
 			 * If data is ready to transmit, start it transmitting,
 			 * otherwise defer until after handling receiver.
@@ -899,8 +902,8 @@ dp8390_ioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else
-				bcopy(ina->x_host.c_host, LLADDR(ifp->if_sadl),
-				    ETHER_ADDR_LEN);
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host, ETHER_ADDR_LEN);
 			/* Set new address. */
 			dp8390_init(sc);
 			break;
@@ -990,7 +993,6 @@ dp8390_read(sc, buf, len)
 {
 	struct ifnet *ifp = &sc->sc_ec.ec_if;
 	struct mbuf *m;
-	struct ether_header *eh;
 
 	/* Pull packet off interface. */
 	m = dp8390_get(sc, buf, len);
@@ -1001,30 +1003,13 @@ dp8390_read(sc, buf, len)
 
 	ifp->if_ipackets++;
 
-	/* We assume that the header fits entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	/*
 	 * Check if there's a BPF listener on this interface.
 	 * If so, hand off the raw packet to bpf.
 	 */
-	if (ifp->if_bpf) {
+	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
-
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-		if ((ifp->if_flags & IFF_PROMISC) &&
-		    (eh->ether_dhost[0] & 1) == 0 &&	/* !mcast and !bcast */
-		    bcmp(eh->ether_dhost, LLADDR(ifp->if_sadl),
-		    sizeof(eh->ether_dhost)) != 0) {
-			m_freem(m);
-			return;
-		}
-	}
 #endif
 
 	(*ifp->if_input)(ifp, m);
@@ -1068,7 +1053,7 @@ dp8390_getmcaf(ec, af)
 		af[i] = 0;
 	ETHER_FIRST_MULTI(step, ec, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi,
 		    sizeof(enm->enm_addrlo)) != 0) {
 			/*
 			 * We must listen to a range of multicast addresses.
@@ -1348,14 +1333,14 @@ dp8390_detach(sc, flags)
 	/* dp8390_disable() checks sc->sc_enabled */
 	dp8390_disable(sc);
 
-	/* Delete all media. */
+	if (sc->sc_media_fini != NULL)
+		(*sc->sc_media_fini)(sc);
+
+	/* Delete all remaining media. */
 	ifmedia_delete_instance(&sc->sc_media, IFM_INST_ANY);
 
 #if NRND > 0
 	rnd_detach_source(&sc->rnd_source);
-#endif
-#if NBPFILTER > 0
-	bpfdetach(ifp);
 #endif
 	ether_ifdetach(ifp);
 	if_detach(ifp);
@@ -1613,7 +1598,7 @@ dp8390_ipkdb_send(kip, buf, l)
 	mb.m_next = NULL;
 	mb.m_pkthdr.len = mb.m_len = l;
 	mtod(&mb, u_char *) = buf;
-	mb.m_flags = M_EXT | M_PKTHDR | M_EOR;
+	mb.m_flags = M_EXT | M_PKTHDR;
 	mb.m_type = MT_DATA;
 
 	l = sc->write_mbuf(sc, &mb,

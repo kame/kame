@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_var.h,v 1.41.4.1 2000/08/26 16:38:33 tron Exp $	*/
+/*	$NetBSD: ip_var.h,v 1.47 2002/05/07 02:59:38 matt Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -100,19 +100,20 @@ struct ipovly {
  * port numbers (which are no longer needed once we've located the
  * tcpcb) are overlayed with an mbuf pointer.
  */
-LIST_HEAD(ipqehead, ipqent);
+TAILQ_HEAD(ipqehead, ipqent);
 struct ipqent {
-	LIST_ENTRY(ipqent) ipqe_q;
+	TAILQ_ENTRY(ipqent) ipqe_q;
 	union {
 		struct ip	*_ip;
 		struct tcpiphdr *_tcp;
 	} _ipqe_u1;
-	struct mbuf	*ipqe_m;	/* mbuf contains packet */
+	struct mbuf	*ipqe_m;	/* point to first mbuf */
+	struct mbuf	*ipre_mlast;	/* point to last mbuf */
 	u_int8_t	ipqe_mff;	/* for IP fragmentation */
 	/*
 	 * The following are used in TCP reassembly
 	 */
-	LIST_ENTRY(ipqent) ipqe_timeq;
+	TAILQ_ENTRY(ipqent) ipqe_timeq;
 	u_int32_t ipqe_seq;
 	u_int32_t ipqe_len;
 	u_int32_t ipqe_flags;
@@ -238,6 +239,7 @@ struct ipflow {
 #define	IP_RETURNMTU		0x4		/* pass back mtu on EMSGSIZE */
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
+#define	IP_MTUDISC		0x0400		/* Path MTU Discovery; set DF */
 
 extern struct ipstat ipstat;		/* ip statistics */
 extern LIST_HEAD(ipqhead, ipq) ipq;	/* ip reass. queue */

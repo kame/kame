@@ -1,4 +1,4 @@
-/*	$NetBSD: in_var.h,v 1.39.4.1 2000/10/17 00:46:09 tv Exp $	*/
+/*	$NetBSD: in_var.h,v 1.44 2002/05/12 20:33:50 matt Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -168,16 +168,16 @@ struct	in_aliasreq {
 
 #define	IN_IFADDR_HASH(x) in_ifaddrhashtbl[(u_long)(x) % IN_IFADDR_HASH_SIZE]
 
-u_long in_ifaddrhash;				/* size of hash table - 1 */
-int	in_ifaddrentries;			/* total number of addrs */
 LIST_HEAD(in_ifaddrhashhead, in_ifaddr);	/* Type of the hash head */
 TAILQ_HEAD(in_ifaddrhead, in_ifaddr);		/* Type of the list head */
 
+extern	u_long in_ifaddrhash;			/* size of hash table - 1 */
+extern	int	in_ifaddrentries;		/* total number of addrs */
 extern  struct in_ifaddrhashhead *in_ifaddrhashtbl;	/* Hash table head */
 extern  struct in_ifaddrhead in_ifaddr;		/* List head (in ip_input) */
 
 extern	struct	ifqueue	ipintrq;		/* ip packet input queue */
-extern	int	inetctlerrmap[];
+extern	const	int	inetctlerrmap[];
 
 
 /*
@@ -191,9 +191,7 @@ extern	int	inetctlerrmap[];
 	/* struct in_addr addr; */ \
 	/* struct in_ifaddr *ia; */ \
 { \
-	for (ia = IN_IFADDR_HASH((addr).s_addr).lh_first; \
-	     ia != NULL; \
-	     ia = ia->ia_hash.le_next) { \
+	LIST_FOREACH(ia, &IN_IFADDR_HASH((addr).s_addr), ia_hash) { \
 		if (in_hosteq(ia->ia_addr.sin_addr, (addr)) && \
 		    (ia->ia_ifp->if_flags & IFF_UP) != 0) \
 			break; \
@@ -212,7 +210,7 @@ extern	int	inetctlerrmap[];
 	struct in_addr addr; \
 	addr = ia->ia_addr.sin_addr; \
 	do { \
-		ia = ia->ia_hash.le_next; \
+		ia = LIST_NEXT(ia, ia_hash); \
 	} while ((ia != NULL) && !in_hosteq(ia->ia_addr.sin_addr, addr)); \
 }
 
@@ -240,10 +238,10 @@ extern	int	inetctlerrmap[];
 { \
 	struct ifaddr *ifa; \
 \
-	for (ifa = (ifp)->if_addrlist.tqh_first; \
-	    ifa != NULL && ifa->ifa_addr->sa_family != AF_INET; \
-	    ifa = ifa->ifa_list.tqe_next) \
-		continue; \
+	TAILQ_FOREACH(ifa, &(ifp)->if_addrlist, ifa_list) { \
+		if (ifa->ifa_addr->sa_family == AF_INET) \
+			break; \
+	} \
 	(ia) = ifatoia(ifa); \
 }
 #endif
@@ -307,9 +305,9 @@ struct in_multistep {
 	if (ia == NULL) \
 		(inm) = NULL; \
 	else \
-		for ((inm) = ia->ia_multiaddrs.lh_first; \
+		for ((inm) = LIST_FIRST(&ia->ia_multiaddrs); \
 		    (inm) != NULL && !in_hosteq((inm)->inm_addr, (addr)); \
-		     (inm) = inm->inm_list.le_next) \
+		     (inm) = LIST_NEXT((inm), inm_list)) \
 			 continue; \
 }
 
@@ -325,13 +323,13 @@ struct in_multistep {
 	/* struct in_multi *inm; */ \
 { \
 	if (((inm) = (step).i_inm) != NULL) \
-		(step).i_inm = (inm)->inm_list.le_next; \
+		(step).i_inm = LIST_NEXT((inm), inm_list); \
 	else \
 		while ((step).i_ia != NULL) { \
-			(inm) = (step).i_ia->ia_multiaddrs.lh_first; \
-			(step).i_ia = (step).i_ia->ia_list.tqe_next; \
+			(inm) = LIST_FIRST(&(step).i_ia->ia_multiaddrs); \
+			(step).i_ia = TAILQ_NEXT((step).i_ia, ia_list); \
 			if ((inm) != NULL) { \
-				(step).i_inm = (inm)->inm_list.le_next; \
+				(step).i_inm = LIST_NEXT((inm), inm_list); \
 				break; \
 			} \
 		} \
@@ -341,7 +339,7 @@ struct in_multistep {
 	/* struct in_multistep step; */ \
 	/* struct in_multi *inm; */ \
 { \
-	(step).i_ia = in_ifaddr.tqh_first; \
+	(step).i_ia = TAILQ_FIRST(&in_ifaddr); \
 	(step).i_inm = NULL; \
 	IN_NEXT_MULTI((step), (inm)); \
 }

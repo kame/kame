@@ -1,4 +1,4 @@
-/*	$NetBSD: if_hippisubr.c,v 1.5.4.1 2000/10/17 01:23:49 tv Exp $	*/
+/*	$NetBSD: if_hippisubr.c,v 1.14.10.1 2002/06/15 01:06:54 lukem Exp $	*/
 
 /*
  * Copyright (c) 1982, 1989, 1993
@@ -33,7 +33,12 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_hippisubr.c,v 1.14.10.1 2002/06/15 01:06:54 lukem Exp $");
+
 #include "opt_inet.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -54,6 +59,10 @@
 #include <net/if_llc.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #include <net/if_hippi.h>
 
@@ -205,7 +214,7 @@ hippi_output(ifp, m0, dst, rt0)
 	if (m == 0)
 		senderr(ENOBUFS);
 	cci = mtod(m, u_int32_t *);
-	bzero(cci, sizeof(struct hippi_header) + 8);
+	memset(cci, 0, sizeof(struct hippi_header) + 8);
 	cci[0] = 0;
 	cci[1] = ifield;
 	hh = (struct hippi_header *) &cci[2];
@@ -222,7 +231,7 @@ hippi_output(ifp, m0, dst, rt0)
 	}
 
 	len = m->m_pkthdr.len;
-	s = splimp();
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
@@ -311,7 +320,7 @@ hippi_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -339,7 +348,7 @@ hippi_ip_input(ifp, m)
 	schednetisr(NETISR_IP);
 	inq = &ipintrq;
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -349,7 +358,6 @@ hippi_ip_input(ifp, m)
 }
 #endif
 
-
 /*
  * Perform common duties while attaching to interface list
  */
@@ -358,19 +366,20 @@ hippi_ifattach(ifp, lla)
 	struct ifnet *ifp;
 	caddr_t lla;
 {
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_HIPPI;
 	ifp->if_addrlen = 6;  /* regular 802.3 MAC address */
 	ifp->if_hdrlen = sizeof(struct hippi_header) + 8; /* add CCI */
+	ifp->if_dlt = DLT_HIPPI;
 	ifp->if_mtu = HIPPIMTU;
 	ifp->if_output = hippi_output;
 	ifp->if_input = hippi_input;
 	ifp->if_baudrate = IF_Mbps(800);	/* XXX double-check */
-	if ((sdl = ifp->if_sadl) &&
-	    sdl->sdl_family == AF_LINK) {
-		sdl->sdl_type = IFT_HIPPI;
-		sdl->sdl_alen = ifp->if_addrlen;
-		bcopy((caddr_t)lla, LLADDR(sdl), ifp->if_addrlen);
-	}
+
+	if_alloc_sadl(ifp);
+	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
+
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_HIPPI, sizeof(struct hippi_header));
+#endif
 }

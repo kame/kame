@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.13 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.14 2002/09/25 11:41:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -1128,11 +1128,15 @@ sctp_inpcb_alloc(struct socket *so)
 	/* Init the timer structure for signature change */
 	callout_init(&inp->sctp_ep.signature_change.timer);
 
-	inp->sctp_tcbhash = hashinit(sctp_pcbtblsize, M_PCB,
-#ifndef __FreeBSD__
-				     M_WAITOK,
+	inp->sctp_tcbhash = hashinit(sctp_pcbtblsize,
+#ifdef __NetBSD__
+	    HASH_LIST,
 #endif
-				     &inp->sctp_hashmark);
+	    M_PCB,
+#ifndef __FreeBSD__
+	    M_WAITOK,
+#endif
+	    &inp->sctp_hashmark);
 	/* now init the actual endpoint default data */
 	m = &inp->sctp_ep;
 
@@ -3232,18 +3236,26 @@ sctp_pcb_init()
 #endif
 #endif
 
-	sctppcbinfo.sctp_ephash = hashinit(hashtblsize, M_PCB,
-#ifndef __FreeBSD__
-					   M_WAITOK,
+	sctppcbinfo.sctp_ephash = hashinit(hashtblsize,
+#ifdef __NetBSD__
+	    HASH_LIST,
 #endif
-					   &sctppcbinfo.hashmark);
+	    M_PCB,
+#ifndef __FreeBSD__
+	    M_WAITOK,
+#endif
+	    &sctppcbinfo.hashmark);
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
-	sctppcbinfo.sctp_tcpephash = hashinit(hashtblsize, M_PCB,
-#ifndef __FreeBSD__
-					      M_WAITOK,
+	sctppcbinfo.sctp_tcpephash = hashinit(hashtblsize,
+#ifdef __NetBSD__
+	    HASH_LIST,
 #endif
-					      &sctppcbinfo.hashtcpmark);
+	    M_PCB,
+#ifndef __FreeBSD__
+	    M_WAITOK,
+#endif
+	    &sctppcbinfo.hashtcpmark);
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 
 	sctppcbinfo.hashtblsize = hashtblsize;
@@ -3267,19 +3279,18 @@ sctp_pcb_init()
 #endif
 #if defined(__NetBSD__)
 	pool_init(&sctppcbinfo.ipi_zone_ep, sizeof(struct sctp_inpcb),
-		  0, 0, 0, "sctp_ep", 0, NULL, NULL, M_PCB);
+		  0, 0, 0, "sctp_ep", NULL);
 
 	pool_init(&sctppcbinfo.ipi_zone_asoc, sizeof(struct sctp_tcb),
-		  0, 0, 0, "sctp_asoc", 0, NULL, NULL, M_PCB);
+		  0, 0, 0, "sctp_asoc", NULL);
 
 	pool_init(&sctppcbinfo.ipi_zone_laddr, sizeof(struct sctp_laddr),
-		  0, 0, 0, "sctp_laddr", 0, NULL, NULL, M_PCB);
+		  0, 0, 0, "sctp_laddr", NULL);
 
 	pool_init(&sctppcbinfo.ipi_zone_raddr, sizeof(struct sctp_nets),
-		  0, 0, 0, "sctp_raddr", 0, NULL, NULL, M_PCB);
-
+		  0, 0, 0, "sctp_raddr", NULL); 
 	pool_init(&sctppcbinfo.ipi_zone_chunk, sizeof(struct sctp_tmit_chunk),
-		  0, 0, 0,"sctp_chunk", 0, NULL, NULL, M_PCB);
+		  0, 0, 0,"sctp_chunk", NULL);
 #endif
 #if defined(__FreeBSD__)
 	sctppcbinfo.ipi_zone_ep = zinit("sctp_ep",

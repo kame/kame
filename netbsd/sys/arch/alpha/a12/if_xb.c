@@ -1,4 +1,4 @@
-/* $NetBSD: if_xb.c,v 1.2 2000/03/13 23:52:25 soren Exp $ */
+/* $NetBSD: if_xb.c,v 1.9 2001/08/20 12:20:04 wiz Exp $ */
 
 /* [Notice revision 2.2]
  * Copyright (c) 1997, 1998 Avalon Computer Systems, Inc.
@@ -74,7 +74,7 @@
 #include "opt_avalon_a12.h"		/* Config options headers */
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: if_xb.c,v 1.2 2000/03/13 23:52:25 soren Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_xb.c,v 1.9 2001/08/20 12:20:04 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -85,7 +85,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_xb.c,v 1.2 2000/03/13 23:52:25 soren Exp $");
 #include <sys/mbuf.h>
 #include <sys/sockio.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -159,7 +159,7 @@ typedef struct ccode_struct {
  * forward the rest of the switch frame.  Obviously, this helps if the second
  * switch word in the frame is the address word for a cascaded switch. (This
  * can be repeated for an arbitrary depth of MSN.) The words aren't quite as
- * wierd as they look: the switch is really lots of narrow switches in an
+ * weird as they look: the switch is really lots of narrow switches in an
  * array, and they don't switch an even number of hex digits.  Also, there is
  * a parity bit on most of the subunits.
  */
@@ -230,11 +230,11 @@ xbattach(parent, self, aux)
 {
 	struct xb_config *ccp;
 
-	bcopy(self->dv_xname, xbi.if_xname, IFNAMSIZ);
+	strcpy(xbi.if_xname, self->dv_xname);
 	xbfound = 1;
 	ccp = &xb_configuration;
 	xb_init_config(ccp, 1);
-	printf(": driver %s mtu %d\n", "$Revision: 1.2 $", xbi.if_mtu);
+	printf(": driver %s mtu %d\n", "$Revision: 1.9 $", xbi.if_mtu);
 }
 
 static void
@@ -359,8 +359,8 @@ int	s = 0;	/* XXX gcc */
 		xb_ibp   += 2;
 		if (xb_intr_rcv_state == XBIR_PKTHDR) {
 			if (XB_DEBUG) {
-				s = splimp();
-				if (s != splimp())
+				s = splnet();
+				if (s != splnet())
 					DIE();
 			}
 		      ++xbi.if_ipackets;
@@ -430,7 +430,7 @@ xb_ioctl(ifp, cmd, data)
 	struct ifaddr *ifa = (struct ifaddr *)data;
 	int s, error = 0;
 
-	s = splimp();
+	s = splnet();
 	switch (cmd) {
 	case SIOCSIFADDR:
 		xbi.if_flags |= IFF_UP;
@@ -552,11 +552,11 @@ xb_output(ifp, m0, dst, rt0)
 		xbaddr = (lladdr[i] & 0xff) - 1;
 		if (!(0 <= xbaddr && xbaddr <= 11))	/* XXX */
 			DIE();		/* 12 or 13 will be OK later */
-		bcopy(&channel[xbaddr].lo64, xbh, 16);
+		memcpy(xbh, &channel[xbaddr].lo64, 16);
 		xbh += 16;
 	}
-	bcopy(&xbo_framesize, xbh, 8);
-	s = splimp();
+	memcpy(xbh, &xbo_framesize, 8);
+	s = splnet();
 	if (IF_QFULL(&ifp->if_snd)) {
 		IF_DROP(&ifp->if_snd);
 	      ++ifp->if_oerrors;
@@ -674,14 +674,14 @@ restart:
 		/* See function intro comment regarding padding */
 		if (leftover_len + len < sizeof leftover) {
 			/* Heh, not even enough to write out */
-			bcopy(blk, XFERADJ(), len);
+			memcpy(XFERADJ(), blk, len);
 			leftover_len += len;
 			return 1;
 		}
 		xfertmp[0] = leftover[0];
 		xfertmp[1] = leftover[1];
 		fillin = sizeof leftover - leftover_len;
-		bcopy(blk, XFERADJ(), fillin);
+		memcpy(XFERADJ(), blk, fillin);
 		blk += fillin;
 		len -= fillin;
 		xb_mcrp_write(xfertmp, 1, 0);
@@ -700,7 +700,7 @@ restart:
 			full = 1;
 		}
 		frag_len &= ~0xf;
-		bcopy(blk, xfertmp, frag_len);
+		memcpy(xfertmp, blk, frag_len);
 		frag_len >>= 4;		/* Round down to switch word size */
 		xb_mcrp_write(xfertmp, frag_len, 0);
 		fifo_free -= frag_len;
@@ -712,7 +712,7 @@ restart:
 			goto restart;
 		}
 	}
-	bcopy(blk, leftover, len);
+	memcpy(leftover, blk, len);
 	leftover_len = len;
 	return 1;
 }
@@ -765,8 +765,6 @@ a12_xbar_setup()
 	xbi.if_flags    = IFF_BROADCAST	/* ha ha */
 		        | IFF_SIMPLEX;
 
-	if_attach(&xbi);
-
 	xbi.if_type     = IFT_A12MPPSWITCH;
 	xbi.if_addrlen  = 32;
 	xbi.if_hdrlen   = 32;
@@ -774,7 +772,10 @@ a12_xbar_setup()
 	xbi.if_output   = xb_output;
 	/* xbi.if_broadcastaddr = (u_int8_t)&xbar_bc_addr; */
 
+	if_attach(&xbi);
+	if_alloc_sadl(&xbi);
+
 #if NBPFILTER > 0
-	bpfattach(&xbi.if_bpf, &xbi, DLT_NULL, 0);
+	bpfattach(&xbi, DLT_NULL, 0);
 #endif
 }

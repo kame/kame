@@ -1,4 +1,4 @@
-/*	$NetBSD: if_fddisubr.c,v 1.33 2000/06/14 05:10:28 mycroft Exp $	*/
+/*	$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,12 +67,18 @@
  *
  * Id: if_fddisubr.c,v 1.15 1997/03/21 22:35:50 thomas Exp
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_fddisubr.c,v 1.43 2001/11/12 23:49:38 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
 #include "opt_llc.h"
 #include "opt_iso.h"
 #include "opt_ns.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -93,6 +99,10 @@
 #include <net/if_llc.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #ifdef INET
 #include <netinet/in.h>
@@ -574,7 +584,7 @@ fddi_output(ifp, m0, dst, rt0)
 		    sizeof(fh->fddi_shost));
 	mflags = m->m_flags;
 	len = m->m_pkthdr.len;
-	s = splimp();
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
@@ -834,7 +844,7 @@ fddi_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -845,25 +855,16 @@ fddi_input(ifp, m)
 /*
  * Perform common duties while attaching to interface list
  */
-#if defined(__NetBSD__)
 void
 fddi_ifattach(ifp, lla)
 	struct ifnet *ifp;
 	caddr_t lla;
-#else
-void
-fddi_ifattach(ifp)
-	struct ifnet *ifp;
-#endif
 {
-#if !defined(__NetBSD__)
-	struct ifaddr *ifa;
-#endif
-	struct sockaddr_dl *sdl;
 
 	ifp->if_type = IFT_FDDI;
 	ifp->if_addrlen = 6;
 	ifp->if_hdrlen = 21;
+	ifp->if_dlt = DLT_FDDI;
 	ifp->if_mtu = FDDIMTU;
 	ifp->if_output = fddi_output;
 	ifp->if_input = fddi_input;
@@ -871,21 +872,18 @@ fddi_ifattach(ifp)
 #ifdef IFF_NOTRAILERS
 	ifp->if_flags |= IFF_NOTRAILERS;
 #endif
-#if defined(__NetBSD__)
-	if ((sdl = ifp->if_sadl) != NULL && sdl->sdl_family == AF_LINK) {
-	    sdl->sdl_type = IFT_FDDI;
-	    sdl->sdl_alen = ifp->if_addrlen;
-	    bcopy(lla, LLADDR(sdl), ifp->if_addrlen);
-	}
+
+	/*
+	 * Update the max_linkhdr
+	 */
+	if (ALIGN(ifp->if_hdrlen) > max_linkhdr)
+		max_linkhdr = ALIGN(ifp->if_hdrlen);
+
+	if_alloc_sadl(ifp);
+	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
+
 	ifp->if_broadcastaddr = fddibroadcastaddr;
-#else
-	for (ifa = ifp->if_addrlist; ifa != NULL; ifa = ifa->ifa_next)
-		if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
-		    sdl->sdl_family == AF_LINK) {
-			sdl->sdl_type = IFT_FDDI;
-			sdl->sdl_alen = ifp->if_addrlen;
-			bcopy(FDDIADDR(ifp), LLADDR(sdl), ifp->if_addrlen);
-			break;
-		}
-#endif
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_FDDI, sizeof(struct fddi_header));
+#endif /* NBPFILTER > 0 */
 }

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.32 2002/09/11 02:34:14 itojun Exp $	*/
+/*	$KAME: if_hif.c,v 1.33 2002/09/25 11:41:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -209,11 +209,11 @@ hifattach(dummy)
 #endif
 		if_attach(&sc->hif_if);
 #if NBPFILTER > 0
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPFATTACH
 		bpfattach(&sc->hif_if, DLT_NULL, sizeof(u_int));
 #else
 		bpfattach(&sc->hif_if.if_bpf, &sc->hif_if, DLT_NULL, sizeof(u_int));
-#endif /* HAVE_OLD_BPF */
+#endif /* HAVE_NEW_BPF */
 #endif /* NBPFILTER > 0 */
 
 		sc->hif_location = HIF_LOCATION_UNKNOWN;

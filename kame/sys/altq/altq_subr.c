@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.14 2002/08/03 08:24:01 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.15 2002/09/25 11:41:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -26,7 +26,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef ALTQ
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #if (__FreeBSD__ != 2)
@@ -200,7 +199,11 @@ altq_enable(ifq)
 	if (ALTQ_IS_ENABLED(ifq))
 		return 0;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	IFQ_PURGE(ifq);
 	ASSERT(ifq->ifq_len == 0);
 	ifq->altq_flags |= ALTQF_ENABLED;
@@ -220,7 +223,11 @@ altq_disable(ifq)
 	if (!ALTQ_IS_ENABLED(ifq))
 		return 0;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	IFQ_PURGE(ifq);
 	ASSERT(ifq->ifq_len == 0);
 	ifq->altq_flags &= ~(ALTQF_ENABLED|ALTQF_CLASSIFY);
@@ -366,7 +373,11 @@ tbr_timeout(arg)
 	int active, s;
 
 	active = 0;
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 #ifdef __FreeBSD__
 #if (__FreeBSD_version < 300000)
 	for (ifp = ifnet; ifp; ifp = ifp->if_next)
@@ -843,7 +854,11 @@ acc_add_filter(classifier, filter, class, phandle)
 	 * add this filter to the filter list.
 	 * filters are ordered from the highest rule number.
 	 */
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	prev = NULL;
 	LIST_FOREACH(tmp, &classifier->acc_filters[i], f_chain) {
 		if (tmp->f_filter.ff_ruleno > afp->f_filter.ff_ruleno)
@@ -872,7 +887,11 @@ acc_delete_filter(classifier, handle)
 	if ((afp = filth_to_filtp(classifier, handle)) == NULL)
 		return (EINVAL);
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	LIST_REMOVE(afp, f_chain);
 	splx(s);
 
@@ -896,7 +915,11 @@ acc_discard_filters(classifier, class, all)
 	struct acc_filter *afp;
 	int	i, s;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	for (i = 0; i < ACC_FILTER_TABLESIZE; i++) {
 		do {
 			LIST_FOREACH(afp, &classifier->acc_filters[i], f_chain)
@@ -1596,5 +1619,3 @@ init_machclk(void)
 	printf("altq: emulate %uHz cpu clock\n", machclk_freq);
 }
 #endif /* !i386 && !alpha */
-
-#endif /* ALTQ */

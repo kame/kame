@@ -1,4 +1,4 @@
-/*	$NetBSD: if_eon.c,v 1.29 2000/03/30 13:10:11 augustss Exp $	*/
+/*	$NetBSD: if_eon.c,v 1.36.10.1 2002/07/30 02:33:21 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -70,6 +70,9 @@ SOFTWARE.
  * for the nsel
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_eon.c,v 1.36.10.1 2002/07/30 02:33:21 lukem Exp $");
+
 #include "opt_eon.h"
 
 #ifdef EON
@@ -84,7 +87,6 @@ SOFTWARE.
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/errno.h>
-#include <sys/types.h>
 
 #include <machine/cpu.h>	/* XXX for setsoftnet().  This must die. */
 
@@ -161,6 +163,7 @@ eonattach()
 	ifp->if_hdrlen = EONIPLEN;
 	ifp->if_flags = IFF_BROADCAST;
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 	eonioctl(ifp, SIOCSIFADDR, (caddr_t) ifp->if_addrlist.tqh_first);
 	eon_llinfo.el_qhdr.link =
 		eon_llinfo.el_qhdr.rlink = &(eon_llinfo.el_qhdr);
@@ -190,7 +193,7 @@ eonioctl(ifp, cmd, data)
 	u_long          cmd;
 	caddr_t data;
 {
-	int             s = splimp();
+	int             s = splnet();
 	int    error = 0;
 
 #ifdef ARGO_DEBUG
@@ -314,7 +317,7 @@ eonrtrequest(cmd, rt, info)
 		el->el_rt = rt;
 		break;
 	}
-	if (info || (gate = info->rti_info[RTAX_GATEWAY]))	/*XXX*/
+	if (info && (gate = info->rti_info[RTAX_GATEWAY]))	/*XXX*/
 		switch (gate->sa_family) {
 		case AF_LINK:
 #define SDL(x) ((struct sockaddr_dl *)x)
@@ -563,7 +566,7 @@ eoninput(m, va_alist)
 		}
 #endif
 		ifq = &clnlintrq;
-		s = splimp();
+		s = splnet();
 		if (IF_QFULL(ifq)) {
 			IF_DROP(ifq);
 			m_freem(m);

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_arcsubr.c,v 1.31 2000/04/12 10:36:38 itojun Exp $	*/
+/*	$NetBSD: if_arcsubr.c,v 1.39 2002/03/05 04:12:59 itojun Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Ignatios Souvatzis
@@ -37,7 +37,13 @@
  *       @(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
  *
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_arcsubr.c,v 1.39 2002/03/05 04:12:59 itojun Exp $");
+
 #include "opt_inet.h"
+
+#include "bpfilter.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,6 +66,10 @@
 #include <net/if_arc.h>
 #include <net/if_arp.h>
 #include <net/if_ether.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #ifdef INET
 #include <netinet/in.h>
@@ -294,7 +304,7 @@ arc_output(ifp, m0, dst, rt0)
 			ah->arc_seqid = ac->ac_seqid;
 
 			len = m->m_pkthdr.len;
-			s = splimp();
+			s = splnet();
 			/*
 			 * Queue message on interface, and start output if 
 			 * interface not yet active.
@@ -356,7 +366,7 @@ arc_output(ifp, m0, dst, rt0)
 	}
 
 	len = m->m_pkthdr.len;
-	s = splimp();
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
@@ -627,7 +637,7 @@ arc_input(ifp, m)
 		return;
 	}
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		m_freem(m);
@@ -661,13 +671,8 @@ arc_storelladdr(ifp, lla)
 	struct ifnet *ifp;
 	u_int8_t lla;
 {
-	struct sockaddr_dl *sdl;
-	if ((sdl = ifp->if_sadl) &&
-	   sdl->sdl_family == AF_LINK) {
-		sdl->sdl_type = IFT_ARCNET;
-		sdl->sdl_alen = ifp->if_addrlen;
-		*(LLADDR(sdl)) = lla;
-	}
+
+	*(LLADDR(ifp->if_sadl)) = lla;
 	ifp->if_mtu = ARC_PHDS_MAXMTU;
 }
 
@@ -684,6 +689,7 @@ arc_ifattach(ifp, lla)
 	ifp->if_type = IFT_ARCNET;
 	ifp->if_addrlen = 1;
 	ifp->if_hdrlen = ARC_HDRLEN;
+	ifp->if_dlt = DLT_ARCNET;
 	if (ifp->if_flags & IFF_BROADCAST)
 		ifp->if_flags |= IFF_MULTICAST|IFF_ALLMULTI;
 	if (ifp->if_flags & IFF_LINK0 && arc_ipmtu > ARC_PHDS_MAXMTU)
@@ -701,7 +707,12 @@ arc_ifattach(ifp, lla)
 		   ifp->if_xname, ifp->if_xname); 
 	}
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 	arc_storelladdr(ifp, lla);
 
 	ifp->if_broadcastaddr = &arcbroadcastaddr;
+
+#if NBPFILTER > 0
+	bpfattach(ifp, DLT_ARCNET, ARC_HDRLEN);
+#endif
 }

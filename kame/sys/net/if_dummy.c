@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.16 2002/06/04 22:10:58 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.17 2002/09/25 11:41:21 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -182,7 +182,7 @@ dummyattach(dummy)
 		ifp->if_addrlen = 0;
 		if_attach(ifp);
 #if NBPFILTER > 0
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPFATTACH
 		bpfattach(ifp, DLT_NULL, sizeof(u_int));
 #else
 		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int));
@@ -227,7 +227,7 @@ dummyoutput(ifp, m, dst, rt)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPF
 		bpf_mtap(ifp, &m0);
 #else
 		bpf_mtap(ifp->if_bpf, &m0);
@@ -287,7 +287,11 @@ dummyoutput(ifp, m, dst, rt)
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);

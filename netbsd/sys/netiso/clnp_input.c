@@ -1,4 +1,4 @@
-/*	$NetBSD: clnp_input.c,v 1.20 2000/03/30 13:10:06 augustss Exp $	*/
+/*	$NetBSD: clnp_input.c,v 1.25 2002/05/12 21:30:35 matt Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -62,6 +62,9 @@ SOFTWARE.
  * ARGO Project, Computer Sciences Dept., University of Wisconsin - Madison
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: clnp_input.c,v 1.25 2002/05/12 21:30:35 matt Exp $");
+
 #include "opt_iso.h"
 
 #include <sys/param.h>
@@ -105,6 +108,9 @@ int             clnpqmaxlen = IFQ_MAXLEN;	/* RAH? why is this a
 void            x25esis_input();
 #endif
 #endif				/* ISO_X25ESIS */
+struct iso_ifaddrhead iso_ifaddr = TAILQ_HEAD_INITIALIZER(iso_ifaddr);
+struct ifqueue  clnlintrq;
+struct clnp_stat clnp_stat;
 
 /*
  * FUNCTION:		clnp_init
@@ -142,8 +148,6 @@ clnp_init()
 	clnl_protox[ISO8473_CLNP].clnl_input = clnp_input;
 
 	clnlintrq.ifq_maxlen = clnpqmaxlen;
-
-	TAILQ_INIT(&iso_ifaddr);
 }
 
 /*
@@ -171,7 +175,7 @@ clnlintr()
 	 *	Get next datagram off clnl input queue
 	 */
 next:
-	s = splimp();
+	s = splnet();
 	/* IF_DEQUEUESNPAHDR(&clnlintrq, m, sh); */
 	IF_DEQUEUE(&clnlintrq, m);
 	splx(s);

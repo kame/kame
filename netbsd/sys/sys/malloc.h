@@ -1,4 +1,4 @@
-/*	$NetBSD: malloc.h,v 1.51.2.1 2000/06/24 23:53:09 thorpej Exp $	*/
+/*	$NetBSD: malloc.h,v 1.77.10.1 2002/07/21 03:35:56 lukem Exp $	*/
 
 /*
  * Copyright (c) 1987, 1993
@@ -38,25 +38,23 @@
 #ifndef _SYS_MALLOC_H_
 #define	_SYS_MALLOC_H_
 
-#if defined(_KERNEL) && !defined(_LKM)
+#if defined(_KERNEL_OPT)
 #include "opt_kmemstats.h"
 #include "opt_malloclog.h"
+#include "opt_malloc_debug.h"
 #include "opt_lockdebug.h"
 #endif
 
 /*
- * XXX
- */
-#define splmem splimp
-
-/*
  * flags to malloc
  */
-#define	M_WAITOK	0x0000
-#define	M_NOWAIT	0x0001
-
+#define	M_WAITOK	0x0000	/* can wait for resources */
+#define	M_NOWAIT	0x0001	/* do not wait for resources */
+#define	M_ZERO		0x0002	/* zero the allocation */
+#define	M_CANFAIL	0x0004	/* can fail if requested memory can't ever
+				 * be allocated */
 /*
- * Types of memory to be allocated
+ * Types of memory to be allocated (don't forget to update malloc.9)
  */
 #define	M_FREE		0	/* should be on free list */
 #define	M_MBUF		1	/* mbuf */
@@ -126,56 +124,76 @@
 #define	M_MISCFSNODE	65	/* miscfs vnode private part */
 #define	M_ADOSFSMNT	66	/* adosfs mount structures */
 #define	M_ADOSFSNODE	67	/* adosfs vnode private part */
-#define	M_ANODE		68	/* adosfs anode structures and tables. */
+#define	M_ANODE		68	/* adosfs anode structures and tables */
 #define	M_IPQ		69	/* IP packet queue entry */
 #define	M_AFS		70	/* Andrew File System */
 #define	M_ADOSFSBITMAP	71	/* adosfs bitmap */
 #define	M_NFSRVDESC	72	/* NFS server descriptor */
 #define	M_NFSDIROFF	73	/* NFS directory cookies */
 #define	M_NFSBIGFH	74	/* NFS big filehandle */
-#define M_EXT2FSNODE	75	/* EXT2FS vnode private part */
-#define M_VMSWAP	76	/* VM swap structures */
-#define M_VMPAGE	77	/* VM page structures */
-#define M_VMPBUCKET	78	/* VM page buckets */
+#define	M_EXT2FSNODE	75	/* EXT2FS vnode private part */
+#define	M_VMSWAP	76	/* VM swap structures */
+#define	M_VMPAGE	77	/* VM page structures */
+#define	M_VMPBUCKET	78	/* VM page buckets */
 /*
  * Why are 79-81 empty?
  */
-#define M_UVMAMAP	82	/* UVM amap and related structs */
-#define M_UVMAOBJ	83	/* UVM aobj and related structs */
+#define	M_UVMAMAP	82	/* UVM amap and related structs */
+#define	M_UVMAOBJ	83	/* UVM aobj and related structs */
 #define	M_TEMP		84	/* misc temporary data buffers */
 #define	M_DMAMAP	85	/* bus_dma(9) structures */
 #define	M_IPFLOW	86	/* IP flow entries */
 #define	M_USB		87	/* USB general */
 #define	M_USBDEV	88	/* USB device driver */
 #define	M_POOL		89	/* memory pool structs */
-#define	M_CODA		90	/* Coda file system structures and tables. */
-#define	M_FILECOREMNT	91	/* Filcore FS mount structures */
-#define	M_FILECORENODE	92	/* Filcore FS vnode private part */
+#define	M_CODA		90	/* Coda file system structures and tables */
+#define	M_FILECOREMNT	91	/* Filecore FS mount structures */
+#define	M_FILECORENODE	92	/* Filecore FS vnode private part */
 #define	M_RAIDFRAME	93	/* RAIDframe structures */
-#define M_USBHC		94	/* USB host controller */
+#define	M_USBHC		94	/* USB host controller */
 #define	M_SECA		95	/* security associations, key management */
 #define	M_IP6OPT	96	/* IPv6 options */
 #define	M_IP6NDP	97	/* IPv6 Neighbour Discovery */
 #define	M_NTFS		98	/* Windows NT file system structures */
-#define M_PAGEDEP	99	/* File page dependencies */
-#define M_INODEDEP	100	/* Inode dependencies */
-#define M_NEWBLK	101	/* New block allocation */
-#define M_BMSAFEMAP	102	/* Block or frag allocated from cyl group map */
-#define M_ALLOCDIRECT	103	/* Block or frag dependency for an inode */
-#define M_INDIRDEP	104	/* Indirect block dependencies */
-#define M_ALLOCINDIR	105	/* Block dependency for an indirect block */
-#define M_FREEFRAG	106	/* Previously used frag for an inode */
-#define M_FREEBLKS	107	/* Blocks freed from an inode */
-#define M_FREEFILE	108	/* Inode deallocated */
-#define M_DIRADD	109	/* New directory entry */
-#define M_MKDIR		110	/* New directory */
-#define M_DIRREM	111 	/* Directory entry deleted */
+#define	M_PAGEDEP	99	/* File page dependencies */
+#define	M_INODEDEP	100	/* Inode dependencies */
+#define	M_NEWBLK	101	/* New block allocation */
+#define	M_BMSAFEMAP	102	/* Block or frag allocated from cyl group map */
+#define	M_ALLOCDIRECT	103	/* Block or frag dependency for an inode */
+#define	M_INDIRDEP	104	/* Indirect block dependencies */
+#define	M_ALLOCINDIR	105	/* Block dependency for an indirect block */
+#define	M_FREEFRAG	106	/* Previously used frag for an inode */
+#define	M_FREEBLKS	107	/* Blocks freed from an inode */
+#define	M_FREEFILE	108	/* Inode deallocated */
+#define	M_DIRADD	109	/* New directory entry */
+#define	M_MKDIR		110	/* New directory */
+#define	M_DIRREM	111 	/* Directory entry deleted */
 #define	M_IP6RR		112	/* IPv6 Router Renumbering Prefix */
 #define	M_RR_ADDR	113	/* IPv6 Router Renumbering Ifid */
-#define M_SOFTINTR	114	/* Softinterrupt structures */
-#define	M_NATPT		115	/* Network Address Translation - Protocol Translation */
-#define	M_MSFILTER	116	/* Multicast Source Filters */
-#define	M_LAST		117	/* Must be last type + 1 */
+#define	M_SOFTINTR	114	/* Softinterrupt structures */
+#define	M_EMULDATA	115	/* Per-process emulation data */
+#define	M_1394CTL	116	/* IEEE 1394 control structures */
+#define	M_1394DATA	117	/* IEEE 1394 data buffers */
+#define	M_PIPE		118	/* Pipe structures */
+#define	M_AGP		119	/* AGP memory */
+#define	M_PROP		120	/* Kernel properties structures */
+#define	M_NEWDIRBLK	121	/* Unclaimed new dir block (softdeps) */
+#define	M_SMBIOD	122	/* SMB network id daemon */
+#define	M_SMBCONN	123	/* SMB connection */
+#define	M_SMBRQ		124	/* SMB request */
+#define	M_SMBDATA	125	/* Misc netsmb data */
+#define	M_SMBSTR	126	/* netsmb string data */
+#define	M_SMBTEMP	127	/* Temp netsmb data */
+#define	M_ICONV		128	/* ICONV data */
+#define	M_SMBNODE	129	/* SMBFS node */
+#define	M_SMBNODENAME	130	/* SMBFS node name */
+#define	M_SMBFSDATA	131	/* SMBFS private data */
+#define	M_SMBFSHASH	132	/* SMBFS hash table */
+#define	M_SA		133	/* Scheduler activations */
+#define	M_MSFILTER	134	/* Multicast Source Filters */
+#define	M_LAST		135	/* Must be last type + 1 */
+
+/* added something?  don't forget to update malloc.9 */
 
 #define	INITKMEMNAMES { \
 	"free",		/* 0 M_FREE */ \
@@ -293,21 +311,39 @@
 	"ip6rr",	/* 112 M_IP6RR */ \
 	"rp_addr",	/* 113 M_RR_ADDR */ \
 	"softintr",	/* 114 M_SOFTINTR */ \
-	"natpt",	/* 115 M_NATPT */ \
-	"msfilter",	/* 116 M_MSFILTER */ \
-	NULL,		/* 117 */ \
+	"emuldata",	/* 115 M_EMULDATA */ \
+	"1394ctl",	/* 116 M_1394CTL */ \
+	"1394data",	/* 117 M_1394DATA */ \
+	"pipe",		/* 118 M_PIPE */ \
+	"AGP",		/* 119 M_AGP */ \
+	"prop",		/* 120 M_PROP */ \
+	"newdirblk",	/* 121 M_NEWDIRBLK */ \
+	"smbiod",	/* 122 M_SMBIOD */ \
+	"smbconn",	/* 123 M_SMBCONN */ \
+	"smbrq",	/* 124 M_SMBRQ */ \
+	"smbdata",	/* 125 M_SMBDATA */ \
+	"smbstr",	/* 126 M_SMBDATA */ \
+	"smbtemp",	/* 127 M_SMBTEMP */ \
+	"iconv",	/* 128 M_ICONV */ \
+	"smbnode",	/* 129 M_SMBNODE */ \
+	"smbnodename",	/* 130 M_SMBNODENAME */ \
+	"smbfsdata",	/* 131 M_SMBFSDATA */ \
+	"smbfshash",	/* 132 M_SMBFSHASH */ \
+	"sa",		/* 133 M_SA */ \
+	"msfilter",	/* 134 M_MSFILTER */ \
+	NULL,		/* 135 */ \
 }
 
 struct kmemstats {
-	long	ks_inuse;	/* # of packets of this type currently in use */
-	long	ks_calls;	/* total packets of this type ever allocated */
-	long 	ks_memuse;	/* total memory held in bytes */
+	u_long	ks_inuse;	/* # of packets of this type currently in use */
+	u_long	ks_calls;	/* total packets of this type ever allocated */
+	u_long 	ks_memuse;	/* total memory held in bytes */
 	u_short	ks_limblocks;	/* number of times blocked for hitting limit */
 	u_short	ks_mapblocks;	/* number of times blocked for kernel map */
-	long	ks_maxused;	/* maximum number ever used */
-	long	ks_limit;	/* most that are allowed to exist */
-	long	ks_size;	/* sizes of this thing that are allocated */
-	long	ks_spare;
+	u_long	ks_maxused;	/* maximum number ever used */
+	u_long	ks_limit;	/* most that are allowed to exist */
+	u_long	ks_size;	/* sizes of this thing that are allocated */
+	u_long	ks_spare;
 };
 
 /*
@@ -383,62 +419,75 @@ struct kmembuckets {
  * Macro versions for the usual cases of malloc/free
  */
 #if defined(KMEMSTATS) || defined(DIAGNOSTIC) || defined(_LKM) || \
-    defined(MALLOCLOG) || defined(LOCKDEBUG)
+    defined(MALLOCLOG) || defined(LOCKDEBUG) || defined(MALLOC_NOINLINE)
 #define	MALLOC(space, cast, size, type, flags) \
-	(space) = (cast)malloc((u_long)(size), type, flags)
-#define	FREE(addr, type) free((caddr_t)(addr), type)
+	(space) = (cast)malloc((u_long)(size), (type), (flags))
+#define	FREE(addr, type) free((caddr_t)(addr), (type))
 
 #else /* do not collect statistics */
-#define	MALLOC(space, cast, size, type, flags) do { \
-	register struct kmembuckets *kbp = &bucket[BUCKETINDX(size)]; \
-	long s = splmem(); \
-	if (kbp->kb_next == NULL) { \
-		(space) = (cast)malloc((u_long)(size), type, flags); \
-	} else { \
-		(space) = (cast)kbp->kb_next; \
-		kbp->kb_next = *(caddr_t *)(space); \
-	} \
-	splx(s); \
-} while (0)
+#define	MALLOC(space, cast, size, type, flags)				\
+do {									\
+	register struct kmembuckets *kbp = &bucket[BUCKETINDX((size))];	\
+	long s = splvm();						\
+	if (kbp->kb_next == NULL) {					\
+		(space) = (cast)malloc((u_long)(size), (type), (flags)); \
+	} else {							\
+		(space) = (cast)kbp->kb_next;				\
+		kbp->kb_next = *(caddr_t *)(space);			\
+	}								\
+	splx(s);							\
+} while (/* CONSTCOND */ 0)
 
-#define	FREE(addr, type) do { \
-	register struct kmembuckets *kbp; \
-	register struct kmemusage *kup = btokup(addr); \
-	long s = splmem(); \
-	if (1 << kup->ku_indx > MAXALLOCSAVE) { \
-		free((caddr_t)(addr), type); \
-	} else { \
-		kbp = &bucket[kup->ku_indx]; \
-		if (kbp->kb_next == NULL) \
-			kbp->kb_next = (caddr_t)(addr); \
-		else \
-			*(caddr_t *)(kbp->kb_last) = (caddr_t)(addr); \
-		*(caddr_t *)(addr) = NULL; \
-		kbp->kb_last = (caddr_t)(addr); \
-	} \
-	splx(s); \
-} while(0)
+#define	FREE(addr, type)						\
+do {									\
+	register struct kmembuckets *kbp;				\
+	register struct kmemusage *kup = btokup((addr));		\
+	long s = splvm();						\
+	if (1 << kup->ku_indx > MAXALLOCSAVE) {				\
+		free((caddr_t)(addr), (type));				\
+	} else {							\
+		kbp = &bucket[kup->ku_indx];				\
+		if (kbp->kb_next == NULL)				\
+			kbp->kb_next = (caddr_t)(addr);			\
+		else							\
+			*(caddr_t *)(kbp->kb_last) = (caddr_t)(addr);	\
+		*(caddr_t *)(addr) = NULL;				\
+		kbp->kb_last = (caddr_t)(addr);				\
+	}								\
+	splx(s);							\
+} while(/* CONSTCOND */ 0)
 #endif /* do not collect statistics */
 
-extern struct kmemstats kmemstats[];
-extern struct kmemusage *kmemusage;
-extern char *kmembase;
-extern struct kmembuckets bucket[];
+extern struct kmemstats		kmemstats[];
+extern struct kmemusage		*kmemusage;
+extern char			*kmembase;
+extern struct kmembuckets	bucket[];
 
 #ifdef MALLOCLOG
-extern void *_malloc __P((unsigned long size, int type, int flags,
-	const char *file, long line));
-extern void _free __P((void *addr, int type, const char *file, long line));
+void	*_malloc(unsigned long size, int type, int flags,
+	    const char *file, long line);
+void	_free(void *addr, int type, const char *file, long line);
 #define	malloc(size, type, flags) \
-	_malloc((size), (type), (flags), __FILE__, __LINE__)
+	    _malloc((size), (type), (flags), __FILE__, __LINE__)
 #define	free(addr, type) \
-	_free((addr), (type), __FILE__, __LINE__)
+	    _free((addr), (type), __FILE__, __LINE__)
 #else
-extern void *malloc __P((unsigned long size, int type, int flags));
-extern void free __P((void *addr, int type));
+void	*malloc(unsigned long size, int type, int flags);
+void	free(void *addr, int type);
 #endif /* MALLOCLOG */
 
-extern void *realloc __P((void *curaddr, unsigned long newsize, int type,
-			int flags));
+#ifdef MALLOC_DEBUG
+int	debug_malloc(unsigned long, int, int, void **);
+int	debug_free(void *, int);
+void	debug_malloc_init(void);
+
+void	debug_malloc_print(void);
+void	debug_malloc_printit(void (*)(const char *, ...), vaddr_t);
+#endif /* MALLOC_DEBUG */
+
+void	*realloc(void *curaddr, unsigned long newsize, int type,
+	    int flags);
+unsigned long
+	malloc_roundup(unsigned long);
 #endif /* _KERNEL */
 #endif /* !_SYS_MALLOC_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.72 2002/06/08 21:42:51 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.73 2002/09/25 11:41:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,6 +106,18 @@
  *	FreeBSD 2, FreeBSD 3, NetBSD post-1.5N
  *		need only struct ifnet * as argument
  *
+ * - bpfattach:
+ *	OpenBSD, NetBSD 1.5, BSDI [34]
+ *		bpfattach(caddr_t *, struct ifnet *, u_int, u_int)
+ *	FreeBSD, NetBSD 1.6:
+ *		bpfattach(struct ifnet *, u_int, u_int)
+ *
+ * - bpf_mtap:
+ *	OpenBSD, NetBSD, BSDI [34]
+ *		bpf_mtap(caddr_t, struct mbuf *)
+ *	FreeBSD
+ *		bpf_mtap(struct ifnet *, struct mbuf *)
+ *
  * - struct ifnet
  *			use queue.h?	member names	if name
  *			---		---		---
@@ -190,7 +202,7 @@
  *	other operating systems use splnet().
  *
  * - splimp()
- *	NetBSD-current (2001/4/13): use splnet() in network, splvm() in vm.
+ *	NetBSD 1.6: use splnet() in network, splvm() in vm.
  *	other operating systems: use splimp().
  *
  * - dtom()
@@ -222,7 +234,7 @@
  *
  * - protosw in general.
  *	NetBSD 1.5 has extra member for ipfilter (netbsd-current dropped
- *	it so it will go away in 1.6).
+ *	it so it went away in 1.6).
  *	NetBSD 1.5 requires PR_LISTEN flag bit with protocols that permit
  *	listen/accept (like tcp).
  *
@@ -303,8 +315,11 @@ struct ifnet;
 extern const char *if_name __P((struct ifnet *));
 #endif
 
+#if defined(__FreeBSD__) || defined(__NetBSD__)
+#define HAVE_NEW_BPFATTACH
+#endif
 #ifdef __FreeBSD__
-#define HAVE_OLD_BPF
+#define HAVE_NEW_BPF
 #endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -319,6 +334,10 @@ extern const char *if_name __P((struct ifnet *));
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #define HAVE_PPSRATECHECK
+#endif
+
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 104000000
+#define ovbcopy(src, dst, len)  memmove((dst), (src), (len))
 #endif
 
 #if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
@@ -344,7 +363,6 @@ extern const char *if_name __P((struct ifnet *));
 #if 1				/* at this moment, all OSes do this */
 #define WITH_CONVERT_IP_OFF
 #endif
-
 
 #endif /*_KERNEL*/
 #endif /*__NET_NET_OSDEP_H_DEFINED_ */

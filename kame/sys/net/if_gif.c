@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.92 2002/06/13 05:09:49 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.93 2002/09/25 11:41:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -343,7 +343,7 @@ gifattach0(sc)
 	IFQ_SET_READY(&sc->gif_if.if_snd);
 	if_attach(&sc->gif_if);
 #if NBPFILTER > 0
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPFATTACH
 	bpfattach(&sc->gif_if, DLT_NULL, sizeof(u_int));
 #else
 	bpfattach(&sc->gif_if.if_bpf, &sc->gif_if, DLT_NULL, sizeof(u_int));
@@ -383,7 +383,11 @@ gif_start(ifp)
 #endif /* NBRIDGE */
 
 	for (;;) {
+#ifdef __NetBSD__
+		s = splnet();
+#else
 		s = splimp();
+#endif
 		IFQ_DEQUEUE(&ifp->if_snd, m);
 		splx(s);
 
@@ -601,7 +605,7 @@ gifintr(arg)
 		family = *mtod(m, int *);
 #if NBPFILTER > 0
 		if (ifp->if_bpf) {
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPF
 			bpf_mtap(ifp, m);
 #else
 			bpf_mtap(ifp->if_bpf, m);
@@ -673,7 +677,7 @@ gif_input(m, af, ifp)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af1;
 		
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPF
 		bpf_mtap(ifp, &m0);
 #else
 		bpf_mtap(ifp->if_bpf, &m0);
@@ -719,7 +723,11 @@ gif_input(m, af, ifp)
 		return;
 	}
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);

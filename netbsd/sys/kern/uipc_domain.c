@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_domain.c,v 1.31 2000/03/30 09:27:14 augustss Exp $	*/
+/*	$NetBSD: uipc_domain.c,v 1.37 2002/05/12 20:36:58 matt Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -35,6 +35,9 @@
  *	@(#)uipc_domain.c	8.3 (Berkeley) 2/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: uipc_domain.c,v 1.37 2002/05/12 20:36:58 matt Exp $");
+
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_atalk.h"
@@ -54,11 +57,12 @@
 #include <sys/systm.h>
 #include <sys/callout.h>
 #include <sys/proc.h>
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 void	pffasttimo __P((void *));
 void	pfslowtimo __P((void *));
+
+struct	domain	*domains;
 
 struct callout pffasttimo_ch, pfslowtimo_ch;
 
@@ -113,8 +117,10 @@ domaininit()
 #ifdef IPSEC
 	ADDDOMAIN(key);
 #endif
+#ifdef INET
 #if NARP > 0
 	ADDDOMAIN(arp);
+#endif
 #endif
 	ADDDOMAIN(route);
 #endif /* ! lint */
@@ -261,6 +267,32 @@ pfctlinput(cmd, sa)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_ctlinput)
 				(*pr->pr_ctlinput)(cmd, sa, NULL);
+}
+
+void
+pfctlinput2(cmd, sa, ctlparam)
+	int cmd;
+	struct sockaddr *sa;
+	void *ctlparam;
+{
+	struct domain *dp;
+	struct protosw *pr;
+
+	if (!sa)
+		return;
+	for (dp = domains; dp; dp = dp->dom_next) {
+		/*
+		 * the check must be made by xx_ctlinput() anyways, to
+		 * make sure we use data item pointed to by ctlparam in
+		 * correct way.  the following check is made just for safety.
+		 */
+		if (dp->dom_family != sa->sa_family)
+			continue;
+
+		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
+			if (pr->pr_ctlinput)
+				(*pr->pr_ctlinput)(cmd, sa, ctlparam);
+	}
 }
 
 void

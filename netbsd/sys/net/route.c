@@ -1,4 +1,4 @@
-/*	$NetBSD: route.c,v 1.42 2001/01/27 11:07:59 itojun Exp $	*/
+/*	$NetBSD: route.c,v 1.52 2002/05/12 20:40:12 matt Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -101,6 +101,9 @@
  *	@(#)route.c	8.3 (Berkeley) 1/9/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: route.c,v 1.52 2002/05/12 20:40:12 matt Exp $");
+
 #include "opt_ns.h"
 
 #include <sys/param.h>
@@ -128,6 +131,10 @@
 #endif
 
 #define	SA(p) ((struct sockaddr *)(p))
+
+struct	route_cb route_cb;
+struct	rtstat	rtstat;
+struct	radix_node_head *rt_tables[AF_MAX+1];
 
 int	rttrash;		/* routes not in table but not freed */
 struct	sockaddr wildcard;	/* zero valued cookie for wildcard searches */
@@ -166,7 +173,7 @@ route_init()
 {
 
 	pool_init(&rtentry_pool, sizeof(struct rtentry), 0, 0, 0, "rtentpl",
-	    0, NULL, NULL, M_RTABLE);
+	    NULL);
 
 	rn_init();	/* initialize all zeroes, all ones, mask table */
 #ifdef RADIX_ART
@@ -218,13 +225,13 @@ rtalloc1(dst, report)
 				goto miss;
 			}
 			/* Inform listeners of the new route */
-			bzero(&info, sizeof(info));
+			memset(&info, 0, sizeof(info));
 			info.rti_info[RTAX_DST] = rt_key(rt);
 			info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 			info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 			if (rt->rt_ifp != NULL) {
 				info.rti_info[RTAX_IFP] = 
-				    rt->rt_ifp->if_addrlist.tqh_first->ifa_addr;
+				    TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
 				info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 			}
 			rt_missmsg(RTM_ADD, &info, rt->rt_flags, 0);
@@ -238,7 +245,7 @@ rtalloc1(dst, report)
 	} else {
 		rtstat.rts_unreach++;
 	miss:	if (report) {
-			bzero((caddr_t)&info, sizeof(info));
+			memset((caddr_t)&info, 0, sizeof(info));
 			info.rti_info[RTAX_DST] = dst;
 			rt_missmsg(msgtype, &info, 0, err);
 		}
@@ -309,7 +316,7 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 {
 	struct rtentry *rt;
 	int error = 0;
-	short *stat = 0;
+	u_quad_t *stat = 0;
 	struct rt_addrinfo info;
 	struct ifaddr *ifa;
 
@@ -422,7 +429,7 @@ out:
 		rtstat.rts_badredirect++;
 	else if (stat != NULL)
 		(*stat)++;
-	bzero((caddr_t)&info, sizeof(info));
+	memset((caddr_t)&info, 0, sizeof(info));
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = gateway;
 	info.rti_info[RTAX_NETMASK] = netmask;
@@ -445,7 +452,7 @@ rtdeletemsg(rt)
 	 * deleted.  That will allow the information being reported to
 	 * be accurate (and consistent with route_output()).
 	 */
-	bzero((caddr_t)&info, sizeof(info));
+	memset((caddr_t)&info, 0, sizeof(info));
 	info.rti_info[RTAX_DST] = rt_key(rt);
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
@@ -559,7 +566,7 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 {
 	struct rt_addrinfo info;
 
-	bzero(&info, sizeof(info));
+	memset(&info, 0, sizeof(info));
 	info.rti_flags = flags;
 	info.rti_info[RTAX_DST] = dst;
 	info.rti_info[RTAX_GATEWAY] = gateway;
@@ -853,7 +860,7 @@ rt_maskedcopy(src, dst, netmask)
 	while (cp2 < cplim)
 		*cp2++ = *cp1++ & *cp3++;
 	if (cp2 < cplim2)
-		bzero((caddr_t)cp2, (unsigned)(cplim2 - cp2));
+		memset((caddr_t)cp2, 0, (unsigned)(cplim2 - cp2));
 }
 
 /*
@@ -887,7 +894,7 @@ rtinit(ifa, cmd, flags)
 							: ENETUNREACH);
 		}
 	}
-	bzero(&info, sizeof(info));
+	memset(&info, 0, sizeof(info));
 	info.rti_ifa = ifa;
 	info.rti_flags = flags | ifa->ifa_flags;
 	info.rti_info[RTAX_DST] = dst;
@@ -961,7 +968,7 @@ rt_timer_init()
 	assert(rt_init_done == 0);
 
 	pool_init(&rttimer_pool, sizeof(struct rttimer), 0, 0, 0, "rttmrpl",
-	    0, NULL, NULL, M_RTABLE);
+	    NULL);
 
 	LIST_INIT(&rttimer_queue_head);
 	callout_init(&rt_timer_ch);

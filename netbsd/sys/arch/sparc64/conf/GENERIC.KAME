@@ -3,8 +3,3 @@ include	"arch/sparc64/conf/GENERIC"
 # INET6 and IPSEC items are defined in GENERIC
 
 options 	NEW_STRUCT_ROUTE		# mandatory
-
-# IPv6 firewall - not tested
-#options 	IPV6FIREWALL
-#options 	IPV6FIREWALL_VERBOSE
-#options 	IPV6FIREWALL_DEFAULT_TO_ACCEPT

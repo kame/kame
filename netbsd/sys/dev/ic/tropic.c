@@ -1,4 +1,4 @@
-/*	$NetBSD: tropic.c,v 1.12.2.1 2000/11/01 23:24:45 tv Exp $	*/
+/*	$NetBSD: tropic.c,v 1.19 2001/11/13 13:14:45 lukem Exp $	*/
 
 /* 
  * Ported to NetBSD by Onno van der Linden
@@ -33,6 +33,9 @@
  * the rights to redistribute these changes.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: tropic.c,v 1.19 2001/11/13 13:14:45 lukem Exp $");
+
 #include "opt_inet.h"
 #include "opt_ns.h"
 #include "bpfilter.h"
@@ -56,7 +59,6 @@
 #include <net/if_media.h>
 #include <net/netisr.h>
 #include <net/route.h>
-
 #include <net/if_token.h>
 
 #ifdef INET
@@ -341,7 +343,7 @@ tr_attach(sc)
 	/*
 	 * init network-visible interface 
 	 */
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_ioctl = tr_ioctl;
 	if (sc->sc_init_status & FAST_PATH_TRANSMIT)
@@ -350,9 +352,7 @@ tr_attach(sc)
 		ifp->if_start = tr_oldstart;
 	ifp->if_flags = IFF_BROADCAST | IFF_NOTRAILERS;
 	ifp->if_watchdog = tr_watchdog;
-#ifdef notyet /* if_tokensubr.c hasn't been converted yet */
 	IFQ_SET_READY(&ifp->if_snd);
-#endif
 
 	switch (MM_INB(sc, TR_MEDIAS_OFFSET)) {
 	case 0xF:
@@ -442,10 +442,6 @@ tr_attach(sc)
 
 	printf("%s: address %s ring speed %d Mbps\n", sc->sc_dev.dv_xname,
 	    token_sprintf(myaddr), (sc->sc_init_status & RSP_16) ? 16 : 4);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_IEEE802, sizeof(struct token_header));
-#endif
 
 	callout_init(&sc->sc_init_callout);
 	callout_init(&sc->sc_reinit_callout);
@@ -817,6 +813,7 @@ next:
 #endif
 }
 
+
 /*
  *  tr_intr - interrupt handler.  Find the cause of the interrupt and
  *  service it.
@@ -1132,7 +1129,7 @@ tr_intr(arg)
  * XXX should this be done here ?
  */
 				/* if data on send queue */
-				if (!IFQ_IS_EMPTY(&ifp->if_snd))
+				if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 					tr_oldstart(ifp);
 				break;
 
@@ -1821,10 +1818,6 @@ tr_detach(self, flags)
 
 	/* Delete all remaining media. */
 	ifmedia_delete_instance(&sc->sc_media, IFM_INST_ANY);
-
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
 
 	token_ifdetach(ifp);
 	if_detach(ifp);

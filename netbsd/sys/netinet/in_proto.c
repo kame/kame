@@ -1,4 +1,4 @@
-/*	$NetBSD: in_proto.c,v 1.39.4.2 2001/03/11 21:09:55 he Exp $	*/
+/*	$NetBSD: in_proto.c,v 1.55 2002/03/04 13:24:12 sommerfeld Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,6 +63,9 @@
  *
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.55 2002/03/04 13:24:12 sommerfeld Exp $");
 
 #include "opt_mrouting.h"
 #include "opt_eon.h"			/* ISO CLNL over IP */
@@ -142,11 +145,6 @@
 #include <netiso/eonvar.h>
 #endif /* EON */
 
-#include "ipip.h"
-#if NIPIP > 0 || defined(MROUTING)
-#include <netinet/ip_ipip.h>
-#endif /* NIPIP > 0 || MROUTING */
-
 #include "gre.h"
 #if NGRE > 0
 #include <netinet/ip_gre.h>
@@ -157,12 +155,6 @@
 #include <netinet/sctp.h>
 #include <netinet/sctp_var.h>
 #endif /* SCTP */
-
-#ifdef NATPT
-void	natpt_init	__P((void));
-int	natpt_usrreq	__P((struct socket *, int,
-			     struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
-#endif /* NATPT */
 
 extern	struct domain inetdomain;
 
@@ -180,7 +172,7 @@ struct protosw inetsw[] = {
 { SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_ABRTACPTDIS,
   tcp_input,	0,		tcp_ctlinput,	tcp_ctloutput,
   tcp_usrreq,
-  tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
+  tcp_init,	0,		tcp_slowtimo,	tcp_drain,	tcp_sysctl
 },
 #ifdef SCTP
 /*
@@ -213,17 +205,17 @@ struct protosw inetsw[] = {
 { SOCK_RAW,	&inetdomain,	IPPROTO_ICMP,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   icmp_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
-  0,		0,		0,		0,		icmp_sysctl
+  icmp_init,	0,		0,		0,		icmp_sysctl
 },
 #ifdef IPSEC
 { SOCK_RAW,	&inetdomain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
-  ah4_input,	0,	 	0,		0,
+  ah4_input,	0,	 	ah4_ctlinput,	0,
   0,	  
   0,		0,		0,		0,		ipsec_sysctl
 },
 #ifdef IPSEC_ESP
 { SOCK_RAW,	&inetdomain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
-  esp4_input,	0,	 	0,		0,
+  esp4_input,	0,	 	esp4_ctlinput,	0,
   0,	  
   0,		0,		0,		0,		ipsec_sysctl
 },
@@ -253,7 +245,7 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_MOBILE,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  gre_mobile_input, rip_output,	rip_ctlinput,	rip_ctloutput,
+  gre_mobile_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
   0,		0,		0,		0,
 },
@@ -271,6 +263,7 @@ struct protosw inetsw[] = {
 },
 #endif /* TPIP */
 #ifdef ISO
+/* EON (ISO CLNL over IP) */
 #ifdef EON
 { SOCK_RAW,	&inetdomain,	IPPROTO_EON,	PR_LASTHDR,
   eoninput,	0,		eonctlinput,	0,
@@ -292,13 +285,6 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,
 },
 #endif /* NSIP */
-#ifdef NATPT
-{ SOCK_RAW,	&inetdomain,	IPPROTO_AHIP,	PR_ATOMIC|PR_ADDR,
-  0,		0,		0,		0,
-  natpt_usrreq,
-  natpt_init,	0,		0,		0,
-},
-#endif /* NATPT */
 /* raw wildcard */
 { SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
@@ -306,15 +292,6 @@ struct protosw inetsw[] = {
   rip_init,	0,		0,		0,
 },
 };
-
-#if NIPIP > 0
-struct protosw ipip_protosw =
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
-  ipip_input,	rip_output,	0,		rip_ctloutput,
-  rip_usrreq,	/* XXX */
-  0,		0,		0,		0,
-};
-#endif /* NIPIP */
 
 struct domain inetdomain =
     { PF_INET, "internet", 0, 0, 0, 
@@ -329,16 +306,5 @@ struct domain inetdomain =
       32, sizeof(struct sockaddr_in) };
 
 u_char	ip_protox[IPPROTO_MAX];
-
-#define	TCP_SYN_HASH_SIZE	293
-#define	TCP_SYN_BUCKET_SIZE	35
-
-int	tcp_syn_cache_size = TCP_SYN_HASH_SIZE;
-int	tcp_syn_cache_limit = TCP_SYN_HASH_SIZE*TCP_SYN_BUCKET_SIZE;
-int	tcp_syn_bucket_limit = 3*TCP_SYN_BUCKET_SIZE;
-struct	syn_cache_head tcp_syn_cache[TCP_SYN_HASH_SIZE];
-int	tcp_syn_cache_interval = 1;	/* runs timer twice a second */
-
-int tcp_rst_ppslim = 100;			/* 100pps */
 
 int icmperrppslim = 100;			/* 100pps */

@@ -1,4 +1,4 @@
-/*      $NetBSD: if_atm.c,v 1.12 2000/03/30 13:24:53 augustss Exp $       */
+/*      $NetBSD: if_atm.c,v 1.14 2001/11/13 00:32:35 lukem Exp $       */
 
 /*
  *
@@ -35,6 +35,9 @@
 /*
  * IP <=> ATM address resolution.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_atm.c,v 1.14 2001/11/13 00:32:35 lukem Exp $");
 
 #include "opt_inet.h"
 #include "opt_natm.h"

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_inarp.h,v 1.31 2000/05/20 03:08:43 jhawk Exp $	*/
+/*	$NetBSD: if_inarp.h,v 1.32 2001/01/17 04:05:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993

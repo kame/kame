@@ -1,4 +1,4 @@
-/*	$KAME: sctp_sha1.c,v 1.4 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctp_sha1.c,v 1.5 2002/09/25 11:41:22 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_sha1.c,v 1.6 2002/04/04 17:43:19 randall Exp	*/
 
 /*
@@ -33,9 +33,7 @@
  * SUCH DAMAGE.
  */
 #include <netinet/sctp_sha1.h>
-#ifdef __OpenBSD__
 #include <sys/systm.h>
-#endif
 void
 SHA1_Init(struct sha1_context *ctx)
 {

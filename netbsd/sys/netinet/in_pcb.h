@@ -1,4 +1,4 @@
-/*	$NetBSD: in_pcb.h,v 1.29 2000/02/02 23:28:09 thorpej Exp $	*/
+/*	$NetBSD: in_pcb.h,v 1.30 2001/07/02 15:25:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

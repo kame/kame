@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_output.c,v 1.74.4.1 2001/04/06 00:25:20 he Exp $	*/
+/*	$NetBSD: ip_output.c,v 1.95 2002/02/07 21:47:45 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -138,6 +138,9 @@
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95 2002/02/07 21:47:45 thorpej Exp $");
+
 #include "opt_pfil_hooks.h"
 #include "opt_ipsec.h"
 #include "opt_mrouting.h"
@@ -150,8 +153,6 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/systm.h>
-
-#include <vm/vm.h>
 #include <sys/proc.h>
 
 #include <net/if.h>
@@ -170,10 +171,6 @@
 
 #ifdef MROUTING
 #include <netinet/ip_mroute.h>
-#endif
-
-#ifdef __vax__
-#include <machine/mtpr.h>
 #endif
 
 #include <machine/stdarg.h>
@@ -201,6 +198,10 @@ static void ip_mloopback
 #define SIN(x)	((struct sockaddr_in *)(x))
 #endif
 
+#ifdef PFIL_HOOKS
+extern struct pfil_head inet_pfil_hook;			/* XXX */
+#endif
+
 /*
  * IP output.  The packet in mbuf chain m contains a skeletal IP
  * header (with len, off, ttl, proto, tos, src, dst).
@@ -223,26 +224,19 @@ ip_output(m0, va_alist)
 	int len, off, error = 0;
 	struct route iproute;
 	struct sockaddr_in *dst;
-#if IFA_STATS
-	struct sockaddr_in src;
-#endif
 	struct in_ifaddr *ia;
 	struct mbuf *opt;
 	struct route *ro;
-	int flags;
+	int flags, sw_csum;
 	int *mtu_p;
 	int mtu;
 	struct ip_moptions *imo;
 	va_list ap;
-#ifdef PFIL_HOOKS
-	struct packet_filter_hook *pfh;
-	struct mbuf *m1;
-	int rv;
-#endif /* PFIL_HOOKS */
 #ifdef IPSEC
 	struct socket *so;
 	struct secpolicy *sp = NULL;
 #endif /*IPSEC*/
+	u_int16_t ip_len;
 
 	va_start(ap, m0);
 	opt = va_arg(ap, struct mbuf *);
@@ -274,7 +268,7 @@ ip_output(m0, va_alist)
 	 */
 	if ((flags & (IP_FORWARDING|IP_RAWOUTPUT)) == 0) {
 		ip->ip_v = IPVERSION;
-		ip->ip_off &= IP_DF;
+		ip->ip_off = 0;
 		ip->ip_id = htons(ip_id++);
 		ip->ip_hl = hlen >> 2;
 		ipstat.ips_localout++;
@@ -297,7 +291,7 @@ ip_output(m0, va_alist)
 	 * cache with IPv6.
 	 */
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-	    dst->sin_family != AF_INET || 
+	    dst->sin_family != AF_INET ||
 	    !in_hosteq(dst->sin_addr, ip->ip_dst))) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
@@ -380,12 +374,13 @@ ip_output(m0, va_alist)
 		}
 
 		/*
-		 * Confirm that the outgoing interface supports multicast.
+		 * If the packet is multicast or broadcast, confirm that
+		 * the outgoing interface can transmit it.
 		 */
 		if (((m->m_flags & M_MCAST) &&
 		     (ifp->if_flags & IFF_MULTICAST) == 0) ||
 		    ((m->m_flags & M_BCAST) && 
-		     (ifp->if_flags & IFF_BROADCAST) == 0))  {
+		     (ifp->if_flags & (IFF_BROADCAST|IFF_POINTOPOINT)) == 0))  {
 			ipstat.ips_noroute++;
 			error = ENETUNREACH;
 			goto bad;
@@ -497,6 +492,22 @@ ip_output(m0, va_alist)
 		m->m_flags &= ~M_BCAST;
 
 sendit:
+	/*
+	 * If we're doing Path MTU Discovery, we need to set DF unless
+	 * the route's MTU is locked.
+	 */
+	if ((flags & IP_MTUDISC) != 0 && ro->ro_rt != NULL &&
+	    (ro->ro_rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
+		ip->ip_off |= IP_DF;
+
+	/*
+	 * Remember the current ip_len and ip_off, and swap them into
+	 * network order.
+	 */
+	ip_len = ip->ip_len;
+
+	HTONS(ip->ip_len);
+	HTONS(ip->ip_off);
 
 #ifdef IPSEC
 	/* get SP for this packet */
@@ -539,9 +550,10 @@ sendit:
 		printf("ip_output: Invalid policy found. %d\n", sp->policy);
 	}
 
-	ip->ip_len = htons((u_short)ip->ip_len);
-	ip->ip_off = htons((u_short)ip->ip_off);
-	ip->ip_sum = 0;
+	/*
+	 * ipsec4_output() expects ip_len and ip_off in network
+	 * order.  They have been set to network order above.
+	 */
 
     {
 	struct ipsec_output_state state;
@@ -553,6 +565,20 @@ sendit:
 	} else
 		state.ro = ro;
 	state.dst = (struct sockaddr *)dst;
+
+	/*
+	 * We can't defer the checksum of payload data if
+	 * we're about to encrypt/authenticate it.
+	 *
+	 * XXX When we support crypto offloading functions of
+	 * XXX network interfaces, we need to reconsider this,
+	 * XXX since it's likely that they'll support checksumming,
+	 * XXX as well.
+	 */
+	if (m->m_pkthdr.csum_flags & (M_CSUM_TCPv4|M_CSUM_UDPv4)) {
+		in_delayed_cksum(m);
+		m->m_pkthdr.csum_flags &= ~(M_CSUM_TCPv4|M_CSUM_UDPv4);
+	}
 
 	error = ipsec4_output(&state, sp, flags);
 
@@ -597,6 +623,8 @@ sendit:
 #else
 	hlen = ip->ip_hl << 2;
 #endif
+	ip_len = ntohs(ip->ip_len);
+
 	if (ro->ro_rt == NULL) {
 		if ((flags & IP_ROUTETOIF) == 0) {
 			printf("ip_output: "
@@ -611,9 +639,6 @@ sendit:
 	}
     }
 
-	/* make it flipped, again. */
-	ip->ip_len = ntohs((u_short)ip->ip_len);
-	ip->ip_off = ntohs((u_short)ip->ip_off);
 skip_ipsec:
 #endif /*IPSEC*/
 
@@ -621,43 +646,52 @@ skip_ipsec:
 	/*
 	 * Run through list of hooks for output packets.
 	 */
-	m1 = m;
-	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IP]].pr_pfh);
-	for (; pfh; pfh = pfh->pfil_link.tqe_next)
-		if (pfh->pfil_func) {
-		    	rv = pfh->pfil_func(ip, hlen, ifp, 1, &m1);
-			if (rv) {
-				error = EHOSTUNREACH;
-				goto done;
-			}
-			m = m1;
-			if (m == NULL)
-				goto done;
-			ip = mtod(m, struct ip *);
-		}
+	if ((error = pfil_run_hooks(&inet_pfil_hook, &m, ifp,
+				    PFIL_OUT)) != 0)
+		goto done;
+	if (m == NULL)
+		goto done;
+
+	ip = mtod(m, struct ip *);
 #endif /* PFIL_HOOKS */
 
 	/*
 	 * If small enough for mtu of path, can just send directly.
 	 */
-	if ((u_int16_t)ip->ip_len <= mtu) {
+	if (ip_len <= mtu) {
 #if IFA_STATS
 		/*
 		 * search for the source address structure to
 		 * maintain output statistics.
 		 */
-		bzero((caddr_t*) &src, sizeof(src));
-		src.sin_family = AF_INET;
-		src.sin_addr.s_addr = ip->ip_src.s_addr;
-		src.sin_len = sizeof(src);
-		ia = ifatoia(ifa_ifwithladdr(sintosa(&src)));
+		INADDR_TO_IA(ip->ip_src, ia);
 		if (ia)
-			ia->ia_ifa.ifa_data.ifad_outbytes += ntohs(ip->ip_len);
+			ia->ia_ifa.ifa_data.ifad_outbytes += ip_len;
 #endif
-		HTONS(ip->ip_len);
-		HTONS(ip->ip_off);
+		/*
+		 * Always initialize the sum to 0!  Some HW assisted
+		 * checksumming requires this.
+		 */
 		ip->ip_sum = 0;
-		ip->ip_sum = in_cksum(m, hlen);
+		m->m_pkthdr.csum_flags |= M_CSUM_IPv4;
+
+		sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_csum_flags_tx;
+
+		/*
+		 * Perform any checksums that the hardware can't do
+		 * for us.
+		 *
+		 * XXX Does any hardware require the {th,uh}_sum
+		 * XXX fields to be 0?
+		 */
+		if (sw_csum & M_CSUM_IPv4)
+			ip->ip_sum = in_cksum(m, hlen);
+		if (sw_csum & (M_CSUM_TCPv4|M_CSUM_UDPv4)) {
+			in_delayed_cksum(m);
+			sw_csum &= ~(M_CSUM_TCPv4|M_CSUM_UDPv4);
+		}
+		m->m_pkthdr.csum_flags &= ifp->if_csum_flags_tx;
+
 #ifdef IPSEC
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
@@ -667,9 +701,27 @@ skip_ipsec:
 	}
 
 	/*
+	 * We can't use HW checksumming if we're about to
+	 * to fragment the packet.
+	 *
+	 * XXX Some hardware can do this.
+	 */
+	if (m->m_pkthdr.csum_flags & (M_CSUM_TCPv4|M_CSUM_UDPv4)) {
+		in_delayed_cksum(m);
+		m->m_pkthdr.csum_flags &= ~(M_CSUM_TCPv4|M_CSUM_UDPv4);
+	}
+
+	/*
 	 * Too large for interface; fragment if possible.
 	 * Must be able to put at least 8 bytes per fragment.
+	 *
+	 * Note we swap ip_len and ip_off into host order to make
+	 * the logic below a little simpler.
 	 */
+
+	NTOHS(ip->ip_len);
+	NTOHS(ip->ip_off);
+
 	if (ip->ip_off & IP_DF) {
 		if (flags & IP_RETURNMTU)
 			*mtu_p = mtu;
@@ -753,7 +805,7 @@ sendorfree:
 	 * If there is no room for all the fragments, don't queue
 	 * any of them.
 	 */
-	s = splimp();
+	s = splnet();
 	if (ifp->if_snd.ifq_maxlen - ifp->if_snd.ifq_len < fragments)
 		error = ENOBUFS;
 	splx(s);
@@ -766,11 +818,7 @@ sendorfree:
 			 * search for the source address structure to
 			 * maintain output statistics.
 			 */
-			bzero((caddr_t*) &src, sizeof(src));
-			src.sin_family = AF_INET;
-			src.sin_addr.s_addr = ip->ip_src.s_addr;
-			src.sin_len = sizeof(src);
-			ia = ifatoia(ifa_ifwithladdr(sintosa(&src)));
+			INADDR_TO_IA(ip->ip_src, ia);
 			if (ia) {
 				ia->ia_ifa.ifa_data.ifad_outbytes +=
 					ntohs(ip->ip_len);
@@ -807,6 +855,33 @@ done:
 bad:
 	m_freem(m);
 	goto done;
+}
+
+/*
+ * Process a delayed payload checksum calculation.
+ */
+void
+in_delayed_cksum(struct mbuf *m)
+{
+	struct ip *ip;
+	u_int16_t csum, offset;
+
+	ip = mtod(m, struct ip *);
+	offset = ip->ip_hl << 2;
+	csum = in4_cksum(m, 0, offset, ntohs(ip->ip_len) - offset);
+	if (csum == 0 && (m->m_pkthdr.csum_flags & M_CSUM_UDPv4) != 0)
+		csum = 0xffff;
+
+	offset += m->m_pkthdr.csum_data;	/* checksum offset */
+
+	if ((offset + sizeof(u_int16_t)) > m->m_len) {
+		/* This happen when ip options were inserted
+		printf("in_delayed_cksum: pullup len %d off %d proto %d\n",
+		    m->m_len, offset, ip->ip_p);
+		 */
+		m_copyback(m, offset, sizeof(csum), (caddr_t) &csum);
+	} else
+		*(u_int16_t *)(mtod(m, caddr_t) + offset) = csum;
 }
 
 /*
@@ -852,7 +927,8 @@ ip_insertoptions(m, opt, phlen)
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		if (n == 0)
 			return (m);
-		n->m_pkthdr.len = m->m_pkthdr.len + optlen;
+		M_COPY_PKTHDR(n, m);
+		m->m_flags &= ~M_PKTHDR;
 		m->m_len -= sizeof(struct ip);
 		m->m_data += sizeof(struct ip);
 		n->m_next = m;
@@ -863,9 +939,9 @@ ip_insertoptions(m, opt, phlen)
 	} else {
 		m->m_data -= optlen;
 		m->m_len += optlen;
-		m->m_pkthdr.len += optlen;
 		memmove(mtod(m, caddr_t), ip, sizeof(struct ip));
 	}
+	m->m_pkthdr.len += optlen;
 	ip = mtod(m, struct ip *);
 	bcopy((caddr_t)p->ipopt_list, (caddr_t)(ip + 1), (unsigned)optlen);
 	*phlen = sizeof(struct ip) + optlen;
@@ -1209,7 +1285,7 @@ ip_pcbopts(pcbopt, m)
 		return (0);
 	}
 
-#ifndef	vax
+#ifndef	__vax__
 	if (m->m_len % sizeof(int32_t))
 		goto bad;
 #endif
@@ -2404,6 +2480,13 @@ ip_mloopback(ifp, m, dst)
 		ip = mtod(copym, struct ip *);
 		HTONS(ip->ip_len);
 		HTONS(ip->ip_off);
+
+		if (copym->m_pkthdr.csum_flags & (M_CSUM_TCPv4|M_CSUM_UDPv4)) {
+			in_delayed_cksum(copym);
+			copym->m_pkthdr.csum_flags &=
+			    ~(M_CSUM_TCPv4|M_CSUM_UDPv4);
+		}
+
 		ip->ip_sum = 0;
 		ip->ip_sum = in_cksum(copym, ip->ip_hl << 2);
 		(void) looutput(ifp, copym, sintosa(dst), NULL);

@@ -1,4 +1,4 @@
-/*	$NetBSD: smc90cx6.c,v 1.35 2000/03/30 12:45:32 augustss Exp $ */
+/*	$NetBSD: smc90cx6.c,v 1.39 2001/11/13 13:14:44 lukem Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -40,6 +40,9 @@
  * Chip core driver for the SMC90c26 / SMC90c56 (and SMC90c66 in '56
  * compatibility mode) boards
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: smc90cx6.c,v 1.39 2001/11/13 13:14:44 lukem Exp $");
 
 /* #define BAHSOFTCOPY */
 #define BAHRETRANSMIT /**/
@@ -197,7 +200,7 @@ bah_attach_subr(sc)
 	 */
 	bah_stop(sc); 
 
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	strcpy(ifp->if_xname, sc->sc_dev.dv_xname);
 	ifp->if_softc = sc;
 	ifp->if_start = bah_start;
 	ifp->if_ioctl = bah_ioctl;
@@ -211,9 +214,6 @@ bah_attach_subr(sc)
 
 	arc_ifattach(ifp, linkaddress);
 
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_ARCNET, ARC_HDRLEN);
-#endif
 #ifdef BAHSOFTCOPY
 	sc->sc_rxcookie = softintr_establish(IPL_SOFTNET, bah_srint, sc);
 	sc->sc_txcookie = softintr_establish(IPL_SOFTNET,

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.84 2002/09/17 06:32:23 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.85 2002/09/25 11:41:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -287,7 +287,7 @@ stf_clone_create(ifc, unit)
 	sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 	if_attach(&sc->sc_if);
 #if NBPFILTER > 0
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPFATTACH
 	bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
 #else
 	bpfattach(&sc->sc_if.if_bpf, &sc->sc_if, DLT_NULL, sizeof(u_int));
@@ -418,7 +418,7 @@ stfattach(dummy)
 #endif
 		if_attach(&sc->sc_if);
 #if NBPFILTER > 0
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPF
 		bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
 #else
 		bpfattach(&sc->sc_if.if_bpf, &sc->sc_if, DLT_NULL, sizeof(u_int));
@@ -753,7 +753,7 @@ stf_output(ifp, m, dst, rt)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 		
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPF
 		bpf_mtap(ifp, &m0);
 #else
 		bpf_mtap(ifp->if_bpf, &m0);
@@ -1042,7 +1042,7 @@ in_stf_input(m, va_alist)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 		
-#ifdef HAVE_OLD_BPF
+#ifdef HAVE_NEW_BPF
 		bpf_mtap(ifp, &m0);
 #else
 		bpf_mtap(ifp->if_bpf, &m0);
@@ -1059,7 +1059,11 @@ in_stf_input(m, va_alist)
 	ifq = &ip6intrq;
 	isr = NETISR_IPV6;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);

@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.11 2002/04/03 05:38:51 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.12 2002/09/25 11:41:20 itojun Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -311,7 +311,11 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 	/*
 	 * put the class into the class tree
 	 */
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	if ((peer = ifd->active_[pri]) != NULL) {
 		/* find the last class at this pri */
 		cl->peer_ = peer;
@@ -364,7 +368,11 @@ rmc_modclass(cl, nsecPerByte, maxq, maxidle, minidle, offtime, pktsize)
 	ifd = cl->ifdat_;
 	old_allotment = cl->allotment_;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	cl->allotment_ = RM_NS_PER_SEC / nsecPerByte; /* Bytes per sec */
 	cl->qthresh_ = 0;
 	cl->ns_per_byte_ = nsecPerByte;
@@ -564,7 +572,11 @@ rmc_delete_class(ifd, cl)
 	if (cl->sleeping_)
 		CALLOUT_STOP(&cl->callout_);
 	
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	/*
 	 * Free packets in the packet queue.
 	 * XXX - this may not be a desired behavior.  Packets should be
@@ -1594,7 +1606,11 @@ rmc_restart(cl)
 	struct rm_ifdat *ifd = cl->ifdat_;
 	int s;
 
+#ifdef __NetBSD__
+	s = splnet();
+#else
 	s = splimp();
+#endif
 	if (cl->sleeping_) {
 		cl->sleeping_ = 0;
 		cl->undertime_.tv_sec = 0;

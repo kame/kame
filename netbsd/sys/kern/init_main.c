@@ -1,4 +1,4 @@
-/*	$NetBSD: init_main.c,v 1.172.2.3 2001/05/06 15:22:50 he Exp $	*/
+/*	$NetBSD: init_main.c,v 1.199 2002/03/04 02:30:27 simonb Exp $	*/
 
 /*
  * Copyright (c) 1995 Christopher G. Demetriou.  All rights reserved.
@@ -41,11 +41,15 @@
  *	@(#)init_main.c	8.16 (Berkeley) 5/14/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: init_main.c,v 1.199 2002/03/04 02:30:27 simonb Exp $");
+
 #include "fs_nfs.h"
 #include "opt_nfsserver.h"
 #include "opt_sysv.h"
 #include "opt_maxuprc.h"
 #include "opt_multiprocessor.h"
+#include "opt_pipe.h"
 #include "opt_syscall_debug.h"
 
 #include "rnd.h"
@@ -55,7 +59,6 @@
 #include <sys/filedesc.h>
 #include <sys/file.h>
 #include <sys/errno.h>
-#include <sys/exec.h>
 #include <sys/callout.h>
 #include <sys/kernel.h>
 #include <sys/mount.h>
@@ -71,6 +74,8 @@
 #include <sys/disklabel.h>
 #include <sys/buf.h>
 #include <sys/device.h>
+#include <sys/disk.h>
+#include <sys/exec.h>
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
 #include <sys/reboot.h>
@@ -91,6 +96,9 @@
 #if NRND > 0
 #include <sys/rnd.h>
 #endif
+#ifndef PIPE_SOCKETPAIR
+#include <sys/pipe.h>
+#endif
 
 #include <sys/syscall.h>
 #include <sys/syscallargs.h>
@@ -102,21 +110,17 @@
 
 #include <machine/cpu.h>
 
-#include <vm/vm.h>
-#include <vm/vm_pageout.h>
-
 #include <uvm/uvm.h>
 
 #include <net/if.h>
 #include <net/raw_cb.h>
 
-const char copyright[] = "\
-Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001
-    The NetBSD Foundation, Inc.  All rights reserved.
-Copyright (c) 1982, 1986, 1989, 1991, 1993
-    The Regents of the University of California.  All rights reserved.
-
-";
+const char copyright[] =
+"Copyright (c) 1996, 1997, 1998, 1999, 2000, 2001, 2002\n"
+"    The NetBSD Foundation, Inc.  All rights reserved.\n"
+"Copyright (c) 1982, 1986, 1989, 1991, 1993\n"
+"    The Regents of the University of California.  All rights reserved.\n"
+"\n";
 
 /* Components of the first process -- never freed. */
 struct	session session0;
@@ -145,33 +149,9 @@ __volatile int start_init_exec;		/* semaphore for start_init() */
 
 static void check_console(struct proc *p);
 static void start_init(void *);
-static void start_pagedaemon(void *);
-static void start_reaper(void *);
 void main(void);
 
-extern char sigcode[], esigcode[];
-#ifdef SYSCALL_DEBUG
-extern char *syscallnames[];
-#endif
-
-struct emul emul_netbsd = {
-	"netbsd",
-	NULL,
-	sendsig,
-	SYS_syscall,
-	SYS_MAXSYSCALL,
-	sysent,
-#ifdef SYSCALL_DEBUG
-	syscallnames,
-#else
-	NULL,
-#endif
-	0,
-	copyargs,
-	setregs,
-	sigcode,
-	esigcode,
-};
+extern const struct emul emul_netbsd;	/* defined in kern_exec.c */
 
 /*
  * System startup; initialize the world, create process 0, mount root
@@ -185,10 +165,9 @@ main(void)
 	struct proc *p;
 	struct pdevinit *pdev;
 	int i, s, error;
+	rlim_t lim;
 	extern struct pdevinit pdevinit[];
-	extern void roundrobin(void *);
 	extern void schedcpu(void *);
-	extern void disk_init(void);
 #if defined(NFSSERVER) || defined(NFS)
 	extern void nfs_init(void);
 #endif
@@ -209,6 +188,8 @@ main(void)
 	 */
 	consinit();
 	printf("%s", copyright);
+
+	KERNEL_LOCK_INIT();
 
 	uvm_init();
 
@@ -271,6 +252,9 @@ main(void)
 	p->p_stat = SONPROC;
 	p->p_nice = NZERO;
 	p->p_emul = &emul_netbsd;
+#ifdef __HAVE_SYSCALL_INTERN
+	(*p->p_emul->e_syscall_intern)(p);
+#endif
 	strncpy(p->p_comm, "swapper", MAXCOMLEN);
 
 	callout_init(&p->p_realit_ch);
@@ -306,10 +290,10 @@ main(void)
 	limit0.pl_rlimit[RLIMIT_NPROC].rlim_cur =
 	    maxproc < MAXUPRC ? maxproc : MAXUPRC;
 
-	i = ptoa(uvmexp.free);
-	limit0.pl_rlimit[RLIMIT_RSS].rlim_max = i;
-	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_max = i;
-	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = i / 3;
+	lim = ptoa(uvmexp.free);
+	limit0.pl_rlimit[RLIMIT_RSS].rlim_max = lim;
+	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_max = lim;
+	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = lim / 3;
 	limit0.pl_corename = defcorename;
 	limit0.p_refcnt = 1;
 
@@ -319,7 +303,7 @@ main(void)
 	 * share proc0's vmspace, and thus, the kernel pmap.
 	 */
 	uvmspace_init(&vmspace0, pmap_kernel(), round_page(VM_MIN_ADDRESS),
-	    trunc_page(VM_MAX_ADDRESS), TRUE);
+	    trunc_page(VM_MAX_ADDRESS));
 	p->p_vmspace = &vmspace0;
 
 	p->p_addr = proc0paddr;				/* XXX */
@@ -344,10 +328,25 @@ main(void)
 #if defined(NFSSERVER) || defined(NFS)
 	nfs_init();			/* initialize server/shared data */
 #endif
+#ifdef NVNODE_IMPLICIT
+	/*
+	 * If maximum number of vnodes in namei vnode cache is not explicitly
+	 * defined in kernel config, adjust the number such as we use roughly
+	 * 0.5% of memory for vnode cache (but not less than NVNODE vnodes).
+	 */
+	usevnodes = (ptoa((unsigned)physmem) / 200) / sizeof(struct vnode);
+	if (usevnodes > desiredvnodes) 
+		desiredvnodes = usevnodes;
+#endif
 	vfsinit();
 
 	/* Configure the system hardware.  This will enable interrupts. */
 	configure();
+
+	ubc_init();		/* must be after autoconfig */
+
+	/* Lock the kernel on behalf of proc0. */
+	KERNEL_PROC_LOCK(p);
 
 #ifdef SYSVSHM
 	/* Initialize System V style shared memory. */
@@ -372,7 +371,7 @@ main(void)
 	 * Initialize protocols.  Block reception of incoming packets
 	 * until everything is ready.
 	 */
-	s = splimp();
+	s = splnet();
 	ifinit();
 	domaininit();
 	if_attachdomain();
@@ -395,7 +394,6 @@ main(void)
 	siginit(p);
 
 	/* Kick off timeout driven events by calling first time. */
-	roundrobin(NULL);
 	schedcpu(NULL);
 
 	/*
@@ -473,7 +471,7 @@ main(void)
 	 * munched in mi_switch() after the time got set.
 	 */
 	proclist_lock_read();
-	s = splhigh();		/* block clock and statclock */
+	s = splsched();
 	for (p = LIST_FIRST(&allproc); p != NULL;
 	     p = LIST_NEXT(p, p_list)) {
 		p->p_stats->p_start = mono_time = boottime = time;
@@ -486,20 +484,32 @@ main(void)
 
 	/* Create the pageout daemon kernel thread. */
 	uvm_swap_init();
-	if (kthread_create1(start_pagedaemon, NULL, NULL, "pagedaemon"))
+	if (kthread_create1(uvm_pageout, NULL, NULL, "pagedaemon"))
 		panic("fork pagedaemon");
 
 	/* Create the process reaper kernel thread. */
-	if (kthread_create1(start_reaper, NULL, NULL, "reaper"))
+	if (kthread_create1(reaper, NULL, NULL, "reaper"))
 		panic("fork reaper");
 
 	/* Create the filesystem syncer kernel thread. */
 	if (kthread_create1(sched_sync, NULL, NULL, "ioflush"))
 		panic("fork syncer");
 
+	/* Create the aiodone daemon kernel thread. */
+	if (kthread_create1(uvm_aiodone_daemon, NULL, NULL, "aiodoned"))
+		panic("fork aiodoned");
+
 #if defined(MULTIPROCESSOR)
 	/* Boot the secondary processors. */
 	cpu_boot_secondary_processors();
+#endif
+
+	/* Initialize exec structures */
+	exec_init(1);
+
+#ifndef PIPE_SOCKETPAIR
+	/* Initialize pipe structures */
+	pipe_init();
 #endif
 
 	/*
@@ -507,17 +517,6 @@ main(void)
 	 */
 	start_init_exec = 1;
 	wakeup((void *)&start_init_exec);
-
-#ifdef NVNODE_IMPLICIT
-	/*
-	 * If maximum number of vnodes in namei vnode cache is not explicitly
-	 * defined in kernel config, adjust the number such as we use roughly
-	 * 0.5% of memory for vnode cache (but not less than NVNODE vnodes).
-	 */
-	usevnodes = (ptoa(physmem) / 200) / sizeof(struct vnode);
-	if (usevnodes > desiredvnodes) 
-		desiredvnodes = usevnodes;
-#endif
 
 	/* The scheduler is an infinite loop. */
 	uvm_scheduler();
@@ -594,11 +593,10 @@ start_init(void *arg)
 	 */
 	addr = USRSTACK - PAGE_SIZE;
 	if (uvm_map(&p->p_vmspace->vm_map, &addr, PAGE_SIZE, 
-                    NULL, UVM_UNKNOWN_OFFSET, 
+                    NULL, UVM_UNKNOWN_OFFSET, 0,
                     UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 		    UVM_ADV_NORMAL,
-                    UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW))
-		!= KERN_SUCCESS)
+                    UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW)) != 0)
 		panic("init: couldn't allocate argument space");
 	p->p_vmspace->vm_maxsaddr = (caddr_t)addr;
 
@@ -672,29 +670,13 @@ start_init(void *arg)
 		 * other than it doesn't exist, complain.
 		 */
 		error = sys_execve(p, &args, retval);
-		if (error == 0 || error == EJUSTRETURN)
+		if (error == 0 || error == EJUSTRETURN) {
+			KERNEL_PROC_UNLOCK(p);
 			return;
+		}
 		if (error != ENOENT)
 			printf("exec %s: error %d\n", path, error);
 	}
 	printf("init: not found\n");
 	panic("no init");
-}
-
-/* ARGSUSED */
-static void
-start_pagedaemon(void *arg)
-{
-
-	uvm_pageout();
-	/* NOTREACHED */
-}
-
-/* ARGSUSED */
-static void
-start_reaper(void *arg)
-{
-
-	reaper();
-	/* NOTREACHED */
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: in.c,v 1.61.4.4 2002/04/03 21:16:45 he Exp $	*/
+/*	$NetBSD: in.c,v 1.76 2002/05/09 06:49:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -138,6 +138,9 @@
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: in.c,v 1.76 2002/05/09 06:49:15 itojun Exp $");
+
 #include "opt_inet.h"
 #include "opt_inet_conf.h"
 #include "opt_mrouting.h"
@@ -150,6 +153,7 @@
 #include <sys/socketvar.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -204,11 +208,11 @@ in_localaddr(in)
 	struct in_ifaddr *ia;
 
 	if (subnetsarelocal) {
-		for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next)
+		TAILQ_FOREACH(ia, &in_ifaddr, ia_list)
 			if ((in.s_addr & ia->ia_netmask) == ia->ia_net)
 				return (1);
 	} else {
-		for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next)
+		TAILQ_FOREACH(ia, &in_ifaddr, ia_list)
 			if ((in.s_addr & ia->ia_subnetmask) == ia->ia_subnet)
 				return (1);
 	}
@@ -288,7 +292,7 @@ in_setmaxmtu()
 	struct ifnet *ifp;
 	unsigned long maxmtu = 0;
 
-	for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next) {
+	TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
 		if ((ifp = ia->ia_ifp) == 0)
 			continue;
 		if ((ifp->if_flags & (IFF_UP|IFF_LOOPBACK)) != IFF_UP)
@@ -382,8 +386,9 @@ in_control(so, cmd, data, ifp, p)
 	case SIOCDIFADDR:
 	case SIOCGIFALIAS:
 		if (ifra->ifra_addr.sin_family == AF_INET)
-			for (ia = IN_IFADDR_HASH(ifra->ifra_addr.sin_addr.s_addr).lh_first;
-			    ia != 0; ia = ia->ia_hash.le_next) {
+			LIST_FOREACH(ia,
+			    &IN_IFADDR_HASH(ifra->ifra_addr.sin_addr.s_addr),
+			    ia_hash) {
 				if (ia->ia_ifp == ifp  &&
 				    in_hosteq(ia->ia_addr.sin_addr,
 				    ifra->ifra_addr.sin_addr))
@@ -768,7 +773,7 @@ in_lifaddr_ioctl(so, cmd, data, ifp, p)
 			}
 		}
 
-		for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next) {
+		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family != AF_INET6)
 				continue;
 			if (!cmp)
@@ -849,7 +854,7 @@ in_ifinit(ifp, ia, sin, scrub)
 {
 	u_int32_t i = sin->sin_addr.s_addr;
 	struct sockaddr_in oldaddr;
-	int s = splimp(), flags = RTF_UP, error;
+	int s = splnet(), flags = RTF_UP, error;
 
 	/*
 	 * Set up new addresses.
@@ -970,7 +975,7 @@ in_addprefix(target, flags)
 	mask = target->ia_sockmask.sin_addr;
 	prefix.s_addr &= mask.s_addr;
 
-	for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next) {
+	TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
 		/* easy one first */
 		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
 			continue;
@@ -985,7 +990,7 @@ in_addprefix(target, flags)
 
 		/*
 		 * if we got a matching prefix route inserted by other
-		 * interface adderss, we don't need to bother
+		 * interface address, we don't need to bother
 		 */
 		if (ia->ia_flags & IFA_ROUTE)
 			return 0;
@@ -1023,7 +1028,7 @@ in_scrubprefix(target)
 	mask = target->ia_sockmask.sin_addr;
 	prefix.s_addr &= mask.s_addr;
 
-	for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next) {
+	TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
 		/* easy one first */
 		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
 			continue;
@@ -1082,7 +1087,7 @@ in_broadcast(in, ifp)
 	 * with a broadcast address.
 	 */
 #define ia (ifatoia(ifa))
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 		if (ifa->ifa_addr->sa_family == AF_INET &&
 		    !in_hosteq(in, ia->ia_addr.sin_addr) &&
 		    (in_hosteq(in, ia->ia_broadaddr.sin_addr) ||
@@ -1113,8 +1118,9 @@ in_savemkludge(oia)
 
 	IFP_TO_IA(oia->ia_ifp, ia);
 	if (ia) {	/* there is another address */
-		for (inm = oia->ia_multiaddrs.lh_first; inm; inm = next){
-			next = inm->inm_list.le_next;
+		for (inm = LIST_FIRST(&oia->ia_multiaddrs); inm; inm = next){
+			next = LIST_NEXT(inm, inm_list);
+			LIST_REMOVE(inm, inm_list);
 			IFAFREE(&inm->inm_ia->ia_ifa);
 			IFAREF(&ia->ia_ifa);
 			inm->inm_ia = ia;
@@ -1146,6 +1152,7 @@ in_restoremkludge(ia, ifp)
 			for (inm = LIST_FIRST(&oia->ia_multiaddrs);
 			    inm != NULL; inm = next) {
 				next = LIST_NEXT(inm, inm_list);
+				LIST_REMOVE(inm, inm_list);
 				IFAFREE(&inm->inm_ia->ia_ifa);
 				IFAREF(&ia->ia_ifa);
 				inm->inm_ia = ia;

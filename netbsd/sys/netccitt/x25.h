@@ -1,4 +1,4 @@
-/*	$NetBSD: x25.h,v 1.9 2000/03/13 23:52:40 soren Exp $	*/
+/*	$NetBSD: x25.h,v 1.11 2001/01/17 04:05:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 1984 University of British Columbia.
@@ -42,6 +42,9 @@
  *
  *	@(#)x25.h	8.1 (Berkeley) 6/10/93
  */
+
+#ifndef _NETCCITT_X25_H_
+#define _NETCCITT_X25_H_
 
 #ifdef _KERNEL
 #define PRC_IFUP	3
@@ -183,3 +186,5 @@ int pk_user_protolisten __P((u_char *));
 int pk_rtattach __P((struct socket *, struct mbuf *));
 int x25_rtattach __P((struct pklcd *, struct rtentry *));
 #endif
+
+#endif /* _NETCCITT_X25_H_ */

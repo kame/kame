@@ -1,4 +1,4 @@
-/*	$NetBSD: if_bm.c,v 1.9.2.1 2000/11/01 15:02:49 tv Exp $	*/
+/*	$NetBSD: if_bm.c,v 1.17 2002/03/05 04:12:57 itojun Exp $	*/
 
 /*-
  * Copyright (C) 1998, 1999, 2000 Tsubai Masanari.  All rights reserved.
@@ -39,7 +39,7 @@
 #include <sys/systm.h>
 #include <sys/callout.h>
 
-#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
@@ -202,7 +202,7 @@ bmac_attach(parent, self, aux)
 	if (strcmp(ca->ca_name, "ethernet") == 0) {
 		char name[64];
 
-		bzero(name, 64);
+		memset(name, 0, 64);
 		OF_package_to_path(ca->ca_node, name, sizeof(name));
 		OF_open(name);
 		sc->sc_flags |= BMAC_BMACPLUS;
@@ -221,7 +221,7 @@ bmac_attach(parent, self, aux)
 		printf(": cannot get mac-address\n");
 		return;
 	}
-	bcopy(laddr, sc->sc_enaddr, 6);
+	memcpy(sc->sc_enaddr, laddr, 6);
 
 	sc->sc_txdma = mapiodev(ca->ca_reg[2], NBPG);
 	sc->sc_rxdma = mapiodev(ca->ca_reg[4], NBPG);
@@ -241,7 +241,7 @@ bmac_attach(parent, self, aux)
 	intr_establish(ca->ca_intr[0], IST_LEVEL, IPL_NET, bmac_intr, sc);
 	intr_establish(ca->ca_intr[2], IST_LEVEL, IPL_NET, bmac_rint, sc);
 
-	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+	memcpy(ifp->if_xname, sc->sc_dev.dv_xname, IFNAMSIZ);
 	ifp->if_softc = sc;
 	ifp->if_ioctl = bmac_ioctl;
 	ifp->if_start = bmac_start;
@@ -270,10 +270,6 @@ bmac_attach(parent, self, aux)
 
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
-
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 }
 
 /*
@@ -398,9 +394,9 @@ bmac_init(sc)
 	data = sc->sc_txbuf;
 	eh = (struct ether_header *)data;
 
-	bzero(data, sizeof(eh) + ETHERMIN);
-	bcopy(sc->sc_enaddr, eh->ether_dhost, ETHER_ADDR_LEN);
-	bcopy(sc->sc_enaddr, eh->ether_shost, ETHER_ADDR_LEN);
+	memset(data, 0, sizeof(eh) + ETHERMIN);
+	memcpy(eh->ether_dhost, sc->sc_enaddr, ETHER_ADDR_LEN);
+	memcpy(eh->ether_shost, sc->sc_enaddr, ETHER_ADDR_LEN);
 	bmac_transmit_packet(sc, data, sizeof(eh) + ETHERMIN);
 
 	bmac_start(ifp);
@@ -418,8 +414,8 @@ bmac_init_dma(sc)
 	dbdma_reset(sc->sc_txdma);
 	dbdma_reset(sc->sc_rxdma);
 
-	bzero(sc->sc_txcmd, BMAC_TXBUFS * sizeof(dbdma_command_t));
-	bzero(sc->sc_rxcmd, (BMAC_RXBUFS + 1) * sizeof(dbdma_command_t));
+	memset(sc->sc_txcmd, 0, BMAC_TXBUFS * sizeof(dbdma_command_t));
+	memset(sc->sc_rxcmd, 0, (BMAC_RXBUFS + 1) * sizeof(dbdma_command_t));
 
 	for (i = 0; i < BMAC_RXBUFS; i++) {
 		DBDMA_BUILD(cmd, DBDMA_CMD_IN_LAST, 0, BMAC_BUFLEN,
@@ -509,7 +505,6 @@ bmac_rint(v)
 			ifp->if_ierrors++;
 			goto next;
 		}
-		m->m_flags |= M_HASFCS;
 
 #if NBPFILTER > 0
 		/*
@@ -650,7 +645,7 @@ bmac_put(sc, buff, m)
 			MFREE(m, n);
 			continue;
 		}
-		bcopy(mtod(m, caddr_t), buff, len);
+		memcpy(buff, mtod(m, caddr_t), len);
 		buff += len;
 		tlen += len;
 		MFREE(m, n);
@@ -700,7 +695,7 @@ bmac_get(sc, pkt, totlen)
 			len = MCLBYTES;
 		}
 		m->m_len = len = min(totlen, len);
-		bcopy(pkt, mtod(m, caddr_t), len);
+		memcpy(mtod(m, caddr_t), pkt, len);
 		pkt += len;
 		totlen -= len;
 		*mp = m;
@@ -759,8 +754,8 @@ bmac_ioctl(ifp, cmd, data)
 				ina->x_host =
 				    *(union ns_host *)LLADDR(ifp->if_sadl);
 			else {
-				bcopy(ina->x_host.c_host,
-				    LLADDR(ifp->if_sadl),
+				memcpy(LLADDR(ifp->if_sadl),
+				    ina->x_host.c_host,
 				    sizeof(sc->sc_enaddr));
 			}
 			/* Set new address. */
@@ -892,7 +887,7 @@ bmac_setladrf(sc)
 
 	ETHER_FIRST_MULTI(step, &sc->sc_ethercom, enm);
 	while (enm != NULL) {
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
 			/*
 			 * We must listen to a range of multicast addresses.
 			 * For now, just accept all multicasts, rather than

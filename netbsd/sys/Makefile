@@ -1,14 +1,12 @@
-#	$NetBSD: Makefile,v 1.37 1999/11/08 00:16:40 mycroft Exp $
+#	$NetBSD: Makefile,v 1.46 2002/01/09 21:51:53 deberg Exp $
 
-SUBDIR=	adosfs arch compat dev filecorefs isofs miscfs msdosfs net \
-	netatalk netccitt netinet netinet6 netiso netkey netnatm netns \
-	nfs ntfs sys ufs uvm vm
-SUBDIR+=altq
+SUBDIR=	adosfs altq arch compat dev filecorefs fs isofs miscfs msdosfs \
+	net netatalk netccitt netinet netinet6 netisdn netiso netkey \
+	netnatm netns netsmb nfs ntfs sys ufs uvm
+#SUBDIR+=lkm
 
-#.if (${MACHINE_ARCH} != "mipseb" && ${MACHINE_ARCH} != "mipsel")
-#
-#SUBDIR+= lkm
-#
-#.endif
+# Speedup stubs for some subtrees that don't need to run these rules
+includes-lkm:
+	@true
 
 .include <bsd.kinc.mk>

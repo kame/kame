@@ -1,4 +1,4 @@
-/*	$NetBSD: if_upl.c,v 1.4.2.1 2000/08/09 08:27:48 drochner Exp $	*/
+/*	$NetBSD: if_upl.c,v 1.17 2002/03/05 04:12:59 itojun Exp $	*/
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -40,6 +40,9 @@
  * Prolific PL2301/PL2302 driver
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_upl.c,v 1.17 2002/03/05 04:12:59 itojun Exp $");
+
 #include "opt_inet.h"
 #include "opt_ns.h"
 #include "bpfilter.h"
@@ -74,6 +77,8 @@
 #include <netinet/in.h> 
 #include <netinet/in_var.h> 
 #include <netinet/if_inarp.h>
+#else
+#error upl without INET?
 #endif
 
 #ifdef NS
@@ -88,7 +93,7 @@
 
 /*
  * 7  6  5  4  3  2  1  0
- *  tx rx 1  0
+ * tx rx 1  0
  * 1110 0000 rxdata
  * 1010 0000 idle
  * 0010 0000 tx over
@@ -246,7 +251,7 @@ USB_ATTACH(upl)
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
-	err = usbd_set_config_no(dev, UPL_CONFIG_NO, 0);
+	err = usbd_set_config_no(dev, UPL_CONFIG_NO, 1);
 	if (err) {
 		printf("%s: setting config no failed\n",
 		    USBDEVNAME(sc->sc_dev));
@@ -293,7 +298,7 @@ USB_ATTACH(upl)
 		USB_ATTACH_ERROR_RETURN;
 	}
 
-	s = splimp();
+	s = splnet();
 
 	/* Initialize interface info.*/
 	ifp = &sc->sc_if;
@@ -311,13 +316,15 @@ USB_ATTACH(upl)
 	ifp->if_output = upl_output;
 	ifp->if_input = upl_input;
 	ifp->if_baudrate = 12000000;
+	ifp->if_dlt = DLT_RAW;
 	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 
 #if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, 0);
+	bpfattach(ifp, DLT_RAW, 0);
 #endif
 #if NRND > 0
 	rnd_attach_source(&sc->sc_rnd_source, USBDEVNAME(sc->sc_dev),
@@ -358,7 +365,6 @@ USB_DETACH(upl)
 #if NBPFILTER > 0
 	bpfdetach(ifp);
 #endif
-	ether_ifdetach(ifp);
 
 	if_detach(ifp);
 
@@ -546,7 +552,7 @@ upl_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	m->m_pkthdr.rcvif = ifp;
 
-	s = splimp();
+	s = splnet();
 
 	/* XXX ugly */
 	if (upl_newbuf(sc, c, NULL) == ENOBUFS) {
@@ -602,7 +608,7 @@ upl_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	if (sc->sc_dying)
 		return;
 
-	s = splimp();
+	s = splnet();
 
 	DPRINTFN(10,("%s: %s: enter status=%d\n", USBDEVNAME(sc->sc_dev),
 		    __FUNCTION__, status));
@@ -693,7 +699,6 @@ upl_start(struct ifnet *ifp)
 		return;
 
 	if (upl_send(sc, m_head, 0)) {
-		IF_PREPEND(&ifp->if_snd, m_head);
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
@@ -732,7 +737,7 @@ upl_init(void *xsc)
 	if (ifp->if_flags & IFF_RUNNING)
 		return;
 
-	s = splimp();
+	s = splnet();
 
 	/* Init TX ring. */
 	if (upl_tx_list_init(sc) == ENOBUFS) {
@@ -864,7 +869,7 @@ upl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	DPRINTFN(5,("%s: %s: cmd=0x%08lx\n",
 		    USBDEVNAME(sc->sc_dev), __FUNCTION__, command));
 
-	s = splimp();
+	s = splnet();
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -1045,7 +1050,7 @@ upl_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	len = m->m_pkthdr.len;
-	s = splimp();
+	s = splnet();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
@@ -1075,12 +1080,14 @@ upl_input(struct ifnet *ifp, struct mbuf *m)
 	schednetisr(NETISR_IP);
 	inq = &ipintrq;
 
-	s = splimp();
+	s = splnet();
 	if (IF_QFULL(inq)) {
 		IF_DROP(inq);
 		splx(s);
-		//if (sc->sc_flags & SC_DEBUG)
-		//printf("%s: input queue full\n", ifp->if_xname);
+#if 0
+		if (sc->sc_flags & SC_DEBUG)
+			printf("%s: input queue full\n", ifp->if_xname);
+#endif
 		ifp->if_iqdrops++;
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.171 2002/09/11 02:40:49 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.172 2002/09/25 11:41:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,9 +56,6 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
-#ifdef __NetBSD__
-#include <vm/vm.h>
-#endif
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/sysctl.h>
 #endif
