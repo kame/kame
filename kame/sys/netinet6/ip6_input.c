@@ -589,11 +589,14 @@ ip6_input(m)
 	plen = (u_int32_t)ntohs(ip6->ip6_plen);
 	if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
 		if (ip6_hopopts_input(&plen, &rtalert, &m, &off)) {
+#if 0	/*touches NULL pointer*/
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
+#endif
 			return;	/* m have already been freed */
 		}
 		/* adjust pointer */
 		ip6 = mtod(m, struct ip6_hdr *);
+		/* ip6_hopopts_input() ensures that mbuf is contiguous */
 		nxt = ((struct ip6_hbh *)(ip6 + 1))->ip6h_nxt;
 
 		/*
@@ -991,6 +994,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		 */
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
+			/* XXX sanity check? */
 			struct ip6_hbh *hbh = (struct ip6_hbh *)(ip6 + 1);
 
 			/*
@@ -1020,8 +1024,19 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		 * the chain of ancillary data.
 		 */
 		while(1) {	/* is explicit loop prevention necessary? */
-			struct ip6_ext *ip6e =
-				(struct ip6_ext *)(mtod(m, caddr_t) + off);
+			struct ip6_ext *ip6e;
+			int elen;
+
+			/* XXX more sanity checks? */
+			if (m->m_len < off + sizeof(struct ip6_ext))
+				break;
+			ip6e = (struct ip6_ext *)(mtod(m, caddr_t) + off);
+			if (nxt == IPPROTO_AH)
+				elen = (ip6e->ip6e_len + 2) << 2;
+			else
+				elen = (ip6e->ip6e_len + 1) << 3;
+			if (m->m_len < off + elen)
+				break;
 
 			switch(nxt) {
 		         case IPPROTO_DSTOPTS:
@@ -1036,8 +1051,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 				 if (!privileged)
 					 break;
 
-				 *mp = sbcreatecontrol((caddr_t)ip6e,
-						       (ip6e->ip6e_len + 1) << 3,
+				 *mp = sbcreatecontrol((caddr_t)ip6e, elen,
 						       IPV6_DSTOPTS,
 						       IPPROTO_IPV6);
 				 if (*mp)
@@ -1048,8 +1062,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 				 if (!in6p->in6p_flags & IN6P_RTHDR)
 					 break;
 
-				 *mp = sbcreatecontrol((caddr_t)ip6e,
-						       (ip6e->ip6e_len + 1) << 3,
+				 *mp = sbcreatecontrol((caddr_t)ip6e, elen,
 						       IPV6_RTHDR,
 						       IPPROTO_IPV6);
 				 if (*mp)
@@ -1072,10 +1085,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 			}
 
 			/* proceed with the next header. */
-			if (nxt == IPPROTO_AH)
-				off += (ip6e->ip6e_len + 2) << 2;
-			else
-				off += (ip6e->ip6e_len + 1) << 3;
+			off += elen;
 			nxt = ip6e->ip6e_nxt;
 		}
 	  loopend:
