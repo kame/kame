@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.46 2000/04/11 16:21:49 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.47 2000/04/12 02:00:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,6 +131,7 @@ get_rand_ifid(ifp, in6)
 
 /*
  * Get interface identifier for the specified interface.
+ * XXX assumes single sockaddr_dl (AF_LINK address) per an interface
  */
 static int
 get_hw_ifid(ifp, in6)
