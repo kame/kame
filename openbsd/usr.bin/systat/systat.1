@@ -1,4 +1,4 @@
-.\"	$OpenBSD: systat.1,v 1.30 2003/09/02 18:50:06 jmc Exp $
+.\"	$OpenBSD: systat.1,v 1.33 2004/02/20 22:07:08 jmc Exp $
 .\"	$NetBSD: systat.1,v 1.6 1996/05/10 23:16:39 thorpej Exp $
 .\"
 .\" Copyright (c) 1985, 1990, 1993
@@ -35,7 +35,7 @@
 .Os
 .Sh NAME
 .Nm systat
-.Nd display system statistics on a crt
+.Nd display system statistics on a CRT
 .Sh SYNOPSIS
 .Nm systat
 .Op Fl w Ar wait
@@ -81,7 +81,13 @@ input line is passed to a per-display command interpreter.
 This allows each display to have certain display-specific commands.
 .Pp
 The options are as follows:
-.Bl -tag -width Ds
+.Bl -tag -width "refresh-interval"
+.It Fl w Ar wait
+Specifies the screen refresh time interval in seconds.
+This option is overridden by
+.Ar refresh-interval ,
+if given.
+The default interval is 5 seconds.
 .It Ar display
 The
 .Ar display
@@ -100,10 +106,11 @@ The
 .Ar refresh-interval
 specifies the screen refresh time interval in seconds.
 This is provided for backwards compatibility, and overrides the
-.Ar refresh-interval
-specified with the
+.Ar wait
+interval specified with the
 .Fl w
 flag.
+The default interval is 5 seconds.
 .El
 .Pp
 Certain characters cause immediate action by
@@ -204,6 +211,9 @@ statistics in bar graph form (default).
 .It Cm secs
 Toggle the display of time in disk activity (the default is to
 not display time).
+.It Cm split
+Toggle the display of separate read/write statistics (the default is
+combined statistics).
 .El
 .It Ic swap
 Show information about swap space usage on all the

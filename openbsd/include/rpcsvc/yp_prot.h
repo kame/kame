@@ -1,4 +1,4 @@
-/*	$OpenBSD: yp_prot.h,v 1.6 2003/06/02 04:00:17 deraadt Exp $	*/
+/*	$OpenBSD: yp_prot.h,v 1.8 2004/01/22 21:48:02 espie Exp $	*/
 /*	$NetBSD: yp_prot.h,v 1.6 1995/07/14 21:10:58 christos Exp $	*/
 
 /*
@@ -32,33 +32,33 @@
 
 /*
  * YPSERV PROTOCOL:
- * 
+ *
  * ypserv supports the following procedures:
- * 
+ *
  * YPPROC_NULL		takes (void), returns (void).
- * 			called to check if server is alive.
+ *			called to check if server is alive.
  * YPPROC_DOMAIN	takes (char *), returns (bool_t).
- * 			true if ypserv serves the named domain.
+ *			true if ypserv serves the named domain.
  * YPPROC_DOMAIN_NOACK	takes (char *), returns (bool_t).
- * 			true if ypserv serves the named domain.
+ *			true if ypserv serves the named domain.
  *			used for broadcasts, does not ack if ypserv
  *			doesn't handle named domain.
  * YPPROC_MATCH		takes (struct ypreq_key), returns (struct ypresp_val)
- * 			does a lookup.
+ *			does a lookup.
  * YPPROC_FIRST		takes (struct ypreq_nokey) returns (ypresp_key_val).
- * 			gets the first key/datum from the map.
+ *			gets the first key/datum from the map.
  * YPPROC_NEXT		takes (struct ypreq_key) returns (ypresp_key_val).
- * 			gets the next key/datum from the map.
+ *			gets the next key/datum from the map.
  * YPPROC_XFR		takes (struct ypreq_xfr), returns (void).
- * 			tells ypserv to check if there is a new version of
+ *			tells ypserv to check if there is a new version of
  *			the map.
  * YPPROC_CLEAR		takes (void), returns (void).
- * 			tells ypserv to flush it's file cache, so that
+ *			tells ypserv to flush it's file cache, so that
  *			newly transferred files will get read.
  * YPPROC_ALL		takes (struct ypreq_nokey), returns (bool_t and
  *			struct ypresp_key_val).
- * 			returns an array of data, with the bool_t being
- * 			false on the last datum. read the source, it's
+ *			returns an array of data, with the bool_t being
+ *			false on the last datum. read the source, it's
  *			convoluted.
  * YPPROC_MASTER	takes (struct ypreq_nokey), returns (ypresp_master).
  * YPPROC_ORDER		takes (struct ypreq_nokey), returns (ypresp_order).
@@ -66,19 +66,19 @@
  */
 
 #ifndef BOOL_DEFINED
-typedef u_int bool;
+typedef unsigned int bool;
 #define BOOL_DEFINED
 #endif
 
 
 /* Program and version symbols, magic numbers */
-#define YPPROG		((u_long)100004)
-#define YPVERS		((u_long)2)
-#define YPVERS_ORIG	((u_long)1)
-#define YPMAXRECORD	((u_long)1024)
-#define YPMAXDOMAIN	((u_long)64)
-#define YPMAXMAP	((u_long)64)
-#define YPMAXPEER	((u_long)256)
+#define YPPROG		((unsigned long)100004)
+#define YPVERS		((unsigned long)2)
+#define YPVERS_ORIG	((unsigned long)1)
+#define YPMAXRECORD	((unsigned long)1024)
+#define YPMAXDOMAIN	((unsigned long)64)
+#define YPMAXMAP	((unsigned long)64)
+#define YPMAXPEER	((unsigned long)256)
 
 /*
  * I don't know if anything of sun's depends on this, or if they
@@ -98,7 +98,7 @@ typedef struct {
 struct ypmap_parms {
 	const char *domain;
 	const char *map;
-	u_long ordernum;
+	unsigned long ordernum;
 	char *owner;
 };
 
@@ -115,9 +115,9 @@ struct ypreq_nokey {
 
 struct ypreq_xfr {
 	struct ypmap_parms map_parms;
-	u_long transid;
-	u_long proto;
-	u_short port;
+	unsigned long transid;
+	unsigned long proto;
+	unsigned short port;
 };
 #define ypxfr_domain	map_parms.domain
 #define ypxfr_map	map_parms.map
@@ -125,24 +125,24 @@ struct ypreq_xfr {
 #define ypxfr_owner	map_parms.owner
 
 struct ypresp_val {
-	u_long status;
+	unsigned long status;
 	datum valdat;
 };
 
 struct ypresp_key_val {
-	u_long status;
+	unsigned long status;
 	datum keydat;
 	datum valdat;
 };
 
 struct ypresp_master {
-	u_long status;
+	unsigned long status;
 	char *master;
 };
 
 struct ypresp_order {
-	u_long status;
-	u_long ordernum;
+	unsigned long status;
+	unsigned long ordernum;
 };
 
 struct ypresp_all {
@@ -158,35 +158,35 @@ struct ypmaplist {
 };
 
 struct ypresp_maplist {
-	u_long status;
+	unsigned long status;
 	struct ypmaplist *list;
 };
 
 /* ypserv procedure numbers */
-#define YPPROC_NULL		((u_long)0)
-#define YPPROC_DOMAIN		((u_long)1)
-#define YPPROC_DOMAIN_NONACK	((u_long)2)
-#define YPPROC_MATCH		((u_long)3)
-#define YPPROC_FIRST		((u_long)4)
-#define YPPROC_NEXT		((u_long)5)
-#define YPPROC_XFR		((u_long)6)
-#define YPPROC_CLEAR		((u_long)7)
-#define YPPROC_ALL		((u_long)8)
-#define YPPROC_MASTER		((u_long)9)
-#define YPPROC_ORDER		((u_long)10)
-#define YPPROC_MAPLIST		((u_long)11)
+#define YPPROC_NULL		((unsigned long)0)
+#define YPPROC_DOMAIN		((unsigned long)1)
+#define YPPROC_DOMAIN_NONACK	((unsigned long)2)
+#define YPPROC_MATCH		((unsigned long)3)
+#define YPPROC_FIRST		((unsigned long)4)
+#define YPPROC_NEXT		((unsigned long)5)
+#define YPPROC_XFR		((unsigned long)6)
+#define YPPROC_CLEAR		((unsigned long)7)
+#define YPPROC_ALL		((unsigned long)8)
+#define YPPROC_MASTER		((unsigned long)9)
+#define YPPROC_ORDER		((unsigned long)10)
+#define YPPROC_MAPLIST		((unsigned long)11)
 
 /* ypserv procedure return status values */
-#define YP_TRUE	 	((unsigned long)1)	/* general purpose success code */
-#define YP_NOMORE 	((unsigned long)2)	/* no more entries in map */
-#define YP_FALSE 	((unsigned long)0)	/* general purpose failure code */
-#define YP_NOMAP 	((unsigned long)-1)	/* no such map in domain */
-#define YP_NODOM 	((unsigned long)-2)	/* domain not supported */
-#define YP_NOKEY 	((unsigned long)-3)	/* no such key in map */
-#define YP_BADOP 	((unsigned long)-4)	/* invalid operation */
-#define YP_BADDB 	((unsigned long)-5)	/* server data base is bad */
-#define YP_YPERR 	((unsigned long)-6)	/* YP server error */
-#define YP_BADARGS 	((unsigned long)-7)	/* request arguments bad */
+#define YP_TRUE		((unsigned long)1)	/* general purpose success code */
+#define YP_NOMORE	((unsigned long)2)	/* no more entries in map */
+#define YP_FALSE	((unsigned long)0)	/* general purpose failure code */
+#define YP_NOMAP	((unsigned long)-1)	/* no such map in domain */
+#define YP_NODOM	((unsigned long)-2)	/* domain not supported */
+#define YP_NOKEY	((unsigned long)-3)	/* no such key in map */
+#define YP_BADOP	((unsigned long)-4)	/* invalid operation */
+#define YP_BADDB	((unsigned long)-5)	/* server data base is bad */
+#define YP_YPERR	((unsigned long)-6)	/* YP server error */
+#define YP_BADARGS	((unsigned long)-7)	/* request arguments bad */
 #define YP_VERS		((unsigned long)-8)	/* YP server version mismatch */
 
 /*
@@ -195,7 +195,7 @@ struct ypresp_maplist {
  * Users of the ypclnt package (or of this protocol) don't HAVE to know about
  * it, but it must be available to users because _yp_dobind is a public
  * interface."
- * 
+ *
  * This is totally bogus! Nowhere else does Sun state that _yp_dobind() is
  * a public interface, and I don't know any reason anyone would want to call
  * it. But, just in case anyone does actually expect it to be available..
@@ -205,16 +205,16 @@ struct dom_binding {
 	struct dom_binding *dom_pnext;
 	char dom_domain[YPMAXDOMAIN + 1];
 	struct sockaddr_in dom_server_addr;
-	u_short dom_server_port;
+	unsigned short dom_server_port;
 	int dom_socket;
 	CLIENT *dom_client;
-	u_short dom_local_port;
+	unsigned short dom_local_port;
 	long dom_vers;
 };
 
 /*
  * YPBIND PROTOCOL:
- * 
+ *
  * ypbind supports the following procedures:
  *
  * YPBINDPROC_NULL	takes (void), returns (void).
@@ -225,15 +225,15 @@ struct dom_binding {
  * YPBINDPROC_SETDOM	takes (struct ypbind_setdom), returns (void).
  *			used by ypset.
  */
- 
-#define YPBINDPROG		((u_long)100007)
-#define YPBINDVERS		((u_long)2)
-#define YPBINDVERS_ORIG		((u_long)1)
+
+#define YPBINDPROG		((unsigned long)100007)
+#define YPBINDVERS		((unsigned long)2)
+#define YPBINDVERS_ORIG		((unsigned long)1)
 
 /* ypbind procedure numbers */
-#define YPBINDPROC_NULL		((u_long)0)
-#define YPBINDPROC_DOMAIN	((u_long)1)
-#define YPBINDPROC_SETDOM	((u_long)2)
+#define YPBINDPROC_NULL		((unsigned long)0)
+#define YPBINDPROC_DOMAIN	((unsigned long)1)
+#define YPBINDPROC_SETDOM	((unsigned long)2)
 
 /* error code in ypbind_resp.ypbind_status */
 enum ypbind_resptype {
@@ -244,13 +244,13 @@ enum ypbind_resptype {
 /* network order, of course */
 struct ypbind_binding {
 	struct in_addr	ypbind_binding_addr;
-	u_short		ypbind_binding_port;
+	unsigned short	ypbind_binding_port;
 };
 
 struct ypbind_resp {
 	enum ypbind_resptype	ypbind_status;
 	union {
-		u_long			ypbind_error;
+		unsigned long		ypbind_error;
 		struct ypbind_binding	ypbind_bindinfo;
 	} ypbind_respbody;
 };
@@ -266,45 +266,45 @@ struct ypbind_resp {
 struct ypbind_setdom {
 	char ypsetdom_domain[YPMAXDOMAIN + 1];
 	struct ypbind_binding ypsetdom_binding;
-	u_short ypsetdom_vers;
+	unsigned short ypsetdom_vers;
 };
 #define ypsetdom_addr ypsetdom_binding.ypbind_binding_addr
 #define ypsetdom_port ypsetdom_binding.ypbind_binding_port
 
 /*
  * YPPUSH PROTOCOL:
- * 
+ *
  * Sun says:
  * "Protocol between clients (ypxfr, only) and yppush
  *  yppush speaks a protocol in the transient range, which
  *  is supplied to ypxfr as a command-line parameter when it
  *  is activated by ypserv."
- * 
+ *
  * This protocol is not implemented, naturally, because this YP
  * implementation only does the client side.
  */
-#define YPPUSHVERS		((u_long)1)
-#define YPPUSHVERS_ORIG		((u_long)1)
+#define YPPUSHVERS		((unsigned long)1)
+#define YPPUSHVERS_ORIG		((unsigned long)1)
 
 /* yppush procedure numbers */
-#define YPPUSHPROC_NULL		((u_long)0)
-#define YPPUSHPROC_XFRRESP	((u_long)1)
+#define YPPUSHPROC_NULL		((unsigned long)0)
+#define YPPUSHPROC_XFRRESP	((unsigned long)1)
 
 struct yppushresp_xfr {
-	u_long	transid;
-	u_long	status;
+	unsigned long	transid;
+	unsigned long	status;
 };
 
 /* yppush status value in yppushresp_xfr.status */
 #define YPPUSH_SUCC	((unsigned long)1)	/* Success */
 #define YPPUSH_AGE	((unsigned long)2)	/* Master's version not newer */
-#define YPPUSH_NOMAP 	((unsigned long)-1)	/* Can't find server for map */
-#define YPPUSH_NODOM 	((unsigned long)-2)	/* Domain not supported */
-#define YPPUSH_RSRC 	((unsigned long)-3)	/* Local resouce alloc failure */
-#define YPPUSH_RPC 	((unsigned long)-4)	/* RPC failure talking to server */
+#define YPPUSH_NOMAP	((unsigned long)-1)	/* Can't find server for map */
+#define YPPUSH_NODOM	((unsigned long)-2)	/* Domain not supported */
+#define YPPUSH_RSRC	((unsigned long)-3)	/* Local resouce alloc failure */
+#define YPPUSH_RPC	((unsigned long)-4)	/* RPC failure talking to server */
 #define YPPUSH_MADDR	((unsigned long)-5)	/* Can't get master address */
-#define YPPUSH_YPERR 	((unsigned long)-6)	/* YP server/map db error */
-#define YPPUSH_BADARGS 	((unsigned long)-7)	/* Request arguments bad */
+#define YPPUSH_YPERR	((unsigned long)-6)	/* YP server/map db error */
+#define YPPUSH_BADARGS	((unsigned long)-7)	/* Request arguments bad */
 #define YPPUSH_DBM	((unsigned long)-8)	/* Local dbm operation failed */
 #define YPPUSH_FILE	((unsigned long)-9)	/* Local file I/O operation failed */
 #define YPPUSH_SKEW	((unsigned long)-10)	/* Map version skew during transfer */
@@ -329,7 +329,7 @@ bool_t xdr_ypresp_val(XDR *, struct ypresp_val *);
 bool_t xdr_ypbind_setdom(XDR *, struct ypbind_setdom *);
 bool_t xdr_ypresp_key_val(XDR *, struct ypresp_key_val *);
 bool_t xdr_ypresp_all(XDR *, struct ypresp_all *);
-bool_t xdr_ypresp_all_seq(XDR *, u_long *);
+bool_t xdr_ypresp_all_seq(XDR *, unsigned long *);
 bool_t xdr_ypresp_master(XDR *, struct ypresp_master *);
 bool_t xdr_ypmaplist_str(XDR *, char *);
 bool_t xdr_ypmaplist(XDR *, struct ypmaplist *);

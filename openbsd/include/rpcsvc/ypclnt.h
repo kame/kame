@@ -1,4 +1,4 @@
-/*	$OpenBSD: ypclnt.h,v 1.7 2003/06/02 04:00:17 deraadt Exp $	*/
+/*	$OpenBSD: ypclnt.h,v 1.9 2004/01/22 21:48:02 espie Exp $	*/
 /*	$NetBSD: ypclnt.h,v 1.7 1995/07/14 21:11:10 christos Exp $	*/
 
 /*
@@ -53,11 +53,11 @@
 #define YPOP_CHANGE	1		/* change, do not add */
 #define YPOP_INSERT	2		/* add, do not change */
 #define YPOP_DELETE	3		/* delete this entry */
-#define YPOP_STORE 	4		/* add, or change */
- 
+#define YPOP_STORE	4		/* add, or change */
+
 struct ypall_callback {
 	/* return non-0 to stop getting called */
-	int (*foreach)(u_long, char *, int, char *, int, void *);
+	int (*foreach)(unsigned long, char *, int, char *, int, void *);
 	char *data;		/* opaque pointer for use of callback fn */
 };
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmstat.c,v 1.41 2003/06/03 02:56:17 millert Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.45 2004/02/15 22:56:12 tedu Exp $	*/
 /*	$NetBSD: vmstat.c,v 1.5 1996/05/10 23:16:40 thorpej Exp $	*/
 
 /*-
@@ -34,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)vmstat.c	8.2 (Berkeley) 1/12/94";
 #endif
-static char rcsid[] = "$OpenBSD: vmstat.c,v 1.41 2003/06/03 02:56:17 millert Exp $";
+static char rcsid[] = "$OpenBSD: vmstat.c,v 1.45 2004/02/15 22:56:12 tedu Exp $";
 #endif /* not lint */
 
 /*
@@ -311,6 +311,8 @@ labelkre(void)
 	mvprintw(VMSTATROW + 15, VMSTATCOL + 10, "pdfre");
 	if (LINES - 1 > VMSTATROW + 16)
 		mvprintw(VMSTATROW + 16, VMSTATCOL + 10, "pdscn");
+	if (LINES - 1 > VMSTATROW + 17)
+		mvprintw(VMSTATROW + 17, VMSTATCOL + 10, "pzidle");
 
 	mvprintw(GENSTATROW, GENSTATCOL, "   Csw   Trp   Sys   Int   Sof  Flt");
 
@@ -324,7 +326,7 @@ labelkre(void)
 	    "Namei         Sys-cache    Proc-cache    No-cache");
 	mvprintw(NAMEIROW + 1, NAMEICOL,
 	    "    Calls     hits    %%    hits     %%    miss   %%");
-	mvprintw(DISKROW, DISKCOL, "Discs");
+	mvprintw(DISKROW, DISKCOL, "Disks");
 	mvprintw(DISKROW + 1, DISKCOL, "seeks");
 	mvprintw(DISKROW + 2, DISKCOL, "xfers");
 	mvprintw(DISKROW + 3, DISKCOL, "Kbyte");
@@ -480,6 +482,8 @@ showkre(void)
 	PUTRATE(uvmexp.pdfreed, VMSTATROW + 15, VMSTATCOL, 9);
 	if (LINES - 1 > VMSTATROW + 16)
 		PUTRATE(uvmexp.pdscans, VMSTATROW + 16, VMSTATCOL, 9);
+	if (LINES - 1 > VMSTATROW + 17)
+		PUTRATE(uvmexp.zeropages, VMSTATROW + 17, VMSTATCOL, 9);
 
 	PUTRATE(uvmexp.pageins, PAGEROW + 2, PAGECOL + 5, 5);
 	PUTRATE(uvmexp.pdpageouts, PAGEROW + 2, PAGECOL + 10, 5);
@@ -701,10 +705,12 @@ dinfo(int dn, int c)
 	atime = (double)cur.dk_time[dn].tv_sec +
 	    ((double)cur.dk_time[dn].tv_usec / (double)1000000);
 
-	words = cur.dk_bytes[dn] / 1024.0;	/* # of K transferred */
+	/* # of K transferred */
+	words = (cur.dk_rbytes[dn] + cur.dk_wbytes[dn]) / 1024.0;
 
 	putint((int)((float)cur.dk_seek[dn]/etime+0.5), DISKROW + 1, c, 5);
-	putint((int)((float)cur.dk_xfer[dn]/etime+0.5), DISKROW + 2, c, 5);
+	putint((int)((float)(cur.dk_rxfer[dn] + cur.dk_wxfer[dn])/etime+0.5),
+	    DISKROW + 2, c, 5);
 	putint((int)(words/etime + 0.5), DISKROW + 3, c, 5);
 	putfloat(atime/etime, DISKROW + 4, c, 5, 1, 1);
 }

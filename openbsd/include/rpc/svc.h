@@ -1,4 +1,4 @@
-/*	$OpenBSD: svc.h,v 1.7 2002/02/17 19:42:21 millert Exp $	*/
+/*	$OpenBSD: svc.h,v 1.9 2004/01/22 21:48:02 espie Exp $	*/
 /*	$NetBSD: svc.h,v 1.9 1995/04/29 05:28:01 cgd Exp $	*/
 
 /*
@@ -42,6 +42,7 @@
 #ifndef _RPC_SVC_H
 #define _RPC_SVC_H
 #include <sys/cdefs.h>
+#include <sys/poll.h>
 
 /*
  * This interface must manage two items concerning remote procedure calling:
@@ -76,7 +77,7 @@ enum xprt_stat {
  */
 typedef struct __rpc_svcxprt {
 	int		xp_sock;
-	u_short		xp_port;	 /* associated port number */
+	unsigned short	xp_port;	 /* associated port number */
 	struct xp_ops {
 		/* receive incomming requests */
 		bool_t	(*xp_recv)(struct __rpc_svcxprt *,
@@ -163,13 +164,13 @@ struct svc_req {
  *
  * svc_register(xprt, prog, vers, dispatch, protocol)
  *	SVCXPRT *xprt;
- *	u_long prog;
- *	u_long vers;
+ *	unsigned long prog;
+ *	unsigned long vers;
  *	void (*dispatch)();
  *	int protocol;    like TCP or UDP, zero means do not register 
  */
 __BEGIN_DECLS
-extern bool_t	svc_register(SVCXPRT *, u_long, u_long,
+extern bool_t	svc_register(SVCXPRT *, unsigned long, unsigned long,
 		    void (*)(struct svc_req *, SVCXPRT *), int);
 __END_DECLS
 
@@ -177,11 +178,11 @@ __END_DECLS
  * Service un-registration
  *
  * svc_unregister(prog, vers)
- *	u_long prog;
- *	u_long vers;
+ *	unsigned long prog;
+ *	unsigned long vers;
  */
 __BEGIN_DECLS
-extern void	svc_unregister(u_long, u_long);
+extern void	svc_unregister(unsigned long, unsigned long);
 __END_DECLS
 
 /*
@@ -239,7 +240,7 @@ extern bool_t	svc_sendreply(SVCXPRT *, xdrproc_t, char *);
 extern void	svcerr_decode(SVCXPRT *);
 extern void	svcerr_weakauth(SVCXPRT *);
 extern void	svcerr_noproc(SVCXPRT *);
-extern void	svcerr_progvers(SVCXPRT *, u_long, u_long);
+extern void	svcerr_progvers(SVCXPRT *, unsigned long, unsigned long);
 extern void	svcerr_auth(SVCXPRT *, enum auth_stat);
 extern void	svcerr_noprog(SVCXPRT *);
 extern void	svcerr_systemerr(SVCXPRT *);
@@ -260,13 +261,11 @@ __END_DECLS
  * Global keeper of rpc service descriptors in use
  * dynamic; must be inspected before each call to select 
  */
-extern int svc_maxfd;
-#ifdef FD_SETSIZE
 extern fd_set svc_fdset;
 #define svc_fds svc_fdset.fds_bits[0]	/* compatibility */
-#else
-extern int svc_fds;
-#endif /* def FD_SETSIZE */
+extern struct pollfd *svc_pollfd;
+extern int svc_max_pollfd;
+extern int svc_maxfd;			/* non-standard */
 
 /*
  * a small program implemented by the svc_rpc implementation itself;
@@ -276,6 +275,8 @@ extern void rpctest_service();				/* XXX relic? */
 
 __BEGIN_DECLS
 extern void	svc_getreq(int);
+extern void	svc_getreq_common(int);
+extern void	svc_getreq_poll(struct pollfd *, const int);
 extern void	svc_getreqset(fd_set *);
 extern void	svc_getreqset2(fd_set *, int);
 extern void	svc_run(void);
@@ -303,7 +304,7 @@ __END_DECLS
  */
 __BEGIN_DECLS
 extern SVCXPRT *svcudp_create(int);
-extern SVCXPRT *svcudp_bufcreate(int, u_int, u_int);
+extern SVCXPRT *svcudp_bufcreate(int, unsigned int, unsigned int);
 __END_DECLS
 
 
@@ -311,14 +312,14 @@ __END_DECLS
  * Tcp based rpc.
  */
 __BEGIN_DECLS
-extern SVCXPRT *svctcp_create(int, u_int, u_int);
+extern SVCXPRT *svctcp_create(int, unsigned int, unsigned int);
 __END_DECLS
 
 /*
  * Fd based rpc.
  */
 __BEGIN_DECLS
-extern SVCXPRT *svcfd_create(int, u_int, u_int);
+extern SVCXPRT *svcfd_create(int, unsigned int, unsigned int);
 __END_DECLS
 
 #endif /* !_RPC_SVC_H */

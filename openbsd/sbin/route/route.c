@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.60 2003/08/26 08:33:12 itojun Exp $	*/
+/*	$OpenBSD: route.c,v 1.63 2004/01/18 12:26:16 markus Exp $	*/
 /*	$NetBSD: route.c,v 1.16 1996/04/15 18:27:05 cgd Exp $	*/
 
 /*
@@ -40,7 +40,7 @@ static const char copyright[] =
 #if 0
 static const char sccsid[] = "@(#)route.c	8.3 (Berkeley) 3/19/94";
 #else
-static const char rcsid[] = "$OpenBSD: route.c,v 1.60 2003/08/26 08:33:12 itojun Exp $";
+static const char rcsid[] = "$OpenBSD: route.c,v 1.63 2004/01/18 12:26:16 markus Exp $";
 #endif
 #endif /* not lint */
 
@@ -1379,7 +1379,8 @@ rtmsg(int cmd, int flags)
 	if (debugonly)
 		return (0);
 	if ((rlen = write(s, (char *)&m_rtmsg, l)) < 0) {
-		perror("writing to routing socket");
+		if (qflag == 0)
+			perror("writing to routing socket");
 		return (-1);
 	}
 	if (cmd == RTM_GET) {
@@ -1455,6 +1456,7 @@ char *msgtypes[] = {
 	"RTM_NEWADDR: address being added to iface",
 	"RTM_DELADDR: address being removed from iface",
 	"RTM_IFINFO: iface status change",
+	"RTM_IFANNOUNCE: iface arrival/departure",
 	0,
 };
 
@@ -1472,6 +1474,8 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 {
 	struct if_msghdr *ifm;
 	struct ifa_msghdr *ifam;
+	struct if_announcemsghdr *ifan;
+	const char *state = "unknown";
 
 	if (verbose == 0)
 		return;
@@ -1484,7 +1488,16 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 	switch (rtm->rtm_type) {
 	case RTM_IFINFO:
 		ifm = (struct if_msghdr *)rtm;
-		(void) printf("if# %d, flags:", ifm->ifm_index);
+		(void) printf("if# %d, ", ifm->ifm_index);
+		switch (ifm->ifm_data.ifi_link_state) {
+		case LINK_STATE_DOWN:
+			state = "down";
+			break;
+		case LINK_STATE_UP:
+			state = "up";
+			break;
+		}
+		(void) printf("link: %s, flags:", state);
 		bprintf(stdout, ifm->ifm_flags, ifnetflags);
 		pmsg_addrs((char *)(ifm + 1), ifm->ifm_addrs);
 		break;
@@ -1494,6 +1507,23 @@ print_rtmsg(struct rt_msghdr *rtm, int msglen)
 		(void) printf("metric %d, flags:", ifam->ifam_metric);
 		bprintf(stdout, ifam->ifam_flags, routeflags);
 		pmsg_addrs((char *)(ifam + 1), ifam->ifam_addrs);
+		break;
+	case RTM_IFANNOUNCE:
+		ifan = (struct if_announcemsghdr *)rtm;
+		(void) printf("if# %d, name %s, what: ",
+		    ifan->ifan_index, ifan->ifan_name);
+		switch (ifan->ifan_what) {
+		case IFAN_ARRIVAL:
+			printf("arrival");
+			break;
+		case IFAN_DEPARTURE:
+			printf("departure");
+			break;
+		default:
+			printf("#%d", ifan->ifan_what);
+			break;
+		}
+		printf("\n");
 		break;
 	default:
 		(void) printf("pid: %ld, seq %d, errno %d, flags:",
@@ -1615,17 +1645,17 @@ pmsg_addrs(char *cp, int addrs)
 	struct sockaddr *sa;
 	int i;
 
-	if (addrs == 0)
-		return;
-	(void) printf("\nsockaddrs: ");
-	bprintf(stdout, addrs, addrnames);
-	(void) putchar('\n');
-	for (i = 1; i; i <<= 1)
-		if (i & addrs) {
-			sa = (struct sockaddr *)cp;
-			(void) printf(" %s", routename(sa));
-			ADVANCE(cp, sa);
-		}
+	if (addrs != 0) {
+		(void) printf("\nsockaddrs: ");
+		bprintf(stdout, addrs, addrnames);
+		(void) putchar('\n');
+		for (i = 1; i; i <<= 1)
+			if (i & addrs) {
+				sa = (struct sockaddr *)cp;
+				(void) printf(" %s", routename(sa));
+				ADVANCE(cp, sa);
+			}
+	}
 	(void) putchar('\n');
 	(void) fflush(stdout);
 }

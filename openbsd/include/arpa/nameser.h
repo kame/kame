@@ -1,4 +1,4 @@
-/*	$OpenBSD: nameser.h,v 1.8 2003/06/02 19:34:12 millert Exp $	*/
+/*	$OpenBSD: nameser.h,v 1.10 2004/01/22 21:48:02 espie Exp $	*/
 
 /*
  * ++Copyright++ 1983, 1989, 1993
@@ -179,13 +179,26 @@
 #define T_SRV		33		/* Server selection */
 #define T_ATMA		34		/* ATM Address */
 #define T_NAPTR		35		/* Naming Authority PoinTeR */
+#define T_KX		36		/* Key Exchanger */
+#define T_CERT		37		/* CERT */
+#define T_A6		38		/* A6 */
+#define T_DNAME		39		/* DNAME */
+#define T_SINK		40		/* SINK */
 #define T_OPT		41		/* OPT pseudo-RR, RFC2671 */
+#define T_APL		42		/* APL */
+#define T_DS		43		/* Delegation Signer */
+#define T_SSHFP		44		/* SSH Key Fingerprint */
+#define T_RRSIG		46		/* RRSIG */
+#define T_NSEC		47		/* NSEC */
+#define T_DNSKEY	48		/* DNSKEY */
 	/* non standard */
 #define T_UINFO		100		/* user (finger) information */
 #define T_UID		101		/* user ID */
 #define T_GID		102		/* group ID */
 #define T_UNSPEC	103		/* Unspecified format (binary data) */
 	/* Query type values which do not appear in resource records */
+#define	T_TKEY		249		/* Transaction Key */
+#define	T_TSIG		250		/* Transaction Signature */
 #define	T_IXFR		251		/* incremental zone transfer */
 #define T_AXFR		252		/* transfer zone of authority */
 #define T_MAILB		253		/* transfer mailbox records */
@@ -348,8 +361,8 @@ typedef struct {
  */
 #define INDIR_MASK	0xc0
 
-extern	u_int16_t	_getshort(const u_char *);
-extern	u_int32_t	_getlong(const u_char *);
+extern	u_int16_t	_getshort(const unsigned char *);
+extern	u_int32_t	_getlong(const unsigned char *);
 
 /*
  * Inline versions of get/put short/long.  Pointer is advanced.
@@ -358,7 +371,7 @@ extern	u_int32_t	_getlong(const u_char *);
  * portable or it can be elegant but rarely both.
  */
 #define GETSHORT(s, cp) { \
-	register u_char *t_cp = (u_char *)(cp); \
+	unsigned char *t_cp = (unsigned char *)(cp); \
 	(s) = ((u_int16_t)t_cp[0] << 8) \
 	    | ((u_int16_t)t_cp[1]) \
 	    ; \
@@ -366,7 +379,7 @@ extern	u_int32_t	_getlong(const u_char *);
 }
 
 #define GETLONG(l, cp) { \
-	register u_char *t_cp = (u_char *)(cp); \
+	unsigned char *t_cp = (unsigned char *)(cp); \
 	(l) = ((u_int32_t)t_cp[0] << 24) \
 	    | ((u_int32_t)t_cp[1] << 16) \
 	    | ((u_int32_t)t_cp[2] << 8) \
@@ -376,16 +389,16 @@ extern	u_int32_t	_getlong(const u_char *);
 }
 
 #define PUTSHORT(s, cp) { \
-	register u_int16_t t_s = (u_int16_t)(s); \
-	register u_char *t_cp = (u_char *)(cp); \
+	u_int16_t t_s = (u_int16_t)(s); \
+	unsigned char *t_cp = (unsigned char *)(cp); \
 	*t_cp++ = t_s >> 8; \
 	*t_cp   = t_s; \
 	(cp) += INT16SZ; \
 }
 
 #define PUTLONG(l, cp) { \
-	register u_int32_t t_l = (u_int32_t)(l); \
-	register u_char *t_cp = (u_char *)(cp); \
+	u_int32_t t_l = (u_int32_t)(l); \
+	unsigned char *t_cp = (unsigned char *)(cp); \
 	*t_cp++ = t_l >> 24; \
 	*t_cp++ = t_l >> 16; \
 	*t_cp++ = t_l >> 8; \

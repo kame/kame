@@ -1,4 +1,4 @@
-.\"	$OpenBSD: sysctl.8,v 1.107 2003/09/09 11:55:05 jmc Exp $
+.\"	$OpenBSD: sysctl.8,v 1.120 2004/03/02 16:41:58 markus Exp $
 .\"	$NetBSD: sysctl.8,v 1.4 1995/09/30 07:12:49 thorpej Exp $
 .\"
 .\" Copyright (c) 1993
@@ -41,12 +41,11 @@
 .Op Fl n
 .Ar variable ...
 .Nm sysctl
-.Op Fl nq
-.Fl w
+.Op Fl nqw
 .Ar variable Ns = Ns Ar value ...
 .Nm sysctl
-.Fl aA
 .Op Fl n
+.Fl Aa
 .Sh DESCRIPTION
 The
 .Nm
@@ -57,15 +56,24 @@ The state to be retrieved or set is described using a
 .Pq MIB
 style name, described as a dotted set of components.
 .Pp
+When setting a variable,
+the MIB name should be followed by an equal sign and the new value.
+Variables are set implicitly using the
+.Ar variable Ns = Ns Ar value
+syntax, or explicitly with the
+.Fl w
+option.
+Both forms are identical.
+.Pp
 The options are as follows:
 .Bl -tag -width xxx
-.It Fl a
-List all the currently available string or integer values.
 .It Fl A
 List all the known MIB names including tables.
 Those with string or integer values will be printed as with the
 .Fl a
 flag; for the table values, the name of the utility to retrieve them is given.
+.It Fl a
+List all the currently available string or integer values.
 .It Fl n
 Suppress printing of the field name, only output the field value.
 Useful for setting shell variables.
@@ -78,8 +86,13 @@ Suppress all output when setting a variable.
 This option overrides the behaviour of
 .Fl n .
 .It Fl w
-Required to set a variable.
-The MIB name should be followed by an equal sign and the new value.
+Set a variable.
+It must be followed by a
+.Ar variable Ns = Ns Ar value
+assignment.
+The
+.Fl w
+flag is optional when setting a variable.
 .El
 .Pp
 The information available from
@@ -142,6 +155,9 @@ privilege can change the value.
 .It kern.tty.tk_nout	int64_t	no
 .It kern.tty.tk_rawcc	int64_t	no
 .It kern.tty.tk_cancc	int64_t	no
+.It kern.tty.ttyinfo	struct	no
+.It kern.tty.maxptys	integer	yes
+.It kern.tty.nptys	integer	no
 .It kern.ccpu	u_int	no
 .It kern.fscale	integer	no
 .It kern.nprocs	integer	no
@@ -233,6 +249,10 @@ privilege can change the value.
 .It net.inet.tcp.rstppslimit	integer	yes
 .It net.inet.tcp.ackonpush	integer	yes
 .It net.inet.tcp.ecn	integer	yes
+.It net.inet.tcp.syncachelimit	integer	yes
+.It net.inet.tcp.synbucketlimit	integer	yes
+.It net.inet.tcp.rfc3390	integer	yes
+.It net.inet.tcp.reasslimit	integer	yes
 .It net.inet.udp.checksum	integer	yes
 .It net.inet.udp.baddynamic	array	yes
 .It net.inet.udp.recvspace	integer	yes
@@ -240,10 +260,16 @@ privilege can change the value.
 .It net.inet.gre.allow	integer	yes
 .It net.inet.gre.wccp	integer	yes
 .It net.inet.esp.enable	integer	yes
+.It net.inet.esp.udpencap	integer	yes
+.It net.inet.esp.udpencap_port	integer	yes
 .It net.inet.ah.enable	integer	yes
 .It net.inet.mobileip.allow	integer	yes
 .It net.inet.etherip.allow	integer	yes
 .It net.inet.ipcomp.enable	integer	yes
+.It net.inet.carp.allow	integer	yes
+.It net.inet.carp.preempt	integer	yes
+.It net.inet.carp.log	integer	yes
+.It net.inet.carp.arpbalance	integer	yes
 .It net.inet6.ip6.forwarding	integer	yes
 .It net.inet6.ip6.redirect	integer	yes
 .It net.inet6.ip6.hlim	integer	yes
@@ -296,6 +322,8 @@ privilege can change the value.
 .It hw.disknames	string	no
 .It hw.diskcount	integer	no
 .It hw.sensors	struct	no
+.It hw.cpuspeed	integer	no
+.It hw.setperf	integer	yes
 .It machdep.console_device	dev_t	no
 .It machdep.unaligned_print	integer	yes (alpha only)
 .It machdep.unaligned_fix	integer	yes (alpha only)
@@ -304,6 +332,10 @@ privilege can change the value.
 .It machdep.apmhalt	integer	yes (i386 only)
 .It machdep.kbdreset	integer	yes (i386 only)
 .It machdep.userldt	integer	yes (i386 only)
+.It machdep.osxsfr	integer	no (i386 only)
+.It machdep.sse	integer	no (i386 only)
+.It machdep.sse2	integer	no (i386 only)
+.It machdep.xcrypt	integer	no (i386 only)
 .It machdep.allowaperture	integer	yes (XFree86)
 .It machdep.led_blink	integer	yes (sparc/sparc64)
 .It machdep.ceccerrs	integer	no (sparc64)
@@ -352,6 +384,9 @@ privilege can change the value.
 .It vfs.ffs.sd_inode_bitmap	integer	no
 .It vfs.ffs.sd_direct_blk_ptrs	integer	no
 .It vfs.ffs.sd_dir_entry	integer	no
+.It vfs.ffs.dirhash_dirsize	integer	yes
+.It vfs.ffs.dirhash_maxmem	integer	yes
+.It vfs.ffs.dirhash_mem	integer	no
 .It vfs.nfs.iothreads	integer	yes
 .El
 .Pp
@@ -424,7 +459,7 @@ in the system:
 To set the maximum number of processes allowed
 in the system to 1000:
 .Pp
-.Dl # sysctl -w kern.maxproc=1000
+.Dl # sysctl kern.maxproc=1000
 .Pp
 To retrieve information about the system clock rate:
 .Pp
@@ -438,12 +473,12 @@ To make the
 .Xr chown 2
 system call use traditional BSD semantics (don't clear setuid/setgid bits):
 .Pp
-.Dl # sysctl -w fs.posix.setuid=0
+.Dl # sysctl fs.posix.setuid=0
 .Pp
 To set the list of reserved TCP ports that should not be allocated
 by the kernel dynamically:
 .Pp
-.Dl # sysctl -w net.inet.tcp.baddynamic=749,750,751,760,761,871
+.Dl # sysctl net.inet.tcp.baddynamic=749,750,751,760,761,871
 .Pp
 This can be used to keep daemons
 from stealing a specific port that another program needs to function.
@@ -451,8 +486,8 @@ List elements may be separated by commas and/or whitespace.
 .Pp
 It is also possible to add or remove ports from the current list:
 .Bd -literal -offset indent
-# sysctl -w net.inet.tcp.baddynamic=+748
-# sysctl -w net.inet.tcp.baddynamic=-871
+# sysctl net.inet.tcp.baddynamic=+748
+# sysctl net.inet.tcp.baddynamic=-871
 .Ed
 .Pp
 To adjust the number of kernel
@@ -460,7 +495,7 @@ To adjust the number of kernel
 threads used to service asynchronous
 I/O requests on an NFS client machine:
 .Pp
-.Dl # sysctl -w vfs.nfs.iothreads=4
+.Dl # sysctl vfs.nfs.iothreads=4
 .Pp
 The number of 4 is the default, 20 is the maximum.
 See
@@ -472,8 +507,8 @@ for further discussion.
 To set the amount of shared memory available in the system and
 the maximum number of shared memory segments:
 .Bd -literal -offset indent
-# sysctl -w kern.shminfo.shmmax=33554432
-# sysctl -w kern.shminfo.shmseg=32
+# sysctl kern.shminfo.shmmax=33554432
+# sysctl kern.shminfo.shmseg=32
 .Ed
 .Sh SEE ALSO
 .Xr sysctl 3 ,
