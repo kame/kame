@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.218 2001/06/22 15:28:57 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.219 2001/06/26 19:49:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -659,14 +659,15 @@ icmp6_input(mp, offp, proto)
 			nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
 			bcopy(icmp6, nicmp6, sizeof(struct icmp6_hdr));
 			noff = sizeof(struct ip6_hdr);
-			n->m_pkthdr.len = n->m_len =
-				noff + sizeof(struct icmp6_hdr);
+			n->m_len = noff + sizeof(struct icmp6_hdr);
 			/*
 			 * Adjust mbuf. ip6_plen will be adjusted in
 			 * ip6_output().
+			 * n->m_pkthdr.len == n0->m_pkthdr.len at this point.
 			 */
+			n->m_pkthdr.len += noff + sizeof(struct icmp6_hdr);
+			n->m_pkthdr.len -= (off + sizeof(struct icmp6_hdr));
 			m_adj(n0, off + sizeof(struct icmp6_hdr));
-			n->m_pkthdr.len += n0->m_pkthdr.len;
 			n->m_next = n0;
 			n0->m_flags &= ~M_PKTHDR;
 		} else {
