@@ -282,25 +282,25 @@ dump_bgp_exportlist(FILE *fp, struct rt_entry *rte, char *indent)
 			while(rtp) {
 				if (rtp->rtp_type == RTPROTO_BGP &&
 				    rtp->rtp_bgp == srcbnp) {
+					if (first == 1) {
+						fprintf(fp, "%s  Exported to:\n",
+							indent);
+						first = 0; 
+					}
+					fprintf(fp,
+						"%s    %s(%s), ID=%s\n",
+						indent,
+						bgp_peerstr(obnp),
+						(obnp->rp_mode & BGPO_IGP) ?
+						"IBGP" : "EBGP",
+						inet_ntop(AF_INET, &obnp->rp_id,
+							  inetaddrstr,
+							  INET_ADDRSTRLEN));
 				}
-				if (first == 1) {
-					fprintf(fp, "%s  Exported to:\n",
-						indent);
-					first = 0; 
-				}
-				fprintf(fp,
-					"%s    %s(%s), ID=%s\n",
-					indent,
-					bgp_peerstr(obnp),
-					(obnp->rp_mode & BGPO_IGP) ?
-					"IBGP" : "EBGP",
-					inet_ntop(AF_INET, &obnp->rp_id,
-						  inetaddrstr,
-						  INET_ADDRSTRLEN));
-			}
-
-			if ((rtp = rtp->rtp_next) == obnp->rp_adj_ribs_out)
+				if ((rtp = rtp->rtp_next) ==
+				    obnp->rp_adj_ribs_out)
 				break;
+			}
 		}
 
 		if ((obnp = obnp->rp_next) == bgb)
