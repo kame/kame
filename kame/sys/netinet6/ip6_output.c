@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.316 2002/06/24 10:50:33 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.317 2002/06/25 10:07:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,6 +930,32 @@ skip_ipsec2:;
 #endif /* MIP6 */
 	dst = (struct sockaddr_in6 *)&ro->ro_dst;
 
+	/*
+	 * if specified, try to fill in the traffic class field.
+	 * do not override if a non-zero value is already set.
+	 * we check the diffserv field and the ecn field separately.
+	 */
+	if (opt && opt->ip6po_tclass >= 0) {
+		int mask = 0;
+
+		if ((ip6->ip6_flow & htonl(0xfc << 20)) == 0)
+			mask |= 0xfc;
+		if ((ip6->ip6_flow & htonl(0x03 << 20)) == 0)
+			mask |= 0x03;
+		if (mask != 0)
+			ip6->ip6_flow |= htonl((opt->ip6po_tclass & mask) << 20);
+	}
+
+	/* fill in or override the hop limit field, if necessary. */
+	if (opt && opt->ip6po_hlim != -1)
+		ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
+	else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+		if (im6o != NULL)
+			ip6->ip6_hlim = im6o->im6o_multicast_hlim;
+		else
+			ip6->ip6_hlim = ip6_defmcasthlim;
+	}
+
 #ifdef IPSEC
 #ifdef __OpenBSD__
 	/*
@@ -1033,31 +1059,8 @@ skip_ipsec2:;
 #endif /* OpenBSD */
 #endif /* IPSEC */
 
-	/*
-	 * if specified, try to fill in the traffic class field.
-	 * do not override if a non-zero value is already set.
-	 * we check the diffserv field and the ecn field separately.
-	 */
-	if (opt && opt->ip6po_tclass >= 0) {
-		int mask = 0;
-
-		if ((ip6->ip6_flow & htonl(0xfc << 20)) == 0)
-			mask |= 0xfc;
-		if ((ip6->ip6_flow & htonl(0x03 << 20)) == 0)
-			mask |= 0x03;
-		if (mask != 0)
-			ip6->ip6_flow |= htonl((opt->ip6po_tclass & mask) << 20);
-	}
-
-	/* fill in or override the hop limit field, if necessary. */
-	if (opt && opt->ip6po_hlim != -1)
-		ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
-	else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
-		if (im6o != NULL)
-			ip6->ip6_hlim = im6o->im6o_multicast_hlim;
-		else
-			ip6->ip6_hlim = ip6_defmcasthlim;
-	}
+	/* adjust pointer */
+	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(__bsdi__) || defined(__FreeBSD__)
 	if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
