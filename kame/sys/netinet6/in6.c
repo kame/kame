@@ -1453,7 +1453,7 @@ in6_purgemkludge(ifp)
 		if (mk->mk_ifp != ifp)
 			continue;
 
-		for (in6m = mk->mk_head.lh_first; in6m; in6m = next){
+		for (in6m = mk->mk_head.lh_first; in6m; in6m = next) {
 			next = in6m->in6m_entry.le_next;
 			LIST_REMOVE(in6m, in6m_entry);
 			in6_delmulti(in6m);
@@ -1574,7 +1574,8 @@ in6_delmulti(in6m)
 		 * Unlink from list.
 		 */
 		LIST_REMOVE(in6m, in6m_entry);
-		IFAFREE(&in6m->in6m_ia->ia_ifa); /* release reference */
+		if (in6m->in6m_ia)
+			IFAFREE(&in6m->in6m_ia->ia_ifa); /* release reference */
 
 		/*
 		 * Notify the network driver to update its multicast 

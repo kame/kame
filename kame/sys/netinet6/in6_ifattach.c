@@ -239,6 +239,10 @@ found:
 	}
 }
 
+/*
+ * XXX multiple loopback interface needs more care.  for instance,
+ * nodelocal address needs to be configured onto only one of them.
+ */
 void
 in6_ifattach(ifp, type, laddr, noloop)
 	struct ifnet *ifp;
@@ -668,6 +672,9 @@ in6_ifattach(ifp, type, laddr, noloop)
 	return;
 }
 
+/*
+ * NOTE: in6_ifdetach() does not support loopback if at this moment.
+ */
 void
 in6_ifdetach(ifp)
 	struct ifnet *ifp;
