@@ -92,7 +92,11 @@
 #define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
 
+#if 0
 #define	MINCLSIZE	(MHLEN+MLEN+1)	/* smallest amount to put in cluster */
+#else
+#define	MINCLSIZE	(MHLEN+1)	/* smallest amount to put in cluster */
+#endif
 #define	M_MAXCOMPRESS	(MHLEN / 2)	/* max amount to copy for compression */
 
 /*
