@@ -1,11 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.889 2000/05/17 10:10:16 sumikawa Exp $
+$Id: CHANGELOG,v 1.890 2000/05/17 10:18:34 sumikawa Exp $
 
 <200005>
 Wed May 17 19:09:51 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/{squid11, qmail}: upgrade to latest IPv6
 	  patch.
+	* kame/freebsd3/ports/{quake6, quakedata}: use IPv6-migrated
+	  quakeforge.
 
 2000-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/scope6config/scope6config.c: added a new syntax
