@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-api-fst.c,v 1.11 2001/06/22 19:25:14 itojun Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.12 2002/05/24 06:17:57 suz Exp $	*/
 
 /*
  * rijndael-api-fst.c   v2.3   April '2000
@@ -125,6 +125,7 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		for (i = numBlocks - 1; i > 0; i--) {
 #if 1 /*STRICT_ALIGN*/
 			bcopy(outBuffer, block, 16);
+			bcopy(input, iv, 16);
 			((word32*)block)[0] ^= ((word32*)iv)[0];
 			((word32*)block)[1] ^= ((word32*)iv)[1];
 			((word32*)block)[2] ^= ((word32*)iv)[2];
