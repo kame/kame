@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.635 2000/02/29 04:11:47 jinmei Exp $
+$Id: CHANGELOG,v 1.636 2000/02/29 04:31:33 itojun Exp $
 
 <200002>
+Tue Feb 29 13:30:10 JST 2000  itojun@iijlab.net
+	* */sys/netinet{,6}/in{,6}_proto.c: call encap_init().  From: jinmei
+	* */sys/netinet{,6}/tcp{,6}_subr.c: make sure to send valid TCP window
+	  size option, even when we have socket buffer size >= 65536.
+	  FreeBSD PR 16914.
+
 Mon Feb 28 23:26:03 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/icmp6.c: fix ICMPv6 redirect input.  the bug
 	  can result in invalid ND entry.
