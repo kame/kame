@@ -1534,7 +1534,6 @@ netinet/tcp_usrreq.c	optional inet
 netinet/udp_usrreq.c	optional inet
 netinet/dccp_usrreq.c   optional inet dccp
 netinet/dccp_cc_sw.c    optional inet dccp
-netinet/dccp_tfrc.c     optional inet dccp_tfrc
 netinet/dccp_tcplike.c	optional inet dccp
 netinet6/ah_aesxcbcmac.c	optional ipsec
 netinet6/ah_core.c	optional ipsec
