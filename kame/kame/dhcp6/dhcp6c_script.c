@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.1 2003/04/11 07:13:22 jinmei Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.2 2003/04/11 12:19:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -108,26 +108,29 @@ client6_script(ifp, state, optinfo)
 		goto clean;
 	}
 	/* "var=addr1 addr2 ... addrN" + null char for termination */
-	elen = sizeof (dnsserver_str) +
-	    (INET6_ADDRSTRLEN + 1) * dnsservers + 1;
-	if ((s = envp[i++] = malloc(elen)) == NULL) {
-		dprintf(LOG_NOTICE, FNAME,
-		    "failed to allocate strings for DNS servers");
-		goto clean;
-	}
-	memset(s, 0, elen);
-	strcpy(s, dnsserver_str);
-	s += strlen(dnsserver_str);
-	*s++ = '=';
-	for (v = TAILQ_FIRST(&optinfo->dns_list); v; v = TAILQ_NEXT(v, link)) {
-		char *addr;
+	if (dnsservers) {
+		elen = sizeof (dnsserver_str) +
+		    (INET6_ADDRSTRLEN + 1) * dnsservers + 1;
+		if ((s = envp[i++] = malloc(elen)) == NULL) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to allocate strings for DNS servers");
+			goto clean;
+		}
+		memset(s, 0, elen);
+		strcpy(s, dnsserver_str);
+		s += strlen(dnsserver_str);
+		*s++ = '=';
+		for (v = TAILQ_FIRST(&optinfo->dns_list); v;
+		    v = TAILQ_NEXT(v, link)) {
+			char *addr;
 
-		addr = in6addr2str(&v->val_addr6, 0);
-		strcpy(s, addr);
-		s += strlen(addr);
-		*s++ = ' ';
+			addr = in6addr2str(&v->val_addr6, 0);
+			strcpy(s, addr);
+			s += strlen(addr);
+			*s++ = ' ';
+		}
+		*s = '\0';
 	}
-	*s = '\0';
 
 	/* launch the script */
 	pid = fork();
