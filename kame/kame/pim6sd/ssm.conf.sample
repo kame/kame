@@ -1,0 +1,52 @@
+## SSM configuration example
+## syntax : phyint <interface> <disable> <metric> [metric] <preference> 
+##         [preference] [version <version>]
+##   metric and pref are for the asserts messages
+#phyint ed1 enable version 1;	# speaks only MLDv1
+#phyint de0 enable version 2;	# speaks only MLDv2
+phyint fxp0 enable version any;	# speaks MLDv2 and MLDv1-compat mode
+#phyint gif0 disable;		# not enables multicast on gif0
+
+
+## Normally, the following parameters need not be configured.
+##---------------Protocol timer specifications---------------------------#
+## The timer granularity.
+##   More this value is small, more pim6sd will be accurate.
+##   default if not specified : 5
+##   BE SURE to have to same granularity on ALL routers, otherwise....
+#granularity 5;
+
+## Notes : theses value are the default spec value!
+##         do not touch it if you don't know what you do!!
+##         you MUST change theses values according to the granularity value!
+
+## syntax :  'hello_period <number> <coef>'.
+##   number is the period in second between 2 hello messages.
+##   coef is the coef to deterimine the hello holdtime = hello_period * coef.
+##   default if not specified: 30 3.5
+#hello_period 30 3.5;
+
+## syntax :  'join_prune_period <number> <coef>'.
+##    number is the period in second between 2 join/prune messages.
+##    coef is the coef to deterimine the join/prune holdtime
+##    = join_prune_period * coef.
+## default if not specified : 60 3.5
+#join_prune_period 60 3.5;
+
+## syntax :  'data_timeout <number>'.
+##    number is the time after which (S,G) state for a silent source will 
+##    be deleted.
+##    default if not specified  : 210 
+#data_timeout 210;
+
+## syntax :  'assert_timeout <number>'.
+##    this is the interval between the last time an Assert is received and 
+##    the time at which the assert is timeout.
+##    default if not specified : 180
+#assert_timeout 180;
+
+## syntax : default_source_metric <number>
+#default_source_metric 1243;
+
+## syntax : default_source_preference <number>
+#default_source_preference 123;
