@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.56 2001/12/28 07:30:46 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.57 2002/01/07 12:45:25 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -761,7 +761,9 @@ mip6_validate_bu(m, opt)
 	struct ip6_opt_binding_update *bu_opt;
 	MIP6_SEQNO_T seqno;
 	struct mip6_bc *mbc;
+#ifndef MIP6_DRAFT13
 	int error = 0;
+#endif /* !MIP6_DRAFT13 */
 #if defined(IPSEC) && !defined(__OpenBSD__)
 	int ipsec_protected = 0;
 #ifndef MIP6_DRAFT13
