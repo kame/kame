@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.8 2000/05/31 13:35:10 itojun Exp $	*/
+/*	$KAME: db.h,v 1.9 2000/05/31 14:17:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -29,13 +29,14 @@
  * SUCH DAMAGE.
  */
 
+struct sockdb;
 struct qcache {
 	LIST_ENTRY(qcache) link;
 	struct sockaddr_storage from;
 	char *qbuf;	/* original query packet */
 	int qlen;
 	u_int16_t id;	/* id on relayed query - net endian */
-	int sockidx;	/* inbound socket for query */
+	struct sockdb *sd;	/* inbound socket for query */
 };
 
 struct acache {
@@ -52,15 +53,24 @@ struct scache {
 	int sockidx;
 };
 
+enum nstype { N_UNICAST, N_MULTICAST };
 struct nsdb {
 	LIST_ENTRY(nsdb) link;
 	struct sockaddr_storage addr;
 	char *comment;
-	int flags;
+	enum nstype type;
 	int prio;
 	struct timeval expire;
 	struct timeval lasttx;	/* last packet transmit */
 	struct timeval lastrx;	/* last packet delivery */
+};
+
+enum sdtype { S_UNICAST, S_MULTICAST, S_MEDIATOR };
+struct sockdb {
+	LIST_ENTRY(sockdb) link;
+	int af;
+	int s;
+	enum sdtype type;
 };
 
 extern LIST_HEAD(qchead, qcache) qcache;
@@ -69,11 +79,7 @@ extern LIST_HEAD(achead, acache) acache;
 #endif
 extern LIST_HEAD(schead, scache) scache;
 extern LIST_HEAD(nshead, nsdb) nsdb;
-
-/* nsdb->flags */
-#define NSDB_ANY	0
-#define NSDB_UNICAST	1
-#define NSDB_MULTICAST	2
+extern LIST_HEAD(sockhead, sockdb) sockdb;
 
 extern int dbtimeo __P((void));
 extern struct qcache *newqcache __P((const struct sockaddr *, char *, int));
@@ -81,6 +87,10 @@ extern void delqcache __P((struct qcache *));
 extern struct scache *newscache __P((int, const struct sockaddr *,
 	const struct sockaddr *, char *, int));
 extern void delscache __P((struct scache *));
-extern struct nsdb *newnsdb __P((const struct sockaddr *, const char *, int));
+extern struct nsdb *newnsdb __P((const struct sockaddr *, const char *));
 extern void delnsdb __P((struct nsdb *));
 extern void printnsdb __P((struct nsdb *));
+extern struct sockdb *newsockdb __P((int, int));
+extern struct sockdb *sock2sockdb __P((int));
+extern struct sockdb *af2sockdb __P((int, int));
+extern void delsockdb __P((struct sockdb *));

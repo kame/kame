@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.7 2000/05/31 12:10:12 itojun Exp $	*/
+/*	$KAME: db.c,v 1.8 2000/05/31 14:17:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -52,6 +52,7 @@ struct achead acache;
 #endif
 struct schead scache;
 struct nshead nsdb;
+struct sockhead sockdb;
 
 int
 dbtimeo()
@@ -195,10 +196,9 @@ delscache(sc)
 }
 
 struct nsdb *
-newnsdb(addr, comment, flags)
+newnsdb(addr, comment)
 	const struct sockaddr *addr;
 	const char *comment;
-	int flags;
 {
 	struct nsdb *ns;
 
@@ -213,7 +213,6 @@ newnsdb(addr, comment, flags)
 	memcpy(&ns->addr, addr, addr->sa_len);
 	if (comment)
 		ns->comment = strdup(comment);
-	ns->flags = flags;
 
 	LIST_INSERT_HEAD(&nsdb, ns, link);
 	return ns;
@@ -242,7 +241,7 @@ printnsdb(ns)
 		printf(" %s %s", hbuf, sbuf);
 	} else
 		printf(" addr? serv?");
-	printf(" flags %d prio %d", ns->flags, ns->prio);
+	printf(" type %d prio %d", ns->type, ns->prio);
 	if (ns->expire.tv_sec == -1 && ns->expire.tv_usec == -1)
 		printf(" expire never");
 	else
@@ -253,4 +252,69 @@ printnsdb(ns)
 		printf(" comment \"%s\"", ns->comment);
 
 	printf("\n");
+}
+
+struct sockdb *
+newsockdb(s, af)
+	int s;
+	int af;
+{
+	struct sockdb *sd;
+
+	sd = (struct sockdb *)malloc(sizeof(*sd));
+	if (sd == NULL)
+		return NULL;
+	memset(sd, 0, sizeof(*sd));
+
+	sd->s = s;
+	sd->af = af;
+
+	LIST_INSERT_HEAD(&sockdb, sd, link);
+	return sd;
+}
+
+struct sockdb *
+sock2sockdb(s)
+	int s;
+{
+	struct sockdb *sd;
+
+	for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
+		if (sd->s == s)
+			return sd;
+	}
+	return NULL;
+}
+
+struct sockdb *
+af2sockdb(af, mcast)
+	int af;
+	int mcast;
+{
+	struct sockdb *sd;
+
+	for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
+		switch (sd->type) {
+		case S_MEDIATOR:
+			continue;
+		case S_UNICAST:
+			if (!mcast)
+				return sd;
+			break;
+		case S_MULTICAST:
+			if (mcast)
+				return sd;
+			break;
+		}
+	}
+	return NULL;
+}
+
+void
+delsockdb(sd)
+	struct sockdb *sd;
+{
+
+	LIST_REMOVE(sd, link);
+	free(sd);
 }

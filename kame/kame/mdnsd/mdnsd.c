@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.18 2000/05/31 13:41:32 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.19 2000/05/31 14:17:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -52,17 +52,11 @@
 #include "db.h"
 #include "mediator_compat.h"
 
-#define MAXSOCK		20
-
 u_int16_t dnsid;
 const char *srcport = "53";
 const char *dstport = MDNS_PORT;
 const char *dnsserv = NULL;
 const char *intface = NULL;
-int sockaf[MAXSOCK];
-int sock[MAXSOCK];
-int sockflag[MAXSOCK];
-int nsock = 0;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
 const char *hostname = NULL;
@@ -78,7 +72,8 @@ const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
 
 static void usage __P((void));
-static int getsock __P((int, const char *, const char *, int, int));
+static int getsock __P((int, const char *, const char *, int, int,
+	enum sdtype));
 static int getsock0 __P((const struct addrinfo *));
 static int join __P((int, int, const char *));
 static int join0 __P((int, const struct addrinfo *));
@@ -91,8 +86,8 @@ main(argc, argv)
 	char **argv;
 {
 	int ch;
-	int i;
 	int ready4, ready6;
+	struct sockdb *sd;
 
 	while ((ch = getopt(argc, argv, "46d:h:i:mp:P:")) != EOF) {
 		switch (ch) {
@@ -152,62 +147,48 @@ main(argc, argv)
 	srandom(time(NULL) ^ getpid());
 	dnsid = random() & 0xffff;
 
-	if (getsock(family, NULL, srcport, SOCK_DGRAM, AI_PASSIVE) != 0) {
+	if (getsock(family, NULL, srcport, SOCK_DGRAM, AI_PASSIVE,
+	    S_MULTICAST) != 0) {
 		err(1, "getsock");
 		/*NOTREACHED*/
 	}
-	if (nsock == 0) {
+	if (LIST_FIRST(&sockdb) == NULL) {
 		errx(1, "no socket");
 		/*NOTREACHED*/
 	}
-	dprintf("%d listening sockets available\n", nsock);
 
-	i = nsock;
-	if (getsock(family, NULL, "0", SOCK_DGRAM, AI_PASSIVE) != 0) {
+	if (getsock(family, NULL, "0", SOCK_DGRAM, AI_PASSIVE, S_UNICAST)
+	    != 0) {
 		err(1, "getsock");
 		/*NOTREACHED*/
 	}
-	if (i == nsock) {
-		errx(1, "no outgoing socket");
-		/*NOTREACHED*/
-	}
-	for (/*nothing*/; i < nsock; i++) {
-		sockflag[i] |= SOCK_OUTGOING;
-		dprintf("%d: outgoing socket\n", i);
-	}
 
 	if (mflag) {
-		i = nsock;
-		if (getsock(AF_INET, NULL, MEDIATOR_CTRL_PORT, SOCK_DGRAM, 0)
-		    != 0) {
+		if (getsock(AF_INET, NULL, MEDIATOR_CTRL_PORT, SOCK_DGRAM, 0,
+		    S_MEDIATOR) != 0) {
 			err(1, "getsock(mediator)");
 			/*NOTREACHED*/
-		}
-		if (i == nsock) {
-			errx(1, "no mediator socket");
-			/*NOTREACHED*/
-		}
-		for (/*nothing*/; i < nsock; i++) {
-			sockflag[i] |= SOCK_MEDIATOR;
-			dprintf("%d: mediator socket\n", i);
 		}
 	}
 
 	ready4 = ready6 = 0;
-	for (i = 0; i < nsock; i++) {
-		if ((sockflag[i] & SOCK_MEDIATOR) != 0)
+	for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
+		switch (sd->type) {
+		case S_MEDIATOR:
+		case S_UNICAST:
 			continue;
-		if ((sockflag[i] & SOCK_OUTGOING) != 0)
-			continue;
+		case S_MULTICAST:
+			break;
+		}
 
-		switch (sockaf[i]) {
+		switch (sd->af) {
 		case AF_INET6:
 			ready6++;
-			if (join(sock[0], sockaf[i], MDNS_GROUP6) < 0) {
+			if (join(sd->s, sd->af, MDNS_GROUP6) < 0) {
 				err(1, "join");
 				/*NOTREACHED*/
 			}
-			if (setif(sock[i], sockaf[i], intface) < 0) {
+			if (setif(sd->s, sd->af, intface) < 0) {
 				errx(1, "setif");
 				/*NOTREACHED*/
 			}
@@ -215,11 +196,11 @@ main(argc, argv)
 		case AF_INET:
 			ready4++;
 #if 0
-			if (join(sock[0], sockaf[i], MDNS_GROUP4) < 0) {
+			if (join(sd->s, sd->af, MDNS_GROUP4) < 0) {
 				err(1, "join");
 				/*NOTREACHED*/
 			}
-			if (setif(sock[i], sockaf[i], intface) < 0) {
+			if (setif(sd->s, sd->af, intface) < 0) {
 				errx(1, "setif");
 				/*NOTREACHED*/
 			}
@@ -261,14 +242,17 @@ usage()
 }
 
 static int
-getsock(af, host, serv, socktype, flags)
+getsock(af, host, serv, socktype, flags, stype)
 	int af;
 	const char *host;
 	const char *serv;
 	int socktype, flags;
+	enum sdtype stype;
 {
 	struct addrinfo hints, *res, *ai;
 	int error;
+	struct sockdb *sd;
+	int s;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = af;
@@ -281,13 +265,16 @@ getsock(af, host, serv, socktype, flags)
 	}
 
 	for (ai = res; ai; ai = ai->ai_next) {
-		if (nsock < sizeof(sock) / sizeof(sock[0])) {
-			sock[nsock] = getsock0(ai);
-			sockaf[nsock] =ai->ai_family;
-			if (sock[nsock] >= 0)
-				nsock++;
-		} else
-			break;
+		s = getsock0(ai);
+		if (s < 0)
+			continue;
+		sd = newsockdb(s, ai->ai_family);
+		if (sd == NULL) {
+			close(s);
+			continue;
+		}
+		sd->type = stype;
+		printf("sock %d type %d\n", sd->s, sd->type);
 	}
 
 	freeaddrinfo(res);
@@ -511,6 +498,7 @@ addserv(n, ttl, comment)
 	struct sockaddr_in6 *sin6;
 	int flags;
 	struct nsdb *ns;
+	int multicast;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
@@ -525,27 +513,22 @@ addserv(n, ttl, comment)
 	switch (res->ai_family) {
 	case AF_INET:
 		sin = (struct sockaddr_in *)res->ai_addr;
-		if (IN_MULTICAST(sin->sin_addr.s_addr))
-			flags = NSDB_MULTICAST;
-		else
-			flags = NSDB_UNICAST;
+		multicast = IN_MULTICAST(sin->sin_addr.s_addr) ? 1 : 0;
 		break;
 	case AF_INET6:
 		sin6 = (struct sockaddr_in6 *)res->ai_addr;
-		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
-			flags = NSDB_MULTICAST;
-		else
-			flags = NSDB_UNICAST;
+		multicast = IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) ? 1 : 0;
 		break;
 	default:
 		flags = 0;
 		break;
 	}
-	ns = newnsdb(res->ai_addr, comment, flags);
+	ns = newnsdb(res->ai_addr, comment);
 	if (ns == NULL) {
 		freeaddrinfo(res);
 		return -1;
 	}
+	ns->type = multicast ? N_MULTICAST : N_UNICAST;
 	if (ttl < 0) {
 		ns->expire.tv_sec = -1;
 		ns->expire.tv_usec = -1;
