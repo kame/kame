@@ -63,3 +63,5 @@ int	via82c586_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
 	    pciintr_icu_tag_t *, pciintr_icu_handle_t *));
 int	sis85c503_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
 	    pciintr_icu_tag_t *, pciintr_icu_handle_t *));
+int	ali1543_init __P((pci_chipset_tag_t, bus_space_tag_t, pcitag_t,
+	    pciintr_icu_tag_t *, pciintr_icu_handle_t *));

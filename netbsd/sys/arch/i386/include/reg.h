@@ -1,4 +1,4 @@
-/*	$NetBSD: reg.h,v 1.15.28.1 2001/07/29 18:36:02 he Exp $	*/
+/*	$NetBSD: reg.h,v 1.15 1997/10/16 02:31:32 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.

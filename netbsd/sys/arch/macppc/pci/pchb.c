@@ -1,4 +1,4 @@
-/*	$NetBSD: pchb.c,v 1.4.4.1 2001/06/18 16:49:03 jhawk Exp $	*/
+/*	$NetBSD$	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.

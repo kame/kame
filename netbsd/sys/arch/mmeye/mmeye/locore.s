@@ -1086,7 +1086,6 @@ XL_splimit_low3:	.long	0x80000000
 	nop
 	add	#4, r15		/* pop dummy code */
 	CLI
-	ldtlb
 	INTRFASTEXIT
 
 	.align	2

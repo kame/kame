@@ -40,6 +40,9 @@
  *	@(#)dinode.h	8.9 (Berkeley) 3/29/95
  */
 
+#ifndef	_UFS_UFS_DINODE_H_
+#define	_UFS_UFS_DINODE_H_
+
 /*
  * The root inode is the root of the file system.  Inode 0 can't be used for
  * normal purposes and historically bad blocks were linked to inode 1, thus
@@ -128,3 +131,5 @@ struct dinode {
 
 /* Size of the on-disk inode. */
 #define	DINODE_SIZE	(sizeof(struct dinode))		/* 128 */
+
+#endif /* !_UFS_UFS_DINODE_H_ */

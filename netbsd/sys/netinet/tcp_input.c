@@ -1,17 +1,4 @@
-/*	$NetBSD: tcp_input.c,v 1.108.4.9 2001/05/09 19:37:19 he Exp $	*/
-
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-
-*/
+/*	$NetBSD: tcp_input.c,v 1.108.4.12 2002/04/03 21:17:06 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,6 +27,46 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ */
+
+/*
+ *      @(#)COPYRIGHT   1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ *      This product includes software developed by the University of
+ *      California, Berkeley and its contributors.
+ *      This product includes software developed at the Information
+ *      Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
 
 /*-
@@ -837,23 +864,13 @@ findpcb:
 		{
 			++tcpstat.tcps_noport;
 			if (tcp_log_refused && (tiflags & TH_SYN)) {
-#ifndef INET6
 				char src[4*sizeof "123"];
 				char dst[4*sizeof "123"];
-#else
-				char src[INET6_ADDRSTRLEN];
-				char dst[INET6_ADDRSTRLEN];
-#endif
+
 				if (ip) {
 					strcpy(src, inet_ntoa(ip->ip_src));
 					strcpy(dst, inet_ntoa(ip->ip_dst));
 				}
-#ifdef INET6
-				else if (ip6) {
-					strcpy(src, ip6_sprintf(&ip6->ip6_src));
-					strcpy(dst, ip6_sprintf(&ip6->ip6_dst));
-				}
-#endif
 				else {
 					strcpy(src, "(unknown)");
 					strcpy(dst, "(unknown)");
@@ -898,6 +915,23 @@ findpcb:
 		}
 		if (in6p == NULL) {
 			++tcpstat.tcps_noport;
+			if (tcp_log_refused && (tiflags & TH_SYN)) {
+				char src[INET6_ADDRSTRLEN];
+				char dst[INET6_ADDRSTRLEN];
+
+				if (ip6) {
+					strcpy(src, ip6_sprintf(&ip6->ip6_src));
+					strcpy(dst, ip6_sprintf(&ip6->ip6_dst));
+				}
+				else {
+					strcpy(src, "(unknown v6)");
+					strcpy(dst, "(unknown v6)");
+				}
+				log(LOG_INFO,
+				    "Connection attempt to TCP [%s]:%d from [%s]:%d\n",
+				    dst, ntohs(th->th_dport),
+				    src, ntohs(th->th_sport));
+			}
 			TCP_FIELDS_TO_HOST(th);
 			goto dropwithreset_ratelim;
 		}
@@ -1343,6 +1377,26 @@ after_listen:
 	}
 
 	switch (tp->t_state) {
+	case TCPS_LISTEN:
+		/*
+		 * RFC1122 4.2.3.10, p. 104: discard bcast/mcast SYN
+		 */
+		if (m->m_flags & (M_BCAST|M_MCAST))
+			goto drop;
+		switch (af) {
+#ifdef INET6
+		case AF_INET6:
+			if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
+				goto drop;
+			break;
+#endif /* INET6 */
+		case AF_INET:
+			if (IN_MULTICAST(ip->ip_dst.s_addr) ||
+			    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))
+				goto drop;
+			break;
+		}
+		break;
 
 	/*
 	 * If the state is SYN_SENT:
@@ -2156,6 +2210,21 @@ dropwithreset:
 	 */
 	if (tiflags & TH_RST)
 		goto drop;
+
+	switch (af) {
+#ifdef INET6
+	case AF_INET6:
+		/* For following calls to tcp_respond */
+		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
+			goto drop;
+		break;
+#endif /* INET6 */
+	case AF_INET:
+		if (IN_MULTICAST(ip->ip_dst.s_addr) ||
+		    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))
+			goto drop;
+	}
+
     {
 	/*
 	 * need to recover version # field, which was overwritten on

@@ -1,4 +1,4 @@
-/*      $NetBSD: ac97.c,v 1.11.2.3 2001/05/03 21:13:05 he Exp $ */
+/*      $NetBSD: ac97.c,v 1.11.2.5 2002/02/09 18:19:50 he Exp $ */
 /*	$OpenBSD: ac97.c,v 1.8 2000/07/19 09:01:35 csapuntz Exp $	*/
 
 /*
@@ -304,6 +304,7 @@ static const struct ac97_codecid {
 	{ AC97_CODEC_ID('T', 'R', 'A', 35),	"TriTech unknown",	},
 	{ AC97_CODEC_ID('W', 'M', 'L', 0),	"Wolfson WM9704",	},
 	{ AC97_CODEC_ID('W', 'M', 'L', 3),	"Wolfson WM9707",	},
+	{ 0x45838308,				"ESS Technology ES1921", },
 	{ 0x83847600,				"SigmaTel STAC9700",	},
 	{ 0x83847604,				"SigmaTel STAC9701/3/4/5", },
 	{ 0x83847605,				"SigmaTel STAC9704", 	},
@@ -317,11 +318,11 @@ static const struct ac97_codecid {
 static const char * const ac97enhancement[] = {
 	"no 3D stereo",
 	"Analog Devices Phat Stereo",
-	"Creative"
+	"Creative",
 	"National Semi 3D",
 	"Yamaha Ymersion",
 	"BBE 3D",
-	"Crystal Semi 3D"
+	"Crystal Semi 3D",
 	"Qsound QXpander",
 	"Spatializer 3D",
 	"SRS 3D",

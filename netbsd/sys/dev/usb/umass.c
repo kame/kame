@@ -761,7 +761,7 @@ USB_MATCH(umass)
 	USB_MATCH_START(umass, uaa);
 #if defined(__FreeBSD__)
 	struct umass_softc *sc = device_get_softc(self);
-#else if defined(__NetBSD__) || defined(__OpenBSD__)
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
 	struct umass_softc scs, *sc = &scs;
 	memset(sc, 0, sizeof *sc);
 #endif

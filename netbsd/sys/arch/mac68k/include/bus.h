@@ -71,6 +71,8 @@
  */
 #define MAC68K_BUS_SPACE_MEM	0	/* space is mem space */
 
+#define __BUS_SPACE_HAS_STREAM_METHODS 1
+
 /*
  * Bus address and size types
  */

@@ -6724,7 +6724,7 @@ int
 pmap_count_ptes(pm)
 	struct pmap *pm;
 {
-	int idx, total;
+	int idx, vs, total;
 	struct regmap *rp;
 	struct segmap *sp;
 
@@ -6735,9 +6735,14 @@ pmap_count_ptes(pm)
 		rp = pm->pm_regmap;
 		idx = NUREG;
 	}
-	for (total = 0; idx;)
-		if ((sp = rp[--idx].rg_segmap) != NULL)
-			total += sp->sg_npte;
+	for (total = 0; idx;) {
+		if ((sp = rp[--idx].rg_segmap) == NULL) {
+			continue;
+		}
+		for (vs = 0; vs < NSEGRG; vs++) {
+			total += sp[vs].sg_npte;
+		}
+	}
 	pm->pm_stats.resident_count = total;
 	return (total);
 }

@@ -1,10 +1,10 @@
-/*	$NetBSD: cardbusdevs.h,v 1.8 2000/06/13 15:37:29 soren Exp $	*/
+/*	$NetBSD: cardbusdevs.h,v 1.8.2.3 2002/02/05 12:55:32 he Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: cardbusdevs,v 1.10 2000/06/06 17:21:42 soren Exp 
+ *	NetBSD: cardbusdevs,v 1.10.2.3 2002/02/05 12:54:48 he Exp 
  */
 
 /*
@@ -50,10 +50,14 @@
 #define	CARDBUS_VENDOR_DEC	0x1011		/* Digital Equipment */
 #define	CARDBUS_VENDOR_3COM	0x10B7		/* 3Com */
 #define	CARDBUS_VENDOR_ADP	0x9004		/* Adaptec */
+#define	CARDBUS_VENDOR_DLINK	0x1186		/* D-Link Systems */
+#define	CARDBUS_VENDOR_COREGA	0x1259		/* Corega */
+#define	CARDBUS_VENDOR_ALLIEDTELESYN	0x1259		/* Allied Telesyn International */
 #define	CARDBUS_VENDOR_ADP2	0x9005		/* Adaptec (2nd PCI Vendor ID) */
 #define	CARDBUS_VENDOR_OPTI	0x1045		/* Opti */
 #define	CARDBUS_VENDOR_XIRCOM	0x115d		/* Xircom */
 #define	CARDBUS_VENDOR_ACCTON	0x1113		/* Accton Technology */
+#define	CARDBUS_VENDOR_ABOCOM	0x13d1		/* AboCom Systems */
 #define	CARDBUS_VENDOR_REALTEK	0x10ec		/* Realtek Semiconductor */
 #define	CARDBUS_VENDOR_INTEL	0x8086		/* Intel */
 #define	CARDBUS_VENDOR_INVALID	0xffff		/* INVALID VENDOR ID */
@@ -68,11 +72,16 @@
 #define	CARDBUS_PRODUCT_3COM_3C575BTX	0x5157		/* 3c575B-TX */
 #define	CARDBUS_PRODUCT_3COM_3C575CTX	0x5257		/* 3c575C-TX */
 
+/* AboCom products */
+#define	CARDBUS_PRODUCT_ABOCOM_FE2500	0xab02		/* FE2500 10/100 Ethernet */
+#define	CARDBUS_PRODUCT_ABOCOM_PCM200	0xab03		/* FE2500 10/100 Ethernet */
+
 /* Adaptec products */
 #define	CARDBUS_PRODUCT_ADP_1480	0x6075		/* APA-1480 */
 
 /* Accton products */
 #define	CARDBUS_PRODUCT_ACCTON_MPX5030	0x1211		/* MPX 5030/5038 Ethernet */
+#define	CARDBUS_PRODUCT_ACCTON_EN2242	0x1216		/* EN2242 10/100 Ethernet */
 
 /* DEC products */
 #define	CARDBUS_PRODUCT_DEC_21142	0x0019		/* DECchip 21142/3 */
@@ -93,6 +102,12 @@
 #define	CARDBUS_PRODUCT_XIRCOM_X3201_3_21143	0x0003		/* X3201-3 Fast Ethernet Controller (21143) */
 #define	CARDBUS_PRODUCT_XIRCOM_MODEM56	0x0103		/* 56k Modem */
 
+/* D-Link products */
+#define	CARDBUS_PRODUCT_DLINK_DFE_690TXD	0x1340		/* DFE-690TXD 10/100 Ethernet */
+
+/* Corega products */
+#define	CARDBUS_PRODUCT_COREGA_CB_TXD	0xa117		/* FEther CB-TXD 10/100 Ethernet */
+
 /* Realtek (Creative Labs?) products */
 #define	CARDBUS_PRODUCT_REALTEK_RT8138	0x8138		/* 8138 Ethernet */
-
+#define	CARDBUS_PRODUCT_REALTEK_RT8139	0x8139		/* 8139 Ethernet */

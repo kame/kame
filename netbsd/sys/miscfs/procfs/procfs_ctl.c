@@ -106,10 +106,16 @@ procfs_control(curp, p, op, sig)
 	int error;
 
 	/*
+	 * You cannot do anything to the process if it is currently exec'ing
+	 */
+	if (ISSET(p->p_flag, P_INEXEC))
+		return (EAGAIN);
+
+	switch (op) {
+	/*
 	 * Attach - attaches the target process for debugging
 	 * by the calling process.
 	 */
-	switch (op) {
 	case PROCFS_CTL_ATTACH:
 		/* 
 		 * You can't attach to a process if:

@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.114.4.6 2001/04/24 22:21:20 he Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.114.4.8 2002/02/26 21:07:56 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,6 +138,8 @@
 /* just for gif_ttl */
 #include <netinet/in_gif.h>
 #include "gif.h"
+#include <net/if_gre.h>
+#include "gre.h"
 
 #ifdef MROUTING
 #include <netinet/ip_mroute.h>
@@ -622,6 +624,13 @@ nofilt:;
 			ipstat.ips_cantforward++;
 			return;
 		}
+#ifdef IPSEC
+		if (ipsec4_in_reject(m, NULL)) {
+			ipsecstat.in_polvio++;
+			goto bad;
+		}
+#endif
+
 		ip_forward(m, 0);
 	}
 	return;
@@ -1768,6 +1777,12 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPCTL_GIF_TTL:
 		return(sysctl_int(oldp, oldlenp, newp, newlen,
 				  &ip_gif_ttl));
+#endif
+
+#if NGRE > 0
+	case IPCTL_GRE_TTL:
+		return(sysctl_int(oldp, oldlenp, newp, newlen,
+				  &ip_gre_ttl));
 #endif
 
 #ifndef IPNOPRIVPORTS

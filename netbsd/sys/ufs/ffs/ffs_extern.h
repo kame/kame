@@ -91,7 +91,7 @@ void ffs_clusteracct __P((struct fs *, struct cg *, ufs_daddr_t, int));
 int ffs_balloc __P((void *));
 
 /* ffs_bswap.c */
-void ffs_sb_swap __P((struct fs*, struct fs *, int));
+void ffs_sb_swap __P((struct fs*, struct fs *));
 void ffs_dinode_swap __P((struct dinode *, struct dinode *));
 void ffs_csum_swap __P((struct csum *, struct csum *, int));
 

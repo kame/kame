@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_bswap.c,v 1.8 2000/05/15 08:51:55 bouyer Exp $	*/
+/*	$NetBSD: ffs_bswap.c,v 1.8.4.4 2001/11/25 20:00:11 he Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -33,35 +33,66 @@
  */
 
 #include <sys/param.h>
+#if defined(_KERNEL)
 #include <sys/systm.h>
+#endif
+
 #include <ufs/ufs/dinode.h>
 #include <ufs/ufs/ufs_bswap.h>
 #include <ufs/ffs/fs.h>
 #include <ufs/ffs/ffs_extern.h>
 
 #if !defined(_KERNEL)
+#include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#define panic(x)	printf("%s\n", (x)), abort()
 #endif
 
 void
-ffs_sb_swap(o, n, ns)
-	struct fs *o, *n;
-	int ns;
+ffs_sb_swap(struct fs *o, struct fs *n)
 {
-	int i;
+	int i, needswap, len;
 	u_int32_t *o32, *n32;
 	u_int16_t *o16, *n16;
-	
-	/* in order to avoid a lot of lines, as the first 52 fields of
-	 * the superblock are u_int32_t, we loop here to convert it.
+	u_int32_t postbloff, postblfmt;
+
+	if (o->fs_magic == FS_MAGIC) {
+		needswap = 0;
+	} else if (o->fs_magic == bswap32(FS_MAGIC)) {
+		needswap = 1;
+	} else {
+		panic("ffs_sb_swap: can't determine magic");
+	}
+	postbloff = ufs_rw32(o->fs_postbloff, needswap);
+	postblfmt = ufs_rw32(o->fs_postblformat, needswap);
+		/* compute these before swapping, in case o == n */
+	o16 = (postblfmt == FS_42POSTBLFMT) ? o->fs_opostbl[0] :
+	    (int16_t *)((u_int8_t *)o + postbloff);
+	n16 = (postblfmt == FS_42POSTBLFMT) ? n->fs_opostbl[0] :
+	    (int16_t *)((u_int8_t *)n + postbloff);
+	len = postblfmt == FS_42POSTBLFMT ?
+	    sizeof(o->fs_opostbl) / sizeof(o->fs_opostbl[0][0]) :
+	    ufs_rw32(o->fs_cpc, needswap) * ufs_rw32(o->fs_nrpos, needswap);
+
+	/*
+	 * In order to avoid a lot of lines, as the first N fields (52)
+	 * of the superblock up to fs_fmod are u_int32_t, we just loop
+	 * here to convert them.
 	 */
 	o32 = (u_int32_t *)o;
 	n32 = (u_int32_t *)n;
-	for (i=0; i< 52; i++)
+	for (i = 0; i < offsetof(struct fs, fs_fmod) / sizeof(u_int32_t); i++)
 		n32[i] = bswap32(o32[i]);
-   
+
+			/* fs_cgrotor is now unused */
 	n->fs_cpc = bswap32(o->fs_cpc);
-	n->fs_fscktime = bswap32(o->fs_fscktime);
+			/* fs_opostbl - may be done below */
+			/* fs_snapinum[20] - ignore for now */
+	n->fs_avgfilesize = bswap32(o->fs_avgfilesize);
+	n->fs_avgfpdir = bswap32(o->fs_avgfpdir);
+			/* fs_sparecon[28] - ignore for now */
 	n->fs_contigsumsize = bswap32(o->fs_contigsumsize);
 	n->fs_maxsymlinklen = bswap32(o->fs_maxsymlinklen);
 	n->fs_inodefmt = bswap32(o->fs_inodefmt);
@@ -74,25 +105,15 @@ ffs_sb_swap(o, n, ns)
 	n->fs_postbloff = bswap32(o->fs_postbloff);
 	n->fs_rotbloff = bswap32(o->fs_rotbloff);
 	n->fs_magic = bswap32(o->fs_magic);
-	/* byteswap the postbl */
-	o16 = (ufs_rw32(o->fs_postblformat, ns) == FS_42POSTBLFMT)
-	    ? o->fs_opostbl[0]
-	    : (int16_t *)((u_int8_t *)o + ufs_rw32(o->fs_postbloff, ns));
-	n16 = (ufs_rw32(o->fs_postblformat, ns) == FS_42POSTBLFMT)
-	    ? n->fs_opostbl[0]
-	    : (int16_t *)((u_int8_t *)n + ufs_rw32(n->fs_postbloff, ns));
-	for (i = 0; i < (
-	         (ufs_rw32(o->fs_postblformat, ns) == FS_42POSTBLFMT) ?
-	         168 : /* fs_opostbl[16][8] */
-	         ufs_rw32(o->fs_cpc, ns) * ufs_rw32(o->fs_nrpos, ns));
-	     i++)
+			/* byteswap the postbl */
+	for (i = 0; i < len; i++)
 		n16[i] = bswap16(o16[i]);
 }
 
 void
-ffs_dinode_swap(o, n)
-	struct dinode *o, *n;
+ffs_dinode_swap(struct dinode *o, struct dinode *n)
 {
+
 	n->di_mode = bswap16(o->di_mode);
 	n->di_nlink = bswap16(o->di_nlink);
 	n->di_u.oldids[0] = bswap16(o->di_u.oldids[0]);
@@ -113,9 +134,7 @@ ffs_dinode_swap(o, n)
 }
 
 void
-ffs_csum_swap(o, n, size)
-	struct csum *o, *n;
-	int size;
+ffs_csum_swap(struct csum *o, struct csum *n, int size)
 {
 	int i;
 	u_int32_t *oint, *nint;

@@ -1,4 +1,4 @@
-/* $NetBSD: wskbd.c,v 1.38.4.1 2001/08/16 16:19:12 tv Exp $ */
+/* $NetBSD: wskbd.c,v 1.38 2000/03/23 07:01:47 thorpej Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wskbd.c,v 1.38.4.1 2001/08/16 16:19:12 tv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wskbd.c,v 1.38 2000/03/23 07:01:47 thorpej Exp $");
 
 /*
  * Copyright (c) 1992, 1993

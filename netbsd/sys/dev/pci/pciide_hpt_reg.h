@@ -46,6 +46,7 @@
  */
 #define HPT366_REV 0x01
 #define HPT370_REV 0x03
+#define HPT370A_REV 0x04
 
 #define HPT_IDETIM(chan, drive) (0x40 + ((drive) * 4) + ((chan) * 8))
 #define HPT_IDETIM_BUFEN		0x80000000

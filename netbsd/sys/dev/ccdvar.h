@@ -1,4 +1,4 @@
-/*	$NetBSD: ccdvar.h,v 1.19.12.1 2001/08/16 16:10:53 tv Exp $	*/
+/*	$NetBSD: ccdvar.h,v 1.20 2001/08/05 11:20:14 jdolecek Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 1999 The NetBSD Foundation, Inc.

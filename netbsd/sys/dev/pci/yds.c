@@ -1,4 +1,4 @@
-/*	$NetBSD: yds.c,v 1.3.6.3 2001/07/29 20:14:48 he Exp $	*/
+/*	$NetBSD: yds.c,v 1.3.6.2 2001/05/26 17:13:55 he Exp $	*/
 
 /*
  * Copyright (c) 2000, 2001 Kazuki Sakamoto and Minoura Makoto.

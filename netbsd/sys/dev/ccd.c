@@ -1,4 +1,4 @@
-/*	$NetBSD: ccd.c,v 1.69.4.2 2001/08/16 16:10:53 tv Exp $	*/
+/*	$NetBSD: ccd.c,v 1.69.4.1 2001/05/01 12:27:03 he Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998, 1999 The NetBSD Foundation, Inc.

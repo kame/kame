@@ -117,10 +117,12 @@ oss_ioctl_audio(p, uap, retval)
 			goto out;
 		break;
 	case OSS_SNDCTL_DSP_SYNC:
-	case OSS_SNDCTL_DSP_POST:
 		error = ioctlf(fp, AUDIO_DRAIN, (caddr_t)0, p);
 		if (error)
 			goto out;
+		break;
+	case OSS_SNDCTL_DSP_POST:
+		/* This call is merely advisory, and may be a nop. */
 		break;
 	case OSS_SNDCTL_DSP_SPEED:
 		AUDIO_INITINFO(&tmpinfo);

@@ -1,10 +1,10 @@
-/*	$NetBSD: cardbusdevs_data.h,v 1.8 2000/06/13 15:37:29 soren Exp $	*/
+/*	$NetBSD: cardbusdevs_data.h,v 1.8.2.3 2002/02/05 12:55:32 he Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: cardbusdevs,v 1.10 2000/06/06 17:21:42 soren Exp 
+ *	NetBSD: cardbusdevs,v 1.10.2.3 2002/02/05 12:54:48 he Exp 
  */
 
 /*
@@ -58,6 +58,18 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    "3c575C-TX",
 	},
 	{
+	    CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_FE2500,
+	    0,
+	    "AboCom Systems",
+	    "FE2500 10/100 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_PCM200,
+	    0,
+	    "AboCom Systems",
+	    "FE2500 10/100 Ethernet",
+	},
+	{
 	    CARDBUS_VENDOR_ADP, CARDBUS_PRODUCT_ADP_1480,
 	    0,
 	    "Adaptec",
@@ -68,6 +80,12 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    0,
 	    "Accton Technology",
 	    "MPX 5030/5038 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_ACCTON, CARDBUS_PRODUCT_ACCTON_EN2242,
+	    0,
+	    "Accton Technology",
+	    "EN2242 10/100 Ethernet",
 	},
 	{
 	    CARDBUS_VENDOR_DEC, CARDBUS_PRODUCT_DEC_21142,
@@ -112,10 +130,28 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    "56k Modem",
 	},
 	{
+	    CARDBUS_VENDOR_DLINK, CARDBUS_PRODUCT_DLINK_DFE_690TXD,
+	    0,
+	    "D-Link Systems",
+	    "DFE-690TXD 10/100 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_COREGA, CARDBUS_PRODUCT_COREGA_CB_TXD,
+	    0,
+	    "Corega",
+	    "FEther CB-TXD 10/100 Ethernet",
+	},
+	{
 	    CARDBUS_VENDOR_REALTEK, CARDBUS_PRODUCT_REALTEK_RT8138,
 	    0,
 	    "Realtek Semiconductor",
 	    "8138 Ethernet",
+	},
+	{
+	    CARDBUS_VENDOR_REALTEK, CARDBUS_PRODUCT_REALTEK_RT8139,
+	    0,
+	    "Realtek Semiconductor",
+	    "8139 Ethernet",
 	},
 	{
 	    CARDBUS_VENDOR_DEC, 0,
@@ -133,6 +169,24 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    CARDBUS_VENDOR_ADP, 0,
 	    CARDBUS_KNOWNDEV_NOPROD,
 	    "Adaptec",
+	    NULL,
+	},
+	{
+	    CARDBUS_VENDOR_DLINK, 0,
+	    CARDBUS_KNOWNDEV_NOPROD,
+	    "D-Link Systems",
+	    NULL,
+	},
+	{
+	    CARDBUS_VENDOR_COREGA, 0,
+	    CARDBUS_KNOWNDEV_NOPROD,
+	    "Corega",
+	    NULL,
+	},
+	{
+	    CARDBUS_VENDOR_ALLIEDTELESYN, 0,
+	    CARDBUS_KNOWNDEV_NOPROD,
+	    "Allied Telesyn International",
 	    NULL,
 	},
 	{
@@ -157,6 +211,12 @@ struct cardbus_knowndev cardbus_knowndevs[] = {
 	    CARDBUS_VENDOR_ACCTON, 0,
 	    CARDBUS_KNOWNDEV_NOPROD,
 	    "Accton Technology",
+	    NULL,
+	},
+	{
+	    CARDBUS_VENDOR_ABOCOM, 0,
+	    CARDBUS_KNOWNDEV_NOPROD,
+	    "AboCom Systems",
 	    NULL,
 	},
 	{

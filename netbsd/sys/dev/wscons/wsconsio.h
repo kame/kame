@@ -1,4 +1,4 @@
-/* $NetBSD: wsconsio.h,v 1.31.2.2 2001/08/16 16:19:13 tv Exp $ */
+/* $NetBSD: wsconsio.h,v 1.31.2.1 2000/07/07 09:49:17 hannken Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.

@@ -1,4 +1,4 @@
-/*	$NetBSD: disklabel.h,v 1.60.4.2 2001/05/01 12:26:56 he Exp $	*/
+/*	$NetBSD: disklabel.h,v 1.60.4.4 2002/01/29 22:16:37 he Exp $	*/
 
 /*
  * Copyright (c) 1987, 1988, 1993
@@ -37,6 +37,13 @@
 
 #ifndef _SYS_DISKLABEL_H_
 #define _SYS_DISKLABEL_H_
+
+/*
+ * We need <machine/types.h> for __HAVE_OLD_DISKLABEL
+ */
+#ifndef _LOCORE
+#include <sys/types.h>
+#endif
 
 /*
  * Each disk has a label which includes information about the hardware
@@ -265,6 +272,7 @@ struct olddisklabel {
 #define	DTYPE_VND		12		/* vnode pseudo-disk */
 #define DTYPE_ATAPI		13		/* ATAPI */
 #define	DTYPE_RAID		14		/* RAIDframe */
+#define DTYPE_LD		15		/* logical disk */
 
 #ifdef DKTYPENAMES
 static const char *const dktypenames[] = {
@@ -283,6 +291,7 @@ static const char *const dktypenames[] = {
 	"vnd",
 	"ATAPI",
 	"RAID",
+	"ld",
 	NULL
 };
 #define DKMAXTYPES	(sizeof(dktypenames) / sizeof(dktypenames[0]) - 1)

@@ -1,4 +1,4 @@
-/* $NetBSD: wsdisplay.c,v 1.37.4.3 2001/08/16 16:19:12 tv Exp $ */
+/* $NetBSD: wsdisplay.c,v 1.37.4.2 2000/12/13 22:10:23 he Exp $ */
 
 /*
  * Copyright (c) 1996, 1997 Christopher G. Demetriou.  All rights reserved.
@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: wsdisplay.c,v 1.37.4.3 2001/08/16 16:19:12 tv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: wsdisplay.c,v 1.37.4.2 2000/12/13 22:10:23 he Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>

@@ -39,10 +39,7 @@
 #include <lib/libkern/libkern.h>
 
 int
-scanc(size, cp, table, mask)
-	u_int size;
-	const u_char *cp, table[];
-	u_char mask;
+scanc(u_int size, const u_char *cp, const u_char table[], int mask)
 {
 	const u_char *end = &cp[size];
 

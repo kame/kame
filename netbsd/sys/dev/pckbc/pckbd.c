@@ -382,8 +382,8 @@ pckbd_enable(v, on)
 		pckbc_slot_enable(sc->id->t_kbctag, sc->id->t_kbcslot, 1);
 
 		cmd[0] = KBC_ENABLE;
-		res = pckbc_enqueue_cmd(sc->id->t_kbctag, sc->id->t_kbcslot,
-					cmd, 1, 0, 1, 0);
+		res = pckbc_poll_cmd(sc->id->t_kbctag, sc->id->t_kbcslot,
+					cmd, 1, 0, NULL, 0);
 		if (res) {
 			printf("pckbd_enable: command error\n");
 			return (res);

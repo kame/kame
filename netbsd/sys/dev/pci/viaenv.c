@@ -296,7 +296,7 @@ viaenv_attach(struct device * parent, struct device * self, void *aux)
 	}
 	printf("\n");
 
-	lockinit(&sc->sc_lock, 0, "viaenv", 0, 0);
+	lockinit(&sc->sc_lock, PWAIT, "viaenv", 0, 0);
 
 	/* Initialize sensors */
 	for (i = 0; i < VIANUMSENSORS; ++i) {

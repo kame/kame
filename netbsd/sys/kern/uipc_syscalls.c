@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_syscalls.c,v 1.52.4.2 2001/07/02 13:41:41 jhawk Exp $	*/
+/*	$NetBSD: uipc_syscalls.c,v 1.52.4.1 2000/12/15 00:09:10 he Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1990, 1993

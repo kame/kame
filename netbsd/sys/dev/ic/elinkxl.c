@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxl.c,v 1.34.2.4 2001/05/15 21:34:06 he Exp $	*/
+/*	$NetBSD: elinkxl.c,v 1.34.2.7 2002/02/13 22:15:10 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -116,6 +116,10 @@ void ex_set_mc __P((struct ex_softc *));
 void ex_getstats __P((struct ex_softc *));
 void ex_printstats __P((struct ex_softc *));
 void ex_tick __P((void *));
+
+int ex_enable __P((struct ex_softc *));
+void ex_disable __P((struct ex_softc *));
+void ex_power __P((int, void *));
 
 static int ex_eeprom_busy __P((struct ex_softc *));
 static int ex_add_rxbuf __P((struct ex_softc *, struct ex_rxdesc *));
@@ -462,6 +466,15 @@ ex_config(sc)
 
 	/*  Establish callback to reset card when we reboot. */
 	sc->sc_sdhook = shutdownhook_establish(ex_shutdown, sc);
+	if (sc->sc_sdhook == NULL)
+		printf("%s: WARNING: unable to establish shutdown hook\n",
+		    sc->sc_dev.dv_xname);
+
+	/* Add a suspend hook to make sure we come back up after a resume. */
+	sc->sc_powerhook = powerhook_establish(ex_power, sc);
+	if (sc->sc_powerhook == NULL)
+		printf("%s: WARNING: unable to establish power hook\n",
+		    sc->sc_dev.dv_xname);
 
 	/* The attach is successful. */
 	sc->ex_flags |= EX_FLAGS_ATTACHED;
@@ -678,7 +691,7 @@ ex_init(sc)
 			cbcard_config |= 0x4000; /* turn on PHY power */
 		}
 		if (sc->ex_conf & EX_CONF_INV_LED_POLARITY) {
-			cbcard_config |= 0x0020; /* invert LED polarity */
+			cbcard_config |= 0x0010; /* invert LED polarity */
 		}
 		bus_space_write_2(sc->sc_iot, sc->sc_ioh, 0x0c, cbcard_config);
 
@@ -1295,6 +1308,8 @@ ex_ioctl(ifp, cmd, data)
 	switch (cmd) {
 
 	case SIOCSIFADDR:
+		if ((error = ex_enable(sc)) != 0)
+			break;
 		ifp->if_flags |= IFF_UP;
 		switch (ifa->ifa_addr->sa_family) {
 #ifdef INET
@@ -1338,18 +1353,23 @@ ex_ioctl(ifp, cmd, data)
 			 */
 			ex_stop(sc);
 			ifp->if_flags &= ~IFF_RUNNING;
+			ex_disable(sc);
 		} else if ((ifp->if_flags & IFF_UP) != 0 &&
 			   (ifp->if_flags & IFF_RUNNING) == 0) {
 			/*
 			 * If interface is marked up and it is stopped, then
 			 * start it.
 			 */
+			if ((error = ex_enable(sc)) != 0)
+				break;
 			ex_init(sc);
 		} else if ((ifp->if_flags & IFF_UP) != 0) {
 			/*
 			 * Deal with other flags that change hardware
 			 * state, i.e. IFF_PROMISC.
 			 */
+			if ((error = ex_enable(sc)) != 0)
+				break;
 			ex_set_mc(sc);
 		}
 		break;
@@ -1643,7 +1663,8 @@ ex_detach(sc)
 	bus_dmamem_free(sc->sc_dmat, &sc->sc_useg, sc->sc_urseg);
 
 	shutdownhook_disestablish(sc->sc_sdhook);
-
+	powerhook_disestablish(sc->sc_powerhook);
+	
 	return (0);
 }
 
@@ -1865,3 +1886,63 @@ ex_mii_statchg(v)
 	bus_space_write_2(iot, ioh, ELINK_W3_MAC_CONTROL, mctl);
 	GO_WINDOW(1);   /* back to operating window */
 }
+
+int 
+ex_enable(sc)
+	struct ex_softc *sc;
+{
+	if (sc->enabled == 0 && sc->enable != NULL) {
+		if ((*sc->enable)(sc) != 0) {
+			printf("%s: de/vice enable failed\n",
+			    sc->sc_dev.dv_xname);
+			return (EIO);
+		}
+		sc->enabled = 1;
+	}
+	return (0);
+}
+
+void 
+ex_disable(sc)
+	struct ex_softc *sc;
+{
+	if (sc->enabled == 1 && sc->disable != NULL) {
+		(*sc->disable)(sc);
+		sc->enabled = 0;
+	}
+}
+
+void 
+ex_power(why, arg)
+	int why;
+	void *arg;
+{
+	struct ex_softc *sc = (void *)arg;
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+	int s;
+
+	s = splnet();
+	switch (why) {
+	case PWR_SUSPEND:
+	case PWR_STANDBY:
+		ex_stop(sc);
+		if (sc->power != NULL)
+			(*sc->power)(sc, why);
+		break;
+	case PWR_RESUME:
+		if (ifp->if_flags & IFF_UP) {
+			if (sc->power != NULL)
+				(*sc->power)(sc, why);
+			ex_init(sc);
+		}
+		break;
+	case PWR_SOFTSUSPEND:		
+	case PWR_SOFTSTANDBY:		
+	case PWR_SOFTRESUME:
+		break;
+	}
+	splx(s);
+}
+
+
+

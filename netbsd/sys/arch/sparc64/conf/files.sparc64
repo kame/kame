@@ -35,6 +35,8 @@ include "dev/sbus/files.sbus"
 attach sbus at mainbus
 file	arch/sparc64/dev/sbus.c			sbus
 
+include "dev/i2o/files.i2o"
+
 device  psycho: pcibus
 attach  psycho at mainbus
 include "dev/pci/files.pci"

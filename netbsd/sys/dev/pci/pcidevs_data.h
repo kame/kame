@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.240.2.20 2001/06/18 16:51:54 jhawk Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.240.2.26 2002/06/06 19:44:57 he Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD
+ *	NetBSD: pcidevs,v 1.236.2.26 2002/06/06 19:44:09 he Exp 
  */
 
 /*
@@ -256,6 +256,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "Escalade IDE RAID",
 	},
 	{
+	    PCI_VENDOR_3WARE, PCI_PRODUCT_3WARE_ESCALADE_ASIC,
+	    0,
+	    "3ware",
+	    "Escalade IDE RAID (ASIC)",
+	},
+	{
 	    PCI_VENDOR_ACC, PCI_PRODUCT_ACC_2188,
 	    0,
 	    "ACC Microelectronics",
@@ -272,6 +278,24 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "ACC Microelectronics",
 	    "2051 PCI Single Chip Solution (ISA bridge)",
+	},
+	{
+	    PCI_VENDOR_ACARD, PCI_PRODUCT_ACARD_ATP850U,
+	    0,
+	    "Acard",
+	    "ATP850U/UF UDMA IDE Controller",
+	},
+	{
+	    PCI_VENDOR_ACARD, PCI_PRODUCT_ACARD_ATP860,
+	    0,
+	    "Acard",
+	    "ATP860 UDMA IDE Controller",
+	},
+	{
+	    PCI_VENDOR_ACARD, PCI_PRODUCT_ACARD_ATP860A,
+	    0,
+	    "Acard",
+	    "ATP860-A UDMA IDE Controller",
 	},
 	{
 	    PCI_VENDOR_ACARD, PCI_PRODUCT_ACARD_AEC6710,
@@ -716,6 +740,48 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Advanced Micro Devices",
 	    "AMD766 USB Host Controller",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_ISA,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD768 PCI to ISA/LPC Bridge",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_IDE,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD768 EIDE Controller",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_PMC,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD768 Power Management Controller",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_AC,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD768 AC97 Audio",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_MD,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD768 AC97 Modem",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_PPB,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD768 PCI to PCI Bridge",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC768_USB,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD768 USB Controller",
 	},
 	{
 	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_BANDIT,
@@ -1702,6 +1768,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "Compaq SMART RAID 42xx",
 	},
 	{
+	    PCI_VENDOR_DEC, PCI_PRODUCT_DEC_SWXCR,
+	    0,
+	    "Digital Equipment",
+	    "SWXCR RAID",
+	},
+	{
 	    PCI_VENDOR_DELTA, PCI_PRODUCT_DELTA_8139,
 	    0,
 	    "Delta Electronics",
@@ -1822,6 +1894,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "Maestro 2E PCI Audio Accelerator",
 	},
 	{
+	    PCI_VENDOR_ESSTECH, PCI_PRODUCT_ESSTECH_ALLEGRO1,
+	    0,
+	    "ESS Technology Inc",
+	    "Allegro-1 PCI Audio Accelerator",
+	},
+	{
 	    PCI_VENDOR_ESSTECH, PCI_PRODUCT_ESSTECH_MAESTRO3,
 	    0,
 	    "ESS Technology Inc",
@@ -1832,6 +1910,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "ESS Technology Inc",
 	    "Maestro 3 Modem",
+	},
+	{
+	    PCI_VENDOR_ESSTECH, PCI_PRODUCT_ESSTECH_MAESTRO3_2,
+	    0,
+	    "ESS Technology Inc",
+	    "Maestro 3 PCI Audio Accelerator",
 	},
 	{
 	    PCI_VENDOR_ESSTECH2, PCI_PRODUCT_ESSTECH2_MAESTRO1,
@@ -2096,6 +2180,54 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Intel",
 	    "InBusiness Fast Ethernet LAN Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_100_VE_0,
+	    0,
+	    "Intel",
+	    "PRO/100 VE Network Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_100_VE_1,
+	    0,
+	    "Intel",
+	    "PRO/100 VE Network Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_100_VM_0,
+	    0,
+	    "Intel",
+	    "PRO/100 VM Network Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_100_VM_1,
+	    0,
+	    "Intel",
+	    "PRO/100 VM Network Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82562EH_HPNA_0,
+	    0,
+	    "Intel",
+	    "82562EH HomePNA Network Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82562EH_HPNA_1,
+	    0,
+	    "Intel",
+	    "82562EH HomePNA Network Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82562EH_HPNA_2,
+	    0,
+	    "Intel",
+	    "82562EH HomePNA Network Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_PRO_100_VM_2,
+	    0,
+	    "Intel",
+	    "PRO/100 VM Network Controller",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82559ER,
@@ -2824,10 +2956,28 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "MPC106 \"Grackle\" Host Bridge",
 	},
 	{
-	    PCI_VENDOR_MYLEX, PCI_PRODUCT_MYLEX_960P,
+	    PCI_VENDOR_MYLEX, PCI_PRODUCT_MYLEX_RAID_V2,
 	    0,
 	    "Mylex",
-	    "DAC960P RAID controller",
+	    "DAC960 RAID (v2 interface)",
+	},
+	{
+	    PCI_VENDOR_MYLEX, PCI_PRODUCT_MYLEX_RAID_V3,
+	    0,
+	    "Mylex",
+	    "DAC960 RAID (v3 interface)",
+	},
+	{
+	    PCI_VENDOR_MYLEX, PCI_PRODUCT_MYLEX_RAID_V4,
+	    0,
+	    "Mylex",
+	    "DAC960 RAID (v4 interface)",
+	},
+	{
+	    PCI_VENDOR_MYLEX, PCI_PRODUCT_MYLEX_RAID_V5,
+	    0,
+	    "Mylex",
+	    "DAC960 RAID (v5 interface)",
 	},
 	{
 	    PCI_VENDOR_MUTECH, PCI_PRODUCT_MUTECH_MV1000,
@@ -2900,6 +3050,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Symbios Logic",
 	    "53c860",
+	},
+	{
+	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_1510D,
+	    0,
+	    "Symbios Logic",
+	    "53c1510D",
 	},
 	{
 	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_896,

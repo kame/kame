@@ -478,10 +478,10 @@ bdev_decl(uk);
 cdev_decl(uk);
 
 /*
- * [bc]dev_decl()s for Compaq RAID devices.
+ * [bc]dev_decl()s for `logical disk' devices.
  */
-bdev_decl(ca);
-cdev_decl(ca);
+bdev_decl(ld);
+cdev_decl(ld);
 
 /*
  * cdev_decl()s for Brooktree 8[47][89] based TV cards.

@@ -1,4 +1,4 @@
-/* $NetBSD: pckbc.c,v 1.5.2.1 2001/08/16 13:47:20 tv Exp $ */
+/* $NetBSD: pckbc.c,v 1.8 2001/05/17 10:48:39 drochner Exp $ */
 
 /*
  * Copyright (c) 1998

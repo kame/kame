@@ -322,6 +322,10 @@ ip_output(m0, va_alist)
 			struct in_ifaddr *ia;
 
 			IFP_TO_IA(ifp, ia);
+			if (!ia) {
+				error = EADDRNOTAVAIL;
+				goto bad;
+			}
 			ip->ip_src = ia->ia_addr.sin_addr;
 		}
 

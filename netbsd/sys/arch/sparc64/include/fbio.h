@@ -1,4 +1,4 @@
-/*	$NetBSD: fbio.h,v 1.1.1.1.24.1 2001/08/16 16:52:38 tv Exp $ */
+/*	$NetBSD: fbio.h,v 1.1.1.1 1998/06/20 04:58:51 eeh Exp $ */
 
 /*
  * Copyright (c) 1992 Regents of the University of California.

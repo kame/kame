@@ -1,4 +1,4 @@
-/*	$NetBSD: trap.c,v 1.26.4.1 2001/07/02 14:05:44 jhawk Exp $	*/
+/*	$NetBSD: trap.c,v 1.26 2000/05/27 00:40:40 sommerfeld Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.

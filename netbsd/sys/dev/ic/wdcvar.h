@@ -1,4 +1,4 @@
-/*	$NetBSD: wdcvar.h,v 1.25 2000/06/12 21:10:41 bouyer Exp $	*/
+/*	$NetBSD: wdcvar.h,v 1.25.2.1 2001/12/27 12:28:39 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -99,6 +99,7 @@ struct wdc_softc { /* Per controller state */
 #define WDC_CAPABILITY_NO_EXTRA_RESETS 0x0100 /* only reset once */
 #define WDC_CAPABILITY_PREATA 0x0200 /* ctrl can be a pre-ata one */
 #define WDC_CAPABILITY_IRQACK 0x0400 /* callback to ack interrupt */
+#define WDC_CAPABILITY_SELECT  0x2000	/* Controller selects target */
 	u_int8_t      PIO_cap; /* highest PIO mode supported */
 	u_int8_t      DMA_cap; /* highest DMA mode supported */
 	u_int8_t      UDMA_cap; /* highest UDMA mode supported */
@@ -131,6 +132,9 @@ struct wdc_softc { /* Per controller state */
 	/* if WDC_CAPABILITY_MODE set in 'cap' */
 	void 		(*set_modes) __P((struct channel_softc *));
 
+	/* if WDC_CAPABILITY_SELECT set in 'cap' */
+	void		(*select) __P((struct channel_softc *,int));
+
 	/* if WDC_CAPABILITY_IRQACK set in 'cap' */
 	void		(*irqack) __P((struct channel_softc *));
 };
@@ -146,6 +150,7 @@ struct wdc_xfer {
 #define C_POLL		0x0004 /* cmd is polled */
 #define C_DMA		0x0008 /* cmd uses DMA */
 #define C_SENSE		0x0010 /* cmd is a internal command */
+#define	C_FORCEPIO	0x0020 /* cmd must use PIO */
 
 	/* Informations about our location */
 	struct channel_softc *chp;

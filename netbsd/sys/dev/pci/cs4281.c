@@ -650,7 +650,6 @@ cs4281_trigger_input(addr, start, end, blksize, intr, arg, param)
 	u_int32_t fmt=0;
 	int dma_count;
 
-	printf("cs4281_trigger_input: not implemented yet\n");
 #ifdef DIAGNOSTIC
 	if (sc->sc_rrun)
 		printf("cs4281_trigger_input: already running\n");

@@ -105,6 +105,10 @@ sys_ptrace(p, v, retval)
 			return (ESRCH);
 	}
 
+	/* Can't trace a process that's currently exec'ing. */
+	if ((t->p_flag & P_INEXEC) != 0)
+		return EAGAIN;
+
 	/* Make sure we can operate on it. */
 	switch (SCARG(uap, req)) {
 	case  PT_TRACE_ME:

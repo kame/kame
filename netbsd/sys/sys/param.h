@@ -65,7 +65,7 @@
  *
  */
 
-#define __NetBSD_Version__  105000200	/* NetBSD 1.5.2 */
+#define __NetBSD_Version__  105000300	/* NetBSD 1.5.3 */
 
 /*
  * Historical NetBSD #define

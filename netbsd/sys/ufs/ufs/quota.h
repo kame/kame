@@ -105,8 +105,8 @@ struct dqblk {
 	u_int32_t dqb_ihardlimit;	/* maximum # allocated inodes + 1 */
 	u_int32_t dqb_isoftlimit;	/* preferred inode limit */
 	u_int32_t dqb_curinodes;	/* current # allocated inodes */
-	time_t	  dqb_btime;		/* time limit for excessive disk use */
-	time_t	  dqb_itime;		/* time limit for excessive files */
+	int32_t	  dqb_btime;		/* time limit for excessive disk use */
+	int32_t	  dqb_itime;		/* time limit for excessive files */
 };
 
 #ifdef _KERNEL

@@ -402,8 +402,8 @@ esp_dma_intr(sc)
 		return 0;
 	}
 
-	cnt = esc->sc_dmasize;
-	if (esc->sc_dmasize == 0) {
+	cnt = *esc->sc_dmalen;
+	if (*esc->sc_dmalen == 0) {
 		printf("data interrupt, but no count left.");
 	}
 
@@ -450,9 +450,9 @@ esp_dma_intr(sc)
 	sc->sc_espstat = (u_char) espstat;
 	sc->sc_espintr = (u_char) espintr;
 	*esc->sc_dmaaddr = p;
-	esc->sc_dmasize = cnt;
+	*esc->sc_dmalen = cnt;
 
-	if (esc->sc_dmasize == 0) {
+	if (*esc->sc_dmalen == 0) {
 		esc->sc_tc = NCRSTAT_TC;
 	}
 	sc->sc_espstat |= esc->sc_tc;

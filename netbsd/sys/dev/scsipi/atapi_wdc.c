@@ -1,4 +1,4 @@
-/*	$NetBSD: atapi_wdc.c,v 1.36.2.1 2000/08/04 09:43:53 bouyer Exp $	*/
+/*	$NetBSD: atapi_wdc.c,v 1.36.2.3 2002/02/09 17:39:10 he Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -46,6 +46,7 @@
 #include <sys/device.h>
 #include <sys/syslog.h>
 #include <sys/proc.h>
+#include <sys/dvdio.h>
 
 #include <vm/vm.h>
 
@@ -309,6 +310,14 @@ wdc_atapi_send_cmd(sc_xfer)
 		xfer->c_flags |= C_POLL;
 	xfer->drive = drive;
 	xfer->c_flags |= C_ATAPI;
+	if (sc_xfer->cmd->opcode == GPCMD_REPORT_KEY ||
+	    sc_xfer->cmd->opcode == GPCMD_SEND_KEY ||
+	    sc_xfer->cmd->opcode == GPCMD_READ_DVD_STRUCTURE) {
+		/*
+		 * DVD authentication commands must always be done in PIO mode.
+		 */
+		xfer->c_flags |= C_FORCEPIO;
+	}
 	xfer->cmd = sc_xfer;
 	xfer->databuf = sc_xfer->data;
 	xfer->c_bcount = sc_xfer->datalen;
@@ -341,7 +350,8 @@ wdc_atapi_start(chp, xfer)
 	    sc_xfer->xs_control), DEBUG_XFERS);
 	/* Adjust C_DMA, it may have changed if we are requesting sense */
 	if ((drvp->drive_flags & (DRIVE_DMA | DRIVE_UDMA)) &&
-	    (sc_xfer->datalen > 0 || (xfer->c_flags & C_SENSE))) {
+	    (sc_xfer->datalen > 0 || (xfer->c_flags & C_SENSE)) &&
+	    !(xfer->c_flags & C_FORCEPIO)) {
 		if (drvp->n_xfers <= NXFER)
 			drvp->n_xfers++;
 		xfer->c_flags |= C_DMA;
@@ -470,9 +480,15 @@ wdc_atapi_intr(chp, xfer, irq)
 	if (chp->wdc->cap & WDC_CAPABILITY_IRQACK)
 		chp->wdc->irqack(chp);
 
-	/* If we missed an IRQ and were using DMA, flag it as a DMA error */
+	/*
+	 * If we missed an IRQ and were using DMA, flag it as a DMA error
+	 * and reset device.
+	 */
 	if ((xfer->c_flags & C_TIMEOU) && (xfer->c_flags & C_DMA)) {
 		ata_dmaerr(drvp);
+		sc_xfer->error = XS_RESET;
+		wdc_atapi_reset(chp, xfer);
+		return (1);
 	}
 	/* 
 	 * if the request sense command was aborted, report the short sense

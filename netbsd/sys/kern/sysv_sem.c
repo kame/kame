@@ -1,4 +1,4 @@
-/*	$NetBSD: sysv_sem.c,v 1.38.2.1 2001/08/16 13:53:08 tv Exp $	*/
+/*	$NetBSD: sysv_sem.c,v 1.38 2000/06/02 15:53:05 simonb Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

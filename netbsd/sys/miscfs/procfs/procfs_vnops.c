@@ -253,7 +253,7 @@ procfs_open(v)
 			return (EBUSY);
 
 		if ((error = procfs_checkioperm(p1, p2)) != 0)
-			return (EPERM);
+			return (error);
 
 		if (ap->a_mode & FWRITE)
 			pfs->pfs_flags = ap->a_mode & (FWRITE|O_EXCL);

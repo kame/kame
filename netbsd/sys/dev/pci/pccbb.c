@@ -1,4 +1,4 @@
-/*	$NetBSD: pccbb.c,v 1.42.2.4 2001/05/01 12:54:28 he Exp $	*/
+/*	$NetBSD: pccbb.c,v 1.42.2.7 2002/02/09 18:29:18 he Exp $	*/
 
 /*
  * Copyright (c) 1998, 1999 and 2000
@@ -400,6 +400,7 @@ pccbbattach(parent, self, aux)
 	bus_addr_t sockbase;
 	char devinfo[256];
 	int flags;
+	int pwrmgt_offs;
 
 	sc->sc_chipset = cb_chipset(pa->pa_id, &flags);
 
@@ -419,6 +420,19 @@ pccbbattach(parent, self, aux)
 #endif /* rbus */
 
 	sc->sc_base_memh = 0;
+
+	/* power management: set D0 state */
+	if (pci_get_capability(pc, pa->pa_tag, PCI_CAP_PWRMGMT,
+	    &pwrmgt_offs, 0)) {
+		reg = pci_conf_read(pc, pa->pa_tag, pwrmgt_offs + 4);
+		if ((reg & PCI_PMCSR_STATE_MASK) != PCI_PMCSR_STATE_D0 ||
+		    reg & 0x100 /* PCI_PMCSR_PME_EN */) {
+			reg &= ~PCI_PMCSR_STATE_MASK;
+			reg |= PCI_PMCSR_STATE_D0;
+			reg &= ~(0x100 /* PCI_PMCSR_PME_EN */);
+			pci_conf_write(pc, pa->pa_tag, pwrmgt_offs + 4, reg);
+		}
+	}
 
 	/* 
 	 * MAP socket registers and ExCA registers on memory-space
@@ -962,6 +976,9 @@ pccbbintr(arg)
 					cardslot_event_throw(sc->sc_csc,
 					    CARDSLOT_EVENT_REMOVAL_CB);
 				}
+			} else if (sc->sc_flags & CBB_INSERTING) {
+				sc->sc_flags &= ~CBB_INSERTING;
+				callout_stop(&sc->sc_insert_ch);
 			}
 		} else if (0x00 == (sockstate & CB_SOCKET_STAT_CD) &&
 		    /*
@@ -973,7 +990,7 @@ pccbbintr(arg)
 			if (sc->sc_flags & CBB_INSERTING) {
 				callout_stop(&sc->sc_insert_ch);
 			}
-			callout_reset(&sc->sc_insert_ch, hz / 10,
+			callout_reset(&sc->sc_insert_ch, hz / 5,
 			    pci113x_insert, sc);
 			sc->sc_flags |= CBB_INSERTING;
 		}
@@ -1045,6 +1062,12 @@ pci113x_insert(arg)
 {
 	struct pccbb_softc *sc = (struct pccbb_softc *)arg;
 	u_int32_t sockevent, sockstate;
+
+	if (!(sc->sc_flags & CBB_INSERTING)) {
+		/* We add a card only under inserting state. */
+		return;
+	}
+	sc->sc_flags &= ~CBB_INSERTING;
 
 	sockevent = bus_space_read_4(sc->sc_base_memt, sc->sc_base_memh,
 	    CB_SOCKET_EVENT);
@@ -1897,11 +1920,38 @@ pccbb_pcmcia_io_alloc(pch, start, size, align, pcihp)
 	int flags = 0;
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
+	bus_addr_t mask;
 #if rbus
 	rbus_tag_t rb;
 #endif
 	if (align == 0) {
 		align = size;	       /* XXX: funny??? */
+	}
+
+	if (start != 0) {
+		/* XXX: assume all card decode lower 10 bits by its hardware */
+		mask = 0x3ff;
+	} else {
+		/*
+		 * calculate mask:
+		 *  1. get the most significant bit of size (call it msb).
+		 *  2. compare msb with the value of size.
+		 *  3. if size is larger, shift msb left once.
+		 *  4. obtain mask value to decrement msb.
+		 */
+		bus_size_t size_tmp = size;
+		int shifts = 0;
+
+		mask = 1;
+		while (size_tmp) {
+			++shifts;
+			size_tmp >>= 1;
+		}
+		mask = (1 << shifts);
+		if (mask < size) {
+			mask <<= 1;
+		}
+		--mask;
 	}
 
 	/* 
@@ -1912,8 +1962,7 @@ pccbb_pcmcia_io_alloc(pch, start, size, align, pcihp)
 
 #if rbus
 	rb = ((struct pccbb_softc *)(ph->ph_parent))->sc_rbus_iot;
-	/* XXX: I assume all card decode lower 10 bits by its hardware */
-	if (rbus_space_alloc(rb, start, size, 0x3ff, align, 0, &ioaddr, &ioh)) {
+	if (rbus_space_alloc(rb, start, size, mask, align, 0, &ioaddr, &ioh)) {
 		return 1;
 	}
 #else

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_gre.c,v 1.9.6.2 2000/11/19 20:21:50 tv Exp $ */
+/*	$NetBSD: if_gre.c,v 1.9.6.4 2002/02/26 20:57:57 he Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -115,9 +115,10 @@
 #define LINK_MASK (IFF_LINK0|IFF_LINK1|IFF_LINK2)
 
 struct gre_softc gre_softc[NGRE];
+int ip_gre_ttl = GRE_TTL;
 
 
-void gre_compute_route(struct gre_softc *sc);
+int gre_compute_route(struct gre_softc *sc);
 #ifdef DIAGNOSTIC
 void gre_inet_ntoa(struct in_addr in);
 #endif
@@ -173,9 +174,11 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	struct gre_softc *sc = (struct gre_softc *)(ifp->if_softc);
 	struct greip *gh;
 	struct ip *inp;
-	u_char ttl, osrc;
+	u_char osrc;
 	u_short etype = 0;
 	
+	if ((ifp->if_flags & IFF_UP) == 0)
+		return ENETDOWN;
 
 	gh = NULL;
 	inp = NULL;
@@ -196,7 +199,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	}
 #endif
 
-	ttl = 255;
+	m->m_flags &= ~(M_BCAST|M_MCAST);
 
 	if (sc->g_proto == IPPROTO_MOBILE) {
 		if (dst->sa_family == AF_INET) {
@@ -263,7 +266,6 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		switch(dst->sa_family) {
 		case AF_INET:
 			inp = mtod(m, struct ip *);
-			ttl = inp->ip_ttl;
 			etype = ETHERTYPE_IP;
 			break;
 #ifdef NETATALK
@@ -308,7 +310,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		gh->gi_src = sc->g_src;
 		gh->gi_dst = sc->g_dst;
 		((struct ip*)gh)->ip_hl = (sizeof(struct ip)) >> 2; 
-		((struct ip*)gh)->ip_ttl = ttl;
+		((struct ip*)gh)->ip_ttl = ip_gre_ttl;
 		((struct ip*)gh)->ip_tos = inp->ip_tos;
 	    gh->gi_len = m->m_pkthdr.len;
 	}
@@ -357,8 +359,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			    (sc->g_dst.s_addr != INADDR_ANY)) {
 				if (sc->route.ro_rt != 0) /* free old route */
 					RTFREE(sc->route.ro_rt);
-				gre_compute_route(sc);
-				ifp->if_flags |= IFF_UP;
+				if (gre_compute_route(sc) == 0)
+					ifp->if_flags |= IFF_UP;
 			}
 		}
 		break;
@@ -449,8 +451,8 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		    (sc->g_dst.s_addr != INADDR_ANY)) {
 			if (sc->route.ro_rt != 0) /* free old route */
 				RTFREE(sc->route.ro_rt);
-			gre_compute_route(sc);
-			ifp->if_flags |= IFF_UP;
+			if (gre_compute_route(sc) == 0)
+				ifp->if_flags |= IFF_UP;
 		}
 		break;
 	case GREGADDRS:
@@ -483,7 +485,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
  * at least a default route which matches.
  */
 
-void
+int
 gre_compute_route(struct gre_softc *sc)
 {
 	struct route *ro;
@@ -520,6 +522,20 @@ gre_compute_route(struct gre_softc *sc)
 	rtalloc(ro);
 
 	/*
+	 * check if this returned a route at all and this route is no
+	 * recursion to ourself
+	 */
+	if (ro->ro_rt == NULL || ro->ro_rt->rt_ifp->if_softc == sc) {
+#ifdef DIAGNOSTIC
+		if (ro->ro_rt == NULL)
+			printf(" - no route found!\n");
+		else
+			printf(" - route loops back to ourself!\n");
+#endif
+		return EADDRNOTAVAIL;
+	}
+
+	/*
 	 * now change it back - else ip_output will just drop 
          * the route and search one to this interface ...
          */
@@ -531,6 +547,8 @@ gre_compute_route(struct gre_softc *sc)
 	gre_inet_ntoa(((struct sockaddr_in *)(ro->ro_rt->rt_gateway))->sin_addr);
 	printf("\n");
 #endif
+
+	return 0;
 }
 
 /*

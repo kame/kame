@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.389.2.6 2001/06/25 16:11:34 he Exp $	*/
+/*	$NetBSD: machdep.c,v 1.389.2.5 2001/06/17 22:27:03 he Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997, 1998 The NetBSD Foundation, Inc.

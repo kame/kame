@@ -1,4 +1,4 @@
-/*	$NetBSD: umap_vfsops.c,v 1.25.2.1 2001/08/16 16:03:44 tv Exp $	*/
+/*	$NetBSD: umap_vfsops.c,v 1.25 2000/06/10 18:27:04 assar Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993

@@ -63,7 +63,7 @@ procfs_doregs(curp, p, pfs, uio)
 	int kl;
 
 	if ((error = procfs_checkioperm(curp, p)) != 0)
-		return (EPERM);
+		return error;
 
 	kl = sizeof(r);
 	kv = (char *) &r;

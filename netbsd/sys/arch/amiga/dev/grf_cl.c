@@ -1,4 +1,4 @@
-/*	$NetBSD: grf_cl.c,v 1.25.12.1 2001/08/16 16:52:36 tv Exp $	*/
+/*	$NetBSD: grf_cl.c,v 1.26 2001/08/05 18:07:52 jdolecek Exp $	*/
 
 /*
  * Copyright (c) 1997 Klaus Burkert

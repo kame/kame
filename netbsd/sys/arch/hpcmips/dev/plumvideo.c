@@ -1,4 +1,4 @@
-/*	$NetBSD: plumvideo.c,v 1.11.4.2 2001/08/16 16:52:37 tv Exp $ */
+/*	$NetBSD: plumvideo.c,v 1.11.4.1 2000/06/30 16:27:24 simonb Exp $ */
 
 /*-
  * Copyright (c) 1999, 2000 UCHIYAMA Yasushi.  All rights reserved.

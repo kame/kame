@@ -4,4 +4,3 @@
 # sys/arch/vax/conf/files.vax
 
 file	compat/vax1k/vax1k_exec.c		compat_vax1k
-file	compat/vax1k/vax1k_subr.c		compat_vax1k

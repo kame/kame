@@ -1,4 +1,4 @@
-/*	$NetBSD: coda_venus.c,v 1.7.20.1 2001/08/16 15:22:33 tv Exp $	*/
+/*	$NetBSD: coda_venus.c,v 1.7 1998/11/18 03:09:20 ross Exp $	*/
 
 /*
  * 

@@ -211,7 +211,7 @@ out_of_mbufs:
 
 	.align 2
 XLprintf:
-	.long	_printf
+	.long	_C_LABEL(printf)
 
 	.align 2
 message_out_of_data:

@@ -149,6 +149,9 @@ const struct pciintr_icu_table {
 	{ PCI_VENDOR_SIS,	PCI_PRODUCT_SIS_85C503,
 	  sis85c503_init },
 
+	{ PCI_VENDOR_ALI,	PCI_PRODUCT_ALI_M1543,
+	  ali1543_init },
+
 	{ 0,			0,
 	  NULL },
 };

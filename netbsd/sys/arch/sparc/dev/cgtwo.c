@@ -1,4 +1,4 @@
-/*	$NetBSD: cgtwo.c,v 1.31.4.2 2001/08/16 16:52:37 tv Exp $ */
+/*	$NetBSD: cgtwo.c,v 1.31.4.1 2000/06/30 16:27:38 simonb Exp $ */
 
 /*
  * Copyright (c) 1992, 1993

@@ -1,4 +1,4 @@
-/* $NetBSD: sfbplus.c,v 1.3.6.2 2001/08/16 16:52:40 tv Exp $ */
+/* $NetBSD: sfbplus.c,v 1.3.6.1 2000/06/30 16:27:52 simonb Exp $ */
 
 /*
  * Copyright (c) 1999 Tohru Nishimura.  All rights reserved.
@@ -32,7 +32,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: sfbplus.c,v 1.3.6.2 2001/08/16 16:52:40 tv Exp $");
+__KERNEL_RCSID(0, "$NetBSD: sfbplus.c,v 1.3.6.1 2000/06/30 16:27:52 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

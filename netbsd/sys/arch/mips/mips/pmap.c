@@ -1743,9 +1743,8 @@ pmap_copy_page(src, dst)
 	 *      the destination as well?
 	 */
 	if (CPUISMIPS3) {
-		/*XXX FIXME Not very sophisticated */
-		/*	MachFlushCache();*/
-		MachFlushDCache(dst, NBPG);
+		MachHitFlushDCache(MIPS_PHYS_TO_KSEG0(src), NBPG);
+		MachHitFlushDCache(MIPS_PHYS_TO_KSEG0(dst), NBPG);
 	}
 #endif
 }

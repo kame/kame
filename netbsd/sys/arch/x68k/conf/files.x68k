@@ -170,6 +170,10 @@ file	arch/x68k/dev/sram.c		sram needs-flag
 defpseudo pow
 file	arch/x68k/dev/pow.c		pow needs-count
 
+# Nereid Ethernet
+attach	ne at intio with ne_intio: rtl80x9
+file	arch/x68k/dev/if_ne_intio.c	ne_intio
+
 # memory disk
 file	arch/x68k/dev/md_root.c		memory_disk_hooks
 major	{md = 8}

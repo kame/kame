@@ -90,11 +90,7 @@ extern struct cpu_info cpu_info_store;
  */
 #define clockframe intrframe
 
-#if 1
-#define	CLKF_USERMODE(frame)	(!KERNELMODE((frame)->if_r15))
-#else
-#define	CLKF_USERMODE(frame)	USERMODE((frame)->if_spc, (frame)->if_ssr)
-#endif
+#define	CLKF_USERMODE(frame)	(!KERNELMODE((frame)->if_r15, (frame)->if_ssr))
 #if 0
 #define	CLKF_BASEPRI(frame)	((frame)->if_pri == 0)
 #else

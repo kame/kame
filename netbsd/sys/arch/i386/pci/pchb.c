@@ -1,4 +1,4 @@
-/*	$NetBSD: pchb.c,v 1.18.4.1 2000/10/30 23:30:18 tv Exp $	*/
+/*	$NetBSD: pchb.c,v 1.18.4.4 2002/03/20 22:36:36 he Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1998 The NetBSD Foundation, Inc.
@@ -101,8 +101,11 @@ pchbattach(parent, self, aux)
 	pcireg_t bcreg;
 	u_char bdnum, pbnum;
 	pcitag_t tag;
+	int doattach, attachflags;
 
 	printf("\n");
+	doattach = 0;
+	attachflags = pa->pa_flags;
 
 	/*
 	 * Print out a description, and configure certain chipsets which
@@ -114,7 +117,7 @@ pchbattach(parent, self, aux)
 	    PCI_REVISION(pa->pa_class));
 	switch (PCI_VENDOR(pa->pa_id)) {
 	case PCI_VENDOR_PEQUR:
-		pbnum = pci_conf_read(pa->pa_pc, pa->pa_tag, 0x44);
+		pbnum = pci_conf_read(pa->pa_pc, pa->pa_tag, 0x44) & 0xff;
 
 		if (pbnum == 0)
 			break;
@@ -123,14 +126,18 @@ pchbattach(parent, self, aux)
 		 * This host bridge has a second PCI bus.
 		 * Configure it.
 		 */
-		pba.pba_busname = "pci";
-		pba.pba_iot = pa->pa_iot;
-		pba.pba_memt = pa->pa_memt;
-		pba.pba_dmat = pa->pa_dmat;
-		pba.pba_bus = pbnum;
-		pba.pba_flags = pa->pa_flags;
-		pba.pba_pc = pa->pa_pc;
-		config_found(self, &pba, pchb_print);
+		doattach = 1;
+		switch (PCI_PRODUCT(pa->pa_id)) {
+		case PCI_PRODUCT_PEQUR_XX5:
+		case PCI_PRODUCT_PEQUR_CNB20HE:
+		case PCI_PRODUCT_PEQUR_CNB20LE:
+		case PCI_PRODUCT_PEQUR_CIOB20:
+			if ((attachflags &
+			    (PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED)) ==
+			    PCI_FLAGS_MEM_ENABLED)
+				attachflags |= PCI_FLAGS_IO_ENABLED;
+			break;
+		}
 		break;
 
 	case PCI_VENDOR_INTEL:
@@ -156,14 +163,7 @@ pchbattach(parent, self, aux)
 				 * This host bridge has a second PCI bus.
 				 * Configure it.
 				 */
-				pba.pba_busname = "pci";
-				pba.pba_iot = pa->pa_iot;
-				pba.pba_memt = pa->pa_memt;
-				pba.pba_dmat = pa->pa_dmat;
-				pba.pba_bus = pbnum;
-				pba.pba_flags = pa->pa_flags;
-				pba.pba_pc = pa->pa_pc;
-				config_found(self, &pba, pchb_print);
+				doattach = 1;
 				break;
 			}
 			break;
@@ -190,6 +190,11 @@ pchbattach(parent, self, aux)
 			 * (It would be easier to attach all the buses
 			 * at the MIOC, but less aesthetical imho.)
 			 */
+			if ((attachflags &
+			    (PCI_FLAGS_IO_ENABLED | PCI_FLAGS_MEM_ENABLED)) ==
+			    PCI_FLAGS_MEM_ENABLED)
+				attachflags |= PCI_FLAGS_IO_ENABLED;
+
 			pbnum = 0;
 			switch (pa->pa_device) {
 			case 18: /* PXB 0 bus A - primary bus */
@@ -213,18 +218,22 @@ pchbattach(parent, self, aux)
 				pbnum = (bcreg & 0x000000ff) + 1;
 				break;
 			}
-			if (pbnum != 0) {
-				pba.pba_busname = "pci";
-				pba.pba_iot = pa->pa_iot;
-				pba.pba_memt = pa->pa_memt;
-				pba.pba_dmat = pa->pa_dmat;
-				pba.pba_bus = pbnum;
-				pba.pba_flags = pci_bus_flags();
-				pba.pba_pc = pa->pa_pc;
-				config_found(self, &pba, pchb_print);
-			}
+			if (pbnum != 0)
+				doattach = 1;
 			break;
 		}
+		break;
+	}
+
+	if (doattach) {
+		pba.pba_busname = "pci";
+		pba.pba_iot = pa->pa_iot;
+		pba.pba_memt = pa->pa_memt;
+		pba.pba_dmat = pa->pa_dmat;
+		pba.pba_bus = pbnum;
+		pba.pba_flags = attachflags;
+		pba.pba_pc = pa->pa_pc;
+		config_found(self, &pba, pchb_print);
 	}
 }
 

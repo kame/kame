@@ -680,7 +680,8 @@ proc_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 				newplim = limcopy(ptmp->p_limit);
 				limfree(ptmp->p_limit);
 				ptmp->p_limit = newplim;
-			} else if (ptmp->p_limit->pl_corename != defcorename) {
+			}
+			if (ptmp->p_limit->pl_corename != defcorename) {
 				free(ptmp->p_limit->pl_corename, M_TEMP);
 			}
 			ptmp->p_limit->pl_corename = tmps;
