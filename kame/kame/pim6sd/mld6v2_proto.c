@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.26 2004/05/31 12:06:17 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.27 2004/05/31 12:31:01 suz Exp $
  */
 
 /*
@@ -152,10 +152,11 @@ SendQueryV2spec(arg)
     register struct uvif *v = &uvifs[cbk->mifi];
 
     if ((v->uv_flags & VIFF_QUERIER) == 0 || (v->uv_flags & VIFF_NOLISTENER)) {
-    	log_msg(LOG_DEBUG, 0,
+	log_msg(LOG_DEBUG, 0,
 		"don't send a GS/GSS Query due to a lack of querying right");
 	return;
     }
+
     send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		NULL, &cbk->g->al_addr, v->uv_ifindex,
 		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
@@ -203,6 +204,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     register struct uvif *v;
     struct sockaddr_in6 group_sa = { sizeof(group_sa), AF_INET6 };
     struct sockaddr_in6 source_sa = { sizeof(source_sa), AF_INET6 };
+    struct listaddr *g, *s;
     struct in6_addr *group;
     struct mldv2_hdr *mldh;
     int             tmo;
@@ -302,81 +304,72 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     if (qqi != 0) {
 	v->uv_mld_query_interval = qqi;
 	IF_DEBUG(DEBUG_MLD)
-	    log_msg(LOG_DEBUG, 0, "New Qqi adopted : %d", v->uv_mld_query_interval);
+	    log_msg(LOG_DEBUG, 0, "New Qqi adopted : %d",
+		v->uv_mld_query_interval);
     }
 
     /*
-     * if the S flag is set
-     * I'm not the querier : for each sources in the Specific Query
-     * message,lower our membership timer to (according draft-vida-mldv2)
-     * - [Last Listener Query Interval] if this is a m-a-s source/group
-     * query. (they are no group specific query : we are in SSM)
+     * When S-flag is set, only querier election has to be done.
+     * (draft-vida-mld-v2-08.txt section 5.1.7)
      */
+    if (sflag == TRUE) {
+	log_msg(LOG_DEBUG, 0, "MLDv2 Query processing is suppressed");
+    	return;
+    }
 
-    if (sflag == FALSE)
-    {
-	if (!IN6_IS_ADDR_UNSPECIFIED(group))
-	{
-	    struct listaddr *g;
-	    struct listaddr *s;
+    if (IN6_IS_ADDR_UNSPECIFIED(group)) {
+	log_msg(LOG_DEBUG, 0,
+		"nothing to do with general-query on router-side, "
+		"except for querier-election");
+    	return;
+    }
 
-	    IF_DEBUG(DEBUG_MLD)
-		log_msg(LOG_DEBUG, 0,
-		    "%s for %s from %s on vif %d, timer %d",
-		    "Group/Source-specific membership query V2",
-		    inet6_fmt(group), sa6_fmt(src), vifi, tmo);
+    IF_DEBUG(DEBUG_MLD)
+	log_msg(LOG_DEBUG, 0,
+	    "%s for %s from %s on vif %d, timer %d",
+	    "Group/Source-specific membership query V2",
+	    inet6_fmt(group), sa6_fmt(src), vifi, tmo);
 
-	    group_sa.sin6_addr = *group;
-	    group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
+    group_sa.sin6_addr = *group;
+    group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
-	    IF_DEBUG(DEBUG_MLD)
-		log_msg(LOG_DEBUG,0,"List of sources :");
-	    for (i = 0; i < numsrc; i++)
-	    {
-		source_sa.sin6_addr = mldh->mld_src[i];
-		source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
+    IF_DEBUG(DEBUG_MLD)
+	log_msg(LOG_DEBUG, 0, "List of sources :");
+    for (i = 0; i < numsrc; i++) {
+	source_sa.sin6_addr = mldh->mld_src[i];
+	source_sa.sin6_scope_id = inet6_uvif2scopeid(&source_sa, v);
 
-	        log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
+        log_msg(LOG_DEBUG, 0, "%s", sa6_fmt(&source_sa));
 
-               /*
-                * I'm not the querier but maybe I'm still in the state Checking listener
-                * for this Group/Source we verify this with the al_checklist var
-                */
-                /*
-                 * Section 6.6.1 draft-vida-mld-v2-00.txt : When a router 
-		 * receive a query with clear router Side Processing flag,
-                 * it must update it's timer to reflect the correct
-                 * timeout values : source timer for sources are lowered to LLQI
-                 */
+	/*
+	 * I'm not the querier but maybe I'm still in the state Checking
+	 * listener for this Group/Source we verify this with the 
+	 * al_checklist var
+	 */
+	/*
+	 * Section 7.6.1 draft-vida-mld-v2-08.txt : When a router 
+	 * receive a query with clear router Side Processing flag,
+	 * it must update it's timer to reflect the correct
+	 * timeout values : source timer for sources are lowered to LLQI
+	 */
 
-		if ((s =
-		     check_multicastV2_listener(v, &group_sa, &g,
-						&source_sa)) != NULL)
-		{
-		    /*
-		     * setup a timeout to remove the source/group
-		     * membership
-		     */
-                    if (timer_leftTimer(s->al_timerid) >
-                        (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL /
-                               MLD6_TIMER_SCALE)) 
-		    {
-		        timer_clearTimer(s->al_timerid);
-		        SET_TIMER(s->al_timer,
-			          MLD6_LAST_LISTENER_QUERY_INTERVAL /
-			          MLD6_TIMER_SCALE);
-		        s->al_timerid = SetTimerV2(vifi, g, s);
-		    }
+	s = check_multicastV2_listener(v, &group_sa, &g, &source_sa);
+	if (s == NULL)
+		continue;
 
-		    IF_DEBUG(DEBUG_MLD)
-			log_msg(LOG_DEBUG, 0,
-			    "timer for grp %s src %s on vif %d "
-			    "set to %ld",
-			    inet6_fmt(group),
-			    sa6_fmt(&source_sa), vifi, s->al_timer);
-		}
-	    }
+	/* setup a timeout to remove the source/group membership */
+	if (timer_leftTimer(s->al_timerid) >
+            (int) (MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE)) {
+	    timer_clearTimer(s->al_timerid);
+	    SET_TIMER(s->al_timer,
+	    	MLD6_LAST_LISTENER_QUERY_INTERVAL / MLD6_TIMER_SCALE);
+	    s->al_timerid = SetTimerV2(vifi, g, s);
 	}
+
+	IF_DEBUG(DEBUG_MLD)
+	    log_msg(LOG_DEBUG, 0,
+		"timer for grp %s src %s on vif %d set to %ld",
+		inet6_fmt(group), sa6_fmt(&source_sa), vifi, s->al_timer);
     }
 }
 
@@ -607,7 +600,7 @@ accept_multicast_record(vifi, mard, src, grp)
 	case BLOCK_OLD_SOURCES:
 	    /*
 	     * Routers in Non-Querier state MUST ignore BLOCK_OLD_SOURCES
-	     * message like RFC2710? assume yes.
+	     * message like RFC2710?  assume yes.
 	     */
 	    if (!(v->uv_flags & VIFF_QUERIER) || v->uv_flags & VIFF_NOLISTENER)
 		break;
