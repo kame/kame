@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_init.c	8.1 (Berkeley) 6/7/93";
-static char rcsid[] = "$Id: res_init.c,v 1.3 2000/02/20 15:17:07 itojun Exp $";
+static char rcsid[] = "$Id: res_init.c,v 1.4 2000/02/27 09:28:49 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -346,8 +346,12 @@ res_init()
 #ifdef INET6
 		    char *q;
 		    struct in6_addr a6;
-#endif /* INET6 */
+		    struct addrinfo hints, *res;
+		    int gaierror;
+		    char pbuf[NI_MAXSERV];
+#else
 		    struct in_addr a;
+#endif /* INET6 */
 
 		    cp = buf + sizeof("nameserver") - 1;
 		    while (*cp == ' ' || *cp == '\t')
@@ -361,29 +365,26 @@ res_init()
 			    break;
 			}
 		    }
-		    if (inet_pton(AF_INET6, cp, &a6) == 1) {
-			sin6 = (struct sockaddr_in6 *)
-				&_res_ext.nsaddr_list[nserv];
-			memset(sin6, 0, sizeof(*sin6));
-			sin6->sin6_family = AF_INET6;
-			sin6->sin6_len = sizeof(struct sockaddr_in6);
-			memcpy(&sin6->sin6_addr, &a6, sizeof(sin6->sin6_addr));
-			sin6->sin6_port = htons(NAMESERVER_PORT);
-			/* just for safety */
-			memset(&_res.nsaddr_list[nserv], 0,
-			    sizeof(_res.nsaddr_list[nserv]));
-			nserv++;
-		    } else if (inet_pton(AF_INET, cp, &a) == 1) {
-			struct sockaddr_in *sin;
-			sin = (struct sockaddr_in *)
-				&_res_ext.nsaddr_list[nserv];
-			memset(sin, 0, sizeof(*sin));
-			sin->sin_family = AF_INET;
-			sin->sin_len = sizeof(struct sockaddr_in);
-			memcpy(&sin->sin_addr, &a, sizeof(sin->sin_addr));
-			sin->sin_port = htons(NAMESERVER_PORT);
-			/* backward compat */
-			memcpy(&_res.nsaddr_list[nserv], sin, sin->sin_len);
+		    memset(&hints, 0, sizeof(hints));
+		    hints.ai_flags = AI_NUMERICHOST;
+		    hints.ai_socktype = SOCK_DGRAM;
+		    snprintf(pbuf, sizeof(pbuf), "%d", NAMESERVER_PORT);
+		    if (getaddrinfo(cp, pbuf, &hints, &res) == 0 &&
+			    res->ai_next == NULL) {
+			if (res->ai_addrlen <= sizeof(_res_ext.nsaddr_list[nserv])) {
+			    memcpy(&_res_ext.nsaddr_list[nserv], res->ai_addr,
+				res->ai_addrlen);
+			} else {
+			    memset(&_res_ext.nsaddr_list[nserv], 0,
+				sizeof(_res_ext.nsaddr_list[nserv]));
+			}
+			if (res->ai_addrlen <= sizeof(_res.nsaddr_list[nserv])) {
+			    memcpy(&_res.nsaddr_list[nserv], res->ai_addr,
+				res->ai_addrlen);
+			} else {
+			    memset(&_res.nsaddr_list[nserv], 0,
+				sizeof(_res.nsaddr_list[nserv]));
+			}
 			nserv++;
 		    }
 #else /* INET6 */
