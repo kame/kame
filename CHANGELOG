@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1180 2000/08/07 15:02:05 itojun Exp $
+$KAME: CHANGELOG,v 1.1181 2000/08/09 13:38:56 itojun Exp $
 
 <200007>
+Wed Aug  9 22:37:14 JST 2000  itojun@iijlab.net
+	* kame/ping6/ping6.c: support compresed DNS label string.  be more
+	  picky about DNS label validation.
+
 Mon Aug  7 23:59:51 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_send.c: correct sendto() timeout retry loop.
 	  old code made infinite loop in EINTR-busy environment.
