@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.253 2004/07/05 03:10:14 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.254 2004/07/05 06:24:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1803,7 +1803,7 @@ pfxlist_onlink_check()
 					ifa->ia6_flags &= ~IN6_IFF_DETACHED;
 					ifa->ia6_flags |= IN6_IFF_TENTATIVE;
 					nd6_dad_start((struct ifaddr *)ifa,
-					    NULL);
+					    0);
 				}
 			} else
 				ifa->ia6_flags |= IN6_IFF_DETACHED;
