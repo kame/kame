@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)inet.c	8.5 (Berkeley) 5/24/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.10 2003/08/24 09:04:19 hsu Exp $";
+  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.12 2004/03/30 09:18:15 des Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -657,7 +657,7 @@ icmp_stats(u_long off __unused, char *name, int af __unused)
 		}
 	p(icps_reflect, "\t%lu message response%s generated\n");
 	p2(icps_badaddr, "\t%lu invalid return address%s\n");
-	p(icps_badaddr, "\t%lu no return route%s\n");
+	p(icps_noroute, "\t%lu no return route%s\n");
 #undef p
 #undef p1a
 #undef p2
@@ -718,7 +718,8 @@ pim_stats(u_long off __unused, char *name, int af1 __unused)
 		memset(&zerostat, 0, len);
 	if (sysctlbyname("net.inet.pim.stats", &pimstat, &len,
 	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
-		warn("sysctl: net.inet.pim.stats");
+		if (errno != ENOENT)
+			warn("sysctl: net.inet.pim.stats");
 		return;
 	}
 

@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/tftp/main.c,v 1.8.2.3 2002/05/14 22:08:07 bsd Exp $";
+  "$FreeBSD: src/usr.bin/tftp/main.c,v 1.8.2.4.2.1 2004/05/12 03:30:00 tjr Exp $";
 #endif /* not lint */
 
 /* Many bug fixes are from Jim Guyton <guyton@rand-unix> */
@@ -82,7 +82,8 @@ int	connected;
 char	mode[32];
 char	line[200];
 int	margc;
-char	*margv[20];
+#define	MAX_MARGV	20
+char	*margv[MAX_MARGV];
 char	*prompt = "tftp";
 jmp_buf	toplevel;
 volatile int txrx_error;
@@ -255,7 +256,7 @@ setpeer(argc, argv)
 		argv = margv;
 	}
 	if ((argc < 2) || (argc > 3)) {
-		printf("usage: %s host-name [port]\n", argv[0]);
+		printf("usage: %s [host [port]]\n", argv[0]);
 		return;
 	}
 	if (argc == 3)
@@ -421,8 +422,8 @@ static void
 putusage(s)
 	char *s;
 {
-	printf("usage: %s file ... host:target, or\n", s);
-	printf("       %s file ... target (when already connected)\n", s);
+	printf("usage: %s file [[host:]remotename]\n", s);
+	printf("       %s file1 file2 ... fileN [[host:]remote-directory]\n", s);
 }
 
 /*
@@ -503,8 +504,8 @@ static void
 getusage(s)
 	char *s;
 {
-	printf("usage: %s host:file host:file ... file, or\n", s);
-	printf("       %s file file ... file if connected\n", s);
+	printf("usage: %s [host:]file [localname]\n", s);
+	printf("       %s [host1:]file1 [host2:]file2 ... [hostN:]fileN\n", s);
 }
 
 int	rexmtval = TIMEOUT;
@@ -683,7 +684,7 @@ makeargv()
 	margc = 0;
 	if ((cp = strchr(line, '\n')))
 		*cp = '\0';
-	for (cp = line; *cp;) {
+	for (cp = line; margc < MAX_MARGV - 1 && *cp;) {
 		while (isspace(*cp))
 			cp++;
 		if (*cp == '\0')
