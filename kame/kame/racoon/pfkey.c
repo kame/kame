@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.57 2000/06/28 10:18:29 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.58 2000/06/29 01:54:48 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -2053,7 +2053,8 @@ sadbsecas2str(src, dst, proto, spi, mode)
 	if (spi) {
 		p += i;
 		blen -= i;
-		snprintf(p, blen, "spi=%ld(0x%lx)", ntohl(spi), ntohl(spi));
+		snprintf(p, blen, "spi=%d(0x%x)", (u_int32_t)ntohl(spi),
+		    (u_int32_t)ntohl(spi));
 	}
 
 	return buf;
