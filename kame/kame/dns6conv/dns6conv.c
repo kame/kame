@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.8 2001/09/07 06:47:38 jinmei Exp $ */
+/*	$KAME: dns6conv.c,v 1.9 2001/11/16 08:04:07 itojun Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -70,7 +70,7 @@ main(argc, argv)
 	hints.ai_flags = AI_NUMERICHOST;
 
 	while ((ch = getopt(argc, argv, "b:e:f:")) != -1) {
-		switch(ch) {
+		switch (ch) {
 		case 'b':
 			beg = atoi(optarg);
 			break;
@@ -117,7 +117,7 @@ main(argc, argv)
 		"dns6conv: translate %s into the %s format, from %d to %d\n",
 		addr, fmt_t2s(fmttype), beg, end);
 
-	switch(fmttype) {
+	switch (fmttype) {
 	case a6:
 		if ((bin6 = cut((const struct sockaddr_in6 *)res->ai_addr,
 				beg, end)) == NULL)
@@ -202,7 +202,7 @@ cut_bitlabel(a6, beg, end)
 	sft = beg % 8;
 	memset(ret, 0, sizeof(ret));
 
-	while(resid > 0) {
+	while (resid > 0) {
 		*cp = ((*bp << sft) & (0xff << sft)) & 0xff;
 		if ((resid -= (8 - sft)) <= 0)
 			break;
@@ -284,7 +284,7 @@ print_nibble(cp0, blen)
 static char *
 fmt_t2s(int fmttype)
 {
-	switch(fmttype) {
+	switch (fmttype) {
 	case a6:
 		return("a6");
 	case bitlabel:
