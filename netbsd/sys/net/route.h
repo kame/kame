@@ -107,6 +107,9 @@ struct rt_metrics {
 #if 1	/*RADIX_ART*/
 #include <net/radix_art.h>
 #endif
+#if 1	/*RADIX_MPATH*/
+#include <net/radix_mpath.h>
+#endif
 #endif
 struct rtentry {
 	struct	radix_node rt_nodes[2];	/* tree glue, and other values */

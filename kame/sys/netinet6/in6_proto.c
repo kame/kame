@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.97 2001/06/28 06:10:16 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.98 2001/07/20 18:35:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,6 +93,8 @@
 #include <net/radix.h>
 #ifdef RADIX_ART
 #include <net/radix_art.h>
+#elif defined(RADIX_MPATH)
+#include <net/radix_mpath.h>
 #endif
 #include <net/route.h>
 
@@ -474,6 +476,8 @@ struct domain inet6domain =
 #else
 #ifdef RADIX_ART
       rn_art_inithead,
+#elif defined(RADIX_MPATH)
+      rn_mpath_inithead,
 #else
       rn_inithead,
 #endif

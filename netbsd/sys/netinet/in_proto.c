@@ -81,6 +81,8 @@
 #include <net/radix.h>
 #ifdef RADIX_ART
 #include <net/radix_art.h>
+#elif defined(RADIX_MPATH)
+#include <net/radix_mpath.h>
 #endif
 #include <net/route.h>
 
@@ -323,6 +325,8 @@ struct domain inetdomain =
       inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
 #ifdef RADIX_ART
       rn_art_inithead,
+#elif defined(RADIX_MPATH)
+      rn_mpath_inithead,
 #else
       rn_inithead,
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.10 2001/07/17 04:18:07 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.11 2001/07/20 18:34:58 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -177,6 +177,10 @@
 /* statistics - need entries in rtstat (netbsd only at this moment) */
 #ifdef __NetBSD__
 #define RADIX_ART_STAT
+#endif
+
+#ifdef RADIX_MPATH
+#error RADIX_ART cannot be used with RADIX_MPATH
 #endif
 
 #include <sys/param.h>

@@ -618,6 +618,23 @@ rtrequest1(req, info, ret_nrt)
 		if ((rn = rnh->rnh_lookup(dst, netmask, rnh)) == 0)
 			senderr(ESRCH);
 		rt = (struct rtentry *)rn;
+#ifdef RADIX_MPATH
+		/*
+		 * if we got multipath routes, we require users to specify
+		 * a matching RTAX_GATEWAY.
+		 */
+		if (rn_mpath_capable(rnh) && rn_mpath_next(rn)) {
+			if (!gateway)
+				senderr(ESRCH);
+			do {
+				rt = (struct rtentry *)rn;
+				if (equal(rt->rt_gateway, gateway))
+					break;
+			} while ((rn = rn_mpath_next(rn)) != NULL);
+			if (!rn)
+				senderr(ESRCH);
+		}
+#endif
 		if ((rt->rt_flags & RTF_CLONING) != 0) {
 			/* clean up any cloned children */
 			rtflushclone(rnh, rt);

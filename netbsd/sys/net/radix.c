@@ -52,6 +52,10 @@
 #include <net/radix.h>
 #endif
 
+#ifdef RADIX_MPATH
+#include <net/radix_mpath.h>
+#endif
+
 int	max_keylen;
 struct radix_mask *rn_mkfreelist;
 struct radix_node_head *mask_rnhead;
@@ -544,6 +548,21 @@ rn_addroute(v_arg, n_arg, head, treenodes)
 	saved_tt = tt = rn_insert(v, head, &keyduplicated, treenodes);
 	if (keyduplicated) {
 		for (t = tt; tt; t = tt, tt = tt->rn_dupedkey) {
+#ifdef RADIX_MPATH
+			/* permit multipath, if enabled for the family */
+			if (rn_mpath_capable(head) && netmask == tt->rn_mask) {
+				/*
+				 * go down to the end of multipaths, so that
+				 * new entry goes into the end of rn_dupedkey
+				 * chain.
+				 */
+				do {
+					t = tt;
+					tt = tt->rn_dupedkey;
+				} while (tt && t->rn_mask == tt->rn_mask);
+				break;
+			}
+#endif
 			if (tt->rn_mask == netmask)
 				return (0);
 			if (netmask == 0 ||
