@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.15 2000/08/06 13:07:12 kjc Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.16 2000/08/06 13:11:18 kjc Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -802,7 +802,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
  	for (inp = LIST_FIRST(head); inp != NULL; inp = ninp) {
  		ninp = LIST_NEXT(inp, inp_list);
 
- 		if ((inp->inp_vflag & INP_IPV6) == NULL)
+ 		if ((inp->inp_vflag & INP_IPV6) == 0)
 			continue;
 
  		if (do_rtchange) {
