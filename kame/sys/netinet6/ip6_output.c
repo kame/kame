@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.415 2004/01/22 23:23:42 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.416 2004/02/02 13:16:19 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3974,8 +3974,6 @@ ip6_setmoptions(optname, im6op, m)
 				break;
 		}
 
-		/* ToDo: upper limit check */
-
 		if (imm != NULL) {
 			msf = imm->i6mm_msf;
 
@@ -3987,8 +3985,12 @@ ip6_setmoptions(optname, im6op, m)
 				error = EINVAL;
 				break;
 			}
+
 			/*
 			 * If there is EXCLUDE msf state, return EINVAL.
+			 * join or EXCLUDE join was already requested.
+			 * (draft-ietf-magma-msf-api-05.txt 4.1.3 2nd paragraph)
+			 *
 			 */
 			if (msf->msf_blknumsrc != 0) {
 				error = EINVAL;
@@ -4022,7 +4024,8 @@ ip6_setmoptions(optname, im6op, m)
 		/*
 		 * Set source address to the msf.
 		 * If requested source address was already in the socket list,
-		 * return EADDRNOTAVAIL. 
+		 * return EADDRNOTAVAIL. (draft-ietf-magma-msf-api-05.txt 
+		 * 4.1.3  1st paragraph)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
@@ -4087,7 +4090,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		if ((msf->msf_grpjoin != 0) || (msf->msf_blknumsrc != 0)) {
+		if (msf->msf_grpjoin != 0 || msf->msf_blknumsrc != 0) {
 			error = EINVAL;
 			break;
 		}
@@ -4136,35 +4139,27 @@ ip6_setmoptions(optname, im6op, m)
 			    SS_CMP(&imm->i6mm_maddr->in6m_sa, ==, &ss_grp))
 				break;
 		}
-		/* ToDo: upper limit check */
-		if (imm != NULL) {
-			msf = imm->i6mm_msf;
 
-			/*
-			 * If there is INCLUDE msf state, return EINVAL.
-			 */
-			if (msf->msf_numsrc != 0) {
-				error = EINVAL;
-				break;
-			}
-			if (msf->msf_blknumsrc >= mldsomaxsrc) {
-				error = ENOBUFS;
-				break;
-			}
-			init = 0;
-		} else {
-			imm = malloc(sizeof(*imm), M_IPMADDR, M_NOWAIT);
-			if (imm == NULL) {
-				error = ENOBUFS;
-				break;
-			}
-			IMO_MSF_ALLOC(imm->i6mm_msf);
-			msf = imm->i6mm_msf;
-			if (error != 0)
-				break;
-			init = 1;
+		/*
+		 * return EIVNAL, since it's invalid to BLOCK non-existent 
+		 * membership (draft-ietf-magma-msf-api-05.txt 4.1.3)
+		 */
+		if (imm == NULL) {
+			error = EINVAL;
+			break;
 		}
 
+		msf = imm->i6mm_msf;
+
+		/* If there is INCLUDE msf state, return EINVAL  */
+		if (msf->msf_numsrc != 0) {
+			error = EINVAL;
+			break;
+		}
+		if (msf->msf_blknumsrc >= mldsomaxsrc) {
+			error = ENOBUFS;
+			break;
+		}
 
 		/*
 		 * Set source address to the msf.
@@ -4174,11 +4169,8 @@ ip6_setmoptions(optname, im6op, m)
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
 		error = in6_setmopt_source_addr(&ss_src, msf, optname);
-		if (error != 0) {
-			if (init)
-				IMO_MSF_FREE(msf);
+		if (error != 0)
 			break;
-		}
 
 		/*
 		 * Everything looks good; add a new record to the multicast
@@ -4186,43 +4178,37 @@ ip6_setmoptions(optname, im6op, m)
 		 * But if some error occurs when source list is added to
 		 * the list, undo added msf list from the socket.
 		 */
-		if (msf->msf_grpjoin == 0) {
-			/* IN{NULL}/EX{non NULL} -> EX{non NULL} */
+		if (msf->msf_blknumsrc != 0) {
+			/*
+			 * EX{non NULL} -> EX{non NULL} only,
+			 * IN{NULL}->EX{non NULL} is prohibited
+			 */
 			imm->i6mm_maddr = 
 				in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
-					     &ss_src, MCAST_EXCLUDE,
-					     init);
+					     &ss_src, MCAST_EXCLUDE, 0);
 			if (error != 0) {
-				if (init) {
-					IMO_MSF_FREE(msf);
-					FREE(imm, M_IPMADDR);
-				} else {
-					in6_undomopt_source_addr(msf, optname);
-				}
+				in6_undomopt_source_addr(msf, optname);
 				break;
 			}
 		} else {
-			/* EX{NULL} -> EX{non NULL} */
+			/* 
+			 * EX{NULL} -> EX{non NULL}
+			 * msf->msf_grpjoin never goes to 0; otherwise msf
+			 * state goes to IN{NULL} after UNBLOCK(S).
+			 * (to guarantee this, BLOCK(S) is prohibited when
+			 *  msf->msf_grpjoin is greater than 0)
+			 */
 			imm->i6mm_maddr =
 				in6_modmulti(SIN6(&ss_grp), ifp, &error, 1,
 					     &ss_src, MCAST_EXCLUDE,
-					     0, NULL, MCAST_EXCLUDE, init,
+					     0, NULL, MCAST_EXCLUDE, 0,
 					     msf->msf_grpjoin);
 			if (imm->i6mm_maddr == NULL) {
-				if (init) {
-					IMO_MSF_FREE(msf);
-					FREE(imm, M_IPMADDR);
-				} else {
-					 in6_undomopt_source_addr(msf, optname);
-				}
+				in6_undomopt_source_addr(msf, optname);
 				break;
 			}
-			msf->msf_grpjoin = 0;
 		}
 		in6_cleanmopt_source_addr(msf, optname);
-		if (init)
-			LIST_INSERT_HEAD(&im6o->im6o_memberships, imm,
-					 i6mm_chain);
 		break;
 
 	case MCAST_UNBLOCK_SOURCE:
@@ -4245,47 +4231,34 @@ ip6_setmoptions(optname, im6op, m)
 
 		/*
 		 * Remove source address from the msf.
-		 * If (*,G) join or INCLUDE join was requested previously,
-		 * return EINVAL.
+		 * If EXCLUDE join was not requested or INCLUDE join was
+		 * requested previously return EINVAL.
 		 * If requested source address was not in the socket list,
 		 * return EADDRNOTAVAIL. 
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
 		msf = imm->i6mm_msf;
-		if ((msf->msf_grpjoin != 0) || (msf->msf_numsrc != 0)) {
+		if (msf->msf_blknumsrc == 0 || msf->msf_numsrc != 0) {
 			error = EINVAL;
 			break;
 		}
 		error = in6_setmopt_source_addr(&ss_src, msf, optname);
 		if (error != 0)
 			break;
-		if (msf->msf_blknumsrc == 0)
-			final = 1;
-		else
-			final = 0;
 
 		/*
 		 * Give up the multicast address record to which the
 		 * membership points.
 		 */
 		in6_delmulti(imm->i6mm_maddr, &error, 1, &ss_src,
-			     MCAST_EXCLUDE, final);
+			     MCAST_EXCLUDE, 0);
 		if (error != 0) {
 			printf("ip6_setmoptions: error must be 0! panic!\n");
 			in6_undomopt_source_addr(msf, optname);
 			break; /* strange... */
 		}
 		in6_cleanmopt_source_addr(msf, optname);
-
-		/*
-		 * Remove the gap in the membership array if there is no
-		 * msf member.
-		 */
-		if (final) {
-			LIST_REMOVE(imm, i6mm_chain);
-			FREE(imm, M_IPMADDR);
-		}
 		break;
 #endif /* MLDV2 */
 
