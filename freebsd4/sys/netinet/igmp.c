@@ -1209,7 +1209,7 @@ igmp_record_queried_source(inm, igmp, igmplen)
 	struct in_addr_source *curias;
 	u_int16_t numsrc, i;
 	int ref_count;
-	u_int32_t src_h;
+	struct sockaddr_in sin;
 	int recorded = 0;
 
 	igmplen -= qhdrlen; /* remaining source list */
@@ -1218,11 +1218,15 @@ igmp_record_queried_source(inm, igmp, igmplen)
 	    return EOPNOTSUPP; /* XXX */
 
 	for (i = 0; i < numsrc && igmplen >= addrlen; i++, igmplen -= addrlen) {
-	    src_h = ntohl(igmp->src[i].s_addr);
+	    bzero(&sin, sizeof(sin));
+	    sin.sin_family = AF_INET;
+	    sin.sin_len = sizeof(sin);
+	    sin.sin_addr = igmp->src[i];
+
 	    if (inm->inm_source->ims_grpjoin > 0) {
 		if ((ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_rec,
-					 src_h, IMS_ADD_SOURCE)) < 0) {
+					 &sin, IMS_ADD_SOURCE)) < 0) {
 		    in_free_msf_source_list(inm->inm_source->ims_rec->head);
 		    inm->inm_source->ims_rec->numsrc = 0;
 		    return ENOBUFS;
@@ -1234,15 +1238,15 @@ igmp_record_queried_source(inm, igmp, igmplen)
 	    }
 
 	    LIST_FOREACH(curias, inm->inm_source->ims_cur->head, ias_list) {
-		if (curias->ias_addr.s_addr < src_h)
+		if (SS_CMP(&curias->ias_addr, <, &sin))
 		    continue;
 
-		if (curias->ias_addr.s_addr == src_h) {
+		if (SS_CMP(&curias->ias_addr, ==, &sin)) {
 		    if (inm->inm_source->ims_mode != MCAST_INCLUDE)
 			break;
 		    ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_rec,
-					 src_h, IMS_ADD_SOURCE);
+					 &sin, IMS_ADD_SOURCE);
 		    if (ref_count < 0) {
 			in_free_msf_source_list(inm->inm_source->ims_rec->head);
 			inm->inm_source->ims_rec->numsrc = 0;
@@ -1254,11 +1258,11 @@ igmp_record_queried_source(inm, igmp, igmplen)
 		    break;
 		}
 
-		/* curias->ias_addr.s_addr > src_h */
+		/* curias->ias_addr > sin */
 		if (inm->inm_source->ims_mode == MCAST_EXCLUDE) {
 		    ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_rec,
-					 src_h, IMS_ADD_SOURCE);
+					 &sin, IMS_ADD_SOURCE);
 		    if (ref_count < 0) {
 			in_free_msf_source_list(inm->inm_source->ims_rec->head);
 			inm->inm_source->ims_rec->numsrc = 0;
@@ -1276,7 +1280,7 @@ igmp_record_queried_source(inm, igmp, igmplen)
 		if (inm->inm_source->ims_mode == MCAST_EXCLUDE) {
 		    ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_rec,
-					 src_h, IMS_ADD_SOURCE);
+					 &sin, IMS_ADD_SOURCE);
 		    if (ref_count < 0) {
 			in_free_msf_source_list(inm->inm_source->ims_rec->head);
 			inm->inm_source->ims_rec->numsrc = 0;
@@ -1807,7 +1811,8 @@ igmp_create_group_record(m, buflenp, inm, numsrc, done, type)
 		for (; i < numsrc && ias != NULL && mfreelen > addrlen;
 				i++, total++, mfreelen -= addrlen,
 				ias = LIST_NEXT(ias, ias_list))
-			igmp_ghdr->src[i].s_addr = htonl(ias->ias_addr.s_addr);
+			bcopy(&ias->ias_addr.sin_addr,
+			      &igmp_ghdr->src[i].s_addr, ias->ias_addr.sin_len);
 	}
 
 	*done = total;

@@ -68,14 +68,14 @@
 
 #ifdef IGMPV3
 
-static int in_merge_msf_head __P((struct in_multi *, struct in_addr_slist *,
-		u_int, u_int));
-static void in_undo_new_msf_curhead __P((struct in_multi *, u_int32_t));
-static void in_clear_pending_report __P((struct in_multi *, u_int));
-static int in_merge_pending_report __P((struct in_multi *,
-		struct in_addr_source *, u_int8_t));
-static int in_copy_msf_source_list __P((struct in_addr_slist *,
-		struct in_addr_slist *, u_int));
+static int in_merge_msf_head(struct in_multi *, struct in_addr_slist *,
+		u_int, u_int);
+static void in_undo_new_msf_curhead(struct in_multi *, struct sockaddr_in *);
+static void in_clear_pending_report(struct in_multi *, u_int);
+static int in_merge_pending_report(struct in_multi *,
+		struct in_addr_source *, u_int8_t);
+static int in_copy_msf_source_list(struct in_addr_slist *,
+		struct in_addr_slist *, u_int);
 
 #define IAS_LIST_ALLOC(iasl) do {					\
 	MALLOC((iasl), struct in_addr_slist *,				\
@@ -136,7 +136,6 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	struct in_addr_source *ias;
 	u_int16_t *fnumsrc = NULL;
 	struct sockaddr_in *sin;
-	u_int32_t src_h;
 	u_int16_t i, j;
 	int ref_count;
 	int error = 0;
@@ -207,7 +206,7 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			if (ias == NULL)
 				return ENOBUFS;
 
-			ias->ias_addr.s_addr = ntohl(SIN_ADDR(sin));
+			bcopy(sin, &ias->ias_addr, sin->sin_len);
 			ias->ias_refcount = 1;
 			if (INM_SOURCE_LIST(mode) == NULL) {
 				IAS_LIST_ALLOC(INM_SOURCE_LIST(mode));
@@ -241,8 +240,7 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 		sin = SIN(&ss[i]);
 		if (SIN_ADDR(sin) == INADDR_ANY)
 			continue; /* skip */
-		src_h = ntohl(SIN_ADDR(sin));
-		ref_count = in_merge_msf_source_addr(iasl, src_h,
+		ref_count = in_merge_msf_source_addr(iasl, sin,
 						     IMS_ADD_SOURCE);
 		if (ref_count < 0) {
 			in_undomultisrc(inm, i, ss, mode, IMS_ADD_SOURCE);
@@ -322,7 +320,6 @@ in_delmultisrc(inm, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 	struct in_addr_source *ias, *nias;
 	struct sockaddr_in *sin;
 	u_int16_t *fnumsrc = NULL;
-	u_int32_t src_h;
 	u_int16_t i, j;
 	int ref_count;
 	int error;
@@ -356,8 +353,7 @@ in_delmultisrc(inm, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 		sin = SIN(&ss[i]);
 		if (SIN_ADDR(sin) == INADDR_ANY)
 			continue; /* skip */
-		src_h = ntohl(SIN_ADDR(sin));
-		ref_count = in_merge_msf_source_addr(iasl, src_h,
+		ref_count = in_merge_msf_source_addr(iasl, sin,
 						     IMS_DELETE_SOURCE);
 		if (ref_count < 0) {
 			in_undomultisrc(inm, i, ss, mode, IMS_DELETE_SOURCE);
@@ -436,7 +432,6 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 	struct in_addr_source *ias, *nias;
 	u_int16_t *fnumsrc = NULL, *ofnumsrc = NULL;
 	struct sockaddr_in *sin;
-	u_int32_t src_h;
 	u_int16_t i, j, k;
 	int ref_count;
 	int error = 0;
@@ -494,8 +489,7 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 	i = j = k = 0;
 	for (; i < old_num; i++) {
 		sin = SIN(&old_ss[i]);
-		src_h = ntohl(SIN_ADDR(sin));
-		ref_count = in_merge_msf_source_addr(oiasl, src_h,
+		ref_count = in_merge_msf_source_addr(oiasl, sin,
 						     IMS_DELETE_SOURCE);
 		if (ref_count < 0) {
 			in_undomultisrc(inm, i, old_ss, old_mode,
@@ -529,7 +523,7 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			       M_MSFILTER, M_NOWAIT);
 			if (ias == NULL)
 				return ENOBUFS;
-			ias->ias_addr.s_addr = ntohl(SIN_ADDR(sin));
+			bcopy(&sin->sin_addr, &ias->ias_addr, sin->sin_len);
 			ias->ias_refcount = 1;
 			if (INM_SOURCE_LIST(mode) == NULL) {
 				IAS_LIST_ALLOC(INM_SOURCE_LIST(mode));
@@ -562,8 +556,7 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 		sin = SIN(&ss[i]);
 		if (SIN_ADDR(sin) == INADDR_ANY)
 			continue; /* skip */
-		src_h = ntohl(SIN_ADDR(sin));
-		ref_count = in_merge_msf_source_addr(iasl, src_h,
+		ref_count = in_merge_msf_source_addr(iasl, sin,
 						     IMS_ADD_SOURCE);
 		if (ref_count < 0) {
 			in_undomultisrc(inm, i, ss, mode, IMS_ADD_SOURCE);
@@ -672,7 +665,6 @@ in_undomultisrc(inm, numsrc, ss, mode, req)
 	struct ias_head head;
 	struct sockaddr_in *sin;
 	struct in_addr_source *ias, *nias;
-	u_int32_t src_h;
 	u_int16_t i;
 
 	if (mode != MCAST_INCLUDE && mode != MCAST_EXCLUDE)
@@ -683,12 +675,11 @@ in_undomultisrc(inm, numsrc, ss, mode, req)
 		sin = SIN(&ss[i]);
 		if (SIN_ADDR(sin) == INADDR_ANY)
 			continue; /* skip */
-		src_h = ntohl(SIN_ADDR(sin));
 		for (ias = LIST_FIRST(&head); ias; ias = nias) {
 			nias = LIST_NEXT(ias, ias_list);
-			if (ias->ias_addr.s_addr < src_h)
+			if (SS_CMP(&ias->ias_addr, <, sin))
 				continue;
-			if (ias->ias_addr.s_addr > src_h) {
+			if (SS_CMP(&ias->ias_addr, >, sin)) {
 				/* XXX strange. this should never occur. */
 				printf("in_undomultisrc: list corrupted. panic!\n");
 				continue; /* XXX */
@@ -728,9 +719,9 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 {
 	struct in_addr_source *in_ias, *ex_ias, *newias, *nias, *lastp = NULL;
 	struct ias_head inhead, exhead;
+	struct sockaddr_in *sin;
 	u_int filter;
 	u_int8_t cmd;
-	u_int32_t src_h;
 	int i;
 	int error = 0;
 
@@ -1114,13 +1105,13 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 	LIST_FOREACH(ex_ias, &exhead, ias_list) {
 		if (ex_ias->ias_refcount != inmm_src->ims_excnt)
 			continue;
-		src_h = ex_ias->ias_addr.s_addr;
+		sin = &ex_ias->ias_addr;
 		LIST_FOREACH(in_ias, &inhead, ias_list) {
 			if (in_ias->ias_refcount == 0)
 				continue; /* skip */
-			if (in_ias->ias_addr.s_addr < src_h)
+			if (SS_CMP(&in_ias->ias_addr, <, sin))
 				continue;
-			if (in_hosteq(ex_ias->ias_addr, in_ias->ias_addr)) {
+			if (SS_CMP(&ex_ias->ias_addr, ==, &in_ias->ias_addr)) {
 				LIST_FIRST(&inhead) = LIST_NEXT(in_ias,
 								ias_list);
 				break;
@@ -1141,7 +1132,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 				LIST_INSERT_AFTER(lastp, newias, ias_list);
 			}
 			++(*newnumsrc);
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			lastp = newias;
 			LIST_FIRST(&inhead) = in_ias;
 			break;
@@ -1162,7 +1153,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 				LIST_INSERT_AFTER(lastp, newias, ias_list);
 			}
 			++(*newnumsrc);
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			lastp = newias;
 		}
 	}
@@ -1212,7 +1203,7 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 {
 	struct ias_head head;
 	struct in_addr_source *ias = NULL, *curias, *newias, *lastp = NULL;
-	u_int32_t src_h;
+	struct sockaddr_in *sin;
 	int error;
 
 	if ((filter != REPORT_FILTER1) && (filter != REPORT_FILTER2))
@@ -1226,14 +1217,14 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 			    (refcount != 0 && ias->ias_refcount != refcount))
 				continue; /* skip */
 
-			src_h = ias->ias_addr.s_addr;
-			if (curias->ias_addr.s_addr == src_h) {
+			sin = &ias->ias_addr;
+			if (SS_CMP(&curias->ias_addr, ==, sin)) {
 				++curias->ias_refcount;
 				LIST_FIRST(&head) = LIST_NEXT(ias, ias_list);
 				break;
 			}
 
-			if (curias->ias_addr.s_addr < src_h) {
+			if (SS_CMP(&curias->ias_addr, <, sin)) {
 				if (filter == REPORT_FILTER1)
 					error = in_merge_pending_report
 							(inm, curias,
@@ -1249,7 +1240,7 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 					 * and return error.
 					 */
 					in_undo_new_msf_curhead
-						(inm, curias->ias_addr.s_addr);
+						(inm, &curias->ias_addr);
 					/* XXX But do we really clear pending
 					 * report? */
 					in_clear_pending_report(inm, filter);
@@ -1267,7 +1258,7 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 			MALLOC(newias, struct in_addr_source *, sizeof(*newias),
 			       M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-				in_undo_new_msf_curhead(inm, src_h);
+				in_undo_new_msf_curhead(inm, sin);
 				in_clear_pending_report(inm, filter); /* XXX */
 #ifdef IGMPV3_DEBUG
 				printf("in_merge_msf_head: malloc fail\n");
@@ -1281,14 +1272,14 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 				error = in_merge_pending_report
 						(inm, ias, BLOCK_OLD_SOURCES);
 			if (error != 0) {
-				in_undo_new_msf_curhead(inm, src_h);
+				in_undo_new_msf_curhead(inm, sin);
 				in_clear_pending_report(inm, filter); /* XXX */
 #ifdef IGMPV3_DEBUG
 				printf("in_merge_msf_head: merge fail for FILTER%d\n", filter);
 #endif
 				return error;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_BEFORE(curias, newias, ias_list);
 		}
@@ -1302,7 +1293,7 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 						(inm, curias, ALLOW_NEW_SOURCES);
 			if (error != 0) {
 				in_undo_new_msf_curhead
-						(inm, curias->ias_addr.s_addr);
+						(inm, &curias->ias_addr);
 				in_clear_pending_report(inm, filter); /* XXX */
 #ifdef IGMPV3_DEBUG
 				printf("in_merge_msf_head: merge fail for FILTER%d\n", filter);
@@ -1327,7 +1318,7 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 #ifdef IGMPV3_DEBUG
 			printf("in_merge_msf_head: malloc fail\n");
 #endif
-			in_undo_new_msf_curhead(inm, ias->ias_addr.s_addr);
+			in_undo_new_msf_curhead(inm, &ias->ias_addr);
 			in_clear_pending_report(inm, filter); /* XXX */
 			return ENOBUFS;
 		}
@@ -1338,14 +1329,14 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 			error = in_merge_pending_report(inm, ias,
 							BLOCK_OLD_SOURCES);
 		if (error != 0) {
-			in_undo_new_msf_curhead(inm, ias->ias_addr.s_addr);
+			in_undo_new_msf_curhead(inm, &ias->ias_addr);
 			in_clear_pending_report(inm, filter); /* XXX */
 #ifdef IGMPV3_DEBUG
 			printf("in_merge_msf_head: merge fail for FILTER%d\n", filter);
 #endif
 			return error;
 		}
-		newias->ias_addr.s_addr = ias->ias_addr.s_addr;
+		newias->ias_addr = ias->ias_addr;
 		newias->ias_refcount = 1;
 		LIST_INSERT_AFTER(lastp, newias, ias_list);
 		lastp = newias;
@@ -1355,14 +1346,14 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 }
 
 static void
-in_undo_new_msf_curhead(inm, src_h)
+in_undo_new_msf_curhead(inm, sin)
 	struct in_multi *inm;
-	u_int32_t src_h;
+	struct sockaddr_in *sin;
 {
 	struct in_addr_source *ias;
 
 	LIST_FOREACH(ias, inm->inm_source->ims_cur->head, ias_list) {
-		if (ias->ias_addr.s_addr >= src_h)
+		if (SS_CMP(&ias->ias_addr, >=, sin))
 			return;
 
 		if (ias->ias_refcount == 1) {
@@ -1408,8 +1399,8 @@ in_merge_msf_state(inm, newhead, newmode, newnumsrc)
 {
 	struct in_addr_source *ias, *newias, *nias;
 	struct ias_head curhead;	/* current ims_cur->head */
+	struct sockaddr_in *sin;
 	u_int filter;
-	u_int32_t src_h;
 	int chg_flag = 0;
 	int error = 0;
 
@@ -1447,9 +1438,9 @@ in_merge_msf_state(inm, newhead, newmode, newnumsrc)
 	/* use following ias when newhead points NULL */
 	ias = LIST_FIRST(inm->inm_source->ims_cur->head);
 	LIST_FOREACH(newias, newhead, ias_list) {
-		src_h = newias->ias_addr.s_addr;
+		sin = &newias->ias_addr;
 		LIST_FOREACH(ias, &curhead, ias_list) {
-			if (ias->ias_addr.s_addr < src_h) {
+			if (SS_CMP(&ias->ias_addr, <, sin)) {
 				if (filter == REPORT_FILTER2)
 					continue;
 				error = in_merge_pending_report
@@ -1458,8 +1449,8 @@ in_merge_msf_state(inm, newhead, newmode, newnumsrc)
 					break;
 				else
 					++chg_flag;
-			} else if (ias->ias_addr.s_addr
-						== newias->ias_addr.s_addr) {
+			} else if (SS_CMP(&ias->ias_addr, ==,
+					  &newias->ias_addr)) {
 				if (filter == REPORT_FILTER3) {
 					error = in_merge_pending_report
 							(inm, newias,
@@ -1660,7 +1651,7 @@ in_merge_pending_report(inm, ias, type)
 	u_int8_t type;
 {
 	struct in_addr_source *newias;
-	u_int32_t src_h = ias->ias_addr.s_addr;
+	struct sockaddr_in *sin = &ias->ias_addr;
 	int ref_count;
 	int error = 0;
 
@@ -1684,7 +1675,7 @@ in_merge_pending_report(inm, ias, type)
 				 */
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_alw->head,
 					 newias, ias_list);
@@ -1698,13 +1689,13 @@ in_merge_pending_report(inm, ias, type)
 #endif
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_alw->head,
 					 newias, ias_list);
 			inm->inm_source->ims_alw->numsrc = 1;
 		} else if ((ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_alw, src_h,
+					(inm->inm_source->ims_alw, sin,
 					 IMS_ADD_SOURCE)) < 0) {
 #ifdef IGMPV3_DEBUG
 			printf("in_merge_pending_report: ENOBUFS\n");
@@ -1717,7 +1708,7 @@ in_merge_pending_report(inm, ias, type)
 		 * BLOCK if ALLOW is the new request) if it exists. */
 		if (inm->inm_source->ims_blk != NULL)
 			in_free_msf_source_addr
-					(inm->inm_source->ims_blk, src_h);
+					(inm->inm_source->ims_blk, sin);
 		return 0;
 
 	case BLOCK_OLD_SOURCES:
@@ -1733,7 +1724,7 @@ in_merge_pending_report(inm, ias, type)
 #endif
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_blk->head,
 					 newias, ias_list);
@@ -1747,13 +1738,13 @@ in_merge_pending_report(inm, ias, type)
 #endif
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_blk->head,
 					 newias, ias_list);
 			inm->inm_source->ims_blk->numsrc = 1;
 		} else if ((ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_blk, src_h,
+					(inm->inm_source->ims_blk, sin,
 					 IMS_ADD_SOURCE)) < 0) {
 #ifdef IGMPV3_DEBUG
 			printf("in_merge_pending_report: ENOBUFS\n");
@@ -1763,7 +1754,7 @@ in_merge_pending_report(inm, ias, type)
 			++inm->inm_source->ims_blk->numsrc;
 		if (inm->inm_source->ims_alw != NULL)
 			in_free_msf_source_addr
-					(inm->inm_source->ims_alw, src_h);
+					(inm->inm_source->ims_alw, sin);
 		return 0;
 
 	case CHANGE_TO_INCLUDE_MODE:
@@ -1779,7 +1770,7 @@ in_merge_pending_report(inm, ias, type)
 #endif
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_toin->head,
 					 newias, ias_list);
@@ -1793,13 +1784,13 @@ in_merge_pending_report(inm, ias, type)
 #endif
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_toin->head,
 					 newias, ias_list);
 			inm->inm_source->ims_toin->numsrc = 1;
 		} else if ((ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_toin, src_h,
+					(inm->inm_source->ims_toin, sin,
 					 IMS_ADD_SOURCE)) < 0) {
 #ifdef IGMPV3_DEBUG
 			printf("in_merge_pending_report: ENOBUFS\n");
@@ -1822,7 +1813,7 @@ in_merge_pending_report(inm, ias, type)
 #endif
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_toex->head,
 					 newias, ias_list);
@@ -1836,13 +1827,13 @@ in_merge_pending_report(inm, ias, type)
 #endif
 				return ENOBUFS;
 			}
-			newias->ias_addr.s_addr = src_h;
+			bcopy(sin, &newias->ias_addr, sin->sin_len);
 			newias->ias_refcount = 1;
 			LIST_INSERT_HEAD(inm->inm_source->ims_toex->head,
 					 newias, ias_list);
 			inm->inm_source->ims_toex->numsrc = 1;
 		} else if ((ref_count = in_merge_msf_source_addr
-					(inm->inm_source->ims_toex, src_h,
+					(inm->inm_source->ims_toex, sin,
 					 IMS_ADD_SOURCE)) < 0) {
 #ifdef IGMPV3_DEBUG
 			printf("in_merge_pending_report: ENOBUFS\n");
@@ -1888,7 +1879,7 @@ in_copy_msf_source_list(iasl, newiasl, refcount)
 		} else {
 			LIST_INSERT_AFTER(lastp, newias, ias_list);
 		}
-		newias->ias_addr.s_addr = ias->ias_addr.s_addr;
+		newias->ias_addr = ias->ias_addr;
 		newias->ias_refcount = 1;
 		++i;
 		lastp = newias;
@@ -1972,9 +1963,9 @@ in_free_msf_source_list(head)
 }
 
 void
-in_free_msf_source_addr(iasl, src_h)
+in_free_msf_source_addr(iasl, sin)
 	struct in_addr_slist *iasl;
-	u_int32_t src_h;
+	struct sockaddr_in *sin;
 {
 	struct in_addr_source *ias, *nias;
 
@@ -1982,9 +1973,9 @@ in_free_msf_source_addr(iasl, src_h)
 		return;
 	for (ias = LIST_FIRST(iasl->head); ias; ias = nias) {
 		nias = LIST_NEXT(ias, ias_list);
-		if (ias->ias_addr.s_addr < src_h)
+		if (SS_CMP(&ias->ias_addr, <, sin))
 			continue;
-		else if (ias->ias_addr.s_addr == src_h) {
+		else if (SS_CMP(&ias->ias_addr, ==, sin)) {
 			LIST_REMOVE(ias, ias_list);
 			FREE(ias, M_MSFILTER);
 			--iasl->numsrc;
@@ -2008,28 +1999,28 @@ in_free_msf_source_addr(iasl, src_h)
  *		-1: error (EADDRNOTAVAIL)
  */
 int
-in_merge_msf_source_addr(iasl, src_h, req)
+in_merge_msf_source_addr(iasl, src, req)
 	struct in_addr_slist *iasl;	/* target source list */
-	u_int32_t src_h;		/* source to be merged */
+	struct sockaddr_in *src;	/* source to be merged */
 	int req;			/* request to add or delete */
 {
 	struct in_addr_source *ias, *newias, *lastp = NULL;
 
 	LIST_FOREACH(ias, iasl->head, ias_list) {
 		lastp = ias;
-		if (ias->ias_addr.s_addr == src_h) {
+		if (SS_CMP(&ias->ias_addr, ==, src)) {
 			if (req == IMS_ADD_SOURCE)
 				return (++ias->ias_refcount);
 			else
 				return (--ias->ias_refcount);
-		} else if (ias->ias_addr.s_addr > src_h) {
+		} else if (SS_CMP(&ias->ias_addr, >, src)) {
 			if (req == IMS_ADD_SOURCE) {
 				MALLOC(newias, struct in_addr_source *,
 					sizeof(*newias), M_MSFILTER, M_NOWAIT);
 				if (newias == NULL)
 					return -1;
 				LIST_INSERT_BEFORE(ias, newias, ias_list);
-				newias->ias_addr.s_addr = src_h;
+				bcopy(src, &newias->ias_addr, src->sin_len);
 				newias->ias_refcount = 1;
 				return (newias->ias_refcount);
 			} else {
@@ -2054,7 +2045,7 @@ in_merge_msf_source_addr(iasl, src_h, req)
 					LIST_INSERT_AFTER(lastp, newias,
 							  ias_list);
 				}
-				newias->ias_addr.s_addr = src_h;
+				bcopy(src, &newias->ias_addr, src->sin_len);
 				newias->ias_refcount = 1;
 				return (newias->ias_refcount);
 			}
@@ -2088,7 +2079,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 	struct sock_msf_source *msfsrc, *nmsfsrc;
 	struct in_addr_slist *iasl;
 	struct in_addr_source *ias;
-	u_int32_t src_n, src_h;
+	struct sockaddr_in src;
 	struct route ro;
 	struct sockaddr_in *dst;
 	int i, j;
@@ -2234,12 +2225,13 @@ ip_setmopt_srcfilter(sop, imsfp)
 			return error;
 		}
 		for (j = 0; j < imsf->imsf_numsrc; j++) {
-			error = copyin((void *)&(*imsfp)->imsf_slist[j].s_addr,
-				       (void *)&src_n, sizeof(u_int32_t));
+			error = copyin((void *)&(*imsfp)->imsf_slist[j],
+				       (void *)&src, sizeof(struct sockaddr_in));
 			if (error != 0) /* EFAULT */
 				break;
-			if (IN_MULTICAST(src_n) || IN_BADCLASS(src_n) ||
-			    (src_n & IN_CLASSA_NET) == 0) {
+			if (IN_MULTICAST(SIN_ADDR(&src)) ||
+			    IN_BADCLASS(SIN_ADDR(&src)) ||
+			    (SIN_ADDR(&src) & IN_CLASSA_NET) == 0) {
 				error = EINVAL;
 				break;
 			}
@@ -2247,8 +2239,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 			 * Sort and validate source lists. Duplicate addresses
 			 * can be checked here.
 			 */
-			src_h = ntohl(src_n);
-			if (in_merge_msf_source_addr(iasl, src_h,
+			if (in_merge_msf_source_addr(iasl, &src,
 						     IMS_ADD_SOURCE) != 1) {
 				error = EINVAL;
 				break;
@@ -2283,9 +2274,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 		     j < imsf->imsf_numsrc && ias;
 		     j++, ias = LIST_NEXT(ias, ias_list)) {
 			sin = SIN(&ss_src[j]);
-			SIN_ADDR(sin) = htonl(ias->ias_addr.s_addr);
-			sin->sin_family = AF_INET;
-			sin->sin_len = ss_src[j].ss_len;
+			bcopy(&ias->ias_addr, sin, ias->ias_addr.sin_len);
 		}
 		in_free_msf_source_list(iasl->head);
 		FREE(iasl->head, M_MSFILTER);
@@ -2543,7 +2532,6 @@ ip_getmopt_srcfilter(sop, imsfp)
 	struct sockaddr_in *sin;
 	struct msf_head head;
 	u_int16_t numsrc;
-	u_int32_t src_n;
 	int i, j;
 	int error;
 
@@ -2637,8 +2625,7 @@ ip_getmopt_srcfilter(sop, imsfp)
 	for (msfsrc = LIST_FIRST(&head), j = 0; numsrc > j && msfsrc;
 			++j, msfsrc = LIST_NEXT(msfsrc, list)) {
 		sin = SIN(&msfsrc->src);
-		src_n = htonl(SIN_ADDR(sin));
-		error = copyout((void *)&src_n,
+		error = copyout((void *)&sin->sin_addr,
 				(void *)&(*imsfp)->imsf_slist[j].s_addr,
 				sizeof(u_int32_t));
 		if (error != 0) {
@@ -2667,7 +2654,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 	u_int16_t add_num, old_num;
 	u_int old_mode;
 	struct sockaddr_in *sin, *dst;
-	u_int32_t src_n, src_h;
+	struct sockaddr_in src;
 	struct route ro;
 	struct sock_msf_source *msfsrc, *nmsfsrc;
 	struct in_addr_slist *iasl;
@@ -2810,12 +2797,13 @@ sock_setmopt_srcfilter(sop, grpfp)
 			return error;
 		}
 		for (j = 0; j < grpf->gf_numsrc; j++) {
-			error = copyin((void *)&SIN_ADDR(&((*grpfp)->gf_slist[j])),
-				       (void *)&src_n, sizeof(u_int32_t));
+			error = copyin((void *)&((*grpfp)->gf_slist[j]),
+				       (void *)&src, sizeof(struct sockaddr_in));
 			if (error != 0) /* EFAULT */
 				break;
-			if (IN_MULTICAST(src_n) || IN_BADCLASS(src_n) ||
-			    (src_n & IN_CLASSA_NET) == 0) {
+			if (IN_MULTICAST(SIN_ADDR(&src)) ||
+			    IN_BADCLASS(SIN_ADDR(&src)) ||
+			    (SIN_ADDR(&src) & IN_CLASSA_NET) == 0) {
 				error = EINVAL;
 				break;
 			}
@@ -2823,8 +2811,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 			 * Sort and validate source lists. Duplicate addresses
 			 * can be checked here.
 			 */
-			src_h = ntohl(src_n);
-			if (in_merge_msf_source_addr(iasl, src_h,
+			if (in_merge_msf_source_addr(iasl, &src,
 						     IMS_ADD_SOURCE) != 1) {
 				error = EINVAL;
 				break;
@@ -2859,9 +2846,7 @@ sock_setmopt_srcfilter(sop, grpfp)
 		     j < grpf->gf_numsrc && ias;
 		     j++, ias = LIST_NEXT(ias, ias_list)) {
 			sin = SIN(&ss_src[j]);
-			SIN_ADDR(sin) = htonl(ias->ias_addr.s_addr);
-			sin->sin_family = AF_INET;
-			sin->sin_len = ss_src[j].ss_len;
+			bcopy(&ias->ias_addr, sin, ias->ias_addr.sin_len);
 		}
 		in_free_msf_source_list(iasl->head);
 		FREE(iasl->head, M_MSFILTER);
@@ -3113,7 +3098,6 @@ sock_getmopt_srcfilter(sop, grpfp)
 	struct sockaddr_in *sin;
 	struct msf_head head;
 	u_int16_t numsrc;
-	u_int32_t src_n;
 	int i, j;
 	int error;
 
@@ -3211,8 +3195,7 @@ sock_getmopt_srcfilter(sop, grpfp)
 	for (msfsrc = LIST_FIRST(&head), j = 0; numsrc > j && msfsrc;
 	     ++j, msfsrc = LIST_NEXT(msfsrc, list)) {
 		sin = SIN(&msfsrc->src);
-		src_n = htonl(SIN_ADDR(sin));
-		error = copyout((void *)&src_n,
+		error = copyout((void *)&sin->sin_addr,
 				(void *)&SIN_ADDR(&((*grpfp)->gf_slist[j])),
 				sizeof(u_int32_t));
 		if (error != 0) {
@@ -3818,8 +3801,7 @@ print_in_addr_slist(struct in_addr_slist *ias, char *heading)
 	printf("\t\t%s(%d)\n", heading, ias->numsrc);
 
 	LIST_FOREACH(tmp, ias->head, ias_list) {
-		struct in_addr dummy = tmp->ias_addr;
-		dummy.s_addr = htonl(dummy.s_addr);
+		struct in_addr dummy = tmp->ias_addr.sin_addr;
 		printf("\t\tsrc %s (ref=%d)\n",
 		    inet_ntoa(dummy), tmp->ias_refcount);
 	}

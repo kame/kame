@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.3 2002/09/05 08:09:35 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.4 2002/09/16 05:33:13 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -84,7 +84,7 @@ MALLOC_DECLARE(M_IPMOPTS);
 
 
 struct in_addr_source {
-	struct	in_addr ias_addr;	 /* source address		    */
+	struct	sockaddr_in ias_addr;	 /* source address		    */
 	LIST_ENTRY(in_addr_source) ias_list; /* list of source addresses    */
 	u_int	ias_refcount;		 /* reference count of the source   */
 };
@@ -273,9 +273,10 @@ int	in_merge_msf_state(struct in_multi *, struct ias_head *,
 		u_int, u_int16_t);
 void	in_free_all_msf_source_list(struct in_multi *);
 void	in_free_msf_source_list(struct ias_head *);
-void	in_free_msf_source_addr(struct in_addr_slist *, u_int32_t);
+void	in_free_msf_source_addr(struct in_addr_slist *, struct sockaddr_in *);
 void	in_clear_all_pending_report(struct in_multi *);
-int	in_merge_msf_source_addr(struct in_addr_slist *, u_int32_t, int);
+int	in_merge_msf_source_addr(struct in_addr_slist *, struct sockaddr_in *,
+				 int);
 int	ip_setmopt_srcfilter(struct socket *, struct ip_msfilter **);
 int	ip_getmopt_srcfilter(struct socket *, struct ip_msfilter **);
 int	sock_setmopt_srcfilter(struct socket *, struct group_filter **);
