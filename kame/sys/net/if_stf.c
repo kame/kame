@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.91 2002/11/17 16:24:52 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.92 2002/11/17 19:35:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -801,7 +801,11 @@ stf_checkaddr6(sc, in6, inifp)
 	 * reject node-local and link-local multicast
 	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
 	 */
+#ifdef IN6_IS_ADDR_MC_INTFACELOCAL
+	if (IN6_IS_ADDR_MC_INTFACELOCAL(in6) || IN6_IS_ADDR_MC_LINKLOCAL(in6))
+#else
 	if (IN6_IS_ADDR_MC_NODELOCAL(in6) || IN6_IS_ADDR_MC_LINKLOCAL(in6))
+#endif
 		return -1;
 
 	return 0;
