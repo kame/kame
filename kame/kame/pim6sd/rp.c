@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.31 2003/08/15 06:03:56 suz Exp $	*/
+/*	$KAME: rp.c,v 1.32 2003/08/15 06:05:10 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1390,6 +1390,13 @@ update_rp_neighbor()
 
 				/* existing upstream is updated automatically */
 				if (mrtentry_grp->upstream != NULL)
+					continue;
+
+				/*
+				 * (*,G) at RP has no upstream neighbor, but
+				 * it's ok
+				 */
+				if (mrtentry_grp->incoming == reg_vif_num)
 					continue;
 				mrtentry_grp->upstream = rpentry->upstream;
 			}
