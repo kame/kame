@@ -747,6 +747,21 @@ receive_pim6_register(reg_src, reg_dst, pim_message, datalen)
 
     pim6dstat.in_pim6_register++;
 
+    /*
+     * Message length validation.
+     * This is almost done in the kernel, but the kernel does not pefrome
+     * the check for NULL register messages. Thus, we always check this for
+     * safety.
+     */
+    if (sizeof(struct pim) + sizeof(pim_register_t) +
+	sizeof(struct ip6_hdr) > datalen) {
+	    IF_DEBUG(DEBUG_PIM_REGISTER)
+		    log(LOG_INFO, 0,
+			"PIM register: short packet (len = %d) from %s",
+			datalen, sa6_fmt(reg_src));
+	    return(FALSE);
+    }
+
     register_p = (pim_register_t *) (pim_message + sizeof(struct pim));
 
     borderBit = ntohl(register_p->reg_flags) & PIM_MESSAGE_REGISTER_BORDER_BIT;
@@ -754,7 +769,18 @@ receive_pim6_register(reg_src, reg_dst, pim_message, datalen)
 	ntohl(register_p->reg_flags) & PIM_MESSAGE_REGISTER_NULL_REGISTER_BIT;
 
     /* initialize the pointer to the encapsulated packet */
-    ip = (struct ip6_hdr *) (register_p + 1);
+    ip = (struct ip6_hdr *)(register_p + 1);
+
+    /* check the IP version (especially for the null register...see above) */
+    if ((ip->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+	    IF_DEBUG(DEBUG_PIM_REGISTER)
+		    log(LOG_INFO, 0,
+			"PIM register: incorrect IP version (%d) of the inner"
+			" packet from %s",
+			ip->ip6_vfc & IPV6_VERSION_MASK,
+			sa6_fmt(reg_src));
+	    return(FALSE);
+    }
 
     /*
      * We are keeping all addresses in network order,
