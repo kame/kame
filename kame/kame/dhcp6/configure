@@ -3586,7 +3586,78 @@ EOF
 fi
 done
 
-echo "$as_me:3589: checking if --enable-mediator option is specified" >&5
+for ac_func in arc4random
+do
+as_ac_var=`echo "ac_cv_func_$ac_func" | $as_tr_sh`
+echo "$as_me:3592: checking for $ac_func" >&5
+echo $ECHO_N "checking for $ac_func... $ECHO_C" >&6
+if eval "test \"\${$as_ac_var+set}\" = set"; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  cat >conftest.$ac_ext <<_ACEOF
+#line 3598 "configure"
+#include "confdefs.h"
+/* System header to define __stub macros and hopefully few prototypes,
+    which can conflict with char $ac_func (); below.  */
+#include <assert.h>
+/* Override any gcc2 internal prototype to avoid an error.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+/* We use char because int might match the return type of a gcc2
+   builtin and then its argument prototype would still apply.  */
+char $ac_func ();
+char (*f) ();
+
+int
+main ()
+{
+/* The GNU C library defines this for functions which it implements
+    to always fail with ENOSYS.  Some functions are actually named
+    something starting with __ and the normal name is an alias.  */
+#if defined (__stub_$ac_func) || defined (__stub___$ac_func)
+choke me
+#else
+f = $ac_func;
+#endif
+
+  ;
+  return 0;
+}
+_ACEOF
+rm -f conftest.$ac_objext conftest$ac_exeext
+if { (eval echo "$as_me:3629: \"$ac_link\"") >&5
+  (eval $ac_link) 2>&5
+  ac_status=$?
+  echo "$as_me:3632: \$? = $ac_status" >&5
+  (exit $ac_status); } &&
+         { ac_try='test -s conftest$ac_exeext'
+  { (eval echo "$as_me:3635: \"$ac_try\"") >&5
+  (eval $ac_try) 2>&5
+  ac_status=$?
+  echo "$as_me:3638: \$? = $ac_status" >&5
+  (exit $ac_status); }; }; then
+  eval "$as_ac_var=yes"
+else
+  echo "$as_me: failed program was:" >&5
+cat conftest.$ac_ext >&5
+eval "$as_ac_var=no"
+fi
+rm -f conftest.$ac_objext conftest$ac_exeext conftest.$ac_ext
+fi
+echo "$as_me:3648: result: `eval echo '${'$as_ac_var'}'`" >&5
+echo "${ECHO_T}`eval echo '${'$as_ac_var'}'`" >&6
+if test `eval echo '${'$as_ac_var'}'` = yes; then
+  cat >>confdefs.h <<EOF
+#define `echo "HAVE_$ac_func" | $as_tr_cpp` 1
+EOF
+
+else
+  LIBOBJS="$LIBOBJS $ac_func.$ac_objext"
+fi
+done
+
+echo "$as_me:3660: checking if --enable-mediator option is specified" >&5
 echo $ECHO_N "checking if --enable-mediator option is specified... $ECHO_C" >&6
 
 # Check whether --with-mediator or --without-mediator was given.
@@ -3600,10 +3671,10 @@ EOF
 else
   with_mediator=no
 fi;
-echo "$as_me:3603: result: $with_mediator" >&5
+echo "$as_me:3674: result: $with_mediator" >&5
 echo "${ECHO_T}$with_mediator" >&6;
 
-echo "$as_me:3606: checking if --enable-pedant option is specified" >&5
+echo "$as_me:3677: checking if --enable-pedant option is specified" >&5
 echo $ECHO_N "checking if --enable-pedant option is specified... $ECHO_C" >&6
 # Check whether --enable-pedant or --disable-pedant was given.
 if test "${enable_pedant+set}" = set; then
@@ -3614,13 +3685,13 @@ if test "${enable_pedant+set}" = set; then
 else
   enableval=no
 fi;
-echo "$as_me:3617: result: $enableval" >&5
+echo "$as_me:3688: result: $enableval" >&5
 echo "${ECHO_T}$enableval" >&6;
 
-echo "$as_me:3620: checking ANSI predeclared __func__" >&5
+echo "$as_me:3691: checking ANSI predeclared __func__" >&5
 echo $ECHO_N "checking ANSI predeclared __func__... $ECHO_C" >&6
 cat >conftest.$ac_ext <<_ACEOF
-#line 3623 "configure"
+#line 3694 "configure"
 #include "confdefs.h"
 
 int
@@ -3632,33 +3703,33 @@ void func(void) {printf("%s\n", __func__);}
 }
 _ACEOF
 rm -f conftest.$ac_objext
-if { (eval echo "$as_me:3635: \"$ac_compile\"") >&5
+if { (eval echo "$as_me:3706: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
-  echo "$as_me:3638: \$? = $ac_status" >&5
+  echo "$as_me:3709: \$? = $ac_status" >&5
   (exit $ac_status); } &&
          { ac_try='test -s conftest.$ac_objext'
-  { (eval echo "$as_me:3641: \"$ac_try\"") >&5
+  { (eval echo "$as_me:3712: \"$ac_try\"") >&5
   (eval $ac_try) 2>&5
   ac_status=$?
-  echo "$as_me:3644: \$? = $ac_status" >&5
+  echo "$as_me:3715: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  echo "$as_me:3646: result: yes" >&5
+  echo "$as_me:3717: result: yes" >&5
 echo "${ECHO_T}yes" >&6
 	 pred_func_id=ansi
 else
   echo "$as_me: failed program was:" >&5
 cat conftest.$ac_ext >&5
-echo "$as_me:3652: result: no" >&5
+echo "$as_me:3723: result: no" >&5
 echo "${ECHO_T}no" >&6
 	 pred_func_id=no
 fi
 rm -f conftest.$ac_objext conftest.$ac_ext
 if test $pred_func_id = no; then
-echo "$as_me:3658: checking gcc predelcared __FUNCTION__" >&5
+echo "$as_me:3729: checking gcc predelcared __FUNCTION__" >&5
 echo $ECHO_N "checking gcc predelcared __FUNCTION__... $ECHO_C" >&6
 	cat >conftest.$ac_ext <<_ACEOF
-#line 3661 "configure"
+#line 3732 "configure"
 #include "confdefs.h"
 
 int
@@ -3670,24 +3741,24 @@ void func(void) {printf("%s\n", __FUNCTION__);}
 }
 _ACEOF
 rm -f conftest.$ac_objext
-if { (eval echo "$as_me:3673: \"$ac_compile\"") >&5
+if { (eval echo "$as_me:3744: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
-  echo "$as_me:3676: \$? = $ac_status" >&5
+  echo "$as_me:3747: \$? = $ac_status" >&5
   (exit $ac_status); } &&
          { ac_try='test -s conftest.$ac_objext'
-  { (eval echo "$as_me:3679: \"$ac_try\"") >&5
+  { (eval echo "$as_me:3750: \"$ac_try\"") >&5
   (eval $ac_try) 2>&5
   ac_status=$?
-  echo "$as_me:3682: \$? = $ac_status" >&5
+  echo "$as_me:3753: \$? = $ac_status" >&5
   (exit $ac_status); }; }; then
-  echo "$as_me:3684: result: yes" >&5
+  echo "$as_me:3755: result: yes" >&5
 echo "${ECHO_T}yes" >&6
 		 pred_func_id=gcc
 else
   echo "$as_me: failed program was:" >&5
 cat conftest.$ac_ext >&5
-echo "$as_me:3690: result: no" >&5
+echo "$as_me:3761: result: no" >&5
 echo "${ECHO_T}no" >&6
 		 pred_func_id=no
 fi
@@ -3711,23 +3782,23 @@ esac
 for ac_header in stdarg.h
 do
 as_ac_Header=`echo "ac_cv_header_$ac_header" | $as_tr_sh`
-echo "$as_me:3714: checking for $ac_header" >&5
+echo "$as_me:3785: checking for $ac_header" >&5
 echo $ECHO_N "checking for $ac_header... $ECHO_C" >&6
 if eval "test \"\${$as_ac_Header+set}\" = set"; then
   echo $ECHO_N "(cached) $ECHO_C" >&6
 else
   cat >conftest.$ac_ext <<_ACEOF
-#line 3720 "configure"
+#line 3791 "configure"
 #include "confdefs.h"
 #include <$ac_header>
 _ACEOF
-if { (eval echo "$as_me:3724: \"$ac_cpp conftest.$ac_ext\"") >&5
+if { (eval echo "$as_me:3795: \"$ac_cpp conftest.$ac_ext\"") >&5
   (eval $ac_cpp conftest.$ac_ext) 2>conftest.er1
   ac_status=$?
   egrep -v '^ *\+' conftest.er1 >conftest.err
   rm -f conftest.er1
   cat conftest.err >&5
-  echo "$as_me:3730: \$? = $ac_status" >&5
+  echo "$as_me:3801: \$? = $ac_status" >&5
   (exit $ac_status); } >/dev/null; then
   if test -s conftest.err; then
     ac_cpp_err=$ac_c_preproc_warn_flag
@@ -3746,7 +3817,7 @@ else
 fi
 rm -f conftest.err conftest.$ac_ext
 fi
-echo "$as_me:3749: result: `eval echo '${'$as_ac_Header'}'`" >&5
+echo "$as_me:3820: result: `eval echo '${'$as_ac_Header'}'`" >&5
 echo "${ECHO_T}`eval echo '${'$as_ac_Header'}'`" >&6
 if test `eval echo '${'$as_ac_Header'}'` = yes; then
   cat >>confdefs.h <<EOF
@@ -3866,7 +3937,7 @@ rm -f confdef2opt.sed
 : ${CONFIG_STATUS=./config.status}
 ac_clean_files_save=$ac_clean_files
 ac_clean_files="$ac_clean_files $CONFIG_STATUS"
-{ echo "$as_me:3869: creating $CONFIG_STATUS" >&5
+{ echo "$as_me:3940: creating $CONFIG_STATUS" >&5
 echo "$as_me: creating $CONFIG_STATUS" >&6;}
 cat >$CONFIG_STATUS <<_ACEOF
 #! $SHELL
@@ -4034,7 +4105,7 @@ cat >>$CONFIG_STATUS <<\EOF
     echo "$ac_cs_version"; exit 0 ;;
   --he | --h)
     # Conflict between --help and --header
-    { { echo "$as_me:4037: error: ambiguous option: $1
+    { { echo "$as_me:4108: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: ambiguous option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -4053,7 +4124,7 @@ Try \`$0 --help' for more information." >&2;}
     ac_need_defaults=false;;
 
   # This is an error.
-  -*) { { echo "$as_me:4056: error: unrecognized option: $1
+  -*) { { echo "$as_me:4127: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&5
 echo "$as_me: error: unrecognized option: $1
 Try \`$0 --help' for more information." >&2;}
@@ -4089,7 +4160,7 @@ do
   case "$ac_config_target" in
   # Handling of arguments.
   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
-  *) { { echo "$as_me:4092: error: invalid argument: $ac_config_target" >&5
+  *) { { echo "$as_me:4163: error: invalid argument: $ac_config_target" >&5
 echo "$as_me: error: invalid argument: $ac_config_target" >&2;}
    { (exit 1); exit 1; }; };;
   esac
@@ -4296,7 +4367,7 @@ done; }
   esac
 
   if test x"$ac_file" != x-; then
-    { echo "$as_me:4299: creating $ac_file" >&5
+    { echo "$as_me:4370: creating $ac_file" >&5
 echo "$as_me: creating $ac_file" >&6;}
     rm -f "$ac_file"
   fi
@@ -4314,7 +4385,7 @@ echo "$as_me: creating $ac_file" >&6;}
       -) echo $tmp/stdin ;;
       [\\/$]*)
          # Absolute (can't be DOS-style, as IFS=:)
-         test -f "$f" || { { echo "$as_me:4317: error: cannot find input file: $f" >&5
+         test -f "$f" || { { echo "$as_me:4388: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          echo $f;;
@@ -4327,7 +4398,7 @@ echo "$as_me: error: cannot find input file: $f" >&2;}
            echo $srcdir/$f
          else
            # /dev/null tree
-           { { echo "$as_me:4330: error: cannot find input file: $f" >&5
+           { { echo "$as_me:4401: error: cannot find input file: $f" >&5
 echo "$as_me: error: cannot find input file: $f" >&2;}
    { (exit 1); exit 1; }; }
          fi;;
