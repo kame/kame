@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.55 2001/04/03 15:51:54 thorpej Exp $	*/
+/*	$KAME: cftoken.l,v 1.56 2001/04/04 01:56:26 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -93,10 +93,8 @@ ccomment	"/*"
 bracketstring	\<[^>]*\>
 quotedstring	\"[^"]*\"
 addrstring	[a-fA-F0-9:][a-fA-F0-9:\.]*
-protectedstring	[a-fA-F0-9:\._][a-fA-F0-9:\._]*
 decstring	{digit}+
 hexstring	0x{hexdigit}+
-octetstring	{octet}({dot}{octet})+
 
 %s S_INI S_PTH S_INF S_LOG S_PAD S_LST S_RTRY
 %s S_ALGST S_ALGCL
