@@ -1822,7 +1822,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
     data_ptr_start = data_ptr;
     star_star_rp_found = FALSE;	/* Indicating whether we have (*,*,RP) join */
  
-   IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
+    IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
 	log(LOG_DEBUG,0,"Number of groups to process : %d",num_groups_tmp);
 
     while (num_groups_tmp--)
