@@ -3586,7 +3586,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     }
     else
     {
-	if (local_address(dst) == NO_VIF)
+	if (local_address(dst) == NO_VIF) {
 	    /*
 	     * TODO: XXX: this situation should be handled earlier: The
 	     * destination is neither ALL_PIM_ROUTERS nor me
@@ -3595,6 +3595,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		"receive_pim6_bootstrap: Bootstrap with an invalid dst(%s)",
 		inet6_fmt(&dst->sin6_addr));
 	    return (FALSE);
+	}
 
 	/* Probably unicasted from the current DR */
 	if (cand_rp_list != (cand_rp_t *) NULL)
