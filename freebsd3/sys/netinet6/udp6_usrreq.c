@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.24 2000/03/30 16:47:22 sumikawa Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.25 2000/04/04 11:18:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -520,6 +520,7 @@ udp6_output(in6p, m, addr6, control, p)
 	struct	in6_addr laddr6;
 	int s = 0, error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
+	int flags;
 
 	if (control) {
 		if (error = ip6_setpktoptions(control, &opt,
@@ -596,13 +597,17 @@ udp6_output(in6p, m, addr6, control, p)
 		udp6->uh_sum = 0xffff;
 	}
 
+	flags = 0;
+	if (inp->inp_flags & IN6P_MINMTU)
+		flags |= IPV6_MINMTU;
+
 	udpstat.udps_opackets++;
 
 #ifdef IPSEC
 	ipsec_setsocket(m, in6p->in6p_socket);
 #endif /*IPSEC*/
 	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
-			    0, in6p->in6p_moptions, NULL);
+			    flags, in6p->in6p_moptions, NULL);
 
 	if (addr6) {
 		in6_pcbdisconnect(in6p);
