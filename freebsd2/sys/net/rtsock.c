@@ -978,6 +978,3 @@ static struct domain routedomain =
 
 DOMAIN_SET(route);
 
-#ifdef MIP6
-#include <net/rtsock_mip.c>
-#endif
