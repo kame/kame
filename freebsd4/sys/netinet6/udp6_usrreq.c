@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.75 2004/02/06 08:34:07 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.76 2004/02/06 08:52:22 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -953,7 +953,7 @@ pass_to_pcb6(m, opts, last, src, in6p, off)
 			m_freem(opts);
 		udpstat.udps_fullsock++;
 	} else
-		sorwakeup(last->in6p_socket);
+		sorwakeup((*last)->in6p_socket);
 	opts = NULL;
 
 end:
