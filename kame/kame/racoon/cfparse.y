@@ -144,7 +144,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %token POLICY DIRTYPE ACTION
 %token PLADDRTYPE PROPOSAL WHICHSIDE
 %token PROTOCOL SECLEVEL SECLEVELTYPE SECMODE SECMODETYPE
-	/* sa info */
+	/* sainfo */
 %token SAINFO
 	/* remote */
 %token REMOTE ANONYMOUS
@@ -162,7 +162,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 
 %token NUMBER SWITCH
 %token HEXSTRING QUOTEDSTRING ADDRSTRING
-%token EOS BOC EOC
+%token EOS BOC EOC COMMA
 
 %type <num> NUMBER SWITCH keylength
 %type <num> PATHTYPE IDENTIFIERTYPE LOGLEV 
@@ -768,7 +768,7 @@ sainfo_spec
 	|	ALGORITHM_CLASS {
 			cur_algclass = $1;
 		}
-		algorithm EOS
+		algorithms EOS
 	|	IDENTIFIER IDENTIFIERTYPE
 		{
 			cur_sainfo->myidenttype = idtype2doi($2);
@@ -778,7 +778,7 @@ sainfo_spec
 
 algorithms
 	:	algorithm
-	|	algorithm algorithms
+	|	algorithm COMMA algorithm
 	;
 algorithm
 	:	ALGORITHMTYPE keylength

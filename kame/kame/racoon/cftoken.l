@@ -74,7 +74,7 @@ letter		[A-Za-z]
 hexdigit	[0-9A-Fa-f]
 /*octet		(([01]?{digit}?{digit})|((2([0-4]{digit}))|(25[0-5]))) */
 special		[()+\|\?\*]
-comma		,
+comma		\,
 dot		\.
 slash		\/
 bcl		\{
@@ -239,7 +239,7 @@ octetstring	{octet}({dot}{octet})+
 <S_SAINFS>encryption_algorithm { YYD; yylval.num = algclass_ipsec_enc; return(ALGORITHM_CLASS); }
 <S_SAINFS>authentication_algorithm { YYD; yylval.num = algclass_ipsec_auth; return(ALGORITHM_CLASS); }
 <S_SAINFS>compression_algorithm	{ YYD; yylval.num = algclass_ipsec_comp; return(ALGORITHM_CLASS); }
-<S_SAINFS>{comma}	{ YYD; /* XXX ignored, but to be handled. */ ; }
+<S_SAINFS>{comma}	{ YYD; return(COMMA); }
 
 	/* remote */
 <S_INI>remote		{ BEGIN S_RMT; YYDB; return(REMOTE); }
