@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/03/22 07:52:30 $
+			$Date: 2000/04/02 15:41:19 $
 
 1. IPv6
 
@@ -111,7 +111,7 @@ draft-ietf-ngtrans-tcpudp-relay-00.txt:
       details.
 draft-ietf-ngtrans-6to4-03.txt:
 	Connection of IPv6 Domains via IPv4 Clouds without Explicit Tunnels
-    * "stf" interface implments it.  Be sure to read the next item before
+    * "stf" interface implements it.  Be sure to read the next item before
       configuring it, there are security issues.
 http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt:
 	Possible abuse against IPv6 transition technologies
@@ -1152,7 +1152,7 @@ The kernel will contact racoon daemon as necessary to exchange keys.
 In IKE spec, there's ambiguity about interpretation of "tunnel" proposal.
 For example, if we would like to propose the use of following packet:
 	IP AH ESP IP payload
-some implmementation proposes it as "AH transport and ESP tunnel", since
+some implementation proposes it as "AH transport and ESP tunnel", since
 this is more logical from packet construction point of view.  Some
 implementation proposes it as "AH tunnel and ESP tunnel".
 Racoon follows the former route.
