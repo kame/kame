@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.5 1999/12/01 12:51:04 jinmei Exp $
+.\"     $Id: ping6.8,v 1.6 1999/12/11 08:46:58 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -37,7 +37,10 @@
 packets to network hosts
 .Sh SYNOPSIS
 .Nm
-.Op Fl AdEfnqRrvw
+.\" without ipsec, or new ipsec
+.Op Fl dfnqRrvw
+.\" old ipsec
+.\" .Op Fl AdEfnqRrvw
 .Op Fl a Ar addrtype
 .Op Fl b Ar bufsiz
 .Op Fl c Ar count
@@ -46,13 +49,16 @@ packets to network hosts
 .Op Fl i Ar wait
 .Op Fl l Ar preload
 .Op Fl p Ar pattern
+.\" new ipsec
+.Op Fl P Ar policy
 .Op Fl S Ar sourceaddr
 .Op Fl s Ar packetsize
 .Ar host
 .Sh DESCRIPTION
 .Bl -tag -width Ds
-.It Fl A
-Enables transport-mode IPsec authentication header. (experimental)
+.\" old ipsec
+.\" .It Fl A
+.\" Enables transport-mode IPsec authentication header. (experimental)
 .It Fl a Ar addrtype
 Generate ICMPv6 Node Information Node Addresses query, rather than echo-request.
 .Ar addrtype
@@ -87,8 +93,8 @@ packets.
 Set the
 .Dv SO_DEBUG
 option on the socket being used.
-.It Fl E
-Enables transport-mode IPsec encapsulated security payload. (experimental)
+.\" .It Fl E
+.\" Enables transport-mode IPsec encapsulated security payload. (experimental)
 .It Fl f
 Flood ping.
 Outputs packets as fast as they come back or one hundred times per second,
@@ -145,6 +151,10 @@ flag,
 .Nm
 prints out any ICMP error messages caused by its own ECHO_REQUEST
 messages.
+.\" new ipsec
+.It Fl P Ar policy
+.Ar policy
+specifies IPsec policy to be used for the probe.
 .It Fl q
 Quiet output.
 Nothing is displayed except the summary lines at startup time and
