@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.98 2003/01/10 08:24:33 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.99 2003/01/23 04:44:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,19 +131,6 @@ static struct mbuf *gif_eon_decap(struct ifnet *, struct mbuf *);
  */
 int ngif;			/* number of interfaces */
 struct gif_softc *gif_softc = NULL;
-
-#ifndef MAX_GIF_NEST
-/*
- * This macro controls the upper limitation on nesting of gif tunnels.
- * Since, setting a large value to this macro with a careless configuration
- * may introduce system crash, we don't allow any nestings by default.
- * If you need to configure nested gif tunnels, you can define this macro
- * in your kernel configuration file.  However, if you do so, please be
- * careful to configure the tunnels so that it won't make a loop.
- */
-#define MAX_GIF_NEST 1
-#endif
-static int max_gif_nesting = MAX_GIF_NEST;
 
 void
 gifattach(dummy)
@@ -346,24 +333,35 @@ gif_output(ifp, m, dst, rt)
 	static int called = 0;	/* XXX: MUTEX */
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 	int s;
+	struct m_tag *mtag;
 
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 	/*
 	 * gif may cause infinite recursion calls when misconfigured.
-	 * We'll prevent this by introducing upper limit.
-	 * XXX: this mechanism may introduce another problem about
-	 *      mutual exclusion of the variable CALLED, especially if we
-	 *      use kernel thread.
+	 * We'll prevent this by limiting packets from going through a gif
+	 * interface up to once.
 	 */
-	if (++called > max_gif_nesting) {
-		log(LOG_NOTICE,
-		    "gif_output: recursively called too many times(%d)\n",
-		    called);
-		m_freem(m);
-		error = EIO;	/* is there better errno? */
-		goto end;
+	for (mtag = m_tag_find(m, PACKET_TAG_GIF, NULL); mtag;
+	     mtag = m_tag_find(m, PACKET_TAG_GIF, mtag)) {
+		if (bcmp((caddr_t)(mtag + 1), &ifp, sizeof(struct ifnet *))
+		    == 0) {
+			m_freem(m);
+			error = EIO;	/* is there better errno? */
+			goto end;
+		}
 	}
+
+	mtag = m_tag_get(PACKET_TAG_GIF, sizeof(struct ifnet *), M_NOWAIT);
+	if (!mtag) {
+		IF_DROP(&ifp->if_snd);
+		m_freem(m);
+		error = ENOMEM;
+		goto end;
+
+	}
+	bcopy(&ifp, (caddr_t)(mtag + 1), sizeof(struct ifnet *));
+	m_tag_prepend(m, mtag);
 
 	m->m_flags &= ~(M_BCAST|M_MCAST);
 	if (!(ifp->if_flags & IFF_UP) ||
