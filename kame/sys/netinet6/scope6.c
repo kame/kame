@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.16 2001/08/15 11:28:18 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.17 2001/08/28 04:08:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -192,8 +192,8 @@ in6_addrscope(addr)
 {
 	int scope;
 
-	if (addr->s6_addr8[0] == 0xfe) {
-		scope = addr->s6_addr8[1] & 0xc0;
+	if (addr->s6_addr[0] == 0xfe) {
+		scope = addr->s6_addr[1] & 0xc0;
 
 		switch (scope) {
 		case 0x80:
@@ -209,8 +209,8 @@ in6_addrscope(addr)
 	}
 
 
-	if (addr->s6_addr8[0] == 0xff) {
-		scope = addr->s6_addr8[1] & 0x0f;
+	if (addr->s6_addr[0] == 0xff) {
+		scope = addr->s6_addr[1] & 0x0f;
 
 		/*
 		 * due to other scope such as reserved,
@@ -238,9 +238,9 @@ in6_addrscope(addr)
 	 */
 #if 0
 	if (bcmp(&in6addr_loopback, addr, sizeof(addr) - 1) == 0) {
-		if (addr->s6_addr8[15] == 1) /* loopback */
+		if (addr->s6_addr[15] == 1) /* loopback */
 			return IPV6_ADDR_SCOPE_INTFACELOCAL;
-		if (addr->s6_addr8[15] == 0) /* unspecified */
+		if (addr->s6_addr[15] == 0) /* unspecified */
 			return IPV6_ADDR_SCOPE_GLOBAL; /* XXX: correct? */
 	}
 #endif
