@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.97 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.98 2004/06/16 02:35:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -654,7 +654,7 @@ do {								\
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;	\
 		     (in6m) != NULL &&				\
 		     !IN6_ARE_ADDR_EQUAL(&(in6m)->in6m_addr, &(addr));	\
-		     (in6m) = in6m->in6m_entry.le_next)		\
+		     (in6m) = (in6m)->in6m_entry.le_next)	\
 			continue;				\
 } while (/*CONSTCOND*/ 0)
 
