@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.114 2000/05/24 16:22:38 sakane Exp $	*/
+/*	$KAME: key.c,v 1.115 2000/05/24 17:28:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -306,8 +306,6 @@ do { \
 	} while (0)
 #endif
 
-#define KSIN6(a) (&((struct sockaddr_in6 *)(a))->sin6_addr)
-
 /*
  * set parameters into secpolicyindex buffer.
  * Must allocate secpolicyindex buffer passed to this function.
@@ -408,6 +406,7 @@ static int key_cmpspidx_exactly
 	__P((struct secpolicyindex *, struct secpolicyindex *));
 static int key_cmpspidx_withmask
 	__P((struct secpolicyindex *, struct secpolicyindex *));
+static int key_sockaddrcmp __P((struct sockaddr *, struct sockaddr *, int));
 static int key_bbcmp __P((caddr_t, caddr_t, u_int));
 static u_int16_t key_satype2proto __P((u_int8_t));
 static u_int8_t key_proto2satype __P((u_int16_t));
@@ -739,6 +738,8 @@ key_allocsa(family, src, dst, proto, spi)
 	struct secashead *sah;
 	struct secasvar *sav;
 	u_int stateidx, state;
+	struct sockaddr_in sin;
+	struct sockaddr_in6 sin6;
 	int s;
 
 	/* sanity check */
@@ -777,37 +778,32 @@ key_allocsa(family, src, dst, proto, spi)
 				/* check src address */
 				switch (family) {
 				case AF_INET:
-					if (!key_bbcmp(src,
-					     (caddr_t)&((struct sockaddr_in *)&sav->sah->saidx.src)->sin_addr,
-					     sizeof(struct in_addr) << 3))
+					bzero(&sin, sizeof(sin));
+					sin.sin_family = AF_INET;
+					sin.sin_len = sizeof(sin);
+					bcopy(src, &sin.sin_addr,
+					    sizeof(sin.sin_addr));
+					if (key_sockaddrcmp((struct sockaddr*)&sin,
+					    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
 						continue;
+
 					break;
 				case AF_INET6:
-				{
-					struct in6_addr *in6, fake;
-					struct sockaddr_in6 *s;
-
-					in6 = (struct in6_addr *)src;
-					s = (struct sockaddr_in6 *)&sav->sah->saidx.src;
-
-					if (IN6_IS_SCOPE_LINKLOCAL((struct in6_addr *)src)
-					 && IN6_IS_SCOPE_LINKLOCAL(&s->sin6_addr)) {
-						if (s->sin6_scope_id != ntohs(in6->s6_addr16[1]))
-							continue;
-
-						/* fake scope id */
-						bcopy(src, &fake, sizeof(fake));
-
-						fake.s6_addr16[1] = 0;
-						in6 = &fake;
+					bzero(&sin6, sizeof(sin6));
+					sin6.sin6_family = AF_INET6;
+					sin6.sin6_len = sizeof(sin6);
+					bcopy(src, &sin6.sin6_addr,
+					    sizeof(sin6.sin6_addr));
+					if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)) {
+						/* kame fake scopeid */
+						sin6.sin6_scope_id =
+						    ntohs(sin6.sin6_addr.s6_addr16[1]);
+						sin6.sin6_addr.s6_addr16[1] = 0;
 					}
-
-					if (!key_bbcmp((caddr_t)in6,
-						(caddr_t)&s->sin6_addr,
-						sizeof(struct in6_addr) << 3))
+					if (key_sockaddrcmp((struct sockaddr*)&sin6,
+					    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
 						continue;
 					break;
-				}
 				default:
 					printf("key_allocsa: unknown address family=%d.\n",
 						family);
@@ -818,37 +814,32 @@ key_allocsa(family, src, dst, proto, spi)
 				/* check dst address */
 				switch (family) {
 				case AF_INET:
-					if (!key_bbcmp(dst,
-					     (caddr_t)&((struct sockaddr_in *)&sav->sah->saidx.src)->sin_addr,
-					     sizeof(struct in_addr) << 3))
+					bzero(&sin, sizeof(sin));
+					sin.sin_family = AF_INET;
+					sin.sin_len = sizeof(sin);
+					bcopy(dst, &sin.sin_addr,
+					    sizeof(sin.sin_addr));
+					if (key_sockaddrcmp((struct sockaddr*)&sin,
+					    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
 						continue;
+
 					break;
 				case AF_INET6:
-				{
-					struct in6_addr *in6, fake;
-					struct sockaddr_in6 *s;
-
-					in6 = (struct in6_addr *)dst;
-					s = (struct sockaddr_in6 *)&sav->sah->saidx.dst;
-
-					if (IN6_IS_SCOPE_LINKLOCAL((struct in6_addr *)dst)
-					 && IN6_IS_SCOPE_LINKLOCAL(&s->sin6_addr)) {
-						if (s->sin6_scope_id != ntohs(in6->s6_addr16[1]))
-							continue;
-
-						/* fake scope id */
-						bcopy(dst, &fake, sizeof(fake));
-
-						fake.s6_addr16[1] = 0;
-						in6 = &fake;
+					bzero(&sin6, sizeof(sin6));
+					sin6.sin6_family = AF_INET6;
+					sin6.sin6_len = sizeof(sin6);
+					bcopy(dst, &sin6.sin6_addr,
+					    sizeof(sin6.sin6_addr));
+					if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)) {
+						/* kame fake scopeid */
+						sin6.sin6_scope_id =
+						    ntohs(sin6.sin6_addr.s6_addr16[1]);
+						sin6.sin6_addr.s6_addr16[1] = 0;
 					}
-
-					if (!key_bbcmp((caddr_t)in6,
-						(caddr_t)&s->sin6_addr,
-						sizeof(struct in6_addr) << 3))
+					if (key_sockaddrcmp((struct sockaddr*)&sin6,
+					    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
 						continue;
 					break;
-				}
 				default:
 					printf("key_allocsa: unknown address family=%d.\n",
 						family);
@@ -1688,6 +1679,11 @@ key_spdadd(so, m, mhp)
 	/* sanity check on addr pair */
 	if (((struct sockaddr *)(src0 + 1))->sa_family !=
 			((struct sockaddr *)(dst0+ 1))->sa_family) {
+		keydb_delsecpolicy(newsp);
+		return key_senderror(so, m, EINVAL);
+	}
+	if (((struct sockaddr *)(src0 + 1))->sa_len !=
+			((struct sockaddr *)(dst0+ 1))->sa_len) {
 		keydb_delsecpolicy(newsp);
 		return key_senderror(so, m, EINVAL);
 	}
@@ -3649,13 +3645,9 @@ key_ismyaddr6(sin6)
 	struct in6_multi *in6m;
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-		if (sin6->sin6_family == ia->ia_addr.sin6_family &&
-		    sin6->sin6_len == ia->ia_addr.sin6_len &&
-		    sin6->sin6_scope_id == ia->ia_addr.sin6_scope_id &&
-		    IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &ia->ia_addr.sin6_addr)) {
+		if (key_sockaddrcmp((struct sockaddr *)&sin6,
+		    (struct sockaddr *)&ia->ia_addr, 0) == 0)
 			return 1;
-		}
-
 
 		/*
 		 * XXX Multicast
@@ -3710,8 +3702,8 @@ key_cmpsaidx_exactly(saidx0, saidx1)
 	 || saidx0->reqid != saidx1->reqid)
 		return 0;
 
-	if (bcmp(&saidx0->src, &saidx1->src, saidx0->src.ss_len) != 0
-	 || bcmp(&saidx0->dst, &saidx1->dst, saidx0->dst.ss_len) != 0)
+	if (bcmp(&saidx0->src, &saidx1->src, saidx0->src.ss_len) != 0 ||
+	    bcmp(&saidx0->dst, &saidx1->dst, saidx0->dst.ss_len) != 0)
 		return 0;
 
 	return 1;
@@ -3738,43 +3730,27 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 	if (saidx0 == NULL || saidx1 == NULL)
 		return 0;
 
-	if (saidx0->proto != saidx1->proto
-	 || saidx0->src.ss_family != saidx1->src.ss_family
-	 || saidx0->dst.ss_family != saidx1->dst.ss_family)
+	if (saidx0->proto != saidx1->proto)
 		return 0;
 
 	/*
 	 * If reqid of SPD is non-zero, unique SA is required.
 	 * The result must be of same reqid in this case.
 	 */
-	if (saidx1->reqid != 0
-	 && saidx0->reqid != saidx1->reqid)
+	if (saidx1->reqid != 0 && saidx0->reqid != saidx1->reqid)
 		return 0;
 
-	if (saidx0->mode != IPSEC_MODE_ANY
-	 && saidx0->mode != saidx1->mode)
+	if (saidx0->mode != IPSEC_MODE_ANY && saidx0->mode != saidx1->mode)
 		return 0;
 
-    {
-	int sa_len = _INALENBYAF(saidx0->src.ss_family);
-
-	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx0->src))
-	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx1->src))) {
-		if (((struct sockaddr_in6 *)&saidx0->src)->sin6_scope_id !=
-			((struct sockaddr_in6 *)&saidx1->src)->sin6_scope_id)
-			return 0;
+	if (key_sockaddrcmp((struct sockaddr *)&saidx0->src,
+	    (struct sockaddr *)&saidx1->src, 0) != 0) {
+		return 0;
 	}
-	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx0->dst))
-	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&saidx1->dst))) {
-		if (((struct sockaddr_in6 *)&saidx0->dst)->sin6_scope_id !=
-			((struct sockaddr_in6 *)&saidx1->dst)->sin6_scope_id)
-			return 0;
-	}
-
-	if (bcmp(_INADDRBYSA(&saidx0->src), _INADDRBYSA(&saidx1->src), sa_len)
-	 || bcmp(_INADDRBYSA(&saidx0->dst), _INADDRBYSA(&saidx1->dst), sa_len))
+	if (key_sockaddrcmp((struct sockaddr *)&saidx0->dst,
+	    (struct sockaddr *)&saidx1->dst, 0) != 0) {
 		return 0;
-    }
+	}
 
 	return 1;
 }
@@ -3804,9 +3780,14 @@ key_cmpspidx_exactly(spidx0, spidx1)
 	 || spidx0->ul_proto != spidx1->ul_proto)
 		return 0;
 
-	if (bcmp(&spidx0->src, &spidx1->src, spidx0->src.ss_len) != 0
-	 || bcmp(&spidx0->dst, &spidx1->dst, spidx0->dst.ss_len) != 0)
+	if (key_sockaddrcmp((struct sockaddr *)&spidx0->src,
+	    (struct sockaddr *)&spidx1->src, 1) != 0) {
 		return 0;
+	}
+	if (key_sockaddrcmp((struct sockaddr *)&spidx0->dst,
+	    (struct sockaddr *)&spidx1->dst, 1) != 0) {
+		return 0;
+	}
 
 	return 1;
 }
@@ -3831,8 +3812,10 @@ key_cmpspidx_withmask(spidx0, spidx1)
 	if (spidx0 == NULL || spidx1 == NULL)
 		return 0;
 
-	if (spidx0->src.ss_family != spidx1->src.ss_family
-	 || spidx0->dst.ss_family != spidx1->dst.ss_family)
+	if (spidx0->src.ss_family != spidx1->src.ss_family ||
+	    spidx0->dst.ss_family != spidx1->dst.ss_family ||
+	    spidx0->src.ss_len != spidx1->src.ss_len ||
+	    spidx0->dst.ss_len != spidx1->dst.ss_len)
 		return 0;
 
 	/* if spidx.ul_proto == IPSEC_ULPROTO_ANY, ignore. */
@@ -3840,41 +3823,108 @@ key_cmpspidx_withmask(spidx0, spidx1)
 	 && spidx0->ul_proto != spidx1->ul_proto)
 		return 0;
 
-	if (_INPORTBYSA(&spidx0->src) != IPSEC_PORT_ANY
-	 && _INPORTBYSA(&spidx0->src) != _INPORTBYSA(&spidx1->src))
-		return 0;
-
-	if (_INPORTBYSA(&spidx0->dst) != IPSEC_PORT_ANY
-	 && _INPORTBYSA(&spidx0->dst) != _INPORTBYSA(&spidx1->dst))
-		return 0;
-
-	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx0->src))
-	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx1->src))) {
-		if (((struct sockaddr_in6 *)&spidx0->src)->sin6_scope_id !=
-			((struct sockaddr_in6 *)&spidx1->src)->sin6_scope_id)
+	switch (spidx0->src.ss_family) {
+	case AF_INET:
+		if (satosin(&spidx0->src)->sin_port !=
+		    satosin(&spidx1->src)->sin_port)
 			return 0;
+		if (!key_bbcmp((caddr_t)&satosin(&spidx0->src)->sin_addr,
+		    (caddr_t)&satosin(&spidx1->src)->sin_addr, spidx0->prefs))
+			return 0;
+		break;
+	case AF_INET6:
+		if (satosin6(&spidx0->src)->sin6_port !=
+		    satosin6(&spidx1->src)->sin6_port)
+			return 0;
+		if (satosin6(&spidx0->src)->sin6_scope_id !=
+		    satosin6(&spidx1->src)->sin6_scope_id)
+			return 0;
+		if (!key_bbcmp((caddr_t)&satosin6(&spidx0->src)->sin6_addr,
+		    (caddr_t)&satosin6(&spidx1->src)->sin6_addr, spidx0->prefs))
+			return 0;
+		break;
+	default:
+		/* XXX */
+		if (bcmp(&spidx0->src, &spidx1->src, spidx0->src.ss_len) != 0)
+			return 0;
+		break;
 	}
 
-	if (IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx0->dst))
-	 && IN6_IS_SCOPE_LINKLOCAL(KSIN6(&spidx1->dst))) {
-		if (((struct sockaddr_in6 *)&spidx0->dst)->sin6_scope_id !=
-			((struct sockaddr_in6 *)&spidx1->dst)->sin6_scope_id)
+	switch (spidx0->dst.ss_family) {
+	case AF_INET:
+		if (satosin(&spidx0->dst)->sin_port !=
+		    satosin(&spidx1->dst)->sin_port)
 			return 0;
+		if (!key_bbcmp((caddr_t)&satosin(&spidx0->dst)->sin_addr,
+		    (caddr_t)&satosin(&spidx1->dst)->sin_addr, spidx0->prefs))
+			return 0;
+		break;
+	case AF_INET6:
+		if (satosin6(&spidx0->dst)->sin6_port !=
+		    satosin6(&spidx1->dst)->sin6_port)
+			return 0;
+		if (satosin6(&spidx0->dst)->sin6_scope_id !=
+		    satosin6(&spidx1->dst)->sin6_scope_id)
+			return 0;
+		if (!key_bbcmp((caddr_t)&satosin6(&spidx0->dst)->sin6_addr,
+		    (caddr_t)&satosin6(&spidx1->dst)->sin6_addr, spidx0->prefs))
+			return 0;
+		break;
+	default:
+		/* XXX */
+		if (bcmp(&spidx0->dst, &spidx1->dst, spidx0->dst.ss_len) != 0)
+			return 0;
+		break;
 	}
 
-	if (!key_bbcmp(_INADDRBYSA(&spidx0->src),
-	               _INADDRBYSA(&spidx1->src),
-	               spidx0->prefs))
-		return 0;
-
-	if (!key_bbcmp(_INADDRBYSA(&spidx0->dst),
-	               _INADDRBYSA(&spidx1->dst),
-	               spidx0->prefd))
-		return 0;
-
-	/* XXX Do we check other field ?  e.g. flowinfo, scope_id. */
+	/* XXX Do we check other field ?  e.g. flowinfo */
 
 	return 1;
+}
+
+/* returns 0 on match */
+static int
+key_sockaddrcmp(sa1, sa2, port)
+	struct sockaddr *sa1;
+	struct sockaddr *sa2;
+	int port;
+{
+	if (sa1->sa_family != sa2->sa_family || sa1->sa_len != sa2->sa_len)
+		return 1;
+
+	switch (sa1->sa_family) {
+	case AF_INET:
+		if (sa1->sa_len != sizeof(struct sockaddr_in))
+			return 1;
+		if (satosin(sa1)->sin_addr.s_addr !=
+		    satosin(sa2)->sin_addr.s_addr) {
+			return 1;
+		}
+		if (port && satosin(sa1)->sin_port != satosin(sa2)->sin_port)
+			return 1;
+		break;
+	case AF_INET6:
+		if (sa1->sa_len != sizeof(struct sockaddr_in6))
+			return 1;	/*EINVAL*/
+		if (satosin6(sa1)->sin6_scope_id !=
+		    satosin6(sa2)->sin6_scope_id) {
+			return 1;
+		}
+		if (!IN6_ARE_ADDR_EQUAL(&satosin6(sa1)->sin6_addr,
+		    &satosin6(sa2)->sin6_addr)) {
+			return 1;
+		}
+		if (port &&
+		    satosin6(sa1)->sin6_port != satosin6(sa2)->sin6_port) {
+			return 1;
+		}
+	default:
+		if (bcmp(sa1, sa2, sa1->sa_len) != 0)
+			return 1;
+		break;
+	}
+
+	return 0;
 }
 
 /*
@@ -4316,8 +4366,38 @@ key_getspi(so, m, mhp)
 	}
 
 	/* make sure if port number is zero. */
-	_INPORTBYSA((struct sockaddr *)(src0 + 1)) = 0;
-	_INPORTBYSA((struct sockaddr *)(dst0 + 1)) = 0;
+	switch (((struct sockaddr *)(src0 + 1))->sa_family) {
+	case AF_INET:
+		if (((struct sockaddr *)(src0 + 1))->sa_len !=
+		    sizeof(struct sockaddr_in))
+			return key_senderror(so, m, EINVAL);
+		((struct sockaddr_in *)(src0 + 1))->sin_port = 0;
+		break;
+	case AF_INET6:
+		if (((struct sockaddr *)(src0 + 1))->sa_len !=
+		    sizeof(struct sockaddr_in6))
+			return key_senderror(so, m, EINVAL);
+		((struct sockaddr_in6 *)(src0 + 1))->sin6_port = 0;
+		break;
+	default:
+		; /*???*/
+	}
+	switch (((struct sockaddr *)(dst0 + 1))->sa_family) {
+	case AF_INET:
+		if (((struct sockaddr *)(dst0 + 1))->sa_len !=
+		    sizeof(struct sockaddr_in))
+			return key_senderror(so, m, EINVAL);
+		((struct sockaddr_in *)(dst0 + 1))->sin_port = 0;
+		break;
+	case AF_INET6:
+		if (((struct sockaddr *)(dst0 + 1))->sa_len !=
+		    sizeof(struct sockaddr_in6))
+			return key_senderror(so, m, EINVAL);
+		((struct sockaddr_in6 *)(dst0 + 1))->sin6_port = 0;
+		break;
+	default:
+		; /*???*/
+	}
 
 	/* XXX boundary check against sa_len */
 	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
@@ -6531,7 +6611,7 @@ key_parse(m, so)
 	if (mh.ext[SADB_EXT_ADDRESS_SRC] != NULL
 	 && mh.ext[SADB_EXT_ADDRESS_DST] != NULL) {
 		struct sadb_address *src0, *dst0;
-		u_int prefix;
+		u_int plen;
 
 		src0 = (struct sadb_address *)(mh.ext[SADB_EXT_ADDRESS_SRC]);
 		dst0 = (struct sadb_address *)(mh.ext[SADB_EXT_ADDRESS_DST]);
@@ -6547,8 +6627,8 @@ key_parse(m, so)
 		}
 
 		/* check family */
-		if (PFKEY_ADDR_SADDR(src0)->sa_family
-		 != PFKEY_ADDR_SADDR(dst0)->sa_family) {
+		if (PFKEY_ADDR_SADDR(src0)->sa_family !=
+		    PFKEY_ADDR_SADDR(dst0)->sa_family) {
 #ifdef IPSEC_DEBUG
 			printf("key_parse: address family mismatched.\n");
 #endif
@@ -6556,14 +6636,10 @@ key_parse(m, so)
 			error = EINVAL;
 			goto senderror;
 		}
-
-		prefix = _INALENBYAF(PFKEY_ADDR_SADDR(src0)->sa_family) << 3;
-
-		/* check max prefixlen */
-		if (prefix < src0->sadb_address_prefixlen
-		 || prefix < dst0->sadb_address_prefixlen) {
+		if (PFKEY_ADDR_SADDR(src0)->sa_len !=
+		    PFKEY_ADDR_SADDR(dst0)->sa_len) {
 #ifdef IPSEC_DEBUG
-			printf("key_parse: illegal prefixlen.\n");
+			printf("key_parse: address struct size mismatched.\n");
 #endif
 			pfkeystat.out_invaddr++;
 			error = EINVAL;
@@ -6572,14 +6648,50 @@ key_parse(m, so)
 
 		switch (PFKEY_ADDR_SADDR(src0)->sa_family) {
 		case AF_INET:
+			if (PFKEY_ADDR_SADDR(src0)->sa_len !=
+			    sizeof(struct sockaddr_in)) {
+				pfkeystat.out_invaddr++;
+				error = EINVAL;
+				goto senderror;
+			}
+			break;
 		case AF_INET6:
+			if (PFKEY_ADDR_SADDR(src0)->sa_len !=
+			    sizeof(struct sockaddr_in6)) {
+				pfkeystat.out_invaddr++;
+				error = EINVAL;
+				goto senderror;
+			}
 			break;
 		default:
 #ifdef IPSEC_DEBUG
-			printf("key_parse: invalid address family.\n");
+			printf("key_parse: unsupported address family.\n");
 #endif
 			pfkeystat.out_invaddr++;
 			error = EAFNOSUPPORT;
+			goto senderror;
+		}
+
+		switch (PFKEY_ADDR_SADDR(src0)->sa_family) {
+		case AF_INET:
+			plen = sizeof(struct in_addr) << 3;
+			break;
+		case AF_INET6:
+			plen = sizeof(struct in6_addr) << 3;
+			break;
+		default:
+			plen = 0;	/*fool gcc*/
+			break;
+		}
+
+		/* check max prefix length */
+		if (src0->sadb_address_prefixlen > plen ||
+		    dst0->sadb_address_prefixlen > plen) {
+#ifdef IPSEC_DEBUG
+			printf("key_parse: illegal prefixlen.\n");
+#endif
+			pfkeystat.out_invaddr++;
+			error = EINVAL;
 			goto senderror;
 		}
 
