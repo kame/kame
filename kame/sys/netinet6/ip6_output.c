@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.160 2001/02/10 01:40:57 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.161 2001/02/10 02:07:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,6 +195,10 @@ int (*mip6_output_hook)(struct mbuf *m, struct ip6_pktopts **opt);
  * This function may modify ver and hlim only.
  * The mbuf chain containing the packet will be freed.
  * The mbuf opt, if present, will not be freed.
+ *
+ * type of "mtu": rt_rmx.rmx_mtu is u_long, ifnet.ifr_mtu is int, and
+ * nd_ifinfo.linkmtu is u_int32_t.  so we use u_long to hold largest one,
+ * which is rt_rmx.rmx_mtu.
  */
 int
 ip6_output(m0, opt, ro, flags, im6o, ifpp)
@@ -221,7 +225,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct sockaddr_in6 *dst;
 	int error = 0;
 	struct in6_ifaddr *ia;
-	u_int32_t mtu;
+	u_long mtu;
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
 	struct in6_addr finaldst;
@@ -1259,10 +1263,15 @@ skip_ipsec2:;
 		 * can always occur when an application tries to send a larger
 		 * packet than the link MTU even with specifing path MTU.
 		 * Or should we always notify all applications?
+		 *
+		 * XXX what if mtu >= 2^32?
 		 */
-		if (opt == NULL || opt->ip6po_mtu == -1) {
+		if ((opt == NULL || opt->ip6po_mtu == -1) &&
+		    mtu <= 0xffffffffLU) {
+			u_int32_t mtu32;
+			mtu32 = mtu;
 			bzero(&ip6cp, sizeof(ip6cp));
-			ip6cp.ip6c_cmdarg = (void *)&mtu;
+			ip6cp.ip6c_cmdarg = (void *)&mtu32;
 			pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst,
 				    (void *)&ip6cp);
 		}
