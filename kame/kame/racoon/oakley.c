@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.118 2004/06/16 11:55:36 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.119 2004/08/24 06:47:27 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,6 +94,7 @@ do {                                                                           \
 	a.prime = vdup(&buf);                                                  \
 	a.gen1 = 2;                                                            \
 	a.gen2 = 0;                                                            \
+	racoon_free(buf.v);                                                    \
 } while(0);
 
 struct dhgroup dh_modp768;
