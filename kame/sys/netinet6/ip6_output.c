@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.436 2004/03/12 08:48:49 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.437 2004/03/12 11:26:10 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -856,27 +856,22 @@ skip_ipsec2:;
 	 * If there is a routing header, replace the destination address field
 	 * with the first hop of the routing header.
 	 */
-	if (exthdrs.ip6e_rthdr
+    {
+	struct ip6_rthdr *rh;
+
+	rh = NULL;
+	if (exthdrs.ip6e_rthdr)
+		rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
+		    struct ip6_rthdr *));
 #ifdef MIP6
-	    || exthdrs.ip6e_rthdr2
+	if (exthdrs.ip6e_rthdr2)
+		rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr2,
+		    struct ip6_rthdr *));
 #endif /* MIP6 */
-		) {
-		struct ip6_rthdr *rh;
+	if (rh) {
 		struct ip6_rthdr0 *rh0;
 		struct in6_addr *addr;
 		struct sockaddr_in6 sa;
-
-		if (exthdrs.ip6e_rthdr)
-			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
-			    struct ip6_rthdr *));
-		else {
-#ifdef MIP6
-			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr2,
-			    struct ip6_rthdr *));
-#else
-			rh = NULL;
-#endif /* MIP6 */
-		}
 
 		finaldst = ip6->ip6_dst;
 		switch (rh->ip6r_type) {
@@ -914,6 +909,7 @@ skip_ipsec2:;
 			 goto bad;
 		}
 	}
+    }
 
 	/* Source address validation */
 	if (!(flags & IPV6_UNSPECSRC) &&
