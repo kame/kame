@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.var.dist,v 1.38.2.3 1999/08/29 14:19:26 peter Exp $
+# $FreeBSD: src/etc/mtree/BSD.var.dist,v 1.38.2.4 2000/01/11 08:24:02 rgrimes Exp $
 #
 
 /set type=dir uname=root gname=wheel mode=0755
@@ -27,9 +27,9 @@
     ..
 /set type=dir uname=root gname=wheel mode=0755
     games                gname=games mode=0775
-	hackdir          gname=games mode=0770
-	    save         gname=games mode=0770
-	    ..
+        hackdir          gname=games mode=0770
+            save         gname=games mode=0770
+            ..
         ..
         larn             gname=games mode=0775
         ..
@@ -57,11 +57,11 @@
         ..
         mqueue
         ..
-	opielocks       mode=0700
-	..
+        opielocks       mode=0700
+        ..
         output
-	    lpd
-	    ..
+            lpd
+            ..
         ..
 /set type=dir uname=uucp gname=uucp mode=0775
         uucp
