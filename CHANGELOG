@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.717 2000/03/22 08:57:58 itojun Exp $
+$Id: CHANGELOG,v 1.718 2000/03/22 12:05:51 jinmei Exp $
 
 <200003>
+2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {freebsd[23], bsdi[34]}/sbin/route/route.c: supported extended
+	format for IPv6 scoped addresses. For example, you can install an
+	IPv6 link-local gateway like
+	# route add add -inet6 3ffe:: fe80::1234%ed0 -prefixlen 16
+	instead of
+	# route add add -inet6 3ffe:: fe80:1::1234 -prefixlen 16
+	(where 1 embedded in the link-local address is the inteface index
+	 of ed0).
+	
 Wed Mar 22 17:57:21 JST 2000  itojun@iijlab.net
 	* netbsd: synchronize userland with 1.4.1 -> 1.4.2 changes.
 
