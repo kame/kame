@@ -261,6 +261,9 @@ cdev_decl(pci);
 #include "clockctl.h"
 cdev_decl(clockctl);
 
+#include "pf.h"
+cdev_decl(pf);
+
 struct cdevsw	cdevsw[] =
 {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -367,6 +370,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 94 */
 	cdev_notdef(),			/* 95 */
 	cdev__oci_init(NDPT,dpt),	/* 96: DPT/Adaptec RAID management */
+	cdev__oci_init(NPF,pf),		/* 97: PF packet filter */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
