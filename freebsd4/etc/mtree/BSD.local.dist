@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55 2000/01/11 07:57:09 rgrimes Exp $
+# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55.2.1 2000/06/29 07:39:14 asami Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -17,6 +17,26 @@
     ..
     lib
         perl5
+            5.00503
+                man
+                    man3
+                    ..
+                ..
+            ..
+            site_perl
+                5.005
+                    alpha-freebsd
+                        auto
+                        ..
+                    ..
+                    auto
+                    ..
+                    i386-freebsd
+                        auto
+                        ..
+                    ..
+                ..
+            ..
         ..
     ..
     libexec
@@ -166,9 +186,13 @@
     sbin
     ..
     share
+        aclocal
+        ..
         dict
         ..
         doc
+            ja
+            ..
         ..
         emacs
             site-lisp

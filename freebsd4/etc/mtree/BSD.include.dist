@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32 2000/01/25 09:24:22 n_hibma Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.1 2000/07/13 06:28:47 obrien Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -12,6 +12,8 @@
         ..
     ..
     dev
+        ppbus
+        ..
         usb
         ..
     ..

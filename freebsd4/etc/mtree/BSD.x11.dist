@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.x11.dist,v 1.9 2000/02/18 02:35:24 asami Exp $
+# $FreeBSD: src/etc/mtree/BSD.x11.dist,v 1.9.2.3 2000/06/29 07:39:14 asami Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -118,6 +118,8 @@
                 ..
                 zh_TW
                 ..
+                zh_TW.Big5
+                ..
             ..
             proxymngr
             ..
@@ -183,6 +185,8 @@
             ..
             xsm
             ..
+        ..
+        aout
         ..
         modules
         ..
@@ -284,7 +288,11 @@
         ..
     ..
     share
+        aclocal
+        ..
         doc
+            ja
+            ..
         ..
         examples
         ..

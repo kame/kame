@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188 2000/02/29 08:45:22 billf Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.3 2000/06/30 11:06:17 tg Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -23,6 +23,8 @@
     ..
     libdata
         doscmd
+            fonts
+            ..
         ..
         gcc
         ..
@@ -158,8 +160,6 @@
         ..
     ..
     local
-    ..
-    mdec
     ..
     obj nochange
     ..
@@ -342,8 +342,6 @@
             mdoc
             ..
             meteor
-            ..
-            more
             ..
             netgraph
             ..
