@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcscp.c,v 1.2 2001/02/14 06:37:01 fgsch Exp $	*/
+/*	$OpenBSD: pcscp.c,v 1.7 2001/09/27 04:01:42 jason Exp $	*/
 /*	$NetBSD: pcscp.c,v 1.11 2000/11/14 18:42:58 thorpej Exp $	*/
 
 /*-
@@ -149,6 +149,14 @@ struct ncr53c9x_glue pcscp_glue = {
 	NULL,			/* gl_clear_latched_intr */
 };
 
+#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
+#define pcscp_bus_dmamap_sync(t, m, o, l, f) \
+    bus_dmamap_sync((t), (m), (o), (l), (f))
+#else
+#define pcscp_bus_dmamap_sync(t, m, o, l, f) \
+    bus_dmamap_sync((t), (m), (f))
+#endif
+
 int
 pcscp_match(parent, match, aux)
 	struct device *parent;
@@ -188,13 +196,12 @@ pcscp_attach(parent, self, aux)
 	bus_dma_segment_t seg;
 	int error, rseg;
 
-	ioh_valid = (pci_mapreg_map(pa, IO_MAP_REG,
-	    PCI_MAPREG_TYPE_IO, 0,
-	    &iot, &ioh, NULL, NULL) == 0);
+	ioh_valid = (pci_mapreg_map(pa, IO_MAP_REG, PCI_MAPREG_TYPE_IO, 0,
+	    &iot, &ioh, NULL, NULL, 0) == 0);
 #if 0	/* XXX cannot use memory map? */
 	memh_valid = (pci_mapreg_map(pa, MEM_MAP_REG,
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
-	    &memt, &memh, NULL, NULL) == 0);
+	    &memt, &memh, NULL, NULL, 0) == 0);
 #else
 	memh_valid = 0;
 #endif
@@ -268,8 +275,7 @@ pcscp_attach(parent, self, aux)
 	sc->sc_maxxfer = 16 * 1024 * 1024;
 
 	/* map and establish interrupt */
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}
@@ -340,7 +346,7 @@ pcscp_attach(parent, self, aux)
 	ncr53c9x_attach(sc, &pcscp_adapter, NULL);
 
 	/* Turn on target selection using the `dma' method */
-	ncr53c9x_dmaselect = 1;
+	sc->sc_features |= NCR_F_DMASELECT;
 }
 
 /*
@@ -488,7 +494,7 @@ pcscp_dma_intr(sc)
 
 	WRITE_DMAREG(esc, DMA_CMD, DMACMD_IDLE | (datain ? DMACMD_DIR : 0));
 
-	bus_dmamap_sync(esc->sc_dmat, dmap,
+	pcscp_bus_dmamap_sync(esc->sc_dmat, dmap, 0, dmap->dm_mapsize,
 	    datain ? BUS_DMASYNC_POSTREAD : BUS_DMASYNC_POSTWRITE);
 	bus_dmamap_unload(esc->sc_dmat, dmap);
 
@@ -637,11 +643,11 @@ pcscp_dma_go(sc)
 		return;
 
 	/* sync transfer buffer */
-	bus_dmamap_sync(esc->sc_dmat, dmap,
+	pcscp_bus_dmamap_sync(esc->sc_dmat, dmap, 0, dmap->dm_mapsize,
 	    datain ? BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
 
 	/* sync MDL */
-	bus_dmamap_sync(esc->sc_dmat, mdldmap,
+	pcscp_bus_dmamap_sync(esc->sc_dmat, mdldmap, 0, mdldmap->dm_mapsize,
 	    BUS_DMASYNC_PREWRITE);
 
 	/* set Starting MDL Address */

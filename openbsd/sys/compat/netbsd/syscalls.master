@@ -1,4 +1,4 @@
-;	$OpenBSD: syscalls.master,v 1.11 2000/05/01 23:10:58 deraadt Exp $
+;	$OpenBSD: syscalls.master,v 1.15 2001/09/21 15:31:59 art Exp $
 
 ;	@(#)syscalls.master	8.2 (Berkeley) 1/13/94
 
@@ -81,8 +81,8 @@
 16	STD		{ int netbsd_sys_chown(char *path, uid_t uid, \
 			    gid_t gid); }
 17	NOARGS		{ int sys_obreak(char *nsize); } break
-18	NOARGS		{ int sys_ogetfsstat(struct statfs *buf, long bufsize, \
-			    int flags); }
+18	NOARGS		{ int compat_25_sys_getfsstat(struct ostatfs *buf, \
+			    long bufsize, int flags); }
 19	NOARGS		{ long sys_lseek(int fd, long offset, int whence); } \
 			    olseek
 20	NOARGS		{ pid_t sys_getpid(void); }
@@ -230,15 +230,19 @@
 111	NOARGS		{ int sys_sigsuspend(int mask); }
 112	NOARGS		{ int compat_43_sys_sigstack(struct sigstack *nss, \
 			    struct sigstack *oss); } osigstack
+#ifdef MSG_COMPAT
 113	NOARGS		{ int compat_43_sys_recvmsg(int s, \
 			    struct omsghdr *msg, int flags); } orecvmsg
+#else
+113	OBSOL		orecvmsg
+#endif
+#ifdef MSG_COMPAT
 114	NOARGS		{ int compat_43_sys_sendmsg(int s, caddr_t msg, \
 			    int flags); } osendmsg
-#ifdef TRACE
-115	NOARGS		{ int sys_vtrace(int request, int value); }
 #else
-115	OBSOL		vtrace
+114	OBSOL		orecvmsg
 #endif
+115	OBSOL		vtrace
 116	NOARGS		{ int sys_gettimeofday(struct timeval *tp, \
 			    struct timezone *tzp); }
 117	NOARGS		{ int sys_getrusage(int who, struct rusage *rusage); }
@@ -253,9 +257,13 @@
 			    const struct timezone *tzp); }
 123	NOARGS		{ int sys_fchown(int fd, uid_t uid, gid_t gid); }
 124	NOARGS		{ int sys_fchmod(int fd, int mode); }
+#ifdef MSG_COMPAT
 125	NOARGS		{ int compat_43_sys_recvfrom(int s, caddr_t buf, \
 			    size_t len, int flags, caddr_t from, \
 			    int *fromlenaddr); } orecvfrom
+#else
+125	OBSOL		orecvfrom
+#endif
 126	NOARGS		{ int compat_43_sys_setreuid(int ruid, int euid); } \
 			    osetreuid
 127	NOARGS		{ int compat_43_sys_setregid(int rgid, int egid); } \
@@ -313,8 +321,10 @@
 #endif
 156	NOARGS		{ int compat_43_sys_getdirentries(int fd, char *buf, \
 			    u_int count, long *basep); } ogetdirentries
-157	NOARGS		{ int sys_ostatfs(char *path, struct ostatfs *buf); }
-158	NOARGS		{ int sys_ofstatfs(int fd, struct ostatfs *buf); }
+157	NOARGS		{ int compat_25_sys_statfs(char *path, \
+			    struct ostatfs *buf); }
+158	NOARGS		{ int compat_25_sys_fstatfs(int fd, \
+			    struct ostatfs *buf); }
 159	UNIMPL
 160	UNIMPL
 #if defined(NFSCLIENT) || defined(NFSSERVER)
@@ -354,9 +364,9 @@
 171	UNIMPL		1.0 shmsys
 #endif
 172	UNIMPL
-173	STD		{ ssize_t netbsd_sys_pread(int fd, void *buf, \
+173	NOARGS		{ ssize_t sys_pread(int fd, void *buf, \
 			    size_t nbyte, int pad, off_t offset); }
-174	STD		{ ssize_t netbsd_sys_pwrite(int fd, const void *buf, \
+174	NOARGS		{ ssize_t sys_pwrite(int fd, const void *buf, \
 			    size_t nbyte, int pad, off_t offset); }
 #ifdef NTP
 175	NOARGS		{ int sys_ntp_gettime(struct ntptimeval *ntvp); }
@@ -450,8 +460,8 @@
 #endif	/* !LKM */
 ; System calls 220-240 are reserved for use by OpenBSD
 #ifdef SYSVSEM
-220	NOARGS		{ int sys___osemctl(int semid, int semnum, int cmd, \
-			    union semun *arg); }
+220	NOARGS		{ int compat_23_sys___semctl(int semid, int semnum, \
+			    int cmd, union semun *arg); } __osemctl
 221	NOARGS		{ int sys_semget(key_t key, int nsems, int semflg); }
 222	NOARGS		{ int sys_semop(int semid, struct sembuf *sops, \
 			    u_int nsops); }
@@ -463,8 +473,8 @@
 223	UNIMPL		semconfig
 #endif
 #ifdef SYSVMSG
-224	NOARGS		{ int sys_omsgctl(int msqid, int cmd, \
-			    struct omsqid_ds *buf); }
+224	NOARGS		{ int compat_23_sys_msgctl(int msqid, int cmd, \
+			    struct omsqid_ds *buf); } omsgctl
 225	NOARGS		{ int sys_msgget(key_t key, int msgflg); }
 226	NOARGS		{ int sys_msgsnd(int msqid, const void *msgp, \
 			    size_t msgsz, int msgflg); }
@@ -479,8 +489,8 @@
 #ifdef SYSVSHM
 228	NOARGS		{ void *sys_shmat(int shmid, const void *shmaddr, \
 			    int shmflg); }
-229	NOARGS		{ int sys_oshmctl(int shmid, int cmd, \
-			    struct oshmid_ds *buf); }
+229	NOARGS		{ int compat_23_sys_shmctl(int shmid, int cmd, \
+			    struct oshmid_ds *buf); } oshmctl
 230	NOARGS		{ int sys_shmdt(const void *shmaddr); }
 231	NOARGS		{ int sys_shmget(key_t key, int size, int shmflg); }
 #else
@@ -545,7 +555,7 @@
 273	NOARGS		{ int sys_minherit(void *addr, size_t len, \
 			    int inherit); }
 274	STD		{ int netbsd_sys_lchmod(const char *path, \
-			    mode_t mode); }
+			    netbsd_mode_t mode); }
 275	NOARGS		{ int sys_lchown(const char *path, uid_t uid, \
 			    gid_t gid); }
 276	STD		{ int netbsd_sys_lutimes(const char *path, \
@@ -579,10 +589,10 @@
 #else
 288	UNIMPL
 #endif
-289	STD		{ ssize_t netbsd_sys_preadv(int fd, \
+289	NOARGS		{ ssize_t sys_preadv(int fd, \
 			    const struct iovec *iovp, int iovcnt, \
 			    int pad, off_t offset); }
-290	STD		{ ssize_t netbsd_sys_pwritev(int fd, \
+290	NOARGS		{ ssize_t sys_pwritev(int fd, \
 			    const struct iovec *iovp, int iovcnt, \
 			    int pad, off_t offset); }
 291	STD		{ int netbsd_sys___sigaction14(int signum, \
@@ -600,3 +610,11 @@
 296	STD		{ int netbsd_sys___getcwd(char *bufp, size_t length); }
 297	UNIMPL
 ;297	STD		{ int netbsd_sys_fchroot(int fd); }
+298	UNIMPL
+299	UNIMPL
+300	UNIMPL
+301	UNIMPL
+302	UNIMPL
+303	UNIMPL
+304	UNIMPL
+305	STD		{ int sys_issetugid(void); }

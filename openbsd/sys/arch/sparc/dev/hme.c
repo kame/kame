@@ -1,4 +1,4 @@
-/*	$OpenBSD: hme.c,v 1.31 2001/02/20 19:39:34 mickey Exp $	*/
+/*	$OpenBSD: hme.c,v 1.34 2001/08/24 05:14:05 jason Exp $	*/
 
 /*
  * Copyright (c) 1998 Jason L. Wright (jason@thought.net)
@@ -160,6 +160,7 @@ hmeattach(parent, self, aux)
 	struct hme_softc *sc = (struct hme_softc *)self;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int pri;
+	struct bootpath *bp;
 	/* XXX the following declaration should be elsewhere */
 	extern void myetheraddr __P((u_char *));
 
@@ -246,10 +247,19 @@ hmeattach(parent, self, aux)
 	ifp->if_watchdog = hmewatchdog;
 	ifp->if_flags =
 		IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_MAXLEN(&ifp->if_snd, HME_TX_RING_SIZE);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp);
+
+	bp = ca->ca_ra.ra_bp;
+	if (bp != NULL && sc->sc_dev.dv_unit == bp->val[1] &&
+	    ((strcmp(bp->name, hme_cd.cd_name) == 0) ||
+	     (strcmp(bp->name, "qfe") == 0) ||
+	     (strcmp(bp->name, "SUNW,hme") == 0)))
+		bp->dev = &sc->sc_dev;
 }
 
 /*
@@ -275,7 +285,7 @@ hmestart(ifp)
 	bix = sc->sc_last_td;
 
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == NULL)
 			break;
 #if NBPFILTER > 0
@@ -828,7 +838,6 @@ hme_read(sc, idx, len)
 	int idx, len;
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	struct ether_header *eh;
 	struct mbuf *m;
 
 	if (len <= sizeof(struct ether_header) ||
@@ -850,9 +859,6 @@ hme_read(sc, idx, len)
 
 	ifp->if_ipackets++;
 
-	/* We assume that the header fit entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	/*
 	 * Check if there's a BPF listener on this interface.
@@ -861,9 +867,8 @@ hme_read(sc, idx, len)
 	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
-	/* Pass the packet up, with the ether header sort-of removed. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	/* Pass the packet up. */
+	ether_input_mbuf(ifp, m);
 }
 
 /*

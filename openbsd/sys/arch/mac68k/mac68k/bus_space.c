@@ -1,5 +1,5 @@
-/*	$OpenBSD: bus_space.c,v 1.4 1999/09/03 18:01:11 art Exp $	*/
-/*	$NetBSD: bus_space.c,v 1.2 1998/04/24 05:27:24 scottr Exp $	*/
+/*	$OpenBSD: bus_space.c,v 1.11 2001/09/19 20:50:56 mickey Exp $	*/
+/*	$NetBSD: bus_space.c,v 1.5 1999/03/26 23:41:30 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -42,10 +42,6 @@
  * Implementation of bus_space mapping for mac68k.
  */
 
-#if 0
-#include "opt_uvm.h"
-#endif
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/extent.h>
@@ -54,11 +50,7 @@
 #include <machine/bus.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 int	bus_mem_add_mapping __P((bus_addr_t, bus_size_t,
 	    int, bus_space_handle_t *));
@@ -75,7 +67,7 @@ bus_space_map(t, bpa, size, flags, bshp)
 	int flags;
 	bus_space_handle_t *bshp;
 {
-	u_long pa, endpa;
+	paddr_t pa, endpa;
 	int error;
 
 	/*
@@ -130,7 +122,7 @@ bus_space_alloc(t, rstart, rend, size, alignment, boundary, flags, bpap, bshp)
 	 * Do the requested allocation.
 	 */
 	error = extent_alloc_subregion(iomem_ex, rstart, rend, size, alignment,
-	    boundary,
+	    0, boundary,
 	    EX_FAST | EX_NOWAIT | (iomem_malloc_safe ?  EX_MALLOCOK : 0),
 	    &bpa);
 
@@ -164,7 +156,8 @@ bus_mem_add_mapping(bpa, size, flags, bshp)
 	bus_space_handle_t *bshp;
 {
 	u_long pa, endpa;
-	vm_offset_t va;
+	vaddr_t va;
+	pt_entry_t *pte;
 
 	pa = m68k_trunc_page(bpa);
 	endpa = m68k_round_page((bpa + size) - 1);
@@ -174,11 +167,7 @@ bus_mem_add_mapping(bpa, size, flags, bshp)
 		panic("bus_mem_add_mapping: overflow");
 #endif
 
-#if defined(UVM)
 	va = uvm_km_valloc(kernel_map, endpa - pa);
-#else
-	va = kmem_alloc_pageable(kernel_map, endpa - pa);
-#endif
 	if (va == 0)
 		return (ENOMEM);
 
@@ -186,9 +175,13 @@ bus_mem_add_mapping(bpa, size, flags, bshp)
 
 	for (; pa < endpa; pa += NBPG, va += NBPG) {
 		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ | VM_PROT_WRITE, TRUE, 0);
-		if (!(flags & BUS_SPACE_MAP_CACHEABLE))
-			pmap_changebit(pa, PG_CI, TRUE);
+		    VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
+		pte = kvtopte(va);
+		if ((flags & BUS_SPACE_MAP_CACHEABLE))
+			*pte &= ~PG_CI;
+		else
+			*pte |= PG_CI;
+		pmap_update();
 	}
  
 	return 0;
@@ -200,7 +193,7 @@ bus_space_unmap(t, bsh, size)
 	bus_space_handle_t bsh;
 	bus_size_t size;
 {
-	vm_offset_t	va, endva;
+	vaddr_t va, endva;
 	bus_addr_t bpa;
 
 	va = m68k_trunc_page(bsh);
@@ -211,16 +204,13 @@ bus_space_unmap(t, bsh, size)
 		panic("bus_space_unmap: overflow");
 #endif
 
-	bpa = pmap_extract(pmap_kernel(), va) + (bsh & PGOFSET);
+	pmap_extract(pmap_kernel(), va, &bpa);
+	bpa += (bsh & PGOFSET);
 
 	/*
 	 * Free the kernel virtual mapping.
 	 */
-#if defined(UVM)
 	uvm_km_free(kernel_map, va, endva - va);
-#else
-	kmem_free(kernel_map, va, endva - va);
-#endif
 
 	if (extent_free(iomem_ex, bpa, size,
 	    EX_NOWAIT | (iomem_malloc_safe ? EX_MALLOCOK : 0))) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.15 2001/03/12 23:00:40 miod Exp $	*/
+/*	$OpenBSD: trap.c,v 1.23 2001/09/19 20:50:57 mickey Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -46,63 +46,62 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <vm/vm.h>
-#include <vm/vm_kern.h>			/* kernel_map */
-#if defined(UVM)
-#include <uvm/uvm_extern.h>
-#endif
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/user.h>
 #include <sys/syscall.h>
+#include <sys/systm.h>
 #include <sys/ktrace.h>
+
+#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
+
+#include <machine/asm_macro.h>   /* enable/disable interrupts */
 #include <machine/bugio.h>		/* bugreturn() */
 #include <machine/cpu.h>		/* DMT_VALID, etc. */
-#include <machine/asm_macro.h>   /* enable/disable interrupts */
+#include <machine/locore.h>
 #include <machine/m88100.h>		/* DMT_VALID, etc. */
 #ifdef MVME197
 #include <machine/m88110.h>		/* DMT_VALID, etc. */
 #endif
-#include <machine/locore.h>
-#include <machine/trap.h>
-#include <machine/psl.h>		/* FIP_E, etc. */
 #include <machine/pcb.h>		/* FIP_E, etc. */
+#include <machine/psl.h>		/* FIP_E, etc. */
+#include <machine/trap.h>
 
-#include <sys/systm.h>
-
-#if (DDB)
-   #include <machine/db_machdep.h>
-   #include <ddb/db_output.h>		/* db_printf()		*/
+#ifdef DDB
+#include <machine/db_machdep.h>
+#include <ddb/db_output.h>		/* db_printf()		*/
 #else 
-   #define PC_REGS(regs) ((regs->sxip & 2) ?  regs->sxip & ~3 : \
+#define PC_REGS(regs) ((regs->sxip & 2) ?  regs->sxip & ~3 : \
 	(regs->snip & 2 ? regs->snip & ~3 : regs->sfip & ~3))
-   #define inst_return(I) (((I)&0xfffffbffU) == 0xf400c001U ? TRUE : FALSE)
-   #define inst_call(I) ({ unsigned i = (I); \
+#define inst_return(I) (((I)&0xfffffbffU) == 0xf400c001U ? TRUE : FALSE)
+#define inst_call(I) ({ unsigned i = (I); \
 	   ((((i) & 0xf8000000U) == 0xc8000000U || /*bsr*/ \
       ((i) & 0xfffffbe0U) == 0xf400c800U)   /*jsr*/ \
 	   ? TRUE : FALSE) \
       ;})
-
 #endif /* DDB */
 #define SSBREAKPOINT (0xF000D1F8U) /* Single Step Breakpoint */
 
 #define TRAPTRACE
+
 #if defined(TRAPTRACE)
 unsigned traptrace = 0;
 #endif
 
 #if DDB
-   #define DEBUG_MSG db_printf
+#define DEBUG_MSG db_printf
 #else
-   #define DEBUG_MSG printf
+#define DEBUG_MSG printf
 #endif /* DDB */
 
 #define USERMODE(PSR)   (((struct psr*)&(PSR))->psr_mode == 0)
 #define SYSTEMMODE(PSR) (((struct psr*)&(PSR))->psr_mode != 0)
 
-/* XXX MAJOR CLEANUP REQUIRED TO PORT TO BSD */
+/* sigh */
+extern int procfs_domem __P((struct proc *, struct proc *, void *, struct uio *));
 
-extern int procfs_domem();
 extern void regdump __P((struct trapframe *f));
 
 char  *trap_type[] = {
@@ -136,7 +135,6 @@ static inline void
 userret(struct proc *p, struct m88100_saved_state *frame, u_quad_t oticks)
 {
 	int sig;
-	int s;
 
 	/* take pending signals */
 	while ((sig = CURSIG(p)) != 0)
@@ -145,18 +143,9 @@ userret(struct proc *p, struct m88100_saved_state *frame, u_quad_t oticks)
 
 	if (want_resched) {
 		/*
-		 * Since we are curproc, clock will normally just change
-		 * our priority without moving us from one queue to another
-		 * (since the running process is not on a queue.)
-		 * If that happened after we put ourselves on the run queue
-		 * but before we switched, we might not be on the queue
-		 * indicated by our priority.
+		 * We're being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		(void) splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -199,7 +188,7 @@ unsigned last_vector = 0;
 
 /*ARGSUSED*/
 void
-trap(unsigned type, struct m88100_saved_state *frame)
+trap18x(unsigned type, struct m88100_saved_state *frame)
 {
 	struct proc *p;
 	u_quad_t sticks = 0;
@@ -216,7 +205,6 @@ trap(unsigned type, struct m88100_saved_state *frame)
 	unsigned pc = PC_REGS(frame);  /* get program counter (sxip) */
 
 	extern vm_map_t kernel_map;
-	extern int fubail(), subail();
 	extern unsigned guarded_access_start;
 	extern unsigned guarded_access_end;
 	extern unsigned guarded_access_bad;
@@ -227,11 +215,7 @@ trap(unsigned type, struct m88100_saved_state *frame)
 		last_trap[2] = last_trap[3];
 		last_trap[3] = type;
 	}
-#if defined(UVM)
 	uvmexp.traps++;
-#else
-	cnt.v_trap++;
-#endif
 	if ((p = curproc) == NULL)
 		p = &proc0;
 
@@ -415,15 +399,13 @@ trap(unsigned type, struct m88100_saved_state *frame)
 		 */
 		if ((unsigned)map & 3) {
 			printf("map is not word aligned! 0x%x\n", map);
+#ifdef DDB
 			Debugger();
+#endif
 		}
 		if ((frame->dpfsr >> 16 & 0x7) == 0x4	     /* seg fault  */
 		    || (frame->dpfsr >> 16 & 0x7) == 0x5) {  /* page fault */
-#if defined(UVM)
 			result = uvm_fault(map, va, 0, ftype);
-#else
-			result = vm_fault(map, va, ftype, FALSE); 
-#endif
 			if (result == KERN_SUCCESS) {
 			/*
 			 * We could resolve the fault. Call
@@ -502,22 +484,20 @@ outtahere:
 		map = &vm->vm_map;
 		if ((unsigned)map & 3) {
 			printf("map is not word aligned! 0x%x\n", map);
+#ifdef DDB
 			Debugger();
+#endif
 		}
 		/* Call vm_fault() to resolve non-bus error faults */
 		if ((frame->ipfsr >> 16 & 0x7) != 0x3 &&
 		    (frame->dpfsr >> 16 & 0x7) != 0x3) {
-#if defined(UVM)
 			result = uvm_fault(map, va, 0, ftype);
-#else
-			result = vm_fault(map, va, ftype, FALSE); 
-#endif
 			frame->ipfsr = frame->dpfsr = 0;
 		}
 
 		if ((caddr_t)va >= vm->vm_maxsaddr) {
 			if (result == KERN_SUCCESS) {
-				nss = clrnd(btoc(USRSTACK - va));/* XXX check this */
+				nss = btoc(USRSTACK - va);/* XXX check this */
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
 			} else if (result == KERN_PROTECTION_FAILURE)
@@ -668,11 +648,7 @@ outtahere:
 		break;
 
 	case T_ASTFLT+T_USER:
-#if defined(UVM)
 		uvmexp.softs++;
-#else
-		cnt.v_soft++;
-#endif
 		want_ast = 0;
 		if (p->p_flag & P_OWEUPC) {
 			p->p_flag &= ~P_OWEUPC;
@@ -701,10 +677,11 @@ outtahere:
 	userret(p, frame, sticks);
 }
 #endif /* defined(MVME187) || defined(MVME188) */
-/*ARGSUSED*/
+
 #ifdef MVME197
+/*ARGSUSED*/
 void
-trap2(unsigned type, struct m88100_saved_state *frame)
+trap197(unsigned type, struct m88100_saved_state *frame)
 {
 	struct proc *p;
 	u_quad_t sticks = 0;
@@ -716,23 +693,16 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 	unsigned nss, fault_addr;
 	struct vmspace *vm;
 	union sigval sv;
-	int su = 0;
 	int result;
 	int sig = 0;
 	unsigned pc = PC_REGS(frame);  /* get program counter (sxip) */
-	unsigned dsr, isr, user = 0, write = 0, data = 0;
+	unsigned user = 0, write = 0, data = 0;
 
 	extern vm_map_t kernel_map;
-	extern int fubail(), subail();
 	extern unsigned guarded_access_start;
 	extern unsigned guarded_access_end;
-	extern unsigned guarded_access_bad;
 
-#if defined(UVM)
 	uvmexp.traps++;
-#else
-	cnt.v_trap++;
-#endif
 
 	if ((p = curproc) == NULL)
 		p = &proc0;
@@ -996,11 +966,7 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 		if (type == T_DATAFLT) {
 			if ((frame->dsr & CMMU_DSR_SI)	      /* seg fault  */
 			    || (frame->dsr & CMMU_DSR_PI)) { /* page fault */
-#if defined(UVM)
 				result = uvm_fault(map, va, 0, ftype);
-#else
-				result = vm_fault(map, va, ftype, FALSE); 
-#endif
 				if (result == KERN_SUCCESS) {
 					return;
 				}
@@ -1008,11 +974,7 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 		} else {
 			if ((frame->isr & CMMU_ISR_SI)	      /* seg fault  */
 			    || (frame->isr & CMMU_ISR_PI)) { /* page fault */
-#if defined(UVM)
 				result = uvm_fault(map, va, 0, ftype);
-#else
-				result = vm_fault(map, va, ftype, FALSE); 
-#endif
 				if (result == KERN_SUCCESS) {
 					return;
 				}
@@ -1057,11 +1019,7 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 		if (type == T_DATAFLT+T_USER) {
 			if ((frame->dsr & CMMU_DSR_SI)	      /* seg fault  */
 			    || (frame->dsr & CMMU_DSR_PI)) { /* page fault */
-#if defined(UVM)
 				result = uvm_fault(map, va, 0, ftype);
-#else
-				result = vm_fault(map, va, ftype, FALSE); 
-#endif
 				if (result == KERN_SUCCESS) {
 					return;
 				}
@@ -1069,11 +1027,7 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 		} else {
 			if ((frame->isr & CMMU_ISR_SI)	      /* seg fault  */
 			    || (frame->isr & CMMU_ISR_PI)) { /* page fault */
-#if defined(UVM)
 				result = uvm_fault(map, va, 0, ftype);
-#else
-				result = vm_fault(map, va, ftype, FALSE); 
-#endif
 				if (result == KERN_SUCCESS) {
 					return;
 				}
@@ -1082,7 +1036,7 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 
 		if ((caddr_t)va >= vm->vm_maxsaddr) {
 			if (result == KERN_SUCCESS) {
-				nss = clrnd(btoc(USRSTACK - va));/* XXX check this */
+				nss = btoc(USRSTACK - va);/* XXX check this */
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
 			} else if (result == KERN_PROTECTION_FAILURE)
@@ -1204,11 +1158,7 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 		break;
 
 	case T_ASTFLT+T_USER:
-#if defined(UVM)
 		uvmexp.softs++;
-#else
-		cnt.v_soft++;
-#endif
 		want_ast = 0;
 		if (p->p_flag & P_OWEUPC) {
 			p->p_flag &= ~P_OWEUPC;
@@ -1234,12 +1184,6 @@ trap2(unsigned type, struct m88100_saved_state *frame)
 	userret(p, frame, sticks);
 }
 
-void
-test_trap2(int num, int m197)
-{
-	DEBUG_MSG("\n[test_trap (Good News[tm]) m197 = %d, vec = %d]\n", m197, num);
-	bugreturn();
-}
 #endif /* MVME197 */
 
 void
@@ -1263,9 +1207,9 @@ error_fault(struct m88100_saved_state *frame)
 	DEBUG_MSG("last exception vector = %d\n", last_vector);
 #endif 
 #if DDB 
-	gimmeabreak();
+	Debugger();
 	DEBUG_MSG("You really can't restart after an error exception!\n");
-	gimmeabreak();
+	Debugger();
 #endif /* DDB */
 	bugreturn();  /* This gets us to Bug instead of a loop forever */
 }
@@ -1277,9 +1221,9 @@ error_reset(struct m88100_saved_state *frame)
 	DEBUG_MSG("This is usually caused by a branch to a NULL function pointer.\n");
 	DEBUG_MSG("e.g. jump to address 0.  Use the debugger trace command to track it down.\n");
 #if DDB 
-	gimmeabreak();
+	Debugger();
 	DEBUG_MSG("It's useless to restart after a reset exception! You might as well reboot.\n");
-	gimmeabreak();
+	Debugger();
 #endif /* DDB */
 	bugreturn();  /* This gets us to Bug instead of a loop forever */
 }
@@ -1298,11 +1242,7 @@ syscall(register_t code, struct m88100_saved_state *tf)
 	u_quad_t sticks;
 	extern struct pcb *curpcb;
 
-#if defined(UVM)
 	uvmexp.syscalls++;
-#else
-	cnt.v_syscall++;
-#endif
 
 	p = curproc;
 
@@ -1460,11 +1400,7 @@ m197_syscall(register_t code, struct m88100_saved_state *tf)
 	u_quad_t sticks;
 	extern struct pcb *curpcb;
 
-#if defined(UVM)
 	uvmexp.syscalls++;
-#else
-	cnt.v_syscall++;
-#endif
 
 	p = curproc;
 
@@ -1861,3 +1797,4 @@ register struct proc *p;
 	if (i < 0) return (EFAULT);
 	return (0);
 }
+

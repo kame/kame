@@ -1,4 +1,4 @@
-/*	$OpenBSD: be.c,v 1.26 2001/04/13 04:32:10 brad Exp $	*/
+/*	$OpenBSD: be.c,v 1.28 2001/07/30 21:50:06 jason Exp $	*/
 
 /*
  * Copyright (c) 1998 Theo de Raadt and Jason L. Wright.
@@ -219,6 +219,9 @@ beattach(parent, self, aux)
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS |
 	    IFF_MULTICAST;
 
+	IFQ_SET_MAXLEN(&ifp->if_snd, BE_TX_RING_SIZE);
+	IFQ_SET_READY(&ifp->if_snd);
+
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp);
@@ -255,8 +258,8 @@ bestart(ifp)
 	bix = sc->sc_last_td;
 
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
-		if (m == 0)
+		IFQ_DEQUEUE(&ifp->if_snd, m);
+		if (m == NULL)
 			break;
 
 #if NBPFILTER > 0
@@ -965,7 +968,6 @@ be_read(sc, idx, len)
 	int idx, len;
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	struct ether_header *eh;
 	struct mbuf *m;
 
 	if (len <= sizeof(struct ether_header) ||
@@ -988,8 +990,6 @@ be_read(sc, idx, len)
 	}
 	ifp->if_ipackets++;
 
-	/* We assume that the header fit entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
 
 #if NBPFILTER > 0
 	/*
@@ -999,9 +999,8 @@ be_read(sc, idx, len)
 	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
-	/* Pass the packet up, with the ether header sort-of removed. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	/* Pass the packet up. */
+	ether_input_mbuf(ifp, m);
 }
 
 /*

@@ -1,3 +1,5 @@
+/*	$OpenBSD: pmap_table.c,v 1.8 2001/09/11 20:05:24 miod Exp $	*/
+
 /* 
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -31,17 +33,13 @@
 #include <sys/param.h>
 #include <machine/m882xx.h>		/* CMMU stuff */
 #include <vm/vm.h>
-#include <vm/vm_kern.h>			/* vm/vm_kern.h */
 #include <machine/pmap_table.h>		/* pmap_table.h*/
 
 #define R VM_PROT_READ
 #define RW VM_PROT_READ|VM_PROT_WRITE
-#define C CACHE_DFL
 #define CW CACHE_WT
 #define CI CACHE_INH
 #define CG CACHE_GLOBAL
-#define PAGE M88K_PGBYTES
-#define SEG M88K_SGBYTES
 
 #undef VEQR_ADDR
 #define VEQR_ADDR 0
@@ -94,16 +92,13 @@ pmap_table_build(endoftext)
 		bt = m197_board_table;
 		break;
 #endif 
-	default:
-		panic("pmap_table_build: Unknown CPU type.");
-		/* NOT REACHED */
 	}
 
 	/* round off all entries to nearest segment */
 	pbt = bt;
 	for (i = 0; pbt->size != 0xffffffff; i++) {
 		if (pbt->size>0)
-			pbt->size = (pbt->size + M88K_PGBYTES-1) & ~(M88K_PGBYTES-1);
+			pbt->size = (pbt->size + PAGE_MASK) & ~PAGE_MASK;
 		pbt++;
 	}
 	return bt;

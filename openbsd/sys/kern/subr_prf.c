@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_prf.c,v 1.31 2001/02/22 19:33:22 mickey Exp $	*/
+/*	$OpenBSD: subr_prf.c,v 1.35 2001/09/05 22:32:39 deraadt Exp $	*/
 /*	$NetBSD: subr_prf.c,v 1.45 1997/10/24 18:14:25 chuck Exp $	*/
 
 /*-
@@ -73,7 +73,7 @@
 #include <ddb/db_output.h>	/* db_printf, db_putchar prototypes */
 extern	int db_radix;		/* XXX: for non-standard '%r' format */
 #endif
-#if defined(UVM) && defined(UVM_SWAP_ENCRYPT)
+#if defined(UVM_SWAP_ENCRYPT)
 extern int uvm_doswapencrypt;
 #endif
 
@@ -97,8 +97,8 @@ extern int uvm_doswapencrypt;
  * local prototypes
  */
 
-static int	 kprintf __P((const char *, int, void *, 
-				char *, va_list));
+static int	 kprintf __P((const char *, int, void *,
+		    char *, va_list));
 static void	 putchar __P((int, int, struct tty *));
 
 
@@ -146,8 +146,8 @@ void (*v_putc) __P((int)) = cnputc;	/* start with cnputc (normal cons) */
  */
 
 /*
- *      Partial support (the failure case) of the assertion facility
- *      commonly found in userland.
+ *	Partial support (the failure case) of the assertion facility
+ *	commonly found in userland.
  */
 void
 __assert(t, f, l, e)
@@ -174,7 +174,7 @@ tablefull(tab)
  * panic: handle an unresolvable fatal error
  *
  * prints "panic: <message>" and reboots.   if called twice (i.e. recursive
- * call) we avoid trying to sync the disk and just reboot (to avoid 
+ * call) we avoid trying to sync the disk and just reboot (to avoid
  * recursive panics).
  */
 
@@ -192,7 +192,7 @@ panic(fmt, va_alist)
 	va_list ap;
 
 	bootopt = RB_AUTOBOOT | RB_DUMP;
-#if defined(UVM) && defined(UVM_SWAP_ENCRYPT)
+#if defined(UVM_SWAP_ENCRYPT)
 	if (uvm_doswapencrypt)
 		bootopt &= ~RB_DUMP;
 #endif
@@ -203,6 +203,7 @@ panic(fmt, va_alist)
 		vsprintf(panicbuf, fmt, ap);
 		panicstr = panicbuf;
 	}
+	va_end(ap);
 
 	printf("panic: ");
 	va_start(ap, fmt);
@@ -252,8 +253,8 @@ log(level, fmt, va_alist)
 	logpri(level);		/* log the level first */
 	va_start(ap, fmt);
 	kprintf(fmt, TOLOG, NULL, NULL, ap);
-	splx(s);
 	va_end(ap);
+	splx(s);
 	if (!log_open) {
 		va_start(ap, fmt);
 		kprintf(fmt, TOCONS, NULL, NULL, ap);
@@ -299,8 +300,8 @@ addlog(fmt, va_alist)
 	s = splhigh();
 	va_start(ap, fmt);
 	kprintf(fmt, TOLOG, NULL, NULL, ap);
-	splx(s);
 	va_end(ap);
+	splx(s);
 	if (!log_open) {
 		va_start(ap, fmt);
 		kprintf(fmt, TOCONS, NULL, NULL, ap);
@@ -345,11 +346,11 @@ putchar(c, flags, tp)
 		mbp->msg_bufl = min(mbp->msg_bufl+1, mbp->msg_bufs);
 		if (mbp->msg_bufx < 0 || mbp->msg_bufx >= mbp->msg_bufs)
 			mbp->msg_bufx = 0;
-                /* If the buffer is full, keep the most recent data. */
-                if (mbp->msg_bufr == mbp->msg_bufx) {
-                         if (++mbp->msg_bufr >= mbp->msg_bufs)
-                                mbp->msg_bufr = 0;
-                }
+		/* If the buffer is full, keep the most recent data. */
+		if (mbp->msg_bufr == mbp->msg_bufx) {
+			if (++mbp->msg_bufr >= mbp->msg_bufs)
+				mbp->msg_bufr = 0;
+		}
 	}
 	if ((flags & TOCONS) && constty == NULL && c != '\0')
 		(*v_putc)(c);
@@ -428,7 +429,7 @@ tprintf_close(sess)
 }
 
 /*
- * tprintf: given tprintf handle to a process [obtained with tprintf_open], 
+ * tprintf: given tprintf handle to a process [obtained with tprintf_open],
  * send a message to the controlling tty for that process.
  *
  * => also sends message to /dev/klog
@@ -569,9 +570,9 @@ int
 sprintf(char *buf, const char *fmt, ...)
 #else
 sprintf(buf, fmt, va_alist)
-        char *buf;
-        const char *cfmt;
-        va_dcl
+	char *buf;
+	const char *cfmt;
+	va_dcl
 #endif
 {
 	int retval;
@@ -616,10 +617,10 @@ int
 snprintf(char *buf, size_t size, const char *fmt, ...)
 #else
 snprintf(buf, size, fmt, va_alist)
-        char *buf;
-        size_t size;
-        const char *cfmt;
-        va_dcl
+	char *buf;
+	size_t size;
+	const char *cfmt;
+	va_dcl
 #endif
 {
 	int retval;
@@ -641,10 +642,10 @@ snprintf(buf, size, fmt, va_alist)
  */
 int
 vsnprintf(buf, size, fmt, ap)
-        char *buf;
-        size_t size;
-        const char *fmt;
-        va_list ap;
+	char *buf;
+	size_t size;
+	const char *fmt;
+	va_list ap;
 {
 	int retval;
 	char *p;
@@ -660,7 +661,7 @@ vsnprintf(buf, size, fmt, ap)
 /*
  * kprintf: scaled down version of printf(3).
  *
- * this version based on vfprintf() from libc which was derived from 
+ * this version based on vfprintf() from libc which was derived from
  * software contributed to Berkeley by Chris Torek.
  *
  * Two additional formats:
@@ -807,11 +808,11 @@ rflag:		ch = *fmt++;
 reswitch:	switch (ch) {
 		/* XXX: non-standard '%:' format */
 #ifndef __powerpc__
-		case ':': 
+		case ':':
 			if (oflags != TOBUFONLY) {
 				cp = va_arg(ap, char *);
-				kprintf(cp, oflags, vp, 
-					NULL, va_arg(ap, va_list));
+				kprintf(cp, oflags, vp,
+				    NULL, va_arg(ap, va_list));
 			}
 			continue;	/* no output */
 #endif
@@ -822,11 +823,11 @@ reswitch:	switch (ch) {
 			_uquad = va_arg(ap, u_int);
 			b = va_arg(ap, char *);
 			if (*b == 8)
-				sprintf(buf, "%qo", _uquad);
+				sprintf(buf, "%llo", _uquad);
 			else if (*b == 10)
-				sprintf(buf, "%qd", _uquad);
+				sprintf(buf, "%lld", _uquad);
 			else if (*b == 16)
-				sprintf(buf, "%qx", _uquad);
+				sprintf(buf, "%llx", _uquad);
 			else
 				break;
 			b++;
@@ -865,9 +866,9 @@ reswitch:	switch (ch) {
 #ifdef DDB
 		/* XXX: non-standard '%r' format (print int in db_radix) */
 		case 'r':
-			if ((oflags & TODDB) == 0) 
+			if ((oflags & TODDB) == 0)
 				goto default_case;
-			
+
 			if (db_radix == 16)
 				goto case_z;	/* signed hex */
 			_uquad = SARG();
@@ -882,7 +883,7 @@ reswitch:	switch (ch) {
 		/* XXX: non-standard '%z' format ("signed hex", a "hex %i")*/
 		case 'z':
 		case_z:
-			if ((oflags & TODDB) == 0) 
+			if ((oflags & TODDB) == 0)
 				goto default_case;
 
 			xdigs = "0123456789abcdef";

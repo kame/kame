@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_fork.c,v 1.39 2001/04/02 21:43:11 niklas Exp $	*/
+/*	$OpenBSD: kern_fork.c,v 1.44 2001/10/14 14:39:03 art Exp $	*/
 /*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 
 /*
@@ -62,12 +62,8 @@
 #include <sys/syscallargs.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
 #include <uvm/uvm_map.h>
-#endif
 
 int	nprocs = 1;		/* process 0 */
 int	randompid;		/* when set to 1, pid's go random */
@@ -156,6 +152,13 @@ fork1(p1, exitsig, flags, stack, stacksize, retval)
 	extern void endtsleep __P((void *));
 	extern void realitexpire __P((void *));
 
+#ifndef RFORK_FDSHARE
+	/* XXX - Too dangerous right now. */
+	if (flags & FORK_SHAREFILES) {
+		return (EOPNOTSUPP);
+	}
+#endif
+
 	/*
 	 * Although process entries are dynamically created, we still keep
 	 * a global limit on the maximum number we will create. We reserve
@@ -167,11 +170,6 @@ fork1(p1, exitsig, flags, stack, stacksize, retval)
 		tablefull("proc");
 		return (EAGAIN);
 	}
-
-#if !defined(UVM)
-	if (flags & FORK_SHAREVM)
-		return (EINVAL);
-#endif
 
 	/*
 	 * Increment the count of procs running with this uid. Don't allow
@@ -186,15 +184,7 @@ fork1(p1, exitsig, flags, stack, stacksize, retval)
 	/*
 	 * Allocate a pcb and kernel stack for the process
 	 */
-#if defined(arc) || defined(mips_cachealias)
-	uaddr = kmem_alloc_upage(kernel_map, USPACE);
-#else
-#if defined(UVM)
 	uaddr = uvm_km_valloc(kernel_map, USPACE);
-#else
-	uaddr = kmem_alloc_pageable(kernel_map, USPACE);
-#endif
-#endif
 	if (uaddr == 0)
 		return ENOMEM;
 
@@ -355,50 +345,22 @@ again:
 	 */
 	PHOLD(p1);
 
-#if defined(UVM)
 	if (flags & FORK_VMNOSTACK) {
 		/* share as much address space as possible */
 		(void) uvm_map_inherit(&p1->p_vmspace->vm_map,
 		    VM_MIN_ADDRESS, VM_MAXUSER_ADDRESS - MAXSSIZ,
 		    VM_INHERIT_SHARE);
 	}
-#else
-	if (flags & FORK_VMNOSTACK) {
-		/* share as much address space as possible */
-		(void) vm_map_inherit(&p1->p_vmspace->vm_map,
-		    VM_MIN_ADDRESS, VM_MAXUSER_ADDRESS - MAXSSIZ,
-		    VM_INHERIT_SHARE);
-	}
-#endif
 
 	p2->p_addr = (struct user *)uaddr;
 
-#ifdef __FORK_BRAINDAMAGE
-	/*
-	 * Set return values for child before vm_fork,
-	 * so they can be copied to child stack.
-	 * We return 0, rather than the traditional behaviour of modifying the
-	 * return value in the system call stub.
-	 * NOTE: the kernel stack may be at a different location in the child
-	 * process, and thus addresses of automatic variables (including retval)
-	 * may be invalid after vm_fork returns in the child process.
-	 */
-	retval[0] = 0;
-	retval[1] = 1;
-	if (vm_fork(p1, p2, stack, stacksize))
-		return (0);
-#else
 	/*
 	 * Finish creating the child process.  It will return through a
 	 * different path later.
 	 */
-#if defined(UVM)
 	uvm_fork(p1, p2, ((flags & FORK_SHAREVM) ? TRUE : FALSE), stack,
 	    stacksize);
-#else /* UVM */
-	vm_fork(p1, p2, stack, stacksize);
-#endif /* UVM */
-#endif
+
 	vm = p2->p_vmspace;
 
 	if (flags & FORK_FORK) {
@@ -430,13 +392,11 @@ again:
 	 */
 	PRELE(p1);
 
-#if defined(UVM)
 	uvmexp.forks++;
 	if (flags & FORK_PPWAIT)
 		uvmexp.forks_ppwait++;
 	if (flags & FORK_SHAREVM)
 		uvmexp.forks_sharevm++;
-#endif
 
 	/*
 	 * tell any interested parties about the new process

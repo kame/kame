@@ -1,3 +1,5 @@
+/*	$OpenBSD: dart.c,v 1.12 2001/08/31 08:18:24 miod Exp $	*/
+
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -34,24 +36,24 @@
 #include <sys/time.h>
 #include <sys/device.h>
 #include <sys/simplelock.h>
-#include <machine/cpu.h>
-#include <machine/autoconf.h>
-#include <machine/cpu_number.h>
+#include <sys/syslog.h>
+
 #include <machine/asm_macro.h>   /* enable/disable interrupts */
+#include <machine/autoconf.h>
+#include <machine/cpu.h>
+#include <machine/cpu_number.h>
+#include <machine/psl.h>
+
 #include <dev/cons.h>
+
 #include <mvme88k/dev/sysconreg.h>
 #include <mvme88k/dev/dartreg.h>
-#include <sys/syslog.h>
+
 #include "dart.h"
-#include <machine/psl.h>
 #define spldart()	splx(IPL_TTY)
 
-#if defined(DDB)
-#include <machine/db_machdep.h>		/* for details on entering kdb */
-#define DDB_ENTER_BREAK 0x1
-#define DDB_ENTER_CHAR  0x2
-unsigned char ddb_break_mode = DDB_ENTER_BREAK;
-unsigned char ddb_break_char = 0;
+#ifdef	DDB
+#include <ddb/db_var.h>
 #endif
 
 #ifdef DEBUG
@@ -96,6 +98,14 @@ int dartcnprobe __P((struct consdev *cp));
 int dartcninit __P((struct consdev *cp));
 int dartcngetc __P((dev_t dev));
 void dartcnputc __P((dev_t dev, char c));
+int dart_speed __P((int));
+struct tty* darttty __P((dev_t));
+void dartstart __P((struct tty *));
+int dartmctl __P((dev_t, int, int));
+int dartparam __P((struct tty *, struct termios *));
+void dartmodemtrans __P((struct dartsoftc *, unsigned int, unsigned int));
+void dartrint __P((struct dartsoftc *, int));
+void dartxint __P((struct dartsoftc *, int));
 
 int dartopen __P((dev_t dev, int flag, int mode, struct proc *p));
 int dartclose __P((dev_t dev, int flag, int mode, struct proc *p));
@@ -178,7 +188,7 @@ dartmatch(parent, vcf, args)
 	if (cputyp != CPU_188) return (0);
 	ca->ca_vaddr = ca->ca_paddr; /* 1:1 */
 	addr = (union dartreg *)ca->ca_vaddr;
-	if (badvaddr(addr, 2) <= 0) {
+	if (badvaddr((vaddr_t)addr, 2) <= 0) {
 		printf("==> dart: failed address check.\n");
 		return (0);
 	}
@@ -479,7 +489,7 @@ dartmctl (dev, flags, how)
 		addr->write.wr_oprreset = newflags;
 		break;
 	case DMGET:
-		panic("dartmctl: DMGET not supported (yet)\n");
+		panic("dartmctl: DMGET not supported (yet)");
 		break;
 	}
 
@@ -661,7 +671,7 @@ dartparam(tp, t)
 		/* hang up on zero baud rate */
 		if (tp->t_ispeed == 0) {
 			dprintf(("dartparam: ispeed == 0 -> HUP\n"));
-			dartmctl(tp, HUPCL, DMSET);
+			dartmctl(dev, HUPCL, DMSET);
 			return 0;
 		} else {
 			/* set baudrate */
@@ -973,9 +983,9 @@ dartrint(sc, port)
 			ptaddr->write.wr_cr = ERRRESET;
 
 #if defined(DDB)
-			if (ddb_break_mode & DDB_ENTER_BREAK) {
+			if (db_console != 0) {
 				dprintf(("dartrint: break detected - entering debugger\n"));
-				gimmeabreak();
+				Debugger();
 			}
 #endif
 		} else {
@@ -991,13 +1001,7 @@ dartrint(sc, port)
 				ptaddr->write.wr_cr = ERRRESET;
 			} else {
 				/* no errors */
-#if defined(DDB)
-				if ((ddb_break_mode & DDB_ENTER_CHAR) && (ddb_break_char == data)) {
-					dprintf(("dartrint: ddb_break_char detected - entering debugger\n"));
-					gimmeabreak();
-				} else
-#endif
-					(*linesw[tp->t_line].l_rint)(data,tp);
+				(*linesw[tp->t_line].l_rint)(data,tp);
 #if 0
 				{
 					if (tp->t_ispeed == B134) /* CS6 */
@@ -1231,7 +1235,10 @@ dartcngetc(dev)
 	int c;		/* received character */
 	int s;
 	int port;
+#if 1
+#else
 	m88k_psr_type psr;
+#endif
 	char buf[] = "char x";
 
 	port = DART_PORT(dev);

@@ -1,4 +1,4 @@
-/* $OpenBSD: osf1_descrip.c,v 1.1 2000/08/04 15:47:54 ericj Exp $ */
+/* $OpenBSD: osf1_descrip.c,v 1.6 2001/05/14 13:28:23 art Exp $ */
 /* $NetBSD: osf1_descrip.c,v 1.5 1999/06/26 01:24:41 cgd Exp $ */
 
 /*
@@ -249,20 +249,7 @@ osf1_sys_fstat(p, v, retval)
 	    (fp->f_iflags & FIF_WANTCLOSE) != 0) */
 		return (EBADF);
 
-	switch (fp->f_type) {
-
-	case DTYPE_VNODE:
-		error = vn_stat((struct vnode *)fp->f_data, &ub, p);
-		break;
-
-	case DTYPE_SOCKET:
-		error = soo_stat((struct socket *)fp->f_data, &ub);
-		break;
-
-	default:
-		panic("ofstat");
-		/*NOTREACHED*/
-	}
+	error = (*fp->f_ops->fo_stat)(fp, &ub, p);
 	osf1_cvt_stat_from_native(&ub, &oub);
 	if (error == 0)
 		error = copyout((caddr_t)&oub, (caddr_t)SCARG(uap, sb),

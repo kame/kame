@@ -1,4 +1,4 @@
-/*      $OpenBSD: isp_openbsd.h,v 1.13 2001/04/04 22:08:08 mjacob Exp $ */
+/*      $OpenBSD: isp_openbsd.h,v 1.16 2001/09/01 07:16:40 mjacob Exp $ */
 /*
  * OpenBSD Specific definitions for the Qlogic ISP Host Adapter
  */
@@ -49,8 +49,6 @@
 #include <scsi/scsi_debug.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
 
 
 #define	ISP_PLATFORM_VERSION_MAJOR	2
@@ -339,9 +337,15 @@ isp_wait_complete(struct ispsoftc *isp)
 	if (MUST_POLL(isp)) {
 		int usecs = 0;
 		while (usecs < 2 * 1000000) {
-			(void) isp_intr(isp);
+			u_int16_t isr, sema, mbox;
 			if (isp->isp_mboxbsy == 0) {
 				break;
+			}
+			if (ISP_READ_ISR(isp, &isr, &sema, &mbox)) {
+				isp_intr(isp, isr, sema, mbox);
+				if (isp->isp_mboxbsy == 0) {
+					break;
+				}
 			}
 			USEC_DELAY(500);
 			usecs += 500;

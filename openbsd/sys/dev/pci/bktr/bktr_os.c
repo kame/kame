@@ -1,4 +1,4 @@
-/*	$OpenBSD: bktr_os.c,v 1.1 2001/03/28 03:27:09 fgsch Exp $	*/
+/*	$OpenBSD: bktr_os.c,v 1.6 2001/09/11 20:05:25 miod Exp $	*/
 /* $FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.20 2000/10/20 08:16:53 roger Exp $ */
 
 /*
@@ -78,7 +78,6 @@
 #include <sys/vnode.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 
@@ -1381,7 +1380,7 @@ bktr_attach(struct device *parent, struct device *self, void *aux)
 				PCI_MAPREG_TYPE_MEM
 				| PCI_MAPREG_MEM_TYPE_32BIT, 0,
 				&bktr->memt, &bktr->memh, NULL,
-				&bktr->obmemsz);
+				&bktr->obmemsz, 0);
 	DPR(("pci_mapreg_map: memt %x, memh %x, size %x\n",
 	     bktr->memt, (u_int)bktr->memh, (u_int)bktr->obmemsz));
 	if (retval) {
@@ -1398,8 +1397,7 @@ bktr_attach(struct device *parent, struct device *self, void *aux)
 	/*
 	 * map interrupt
 	 */
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n",
 		       bktr_name(bktr));
 		return;
@@ -1499,9 +1497,6 @@ get_bktr_mem(bktr, dmapp, size)
                 bus_dmamem_free(dmat, &seg, rseg);
                 return 0;
         }
-#ifdef __OpenBSD__
-        bktr->dm_mapsize = size;
-#endif
         /*
          * Create and locd the DMA map for the DMA area
          */
@@ -1531,11 +1526,7 @@ free_bktr_mem(bktr, dmap, kva)
 {
         bus_dma_tag_t dmat = bktr->dmat;
 
-#ifdef __NetBSD__ 
         bus_dmamem_unmap(dmat, (caddr_t)kva, dmap->dm_mapsize);
-#else
-        bus_dmamem_unmap(dmat, (caddr_t)kva, bktr->dm_mapsize);
-#endif
         bus_dmamem_free(dmat, dmap->dm_segs, 1);
         bus_dmamap_destroy(dmat, dmap);
 }
@@ -1568,7 +1559,7 @@ bktr_open(dev_t dev, int flags, int fmt, struct proc *p)
 	unit = UNIT(dev);
 
 	/* unit out of range */
-	if ((unit > bktr_cd.cd_ndevs) || (bktr_cd.cd_devs[unit] == NULL))
+	if ((unit >= bktr_cd.cd_ndevs) || (bktr_cd.cd_devs[unit] == NULL))
 		return(ENXIO);
 
 	bktr = bktr_cd.cd_devs[unit];

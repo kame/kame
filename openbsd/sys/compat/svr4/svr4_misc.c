@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_misc.c,v 1.29 2001/01/23 05:48:04 csapuntz Exp $	 */
+/*	$OpenBSD: svr4_misc.c,v 1.35 2001/08/28 18:25:14 jason Exp $	 */
 /*	$NetBSD: svr4_misc.c,v 1.42 1996/12/06 03:22:34 christos Exp $	 */
 
 /*
@@ -42,6 +42,7 @@
 #include <sys/namei.h>
 #include <sys/dirent.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <sys/time.h>
@@ -53,6 +54,7 @@
 #include <sys/ktrace.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
+#include <sys/pool.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
 #include <sys/socket.h>
@@ -89,9 +91,7 @@
 
 #include <vm/vm.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 static __inline clock_t timeval_to_clock_t __P((struct timeval *));
 static int svr4_setinfo	__P((struct proc *, int, svr4_siginfo_t *));
@@ -368,7 +368,7 @@ svr4_sys_mmap(p, v, retval)
 	SCARG(&mm, addr) = SCARG(uap, addr);
 	SCARG(&mm, pos) = SCARG(uap, pos);
 
-	rp = (void *) round_page(p->p_vmspace->vm_daddr + MAXDSIZ);
+	rp = (void *) round_page((vaddr_t)p->p_vmspace->vm_daddr + MAXDSIZ);
 	if ((SCARG(&mm, flags) & MAP_FIXED) == 0 &&
 	    SCARG(&mm, addr) != 0 && SCARG(&mm, addr) < rp)
 		SCARG(&mm, addr) = rp;
@@ -402,7 +402,7 @@ svr4_sys_mmap64(p, v, retval)
 	SCARG(&mm, addr) = SCARG(uap, addr);
 	SCARG(&mm, pos) = SCARG(uap, pos);
 
-	rp = (void *) round_page(p->p_vmspace->vm_daddr + MAXDSIZ);
+	rp = (void *) round_page((vaddr_t)p->p_vmspace->vm_daddr + MAXDSIZ);
 	if ((SCARG(&mm, flags) & MAP_FIXED) == 0 &&
 	    SCARG(&mm, addr) != 0 && SCARG(&mm, addr) < rp)
 		SCARG(&mm, addr) = rp;
@@ -565,12 +565,14 @@ svr4_sys_sysconfig(p, v, retval)
 	case SVR4_CONFIG_RTSIG_MAX:
 		*retval = 0;
 		break;
+#ifdef SYSVSEM
 	case SVR4_CONFIG_SEM_NSEMS_MAX:
 		*retval = seminfo.semmni;
 		break;
 	case SVR4_CONFIG_SEM_VALUE_MAX:
 		*retval = seminfo.semvmx;
 		break;
+#endif
 	case SVR4_CONFIG_SIGQUEUE_MAX:
 		*retval = 0;	/* XXX: Don't know */
 		break;
@@ -582,18 +584,10 @@ svr4_sys_sysconfig(p, v, retval)
 		*retval = 3;	/* XXX: real, virtual, profiling */
 		break;
 	case SVR4_CONFIG_PHYS_PAGES:
-#if defined(UVM)
 		*retval = uvmexp.npages;
-#else
-		*retval = cnt.v_free_count;	/* XXX: free instead of total */
-#endif
 		break;
 	case SVR4_CONFIG_AVPHYS_PAGES:
-#if defined(UVM)
 		*retval = uvmexp.active;	/* XXX: active instead of avg */
-#else
-		*retval = cnt.v_active_count;	/* XXX: active instead of avg */
-#endif
 		break;
 	default:
 		return EINVAL;
@@ -666,7 +660,7 @@ svr4_sys_break(p, v, retval)
 	register int    diff;
 
 	old = (vaddr_t) vm->vm_daddr;
-	new = round_page(SCARG(uap, nsize));
+	new = round_page((vaddr_t)SCARG(uap, nsize));
 	diff = new - old;
 
 	DPRINTF(("break(1): old %lx new %lx diff %x\n", old, new, diff));
@@ -682,15 +676,11 @@ svr4_sys_break(p, v, retval)
 	DPRINTF(("break(3): old %lx new %lx diff %x\n", old, new, diff));
 
 	if (diff > 0) {
-#if defined(UVM)
 		rv = uvm_map(&vm->vm_map, &old, diff, NULL, UVM_UNKNOWN_OFFSET,
 			UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
 				    UVM_ADV_NORMAL,
 				    UVM_FLAG_AMAPPAD|UVM_FLAG_FIXED|
 				    UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW));
-#else
-		rv = vm_allocate(&vm->vm_map, &old, diff, FALSE);
-#endif
 		if (rv != KERN_SUCCESS) {
 			uprintf("sbrk: grow failed, return = %d\n", rv);
 			return ENOMEM;
@@ -698,11 +688,7 @@ svr4_sys_break(p, v, retval)
 		vm->vm_dsize += btoc(diff);
 	} else if (diff < 0) {
 		diff = -diff;
-#if defined(UVM)
 		rv = uvm_deallocate(&vm->vm_map, new, diff);
-#else
-		rv = vm_deallocate(&vm->vm_map, new, diff);
-#endif
 		if (rv != KERN_SUCCESS) {
 			uprintf("sbrk: shrink failed, return = %d\n", rv);
 			return ENOMEM;
@@ -907,8 +893,6 @@ svr4_sys_pgrpsys(p, v, retval)
 	}
 }
 
-#define syscallarg(x)   union { x datum; register_t pad; }
-
 struct svr4_hrtcntl_args {
 	syscallarg(int) 			cmd;
 	syscallarg(int) 			fun;
@@ -1046,23 +1030,22 @@ svr4_setinfo(p, st, s)
 
 
 int
-svr4_sys_waitsys(p, v, retval) 
-	register struct proc *p;
+svr4_sys_waitsys(q, v, retval) 
+	struct proc *q;
 	void *v;
 	register_t *retval;
 {
 	struct svr4_sys_waitsys_args *uap = v;
 	int nfound;
 	int error;
-	struct proc *q, *t;
-
+	struct proc *p, *t;
 
 	switch (SCARG(uap, grp)) {
 	case SVR4_P_PID:	
 		break;
 
 	case SVR4_P_PGID:
-		SCARG(uap, id) = -p->p_pgid;
+		SCARG(uap, id) = -q->p_pgid;
 		break;
 
 	case SVR4_P_ALL:
@@ -1070,117 +1053,81 @@ svr4_sys_waitsys(p, v, retval)
 		break;
 
 	default:
-		return EINVAL;
+		return (EINVAL);
 	}
 
-	DPRINTF(("waitsys(%d, %d, %p, %x)\n", 
-	         SCARG(uap, grp), SCARG(uap, id),
-		 SCARG(uap, info), SCARG(uap, options)));
+	DPRINTF(("waitsys(%d, %d, %p, %x)\n", SCARG(uap, grp), SCARG(uap, id),
+	    SCARG(uap, info), SCARG(uap, options)));
 
 loop:
 	nfound = 0;
-	for (q = p->p_children.lh_first; q != 0; q = q->p_sibling.le_next) {
+	for (p = q->p_children.lh_first; p != 0; p = p->p_sibling.le_next) {
 		if (SCARG(uap, id) != WAIT_ANY &&
-		    q->p_pid != SCARG(uap, id) &&
-		    q->p_pgid != -SCARG(uap, id)) {
-			DPRINTF(("pid %d pgid %d != %d\n", q->p_pid,
-				 q->p_pgid, SCARG(uap, id)));
+		    p->p_pid != SCARG(uap, id) &&
+		    p->p_pgid != -SCARG(uap, id)) {
+			DPRINTF(("pid %d pgid %d != %d\n", p->p_pid,
+				 p->p_pgid, SCARG(uap, id)));
 			continue;
 		}
 		nfound++;
-		if (q->p_stat == SZOMB && 
+		if (p->p_stat == SZOMB && 
 		    ((SCARG(uap, options) & (SVR4_WEXITED|SVR4_WTRAPPED)))) {
 			*retval = 0;
-			DPRINTF(("found %d\n", q->p_pid));
-			if ((error = svr4_setinfo(q, q->p_xstat,
-						  SCARG(uap, info))) != 0)
-				return error;
+			DPRINTF(("found %d\n", p->p_pid));
+			error = svr4_setinfo(p, p->p_xstat, SCARG(uap, info));
+			if (error)
+				return (error);
 
-
-		        if ((SCARG(uap, options) & SVR4_WNOWAIT)) {
+			if ((SCARG(uap, options) & SVR4_WNOWAIT)) {
 				DPRINTF(("Don't wait\n"));
-				return 0;
+				return (0);
 			}
 
 			/*
 			 * If we got the child via a ptrace 'attach',
 			 * we need to give it back to the old parent.
 			 */
-			if (q->p_oppid && (t = pfind(q->p_oppid))) {
-				q->p_oppid = 0;
-				proc_reparent(q, t);
+			if (p->p_oppid && (t = pfind(p->p_oppid))) {
+				p->p_oppid = 0;
+				proc_reparent(p, t);
 				psignal(t, SIGCHLD);
 				wakeup((caddr_t)t);
-				return 0;
-			}
-			q->p_xstat = 0;
-			ruadd(&p->p_stats->p_cru, q->p_ru);
-			FREE(q->p_ru, M_ZOMBIE);
-
-			/*
-			 * Decrement the count of procs running with this uid.
-			 */
-			(void)chgproccnt(q->p_cred->p_ruid, -1);
-
-			/*
-			 * Free up credentials.
-			 */
-			if (--q->p_cred->p_refcnt == 0) {
-				crfree(q->p_cred->pc_ucred);
-				FREE(q->p_cred, M_SUBPROC);
+				return (0);
 			}
 
-			/*
-			 * Release reference to text vnode
-			 */
-			if (q->p_textvp)
-				vrele(q->p_textvp);
+			scheduler_wait_hook(q, p);
+			p->p_xstat = 0;
+			ruadd(&q->p_stats->p_cru, p->p_ru);
 
-			/*
-			 * Finally finished with old proc entry.
-			 * Unlink it from its process group and free it.
-			 */
-			leavepgrp(q);
-			LIST_REMOVE(q, p_list);	/* off zombproc */
-			LIST_REMOVE(q, p_sibling);
-
-			/*
-			 * Give machine-dependent layer a chance
-			 * to free anything that cpu_exit couldn't
-			 * release while still running in process context.
-			 */
-			cpu_wait(q);
-			FREE(q, M_PROC);
-			nprocs--;
-			return 0;
+			proc_zap(p);
+			return (0);
 		}
-		if (q->p_stat == SSTOP && (q->p_flag & P_WAITED) == 0 &&
-		    (q->p_flag & P_TRACED ||
-		     (SCARG(uap, options) & (SVR4_WSTOPPED|SVR4_WCONTINUED)))) {
-			DPRINTF(("jobcontrol %d\n", q->p_pid));
-		        if (((SCARG(uap, options) & SVR4_WNOWAIT)) == 0)
-				q->p_flag |= P_WAITED;
+		if (p->p_stat == SSTOP && (p->p_flag & P_WAITED) == 0 &&
+		    (p->p_flag & P_TRACED ||
+		    (SCARG(uap, options) & (SVR4_WSTOPPED|SVR4_WCONTINUED)))) {
+			DPRINTF(("jobcontrol %d\n", p->p_pid));
+			if (((SCARG(uap, options) & SVR4_WNOWAIT)) == 0)
+				p->p_flag |= P_WAITED;
 			*retval = 0;
-			return svr4_setinfo(q, W_STOPCODE(q->p_xstat),
-					    SCARG(uap, info));
+			return (svr4_setinfo(p, W_STOPCODE(p->p_xstat),
+			   SCARG(uap, info)));
 		}
 	}
 
 	if (nfound == 0)
-		return ECHILD;
+		return (ECHILD);
 
 	if (SCARG(uap, options) & SVR4_WNOHANG) {
 		*retval = 0;
 		if ((error = svr4_setinfo(NULL, 0, SCARG(uap, info))) != 0)
-			return error;
-		return 0;
+			return (error);
+		return (0);
 	}
 
-	if ((error = tsleep((caddr_t)p, PWAIT | PCATCH, "svr4_wait", 0)) != 0)
-		return error;
+	if ((error = tsleep((caddr_t)q, PWAIT | PCATCH, "svr4_wait", 0)) != 0)
+		return (error);
 	goto loop;
 }
-
 
 static void
 bsd_statfs_to_svr4_statvfs(bfs, sfs)

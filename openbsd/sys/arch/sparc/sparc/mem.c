@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.13 2001/01/31 16:11:34 art Exp $	*/
+/*	$OpenBSD: mem.c,v 1.17 2001/09/19 20:50:57 mickey Exp $	*/
 /*	$NetBSD: mem.c,v 1.13 1996/03/30 21:12:16 christos Exp $ */
 
 /*
@@ -58,7 +58,7 @@
 #include <machine/conf.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 extern vaddr_t prom_vstart;
 extern vaddr_t prom_vend;
@@ -121,13 +121,8 @@ mmrw(dev, uio, flags)
 				return (error);
 		}
 		physlock = 1;
-#if defined(UVM)
 		if (mem_page == 0)
 			mem_page = uvm_km_valloc_wait(kernel_map, NBPG);
-#else
-		if (mem_page == 0)
-			mem_page = kmem_alloc_pageable(kernel_map, NBPG);
-#endif
 		if (mem_page == 0)
 			panic("mmrw: out of space in kernel_map");
 	}
@@ -151,7 +146,7 @@ mmrw(dev, uio, flags)
 			}
 			pmap_enter(pmap_kernel(), mem_page,
 			    trunc_page(pa), uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
+			    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)mem_page + o, c, uio);
@@ -169,15 +164,9 @@ mmrw(dev, uio, flags)
 				c = min(iov->iov_len, prom_vend - prom_vstart);
 			} else {
 				c = min(iov->iov_len, MAXPHYS);
-#if defined(UVM)
 				if (!uvm_kernacc((caddr_t)va, c,
 				    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
 					return (EFAULT);
-#else
-				if (!kernacc((caddr_t)va, c,
-				    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
-					return (EFAULT);
-#endif
 			}
 			error = uiomove((caddr_t)va, c, uio);
 			continue;
@@ -209,10 +198,10 @@ mmrw(dev, uio, flags)
 			}
 			if (zeropage == NULL) {
 				zeropage = (caddr_t)
-				    malloc(CLBYTES, M_TEMP, M_WAITOK);
-				bzero(zeropage, CLBYTES);
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				bzero(zeropage, PAGE_SIZE);
 			}
-			c = min(iov->iov_len, CLBYTES);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(zeropage, c, uio);
 			continue;
 

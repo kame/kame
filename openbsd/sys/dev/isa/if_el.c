@@ -1,4 +1,4 @@
-/*    $OpenBSD: if_el.c,v 1.13 2001/02/20 19:39:40 mickey Exp $       */
+/*    $OpenBSD: if_el.c,v 1.16 2001/06/27 06:34:45 kjc Exp $       */
 /*	$NetBSD: if_el.c,v 1.39 1996/05/12 23:52:32 mycroft Exp $	*/
 
 /*
@@ -53,10 +53,6 @@
 
 #include <dev/isa/isavar.h>
 #include <dev/isa/if_elreg.h>
-
-#define ETHER_MIN_LEN	64
-#define ETHER_MAX_LEN	1518
-#define	ETHER_ADDR_LEN	6
 
 /* for debugging convenience */
 #ifdef EL_DEBUG
@@ -191,6 +187,7 @@ elattach(parent, self, aux)
 	ifp->if_ioctl = elioctl;
 	ifp->if_watchdog = elwatchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Now we can attach the interface. */
 	dprintf(("Attaching interface...\n"));
@@ -320,7 +317,7 @@ elstart(ifp)
 	 */
 	for (;;) {
 		/* Dequeue the next datagram. */
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 
 		/* If there's nothing to send, return. */
 		if (m0 == 0)
@@ -497,7 +494,6 @@ elread(sc, len)
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct mbuf *m;
-	struct ether_header *eh;
 
 	if (len <= sizeof(struct ether_header) ||
 	    len > ETHER_MAX_LEN) {
@@ -516,9 +512,6 @@ elread(sc, len)
 
 	ifp->if_ipackets++;
 
-	/* We assume that the header fit entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	/*
 	 * Check if there's a BPF listener on this interface.
@@ -528,9 +521,7 @@ elread(sc, len)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
 
-	/* We assume that the header fit entirely in one mbuf. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	ether_input_mbuf(ifp, m);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pdqvar.h,v 1.11 1999/02/26 01:44:33 art Exp $	*/
+/*	$OpenBSD: pdqvar.h,v 1.13 2001/09/19 20:50:58 mickey Exp $	*/
 /*	$NetBSD: pdqvar.h,v 1.11 1996/10/25 21:33:37 cgd Exp $	*/
 
 /*-
@@ -71,7 +71,7 @@ enum _pdq_type_t {
 #endif /* M_CAST */
 #include <sys/malloc.h>
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #define	PDQ_USE_MBUFS
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -95,13 +95,8 @@ enum _pdq_type_t {
 #define	PDQ_OS_MEMALLOC_CONTIG(n)	vm_page_alloc_contig(n, 0, 0xffffffff, PAGE_SIZE)
 #define	PDQ_OS_MEMFREE_CONTIG(p, n)	kmem_free(kernel_map, (vm_offset_t) p, n)
 #else
-#if defined(UVM)
 #define	PDQ_OS_MEMALLOC_CONTIG(n)	uvm_km_alloc(kernel_map, round_page(n))
 #define	PDQ_OS_MEMFREE_CONTIG(p, n)	uvm_km_free(kernel_map, (vaddr_t) p, n)
-#else
-#define	PDQ_OS_MEMALLOC_CONTIG(n)	kmem_alloc(kernel_map, round_page(n))
-#define	PDQ_OS_MEMFREE_CONTIG(p, n)	kmem_free(kernel_map, (vm_offset_t) p, n)
-#endif
 #endif /* __FreeBSD__ */
 
 #if defined(__FreeBSD__)

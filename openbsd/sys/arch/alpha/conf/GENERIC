@@ -1,15 +1,10 @@
-#	$OpenBSD: GENERIC,v 1.75 2001/04/21 20:19:27 aaron Exp $
+#	$OpenBSD: GENERIC,v 1.89 2001/10/09 21:20:20 nate Exp $
 #	$NetBSD: GENERIC,v 1.31 1996/12/03 17:25:29 cgd Exp $
-#
-# Generic Alpha kernel.  Enough to get booted, etc., but not much more.
 
 machine	alpha
 
 include "../../../conf/GENERIC"
 maxusers	32
-
-option		PMAP_NEW	# required
-option		UVM		# required
 
 # CPU Support
 option		DEC_3000_500	# Flamingo etc:	3000/[4-9]00*
@@ -20,7 +15,7 @@ option		DEC_AXPPCI_33	# NoName:	AXPpci33, etc.
 option		DEC_EB164	# EB164:	AlphaPC 164
 option		DEC_2000_300	# "Jensen":	2000/300 (DECpc AXP 150)
 option		DEC_550		# Miata:	Digital Personal Workstation
-option		DEC_6600	# EV6:		264DP OEM Board
+option		DEC_6600	# EV6:		XP1000, 264DP OEM Board
 option		API_UP1000	# EV6:		Alpha Processor UP1000
 
 option		COMPAT_OSF1	# OSF/1 binary compatibility
@@ -37,14 +32,16 @@ option		PCIVERBOSE		# recognize "unknown" PCI devices
 option		TCVERBOSE		# recognize "unknown" TC devices
 option		USBVERBOSE
 
+option		USER_PCICONF		# user-space PCI configuration
+
 config		bsd	swap generic
 
 mainbus0 at	root
 cpu*	at	mainbus0
 
 # PCI USB Controllers
-uhci*	at pci?				# Universal Host Controller (Intel)
-ohci*	at pci?				# Open Host Controller
+uhci*	at pci? disable			# Universal Host Controller (Intel)
+ohci*	at pci?	disable			# Open Host Controller
 
 # USB bus support
 usb*	at uhci?
@@ -130,10 +127,8 @@ ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
 scsibus* at ahc?
 isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
 scsibus* at isp?
-ncr*	at pci? dev ? function ?	# NCR 53c8xx SCSI (old)
-scsibus* at ncr?
-#siop*	at pci? dev ? function ?	# NCR 53c8xx SCSI (new)
-#scsibus* at siop?
+siop*	at pci? dev ? function ?	# NCR 53c8xx SCSI
+scsibus* at siop?
 
 #UNTESTED: the following three drivers are untested.
 adw*	at pci? dev ? function ?	# AdvanSys ULTRA WIDE SCSI
@@ -142,12 +137,14 @@ dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID PCI
 scsibus* at dpt?
 gdt*	at pci? dev ? function ?	# ICP Vortex GDT RAID controllers
 scsibus* at gdt?
+twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
+scsibus*	at twe?
 
 #BROKEN: adv and twe have 64-bit problems
 #adv*	at pci? dev ? function ?	# AdvanSys 1200A/B and ULTRA SCSI
 #scsibus* at adv?
-#twe*	at pci? dev ? function ?	# 3ware Escalade RAID controllers
-#scsibus*	at twe?
+#ami*	at pci? dev ? function ?	# AMI MegaRAID controllers
+#scsibus*	at ami?
 
 # PCI Network devices
 de*	at pci? dev ? function ?	# 21x4[012]-based Ethernet
@@ -155,7 +152,10 @@ ne*	at pci? dev ? function ?	# NE2000-compat ethernet cards
 fxp*	at pci? dev ? function ?	# EtherExpress 10/100B ethernet
 ep*	at pci? dev ? function ?	# 3COM 3c59x
 xl*	at pci? dev ? function ?	# 3COM 3c9xx
+txp*	at pci? dev ? function ?	# 3COM 3CR990
 fpa*	at pci? dev ? function ?	# DEC DEFPA FDDI cards
+wx*	at pci? dev ? function ?	# Intel Pro/1000 ethernet
+bge*	at pci? dev ? function ?	# Broadcom BCM570x (aka Tigon3)
 
 #UNTESTED:  the vollowing section of drivers is untested on alpha.
 en*	at pci? dev ? function ?	# ENI PCI ATM (untested)
@@ -171,7 +171,7 @@ dc*	at pci? dev ? function ?	# 21143, "tulip" clone ethernet
 ti*	at pci? dev ? function ?	# Alteon Tigon 1Gb ethernet
 skc*	at pci? dev ? function ?	# SysKonnect GEnesis 984x
 sk*	at skc?				#  each port of above
-wx*	at pci? dev ? function ?	# Intel Pro/1000 ethernet
+an*	at pci? dev ? function ?	# Cisco/Aironet 802.11DS
 
 #BROKEN:  The following two drivers have 64-bit issues
 #tx*	at pci? dev ? function ?	# SMC 83C170 EPIC ethernet
@@ -189,6 +189,7 @@ iophy*	at mii? phy ?			# Intel 82553 PHYs
 icsphy*	at mii? phy ?			# ICS 1890 PHYs
 lxtphy*	at mii? phy ?			# Level1 LXT970 PHYs
 nsphy*	at mii? phy ?			# NS and compatible PHYs
+nsphyter*	at mii? phy ?		# NS and compatible PHYs
 qsphy*	at mii? phy ?			# Quality Semi QS6612 PHYs
 sqphy*	at mii? phy ?			# Seeq 8x220 PHYs
 rlphy*	at mii? phy ?			# RealTek 8139 internal PHYs
@@ -293,8 +294,10 @@ wskbd*		at	pckbd?
 wsmouse*	at	pms?
 
 # crypto support
-#BROKEN: The following two drivers are broken because of 64-bit issues.
-#hifn*	at pci? dev ? function ?	# Hi/fn 7751 crypto card
+hifn*	at pci? dev ? function ?	# Hi/fn 7751 crypto card
 #ubsec*	at pci? dev ? function ?	# Bluesteel Networks 5xxx crypto card
+#ises*	at pci? dev ? function ?	# Pijnenburg PCC-ISES
 
 #pseudo-device	raid		4	# RAIDframe disk driver
+pseudo-device	crypto		1
+

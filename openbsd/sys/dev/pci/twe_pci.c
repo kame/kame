@@ -1,4 +1,4 @@
-/*	$OpenBSD: twe_pci.c,v 1.3 2000/12/07 20:49:36 mickey Exp $	*/
+/*	$OpenBSD: twe_pci.c,v 1.5 2001/08/25 10:13:30 art Exp $	*/
 
 /*
  * Copyright (c) 2000 Michael Shalayeff
@@ -87,7 +87,7 @@ twe_pci_attach(parent, self, aux)
 	pcireg_t csr;
 
 	if (pci_mapreg_map(pa, TWE_BAR, PCI_MAPREG_TYPE_IO, 0,
-	    &sc->iot, &sc->ioh, NULL, &size)) {
+	    &sc->iot, &sc->ioh, NULL, &size, 0)) {
 		printf(": can't map controller i/o space\n");
 		return;
 	}
@@ -98,8 +98,7 @@ twe_pci_attach(parent, self, aux)
 	pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
 	    csr | PCI_COMMAND_MASTER_ENABLE);
 
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": can't map interrupt\n");
 		bus_space_unmap(sc->iot, sc->ioh, size);
 		return;

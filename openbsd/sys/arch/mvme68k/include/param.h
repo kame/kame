@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.8 2000/02/22 19:27:53 deraadt Exp $ */
+/*	$OpenBSD: param.h,v 1.12 2001/07/06 02:07:42 provos Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -62,6 +62,11 @@
 #define	PGSHIFT		12		/* LOG2(NBPG) */
 #define	NBPG		(1 << PGSHIFT)	/* bytes/page */
 #define	PGOFSET		(NBPG-1)	/* byte offset into page */
+
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
 #define	SEGSHIFT	22		/* LOG2(NBSEG) */
@@ -77,10 +82,6 @@
 #define	BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(64 * 1024)	/* max raw I/O transfer size */
 
-#define	CLSIZELOG2	0
-#define	CLSIZE		(1 << CLSIZELOG2)
-
-/* NOTE: SSIZE, SINCR and UPAGES must be multiples of CLSIZE */
 #define	SSIZE		1		/* initial stack size/NBPG */
 #define	SINCR		1		/* increment of stack/NBPG */
 #define	UPAGES		2		/* pages of u-area */
@@ -88,12 +89,12 @@
 
 /*
  * Constants related to network buffer management.
- * MCLBYTES must be no larger than CLBYTES (the software page size), and,
+ * MCLBYTES must be no larger than the software page size, and,
  * on machines that exchange pages of input or output buffers with mbuf
  * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
  * of the hardware page size.
  */
-#define	MSIZE		128		/* size of an mbuf */
+#define	MSIZE		256		/* size of an mbuf */
 #define	MCLSHIFT	11
 #define	MCLBYTES	(1 << MCLSHIFT)	/* large enough for ether MTU */
 #define	MCLOFSET	(MCLBYTES - 1)
@@ -109,10 +110,10 @@
 #define MSGBUFSIZE	4096
 
 /*
- * Size of kernel malloc arena in CLBYTES-sized logical pages
+ * Size of kernel malloc arena in logical pages
  */ 
 #ifndef	NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(2048 * 1024 / CLBYTES)
+#define	NKMEMCLUSTERS	(2048 * 1024 / PAGE_SIZE)
 #endif
 
 /* pages ("clicks") to disk blocks */

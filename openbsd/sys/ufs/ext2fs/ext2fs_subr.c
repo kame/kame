@@ -1,4 +1,4 @@
-/*	$OpenBSD: ext2fs_subr.c,v 1.3 1997/06/12 21:09:35 downsj Exp $	*/
+/*	$OpenBSD: ext2fs_subr.c,v 1.6 2001/09/18 01:39:13 art Exp $	*/
 /*	$NetBSD: ext2fs_subr.c,v 1.1 1997/06/11 09:34:03 bouyer Exp $	*/
 
 /*
@@ -40,14 +40,14 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <ufs/ext2fs/ext2fs.h>
-#include <ufs/ext2fs/ext2fs_extern.h>
-
-#ifdef _KERNEL
 #include <sys/vnode.h>
 #include <sys/buf.h>
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
+#include <ufs/ext2fs/ext2fs.h>
+#include <ufs/ext2fs/ext2fs_extern.h>
+
+#ifdef _KERNEL
 
 /*
  * Return buffer with the contents of block "offset" from the beginning of
@@ -55,33 +55,26 @@
  * remaining space in the directory.
  */
 int
-ext2fs_blkatoff(v)
-	void *v;
+ext2fs_bufatoff(struct inode *ip, off_t offset, char **res, struct buf **bpp)
 {
-	struct vop_blkatoff_args /* {
-		struct vnode *a_vp;
-		off_t a_offset;
-		char **a_res;
-		struct buf **a_bpp;
-	} */ *ap = v;
-	struct inode *ip;
-	register struct m_ext2fs *fs;
+	struct vnode *vp;
+	struct m_ext2fs *fs;
 	struct buf *bp;
-	daddr_t lbn;
+	ufs_daddr_t lbn;
 	int error;
 
-	ip = VTOI(ap->a_vp);
+	vp = ITOV(ip);
 	fs = ip->i_e2fs;
-	lbn = lblkno(fs, ap->a_offset);
+	lbn = lblkno(fs, offset);
 
-	*ap->a_bpp = NULL;
-	if ((error = bread(ap->a_vp, lbn, fs->e2fs_bsize, NOCRED, &bp)) != 0) {
+	*bpp = NULL;
+	if ((error = bread(vp, lbn, fs->e2fs_bsize, NOCRED, &bp)) != 0) {
 		brelse(bp);
 		return (error);
 	}
-	if (ap->a_res)
-		*ap->a_res = (char *)bp->b_data + blkoff(fs, ap->a_offset);
-	*ap->a_bpp = bp;
+	if (res)
+		*res = (char *)bp->b_data + blkoff(fs, offset);
+	*bpp = bp;
 	return (0);
 }
 #endif
@@ -92,8 +85,8 @@ ext2fs_checkoverlap(bp, ip)
 	struct buf *bp;
 	struct inode *ip;
 {
-	register struct buf *ebp, *ep;
-	register daddr_t start, last;
+	struct buf *ebp, *ep;
+	ufs_daddr_t start, last;
 	struct vnode *vp;
 
 	ebp = &buf[nbuf];

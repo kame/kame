@@ -1,4 +1,4 @@
-/*	$OpenBSD: aac_pci.c,v 1.1 2000/11/10 09:39:36 niklas Exp $	*/
+/*	$OpenBSD: aac_pci.c,v 1.6 2001/09/16 18:31:22 art Exp $	*/
 
 /*-
  * Copyright (c) 2000 Michael Smith
@@ -32,7 +32,7 @@
 
 /*
  * This driver would not have rewritten for OpenBSD if it was not for the
- * hardware dontion from Nocom.  I want to thank them for their support.
+ * hardware donation from Nocom.  I want to thank them for their support.
  * Of course, credit should go to Mike Smith for the original work he did
  * in the FreeBSD driver where I found lots of inspiration.
  * - Niklas Hallqvist
@@ -65,18 +65,46 @@ void	aac_pci_attach __P((struct device *, struct device *, void *));
 struct aac_ident {
 	u_int16_t vendor;
 	u_int16_t device;
+	u_int16_t subvendor;
+	u_int16_t subdevice;
 	int	hwif;
 } aac_identifiers[] = {
-	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_2SI, AAC_HWIF_I960RX },
-	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI, AAC_HWIF_I960RX },
-	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3SI, AAC_HWIF_I960RX },
-	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AAC2622, AAC_HWIF_I960RX },
-	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AAC364, AAC_HWIF_STRONGARM },
-	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AAC3642, AAC_HWIF_STRONGARM },
-	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_PERC_2QC, AAC_HWIF_STRONGARM },
-	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_PERC_3QC, AAC_HWIF_STRONGARM },
-	{ PCI_VENDOR_HP, PCI_PRODUCT_HP_NETRAID_4M, AAC_HWIF_STRONGARM },
-	{ 0, 0, 0 }
+	/* Dell PERC 2/Si models */
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_2SI, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_DELL_PERC_2SI, AAC_HWIF_I960RX },
+	/* Dell PERC 3/Di models */
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_DELL_PERC_3DI, AAC_HWIF_I960RX },
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_DELL_PERC_3DI_SUB2, AAC_HWIF_I960RX },
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_DELL_PERC_3DI_SUB3, AAC_HWIF_I960RX },
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3DI_2, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_DELL_PERC_3DI_2_SUB, AAC_HWIF_I960RX },
+	/* Dell PERC 3/Si models */
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3SI, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_DELL_PERC_3SI, AAC_HWIF_I960RX },
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3SI_2, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_DELL_PERC_3SI_2_SUB, AAC_HWIF_I960RX },
+	/* Adaptec ADP-2622 */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AAC2622, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AAC2622, AAC_HWIF_I960RX },
+	/* Adaptec ADP-364 */
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AAC364, AAC_HWIF_STRONGARM },
+	/* Adaptec ADP-3642 */
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AAC3642, AAC_HWIF_STRONGARM },
+	/* Dell PERC 2/QC */
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_PERC_2QC, AAC_HWIF_STRONGARM },
+	/* Dell PERC 3/QC */
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_PERC_3QC, AAC_HWIF_STRONGARM },
+	/* HP NetRAID-4M */
+	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_HP,
+	    PCI_PRODUCT_HP_NETRAID_4M, AAC_HWIF_STRONGARM },
+	{ 0, 0, 0, 0 }
 };
 
 struct cfattach aac_pci_ca = {
@@ -94,11 +122,17 @@ aac_pci_probe(parent, match, aux)
 {
         struct pci_attach_args *pa = aux;
 	struct aac_ident *m;
+	u_int32_t subsysid;
 
 	for (m = aac_identifiers; m->vendor != 0; m++)
 		if (m->vendor == PCI_VENDOR(pa->pa_id) &&
-		    m->device == PCI_PRODUCT(pa->pa_id))
-			return (1);
+		    m->device == PCI_PRODUCT(pa->pa_id)) {
+			subsysid = pci_conf_read(pa->pa_pc, pa->pa_tag,
+			    PCI_SUBSYS_ID_REG);
+			if (m->subvendor == PCI_VENDOR(subsysid) &&
+			    m->subdevice == PCI_PRODUCT(subsysid))
+				return (1);
+		}
 	return (0);
 }
 
@@ -117,6 +151,7 @@ aac_pci_attach(parent, self, aux)
 	const char *intrstr;
 	int state = 0;
 	struct aac_ident *m;
+	u_int32_t subsysid;
 
 	printf(": ");
 
@@ -142,14 +177,13 @@ aac_pci_attach(parent, self, aux)
 	 */
 	if (pci_mapreg_map(pa, PCI_MAPREG_START,
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0, &sc->sc_memt,
-	    &sc->sc_memh, &membase, &memsize)) {
+	    &sc->sc_memh, &membase, &memsize, AAC_REGSIZE)) {
 		printf("can't find mem space\n");
 		goto bail_out;
 	}
 	state++;
 
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-	    &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("couldn't map interrupt\n");
 		goto bail_out;
 	}
@@ -172,21 +206,26 @@ aac_pci_attach(parent, self, aux)
 	for (m = aac_identifiers; m->vendor != 0; m++)
 		if (m->vendor == PCI_VENDOR(pa->pa_id) &&
 		    m->device == PCI_PRODUCT(pa->pa_id)) {
-			sc->sc_hwif = m->hwif;
-			switch(sc->sc_hwif) {
-			case AAC_HWIF_I960RX:
-				AAC_DPRINTF(AAC_D_MISC,
-				    ("set hardware up for i960Rx"));
-				sc->sc_if = aac_rx_interface;
-				break;
+			subsysid = pci_conf_read(pa->pa_pc, pa->pa_tag,
+			    PCI_SUBSYS_ID_REG);
+			if (m->subvendor == PCI_VENDOR(subsysid) &&
+			    m->subdevice == PCI_PRODUCT(subsysid)) {
+				sc->sc_hwif = m->hwif;
+				switch(sc->sc_hwif) {
+				case AAC_HWIF_I960RX:
+					AAC_DPRINTF(AAC_D_MISC,
+					    ("set hardware up for i960Rx"));
+					sc->sc_if = aac_rx_interface;
+					break;
 
-			case AAC_HWIF_STRONGARM:
-				AAC_DPRINTF(AAC_D_MISC,
-				    ("set hardware up for StrongARM"));
-				sc->sc_if = aac_sa_interface;
+				case AAC_HWIF_STRONGARM:
+					AAC_DPRINTF(AAC_D_MISC,
+					    ("set hardware up for StrongARM"));
+					sc->sc_if = aac_sa_interface;
+					break;
+				}
 				break;
 			}
-			break;
 		}
 
 	if (aac_attach(sc))

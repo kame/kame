@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.36 2001/04/15 02:35:09 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.41 2001/09/11 13:11:18 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.23 1996/03/17 01:02:29 thorpej Exp $	*/
 
 /*-
@@ -45,8 +45,8 @@
 #define BSD4_3	1
 #define BSD4_4	1
 
-#define OpenBSD	200105		/* OpenBSD version (year & month). */
-#define OpenBSD2_9 1		/* OpenBSD 2.9 */
+#define OpenBSD	200111		/* OpenBSD version (year & month). */
+#define OpenBSD3_0 1		/* OpenBSD 3.0 */
 
 #ifndef NULL
 #ifdef 	__GNUG__
@@ -115,8 +115,10 @@
 #define	PUSER	50
 #define	MAXPRI	127		/* Priorities range from 0 through MAXPRI. */
 
-#define	PRIMASK	0x0ff
-#define	PCATCH	0x100		/* OR'd with pri for tsleep to check signals */
+#define	PRIMASK		0x0ff
+#define	PCATCH		0x100	/* OR'd with pri for tsleep to check signals */
+#define PNORELOCK	0x200	/* OR'd with pri for ltsleep to not relock
+				   the interlock */
 
 #define	NBPW	sizeof(int)	/* number of bytes per word (integer) */
 
@@ -124,27 +126,6 @@
 #define	NODEV	(dev_t)(-1)	/* non-existent device */
 #define NETDEV	(dev_t)(-2)	/* network device (for nfs swap) */
 	
-/*
- * Clustering of hardware pages on machines with ridiculously small
- * page sizes is done here.  The paging subsystem deals with units of
- * CLSIZE pte's describing NBPG (from machine/param.h) pages each.
- */
-#define	CLBYTES		(CLSIZE*NBPG)
-#define	CLOFSET		(CLSIZE*NBPG-1)	/* for clusters, like PGOFSET */
-#define	claligned(x)	((((int)(x))&CLOFSET)==0)
-#define	CLOFF		CLOFSET
-#define	CLSHIFT		(PGSHIFT+CLSIZELOG2)
-
-#if CLSIZE==1
-#define	clbase(i)	(i)
-#define	clrnd(i)	(i)
-#else
-/* Give the base virtual address (first of CLSIZE). */
-#define	clbase(i)	((i) &~ (CLSIZE-1))
-/* Round a number of clicks up to a whole cluster. */
-#define	clrnd(i)	(((i) + (CLSIZE-1)) &~ (CLSIZE-1))
-#endif
-
 #define	CBLOCK	64		/* Clist block size, must be a power of 2. */
 #define CBQSIZE	(CBLOCK/NBBY)	/* Quote bytes/cblock - can do better. */
 				/* Data chars/clist. */
@@ -211,11 +192,11 @@
  * always allocate and free physical memory; requests for these
  * size allocations should be done infrequently as they will be slow.
  *
- * Constraints: CLBYTES <= MAXALLOCSAVE <= 2 ** (MINBUCKET + 14), and
+ * Constraints: PAGE_SIZE <= MAXALLOCSAVE <= 2 ** (MINBUCKET + 14), and
  * MAXALLOCSIZE must be a power of two.
  */
 #define MINBUCKET	4		/* 4 => min allocation of 16 bytes */
-#define MAXALLOCSAVE	(2 * CLBYTES)
+#define MAXALLOCSAVE	(2 * PAGE_SIZE)
 
 /*
  * Scale factor for scaled integers used to count %cpu time and load avgs.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_stat.c,v 1.5 1999/09/22 01:35:01 kstailey Exp $	*/
+/*	$OpenBSD: netbsd_stat.c,v 1.11 2001/05/15 08:04:31 deraadt Exp $	*/
 /*
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -195,26 +195,8 @@ netbsd_sys___fstat13(p, v, retval)
 	if ((u_int)fd >= fdp->fd_nfiles ||
 	    (fp = fdp->fd_ofiles[fd]) == NULL)
 		return (EBADF);
-	switch (fp->f_type) {
 
-	case DTYPE_VNODE:
-		error = vn_stat((struct vnode *)fp->f_data, &sb, p);
-		break;
-
-	case DTYPE_SOCKET:
-		error = soo_stat((struct socket *)fp->f_data, &sb);
-		break;
-
-#ifndef OLD_PIPE
-	case DTYPE_PIPE:
-		error = pipe_stat((struct pipe *)fp->f_data, &sb);
-		break;
-#endif
-
-	default:
-		panic("fstat");
-		/*NOTREACHED*/
-	}
+	error = (*fp->f_ops->fo_stat)(fp, &sb, p);
 	if (error)
 		return (error);
 	openbsd_to_netbsd_stat(&sb, &nsb);

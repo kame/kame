@@ -1,4 +1,4 @@
-/*	$OpenBSD: svr4_exec.c,v 1.10 2000/08/23 16:33:20 brad Exp $	 */
+/*	$OpenBSD: svr4_exec.c,v 1.12 2001/09/19 13:28:43 art Exp $	 */
 /*	$NetBSD: svr4_exec.c,v 1.16 1995/10/14 20:24:20 christos Exp $	 */
 
 /*
@@ -41,8 +41,6 @@
 
 #include <sys/mman.h>
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_map.h>
 
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -78,7 +76,7 @@ struct emul emul_svr4 = {
 	SVR4_AUX_ARGSIZ,
 	svr4_copyargs,
 	setregs,
-	exec_elf_fixup,
+	exec_elf32_fixup,
 	svr4_sigcode,
 	svr4_esigcode,
 };
@@ -92,7 +90,7 @@ svr4_copyargs(pack, arginfo, stack, argp)
 {
 	AuxInfo *a;
 
-	if (!(a = (AuxInfo *)elf_copyargs(pack, arginfo, stack, argp)))
+	if (!(a = (AuxInfo *)elf32_copyargs(pack, arginfo, stack, argp)))
 		return (NULL);
 #ifdef SVR4_COMPAT_SOLARIS2
 	if (pack->ep_emul_arg) {

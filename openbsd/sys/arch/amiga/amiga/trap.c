@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.19 2000/11/10 18:15:35 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.22 2001/09/13 15:35:05 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.56 1997/07/16 00:01:47 is Exp $	*/
 
 /*
@@ -60,9 +60,7 @@
 #include <sys/user.h>
 #include <vm/pmap.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 #include <machine/psl.h>
 #include <machine/trap.h>
@@ -206,7 +204,7 @@ userret(p, pc, oticks)
 	int pc;
 	u_quad_t oticks;
 {
-	int sig, s;
+	int sig;
 
 	while ((sig = CURSIG(p)) != 0)
 		postsig(sig);
@@ -215,18 +213,9 @@ userret(p, pc, oticks)
 
 	if (want_resched) {
 		/*
-		 * Since we are curproc, clock will normally just change
-		 * our priority without moving us from one queue to another
-		 * (since the running process is not on a queue.)
-		 * If that happened after we setrunqueue ourselves but before
-		 * we switch'ed, we might not be on the queue indicated by
-		 * our priority.
+		 * We're being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -391,7 +380,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	 */
 	nss = 0;
 	if (map != kernel_map && (caddr_t)va >= vm->vm_maxsaddr) {
-		nss = clrnd(btoc(USRSTACK - (unsigned)va));
+		nss = btoc(USRSTACK - (unsigned)va);
 		if (nss > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur)) {
 			rv = KERN_FAILURE;
 			goto nogo;
@@ -404,11 +393,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 		printf("vm_fault(%p,%lx,%d,0)\n", map, va, ftype);
 #endif
 
-#if defined(UVM)
 	rv = uvm_fault(map, va, 0, ftype);
-#else
-	rv = vm_fault(map, va, ftype, FALSE);
-#endif
 
 #ifdef DEBUG
 	if (mmudebug)
@@ -485,7 +470,7 @@ trapmmufault(type, code, v, fp, p, sticks)
 	 */
 	if (map != kernel_map && (caddr_t)va >= vm->vm_maxsaddr) {
 		if (rv == KERN_SUCCESS) {
-			nss = clrnd(btoc(USRSTACK-(unsigned)va));
+			nss = btoc(USRSTACK-(unsigned)va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 		} else if (rv == KERN_PROTECTION_FAILURE)
@@ -551,11 +536,7 @@ trap(type, code, v, frame)
 
 	p = curproc;
 	typ = ucode = 0;
-#if defined(UVM)
 	uvmexp.traps++;
-#else
-	cnt.v_trap++;
-#endif
 
 	if (USERMODE(frame.f_sr)) {
 		type |= T_USER;
@@ -825,11 +806,7 @@ syscall(code, frame)
 	extern struct emul emul_sunos;
 #endif
 
-#if defined(UVM)
 	uvmexp.syscalls++;
-#else
-	cnt.v_syscall++;
-#endif
 	if (!USERMODE(frame.f_sr))
 		panic("syscall");
 	p = curproc;
@@ -1033,15 +1010,9 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 			if (mmudebug)
 				printf("wb3: need to bring in first page\n");
 #endif
-#if defined(UVM)
 			wb_rc = uvm_fault(wb_map, 
 			    trunc_page((vm_offset_t)wb_addr), 
 			    0, VM_PROT_READ | VM_PROT_WRITE);
-#else
-			wb_rc = vm_fault(wb_map, 
-			    trunc_page((vm_offset_t)wb_addr), 
-			    VM_PROT_READ | VM_PROT_WRITE, FALSE);
-#endif
 
 			if (wb_rc != KERN_SUCCESS)
 				return (wb_rc);
@@ -1072,15 +1043,9 @@ _write_back (wb, wb_sts, wb_data, wb_addr, wb_map)
 				    "  Bringing in extra page.\n", wb);
 #endif
 
-#if defined(UVM)
 			wb_rc = uvm_fault(wb_map,
 			    trunc_page((vm_offset_t)wb_addr + wb_extra_page),
 			    0, VM_PROT_READ | VM_PROT_WRITE);
-#else
-			wb_rc = vm_fault(wb_map, 
-			    trunc_page((vm_offset_t)wb_addr + wb_extra_page),
-			    VM_PROT_READ | VM_PROT_WRITE, FALSE);
-#endif
 
 			if (wb_rc != KERN_SUCCESS)
 				return (wb_rc);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tropic.c,v 1.1 1999/12/27 21:51:35 fgsch Exp $	*/
+/*	$OpenBSD: tropic.c,v 1.4 2001/08/19 15:07:30 miod Exp $	*/
 /*	$NetBSD: tropic.c,v 1.6 1999/12/17 08:26:31 fvdl Exp $	*/
 
 /* 
@@ -47,6 +47,7 @@
 #include <sys/ioctl.h>
 #include <sys/errno.h>
 #include <sys/device.h>
+#include <sys/timeout.h>
 
 #include <net/if.h>
 #include <net/if_llc.h>
@@ -90,7 +91,6 @@ void	tr_xint __P((struct tr_softc *));
 void	tr_oldxint __P((struct tr_softc *));
 struct	mbuf *tr_get __P((struct tr_softc *, int, struct ifnet *));
 void	tr_opensap __P((struct tr_softc *, u_char));
-void	tr_timeout __P((void *));
 int	tr_mbcopy __P((struct tr_softc *, bus_size_t, struct mbuf *));
 void	tr_bcopy __P((struct tr_softc *, u_char *, int));
 void	tr_start __P((struct ifnet *));
@@ -352,6 +352,9 @@ tr_attach(sc)
 		ifp->if_start = tr_oldstart;
 	ifp->if_flags = IFF_BROADCAST | IFF_NOTRAILERS;
 	ifp->if_watchdog = tr_watchdog;
+#ifdef notyet /* if_tokensubr.c hasn't been converted yet */
+	IFQ_SET_READY(&ifp->if_snd);
+#endif
 
 	switch (MM_INB(sc, TR_MEDIAS_OFFSET)) {
 	case 0xF:
@@ -736,7 +739,7 @@ next:
 		return;
 
 	/* if data in queue, copy mbuf chain to fast path buffers */
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 
 	if (m0 == 0)
 		return;
@@ -801,9 +804,6 @@ next:
 	goto next;
 #endif
 }
-
-
-#define	IF_EMPTYQUEUE(queue) ((queue).ifq_head == 0)
 
 /*
  *  tr_intr - interrupt handler.  Find the cause of the interrupt and
@@ -897,7 +897,6 @@ tr_intr(arg)
 						    sc->sc_xmit_buffers);
 #endif
 						sc->sc_xmit_correlator = 0;
-						untimeout(tr_timeout, sc);
 						wakeup(&sc->tr_sleepevent);
 					}
 					else
@@ -913,7 +912,10 @@ tr_intr(arg)
  * XXX untimeout depending on the error, timeout in other cases
  * XXX error 0x24 && autospeed mode: open again !!!!
  */
-					timeout(tr_init, sc, hz*30);
+					if (!timeout_initialized(&sc->init_timeout))
+						timeout_set(&sc->init_timeout,
+						    tr_init, sc);
+					timeout_add(&sc->init_timeout, hz * 30);
 				}
 				break;
 
@@ -926,12 +928,10 @@ tr_intr(arg)
 					ifp->if_flags &= ~IFF_RUNNING;
 					ifp->if_flags &= ~IFF_UP;
 					ifp->if_flags &= ~IFF_OACTIVE;
-					untimeout(tr_timeout, sc);
 					wakeup(&sc->tr_sleepevent);
 				}
 				break;
 			case DIR_SET_DEFAULT_RING_SPEED:
-				untimeout(tr_timeout, sc);
 				wakeup(&sc->tr_sleepevent);
 				break;
 
@@ -944,7 +944,6 @@ tr_intr(arg)
 					        SRB_OPNSAP_STATIONID);
 				printf("%s: Token Ring opened\n",
 				    sc->sc_dev.dv_xname);
-				untimeout(tr_timeout, sc);
 				wakeup(&sc->tr_sleepevent);
 				break;
 /* XXX DLC_CLOSE_SAP not needed ? */
@@ -1043,8 +1042,11 @@ tr_intr(arg)
 					    sc->sc_dev.dv_xname);
 					ifp->if_flags &= ~IFF_RUNNING;
 					ifp->if_flags &= ~IFF_UP;
-					if_qflush(&ifp->if_snd);
-					timeout(tr_reinit, sc ,hz*30);
+					IFQ_PURGE(&ifp->if_snd);
+					if (!timeout_initialized(&sc->reinit_timeout))
+						timeout_set(&sc->reinit_timeout,
+						    tr_reinit, sc);
+					timeout_add(&sc->reinit_timeout, hz * 30);
 				}
 				else {
 #ifdef TROPICDEBUG
@@ -1117,7 +1119,7 @@ tr_intr(arg)
  * XXX should this be done here ?
  */
 				/* if data on send queue */
-				if (!IF_EMPTYQUEUE(ifp->if_snd))
+				if (!IFQ_IS_EMPTY(&ifp->if_snd))
 					tr_oldstart(ifp);
 				break;
 
@@ -1351,7 +1353,7 @@ struct tr_softc *sc;
  * XXX what's command here ?  command = 0x0d (always ?)
  */
 		/* if data in queue, copy mbuf chain to DHB */
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (m0 != 0) {
 #if NBPFILTER > 0
 			if (ifp->if_bpf)
@@ -1560,7 +1562,7 @@ caddr_t data;
 			}
 			arp_ifinit(&sc->sc_arpcom, ifa);
 			break;
-#endif INET
+#endif /* INET */
 		default:
 			/* XXX if not running */
 			if ((ifp->if_flags & IFF_RUNNING) == 0) {
@@ -1718,8 +1720,11 @@ void
 tr_sleep(sc)
 struct tr_softc *sc;
 {
-	timeout(tr_timeout, sc, hz*30);
-	sleep(&sc->tr_sleepevent, 1);
+	int error;
+
+	error = tsleep(&sc->tr_sleepevent, 1, "trsleep", hz * 30);
+	if (error == EWOULDBLOCK)
+		printf("%s: sleep event timeout\n", sc->sc_dev.dv_xname);
 }
 
 void
@@ -1732,17 +1737,4 @@ struct ifnet	*ifp;
 	++ifp->if_oerrors;
 
 	tr_reset(sc);
-}
-
-/*
- *  tr_timeout - timeout routine if adapter does not open in 30 seconds
- */
-void
-tr_timeout(arg)
-void	*arg;
-{
-	struct tr_softc *sc = arg;
-
-	printf("Token Ring timeout\n");
-	wakeup(&sc->tr_sleepevent);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.10 2001/03/16 00:03:58 miod Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.14 2001/09/28 20:49:17 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -59,27 +59,24 @@
 struct	device *parsedisk __P((char *, int, int, dev_t *));
 void	setroot __P((void));
 void	swapconf __P((void));
-void	configure __P((void));
 char	buginchr __P((void));
 int	getsb __P((char *, int));
 void	dumpconf __P((void));
 int	findblkmajor __P((struct device *));
 struct device	*getdisk __P((char *, int, int, dev_t *));
 
-int cold;   /* 1 if still booting */
+int cold = 1;   /* 1 if still booting */
 
-/* XXX must be allocated statically because of early console init */
-struct   map extiomap[EIOMAPSIZE/16];
-extern   void *extiobase;
+void *bootaddr;
+int bootpart;
 
 /*
  * called at boot time, configure all devices on the system.
  */
 void
-configure()
+cpu_configure()
 {
 	bootdv = NULL; /* set by device drivers (if found) */
-/*	rminit(extiomap, (long)EIOMAPSIZE, (long)1, "extio", EIOMAPSIZE/16);*/
 
 	if (config_rootfound("mainbus", "mainbus") == 0)
 		panic("no mainbus found");
@@ -161,7 +158,7 @@ getdisk(str, len, defpart, devp)
 		for (dv = alldevs.tqh_first; dv != NULL;
 		    dv = dv->dv_list.tqe_next) {
 			if (dv->dv_class == DV_DISK)
-				printf(" %s[a-h]", dv->dv_xname);
+				printf(" %s[a-p]", dv->dv_xname);
 #ifdef NFSCLIENT
 			if (dv->dv_class == DV_IFNET)
 				printf(" %s", dv->dv_xname);

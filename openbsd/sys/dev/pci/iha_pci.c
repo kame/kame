@@ -1,4 +1,4 @@
-/*	$OpenBSD: iha_pci.c,v 1.2 2001/03/29 23:53:38 krw Exp $ */
+/*	$OpenBSD: iha_pci.c,v 1.6 2001/10/07 23:19:55 jason Exp $ */
 /*
  * Initio INI-9xxxU/UW SCSI Device Driver
  *
@@ -53,14 +53,14 @@
 
 #include <dev/ic/iha.h>
 
-static int  iha_pci_probe  __P((struct device *, void *, void *));
-static void iha_pci_attach __P((struct device *, struct device *, void *));
+int  iha_pci_probe  __P((struct device *, void *, void *));
+void iha_pci_attach __P((struct device *, struct device *, void *));
 
 struct cfattach iha_pci_ca = {
 	sizeof(struct iha_softc), iha_pci_probe, iha_pci_attach
 };
 
-static int
+int
 iha_pci_probe(parent, match, aux)
 	struct device *parent;
 	void *match;
@@ -73,12 +73,18 @@ iha_pci_probe(parent, match, aux)
 		case PCI_PRODUCT_INITIO_INIC940:
 		case PCI_PRODUCT_INITIO_INIC950:
 			return (1);
-	}
+		}
+
+	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_DTCTECH)
+		switch (PCI_PRODUCT(pa->pa_id)) {
+		case PCI_PRODUCT_DTCTECH_DMX3194U:
+			return (1);
+		}
 
 	return (0);
 }
 
-static void
+void
 iha_pci_attach(parent, self, aux)
 	struct device *parent;
 	struct device *self;
@@ -103,7 +109,7 @@ iha_pci_attach(parent, self, aux)
 	 *	 rather that IO mapping, but it didn't work at all..
 	 */
 	ioh_valid = pci_mapreg_map(pa, PCI_MAPREG_START, PCI_MAPREG_TYPE_IO, 0,
-	    &iot, &ioh, NULL, NULL);
+	    &iot, &ioh, NULL, NULL, 0);
 
 	if (ioh_valid != 0) {
 		printf("%s: unable to map registers\n", sc->sc_dev.dv_xname);
@@ -114,8 +120,7 @@ iha_pci_attach(parent, self, aux)
 	sc->sc_ioh  = ioh;
 	sc->sc_dmat = pa->pa_dmat;
 	
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}

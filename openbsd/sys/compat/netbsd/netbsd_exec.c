@@ -1,4 +1,4 @@
-/*	$OpenBSD: netbsd_exec.c,v 1.6 1999/11/10 15:55:22 mickey Exp $	 */
+/*	$OpenBSD: netbsd_exec.c,v 1.9 2001/09/21 15:55:08 art Exp $	 */
 /*	$NetBSD: svr4_exec.c,v 1.16 1995/10/14 20:24:20 christos Exp $	 */
 
 /*
@@ -39,8 +39,6 @@
 
 #include <sys/mman.h>
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_map.h>
 
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -53,9 +51,6 @@
 #include <machine/netbsd_machdep.h>
 
 #ifdef _KERN_DO_ELF64
-
-static void *netbsd_elf64_copyargs __P((struct exec_package *,
-		struct ps_strings *, void *, void *));
 
 extern char netbsd_sigcode[], netbsd_esigcode[];
 extern struct sysent netbsd_sysent[];
@@ -75,28 +70,13 @@ struct emul emul_elf64_netbsd = {
 #else
 	NULL,
 #endif
-	0,
-	netbsd_elf64_copyargs,
+	ELF_AUX_ENTRIES * sizeof(Aux64Info),
+	elf64_copyargs,
 	setregs,
 	exec_elf64_fixup,
 	netbsd_sigcode,
 	netbsd_esigcode,
 };
-
-static void *
-netbsd_elf64_copyargs(pack, arginfo, stack, argp)
-	struct exec_package *pack;
-	struct ps_strings *arginfo;
-	void *stack;
-	void *argp;
-{
-	AuxInfo *a;
-
-	if (!(a = (AuxInfo *)elf64_copyargs(pack, arginfo, stack, argp)))
-		return (NULL);
-
-	return (a);
-}
 
 int
 netbsd_elf64_probe(p, epp, itp, pos, os)

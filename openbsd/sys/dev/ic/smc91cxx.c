@@ -1,4 +1,4 @@
-/*	$OpenBSD: smc91cxx.c,v 1.8 2001/02/20 19:39:36 mickey Exp $	*/
+/*	$OpenBSD: smc91cxx.c,v 1.13 2001/07/08 23:38:06 fgsch Exp $	*/
 /*	$NetBSD: smc91cxx.c,v 1.11 1998/08/08 23:51:41 mycroft Exp $	*/
 
 /*-
@@ -132,8 +132,6 @@
 /* XXX Hardware padding doesn't work yet(?) */
 #define	SMC91CXX_SW_PAD
 
-#define ETHER_ADDR_LEN		6
-
 #ifdef SMC_DEBUG
 const char *smc91cxx_idstrs[] = {
 	NULL,				/* 0 */
@@ -180,11 +178,6 @@ int	smc91cxx_ioctl __P((struct ifnet *, u_long, caddr_t));
 
 int	smc91cxx_enable __P((struct smc91cxx_softc *));
 void	smc91cxx_disable __P((struct smc91cxx_softc *));
-
-/* XXX Should be in a common header file. */
-#define	ETHER_MAX_LEN	1518
-#define	ETHER_MIN_LEN	64
-#define	ETHER_CRC_LEN	4
 
 static __inline int ether_cmp __P((void *, void *));
 static __inline int
@@ -255,7 +248,7 @@ smc91cxx_attach(sc, myea)
 	ifp->if_watchdog = smc91cxx_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
@@ -487,7 +480,8 @@ smc91cxx_start(ifp)
 	/*
 	 * Peek at the next packet.
 	 */
-	if ((m = ifp->if_snd.ifq_head) == NULL)
+	IFQ_POLL(&ifp->if_snd, m);
+	if (m == NULL)
 		return;
 
 	/*
@@ -506,7 +500,7 @@ smc91cxx_start(ifp)
 	if ((len + pad) > (ETHER_MAX_LEN - ETHER_CRC_LEN)) {
 		printf("%s: large packet discarded\n", sc->sc_dev.dv_xname);
 		ifp->if_oerrors++;
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		m_freem(m);
 		goto readcheck;
 	}
@@ -583,7 +577,7 @@ smc91cxx_start(ifp)
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC address, etc.
 	 */
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 
 	/*
 	 * Push the packet out to the card.
@@ -853,7 +847,6 @@ smc91cxx_read(sc)
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	bus_space_tag_t bst = sc->sc_bst;
 	bus_space_handle_t bsh = sc->sc_bsh;
-	struct ether_header *eh;
 	struct mbuf *m;
 	u_int16_t status, packetno, packetlen;
 	u_int8_t *data;
@@ -919,7 +912,6 @@ smc91cxx_read(sc)
 	/*
 	 * Pull the packet off the interface.
 	 */
-	eh = mtod(m, struct ether_header *);
 	data = mtod(m, u_int8_t *);
 	bus_space_read_multi_2(bst, bsh, DATA_REG_W, (u_int16_t *)data,
 	    packetlen >> 1);
@@ -939,13 +931,8 @@ smc91cxx_read(sc)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
 
-	/*
-	 * Strip the ethernet header.
-	 */
-	m->m_pkthdr.len = m->m_len = packetlen - sizeof(struct ether_header);
-	m->m_data += sizeof(struct ether_header);
-
-	ether_input(ifp, eh, m);
+	m->m_pkthdr.len = m->m_len = packetlen;
+	ether_input_mbuf(ifp, m);
 
  out:
 	/*

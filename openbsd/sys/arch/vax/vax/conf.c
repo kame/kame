@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.25 2001/04/18 16:15:20 hugh Exp $ */
+/*	$OpenBSD: conf.c,v 1.30 2001/09/28 02:53:14 mickey Exp $ */
 /*	$NetBSD: conf.c,v 1.44 1999/10/27 16:38:54 ragge Exp $	*/
 
 /*-
@@ -54,8 +54,6 @@ bdev_decl(ht);
 
 #include "rk.h"
 bdev_decl(rk);
-
-bdev_decl(sw);
 
 #include "te.h"
 bdev_decl(tm);
@@ -122,12 +120,6 @@ bdev_decl(cd);
 
 #include "ksyms.h"
 cdev_decl(ksyms);
-
-#ifdef IPFILTER
-#define NIPF 1
-#else
-#define NIPF 0
-#endif
 
 struct bdevsw	bdevsw[] =
 {
@@ -204,11 +196,15 @@ int	bdevtomaj (bdev)
  */
 #include <dev/cons.h>
 
-#include "lkc.h"
-#if NLKC
-#define	smgcngetc lkccngetc
+#include "wskbd.h"
+#if NWSKBD > 0
+#define smgcngetc wskbd_cngetc
 #else
-#define	smgcngetc nullcngetc
+static int
+smgcngetc(dev_t dev)
+{
+	return 0;
+}
 #endif
 
 #define smgcnputc wsdisplay_cnputc
@@ -291,7 +287,6 @@ cdev_decl(ctty);
 #define mmread	mmrw
 #define mmwrite mmrw
 cdev_decl(mm);
-cdev_decl(sw);
 #include "pty.h"
 #define ptstty		ptytty
 #define ptsioctl	ptyioctl
@@ -437,6 +432,10 @@ dev_decl(filedesc,open);
 #include "wskbd.h"
 #include "wsmouse.h"
 
+#include "pf.h"
+
+#include <altq/altqconf.h>
+
 struct cdevsw	cdevsw[] =
 {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -481,7 +480,7 @@ struct cdevsw	cdevsw[] =
 	cdev_audio_init(NNP,np),	/* 39: NP Intelligent Board */
 	cdev_graph_init(NQV,qv),	/* 40: QVSS graphic display */
 	cdev_graph_init(NQD,qd),	/* 41: QDSS graphic display */
-	cdev_gen_ipf(NIPF,ipl),	/* 42: Packet filter */
+	cdev_pf_init(NPF,pf),		/* 42: packet filter */
 	cdev_ingres_init(NII,ii),	/* 43: Ingres device */
 	cdev_notdef(),			/* 44  was Datakit */
 	cdev_notdef(),			/* 45  was Datakit */
@@ -516,7 +515,7 @@ struct cdevsw	cdevsw[] =
 #else
 	cdev_notdef(),			/* 74 */
 #endif
-
+	cdev_altq_init(NALTQ,altq),	/* 75: ALTQ control interface */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -664,6 +663,17 @@ iszerodev(dev)
 {
 
 	return (major(dev) == 3 && minor(dev) == 12);
+}
+
+int
+getmajor(void *ptr)
+{
+	int i;
+
+	for (i = 0; i < nchrdev; i++)
+		if (cdevsw[i].d_open == ptr)
+			return i;
+	panic("getmajor");
 }
 
 dev_t

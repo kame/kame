@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxpvar.h,v 1.4 2000/09/17 17:08:16 aaron Exp $	*/
+/*	$OpenBSD: fxpvar.h,v 1.9 2001/09/17 16:24:49 jason Exp $	*/
 /*	$NetBSD: if_fxpvar.h,v 1.1 1997/06/05 02:01:58 thorpej Exp $	*/
 
 /*                  
@@ -37,29 +37,59 @@
  * Misc. defintions for the Intel EtherExpress Pro/100B PCI Fast
  * Ethernet driver
  */
+
+/*
+ * Number of transmit control blocks. This determines the number
+ * of transmit buffers that can be chained in the CB list.
+ * This must be a power of two.
+ */
+#define FXP_NTXCB	128
+
+/*
+ * Number of receive frame area buffers. These are large so chose
+ * wisely.
+ */
+#define FXP_NRFABUFS	64
+
 /*
  * NOTE: Elements are ordered for optimal cacheline behavior, and NOT
  *	 for functional grouping.
  */
+struct fxp_txsw {
+	struct fxp_txsw *tx_next;
+	struct mbuf *tx_mbuf;
+	bus_dmamap_t tx_map;
+	bus_addr_t tx_off;
+	struct fxp_cb_tx *tx_cb;
+};
+
+struct fxp_ctrl {
+	struct fxp_cb_tx tx_cb[FXP_NTXCB];
+	struct fxp_stats stats;
+	union {
+		struct fxp_cb_mcs mcs;
+		struct fxp_cb_ias ias;
+		struct fxp_cb_config cfg;
+	} u;
+};
+
 struct fxp_softc {
 	struct device sc_dev;		/* generic device structures */
 	void *sc_ih;			/* interrupt handler cookie */
 	bus_space_tag_t sc_st;		/* bus space tag */
 	bus_space_handle_t sc_sh;	/* bus space handle */
+	bus_dma_tag_t sc_dmat;		/* bus dma tag */
 	struct arpcom arpcom;		/* per-interface network data */
 	struct mii_data sc_mii;		/* MII media information */
 	struct mbuf *rfa_headm;		/* first mbuf in receive frame area */
 	struct mbuf *rfa_tailm;		/* last mbuf in receive frame area */
-	struct fxp_cb_tx *cbl_first;	/* first active TxCB in list */
-	int tx_queued;			/* # of active TxCB's */
-	int need_mcsetup;		/* multicast filter needs programming */
-	struct fxp_cb_tx *cbl_last;	/* last active TxCB in list */
-	struct fxp_stats *fxp_stats;	/* Pointer to interface stats */
+	int sc_flags;			/* misc. flags */
+#define	FXPF_HAS_RESUME_BUG	0x08	/* has the resume bug */
+#define	FXPF_FIX_RESUME_BUG	0x10	/* currently need to work-around
+					   the resume bug */
 	struct timeout stats_update_to; /* Pointer to timeout structure */
 	int rx_idle_secs;		/* # of seconds RX has been idle */
 	struct fxp_cb_tx *cbl_base;	/* base of TxCB list */
-	struct fxp_cb_mcs *mcsp;	/* Pointer to mcast setup descriptor */
-	int all_mcasts;			/* receive all multicasts */
 	int phy_primary_addr;		/* address of primary PHY */
 	int phy_primary_device;		/* device type of primary PHY */
 	int phy_10Mbps_only;		/* PHY is 10Mbps-only device */
@@ -67,6 +97,15 @@ struct fxp_softc {
 	int not_82557;			/* yes if we are 82558/82559 */
 	void *sc_sdhook;		/* shutdownhook */
 	void *sc_powerhook;		/* powerhook */
+	struct fxp_txsw txs[FXP_NTXCB];
+	struct fxp_txsw *sc_cbt_cons, *sc_cbt_prod, *sc_cbt_prev;
+	int sc_cbt_cnt;
+	bus_dmamap_t tx_cb_map;
+	bus_dma_segment_t sc_cb_seg;
+	int sc_cb_nseg;
+	struct fxp_ctrl *sc_ctrl;
+	bus_dmamap_t sc_rxmaps[FXP_NRFABUFS];
+	int sc_rxfree;
 };
 
 /* Macros to ease CSR access. */
@@ -86,3 +125,33 @@ struct fxp_softc {
 extern int fxp_intr __P((void *));
 extern int fxp_attach_common __P((struct fxp_softc *, u_int8_t *, const char *));
 extern int fxp_detach __P((struct fxp_softc *));
+
+#define	FXP_RXMAP_GET(sc)	((sc)->sc_rxmaps[(sc)->sc_rxfree++])
+#define	FXP_RXMAP_PUT(sc,map)	((sc)->sc_rxmaps[--(sc)->sc_rxfree] = (map))
+
+#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
+#define	fxp_bus_dmamap_sync(t, m, o, l, p)	\
+    bus_dmamap_sync((t), (m), (o), (l), (p))
+#else
+#define fxp_bus_dmamap_sync(t, m, o, l, p)	\
+    bus_dmamap_sync((t), (m), (p))
+#endif
+
+#define	FXP_TXCB_SYNC(sc, txs, p)					\
+    fxp_bus_dmamap_sync((sc)->sc_dmat, (sc)->tx_cb_map, (txs)->tx_off,	\
+	sizeof(struct fxp_cb_tx), (p))
+
+#define	FXP_MCS_SYNC(sc, p)						\
+    fxp_bus_dmamap_sync((sc)->sc_dmat, (sc)->tx_cb_map,			\
+	offsetof(struct fxp_ctrl, u.mcs), sizeof(struct fxp_cb_mcs), (p))
+
+#define	FXP_IAS_SYNC(sc, p)						\
+    fxp_bus_dmamap_sync((sc)->sc_dmat, (sc)->tx_cb_map,			\
+	offsetof(struct fxp_ctrl, u.ias), sizeof(struct fxp_cb_ias), (p))
+
+#define	FXP_CFG_SYNC(sc, p)						\
+    fxp_bus_dmamap_sync((sc)->sc_dmat, (sc)->tx_cb_map,			\
+	offsetof(struct fxp_ctrl, u.cfg), sizeof(struct fxp_cb_config), (p))
+
+#define	FXP_MBUF_SYNC(sc, m, p)						\
+    fxp_bus_dmamap_sync((sc)->sc_dmat, (m), 0, (m)->dm_mapsize, (p))

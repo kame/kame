@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.h,v 1.11 2001/01/03 01:48:07 miod Exp $	*/
+/*	$OpenBSD: machdep.h,v 1.15 2001/08/25 11:37:26 espie Exp $	*/
 
 /*
  * Copyright (c) 1994 Gordon W. Ross
@@ -60,7 +60,6 @@ struct trapframe;
 struct pmap;
 
 extern int cache_size;
-extern int cold;
 extern int fputype;
 
 extern label_t *nofault;
@@ -87,7 +86,6 @@ int 	cachectl __P((int req, caddr_t addr, int len));
 
 void	child_return __P((void *));
 
-void	configure __P((void));
 void	cninit __P((void));
 
 void	dumpconf __P((void));
@@ -96,9 +94,6 @@ void	dumpsys __P((void));
 void	fb_unblank __P((void));
 
 int 	fpu_emulate __P((struct frame *, struct fpframe *));
-
-int 	getdfc __P((void));
-int 	getsfc __P((void));
 
 /* Backward compatibility... */
 #define getsr	_getsr
@@ -127,8 +122,6 @@ void	pmap_get_ksegmap __P((u_char *));
 void	pmap_get_pagemap __P((int *pt, int off));
 
 int	reboot2 __P((int, char *));
-
-void	regdump __P((struct frame *, int));
 
 void	savectx __P((struct pcb *));
 

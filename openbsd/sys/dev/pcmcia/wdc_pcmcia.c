@@ -1,4 +1,4 @@
-/*	$OpenBSD: wdc_pcmcia.c,v 1.10 2001/01/29 00:20:17 csapuntz Exp $	*/
+/*	$OpenBSD: wdc_pcmcia.c,v 1.12 2001/08/17 21:52:16 deraadt Exp $	*/
 /*	$NetBSD: wdc_pcmcia.c,v 1.19 1999/02/19 21:49:43 abs Exp $ */
 
 /*-
@@ -127,6 +127,10 @@ struct wdc_pcmcia_product {
 	/* Mobile Dock 2, which doesn't have vendor ID nor product ID */
 	{ PCMCIA_VENDOR_INVALID, PCMCIA_PRODUCT_INVALID,
 	  0, PCMCIA_CIS_SHUTTLE_IDE_ATAPI },
+
+	/* Archos MiniCD */
+	{ PCMCIA_VENDOR_ARCHOS, PCMCIA_PRODUCT_ARCHOS_ARC_ATAPI,
+	  0, PCMCIA_CIS_ARCHOS_ARC_ATAPI },
 };
 
 struct wdc_pcmcia_disk_device_interface_args {
@@ -368,7 +372,7 @@ wdc_pcmcia_attach(parent, self, aux)
 #else
 	/* Establish the interrupt handler. */
 	sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_BIO, wdcintr,
-	    &sc->wdc_channel);
+	    &sc->wdc_channel, "");
 	if (sc->sc_ih == NULL) {
 		printf("couldn't establish interrupt handler");
 	}
@@ -453,7 +457,7 @@ wdc_pcmcia_activate(self, act)
 		}
 
 		sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_BIO, 
-		    wdcintr, &sc->wdc_channel);
+		    wdcintr, &sc->wdc_channel, sc->sc_wdcdev.sc_dev.dv_xname);
 		if (sc->sc_ih == NULL) {
 			printf("%s: "
 			    "couldn't establish interrupt handler\n",
@@ -494,7 +498,7 @@ wdc_pcmcia_enable(arg, onoff)
 			}
 
 			sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_BIO, 
-			    wdcintr, &sc->wdc_channel);
+			    wdcintr, &sc->wdc_channel, sc->sc_dev.dv_xname);
 			if (sc->sc_ih == NULL) {
 				printf("%s: "
 				    "couldn't establish interrupt handler\n",

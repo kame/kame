@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.c,v 1.40 2000/01/07 23:08:17 gibbs Exp $
- * $OpenBSD: aic7xxx.c,v 1.27 2001/04/24 18:22:31 deraadt Exp $
+ * $OpenBSD: aic7xxx.c,v 1.31 2001/09/20 17:02:31 mpech Exp $
  */
 /*
  * A few notes on features of the driver.
@@ -101,8 +101,6 @@
 #include <scsi/scsiconf.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/pmap.h>
 
 #include <dev/ic/aic7xxxreg.h>
 #include <dev/ic/aic7xxxvar.h>
@@ -256,6 +254,14 @@ typedef enum {
 	MSGLOOP_MSGCOMPLETE,
 	MSGLOOP_TERMINATED
 } msg_loop_stat;
+
+#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
+#define	ahc_bus_dmamap_sync(tag, map, off, len, op)	\
+    bus_dmamap_sync((tag), (map), (off), (len), (op))
+#else
+#define	ahc_bus_dmamap_sync(tag, map, off, len, op)	\
+    bus_dmamap_sync((tag), (map), (op))
+#endif
 
 STATIC int	ahc_parse_msg __P((struct ahc_softc *ahc,
 				   struct scsi_link *sc_link,
@@ -525,8 +531,8 @@ ahc_index_busy_tcl(ahc, tcl, unbusy)
 	scbid = ahc->untagged_scbs[tcl];
 	if (unbusy) {
 		ahc->untagged_scbs[tcl] = SCB_LIST_NULL;
-		bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
-				BUS_DMASYNC_PREWRITE);
+		ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap,
+		    UNTAGGEDSCB_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 	}
 
 	return (scbid);
@@ -538,8 +544,8 @@ ahc_busy_tcl(ahc, scb)
 	struct scb *scb;
 {
 	ahc->untagged_scbs[scb->hscb->tcl] = scb->hscb->tag;
-	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
-			BUS_DMASYNC_PREWRITE);
+	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	    UNTAGGEDSCB_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 }
 
 static __inline int
@@ -600,8 +606,8 @@ ahc_run_qoutfifo(ahc)
 	struct scb *scb;
 	u_int  scb_index;
 
-	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
-			BUS_DMASYNC_POSTREAD);
+	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	    0, 256, BUS_DMASYNC_POSTREAD);
 
 	while (ahc->qoutfifo[ahc->qoutfifonext] != SCB_LIST_NULL) {
 		scb_index = ahc->qoutfifo[ahc->qoutfifonext];
@@ -3455,7 +3461,8 @@ ahc_done(ahc, scb)
 			op = BUS_DMASYNC_POSTREAD;
 		else
 			op = BUS_DMASYNC_POSTWRITE;
-		bus_dmamap_sync(ahc->sc_dmat, scb->dmamap, op);
+		ahc_bus_dmamap_sync(ahc->sc_dmat, scb->dmamap,
+		    0, scb->dmamap->dm_mapsize, op);
 		bus_dmamap_unload(ahc->sc_dmat, scb->dmamap);
 	}
 
@@ -3674,8 +3681,8 @@ ahc_init(ahc)
 	for (i = 0; i < 256; i++)
 		ahc->qoutfifo[i] = SCB_LIST_NULL;
 
-	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap,
-			BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
+	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap,
+		 0, driver_data_size, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 	
 	/*
 	 * Allocate a tstate to house information for our
@@ -4316,7 +4323,8 @@ ahc_execute_scb(arg, dm_segs, nsegments)
 			op = BUS_DMASYNC_PREREAD;
 		else
 			op = BUS_DMASYNC_PREWRITE;
-		bus_dmamap_sync(ahc->sc_dmat, scb->dmamap, op);
+		ahc_bus_dmamap_sync(ahc->sc_dmat, scb->dmamap,
+		    0, scb->dmamap->dm_mapsize, op);
 	} else {
 		scb->hscb->SG_pointer = 0;
 		scb->hscb->data = 0;
@@ -4371,8 +4379,8 @@ ahc_execute_scb(arg, dm_segs, nsegments)
 
 		ahc->qinfifo[ahc->qinfifonext++] = scb->hscb->tag;
 
-		bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
-				BUS_DMASYNC_PREWRITE);
+		ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+		    QINFIFO_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 		
 		if ((ahc->features & AHC_QUEUE_REGS) != 0) {
 			ahc_outb(ahc, HNSCB_QOFF, ahc->qinfifonext);
@@ -5072,8 +5080,9 @@ bus_reset:
 				ahc->qinfifo[ahc->qinfifonext++] =
 				    scb->hscb->tag;
 
-				bus_dmamap_sync(ahc->sc_dmat,
+				ahc_bus_dmamap_sync(ahc->sc_dmat,
 				    ahc->shared_data_dmamap,
+				    QINFIFO_OFFSET * 256, 256,
 				    BUS_DMASYNC_PREWRITE);
 
 				if ((ahc->features & AHC_QUEUE_REGS) != 0) {
@@ -5125,8 +5134,8 @@ ahc_search_qinfifo(ahc, target, channel, lun, tag, role, status, action)
 	 * for removal will be re-added to the queue as we go.
 	 */
 	ahc->qinfifonext = qinpos;
-	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
-			BUS_DMASYNC_POSTREAD);
+	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	    QINFIFO_OFFSET * 256, 256, BUS_DMASYNC_POSTREAD);
 
 	while (qinpos != qintail) {
 		scbp = &ahc->scb_data->scbarray[ahc->qinfifo[qinpos]];
@@ -5156,8 +5165,8 @@ ahc_search_qinfifo(ahc, target, channel, lun, tag, role, status, action)
 		}
 		qinpos++;
 	}
-	bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
-			BUS_DMASYNC_PREWRITE);
+	ahc_bus_dmamap_sync(ahc->sc_dmat, ahc->shared_data_dmamap, 
+	    QINFIFO_OFFSET * 256, 256, BUS_DMASYNC_PREWRITE);
 	
 	if ((ahc->features & AHC_QUEUE_REGS) != 0) {
 		ahc_outb(ahc, HNSCB_QOFF, ahc->qinfifonext);
@@ -5255,7 +5264,7 @@ ahc_abort_scbs(ahc, target, channel, lun, tag, role, status)
 	 * Go through the pending CCB list and look for
 	 * commands for this target that are still active.
 	 * These are other tagged commands that were
-	 * disconnected when the reset occured.
+	 * disconnected when the reset occurred.
 	 */
 	{
 		struct scb *scb;

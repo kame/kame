@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.11 2001/04/05 20:39:39 deraadt Exp $ */
+/*	$OpenBSD: mem.c,v 1.15 2001/07/25 13:25:32 art Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -83,6 +83,7 @@
 #include <machine/cpu.h>
 
 #include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 extern u_int lowram;
 static caddr_t devzeropage;
@@ -161,11 +162,10 @@ mmrw(dev, uio, flags)
 			}
 #endif
 			
-         pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
-			    trunc_page(v), 
-             uio->uio_rw == UIO_READ ? VM_PROT_READ : VM_PROT_WRITE, 
-             TRUE, 
-             uio->uio_rw == UIO_READ ? VM_PROT_READ : VM_PROT_WRITE); 
+			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap, 
+				   trunc_page(v), 
+				   uio->uio_rw == UIO_READ ? VM_PROT_READ : VM_PROT_WRITE,
+				   (uio->uio_rw == UIO_READ ? VM_PROT_READ : VM_PROT_WRITE) | PMAP_WIRED); 
 
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
@@ -178,7 +178,7 @@ mmrw(dev, uio, flags)
 		case 1:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
-			if (!kernacc((caddr_t)v, c,
+			if (!uvm_kernacc((caddr_t)v, c,
 			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
 				return (EFAULT);
 			if (v < NBPG)
@@ -206,16 +206,10 @@ mmrw(dev, uio, flags)
 			 * is a global zeroed page, the null segment table.
 			 */
 			if (devzeropage == NULL) {
-#if CLBYTES == NBPG
 				extern caddr_t Segtabzero;
 				devzeropage = Segtabzero;
-#else
-				devzeropage = (caddr_t)
-				    malloc(CLBYTES, M_TEMP, M_WAITOK);
-				bzero(devzeropage, CLBYTES);
-#endif
 			}
-			c = min(iov->iov_len, CLBYTES);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(devzeropage, c, uio);
 			continue;
 

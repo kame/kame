@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.h,v 1.8 2001/03/01 20:54:35 provos Exp $	*/
+/*	$OpenBSD: tty.h,v 1.11 2001/07/05 10:12:28 art Exp $	*/
 /*	$NetBSD: tty.h,v 1.30.4.1 1996/06/02 09:08:13 mrg Exp $	*/
 
 /*-
@@ -46,7 +46,20 @@
 #include <sys/select.h>		/* For struct selinfo. */
 #include <sys/timeout.h>
 
-#ifndef REAL_CLISTS
+#define KERN_TTY_TKNIN		1	/* quad: input chars */
+#define KERN_TTY_TKNOUT		2	/* quad: output chars */
+#define KERN_TTY_TKRAWCC	3	/* quad: input chars, raw mode */
+#define KERN_TTY_TKCANCC	4	/* quad: input char, cooked mode */
+#define KERN_TTY_MAXID		5
+
+#define CTL_KERN_TTY_NAMES { \
+	{ 0, 0 }, \
+	{ "tk_nin", CTLTYPE_QUAD }, \
+	{ "tk_nout", CTLTYPE_QUAD }, \
+	{ "tk_rawcc", CTLTYPE_QUAD }, \
+	{ "tk_cancc", CTLTYPE_QUAD }, \
+}
+
 /*
  * Clists are actually ring buffers. The c_cc, c_cf, c_cl fields have
  * exactly the same behaviour as in true clists.
@@ -64,17 +77,6 @@ struct clist {
 	u_char	*c_ce;		/* c_ce + c_len */
 	u_char	*c_cq;		/* N bits/bytes long, see tty_subr.c */
 };
-#else
-/*
- * Clists are character lists, which is a variable length linked list
- * of cblocks, with a count of the number of characters in the list.
- */
-struct clist {
-	int	c_cc;		/* Number of characters in the clist. */
-	u_char	*c_cf;		/* Pointer to the first cblock. */
-	u_char	*c_cl;		/* Pointer to the last cblock. */
-};
-#endif
 
 /*
  * Per-tty structure.
@@ -209,6 +211,8 @@ extern	struct ttychars ttydefaults;
 /* Symbolic sleep message strings. */
 extern	 char ttyin[], ttyout[], ttopen[], ttclos[], ttybg[], ttybuf[];
 
+int	sysctl_tty __P((int *, u_int, void *, size_t *, void *, size_t));
+
 int	 b_to_q __P((u_char *cp, int cc, struct clist *q));
 void	 catq __P((struct clist *from, struct clist *to));
 void	 clist_init __P((void));
@@ -256,7 +260,7 @@ void	tty_attach __P((struct tty *));
 void	tty_detach __P((struct tty *));
 struct tty *ttymalloc __P((void));
 void	 ttyfree __P((struct tty *));
-u_char	*firstc           __P((struct clist *clp, int *c));
+u_char	*firstc __P((struct clist *clp, int *c));
 
 int	cttyopen __P((dev_t, int, int, struct proc *));
 int	cttyread __P((dev_t, struct uio *, int));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_lmc_common.c,v 1.3 2000/02/01 18:01:41 chris Exp $ */
+/*	$OpenBSD: if_lmc_common.c,v 1.6 2001/09/11 20:05:25 miod Exp $ */
 /*	$NetBSD: if_lmc_common.c,v 1.1 1999/03/25 03:32:43 explorer Exp $	*/
 
 /*-
@@ -102,8 +102,6 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_kern.h>
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #include <net/if_sppp.h>
@@ -166,10 +164,14 @@
  * Sigh.  Every OS puts these in different places.  NetBSD and FreeBSD use
  * a C preprocessor that allows this hack, but BSDI does not.
  */
-#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include INCLUDE_PATH_PREFIX "if_lmc_types.h"
 #include INCLUDE_PATH_PREFIX "if_lmcioctl.h"
 #include INCLUDE_PATH_PREFIX "if_lmcvar.h"
+#elif defined(__OpenBSD__)
+#include <dev/pci/if_lmc_types.h>
+#include <dev/pci/if_lmcioctl.h>
+#include <dev/pci/if_lmcvar.h>
 #else /* BSDI */
 #include "i386/pci/if_lmc_types.h"
 #include "i386/pci/if_lmcioctl.h"

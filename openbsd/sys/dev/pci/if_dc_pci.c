@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_dc_pci.c,v 1.13 2001/04/06 17:14:14 aaron Exp $	*/
+/*	$OpenBSD: if_dc_pci.c,v 1.18 2001/10/06 14:37:48 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -66,7 +66,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -240,8 +239,7 @@ void dc_pci_attach(parent, self, aux)
 #endif
 
 	/* Allocate interrupt */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-	    &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		goto fail;
 	}
@@ -267,7 +265,8 @@ void dc_pci_attach(parent, self, aux)
 			sc->dc_type = DC_TYPE_21143;
 			sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
 			sc->dc_flags |= DC_REDUCED_MII_POLL;
-			dc_read_srom(sc, 9);
+			dc_eeprom_width(sc);
+			dc_read_srom(sc, sc->dc_romwidth);
 		}
 		break;
 	case PCI_VENDOR_DAVICOM:
@@ -301,6 +300,8 @@ void dc_pci_attach(parent, self, aux)
 			sc->dc_flags |= DC_TX_ADMTEK_WAR;
 			sc->dc_pmode = DC_PMODE_MII;
 		}
+		dc_eeprom_width(sc);
+		dc_read_srom(sc, sc->dc_romwidth);
 		break;
 	case PCI_VENDOR_MACRONIX:
 	case PCI_VENDOR_ACCTON:
@@ -310,6 +311,9 @@ void dc_pci_attach(parent, self, aux)
 			sc->dc_flags |= DC_TX_USE_TX_INTR;
 			sc->dc_flags |= DC_TX_ADMTEK_WAR;
 			sc->dc_pmode = DC_PMODE_MII;
+
+			dc_eeprom_width(sc);
+			dc_read_srom(sc, sc->dc_romwidth);
 		}
 		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_MACRONIX_MX98713) {
 			found = 1;

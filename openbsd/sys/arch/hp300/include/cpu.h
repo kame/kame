@@ -1,5 +1,5 @@
-/*	$OpenBSD: cpu.h,v 1.9 1998/03/01 00:37:31 niklas Exp $	*/
-/*	$NetBSD: cpu.h,v 1.25 1997/04/27 20:37:07 thorpej Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.15 2001/08/25 11:37:26 espie Exp $	*/
+/*	$NetBSD: cpu.h,v 1.28 1998/02/13 07:41:51 scottr Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -95,6 +95,7 @@ struct clockframe {
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
+extern int want_resched;	/* resched() was called */
 #define	need_resched()	{ want_resched++; aston(); }
 
 /*
@@ -110,20 +111,24 @@ struct clockframe {
  */
 #define	signotify(p)	aston()
 
+extern int astpending;		/* need to trap before returning to user mode */
 #define aston() (astpending++)
-
-int	astpending;		/* need to trap before returning to user mode */
-int	want_resched;		/* resched() was called */
 
 /*
  * CTL_MACHDEP definitions.
  */
 #define	CPU_CONSDEV		1	/* dev_t: console terminal device */
-#define	CPU_MAXID		2	/* number of valid machdep ids */
+#define	CPU_CPUSPEED		2	/* CPU speed in Mhz */
+#define	CPU_MACHINEID		3	/* machine id (HP_XXX) */
+#define	CPU_MMUID		4	/* mmu id (MMUID_*) */
+#define	CPU_MAXID		5	/* number of valid machdep ids */
 
 #define CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
 	{ "console_device", CTLTYPE_STRUCT }, \
+	{ "cpuspeed", CTLTYPE_INT }, \
+	{ "machineid", CTLTYPE_INT }, \
+	{ "mmuid", CTLTYPE_INT }, \
 }
 
 /*
@@ -142,8 +147,6 @@ struct pcb;
 /* locore.s functions */
 void	m68881_save __P((struct fpframe *));
 void	m68881_restore __P((struct fpframe *));
-u_long	getdfc __P((void));
-u_long	getsfc __P((void));
 void	DCIA __P((void));
 void	DCIS __P((void));
 void	DCIU __P((void));
@@ -151,17 +154,17 @@ void	ICIA __P((void));
 void	ICPA __P((void));
 void	PCIA __P((void));
 void	TBIA __P((void));
-void	TBIS __P((vm_offset_t));
+void	TBIS __P((vaddr_t));
 void	TBIAS __P((void));
 void	TBIAU __P((void));
 #if defined(M68040)
 void	DCFA __P((void));
-void	DCFP __P((vm_offset_t));
-void	DCFL __P((vm_offset_t));
-void	DCPL __P((vm_offset_t));
-void	DCPP __P((vm_offset_t));
-void	ICPL __P((vm_offset_t));
-void	ICPP __P((vm_offset_t));
+void	DCFP __P((paddr_t));
+void	DCFL __P((paddr_t));
+void	DCPL __P((paddr_t));
+void	DCPP __P((paddr_t));
+void	ICPL __P((paddr_t));
+void	ICPP __P((paddr_t));
 #endif
 int	suline __P((caddr_t, caddr_t));
 void	savectx __P((struct pcb *));
@@ -169,22 +172,23 @@ void	switch_exit __P((struct proc *));
 void	proc_trampoline __P((void));
 void	loadustp __P((int));
 
-void	doboot __P((void))
-	__attribute__((__noreturn__));
+__dead void	doboot __P((void));
 void	ecacheon __P((void));
 void	ecacheoff __P((void));
+
+/* clock.c functions */
+void	hp300_calibrate_delay __P((void));
 
 /* machdep.c functions */
 int	badaddr __P((caddr_t));
 int	badbaddr __P((caddr_t));
-void	regdump __P((struct frame *, int));
 void	dumpconf __P((void));
 
 /* pmap.c functions */
-vm_offset_t pmap_map __P((vm_offset_t, vm_offset_t, vm_offset_t, int));
+vaddr_t pmap_map __P((vaddr_t, paddr_t, paddr_t, int));
 
 /* sys_machdep.c functions */
-int	cachectl __P((int, caddr_t, int));
+int	cachectl __P((int, vaddr_t, int));
 
 /* vm_machdep.c functions */
 void	physaccess __P((caddr_t, caddr_t, int, int));

@@ -1,4 +1,4 @@
-/* $OpenBSD: bus_dma.c,v 1.1 2001/03/21 17:26:38 art Exp $ */
+/* $OpenBSD: bus_dma.c,v 1.4 2001/09/19 20:50:56 mickey Exp $ */
 /* $NetBSD: bus_dma.c,v 1.40 2000/07/17 04:47:56 thorpej Exp $ */
 
 /*-
@@ -48,7 +48,6 @@
 #include <sys/mbuf.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <uvm/uvm_extern.h>
 
 #include <machine/bus.h>
@@ -158,8 +157,8 @@ _bus_dmamap_load_buffer_direct_common(t, map, buf, buflen, p, flags,
 		 * Get the physical address for this segment.
 		 */
 		if (p != NULL)
-			curaddr = pmap_extract(p->p_vmspace->vm_map.pmap,
-			    vaddr);
+			pmap_extract(p->p_vmspace->vm_map.pmap, vaddr,
+				&curaddr);
 		else
 			curaddr = vtophys(vaddr);
 
@@ -602,8 +601,8 @@ _bus_dmamem_map(t, segs, nsegs, size, kvap, flags)
 			if (size == 0)
 				panic("_bus_dmamem_map: size botch");
 			pmap_enter(pmap_kernel(), va, addr,
-			    VM_PROT_READ | VM_PROT_WRITE, 1,
-			    VM_PROT_READ | VM_PROT_WRITE);
+			    VM_PROT_READ | VM_PROT_WRITE,
+			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		}
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: shm.h,v 1.8 1999/06/23 09:44:28 art Exp $	*/
+/*	$OpenBSD: shm.h,v 1.11 2001/09/28 01:42:54 millert Exp $	*/
 /*	$NetBSD: shm.h,v 1.20 1996/04/09 20:55:35 cgd Exp $	*/
 
 /*
@@ -43,7 +43,7 @@
 
 #define	SHM_RDONLY	010000	/* Attach read-only (else read-write) */
 #define	SHM_RND		020000	/* Round attach address to SHMLBA */
-#define	SHMLBA		CLBYTES	/* Segment low boundry address multiple */
+#define	SHMLBA		PAGE_SIZE /* Segment low boundry address multiple */
 
 /* "official" access mode definitions; somewhat braindead since you have
    to specify (SHM_* >> 3) for group and (SHM_* >> 6) for world permissions */
@@ -83,7 +83,7 @@ struct oshmid_ds {
 #define	SHM_UNLOCK	4	/* Unlock a segment locked by SHM_LOCK. */
 
 /*
- * System 5 style catch-all structure for shared memory constants that
+ * System V style catch-all structure for shared memory constants that
  * might be of interest to user programs.  Do we really want/need this?
  */
 struct shminfo {
@@ -93,8 +93,14 @@ struct shminfo {
 	int	shmseg;		/* max shared memory segments per process */
 	int	shmall;		/* max amount of shared memory (pages) */
 };
-struct shminfo shminfo;
-struct shmid_ds *shmsegs;
+
+struct shm_sysctl_info {
+	struct	shminfo shminfo;
+	struct	shmid_ds shmids[1];
+};
+
+extern struct shminfo shminfo;
+extern struct shmid_ds *shmsegs;
 
 struct vmspace;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_vfsops.c,v 1.41 2001/04/22 21:33:46 gluk Exp $	*/
+/*	$OpenBSD: ffs_vfsops.c,v 1.43 2001/06/23 02:07:55 csapuntz Exp $	*/
 /*	$NetBSD: ffs_vfsops.c,v 1.19 1996/02/09 22:22:26 christos Exp $	*/
 
 /*
@@ -83,6 +83,15 @@ struct vfsops ffs_vfsops = {
 	ffs_init,
 	ffs_sysctl,
 	ufs_check_export
+};
+
+struct inode_vtbl ffs_vtbl = {
+	ffs_truncate,
+	ffs_update,
+	ffs_inode_alloc,
+	ffs_inode_free,
+	ffs_balloc,
+	ffs_bufatoff
 };
 
 extern u_long nextgennumber;
@@ -408,7 +417,7 @@ success:
 			fs->fs_clean = ronly &&
 			    (fs->fs_flags & FS_UNCLEAN) == 0 ? 1 : 0;
 			if (ronly)
-				free(fs->fs_contigdirs, M_WAITOK);
+				free(fs->fs_contigdirs, M_UFSMNT);
 		}
 		if (!ronly) {
 			if (mp->mnt_flag & MNT_SOFTDEP)
@@ -1088,6 +1097,8 @@ retry:
 	ip->i_fs = fs = ump->um_fs;
 	ip->i_dev = dev;
 	ip->i_number = ino;
+	ip->i_vtbl = &ffs_vtbl;
+
 #ifdef QUOTA
 	{
 		int i;

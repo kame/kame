@@ -1,3 +1,5 @@
+/*	$OpenBSD: xform.h,v 1.8 2001/08/28 12:20:43 ben Exp $	*/
+
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -27,36 +29,41 @@
 #include <crypto/rmd160.h>
 
 /* Declarations */
-struct auth_hash
-{
-    int type;
-    char *name;
-    u_int16_t keysize;
-    u_int16_t hashsize; 
-    u_int16_t authsize;
-    u_int16_t ctxsize;
-    void (*Init) (void *);
-    int  (*Update) (void *, u_int8_t *, u_int16_t);
-    void (*Final) (u_int8_t *, void *);
+struct auth_hash {
+	int type;
+	char *name;
+	u_int16_t keysize;
+	u_int16_t hashsize; 
+	u_int16_t authsize;
+	u_int16_t ctxsize;
+	void (*Init) (void *);
+	int  (*Update) (void *, u_int8_t *, u_int16_t);
+	void (*Final) (u_int8_t *, void *);
 };
 
-struct enc_xform
-{
-    int type;
-    char *name;
-    u_int16_t blocksize;
-    u_int16_t minkey, maxkey;
-    u_int32_t ivmask;           /* Or all possible modes, zero iv = 1 */ 
-    void (*encrypt) (caddr_t, u_int8_t *);
-    void (*decrypt) (caddr_t, u_int8_t *);
-    void (*setkey) (u_int8_t **, u_int8_t *, int len);
-    void (*zerokey) (u_int8_t **);
+struct enc_xform {
+	int type;
+	char *name;
+	u_int16_t blocksize;
+	u_int16_t minkey, maxkey;
+	void (*encrypt) (caddr_t, u_int8_t *);
+	void (*decrypt) (caddr_t, u_int8_t *);
+	void (*setkey) (u_int8_t **, u_int8_t *, int len);
+	void (*zerokey) (u_int8_t **);
+};
+
+struct comp_algo {
+	int type;
+	char *name;
+	size_t minlen;
+	u_int32_t (*compress) (u_int8_t *, u_int32_t, u_int8_t **);
+	u_int32_t (*decompress) (u_int8_t *, u_int32_t, u_int8_t **);
 };
 
 union authctx {
-    MD5_CTX md5ctx;
-    SHA1_CTX sha1ctx;
-    RMD160_CTX rmd160ctx;
+	MD5_CTX md5ctx;
+	SHA1_CTX sha1ctx;
+	RMD160_CTX rmd160ctx;
 };
 
 extern struct enc_xform enc_xform_des;
@@ -65,10 +72,15 @@ extern struct enc_xform enc_xform_blf;
 extern struct enc_xform enc_xform_cast5;
 extern struct enc_xform enc_xform_skipjack;
 extern struct enc_xform enc_xform_rijndael128;
+extern struct enc_xform enc_xform_arc4;
 
+extern struct auth_hash auth_hash_md5;
+extern struct auth_hash auth_hash_sha1;
 extern struct auth_hash auth_hash_key_md5;
 extern struct auth_hash auth_hash_key_sha1;
 extern struct auth_hash auth_hash_hmac_md5_96;
 extern struct auth_hash auth_hash_hmac_sha1_96;
 extern struct auth_hash auth_hash_hmac_ripemd_160_96;
+
+extern struct comp_algo comp_algo_deflate;
 #endif /* _CRYPTO_XFORM_H_ */

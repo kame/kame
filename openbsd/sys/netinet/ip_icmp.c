@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_icmp.c,v 1.33 2001/03/28 20:03:03 angelos Exp $	*/
+/*	$OpenBSD: ip_icmp.c,v 1.42 2001/07/04 16:52:03 dhartmei Exp $	*/
 /*	$NetBSD: ip_icmp.c,v 1.19 1996/02/13 23:42:22 christos Exp $	*/
 
 /*
@@ -33,32 +33,50 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
-
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/kernel.h>
-#include <sys/proc.h>
-
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -71,8 +89,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/ip_icmp.h>
 #include <netinet/ip_var.h>
 #include <netinet/icmp_var.h>
-
-#include <machine/stdarg.h>
 
 /*
  * ICMP routines: error generation, receive packet processing, and
@@ -110,8 +126,9 @@ icmp_error(n, type, code, dest, destifp)
 	register struct ip *oip = mtod(n, struct ip *), *nip;
 	register unsigned oiplen = oip->ip_hl << 2;
 	register struct icmp *icp;
-	struct mbuf *m, m0;
-	unsigned icmplen;
+	struct mbuf *m;
+	struct m_tag *mtag;
+	unsigned icmplen, mblen;
 
 #ifdef ICMPPRINTFS
 	if (icmpprintfs)
@@ -124,7 +141,7 @@ icmp_error(n, type, code, dest, destifp)
 	 * Don't error if the old packet protocol was ICMP
 	 * error message, only known informational types.
 	 */
-	if (oip->ip_off &~ (IP_MF|IP_DF))
+	if (oip->ip_off & IP_OFFMASK)
 		goto freeit;
 	if (oip->ip_p == IPPROTO_ICMP && type != ICMP_REDIRECT &&
 	  n->m_len >= oiplen + ICMP_MINLEN &&
@@ -147,12 +164,41 @@ icmp_error(n, type, code, dest, destifp)
 	/*
 	 * Now, formulate icmp message
 	 */
+	icmplen = oiplen + min(8, oip->ip_len);
+ 	/*
+	 * Defend against mbuf chains shorter than oip->ip_len:
+	 */
+	mblen = 0;
+	for (m = n; m && (mblen < icmplen); m = m->m_next)
+		mblen += m->m_len;
+	icmplen = min(mblen, icmplen);
+
+	/*
+	 * As we are not required to return everything we have,
+	 * we return whatever we can return at ease.
+	 *
+	 * Note that ICMP datagrams longer than 576 octets are out of spec
+	 * according to RFC1812;
+	 */
+
+	KASSERT(ICMP_MINLEN <= MCLBYTES);
+
+	if (icmplen + ICMP_MINLEN > MCLBYTES)
+		icmplen = MCLBYTES - ICMP_MINLEN - sizeof (struct ip);
+
 	m = m_gethdr(M_DONTWAIT, MT_HEADER);
+	if (m && (sizeof (struct ip) + icmplen + ICMP_MINLEN > MHLEN)) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_freem(m);
+			m = NULL;
+		}
+	}
 	if (m == NULL)
 		goto freeit;
-	icmplen = oiplen + min(8, oip->ip_len);
 	m->m_len = icmplen + ICMP_MINLEN;
-	MH_ALIGN(m, m->m_len);
+	if ((m->m_flags & M_EXT) == 0)
+		MH_ALIGN(m, m->m_len);
 	icp = mtod(m, struct icmp *);
 	if ((u_int)type > ICMP_MAXTYPE)
 		panic("icmp_error");
@@ -174,35 +220,40 @@ icmp_error(n, type, code, dest, destifp)
 			icp->icmp_nextmtu = htons(destifp->if_mtu);
 	}
 
+	HTONS(oip->ip_off);
+	HTONS(oip->ip_len);
 	icp->icmp_code = code;
-	bcopy((caddr_t)oip, (caddr_t)&icp->icmp_ip, icmplen);
+	m_copydata(n, 0, icmplen, (caddr_t)&icp->icmp_ip);
 	nip = &icp->icmp_ip;
-	nip->ip_off = htons(nip->ip_off);
-	nip->ip_len = htons(nip->ip_len);
-
-	m0.m_next = NULL;			/* correct nip->ip_sum */
-	m0.m_data = (char *)nip;
-	m0.m_len = nip->ip_hl << 2;
-	nip->ip_sum = 0;
-	nip->ip_sum = in_cksum(&m0, nip->ip_hl << 2);
 
 	/*
 	 * Now, copy old ip header (without options)
 	 * in front of icmp message.
 	 */
-	if (m->m_data - sizeof(struct ip) < m->m_pktdat)
+	if ((m->m_flags & M_EXT) == 0 &&
+	    m->m_data - sizeof(struct ip) < m->m_pktdat)
 		panic("icmp len");
 	m->m_data -= sizeof(struct ip);
 	m->m_len += sizeof(struct ip);
 	m->m_pkthdr.len = m->m_len;
 	m->m_pkthdr.rcvif = n->m_pkthdr.rcvif;
 	nip = mtod(m, struct ip *);
-	bcopy((caddr_t)oip, (caddr_t)nip, sizeof(struct ip));
-	nip->ip_off = htons(nip->ip_off);
-	nip->ip_len = m->m_len;
+	/* ip_v set in ip_output */
 	nip->ip_hl = sizeof(struct ip) >> 2;
-	nip->ip_p = IPPROTO_ICMP;
 	nip->ip_tos = 0;
+	nip->ip_len = m->m_len;
+	/* ip_id set in ip_output */
+	nip->ip_off = 0;
+	/* ip_ttl set in icmp_reflect */
+	nip->ip_p = IPPROTO_ICMP;
+	nip->ip_src = oip->ip_src;
+	nip->ip_dst = oip->ip_dst;
+	/* move PF_GENERATED m_tag to new packet, if it exists */
+	mtag = m_tag_find(n, PACKET_TAG_PF_GENERATED, NULL);
+	if (mtag != NULL) {
+		m_tag_unlink(n, mtag);
+		m_tag_prepend(m, mtag);
+	}
 	icmp_reflect(m);
 
 freeit:
@@ -259,7 +310,7 @@ icmp_input(m, va_alist)
 		goto freeit;
 	}
 	i = hlen + min(icmplen, ICMP_ADVLENMIN);
-	if (m->m_len < i && (m = m_pullup(m, i)) == 0)  {
+	if (m->m_len < i && (m = m_pullup(m, i)) == NULL)  {
 		icmpstat.icps_tooshort++;
 		return;
 	}
@@ -366,13 +417,10 @@ icmp_input(m, va_alist)
 			goto badcode;
 		code = PRC_QUENCH;
 	deliver:
-		/*
-		 * Free packet atttributes. XXX
-		 */
-		if ((m->m_flags & M_PKTHDR) && (m->m_pkthdr.tdbi)) {
-		    free(m->m_pkthdr.tdbi, M_TEMP);
-		    m->m_pkthdr.tdbi = NULL;
-		}
+		/* Free packet atttributes */
+		if (m->m_flags & M_PKTHDR)
+			m_tag_delete_chain(m, NULL);
+
 		/*
 		 * Problem with datagram; advise higher level routines.
 		 */
@@ -392,8 +440,8 @@ icmp_input(m, va_alist)
 				icmpstat.icps_badlen++;
 				goto freeit;
 			} else {
-				if (!(m = m_pullup(m, (ip->ip_hl << 2) +
-				    ICMP_V6ADVLEN(icp)))) {
+				if ((m = m_pullup(m, (ip->ip_hl << 2) +
+				    ICMP_V6ADVLEN(icp))) == NULL) {
 					icmpstat.icps_tooshort++;
 					return;
 				}
@@ -460,8 +508,9 @@ icmp_input(m, va_alist)
 			icmpdst.sin_addr = ip->ip_src;
 		else
 			icmpdst.sin_addr = ip->ip_dst;
-		ia = ifatoia(ifaof_ifpforaddr(sintosa(&icmpdst),
-		    m->m_pkthdr.rcvif));
+		if (m->m_pkthdr.rcvif != NULL)
+			ia = ifatoia(ifaof_ifpforaddr(sintosa(&icmpdst),
+			    m->m_pkthdr.rcvif));
 		if (ia == 0)
 			break;
 		icp->icmp_type = ICMP_MASKREPLY;
@@ -473,13 +522,10 @@ icmp_input(m, va_alist)
 				ip->ip_src = ia->ia_dstaddr.sin_addr;
 		}
 reflect:
-		/*
-		 * Free packet atttributes. XXX
-		 */
-		if ((m->m_flags & M_PKTHDR) && (m->m_pkthdr.tdbi)) {
-		    free(m->m_pkthdr.tdbi, M_TEMP);
-		    m->m_pkthdr.tdbi = NULL;
-		}
+		/* Free packet atttributes */
+		if (m->m_flags & M_PKTHDR)
+			m_tag_delete_chain(m, NULL);
+
 		ip->ip_len += hlen;	/* since ip_input deducts this */
 		icmpstat.icps_reflect++;
 		icmpstat.icps_outhist[icp->icmp_type]++;
@@ -487,13 +533,9 @@ reflect:
 		return;
 
 	case ICMP_REDIRECT:
-		/*
-		 * Free packet atttributes. XXX
-		 */
-		if ((m->m_flags & M_PKTHDR) && (m->m_pkthdr.tdbi)) {
-		    free(m->m_pkthdr.tdbi, M_TEMP);
-		    m->m_pkthdr.tdbi = NULL;
-		}
+		/* Free packet atttributes */
+		if (m->m_flags & M_PKTHDR)
+			m_tag_delete_chain(m, NULL);
 		if (code > 3)
 			goto badcode;
 		if (icmplen < ICMP_ADVLENMIN || icmplen < ICMP_ADVLEN(icp) ||
@@ -536,6 +578,14 @@ reflect:
 	case ICMP_TSTAMPREPLY:
 	case ICMP_IREQREPLY:
 	case ICMP_MASKREPLY:
+	case ICMP_TRACEROUTE:
+	case ICMP_DATACONVERR:
+	case ICMP_MOBILE_REDIRECT:
+	case ICMP_IPV6_WHEREAREYOU:
+	case ICMP_IPV6_IAMHERE:
+	case ICMP_MOBILE_REGREQUEST:
+	case ICMP_MOBILE_REGREPLY:
+	case ICMP_PHOTURIS:
 	default:
 		break;
 	}
@@ -583,7 +633,7 @@ icmp_reflect(m)
 			break;
 	}
 	icmpdst.sin_addr = t;
-	if (ia == (struct in_ifaddr *)0)
+	if ((ia == (struct in_ifaddr *)0) && (m->m_pkthdr.rcvif != NULL))
 		ia = ifatoia(ifaof_ifpforaddr(sintosa(&icmpdst),
 					      m->m_pkthdr.rcvif));
 	/*

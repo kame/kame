@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ve.c,v 1.6 2001/03/09 05:44:39 smurph Exp $ */
+/*	$OpenBSD: if_ve.c,v 1.10 2001/09/11 20:05:24 miod Exp $ */
 /*-
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1982, 1992, 1993
@@ -67,8 +67,6 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_map.h>
-#include <vm/vm_kern.h>
 
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -88,14 +86,14 @@ void ve_recv_print __P((struct vam7990_softc *, int));
 void ve_xmit_print __P((struct vam7990_softc *, int));
 #endif
 
-integrate void ve_rint __P((struct vam7990_softc *));
-integrate void ve_tint __P((struct vam7990_softc *));
+void ve_rint __P((struct vam7990_softc *));
+void ve_tint __P((struct vam7990_softc *));
 
-integrate int ve_put __P((struct vam7990_softc *, int, struct mbuf *));
-integrate struct mbuf *ve_get __P((struct vam7990_softc *, int, int));
-integrate void ve_read __P((struct vam7990_softc *, int, int)); 
+int ve_put __P((struct vam7990_softc *, int, struct mbuf *));
+struct mbuf *ve_get __P((struct vam7990_softc *, int, int));
+void ve_read __P((struct vam7990_softc *, int, int)); 
 
-hide void ve_shutdown __P((void *));
+void ve_shutdown __P((void *));
 
 #define	ifp	(&sc->sc_arpcom.ac_if)
 #ifndef	ETHER_CMP
@@ -137,12 +135,16 @@ struct cfattach ve_ca = {
 	sizeof(struct ve_softc), vematch, veattach
 };
 
-hide void vewrcsr __P((struct vam7990_softc *, u_int16_t, u_int16_t));
-hide u_int16_t verdcsr __P((struct vam7990_softc *, u_int16_t));
+void vewrcsr __P((struct vam7990_softc *, u_int16_t, u_int16_t));
+u_int16_t verdcsr __P((struct vam7990_softc *, u_int16_t));
+void nvram_cmd __P((struct vam7990_softc *, u_char, u_short));
+u_int16_t nvram_read __P((struct vam7990_softc *, u_char));
+void vereset __P((struct vam7990_softc *));
+void ve_ackint __P((struct vam7990_softc *));
 
 /* send command to the nvram controller */
 void
-nvram_cmd(sc, cmd, addr )
+nvram_cmd(sc, cmd, addr)
 	struct vam7990_softc *sc;
 	u_char cmd;
 	u_short addr;
@@ -190,7 +192,7 @@ nvram_read(sc, nvram_addr)
 	return (val);
 }
 
-hide void
+void
 vewrcsr(sc, port, val)
 	struct vam7990_softc *sc;
 	u_int16_t port, val;
@@ -201,7 +203,7 @@ vewrcsr(sc, port, val)
 	ve1->ver1_rdp = val;
 }
 
-hide u_int16_t
+u_int16_t
 verdcsr(sc, port)
 	struct vam7990_softc *sc;
 	u_int16_t port;
@@ -306,7 +308,7 @@ veattach(parent, self, aux)
 	if (sc->sc_mem == NULL)	panic("ve: no more memory in external I/O map");
 	sc->sc_memsize = LEMEMSIZE;
 	sc->sc_conf3 = LE_C3_BSWP;
-	sc->sc_addr = kvtop(sc->sc_mem);
+	sc->sc_addr = kvtop((vm_offset_t)sc->sc_mem);
 
 	/* get ether address via bug call */
 	veetheraddr(sc);
@@ -577,7 +579,7 @@ ve_init(sc)
  * Routine to copy from mbuf chain to transmit buffer in
  * network buffer memory.
  */
-integrate int
+int
 ve_put(sc, boff, m)
 	struct vam7990_softc *sc;
 	int boff;
@@ -610,7 +612,7 @@ ve_put(sc, boff, m)
  * We copy the data into mbufs.  When full cluster sized units are present
  * we copy into clusters.
  */
-integrate struct mbuf *
+struct mbuf *
 ve_get(sc, boff, totlen)
 	struct vam7990_softc *sc;
 	int boff, totlen;
@@ -658,13 +660,15 @@ ve_get(sc, boff, totlen)
 /*
  * Pass a packet to the higher levels.
  */
-integrate void
+void
 ve_read(sc, boff, len)
 	register struct vam7990_softc *sc;
 	int boff, len;
 {
 	struct mbuf *m;
+#ifdef LANCE_REVC_BUG
 	struct ether_header *eh;
+#endif
 
 	if (len <= sizeof(struct ether_header) ||
 	    len > ETHERMTU + sizeof(struct ether_header)) {
@@ -685,9 +689,6 @@ ve_read(sc, boff, len)
 
 	ifp->if_ipackets++;
 
-	/* We assume that the header fit entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	/*
 	 * Check if there's a BPF listener on this interface.
@@ -705,6 +706,7 @@ ve_read(sc, boff, len)
 	 * destination address (garbage will usually not match).
 	 * Of course, this precludes multicast support...
 	 */
+	eh = mtod(m, struct ether_header *);
 	if (ETHER_CMP(eh->ether_dhost, sc->sc_arpcom.ac_enaddr) &&
 	    ETHER_CMP(eh->ether_dhost, etherbroadcastaddr)) {
 		m_freem(m);
@@ -712,12 +714,11 @@ ve_read(sc, boff, len)
 	}
 #endif
 
-	/* Pass the packet up, with the ether header sort-of removed. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	/* Pass the packet up. */
+	ether_input_mbuf(ifp, m);
 }
 
-integrate void
+void
 ve_rint(sc)
 	struct vam7990_softc *sc;
 {
@@ -792,7 +793,7 @@ ve_rint(sc)
 	sc->sc_last_rd = bix;
 }
 
-integrate void
+void
 ve_tint(sc)
 	register struct vam7990_softc *sc;
 {
@@ -1145,7 +1146,7 @@ ve_ioctl(ifp, cmd, data)
 	return (error);
 }
 
-hide void
+void
 ve_shutdown(arg)
 	void *arg;
 {
@@ -1344,5 +1345,3 @@ ve_zerobuf_contig(sc, boff, len)
 	 */
 	bzero(buf + boff, len);
 }
-
-

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_malloc.c,v 1.25 2001/04/06 14:37:50 angelos Exp $	*/
+/*	$OpenBSD: kern_malloc.c,v 1.39 2001/09/19 20:50:58 mickey Exp $	*/
 /*	$NetBSD: kern_malloc.c,v 1.15.4.2 1996/06/13 17:10:56 cgd Exp $	*/
 
 /*
@@ -45,14 +45,12 @@
 #include <sys/sysctl.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
 
 static struct vm_map_intrsafe kmem_map_store;
 vm_map_t kmem_map = NULL;
-#endif
+
+int nkmempages;
 
 struct kmembuckets bucket[MINBUCKET + 16];
 struct kmemstats kmemstats[M_LAST];
@@ -62,12 +60,8 @@ char buckstring[16 * sizeof("123456,")];
 int buckstring_init = 0;
 #if defined(KMEMSTATS) || defined(DIAGNOSTIC) || defined(FFS_SOFTUPDATES)
 char *memname[] = INITKMEMNAMES;
-#endif
-
-#ifdef MALLOC_DEBUG
-extern int debug_malloc __P((unsigned long, int, int, void **));
-extern int debug_free __P((void *, int));
-extern void debug_malloc_init __P((void));
+char *memall = NULL;
+extern struct lock sysctl_kmemlock;
 #endif
 
 #ifdef DIAGNOSTIC
@@ -160,18 +154,13 @@ malloc(size, type, flags)
 	if (kbp->kb_next == NULL) {
 		kbp->kb_last = NULL;
 		if (size > MAXALLOCSAVE)
-			allocsize = clrnd(round_page(size));
+			allocsize = round_page(size);
 		else
 			allocsize = 1 << indx;
-		npg = clrnd(btoc(allocsize));
-#if defined(UVM)
+		npg = btoc(allocsize);
 		va = (caddr_t) uvm_km_kmemalloc(kmem_map, uvmexp.kmem_object,
 				(vsize_t)ctob(npg), 
 				(flags & M_NOWAIT) ? UVM_KMF_NOWAIT : 0);
-#else
-		va = (caddr_t) kmem_malloc(kmem_map, (vsize_t)ctob(npg),
-					   !(flags & M_NOWAIT));
-#endif
 		if (va == NULL) {
 			/*
 			 * Kmem_malloc() can return NULL, even if it can
@@ -238,31 +227,22 @@ malloc(size, type, flags)
 	freep = (struct freelist *)va;
 	savedtype = (unsigned)freep->type < M_LAST ?
 		memname[freep->type] : "???";
-#if defined(UVM)
 	if (kbp->kb_next) {
 		int rv;
 		vaddr_t addr = (vaddr_t)kbp->kb_next;
 
 		vm_map_lock(kmem_map);
 		rv = uvm_map_checkprot(kmem_map, addr,
-				       addr + sizeof(struct freelist),
-				       VM_PROT_WRITE);
+		    addr + sizeof(struct freelist), VM_PROT_WRITE);
 		vm_map_unlock(kmem_map);
 
-		if (!rv)
-#else
-	if (kbp->kb_next &&
-	    !kernacc(kbp->kb_next, sizeof(struct freelist), 0))
-#endif
-	  {
-		printf("%s %d of object %p size %ld %s %s (invalid addr %p)\n",
+		if (!rv)  {
+		printf("%s %d of object %p size 0x%lx %s %s (invalid addr %p)\n",
 			"Data modified on freelist: word", 
 			(int32_t *)&kbp->kb_next - (int32_t *)kbp, va, size,
 			"previous type", savedtype, kbp->kb_next);
 		kbp->kb_next = NULL;
-#if defined(UVM)
 		}
-#endif
 	}
 
 	/* Fill the fields that we've used with WEIRD_ADDR */
@@ -282,7 +262,7 @@ malloc(size, type, flags)
 	for (lp = (int32_t *)va; lp < end; lp++) {
 		if (*lp == WEIRD_ADDR)
 			continue;
-		printf("%s %d of object %p size %ld %s %s (0x%x != 0x%x)\n",
+		printf("%s %d of object %p size 0x%lx %s %s (0x%x != 0x%x)\n",
 			"Data modified on freelist: word", lp - (int32_t *)va,
 			va, size, "previous type", savedtype, *lp, WEIRD_ADDR);
 		break;
@@ -339,6 +319,12 @@ free(addr, type)
 		return;
 #endif
 
+#ifdef DIAGNOSTIC
+	if (addr < (void *)kmembase || addr >= (void *)kmemlimit)
+		panic("free: non-malloced addr %p type %s", addr,
+		    memname[type]);
+#endif
+
 	kup = btokup(addr);
 	size = 1 << kup->ku_indx;
 	kbp = &bucket[kup->ku_indx];
@@ -348,8 +334,8 @@ free(addr, type)
 	 * Check for returns of data that do not point to the
 	 * beginning of the allocation.
 	 */
-	if (size > PAGE_SIZE * CLSIZE)
-		alloc = addrmask[BUCKETINDX(PAGE_SIZE * CLSIZE)];
+	if (size > PAGE_SIZE)
+		alloc = addrmask[BUCKETINDX(PAGE_SIZE)];
 	else
 		alloc = addrmask[kup->ku_indx];
 	if (((u_long)addr & alloc) != 0)
@@ -357,11 +343,7 @@ free(addr, type)
 			addr, size, memname[type], alloc);
 #endif /* DIAGNOSTIC */
 	if (size > MAXALLOCSAVE) {
-#if defined(UVM)
 		uvm_km_free(kmem_map, (vaddr_t)addr, ctob(kup->ku_pagecnt));
-#else
-		kmem_free(kmem_map, (vaddr_t)addr, ctob(kup->ku_pagecnt));
-#endif
 #ifdef KMEMSTATS
 		size = kup->ku_pagecnt << PGSHIFT;
 		ksp->ks_memuse -= size;
@@ -434,19 +416,9 @@ void
 kmeminit()
 {
 #ifdef KMEMSTATS
-	register long indx;
+	long indx;
 #endif
 	int npg;
-
-#if	((MAXALLOCSAVE & (MAXALLOCSAVE - 1)) != 0)
-		ERROR!_kmeminit:_MAXALLOCSAVE_not_power_of_2
-#endif
-#if	(MAXALLOCSAVE > MINALLOCSIZE * 32768)
-		ERROR!_kmeminit:_MAXALLOCSAVE_too_big
-#endif
-#if	(MAXALLOCSAVE < CLBYTES)
-		ERROR!_kmeminit:_MAXALLOCSAVE_too_small
-#endif
 
 #ifdef DIAGNOSTIC
 	if (sizeof(struct freelist) > (1 << MINBUCKET))
@@ -454,24 +426,17 @@ kmeminit()
 #endif
 
 	npg = VM_KMEM_SIZE / PAGE_SIZE;
-#if defined(UVM)
 	kmemusage = (struct kmemusage *) uvm_km_zalloc(kernel_map,
 		(vsize_t)(npg * sizeof(struct kmemusage)));
 	kmem_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&kmembase,
 		(vaddr_t *)&kmemlimit, (vsize_t)(npg * PAGE_SIZE), 
 			VM_MAP_INTRSAFE, FALSE, &kmem_map_store.vmi_map);
-#else
-	kmemusage = (struct kmemusage *) kmem_alloc(kernel_map,
-		(vsize_t)(npg * sizeof(struct kmemusage)));
-	kmem_map = kmem_suballoc(kernel_map, (vaddr_t *)&kmembase,
-		(vaddr_t *)&kmemlimit, (vsize_t)(npg * PAGE_SIZE), FALSE);
-#endif
 #ifdef KMEMSTATS
 	for (indx = 0; indx < MINBUCKET + 16; indx++) {
-		if (1 << indx >= CLBYTES)
+		if (1 << indx >= PAGE_SIZE)
 			bucket[indx].kb_elmpercl = 1;
 		else
-			bucket[indx].kb_elmpercl = CLBYTES / (1 << indx);
+			bucket[indx].kb_elmpercl = PAGE_SIZE / (1 << indx);
 		bucket[indx].kb_highwat = 5 * bucket[indx].kb_elmpercl;
 	}
 	for (indx = 0; indx < M_LAST; indx++)
@@ -480,47 +445,95 @@ kmeminit()
 #ifdef MALLOC_DEBUG
 	debug_malloc_init();
 #endif
+
+	nkmempages = npg;
 }
 
 /*
  * Return kernel malloc statistics information.
  */
 int
-sysctl_malloc(name, namelen, oldp, oldlenp, newp, newlen)
+sysctl_malloc(name, namelen, oldp, oldlenp, newp, newlen, p)
 	int *name;
 	u_int namelen;
 	void *oldp;
 	size_t *oldlenp;
 	void *newp;
 	size_t newlen;
+	struct proc *p;
 {
-        struct kmembuckets kb;
-        int i, siz;
+	struct kmembuckets kb;
+	int i, siz;
 
-	if (namelen != 2 && name[0] != KERN_MALLOC_BUCKETS)
+	if (namelen != 2 && name[0] != KERN_MALLOC_BUCKETS &&
+	    name[0] != KERN_MALLOC_KMEMNAMES)
 		return (ENOTDIR);		/* overloaded */
 
 	switch (name[0]) {
 	case KERN_MALLOC_BUCKETS:
-	        /* Initialize the first time */
-	        if (buckstring_init == 0) {
+		/* Initialize the first time */
+		if (buckstring_init == 0) {
 			buckstring_init = 1;
 			bzero(buckstring, sizeof(buckstring));
-		        for (siz = 0, i = MINBUCKET; i < MINBUCKET + 16; i++)
-			        siz += snprintf(buckstring + siz,
-						sizeof(buckstring) - siz - 1,
-					        "%d,", (u_int)(1<<i));
-			buckstring[siz - 1] = '\0'; /* Remove trailing comma */
+			for (siz = 0, i = MINBUCKET; i < MINBUCKET + 16; i++)
+			    siz += sprintf(buckstring + siz,
+			    "%d,", (u_int)(1<<i));
+			/* Remove trailing comma */
+			if (siz)
+				buckstring[siz - 1] = '\0';
 		}
-	        return (sysctl_rdstring(oldp, oldlenp, newp, buckstring));
+		return (sysctl_rdstring(oldp, oldlenp, newp, buckstring));
 
 	case KERN_MALLOC_BUCKET:
-	        bcopy(&bucket[BUCKETINDX(name[1])], &kb, sizeof(kb));
+		bcopy(&bucket[BUCKETINDX(name[1])], &kb, sizeof(kb));
 		kb.kb_next = kb.kb_last = 0;
-		return (sysctl_rdstruct(oldp, oldlenp, newp, &kb,
-					sizeof(kb)));
+		return (sysctl_rdstruct(oldp, oldlenp, newp, &kb, sizeof(kb)));
+	case KERN_MALLOC_KMEMSTATS:
+#ifdef KMEMSTATS
+		if ((name[1] < 0) || (name[1] >= M_LAST))
+			return (EINVAL);
+		return (sysctl_rdstruct(oldp, oldlenp, newp,
+		    &kmemstats[name[1]], sizeof(struct kmemstats)));
+#else
+		return (EOPNOTSUPP);
+#endif
+	case KERN_MALLOC_KMEMNAMES:
+#if defined(KMEMSTATS) || defined(DIAGNOSTIC) || defined(FFS_SOFTUPDATES)
+		if (memall == NULL) {
+			int totlen;
+
+			i = lockmgr(&sysctl_kmemlock, LK_EXCLUSIVE, NULL, p);
+			if (i)
+				return (i);
+
+			/* Figure out how large a buffer we need */
+			for (totlen = 0, i = 0; i < M_LAST; i++) {
+				if (memname[i])
+					totlen += strlen(memname[i]);
+				totlen++;
+			}
+			memall = malloc(totlen + M_LAST, M_SYSCTL, M_WAITOK);
+			bzero(memall, totlen + M_LAST);
+			for (siz = 0, i = 0; i < M_LAST; i++)
+				siz += sprintf(memall + siz, "%s,",
+				    memname[i] ? memname[i] : "");
+
+			/* Remove trailing comma */
+			if (siz)
+				memall[siz - 1] = '\0';
+
+			/* Now, convert all spaces to underscores */
+			for (i = 0; i < totlen; i++)
+				if (memall[i] == ' ')
+					memall[i] = '_';
+			lockmgr(&sysctl_kmemlock, LK_RELEASE, NULL, p);
+		}
+		return (sysctl_rdstring(oldp, oldlenp, newp, memall));
+#else
+		return (EOPNOTSUPP);
+#endif
 	default:
-	        return (EOPNOTSUPP);
+		return (EOPNOTSUPP);
 	}
 	/* NOTREACHED */
 }

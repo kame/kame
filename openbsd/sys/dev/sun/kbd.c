@@ -1,4 +1,4 @@
-/*	$OpenBSD: kbd.c,v 1.9 2001/03/24 10:22:48 ho Exp $	*/
+/*	$OpenBSD: kbd.c,v 1.11 2001/08/12 12:03:03 heko Exp $	*/
 /*	$NetBSD: kbd.c,v 1.14 1997/07/17 01:17:45 jtk Exp $	*/
 
 /*
@@ -430,7 +430,7 @@ kbdioctl(dev, cmd, data, flag, p)
 	case KIOCGETKEY:	/* Get keymap entry (old format) */
 		error = kbd_oldkeymap(ks, cmd, (struct okiockey *)data);
 		break;
-#endif	KIOCGETKEY */
+#endif	/* KIOCGETKEY */
 
 	case KIOCSKEY:  	/* Set keymap entry */
 		/* Don't let just anyone hose the keyboard. */
@@ -1073,7 +1073,7 @@ kbd_stint(cs)
 }
 
 /*
- * Get input from the recieve ring and pass it on.
+ * Get input from the receive ring and pass it on.
  * Note: this is called at splsoftclock()
  */
 static void

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kgdb_stub.c,v 1.5 1997/01/16 04:04:25 kstailey Exp $	*/
+/*	$OpenBSD: kgdb_stub.c,v 1.7 2001/09/20 17:02:31 mpech Exp $	*/
 /*	$NetBSD: kgdb_stub.c,v 1.6 1996/10/23 16:30:48 gwr Exp $	*/
 
 /*
@@ -53,7 +53,6 @@
 #include <sys/systm.h>
 
 #include <vm/vm.h>
-#include <vm/vm_extern.h>
 
 #include <machine/control.h>
 #include <machine/cpu.h>
@@ -453,7 +452,7 @@ kgdb_trap(type, tf)
 	}
 	/*
 	 * Stick frame regs into our reg cache then tell remote host
-	 * that an exception has occured.
+	 * that an exception has occurred.
 	 */
 	regs_to_gdb(tf, gdb_regs);
 	if (type != T_BREAKPOINT) {

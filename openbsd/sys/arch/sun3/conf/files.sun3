@@ -1,4 +1,4 @@
-#	$OpenBSD: files.sun3,v 1.15 2000/08/28 21:51:03 miod Exp $
+#	$OpenBSD: files.sun3,v 1.18 2001/05/30 20:37:51 miod Exp $
 #	$NetBSD: files.sun3,v 1.26 1996/10/29 19:58:14 gwr Exp $
 
 #
@@ -27,7 +27,7 @@ file arch/sun3/sun3/leds.c
 file arch/sun3/sun3/machdep.c	
 file arch/sun3/sun3/mem.c		
 file arch/sun3/sun3/pmap.c		
-file arch/sun3/sun3/stub.c		
+file arch/sun3/sun3/stub.c			!ddb
 file arch/sun3/sun3/sun3_startup.c	
 file arch/sun3/sun3/sys_machdep.c
 file arch/sun3/sun3/trap.c		
@@ -175,10 +175,6 @@ file arch/sun3/dev/kd.c 		kbd
 device ms: zsevent
 attach ms at zsc
 file arch/sun3/dev/ms.c			ms needs-flag
-
-
-# RAM Disk for boot tape
-file arch/sun3/dev/rd_root.c		ramdisk_hooks
 
 # Major numbers for root/swap device configuration
 major	{xy=3}	# Xylogics 450 and 451

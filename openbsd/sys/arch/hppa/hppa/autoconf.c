@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.13 2001/04/01 06:25:33 mickey Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.15 2001/06/25 00:43:10 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Michael Shalayeff
@@ -80,14 +80,12 @@ extern int hz;
 #endif
 
 /*
- * configure:
+ * cpu_configure:
  * called at boot time, configure all devices on system
  */
 void
-configure()
+cpu_configure()
 {
-	extern int cold;
-
 	splhigh();
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.16 2001/01/15 23:23:58 jason Exp $	*/
+/*	$OpenBSD: param.h,v 1.20 2001/07/18 10:47:05 art Exp $	*/
 /*	$NetBSD: param.h,v 1.29 1997/03/10 22:50:37 pk Exp $ */
 
 /*
@@ -101,21 +101,17 @@ extern int nbpg, pgofset, pgshift;
 #define	BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(64 * 1024)
 
-#define	CLSIZE		1
-#define	CLSIZELOG2	0
-
-/* NOTE: SSIZE must be multiple of CLSIZE */
 #define	SSIZE		1		/* initial stack size in pages */
 #define	USPACE		8192
 
 /*
  * Constants related to network buffer management.
- * MCLBYTES must be no larger than CLBYTES (the software page size), and,
+ * MCLBYTES must be no larger than the software page size, and,
  * on machines that exchange pages of input or output buffers with mbuf
  * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
  * of the hardware page size.
  */
-#define	MSIZE		128		/* size of an mbuf */
+#define	MSIZE		256		/* size of an mbuf */
 #define	MCLBYTES	2048		/* enough for whole Ethernet packet */
 #define	MCLSHIFT	11		/* log2(MCLBYTES) */
 #define	MCLOFSET	(MCLBYTES - 1)
@@ -131,10 +127,10 @@ extern int nbpg, pgofset, pgshift;
 #define MSGBUFSIZE	4096		/* cannot be changed without great pain */
 
 /*
- * Size of kernel malloc arena in CLBYTES-sized logical pages.
+ * Size of kernel malloc arena in logical pages.
  */
 #ifndef	NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(6 * 1024 * 1024 / CLBYTES)
+#define	NKMEMCLUSTERS	(6 * 1024 * 1024 / PAGE_SIZE)
 #endif
 
 /* pages ("clicks") to disk blocks */

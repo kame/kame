@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.13 2000/10/09 22:55:35 bjc Exp $ */
+/*	$OpenBSD: param.h,v 1.20 2001/07/06 02:07:44 provos Exp $ */
 /*      $NetBSD: param.h,v 1.39 1999/10/22 21:14:34 ragge Exp $    */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -71,6 +71,10 @@
 #define	NBPG		(1 << PGSHIFT)		/* (1 << PGSHIFT) bytes/page */
 #define	PGOFSET		(NBPG - 1)               /* byte offset into page */
 
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 #define	VAX_PGSHIFT	9
 #define	VAX_NBPG	(1 << VAX_PGSHIFT)
 #define	VAX_PGOFSET	(VAX_NBPG - 1)
@@ -84,9 +88,6 @@
 #define BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(63 * 1024)	/* max raw I/O transfer size */
 #define	MAXBSIZE	0x4000		/* max FS block size - XXX */
-
-#define	CLSIZELOG2	0		
-#define	CLSIZE		1		
 
 #define	UPAGES		2		/* pages of u-area */
 #define USPACE		(NBPG*UPAGES)
@@ -105,7 +106,7 @@
  */
 
 #ifndef	MSIZE
-#define	MSIZE		128		/* size of an mbuf */
+#define	MSIZE		256		/* size of an mbuf */
 #endif	/* MSIZE */
 
 #ifndef	MCLSHIFT
@@ -164,7 +165,6 @@
 #define       ovbcopy(x,y,z)  bcopy(x, y, z)
 
 #ifdef _KERNEL
-#define        pmap_pageable(a,b,c,d)          /* Dont do anything */
 #ifndef lint
 #define splx(reg)						\
 ({								\
@@ -199,6 +199,7 @@
 #define splnet()	_splraise(0x15)	/* IPL15 */
 #define spltty()	_splraise(0x15)	/* IPL15 */
 #define splimp()	_splraise(0x17)	/* IPL17 */
+#define splvm()		_splraise(0x17)	/* IPL17 */
 #define splclock()	_splraise(0x18)	/* IPL18 */
 #define splhigh()	_splraise(0x1f)	/* IPL1F */
 #define	splstatclock()	splclock()
@@ -211,6 +212,8 @@
 
 /* Prototype needed for delay() */
 #ifndef	_LOCORE
+#include <machine/cpu.h>
+
 void	delay __P((int));
 /* inline macros used inside kernel */
 #include <machine/macros.h>

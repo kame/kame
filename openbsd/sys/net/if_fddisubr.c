@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fddisubr.c,v 1.22 2000/02/07 06:09:08 itojun Exp $	*/
+/*	$OpenBSD: if_fddisubr.c,v 1.25 2001/06/27 06:07:40 kjc Exp $	*/
 /*	$NetBSD: if_fddisubr.c,v 1.5 1996/05/07 23:20:21 christos Exp $	*/
 
 /*
@@ -150,17 +150,18 @@ fddi_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t type;
-	int s, error = 0;
- 	u_char edst[6];
+	int s, len, error = 0, hdrcmplt = 0;
+ 	u_char edst[6], esrc[6];
 	register struct mbuf *m = m0;
 	register struct rtentry *rt;
 	struct mbuf *mcopy = (struct mbuf *)0;
 	register struct fddi_header *fh;
 	struct arpcom *ac = (struct arpcom *)ifp;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
+	short mflags;
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
 	if ((rt = rt0) != NULL) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 			if ((rt0 = rt = RTALLOC1(dst, 1)) != NULL)
@@ -183,6 +184,13 @@ fddi_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -339,6 +347,14 @@ fddi_output(ifp, m0, dst, rt0)
 		} break;
 #endif /* CCITT */	
 
+	case pseudo_AF_HDRCMPLT:
+	{
+		struct fddi_header *fh = (struct fddi_header *)dst->sa_data;
+		hdrcmplt = 1;
+		bcopy((caddr_t)fh->fddi_shost, (caddr_t)esrc, sizeof (esrc));
+		/* FALLTHROUGH */
+	}
+
 	case AF_UNSPEC:
 	{
 		struct ether_header *eh;
@@ -419,25 +435,31 @@ fddi_output(ifp, m0, dst, rt0)
 #if NBPFILTER > 0
   queue_it:
 #endif
- 	bcopy((caddr_t)ac->ac_enaddr, (caddr_t)fh->fddi_shost,
-	    sizeof(fh->fddi_shost));
+	if (hdrcmplt)
+		bcopy((caddr_t)esrc, (caddr_t)fh->fddi_shost,
+		    sizeof(fh->fddi_shost));
+	else
+ 		bcopy((caddr_t)ac->ac_enaddr, (caddr_t)fh->fddi_shost,
+		    sizeof(fh->fddi_shost));
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	ifp->if_obytes += len;
+	if (mflags & M_MCAST)
+		ifp->if_omcasts++;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
-	if (m->m_flags & M_MCAST)
-		ifp->if_omcasts++;
 	return (error);
 
 bad:
@@ -468,7 +490,6 @@ fddi_input(ifp, fh, m)
 		m_freem(m);
 		return;
 	}
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*fh);
 	if (bcmp((caddr_t)fddibroadcastaddr, (caddr_t)fh->fddi_dhost,
 	    sizeof(fddibroadcastaddr)) == 0)

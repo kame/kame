@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.14 2001/03/24 10:07:18 ho Exp $	*/
+/*	$OpenBSD: if_ie.c,v 1.18 2001/07/25 13:25:33 art Exp $	*/
 /*	$NetBSD: if_ie.c,v 1.33 1997/07/29 17:55:38 fair Exp $	*/
 
 /*-
@@ -137,9 +137,7 @@ Mode of operation:
 
 #include <vm/vm.h>
 
-#if defined(UVM)
 #include <uvm/uvm_map.h>
-#endif
 
 /*
  * ugly byte-order hack for SUNs
@@ -164,10 +162,6 @@ vm_map_t ie_map; /* for obio */
 #define	IED_CNA		0x08
 #define	IED_READFRAME	0x10
 #define	IED_ALL		0x1f
-
-#define	ETHER_MIN_LEN	64
-#define	ETHER_MAX_LEN	1518
-#define	ETHER_ADDR_LEN	6
 
 #define B_PER_F         3               /* recv buffers per frame */
 #define MXFRAMES        300             /* max number of recv frames */
@@ -542,19 +536,10 @@ ieattach(parent, self, aux)
 		 * XXX
 		 */
 
-#if defined(UVM)
 		ie_map = uvm_map_create(pmap_kernel(), (vaddr_t)IEOB_ADBASE,
 			(vaddr_t)IEOB_ADBASE + sc->sc_msize, 1);
-#else
-		ie_map = vm_map_create(pmap_kernel(), (vaddr_t)IEOB_ADBASE,
-			(vaddr_t)IEOB_ADBASE + sc->sc_msize, 1);
-#endif
 		if (ie_map == NULL) panic("ie_map");
-#if defined(UVM)
 		sc->sc_maddr = (caddr_t) uvm_km_alloc(ie_map, sc->sc_msize);
-#else
-		sc->sc_maddr = (caddr_t) kmem_alloc(ie_map, sc->sc_msize);
-#endif
 		if (sc->sc_maddr == NULL) panic("ie kmem_alloc");
 		kvm_uncache(sc->sc_maddr, sc->sc_msize >> PGSHIFT);
 		if (((u_long)sc->sc_maddr & ~(NBPG-1)) != (u_long)sc->sc_maddr)
@@ -576,12 +561,11 @@ ieattach(parent, self, aux)
 		 * to IEOB_ADBASE to be safe.
 		 */
 
-		pa = pmap_extract(pmap_kernel(), (vaddr_t)sc->sc_maddr);
-		if (pa == 0)
+		if (pmap_extract(pmap_kernel(), (vaddr_t)sc->sc_maddr, &pa) == FALSE)
 			panic("ie pmap_extract");
 		pmap_enter(pmap_kernel(), trunc_page(IEOB_ADBASE+IE_SCP_ADDR),
                     (paddr_t)pa | PMAP_NC /*| PMAP_IOC*/,
-                    VM_PROT_READ | VM_PROT_WRITE, 1, 0);
+                    VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 
 		sc->scp = (volatile struct ie_sys_conf_ptr *)
 			(IEOB_ADBASE + IE_SCP_ADDR);

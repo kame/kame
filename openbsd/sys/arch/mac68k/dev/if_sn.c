@@ -1,3 +1,4 @@
+/*    $OpenBSD: if_sn.c,v 1.29 2001/07/04 08:52:45 niklas Exp $        */
 /*    $NetBSD: if_sn.c,v 1.13 1997/04/25 03:40:10 briggs Exp $        */
 
 /*
@@ -132,11 +133,6 @@ snsetup(sc, lladdr)
 	 * to do that?
 	 */
 	sc->space = malloc((SN_NPAGES + 1) * NBPG, M_DEVBUF, M_WAITOK);
-	if (sc->space == NULL) {
-		printf ("%s: memory allocation for descriptors failed\n",
-			sc->sc_dev.dv_xname);
-		return (1);
-	}
 
 	/*
 	 * Put the pup in reset mode (sninit() will fix it later),

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.7 2001/01/31 22:39:42 jason Exp $ */
+/*	$OpenBSD: mem.c,v 1.11 2001/08/26 14:31:12 miod Exp $ */
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -54,11 +54,15 @@
 #include <machine/board.h>
 
 #include <vm/vm.h>
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 caddr_t zeropage;
+
+int mmopen __P((dev_t, int, int));
+int mmclose __P((dev_t, int, int));
+int mmrw __P((dev_t, struct uio *, int));
+int mmmmap __P((dev_t, int, int));
+int mmioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
 
 /*ARGSUSED*/
 int
@@ -134,7 +138,7 @@ mmrw(dev, uio, flags)
 			}
 			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
 			    trunc_page(v), uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
+			    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
@@ -146,15 +150,9 @@ mmrw(dev, uio, flags)
 		case 1:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
-#if defined(UVM)
 			if (!uvm_kernacc((caddr_t)v, c,
 			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
 				return (EFAULT);
-#else
-			if (!kernacc((caddr_t)v, c,
-			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
-				return (EFAULT);
-#endif
 			if (v < NBPG) {
 #ifdef DEBUG
 				/*
@@ -164,9 +162,9 @@ mmrw(dev, uio, flags)
 				if (uio->uio_rw == UIO_READ) {
 					if (zeropage == NULL) {
 						zeropage = (caddr_t)
-						    malloc(CLBYTES, M_TEMP,
+						    malloc(PAGE_SIZE, M_TEMP,
 						    M_WAITOK);
-						bzero(zeropage, CLBYTES);
+						bzero(zeropage, PAGE_SIZE);
 					}
 					c = min(c, NBPG - (int)v);
 					v = (vm_offset_t)zeropage;
@@ -193,10 +191,10 @@ mmrw(dev, uio, flags)
 			}
 			if (zeropage == NULL) {
 				zeropage = (caddr_t)
-				    malloc(CLBYTES, M_TEMP, M_WAITOK);
-				bzero(zeropage, CLBYTES);
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				bzero(zeropage, PAGE_SIZE);
 			}
-			c = min(iov->iov_len, CLBYTES);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(zeropage, c, uio);
 			continue;
 

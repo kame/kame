@@ -1,0 +1,171 @@
+#	$OpenBSD: files.sparc64,v 1.18 2001/10/05 17:37:30 jason Exp $
+#	$NetBSD: files.sparc64,v 1.50 2001/08/10 20:53:50 eeh Exp $
+
+# maxpartitions must be first item in files.${ARCH}
+maxpartitions 16
+
+maxusers 2 8 1024
+
+define mainbus {}
+device mainbus: pcibus, mainbus
+attach mainbus at root
+
+device pcons
+attach pcons at mainbus
+file	arch/sparc64/dev/pcons.c		pcons needs-flag
+
+# Sun HME Ethernet controllers
+device	hme: ether, ifnet, mii, ifmedia
+file	dev/ic/hme.c			hme
+
+include "dev/sun/files.sun"
+include "dev/sbus/files.sbus"
+include "dev/i2o/files.i2o"
+include "dev/mii/files.mii"
+include "dev/atapiscsi/files.atapiscsi"
+include "dev/ata/files.ata"
+
+# COMPAT_NETBSD
+include "compat/netbsd/files.netbsd"
+file	arch/sparc64/sparc64/netbsd_machdep.c	compat_netbsd
+
+attach sbus at mainbus
+file	arch/sparc64/dev/sbus.c			sbus
+
+device psycho: pcibus
+attach psycho at mainbus
+include "dev/pci/files.pci"
+file	arch/sparc64/dev/psycho.c		psycho
+file	arch/sparc64/dev/pci_machdep.c		psycho
+
+attach	hme at pci with hme_pci
+file	dev/pci/if_hme_pci.c		hme_pci
+
+# IOMMU is for both
+file	arch/sparc64/dev/iommu.c		sbus | psycho
+
+device ebus {[addr = -1]}: pcibus
+attach ebus at pci
+file	arch/sparc64/dev/ebus.c			ebus
+
+device clock: mk48txx
+attach clock at mainbus, sbus with clock_sbus
+attach clock at ebus with clock_ebus
+
+device timer
+attach timer at mainbus, sbus
+
+device eeprom
+attach eeprom at sbus, ebus
+file	arch/sparc64/sparc64/clock.c
+file	dev/clock_subr.c
+
+device cpu
+attach cpu at mainbus
+file	arch/sparc64/sparc64/cpu.c
+
+device auxio
+attach auxio at ebus with auxio_ebus
+attach auxio at sbus with auxio_sbus
+file	arch/sparc64/dev/auxio.c		auxio
+
+device beeper
+attach beeper at ebus
+file	arch/sparc64/dev/beeper.c		beeper
+
+device audioce: audio, auconv
+attach audioce at ebus
+file	arch/sparc64/dev/ce4231.c		audioce
+
+#
+# Console related stuff
+#
+
+attach com at ebus with com_ebus
+file	arch/sparc64/dev/com_ebus.c		com_ebus
+
+device zs {channel = -1}
+attach zs at mainbus, sbus
+file	arch/sparc64/dev/zs.c			zs needs-flag
+file	arch/sparc64/dev/z8530sc.c		zs
+
+define zstty {}
+device zstty: tty
+attach zstty at zs
+file arch/sparc64/dev/z8530tty.c		zstty needs-flag
+
+device kbd
+attach kbd at zs with kbd_zs
+attach kbd at zstty
+file arch/sparc64/dev/kbd_zs.c			kbd_zs
+file arch/sparc64/dev/kbd.c			kbd needs-flag
+file dev/sun/kbd_tables.c 		kbd
+file arch/sparc64/dev/kd.c 		kbd
+file dev/sun/sunkbd.c			kbd needs-flag
+
+device ms
+attach ms at zs with ms_zs
+attach ms at zstty
+file dev/sun/ms_zs.c			ms_zs
+file dev/sun/ms.c			ms needs-flag
+file dev/sun/sunms.c			ms needs-flag
+
+file	dev/cons.c
+file	arch/sparc64/dev/consinit.c
+
+file	arch/sparc64/fpu/fpu.c
+file	arch/sparc64/fpu/fpu_add.c
+file	arch/sparc64/fpu/fpu_compare.c
+file	arch/sparc64/fpu/fpu_div.c
+file	arch/sparc64/fpu/fpu_explode.c
+file	arch/sparc64/fpu/fpu_implode.c
+file	arch/sparc64/fpu/fpu_mul.c
+file	arch/sparc64/fpu/fpu_sqrt.c
+file	arch/sparc64/fpu/fpu_subr.c
+
+# N.B.: optimizer breaks pmap.c and/or cache.c somehow -- have not
+# identified the exact problem yet.  NOOPT_C suffices for now.
+file	arch/sparc64/sparc64/autoconf.c
+file	arch/sparc64/sparc64/cache.c
+file	arch/sparc64/sparc64/conf.c
+file	arch/sparc64/sparc64/emul.c
+file	arch/sparc64/sparc64/in_cksum.S
+file	arch/sparc64/sparc64/intr.c
+file	arch/sparc64/sparc64/kgdb_machdep.c kgdb
+# sparc/sparc/locore.s is handled specially in the makefile,
+# because it must come first in the "ld" command line.
+file	arch/sparc64/sparc64/locore2.c
+file	arch/sparc64/sparc64/machdep.c
+file	arch/sparc64/sparc64/process_machdep.c
+file	arch/sparc64/sparc64/mem.c
+file	arch/sparc64/sparc64/openprom.c
+file	arch/sparc64/sparc64/openfirm.c
+file	arch/sparc64/sparc64/ofw_machdep.c
+file	arch/sparc64/sparc64/pmap.c
+# the following overrides the generic "sys_process.c"
+# commented out by deraadt
+#file	arch/sparc64/sparc64/sys_process.c
+file	arch/sparc64/sparc64/sys_machdep.c
+file	arch/sparc64/sparc64/trap.c
+file	arch/sparc64/sparc64/vm_machdep.c
+file	arch/sparc64/sparc64/disksubr.c
+
+file	arch/sparc64/sparc64/db_interface.c	ddb | kgdb
+file	arch/sparc64/sparc64/db_trace.c	ddb
+file	arch/sparc64/sparc64/db_disasm.c	ddb
+
+file	arch/sparc64/dev/md_root.c	memory_disk_hooks
+
+#
+# Machine-independent SCSI drivers
+#
+include "../../../scsi/files.scsi"
+major { sd = 7 }
+major { vnd = 8 }
+major { cd = 18 }
+major { rd = 5 }
+
+#
+# Machine-independent USB drivers
+#
+include "dev/usb/files.usb"

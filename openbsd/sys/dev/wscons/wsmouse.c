@@ -1,4 +1,4 @@
-/* $OpenBSD: wsmouse.c,v 1.5 2001/03/30 16:38:14 aaron Exp $ */
+/* $OpenBSD: wsmouse.c,v 1.7 2001/10/04 19:37:52 mickey Exp $ */
 /* $NetBSD: wsmouse.c,v 1.12 2000/05/01 07:36:58 takemura Exp $ */
 
 /*
@@ -97,6 +97,8 @@
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsmousevar.h>
 #include <dev/wscons/wseventvar.h>
+#include <dev/wscons/wsdisplayvar.h>
+#include <dev/rndvar.h>
 
 #include "wsmouse.h"
 #include "wsmux.h"
@@ -304,6 +306,8 @@ wsmouse_input(wsmousedev, btns, x, y, z, flags)
 	if (sc->sc_ready == 0)
 		return;
 
+	add_mouse_randomness(x ^ y ^ z ^ btns);
+
 #if NWSMUX > 0
 	if (sc->sc_mux)
 		evar = &sc->sc_mux->sc_events;
@@ -436,6 +440,7 @@ out:
 		sc->sc_ub = ub;
 		evar->put = put;
 		WSEVENT_WAKEUP(evar);
+		/* wsdisplay_burn(sc->sc_displaydv, WSDISPLAY_BURN_MOUSE); */
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: asm_macro.h,v 1.11 2001/03/08 22:24:59 miod Exp $ */
+/*	$OpenBSD: asm_macro.h,v 1.14 2001/08/12 12:03:02 heko Exp $ */
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -74,6 +74,7 @@ static __inline__ m88k_psr_type disable_interrupts_return_psr(void)
 static __inline__ void set_psr(m88k_psr_type psr)
 {
 	__asm__ __volatile__ ("stcr %0, cr1" :: "r" (psr));
+	__asm__ __volatile__ ("tcnd ne0, r0, 0");
 }
 
 /*
@@ -85,6 +86,7 @@ static __inline__ m88k_psr_type enable_interrupts_return_psr(void)
 	__asm__ __volatile__ ("ldcr %0, cr1" : "=r" (oldpsr));
 	__asm__ __volatile__ ("clr  %1, %0, 1<1>" : "=r" (oldpsr), "=r" (temp));
 	__asm__ __volatile__ ("stcr %0, cr1" : "=r" (temp));
+	__asm__ __volatile__ ("tcnd ne0, r0, 0");
 	return oldpsr;
 }
 #define enable_interrupt() (void)enable_interrupts_return_psr()
@@ -116,8 +118,8 @@ static __inline__ unsigned long stack_pointer(void)
  */
 static __inline__ unsigned ff1(register unsigned val)
 {
-	__asm__ ("ff1 %0, %0" : "=r" (val) : "0" (val));
+	__asm__ __volatile__ ("ff1 %0, %0" : "=r" (val) : "0" (val));
 	return val;
 }
 
-#endif __MACHINE_M88K_ASM_MACRO_H__
+#endif /* __MACHINE_M88K_ASM_MACRO_H__ */

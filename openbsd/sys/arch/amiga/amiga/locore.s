@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.29 2000/06/05 11:02:55 art Exp $	*/
+/*	$OpenBSD: locore.s,v 1.31 2001/08/12 23:52:59 miod Exp $	*/
 /*	$NetBSD: locore.s,v 1.89 1997/07/17 16:22:54 is Exp $	*/
 
 /*
@@ -465,11 +465,7 @@ _trace:
 
 _spurintr:
 	addql	#1,_intrcnt+0
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	rei
 
 #ifdef DRACO
@@ -497,11 +493,7 @@ _DraCoLev2intr:
 
 Ldraciaend:
 	moveml	sp@+,#0x0303
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	rei
 
 /* XXX on the DraCo rev. 4 or later, lev 1 is vectored here. */
@@ -535,11 +527,7 @@ Ldrclockretry:
 	clrb	a0@(9)		| reset timer irq
 
 	moveml	sp@+,#0x0303
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	rei
 
 /* XXX on the DraCo, lev 1, 3, 4, 5 and 6 are vectored here by initcpu() */
@@ -556,11 +544,7 @@ Ldrintrcommon:
 	jbsr	_intrhand		| handle interrupt
 	addql	#4,sp			| pop SR
 	moveml	sp@+,#0x0303
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	rei
 #endif
 	
@@ -575,11 +559,7 @@ _lev5intr:
 #endif
 	moveml	sp@+,d0/d1/a0/a1
 	addql	#1,_intrcnt+20
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	rei
 
 _lev1intr:
@@ -599,11 +579,7 @@ Lintrcommon:
 	jbsr	_intrhand		| handle interrupt
 	addql	#4,sp			| pop SR
 	moveml	sp@+,d0-d1/a0-a1
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	rei
 
 | Both IPL_REMAP_1 and IPL_REMAP_2 are experimental interruptsystems from
@@ -689,11 +665,7 @@ Lskipciab:
 | other ciab interrupts?
 Llev6done:
 	moveml	sp@+,d0-d1/a0-a1	| restore scratch regs
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	rei			| all done [can we do rte here?]
 Lchkexter:
 | check to see if EXTER request is really set?
@@ -748,11 +720,7 @@ Lexter:
 	addql	#8,sp
 	addql	#1,_intrcnt+24		| add another exter interrupt
 	moveml	sp@+,d0-d1/a0-a1	| restore scratch regs
-#ifdef UVM
 	addql	#1,_uvmexp+UVMEXP_INTRS
-#else
-	addql	#1,_cnt+V_INTR
-#endif
 	jra	Lastchk			| all done [can we do rte here?]
 #endif
 	
@@ -1175,20 +1143,6 @@ Lauexit:
 	rts
 
 
-#ifdef notdef
-/*
- * non-local gotos
- */
-ENTRY(qsetjmp)
-	movl	sp@(4),a0	| savearea pointer
-	lea	a0@(40),a0	| skip regs we do not save
-	movl	a6,a0@+		| save FP
-	movl	sp,a0@+		| save SP
-	movl	sp@,a0@		| and return address
-	moveq	#0,d0		| return 0
-	rts
-#endif
-	
 	.globl	_whichqs,_qs,_panic
 	.globl	_curproc
 	.comm	_want_resched,4
@@ -1790,12 +1744,6 @@ Lpcia040:
 	rts
 #endif
 
-ENTRY(ecacheon)
-	rts
-
-ENTRY(ecacheoff)
-	rts
-
 /*
  * Get callers current SP value.
  * Note that simply taking the address of a local variable in a C function
@@ -1861,44 +1809,6 @@ Lldustp060:
 Lldustp040:
 	.word	0xf518
 	.word	0x4e7b,0x0806		| movec d0,URP
-	rts
-
-/*
- * Flush any hardware context associated with given USTP.
- * Only does something for HP330 where we must flush RPT
- * and ATC entries in PMMU.
- */
-ENTRY(flushustp)
-#ifdef M68060
-	btst	#7,_machineid+3
-	jne	Lflustp060
-#endif
-	cmpl	#MMU_68040,_mmutype
-	jeq	Lnot68851
-	tstl	_mmutype		| 68851 PMMU?
-	jle	Lnot68851		| no, nothing to do
-	movl	sp@(4),d0		| get USTP to flush
-	moveq	#PGSHIFT,d1
-	lsll	d1,d0			| convert to address
-	movl	d0,_protorp+4		| stash USTP
-	pflushr	_protorp		| flush RPT/TLB entries
-Lnot68851:
-	rts
-#ifdef M68060
-Lflustp060:
-	movc	cacr,d1
-	orl	#IC60_CUBC,d1		| clear user branch cache entries
-	movc	d1,cacr
-	rts
-#endif
-	
-
-ENTRY(ploadw)
-	movl	sp@(4),a0		| address to load
-	cmpl	#MMU_68040,_mmutype
-	jeq	Lploadw040
-	ploadw	#1,a0@			| pre-load translation
-Lploadw040:				| should 68040 do a ptest?
 	rts
 
 /*

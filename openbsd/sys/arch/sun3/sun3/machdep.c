@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.28 2000/10/27 00:16:20 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.42 2001/09/19 20:50:57 mickey Exp $	*/
 /*	$NetBSD: machdep.c,v 1.77 1996/10/13 03:47:51 christos Exp $	*/
 
 /*
@@ -80,9 +80,8 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_map.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
 
@@ -99,12 +98,15 @@
 extern char *cpu_string;
 extern char version[];
 extern short exframesize[];
-extern vm_offset_t vmmap;	/* XXX - poor name.  See mem.c */
 
 int physmem;
 int fputype;
 label_t *nofault;
 vm_offset_t vmmap;
+
+vm_map_t exec_map = NULL;
+vm_map_t mb_map = NULL;
+vm_map_t phys_map = NULL;
 
 /*
  * safepri is a safe priority for sleep to set for a spin-wait
@@ -115,7 +117,6 @@ int	safepri = PSL_LOWIPL;
 /*
  * Declare these as initialized data so we can patch them.
  */
-int	nswbuf = 0;
 #ifdef	NBUF
 int	nbuf = NBUF;
 #else
@@ -130,8 +131,6 @@ int	bufpages = 0;
 static caddr_t allocsys __P((caddr_t));
 static void identifycpu __P((void));
 static void initcpu __P((void));
-static void dumpmem __P((int *, int, int));
-static char *hexstr __P((int, int));
 static void reboot_sync __P((void));
 int  reboot2 __P((int, char *)); /* share with sunos_misc.c */
 
@@ -184,10 +183,6 @@ allocsys(v)
 	register caddr_t v;
 {
 
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -219,7 +214,7 @@ allocsys(v)
 	if (bufpages == 0) {
 		/* We always have more than 2MB of memory. */
 		bufpages = (btoc(2 * 1024 * 1024) + physmem) *
-		    BUFCACHEPERCENT / (100 * CLSIZE);
+		    BUFCACHEPERCENT / 100;
 	}
 	if (nbuf == 0) {
 		nbuf = bufpages;
@@ -233,14 +228,8 @@ allocsys(v)
 			MAXBSIZE * 7 / 10;
 	
 	/* More buffer pages than fits into the buffers is senseless.  */
-	if (bufpages > nbuf * MAXBSIZE / CLBYTES)
-		bufpages = nbuf * MAXBSIZE / CLBYTES;
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
-	valloc(swbuf, struct buf, nswbuf);
+	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
+		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
 	valloc(buf, struct buf, nbuf);
 	return v;
 }
@@ -282,7 +271,7 @@ cpu_startup()
 	 * and then give everything true virtual addresses.
 	 */
 	sz = (int)allocsys((caddr_t)0);
-	if ((v = (caddr_t)kmem_alloc(kernel_map, round_page(sz))) == 0)
+	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(sz))) == 0)
 		panic("startup: no room for tables");
 	if (allocsys(v) - v != sz)
 		panic("startup: table size inconsistency");
@@ -292,12 +281,12 @@ cpu_startup()
 	 * in that they usually occupy more virtual memory than physical.
 	 */
 	size = MAXBSIZE * nbuf;
-	buffer_map = kmem_suballoc(kernel_map, (vm_offset_t *)&buffers,
-				   &maxaddr, size, TRUE);
-	minaddr = (vm_offset_t)buffers;
-	if (vm_map_find(buffer_map, vm_object_allocate(size), (vm_offset_t)0,
-			&minaddr, size, FALSE) != KERN_SUCCESS)
+	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
+	    NULL, UVM_UNKNOWN_OFFSET,
+	    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
+	                UVM_ADV_NORMAL, 0)) != KERN_SUCCESS)
 		panic("startup: cannot allocate buffers");
+	minaddr = (vm_offset_t)buffers;
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
 		/* don't want to alloc more physical mem than needed */
 		bufpages = btoc(MAXBSIZE) * nbuf;
@@ -305,28 +294,38 @@ cpu_startup()
 	base = bufpages / nbuf;
 	residual = bufpages % nbuf;
 	for (i = 0; i < nbuf; i++) {
-		vm_size_t curbufsize;
-		vm_offset_t curbuf;
+		vsize_t curbufsize;
+		vaddr_t curbuf;
+		struct vm_page *pg;
 
 		/*
-		 * First <residual> buffers get (base+1) physical pages
-		 * allocated for them.  The rest get (base) physical pages.
-		 *
-		 * The rest of each buffer occupies virtual space,
-		 * but has no physical memory allocated for it.
+		 * Each buffer has MAXBSIZE bytes of VM space allocated.  Of
+		 * that MAXBSIZE space, we allocate and map (base+1) pages
+		 * for the first "residual" buffers, and then we allocate
+		 * "base" pages for the rest.
 		 */
-		curbuf = (vm_offset_t)buffers + i * MAXBSIZE;
-		curbufsize = CLBYTES * (i < residual ? base+1 : base);
-		vm_map_pageable(buffer_map, curbuf, curbuf+curbufsize, FALSE);
-		vm_map_simplify(buffer_map, curbuf);
+		curbuf = (vm_offset_t) buffers + (i * MAXBSIZE);
+		curbufsize = PAGE_SIZE * ((i < residual) ? (base+1) : base);
+
+		while (curbufsize != 0) {
+			pg = uvm_pagealloc(NULL, 0, NULL, 0);
+			if (pg == NULL)
+				panic("cpu_startup: not enough memory for "
+				    "buffer cache");
+			pmap_enter(kernel_map->pmap, curbuf,
+			    VM_PAGE_TO_PHYS(pg), VM_PROT_ALL,
+			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
+			curbuf += PAGE_SIZE;
+			curbufsize -= PAGE_SIZE;
+		}
 	}
 
 	/*
 	 * Allocate a submap for exec arguments.  This map effectively
 	 * limits the number of processes exec'ing at any time.
 	 */
-	exec_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr,
-				 16*NCARGS, TRUE);
+	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * We don't use a submap for physio, and use a separate map
@@ -335,31 +334,19 @@ cpu_startup()
 	 * device drivers clone the kernel mappings into DVMA space.
 	 */
 
-	/*
-	 * Finally, allocate mbuf pool.  Since mclrefcnt is an off-size
-	 * we use the more space efficient malloc in place of kmem_alloc.
-	 */
-	mclrefcnt = (char *)malloc(NMBCLUSTERS+CLBYTES/MCLBYTES,
-				   M_MBUF, M_NOWAIT);
-	bzero(mclrefcnt, NMBCLUSTERS+CLBYTES/MCLBYTES);
-	mb_map = kmem_suballoc(kernel_map, (vm_offset_t *)&mbutl, &maxaddr,
-			       VM_MBUF_SIZE, FALSE);
+	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 
-	/*
-	 * Initialize timeouts
-	 */
-	timeout_init();
-
-	printf("avail mem = %ld\n", ptoa(cnt.v_free_count));
+	printf("avail mem = %ld\n", ptoa(uvmexp.free));
 	printf("using %d buffers containing %d bytes of memory\n",
-		   nbuf, bufpages * CLBYTES);
+		   nbuf, bufpages * PAGE_SIZE);
 
 	/*
 	 * Allocate a virtual page (for use by /dev/mem)
 	 * This page is handed to pmap_enter() therefore
 	 * it has to be in the normal kernel VA range.
 	 */
-	vmmap = kmem_alloc_wait(kernel_map, NBPG);
+	vmmap = uvm_km_valloc_wait(kernel_map, NBPG);
 
 	/*
 	 * Create the DVMA maps.
@@ -386,7 +373,6 @@ cpu_startup()
 		printf("kernel does not support -c; continuing..\n");
 #endif
 	}
-	configure();
 }
 
 /*
@@ -435,17 +421,20 @@ char	machine[] = "sun3";		/* cpu "architecture" */
 char	cpu_model[120];
 extern	long hostid;
 
-static void
+void
 identifycpu()
 {
-    /*
-     * actual identification done earlier because i felt like it,
-     * and i believe i will need the info to deal with some VAC, and awful
-     * framebuffer placement problems.  could be moved later.
-     */
+	/*
+	 * actual identification done earlier because i felt like it,
+	 * and i believe i will need the info to deal with some VAC, and awful
+	 * framebuffer placement problems.  could be moved later.
+	 */
 	strcpy(cpu_model, "Sun 3/");
 
-    /* should eventually include whether it has a VAC, mc6888x version, etc */
+	/*
+	 * should eventually include whether it has a VAC, mc6888x
+	 * version, etc
+	 */
 	strcat(cpu_model, cpu_string);
 
 	printf("Model: %s (hostid %lx)\n", cpu_model, hostid);
@@ -523,7 +512,7 @@ int sigpid = 0;
  * XXX - Put waittime checks in there too?
  */
 int waittime = -1;	/* XXX - Who else looks at this? -gwr */
-static void
+void
 reboot_sync()
 {
 	extern struct proc proc0;
@@ -541,7 +530,7 @@ reboot_sync()
 /*
  * Common part of the BSD and SunOS reboot system calls.
  */
-int
+__dead int
 reboot2(howto, user_boot_string)
 	int howto;
 	char *user_boot_string;
@@ -622,7 +611,7 @@ reboot2(howto, user_boot_string)
  * that specifies a machine-dependent boot string that
  * is passed to the boot program if RB_STRING is set.
  */
-void
+__dead void
 boot(howto)
 	int howto;
 {
@@ -646,7 +635,7 @@ vm_offset_t dumppage_pa;
 
 /*
  * This is called by cpu_startup to set dumplo, dumpsize.
- * Dumps always skip the first CLBYTES of disk space
+ * Dumps always skip the first block of disk space
  * in case there might be a disk label stored there.
  * If there is extra space, put dump at the end to
  * reduce the chance that swapping trashes it.
@@ -800,7 +789,7 @@ dumpsys()
 		if ((todo & 0xf) == 0)
 			printf("\r%4d", todo);
 		pmap_enter(pmap_kernel(), vmmap, paddr | PMAP_NC,
-			VM_PROT_READ, FALSE, VM_PROT_READ);
+			VM_PROT_READ, VM_PROT_READ);
 		error = (*dsw->d_dump)(dumpdev, blkno, vaddr, NBPG);
 		pmap_remove(pmap_kernel(), vmmap, vmmap + NBPG);
 		if (error)
@@ -840,98 +829,6 @@ straytrap(frame)
 }
 
 /* XXX: parityenable() ? */
-
-/*
- * Print a register and stack dump.
- */
-void
-regdump(fp, sbytes)
-	struct frame *fp; /* must not be register */
-	int sbytes;
-{
-	static int doingdump = 0;
-	register int i;
-	int s;
-
-	if (doingdump)
-		return;
-	s = splhigh();
-	doingdump = 1;
-	printf("pid = %d, pc = %s, ",
-	       curproc ? curproc->p_pid : -1, hexstr(fp->f_pc, 8));
-	printf("ps = %s, ", hexstr(fp->f_sr, 4));
-	printf("sfc = %s, ", hexstr(getsfc(), 4));
-	printf("dfc = %s\n", hexstr(getdfc(), 4));
-	printf("Registers:\n     ");
-	for (i = 0; i < 8; i++)
-		printf("        %d", i);
-	printf("\ndreg:");
-	for (i = 0; i < 8; i++)
-		printf(" %s", hexstr(fp->f_regs[i], 8));
-	printf("\nareg:");
-	for (i = 0; i < 8; i++)
-		printf(" %s", hexstr(fp->f_regs[i+8], 8));
-	if (sbytes > 0) {
-		if (fp->f_sr & PSL_S) {
-			printf("\n\nKernel stack (%s):",
-			       hexstr((int)(((int *)&fp)-1), 8));
-			dumpmem(((int *)&fp)-1, sbytes, 0);
-		} else {
-			printf("\n\nUser stack (%s):", hexstr(fp->f_regs[SP], 8));
-			dumpmem((int *)fp->f_regs[SP], sbytes, 1);
-		}
-	}
-	doingdump = 0;
-	splx(s);
-}
-
-#define KSADDR	((int *)((u_int)curproc->p_addr + USPACE - NBPG))
-
-static void
-dumpmem(ptr, sz, ustack)
-	register int *ptr;
-	int sz, ustack;
-{
-	register int i, val;
-
-	for (i = 0; i < sz; i++) {
-		if ((i & 7) == 0)
-			printf("\n%s: ", hexstr((int)ptr, 6));
-		else
-			printf(" ");
-		if (ustack == 1) {
-			if ((val = fuword(ptr++)) == -1)
-				break;
-		} else {
-			if (ustack == 0 &&
-			    (ptr < KSADDR || ptr > KSADDR+(NBPG/4-1)))
-				break;
-			val = *ptr++;
-		}
-		printf("%s", hexstr(val, 8));
-	}
-	printf("\n");
-}
-
-char *
-hexstr(val, len)
-	register int val;
-	int len;
-{
-	static char nbuf[9];
-	register int x, i;
-
-	if (len > 8)
-		return("");
-	nbuf[len] = '\0';
-	for (i = len-1; i >= 0; --i) {
-		x = val & 0xF;
-		/* Isn't this a cool trick? */
-		nbuf[i] = "0123456789ABCDEF"[x];
-		val >>= 4;
-	}
-	return(nbuf);
-}
 
 /*
  * cpu_exec_aout_makecmds():

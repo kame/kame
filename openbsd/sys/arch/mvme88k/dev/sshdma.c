@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshdma.c,v 1.3 2001/03/09 05:44:39 smurph Exp $	*/
+/*	$OpenBSD: sshdma.c,v 1.6 2001/09/23 02:50:25 miod Exp $	*/
 
 /*
  * Copyright (c) 1996 Nivas Madhur
@@ -43,7 +43,9 @@
 #include <sys/kernel.h>
 #include <sys/device.h>
 
+#include <vm/vm.h>
 #include <vm/pmap.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/autoconf.h>
 #include <machine/board.h>
@@ -61,9 +63,6 @@
 #include <mvme88k/dev/pcctwofunc.h>
 #include <mvme88k/dev/pcctworeg.h>
 #endif
-
-extern struct pmap	kernel_pmap_store;
-#define	pmap_kernel()		(&kernel_pmap_store)
 
 int	afscmatch	__P((struct device *, void *, void *));
 void	afscattach	__P((struct device *, struct device *, void *));
@@ -173,8 +172,8 @@ afscattach(parent, self, auxp)
 
 		struct pcctworeg *pcc2 = (struct pcctworeg *)ca->ca_master;
 		
-		pmap_cache_ctrl(pmap_kernel(), M88K_TRUNC_PAGE((vm_offset_t)sc),
-			M88K_ROUND_PAGE((vm_offset_t)sc + sizeof(*sc)),
+		pmap_cache_ctrl(pmap_kernel(), trunc_page((vm_offset_t)sc),
+			round_page((vm_offset_t)sc + sizeof(*sc)),
 			CACHE_INH);
 
 		pcctwointr_establish(PCC2V_NCR, &sc->sc_ih);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: xl.c,v 1.23 2001/04/08 01:05:12 aaron Exp $	*/
+/*	$OpenBSD: xl.c,v 1.30 2001/08/19 18:07:33 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -136,16 +136,13 @@
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <dev/pci/pcireg.h>
-#include <dev/pci/pcivar.h>
-#include <dev/pci/pcidevs.h>
+#include <machine/bus.h>
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 #include <dev/ic/xlreg.h>
 
@@ -198,6 +195,30 @@ void xl_testpacket	__P((struct xl_softc *));
 int xl_miibus_readreg	__P((struct device *, int, int));
 void xl_miibus_writereg	__P((struct device *, int, int, int));
 void xl_miibus_statchg	__P((struct device *));
+
+void xl_power __P((int, void *));
+
+void
+xl_power(why, arg)
+	int why;
+	void *arg;
+{
+	struct xl_softc *sc = arg;
+	struct ifnet *ifp;
+	int s;
+
+	s = splimp();
+	if (why != PWR_RESUME)
+		xl_stop(sc);
+	else {
+		ifp = &sc->arpcom.ac_if;
+		if (ifp->if_flags & IFF_UP) {
+			xl_reset(sc, 1);
+			xl_init(sc);
+		}
+	}
+	splx(s);
+}
 
 /*
  * Murphy's law says that it's possible the chip can wedge and
@@ -708,6 +729,7 @@ void xl_testpacket(sc)
 {
 	struct mbuf		*m;
 	struct ifnet		*ifp;
+	int			error;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -725,7 +747,7 @@ void xl_testpacket(sc)
 	mtod(m, unsigned char *)[15] = 0;
 	mtod(m, unsigned char *)[16] = 0xE3;
 	m->m_len = m->m_pkthdr.len = sizeof(struct ether_header) + 3;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	IFQ_ENQUEUE(&ifp->if_snd, m, NULL, error);
 	xl_start(ifp);
 
 	return;
@@ -1188,7 +1210,6 @@ int xl_rx_resync(sc)
 void xl_rxeof(sc)
 	struct xl_softc		*sc;
 {
-        struct ether_header	*eh;
         struct mbuf		*m;
         struct ifnet		*ifp;
 	struct xl_chain_onefrag	*cur_rx;
@@ -1246,22 +1267,17 @@ again:
 		}
 
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 		m->m_pkthdr.rcvif = ifp;
+		m->m_pkthdr.len = m->m_len = total_len;
 #if NBPFILTER > 0
 		/*
 		 * Handle BPF listeners. Let the BPF user see the packet.
 		 */
 		if (ifp->if_bpf) {
-			m->m_pkthdr.len = m->m_len = total_len;
 			bpf_mtap(ifp->if_bpf, m);
 		}
 #endif
-		/* Remove header from mbuf and pass it on. */
-		m->m_pkthdr.len = m->m_len =
-				total_len - sizeof(struct ether_header);
-		m->m_data += sizeof(struct ether_header);
-		ether_input(ifp, eh, m);
+		ether_input_mbuf(ifp, m);
 	}
 
 	/*
@@ -1504,7 +1520,7 @@ int xl_intr(arg)
 		}
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	return (claimed);
@@ -1666,7 +1682,7 @@ void xl_start(ifp)
 	start_tx = sc->xl_cdata.xl_tx_free;
 
 	while(sc->xl_cdata.xl_tx_free != NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1822,7 +1838,7 @@ xl_start_90xB(ifp)
 			break;
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1990,7 +2006,11 @@ void xl_init(xsc)
 	/*
 	 * Program the multicast filter, if necessary.
 	 */
+#if 0
 	if (sc->xl_type == XL_TYPE_905B)
+#else
+	if (0)	/* xl_setmulti_hash() does not work right */
+#endif
 		xl_setmulti_hash(sc);
 	else
 		xl_setmulti(sc);
@@ -2275,7 +2295,11 @@ xl_ioctl(ifp, command, data)
 			 * Multicast list has changed; set the hardware
 			 * filter accordingly.
 			 */
+#if 0
 			if (sc->xl_type == XL_TYPE_905B)
+#else
+			if (0)	/* xl_setmulti_hash() does not work right */
+#endif
 				xl_setmulti_hash(sc);
 			else
 				xl_setmulti(sc);
@@ -2325,7 +2349,7 @@ void xl_watchdog(ifp)
 	xl_reset(sc, 0);
 	xl_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	return;
@@ -2495,8 +2519,19 @@ xl_attach(sc)
 		ifp->if_start = xl_start;
 	ifp->if_watchdog = xl_watchdog;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = XL_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, XL_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+
+#if NVLAN > 0
+	if (sc->xl_type == XL_TYPE_905B)
+		ifp->if_capabilities = IFCAP_VLAN_MTU;
+	/*
+	 * XXX
+	 * Do other cards filter large packets or simply pass them through?
+	 * Apparently only the 905B has the capability to set a larger size.
+ 	 */
+#endif
 
 	XL_SEL_WIN(3);
 	sc->xl_media = CSR_READ_2(sc, XL_W3_MEDIA_OPT);
@@ -2638,6 +2673,7 @@ xl_attach(sc)
 	ether_ifattach(ifp);
 
 	sc->sc_sdhook = shutdownhook_establish(xl_shutdown, sc);
+	sc->sc_pwrhook = powerhook_establish(xl_power, sc);
 }
 
 int

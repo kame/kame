@@ -1,4 +1,4 @@
-/*	$OpenBSD: pccom.c,v 1.37 2001/03/15 17:52:20 deraadt Exp $	*/
+/*	$OpenBSD: pccom.c,v 1.40 2001/08/08 19:07:17 mickey Exp $	*/
 /*	$NetBSD: com.c,v 1.82.4.1 1996/06/02 09:08:00 mrg Exp $	*/
 
 /*
@@ -118,7 +118,6 @@ void pccom_xr16850_fifo_init __P((bus_space_tag_t, bus_space_handle_t));
 int	comprobe __P((struct device *, void *, void *));
 void	comattach __P((struct device *, struct device *, void *));
 void	compwroff __P((struct com_softc *));
-void	com_raisedtr __P((void *));
 
 #if NPCCOM_ISA
 struct cfattach pccom_isa_ca = {
@@ -226,7 +225,7 @@ comspeed(freq, speed)
 		return -1;
 	return x;
 
-#undef	divrnd(n, q)
+#undef	divrnd
 }
 
 int
@@ -856,12 +855,6 @@ comopen(dev, flag, mode, p)
 
 		s = spltty();
 
-		sc->sc_initialize = 1;
-		comparam(tp, &tp->t_termios);
-		ttsetwater(tp);
-
-		sc->sc_rxput = sc->sc_rxget = sc->sc_tbc = 0;
-
 		iot = sc->sc_iot;
 		ioh = sc->sc_ioh;
 
@@ -882,6 +875,12 @@ comopen(dev, flag, mode, p)
 			bus_space_write_1(iot, ioh, com_ier, 0);
 			break;
 		}
+
+		sc->sc_initialize = 1;
+		comparam(tp, &tp->t_termios);
+		ttsetwater(tp);
+
+		sc->sc_rxput = sc->sc_rxget = sc->sc_tbc = 0;
 
 #ifdef COM_HAYESP
 		/* Setup the ESP board */

@@ -1,7 +1,7 @@
-/*	$OpenBSD: apmcall.S,v 1.1 2000/02/21 17:09:01 mickey Exp $	*/
+/*	$OpenBSD: apmcall.S,v 1.3 2001/06/29 22:22:45 mickey Exp $	*/
 
 /*
- * Copyright (c) 2000 Michael Shalayeff
+ * Copyright (c) 2000,2001 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -99,6 +99,10 @@ ENTRY(apmcall)
 	movl	%ecx, 8(%edi)
 	movl	%edx, 12(%edi)
 
+	testl	$0xff00, %eax
+	jnz	1f
+	xorl	%esi, %esi
+1:
 	movl	%esi, %eax
 
 	popl	%edi

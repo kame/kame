@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.9 2000/12/15 15:18:36 art Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.16 2001/09/22 18:00:06 miod Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.16 1997/07/12 16:18:36 perry Exp $	*/
 
 /*
@@ -48,7 +48,7 @@
 #include <machine/pte.h>
 
 /*
- * Machine dependent constants for HP300
+ * Machine dependent constants for amiga
  */
 /*
  * USRTEXT is the start of the user text/data space, while USRSTACK
@@ -64,7 +64,7 @@
 #define	USRTEXT		(vm_offset_t)0x2000
 #define	USRSTACK	(vm_offset_t)0x0E000000
 #define	LOWPAGES	btoc(USRTEXT)
-#define KUSER_AREA	(-UPAGES*NBPG)
+
 /*
  * Virtual memory related constants, all in bytes
  */
@@ -86,20 +86,8 @@
 #endif
 
 /*
- * Default sizes of swap allocation chunks (see dmap.h).
- * The actual values may be changed in vminit() based on MAXDSIZ.
- * With MAXDSIZ of 16Mb and NDMAP of 38, dmmax will be 1024.
- * DMMIN should be at least ctod(1) so that vtod() works.
- * vminit() insures this.
- */
-#define	DMMIN	32			/* smallest swap allocation */
-#define	DMMAX	NBPG			/* largest potential swap allocation */
-
-/*
  * Sizes of the system and user portions of the system page table.
  */
-/* SYSPTSIZE IS SILLY; IT SHOULD BE COMPUTED AT BOOT TIME */
-#define	SYSPTSIZE	(2 * NPTEPG)	/* 16mb */
 #define	USRPTSIZE 	(1 * NPTEPG)	/* 16mb */
 
 /*
@@ -130,26 +118,6 @@
 #define	MAXSLP 		20
 
 /*
- * A swapped in process is given a small amount of core without being bothered
- * by the page replacement algorithm.  Basically this says that if you are
- * swapped in you deserve some resources.  We protect the last SAFERSS
- * pages against paging and will just swap you out rather than paging you.
- * Note that each process has at least UPAGES+CLSIZE pages which are not
- * paged anyways (this is currently 8+2=10 pages or 5k bytes), so this
- * number just means a swapped in process is given around 25k bytes.
- * Just for fun: current memory prices are 4600$ a megabyte on VAX (4/22/81),
- * so we loan each swapped in process memory worth 100$, or just admit
- * that we don't consider it worthwhile and swap it out to disk which costs
- * $30/mb or about $0.75.
- * Update: memory prices have changed recently (9/96). At the current
- * value of $6 per megabyte, we lend each swapped in process memory worth
- * $0.15, or just admit that we don't consider it worthwhile and swap it out
- * to disk which costs $0.20/MB, or just under half a cent.
- */
-#define	SAFERSS		4		/* nominal ``small'' resident set size
-					   protected against replacement */
-
-/*
  * user/kernel map constants
  */
 #define VM_MIN_ADDRESS		((vm_offset_t)0)
@@ -162,10 +130,8 @@
  * virtual sizes (bytes) for various kernel submaps
  */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
-#define VM_PHYS_SIZE		(USRIOSIZE*CLBYTES)
-
-#define MACHINE_NEW_NONCONTIG
+#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 #define VM_PHYSSEG_MAX		(16)
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_RANDOM
@@ -193,16 +159,5 @@ struct pmap_physseg {
  * number of kernel PT pages (initial only, can grow dynamically)
  */
 #define VM_KERNEL_PT_PAGES	((vm_size_t)8)
-
-/*
- * XXX Override MI values for number of kernel maps and entries to statically
- * allocate, as we seem to lose hanging in high IPL with the MI values.
- */
-#ifndef MAX_KMAP
-#define MAX_KMAP	10
-#endif
-#ifndef MAX_KMAPENT
-#define MAX_KMAPENT	500
-#endif
 
 #endif /* !_MACHINE_VMPARAM_H_ */

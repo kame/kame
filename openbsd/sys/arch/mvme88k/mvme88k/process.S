@@ -1,4 +1,4 @@
-/*	$OpenBSD: process.S,v 1.8 2001/03/09 05:44:42 smurph Exp $	*/
+/*	$OpenBSD: process.S,v 1.11 2001/08/26 14:31:12 miod Exp $	*/
 /*
  * Copyright (c) 1996 Nivas Madhur
  * All rights reserved.
@@ -30,14 +30,10 @@
  *
  */
 
-#ifndef ASSEMBLER
-#define	ASSEMBLER
-#endif /* ASSEMBLER */
-
-#include "assym.s"
-#include "machine/asm.h"
-#include "machine/psl.h"
-#include "machine/intr.h"
+#include "assym.h"
+#include <machine/asm.h>
+#include <machine/psl.h>
+#include <machine/intr.h>
 
 	data
 	align 4
@@ -96,7 +92,7 @@ ENTRY(switch_exit)
  * When no processes are on the runq, switch
  * idles here watiing for something to come ready.
  */
-LABEL(idle)
+ASGLOBAL(idle)
 	or.u	r10, r0, hi16(_curproc)
 	st	r0, r10, lo16(_curproc)	/* curproc = NULL */
 
@@ -144,9 +140,6 @@ ENTRY(cpu_switch)
 
 	or.u	r11, r0, hi16(_curproc)
 	ld	r11,r11, lo16(_curproc)
-
-	or.u	r12, r0, hi16(_lastproc)
-	st	r11, r12, lo16(_lastproc)/* lastproc = curproc */
 
 	or.u	r11, r0, hi16(_curproc)
 	st	r0, r11, lo16(_curproc)	/* curproc = NULL */
@@ -239,11 +232,6 @@ Lsw2:
 	or.u	r11, r0, hi16(_curproc)
 	st	r9,  r11,lo16(_curproc)		/* curproc = p */
 	
-#ifdef notyet
-	or.u	r2, r0, hi16(_lastproc)
-	ld	r2, r2, lo16(_lastproc)
-#endif /* notyet */
-
 	/* huh??? */
 	or.u	r10, r0, hi16(_curpcb)
 	ld	r10,r10, lo16(_curpcb)

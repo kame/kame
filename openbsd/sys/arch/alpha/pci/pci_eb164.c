@@ -1,4 +1,4 @@
-/* $OpenBSD: pci_eb164.c,v 1.6 2001/02/06 19:28:59 art Exp $ */
+/* $OpenBSD: pci_eb164.c,v 1.10 2001/08/17 22:55:09 mickey Exp $ */
 /* $NetBSD: pci_eb164.c,v 1.27 2000/06/06 00:50:15 thorpej Exp $ */
 
 /*-
@@ -98,6 +98,7 @@
 int	dec_eb164_intr_map __P((void *, pcitag_t, int, int,
 	    pci_intr_handle_t *));
 const char *dec_eb164_intr_string __P((void *, pci_intr_handle_t));
+int	dec_eb164_intr_line __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_eb164_intr_evcnt __P((void *, pci_intr_handle_t));
 void	*dec_eb164_intr_establish __P((void *, pci_intr_handle_t,
 	    int, int (*func)(void *), void *, char *));
@@ -105,6 +106,7 @@ void	dec_eb164_intr_disestablish __P((void *, void *));
 
 void	*dec_eb164_pciide_compat_intr_establish __P((void *, struct device *,
 	    struct pci_attach_args *, int, int (*)(void *), void *));
+void    dec_eb164_pciide_compat_intr_disestablish __P((void *, void *));
 
 #define	EB164_SIO_IRQ	4  
 #define	EB164_MAX_IRQ	24
@@ -130,11 +132,14 @@ pci_eb164_pickintr(ccp)
         pc->pc_intr_v = ccp;
         pc->pc_intr_map = dec_eb164_intr_map;
         pc->pc_intr_string = dec_eb164_intr_string;
+        pc->pc_intr_line = dec_eb164_intr_line;
         pc->pc_intr_establish = dec_eb164_intr_establish;
         pc->pc_intr_disestablish = dec_eb164_intr_disestablish;
 
 	pc->pc_pciide_compat_intr_establish =
 	    dec_eb164_pciide_compat_intr_establish;
+	pc->pc_pciide_compat_intr_disestablish =
+	    dec_eb164_pciide_compat_intr_disestablish;
 
 	eb164_intrgate_iot = iot;
 	if (bus_space_map(eb164_intrgate_iot, 0x804, 3, 0,
@@ -253,6 +258,14 @@ dec_eb164_intr_string(ccv, ih)
         return (irqstr);
 }
 
+int
+dec_eb164_intr_line(ccv, ih)
+	void *ccv;
+	pci_intr_handle_t ih;
+{
+	return (ih);
+}
+
 void *
 dec_eb164_intr_establish(ccv, ih, level, func, arg, name)
         void *ccv, *arg;
@@ -330,6 +343,12 @@ dec_eb164_pciide_compat_intr_establish(v, dev, pa, chan, func, arg)
 		return (NULL);
 #endif
 	return (cookie);
+}
+
+void
+dec_eb164_pciide_compat_intr_disestablish(void *v, void *cookie)
+{
+	sio_intr_disestablish(NULL, cookie);
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.2 1997/09/17 17:45:20 downsj Exp $	*/
+/*	$OpenBSD: param.h,v 1.4 2001/07/06 02:07:42 provos Exp $	*/
 /*	$NetBSD: param.h,v 1.2 1997/06/10 18:21:23 veego Exp $	*/
 
 /*
@@ -78,10 +78,6 @@
 #define BLKDEV_IOSIZE	2048
 #define	MAXPHYS		(64 * 1024)	/* max raw I/O transfer size */
 
-#define	CLSIZELOG2	0
-#define	CLSIZE		(1 << CLSIZELOG2)
-
-/* NOTE: SSIZE, SINCR and UPAGES must be multiples of CLSIZE */
 #define	SSIZE		1		/* initial stack size/NBPG */
 #define	SINCR		1		/* increment of stack/NBPG */
 
@@ -98,7 +94,7 @@
  * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
  * of the hardware page size.
  */
-#define	MSIZE		128		/* size of an mbuf */
+#define	MSIZE		256		/* size of an mbuf */
 
 #ifndef	MCLSHIFT
 # define	MCLSHIFT	11	/* convert bytes to m_buf clusters */

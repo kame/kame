@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofbus.c,v 1.9 2000/10/16 00:18:01 drahn Exp $	*/
+/*	$OpenBSD: ofbus.c,v 1.11 2001/08/24 14:36:31 drahn Exp $	*/
 /*	$NetBSD: ofbus.c,v 1.3 1996/10/13 01:38:11 christos Exp $	*/
 
 /*
@@ -33,13 +33,17 @@
  */
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/systm.h>
 
 #include <machine/autoconf.h>
 #include <dev/ofw/openfirm.h>
 
 /* a bit of a hack to prevent conflicts between ofdisk and sd/wd */
 #include "sd.h"
+
+extern void systype(char *);
 
 int ofrprobe __P((struct device *, void *, void *));
 void ofrattach __P((struct device *, struct device *, void *));
@@ -95,7 +99,6 @@ ofrprobe(parent, cf, aux)
 	struct device *parent;
 	void *cf, *aux;
 {
-	int node;
 	struct confargs *ca = aux;
 	
 	if (strcmp(ca->ca_name, ofroot_cd.cd_name) != 0)
@@ -112,10 +115,11 @@ ofrattach(parent, dev, aux)
 	char name[64];
 	struct ofprobe *ofp = aux;
 	struct ofprobe probe;
-	int units;
 	int node;
+#ifdef HAVE_SYSTYPE
 	char ofname[64];
 	int l;
+#endif
 	
         if (!(node = OF_peer(0)))
                 panic("No PROM root");
@@ -125,6 +129,7 @@ ofrattach(parent, dev, aux)
 	ofbprint(ofp, 0);
 	printf("\n");
 
+#ifdef HAVE_SYSTYPE
 	if ((l = OF_getprop(ofp->phandle, "model", ofname, sizeof ofname - 1)) < 0)
 	{
 		/* no system name? */
@@ -134,6 +139,7 @@ ofrattach(parent, dev, aux)
 		ofname[l] = 0;
 		systype(ofname);
 	}
+#endif
 	ofw_intr_establish();
 		
 

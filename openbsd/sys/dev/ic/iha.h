@@ -1,8 +1,8 @@
-/*	$OpenBSD: iha.h,v 1.2 2001/02/08 17:35:05 krw Exp $ */
+/*	$OpenBSD: iha.h,v 1.7 2001/08/26 02:39:05 krw Exp $ */
 /*
  * Initio INI-9xxxU/UW SCSI Device Driver
  *
- * Copyright (c) 2000 Ken Westerback
+ * Copyright (c) 2000-2001 Ken Westerback
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,8 +48,6 @@
 #define IHA_MAX_SCB		32
 #define IHA_MAX_EXTENDED_MSG	 4 /* SDTR(3) and WDTR(4) only */
 
-#define OFFSETOF(type, member)	((size_t)(&((type *)0)->member))
-
 #define SCSI_CONDITION_MET    0x04 /* SCSI Status codes not defined */
 #define SCSI_INTERM_COND_MET  0x14 /*     in scsi_all.h             */
 #define SCSI_RSERV_CONFLICT   0x18
@@ -66,7 +64,7 @@ struct iha_sg_element {
 
 /*
  * iha_scsi_req_q - SCSI Request structure used by the
- *		    Tulip (aka inic-950). Note that 32
+ *		    Tulip (aka inic-940/950). Note that 32
  *		    bit pointers and ints are assumed!
  */
 
@@ -135,7 +133,6 @@ struct tcs {
 #define		      FLAG_SYNC_DONE	 0x0200 /* SDTR msg has been sent    */
 #define		      FLAG_NO_NEG_SYNC   (FLAG_NO_SYNC | FLAG_SYNC_DONE)
 #define		      FLAG_NO_NEG_WIDE   (FLAG_NO_WIDE | FLAG_WIDE_DONE)
-#define		      FLAG_NO_NEGOTIATE	 (FLAG_NO_NEG_SYNC | FLAG_NO_NEG_WIDE)
 	u_int8_t  TCS_JS_Period;
 #define		      PERIOD_WIDE_SCSI	 0x80	/* Enable Wide SCSI	     */
 #define		      PERIOD_SYXPD	 0x70	/* Synch. SCSI Xfer rate     */
@@ -195,7 +192,7 @@ struct iha_softc {
  *   EEPROM for one SCSI Channel
  *
  */
-struct nvram_scsi {
+struct iha_nvram_scsi {
 	u_int8_t  NVM_SCSI_Id;	    /* 0x00 Channel Adapter SCSI Id          */
 	u_int8_t  NVM_SCSI_Cfg;	    /* 0x01 Channel configuration            */
 #define		      CFG_SCSI_RESET 0x0001 /*     Reset bus at power up     */
@@ -204,19 +201,17 @@ struct nvram_scsi {
 #define		      CFG_ACT_TERM2  0x0008 /*     Enable active term 2      */
 #define		      CFG_AUTO_TERM  0x0010 /*     Enable auto terminator    */
 #define		      CFG_EN_PWR     0x0080 /*     Enable power mgmt         */
-#define		      CFG_DEFAULT (CFG_SCSI_RESET | CFG_AUTO_TERM | CFG_EN_PAR)
 	u_int8_t  NVM_SCSI_CfgByte2;        /* 0x02 Unused Channel Cfg byte 2*/
 	u_int8_t  NVM_SCSI_Targets;	    /* 0x03 Number of SCSI targets   */
 					    /* 0x04 Lower bytes of targ flags*/
 	u_int8_t  NVM_SCSI_TargetFlags[IHA_MAX_TARGETS];
-#define		      FLAG_DEFAULT   (FLAG_NO_WIDE | FLAG_1GIGA | FLAG_EN_DISC)
 };
 
 /*
- * Tulip (aka ini-950) Serial EEPROM Layout
+ * Tulip (aka ini-940/950) Serial EEPROM Layout
  *
  */
-struct nvram {
+struct iha_nvram {
 	/* ---------- Header ------------------------------------------------*/
 	u_int16_t  NVM_Signature;	       /* 0x00 NVRAM Signature	     */
 #define		       SIGNATURE	0xC925
@@ -242,7 +237,7 @@ struct nvram {
 #define		       HACFG_LUNMASK	  0x70 /*      Boot LUN number	     */
 #define		       HACFG_CHANMASK	  0x80 /*      Boot Channel number   */
 	u_int8_t   NVM_HAConfig2;	       /* 0x0b Host adapter config 2 */
-	struct nvram_scsi NVM_Scsi[2];         /* 0x0c		             */
+	struct iha_nvram_scsi NVM_Scsi[2];     /* 0x0c		             */
 	u_int8_t   NVM_Reserved[10];	       /* 0x34			     */
 
 	/* --------- CheckSum -----------------------------------------------*/
@@ -250,7 +245,7 @@ struct nvram {
 };
 
 /*
- *  Tulip (aka inic-950) PCI Configuration Space Initio Specific Registers
+ *  Tulip (aka inic-940/950) PCI Configuration Space Initio Specific Registers
  *
  *  Offsets 0x00 through 0x3f are the standard PCI Configuration Header
  *  registers.
@@ -261,7 +256,7 @@ struct nvram {
  *  Registers 0x50 and 0x52 always read as 0.
  *
  *  The register offset names and associated bit field names are taken
- *  from the Init-950 Data Sheet, Version 2.1, March 1997
+ *  from the Inic-950 Data Sheet, Version 2.1, March 1997
  */
 #define TUL_GCTRL0	0x54	       /* R/W Global Control 0		     */
 #define	    EEPRG	    0x04       /*     Enable EEPROM Programming	     */
@@ -282,7 +277,7 @@ struct nvram {
 #define	    NVRDI	    0x01       /*     NVRAM Read  Data		     */
 
 /*
- *   Tulip (aka inic-950) SCSI Registers
+ *   Tulip (aka inic-940/950) SCSI Registers
  */
 #define TUL_STCNT0	0x80	       /* R/W 24 bit SCSI Xfer Count	     */
 #define	    TCNT	    0x00ffffff /*     SCSI Xfer Transfer Count	     */
@@ -386,7 +381,7 @@ struct nvram {
 #define TUL_STEST1	0x93	       /* R/W Test1			     */
 
 /*
- *   Tulip (aka inic-950) DMA Registers
+ *   Tulip (aka inic-940/950) DMA Registers
  */
 #define TUL_DXPA	0xC0	       /* R/W DMA      Xfer Physcl Addr	 0-31*/
 #define TUL_DXPAE	0xC4	       /* R/W DMA      Xfer Physcl Addr 32-63*/
@@ -451,8 +446,13 @@ int  iha_intr	    __P((void *));
 void iha_minphys    __P((struct buf *));
 int  iha_init_tulip __P((struct iha_softc *));
 
-
-
+#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
+#define	iha_bus_dmamap_sync(tag, map, off, len, op)	\
+    bus_dmamap_sync((tag), (map), (off), (len), (op))
+#else
+#define	iha_bus_dmamap_sync(tag, map, off, len, op)	\
+    bus_dmamap_sync((tag), (map), (op))
+#endif
 
 
 

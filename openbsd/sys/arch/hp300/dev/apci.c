@@ -1,9 +1,44 @@
-/*	$OpenBSD: apci.c,v 1.3 1997/09/14 03:43:01 downsj Exp $	*/
-/*	$NetBSD: apci.c,v 1.1 1997/05/12 08:12:36 thorpej Exp $	*/
+/*	$OpenBSD: apci.c,v 1.11 2001/09/23 07:05:06 millert Exp $	*/
+/*	$NetBSD: apci.c,v 1.9 2000/11/02 00:35:05 eeh Exp $	*/
+
+/*-
+ * Copyright (c) 1996, 1997, 1999 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Jason R. Thorpe.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by the NetBSD
+ *	Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*      
  * Copyright (c) 1997 Michael Smith.  All rights reserved.
- * Copyright (c) 1995, 1996, 1997 Jason R. Thorpe.  All rights reserved.
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -69,6 +104,7 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/device.h>       
+#include <sys/timeout.h>       
     
 #include <machine/autoconf.h>
 #include <machine/cpu.h>
@@ -85,10 +121,15 @@
 #include <hp300/dev/apcireg.h>
 #include <hp300/dev/dcareg.h>		/* register bit definitions */
 
+#ifdef DDB
+#include <ddb/db_var.h>
+#endif
+
 struct apci_softc {
 	struct	device sc_dev;		/* generic device glue */
 	struct	apciregs *sc_apci;	/* device registers */
 	struct	tty *sc_tty;		/* tty glue */
+	struct	timeout sc_timeout;	/* timeout */
 	int	sc_ferr,
 		sc_perr,
 		sc_oflow,
@@ -121,8 +162,6 @@ void	apcistart __P((struct tty *));
 int	apcimctl __P((struct apci_softc *, int, int));
 void	apciinit __P((struct apciregs *, int));
 void	apcitimeout __P((void *));
-
-int	apcicheckdca __P((void));
 
 cdev_decl(apci);
 
@@ -180,16 +219,11 @@ apcimatch(parent, match, aux)
 	case FRODO_APCI_OFFSET(1):
 	case FRODO_APCI_OFFSET(2):
 	case FRODO_APCI_OFFSET(3):
-		break;
-	default:
-		return (0);
+		/* Yup, we exist! */
+		return (1);
 	}
 
-	/* Make sure there's not a DCA in the way. */
-	if (fa->fa_offset == FRODO_APCI_OFFSET(1) && apcicheckdca())
-		return (0);
-
-	return (1);
+	return (0);
 }
 
 void
@@ -204,6 +238,9 @@ apciattach(parent, self, aux)
 	sc->sc_apci = apci =
 	    (struct apciregs *)IIOV(FRODO_BASE + fa->fa_offset);
 	sc->sc_flags = 0;
+
+	/* Initialize timeout structure */
+	timeout_set(&sc->sc_timeout, apcitimeout, sc);
 
 	/* Are we the console? */
 	if (apci == apci_cn) {
@@ -223,7 +260,7 @@ apciattach(parent, self, aux)
 	if ((apci->ap_iir & IIR_FIFO_MASK) == IIR_FIFO_MASK)
 		sc->sc_flags |= APCI_HASFIFO;
 
-	/* Establish out interrupt handler. */
+	/* Establish our interrupt handler. */
 	frodo_intr_establish(parent, apciintr, sc, fa->fa_line,
 	    (sc->sc_flags & APCI_HASFIFO) ? IPL_TTY : IPL_TTYNOBUF);
 
@@ -368,7 +405,7 @@ apciopen(dev, flag, mode, p)
 	if (error == 0) {
 		/* clear errors, start timeout */
 		sc->sc_ferr = sc->sc_perr = sc->sc_oflow = sc->sc_toterr = 0;
-		timeout(apcitimeout, sc, hz);
+		timeout_add(&sc->sc_timeout, hz);
 	}
 
 	return (error);
@@ -523,6 +560,13 @@ apcieint(sc, stat)
 	c = apci->ap_data;
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return;
+
+#ifdef DDB
+	if ((sc->sc_flags & APCI_ISCONSOLE) && db_console && (stat & LSR_BI)) {
+		Debugger();
+		return;
+	}
+#endif
 
 	if (stat & (LSR_BI | LSR_FE)) {
 		c |= TTY_FE;
@@ -703,7 +747,7 @@ apciparam(tp, t)
 		(void) apcimctl(sc, 0, DMSET);	/* hang up line */
 
 	/*
-	 * Set the FIFO threshold based on the recieve speed, if we
+	 * Set the FIFO threshold based on the receive speed, if we
 	 * are changing it.
 	 */
 	if (tp->t_ispeed != t->c_ispeed) {
@@ -719,7 +763,7 @@ apciparam(tp, t)
 		apci->ap_ier = (ospeed >> 8) & 0xff;
 		apci->ap_cfcr = cfcr;
 	} else
-		apci->ap_cfcr;
+		apci->ap_cfcr = cfcr;
 
 	/* and copy to tty */
 	tp->t_ispeed = t->c_ispeed;
@@ -727,7 +771,6 @@ apciparam(tp, t)
 	tp->t_cflag = cflag;
 
 	apci->ap_ier = IER_ERXRDY | IER_ETXRDY | IER_ERLS | IER_EMSC;
-	apci->ap_mcr |= MCR_IEN;
 
 	splx(s);
 	return (0);
@@ -793,14 +836,6 @@ apcimctl(sc, bits, how)
 {
 	struct apciregs *apci = sc->sc_apci;
 	int s;
-
-	/*
-	 * Always make sure MCR_IEN is set (unless setting to 0)
-	 */
-	if (how == DMBIS || (how == DMSET && bits))
-		bits |= MCR_IEN;
-	else if (how == DMBIC)
-		bits &= ~MCR_IEN;
 
 	s = spltty();
 
@@ -876,47 +911,8 @@ apcitimeout(arg)
 		    sc->sc_dev.dv_xname, ferr, perr, oflow, sc->sc_toterr);
 	}
 
-	timeout(apcitimeout, sc, hz);
+	timeout_add(&sc->sc_timeout, hz);
 }
-
-int
-apcicheckdca()
-{
-	caddr_t va;
-	int rv = 0;
-
-	/*
-	 * On systems that also have a dca at select code 9, we
-	 * cannot use the second UART, as it is mapped to select
-	 * code 9 by the firmware.  We check for this by mapping
-	 * select code 9 and checking for a dca.  Yuck.
-	 */
-	va = iomap(dio_scodetopa(9), NBPG);
-	if (va == NULL) {
-		printf("apcicheckdca: can't map scode 9!\n");
-		return (1);	/* Safety. */
-	}
-
-	/* Check for hardware. */
-	if (badaddr(va)) {
-		/* Nothing there, assume APCI. */
-		goto unmap;
-	}
-
-	/* Check DIO ID against DCA IDs. */
-	switch (DIO_ID(va)) {
-	case DIO_DEVICE_ID_DCA0:
-	case DIO_DEVICE_ID_DCA0REM:
-	case DIO_DEVICE_ID_DCA1:
-	case DIO_DEVICE_ID_DCA1REM:
-		rv = 1;
-	}
- unmap:
-	iounmap(va, NBPG);
-
-	return (rv);
-}
-
 
 /*
  * The following routines are required for the APCI to act as the console.
@@ -940,27 +936,29 @@ apcicnprobe(cp)
 	if (conforced)
 		return;
 
-	/* These can only exist on 400-series machines. */
-	switch (machineid) {
-	case HP_400:
-	case HP_425:
-	case HP_433:
-		break;
-
-	default:
+	/*
+	 * The APCI can only be a console on a 425e; on other 4xx
+	 * models, the "first" serial port is mapped to the DCA
+	 * at select code 9.  See frodo.c for the autoconfiguration
+	 * version of this check.
+	 */
+	if (machineid != HP_425 || mmuid != MMUID_425_E)
 		return;
-	}
 
-	/* Make sure a DCA isn't in the way. */
-	if (apcicheckdca() == 0) {
 #ifdef APCI_FORCE_CONSOLE
-		cp->cn_pri = CN_REMOTE;
-		conforced = 1;
-		conscode = -2;			/* XXX */
+	cp->cn_pri = CN_REMOTE;
+	conforced = 1;
+	conscode = -2;			/* XXX */
 #else
-		cp->cn_pri = CN_NORMAL;
+	cp->cn_pri = CN_NORMAL;
 #endif
-	}
+
+	/*
+	 * If our priority is higher than the currently-remembered
+	 * console, install ourselves.
+	 */
+	if (((cn_tab == NULL) || (cp->cn_pri > cn_tab->cn_pri)) || conforced)
+		cn_tab = cp;
 }
 
 /* ARGSUSED */
@@ -986,6 +984,8 @@ apcicngetc(dev)
 	while (((stat = apci_cn->ap_lsr) & LSR_RXRDY) == 0)
 		;
 	c = apci_cn->ap_data;
+
+	/* clear any interrupts generated by this transmission */
 	stat = apci_cn->ap_iir;
 	splx(s);
 	return (c);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fe.c,v 1.13 2001/02/20 19:39:40 mickey Exp $	*/
+/*	$OpenBSD: if_fe.c,v 1.18 2001/09/20 17:02:31 mpech Exp $	*/
 
 /*
  * All Rights Reserved, Copyright (C) Fujitsu Limited 1995
@@ -236,8 +236,6 @@ struct cfdriver fe_cd = {
 /* Ethernet constants.  To be defined in if_ehter.h?  FIXME. */
 #define ETHER_MIN_LEN	60	/* with header, without CRC. */
 #define ETHER_MAX_LEN	1514	/* with header, without CRC. */
-#define ETHER_ADDR_LEN	6	/* number of bytes in an address. */
-#define ETHER_HDR_SIZE	14	/* src addr, dst addr, and data type. */
 
 /*
  * Fe driver specific constants which relate to 86960/86965.
@@ -1001,21 +999,7 @@ feattach(parent, self, aux)
 	ifp->if_watchdog = fe_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
-
-	/*
-	 * Set maximum size of output queue, if it has not been set.
-	 * It is done here as this driver may be started after the
-	 * system intialization (i.e., the interface is PCMCIA.)
-	 *
-	 * I'm not sure this is really necessary, but, even if it is,
-	 * it should be done somewhere else, e.g., in if_attach(),
-	 * since it must be a common workaround for all network drivers.
-	 * FIXME.
-	 */
-	if (ifp->if_snd.ifq_maxlen == 0) {
-		extern int ifqmaxlen;		/* Don't be so shocked... */
-		ifp->if_snd.ifq_maxlen = ifqmaxlen;
-	}
+	IFQ_SET_READY(&ifp->if_snd);
 
 #if FE_DEBUG >= 3
 	log(LOG_INFO, "%s: feattach()\n", sc->sc_dev.dv_xname);
@@ -1510,7 +1494,7 @@ fe_start(ifp)
 		/*
 		 * Get the next mbuf chain for a packet to send.
 		 */
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0) {
 			/* No more packets to send. */
 			goto indicate_inactive;
@@ -1632,7 +1616,7 @@ fe_tint(sc, tstat)
 		 * packet transmission.  When we send two or more packets
 		 * with one start command (that's what we do when the
 		 * transmission queue is clauded), 86960 informs us number
-		 * of collisions occured on the last packet on the
+		 * of collisions occurred on the last packet on the
 		 * transmission only.  Number of collisions on previous
 		 * packets are lost.  I have told that the fact is clearly
 		 * stated in the Fujitsu document.
@@ -2019,7 +2003,6 @@ fe_get_packet(sc, len)
 	struct fe_softc *sc;
 	int len;
 {
-	struct ether_header *eh;
 	struct mbuf *m;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 
@@ -2059,7 +2042,6 @@ fe_get_packet(sc, len)
 	 * header mbuf.
 	 */
 	m->m_data += EOFF;
-	eh = mtod(m, struct ether_header *);
 
 	/* Set the length of this packet. */
 	m->m_len = len;
@@ -2076,9 +2058,7 @@ fe_get_packet(sc, len)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
 
-	/* Fix up data start offset in mbuf to point past ether header. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	ether_input_mbuf(ifp, m);
 	return (1);
 }
 
@@ -2093,7 +2073,7 @@ fe_get_packet(sc, len)
  *
  * I wrote a code for an experimental "delayed padding" technique.
  * When employed, it postpones the padding process for short packets.
- * If xmit() occured at the moment, the padding process is omitted, and
+ * If xmit() occurred at the moment, the padding process is omitted, and
  * garbages are sent as pad data.  If next packet is stored in the
  * transmission buffer before xmit(), write_mbuf() pads the previous
  * packet before transmitting new packet.  This *may* gain the

@@ -1,4 +1,4 @@
-/*	$OpenBSD: m18x_cmmu.c,v 1.8 2001/03/18 01:49:39 miod Exp $	*/
+/*	$OpenBSD: m18x_cmmu.c,v 1.14 2001/08/31 01:52:22 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -172,13 +172,6 @@ error("ack gag barf!");
  * May be used from "db_interface.c".
  */
 
-extern unsigned cache_policy;
-extern unsigned cpu_sets[];
-extern unsigned number_cpus;
-extern unsigned master_cpu;
-extern int      max_cpus, max_cmmus;
-extern int      cpu_cmmu_ratio;
-
 int      vme188_config;
 
 /* prototypes */
@@ -194,6 +187,8 @@ void m18x_cmmu_set __P((int reg, unsigned val, int flags, int num,
 void m18x_cmmu_sync_cache __P((vm_offset_t physaddr, int size));
 void m18x_cmmu_sync_inval_cache __P((vm_offset_t physaddr, int size));
 void m18x_cmmu_inval_cache __P((vm_offset_t physaddr, int size));
+int m18x_cmmu_alive __P((int));
+void m18x_cmmu_store __P((int, int, unsigned));
 
 #ifdef CMMU_DEBUG
 void
@@ -290,8 +285,7 @@ struct board_config {
 	int supported;
 	int ncpus;
 	int ncmmus;
-} bd_config[] =
-{
+} bd_config[] = {
 	/* sup, CPU MMU */
 	{  1,  4,  8}, /* 4P128 - 4P512 */
 	{  1,  2,  8}, /* 2P128 - 2P512 */
@@ -315,8 +309,7 @@ struct board_config {
  * Structure for accessing MMUS properly.
  */
 
-struct cmmu cmmu[MAX_CMMUS] =
-{
+struct cmmu cmmu[MAX_CMMUS] = {
 	/* addr    cpu       mode           access
       alive   addr mask */
 	{(void *)VME_CMMU_I0, -1, INST_CMMU, CMMU_ACS_BOTH, 
@@ -350,11 +343,6 @@ m18x_setup_board_config()
 	switch (cputyp) {
 #ifdef MVME187
 	case CPU_187:
-#endif
-#ifdef MVME197
-	case CPU_197:
-#endif
-#if defined(MVME187) || defined(MVME197)
 		vme188_config = 10; /* There is no WHOAMI reg on MVME1x7 - fake it... */
 		cmmu[0].cmmu_regs = (void *)SBC_CMMU_I;
 		cmmu[0].cmmu_cpu = 0;
@@ -369,7 +357,7 @@ m18x_setup_board_config()
 		max_cpus = 1;
 		max_cmmus = 2;
 		break;
-#endif /* defined(MVME187) || defined(MVME197) */
+#endif /* defined(MVME187) */
 #ifdef MVME188
 	case CPU_188:
 		whoami = (volatile unsigned long *)MVME188_WHOAMI;
@@ -380,15 +368,13 @@ m18x_setup_board_config()
 		max_cmmus = bd_config[vme188_config].ncmmus;
 		break;
 #endif /* MVME188 */
-	default:
-		panic("m18x_setup_board_config: Unknown CPU type.");
 	}
 	cpu_cmmu_ratio = max_cmmus / max_cpus;
 	switch (bd_config[vme188_config].supported) {
 	case 0:
 		printf("MVME%x board configuration #%X: %d CPUs %d CMMUs\n", cputyp, 
 		       vme188_config, max_cpus, max_cmmus);
-		panic("This configuration is not supported - go and get another OS.\n");
+		panic("This configuration is not supported - go and get another OS.");
 		/* NOTREACHED */
 		break;
 	case 1:
@@ -397,7 +383,7 @@ m18x_setup_board_config()
 		m18x_setup_cmmu_config();
 		break;
 	default:
-		panic("UNKNOWN MVME%x board configuration: WHOAMI = 0x%02x\n", cputyp, *whoami);
+		panic("UNKNOWN MVME%x board configuration: WHOAMI = 0x%02x", cputyp, *whoami);
 		/* NOTREACHED */
 		break;
 	}
@@ -638,18 +624,13 @@ m18x_cmmu_dump_config()
 	switch (cputyp) {
 #ifdef MVME187
 	case CPU_187:
-#endif
-#ifdef MVME197
-	case CPU_197:
-#endif
-#if defined(MVME187) || defined(MVME197)
 		DEBUG_MSG("VME1x7 split mode\n\n");
-#endif /* defined(MVME187) || defined(MVME197) */
+#endif /* defined(MVME187) */
 #ifdef MVME188
 	case CPU_188:
-		DEBUG_MSG("VME188 address decoder: PCNFA = 0x%1x, PCNFB = 0x%1x\n\n", *pcnfa & 0xf, *pcnfb & 0xf);
 		pcnfa = (volatile unsigned long *)MVME188_PCNFA;
 		pcnfb = (volatile unsigned long *)MVME188_PCNFB;
+		DEBUG_MSG("VME188 address decoder: PCNFA = 0x%1x, PCNFB = 0x%1x\n\n", *pcnfa & 0xf, *pcnfb & 0xf);
 		for (cmmu_num = 0; cmmu_num < max_cmmus; cmmu_num++) {
 			DEBUG_MSG("CMMU #%d: %s CMMU for CPU %d:\n Strategy: %s\n %s access addr 0x%08x mask 0x%08x match %s\n",
 				  cmmu_num,
@@ -666,18 +647,16 @@ m18x_cmmu_dump_config()
 				  cmmu[cmmu_num].cmmu_addr_match ? "TRUE" : "FALSE");
 		}
 #endif /* MVME188 */
-	default:
-		DEBUG_MSG("Unknown CPU\n\n");
 	}
 }
 
 /* To be implemented as a macro for speedup - XXX-em */
-static void 
+void
 m18x_cmmu_store(mmu, reg, val)
 	int mmu, reg;
 	unsigned val;
 {
-	*(volatile unsigned *)(reg + (char*)(cmmu[mmu].cmmu_regs)) = val;
+	*(volatile unsigned *)(reg + (char *)(cmmu[mmu].cmmu_regs)) = val;
 }
 
 int 
@@ -1243,7 +1222,7 @@ m18x_cmmu_flush_remote_tlb(cpu, kernel, vaddr, size)
 		cpu = cpu_number();
 	}
 
-	if ((unsigned)size > M88K_PGBYTES) {
+	if ((unsigned)size > PAGE_SIZE) {
 		/*
 		REGS(cpu, INST_CMMU).scr =
 		REGS(cpu, DATA_CMMU).scr =
@@ -2000,7 +1979,7 @@ m18x_cmmu_show_translation(address, supervisor_flag, verbose_flag, cmmu_num)
 				  thread->task->map, thread->task->map->pmap);
 		}
 		apr_data.bits = 0;
-		apr_data.field.st_base = M88K_BTOP(thread->task->map->pmap->sdt_paddr);
+		apr_data.field.st_base = atop(thread->task->map->pmap->sdt_paddr);
 		apr_data.field.wt = 0;
 		apr_data.field.g  = 1;
 		apr_data.field.ci = 0;
@@ -2340,8 +2319,6 @@ m18x_cmmu_cache_state(addr, supervisor_flag)
 
 }
 
-#endif /* DDB */
-
 void
 m18x_show_cmmu_info(addr)
 	unsigned addr;
@@ -2357,3 +2334,5 @@ m18x_show_cmmu_info(addr)
 			m18x_cmmu_show_translation(addr, 1, 0, cmmu_num);
 		}
 }
+
+#endif /* DDB */

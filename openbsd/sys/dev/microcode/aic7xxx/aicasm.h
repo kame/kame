@@ -1,4 +1,4 @@
-/* $OpenBSD$ */
+/* $OpenBSD: aicasm.h,v 1.1 2000/03/22 02:50:49 smurph Exp $ */
 /*
  * Assembler for the sequencer program downloaded to Aic7xxx SCSI host adapters
  *

@@ -1,4 +1,4 @@
-/*	$OpenBSD: maestro.c,v 1.4 2001/03/13 01:45:56 deraadt Exp $	*/
+/*	$OpenBSD: maestro.c,v 1.11 2001/09/21 17:55:44 miod Exp $	*/
 /* $FreeBSD: /c/ncvs/src/sys/dev/sound/pci/maestro.c,v 1.3 2000/11/21 12:22:11 julian Exp $ */
 /*
  * FreeBSD's ESS Agogo/Maestro driver 
@@ -202,6 +202,7 @@ void	maestro_powerhook __P((int, void *));
 void 	maestro_channel_start __P((struct maestro_channel *));
 void 	maestro_channel_stop __P((struct maestro_channel *));
 void 	maestro_channel_advance_dma __P((struct maestro_channel *));
+void	maestro_channel_suppress_jitter __P((struct maestro_channel *));
 
 int	maestro_get_flags __P((struct pci_attach_args *));
 
@@ -339,8 +340,7 @@ maestro_attach(parent, self, aux)
 	sc->dmat = pa->pa_dmat;
 
 	/* Map interrupt */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-	    &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}
@@ -361,7 +361,7 @@ maestro_attach(parent, self, aux)
 
 	/* Map i/o */
 	if ((error = pci_mapreg_map(pa, PCI_MAPS, PCI_MAPREG_TYPE_IO, 
-	    0, &sc->iot, &sc->ioh, NULL, NULL)) != 0) {
+	    0, &sc->iot, &sc->ioh, NULL, NULL, 0)) != 0) {
 		printf(", couldn't map i/o space\n");
 		goto bad;
 	};
@@ -613,7 +613,7 @@ maestro_mappage(self, mem, off, prot)
 	if (off < 0)
 		return -1;
 	return bus_dmamem_mmap(sc->dmat, &sc->dmaseg, 1,
-	    (caddr_t)mem - sc->dmabase + off, prot, BUS_DMA_WAITOK);
+		off, prot, BUS_DMA_WAITOK);
 }
 
 int
@@ -826,8 +826,11 @@ maestro_open(hdl, flags)
 	struct maestro_softc *sc = (struct maestro_softc *)hdl;
 	DPRINTF(("%s: open(%d)\n", sc->dev.dv_xname, flags));
 
+/* XXX work around VM brokeness */
+#if 0
 	if ((OFLAGS(flags) & O_ACCMODE) != O_WRONLY)
 		return (EINVAL);
+#endif
 	sc->play.mode = MAESTRO_PLAY;
 	sc->record.mode = 0;
 #ifdef AUDIO_DEBUG
@@ -1220,7 +1223,8 @@ maestro_powerhook(why, self)
 		/* Power up device on resume. */
 		DPRINTF(("maestro: power resume\n"));
 		if (sc->suspend == PWR_RESUME) {
-			printf("%s: resume without suspend?\n");
+			printf("%s: resume without suspend?\n",
+			    sc->dev.dv_xname);
 			sc->suspend = why;
 			return;
 		}
@@ -1283,6 +1287,22 @@ maestro_channel_advance_dma(ch)
 #endif
 }
 
+/* Some maestro makes sometimes get desynchronized in stereo mode. */
+void
+maestro_channel_suppress_jitter(ch)
+	struct maestro_channel *ch;
+{
+	int cp, diff;
+
+	/* Verify that both channels are not too far off. */
+	cp = wp_apu_read(ch->sc, ch->num, APUREG_CURPTR);
+	diff = wp_apu_read(ch->sc, ch->num+1, APUREG_CURPTR) - cp;
+	if (diff > 4 || diff < -4)
+		/* Otherwise, directly resynch the 2nd channel. */
+		bus_space_write_2(ch->sc->iot, ch->sc->ioh,
+		    PORT_DSP_DATA, cp);
+}
+
 /* -----------------------------
  * Interrupt handler interface
  */
@@ -1340,9 +1360,11 @@ maestro_intr(arg)
 		    MIDDLE_VOLUME);
 	}
 
-	if (sc->play.mode & MAESTRO_RUNNING)
+	if (sc->play.mode & MAESTRO_RUNNING) {
 		maestro_channel_advance_dma(&sc->play);
-	/* XXX suppress jitter for stereo play? */
+		if (sc->play.mode & MAESTRO_STEREO)
+			maestro_channel_suppress_jitter(&sc->play);
+	}
 
 	if (sc->record.mode & MAESTRO_RUNNING)
 		maestro_channel_advance_dma(&sc->record);
@@ -1507,7 +1529,7 @@ salloc_new(addr, size, nzones)
 	int i;
 
 	MALLOC(pool, salloc_t, sizeof *pool + nzones * sizeof pool->zones[0],
-	    M_TEMP, M_WAITOK);
+	    M_TEMP, M_NOWAIT);
 	if (pool == NULL)
 		return NULL;
 	SLIST_INIT(&pool->free);

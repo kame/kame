@@ -1,4 +1,4 @@
-/*	$OpenBSD: isesvar.h,v 1.1 2001/01/29 08:45:58 ho Exp $	*/
+/*	$OpenBSD: isesvar.h,v 1.5 2001/09/21 19:41:13 ho Exp $	*/
 
 /*
  * Copyright (c) 2000 Håkan Olsson (ho@crt.se)
@@ -28,40 +28,60 @@
  */
 
 struct ises_softc {
-	struct	device		sc_dv;		/* generic device */
+	struct device		sc_dv;		/* generic device */
 	void			*sc_ih;		/* interrupt handler cookie */
 	bus_space_handle_t	sc_memh;	/* memory handle */
 	bus_space_tag_t		sc_memt;	/* memory tag */
 	bus_dma_tag_t		sc_dmat;	/* dma tag */
-	bus_dmamap_t		sc_dmamap_xfer; /* dma xfer map */
-	struct ises_databuf     sc_dmamap;      /* data area */
-	bus_addr_t		sc_dmamap_phys; /* bus address of data area */
+	bus_dmamap_t		sc_dmamap;	/* dma xfer map */
+	caddr_t			sc_dma_data;	/* data area */
+
 	int32_t			sc_cid;		/* crypto tag */
 	u_int32_t		sc_intrmask;	/* interrupt mask */
-	u_int32_t		sc_omr;		/* OMR */
+	u_int32_t		sc_dma_mask;	/* DMA running mask */
 	SIMPLEQ_HEAD(,ises_q)	sc_queue;	/* packet queue */
 	int			sc_nqueue;	/* count enqueued */
 	SIMPLEQ_HEAD(,ises_q)	sc_qchip;	/* on chip */
 	struct timeout		sc_timeout;	/* init + hrng timeout */
 	int			sc_nsessions;	/* nr of sessions */
 	struct ises_session	*sc_sessions;	/* sessions */
+	int			sc_cursession;	/* current session */
+	int			sc_switching;	/* we're switching sessions */
 	int			sc_initstate;	/* card initialization state */
+
+	SIMPLEQ_HEAD(,ises_cmd) sc_cmdq;	/* Commands in A-queue */
+	u_int32_t		sc_lnau1_r[64];	/* LNAU 1 result (2048 bits) */
+	int			sc_lnau1_rlen;	/* LNAU 1 result len (bytes) */
+	u_int32_t		sc_lnau2_r[64];	/* LNAU 2 result (2048 bits) */
+	int			sc_lnau2_rlen;	/* LNAU 2 result len (bytes) */
 };
+
+union ises_q_u {
+	struct mbuf		*mbuf;
+	struct uio		*uio;
+	/* XXX more ? */
+};
+
+#define ISES_MAX_SCATTER	64
 
 struct ises_q {
 	SIMPLEQ_ENTRY(ises_q)	q_next;
 	struct cryptop		*q_crp;
-	struct ises_pktbuf	q_srcpkt;
-	struct ises_pktbuf	q_dstpkt;
-	struct ises_pktctx	q_ctx;
-
 	struct ises_softc	*q_sc;
-	struct mbuf 		*q_src_m, *q_dst_m;
 
+	union ises_q_u		q_src, q_dst;	/* src/dst data bufs */
+
+	bus_dma_segment_t	q_src_ds, q_dst_ds;
+
+	struct ises_session	q_session;
+	u_int16_t		q_offset;	/* crypto offset */
 	int			q_sesn;
-	long			q_src_packp;
-	int			q_src_packl;
+
+#if 0
+	long			q_src_packp[ISES_MAX_SCATTER];
+	int			q_src_packl[ISES_MAX_SCATTER];
 	int			q_src_npa, q_src_l;
+#endif
 
 	long			q_dst_packp;
 	int			q_dst_packl;
@@ -69,12 +89,13 @@ struct ises_q {
 	u_int32_t		q_macbuf[5];
 };
 
-struct ises_session {
-       u_int32_t    ses_used;
-       u_int32_t    ses_deskey[6];		/* 3DES key */
-       u_int32_t    ses_hminner[5];		/* hmac inner state */
-       u_int32_t    ses_hmouter[5];		/* hmac outer state */
-       u_int32_t    ses_iv[2];			/* DES/3DES iv */
+struct ises_cmd {
+	SIMPLEQ_ENTRY(ises_cmd)	cmd_next;
+	u_int32_t		cmd_code;	/* Command code */
+	u_int32_t		cmd_rlen;	/* Response length */
+	u_int32_t		cmd_session;	/* Current ises_session */
+	u_int32_t		(*cmd_cb)(struct ises_softc *, 
+					  struct ises_cmd *); /* Callback */
 };
 
 /* Maximum queue length */

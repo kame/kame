@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.11 2000/03/02 23:01:45 todd Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.13 2001/09/28 20:40:20 miod Exp $	*/
 /*	$NetBSD: cpu.h,v 1.20 1995/12/21 05:02:10 mycroft Exp $	*/
 
 /*
@@ -132,18 +132,6 @@ union sun3sir {
 #define setsoftnet()	(sun3sir.sir_which[SIR_NET] = 1, setsoftint())
 #define setsoftclock()	(sun3sir.sir_which[SIR_CLOCK] = 1, setsoftint())
 
-
-/*
- * CTL_MACHDEP definitions.
- */
-#define	CPU_CONSDEV		1	/* dev_t: console terminal device */
-#define	CPU_MAXID		2	/* number of valid machdep ids */
-
-#define	CTL_MACHDEP_NAMES { \
-	{ 0, 0 }, \
-	{ "console_device", CTLTYPE_STRUCT }, \
-}
-
 /* values for cpu_machine_id */
 
 #define CPU_ARCH_MASK  0xf0
@@ -157,9 +145,6 @@ union sun3sir {
 #define SUN3_MACH_E    0x08
 
 extern	unsigned char cpu_machine_id;
-
-/* autoconf.c */
-void	configure __P((void));
 
 /* dma.c */
 long	dvma_kvtopa __P((long, int));

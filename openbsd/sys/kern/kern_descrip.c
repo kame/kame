@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_descrip.c,v 1.23 2000/11/16 20:02:16 provos Exp $	*/
+/*	$OpenBSD: kern_descrip.c,v 1.38 2001/10/07 23:12:06 art Exp $	*/
 /*	$NetBSD: kern_descrip.c,v 1.42 1996/03/30 22:24:38 christos Exp $	*/
 
 /*
@@ -62,6 +62,7 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 #include <sys/event.h>
+#include <sys/pool.h>
 
 #include <vm/vm.h>
 
@@ -79,35 +80,47 @@ static __inline int find_next_zero __P((u_int *, int, u_int));
 int finishdup __P((struct filedesc *, int, int, register_t *));
 int find_last_set __P((struct filedesc *, int));
 
+struct pool file_pool;
+struct pool fdesc_pool;
+
+void
+filedesc_init()
+{
+	pool_init(&file_pool, sizeof(struct file), 0, 0, 0, "filepl",
+		0, pool_page_alloc_nointr, pool_page_free_nointr, M_PROC);
+	pool_init(&fdesc_pool, sizeof(struct filedesc0), 0, 0, 0, "fdescpl",
+		0, pool_page_alloc_nointr, pool_page_free_nointr, M_FILEDESC);
+}
+
 static __inline int
 find_next_zero (u_int *bitmap, int want, u_int bits)
 {
-        int i, off, maxoff;
+	int i, off, maxoff;
 	u_int sub;
 
-        if (want > bits)
-                return -1;
+	if (want > bits)
+		return -1;
 
 	off = want >> NDENTRYSHIFT;
 	i = want & NDENTRYMASK;
-        if (i) {
+	if (i) {
 		sub = bitmap[off] | ((u_int)~0 >> (NDENTRIES - i));
 		if (sub != ~0)
 			goto found;
 		off++;
-        }
+	}
 
 	maxoff = NDLOSLOTS(bits);
-        while (off < maxoff) {
-                if ((sub = bitmap[off]) != ~0)
-                        goto found;
+	while (off < maxoff) {
+		if ((sub = bitmap[off]) != ~0)
+			goto found;
 		off++;
-        }
+	}
 
-        return -1;
+	return -1;
 
  found:
-        return (off << NDENTRYSHIFT) + ffs(~sub) - 1;
+	return (off << NDENTRYSHIFT) + ffs(~sub) - 1;
 }
 
 int
@@ -121,17 +134,15 @@ find_last_set(struct filedesc *fd, int last)
 
 	while (!bitmap[off] && off >= 0)
 		off--;
-
 	if (off < 0)
 		return 0;
-	
+
 	i = ((off + 1) << NDENTRYSHIFT) - 1;
 	if (i >= last)
 		i = last - 1;
 
 	while (i > 0 && ofiles[i] == NULL)
 		i--;
-
 	return i;
 }
 
@@ -215,8 +226,8 @@ sys_dup2(p, v, retval)
 		syscallarg(u_int) from;
 		syscallarg(u_int) to;
 	} */ *uap = v;
-	register struct filedesc *fdp = p->p_fd;
-	register int old = SCARG(uap, from), new = SCARG(uap, to);
+	struct filedesc *fdp = p->p_fd;
+	int old = SCARG(uap, from), new = SCARG(uap, to);
 	int i, error;
 
 	if ((u_int)old >= fdp->fd_nfiles || fdp->fd_ofiles[old] == NULL ||
@@ -248,14 +259,14 @@ sys_fcntl(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_fcntl_args /* {
+	struct sys_fcntl_args /* {
 		syscallarg(int) fd;
 		syscallarg(int) cmd;
 		syscallarg(void *) arg;
 	} */ *uap = v;
 	int fd = SCARG(uap, fd);
-	register struct filedesc *fdp = p->p_fd;
-	register struct file *fp;
+	struct filedesc *fdp = p->p_fd;
+	struct file *fp;
 	struct vnode *vp;
 	int i, tmp, error, flg = F_POSIX;
 	struct flock fl;
@@ -338,7 +349,7 @@ sys_fcntl(p, v, retval)
 
 	case F_SETLKW:
 		flg |= F_WAIT;
-		/* Fall into F_SETLK */
+		/* FALLTHROUGH */
 
 	case F_SETLK:
 		if (fp->f_type != DTYPE_VNODE)
@@ -349,8 +360,14 @@ sys_fcntl(p, v, retval)
 		    sizeof (fl));
 		if (error)
 			return (error);
-		if (fl.l_whence == SEEK_CUR)
-			fl.l_start += fp->f_offset;
+		if (fl.l_whence == SEEK_CUR) {
+			if (fl.l_start == 0 && fl.l_len < 0) {
+				/* lockf(3) compliance hack */
+				fl.l_len = -fl.l_len;
+				fl.l_start = fp->f_offset - fl.l_len;
+			} else
+				fl.l_start += fp->f_offset;
+		}
 		switch (fl.l_type) {
 
 		case F_RDLCK:
@@ -382,14 +399,14 @@ sys_fcntl(p, v, retval)
 		    sizeof (fl));
 		if (error)
 			return (error);
-		if (fl.l_whence == SEEK_CUR)
-			fl.l_start += fp->f_offset;
-		else if (fl.l_whence != SEEK_END &&
-			 fl.l_whence != SEEK_SET &&
-			 fl.l_whence != 0)
-			return (EINVAL);
-		if (fl.l_start < 0)
-			return (EINVAL);
+		if (fl.l_whence == SEEK_CUR) {
+			if (fl.l_start == 0 && fl.l_len < 0) {
+				/* lockf(3) compliance hack */
+				fl.l_len = -fl.l_len;
+				fl.l_start = fp->f_offset - fl.l_len;
+			} else
+				fl.l_start += fp->f_offset;
+		}
 		if (fl.l_type != F_RDLCK &&
 		    fl.l_type != F_WRLCK &&
 		    fl.l_type != F_UNLCK &&
@@ -443,26 +460,15 @@ fdrelease(p, fd)
 	struct proc *p;
 	int fd;
 {
-	register struct filedesc *fdp = p->p_fd;
-	register struct file **fpp, *fp;
-	register char *pf;
+	struct filedesc *fdp = p->p_fd;
+	struct file **fpp, *fp;
 
 	fpp = &fdp->fd_ofiles[fd];
 	fp = *fpp;
 	if (fp == NULL)
 		return (EBADF);
-	pf = &fdp->fd_ofileflags[fd];
-#if defined(UVM)
-	if (*pf & UF_MAPPED) {
-		/* XXX: USELESS? XXXCDC check it */
-		p->p_fd->fd_ofileflags[fd] &= ~UF_MAPPED;
-	}
-#else
-	if (*pf & UF_MAPPED)
-		(void) munmapfd(p, fd);
-#endif
 	*fpp = NULL;
-	*pf = 0;
+	fdp->fd_ofileflags[fd] = 0;
 	fd_unused(fdp, fd);
 	if (fd < fdp->fd_knlistsize)
 		knote_fdclose(p, fd);
@@ -500,39 +506,20 @@ sys_fstat(p, v, retval)
 	void *v;
 	register_t *retval;
 {
-	register struct sys_fstat_args /* {
+	struct sys_fstat_args /* {
 		syscallarg(int) fd;
 		syscallarg(struct stat *) sb;
 	} */ *uap = v;
 	int fd = SCARG(uap, fd);
-	register struct filedesc *fdp = p->p_fd;
-	register struct file *fp;
+	struct filedesc *fdp = p->p_fd;
+	struct file *fp;
 	struct stat ub;
 	int error;
 
 	if ((u_int)fd >= fdp->fd_nfiles ||
 	    (fp = fdp->fd_ofiles[fd]) == NULL)
 		return (EBADF);
-	switch (fp->f_type) {
-
-	case DTYPE_VNODE:
-		error = vn_stat((struct vnode *)fp->f_data, &ub, p);
-		break;
-
-	case DTYPE_SOCKET:
-		error = soo_stat((struct socket *)fp->f_data, &ub);
-		break;
-
-#ifndef OLD_PIPE
-	case DTYPE_PIPE:
-		error = pipe_stat((struct pipe *)fp->f_data, &ub);
-		break;
-#endif
-
-	default:
-		panic("fstat");
-		/*NOTREACHED*/
-	}
+	error = (*fp->f_ops->fo_stat)(fp, &ub, p);
 	if (error == 0) {
 		/* Don't let non-root see generation numbers
 		   (for NFS security) */
@@ -567,10 +554,7 @@ sys_fpathconf(p, v, retval)
 	    (fp = fdp->fd_ofiles[fd]) == NULL)
 		return (EBADF);
 	switch (fp->f_type) {
-
-#ifndef OLD_PIPE
 	case DTYPE_PIPE:
-#endif
 	case DTYPE_SOCKET:
 		if (SCARG(uap, name) != _PC_PIPE_BUF)
 			return (EINVAL);
@@ -582,7 +566,7 @@ sys_fpathconf(p, v, retval)
 		return (VOP_PATHCONF(vp, SCARG(uap, name), retval));
 
 	default:
-		panic("fpathconf");
+		return (EOPNOTSUPP);
 	}
 	/*NOTREACHED*/
 }
@@ -617,7 +601,7 @@ fdalloc(p, want, result)
 			i = fdp->fd_freefile;
 		off = i >> NDENTRYSHIFT;
 		new = find_next_zero(fdp->fd_himap, off,
-				     (last + NDENTRIES - 1) >> NDENTRYSHIFT);
+		    (last + NDENTRIES - 1) >> NDENTRYSHIFT);
 		if (new != -1) {
 			i = find_next_zero(&fdp->fd_lomap[new], 
 					   new > off ? 0 : i & NDENTRYMASK,
@@ -668,19 +652,19 @@ fdalloc(p, want, result)
 
 		if (NDHISLOTS(nfiles) > NDHISLOTS(fdp->fd_nfiles)) {
 			newhimap = malloc(NDHISLOTS(nfiles) * sizeof(u_int),
-			       M_FILEDESC, M_WAITOK);
+			    M_FILEDESC, M_WAITOK);
 			newlomap = malloc( NDLOSLOTS(nfiles) * sizeof(u_int),
-			       M_FILEDESC, M_WAITOK);
+			    M_FILEDESC, M_WAITOK);
 
 			bcopy(fdp->fd_himap, newhimap,
-			      (i = NDHISLOTS(fdp->fd_nfiles) * sizeof(u_int)));
+			    (i = NDHISLOTS(fdp->fd_nfiles) * sizeof(u_int)));
 			bzero((char *)newhimap + i,
-			      NDHISLOTS(nfiles) * sizeof(u_int) - i);
+			    NDHISLOTS(nfiles) * sizeof(u_int) - i);
 
 			bcopy(fdp->fd_lomap, newlomap,
-			      (i = NDLOSLOTS(fdp->fd_nfiles) * sizeof(u_int)));
+			    (i = NDLOSLOTS(fdp->fd_nfiles) * sizeof(u_int)));
 			bzero((char *)newlomap + i,
-			      NDLOSLOTS(nfiles) * sizeof(u_int) - i);
+			    NDLOSLOTS(nfiles) * sizeof(u_int) - i);
 
 			if (NDHISLOTS(fdp->fd_nfiles) > NDHISLOTS(NDFILE)) {
 				free(fdp->fd_himap, M_FILEDESC);
@@ -746,7 +730,7 @@ falloc(p, resultfp, resultfd)
 	 * the list of open files.
 	 */
 	nfiles++;
-	MALLOC(fp, struct file *, sizeof(struct file), M_FILE, M_WAITOK);
+	fp = pool_get(&file_pool, PR_WAITOK);
 	bzero(fp, sizeof(struct file));
 	if ((fq = p->p_fd->fd_ofiles[0]) != NULL) {
 		LIST_INSERT_AFTER(fq, fp, f_list);
@@ -777,7 +761,7 @@ ffree(fp)
 	fp->f_count = 0;
 #endif
 	nfiles--;
-	FREE(fp, M_FILE);
+	pool_put(&file_pool, fp);
 }
 
 /*
@@ -791,8 +775,7 @@ fdinit(p)
 	register struct filedesc *fdp = p->p_fd;
 	extern int cmask;
 
-	MALLOC(newfdp, struct filedesc0 *, sizeof(struct filedesc0),
-	    M_FILEDESC, M_WAITOK);
+	newfdp = pool_get(&fdesc_pool, PR_WAITOK);
 	bzero(newfdp, sizeof(struct filedesc0));
 	newfdp->fd_fd.fd_cdir = fdp->fd_cdir;
 	VREF(newfdp->fd_fd.fd_cdir);
@@ -834,14 +817,14 @@ struct filedesc *
 fdcopy(p)
 	struct proc *p;
 {
-	register struct filedesc *newfdp, *fdp = p->p_fd;
-	register struct file **fpp;
-	register int i;
+	struct filedesc *newfdp, *fdp = p->p_fd;
+	struct file **fpp;
+	int i;
 
-	MALLOC(newfdp, struct filedesc *, sizeof(struct filedesc0),
-	    M_FILEDESC, M_WAITOK);
+	newfdp = pool_get(&fdesc_pool, PR_WAITOK);
 	bcopy(fdp, newfdp, sizeof(struct filedesc));
-	VREF(newfdp->fd_cdir);
+	if (newfdp->fd_cdir)
+		VREF(newfdp->fd_cdir);
 	if (newfdp->fd_rdir)
 		VREF(newfdp->fd_rdir);
 	newfdp->fd_refcnt = 1;
@@ -876,9 +859,9 @@ fdcopy(p)
 			((struct filedesc0 *) newfdp)->fd_dlomap;
 	} else {
 		newfdp->fd_himap = malloc(NDHISLOTS(i) * sizeof(u_int),
-		       M_FILEDESC, M_WAITOK);
+		    M_FILEDESC, M_WAITOK);
 		newfdp->fd_lomap = malloc(NDLOSLOTS(i) * sizeof(u_int),
-		       M_FILEDESC, M_WAITOK);
+		    M_FILEDESC, M_WAITOK);
 	}
 	newfdp->fd_nfiles = i;
 	bcopy(fdp->fd_ofiles, newfdp->fd_ofiles, i * sizeof(struct file **));
@@ -944,14 +927,15 @@ fdfree(p)
 		free(fdp->fd_himap, M_FILEDESC);
 		free(fdp->fd_lomap, M_FILEDESC);
 	}
-	vrele(fdp->fd_cdir);
+	if (fdp->fd_cdir)
+		vrele(fdp->fd_cdir);
 	if (fdp->fd_rdir)
 		vrele(fdp->fd_rdir);
 	if (fdp->fd_knlist)
 		FREE(fdp->fd_knlist, M_TEMP);
 	if (fdp->fd_knhash)
 		FREE(fdp->fd_knhash, M_TEMP);
-	FREE(fdp, M_FILEDESC);
+	pool_put(&fdesc_pool, fdp);
 }
 
 /*
@@ -1075,7 +1059,7 @@ filedescopen(dev, mode, type, p)
 
 	/*
 	 * XXX Kludge: set curproc->p_dupfd to contain the value of the
-	 * the file descriptor being sought for duplication. The error 
+	 * the file descriptor being sought for duplication. The error
 	 * return ensures that the vnode for this device will be released
 	 * by vn_open. Open will detect this special error and take the
 	 * actions in dupfdopen below. Other callers of vn_open or VOP_OPEN

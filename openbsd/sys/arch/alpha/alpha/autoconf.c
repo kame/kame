@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.10 2000/11/08 16:00:54 art Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.14 2001/09/30 13:08:45 art Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.16 1996/11/13 21:13:04 cgd Exp $	*/
 
 /*
@@ -57,6 +57,7 @@
 #include <machine/rpb.h>
 #include <machine/prom.h>
 #include <machine/cpuconf.h>
+#include <machine/intr.h>
 
 #include <dev/cons.h>
 
@@ -81,15 +82,14 @@ static char *findblkname __P((int));
 static int getstr __P((char *cp, int size));
 
 /*
- * configure:
+ * cpu_configure:
  * called at boot time, configure all devices on system
  */
 void
-configure()
+cpu_configure()
 {
-	extern int cold;
-
 	parse_prom_bootdev();
+	softintr_init();
 
         /*
          * Disable interrupts during autoconfiguration.  splhigh() won't
@@ -191,12 +191,12 @@ getdisk(str, len, defpart, devp)
 	if ((dv = parsedisk(str, len, defpart, devp)) == NULL) {
 		printf("use one of:");
 #ifdef RAMDISK_HOOKS
-		printf(" %s[a-h]", fakerdrootdev.dv_xname);
+		printf(" %s[a-p]", fakerdrootdev.dv_xname);
 #endif
 		for (dv = alldevs.tqh_first; dv != NULL;
 		    dv = dv->dv_list.tqe_next) {
 			if (dv->dv_class == DV_DISK)
-				printf(" %s[a-h]", dv->dv_xname);
+				printf(" %s[a-p]", dv->dv_xname);
 #ifdef NFSCLIENT
 			if (dv->dv_class == DV_IFNET)
 				printf(" %s", dv->dv_xname);

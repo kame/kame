@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fxp_pci.c,v 1.5 2000/12/29 14:03:01 art Exp $	*/
+/*	$OpenBSD: if_fxp_pci.c,v 1.10 2001/09/04 23:46:23 provos Exp $	*/
 
 /*
  * Copyright (c) 1995, David Greenman
@@ -58,21 +58,6 @@
 #include <netinet/ip.h>
 #endif
 
-#ifdef IPX
-#include <netipx/ipx.h>
-#include <netipx/ipx_if.h>
-#endif
-
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-#if NBPFILTER > 0
-#include <net/bpf.h>
-#include <net/bpfdesc.h>
-#endif
-
 #include <sys/ioctl.h>
 #include <sys/errno.h>
 #include <sys/device.h>
@@ -120,6 +105,10 @@ fxp_pci_match(parent, match, aux)
 	case PCI_PRODUCT_INTEL_82559:
 	case PCI_PRODUCT_INTEL_82559ER:
 	case PCI_PRODUCT_INTEL_82562:
+	case PCI_PRODUCT_INTEL_PRO_100_VE_0:
+	case PCI_PRODUCT_INTEL_PRO_100_VE_1:
+	case PCI_PRODUCT_INTEL_PRO_100_VM_0:
+	case PCI_PRODUCT_INTEL_PRO_100_VM_1:
 		return (1);
 	}
 
@@ -152,12 +141,12 @@ fxp_pci_attach(parent, self, aux)
 		return;
 	}
 	sc->sc_st = iot;
+	sc->sc_dmat = pa->pa_dmat;
 
 	/*
 	 * Allocate our interrupt.
 	 */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}
@@ -173,13 +162,34 @@ fxp_pci_attach(parent, self, aux)
 		return;
 	}
 
-	/*
-	 * revisions
-	 * 2 = 82557
-	 * 4-6 = 82558
-	 * 8 = 82559
-	 */
-	sc->not_82557 = (rev >= 4) ? 1 : 0;
+	switch (PCI_PRODUCT(pa->pa_id)) {
+	case PCI_PRODUCT_INTEL_82562:
+		sc->sc_flags |= FXPF_HAS_RESUME_BUG;
+		/* FALLTHROUGH */
+	case PCI_PRODUCT_INTEL_82559:
+	case PCI_PRODUCT_INTEL_82559ER:
+		sc->not_82557 = 1;
+		break;
+	case PCI_PRODUCT_INTEL_82557:
+		/*
+		 * revisions
+		 * 2 = 82557
+		 * 4-6 = 82558
+		 * 8 = 82559
+		 */
+		sc->not_82557 = (rev >= 4) ? 1 : 0;
+		break;
+	case PCI_PRODUCT_INTEL_PRO_100_VE_0:
+	case PCI_PRODUCT_INTEL_PRO_100_VE_1:
+	case PCI_PRODUCT_INTEL_PRO_100_VM_0:
+	case PCI_PRODUCT_INTEL_PRO_100_VM_1:
+		sc->sc_flags |= FXPF_HAS_RESUME_BUG;
+		sc->not_82557 = 0;
+		break;
+	default:
+		sc->not_82557 = 0;
+		break;
+	}
 
 	/* Do generic parts of attach. */
 	if (fxp_attach_common(sc, enaddr, intrstr)) {

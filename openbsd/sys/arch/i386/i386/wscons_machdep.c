@@ -1,4 +1,4 @@
-/*	$OpenBSD: wscons_machdep.c,v 1.5 2001/03/14 18:24:10 todd Exp $ */
+/*	$OpenBSD: wscons_machdep.c,v 1.7 2001/07/29 23:13:28 csapuntz Exp $ */
 
 /*
  * Copyright (c) 2001 Aaron Campbell
@@ -76,6 +76,9 @@
 #if (NPCKBD > 0) || (NUKBD > 0)
 #include <dev/wscons/wskbdvar.h>
 #endif
+#if (NUKBD > 0)
+#include <dev/usb/ukbdvar.h>
+#endif
 
 #include "pc.h"
 #if (NPC > 0)
@@ -113,6 +116,13 @@ void
 wscninit(cp)
 	struct consdev *cp;
 {
+	static int initted;
+
+	if (initted)
+		return;
+
+	initted = 1;
+
 #if (NVGA > 0) || (NEGA > 0) || (NPCDISPLAY > 0)
 #if (NVGA > 0)
 	if (!vga_cnattach(I386_BUS_SPACE_IO, I386_BUS_SPACE_MEM, -1, 1))
@@ -129,7 +139,12 @@ wscninit(cp)
 	if (0) goto dokbd;	/* XXX stupid gcc */
 dokbd:
 #if (NPCKBC > 0)
-	pckbc_cnattach(I386_BUS_SPACE_IO, IO_KBD, KBCMDP, PCKBC_KBD_SLOT);
+	if (!pckbc_cnattach(I386_BUS_SPACE_IO, IO_KBD, KBCMDP, PCKBC_KBD_SLOT))
+		return;
+#endif
+#if (NUKBD > 0)
+	if (!ukbd_cnattach())
+		return;
 #endif
 #endif  /* VGA | EGA | PCDISPLAY */
 	return;

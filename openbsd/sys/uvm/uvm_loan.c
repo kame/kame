@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_loan.c,v 1.6 2001/03/08 15:21:37 smart Exp $	*/
-/*	$NetBSD: uvm_loan.c,v 1.18 1999/07/22 22:58:38 thorpej Exp $	*/
+/*	$OpenBSD: uvm_loan.c,v 1.9 2001/09/11 20:05:26 miod Exp $	*/
+/*	$NetBSD: uvm_loan.c,v 1.20 2000/04/10 00:32:46 thorpej Exp $	*/
 
 /*
  *
@@ -48,7 +48,6 @@
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm.h>
 
@@ -336,7 +335,7 @@ uvm_loananon(ufi, output, flags, anon)
 		pg = anon->u.an_page;
 		if (pg && (pg->pqflags & PQ_ANON) != 0 && anon->an_ref == 1)
 			/* read protect it */
-			pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+			pmap_page_protect(pg, VM_PROT_READ);
 		anon->an_ref++;
 		**output = anon;
 		*output = (*output) + 1;
@@ -381,7 +380,7 @@ uvm_loananon(ufi, output, flags, anon)
 	pg = anon->u.an_page;
 	uvm_lock_pageq();
 	if (pg->loan_count == 0)
-		pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+		pmap_page_protect(pg, VM_PROT_READ);
 	pg->loan_count++;
 	uvm_pagewire(pg);	/* always wire it */
 	uvm_unlock_pageq();
@@ -533,7 +532,7 @@ uvm_loanuobj(ufi, output, flags, va)
 	if ((flags & UVM_LOAN_TOANON) == 0) {	/* loan to wired-kernel page? */
 		uvm_lock_pageq();
 		if (pg->loan_count == 0)
-			pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+			pmap_page_protect(pg, VM_PROT_READ);
 		pg->loan_count++;
 		uvm_pagewire(pg);
 		uvm_unlock_pageq();
@@ -587,7 +586,7 @@ uvm_loanuobj(ufi, output, flags, va)
 	pg->uanon = anon;
 	uvm_lock_pageq();
 	if (pg->loan_count == 0)
-		pmap_page_protect(PMAP_PGARG(pg), VM_PROT_READ);
+		pmap_page_protect(pg, VM_PROT_READ);
 	pg->loan_count++;
 	uvm_pageactivate(pg);
 	uvm_unlock_pageq();
@@ -621,7 +620,8 @@ uvm_loanzero(ufi, output, flags)
 
 	if ((flags & UVM_LOAN_TOANON) == 0) {	/* loaning to kernel-page */
 
-		while ((pg = uvm_pagealloc(NULL, 0, NULL, 0)) == NULL) {
+		while ((pg = uvm_pagealloc(NULL, 0, NULL,
+		    UVM_PGA_ZERO)) == NULL) {
 			uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap, 
 			    ufi->entry->object.uvm_obj, NULL);
 			uvm_wait("loanzero1");
@@ -635,8 +635,7 @@ uvm_loanzero(ufi, output, flags)
 			/* ... and try again */
 		}
 		
-		/* got a page, zero it and return */
-		uvm_pagezero(pg);		/* clears PG_CLEAN */
+		/* got a zero'd page; return */
 		pg->flags &= ~(PG_BUSY|PG_FAKE);
 		UVM_PAGE_OWN(pg, NULL);
 		**output = pg;
@@ -651,7 +650,7 @@ uvm_loanzero(ufi, output, flags)
 
 	/* loaning to an anon */
 	while ((anon = uvm_analloc()) == NULL || 
-	    (pg = uvm_pagealloc(NULL, 0, anon, 0)) == NULL) {
+	    (pg = uvm_pagealloc(NULL, 0, anon, UVM_PGA_ZERO)) == NULL) {
 		
 		/* unlock everything */
 		uvmfault_unlockall(ufi, ufi->entry->aref.ar_amap,
@@ -676,8 +675,7 @@ uvm_loanzero(ufi, output, flags)
 		/* ... and try again */
 	}
 
-	/* got a page, zero it and return */
-	uvm_pagezero(pg);		/* clears PG_CLEAN */
+	/* got a zero'd page; return */
 	pg->flags &= ~(PG_BUSY|PG_FAKE);
 	UVM_PAGE_OWN(pg, NULL);
 	uvm_lock_pageq();
@@ -751,7 +749,7 @@ uvm_unloanpage(ploans, npages)
 	panic("uvm_unloanpage: page %p unowned but PG_BUSY!", pg);
 
 			/* be safe */
-			pmap_page_protect(PMAP_PGARG(pg), VM_PROT_NONE);
+			pmap_page_protect(pg, VM_PROT_NONE);
 			uvm_pagefree(pg);	/* pageq locked above */
 
 		}

@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_pager.h,v 1.7 2001/03/22 03:05:56 smart Exp $	*/
-/*	$NetBSD: uvm_pager.h,v 1.10 1999/06/21 17:25:12 thorpej Exp $	*/
+/*	$OpenBSD: uvm_pager.h,v 1.11 2001/08/12 21:36:48 mickey Exp $	*/
+/*	$NetBSD: uvm_pager.h,v 1.15 2000/05/19 03:45:04 thorpej Exp $	*/
 
 /*
  *
@@ -72,24 +72,22 @@ struct uvm_pagerops {
 				 vm_page_t *, int, int, vm_fault_t,
 				 vm_prot_t, int));
 	boolean_t		(*pgo_flush)	/* flush pages out of obj */
-			 __P((struct uvm_object *, vaddr_t, vaddr_t, int));
+			 __P((struct uvm_object *, voff_t, voff_t, int));
 	int			(*pgo_get)	/* get/read page */
-			 __P((struct uvm_object *, vaddr_t, 
+			 __P((struct uvm_object *, voff_t,
 				 vm_page_t *, int *, int, vm_prot_t, int, int));
 	int			(*pgo_asyncget)	/* start async get */
-			 __P((struct uvm_object *, vaddr_t, int));
+			 __P((struct uvm_object *, voff_t, int));
 	int			(*pgo_put)	/* put/write page */
 			 __P((struct uvm_object *, vm_page_t *, 
 				 int, boolean_t));
 	void			(*pgo_cluster)	/* return range of cluster */
-			__P((struct uvm_object *, vaddr_t, vaddr_t *,
-				vaddr_t *));
+			__P((struct uvm_object *, voff_t, voff_t *,
+				voff_t *));
 	struct vm_page **	(*pgo_mk_pcluster)	/* make "put" cluster */
 			 __P((struct uvm_object *, struct vm_page **,
-				 int *, struct vm_page *, int, vaddr_t,
-				 vaddr_t));
-	void			(*pgo_shareprot)	/* share protect */
-			 __P((vm_map_entry_t, vm_prot_t));
+				 int *, struct vm_page *, int, voff_t,
+				 voff_t));
 	void			(*pgo_aiodone)		/* async iodone */
 			 __P((struct uvm_aiodesc *));
 	boolean_t		(*pgo_releasepg)	/* release page */
@@ -119,6 +117,27 @@ struct uvm_pagerops {
 #ifdef _KERNEL
 
 /*
+ * get/put return values
+ * OK	   operation was successful
+ * BAD	   specified data was out of the accepted range
+ * FAIL	   specified data was in range, but doesn't exist
+ * PEND	   operations was initiated but not completed
+ * ERROR   error while accessing data that is in range and exists
+ * AGAIN   temporary resource shortage prevented operation from happening
+ * UNLOCK  unlock the map and try again
+ * REFAULT [uvm_fault internal use only!] unable to relock data structures,
+ *         thus the mapping needs to be reverified before we can procede
+ */
+#define	VM_PAGER_OK		0
+#define	VM_PAGER_BAD		1
+#define	VM_PAGER_FAIL		2
+#define	VM_PAGER_PEND		3
+#define	VM_PAGER_ERROR		4
+#define VM_PAGER_AGAIN		5
+#define VM_PAGER_UNLOCK		6
+#define VM_PAGER_REFAULT	7
+
+/*
  * handle inline options
  */
 
@@ -134,11 +153,11 @@ struct uvm_pagerops {
 
 void		uvm_pager_dropcluster __P((struct uvm_object *, 
 					struct vm_page *, struct vm_page **, 
-					int *, int, int));
+					int *, int));
 void		uvm_pager_init __P((void));
 int		uvm_pager_put __P((struct uvm_object *, struct vm_page *, 
 				   struct vm_page ***, int *, int, 
-				   vaddr_t, vaddr_t));
+				   voff_t, voff_t));
 
 PAGER_INLINE struct vm_page *uvm_pageratop __P((vaddr_t));
 
@@ -147,8 +166,12 @@ vaddr_t	uvm_pagermapin __P((struct vm_page **, int,
 void		uvm_pagermapout __P((vaddr_t, int));
 struct vm_page **uvm_mk_pcluster  __P((struct uvm_object *, struct vm_page **,
 				       int *, struct vm_page *, int, 
-				       vaddr_t, vaddr_t));
-void		uvm_shareprot __P((vm_map_entry_t, vm_prot_t));
+				       voff_t, voff_t));
+
+/* Flags to uvm_pagermapin() */
+#define	UVMPAGER_MAPIN_WAITOK	0x01	/* it's okay to wait */
+#define	UVMPAGER_MAPIN_READ	0x02	/* host <- device */
+#define	UVMPAGER_MAPIN_WRITE	0x00	/* device -> host (pseudo flag) */
 
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.23 2001/03/23 18:41:01 art Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.30 2001/09/21 02:11:57 miod Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.61 1996/05/03 19:42:35 christos Exp $	*/
 
 /*-
@@ -59,11 +59,7 @@
 #include <sys/ptrace.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 #include <machine/cpu.h>
 #include <machine/gdt.h>
@@ -114,45 +110,20 @@ cpu_fork(p1, p2, stack, stacksize)
 	/* Sync curpcb (which is presumably p1's PCB) and copy it to p2. */
 	savectx(curpcb);
 	*pcb = p1->p_addr->u_pcb;
-#ifndef PMAP_NEW
-	pmap_activate(p2);
-#endif
 	/*
 	 * Preset these so that gdt_compact() doesn't get confused if called
 	 * during the allocations below.
 	 */
 	pcb->pcb_tss_sel = GSEL(GNULL_SEL, SEL_KPL);
-#ifndef PMAP_NEW
-	pcb->pcb_ldt_sel = GSEL(GLDT_SEL, SEL_KPL);
-#else
 	/*
 	 * Activate the addres space.  Note this will refresh pcb_ldt_sel.
 	 */
 	pmap_activate(p2);
-#endif
 
 	/* Fix up the TSS. */
 	pcb->pcb_tss.tss_ss0 = GSEL(GDATA_SEL, SEL_KPL);
 	pcb->pcb_tss.tss_esp0 = (int)p2->p_addr + USPACE - 16;
 	tss_alloc(pcb);
-
-#if defined(USER_LDT) && !defined(PMAP_NEW)
-	/* Copy the LDT, if necessary. */
-	if (pcb->pcb_flags & PCB_USER_LDT) {
-		size_t len;
-		union descriptor *new_ldt;
-
-		len = pcb->pcb_ldt_len * sizeof(union descriptor);
-#if defined(UVM)
-		new_ldt = (union descriptor *)uvm_km_alloc(kernel_map, len);
-#else
-		new_ldt = (union descriptor *)kmem_alloc(kernel_map, len);
-#endif
-		bcopy(pcb->pcb_ldt, new_ldt, len);
-		pcb->pcb_ldt = new_ldt;
-		ldt_alloc(pcb, new_ldt, len);
-	}
-#endif
 
 	/*
 	 * Copy the trapframe, and arrange for the child to return directly
@@ -221,11 +192,7 @@ cpu_exit(p)
 		npxproc = 0;
 #endif
 
-#if defined(UVM)
 	uvmexp.swtch++;
-#else
-	cnt.v_swtch++;
-#endif
 	switch_exit(p);
 }
 
@@ -236,17 +203,6 @@ cpu_wait(p)
 	struct pcb *pcb;
 
 	pcb = &p->p_addr->u_pcb;
-#ifndef PMAP_NEW
-#ifdef USER_LDT
-	if (pcb->pcb_flags & PCB_USER_LDT)
-		i386_user_cleanup(pcb);
-#endif
-#else
-	/*
-	 * No need to do user LDT cleanup here; it's handled in
-	 * pmap_destroy().
-	 */
-#endif
 	tss_free(pcb);
 }
 
@@ -325,8 +281,7 @@ setredzone(pte, vaddr)
 
 /*
  * Move pages from one kernel virtual address to another.
- * Both addresses are assumed to reside in the Sysmap,
- * and size must be a multiple of CLSIZE.
+ * Both addresses are assumed to reside in the Sysmap.
  */
 void
 pagemove(from, to, size)
@@ -334,9 +289,7 @@ pagemove(from, to, size)
 	size_t size;
 {
 	pt_entry_t *fpte, *tpte;
-#ifdef PMAP_NEW
 	pt_entry_t ofpte, otpte;
-#endif
 
 #ifdef DIAGNOSTIC
 	if ((size & PAGE_MASK) != 0)
@@ -345,13 +298,10 @@ pagemove(from, to, size)
 	fpte = kvtopte(from);
 	tpte = kvtopte(to);
 	while (size > 0) {
-#ifdef PMAP_NEW
 		ofpte = *fpte;
 		otpte = *tpte;
-#endif
 		*tpte++ = *fpte;
 		*fpte++ = 0;
-#ifdef PMAP_NEW
 #if defined(I386_CPU)
 		if (cpu_class != CPUCLASS_386)
 #endif
@@ -361,19 +311,14 @@ pagemove(from, to, size)
 			if (ofpte & PG_V)
 				pmap_update_pg((vm_offset_t) from);
 		}
-#endif
 
 		from += NBPG;
 		to += NBPG;
 		size -= NBPG;
 	}
-#ifdef PMAP_NEW
 #if defined(I386_CPU)
 	if (cpu_class != CPUCLASS_386)
 		tlbflush();		
-#endif
-#else
-	pmap_update();
 #endif
 }
 
@@ -382,17 +327,14 @@ pagemove(from, to, size)
  */
 int
 kvtop(addr)
-	register caddr_t addr;
+	caddr_t addr;
 {
 	vm_offset_t pa;
 
-	pa = pmap_extract(pmap_kernel(), (vm_offset_t)addr);
-	if (pa == 0)
+	if (pmap_extract(pmap_kernel(), (vm_offset_t)addr, &pa) == FALSE)
 		panic("kvtop: zero page frame");
 	return((int)pa);
 }
-
-extern vm_map_t phys_map;
 
 /*
  * Map an IO request into kernel virtual address space.  Requests fall into
@@ -418,25 +360,15 @@ vmapbuf(bp, len)
 	vm_size_t len;
 {
 	vm_offset_t faddr, taddr, off;
-#ifdef PMAP_NEW
 	paddr_t fpa;
-#else
-	pt_entry_t *fpte, *tpte;
-	pt_entry_t *pmap_pte __P((pmap_t, vm_offset_t));
-#endif
 
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vmapbuf");
-	faddr = trunc_page(bp->b_saveaddr = bp->b_data);
+	faddr = trunc_page((vaddr_t)(bp->b_saveaddr = bp->b_data));
 	off = (vm_offset_t)bp->b_data - faddr;
 	len = round_page(off + len);
-#if defined(UVM)
 	taddr= uvm_km_valloc_wait(phys_map, len);
-#else
-	taddr = kmem_alloc_wait(phys_map, len);
-#endif
 	bp->b_data = (caddr_t)(taddr + off);
-#ifdef PMAP_NEW
 	/*
 	 * The region is locked, so we expect that pmap_pte() will return
 	 * non-NULL.
@@ -450,28 +382,15 @@ vmapbuf(bp, len)
 	 * mapping is removed).
 	 */
 	while (len) {
-		fpa = pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map),
-		    faddr);
+		pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map),
+		    faddr, &fpa);
 		pmap_enter(vm_map_pmap(phys_map), taddr, fpa,
-		    VM_PROT_READ | VM_PROT_WRITE, TRUE,
-		    VM_PROT_READ | VM_PROT_WRITE);
+		    VM_PROT_READ | VM_PROT_WRITE,
+		    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		faddr += PAGE_SIZE;
 		taddr += PAGE_SIZE;
 		len -= PAGE_SIZE;
 	}
-#else
-        /*
-         * The region is locked, so we expect that pmap_pte() will return
-         * non-NULL.
-         */
-        fpte = pmap_pte(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map), faddr);
-        tpte = pmap_pte(vm_map_pmap(phys_map), taddr);
-        do {
-                *tpte++ = *fpte++;
-                len -= PAGE_SIZE;
-        } while (len);
-#endif
-
 }
 
 /*
@@ -487,14 +406,10 @@ vunmapbuf(bp, len)
 
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vunmapbuf");
-	addr = trunc_page(bp->b_data);
+	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vm_offset_t)bp->b_data - addr;
 	len = round_page(off + len);
-#if defined(UVM)
 	uvm_km_free_wakeup(phys_map, addr, len);
-#else
-	kmem_free_wakeup(phys_map, addr, len);
-#endif
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;
 }

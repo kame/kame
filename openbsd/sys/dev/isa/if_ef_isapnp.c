@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ef_isapnp.c,v 1.10 2001/02/20 19:39:41 mickey Exp $	*/
+/*	$OpenBSD: if_ef_isapnp.c,v 1.13 2001/06/27 06:34:45 kjc Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -89,10 +89,6 @@ struct ef_softc {
 	int			sc_tx_succ_ok;
 	int			sc_busmaster;
 };
-
-#define	ETHER_MIN_LEN		64
-#define	ETHER_MAX_LEN		1518
-#define	ETHER_ADDR_LEN		6
 
 #define	EF_W0_EEPROM_COMMAND	0x200a
 #define    EF_EEPROM_BUSY	(1 << 9)
@@ -218,6 +214,7 @@ ef_isapnp_attach(parent, self, aux)
 	ifp->if_watchdog = efwatchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	sc->sc_mii.mii_ifp = ifp;
 	sc->sc_mii.mii_readreg = ef_miibus_readreg;
@@ -257,7 +254,7 @@ efstart(ifp)
 		return;
 
 startagain:
-	m0 = ifp->if_snd.ifq_head;
+	IFQ_POLL(&ifp->if_snd, m0);
 	if (m0 == NULL)
 		return;
 
@@ -268,7 +265,7 @@ startagain:
 
 	if (len + pad > ETHER_MAX_LEN) {
 		ifp->if_oerrors++;
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		m_freem(m0);
 		goto startagain;
 	}
@@ -291,7 +288,7 @@ startagain:
 		bpf_mtap(ifp->if_bpf, m0);
 #endif
 
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == NULL) /* XXX not needed */
 		return;
 
@@ -697,7 +694,6 @@ efread(sc)
 	bus_space_handle_t ioh = sc->sc_ioh;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct mbuf *m;
-	struct ether_header *eh;
 	int len;
 
 	len = bus_space_read_2(iot, ioh, EF_W1_RX_STATUS);
@@ -746,15 +742,12 @@ efread(sc)
 
 	ifp->if_ipackets++;
 
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
 
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	ether_input_mbuf(ifp, m);
 }
 
 struct mbuf *

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_ipc_10.c,v 1.4 2000/05/01 23:12:28 deraadt Exp $	*/
+/*	$OpenBSD: kern_ipc_10.c,v 1.6 2001/08/11 23:14:22 art Exp $	*/
 /*	$NetBSD: kern_ipc_10.c,v 1.4 1995/10/07 06:26:25 mycroft Exp $	*/
 
 /*
@@ -42,9 +42,11 @@
 #include <sys/syscallargs.h>
 
 #include <vm/vm.h>
-#include <vm/vm_map.h>
-#include <vm/vm_map.h>
-#include <vm/vm_kern.h>
+
+/*
+ * Note that while we no longer have a COMPAT_10 kernel option,
+ * there are other COMPAT_* options that need these old functions.
+ */
 
 #ifdef SYSVSEM
 int
@@ -101,9 +103,7 @@ compat_10_sys_semsys(p, v, retval)
 		return (EINVAL);
 	}
 }
-#endif
 
-#ifdef SYSVSHM
 int
 compat_10_sys_shmsys(p, v, retval)
 	struct proc *p;
@@ -162,9 +162,7 @@ compat_10_sys_shmsys(p, v, retval)
 		return (EINVAL);
 	}
 }
-#endif
 
-#ifdef SYSVMSG
 int
 compat_10_sys_msgsys(p, v, retval)
 	struct proc *p;

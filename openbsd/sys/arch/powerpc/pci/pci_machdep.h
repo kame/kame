@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_machdep.h,v 1.6 2000/10/19 04:53:06 drahn Exp $	*/
+/*	$OpenBSD: pci_machdep.h,v 1.9 2001/08/25 10:13:29 art Exp $	*/
 
 /*
  * Copyright (c) 1996 Carnegie-Mellon University.
@@ -57,6 +57,7 @@ struct ppc_pci_chipset {
 	int		(*pc_intr_map) __P((void *, pcitag_t, int, int,
 			    pci_intr_handle_t *));
 	const char	*(*pc_intr_string) __P((void *, pci_intr_handle_t));
+	int		(*pc_intr_line) __P((void *, pci_intr_handle_t));
 	void		*(*pc_intr_establish) __P((void *, pci_intr_handle_t,
 			    int, int (*)(void *), void *, char *));
 	void		(*pc_intr_disestablish) __P((void *, void *));
@@ -78,8 +79,9 @@ struct ppc_pci_chipset {
     (*(c)->pc_conf_read)((c)->pc_conf_v, (t), (r))
 #define	pci_conf_write(c, t, r, v)					\
     (*(c)->pc_conf_write)((c)->pc_conf_v, (t), (r), (v))
-#define	pci_intr_map(c, it, ip, il, ihp)				\
-    (*(c)->pc_intr_map)((c)->pc_intr_v, (it), (ip), (il), (ihp))
+#define	pci_intr_map(pa, ihp)						\
+    (*((pa)->pa_pc)->pc_intr_map)((pa)->pa_pc->pc_intr_v, 		\
+	(pa)->pa_intrtag, (pa)->pa_intrpin, (pa)->pa_intrline, (ihp))
 #define	pci_intr_string(c, ih)						\
     (*(c)->pc_intr_string)((c)->pc_intr_v, (ih))
 #define	pci_intr_establish(c, ih, l, h, a, nm)				\
@@ -88,6 +90,4 @@ struct ppc_pci_chipset {
     (*(c)->pc_intr_disestablish)((c)->pc_intr_v, (iv))
 #define	pci_ether_hw_addr(c, s)						\
     (*(c)->pc_ether_hw_addr)((c), (s))
-
-vm_offset_t vtophys __P((void *));
 

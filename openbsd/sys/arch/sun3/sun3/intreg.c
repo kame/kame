@@ -1,4 +1,4 @@
-/*	$OpenBSD: intreg.c,v 1.6 2001/01/03 01:47:30 miod Exp $	*/
+/*	$OpenBSD: intreg.c,v 1.8 2001/06/27 04:44:02 art Exp $	*/
 /*	$NetBSD: intreg.c,v 1.5 1996/11/20 18:57:32 gwr Exp $	*/
 
 /*-
@@ -54,6 +54,10 @@
 #include <machine/machdep.h>
 #include <machine/mon.h>
 #include <machine/obio.h>
+
+#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
 
 #include "interreg.h"
 
@@ -146,7 +150,7 @@ soft1intr(arg)
 	splx(s);
 
 	if (sir.sir_any) {
-		cnt.v_soft++;
+		uvmexp.softs++;
 		if (sir.sir_which[SIR_NET]) {
 			s = splhigh();
 			n = netisr;

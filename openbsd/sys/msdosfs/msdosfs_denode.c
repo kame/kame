@@ -1,4 +1,4 @@
-/*	$OpenBSD: msdosfs_denode.c,v 1.16 1999/04/28 09:28:16 art Exp $	*/
+/*	$OpenBSD: msdosfs_denode.c,v 1.18 2001/06/27 04:58:45 art Exp $	*/
 /*	$NetBSD: msdosfs_denode.c,v 1.23 1997/10/17 11:23:58 ws Exp $	*/
 
 /*-
@@ -340,10 +340,32 @@ deupdat(dep, waitfor)
 	struct denode *dep;
 	int waitfor;
 {
+	struct buf *bp;
+	struct direntry *dirp;
+	int error;
 	struct timespec ts;
 
+	if (DETOV(dep)->v_mount->mnt_flag & MNT_RDONLY)
+		return (0);
 	TIMEVAL_TO_TIMESPEC(&time, &ts);
-	return (VOP_UPDATE(DETOV(dep), &ts, &ts, waitfor));
+	DETIMES(dep, &ts, &ts, &ts);
+	if ((dep->de_flag & DE_MODIFIED) == 0)
+		return (0);
+	dep->de_flag &= ~DE_MODIFIED;
+	if (dep->de_Attributes & ATTR_DIRECTORY)
+		return (0);
+	if (dep->de_refcnt <= 0)
+		return (0);
+	error = readde(dep, &bp, &dirp);
+	if (error)
+		return (error);
+	DE_EXTERNALIZE(dirp, dep);
+	if (waitfor)
+		return (bwrite(bp));
+	else {
+		bdwrite(bp);
+		return (0);
+	}
 }
 
 /*
@@ -386,11 +408,7 @@ detrunc(dep, length, flags, cred, p)
 		return (EINVAL);
 	}
 
-#if defined(UVM)
 	uvm_vnp_setsize(DETOV(dep), length);
-#else
-	vnode_pager_setsize(DETOV(dep), length);
-#endif
 
 	if (dep->de_FileSize < length)
 		return (deextend(dep, length, cred));
@@ -443,11 +461,7 @@ detrunc(dep, length, flags, cred, p)
 #endif
 			return (error);
 		}
-#if defined(UVM)
 		uvm_vnp_uncache(DETOV(dep));
-#else
-		vnode_pager_uncache(DETOV(dep));	/* what's this for? */
-#endif
 		/*
 		 * is this the right place for it?
 		 */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cs4280.c,v 1.7 2001/03/14 12:15:11 mickey Exp $	*/
+/*	$OpenBSD: cs4280.c,v 1.11 2001/08/25 10:13:29 art Exp $	*/
 /*	$NetBSD: cs4280.c,v 1.5 2000/06/26 04:56:23 simonb Exp $	*/
 
 /*
@@ -77,7 +77,7 @@ int cs4280debug = 0;
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/cs4280reg.h>
-#include <dev/pci/cs4280_image.h>
+#include <dev/microcode/cirruslogic/cs4280_image.h>
 
 #include <sys/audioio.h>
 #include <dev/audio_if.h>
@@ -575,13 +575,13 @@ cs4280_attach(parent, self, aux)
 	/* Map I/O register */
 	if (pci_mapreg_map(pa, CSCC_PCI_BA0, 
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
-	    &sc->ba0t, &sc->ba0h, NULL, NULL)) {
+	    &sc->ba0t, &sc->ba0h, NULL, NULL, 0)) {
 		printf(": can't map BA0 space\n");
 		return;
 	}
 	if (pci_mapreg_map(pa, CSCC_PCI_BA1,
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
-	    &sc->ba1t, &sc->ba1h, NULL, NULL)) {
+	    &sc->ba1t, &sc->ba1h, NULL, NULL, 0)) {
 		printf(": can't map BA1 space\n");
 		return;
 	}
@@ -602,8 +602,7 @@ cs4280_attach(parent, self, aux)
 	}
 	
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}
@@ -1802,7 +1801,7 @@ cs4280_power(why, v)
 		for(i = 1; i <= CS4280_SAVE_REG_MAX; i++) {
 			if(i == 0x04) /* AC97_REG_MASTER_TONE */
 				continue;
-			cs4280_read_codec(sc, 2*i, &sc->ac97_reg[i>>1]);
+			cs4280_read_codec(sc, 2*i, &sc->ac97_reg[i]);
 		}
 		/* should I powerdown here ? */
 		cs4280_write_codec(sc, AC97_REG_POWER, CS4280_POWER_DOWN_ALL);
@@ -1820,7 +1819,7 @@ cs4280_power(why, v)
 		for(i = 1; i <= CS4280_SAVE_REG_MAX; i++) {
 			if(i == 0x04) /* AC97_REG_MASTER_TONE */
 				continue;
-			cs4280_write_codec(sc, 2*i, sc->ac97_reg[i>>1]);
+			cs4280_write_codec(sc, 2*i, sc->ac97_reg[i]);
 		}
 	}
 }

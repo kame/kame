@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.19 2001/03/29 00:17:00 mickey Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.25 2001/09/19 20:50:56 mickey Exp $	*/
 
 /*
  * Copyright (c) 1999-2000 Michael Shalayeff
@@ -49,7 +49,6 @@
 #include <machine/pcb.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <uvm/uvm.h>
 
 
@@ -97,23 +96,22 @@ cpu_coredump(p, vp, cred, core)
 
 /*
  * Move pages from one kernel virtual address to another.
- * Both addresses are assumed to reside in the Sysmap,
- * and size must be a multiple of CLSIZE.
+ * Both addresses are assumed to reside in the Sysmap.
  */
 void
 pagemove(from, to, size)
 	register caddr_t from, to;
 	size_t size;
 {
-	register paddr_t pa;
+	paddr_t pa;
 
 	while (size > 0) {
-		pa = pmap_extract(pmap_kernel(), (vaddr_t)from);
+		pmap_extract(pmap_kernel(), (vaddr_t)from, &pa);
 		pmap_remove(pmap_kernel(),
 			    (vaddr_t)from, (vaddr_t)from + PAGE_SIZE);
 		pmap_enter(pmap_kernel(), (vaddr_t)to, pa,
-			   VM_PROT_READ|VM_PROT_WRITE, 1,
-			   VM_PROT_READ|VM_PROT_WRITE);
+			   VM_PROT_READ|VM_PROT_WRITE,
+			   VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -346,13 +344,10 @@ vmapbuf(bp, len)
 		/* not needed, thanks to PMAP_PREFER() */
 		/* fdcache(vm_map_pmap(map)->pmap_space, addr, PAGE_SIZE); */
 
-		pa = pmap_extract(vm_map_pmap(map), addr);
-#ifdef DIAGNOSTIC
-		if (pa == 0)
+		if (pmap_extract(vm_map_pmap(map), addr, &pa) == FALSE)
 			panic("vmapbuf: null page frame");
-#endif
 		pmap_enter(vm_map_pmap(phys_map), kva, pa,
-		    VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
+		    VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
 
 		addr += PAGE_SIZE;
 		kva += PAGE_SIZE;
@@ -373,7 +368,7 @@ vunmapbuf(bp, len)
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vunmapbuf");
 #endif
-	addr = trunc_page(bp->b_data);
+	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - addr;
 	len = round_page(off + len);
 	uvm_km_free_wakeup(phys_map, addr, len);

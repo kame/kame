@@ -1,4 +1,4 @@
-/*	$OpenBSD: grf.c,v 1.8 1997/01/16 09:24:07 niklas Exp $	*/
+/*	$OpenBSD: grf.c,v 1.11 2001/09/11 20:05:20 miod Exp $	*/
 /*	$NetBSD: grf.c,v 1.32 1996/12/23 09:10:01 veego Exp $	*/
 
 /*
@@ -59,9 +59,6 @@
 #include <sys/vnode.h>
 #include <sys/mman.h>
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_pager.h>
 #include <machine/cpu.h>
 #include <machine/fbio.h>
 #include <amiga/amiga/color.h>	/* DEBUG */
@@ -135,7 +132,7 @@ grfmatch(pdp, match, auxp)
 /*
  * attach.. plug pointer in and print some info.
  * then try and attach an ite to us. note: dp is NULL
- * durring console init.
+ * during console init.
  */
 void
 grfattach(pdp, dp, auxp)

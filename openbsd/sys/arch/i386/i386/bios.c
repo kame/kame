@@ -1,4 +1,4 @@
-/*	$OpenBSD: bios.c,v 1.42 2001/02/28 19:16:06 mickey Exp $	*/
+/*	$OpenBSD: bios.c,v 1.46 2001/09/19 20:50:56 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997-2001 Michael Shalayeff
@@ -44,7 +44,7 @@
 #include <sys/extent.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 
 #include <dev/cons.h>
@@ -344,6 +344,7 @@ bios_getopt()
 			printf(" unsupported arg (%d) %p", q->ba_type,
 			    q->ba_arg);
 #endif
+			break;
 		}
 	}
 	printf("\n");
@@ -396,11 +397,7 @@ bios32_service(service, e, ei)
 
 	endpa = i386_round_page(BIOS32_END);
 
-#if defined(UVM)
 	sva = va = uvm_km_valloc(kernel_map, endpa);
-#else
-	sva = va = kmem_alloc_pageable(kernel_map, endpa);
-#endif
 	if (va == 0)
 		return (0);
 
@@ -412,14 +409,14 @@ bios32_service(service, e, ei)
 	     va += i386_trunc_page(BIOS32_START);
 	     pa < endpa; pa += NBPG, va += NBPG) {
 		pmap_enter(pmap_kernel(), va, pa,
-		    VM_PROT_READ | VM_PROT_WRITE, TRUE,
-		    VM_PROT_READ | VM_PROT_WRITE);
+		    VM_PROT_READ | VM_PROT_WRITE,
+		    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 
 		/* for all you, broken hearted */
 		if (pa >= i386_trunc_page(base)) {
 			pmap_enter(pmap_kernel(), sva, pa,
-			    VM_PROT_READ | VM_PROT_WRITE, TRUE,
-			    VM_PROT_READ | VM_PROT_WRITE);
+			    VM_PROT_READ | VM_PROT_WRITE,
+			    VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 			sva += NBPG;
 		}
 	}

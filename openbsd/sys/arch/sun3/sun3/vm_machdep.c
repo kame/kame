@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.13 2000/06/08 22:25:23 niklas Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.20 2001/09/19 20:50:57 mickey Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.35 1996/04/26 18:38:06 gwr Exp $	*/
 
 /*
@@ -56,9 +56,7 @@
 #include <sys/core.h>
 #include <sys/exec.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-/* #include <vm/vm_map.h> */
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/machdep.h>
@@ -200,7 +198,7 @@ cpu_exit(p)
 {
 
 	(void) splimp();
-	cnt.v_swtch++;
+	uvmexp.swtch++;
 	switch_exit(p);
 	/* NOTREACHED */
 }
@@ -289,24 +287,23 @@ pagemove(from, to, size)
 	register caddr_t from, to;
 	size_t size;
 {
-	register vm_offset_t pa;
+	vm_offset_t pa;
 
 #ifdef DIAGNOSTIC
-	if (size & CLOFSET || (int)from & CLOFSET || (int)to & CLOFSET)
+	if ((size & PAGE_MASK) != 0 ||
+	    ((vaddr_t)from & PAGE_MASK) != 0 ||
+	    ((vaddr_t)to & PAGE_MASK) != 0)
 		panic("pagemove 1");
 #endif
 	while (size > 0) {
-		pa = pmap_extract(pmap_kernel(), (vm_offset_t)from);
-#ifdef DIAGNOSTIC
-		if (pa == 0)
+		if (pmap_extract(pmap_kernel(), (vm_offset_t)from, &pa) == FALSE)
 			panic("pagemove 2");
-#endif
 		/* this does the cache flush work itself */
 		pmap_remove(pmap_kernel(),
 			(vm_offset_t)from, (vm_offset_t)from + NBPG);
 		pmap_enter(pmap_kernel(),
-			(vm_offset_t)to, pa, VM_PROT_READ|VM_PROT_WRITE, 1,
-			VM_PROT_READ|VM_PROT_WRITE);
+			(vm_offset_t)to, pa, VM_PROT_READ|VM_PROT_WRITE,
+			VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		from += NBPG;
 		to += NBPG;
 		size -= NBPG;
@@ -343,7 +340,8 @@ vmapbuf(bp, sz)
 	register struct buf *bp;
 	vm_size_t sz;
 {
-	register vm_offset_t addr, kva, pa;
+	register vm_offset_t addr, kva;
+	vm_offset_t pa;
 	register vm_size_t size, off;
 	register int npf;
 	struct proc *p;
@@ -358,15 +356,15 @@ vmapbuf(bp, sz)
 	off = addr & PGOFSET;
 	addr = trunc_page(addr);
 	size = round_page(bp->b_bcount + off);
-	kva = kmem_alloc_wait(kernel_map, size);
+	kva = uvm_km_valloc_wait(kernel_map, size);
 	bp->b_data = (caddr_t)(kva + off);
 
 	npf = btoc(size);
 	while (npf--) {
-		pa = pmap_extract(vm_map_pmap(map), (vm_offset_t)addr);
-		pa = trunc_page(pa);	/* page type in low bits? */
-		if (pa == 0)
+		if (pmap_extract(vm_map_pmap(map), (vm_offset_t)addr,
+		    &pa) == FALSE)
 			panic("vmapbuf: null page frame");
+		pa = trunc_page(pa);	/* page type in low bits? */
 #ifdef	HAVECACHE
 		/* flush write-back on old mappings */
 		if (cache_size)
@@ -374,7 +372,7 @@ vmapbuf(bp, sz)
 #endif
 		pmap_enter(pmap_kernel(), kva,
 			pa | PMAP_NC,
-			VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
+			VM_PROT_READ|VM_PROT_WRITE, PMAP_WIRED);
 		addr += NBPG;
 		kva  += NBPG;
 	}
@@ -413,7 +411,7 @@ vunmapbuf(bp, sz)
 	 * pmap_remove but that will do nothing since we
 	 * already removed the actual mappings.
 	 */
-	kmem_free_wakeup(kernel_map, pgva, size);
+	uvm_km_free_wakeup(kernel_map, pgva, size);
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = NULL;
 }

@@ -1,5 +1,5 @@
-/*	$OpenBSD: ext2fs_inode.c,v 1.9 2000/06/23 02:14:39 mickey Exp $	*/
-/*	$NetBSD: ext2fs_inode.c,v 1.1 1997/06/11 09:33:56 bouyer Exp $	*/
+/*	$OpenBSD: ext2fs_inode.c,v 1.16 2001/09/18 01:46:40 art Exp $	*/
+/*	$NetBSD: ext2fs_inode.c,v 1.24 2001/06/19 12:59:18 wiz Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.
@@ -59,15 +59,8 @@
 #include <ufs/ext2fs/ext2fs.h>
 #include <ufs/ext2fs/ext2fs_extern.h>
 
-static int ext2fs_indirtrunc __P((struct inode *, daddr_t, daddr_t,
-    				  daddr_t, int, long *));
-
-int
-ext2fs_init(vfsp)
-	struct vfsconf *vfsp;
-{
-	return (ufs_init(vfsp));
-}
+static int ext2fs_indirtrunc __P((struct inode *, ufs_daddr_t, ufs_daddr_t,
+				ufs_daddr_t, int, long *));
 
 /*
  * Last reference to an inode.  If necessary, write or delete it.
@@ -78,9 +71,11 @@ ext2fs_inactive(v)
 {   
 	struct vop_inactive_args /* {
 		struct vnode *a_vp;
+		struct proc *a_p;
 	} */ *ap = v;
-	register struct vnode *vp = ap->a_vp;
-	register struct inode *ip = VTOI(vp);
+	struct vnode *vp = ap->a_vp;
+	struct inode *ip = VTOI(vp);
+	struct proc *p = ap->a_p;
 	struct timespec ts;
 	int error = 0;
 	extern int prtactive;
@@ -88,28 +83,30 @@ ext2fs_inactive(v)
 	if (prtactive && vp->v_usecount != 0)
 		vprint("ext2fs_inactive: pushing active", vp);
 	/* Get rid of inodes related to stale file handles. */
-	if (ip->i_e2fs_mode == 0 || ip->i_e2fs_dtime != 0) 
+	if (ip->i_e2fs_mode == 0 || ip->i_e2fs_dtime != 0)
 		goto out;
 
+	error = 0;
 	if (ip->i_e2fs_nlink == 0 && (vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
-		error = VOP_TRUNCATE(vp, (off_t)0, 0, NOCRED, NULL); 
+		if (ip->i_e2fs_size != 0) {
+			error = ext2fs_truncate(ip, (off_t)0, 0, NOCRED);
+		}
 		TIMEVAL_TO_TIMESPEC(&time, &ts);
 		ip->i_e2fs_dtime = ts.tv_sec;
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
-		VOP_VFREE(vp, ip->i_number, ip->i_e2fs_mode);
+		ext2fs_inode_free(ip, ip->i_number, ip->i_e2fs_mode);
 	}
 	if (ip->i_flag & (IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE)) {
-		TIMEVAL_TO_TIMESPEC(&time, &ts);
-		VOP_UPDATE(vp, &ts, &ts, 0);
+		ext2fs_update(ip, NULL, NULL, 0);
 	}
 out:
-	VOP_UNLOCK(vp, 0, ap->a_p);
+	VOP_UNLOCK(vp, 0, p);
 	/*
 	 * If we are done with the inode, reclaim it
 	 * so that it can be reused immediately.
 	 */
 	if (ip->i_e2fs_dtime != 0)
-		vrecycle(vp, (struct simplelock *)0, ap->a_p);
+		vrecycle(vp, NULL, p);
 	return (error);
 }   
 
@@ -124,24 +121,21 @@ out:
  * complete.
  */
 int
-ext2fs_update(v)
-	void *v;
+ext2fs_update(struct inode *ip, struct timespec *atime, struct timespec *mtime,
+    int waitfor)
 {
-	struct vop_update_args /* {
-		struct vnode *a_vp;
-		struct timespec *a_access;
-		struct timespec *a_modify;
-		int a_waitfor;
-	} */ *ap = v;
-	register struct m_ext2fs *fs;
+	struct m_ext2fs *fs;
 	struct buf *bp;
-	struct inode *ip;
 	int error;
+	struct timespec ts;
+	caddr_t cp;
 
-	if (ap->a_vp->v_mount->mnt_flag & MNT_RDONLY)
+	if (ITOV(ip)->v_mount->mnt_flag & MNT_RDONLY)
 		return (0);
-	ip = VTOI(ap->a_vp);
-	EXT2FS_ITIMES(ip, &time, &time);
+	TIMEVAL_TO_TIMESPEC(&time, &ts);
+	EXT2FS_ITIMES(ip,
+	    atime ? atime : &ts,
+	    mtime ? mtime : &ts);
 	if ((ip->i_flag & IN_MODIFIED) == 0)
 		return (0);
 	ip->i_flag &= ~IN_MODIFIED;
@@ -153,10 +147,11 @@ ext2fs_update(v)
 		brelse(bp);
 		return (error);
 	}
-	bcopy(&ip->i_din.e2fs_din,
-		((struct ext2fs_dinode *)bp->b_data + ino_to_fsbo(fs, ip->i_number)),
-		sizeof(struct ext2fs_dinode));
-	if (ap->a_waitfor)
+	ip->i_flag &= ~(IN_MODIFIED);
+	cp = (caddr_t)bp->b_data +
+	    (ino_to_fsbo(fs, ip->i_number) * EXT2_DINODE_SIZE);
+	e2fs_isave(&ip->i_din.e2fs_din, (struct ext2fs_dinode *)cp);
+	if (waitfor)
 		return (bwrite(bp));
 	else {
 		bdwrite(bp);
@@ -172,36 +167,28 @@ ext2fs_update(v)
  * disk blocks.
  */
 int
-ext2fs_truncate(v)
-	void *v;
+ext2fs_truncate(struct inode *oip, off_t length, int flags, struct ucred *cred)
 {
-	struct vop_truncate_args /* {
-		struct vnode *a_vp;
-		off_t a_length;
-		int a_flags;
-		struct ucred *a_cred;
-		struct proc *a_p;
-	} */ *ap = v;
-	register struct vnode *ovp = ap->a_vp;
-	register daddr_t lastblock;
-	register struct inode *oip;
-	daddr_t bn, lbn, lastiblock[NIADDR], indir_lbn[NIADDR];
-	daddr_t oldblks[NDADDR + NIADDR], newblks[NDADDR + NIADDR];
-	off_t length = ap->a_length;
-	register struct m_ext2fs *fs;
+	struct vnode *ovp = ITOV(oip);
+	ufs_daddr_t lastblock;
+	ufs_daddr_t bn, lbn, lastiblock[NIADDR], indir_lbn[NIADDR];
+	ufs_daddr_t oldblks[NDADDR + NIADDR], newblks[NDADDR + NIADDR];
+	struct m_ext2fs *fs;
 	struct buf *bp;
 	int offset, size, level;
 	long count, nblocks, vflags, blocksreleased = 0;
-	struct timespec ts;
-	register int i;
+	int i;
 	int aflags, error, allerror;
 	off_t osize;
 
 	if (length < 0)
 		return (EINVAL);
 
-	oip = VTOI(ovp);
-	TIMEVAL_TO_TIMESPEC(&time, &ts);
+	if (ovp->v_type != VREG &&
+	    ovp->v_type != VDIR &&
+	    ovp->v_type != VLNK)
+		return (0);
+
 	if (ovp->v_type == VLNK &&
 		(oip->i_e2fs_size < ovp->v_mount->mnt_maxsymlinklen ||
 		 (ovp->v_mount->mnt_maxsymlinklen == 0 &&
@@ -214,11 +201,11 @@ ext2fs_truncate(v)
 			(u_int)oip->i_e2fs_size);
 		oip->i_e2fs_size = 0;
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
-		return (VOP_UPDATE(ovp, &ts, &ts, 1));
+		return (ext2fs_update(oip, NULL, NULL, 1));
 	}
 	if (oip->i_e2fs_size == length) {
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
-		return (VOP_UPDATE(ovp, &ts, &ts, 0));
+		return (ext2fs_update(oip, NULL, NULL, 0));
 	}
 	fs = oip->i_e2fs;
 	osize = oip->i_e2fs_size;
@@ -235,32 +222,27 @@ ext2fs_truncate(v)
 		offset = blkoff(fs, length - 1);
 		lbn = lblkno(fs, length - 1);
 		aflags = B_CLRBUF;
-		if (ap->a_flags & IO_SYNC)
+		if (flags & IO_SYNC)
 			aflags |= B_SYNC;
-		error = ext2fs_balloc(oip, lbn, offset + 1, ap->a_cred, &bp,
-				   aflags);
+		error = ext2fs_buf_alloc(oip, lbn, offset + 1, cred, &bp,
+		    aflags);
 		if (error)
 			return (error);
 		oip->i_e2fs_size = length;
-#if defined(UVM)
 		uvm_vnp_setsize(ovp, length);
 		uvm_vnp_uncache(ovp);
-#else
-		vnode_pager_setsize(ovp, (u_long)length);
-		(void) vnode_pager_uncache(ovp);
-#endif
 		if (aflags & B_SYNC)
 			bwrite(bp);
 		else
 			bawrite(bp);
 		oip->i_flag |= IN_CHANGE | IN_UPDATE;
-		return (VOP_UPDATE(ovp, &ts, &ts, 1));
+		return (ext2fs_update(oip, NULL, NULL, 1));
 	}
 	/*
 	 * Shorten the size of the file. If the file is not being
 	 * truncated to a block boundry, the contents of the
 	 * partial block following the end of the file must be
-	 * zero'ed in case it ever become accessable again because
+	 * zero'ed in case it ever become accessible again because
 	 * of subsequent file growth.
 	 */
 	offset = blkoff(fs, length);
@@ -269,20 +251,16 @@ ext2fs_truncate(v)
 	} else {
 		lbn = lblkno(fs, length);
 		aflags = B_CLRBUF;
-		if (ap->a_flags & IO_SYNC)
+		if (flags & IO_SYNC)
 			aflags |= B_SYNC;
-		error = ext2fs_balloc(oip, lbn, offset, ap->a_cred, &bp, aflags);
+		error = ext2fs_buf_alloc(oip, lbn, offset, cred, &bp, 
+		    aflags);
 		if (error)
 			return (error);
 		oip->i_e2fs_size = length;
 		size = fs->e2fs_bsize;
-#if defined(UVM)
 		uvm_vnp_setsize(ovp, length);
 		uvm_vnp_uncache(ovp);
-#else
-		vnode_pager_setsize(ovp, (u_long)length);
-		(void) vnode_pager_uncache(ovp);
-#endif
 		bzero((char *)bp->b_data + offset, (u_int)(size - offset));
 		allocbuf(bp, size);
 		if (aflags & B_SYNC)
@@ -307,7 +285,7 @@ ext2fs_truncate(v)
 	 * will be returned to the free list.  lastiblock values are also
 	 * normalized to -1 for calls to ext2fs_indirtrunc below.
 	 */
-	bcopy((caddr_t)&oip->i_e2fs_blocks[0], (caddr_t)oldblks, sizeof oldblks);
+	memcpy((caddr_t)oldblks, (caddr_t)&oip->i_e2fs_blocks[0], sizeof oldblks);
 	for (level = TRIPLE; level >= SINGLE; level--)
 		if (lastiblock[level] < 0) {
 			oip->i_e2fs_blocks[NDADDR + level] = 0;
@@ -316,7 +294,7 @@ ext2fs_truncate(v)
 	for (i = NDADDR - 1; i > lastblock; i--)
 		oip->i_e2fs_blocks[i] = 0;
 	oip->i_flag |= IN_CHANGE | IN_UPDATE;
-	if ((error = VOP_UPDATE(ovp, &ts, &ts, 1)) != 0)
+	if ((error = ext2fs_update(oip, NULL, NULL, 1)) != 0)
 		allerror = error;
 	/*
 	 * Having written the new inode to disk, save its new configuration
@@ -328,7 +306,7 @@ ext2fs_truncate(v)
 	bcopy((caddr_t)oldblks, (caddr_t)&oip->i_e2fs_blocks[0], sizeof oldblks);
 	oip->i_e2fs_size = osize;
 	vflags = ((length > 0) ? V_SAVE : 0) | V_SAVEMETA;
-	allerror = vinvalbuf(ovp, vflags, ap->a_cred, ap->a_p, 0, 0);
+	allerror = vinvalbuf(ovp, vflags, cred, curproc, 0, 0);
 
 	/*
 	 * Indirect blocks first.
@@ -337,10 +315,10 @@ ext2fs_truncate(v)
 	indir_lbn[DOUBLE] = indir_lbn[SINGLE] - NINDIR(fs) -1;
 	indir_lbn[TRIPLE] = indir_lbn[DOUBLE] - NINDIR(fs) * NINDIR(fs) - 1;
 	for (level = TRIPLE; level >= SINGLE; level--) {
-		bn = oip->i_e2fs_blocks[NDADDR + level];
+		bn = fs2h32(oip->i_e2fs_blocks[NDADDR + level]);
 		if (bn != 0) {
 			error = ext2fs_indirtrunc(oip, indir_lbn[level],
-				fsbtodb(fs, bn), lastiblock[level], level, &count);
+			    fsbtodb(fs, bn), lastiblock[level], level, &count);
 			if (error)
 				allerror = error;
 			blocksreleased += count;
@@ -358,27 +336,27 @@ ext2fs_truncate(v)
 	 * All whole direct blocks or frags.
 	 */
 	for (i = NDADDR - 1; i > lastblock; i--) {
-		bn = oip->i_e2fs_blocks[i];
+		bn = fs2h32(oip->i_e2fs_blocks[i]);
 		if (bn == 0)
 			continue;
 		oip->i_e2fs_blocks[i] = 0;
 		ext2fs_blkfree(oip, bn);
 		blocksreleased += btodb(fs->e2fs_bsize);
 	}
-	if (lastblock < 0)
-		goto done;
 
 done:
 #ifdef DIAGNOSTIC
 	for (level = SINGLE; level <= TRIPLE; level++)
-		if (newblks[NDADDR + level] != oip->i_e2fs_blocks[NDADDR + level])
-			panic("itrunc1");
+		if (newblks[NDADDR + level] !=
+		    oip->i_e2fs_blocks[NDADDR + level])
+			panic("ext2fs_truncate1");
 	for (i = 0; i < NDADDR; i++)
 		if (newblks[i] != oip->i_e2fs_blocks[i])
-			panic("itrunc2");
+			panic("ext2fs_truncate2");
 	if (length == 0 &&
-		(ovp->v_dirtyblkhd.lh_first || ovp->v_cleanblkhd.lh_first))
-		panic("itrunc3");
+	    (!LIST_EMPTY(&ovp->v_cleanblkhd) ||
+	     !LIST_EMPTY(&ovp->v_dirtyblkhd)))
+		panic("ext2fs_truncate3");
 #endif /* DIAGNOSTIC */
 	/*
 	 * Put back the real size.
@@ -402,18 +380,18 @@ done:
  */
 static int
 ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
-	register struct inode *ip;
-	daddr_t lbn, lastbn;
-	daddr_t dbn;
+	struct inode *ip;
+	ufs_daddr_t lbn, lastbn;
+	ufs_daddr_t dbn;
 	int level;
 	long *countp;
 {
-	register int i;
+	int i;
 	struct buf *bp;
-	register struct m_ext2fs *fs = ip->i_e2fs;
-	register daddr_t *bap;
+	struct m_ext2fs *fs = ip->i_e2fs;
+	ufs_daddr_t *bap;
 	struct vnode *vp;
-	daddr_t *copy = NULL, nb, nlbn, last;
+	ufs_daddr_t *copy = NULL, nb, nlbn, last;
 	long blkcount, factor;
 	int nblocks, blocksreleased = 0;
 	int error = 0, allerror = 0;
@@ -455,11 +433,11 @@ ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 		return (error);
 	}
 
-	bap = (daddr_t *)bp->b_data;
-	if (lastbn != -1) {
-		MALLOC(copy, daddr_t *, fs->e2fs_bsize, M_TEMP, M_WAITOK);
-		bcopy((caddr_t)bap, (caddr_t)copy, (u_int)fs->e2fs_bsize);
-		bzero((caddr_t)&bap[last + 1],
+	bap = (ufs_daddr_t *)bp->b_data;
+	if (lastbn >= 0) {
+		MALLOC(copy, ufs_daddr_t *, fs->e2fs_bsize, M_TEMP, M_WAITOK);
+		memcpy((caddr_t)copy, (caddr_t)bap, (u_int)fs->e2fs_bsize);
+		memset((caddr_t)&bap[last + 1], 0,
 			(u_int)(NINDIR(fs) - (last + 1)) * sizeof (u_int32_t));
 		error = bwrite(bp);
 		if (error)
@@ -473,12 +451,12 @@ ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	for (i = NINDIR(fs) - 1,
 		nlbn = lbn + 1 - i * factor; i > last;
 		i--, nlbn += factor) {
-		nb = bap[i];
+		nb = fs2h32(bap[i]);
 		if (nb == 0)
 			continue;
 		if (level > SINGLE) {
 			error = ext2fs_indirtrunc(ip, nlbn, fsbtodb(fs, nb),
-						   (daddr_t)-1, level - 1,
+						   (ufs_daddr_t)-1, level - 1,
 						   &blkcount);
 			if (error)
 				allerror = error;
@@ -493,7 +471,7 @@ ext2fs_indirtrunc(ip, lbn, dbn, lastbn, level, countp)
 	 */
 	if (level > SINGLE && lastbn >= 0) {
 		last = lastbn % factor;
-		nb = bap[i];
+		nb = fs2h32(bap[i]);
 		if (nb != 0) {
 			error = ext2fs_indirtrunc(ip, nlbn, fsbtodb(fs, nb),
 						   last, level - 1, &blkcount);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.8 2001/03/29 18:47:18 drahn Exp $ */
+/*	$OpenBSD: intr.h,v 1.12 2001/09/01 15:49:05 drahn Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom, Opsycon AB and RTMX Inc, USA.
@@ -32,8 +32,8 @@
  *
  */
 
-#ifndef _MACHINE_INTR_H_
-#define _MACHINE_INTR_H_
+#ifndef _POWERPC_INTR_H_
+#define _POWERPC_INTR_H_
 
 #define	IPL_BIO		0
 #define	IPL_NET		1
@@ -73,8 +73,7 @@ extern int imask[7];
  * seems to detect and then doen't move instructions past....
  */
 static __inline int
-splraise(newcpl)
-	int newcpl;
+splraise(int newcpl)
 {
 	int oldcpl;
 
@@ -86,8 +85,7 @@ splraise(newcpl)
 }
 
 static __inline void
-splx(newcpl)
-	int newcpl;
+splx(int newcpl)
 {
 	__asm__ volatile("sync; eieio\n");	/* reorder protect */
 	cpl = newcpl;
@@ -97,8 +95,7 @@ splx(newcpl)
 }
 
 static __inline int
-spllower(newcpl)
-	int newcpl;
+spllower(int newcpl)
 {
 	int oldcpl;
 
@@ -114,8 +111,7 @@ spllower(newcpl)
 /* Following code should be implemented with lwarx/stwcx to avoid
  * the disable/enable. i need to read the manual once more.... */
 static __inline void
-set_sint(pending)
-	int	pending;
+set_sint(int pending)
 {
 	int	msrsave;
 
@@ -136,6 +132,7 @@ set_sint(pending)
 #define spltty()	splraise(imask[IPL_TTY])
 #define splclock()	splraise(SPL_CLOCK|SINT_MASK)
 #define splimp()	splraise(imask[IPL_IMP])
+#define splvm()		splraise(imask[IPL_IMP])
 #define splstatclock()	splhigh()
 #define	spllowersoftclock()	spllower(SINT_CLOCK)
 #define	splsoftclock()	splraise(SINT_CLOCK)
@@ -165,8 +162,9 @@ struct intrhand {
 extern int ppc_configed_intr_cnt;
 #define MAX_PRECONF_INTR 16
 extern struct intrhand ppc_configed_intr[MAX_PRECONF_INTR];
+void softnet(int isr);
 
 #endif /* _LOCORE */
 
 
-#endif /* _MACHINE_INTR_H_ */
+#endif /* _POWERPC_INTR_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.34 2001/02/19 04:57:02 ho Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.38 2001/07/13 19:55:41 deraadt Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -123,7 +123,6 @@ extern u_quad_t pentium_base_tsc;
 	} while (0)
 #endif
 #endif
-void	delay __P((int));
 
 /*
  * pull in #defines for kinds of processors
@@ -174,16 +173,13 @@ extern int cpu_f00f_bug;
 void fix_f00f __P((void));
 #endif
 
-/* autoconf.c */
-void	configure __P((void));
-
 /* dkcsum.c */
 void	dkcsumattach __P((void));
 
 /* machdep.c */
-void	delay __P((int));
 void	dumpconf __P((void));
 void	cpu_reset __P((void));
+void	i386_proc0_tss_ldt_init __P((void));
 
 /* locore.s */
 struct region_descriptor;
@@ -214,8 +210,8 @@ int	math_emulate __P((struct trapframe *));
 #ifdef USER_LDT
 /* sys_machdep.h */
 void	i386_user_cleanup __P((struct pcb *));
-int	i386_get_ldt __P((struct proc *, char *, register_t *));
-int	i386_set_ldt __P((struct proc *, char *, register_t *));
+int	i386_get_ldt __P((struct proc *, void *, register_t *));
+int	i386_set_ldt __P((struct proc *, void *, register_t *));
 #endif
 
 /* isa_machdep.c */

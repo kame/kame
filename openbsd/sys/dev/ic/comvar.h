@@ -1,4 +1,4 @@
-/*	$OpenBSD: comvar.h,v 1.24 2001/03/15 21:09:17 art Exp $	*/
+/*	$OpenBSD: comvar.h,v 1.30 2001/10/05 21:01:11 mickey Exp $	*/
 /*	$NetBSD: comvar.h,v 1.5 1996/05/05 19:50:47 christos Exp $	*/
 
 /*
@@ -83,6 +83,11 @@ struct com_softc {
 	struct tty *sc_tty;
 	struct timeout sc_dtr_tmo;
 	struct timeout sc_diag_tmo;
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	void *sc_si;
+#else
+	struct timeout sc_poll_tmo;
+#endif
 
 	int sc_overflows;
 	int sc_floods;
@@ -92,12 +97,8 @@ struct com_softc {
 
 	int sc_iobase;
 	int sc_frequency;
-#ifdef COM_HAYESP
-	int sc_hayespbase;
-#endif
 
 	bus_space_handle_t sc_ioh;
-	bus_space_handle_t sc_hayespioh;
 
 	u_char sc_uarttype;
 #define COM_UART_UNKNOWN	0x00		/* unknown */
@@ -113,7 +114,6 @@ struct com_softc {
 	u_char sc_hwflags;
 #define	COM_HW_NOIEN	0x01
 #define	COM_HW_FIFO	0x02
-#define	COM_HW_HAYESP	0x04
 #define	COM_HW_CONSOLE	0x40
 #define	COM_HW_KGDB	0x80
 	u_char sc_swflags;
@@ -146,9 +146,6 @@ int	comintr __P((void *));
 int	com_detach __P((struct device *, int));
 int	com_activate __P((struct device *, enum devact));
 
-#ifdef COM_HAYESP
-int comprobeHAYESP __P((bus_space_handle_t hayespioh, struct com_softc *sc));
-#endif
 void	comdiag		__P((void *));
 int	comspeed	__P((long, long));
 u_char	com_cflag2lcr	__P((tcflag_t));
@@ -157,8 +154,8 @@ void	comstart	__P((struct tty *));
 void	compoll		__P((void *));
 
 struct consdev;
-void	comcnprobe	__P((struct consdev *));
 int	comcnattach	__P((bus_space_tag_t, int, int, int, tcflag_t));
+void	comcnprobe	__P((struct consdev *));
 void	comcninit	__P((struct consdev *));
 int	comcngetc	__P((dev_t));
 void	comcnputc	__P((dev_t, int));
@@ -166,16 +163,12 @@ void	comcnpollc	__P((dev_t, int));
 int	com_common_getc	__P((bus_space_tag_t, bus_space_handle_t));
 void	com_common_putc	__P((bus_space_tag_t, bus_space_handle_t, int));
 
-#if defined(DDB) || defined(KGDB)
-void	com_enable_debugport	__P((struct com_softc *));
-#endif
-
 #ifdef KGDB
 int	com_kgdb_attach	__P((bus_space_tag_t, int, int, int, tcflag_t));
 int	kgdbintr __P((void *));
 #endif
 
-int comcnattach __P((bus_space_tag_t, int, int, int, tcflag_t));
+void com_attach_subr __P((struct com_softc *));
 
 extern int comdefaultrate;
 extern int comconsaddr;

@@ -1,13 +1,12 @@
-/*	$OpenBSD: ip_ether.c,v 1.26 2001/04/06 04:42:08 csapuntz Exp $  */
-
+/*	$OpenBSD: ip_ether.c,v 1.35 2001/07/27 15:48:38 itojun Exp $  */
 /*
  * The author of this code is Angelos D. Keromytis (kermit@adk.gr)
  *
  * This code was written by Angelos D. Keromytis for OpenBSD in October 1999.
  *
- * Copyright (C) 1999 by Angelos D. Keromytis.
+ * Copyright (C) 1999-2001 Angelos D. Keromytis.
  *	
- * Permission to use, copy, and modify this software without fee
+ * Permission to use, copy, and modify this software with or without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
  * modification of this software. 
@@ -31,31 +30,23 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/mbuf.h>
-#include <sys/domain.h>
 #include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/kernel.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/route.h>
-#include <net/netisr.h>
 
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
-#include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 #endif /* INET */
 
-#include <netinet/ip_ipsp.h>
 #include <netinet/ip_ether.h>
 #include <netinet/if_ether.h>
-#include <dev/rndvar.h>
 #include <net/if_bridge.h>
 #include <net/if_gif.h>
 
@@ -134,7 +125,8 @@ etherip_input(m, va_alist)
 	/* Verify EtherIP version number */
 	m_copydata(m, iphlen, sizeof(struct etherip_header), (caddr_t)&eip);
 	if ((eip.eip_ver & ETHERIP_VER_VERS_MASK) != ETHERIP_VERSION) {
-		DPRINTF(("etherip_input(): received EtherIP version number %d not suppoorted\n", (v >> 4) & 0xff));
+		DPRINTF(("etherip_input(): received EtherIP version number "
+		    "%d not suppoorted\n", (v >> 4) & 0xff));
 		etheripstat.etherip_adrops++;
 		m_freem(m);
 		return;
@@ -146,7 +138,8 @@ etherip_input(m, va_alist)
 	 * zero; this is also invalid protocol behaviour.
 	 */
 	if (eip.eip_ver & ETHERIP_VER_RSVD_MASK) {
-		DPRINTF(("etherip_input(): received EtherIP invalid EtherIP header (reserved field non-zero\n"));
+		DPRINTF(("etherip_input(): received EtherIP invalid EtherIP "
+		    "header (reserved field non-zero\n"));
 		etheripstat.etherip_adrops++;
 		m_freem(m);
 		return;
@@ -154,7 +147,8 @@ etherip_input(m, va_alist)
 
 	/* Finally, the pad value must be zero. */
 	if (eip.eip_pad) {
-		DPRINTF(("etherip_input(): received EtherIP invalid pad value\n"));
+		DPRINTF(("etherip_input(): received EtherIP invalid "
+		    "pad value\n"));
 		etheripstat.etherip_adrops++;
 		m_freem(m);
 		return;
@@ -172,7 +166,7 @@ etherip_input(m, va_alist)
 		}
 	}
 
-	/* Copy the addresses for use later */
+	/* Copy the addresses for use later. */
 	bzero(&ssrc, sizeof(ssrc));
 	bzero(&sdst, sizeof(sdst));
 
@@ -182,9 +176,11 @@ etherip_input(m, va_alist)
 	case 4:
 		ssrc.sa.sa_len = sdst.sa.sa_len = sizeof(struct sockaddr_in);
 		ssrc.sa.sa_family = sdst.sa.sa_family = AF_INET;
-		m_copydata(m, offsetof(struct ip, ip_src), sizeof(struct in_addr),
+		m_copydata(m, offsetof(struct ip, ip_src),
+		    sizeof(struct in_addr),
 		    (caddr_t) &ssrc.sin.sin_addr);
-		m_copydata(m, offsetof(struct ip, ip_dst), sizeof(struct in_addr),
+		m_copydata(m, offsetof(struct ip, ip_dst),
+		    sizeof(struct in_addr),
 		    (caddr_t) &sdst.sin.sin_addr);
 		break;
 #endif /* INET */
@@ -226,23 +222,24 @@ etherip_input(m, va_alist)
 			m->m_flags |= M_MCAST;
 	}
 
-	/* Trim the beginning of the mbuf, to remove the ethernet header */
+	/* Trim the beginning of the mbuf, to remove the ethernet header. */
 	m_adj(m, sizeof(struct ether_header));
 
 #if NGIF > 0
 	/* Find appropriate gif(4) interface */
 	for (i = 0; i < ngif; i++) {
-		if ((gif[i].gif_psrc == NULL) || (gif[i].gif_pdst == NULL) ||
-		    !(gif[i].gif_if.if_flags & (IFF_UP|IFF_RUNNING)))
+		if ((gif_softc[i].gif_psrc == NULL) ||
+		    (gif_softc[i].gif_pdst == NULL) ||
+		    !(gif_softc[i].gif_if.if_flags & (IFF_UP|IFF_RUNNING)))
 			continue;
 
-		if (!bcmp(gif[i].gif_psrc, &sdst, gif[i].gif_psrc->sa_len) &&
-		    !bcmp(gif[i].gif_pdst, &ssrc, gif[i].gif_pdst->sa_len) &&
-		    gif[i].gif_if.if_bridge != NULL)
+		if (!bcmp(gif_softc[i].gif_psrc, &sdst, gif_softc[i].gif_psrc->sa_len) &&
+		    !bcmp(gif_softc[i].gif_pdst, &ssrc, gif_softc[i].gif_pdst->sa_len) &&
+		    gif_softc[i].gif_if.if_bridge != NULL)
 			break;
 	}
 
-	/* None found */
+	/* None found. */
 	if (i >= ngif) {
 		DPRINTF(("etherip_input(): no interface found\n"));
 		etheripstat.etherip_noifdrops++;
@@ -256,12 +253,12 @@ etherip_input(m, va_alist)
 	 * NULL if it has consumed the packet.  In the case of gif's,
 	 * bridge_input() returns non-NULL when an error occurs.
 	 */
-	m->m_pkthdr.rcvif = &gif[i].gif_if;
+	m->m_pkthdr.rcvif = &gif_softc[i].gif_if;
 	if (m->m_flags & (M_BCAST|M_MCAST))
-		gif[i].gif_if.if_imcasts++;
+		gif_softc[i].gif_if.if_imcasts++;
 
 	s = splnet();
-	m = bridge_input(&gif[i].gif_if, &eh, m);
+	m = bridge_input(&gif_softc[i].gif_if, &eh, m);
 	splx(s);
 	if (m == NULL)
 		return;
@@ -290,12 +287,12 @@ etherip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	struct mbuf *m0;
 	ushort hlen;
 
-	/* Some address family sanity checks */
+	/* Some address family sanity checks. */
 	if ((tdb->tdb_src.sa.sa_family != 0) &&
 	    (tdb->tdb_src.sa.sa_family != AF_INET) &&
 	    (tdb->tdb_src.sa.sa_family != AF_INET6)) {
-		DPRINTF(("etherip_output(): IP in protocol-family <%d> attempted, aborting",
-		    tdb->tdb_src.sa.sa_family));
+		DPRINTF(("etherip_output(): IP in protocol-family <%d> "
+		    "attempted, aborting", tdb->tdb_src.sa.sa_family));
 		etheripstat.etherip_adrops++;
 		m_freem(m);
 		return EINVAL;
@@ -303,15 +300,16 @@ etherip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 
 	if ((tdb->tdb_dst.sa.sa_family != AF_INET) &&
 	    (tdb->tdb_dst.sa.sa_family != AF_INET6)) {
-		DPRINTF(("etherip_output(): IP in protocol-family <%d> attempted, aborting",
-		    tdb->tdb_dst.sa.sa_family));
+		DPRINTF(("etherip_output(): IP in protocol-family <%d> "
+		    "attempted, aborting", tdb->tdb_dst.sa.sa_family));
 		etheripstat.etherip_adrops++;
 		m_freem(m);
 		return EINVAL;
 	}
 
 	if (tdb->tdb_dst.sa.sa_family != tdb->tdb_src.sa.sa_family) {
-		DPRINTF(("etherip_output(): mismatch in tunnel source and destination address protocol families (%d/%d), aborting",
+		DPRINTF(("etherip_output(): mismatch in tunnel source and "
+		    "destination address protocol families (%d/%d), aborting",
 		    tdb->tdb_src.sa.sa_family, tdb->tdb_dst.sa.sa_family));
 		etheripstat.etherip_adrops++;
 		m_freem(m);
@@ -330,14 +328,14 @@ etherip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		break;
 #endif /* INET6 */
 	default:
-		DPRINTF(("etherip_output(): unsupported tunnel protocol family <%d>, aborting",
-		    tdb->tdb_dst.sa.sa_family));
+		DPRINTF(("etherip_output(): unsupported tunnel protocol "
+		    "family <%d>, aborting", tdb->tdb_dst.sa.sa_family));
 		etheripstat.etherip_adrops++;
 		m_freem(m);
 		return EINVAL;
 	}
 
-	/* Don't forget the EtherIP header */
+	/* Don't forget the EtherIP header. */
 	hlen += sizeof(struct etherip_header);
 
 	if (!(m->m_flags & M_PKTHDR)) {
@@ -353,7 +351,7 @@ etherip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		m_freem(m);
 		return ENOBUFS;
 	}
-	M_COPY_PKTHDR(m0, m);
+	M_MOVE_PKTHDR(m0, m);
 	m0->m_next = m;
 	m0->m_len = hlen;
 	m0->m_pkthdr.len += hlen;
@@ -376,8 +374,7 @@ etherip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		ipo->ip_tos = 0;
 		ipo->ip_off = 0;
 		ipo->ip_sum = 0;
-		ipo->ip_id = ip_randomid();
-		HTONS(ipo->ip_id);
+		ipo->ip_id = htons(ip_randomid());
 
 		/* 
 		 * We should be keeping tunnel soft-state and send back
@@ -428,7 +425,8 @@ etherip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 
 	switch (name[0]) {
 	case ETHERIPCTL_ALLOW:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, &etherip_allow));
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &etherip_allow));
 	default:
 		return (ENOPROTOOPT);
 	}

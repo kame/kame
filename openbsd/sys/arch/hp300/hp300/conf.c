@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.23 2000/09/26 14:03:52 art Exp $	*/
+/*	$OpenBSD: conf.c,v 1.27 2001/09/28 02:53:13 mickey Exp $	*/
 /*	$NetBSD: conf.c,v 1.39 1997/05/12 08:17:53 thorpej Exp $	*/
 
 /*-
@@ -50,7 +50,6 @@ bdev_decl(ct);
 bdev_decl(mt);
 #include "hd.h"
 bdev_decl(hd);
-bdev_decl(sw);
 #include "sd.h"
 bdev_decl(sd);
 #include "ccd.h"
@@ -107,7 +106,6 @@ cdev_decl(ctty);
 #define	mmread	mmrw
 #define	mmwrite	mmrw
 cdev_decl(mm);
-cdev_decl(sw);
 #include "pty.h"
 #define	ptstty		ptytty
 #define	ptsioctl	ptyioctl
@@ -152,11 +150,9 @@ cdev_decl(ksyms);
 cdev_decl(xfs_dev);
 #endif
 
-#ifdef IPFILTER
-#define NIPF 1
-#else
-#define NIPF 0
-#endif
+#include "pf.h"
+
+#include <altq/altqconf.h>
 
 struct cdevsw	cdevsw[] =
 {
@@ -193,7 +189,7 @@ struct cdevsw	cdevsw[] =
 	cdev_lkm_dummy(),		/* 30 */
 	cdev_lkm_dummy(),		/* 31 */
 	cdev_random_init(1,random),	/* 32: random generator */
-	cdev_gen_ipf(NIPF,ipl),		/* 33: ip filtering */
+	cdev_pf_init(NPF,pf),		/* 33: packet filter */
 	cdev_disk_init(NRD,rd),		/* 34: RAM disk */
 	cdev_tty_init(NAPCI,apci),	/* 35: Apollo APCI UARTs */
 	cdev_ksyms_init(NKSYMS,ksyms),	/* 36: Kernel symbols device */
@@ -214,8 +210,10 @@ struct cdevsw	cdevsw[] =
 #ifdef XFS
 	cdev_xfs_init(NXFS,xfs_dev),	/* 51: xfs communication device */
 #else
+	
 	cdev_notdef(),			/* 51 */
 #endif
+	cdev_altq_init(NALTQ,altq),	/* 52: ALTQ control interface */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

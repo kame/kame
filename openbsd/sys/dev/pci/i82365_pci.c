@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82365_pci.c,v 1.3 2000/09/04 17:07:52 mickey Exp $ */
+/*	$OpenBSD: i82365_pci.c,v 1.5 2001/09/21 17:55:43 miod Exp $ */
 /*	$NetBSD: i82365_pci.c,v 1.11 2000/02/24 03:42:44 itohy Exp $	*/
 
 /*
@@ -124,7 +124,7 @@ pcic_pci_attach(parent, self, aux)
 	int irq, i;
 
 	if (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
-	    &sc->iot, &sc->ioh, NULL, &size)) {
+	    &sc->iot, &sc->ioh, NULL, &size, 0)) {
 		printf(": can't map i/o space\n");
 		return;
 	}
@@ -217,7 +217,7 @@ pcic_pci_attach(parent, self, aux)
         } else
                 printf("%s: no irq, ", sc->dev.dv_xname);
 
-        printf("polling enabled\n", sc->dev.dv_xname);
+        printf("polling enabled\n");
         if (sc->poll_established == 0) {
                 timeout_set(&sc->poll_timeout, pcic_poll_intr, sc);
                 timeout_add(&sc->poll_timeout, hz / 2);

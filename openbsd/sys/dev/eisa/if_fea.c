@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fea.c,v 1.8 1999/11/30 04:00:44 jason Exp $	*/
+/*	$OpenBSD: if_fea.c,v 1.11 2001/09/21 17:55:43 miod Exp $	*/
 /*	$NetBSD: if_fea.c,v 1.9 1996/10/21 22:31:05 thorpej Exp $	*/
 
 /*-
@@ -66,8 +66,6 @@
 #include <net/if_fddi.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
 
 #include <machine/cpu.h>
 #include <machine/bus.h>
@@ -223,7 +221,7 @@ pdq_eisa_attach(parent, self, aux)
 		return;
 	}
 	if (intrstr != NULL)
-		printf(": interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+		printf(": interrupting at %s\n", intrstr);
 
 	bcopy((caddr_t) sc->sc_pdq->pdq_hwaddr.lanaddr_bytes,
 	    sc->sc_ac.ac_enaddr, 6);

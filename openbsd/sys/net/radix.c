@@ -1,4 +1,4 @@
-/*	$OpenBSD: radix.c,v 1.5 2000/06/17 20:30:34 provos Exp $	*/
+/*	$OpenBSD: radix.c,v 1.7 2001/07/21 14:34:47 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.11 1996/03/16 23:55:36 christos Exp $	*/
 
 /*
@@ -47,6 +47,8 @@
 #include <sys/domain.h>
 #else
 #include <stdlib.h>
+#include <stdlib.h>
+#include <string.h>
 #endif
 #include <sys/syslog.h>
 #include <net/radix.h>
@@ -635,8 +637,8 @@ on2:
 		if (m->rm_flags & RNF_NORMAL) {
 			mmask = m->rm_leaf->rn_mask;
 			if (tt->rn_flags & RNF_NORMAL) {
-				log(LOG_ERR,
-				   "Non-unique normal route, mask not entered");
+				log(LOG_ERR, "Non-unique normal route, "
+				    "mask not entered\n");
 				return tt;
 			}
 		} else

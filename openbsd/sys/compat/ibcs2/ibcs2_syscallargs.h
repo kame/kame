@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_syscallargs.h,v 1.7 1999/11/20 18:52:00 espie Exp $	*/
+/*	$OpenBSD: ibcs2_syscallargs.h,v 1.9 2001/08/26 04:14:26 deraadt Exp $	*/
 
 /*
  * System call argument lists.
@@ -7,7 +7,21 @@
  * created from	OpenBSD: syscalls.master,v 1.7 1999/06/07 07:17:47 deraadt Exp 
  */
 
-#define	syscallarg(x)	union { x datum; register_t pad; }
+#ifdef	syscallarg
+#undef	syscallarg
+#endif
+
+#define	syscallarg(x)							\
+	union {								\
+		register_t pad;						\
+		struct { x datum; } le;					\
+		struct {						\
+			int8_t pad[ (sizeof (register_t) < sizeof (x))	\
+				? 0					\
+				: sizeof (register_t) - sizeof (x)];	\
+			x datum;					\
+		} be;							\
+	}
 
 struct ibcs2_sys_read_args {
 	syscallarg(int) fd;
@@ -189,7 +203,7 @@ struct ibcs2_sys_semsys_args {
 
 struct ibcs2_sys_ioctl_args {
 	syscallarg(int) fd;
-	syscallarg(u_long) cmd;
+	syscallarg(int) cmd;
 	syscallarg(caddr_t) data;
 };
 

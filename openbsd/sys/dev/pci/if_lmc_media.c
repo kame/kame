@@ -1,5 +1,5 @@
-/* $OpenBSD: if_lmc_media.c,v 1.4 2000/02/06 17:57:56 chris Exp $ */
-/* $Id: if_lmc_media.c,v 1.4 2000/02/06 17:57:56 chris Exp $ */
+/* $OpenBSD: if_lmc_media.c,v 1.11 2001/09/11 20:05:25 miod Exp $ */
+/* $Id: if_lmc_media.c,v 1.11 2001/09/11 20:05:25 miod Exp $ */
 
 /*-
  * Copyright (c) 1997-1999 LAN Media Corporation (LMC)
@@ -78,8 +78,6 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_kern.h>
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #include <net/if_sppp.h>
@@ -136,10 +134,14 @@
  * Sigh.  Every OS puts these in different places.  NetBSD and FreeBSD use
  * a C preprocessor that allows this hack, but BSDI does not.
  */
-#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include INCLUDE_PATH_PREFIX "if_lmc_types.h"
 #include INCLUDE_PATH_PREFIX "if_lmcioctl.h"
 #include INCLUDE_PATH_PREFIX "if_lmcvar.h"
+#elif defined(__OpenBSD__)
+#include <dev/pci/if_lmc_types.h>
+#include <dev/pci/if_lmcioctl.h>
+#include <dev/pci/if_lmcvar.h>
 #else /* BSDI */
 #include "i386/pci/if_lmc_types.h"
 #include "i386/pci/if_lmcioctl.h"
@@ -407,7 +409,7 @@ lmc_ds3_watchdog (lmc_softc_t * const sc)
 	sc->lmc_miireg16 = lmc_mii_readreg (sc, 0, 16);
 	if (sc->lmc_miireg16 & 0x0018)
 	{
-		printf("%s: AIS Recieved\n", sc->lmc_xname);
+		printf("%s: AIS Received\n", sc->lmc_xname);
 		lmc_led_on (sc, LMC_DS3_LED1 | LMC_DS3_LED2);
 	}
 }
@@ -894,6 +896,10 @@ static void
         sc->ictl.cardtype = LMC_CTL_CARDTYPE_LMC1200;
         mii16 = lmc_mii_readreg(sc, 0, 16);
 
+	mii16 &= ~LMC_MII16_T1_XOE;
+	lmc_mii_writereg (sc, 0, 16, mii16);
+	sc->lmc_miireg16 = mii16;
+
         /* reset 8370 */
         mii16 &= ~LMC_MII16_T1_RST;
         lmc_mii_writereg(sc, 0, 16, mii16 | LMC_MII16_T1_RST);
@@ -943,9 +949,10 @@ static void
 	{                lmc_t1_write(sc, 0x0E0+i, 0x0D);
 					/* SBCn - sys bus per-channel ctl    */
 	}
-        /*  XXX
-        mii16 |= LMC_MII16_T1_XOE;        lmc_mii_writereg(sc, 0, 16, mii16);
-        sc->lmc_miireg16 = mii16;        */
+
+	mii16 |= LMC_MII16_T1_XOE;
+	lmc_mii_writereg(sc, 0, 16, mii16);
+        sc->lmc_miireg16 = mii16;
 }
 
 static void   lmc_t1_default(lmc_softc_t * const sc)
@@ -1118,12 +1125,12 @@ lmc_t1_watchdog(lmc_softc_t * const sc)
 {
 	int t1stat;
 
-	/* read alarm 1 status (recieve) */
+	/* read alarm 1 status (receive) */
 	t1stat = lmc_t1_read (sc, 0x47);
 	/* blue alarm -- RAIS */
 	if (t1stat & 0x08) {
 		if (sc->lmc_blue != 1)
-			printf ("%s: AIS Recieved\n", sc->lmc_xname);
+			printf ("%s: AIS Received\n", sc->lmc_xname);
 		lmc_led_on (sc, LMC_DS3_LED1 | LMC_DS3_LED2);
 		sc->lmc_blue = 1;
 	} else {
@@ -1149,12 +1156,12 @@ lmc_t1_watchdog(lmc_softc_t * const sc)
 	sc->lmc_red = 0;
 	}
 
-	/* check for Recieve Multiframe Yellow Alarm
-	 * Ignore Recieve Yellow Alarm
+	/* check for Receive Multiframe Yellow Alarm
+	 * Ignore Receive Yellow Alarm
 	 */
 	if (t1stat & 0x80) {
 		if (sc->lmc_yel != 1) {
-			printf ("%s: Recieve Yellow Alarm\n", sc->lmc_xname);
+			printf ("%s: Receive Yellow Alarm\n", sc->lmc_xname);
 		}
 			lmc_led_on (sc, LMC_DS3_LED0 | LMC_DS3_LED2);
 			sc->lmc_yel = 1;

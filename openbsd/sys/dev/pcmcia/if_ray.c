@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: if_ray.c,v 1.17 2001/08/17 21:52:16 deraadt Exp $	*/
 /*	$NetBSD: if_ray.c,v 1.21 2000/07/05 02:35:54 onoe Exp $	*/
 
 /*
@@ -110,14 +110,6 @@
 
 #ifndef offsetof
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
-#endif
-
-#ifndef	ETHER_CRC_LEN
-#define	ETHER_CRC_LEN	4
-#endif
-
-#ifndef	ETHER_MAX_LEN
-#define	ETHER_MAX_LEN	1518
 #endif
 
 #define RAY_USE_AMEM 0
@@ -657,6 +649,7 @@ ray_attach(parent, self, aux)
 	ifp->if_ioctl = ray_ioctl;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 	if_attach(ifp);
 	memcpy(&sc->sc_ec.ac_enaddr, ep->e_station_addr, ETHER_ADDR_LEN);
 	ether_ifattach(ifp);
@@ -787,7 +780,7 @@ ray_enable(sc)
 
 	if ((error = ray_init(sc)) == 0) {
 		sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_NET,
-		    ray_intr, sc);
+		    ray_intr, sc, "");
 		if (sc->sc_ih == NULL) {
 			ray_stop(sc);
 			return (EIO);
@@ -1235,7 +1228,7 @@ ray_intr_start(sc)
 		return;
 	}
 
-	if (ifp->if_snd.ifq_len == 0) {
+	if (IFQ_IS_EMPTY(&ifp->if_snd)) {
 		RAY_DPRINTF(("%s: nothing to send.\n",ifp->if_xname));
 		return;
 	}
@@ -1268,7 +1261,7 @@ ray_intr_start(sc)
 			}
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (!m0) {
 			RAY_DPRINTF(("%s: dry queue.\n", ifp->if_xname));
 			break;
@@ -1683,8 +1676,8 @@ done:
 #endif
 	/* XXX doesn't appear to be included m->m_flags |= M_HASFCS; */
 	ifp->if_ipackets++;
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+
+	ether_input_mbuf(ifp, m);
 }
 
 /* receive an auth packet

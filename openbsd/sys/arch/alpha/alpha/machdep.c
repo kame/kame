@@ -1,5 +1,5 @@
-/* $OpenBSD: machdep.c,v 1.42 2001/02/07 07:22:53 art Exp $ */
-/* $NetBSD: machdep.c,v 1.206 2000/05/23 05:12:54 thorpej Exp $ */
+/* $OpenBSD: machdep.c,v 1.55 2001/09/30 13:08:45 art Exp $ */
+/* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -71,14 +71,12 @@
 #include <sys/kernel.h>
 #include <sys/map.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/buf.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#ifdef REAL_CLISTS
-#include <sys/clist.h>
-#endif
 #include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -106,7 +104,6 @@
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
 
-#include <vm/vm_kern.h>
 #include <uvm/uvm_extern.h>
 
 #include <dev/cons.h>
@@ -118,6 +115,8 @@
 #include <machine/prom.h>
 #include <machine/cpuconf.h>
 
+#include <dev/pci/pcivar.h>
+
 #ifdef DDB
 #include <machine/db_machdep.h>
 #include <ddb/db_access.h>
@@ -125,36 +124,14 @@
 #include <ddb/db_extern.h>
 #endif
 
-#include <net/netisr.h>
-#include <net/if.h>
-
-#ifdef INET
-#include <netinet/in.h>
-#include <netinet/if_ether.h>
-#include <netinet/ip_var.h>
-#endif
-
-#ifdef INET6
-# ifndef INET
-#  include <netinet/in.h>
-# endif
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#endif
-
-#include "ppp.h"
-#include "bridge.h"
-
 #include "le_ioasic.h"			/* for le_iomem creation */
 
 int	cpu_dump __P((void));
 int	cpu_dumpsize __P((void));
 u_long	cpu_dump_mempagecnt __P((void));
-void	do_sir __P((void));
 void	dumpsys __P((void));
 caddr_t allocsys __P((caddr_t));
 void	identifycpu __P((void));
-void	netintr __P((void));
 void	regdump __P((struct trapframe *framep));
 void	printregs __P((struct reg *));
 
@@ -186,6 +163,8 @@ int	unknownmem;		/* amount of memory with an unknown use */
 
 int	cputype;		/* system type, from the RPB */
 
+int	bootdev_debug = 0;	/* patchable, or from DDB */
+
 /*
  * XXX We need an address to which we can assign things so that they
  * won't be optimized away because we didn't use the value.
@@ -204,11 +183,6 @@ u_int64_t	cycles_per_usec;
 
 /* number of cpus in the box.  really! */
 int		ncpus;
-
-#if !defined(MULTIPROCESSOR)
-/* A single machine check info structure for single CPU configurations. */
-struct mchkinfo mchkinfo_store;
-#endif
 
 struct bootinfo_kernel bootinfo;
 
@@ -250,7 +224,7 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	vsize_t size;
 	char *p;
 	caddr_t v;
-	char *bootinfo_msg;
+	const char *bootinfo_msg;
 	const struct cpuinit *c;
 	extern caddr_t esym;
 	struct cpu_info *ci;
@@ -827,10 +801,6 @@ allocsys(v)
 #define valloc(name, type, num) \
 	    (name) = (type *)v; v = (caddr_t)ALIGN((name)+(num))
 
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -856,7 +826,7 @@ allocsys(v)
 	 * minimum of 16 buffers.
 	 */
 	if (bufpages == 0)
-		bufpages = (physmem / ((100/BUFCACHEPERCENT) / CLSIZE));
+		bufpages = (physmem / (100/BUFCACHEPERCENT));
 	if (nbuf == 0) {
 		nbuf = bufpages;
 		if (nbuf < 16)
@@ -922,14 +892,17 @@ cpu_startup()
 	 */
 	printf(version);
 	identifycpu();
-	printf("total memory = %d\n", ptoa(totalphysmem));
+	printf("total memory = %d (%dK)\n", ptoa(totalphysmem),
+	    ptoa(totalphysmem) / 1024);
 	printf("(%d reserved for PROM, ", ptoa(resvmem));
 	printf("%d used by OpenBSD)\n", ptoa(physmem));
 	if (unusedmem) {
-		printf("WARNING: unused memory = %d\n", ptoa(unusedmem));
+		printf("WARNING: unused memory = %d (%dK)\n", ptoa(unusedmem),
+		    ptoa(unusedmem) / 1024);
 	}
 	if (unknownmem) {
-		printf("WARNING: %d of memory with unknown purpose\n", ptoa(unknownmem));
+		printf("WARNING: %d (%dK) of memory with unknown purpose\n",
+		    ptoa(unknownmem), ptoa(unknownmem) / 1024);
 	}
 
 	/*
@@ -983,25 +956,14 @@ cpu_startup()
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 				   VM_PHYS_SIZE, 0, FALSE, NULL);
 
-	/*
-	 * Finally, allocate mbuf pool.  Since mclrefcnt is an off-size
-	 * we use the more space efficient malloc in place of kmem_alloc.
-	 */
-	mclrefcnt = (char *)malloc(NMBCLUSTERS+CLBYTES/MCLBYTES,
-			M_MBUF, M_NOWAIT);
-	bzero(mclrefcnt, NMBCLUSTERS+CLBYTES/MCLBYTES);
-	mb_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&mbutl, &maxaddr,
+	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 			VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
-
-	/*
-	 * Initialize timeouts
-	 */
-	timeout_init();
 
 #if defined(DEBUG)
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail memory = %d\n", ptoa(uvmexp.free));
+	printf("avail memory = %d (%dK)\n", ptoa(uvmexp.free),
+	    ptoa(uvmexp.free) / 1024);
 #if 0
 	{
 		extern u_long pmap_pages_stolen;
@@ -1009,7 +971,8 @@ cpu_startup()
 		printf("stolen memory for VM structures = %d\n", pmap_pages_stolen * PAGE_SIZE);
 	}
 #endif
-	printf("using %ld buffers containing %d of memory\n", (long)nbuf, bufpages * NBPG);
+	printf("using %ld buffers containing %d bytes (%dK) of memory\n",
+	    (long)nbuf, bufpages * NBPG, bufpages * (NBPG / 1024));
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
@@ -1026,7 +989,6 @@ cpu_startup()
 		printf("kernel does not support -c; continuing..\n");
 #endif
 	}
-	configure();
 
 	/*
 	 * Set up the HWPCB so that it's safe to configure secondary
@@ -1121,8 +1083,6 @@ void
 boot(howto)
 	int howto;
 {
-	extern int cold;
-
 #if defined(MULTIPROCESSOR)
 #if 0 /* XXX See below. */
 	u_long cpu_id;
@@ -1783,8 +1743,7 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 {
 	dev_t consdev;
 
-	/* all sysctl names at this level are terminal */
-	if (namelen != 1)
+	if (name[0] != CPU_CHIPSET && namelen != 1)
 		return (ENOTDIR);		/* overloaded */
 
 	switch (name[0]) {
@@ -1816,6 +1775,9 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (sysctl_rdstring(oldp, oldlenp, newp,
 		    bootinfo.booted_kernel));
 
+	case CPU_CHIPSET:
+		return (alpha_sysctl_chipset(name + 1, namelen - 1, oldp,
+		    oldlenp));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -1869,58 +1831,13 @@ setregs(p, pack, stack, retval)
 	retval[0] = retval[1] = 0;
 }
 
-void
-netintr()
-{
-	int n, s;
-
-	s = splhigh();
-	n = netisr;
-	netisr = 0;
-	splx(s);
-
-#define	DONETISR(bit, fn)						\
-	do {								\
-		if (n & (1 << (bit)))					\
-			fn();						\
-	} while (0)
-
-#include <net/netisr_dispatch.h>
-
-#undef DONETISR
-}
-
-void
-do_sir()
-{
-	u_int64_t n;
-
-	while ((n = atomic_loadlatch_ulong(&ssir, 0)) != 0) {
-#define	COUNT_SOFT	uvmexp.softs++
-
-#define	DO_SIR(bit, fn)							\
-		do {							\
-			if (n & (bit)) {				\
-				COUNT_SOFT;				\
-				fn;					\
-			}						\
-		} while (0)
-
-		DO_SIR(SIR_NET, netintr());
-		DO_SIR(SIR_CLOCK, softclock());
-
-#undef COUNT_SOFT
-#undef DO_SIR
-	}
-}
-
 int
 spl0()
 {
 
 	if (ssir) {
 		(void) alpha_pal_swpipl(ALPHA_PSL_IPL_SOFT);
-		do_sir();
+		softintr_dispatch();
 	}
 
 	return (alpha_pal_swpipl(ALPHA_PSL_IPL_0));
@@ -1941,6 +1858,10 @@ spl0()
  * Call should be made at splclock(), and p->p_stat should be SRUN.
  */
 
+/* XXXART - grmble */
+#define sched_qs qs
+#define sched_whichqs whichqs
+
 void
 setrunqueue(p)
 	struct proc *p;
@@ -1952,11 +1873,11 @@ setrunqueue(p)
 		panic("setrunqueue");
 
 	bit = p->p_priority >> 2;
-	whichqs |= (1 << bit);
-	p->p_forw = (struct proc *)&qs[bit];
-	p->p_back = qs[bit].ph_rlink;
+	sched_whichqs |= (1 << bit);
+	p->p_forw = (struct proc *)&sched_qs[bit];
+	p->p_back = sched_qs[bit].ph_rlink;
 	p->p_back->p_forw = p;
-	qs[bit].ph_rlink = p;
+	sched_qs[bit].ph_rlink = p;
 }
 
 /*
@@ -1971,15 +1892,15 @@ remrunqueue(p)
 	int bit;
 
 	bit = p->p_priority >> 2;
-	if ((whichqs & (1 << bit)) == 0)
+	if ((sched_whichqs & (1 << bit)) == 0)
 		panic("remrunqueue");
 
 	p->p_back->p_forw = p->p_forw;
 	p->p_forw->p_back = p->p_back;
 	p->p_back = NULL;	/* for firewall checking. */
 
-	if ((struct proc *)&qs[bit] == qs[bit].ph_link)
-		whichqs &= ~(1 << bit);
+	if ((struct proc *)&sched_qs[bit] == sched_qs[bit].ph_link)
+		sched_whichqs &= ~(1 << bit);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.h,v 1.13 2000/06/19 03:00:54 jason Exp $	*/
+/*	$OpenBSD: bpf.h,v 1.17 2001/10/02 18:04:35 deraadt Exp $	*/
 /*	$NetBSD: bpf.h,v 1.15 1996/12/13 07:57:33 mikel Exp $	*/
 
 /*
@@ -113,12 +113,19 @@ struct bpf_version {
 #define BIOCVERSION	_IOR('B',113, struct bpf_version)
 #define BIOCSRSIG	_IOW('B',114, u_int)
 #define BIOCGRSIG	_IOR('B',115, u_int)
+#define BIOCGHDRCMPLT	_IOR('B',116, u_int)
+#define BIOCSHDRCMPLT	_IOW('B',117, u_int)
+
+struct bpf_timeval {
+	u_int32_t	tv_sec;
+	u_int32_t	tv_usec;
+};
 
 /*
  * Structure prepended to each packet.
  */
 struct bpf_hdr {
-	struct timeval	bh_tstamp;	/* time stamp */
+	struct bpf_timeval bh_tstamp;	/* time stamp */
 	u_int32_t	bh_caplen;	/* length of captured portion */
 	u_int32_t	bh_datalen;	/* original length of packet */
 	u_int16_t	bh_hdrlen;	/* length of bpf header (this struct
@@ -162,6 +169,7 @@ struct bpf_hdr {
 #define DLT_RAW		14	/* raw IP */
 #define DLT_SLIP_BSDOS	15	/* BSD/OS Serial Line IP */
 #define DLT_PPP_BSDOS	16	/* BSD/OS Point-to-point Protocol */
+#define DLT_PFLOG	17	/* Packet filter logging */
 
 /*
  * The instruction encodings.
@@ -243,7 +251,7 @@ void	 bpfattach __P((caddr_t *, struct ifnet *, u_int, u_int));
 void	 bpfdetach __P((struct ifnet *));
 void	 bpfilterattach __P((int));
 u_int	 bpf_filter __P((struct bpf_insn *, u_char *, u_int, u_int));
-#endif
+#endif /* _KERNEL */
 
 /*
  * Number of scratch memory words (for BPF_LD|BPF_MEM and BPF_ST).

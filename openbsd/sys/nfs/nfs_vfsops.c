@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_vfsops.c,v 1.32 2001/02/20 01:50:11 assar Exp $	*/
+/*	$OpenBSD: nfs_vfsops.c,v 1.37 2001/07/27 05:43:17 csapuntz Exp $	*/
 /*	$NetBSD: nfs_vfsops.c,v 1.46.4.1 1996/05/25 22:40:35 fvdl Exp $	*/
 
 /*
@@ -67,8 +67,10 @@
 #include <nfs/xdr_subs.h>
 #include <nfs/nfsm_subs.h>
 #include <nfs/nfsdiskless.h>
-#include <nfs/nqnfs.h>
 #include <nfs/nfs_var.h>
+
+#define	NQ_DEADTHRESH	NQ_NEVERDEAD	/* Default nm_deadthresh */
+#define	NQ_NEVERDEAD	9	/* Greater than max. nm_timeouts */
 
 extern struct nfsstats nfsstats;
 extern int nfs_ticks;
@@ -102,7 +104,7 @@ extern u_int32_t nfs_procids[NFS_NPROCS];
 extern u_int32_t nfs_prog, nfs_vers;
 
 struct mount *nfs_mount_diskless
-    __P((struct nfs_dlmount *, char *, int, struct vnode **));
+    __P((struct nfs_dlmount *, char *, int));
 
 #define TRUE	1
 #define	FALSE	0
@@ -285,7 +287,8 @@ nfs_mountroot()
 	 * Create the root mount point.
 	 */
 	nfs_boot_getfh(&nd.nd_boot, "root", &nd.nd_root);
-	mp = nfs_mount_diskless(&nd.nd_root, "/", 0, &vp);
+	mp = nfs_mount_diskless(&nd.nd_root, "/", 0);
+	nfs_root(mp, &rootvp);
 	printf("root on %s\n", nd.nd_root.ndm_host);
 
 	/*
@@ -294,11 +297,10 @@ nfs_mountroot()
 	simple_lock(&mountlist_slock);
 	CIRCLEQ_INSERT_TAIL(&mountlist, mp, mnt_list);
 	simple_unlock(&mountlist_slock);
-	rootvp = vp;
 	vfs_unbusy(mp, procp);
 
 	/* Get root attributes (for the time). */
-	error = VOP_GETATTR(vp, &attr, procp->p_ucred, procp);
+	error = VOP_GETATTR(rootvp, &attr, procp->p_ucred, procp);
 	if (error) panic("nfs_mountroot: getattr for root");
 	n = attr.va_mtime.tv_sec;
 #ifdef	DEBUG
@@ -341,7 +343,8 @@ nfs_mountroot()
 	 * swap file can be on a different server from the rootfs.
 	 */
 	nfs_boot_getfh(&nd.nd_boot, "swap", &nd.nd_swap);
-	mp = nfs_mount_diskless(&nd.nd_swap, "/swap", 0, &vp);
+	mp = nfs_mount_diskless(&nd.nd_swap, "/swap", 0);
+	nfs_root(mp, &vp);
 	vfs_unbusy(mp, procp);
 	printf("swap on %s\n", nd.nd_swap.ndm_host);
 
@@ -378,11 +381,10 @@ nfs_mountroot()
  * Internal version of mount system call for diskless setup.
  */
 struct mount *
-nfs_mount_diskless(ndmntp, mntname, mntflag, vpp)
+nfs_mount_diskless(ndmntp, mntname, mntflag)
 	struct nfs_dlmount *ndmntp;
 	char *mntname;
 	int mntflag;
-	struct vnode **vpp;
 {
 	struct nfs_args args;
 	struct mount *mp;
@@ -418,12 +420,10 @@ nfs_mount_diskless(ndmntp, mntname, mntflag, vpp)
 
 	/* Get mbuf for server sockaddr. */
 	m = m_get(M_WAIT, MT_SONAME);
-	if (m == NULL)
-		panic("nfs_mountroot: mget soname for %s", mntname);
 	bcopy((caddr_t)args.addr, mtod(m, caddr_t),
 	    (m->m_len = args.addr->sa_len));
 
-	error = mountnfs(&args, mp, m, mntname, args.hostname, vpp);
+	error = mountnfs(&args, mp, m, mntname, args.hostname);
 	if (error)
 		panic("nfs_mountroot: mount %s failed: %d", mntname, error);
 
@@ -524,13 +524,9 @@ nfs_decode_args(nmp, argp, nargp)
 	if ((argp->flags & NFSMNT_READAHEAD) && argp->readahead >= 0 &&
 		argp->readahead <= NFS_MAXRAHEAD)
 		nmp->nm_readahead = argp->readahead;
-	if ((argp->flags & NFSMNT_LEASETERM) && argp->leaseterm >= 2 &&
-		argp->leaseterm <= NQ_MAXLEASE)
-		nmp->nm_leaseterm = argp->leaseterm;
 	if ((argp->flags & NFSMNT_DEADTHRESH) && argp->deadthresh >= 1 &&
 		argp->deadthresh <= NQ_NEVERDEAD)
 		nmp->nm_deadthresh = argp->deadthresh;
-
 	if (argp->flags & NFSMNT_ACREGMIN && argp->acregmin >= 0) {
 		if (argp->acregmin > 0xffff)
 			nmp->nm_acregmin = 0xffff;
@@ -579,7 +575,6 @@ nfs_decode_args(nmp, argp, nargp)
 	nargp->retrans = nmp->nm_retry;
 	nargp->maxgrouplist = nmp->nm_numgrps;
 	nargp->readahead = nmp->nm_readahead;
-	nargp->leaseterm = nmp->nm_leaseterm;
 	nargp->deadthresh = nmp->nm_deadthresh;
 	nargp->acregmin = nmp->nm_acregmin;
 	nargp->acregmax = nmp->nm_acregmax;
@@ -608,7 +603,6 @@ nfs_mount(mp, path, data, ndp, p)
 	int error;
 	struct nfs_args args;
 	struct mbuf *nam;
-	struct vnode *vp;
 	char pth[MNAMELEN], hst[MNAMELEN];
 	size_t len;
 	u_char nfh[NFSX_V3FHMAX];
@@ -642,13 +636,15 @@ nfs_mount(mp, path, data, ndp, p)
 			return (EIO);
 		/*
 		 * When doing an update, we can't change from or to
-		 * v3 and/or nqnfs.
+		 * v3.
 		 */
-		args.flags = (args.flags & ~(NFSMNT_NFSV3|NFSMNT_NQNFS)) |
-		    (nmp->nm_flag & (NFSMNT_NFSV3|NFSMNT_NQNFS));
+		args.flags = (args.flags & ~(NFSMNT_NFSV3)) |
+		    (nmp->nm_flag & (NFSMNT_NFSV3));
 		nfs_decode_args(nmp, &args, &mp->mnt_stat.mount_info.nfs_args);
 		return (0);
 	}
+	if (args.fhsize < 0 || args.fhsize > NFSX_V3FHMAX)
+		return (EINVAL);
 	error = copyin((caddr_t)args.fh, (caddr_t)nfh, args.fhsize);
 	if (error)
 		return (error);
@@ -665,7 +661,7 @@ nfs_mount(mp, path, data, ndp, p)
 	if (error)
 		return (error);
 	args.fh = nfh;
-	error = mountnfs(&args, mp, nam, pth, hst, &vp);
+	error = mountnfs(&args, mp, nam, pth, hst);
 	return (error);
 }
 
@@ -673,17 +669,14 @@ nfs_mount(mp, path, data, ndp, p)
  * Common code for mount and mountroot
  */
 int
-mountnfs(argp, mp, nam, pth, hst, vpp)
+mountnfs(argp, mp, nam, pth, hst)
 	register struct nfs_args *argp;
 	register struct mount *mp;
 	struct mbuf *nam;
 	char *pth, *hst;
-	struct vnode **vpp;
 {
 	register struct nfsmount *nmp;
-	struct nfsnode *np;
 	int error;
-	struct vattr attrs;
 
 	if (mp->mnt_flag & MNT_UPDATE) {
 		nmp = VFSTONFS(mp);
@@ -700,14 +693,6 @@ mountnfs(argp, mp, nam, pth, hst, vpp)
 
 	vfs_getnewfsid(mp);
 	nmp->nm_mountp = mp;
-	if (argp->flags & NFSMNT_NQNFS)
-		/*
-		 * We have to set mnt_maxsymlink to a non-zero value so
-		 * that COMPAT_43 routines will know that we are setting
-		 * the d_type field in directories (and can zero it for
-		 * unsuspecting binaries).
-		 */
-		mp->mnt_maxsymlinklen = 1;
 	nmp->nm_timeo = NFS_TIMEO;
 	nmp->nm_retry = NFS_RETRANS;
 	nmp->nm_wsize = NFS_WSIZE;
@@ -715,7 +700,6 @@ mountnfs(argp, mp, nam, pth, hst, vpp)
 	nmp->nm_readdirsize = NFS_READDIRSIZE;
 	nmp->nm_numgrps = NFS_MAXGRPS;
 	nmp->nm_readahead = NFS_DEFRAHEAD;
-	nmp->nm_leaseterm = NQ_DEFLEASE;
 	nmp->nm_deadthresh = NQ_DEADTHRESH;
 	CIRCLEQ_INIT(&nmp->nm_timerhead);
 	nmp->nm_inprog = NULLVP;
@@ -751,19 +735,6 @@ mountnfs(argp, mp, nam, pth, hst, vpp)
 	 * point.
 	 */
 	mp->mnt_stat.f_iosize = NFS_MAXDGRAMDATA;
-	/*
-	 * A reference count is needed on the nfsnode representing the
-	 * remote root.  If this object is not persistent, then backward
-	 * traversals of the mount point (i.e. "..") will not work if
-	 * the nfsnode gets flushed out of the cache. Ufs does not have
-	 * this problem, because one can identify root inodes by their
-	 * number == ROOTINO (2).
-	 */
-	error = nfs_nget(mp, (nfsfh_t *)nmp->nm_fh, nmp->nm_fhsize, &np);
-	if (error)
-		goto bad;
-	*vpp = NFSTOV(np);
-	VOP_GETATTR(*vpp, &attrs, curproc->p_ucred, curproc);	/* XXX */
 
 	return (0);
 bad:
@@ -783,8 +754,6 @@ nfs_unmount(mp, mntflags, p)
 	struct proc *p;
 {
 	register struct nfsmount *nmp;
-	struct nfsnode *np;
-	struct vnode *vp;
 	int error, flags = 0;
 
 	if (mntflags & MNT_FORCE)
@@ -792,26 +761,11 @@ nfs_unmount(mp, mntflags, p)
 	nmp = VFSTONFS(mp);
 	/*
 	 * Goes something like this..
-	 * - Check for activity on the root vnode (other than ourselves).
 	 * - Call vflush() to clear out vnodes for this file system,
 	 *   except for the root vnode.
-	 * - Decrement reference on the vnode representing remote root.
 	 * - Close the socket
 	 * - Free up the data structures
 	 */
-	/*
-	 * We need to decrement the ref. count on the nfsnode representing
-	 * the remote root.  See comment in mountnfs().  The VFS unmount()
-	 * has done vput on this vnode, otherwise we would get deadlock!
-	 */
-	error = nfs_nget(mp, (nfsfh_t *)nmp->nm_fh, nmp->nm_fhsize, &np);
-	if (error)
-		return(error);
-	vp = NFSTOV(np);
-	if (vp->v_usecount > 2) {
-		vput(vp);
-		return (EBUSY);
-	}
 
 	/*
 	 * Must handshake with nqnfs_clientd() if it is active.
@@ -819,9 +773,8 @@ nfs_unmount(mp, mntflags, p)
 	nmp->nm_flag |= NFSMNT_DISMINPROG;
 	while (nmp->nm_inprog != NULLVP)
 		(void) tsleep((caddr_t)&lbolt, PSOCK, "nfsdism", 0);
-	error = vflush(mp, vp, flags);
+	error = vflush(mp, NULL, flags);
 	if (error) {
-		vput(vp);
 		nmp->nm_flag &= ~NFSMNT_DISMINPROG;
 		return (error);
 	}
@@ -830,19 +783,13 @@ nfs_unmount(mp, mntflags, p)
 	 * We are now committed to the unmount.
 	 * For NQNFS, let the server daemon free the nfsmount structure.
 	 */
-	if (nmp->nm_flag & (NFSMNT_NQNFS | NFSMNT_KERB))
+	if (nmp->nm_flag & NFSMNT_KERB)
 		nmp->nm_flag |= NFSMNT_DISMNT;
 
-	/*
-	 * There are two reference counts to get rid of here.
-	 */
-	vrele(vp);
-	vrele(vp);
-	vgone(vp);
 	nfs_disconnect(nmp);
 	m_freem(nmp->nm_nam);
 
-	if ((nmp->nm_flag & (NFSMNT_NQNFS | NFSMNT_KERB)) == 0)
+	if ((nmp->nm_flag & NFSMNT_KERB) == 0)
 		free((caddr_t)nmp, M_NFSMNT);
 	return (0);
 }
@@ -855,7 +802,6 @@ nfs_root(mp, vpp)
 	struct mount *mp;
 	struct vnode **vpp;
 {
-	register struct vnode *vp;
 	struct nfsmount *nmp;
 	struct nfsnode *np;
 	int error;
@@ -864,11 +810,7 @@ nfs_root(mp, vpp)
 	error = nfs_nget(mp, (nfsfh_t *)nmp->nm_fh, nmp->nm_fhsize, &np);
 	if (error)
 		return (error);
-	vp = NFSTOV(np);
-	if (vp->v_type == VNON)
-		vp->v_type = VDIR;
-	vp->v_flag = VROOT;
-	*vpp = vp;
+	*vpp = NFSTOV(np);
 	return (0);
 }
 

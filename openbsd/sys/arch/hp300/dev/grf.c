@@ -1,5 +1,5 @@
-/*	$OpenBSD: grf.c,v 1.8 2001/01/31 22:39:41 jason Exp $	*/
-/*	$NetBSD: grf.c,v 1.25 1997/04/02 22:37:30 scottr Exp $	*/
+/*	$OpenBSD: grf.c,v 1.14 2001/09/11 20:05:24 miod Exp $	*/
+/*	$NetBSD: grf.c,v 1.30 1998/08/20 08:33:41 kleink Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -58,6 +58,7 @@
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/proc.h>
+#include <sys/resourcevar.h>
 #include <sys/vnode.h>
 
 #include <machine/autoconf.h>
@@ -73,9 +74,8 @@ extern struct emul emul_hpux;
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_page.h>
-#include <vm/vm_pager.h>
+
+#include <uvm/uvm.h>
 
 #include <miscfs/specfs/specdev.h>
 
@@ -493,7 +493,6 @@ grflock(gp, block)
 {
 	struct proc *p = curproc;		/* XXX */
 	int error;
-	extern char devioc[];
 
 #ifdef DEBUG
 	if (grfdebug & GDB_LOCK)
@@ -638,9 +637,10 @@ grfmap(dev, addrp, p)
 	vn.v_type = VCHR;			/* XXX */
 	vn.v_specinfo = &si;			/* XXX */
 	vn.v_rdev = dev;			/* XXX */
-	error = vm_mmap(&p->p_vmspace->vm_map, (vm_offset_t *)addrp,
-			(vm_size_t)len, VM_PROT_ALL, VM_PROT_ALL,
-			flags, (caddr_t)&vn, 0);
+	error = uvm_mmap(&p->p_vmspace->vm_map, (vaddr_t *)addrp,
+			 (vsize_t)len, VM_PROT_ALL, VM_PROT_ALL,
+			 flags, (caddr_t)&vn, 0,
+			 p->p_rlimit[RLIMIT_MEMLOCK].rlim_cur);
 	if (error == 0)
 		(void) (*gp->g_sw->gd_mode)(gp, GM_MAP, *addrp);
 	return(error);
@@ -654,7 +654,7 @@ grfunmap(dev, addr, p)
 {
 	struct grf_softc *sc = grf_cd.cd_devs[GRFUNIT(dev)];
 	struct grf_data *gp = sc->sc_data;
-	vm_size_t size;
+	vsize_t size;
 	int rv;
 
 #ifdef DEBUG
@@ -665,7 +665,8 @@ grfunmap(dev, addr, p)
 		return(EINVAL);		/* XXX: how do we deal with this? */
 	(void) (*gp->g_sw->gd_mode)(gp, GM_UNMAP, 0);
 	size = round_page(gp->g_display.gd_regsize + gp->g_display.gd_fbsize);
-	rv = vm_deallocate(&p->p_vmspace->vm_map, (vm_offset_t)addr, size);
+	rv = uvm_unmap(&p->p_vmspace->vm_map, (vaddr_t)addr,
+	    (vaddr_t)addr + size);
 	return(rv == KERN_SUCCESS ? 0 : EINVAL);
 }
 

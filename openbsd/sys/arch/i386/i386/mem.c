@@ -1,5 +1,5 @@
 /*	$NetBSD: mem.c,v 1.31 1996/05/03 19:42:19 christos Exp $	*/
-/*	$OpenBSD: mem.c,v 1.15 2000/12/17 21:10:31 matthieu Exp $ */
+/*	$OpenBSD: mem.c,v 1.19 2001/07/25 13:25:32 art Exp $ */
 /*
  * Copyright (c) 1988 University of Utah.
  * Copyright (c) 1982, 1986, 1990, 1993
@@ -59,9 +59,7 @@
 
 #include <vm/vm.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 #include "mtrr.h"
 
@@ -96,16 +94,6 @@ mmopen(dev, flag, mode, p)
 	case 2:
 	case 12:
 		break;
-#ifdef COMPAT_10
-	/* This is done by i386_iopl(3) now. */
-	case 14:
-		if (securelevel <= 0 && (flag & FWRITE)) {
-			struct trapframe *fp;
-			fp = curproc->p_md.md_regs;
-			fp->tf_eflags |= PSL_IOPL;
-		}
-		break;
-#endif
 #ifdef APERTURE
 	case 4:
 	        if (suser(p->p_ucred, &p->p_acflag) != 0 || !allowaperture)
@@ -177,7 +165,7 @@ mmrw(dev, uio, flags)
 			v = uio->uio_offset;
 			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
 			    trunc_page(v), uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
+			    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
@@ -189,15 +177,9 @@ mmrw(dev, uio, flags)
 		case 1:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
-#if defined(UVM)
 			if (!uvm_kernacc((caddr_t)v, c,
 			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
 				return (EFAULT);
-#else
-			if (!kernacc((caddr_t)v, c,
-			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
-				return (EFAULT);
-#endif
 			error = uiomove((caddr_t)v, c, uio);
 			continue;
 
@@ -215,10 +197,10 @@ mmrw(dev, uio, flags)
 			}
 			if (zeropage == NULL) {
 				zeropage = (caddr_t)
-				    malloc(CLBYTES, M_TEMP, M_WAITOK);
-				bzero(zeropage, CLBYTES);
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				bzero(zeropage, PAGE_SIZE);
 			}
-			c = min(iov->iov_len, CLBYTES);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(zeropage, c, uio);
 			continue;
 
@@ -258,11 +240,7 @@ mmmmap(dev, off, prot)
 /* minor device 1 is kernel memory */
 	case 1:
 		/* XXX - writability, executability checks? */
-#if defined(UVM)
 		if (!uvm_kernacc((caddr_t)off, NBPG, B_READ))
-#else
-		if (!kernacc((caddr_t)off, NBPG, B_READ))
-#endif
 			return -1;
 		return i386_btop(vtophys(off));
 #ifdef APERTURE

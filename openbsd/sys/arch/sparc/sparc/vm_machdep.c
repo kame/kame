@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.22 2001/01/15 23:23:58 jason Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.32 2001/09/19 20:50:57 mickey Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.30 1997/03/10 23:55:40 pk Exp $ */
 
 /*
@@ -63,7 +63,7 @@
 #include <sys/extent.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
 #include <machine/frame.h>
@@ -79,19 +79,19 @@ pagemove(from, to, size)
 	register caddr_t from, to;
 	size_t size;
 {
-	register paddr_t pa;
+	paddr_t pa;
 
-	if (size & CLOFSET || (int)from & CLOFSET || (int)to & CLOFSET)
+#ifdef DEBUG
+	if ((size & PAGE_MASK) != 0 ||
+	    ((vaddr_t)from & PAGE_MASK) != 0 ||
+	    ((vaddr_t)to & PAGE_MASK) != 0)
 		panic("pagemove 1");
+#endif
 	while (size > 0) {
-		pa = pmap_extract(pmap_kernel(), (vaddr_t)from);
-		if (pa == 0)
+		if (pmap_extract(pmap_kernel(), (vaddr_t)from, &pa) == FALSE)
 			panic("pagemove 2");
-		pmap_remove(pmap_kernel(),
-		    (vaddr_t)from, (vaddr_t)from + PAGE_SIZE);
-		pmap_enter(pmap_kernel(),
-		    (vaddr_t)to, pa, VM_PROT_READ | VM_PROT_WRITE, 1,
-		     VM_PROT_READ | VM_PROT_WRITE);
+		pmap_kremove((vaddr_t)from, PAGE_SIZE);
+		pmap_kenter_pa((vaddr_t)to, pa, VM_PROT_READ|VM_PROT_WRITE);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -198,22 +198,21 @@ dvma_mapin_space(map, va, len, canwait, space)
 
 	s = splhigh();
 	if (space & M_SPACE_D24)
-		error = extent_alloc_subregion1(dvmamap_extent,
+		error = extent_alloc_subregion(dvmamap_extent,
 		    DVMA_D24_BASE, DVMA_D24_END, len, dvma_cachealign,
 		    va & (dvma_cachealign - 1), 0,
-		    canwait ? EX_WAITSPACE : EX_WAITOK, &tva);
+		    canwait ? EX_WAITSPACE : EX_NOWAIT, &tva);
 	else
-		error = extent_alloc1(dvmamap_extent, len, dvma_cachealign, 
+		error = extent_alloc(dvmamap_extent, len, dvma_cachealign, 
 		    va & (dvma_cachealign - 1), 0,
-		    canwait ? EX_WAITSPACE : EX_WAITOK, &tva);
+		    canwait ? EX_WAITSPACE : EX_NOWAIT, &tva);
 	splx(s);
 	if (error)
 		return NULL;
 	kva = tva;
 
 	while (npf--) {
-		pa = pmap_extract(vm_map_pmap(map), va);
-		if (pa == 0)
+		if (pmap_extract(vm_map_pmap(map), va, &pa) == FALSE)
 			panic("dvma_mapin: null page frame");
 		pa = trunc_page(pa);
 
@@ -234,8 +233,7 @@ dvma_mapin_space(map, va, len, canwait, space)
 #endif
 #endif
 			pmap_enter(pmap_kernel(), tva, pa | PMAP_NC,
-				   VM_PROT_READ | VM_PROT_WRITE, 1,
-				   0);
+				   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 		}
 
 		tva += PAGE_SIZE;
@@ -287,7 +285,6 @@ dvma_mapout(kva, va, len)
 /*
  * Map an IO request into kernel virtual address space.
  */
-/*ARGSUSED*/
 void
 vmapbuf(bp, sz)
 	struct buf *bp;
@@ -308,7 +305,6 @@ vmapbuf(bp, sz)
 	uva = trunc_page((vaddr_t)bp->b_data);
 	off = (vaddr_t)bp->b_data - uva;
 	size = round_page(off + sz);
-#if defined(UVM)
 	/*
 	 * Note that this is an expanded version of:
 	 *   kva = uvm_km_valloc_wait(kernel_map, size);
@@ -323,14 +319,10 @@ vmapbuf(bp, sz)
 			break;
 		tsleep(kernel_map, PVM, "vallocwait", 0);
 	}
-#else
-	kva = kmem_alloc_wait(kernel_map, size);
-#endif
 	bp->b_data = (caddr_t)(kva + off);
 
 	while (size > 0) {
-		pa = pmap_extract(pmap, uva);
-		if (pa == 0)
+		if (pmap_extract(pmap, uva, &pa) == FALSE)
 			panic("vmapbuf: null page frame");
 
 		/*
@@ -347,7 +339,7 @@ vmapbuf(bp, sz)
 		 * contexts... maybe we should avoid this extra work
 		 */
 		pmap_enter(pmap_kernel(), kva, pa,
-			   VM_PROT_READ | VM_PROT_WRITE, 1, 0);
+			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 
 		uva += PAGE_SIZE;
 		kva += PAGE_SIZE;
@@ -358,13 +350,12 @@ vmapbuf(bp, sz)
 /*
  * Free the io map addresses associated with this IO operation.
  */
-/*ARGSUSED*/
 void
 vunmapbuf(bp, sz)
 	register struct buf *bp;
 	vsize_t sz;
 {
-	register vaddr_t kva = (vaddr_t)bp->b_data;
+	register vaddr_t kva;
 	register vsize_t size, off;
 
 	if ((bp->b_flags & B_PHYS) == 0)
@@ -374,11 +365,7 @@ vunmapbuf(bp, sz)
 	off = (vaddr_t)bp->b_data - kva;
 	size = round_page(sz + off);
 
-#if defined(UVM)
 	uvm_km_free_wakeup(kernel_map, kva, size);
-#else
-	kmem_free_wakeup(kernel_map, kva, size);
-#endif
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = NULL;
 	if (CACHEINFO.c_vactype != VAC_NONE)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fpa.c,v 1.13 1999/11/30 02:25:53 jason Exp $	*/
+/*	$OpenBSD: if_fpa.c,v 1.16 2001/09/11 20:05:25 miod Exp $	*/
 /*	$NetBSD: if_fpa.c,v 1.15 1996/10/21 22:56:40 thorpej Exp $	*/
 
 /*-
@@ -63,8 +63,6 @@
 #include <net/if_fddi.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
 
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/pcivar.h>
@@ -155,8 +153,7 @@ pdq_pci_attach(parent, self, aux)
 		return;
 	}
 
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &intrhandle)) {
+	if (pci_intr_map(pa, &intrhandle)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}

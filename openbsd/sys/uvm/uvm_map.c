@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_map.c,v 1.11 2001/03/22 03:05:55 smart Exp $	*/
-/*	$NetBSD: uvm_map.c,v 1.56 1999/06/16 19:34:24 thorpej Exp $	*/
+/*	$OpenBSD: uvm_map.c,v 1.24 2001/09/19 20:50:59 mickey Exp $	*/
+/*	$NetBSD: uvm_map.c,v 1.77 2000/06/13 04:10:47 chs Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -84,7 +84,6 @@
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
-#include <vm/vm_kern.h>
 
 #define UVM_MAP
 #include <uvm/uvm.h>
@@ -187,22 +186,6 @@ static void		uvm_map_entry_unwire __P((vm_map_t, vm_map_entry_t));
  * local inlines
  */
 
-/* XXX Should not exist! */
-#define	vm_map_downgrade(map)						\
-	(void) lockmgr(&(map)->lock, LK_DOWNGRADE, NULL, curproc)
-
-/* XXX Should not exist! */
-#ifdef DIAGNOSTIC
-#define	vm_map_upgrade(map)						\
-do {									\
-	if (lockmgr(&(map)->lock, LK_UPGRADE, NULL, curproc) != 0)	\
-		panic("vm_map_upgrade: failed to upgrade lock");	\
-} while (0)
-#else
-#define	vm_map_upgrade(map)						\
-	(void) lockmgr(&(map)->lock, LK_UPGRADE, NULL, curproc)
-#endif /* DIAGNOSTIC */
-
 /*
  * uvm_mapent_alloc: allocate a map entry
  *
@@ -293,8 +276,8 @@ uvm_map_entry_unwire(map, entry)
 	vm_map_entry_t entry;
 {
 
-	uvm_fault_unwire(map, entry->start, entry->end);
 	entry->wired_count = 0;
+	uvm_fault_unwire_locked(map, entry->start, entry->end);
 }
 
 /*
@@ -485,7 +468,7 @@ uvm_map(map, startp, size, uobj, uoffset, flags)
 	vaddr_t *startp;	/* IN/OUT */
 	vsize_t size;
 	struct uvm_object *uobj;
-	vaddr_t uoffset;
+	voff_t uoffset;
 	uvm_flag_t flags;
 {
 	vm_map_entry_t prev_entry, new_entry;
@@ -683,6 +666,7 @@ step3:
 		new_entry->aref.ar_pageoff = 0;
 		new_entry->aref.ar_amap = amap;
 	} else {
+		new_entry->aref.ar_pageoff = 0;
 		new_entry->aref.ar_amap = NULL;
 	}
 
@@ -814,7 +798,7 @@ uvm_map_findspace(map, hint, length, result, uobj, uoffset, fixed)
 	vsize_t length;
 	vaddr_t *result; /* OUT */
 	struct uvm_object *uobj;
-	vaddr_t uoffset;
+	voff_t uoffset;
 	boolean_t fixed;
 {
 	vm_map_entry_t entry, next, tmp;
@@ -1037,12 +1021,7 @@ uvm_unmap_remove(map, start, end, entry_list)
 			 * to vm_map_min(kernel_map).
 			 */
 			if (UVM_OBJ_IS_INTRSAFE_OBJECT(entry->object.uvm_obj)) {
-#if defined(PMAP_NEW)
 				pmap_kremove(entry->start, len);
-#else
-				pmap_remove(pmap_kernel(), entry->start,
-				    entry->start + len);
-#endif
 				uvm_km_pgremove_intrsafe(entry->object.uvm_obj,
 				    entry->start - vm_map_min(kernel_map),
 				    entry->end - vm_map_min(kernel_map));
@@ -1073,6 +1052,14 @@ uvm_unmap_remove(map, start, end, entry_list)
 		 * that we've nuked.  then go do next entry.
 		 */
 		UVMHIST_LOG(maphist, "  removed map entry 0x%x", entry, 0, 0,0);
+
+		/* critical! prevents stale hint */
+		/* XXX: need SAVE_HINT with three parms */
+		simple_lock(&map->hint_lock);
+		if (map->hint == entry)
+		    map->hint = entry->prev;
+		simple_unlock(&map->hint_lock);
+
 		uvm_map_entry_unlink(map, entry);
 		map->size -= len;
 		entry->next = first_entry;
@@ -1176,7 +1163,7 @@ uvm_map_reserve(map, size, offset, raddr)
 	vm_map_t map;
 	vsize_t size;
 	vaddr_t offset;    /* hint for pmap_prefer */
-	vaddr_t *raddr;	/* OUT: reserved VA */
+	vaddr_t *raddr;	/* IN:hint, OUT: reserved VA */
 {
 	UVMHIST_FUNC("uvm_map_reserve"); UVMHIST_CALLED(maphist); 
  
@@ -1576,13 +1563,15 @@ uvm_map_extract(srcmap, start, len, dstmap, dstaddrp, flags)
 		while (entry->start < end && entry != &srcmap->header) {
 
 			if (copy_ok) {
-	oldoffset = (entry->start + fudge) - start;
-	elen = min(end, entry->end) - (entry->start + fudge);
-	pmap_copy(dstmap->pmap, srcmap->pmap, dstaddr + oldoffset, 
-		  elen, entry->start + fudge);
+				oldoffset = (entry->start + fudge) - start;
+				elen = min(end, entry->end) -
+				    (entry->start + fudge);
+				pmap_copy(dstmap->pmap, srcmap->pmap,
+				    dstaddr + oldoffset, elen,
+				    entry->start + fudge);
 			}
 
-      /* we advance "entry" in the following if statement */
+			/* we advance "entry" in the following if statement */
 			if (flags & UVM_EXTRACT_REMOVE) {
 				pmap_remove(srcmap->pmap, entry->start, 
 						entry->end);
@@ -1733,6 +1722,7 @@ uvm_map_protect(map, start, end, new_prot, set_max)
 	boolean_t set_max;
 {
 	vm_map_entry_t current, entry;
+	int rv = KERN_SUCCESS;
 	UVMHIST_FUNC("uvm_map_protect"); UVMHIST_CALLED(maphist);
 	UVMHIST_LOG(maphist,"(map=0x%x,start=0x%x,end=0x%x,new_prot=0x%x)",
 	map, start, end, new_prot);
@@ -1753,11 +1743,13 @@ uvm_map_protect(map, start, end, new_prot, set_max)
 
 	current = entry;
 	while ((current != &map->header) && (current->start < end)) {
-		if (UVM_ET_ISSUBMAP(current))
-			return (KERN_INVALID_ARGUMENT);
+		if (UVM_ET_ISSUBMAP(current)) {
+			rv = KERN_INVALID_ARGUMENT;
+			goto out;
+		}
 		if ((new_prot & current->max_protection) != new_prot) {
-			vm_map_unlock(map);
-			return (KERN_PROTECTION_FAILURE);
+			rv = KERN_PROTECTION_FAILURE;
+			goto out;
 		}
 		current = current->next;
 	}
@@ -1789,12 +1781,43 @@ uvm_map_protect(map, start, end, new_prot, set_max)
 			    current->protection & MASK(entry));
 		}
 
+		/*
+		 * If the map is configured to lock any future mappings,
+		 * wire this entry now if the old protection was VM_PROT_NONE
+		 * and the new protection is not VM_PROT_NONE.
+		 */
+
+		if ((map->flags & VM_MAP_WIREFUTURE) != 0 &&
+		    VM_MAPENT_ISWIRED(entry) == 0 &&
+		    old_prot == VM_PROT_NONE &&
+		    new_prot != VM_PROT_NONE) {
+			if (uvm_map_pageable(map, entry->start,
+			    entry->end, FALSE,
+			    UVM_LK_ENTER|UVM_LK_EXIT) != KERN_SUCCESS) {
+				/*
+				 * If locking the entry fails, remember the
+				 * error if it's the first one.  Note we
+				 * still continue setting the protection in
+				 * the map, but will return the resource
+				 * shortage condition regardless.
+				 *
+				 * XXX Ignore what the actual error is,
+				 * XXX just call it a resource shortage
+				 * XXX so that it doesn't get confused
+				 * XXX what uvm_map_protect() itself would
+				 * XXX normally return.
+				 */
+				rv = KERN_RESOURCE_SHORTAGE;
+			}
+		}
+
 		current = current->next;
 	}
 	
+ out:
 	vm_map_unlock(map);
-	UVMHIST_LOG(maphist, "<- done",0,0,0,0);
-	return(KERN_SUCCESS);
+	UVMHIST_LOG(maphist, "<- done, rv=%d",rv,0,0,0);
+	return (rv);
 }
 
 #undef  max
@@ -1840,7 +1863,7 @@ uvm_map_inherit(map, start, end, new_inheritance)
 	}  else {
 		entry = temp_entry->next;
 	}
-	
+
 	while ((entry != &map->header) && (entry->start < end)) {
 		UVM_MAP_CLIP_END(map, entry, end);
 
@@ -1883,6 +1906,10 @@ uvm_map_advice(map, start, end, new_advice)
 		entry = temp_entry->next;
 	}
 
+	/*
+	 * XXXJRT: disallow holes?
+	 */
+
 	while ((entry != &map->header) && (entry->start < end)) {
 		UVM_MAP_CLIP_END(map, entry, end);
 
@@ -1892,65 +1919,6 @@ uvm_map_advice(map, start, end, new_advice)
 		case MADV_SEQUENTIAL:
 			/* nothing special here */
 			break;
-
-#if 0
-		case MADV_WILLNEED:
-			/* activate all these pages */
-			/* XXX */
-			/*
-			 * should invent a "weak" mode for uvm_fault()
-			 * which would only do the PGO_LOCKED pgo_get().
-			 */
-			break;
-
-		case MADV_DONTNEED:
-			/* deactivate this page */
-			/* XXX */
-			/*
-			 * vm_page_t p;
-			 * uvm_lock_pageq();
-			 * for (p in each page)
-			 *	if (not_wired)
-			 *		uvm_pagedeactivate(p);
-			 * uvm_unlock_pageq();
-			 */
-			break;
-
-		case MADV_SPACEAVAIL:
-			/* 
-			 * XXXMRG
-			 * what is this?  i think:  "ensure that we have
-			 * allocated backing-store for these pages".  this
-			 * is going to require changes in the page daemon,
-			 * as it will free swap space allocated to pages in
-			 * core.  there's also what to do for
-			 * device/file/anonymous memory..
-			 */
-			break;
-
-		case MADV_GARBAGE:
-			/* pages are `empty' and can be garbage collected */
-			/* XXX */
-			/*
-			 * (perhaps MADV_FREE? check freebsd's MADV_FREE).
-			 * 
-			 * need to do this:
-			 *	- clear all the referenced and modified bits on
-			 *	  the pages,
-			 *	- delete any backing store,
-			 *	- mark the page as `recycable'.
-			 *
-			 * So, if you start paging, the pages would be thrown out
-			 * and then zero-filled the next time they're used.
-			 * Otherwise you'd just reuse them directly.  Once the
-			 * page has been modified again, it would no longer be
-			 * recyclable.  That way, malloc() can just tell the
-			 * system when pages are `empty'; if memory is needed,
-			 * they'll be tossed; if memory is not needed, there
-			 * will be no additional overhead.
-			 */
-			break;
-#endif
 
 		default:
 			vm_map_unlock(map);
@@ -1976,18 +1944,25 @@ uvm_map_advice(map, start, end, new_advice)
  *	for that, use uvm_fault_wire()/uvm_fault_unwire() (see uvm_vslock()).
  * => regions sepcified as not pageable require lock-down (wired) memory
  *	and page tables.
- * => map must not be locked.
+ * => map must never be read-locked
+ * => if islocked is TRUE, map is already write-locked
+ * => we always unlock the map, since we must downgrade to a read-lock
+ *	to call uvm_fault_wire()
  * => XXXCDC: check this and try and clean it up.
  */
 
 int
-uvm_map_pageable(map, start, end, new_pageable)
+uvm_map_pageable(map, start, end, new_pageable, lockflags)
 	vm_map_t map;
 	vaddr_t start, end;
 	boolean_t new_pageable;
+	int lockflags;
 {
 	vm_map_entry_t entry, start_entry, failed_entry;
 	int rv;
+#ifdef DIAGNOSTIC
+	u_int timestamp_save;
+#endif
 	UVMHIST_FUNC("uvm_map_pageable"); UVMHIST_CALLED(maphist);
 	UVMHIST_LOG(maphist,"(map=0x%x,start=0x%x,end=0x%x,new_pageable=0x%x)",
 	map, start, end, new_pageable);
@@ -1997,7 +1972,9 @@ uvm_map_pageable(map, start, end, new_pageable)
 		panic("uvm_map_pageable: map %p not pageable", map);
 #endif
 
-	vm_map_lock(map);
+	if ((lockflags & UVM_LK_ENTER) == 0)
+		vm_map_lock(map);
+
 	VM_MAP_RANGE_CHECK(map, start, end);
 
 	/* 
@@ -2009,7 +1986,8 @@ uvm_map_pageable(map, start, end, new_pageable)
 	 */
 
 	if (uvm_map_lookup_entry(map, start, &start_entry) == FALSE) {
-		vm_map_unlock(map);
+		if ((lockflags & UVM_LK_EXIT) == 0)
+			vm_map_unlock(map);
 	 
 		UVMHIST_LOG(maphist,"<- done (INVALID ARG)",0,0,0,0);
 		return (KERN_INVALID_ADDRESS);
@@ -2031,7 +2009,8 @@ uvm_map_pageable(map, start, end, new_pageable)
 			    (entry->end < end &&
 			     (entry->next == &map->header ||
 			      entry->next->start > entry->end))) {
-				vm_map_unlock(map);
+				if ((lockflags & UVM_LK_EXIT) == 0)
+					vm_map_unlock(map);
 				UVMHIST_LOG(maphist,
 				    "<- done (INVALID UNWIRE ARG)",0,0,0,0);
 				return (KERN_INVALID_ARGUMENT);
@@ -2043,10 +2022,6 @@ uvm_map_pageable(map, start, end, new_pageable)
 		 * POSIX 1003.1b - a single munlock call unlocks a region,
 		 * regardless of the number of mlock calls made on that
 		 * region.
-		 *
-		 * Note, uvm_fault_unwire() (called via uvm_map_entry_unwire())
-		 * does not lock the map, so we don't have to do anything
-		 * special regarding locking here.
 		 */
 		entry = start_entry;
 		while ((entry != &map->header) && (entry->start < end)) {
@@ -2055,7 +2030,8 @@ uvm_map_pageable(map, start, end, new_pageable)
 				uvm_map_entry_unwire(map, entry);
 			entry = entry->next;
 		}
-		vm_map_unlock(map);
+		if ((lockflags & UVM_LK_EXIT) == 0)
+			vm_map_unlock(map);
 		UVMHIST_LOG(maphist,"<- done (OK UNWIRE)",0,0,0,0);
 		return(KERN_SUCCESS);
 
@@ -2123,7 +2099,8 @@ uvm_map_pageable(map, start, end, new_pageable)
 				entry->wired_count--;
 				entry = entry->prev;
 			}
-			vm_map_unlock(map);
+			if ((lockflags & UVM_LK_EXIT) == 0)
+				vm_map_unlock(map);
 			UVMHIST_LOG(maphist,"<- done (INVALID WIRE)",0,0,0,0);
 			return (KERN_INVALID_ARGUMENT);
 		}
@@ -2134,6 +2111,10 @@ uvm_map_pageable(map, start, end, new_pageable)
 	 * Pass 2.
 	 */
 
+#ifdef DIAGNOSTIC
+	timestamp_save = map->timestamp;
+#endif
+	vm_map_busy(map);
 	vm_map_downgrade(map);
 
 	rv = 0;
@@ -2159,6 +2140,12 @@ uvm_map_pageable(map, start, end, new_pageable)
 		 * Get back to an exclusive (write) lock.
 		 */
 		vm_map_upgrade(map);
+		vm_map_unbusy(map);
+
+#ifdef DIAGNOSTIC
+		if (timestamp_save != map->timestamp)
+			panic("uvm_map_pageable: stale map");
+#endif
 
 		/*
 		 * first drop the wiring count on all the entries
@@ -2181,14 +2168,24 @@ uvm_map_pageable(map, start, end, new_pageable)
 				uvm_map_entry_unwire(map, entry);
 			entry = entry->next;
 		}
-		vm_map_unlock(map);
+		if ((lockflags & UVM_LK_EXIT) == 0)
+			vm_map_unlock(map);
 		UVMHIST_LOG(maphist, "<- done (RV=%d)", rv,0,0,0);
 		return(rv);
 	}
 
 	/* We are holding a read lock here. */
-	vm_map_unlock_read(map);
-	
+	if ((lockflags & UVM_LK_EXIT) == 0) {
+		vm_map_unbusy(map);
+		vm_map_unlock_read(map);
+	} else {
+		/*
+		 * Get back to an exclusive (write) lock.
+		 */
+		vm_map_upgrade(map);
+		vm_map_unbusy(map);
+	}
+
 	UVMHIST_LOG(maphist,"<- done (OK WIRE)",0,0,0,0);
 	return(KERN_SUCCESS);
 }
@@ -2211,6 +2208,9 @@ uvm_map_pageable_all(map, flags, limit)
 	vm_map_entry_t entry, failed_entry;
 	vsize_t size;
 	int rv;
+#ifdef DIAGNOSTIC
+	u_int timestamp_save;
+#endif
 	UVMHIST_FUNC("uvm_map_pageable_all"); UVMHIST_CALLED(maphist);
 	UVMHIST_LOG(maphist,"(map=0x%x,flags=0x%x)", map, flags, 0, 0);
 
@@ -2229,17 +2229,13 @@ uvm_map_pageable_all(map, flags, limit)
 		/*
 		 * POSIX 1003.1b -- munlockall unlocks all regions,
 		 * regardless of how many times mlockall has been called.
-		 *
-		 * Note, uvm_fault_unwire() (called via uvm_map_entry_unwire())
-		 * does not lock the map, so we don't have to do anything
-		 * special regarding locking here.
 		 */
 		for (entry = map->header.next; entry != &map->header;
 		     entry = entry->next) {
 			if (VM_MAPENT_ISWIRED(entry))
 				uvm_map_entry_unwire(map, entry);
 		}
-		map->flags &= ~VM_MAP_WIREFUTURE;
+		vm_map_modflags(map, 0, VM_MAP_WIREFUTURE);
 		vm_map_unlock(map);
 		UVMHIST_LOG(maphist,"<- done (OK UNWIRE)",0,0,0,0);
 		return (KERN_SUCCESS);
@@ -2253,7 +2249,7 @@ uvm_map_pageable_all(map, flags, limit)
 		/*
 		 * must wire all future mappings; remember this.
 		 */
-		map->flags |= VM_MAP_WIREFUTURE;
+		vm_map_modflags(map, VM_MAP_WIREFUTURE, 0);
 	}
 
 	if ((flags & MCL_CURRENT) == 0) {
@@ -2343,6 +2339,10 @@ uvm_map_pageable_all(map, flags, limit)
 	 * Pass 3.
 	 */
 
+#ifdef DIAGNOSTIC
+	timestamp_save = map->timestamp;
+#endif
+	vm_map_busy(map);
 	vm_map_downgrade(map);
 
 	rv = KERN_SUCCESS;
@@ -2367,24 +2367,39 @@ uvm_map_pageable_all(map, flags, limit)
 		 * Get back an exclusive (write) lock.
 		 */
 		vm_map_upgrade(map);
+		vm_map_unbusy(map);
+
+#ifdef DIAGNOSTIC
+		if (timestamp_save != map->timestamp)
+			panic("uvm_map_pageable_all: stale map");
+#endif
 
 		/*
 		 * first drop the wiring count on all the entries
 		 * which haven't actually been wired yet.
+		 *
+		 * Skip VM_PROT_NONE entries like we did above.
 		 */
 		failed_entry = entry;
 		for (/* nothing */; entry != &map->header;
-		     entry = entry->next)
+		     entry = entry->next) {
+			if (entry->protection == VM_PROT_NONE)
+				continue;
 			entry->wired_count--;
+		}
 
 		/*
 		 * now, unwire all the entries that were successfully
 		 * wired above.
+		 *
+		 * Skip VM_PROT_NONE entries like we did above.
 		 */
 		for (entry = map->header.next; entry != failed_entry;
 		     entry = entry->next) {
+			if (entry->protection == VM_PROT_NONE)
+				continue;
 			entry->wired_count--;
-			if (VM_MAPENT_ISWIRED(entry) == 0)
+			if (VM_MAPENT_ISWIRED(entry))
 				uvm_map_entry_unwire(map, entry);
 		}
 		vm_map_unlock(map);
@@ -2393,6 +2408,7 @@ uvm_map_pageable_all(map, flags, limit)
 	}
 
 	/* We are holding a read lock here. */
+	vm_map_unbusy(map);
 	vm_map_unlock_read(map);
 
 	UVMHIST_LOG(maphist,"<- done (OK WIRE)",0,0,0,0);
@@ -2400,19 +2416,22 @@ uvm_map_pageable_all(map, flags, limit)
 }
 
 /*
- * uvm_map_clean: push dirty pages off to backing store.
+ * uvm_map_clean: clean out a map range
  *
  * => valid flags:
+ *   if (flags & PGO_CLEANIT): dirty pages are cleaned first
  *   if (flags & PGO_SYNCIO): dirty pages are written synchronously
  *   if (flags & PGO_DEACTIVATE): any cached pages are deactivated after clean
  *   if (flags & PGO_FREE): any cached pages are freed after clean
  * => returns an error if any part of the specified range isn't mapped
  * => never a need to flush amap layer since the anonymous memory has 
- *	no permanent home...
- * => called from sys_msync()
+ *	no permanent home, but may deactivate pages there
+ * => called from sys_msync() and sys_madvise()
  * => caller must not write-lock map (read OK).
  * => we may sleep while cleaning if SYNCIO [with map read-locked]
  */
+
+int	amap_clean_works = 1;	/* XXX for now, just in case... */
 
 int
 uvm_map_clean(map, start, end, flags)
@@ -2421,16 +2440,25 @@ uvm_map_clean(map, start, end, flags)
 	int flags;
 {
 	vm_map_entry_t current, entry;
-	vsize_t size;
-	struct uvm_object *object;
+	struct uvm_object *uobj;
+	struct vm_amap *amap;
+	struct vm_anon *anon;
+	struct vm_page *pg;
 	vaddr_t offset;
+	vsize_t size;
+	int rv, error, refs;
 	UVMHIST_FUNC("uvm_map_clean"); UVMHIST_CALLED(maphist);
 	UVMHIST_LOG(maphist,"(map=0x%x,start=0x%x,end=0x%x,flags=0x%x)",
 	map, start, end, flags);
 
+#ifdef DIAGNOSTIC
+	if ((flags & (PGO_FREE|PGO_DEACTIVATE)) == (PGO_FREE|PGO_DEACTIVATE))
+		panic("uvm_map_clean: FREE and DEACTIVATE");
+#endif
+
 	vm_map_lock_read(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
-	if (!uvm_map_lookup_entry(map, start, &entry)) {
+	if (uvm_map_lookup_entry(map, start, &entry) == FALSE) {
 		vm_map_unlock_read(map);
 		return(KERN_INVALID_ADDRESS);
 	}
@@ -2450,41 +2478,157 @@ uvm_map_clean(map, start, end, flags)
 		}
 	}
 
-	/* 
-	 * add "cleanit" flag to flags (for generic flush routine).  
-	 * then make a second pass, cleaning/uncaching pages from 
-	 * the indicated objects as we go.  
-	 */
-	flags = flags | PGO_CLEANIT;
+	error = KERN_SUCCESS;
+
 	for (current = entry; current->start < end; current = current->next) {
+		amap = current->aref.ar_amap;	/* top layer */
+		uobj = current->object.uvm_obj;	/* bottom layer */
+
+#ifdef DIAGNOSTIC
+		if (start < current->start)
+			panic("uvm_map_clean: hole");
+#endif
+
+		/*
+		 * No amap cleaning necessary if:
+		 *
+		 *	(1) There's no amap.
+		 *
+		 *	(2) We're not deactivating or freeing pages.
+		 */
+		if (amap == NULL ||
+		    (flags & (PGO_DEACTIVATE|PGO_FREE)) == 0)
+			goto flush_object;
+
+		/* XXX for now, just in case... */
+		if (amap_clean_works == 0)
+			goto flush_object;
+
+		amap_lock(amap);
+
+		offset = start - current->start;
+		size = (end <= current->end ? end : current->end) -
+		    start;
+
+		for (/* nothing */; size != 0; size -= PAGE_SIZE,
+		     offset += PAGE_SIZE) {
+			anon = amap_lookup(&current->aref, offset);
+			if (anon == NULL)
+				continue;
+
+			simple_lock(&anon->an_lock);
+
+			pg = anon->u.an_page;
+			if (pg == NULL) {
+				simple_unlock(&anon->an_lock);
+				continue;
+			}
+
+			switch (flags & (PGO_CLEANIT|PGO_FREE|PGO_DEACTIVATE)) {
+			/*
+			 * XXX In these first 3 cases, we always just
+			 * XXX deactivate the page.  We may want to
+			 * XXX handle the different cases more
+			 * XXX specifically, in the future.
+			 */
+			case PGO_CLEANIT|PGO_FREE:
+			case PGO_CLEANIT|PGO_DEACTIVATE:
+			case PGO_DEACTIVATE:
+ deactivate_it:
+				/* skip the page if it's loaned or wired */
+				if (pg->loan_count != 0 ||
+				    pg->wire_count != 0) {
+					simple_unlock(&anon->an_lock);
+					continue;
+				}
+
+				uvm_lock_pageq();
+
+				/*
+				 * skip the page if it's not actually owned
+				 * by the anon (may simply be loaned to the
+				 * anon).
+				 */
+				if ((pg->pqflags & PQ_ANON) == 0) {
+#ifdef DIAGNOSTIC
+					if (pg->uobject != NULL)
+						panic("uvm_map_clean: "
+						    "page anon vs. object "
+						    "inconsistency");
+#endif
+					uvm_unlock_pageq();
+					simple_unlock(&anon->an_lock);
+					continue;
+				}
+
+#ifdef DIAGNOSTIC
+				if (pg->uanon != anon)
+					panic("uvm_map_clean: anon "
+					    "inconsistency");
+#endif
+
+				/* zap all mappings for the page. */
+				pmap_page_protect(pg, VM_PROT_NONE);
+
+				/* ...and deactivate the page. */
+				uvm_pagedeactivate(pg);
+
+				uvm_unlock_pageq();
+				simple_unlock(&anon->an_lock);
+				continue;
+
+			case PGO_FREE:
+				/*
+				 * If there are multiple references to
+				 * the amap, just deactivate the page.
+				 */
+				if (amap_refs(amap) > 1)
+					goto deactivate_it;
+
+				/* XXX skip the page if it's wired */
+				if (pg->wire_count != 0) {
+					simple_unlock(&anon->an_lock);
+					continue;
+				}
+				amap_unadd(&current->aref, offset);
+				refs = --anon->an_ref;
+				simple_unlock(&anon->an_lock);
+				if (refs == 0)
+					uvm_anfree(anon);
+				continue;
+
+			default:
+				panic("uvm_map_clean: wierd flags");
+			}
+#ifdef DIAGNOSTIC
+			panic("uvm_map_clean: unreachable code");
+#endif
+		}
+
+		amap_unlock(amap);
+
+ flush_object:
+		/*
+		 * flush pages if we've got a valid backing object.
+		 */
+
 		offset = current->offset + (start - current->start);
 		size = (end <= current->end ? end : current->end) - start;
 
-		/*
-		 * get object/offset.  can't be submap (checked above).
-		 */
-		object = current->object.uvm_obj;
-		simple_lock(&object->vmobjlock);
+		if (uobj != NULL) {
+			simple_lock(&uobj->vmobjlock);
+			rv = uobj->pgops->pgo_flush(uobj, offset,
+			    offset + size, flags);
+			simple_unlock(&uobj->vmobjlock);
 
-		/*
-		 * flush pages if we've got a valid backing object.
-		 * note that object is locked.
-		 * XXX should we continue on an error?
-		 */
-
-		if (object && object->pgops) {
-			if (!object->pgops->pgo_flush(object, offset,
-			    offset+size, flags)) {
-				simple_unlock(&object->vmobjlock);
-				vm_map_unlock_read(map);
-				return (KERN_FAILURE);
-			}
+			if (rv == FALSE)
+				error = KERN_FAILURE;
 		}
-		simple_unlock(&object->vmobjlock);
 		start += size;
 	}
+
 	vm_map_unlock_read(map);
-	return(KERN_SUCCESS); 
+	return (error); 
 }
 
 
@@ -2582,11 +2726,7 @@ uvmspace_init(vm, pmap, min, max, pageable)
 	if (pmap)
 		pmap_reference(pmap);
 	else
-#if defined(PMAP_NEW)
 		pmap = pmap_create();
-#else
-		pmap = pmap_create(0);
-#endif
 	vm->vm_map.pmap = pmap;
 
 	vm->vm_refcnt = 1;
@@ -2619,7 +2759,6 @@ uvmspace_unshare(p)
 	struct proc *p; 
 {
 	struct vmspace *nvm, *ovm = p->p_vmspace;
-	int s;
  
 	if (ovm->vm_refcnt == 1)
 		/* nothing to do: vmspace isn't shared in the first place */
@@ -2628,11 +2767,9 @@ uvmspace_unshare(p)
 	/* make a new vmspace, still holding old one */
 	nvm = uvmspace_fork(ovm);
 
-	s = splhigh();			/* make this `atomic' */
 	pmap_deactivate(p);		/* unbind old vmspace */
 	p->p_vmspace = nvm; 
 	pmap_activate(p);		/* switch to new vmspace */
-	splx(s);			/* end of critical section */
 
 	uvmspace_free(ovm);		/* drop reference to old vmspace */
 }
@@ -2649,9 +2786,8 @@ uvmspace_exec(p)
 {
 	struct vmspace *nvm, *ovm = p->p_vmspace;
 	vm_map_t map = &ovm->vm_map;
-	int s;
 
-#ifdef sparc
+#ifdef __sparc__
 	/* XXX cgd 960926: the sparc #ifdef should be a MD hook */
 	kill_user_windows(p);   /* before stack addresses go away */
 #endif
@@ -2680,7 +2816,7 @@ uvmspace_exec(p)
 		 * when a process execs another program image.
 		 */
 		vm_map_lock(map);
-		map->flags &= ~VM_MAP_WIREFUTURE;
+		vm_map_modflags(map, 0, VM_MAP_WIREFUTURE);
 		vm_map_unlock(map);
 
 		/*
@@ -2698,34 +2834,13 @@ uvmspace_exec(p)
 		nvm = uvmspace_alloc(map->min_offset, map->max_offset, 
 			 (map->flags & VM_MAP_PAGEABLE) ? TRUE : FALSE);
 
-#if (defined(i386) || defined(pc532)) && !defined(PMAP_NEW)
-		/* 
-		 * allocate zero fill area in the new vmspace's map for user
-		 * page tables for ports that have old style pmaps that keep
-		 * user page tables in the top part of the process' address
-		 * space.
-		 *
-		 * XXXCDC: this should go away once all pmaps are fixed
-		 */
-		{ 
-			vaddr_t addr = VM_MAXUSER_ADDRESS;
-			if (uvm_map(&nvm->vm_map, &addr, VM_MAX_ADDRESS - addr,
-			    NULL, UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL,
-			    UVM_PROT_ALL, UVM_INH_NONE, UVM_ADV_NORMAL,
-			    UVM_FLAG_FIXED|UVM_FLAG_COPYONW)) != KERN_SUCCESS)
-				panic("vm_allocate of PT page area failed");
-		}
-#endif
-
 		/*
 		 * install new vmspace and drop our ref to the old one.
 		 */
 
-		s = splhigh();
 		pmap_deactivate(p);
 		p->p_vmspace = nvm;
 		pmap_activate(p);
-		splx(s);
 
 		uvmspace_free(ovm);
 	}
@@ -2788,16 +2903,6 @@ uvmspace_fork(vm1)
 	pmap_t          new_pmap;
 	boolean_t	protect_child;
 	UVMHIST_FUNC("uvmspace_fork"); UVMHIST_CALLED(maphist);
-
-#if (defined(i386) || defined(pc532)) && !defined(PMAP_NEW)
-	/*    
-	 * avoid copying any of the parent's pagetables or other per-process
-	 * objects that reside in the map by marking all of them non-inheritable
-	 * XXXCDC: should go away
-	 */
-	(void) uvm_map_inherit(old_map, VM_MAXUSER_ADDRESS, VM_MAX_ADDRESS, 
-			 VM_INHERIT_NONE);
-#endif
 
 	vm_map_lock(old_map);
 
@@ -3066,25 +3171,6 @@ uvmspace_fork(vm1)
 	new_map->size = old_map->size;
 	vm_map_unlock(old_map); 
 
-#if (defined(i386) || defined(pc532)) && !defined(PMAP_NEW)
-	/* 
-	 * allocate zero fill area in the new vmspace's map for user
-	 * page tables for ports that have old style pmaps that keep
-	 * user page tables in the top part of the process' address
-	 * space.
-	 *
-	 * XXXCDC: this should go away once all pmaps are fixed
-	 */
-	{
-		vaddr_t addr = VM_MAXUSER_ADDRESS;
-		if (uvm_map(new_map, &addr, VM_MAX_ADDRESS - addr, NULL,
-		    UVM_UNKNOWN_OFFSET, UVM_MAPFLAG(UVM_PROT_ALL,
-		    UVM_PROT_ALL, UVM_INH_NONE, UVM_ADV_NORMAL,
-		    UVM_FLAG_FIXED|UVM_FLAG_COPYONW)) != KERN_SUCCESS)
-			panic("vm_allocate of PT page area failed");
-	}
-#endif
-
 #ifdef SYSVSHM
 	if (vm1->vm_shm)
 		shmfork(vm1, vm2);
@@ -3145,9 +3231,9 @@ uvm_map_printit(map, full, pr)
 		return;
 	for (entry = map->header.next; entry != &map->header;
 	    entry = entry->next) {
-		(*pr)(" - %p: 0x%lx->0x%lx: obj=%p/0x%x, amap=%p/%d\n",
+		(*pr)(" - %p: 0x%lx->0x%lx: obj=%p/0x%llx, amap=%p/%d\n",
 		    entry, entry->start, entry->end, entry->object.uvm_obj,
-		    entry->offset, entry->aref.ar_amap, entry->aref.ar_pageoff);
+		    (long long)entry->offset, entry->aref.ar_amap, entry->aref.ar_pageoff);
 		(*pr)(
 "\tsubmap=%c, cow=%c, nc=%c, prot(max)=%d/%d, inh=%d, wc=%d, adv=%d\n",
 		    (entry->etype & UVM_ET_SUBMAP) ? 'T' : 'F',
@@ -3184,21 +3270,35 @@ uvm_object_printit(uobj, full, pr)
 	struct vm_page *pg;
 	int cnt = 0;
 
-	(*pr)("OBJECT %p: pgops=%p, npages=%d, ", uobj, uobj->pgops,
-	    uobj->uo_npages);
+	(*pr)("OBJECT %p: locked=%d, pgops=%p, npages=%d, ",
+	    uobj, uobj->vmobjlock.lock_data, uobj->pgops, uobj->uo_npages);
 	if (UVM_OBJ_IS_KERN_OBJECT(uobj))
 		(*pr)("refs=<SYSTEM>\n");
 	else
 		(*pr)("refs=%d\n", uobj->uo_refs);
 
-	if (!full) return;
-	(*pr)("  PAGES <pg,offset>:\n  ");
-	for (pg = uobj->memq.tqh_first ; pg ; pg = pg->listq.tqe_next, cnt++) {
-		(*pr)("<%p,0x%lx> ", pg, pg->offset);
-		if ((cnt % 3) == 2) (*pr)("\n  ");
+	if (!full) {
+		return;
 	}
-	if ((cnt % 3) != 2) (*pr)("\n");
+	(*pr)("  PAGES <pg,offset>:\n  ");
+	for (pg = TAILQ_FIRST(&uobj->memq);
+	     pg != NULL;
+	     pg = TAILQ_NEXT(pg, listq), cnt++) {
+		(*pr)("<%p,0x%lx> ", pg, pg->offset);
+		if ((cnt % 3) == 2) {
+			(*pr)("\n  ");
+		}
+	}
+	if ((cnt % 3) != 2) {
+		(*pr)("\n");
+	}
 } 
+
+const char page_flagbits[] =
+	"\20\4CLEAN\5BUSY\6WANTED\7TABLED\12FAKE\13FILLED\14DIRTY\15RELEASED"
+	"\16FAULTING\17CLEANCHK";
+const char page_pqflagbits[] =
+	"\20\1FREE\2INACTIVE\3ACTIVE\4LAUNDRY\5ANON\6AOBJ";
 
 /*
  * uvm_page_print: print out a page
@@ -3226,12 +3326,16 @@ uvm_page_printit(pg, full, pr)
 	struct vm_page *lcv;
 	struct uvm_object *uobj;
 	struct pglist *pgl;
+	char pgbuf[128];
+	char pqbuf[128];
 
 	(*pr)("PAGE %p:\n", pg);
-	(*pr)("  flags=0x%x, pqflags=0x%x, vers=%d, wire_count=%d, pa=0x%lx\n", 
-	pg->flags, pg->pqflags, pg->version, pg->wire_count, (long)pg->phys_addr);
+	snprintf(pgbuf, sizeof(pgbuf), "%b", pg->flags, page_flagbits);
+	snprintf(pqbuf, sizeof(pqbuf), "%b", pg->pqflags, page_pqflagbits);
+	(*pr)("  flags=%s, pqflags=%s, vers=%d, wire_count=%d, pa=0x%lx\n",
+	    pgbuf, pqbuf, pg->version, pg->wire_count, (long)pg->phys_addr);
 	(*pr)("  uobject=%p, uanon=%p, offset=0x%lx loan_count=%d\n", 
-	pg->uobject, pg->uanon, pg->offset, pg->loan_count);
+	    pg->uobject, pg->uanon, pg->offset, pg->loan_count);
 #if defined(UVM_PAGE_TRKOWN)
 	if (pg->flags & PG_BUSY)
 		(*pr)("  owning process = %d, tag=%s\n",
@@ -3270,8 +3374,11 @@ uvm_page_printit(pg, full, pr)
 	}
 
 	/* cross-verify page queue */
-	if (pg->pqflags & PQ_FREE)
-		pgl = &uvm.page_free[uvm_page_lookup_freelist(pg)];
+	if (pg->pqflags & PQ_FREE) {
+		int fl = uvm_page_lookup_freelist(pg);
+		pgl = &uvm.page_free[fl].pgfl_queues[((pg)->flags & PG_ZERO) ?
+		    PGFL_ZEROS : PGFL_UNKNOWN];
+	}
 	else if (pg->pqflags & PQ_INACTIVE)
 		pgl = (pg->pqflags & PQ_SWAPBACKED) ? 
 		    &uvm.page_inactive_swp : &uvm.page_inactive_obj;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.27 2001/04/01 06:13:40 mickey Exp $	*/
+/*	$OpenBSD: trap.c,v 1.30 2001/09/19 20:50:56 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2000 Michael Shalayeff
@@ -48,7 +48,6 @@
 #include <net/netisr.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <uvm/uvm.h>
 
 #include <machine/iomod.h>
@@ -116,20 +115,10 @@ userret (struct proc *p, register_t pc, u_quad_t oticks)
 
 	p->p_priority = p->p_usrpri;
 	if (want_resched) {
-		register int s;
 		/*
-		 * Since we are curproc, a clock interrupt could
-		 * change our priority without changing run queues
-		 * (the running process is not kept on a run queue).
-		 * If this happened after we setrunqueue ourselves but
-		 * before we switch()'ed, we might not be on the queue
-		 * indicated by our priority.
+		 * We're being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -348,7 +337,7 @@ trap(type, frame)
 		 */
 		if (va >= (vaddr_t)vm->vm_maxsaddr + vm->vm_ssize) {
 			if (ret == KERN_SUCCESS) {
-				vsize_t nss = clrnd(btoc(va - USRSTACK + NBPG));
+				vsize_t nss = btoc(va - USRSTACK + NBPG);
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
 			} else if (ret == KERN_PROTECTION_FAILURE)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.11 2000/01/24 05:20:54 smurph Exp $ */
+/*	$OpenBSD: autoconf.c,v 1.14 2001/09/19 21:32:19 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -74,7 +74,7 @@
 /*
  * Setup the system to run on the current machine.
  *
- * Configure() is called at boot time.  Available
+ * cpu_configure() is called at boot time.  Available
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
  */
@@ -95,13 +95,6 @@
 #include <machine/disklabel.h>
 #include <machine/cpu.h>
 #include <machine/pte.h>
-
-/*
- * The following several variables are related to
- * the configuration process, and are used in initializing
- * the machine.
- */
-extern int cold;		/* if 1, still working on cold-start */
 
 struct	device *parsedisk __P((char *, int, int, dev_t *));
 void	setroot __P((void));
@@ -181,7 +174,8 @@ mainbus_attach(parent, self, args)
 /*
  * Determine mass storage and memory configuration for a machine.
  */
-configure()
+void
+cpu_configure()
 {
 	bootdv = NULL; /* set by device drivers (if found) */
 
@@ -303,7 +297,7 @@ getdisk(str, len, defpart, devp)
 		for (dv = alldevs.tqh_first; dv != NULL;
 		    dv = dv->dv_list.tqe_next) {
 			if (dv->dv_class == DV_DISK)
-				printf(" %s[a-h]", dv->dv_xname);
+				printf(" %s[a-p]", dv->dv_xname);
 #ifdef NFSCLIENT
 			if (dv->dv_class == DV_IFNET)
 				printf(" %s", dv->dv_xname);

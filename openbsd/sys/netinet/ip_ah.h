@@ -1,5 +1,4 @@
-/*	$OpenBSD: ip_ah.h,v 1.26 2000/09/19 03:20:58 angelos Exp $	*/
-
+/*	$OpenBSD: ip_ah.h,v 1.28 2001/06/25 05:11:58 angelos Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and 
@@ -16,10 +15,11 @@
  *
  * Additional features in 1999 by Angelos D. Keromytis.
  *
- * Copyright (C) 1995, 1996, 1997, 1998, 1999 by John Ioannidis,
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999 John Ioannidis,
  * Angelos D. Keromytis and Niels Provos.
- *	
- * Permission to use, copy, and modify this software without fee
+ * Copyright (c) 2001 Angelos D. Keromytis.
+ *
+ * Permission to use, copy, and modify this software with or without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
  * modification of this software. 
@@ -35,8 +35,8 @@
  * PURPOSE.
  */
 
-#ifndef _NETINET_AH_H_
-#define _NETINET_AH_H_
+#ifndef _NETINET_IP_AH_H_
+#define _NETINET_IP_AH_H_
 
 struct ahstat
 {
@@ -90,4 +90,4 @@ struct ah
 extern int ah_enable;
 struct ahstat ahstat;
 #endif /* _KERNEL */
-#endif /* _NETINET_AH_H_ */
+#endif /* _NETINET_IP_AH_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_subr.c,v 1.58 2001/03/22 00:31:56 art Exp $	*/
+/*	$OpenBSD: vfs_subr.c,v 1.68 2001/10/02 17:21:02 csapuntz Exp $	*/
 /*	$NetBSD: vfs_subr.c,v 1.53 1996/04/22 01:39:13 christos Exp $	*/
 
 /*
@@ -69,10 +69,7 @@
 
 #include <miscfs/specfs/specdev.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
-
 
 enum vtype iftovt_tab[16] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
@@ -94,7 +91,7 @@ int suid_clear = 1;		/* 1 => clear SUID / SGID on owner change */
 #define	bufremvn(bp) {							\
 	LIST_REMOVE(bp, b_vnbufs);					\
 	(bp)->b_vnbufs.le_next = NOLIST;				\
-}  
+}
 
 struct freelst vnode_hold_list;   /* list of vnodes referencing buffers */
 struct freelst vnode_free_list;   /* vnode free list */
@@ -120,6 +117,9 @@ static __inline__ void vputonfreelist __P((struct vnode *));
 #ifdef DEBUG
 void printlockedvnodes __P((void));
 #endif
+
+#define VN_KNOTE(vp, b) \
+	KNOTE((struct klist *)&vp->v_selectinfo.vsi_selinfo.si_note, (b))
 
 struct pool vnode_pool;
 
@@ -183,7 +183,7 @@ vfs_busy(mp, flags, interlkp, p)
 		lkflags |= LK_INTERLOCK;
 	if (lockmgr(&mp->mnt_lock, lkflags, interlkp, p))
 		panic("vfs_busy: unexpected lock failure");
-        return (0);
+	return (0);
 }
 
 
@@ -214,7 +214,7 @@ vfs_rootmountalloc(fstypename, devname, mpp)
 	struct proc *p = curproc;	/* XXX */
 	struct vfsconf *vfsp;
 	struct mount *mp;
- 
+
 	for (vfsp = vfsconf; vfsp; vfsp = vfsp->vfc_next)
 		if (!strcmp(vfsp->vfc_name, fstypename))
 			break;
@@ -250,7 +250,7 @@ vfs_mountroot()
 	struct vfsconf *vfsp;
 	extern int (*mountroot)(void);
 	int error;
- 
+
 	if (mountroot != NULL)
 		return ((*mountroot)());
 	for (vfsp = vfsconf; vfsp; vfsp = vfsp->vfc_next) {
@@ -262,7 +262,7 @@ vfs_mountroot()
  	}
 	return (ENODEV);
 }
- 
+
 /*
  * Lookup a mount point by filesystem identifier.
  */
@@ -396,12 +396,11 @@ getnewvnode(tag, mp, vops, vpp)
 	if (numvnodes > 2 * desiredvnodes)
 		toggle = 0;
 
-
 	simple_lock(&vnode_free_list_slock);
 	s = splbio();
 	if ((numvnodes < desiredvnodes) ||
 	    ((TAILQ_FIRST(listhd = &vnode_free_list) == NULL) &&
-	     ((TAILQ_FIRST(listhd = &vnode_hold_list) == NULL) || toggle))) {
+	    ((TAILQ_FIRST(listhd = &vnode_hold_list) == NULL) || toggle))) {
 		splx(s);
 		simple_unlock(&vnode_free_list_slock);
 		vp = pool_get(&vnode_pool, PR_WAITOK);
@@ -409,7 +408,7 @@ getnewvnode(tag, mp, vops, vpp)
 		numvnodes++;
 	} else {
 		for (vp = TAILQ_FIRST(listhd); vp != NULLVP;
-		     vp = TAILQ_NEXT(vp, v_freelist)) {
+		    vp = TAILQ_NEXT(vp, v_freelist)) {
 			if (simple_lock_try(&vp->v_interlock))
 				break;
 		}
@@ -461,9 +460,7 @@ getnewvnode(tag, mp, vops, vpp)
 	*vpp = vp;
 	vp->v_usecount = 1;
 	vp->v_data = 0;
-#ifdef UVM
 	simple_lock_init(&vp->v_uvm.u_obj.vmobjlock);
-#endif
 	return (0);
 }
 
@@ -479,7 +476,7 @@ insmntque(vp, mp)
 	/*
 	 * Delete from old mount point vnode list, if on one.
 	 */
-	
+
 	if (vp->v_mount != NULL)
 		LIST_REMOVE(vp, v_mntvnodes);
 	/*
@@ -597,8 +594,7 @@ loop:
 		break;
 	}
 
-	
-	/* 
+	/*
 	 * Common case is actually in the if statement
 	 */
 	if (vp == NULL || !(vp->v_tag == VT_NON && vp->v_type == VBLK)) {
@@ -619,14 +615,14 @@ loop:
 		return (NULLVP);
 	}
 
-	/* 
+	/*
 	 * This code is the uncommon case. It is called in case
 	 * we found an alias that was VT_NON && vtype of VBLK
 	 * This means we found a block device that was created
 	 * using bdevvp.
 	 * An example of such a vnode is the root partition device vnode
-	 * craeted in ffs_mountroot.
-	 * 
+	 * created in ffs_mountroot.
+	 *
 	 * The vnodes created by bdevvp should not be aliased (why?).
 	 */
 
@@ -651,7 +647,7 @@ loop:
  */
 int
 vget(vp, flags, p)
-        struct vnode *vp;
+	struct vnode *vp;
 	int flags;
 	struct proc *p;
 {
@@ -717,38 +713,31 @@ vref(vp)
 }
 #endif /* DIAGNOSTIC */
 
-
-/*
- * Must be called at splbio
- */
 static __inline__ void
 vputonfreelist(vp)
-        struct vnode *vp;
-
+	struct vnode *vp;
 {
-        int s;
+	int s;
 	struct freelst *lst;
 
 	s = splbio();
 #ifdef DIAGNOSTIC
 	if (vp->v_usecount != 0)
 		panic("Use count is not zero!");
-	
+
 	if (vp->v_bioflag & VBIOONFREELIST) {
-		vprint ("vnode already on free list: ", vp);
-		panic ("vnode already on free list");
+		vprint("vnode already on free list: ", vp);
+		panic("vnode already on free list");
 	}
 #endif
 
-
 	vp->v_bioflag |= VBIOONFREELIST;
 
-	if (vp->v_holdcnt > 0) 
+	if (vp->v_holdcnt > 0)
 		lst = &vnode_hold_list;
 	else
 		lst = &vnode_free_list;
 
-	
 	if (vp->v_type == VBAD)
 		TAILQ_INSERT_HEAD(lst, vp, v_freelist);
 	else
@@ -773,9 +762,9 @@ vput(vp)
 	simple_lock(&vp->v_interlock);
 
 #ifdef DIAGNOSTIC
-	if (vp->v_usecount == 0) { 
-		vprint("vrele: bad ref count", vp);
-		panic("vrele: ref cnt");
+	if (vp->v_usecount == 0) {
+		vprint("vput: bad ref count", vp);
+		panic("vput: ref cnt");
 	}
 #endif
 	vp->v_usecount--;
@@ -787,10 +776,10 @@ vput(vp)
 
 #ifdef DIAGNOSTIC
 	if (vp->v_writecount != 0) {
-		vprint("vrele: bad writecount", vp);
-		panic("vrele: v_writecount != 0");
+		vprint("vput: bad writecount", vp);
+		panic("vput: v_writecount != 0");
 	}
-#endif	
+#endif
 	vputonfreelist(vp);
 
 	simple_unlock(&vp->v_interlock);
@@ -814,7 +803,7 @@ vrele(vp)
 #endif
 	simple_lock(&vp->v_interlock);
 #ifdef DIAGNOSTIC
-	if (vp->v_usecount == 0) { 
+	if (vp->v_usecount == 0) {
 		vprint("vrele: bad ref count", vp);
 		panic("vrele: ref cnt");
 	}
@@ -897,7 +886,7 @@ loop:
 		 */
 		if (vp == skipvp)
 			continue;
-		
+
 		simple_lock(&vp->v_interlock);
 		/*
 		 * Skip over a vnodes marked VSYSTEM.
@@ -992,12 +981,10 @@ vclean(vp, flags, p)
 	 */
 	VOP_LOCK(vp, LK_DRAIN | LK_INTERLOCK, p);
 
-#ifdef UVM
 	/*
 	 * clean out any VM data associated with the vnode.
 	 */
 	uvm_vnp_terminate(vp);
-#endif
 	/*
 	 * Clean out any buffers associated with the vnode.
 	 */
@@ -1049,6 +1036,9 @@ vclean(vp, flags, p)
 	 * Done with purge, notify sleepers of the grim news.
 	 */
 	vp->v_op = dead_vnodeop_p;
+	simple_lock(&vp->v_selectinfo.vsi_lock);
+	VN_KNOTE(vp, NOTE_REVOKE);
+	simple_unlock(&vp->v_selectinfo.vsi_lock);
 	vp->v_tag = VT_NON;
 	vp->v_flag &= ~VXLOCK;
 #ifdef DIAGNOSTIC
@@ -1130,7 +1120,7 @@ vgonel(vp, p)
 	if (vp->v_mount != NULL)
 		insmntque(vp, (struct mount *)0);
 	/*
-	 * If special device, remove it from special device alias list 
+	 * If special device, remove it from special device alias list
 	 * if it is on one.
 	 */
 	if ((vp->v_type == VBLK || vp->v_type == VCHR) && vp->v_specinfo != 0) {
@@ -1169,7 +1159,7 @@ vgonel(vp, p)
 	}
 	/*
 	 * If it is on the freelist and not already at the head,
-	 * move it to the head of the list. 
+	 * move it to the head of the list.
 	 */
 	vp->v_type = VBAD;
 
@@ -1180,7 +1170,8 @@ vgonel(vp, p)
 	if (vp->v_usecount == 0 &&
 	    (vp->v_bioflag & VBIOONFREELIST)) {
 		int s;
-                simple_lock(&vnode_free_list_slock);
+
+		simple_lock(&vnode_free_list_slock);
 		s = splbio();
 
 		if (vp->v_holdcnt > 0)
@@ -1191,7 +1182,7 @@ vgonel(vp, p)
 			TAILQ_INSERT_HEAD(&vnode_free_list, vp, v_freelist);
 		}
 		splx(s);
-                simple_unlock(&vnode_free_list_slock);
+		simple_unlock(&vnode_free_list_slock);
 	}
 }
 
@@ -1326,14 +1317,13 @@ printlockedvnodes()
 	printf("Locked vnodes\n");
 	simple_lock(&mountlist_slock);
 	for (mp = CIRCLEQ_FIRST(&mountlist); mp != CIRCLEQ_END(&mountlist);
-	     mp = nmp) {
-		if (vfs_busy(mp, LK_NOWAIT, &mountlist_slock, p)) { 
+	    mp = nmp) {
+		if (vfs_busy(mp, LK_NOWAIT, &mountlist_slock, p)) {
 			nmp = CIRCLEQ_NEXT(mp, mnt_list);
 			continue;
 		}
-		for (vp = mp->mnt_vnodelist.lh_first;
-		     vp != NULL;
-		     vp = vp->v_mntvnodes.le_next) {
+		for (vp = mp->mnt_vnodelist.lh_first; vp;
+		    vp = vp->v_mntvnodes.le_next) {
 			if (VOP_ISLOCKED(vp))
 				vprint((char *)0, vp);
 		}
@@ -1418,19 +1408,18 @@ sysctl_vnode(where, sizep, p)
 		return (0);
 	}
 	ewhere = where + *sizep;
-		
+
 	simple_lock(&mountlist_slock);
 	for (mp = CIRCLEQ_FIRST(&mountlist); mp != CIRCLEQ_END(&mountlist);
-	     mp = nmp) {
+	    mp = nmp) {
 		if (vfs_busy(mp, LK_NOWAIT, &mountlist_slock, p)) {
 			nmp = CIRCLEQ_NEXT(mp, mnt_list);
 			continue;
 		}
 		savebp = bp;
 again:
-		for (vp = mp->mnt_vnodelist.lh_first;
-		     vp != NULL;
-		     vp = nvp) {
+		for (vp = mp->mnt_vnodelist.lh_first; vp != NULL;
+		    vp = nvp) {
 			/*
 			 * Check that the vp is still associated with
 			 * this filesystem.  RACE: could have been
@@ -1524,6 +1513,8 @@ vfs_hang_addrlist(mp, nep, argp)
 		mp->mnt_flag |= MNT_DEFEXPORTED;
 		return (0);
 	}
+	if (argp->ex_addrlen > MLEN)
+		return (EINVAL);
 	i = sizeof(struct netcred) + argp->ex_addrlen + argp->ex_masklen;
 	np = (struct netcred *)malloc(i, M_NETADDR, M_WAITOK);
 	bzero((caddr_t)np, i);
@@ -1542,6 +1533,10 @@ vfs_hang_addrlist(mp, nep, argp)
 			smask->sa_len = argp->ex_masklen;
 	}
 	i = saddr->sa_family;
+	if (i < 0 || i > AF_MAX) {
+		error = EINVAL;
+		goto out;
+	}
 	if ((rnh = nep->ne_rtable[i]) == 0) {
 		/*
 		 * Seems silly to initialize every AF when most are not
@@ -1645,7 +1640,7 @@ vfs_export_lookup(mp, nep, nam)
 			if (rnh != NULL) {
 				np = (struct netcred *)
 					(*rnh->rnh_matchaddr)((caddr_t)saddr,
-							      rnh);
+					    rnh);
 				if (np && np->netc_rnodes->rn_flags & RNF_ROOT)
 					np = NULL;
 			}
@@ -1673,13 +1668,13 @@ vaccess(file_mode, uid, gid, acc_mode, cred)
 	struct ucred *cred;
 {
 	mode_t mask;
-	
+
 	/* User id 0 always gets access. */
 	if (cred->cr_uid == 0)
 		return 0;
-	
+
 	mask = 0;
-	
+
 	/* Otherwise, check the owner. */
 	if (cred->cr_uid == uid) {
 		if (acc_mode & VEXEC)
@@ -1690,7 +1685,7 @@ vaccess(file_mode, uid, gid, acc_mode, cred)
 			mask |= S_IWUSR;
 		return (file_mode & mask) == mask ? 0 : EACCES;
 	}
-	
+
 	/* Otherwise, check the groups. */
 	if (cred->cr_gid == gid || groupmember(gid, cred)) {
 		if (acc_mode & VEXEC)
@@ -1701,7 +1696,7 @@ vaccess(file_mode, uid, gid, acc_mode, cred)
 			mask |= S_IWGRP;
 		return (file_mode & mask) == mask ? 0 : EACCES;
 	}
-	
+
 	/* Otherwise, check everyone else. */
 	if (acc_mode & VEXEC)
 		mask |= S_IXOTH;
@@ -1726,7 +1721,7 @@ vfs_unmountall()
  retry:
 	allerror = 0;
 	for (mp = CIRCLEQ_LAST(&mountlist); mp != CIRCLEQ_END(&mountlist);
-	     mp = nmp) {
+	    mp = nmp) {
 		nmp = CIRCLEQ_PREV(mp, mnt_list);
 		if ((error = dounmount(mp, MNT_FORCE, curproc)) != 0) {
 			printf("unmount of %s failed with error %d\n",
@@ -1757,14 +1752,6 @@ vfs_shutdown()
 	printf("syncing disks... ");
 
 	if (panicstr == 0) {
-		/* Release inodes held by texts before update. */
-#if !defined(UVM)
-		vnode_pager_umount(NULL);
-#endif
-#ifdef notdef
-		vnshutdown();
-#endif
-
 		/* Sync before unmount, in case we hang on something. */
 		sys_sync(&proc0, (void *)0, (register_t *)0);
 
@@ -1793,7 +1780,7 @@ vfs_syncwait(verbose)
 
 	p = curproc? curproc : &proc0;
 	sys_sync(p, (void *)0, (register_t *)0);
- 
+
 	/* Wait for sync to finish. */
 	dcount = 10000;
 	for (iter = 0; iter < 20; iter++) {
@@ -1825,7 +1812,7 @@ vfs_syncwait(verbose)
 		if (verbose)
 			printf("%d ", nbusy);
 		DELAY(40000 * iter);
-	}   
+	}
 
 	return nbusy;
 }
@@ -1884,8 +1871,8 @@ fs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 }
 
 
-/* 
- * Routines dealing with vnodes and buffers 
+/*
+ * Routines dealing with vnodes and buffers
  */
 
 /*
@@ -1965,7 +1952,7 @@ vinvalbuf(vp, flags, cred, p, slpflag, slptimeo)
 loop:
 	s = splbio();
 	for (;;) {
-		if ((blist = vp->v_cleanblkhd.lh_first) && 
+		if ((blist = vp->v_cleanblkhd.lh_first) &&
 		    (flags & V_SAVEMETA))
 			while (blist && blist->b_lblkno < 0)
 				blist = blist->b_vnbufs.le_next;
@@ -1991,7 +1978,8 @@ loop:
 				}
 				break;
 			}
-			bp->b_flags |= B_BUSY | B_VFLUSH;
+			bremfree(bp);
+			bp->b_flags |= B_BUSY;
 			/*
 			 * XXX Since there are no node locks for NFS, I believe
 			 * there is a slight chance that a delayed write will
@@ -2029,7 +2017,8 @@ loop:
 			continue;
 		if ((bp->b_flags & B_DELWRI) == 0)
 			panic("vflushbuf: not dirty");
-		bp->b_flags |= B_BUSY | B_VFLUSH;
+		bremfree(bp);
+		bp->b_flags |= B_BUSY;
 		splx(s);
 		/*
 		 * Wait for I/O associated with indirect blocks to complete,
@@ -2081,7 +2070,7 @@ bgetvp(vp, bp)
 
 /*
  * Disassociate a buffer from a vnode.
- * 
+ *
  * Manipulates vnode buffer queues. Must be called at splbio().
  */
 void
@@ -2113,7 +2102,7 @@ brelvp(bp)
 
 	/*
 	 * If it is on the holdlist and the hold count drops to
-	 * zero, move it to the free list. 
+	 * zero, move it to the free list.
 	 */
 	if ((vp->v_bioflag & VBIOONFREELIST) &&
 	    vp->v_holdcnt == 0 && vp->v_usecount == 0) {
@@ -2143,7 +2132,7 @@ buf_replacevnode(bp, newvp)
 
 	if (oldvp)
 		brelvp(bp);
-		
+
 	if ((bp->b_flags & (B_READ | B_DONE)) == 0) {
 		newvp->v_numoutput++;	/* put it on swapdev */
 		vwakeup(oldvp);
@@ -2224,9 +2213,8 @@ vfs_register(vfs)
 #endif
 
 	/* Check if filesystem already known */
-	for (vfspp = &vfsconf, vfsp = vfsconf;
-	     vfsp;
-	     vfspp = &vfsp->vfc_next, vfsp = vfsp->vfc_next)
+	for (vfspp = &vfsconf, vfsp = vfsconf; vfsp;
+	    vfspp = &vfsp->vfc_next, vfsp = vfsp->vfc_next)
 		if (strcmp(vfsp->vfc_name, vfs->vfc_name) == 0)
 			return (EEXIST);
 
@@ -2244,7 +2232,7 @@ vfs_register(vfs)
 
 	return 0;
 }
- 
+
 int
 vfs_unregister(vfs)
 	struct vfsconf *vfs;
@@ -2254,20 +2242,19 @@ vfs_unregister(vfs)
 	int maxtypenum;
 
 	/* Find our vfsconf struct */
-	for (vfspp = &vfsconf, vfsp = vfsconf;
-	     vfsp;
-	     vfspp = &vfsp->vfc_next, vfsp = vfsp->vfc_next) {
+	for (vfspp = &vfsconf, vfsp = vfsconf; vfsp;
+	    vfspp = &vfsp->vfc_next, vfsp = vfsp->vfc_next) {
 		if (strcmp(vfsp->vfc_name, vfs->vfc_name) == 0)
 			break;
 	}
 
-	if (!vfsp)                         /* Not found */
+	if (!vfsp)			/* Not found */
 		return (ENOENT);
 
-	if (vfsp->vfc_refcount)            /* In use */
+	if (vfsp->vfc_refcount)		/* In use */
 		return (EBUSY);
 
-	/* Remove from list and free  */
+	/* Remove from list and free */
 	*vfspp = vfsp->vfc_next;
 
 	maxtypenum = 0;
@@ -2277,7 +2264,6 @@ vfs_unregister(vfs)
 			maxtypenum = vfsp->vfc_typenum;
 
 	maxvfsconf = maxtypenum;
-
 	return 0;
 }
 

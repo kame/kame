@@ -1,5 +1,5 @@
-/*	$OpenBSD: usb_port.h,v 1.24 2001/02/03 07:46:11 mickey Exp $ */
-/*	$NetBSD: usb_port.h,v 1.35 2000/09/23 04:32:23 augustss Exp $	*/
+/*	$OpenBSD: usb_port.h,v 1.29 2001/10/02 19:30:22 provos Exp $ */
+/*	$NetBSD: usb_port.h,v 1.42 2001/03/28 19:00:39 ichiro Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.21 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
@@ -60,12 +60,15 @@
 #define UHUB_DEBUG 1
 #define ULPT_DEBUG 1
 #define UCOM_DEBUG 1
+#define UPLCOM_DEBUG 1
+#define UMCT_DEBUG 1
 #define UMODEM_DEBUG 1
 #define UAUDIO_DEBUG 1
 #define AUE_DEBUG 1
 #define CUE_DEBUG 1
 #define KUE_DEBUG 1
 #define UMASS_DEBUG 1
+#define UVISOR_DEBUG 1
 #define UPL_DEBUG 1
 #define UZCOM_DEBUG 1
 #define URIO_DEBUG 1
@@ -221,6 +224,8 @@ __CONCAT(dname,_detach)(self, flags) \
 #define scsipi_minphys		scsi_minphys
 #define scsipi_sense		scsi_sense
 #define scsipi_xfer		scsi_xfer
+#define show_scsipi_xs          show_scsi_xs
+#define show_scsipi_cmd         show_scsi_cmd
 #define xs_control		flags
 #define xs_status		status
 
@@ -249,23 +254,13 @@ typedef int usb_malloc_type;
 
 #define Ether_ifattach(ifp, eaddr) ether_ifattach(ifp)
 #define if_deactivate(x)
-#define IF_INPUT(ifp, m) do {						\
-	struct ether_header *eh;					\
-									\
-	eh = mtod(m, struct ether_header *);				\
-	m_adj(m, sizeof(struct ether_header));				\
-	ether_input((ifp), (eh), (m));					\
-} while (0)
+#define IF_INPUT(ifp, m) ether_input_mbuf((ifp), (m))
 
 #define	usbpoll			usbselect
 #define	uhidpoll		uhidselect
 #define	ugenpoll		ugenselect
 #define	uriopoll		urioselect
 #define uscannerpoll		uscannerselect
-
-#define powerhook_establish(fn, sc) (fn)
-#define powerhook_disestablish(hdl)
-#define PWR_RESUME 0
 
 #define logprintf printf
 
@@ -275,8 +270,6 @@ typedef int usb_malloc_type;
 
 #define realloc usb_realloc
 void *usb_realloc(void *, u_int, int, int);
-
-extern int cold;
 
 typedef struct device *device_ptr_t;
 #define USBBASEDEVICE struct device

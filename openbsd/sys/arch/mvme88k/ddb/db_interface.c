@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.8 2001/03/16 00:01:51 miod Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.15 2001/09/23 02:52:02 miod Exp $	*/
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -47,6 +47,7 @@
 
 #include <ddb/db_command.h>
 #include <ddb/db_extern.h>
+#include <ddb/db_interface.h>
 #include <ddb/db_output.h>
 #include <ddb/db_sym.h>
 
@@ -56,7 +57,6 @@ extern unsigned db_trace_get_val(vm_offset_t addr, unsigned *ptr);
 extern int frame_is_sane __P((db_regs_t *));
 extern void cnpollc __P((int));
 void kdbprinttrap __P((int type, int code));
-void kdb_init __P((void));
 
 void m88k_db_trap __P((int type, struct m88100_saved_state *regs));
 int ddb_nmi_trap __P((int level, db_regs_t *eframe));
@@ -67,37 +67,22 @@ void db_putc __P((int c));
 int db_getc __P((void));
 void cpu_interrupt_to_db __P((int cpu_no));
 char *db_task_name __P((void));
+int m88k_dmx_print __P((unsigned, unsigned, unsigned, unsigned));
+void m88k_db_pause __P((unsigned));
+void m88k_db_print_frame __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_where __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_frame_search __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_iflush __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_dflush __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_peek __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_noise __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_translate __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_cmmucfg __P((db_expr_t, int, db_expr_t, char *));
+void m88k_db_prom_cmd __P((db_expr_t, int, db_expr_t, char *));
 
 int 	db_active = 0;
 int 	db_noisy = 0;
 int	quiet_db_read_bytes = 0;
-
-/************************/
-/* PRINTING *************/
-/************************/
-
-static void
-m88k_db_str(str)
-	char *str;
-{
-	db_printf(str);
-}
-
-static void
-m88k_db_str1(str, arg1)
-	char *str;
-	int arg1;
-{
-	db_printf(str, arg1);
-}
-
-static void
-m88k_db_str2(str, arg1, arg2)
-	char *str;
-	int arg1, arg2;
-{
-	db_printf(str, arg1, arg2);
-}
 
 /************************/
 /* 	DB_REGISTERS ****/
@@ -133,7 +118,7 @@ m88k_db_str2(str, arg1, arg2)
 /*
  * return 1 if the printing of the next stage should be surpressed
  */
-static int
+int
 m88k_dmx_print(t, d, a, no)
 	unsigned t, d, a, no;
 {
@@ -197,11 +182,11 @@ m88k_dmx_print(t, d, a, no)
 	return 0;
 }
 
-static void
+void
 m88k_db_print_frame(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
-	int count;
+	db_expr_t count;
 	char *modif;
 {
 	struct m88100_saved_state *s = (struct m88100_saved_state *)addr;
@@ -344,7 +329,7 @@ m88k_db_print_frame(addr, have_addr, count, modif)
 		}
 	}
 
-	if (s->fpecr & 255) { /* floating point error occured */
+	if (s->fpecr & 255) { /* floating point error occurred */
 		db_printf("fpecr: 0x%08x fpsr: 0x%08x fpcr: 0x%08x\n",
 		    s->fpecr, s->fpsr, s->fpcr);
 		db_printf("fcr1-4: 0x%08x  0x%08x  0x%08x  0x%08x\n",
@@ -355,21 +340,6 @@ m88k_db_print_frame(addr, have_addr, count, modif)
 	db_printf("\n\n");
 }
 
-static void
-m88k_db_registers(addr, have_addr, count, modif)
-	db_expr_t addr;
-	int have_addr;
-	int count;
-	char *modif;
-{
-	if (modif != NULL && *modif != 0) {
-		db_printf("usage: mach regs\n");
-		return;
-	}
-
-	m88k_db_print_frame((db_expr_t)DDB_REGS, TRUE, 0, 0);
-}
-
 /************************/
 /* PAUSE ****************/
 /************************/
@@ -377,7 +347,7 @@ m88k_db_registers(addr, have_addr, count, modif)
 /*
  * pause for 2*ticks many cycles
  */
-static void
+void
 m88k_db_pause(ticks)
 	unsigned volatile ticks;
 {
@@ -397,11 +367,11 @@ m88k_db_trap(type, regs)
 	int i;
 
 	if ((i = db_spl()) != 7)
-		m88k_db_str1("WARNING: spl is not high in m88k_db_trap (spl=%x)\n", i);
+		db_printf("WARNING: spl is not high in m88k_db_trap (spl=%x)\n", i);
 #endif /* 0 */
 
 	if (db_are_interrupts_disabled())
-		m88k_db_str("WARNING: entered debugger with interrupts disabled\n");
+		db_printf("WARNING: entered debugger with interrupts disabled\n");
 
 	switch(type) {
     
@@ -459,21 +429,13 @@ Debugger()
 	/* ends up at ddb_entry_trap below */
 }
 
-/* gimmeabreak - drop execute the ENTRY trap */
-void
-gimmeabreak()
-{
-	asm (ENTRY_ASM); /* entry trap */
-	/* ends up at ddb_entry_trap below */
-}
-
 /* fielded a non maskable interrupt */
 int
 ddb_nmi_trap(level, eframe)
 	int level;
 	db_regs_t *eframe;
 {
-	NOISY(m88k_db_str("kernel: nmi interrupt\n");)
+	NOISY(db_printf("kernel: nmi interrupt\n");)
 	m88k_db_trap(T_KDB_ENTRY, eframe);
 
 	return 0;
@@ -527,10 +489,10 @@ ddb_error_trap(error, eframe)
 	char *error;
 	db_regs_t *eframe;
 {
-	m88k_db_str1("KERNEL:  terminal error [%s]\n",(int)error);
-	m88k_db_str ("KERNEL:  Exiting debugger will cause abort to rom\n");
-	m88k_db_str1("at 0x%x ", eframe->sxip & ~3);
-	m88k_db_str2("dmt0 0x%x dma0 0x%x", eframe->dmt0, eframe->dma0);
+	db_printf("KERNEL:  terminal error [%s]\n",(int)error);
+	db_printf("KERNEL:  Exiting debugger will cause abort to rom\n");
+	db_printf("at 0x%x ", eframe->sxip & ~3);
+	db_printf("dmt0 0x%x dma0 0x%x", eframe->dmt0, eframe->dma0);
 	m88k_db_pause(1000000);
 	m88k_db_trap(T_KDB_BREAK, eframe);
 }
@@ -577,7 +539,7 @@ db_write_bytes(addr, size, data)
 #endif
 		*dst++ = *data++;    
 	}
-	physaddr = pmap_extract(kernel_pmap, (vm_offset_t)addr);
+	pmap_extract(pmap_kernel(), (vm_offset_t)addr, &physaddr);
 	cmmu_flush_cache(physaddr, i); 
 }
 
@@ -600,7 +562,7 @@ db_getc()
 }
 
 /* display where all the cpus are stopped at */
-static void
+void
 m88k_db_where(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -632,7 +594,7 @@ m88k_db_where(addr, have_addr, count, modif)
  * If addr is given, it is assumed to an address on the stack to be
  * searched. Otherwise, r31 of the current cpu is used.
  */
-static void
+void
 m88k_db_frame_search(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -661,7 +623,7 @@ m88k_db_frame_search(addr, have_addr, count, modif)
 }
 
 /* flush icache */
-static void
+void
 m88k_db_iflush(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -674,7 +636,7 @@ m88k_db_iflush(addr, have_addr, count, modif)
 
 /* flush dcache */
 
-static void
+void
 m88k_db_dflush(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -686,7 +648,7 @@ m88k_db_dflush(addr, have_addr, count, modif)
 }
 
 /* probe my cache */
-static void
+void
 m88k_db_peek(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -725,7 +687,7 @@ m88k_db_peek(addr, have_addr, count, modif)
 /*
  * control how much info the debugger prints about itself
  */
-static void
+void
 m88k_db_noise(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -758,7 +720,7 @@ m88k_db_noise(addr, have_addr, count, modif)
  * See how a virtual address translates.
  * Must have an address.
  */
-static void
+void
 m88k_db_translate(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -805,7 +767,7 @@ m88k_db_translate(addr, have_addr, count, modif)
 	cmmu_show_translation(addr, supervisor_flag, verbose_flag, -1);
 }
 
-static void
+void
 m88k_db_cmmucfg(addr, have_addr, count, modif)
 	db_expr_t addr;
 	int have_addr;
@@ -825,12 +787,21 @@ void cpu_interrupt_to_db(cpu_no)
 {
 }
 
+void
+m88k_db_prom_cmd(addr, have_addr, count, modif)
+	db_expr_t addr;
+	int have_addr;
+	db_expr_t count;
+	char *modif;
+{
+	doboot();
+}
 
 /************************/
 /* COMMAND TABLE / INIT */
 /************************/
 
-static struct db_command m88k_cache_cmds[] =
+struct db_command m88k_cache_cmds[] =
 {
     { "iflush",    m88k_db_iflush, 0, 0},
     { "dflush",    m88k_db_dflush, 0, 0},
@@ -843,11 +814,11 @@ struct db_command db_machine_cmds[] =
     {"cache",		0,			0, m88k_cache_cmds},
     {"frame",		m88k_db_print_frame,	0, 0},
     {"noise",		m88k_db_noise,		0, 0},
-    {"regs",		m88k_db_registers,	0, 0},
     {"searchframe",	m88k_db_frame_search,	0, 0},
     {"translate",	m88k_db_translate,      0, 0},
     {"cmmucfg",		m88k_db_cmmucfg,        0, 0},
     {"where",		m88k_db_where,		0, 0},
+    {"prom",		m88k_db_prom_cmd,	0, 0},
     {(char  *) 0,}
 };
 
@@ -855,14 +826,9 @@ struct db_command db_machine_cmds[] =
  * Called from "m88k/m1x7_init.c"
  */
 void
-kdb_init()
+db_machine_init()
 {
-#ifdef DB_MACHINE_COMMANDS
 	db_machine_commands_install(db_machine_cmds);
-#endif
-	ddb_init();
-
-	db_printf("ddb enabled\n");
 }
 
 /*

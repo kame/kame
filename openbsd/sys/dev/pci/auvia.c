@@ -1,4 +1,4 @@
-/*	$OpenBSD: auvia.c,v 1.6 2001/04/21 04:59:01 deraadt Exp $ */
+/*	$OpenBSD: auvia.c,v 1.10 2001/08/25 10:13:29 art Exp $ */
 /*	$NetBSD: auvia.c,v 1.7 2000/11/15 21:06:33 jdolecek Exp $	*/
 
 /*-
@@ -157,14 +157,6 @@ struct cfattach auvia_ca = {
 
 #define TIMEOUT	50
 
-#define	AC97_REG_EXT_AUDIO_ID		0x28
-#define		AC97_CODEC_DOES_VRA		0x0001
-#define	AC97_REG_EXT_AUDIO_STAT		0x2A
-#define		AC97_ENAB_VRA			0x0001
-#define		AC97_ENAB_MICVRA		0x0004
-#define	AC97_REG_EXT_DAC_RATE		0x2C
-#define	AC97_REG_EXT_ADC_RATE		0x32
-
 struct audio_hw_if auvia_hw_if = {
 	auvia_open,
 	auvia_close,
@@ -232,8 +224,7 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 	u_int16_t v;
 	int r, i;
 
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-			&ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -256,7 +247,7 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 	printf(": %s\n", intrstr);
 
 	if (pci_mapreg_map(pa, 0x10, PCI_MAPREG_TYPE_IO, 0, &sc->sc_iot,
-	    &sc->sc_ioh, &sc->sc_ioaddr, &sc->sc_iosize)) {
+	    &sc->sc_ioh, &sc->sc_ioaddr, &sc->sc_iosize, 0)) {
 		printf("%s: can't map i/o space\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -291,14 +282,14 @@ auvia_attach(struct device *parent, struct device *self, void *aux)
 	 * rate audio.
 	 */
 	if (auvia_read_codec(sc, AC97_REG_EXT_AUDIO_ID, &v)
-		|| !(v & AC97_CODEC_DOES_VRA)) {
+		|| !(v & AC97_EXT_AUDIO_VRA)) {
 		printf("%s: warning: codec doesn't support hardware AC'97 2.0 Variable Rate Audio\n",
 			sc->sc_dev.dv_xname);
 		sc->sc_fixed_rate = AUVIA_FIXED_RATE;
 	} else {
 		/* enable VRA */
-		auvia_write_codec(sc, AC97_REG_EXT_AUDIO_STAT,
-			AC97_ENAB_VRA | AC97_ENAB_MICVRA);
+		auvia_write_codec(sc, AC97_REG_EXT_AUDIO_CTRL,
+			AC97_EXT_AUDIO_VRA | AC97_EXT_AUDIO_VRM);
 		sc->sc_fixed_rate = 0;
 	}
 
@@ -546,7 +537,7 @@ auvia_set_params(void *addr, int setmode, int usemode,
 			return (EINVAL);
 
 		reg = mode == AUMODE_PLAY ?
-			AC97_REG_EXT_DAC_RATE : AC97_REG_EXT_ADC_RATE;
+			AC97_REG_FRONT_DAC_RATE : AC97_REG_PCM_ADC_RATE;
 
 		if (!sc->sc_fixed_rate) {
 			auvia_write_codec(sc, reg, (u_int16_t) p->sample_rate);
@@ -827,11 +818,6 @@ auvia_build_dma_ops(struct auvia_softc *sc, struct auvia_softc_chan *ch,
 
 		ch->sc_dma_ops = auvia_malloc(sc, 0,
 			sizeof(struct auvia_dma_op) * segs, M_DEVBUF, M_WAITOK);
-
-		if (ch->sc_dma_ops == NULL) {
-			printf("%s: couldn't build dmaops\n", sc->sc_dev.dv_xname);
-			return 1;
-		}
 
 		for (dp = sc->sc_dmas;
 			dp && dp->addr != (void *)(ch->sc_dma_ops);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rbus_machdep.c,v 1.7 2001/01/25 01:00:52 mickey Exp $ */
+/*	$OpenBSD: rbus_machdep.c,v 1.12 2001/09/19 20:50:56 mickey Exp $ */
 /*	$NetBSD: rbus_machdep.c,v 1.2 1999/10/15 06:43:06 haya Exp $	*/
 
 /*
@@ -38,7 +38,6 @@
 #include <sys/extent.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 
 #include <uvm/uvm_extern.h>
@@ -54,7 +53,6 @@
 
 #include <dev/pci/pcivar.h>
 #include <arch/i386/pci/pcibiosvar.h>
-
 
 
 /**********************************************************************
@@ -99,23 +97,15 @@ _bus_space_unmap(t, bsh, size, adrp)
       }
 #endif
 
-#if __NetBSD_Version__ > 104050000
       if (pmap_extract(pmap_kernel(), va, &bpa) == FALSE) {
 	panic("_i386_memio_unmap:i386/rbus_machdep.c wrong virtual address");
       }
       bpa += (bsh & PGOFSET);
-#else
-      bpa = pmap_extract(pmap_kernel(), va) + (bsh & PGOFSET);
-#endif
 
       /*
        * Free the kernel virtual mapping.
        */
-#if defined(UVM)
       uvm_km_free(kernel_map, va, endva - va);
-#else
-      kmem_free(kernel_map, va, endva - va);
-#endif
     }
   } else {
     panic("_i386_memio_unmap: bad bus space tag");
@@ -155,7 +145,7 @@ rbus_pccbb_parent_mem(pa)
 		extern struct extent *iomem_ex;
 		ex = iomem_ex;
 		start = ex->ex_start;
-		
+
 		/* XXX: unfortunately, iomem_ex cannot be used for the
 		 * dynamic bus_space allocatoin.  There are some
 		 * hidden memory (or some obstacles which do not
@@ -167,11 +157,11 @@ rbus_pccbb_parent_mem(pa)
 		 * area which is not recognised by the kernel are
 		 * already reserved.
 		 */
-		
+
 		if (start < RBUS_MEM_START) {
 			start = RBUS_MEM_START;	/* 1GB */
 		}
-		
+
 		size = ex->ex_end - start;
 	}
 
@@ -182,7 +172,7 @@ rbus_pccbb_parent_mem(pa)
 /**********************************************************************
  * rbus_tag_t rbus_pccbb_parent_io(struct pci_attach_args *pa)
  **********************************************************************/
-#define RBUS_IO_START	0x2000
+#define RBUS_IO_START	0xa000
 #define RBUS_IO_SIZE	0x1000
 
 rbus_tag_t

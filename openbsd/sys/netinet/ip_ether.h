@@ -1,13 +1,12 @@
-/*	$OpenBSD: ip_ether.h,v 1.9 2001/02/03 21:38:39 jason Exp $ */
-
+/*	$OpenBSD: ip_ether.h,v 1.11 2001/06/25 05:11:58 angelos Exp $ */
 /*
  * The author of this code is Angelos D. Keromytis (angelos@adk.gr) 
  *
  * This code was written by Angelos D. Keromytis in October 1999.
  *
- * Copyright (C) 1999, by Angelos D. Keromytis.
+ * Copyright (C) 1999-2001 Angelos D. Keromytis.
  *	
- * Permission to use, copy, and modify this software without fee
+ * Permission to use, copy, and modify this software with or without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
  * modification of this software. 
@@ -22,6 +21,9 @@
  * MERCHANTABILITY OF THIS SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR
  * PURPOSE.
  */
+
+#ifndef _NETINET_IP_ETHER_H_
+#define _NETINET_IP_ETHER_H_
 
 /*
  * Ethernet-inside-IP processing.
@@ -64,4 +66,5 @@ int	etherip_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 
 extern int etherip_allow;
 extern struct etheripstat etheripstat;
-#endif
+#endif /* _KERNEL */
+#endif /* _NETINET_IP_ETHER_H_ */

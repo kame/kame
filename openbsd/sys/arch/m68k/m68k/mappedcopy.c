@@ -1,4 +1,4 @@
-/*	$OpenBSD: mappedcopy.c,v 1.2 1999/09/03 18:01:04 art Exp $	*/
+/*	$OpenBSD: mappedcopy.c,v 1.7 2001/09/11 20:05:24 miod Exp $	*/
 /*	$NetBSD: mappedcopy.c,v 1.1 1997/02/02 06:54:10 thorpej Exp $	*/
 
 /*
@@ -52,7 +52,6 @@
 #include <sys/proc.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 
 #include <machine/cpu.h>
 
@@ -80,7 +79,8 @@ mappedcopyin(fromp, top, count)
 	register void *fromp, *top;
 	register size_t count;
 {
-	register vm_offset_t kva, upa;
+	register vaddr_t kva;
+	register paddr_t upa;
 	register size_t len;
 	int off, alignable;
 	pmap_t upmap;
@@ -93,7 +93,7 @@ mappedcopyin(fromp, top, count)
 	mappedcopyincount++;
 #endif
 
-	kva = (vm_offset_t)CADDR1;
+	kva = (vaddr_t)CADDR1;
 	off = (int)((u_long)fromp & PAGE_MASK);
 	alignable = (off == ((u_long)top & PAGE_MASK));
 	upmap = vm_map_pmap(&curproc->p_vmspace->vm_map);
@@ -107,12 +107,11 @@ mappedcopyin(fromp, top, count)
 		/*
 		 * Map in the page and bcopy data in from it
 		 */
-		upa = pmap_extract(upmap, trunc_page(fromp));
-		if (upa == 0)
+		if (pmap_extract(upmap, trunc_page((vaddr_t)fromp), &upa) == FALSE)
 			panic("mappedcopyin: null page frame");
 		len = min(count, (PAGE_SIZE - off));
-		pmap_enter(pmap_kernel(), kva, upa, VM_PROT_READ, TRUE,
-			   VM_PROT_READ);
+		pmap_enter(pmap_kernel(), kva, upa, VM_PROT_READ,
+			   VM_PROT_READ|PMAP_WIRED);
 		if (len == PAGE_SIZE && alignable && off == 0)
 			copypage((caddr_t)kva, top);
 		else
@@ -131,7 +130,8 @@ mappedcopyout(fromp, top, count)
 	register void *fromp, *top;
 	register size_t count;
 {
-	register vm_offset_t kva, upa;
+	register vaddr_t kva;
+	register paddr_t upa;
 	register size_t len;
 	int off, alignable;
 	pmap_t upmap;
@@ -144,7 +144,7 @@ mappedcopyout(fromp, top, count)
 	mappedcopyoutcount++;
 #endif
 
-	kva = (vm_offset_t) CADDR2;
+	kva = (vaddr_t) CADDR2;
 	off = (int)((u_long)top & PAGE_MASK);
 	alignable = (off == ((u_long)fromp & PAGE_MASK));
 	upmap = vm_map_pmap(&curproc->p_vmspace->vm_map);
@@ -158,13 +158,12 @@ mappedcopyout(fromp, top, count)
 		/*
 		 * Map in the page and bcopy data out to it
 		 */
-		upa = pmap_extract(upmap, trunc_page(top));
-		if (upa == 0)
+		if (pmap_extract(upmap, trunc_page((vaddr_t)top), &upa) == FALSE)
 			panic("mappedcopyout: null page frame");
 		len = min(count, (PAGE_SIZE - off));
 		pmap_enter(pmap_kernel(), kva, upa,
-		    VM_PROT_READ|VM_PROT_WRITE, TRUE,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		    VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		if (len == PAGE_SIZE && alignable && off == 0)
 			copypage(fromp, (caddr_t)kva);
 		else

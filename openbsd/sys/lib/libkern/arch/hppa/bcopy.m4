@@ -1,4 +1,4 @@
-define(_rcsid,``$OpenBSD: bcopy.m4,v 1.5 2000/07/02 01:08:05 mickey Exp $'')dnl
+define(_rcsid,``$OpenBSD: bcopy.m4,v 1.7 2001/09/20 18:37:30 mickey Exp $'')dnl
 dnl
 dnl
 dnl  This is the source file for bcopy.S, spcopy.S
@@ -205,7 +205,7 @@ ifelse(NAME, `bcopy',
 	.align	4
 #endif
 
-ENTRY(memcpy)
+LEAF_ENTRY(memcpy)
 ALTENTRY(memmove)
 	copy	arg0, t1
 	copy	arg1, arg0
@@ -239,7 +239,7 @@ ifelse(NAME, `spcopy',
  */
 	.import	curproc, data
 	.import	copy_on_fault, code
-ENTRY(spcopy)
+LEAF_ENTRY(spcopy)
 	ldw	HPPA_FRAME_ARG(4)(sp), ret1
 	comb,>=,n r0, ret1, L(spcopy, ret)
 `
@@ -247,9 +247,9 @@ ENTRY(spcopy)
 	ldil	L%curproc, r31
 	ldw	R%curproc(r31), r31
 	ldil	L%copy_on_fault, t2
-	ldw	p_addr(r31), r31
+	ldw	P_ADDR(r31), r31
 	ldo	R%copy_on_fault(t2), t2
-	stw	t2, pcb_onfault+u_pcb(r31)
+	stw	t2, PCB_ONFAULT+U_PCB(r31)
 '
 	mfsp	sr2, ret0	/* XXX need this?, sr1 is scratchable */
 	mtsp	arg0, sr1
@@ -259,7 +259,7 @@ ENTRY(spcopy)
 	hppa_copy(spcopy, sr1, arg1, sr2, arg3, ret1, `+')
 
 	/* reset fault handler */
-	stw	r0, pcb_onfault+u_pcb(r31)
+	stw	r0, PCB_ONFAULT+U_PCB(r31)
 	mtsp	ret0, sr2
 L(spcopy, ret)
 	bv	0(rp)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: xmphy.c,v 1.2 2000/08/29 19:00:36 jason Exp $	*/
+/*	$OpenBSD: xmphy.c,v 1.4 2001/10/05 18:26:48 nate Exp $	*/
 
 /*
  * Copyright (c) 2000
@@ -105,6 +105,7 @@ xmphy_attach(parent, self, aux)
 	sc->mii_status = xmphy_status;
 	sc->mii_pdata = mii;
 	sc->mii_flags |= MIIF_NOISOLATE | mii->mii_flags;
+	sc->mii_anegticks = 5;
 
 #define	ADD(m, c)	ifmedia_add(&mii->mii_media, (m), (c), NULL)
 
@@ -208,7 +209,7 @@ xmphy_service(sc, mii, cmd)
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5)
+		if (++sc->mii_ticks != sc->mii_anegticks)
 			return (0);
 		
 		sc->mii_ticks = 0;
@@ -335,7 +336,8 @@ xmphy_mii_phy_auto(mii, waitfor)
 	 */
 	if ((mii->mii_flags & MIIF_DOINGAUTO) == 0) {
 		mii->mii_flags |= MIIF_DOINGAUTO;
-		timeout(mii_phy_auto_timeout, mii, hz >> 1);
+		timeout_set(&mii->mii_phy_timo, mii_phy_auto_timeout, mii);
+		timeout_add(&mii->mii_phy_timo, hz >> 1);
 	}
 	return (EJUSTRETURN);
 }

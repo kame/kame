@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_gre.c,v 1.9 2001/03/25 07:10:47 csapuntz Exp $ */
+/*      $OpenBSD: if_gre.c,v 1.17 2001/06/27 03:49:53 angelos Exp $ */
 /*	$NetBSD: if_gre.c,v 1.9 1999/10/25 19:18:11 drochner Exp $ */
 
 /*
@@ -94,14 +94,16 @@
 #endif /* GRE_RECURSION_LIMIT */
 
 #define GREMTU 1450	/* XXX this is below the standard MTU of
-                         1500 Bytes, allowing for headers, 
+                         1500 Bytes, allowing for headers,
                          but we should possibly do path mtu discovery
-                         before changing if state to up to find the 
+                         before changing if state to up to find the
                          correct value */
 
 #define LINK_MASK (IFF_LINK0|IFF_LINK1|IFF_LINK2)
 
-struct gre_softc gre_softc[NGRE];
+struct gre_softc *gre = 0;
+
+int ngre = 0;
 
 /*
  * We can control the acceptance of GRE and MobileIP packets by
@@ -114,19 +116,23 @@ int ip_mobile_allow = 0;
 static void gre_compute_route(struct gre_softc *sc);
 
 void
-greattach(void)
+greattach(n)
+	int n;
 {
 	struct gre_softc *sc;
 	int i;
 
-	for (i = 0, sc = gre_softc ; i < NGRE ; sc++ ) {
+	ngre = n;
+	gre = sc = malloc(ngre * sizeof(struct gre_softc), M_DEVBUF, M_WAIT);
+	bzero(sc, ngre * sizeof(struct gre_softc));
+	for (i = 0; i < ngre ; sc++) {
 		snprintf(sc->sc_if.if_xname, sizeof(sc->sc_if.if_xname),
 			 "gre%d", i++);
 		sc->sc_if.if_softc = sc;
 		sc->sc_if.if_type =  IFT_OTHER;
 		sc->sc_if.if_addrlen = 4;
 		sc->sc_if.if_hdrlen = 24; /* IP + GRE */
-		sc->sc_if.if_mtu = GREMTU; 
+		sc->sc_if.if_mtu = GREMTU;
 		sc->sc_if.if_flags = IFF_POINTOPOINT|IFF_MULTICAST;
 		sc->sc_if.if_output = gre_output;
 		sc->sc_if.if_ioctl = gre_ioctl;
@@ -147,7 +153,7 @@ greattach(void)
 	}
 }
 
-/* 
+/*
  * The output routine. Takes a packet and encapsulates it in the protocol
  * given by sc->g_proto. See also RFC 1701 and RFC 2004.
  */
@@ -162,15 +168,26 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	struct ip *inp = NULL;
 	u_short etype = 0;
 	struct mobile_h mob_h;
-	static int recursions = 0;	/* XXX MUTEX */
+	struct m_tag *mtag;
 
-	/* Try to limit infinite recursion through misconfiguration */
-	if (++recursions >= GRE_RECURSION_LIMIT) {
+	/* Try to limit infinite recursion through misconfiguration. */
+	for (mtag = m_tag_find(m, PACKET_TAG_GRE, NULL); mtag;
+	     mtag = m_tag_find(m, PACKET_TAG_GRE, mtag)) {
+		if (!bcmp((caddr_t)(mtag + 1), &ifp, sizeof(struct ifnet *))) {
+			IF_DROP(&ifp->if_snd);
+			m_freem(m);
+			return (EIO);	/* Use the same as in if_gif.c */
+		}
+	}
+
+	mtag = m_tag_get(PACKET_TAG_GRE, sizeof(struct ifnet *), M_NOWAIT);
+	if (mtag == NULL) {
 		IF_DROP(&ifp->if_snd);
 		m_freem(m);
-		recursions = 0;
-		return (EIO);	/* Use the same as in if_gif.c */
+		return (ENOBUFS);
 	}
+	bcopy(&ifp, (caddr_t)(mtag + 1), sizeof(struct ifnet *));
+	m_tag_prepend(m, mtag);
 
 #if NBPFILTER >0
 	if (ifp->if_bpf)
@@ -178,10 +195,9 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 #endif
 
 	if (sc->g_proto == IPPROTO_MOBILE) {
-	        if (ip_mobile_allow == 0) {
-		        IF_DROP(&ifp->if_snd);
+		if (ip_mobile_allow == 0) {
+			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			recursions = 0;
 			return (EACCES);
 		}
 
@@ -193,23 +209,19 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 			 * Make sure the complete IP header (with options)
 			 * is in the first mbuf.
 			 */
-			if (m->m_len < sizeof(struct ip))
-			{
-			        m = m_pullup(m, sizeof(struct ip));
-			        if (m == 0) {
+			if (m->m_len < sizeof(struct ip)) {
+				m = m_pullup(m, sizeof(struct ip));
+				if (m == NULL) {
 					IF_DROP(&ifp->if_snd);
-					recursions = 0;
 					return (ENOBUFS);
-				}
-				else
-				        inp = mtod(m, struct ip *);
+				} else
+					inp = mtod(m, struct ip *);
 
 				if (m->m_len < inp->ip_hl << 2) {
-				        m = m_pullup(m,
-						     sizeof(inp->ip_hl << 2));
-					if (m == 0) {
-					        IF_DROP(&ifp->if_snd);
-						recursions = 0;
+					m = m_pullup(m,
+					    sizeof(inp->ip_hl << 2));
+					if (m == NULL) {
+						IF_DROP(&ifp->if_snd);
 						return (ENOBUFS);
 					}
 				}
@@ -246,9 +258,9 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				if (m0 == NULL) {
 					IF_DROP(&ifp->if_snd);
 					m_freem(m);
-					recursions = 0;
 					return (ENOBUFS);
 				}
+				M_MOVE_HDR(m0, m);
 
 				m0->m_len = msiz + (inp->ip_hl << 2);
 				m0->m_data += max_linkhdr;
@@ -257,7 +269,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				m->m_len -= inp->ip_hl << 2;
 
 				bcopy((caddr_t) inp, mtod(m0, caddr_t),
-				       sizeof(struct ip));
+				    sizeof(struct ip));
 
 				m0->m_next = m;
 				m = m0;
@@ -265,8 +277,8 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				m->m_data -= msiz;
 				m->m_len += msiz;
 				m->m_pkthdr.len += msiz;
-				bcopy(inp, mtod(m, caddr_t), 
-				      inp->ip_hl << 2);
+				bcopy(inp, mtod(m, caddr_t),
+				    inp->ip_hl << 2);
 			}
 
 			/* Copy Mobility header */
@@ -277,24 +289,21 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		} else {  /* AF_INET */
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			recursions = 0;
 			return (EINVAL);
 		}
 	} else if (sc->g_proto == IPPROTO_GRE) {
-	        if (gre_allow == 0) {
-		        IF_DROP(&ifp->if_snd);
+		if (gre_allow == 0) {
+			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			recursions = 0;
 			return (EACCES);
 		}
 
 		switch(dst->sa_family) {
 		case AF_INET:
-		        if (m->m_len < sizeof(struct ip)) {
-			        m = m_pullup(m, sizeof(struct ip));
-				if (m == 0) {
-				        IF_DROP(&ifp->if_snd);
-					recursions = 0;
+			if (m->m_len < sizeof(struct ip)) {
+				m = m_pullup(m, sizeof(struct ip));
+				if (m == NULL) {
+					IF_DROP(&ifp->if_snd);
 					return (ENOBUFS);
 				}
 			}
@@ -315,7 +324,6 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		default:
 			IF_DROP(&ifp->if_snd);
 			m_freem(m);
-			recursions = 0;
 			return (EAFNOSUPPORT);
 		}
 
@@ -324,13 +332,11 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 		error = EINVAL;
 		IF_DROP(&ifp->if_snd);
 		m_freem(m);
-		recursions = 0;
 		return (error);
 	}
-			
+
 	if (m == NULL) {
 		IF_DROP(&ifp->if_snd);
-		recursions = 0;
 		return (ENOBUFS);
 	}
 
@@ -346,7 +352,7 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	if (sc->g_proto != IPPROTO_MOBILE) {
 		gh->gi_src = sc->g_src;
 		gh->gi_dst = sc->g_dst;
-		((struct ip *) gh)->ip_hl = (sizeof(struct ip)) >> 2; 
+		((struct ip *) gh)->ip_hl = (sizeof(struct ip)) >> 2;
 		((struct ip *) gh)->ip_ttl = ip_defttl;
 		((struct ip *) gh)->ip_tos = inp->ip_tos;
 		gh->gi_len = m->m_pkthdr.len;
@@ -359,7 +365,6 @@ gre_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	error = ip_output(m, NULL, &sc->route, 0, NULL, NULL);
 	if (error)
 		ifp->if_oerrors++;
-	recursions = 0;
 	return (error);
 }
 
@@ -375,17 +380,17 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct sockaddr_in si;
 	struct sockaddr *sa = NULL;
 	int error = 0;
-	struct proc *prc = curproc;             /* XXX */
+	struct proc *prc = curproc;		/* XXX */
 
 	s = splimp();
 	switch(cmd) {
-	case SIOCSIFADDR:		
-	case SIOCSIFDSTADDR: 	
-		/* 
-                 * set tunnel endpoints in case that we "only"
-                 * have ip over ip encapsulation. This allows to
-                 * set tunnel endpoints with ifconfig.
-                 */
+	case SIOCSIFADDR:
+	case SIOCSIFDSTADDR:
+		/*
+		 * set tunnel endpoints in case that we "only"
+		 * have ip over ip encapsulation. This allows to
+		 * set tunnel endpoints with ifconfig.
+		 */
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			sa = ifa->ifa_addr;
 			sc->g_src = (satosin(sa))->sin_addr;
@@ -393,7 +398,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if ((sc->g_src.s_addr != INADDR_ANY) &&
 			    (sc->g_dst.s_addr != INADDR_ANY)) {
 				if (sc->route.ro_rt != 0) {
-                                        /* free old route */
+					/* free old route */
 					RTFREE(sc->route.ro_rt);
 					sc->route.ro_rt = (struct rtentry *) 0;
 				}
@@ -411,7 +416,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 	case SIOCSIFFLAGS:
-		if ((sc->g_dst.s_addr == INADDR_ANY) || 
+		if ((sc->g_dst.s_addr == INADDR_ANY) ||
 		    (sc->g_src.s_addr == INADDR_ANY))
 			ifp->if_flags &= ~IFF_UP;
 
@@ -445,9 +450,9 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 	case GRESPROTO:
-	        /* Check for superuser */
-	        if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
-		        break;
+		/* Check for superuser */
+		if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
+			break;
 
 		sc->g_proto = ifr->ifr_flags;
 		switch (sc->g_proto) {
@@ -468,14 +473,14 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case GRESADDRS:
 	case GRESADDRD:
-	        /* Check for superuser */
-	        if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
-		        break;
+		/* Check for superuser */
+		if ((error = suser(prc->p_ucred, &prc->p_acflag)) != 0)
+			break;
 
 		/*
-	         * set tunnel endpoints, compute a less specific route
-	         * to the remote end and mark if as up
-                 */
+		 * set tunnel endpoints, compute a less specific route
+		 * to the remote end and mark if as up
+		 */
 		sa = &ifr->ifr_addr;
 		if (cmd == GRESADDRS )
 			sc->g_src = (satosin(sa))->sin_addr;
@@ -484,7 +489,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		if ((sc->g_src.s_addr != INADDR_ANY) &&
 		    (sc->g_dst.s_addr != INADDR_ANY)) {
 			if (sc->route.ro_rt != 0) {
-			        /* free old route */
+				/* free old route */
 				RTFREE(sc->route.ro_rt);
 				sc->route.ro_rt = (struct rtentry *) 0;
 			}
@@ -518,12 +523,12 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	return (error);
 }
 
-/* 
+/*
  * computes a route to our destination that is not the one
  * which would be taken by ip_output(), as this one will loop back to
  * us. If the interface is p2p as  a--->b, then a routing entry exists
  * If we now send a packet to b (e.g. ping b), this will come down here
- * gets src=a, dst=b tacked on and would from ip_ouput() sent back to 
+ * gets src=a, dst=b tacked on and would from ip_ouput() sent back to
  * if_gre.
  * Goal here is to compute a route to b that is less specific than
  * a-->b. We know that this one exists as in normal operation we have
@@ -537,7 +542,7 @@ gre_compute_route(struct gre_softc *sc)
 	u_int32_t a, b, c;
 
 	ro = &sc->route;
-	
+
 	bzero(ro, sizeof(struct route));
 	((struct sockaddr_in *) &ro->ro_dst)->sin_addr = sc->g_dst;
 	ro->ro_dst.sa_family = AF_INET;
@@ -545,10 +550,10 @@ gre_compute_route(struct gre_softc *sc)
 
 	/*
 	 * toggle last bit, so our interface is not found, but a less
-         * specific route. I'd rather like to specify a shorter mask,
+	 * specific route. I'd rather like to specify a shorter mask,
  	 * but this is not possible. Should work though. XXX
 	 * there is a simpler way ...
-         */
+	 */
 	if ((sc->sc_if.if_flags & IFF_LINK1) == 0) {
 		a = ntohl(sc->g_dst.s_addr);
 		b = a & 0x01;
@@ -568,43 +573,42 @@ gre_compute_route(struct gre_softc *sc)
 	 * not allow people to link GRE tunnels.
 	 */
 	if (ro->ro_rt->rt_ifp == &sc->sc_if) {
-                RTFREE(ro->ro_rt);
-                ro->ro_rt = (struct rtentry *) 0;
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = (struct rtentry *) 0;
 		return;
 	}
 
 	/*
-	 * now change it back - else ip_output will just drop 
-         * the route and search one to this interface ...
-         */
+	 * now change it back - else ip_output will just drop
+	 * the route and search one to this interface ...
+	 */
 	if ((sc->sc_if.if_flags & IFF_LINK1) == 0)
 		((struct sockaddr_in *) &ro->ro_dst)->sin_addr = sc->g_dst;
 }
 
 /*
- * do a checksum of a buffer - much like in_cksum, which operates on  
- * mbufs. 
+ * do a checksum of a buffer - much like in_cksum, which operates on
+ * mbufs.
  */
-
 u_short
 gre_in_cksum(u_short *p, u_int len)
 {
-	u_int sum = 0; 
+	u_int sum = 0;
 	int nwords = len >> 1;
-  
+
 	while (nwords-- != 0)
 		sum += *p++;
-  
+
 		if (len & 1) {
 			union {
 				u_short w;
-				u_char c[2]; 
+				u_char c[2];
 			} u;
 			u.c[0] = *(u_char *) p;
 			u.c[1] = 0;
 			sum += u.w;
-		} 
- 
+		}
+
 		/* end-around-carry */
 		sum = (sum >> 16) + (sum & 0xffff);
 		sum += (sum >> 16);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_cnw.c,v 1.7 2001/02/20 19:39:46 mickey Exp $	*/
+/*	$OpenBSD: if_cnw.c,v 1.10 2001/08/17 21:52:16 deraadt Exp $	*/
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -316,7 +316,8 @@ cnw_enable(sc)
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 
-	sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_NET, cnw_intr, sc);
+	sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_NET,
+	    cnw_intr, sc, "");
 	if (sc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt handler\n",
 		    sc->sc_dev.dv_xname);
@@ -434,6 +435,7 @@ cnw_attach(parent, self, aux)
 	ifp->if_ioctl = cnw_ioctl;
 	ifp->if_watchdog = cnw_watchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface */
 	if_attach(ifp);
@@ -471,7 +473,7 @@ cnw_start(ifp)
 			return;
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (m0 == 0)
 			return;
 
@@ -683,9 +685,7 @@ cnw_recv(sc)
 			continue;
 		}
 
-		/* Pass the packet up, with the ether header sort-of removed */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
+		ether_input_mbuf(ifp, m);
 	}
 }
 
@@ -876,10 +876,8 @@ cnw_activate(dev, act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		pcmcia_function_enable(sc->sc_pf);
-		printf("%s:", sc->sc_dev.dv_xname);
-		sc->sc_ih =
-		    pcmcia_intr_establish(sc->sc_pf, IPL_NET, cnw_intr, sc);
-		printf("\n");
+		sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_NET,
+		    cnw_intr, sc, sc->sc_dev.dv_xname);
 		cnw_init(sc);
 		break;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ka53.c,v 1.2 2001/01/30 17:10:05 hugh Exp $	*/
+/*	$OpenBSD: ka53.c,v 1.4 2001/08/25 13:33:37 hugh Exp $	*/
 /*	$NetBSD: ka53.c,v 1.2 2000/06/04 02:19:27 matt Exp $	*/
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden.
@@ -53,8 +53,6 @@ static void    ka53_steal_pages(void);
 static void    ka53_cache_enable(void);
 static void    ka53_halt(void);
 
-extern int cold;		/* cold-start flag */
-
 /* 
  * Declaration of 680-specific calls.
  */
@@ -81,7 +79,7 @@ ka53_conf()
 	{volatile int *hej = (void *)mfpr(PR_ISP); *hej = *hej; hej[-1] = hej[-1];}
 
 	/* This vector (qbus related?) comes out of nowhere, ignore it for now */
-	scb_vecalloc(0x0, (void *)nullop, 0, SCB_ISTACK);
+	scb_vecalloc(0x0, (void *)nullop, NULL, SCB_ISTACK, NULL);
 
 	switch((vax_siedata >> 8) & 0xFF) {
 	case VAX_STYP_50:
@@ -231,8 +229,8 @@ ka53_steal_pages()
 	 * Get the soft and hard memory error vectors now.
 	 */
 
-	scb_vecalloc(0x54, ka53_softmem, 0, 0);
-	scb_vecalloc(0x60, ka53_hardmem, 0, 0);
+	scb_vecalloc(0x54, ka53_softmem, NULL, 0, NULL);
+	scb_vecalloc(0x60, ka53_hardmem, NULL, 0, NULL);
 
 
 	/* Turn on caches (to speed up execution a bit) */

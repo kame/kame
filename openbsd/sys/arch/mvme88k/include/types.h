@@ -1,5 +1,5 @@
 /*	$NetBSD: types.h,v 1.7 1995/07/05 17:46:11 pk Exp $ */
-/*	$OpenBSD: types.h,v 1.7 1999/07/07 23:16:41 art Exp $ */
+/*	$OpenBSD: types.h,v 1.9 2001/08/11 01:58:34 art Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -51,10 +51,6 @@
 #include <sys/cdefs.h>
 
 #if !defined(_ANSI_SOURCE) && !defined(_POSIX_SOURCE)
-typedef struct _physadr {
-	short r[1];
-} *physadr;
-
 typedef struct label_t {
 	int val[22];
 } label_t;
@@ -87,7 +83,5 @@ typedef	unsigned long long	u_int64_t;
 typedef	unsigned long long	 uint64_t;
 
 typedef int32_t			register_t;
-
-#define	__BDEVSW_DUMP_OLD_TYPE
 
 #endif	/* _MACHTYPES_H_ */

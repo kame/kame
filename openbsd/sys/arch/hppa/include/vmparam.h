@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.11 2001/03/22 23:50:53 mickey Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.17 2001/09/22 18:00:09 miod Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -38,8 +38,6 @@
  */
 #define	USRTEXT		0x00002000		/* Start of user .text */
 #define	USRSTACK	0x68FF3000		/* Start of user stack */
-#define	BTOPUSRSTACK	btop(USRSTACK)		/* btop(USRSTACK) */
-#define	P1PAGES		2
 #define	LOWPAGES	0
 #define	HIGHPAGES	UPAGES
 #define	SYSCALLGATE	0xC0000000		/* syscall gateway page */
@@ -63,18 +61,8 @@
 #define	MAXSSIZ		(UADDR-USRSTACK)	/* max stack size */
 #endif
 
-/*
- * Default sizes of swap allocation chunks (see dmap.h).
- * The actual values may be changed in vminit() based on MAXDSIZ.
- * With MAXDSIZ of 64Mb and NDMAP of 62, dmmax will be 4096.
- * DMMIN should be at least ctod(1) so that vtod() works.
- * vminit() ensures this.
- */
-#define	DMMIN	32			/* smallest swap allocation */
-#define	DMMAX	4096			/* largest potential swap allocation */
-
 #ifndef USRIOSIZE
-#define	USRIOSIZE	((2*HPPA_PGALIAS)/CLBYTES)	/* 2mb */
+#define	USRIOSIZE	((2*HPPA_PGALIAS)/PAGE_SIZE)	/* 2mb */
 #endif
 
 /*
@@ -84,11 +72,6 @@
 #ifndef SHMMAXPGS
 #define SHMMAXPGS	((1024*1024*10)/NBPG)	/* 10mb */
 #endif
-
-/*
- * The size of the clock loop.
- */
-#define	LOOPPAGES	(maxfree - firstfree)
 
 /*
  * The time for a process to be blocked before being very swappable.
@@ -101,22 +84,6 @@
  */
 #define	MAXSLP 		20
 
-/*
- * A swapped in process is given a small amount of core without being bothered
- * by the page replacement algorithm.  Basically this says that if you are
- * swapped in you deserve some resources.  We protect the last SAFERSS
- * pages against paging and will just swap you out rather than paging you.
- * Note that each process has at least UPAGES+CLSIZE pages which are not
- * paged anyways (this is currently 8+2=10 pages or 5k bytes), so this
- * number just means a swapped in process is given around 25k bytes.
- * Just for fun: current memory prices are 4600$ a megabyte on VAX (4/22/81),
- * so we loan each swapped in process memory worth 100$, or just admit
- * that we don't consider it worthwhile and swap it out to disk which costs
- * $30/mb or about $0.75.
- */
-#define	SAFERSS		(0x4000/NBPG)	/* nominal ``small'' resident set size
-					   protected against replacement */
-
 /* user/kernel map constants */
 #define	VM_MIN_ADDRESS		((vaddr_t)0)
 #define	VM_MAXUSER_ADDRESS	((vaddr_t)0xc0000000)
@@ -126,8 +93,8 @@
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
-#define VM_PHYS_SIZE		(USRIOSIZE*CLBYTES)
+#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 #define	VM_PHYSSEG_MAX	8	/* this many physmem segments */
 #define	VM_PHYSSEG_STRAT	VM_PSTRAT_BIGFIRST
@@ -137,9 +104,6 @@
 #define	VM_NFREELIST		2
 #define	VM_FREELIST_DEFAULT	0
 #define	VM_FREELIST_FIRST16	1
-
-#define	MACHINE_NEW_NONCONTIG	1	/* defined this until we rely on vm */
-#define	PMAP_NEW
 
 #ifdef _KERNEL
 struct pmap_physseg {

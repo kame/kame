@@ -1,4 +1,4 @@
-/*	$OpenBSD: hd.c,v 1.11 1998/10/04 01:02:26 millert Exp $	*/
+/*	$OpenBSD: hd.c,v 1.14 2001/09/20 17:02:30 mpech Exp $	*/
 /*	$NetBSD: rd.c,v 1.33 1997/07/10 18:14:08 kleink Exp $	*/
 
 /*
@@ -66,8 +66,6 @@
 
 #include <hp300/dev/hdreg.h>
 #include <hp300/dev/hdvar.h>
-
-#include "opt_useleds.h"
 
 #ifdef USELEDS
 #include <hp300/hp300/leds.h>
@@ -313,6 +311,9 @@ hdattach(parent, self, aux)
 	if (hddebug & HDB_ERROR)
 		hderrthresh = 0;
 #endif
+
+	/* Initialize timeout structure */
+	timeout_set(&sc->sc_timeout, hdrestart, sc);
 
 	dk_establish(&sc->sc_dkdev, &sc->sc_dev);	/* XXX */
 }
@@ -708,7 +709,7 @@ done:
 }
 
 /*
- * Called from timeout() when handling maintenance releases
+ * Called via timeout(9) when handling maintenance releases
  */
 void
 hdrestart(arg)
@@ -1014,7 +1015,7 @@ hderror(unit)
 		rs->sc_stats.hdtimeouts++;
 #endif
 		hpibfree(rs->sc_dev.dv_parent, &rs->sc_hq);
-		timeout(hdrestart, rs, hdtimo * hz);
+		timeout_add(&rs->sc_timeout, hdtimo * hz);
 		return(0);
 	}
 	/*
@@ -1026,7 +1027,7 @@ hderror(unit)
 		return(1);
 
 	/*
-	 * First conjure up the block number at which the error occured.
+	 * First conjure up the block number at which the error occurred.
 	 * Note that not all errors report a block number, in that case
 	 * we just use b_blkno.
  	 */
@@ -1044,7 +1045,7 @@ hderror(unit)
 	 * Now output a generic message suitable for badsect.
 	 * Note that we don't use harderr cuz it just prints
 	 * out b_blkno which is just the beginning block number
-	 * of the transfer, not necessary where the error occured.
+	 * of the transfer, not necessary where the error occurred.
 	 */
 	printf("%s%c: hard error sn%d\n", rs->sc_dev.dv_xname,
 	    'a'+hdpart(bp->b_dev), pbn);

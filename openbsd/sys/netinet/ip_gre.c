@@ -1,4 +1,4 @@
-/*      $OpenBSD: ip_gre.c,v 1.8 2001/02/27 09:54:21 niklas Exp $ */
+/*      $OpenBSD: ip_gre.c,v 1.12 2001/09/04 00:57:44 angelos Exp $ */
 /*	$NetBSD: ip_gre.c,v 1.9 1999/10/25 19:18:11 drochner Exp $ */
 
 /*
@@ -57,8 +57,6 @@
 #include <net/route.h>
 #include <net/bpf.h>
 
-#include <machine/cpu.h>
-
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -85,8 +83,6 @@
 
 /* Needs IP headers. */
 #include <net/if_gre.h>
-
-#include <machine/stdarg.h>
 
 struct gre_softc *gre_lookup __P((struct mbuf *, u_int8_t));
 static int gre_input2 __P((struct mbuf *, int, u_char));
@@ -274,7 +270,6 @@ gre_mobile_input(m, va_alist)
 	va_list ap;
 	u_char osrc = 0;
 	int msiz;
-	u_int af = AF_INET;
 
 	va_start(ap,m);
 	hlen = va_arg(ap, int);
@@ -334,6 +329,7 @@ gre_mobile_input(m, va_alist)
                  * try to free it or keep a pointer a to it).
                  */
                 struct mbuf m0;
+		u_int af = AF_INET;
 
                 m0.m_next = m;
                 m0.m_len = 4;
@@ -365,8 +361,7 @@ gre_lookup(m, proto)
 	struct gre_softc *sc;
 	int i;
 
-	for (i = 0; i < NGRE; i++) {
-		sc = &gre_softc[i];
+	for (i = 0, sc = gre; i < ngre; i++, sc++) {
 		if ((sc->g_dst.s_addr == ip->ip_src.s_addr) &&
 		    (sc->g_src.s_addr == ip->ip_dst.s_addr) &&
 		    (sc->g_proto == proto) &&

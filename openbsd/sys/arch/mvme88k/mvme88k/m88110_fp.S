@@ -1,4 +1,4 @@
-/* $OpenBSD: m88110_fp.S,v 1.3 2001/03/09 05:44:42 smurph Exp $	*/
+/* $OpenBSD: m88110_fp.S,v 1.6 2001/08/24 22:53:15 miod Exp $	*/
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * All rights reserved.
@@ -48,15 +48,10 @@
  * 2) Floating Point Privilege Violation
  */
 
-#ifndef ASSEMBLER
-#define	ASSEMBLER
-#endif /* ASSEMBLER */
-
-#include "assym.s"
+#include "assym.h"
 #include <machine/trap.h>
 #include <machine/asm.h>
 
-#ifdef MVME197
 	.text
 ENTRY(m88110_Xfp_precise)
 	or	r29, r3, r0     /*  r29 is now the E.F. */
@@ -81,24 +76,24 @@ ENTRY(m88110_Xfp_precise)
 3:	
 	or.u	r4, r4, 0xffff
 
-LABEL(m88110_FPuimp)
+ASGLOBAL(m88110_FPuimp)
 	subu    r31,r31,40      /* allocate stack */
 	st      r1,r31,36       /* save return address */
 	st      r3,r31,32       /* save exception frame */
 	or      r2,r0,T_FPEPFLT /* load trap type */
 	or	r3, r29, r0
-	bsr     _trap           /* trap */
+	bsr     _C_LABEL(trap197)        /* trap */
 	ld      r1,r31,36       /* recover return address */
 	addu    r31,r31,40      /* deallocate stack */
  	jmp	r1
 
-LABEL(m88110_FPpriviol)
+ASGLOBAL(m88110_FPpriviol)
 	subu    r31,r31,40      /* allocate stack */
 	st      r1,r31,36       /* save return address */
 	st      r3,r31,32       /* save exception frame */
 	or      r2,r0,T_PRIVINFLT /* load trap type */
 	or	r3, r29, r0
-	bsr     _trap           /* trap */
+	bsr     _C_LABEL(trap197)        /* trap */
 	ld      r1,r31,36       /* recover return address */
 	addu    r31,r31,40      /* deallocate stack */
  	jmp	r1
@@ -263,5 +258,3 @@ ENTRY(get_mmureg)
 	ldcr	r2,	cr26
 regmark2: jmp.n	r1
 	ldcr	r2,	cr25
-#endif /* MVME197 */
-	

@@ -1,4 +1,4 @@
-/*	$OpenBSD: disksubr.c,v 1.24 2000/10/18 21:00:40 mickey Exp $	*/
+/*	$OpenBSD: disksubr.c,v 1.26 2001/10/15 04:03:45 jason Exp $	*/
 /*	$NetBSD: disksubr.c,v 1.16 1996/04/28 20:25:59 thorpej Exp $ */
 
 /*
@@ -52,6 +52,7 @@
 #endif
 
 #include <sparc/dev/sbusvar.h>
+#include "cd.h"
 
 #if MAXPARTITIONS != 16
 #warn beware: Sun disklabel compatibility assumes MAXPARTITIONS == 16
@@ -119,6 +120,11 @@ dk_establish(dk, dev)
 	}
 }
 
+#if NCD > 0
+/* XXX for comparison below. */
+extern void cdstrategy __P((struct buf *));
+#endif
+
 /*
  * Attempt to read a disk label from a device
  * using the indicated strategy routine.
@@ -183,6 +189,12 @@ readdisklabel(dev, strat, lp, clp, spoofonly)
 	brelse(bp);
 	if (error)
 		return ("disk label read error");
+
+#if defined(CD9660) && (NCD > 0)
+	if ((strat == cdstrategy) &&
+	    (iso_disklabelspoof(dev, strat, lp) == NULL))
+		return (NULL);
+#endif
 
 	/* Check for a Sun disk label (for PROM compatibility). */
 	slp = (struct sun_disklabel *) clp->cd_block;
@@ -661,7 +673,7 @@ isbad(bt, cyl, trk, sec)
 	register long blk, bblk;
 
 	blk = ((long)cyl << 16) + (trk << 8) + sec;
-	for (i = 0; i < 126; i++) {
+	for (i = 0; i < NBT_BAD; i++) {
 		bblk = ((long)bt->bt_bad[i].bt_cyl << 16) +
 			bt->bt_bad[i].bt_trksec;
 		if (blk == bblk)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_balloc.c,v 1.12 2001/03/20 19:33:06 art Exp $	*/
+/*	$OpenBSD: ffs_balloc.c,v 1.14 2001/06/27 04:58:48 art Exp $	*/
 /*	$NetBSD: ffs_balloc.c,v 1.3 1996/02/09 22:22:21 christos Exp $	*/
 
 /*
@@ -46,9 +46,7 @@
 
 #include <vm/vm.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -63,22 +61,10 @@
  * the inode and the logical block number in a file.
  */
 int
-ffs_balloc(v)
-	void *v;
+ffs_balloc(struct inode *ip, off_t startoffset, int size, struct ucred *cred,
+    int flags, struct buf **bpp)
 {
-	struct vop_balloc_args /* {
-		struct vnode *a_vp;
-		off_t a_startpoint;
-		int a_size;
-		struct ucred *a_cred;
-		int a_flags;
-		struct buf **a_bpp;
-	} */ *ap = v;
-	struct inode *ip;
 	daddr_t lbn;
-	int size;
-	struct ucred *cred;
-	int flags;
 	struct fs *fs;
 	daddr_t nb;
 	struct buf *bp, *nbp;
@@ -89,18 +75,15 @@ ffs_balloc(v)
 	daddr_t *allocib, *blkp, *allocblk, allociblk[NIADDR+1];
 	int unwindidx = -1;
 
-	vp = ap->a_vp;
-	ip = VTOI(vp);
+	vp = ITOV(ip);
 	fs = ip->i_fs;
-	lbn = lblkno(fs, ap->a_startoffset);
-	size = blkoff(fs, ap->a_startoffset) + ap->a_size;
+	lbn = lblkno(fs, startoffset);
+	size = blkoff(fs, startoffset) + size;
 	if (size > fs->fs_bsize)
 		panic("ffs_balloc: blk too big");
-	*ap->a_bpp = NULL;
+	*bpp = NULL;
 	if (lbn < 0)
 		return (EFBIG);
-	cred = ap->a_cred;
-	flags = ap->a_flags;
 
 	/*
 	 * If the next write will extend the file into a new block,
@@ -122,11 +105,7 @@ ffs_balloc(v)
 				    fs->fs_bsize, osize, bp);
 
 			ip->i_ffs_size = lblktosize(fs, nb + 1);
-#if defined(UVM)
 			uvm_vnp_setsize(vp, ip->i_ffs_size);
-#else
-			vnode_pager_setsize(vp, (u_long)ip->i_ffs_size);
-#endif
 			ip->i_ffs_db[nb] = dbtofsb(fs, bp->b_blkno);
 			ip->i_flag |= IN_CHANGE | IN_UPDATE;
 			if (flags & B_SYNC)
@@ -146,7 +125,7 @@ ffs_balloc(v)
 				brelse(bp);
 				return (error);
 			}
-			*ap->a_bpp = bp;
+			*bpp = bp;
 			return (0);
 		}
 		if (nb != 0) {
@@ -193,7 +172,7 @@ ffs_balloc(v)
 		}
 		ip->i_ffs_db[lbn] = dbtofsb(fs, bp->b_blkno);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
-		*ap->a_bpp = bp;
+		*bpp = bp;
 		return (0);
 	}
 	/*
@@ -333,7 +312,7 @@ ffs_balloc(v)
 		} else {
 			bdwrite(bp);
 		}
-		*ap->a_bpp = nbp;
+		*bpp = nbp;
 		return (0);
 	}
 	brelse(bp);
@@ -347,7 +326,7 @@ ffs_balloc(v)
 		nbp = getblk(vp, lbn, fs->fs_bsize, 0, 0);
 		nbp->b_blkno = fsbtodb(fs, nb);
 	}
-	*ap->a_bpp = nbp;
+	*bpp = nbp;
 	return (0);
 
 fail:

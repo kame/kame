@@ -1,4 +1,4 @@
-/*	$OpenBSD: iommu.c,v 1.6 2000/01/01 19:41:00 deraadt Exp $	*/
+/*	$OpenBSD: iommu.c,v 1.10 2001/09/19 20:50:57 mickey Exp $	*/
 /*	$NetBSD: iommu.c,v 1.13 1997/07/29 09:42:04 fair Exp $ */
 
 /*
@@ -40,11 +40,9 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#if defined(UVM)
 #include <uvm/uvm.h>
-#endif
 
 #include <machine/pmap.h>
 
@@ -187,31 +185,21 @@ iommu_attach(parent, self, aux)
 	 */
 	TAILQ_INIT(&mlist);
 #define DVMA_PTESIZE ((0 - DVMA4M_BASE) / 1024)
-#if defined(UVM)
 	if (uvm_pglistalloc(DVMA_PTESIZE, 0, 0xffffffff, DVMA_PTESIZE,
 			    0, &mlist, 1, 0) ||
 	    (iopte_va = uvm_km_valloc(kernel_map, DVMA_PTESIZE)) == 0)
 		panic("iommu_attach: can't allocate memory for pagetables");
-#else
-	if (vm_page_alloc_memory(DVMA_PTESIZE, 0, 0xffffffff, DVMA_PTESIZE,
-				 0, &mlist, 1, 0) ||
-	    (iopte_va = kmem_alloc_pageable(kernel_map, DVMA_PTESIZE)) == 0)
-		panic("iommu_attach: can't allocate memory for pagetables");
-#endif
 #undef DVMA_PTESIZE
 	m = TAILQ_FIRST(&mlist);
 	iopte_pa = VM_PAGE_TO_PHYS(m);
 	sc->sc_ptes = (iopte_t *) iopte_va;
 
 	while (m) {
-#if defined(UVM)
+		/* XXX - art, pagewire breaks the tailq */
 		uvm_pagewire(m);
-#else
-		vm_page_wire(m);
-#endif
 		pmap_enter(pmap_kernel(), iopte_va, VM_PAGE_TO_PHYS(m),
-			   VM_PROT_READ|VM_PROT_WRITE, 1,
-			   VM_PROT_READ|VM_PROT_WRITE);
+			   VM_PROT_READ|VM_PROT_WRITE,
+			   VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		iopte_va += NBPG;
 		m = TAILQ_NEXT(m, pageq);
 	}
@@ -383,7 +371,7 @@ if ((int)sc->sc_dvmacur + len > 0)
 	iovaddr = tva = sc->sc_dvmacur;
 	sc->sc_dvmacur += len;
 	while (len) {
-		pa = pmap_extract(pmap_kernel(), va);
+		pmap_extract(pmap_kernel(), va, &pa);
 
 #define IOMMU_PPNSHIFT	8
 #define IOMMU_V		0x00000002

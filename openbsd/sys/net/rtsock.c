@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtsock.c,v 1.13 2001/01/19 06:37:37 itojun Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.17 2001/09/20 17:02:31 mpech Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
 
 /*
@@ -120,9 +120,8 @@ route_usrreq(so, req, m, nam, control)
 
 	if (req == PRU_ATTACH) {
 		MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
-		if ((so->so_pcb = rp) != NULL)
-			bzero(so->so_pcb, sizeof(*rp));
-
+		so->so_pcb = rp;
+		bzero(so->so_pcb, sizeof(*rp));
 	}
 	if (req == PRU_DETACH && rp) {
 		int af = rp->rcb_proto.sp_protocol;
@@ -235,7 +234,9 @@ route_output(m, va_alist)
 	if (genmask) {
 		struct radix_node *t;
 		t = rn_addmask((caddr_t)genmask, 0, 1);
-		if (t && Bcmp(genmask, t->rn_key, *(u_char *)genmask) == 0)
+		if (t && genmask->sa_len >= ((struct sockaddr *)t->rn_key)->sa_len &&
+		    Bcmp((caddr_t *)genmask + 1, (caddr_t *)t->rn_key + 1,
+		    ((struct sockaddr *)t->rn_key)->sa_len) - 1)
 			genmask = (struct sockaddr *)(t->rn_key);
 		else
 			senderr(ENOBUFS);
@@ -399,13 +400,19 @@ flush:
 	}
 	if (rtm) {
 		m_copyback(m, 0, rtm->rtm_msglen, (caddr_t)rtm);
+		if (m->m_pkthdr.len < rtm->rtm_msglen) {
+			m_freem(m);
+			m = NULL;
+		} else if (m->m_pkthdr.len > rtm->rtm_msglen)
+			m_adj(m, rtm->rtm_msglen - m->m_pkthdr.len);
 		Free(rtm);
 	}
 	if (rp)
 		rp->rcb_proto.sp_family = 0; /* Avoid us */
 	if (dst)
 		route_proto.sp_protocol = dst->sa_family;
-	raw_input(m, &route_proto, &route_src, &route_dst);
+	if (m)
+		raw_input(m, &route_proto, &route_src, &route_dst);
 	if (rp)
 		rp->rcb_proto.sp_family = PF_ROUTE;
     }
@@ -638,7 +645,7 @@ again:
 
 /*
  * This routine is called to generate a message from the routing
- * socket indicating that a redirect has occured, a routing lookup
+ * socket indicating that a redirect has occurred, a routing lookup
  * has failed, or that a protocol has detected timeouts to a particular
  * destination.
  */

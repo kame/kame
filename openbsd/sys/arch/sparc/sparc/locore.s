@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.39 2000/06/07 15:43:24 art Exp $	*/
+/*	$OpenBSD: locore.s,v 1.42 2001/08/30 17:51:02 deraadt Exp $	*/
 /*	$NetBSD: locore.s,v 1.73 1997/09/13 20:36:48 pk Exp $	*/
 
 /*
@@ -1707,11 +1707,7 @@ ctw_invalid:
 #if defined(SUN4)
 memfault_sun4:
 	TRAP_SETUP(-CCFSZ-80)
-#if defined(UVM)
 	INCR(_uvmexp+V_FAULTS)
-#else
-	INCR(_cnt+V_FAULTS)		! cnt.v_faults++ (clobbers %o0,%o1)
-#endif
 
 	st	%g1, [%sp + CCFSZ + 20]	! save g1
 	rd	%y, %l4			! save y
@@ -1776,11 +1772,7 @@ memfault_sun4:
 memfault_sun4c:
 #if defined(SUN4C)
 	TRAP_SETUP(-CCFSZ-80)
-#if defined(UVM)
 	INCR(_uvmexp+V_FAULTS)		! cnt.v_faults++ (clobbers %o0,%o1)
-#else
-	INCR(_cnt+V_FAULTS)		! cnt.v_faults++ (clobbers %o0,%o1)
-#endif
 	
 	st	%g1, [%sp + CCFSZ + 20]	! save g1
 	rd	%y, %l4			! save y
@@ -1886,11 +1878,7 @@ BARF
 	jmpl	%l5, %l7
 	 or	%l4, %lo(CPUINFO_SYNCFLTDUMP), %l4
 	TRAP_SETUP(-CCFSZ-80)
-#if defined(UVM)
 	INCR(_uvmexp+V_FAULTS)		! cnt.v_faults++ (clobbers %o0,%o1)
-#else
-	INCR(_cnt+V_FAULTS)		! cnt.v_faults++ (clobbers %o0,%o1)
-#endif
 
 	st	%g1, [%sp + CCFSZ + 20]	! save g1
 	rd	%y, %l4			! save y
@@ -2338,11 +2326,7 @@ softintr_sun44c:
 softintr_common:
 	INTR_SETUP(-CCFSZ-80)
 	std	%g2, [%sp + CCFSZ + 24]	! save registers
-#if defined(UVM)
 	INCR(_uvmexp+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#else
-	INCR(_cnt+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#endif
 	mov	%g1, %l7
 	rd	%y, %l6
 	std	%g4, [%sp + CCFSZ + 32]
@@ -2410,11 +2394,7 @@ _sparc_interrupt44c:
 _sparc_interrupt_common:
 	INTR_SETUP(-CCFSZ-80)
 	std	%g2, [%sp + CCFSZ + 24]	! save registers
-#if defined(UVM)
 	INCR(_uvmexp+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#else
-	INCR(_cnt+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#endif
 	mov	%g1, %l7
 	rd	%y, %l6
 	std	%g4, [%sp + CCFSZ + 32]
@@ -2506,11 +2486,7 @@ zshard:
 #if defined(SUN4)
 nmi_sun4:
 	INTR_SETUP(-CCFSZ-80)
-#if defined(UVM)
 	INCR(_uvmexp+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#else
-	INCR(_cnt+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#endif
 	/*
 	 * Level 15 interrupts are nonmaskable, so with traps off,
 	 * disable all interrupts to prevent recursion.
@@ -2536,11 +2512,7 @@ nmi_sun4:
 #if defined(SUN4C)
 nmi_sun4c:
 	INTR_SETUP(-CCFSZ-80)
-#if defined(UVM)
 	INCR(_uvmexp+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#else
-	INCR(_cnt+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#endif
 	/*
 	 * Level 15 interrupts are nonmaskable, so with traps off,
 	 * disable all interrupts to prevent recursion.
@@ -2595,11 +2567,7 @@ nmi_common:
 #if defined(SUN4M)
 nmi_sun4m:
 	INTR_SETUP(-CCFSZ-80)
-#if defined(UVM)
 	INCR(_uvmexp+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#else
-	INCR(_cnt+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
-#endif
 	/*
 	 * XXX - we don't handle soft nmi, yet.
 	 */
@@ -3852,14 +3820,14 @@ _sigcode:
 	std	%f30, [%sp + CCFSZ + 128]
 
 1:
-	ldd	[%fp + 64], %o0		! sig, code
+	ldd	[%fp + 64], %o0		! sig, sip
 	ld	[%fp + 76], %o3		! arg3
 #ifdef SIG_DEBUG
 	subcc	%o0, 32, %g0		! signals are 1-32
 	bgu	_suicide
 	 nop
 #endif
-	call	%g1			! (*sa->sa_handler)(sig,code,scp,arg3)
+	call	%g1			! (*sa->sa_handler)(sig,sip,scp,arg3)
 	 add	%fp, 64 + 16, %o2	! scp
 
 	/*
@@ -4200,7 +4168,7 @@ ENTRY(copyin)
  */
 ENTRY(copyout)
 	set	KERNBASE, %o3
-	cmp	%o1, %o3		! dst < KERBASE?
+	cmp	%o1, %o3		! dst < KERNBASE?
 	blu,a	Ldocopy
 	 sethi	%hi(_cpcb), %o3
 
@@ -4359,11 +4327,7 @@ ENTRY(switchexit)
 	 */
 
 	INCR(_nswitchexit)		! nswitchexit++;
-#if defined(UVM)
 	INCR(_uvmexp+V_SWTCH)		! cnt.v_switch++;
-#else
-	INCR(_cnt+V_SWTCH)		! cnt.v_switch++;
-#endif
 
 	mov	PSR_S|PSR_ET, %g1	! oldpsr = PSR_S | PSR_ET;
 	sethi	%hi(_whichqs), %g2

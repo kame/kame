@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.10 2001/03/09 05:44:38 smurph Exp $ */
+/*	$OpenBSD: if_ie.c,v 1.14 2001/08/26 02:37:07 miod Exp $ */
 
 /*-
  * Copyright (c) 1998 Steve Murphree, Jr. 
@@ -135,6 +135,7 @@ Mode of operation:
 #include <machine/pmap.h>
 #include "pcctwo.h"
 #include <mvme88k/dev/pcctworeg.h>
+#include <mvme88k/dev/pcctwofunc.h>
 #include <mvme88k/dev/if_ie.h>
 #include <mvme88k/dev/i82596.h>
 #include <machine/board.h>
@@ -161,8 +162,6 @@ vm_map_t ie_map; /* for obio */
 #define	NTXBUF		2		/* number of transmit commands */
 #define	IE_TBUF_SIZE	ETHER_MAX_LEN	/* length of transmit buffer */
 
-#define CACHED_TO_PHYS(x) pmap_extract(pmap_kernel(), (vm_offset_t)(x))
-
 struct ie_softc {
 	struct device sc_dev;   /* device structure */
 	struct intrhand sc_ih, sc_failih;  /* interrupt info */
@@ -176,9 +175,12 @@ struct ie_softc {
 
 	struct arpcom sc_arpcom;/* system arpcom structure */
 
-	void (*reset_596)();    /* card dependent reset function */
-	void (*chan_attn)();    /* card dependent attn function */
-	void (*run_596)();      /* card depenent "go on-line" function */
+	void (*reset_596) __P((struct ie_softc *));
+				/* card dependent reset function */
+	void (*chan_attn) __P((struct ie_softc *));
+				/* card dependent attn function */
+	void (*run_596) __P((struct ie_softc *));
+				/* card depenent "go on-line" function */
 	void (*memcopy) __P((const void *, void *, u_int));
 	                        /* card dependent memory copy function */
 	void (*memzero) __P((void *, u_int));
@@ -235,9 +237,9 @@ struct ie_softc {
 #endif
 };
 
-static void ie_obreset __P((struct ie_softc *));
-static void ie_obattend __P((struct ie_softc *));
-static void ie_obrun __P((struct ie_softc *));
+void ie_obreset __P((struct ie_softc *));
+void ie_obattend __P((struct ie_softc *));
+void ie_obrun __P((struct ie_softc *));
 int ie_setupram __P((struct ie_softc *sc));
 
 void iewatchdog __P((struct ifnet *));
@@ -247,17 +249,31 @@ int ieinit __P((struct ie_softc *));
 int ieioctl __P((struct ifnet *, u_long, caddr_t));
 void iestart __P((struct ifnet *));
 void iereset __P((struct ie_softc *));
-static void ie_readframe __P((struct ie_softc *, int));
-static void ie_drop_packet_buffer __P((struct ie_softc *));
-static int command_and_wait __P((struct ie_softc *, int,
+void ie_readframe __P((struct ie_softc *, int));
+void ie_drop_packet_buffer __P((struct ie_softc *));
+int command_and_wait __P((struct ie_softc *, int,
     void volatile *, int));
-/*static*/ void ierint __P((struct ie_softc *));
-/*static*/ void ietint __P((struct ie_softc *));
-static int ieget __P((struct ie_softc *, struct mbuf **,
+void ierint __P((struct ie_softc *));
+void ietint __P((struct ie_softc *));
+int ieget __P((struct ie_softc *, struct mbuf **,
 		      struct ether_header *, int *));
-static void setup_bufs __P((struct ie_softc *));
-static int mc_setup __P((struct ie_softc *, void *));
-static void mc_reset __P((struct ie_softc *));
+void setup_bufs __P((struct ie_softc *));
+int mc_setup __P((struct ie_softc *, void *));
+void mc_reset __P((struct ie_softc *));
+static __inline int ether_equal __P((u_char *, u_char *));
+static __inline void ie_ack __P((struct ie_softc *, u_int));
+static __inline void ie_setup_config __P((volatile struct ie_config_cmd *,
+                                          int, int));
+static __inline int check_eh __P((struct ie_softc *, struct ether_header *,
+                                  int *));
+static __inline int ie_buflen __P((struct ie_softc *, int));
+static __inline int ie_packet_len __P((struct ie_softc *));
+static __inline void iexmit __P((struct ie_softc *));
+static __inline caddr_t Align __P((caddr_t));
+
+void chan_attn_timeout __P((void *));
+void run_tdr __P((struct ie_softc *, struct ie_tdr_cmd *));
+void iestop __P((struct ie_softc *));
 
 #ifdef IEDEBUG
 void print_rbd __P((volatile struct ie_recv_buf_desc *));
@@ -266,9 +282,8 @@ int in_ierint = 0;
 int in_ietint = 0;
 #endif
 
-int iematch();
-void ieattach();
-extern void pcctwointr_establish();
+int iematch __P((struct device *, void *, void *));
+void ieattach __P((struct device *, struct device *, void *));
 
 struct cfattach ie_ca = {
 	sizeof(struct ie_softc), iematch, ieattach
@@ -362,8 +377,8 @@ ie_obreset(sc)
 	ieo->portlow = a >> 16;
 	delay(1000);
 
-	a = (u_long)CACHED_TO_PHYS(sc->scp) |
-      IE_PORT_NEWSCPADDR;
+	pmap_extract(pmap_kernel(), (vaddr_t)sc->scp, &a);
+	a |= IE_PORT_NEWSCPADDR;
 	ieo->porthigh = a & 0xffff;
 	t = 0; t = 1;
 	ieo->portlow = a >> 16;
@@ -417,8 +432,8 @@ ieattach(parent, self, aux)
 	/* get the first avaliable etherbuf */
 	sc->sc_maddr = etherbuf;	/* maddr = vaddr */
 	if (sc->sc_maddr == NULL) panic("ie: too many ethernet boards");
-	pa = CACHED_TO_PHYS(sc->sc_maddr);
-	if (pa == 0) panic("ie: pmap_extract");
+	if (pmap_extract(pmap_kernel(), (vaddr_t)sc->sc_maddr, &pa) == FALSE)
+		panic("ie: pmap_extract");
 	sc->sc_iobase = (caddr_t)pa;	/* iobase = paddr (24 bit) */
 
 	/*printf("maddrP %x iobaseV %x\n", sc->sc_maddr, sc->sc_iobase);*/
@@ -433,7 +448,8 @@ ieattach(parent, self, aux)
 	/*printf("scpV %x iscpV %x scbV %x\n", sc->scp, sc->iscp, sc->scb);*/
 
 	sc->scp->ie_bus_use = 0x44;
-	SWT_32(sc->scp->ie_iscp_ptr, CACHED_TO_PHYS(sc->iscp));
+	pmap_extract(pmap_kernel(), (vaddr_t)sc->iscp, &pa);
+	SWT_32(sc->scp->ie_iscp_ptr, pa);
 	/*
 	 * rest of first page is unused (wasted!), rest of ram
 	 * for buffers
@@ -911,7 +927,7 @@ sc->xmit_cbuffs[sc->xctail]);
  * chain of partially-full mbufs.  This should help to speed up the
  * operation considerably.  (Provided that it works, of course.)  
  */
-static inline int
+int
 ieget(sc, mp, ehp, to_bpf)
 	struct ie_softc *sc;
 	struct mbuf **mp;
@@ -1087,7 +1103,7 @@ ieget(sc, mp, ehp, to_bpf)
  * on confusing code to deal with them.  Hopefully, this machine will never ARP
  * for trailers anyway.
  */
-static void
+void
 ie_readframe(sc, num)
 	struct ie_softc *sc;
 	int num;			/* frame number to read */
@@ -1177,7 +1193,7 @@ ie_readframe(sc, num)
 	ether_input(&sc->sc_arpcom.ac_if, &eh, m);
 }
 
-static void
+void
 ie_drop_packet_buffer(sc)
 	struct ie_softc *sc;
 {
@@ -1329,7 +1345,7 @@ iereset(sc)
 
 #ifdef notdef
 	if (!check_ie_present(sc, sc->sc_maddr, sc->sc_msize))
-		panic("ie disappeared!\n");
+		panic("ie disappeared!");
 #endif
 
 	sc->sc_arpcom.ac_if.if_flags |= IFF_UP;
@@ -1360,7 +1376,7 @@ chan_attn_timeout(rock)
  * ((volatile struct ie_cmd_common *)pcmd)->ie_cmd_status & MASK 
  * to become true.  
  */
-static int
+int
 command_and_wait(sc, cmd, pcmd, mask)
 	struct ie_softc *sc;
 	int cmd;
@@ -1371,6 +1387,7 @@ command_and_wait(sc, cmd, pcmd, mask)
 	volatile struct ie_sys_ctl_block *scb = sc->scb;
 	volatile int timedout = 0;
 #if 0
+	struct timeout chan_tmo;
 	extern int hz;
 #endif
 
@@ -1391,7 +1408,8 @@ command_and_wait(sc, cmd, pcmd, mask)
 		 * According to the packet driver, the minimum timeout should
 		 * be .369 seconds, which we round up to .4.
 		 */
-		timeout(chan_attn_timeout, (caddr_t)&timedout, 2 * hz / 5);
+		timeout_set(&chan_tmo, chan_attn_timeout, (caddr_t)&timedout);
+		timeout_add(&chan_tmo, (caddr_t)&timedout, 2 * hz / 5);
 #endif
 
 		/*
@@ -1405,7 +1423,7 @@ command_and_wait(sc, cmd, pcmd, mask)
 			if ((cc->ie_cmd_status & mask) || timedout)
 				break;
 #if 0
-		untimeout(chan_attn_timeout, (caddr_t)&timedout);
+		timeout_del(&chan_tmo);
 #endif
 
 		return timedout;
@@ -1425,7 +1443,7 @@ command_and_wait(sc, cmd, pcmd, mask)
 /*
  * Run the time-domain reflectometer.
  */
-static void
+void
 run_tdr(sc, cmd)
 	struct ie_softc *sc;
 	struct ie_tdr_cmd *cmd;
@@ -1494,7 +1512,7 @@ Align(ptr)
  * note: this function was written to be easy to understand, rather than
  *       highly efficient (it isn't in the critical path).
  */
-static void 
+void 
 setup_bufs(sc)
 	struct ie_softc *sc;
 {
@@ -1508,20 +1526,20 @@ setup_bufs(sc)
 	(sc->memzero)(ptr, sc->buf_area_sz);
 	ptr = Align(ptr);	/* set alignment and stick with it */
 
-	n = (int)Align(sizeof(struct ie_xmit_cmd)) +
-	    (int)Align(sizeof(struct ie_xmit_buf)) + IE_TBUF_SIZE;
+	n = (int)Align((caddr_t)sizeof(struct ie_xmit_cmd)) +
+	    (int)Align((caddr_t)sizeof(struct ie_xmit_buf)) + IE_TBUF_SIZE;
 	n *= NTXBUF;		/* n = total size of xmit area */
 
 	n = sc->buf_area_sz - n;/* n = free space for recv stuff */
 
-	r = (int)Align(sizeof(struct ie_recv_frame_desc)) +
-	    (((int)Align(sizeof(struct ie_recv_buf_desc)) + IE_RBUF_SIZE) * B_PER_F);
+	r = (int)Align((caddr_t)sizeof(struct ie_recv_frame_desc)) +
+	    (((int)Align((caddr_t)sizeof(struct ie_recv_buf_desc)) + IE_RBUF_SIZE) * B_PER_F);
 
 	/* r = size of one R frame */
 
 	sc->nframes = n / r;
 	if (sc->nframes <= 0)
-		panic("ie: bogus buffer calc\n");
+		panic("ie: bogus buffer calc");
 	if (sc->nframes > MXFRAMES)
 		sc->nframes = MXFRAMES;
 
@@ -1623,7 +1641,7 @@ setup_bufs(sc)
  * Run the multicast setup command.
  * Called at splnet().
  */
-static int
+int
 mc_setup(sc, ptr)
 	struct ie_softc *sc;
 	void *ptr;
@@ -1750,7 +1768,7 @@ ieinit(sc)
 	return 0;
 }
 
-static void
+void
 iestop(sc)
 	struct ie_softc *sc;
 {
@@ -1850,7 +1868,7 @@ ieioctl(ifp, cmd, data)
 	return error;
 }
 
-static void
+void
 mc_reset(sc)
 	struct ie_softc *sc;
 {

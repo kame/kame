@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtl81x9.c,v 1.2 2001/04/13 15:58:43 aaron Exp $ */
+/*	$OpenBSD: rtl81x9.c,v 1.9 2001/09/11 20:05:25 miod Exp $ */
 
 /*
  * Copyright (c) 1997, 1998
@@ -84,6 +84,7 @@
  */
 
 #include "bpfilter.h"
+#include "vlan.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -114,9 +115,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
 #include <machine/bus.h>
 
 #include <dev/mii/mii.h>
@@ -626,7 +624,6 @@ int rl_list_tx_init(sc)
 void rl_rxeof(sc)
 	struct rl_softc		*sc;
 {
-        struct ether_header	*eh;
         struct mbuf		*m;
         struct ifnet		*ifp;
 	int			total_len = 0;
@@ -731,7 +728,6 @@ void rl_rxeof(sc)
 		if (m == NULL)
 			continue;
 
-		eh = mtod(m, struct ether_header *);
 		ifp->if_ipackets++;
 
 #if NBPFILTER > 0
@@ -741,9 +737,7 @@ void rl_rxeof(sc)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
+		ether_input_mbuf(ifp, m);
 	}
 
 	return;
@@ -848,7 +842,7 @@ int rl_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, RL_IMR, RL_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		rl_start(ifp);
 
 	return (claimed);
@@ -915,16 +909,18 @@ void rl_start(ifp)
 {
 	struct rl_softc		*sc;
 	struct mbuf		*m_head = NULL;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
 	while(RL_CUR_TXMBUF(sc) == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		/* Pack the data into the descriptor. */
 		rl_encap(sc, m_head);
+		pkts++;
 
 #if NBPFILTER > 0
 		/*
@@ -945,6 +941,8 @@ void rl_start(ifp)
 
 		RL_INC(sc->rl_cdata.cur_tx);
 	}
+	if (pkts == 0)
+		return;
 
 	/*
 	 * We broke out of the loop because all our TX slots are
@@ -1222,7 +1220,8 @@ rl_attach(sc)
 	rl_read_eeprom(sc, (caddr_t)&rl_did, RL_EE_PCI_DID, 1, 0);
 
 	if (rl_did == RT_DEVICEID_8139 || rl_did == ACCTON_DEVICEID_5030 ||
-	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139)
+	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139
+	    || rl_did == DLINK_DEVICEID_8139)
 		sc->rl_type = RL_8139;
 	else if (rl_did == RT_DEVICEID_8129)
 		sc->rl_type = RL_8129;
@@ -1274,9 +1273,13 @@ rl_attach(sc)
 	ifp->if_start = rl_start;
 	ifp->if_watchdog = rl_watchdog;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+
+#if NVLAN > 0
+	ifp->if_capabilities |= IFCAP_VLAN_MTU; 
+#endif
 
 	/*
 	 * Initialize our media structures and probe the MII.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ultrix_syscall.h,v 1.7 1999/06/07 07:18:37 deraadt Exp $	*/
+/*	$OpenBSD: ultrix_syscall.h,v 1.9 2001/08/26 04:14:27 deraadt Exp $	*/
 
 /*
  * System call numbers.

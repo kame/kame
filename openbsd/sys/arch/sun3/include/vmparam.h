@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.4 2000/04/30 15:28:50 miod Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.8 2001/09/22 18:00:10 miod Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.14 1995/09/26 04:02:10 gwr Exp $	*/
 
 /*
@@ -87,16 +87,6 @@
 #endif
 
 /*
- * Default sizes of swap allocation chunks (see dmap.h).
- * The actual values may be changed in vminit() based on MAXDSIZ.
- * With MAXDSIZ of 16Mb and NDMAP of 38, dmmax will be 1024.
- * DMMIN should be at least ctod(1) so that vtod() works.
- * vminit() insures this.
- */
-#define	DMMIN	32			/* smallest swap allocation */
-#define	DMMAX	4096			/* largest potential swap allocation */
-
-/*
  * PTEs for mapping user space into the kernel for phyio operations.
  * The actual limitation for physio requests will be the DVMA space,
  * and that is fixed by hardware design at 1MB.  We could make the
@@ -126,23 +116,7 @@
 #define	MAXSLP 		20
 
 /*
- * A swapped in process is given a small amount of core without being bothered
- * by the page replacement algorithm.  Basically this says that if you are
- * swapped in you deserve some resources.  We protect the last SAFERSS
- * pages against paging and will just swap you out rather than paging you.
- * Note that each process has at least UPAGES+CLSIZE pages which are not
- * paged anyways (this is currently 8+2=10 pages or 5k bytes), so this
- * number just means a swapped in process is given around 25k bytes.
- * Just for fun: current memory prices are 4600$ a megabyte on VAX (4/22/81),
- * so we loan each swapped in process memory worth 100$, or just admit
- * that we don't consider it worthwhile and swap it out to disk which costs
- * $30/mb or about $0.75.
- */
-#define	SAFERSS		4		/* nominal ``small'' resident set size
-					   protected against replacement */
-
-/*
- * Mach-derived constants, virtual memory map:
+ * Virtual memory map:
  *
  * 0000.0000  user space
  * 0E00.0000  kernel space
@@ -161,10 +135,8 @@
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
-#define VM_PHYS_SIZE		(USRIOSIZE*CLBYTES)
- 
-#define MACHINE_NEW_NONCONTIG
+#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
  
 #define VM_PHYSSEG_MAX		4
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sgmap.c,v 1.3 2001/02/06 04:27:45 hugh Exp $	*/
+/*	$OpenBSD: sgmap.c,v 1.5 2001/07/05 10:00:41 art Exp $	*/
 /* $NetBSD: sgmap.c,v 1.8 2000/06/29 07:14:34 mrg Exp $ */
 
 /*-
@@ -142,7 +142,7 @@ vax_sgmap_alloc(map, origlen, sgmap, flags)
 	    origlen, len, map->_dm_sgvalen, map->_dm_boundary, boundary);
 #endif
 
-	error = extent_alloc(sgmap->aps_ex, map->_dm_sgvalen, VAX_NBPG,
+	error = extent_alloc(sgmap->aps_ex, map->_dm_sgvalen, VAX_NBPG, 0,
 	    0, (flags & BUS_DMA_NOWAIT) ? EX_NOWAIT : EX_WAITOK,
 	    &map->_dm_sgva);
 #if 0
@@ -243,7 +243,7 @@ vax_sgmap_load(t, map, buf, buflen, p, flags, sgmap)
 		 * Get the physical address for this segment.
 		 */
 		if (p != NULL)
-			pa = pmap_extract(p->p_vmspace->vm_map.pmap, va);
+			pmap_extract(p->p_vmspace->vm_map.pmap, va, &pa);
 		else
 			pa = kvtophys(va);
 

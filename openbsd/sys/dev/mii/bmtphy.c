@@ -1,5 +1,30 @@
-/*	$OpenBSD: bmtphy.c,v 1.1 2001/04/11 06:47:31 deraadt Exp $	*/
+/*	$OpenBSD: bmtphy.c,v 1.4 2001/10/05 18:26:48 nate Exp $	*/
 /*	$NetBSD: nsphy.c,v 1.25 2000/02/02 23:34:57 thorpej Exp $	*/
+
+/*-
+ * Copyright (c) 2001 Theo de Raadt
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * driver for Broadcom BCM5201/5202 Mini-Theta ethernet 10/100 PHY
@@ -50,6 +75,9 @@ bmtphymatch(parent, match, aux)
 	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_BROADCOM &&
 	    MII_MODEL(ma->mii_id2) == MII_MODEL_BROADCOM_BCM5201)
 		return (10);
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_BROADCOM &&
+	    MII_MODEL(ma->mii_id2) == MII_MODEL_BROADCOM_BCM5221)
+		return (10);
 
 	return (0);
 }
@@ -63,9 +91,14 @@ bmtphyattach(parent, self, aux)
 	struct mii_softc *sc = (struct mii_softc *)self;
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
+	char *model;
 
-	printf(": %s, rev. %d\n", MII_STR_BROADCOM_BCM5201,
-	    MII_REV(ma->mii_id2));
+	if (MII_MODEL(ma->mii_id2) == MII_MODEL_BROADCOM_BCM5201)
+		model = MII_STR_BROADCOM_BCM5201;
+	else if (MII_MODEL(ma->mii_id2) == MII_MODEL_BROADCOM_BCM5221)
+		model = MII_STR_BROADCOM_BCM5221;
+
+	printf(": %s, rev. %d\n", model, MII_REV(ma->mii_id2));
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -73,6 +106,7 @@ bmtphyattach(parent, self, aux)
 	sc->mii_status = bmtphy_status;
 	sc->mii_pdata = mii;
 	sc->mii_flags = mii->mii_flags;
+	sc->mii_anegticks = 5;
 
 	bmtphy_reset(sc);
 
@@ -155,7 +189,7 @@ bmtphy_service(sc, mii, cmd)
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5)
+		if (++sc->mii_ticks != sc->mii_anegticks)
 			return (0);
 
 		sc->mii_ticks = 0;

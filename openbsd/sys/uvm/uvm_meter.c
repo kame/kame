@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_meter.c,v 1.9 2001/01/29 02:07:46 niklas Exp $	*/
-/*	$NetBSD: uvm_meter.c,v 1.8 1999/03/25 18:48:53 mrg Exp $	*/
+/*	$OpenBSD: uvm_meter.c,v 1.12 2001/08/11 10:57:22 art Exp $	*/
+/*	$NetBSD: uvm_meter.c,v 1.12 2000/05/26 00:36:53 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -161,6 +161,9 @@ uvm_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case VM_UVMEXP:
 		return (sysctl_rdstruct(oldp, oldlenp, newp, &uvmexp,
 		    sizeof(uvmexp)));
+
+	case VM_NKMEMPAGES:
+		return (sysctl_rdint(oldp, oldlenp, newp, nkmempages));
 
 	case VM_PSSTRINGS:
 		return (sysctl_rdstruct(oldp, oldlenp, newp, &_ps,

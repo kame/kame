@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_an_pcmcia.c,v 1.4 2001/04/06 18:02:58 aaron Exp $	*/
+/*	$OpenBSD: if_an_pcmcia.c,v 1.6 2001/09/30 00:31:15 art Exp $	*/
 
 /*
  * Copyright (c) 1999 Michael Shalayeff
@@ -40,6 +40,7 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <net/if_media.h>
 
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
@@ -130,7 +131,8 @@ an_pcmcia_attach(parent, self, aux)
 	sc->an_btag = psc->sc_pcioh.iot;
 	sc->an_bhandle = psc->sc_pcioh.ioh;
 
-	sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, an_intr, sc);
+	sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET,
+	    an_intr, sc, "");
 	if (sc->sc_ih == NULL)
 		printf("no irq");
 
@@ -179,9 +181,8 @@ an_pcmcia_activate(dev, act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		pcmcia_function_enable(psc->sc_pf);
-		sc->sc_ih =
-		    pcmcia_intr_establish(psc->sc_pf, IPL_NET, an_intr, sc);
-		printf("\n");
+		sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET,
+		    an_intr, sc, sc->sc_dev.dv_xname);
 		an_init(sc);
 		break;
 

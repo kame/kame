@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubsecreg.h,v 1.10 2001/02/02 01:00:07 jason Exp $	*/
+/*	$OpenBSD: ubsecreg.h,v 1.14 2001/06/29 21:52:42 jason Exp $	*/
 
 /*
  * Copyright (c) 2000 Theo de Raadt
@@ -45,6 +45,7 @@
 #define	BS_MCR2		0x10	/* DMA Master Command Record 2 */
 
 /* BS_CTRL - DMA Control */
+#define	BS_CTRL_RESET		0x80000000	/* hardware reset, 5805/5820 */
 #define	BS_CTRL_MCR2INT		0x40000000	/* enable intr MCR for MCR2 */
 #define	BS_CTRL_MCR1INT		0x20000000	/* enable intr MCR for MCR1 */
 #define	BS_CTRL_OFM		0x10000000	/* Output fragment mode */
@@ -70,11 +71,6 @@
 #define	BS_ERR_ADDR		0xfffffffc	/* error address mask */
 #define	BS_ERR_READ		0x00000002	/* fault was on read */
 
-#define	UBSEC_CARD(sid)		(((sid) & 0xf0000000) >> 28)
-#define	UBSEC_SESSION(sid)	( (sid) & 0x0fffffff)
-#define	UBSEC_SID(crd, sesn)	(((crd) << 28) | ((sesn) & 0x0fffffff))
-#define	MAX_SCATTER		64
-
 struct ubsec_pktctx {
 	u_int32_t	pc_deskey[6];		/* 3DES key */
 	u_int32_t	pc_hminner[5];		/* hmac inner state */
@@ -82,8 +78,6 @@ struct ubsec_pktctx {
 	u_int32_t	pc_iv[2];		/* [3]DES iv */
 	u_int16_t	pc_flags;		/* flags, below */
 	u_int16_t	pc_offset;		/* crypto offset */
-	u_int32_t	pc_paddr;
-	u_int8_t	pad[16];
 };
 #define	UBS_PKTCTX_ENC_3DES	0x8000		/* use 3des */
 #define	UBS_PKTCTX_ENC_NONE	0x0000		/* no encryption */
@@ -92,6 +86,18 @@ struct ubsec_pktctx {
 #define	UBS_PKTCTX_AUTH_NONE	0x0000		/* no authentication */
 #define	UBS_PKTCTX_AUTH_MD5	0x1000		/* use hmac-md5 */
 #define	UBS_PKTCTX_AUTH_SHA1	0x2000		/* use hmac-sha1 */
+
+struct ubsec_pktctx_long {
+	volatile u_int16_t	pc_len;		/* length of ctx struct */
+	volatile u_int16_t	pc_type;	/* context type, 0 */
+	volatile u_int16_t	pc_flags;	/* flags, same as above */
+	volatile u_int16_t	pc_offset;	/* crypto/auth offset */
+	volatile u_int32_t	pc_deskey[6];	/* 3DES key */
+	volatile u_int32_t	pc_iv[2];	/* [3]DES iv */
+	volatile u_int32_t	pc_hminner[5];	/* hmac inner state */
+	volatile u_int32_t	pc_hmouter[5];	/* hmac outer state */
+};
+#define	UBS_PKTCTX_TYPE_IPSEC	0x0000
 
 struct ubsec_pktbuf {
 	volatile u_int32_t	pb_addr;	/* address of buffer start */
@@ -122,7 +128,7 @@ struct ubsec_mcr_add {
 #define	UBS_MCR_ERROR		0x0002		/* error in processing */
 #define	UBS_MCR_ERRORCODE	0xff00		/* error type */
 
-struct ubsec_keyctx {
+struct ubsec_ctx_keyop {
 	volatile u_int16_t	ctx_len;	/* command length */
 	volatile u_int16_t	ctx_op;		/* operation code */
 	volatile u_int8_t	ctx_pad[60];	/* padding */
@@ -142,15 +148,8 @@ struct ubsec_keyctx {
 #define	UBS_CTXOP_MODEXP	0x47		/* modular exponentiation */
 #define	UBS_CTXOP_MODINV	0x48		/* modular inverse */
 
-struct ubsec_rngbypass_ctx {
+struct ubsec_ctx_rngbypass {
 	volatile u_int16_t	rbp_len;	/* command length, 64 */
 	volatile u_int16_t	rbp_op;		/* rng bypass, 0x41 */
 	volatile u_int8_t	rbp_pad[60];	/* padding */
-};
-
-#define UBS_RNGBUFSZ		16
-struct ubsec_rng {
-	struct ubsec_mcr		rng_mcr;
-	struct ubsec_rngbypass_ctx	rng_ctx;
-	volatile u_int32_t		rng_buf[UBS_RNGBUFSZ];
 };

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ka680.c,v 1.4 2001/04/01 16:51:40 hugh Exp $	*/
+/*	$OpenBSD: ka680.c,v 1.6 2001/08/25 13:33:37 hugh Exp $	*/
 /*	$NetBSD: ka680.c,v 1.3 2001/01/28 21:01:53 ragge Exp $	*/
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden.
@@ -60,8 +60,6 @@ static int	ka680_mchk __P((caddr_t));
 static void	ka680_halt __P((void));
 static void	ka680_reboot __P((int));
  
-extern int cold;		/* cold-start flag */
-
 /*
  * KA680-specific IPRs. KA680 has the funny habit to control all caches
  * via IPRs.
@@ -247,8 +245,8 @@ ka680_steal_pages()
 	/*
 	 * Get the soft and hard memory error vectors now.
 	 */
-	scb_vecalloc(0x54, ka680_softmem, 0, 0);
-	scb_vecalloc(0x60, ka680_hardmem, 0, 0);
+	scb_vecalloc(0x54, ka680_softmem, NULL, 0, NULL);
+	scb_vecalloc(0x60, ka680_hardmem, NULL, 0, NULL);
 
 	/* Turn on caches (to speed up execution a bit) */
 	ka680_cache_enable();

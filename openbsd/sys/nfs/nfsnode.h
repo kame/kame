@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfsnode.h,v 1.7 1998/08/06 19:35:02 csapuntz Exp $	*/
+/*	$OpenBSD: nfsnode.h,v 1.10 2001/06/25 03:28:14 csapuntz Exp $	*/
 /*	$NetBSD: nfsnode.h,v 1.16 1996/02/18 11:54:04 fvdl Exp $	*/
 
 /*
@@ -133,9 +133,6 @@ struct nfsnode {
 #define	NFLUSHINPROG	0x0002	/* Avoid multiple calls to vinvalbuf() */
 #define	NMODIFIED	0x0004	/* Might have a modified buffer in bio */
 #define	NWRITEERR	0x0008	/* Flag write errors so close will know */
-#define	NQNFSNONCACHE	0x0020	/* Non-cachable lease */
-#define	NQNFSWRITE	0x0040	/* Write lease */
-#define	NQNFSEVICTED	0x0080	/* Has been evicted */
 #define	NACC		0x0100	/* Special file accessed */
 #define	NUPD		0x0200	/* Special file updated */
 #define	NCHG		0x0400	/* Special file times changed */
@@ -177,9 +174,7 @@ int	nfsfifo_write __P((void *));
 #define nfs_ioctl ((int (*) __P((void *)))enoioctl)
 #define nfs_select ((int (*) __P((void *)))seltrue)
 #define nfs_revoke vop_generic_revoke
-int	nfs_mmap __P((void *));
 int	nfs_fsync __P((void *));
-#define nfs_seek ((int (*) __P((void *)))nullop)
 int	nfs_remove __P((void *));
 int	nfs_link __P((void *));
 int	nfs_rename __P((void *));
@@ -198,23 +193,16 @@ int	nfs_strategy __P((void *));
 int	nfs_print __P((void *));
 int	nfs_pathconf __P((void *));
 int	nfs_advlock __P((void *));
-int	nfs_blkatoff __P((void *));
 int	nfs_bwrite __P((void *));
 int	nfs_vget __P((struct mount *, ino_t, struct vnode **));
-int	nfs_valloc __P((void *));
 #define nfs_reallocblks \
 	((int (*) __P((void *)))eopnotsupp)
-int	nfs_vfree __P((void *));
-int	nfs_truncate __P((void *));
-int	nfs_update __P((void *));
 
 /* other stuff */
 int	nfs_removeit __P((struct sillyrename *));
 int	nfs_nget __P((struct mount *,nfsfh_t *,int,struct nfsnode **));
 int	nfs_lookitup __P((struct vnode *,char *,int,struct ucred *,struct proc *,struct nfsnode **));
 int	nfs_sillyrename __P((struct vnode *,struct vnode *,struct componentname *));
-nfsuint64 *nfs_getcookie __P((struct nfsnode *, off_t, int));
-void nfs_invaldir __P((struct vnode *));
 
 extern int (**nfsv2_vnodeop_p) __P((void *));
 

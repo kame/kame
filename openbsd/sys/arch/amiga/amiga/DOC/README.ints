@@ -1,4 +1,4 @@
-$OpenBSD: README.ints,v 1.2 1996/06/04 12:49:15 niklas Exp $
+$OpenBSD: README.ints,v 1.4 2001/08/16 22:17:42 miod Exp $
 
 There are four different interruptsystems currently supported (well
 only three, really) in the kernel.  They are all mutual exclusive:
@@ -18,10 +18,10 @@ only three, really) in the kernel.  They are all mutual exclusive:
 	temporarily blocking level 6 interrupts via the Amiga custom
 	interrupt controller and set the AUD3 interrupt bit in that
 	same chip.  This will imply a level 4 interrupt to be
-	schudled.  In that handler after the level 6 interrupt has
+	scheduled.  In that handler after the level 6 interrupt has
 	been serviced, IPL 6 is unblocked again.  This will have
 	positive effect on interrupts coming in at IPL 5, specifically
-	the serial recieve interrupt.  A potential trouble area is
+	the serial receive interrupt.  A potential trouble area is
 	audio when using that fourth channel, that is something to
 	check when someone gets the time.  This clever hack was done
 	by Markus Wild.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: buf.h,v 1.22 2001/04/06 18:59:17 gluk Exp $	*/
+/*	$OpenBSD: buf.h,v 1.29 2001/09/20 08:22:26 gluk Exp $	*/
 /*	$NetBSD: buf.h,v 1.25 1997/04/09 21:12:17 mycroft Exp $	*/
 
 /*
@@ -52,7 +52,7 @@ struct vnode;
 
 /*
  * To avoid including <ufs/ffs/softdep.h>
- */ 
+ */
 
 LIST_HEAD(workhead, worklist);
 
@@ -69,7 +69,6 @@ extern struct bio_ops {
 	void	(*io_movedeps) __P((struct buf *, struct buf *));
 	int	(*io_countdeps) __P((struct buf *, int, int));
 } bioops;
- 
 
 /*
  * The buffer header describes an I/O operation in the kernel.
@@ -78,7 +77,7 @@ struct buf {
 	LIST_ENTRY(buf) b_hash;		/* Hash chain. */
 	LIST_ENTRY(buf) b_vnbufs;	/* Buffer's associated vnode. */
 	TAILQ_ENTRY(buf) b_freelist;	/* Free list position if not active. */
-	TAILQ_ENTRY(buf) b_synclist;	/* List of diry buffers to be written out */
+	TAILQ_ENTRY(buf) b_synclist;	/* List of dirty buffers to be written out */
 	long b_synctime;		/* Time this buffer should be flushed */
 	struct	buf *b_actf, **b_actb;	/* Device driver queue when active. */
 	struct  proc *b_proc;		/* Associated proc; NULL if kernel. */
@@ -149,7 +148,7 @@ struct buf {
 #define	B_WRITE		0x00000000	/* Write buffer (pseudo flag). */
 #define	B_WRITEINPROG	0x01000000	/* Write in progress. */
 #define	B_XXX		0x02000000	/* Debugging flag. */
-#define	B_VFLUSH	0x04000000	/* Buffer is being synced. */
+#define	B_DEFERRED	0x04000000	/* Skipped over for cleaning */
 #define	B_SCANNED	0x08000000	/* Block already pushed during sync */
 
 /*
@@ -195,10 +194,6 @@ struct	buf *buf;		/* The buffer headers. */
 char	*buffers;		/* The buffer contents. */
 int	bufpages;		/* Number of memory pages in the buffer pool. */
 int	nswbuf;			/* Number of swap I/O buffer headers. */
-#if !defined(UVM)
-struct	buf *swbuf;		/* Swap I/O buffer headers. */
-struct	buf bswlist;		/* Head of swap I/O buffer headers free list. */
-#endif
 
 __BEGIN_DECLS
 void	allocbuf __P((struct buf *, int));
@@ -220,7 +215,6 @@ void    buf_undirty __P((struct buf *));
 int	bwrite __P((struct buf *));
 struct buf *getblk __P((struct vnode *, daddr_t, int, int, int));
 struct buf *geteblk __P((int));
-struct buf *getnewbuf __P((int slpflag, int slptimeo));
 struct buf *incore __P((struct vnode *, daddr_t));
 
 void	minphys __P((struct buf *bp));
@@ -231,47 +225,47 @@ void  reassignbuf __P((struct buf *));
 void  bgetvp __P((struct vnode *, struct buf *));
 
 void  buf_replacevnode __P((struct buf *, struct vnode *));
+void  buf_daemon __P((struct proc *));
 
 static __inline void
 buf_start(struct buf *bp)
 {
-        if (bioops.io_start)
-                (*bioops.io_start)(bp);
+	if (bioops.io_start)
+		(*bioops.io_start)(bp);
 }
 
 static __inline void
 buf_complete(struct buf *bp)
 {
-        if (bioops.io_complete)
-                (*bioops.io_complete)(bp);
+	if (bioops.io_complete)
+		(*bioops.io_complete)(bp);
 }
 
 static __inline void
 buf_deallocate(struct buf *bp)
 {
-        if (bioops.io_deallocate)
-                (*bioops.io_deallocate)(bp);
+	if (bioops.io_deallocate)
+		(*bioops.io_deallocate)(bp);
 }
 
 static __inline void
 buf_movedeps(struct buf *bp, struct buf *bp2)
 {
-        if (bioops.io_movedeps)
-                (*bioops.io_movedeps)(bp, bp2);
+	if (bioops.io_movedeps)
+		(*bioops.io_movedeps)(bp, bp2);
 }
 
 static __inline int
 buf_countdeps(struct buf *bp, int i, int islocked)
 {
-        if (bioops.io_countdeps)
-                return ((*bioops.io_countdeps)(bp, i, islocked));
-        else
-                return (0);
+	if (bioops.io_countdeps)
+		return ((*bioops.io_countdeps)(bp, i, islocked));
+	else
+		return (0);
 }
 
 int	cluster_read __P((struct vnode *, struct cluster_info *,
-			  u_quad_t, daddr_t, long,
-			  struct ucred *, struct buf **));
+	    u_quad_t, daddr_t, long, struct ucred *, struct buf **));
 void	cluster_write __P((struct buf *, struct cluster_info *, u_quad_t));
 
 __END_DECLS

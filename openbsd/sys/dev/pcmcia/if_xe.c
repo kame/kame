@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_xe.c,v 1.18 2001/02/20 19:39:46 mickey Exp $	*/
+/*	$OpenBSD: if_xe.c,v 1.23 2001/08/17 21:52:16 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1999 Niklas Hallqvist, Brandon Creighton, Job de Haas
@@ -83,9 +83,6 @@
 #include <net/bpf.h>
 #include <net/bpfdesc.h>
 #endif
-
-#define ETHER_MIN_LEN 64
-#define ETHER_CRC_LEN 4
 
 /*
  * Maximum number of bytes to read per interrupt.  Linux recommends
@@ -385,10 +382,10 @@ xe_pcmcia_attach(parent, self, aux)
 	ifp->if_ioctl = xe_ioctl;
 	ifp->if_start = xe_start;
 	ifp->if_watchdog = xe_watchdog;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Establish the interrupt. */
-	sc->sc_ih = pcmcia_intr_establish(pa->pf, IPL_NET, xe_intr, sc);
+	sc->sc_ih = pcmcia_intr_establish(pa->pf, IPL_NET, xe_intr, sc, "");
 	if (sc->sc_ih == NULL) {
 		printf(", couldn't establish interrupt\n");
 		goto bad;
@@ -486,10 +483,8 @@ xe_pcmcia_activate(dev, act)
 	switch (act) {
 	case DVACT_ACTIVATE:
 		pcmcia_function_enable(sc->sc_pf);
-		printf("%s:", sc->sc_xe.sc_dev.dv_xname);
-		sc->sc_xe.sc_ih =
-		    pcmcia_intr_establish(sc->sc_pf, IPL_NET, xe_intr, sc);
-		printf("\n");
+		sc->sc_xe.sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_NET,
+		    xe_intr, sc, sc->sc_xe.sc_dev.dv_xname);
 		xe_init(&sc->sc_xe);
 		break;
 
@@ -739,7 +734,7 @@ xe_intr(arg)
 	}
 			
 	/* Try to start more packets transmitting. */
-	if (ifp->if_snd.ifq_head)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		xe_start(ifp);
 
 	/* Detected excessive collisions? */
@@ -772,7 +767,6 @@ xe_get(sc)
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	u_int16_t pktlen, len, recvcount = 0;
 	u_int8_t *data;
-	struct ether_header *eh;
 	
 	PAGE(sc, 0);
 	rsr = bus_space_read_1(sc->sc_bst, sc->sc_bsh, sc->sc_offset + RSR);
@@ -845,15 +839,12 @@ xe_get(sc)
 	
 	ifp->if_ipackets++;
 	
-	eh = mtod(top, struct ether_header *);
-	
 #if NBPFILTER > 0
 	if (ifp->if_bpf)
 		bpf_mtap(ifp->if_bpf, top);
 #endif
 	
-	m_adj(top, sizeof(struct ether_header));
-	ether_input(ifp, eh, top);
+	ether_input_mbuf(ifp, top);
 	return (recvcount);
 }
 
@@ -1119,7 +1110,7 @@ xe_start(ifp)
 		return;
 
 	/* Peek at the next packet. */
-	m0 = ifp->if_snd.ifq_head;
+	IFQ_POLL(&ifp->if_snd, m0);
 	if (m0 == 0)
 		return;
 
@@ -1142,7 +1133,7 @@ xe_start(ifp)
 		return;
 	}
 
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 
 #if NBPFILTER > 0
 	if (ifp->if_bpf)

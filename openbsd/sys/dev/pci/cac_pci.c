@@ -1,4 +1,4 @@
-/*	$OpenBSD: cac_pci.c,v 1.3 2001/04/16 03:18:19 deraadt Exp $	*/
+/*	$OpenBSD: cac_pci.c,v 1.6 2001/10/11 21:03:35 mickey Exp $	*/
 /*	$NetBSD: cac_pci.c,v 1.10 2001/01/10 16:48:04 ad Exp $	*/
 
 /*-
@@ -198,14 +198,14 @@ cac_pci_attach(parent, self, aux)
 
 	if (memr != -1) {
 		if (pci_mapreg_map(pa, memr, PCI_MAPREG_TYPE_MEM, 0,
-		    &sc->sc_iot, &sc->sc_ioh, NULL, NULL))
+		    &sc->sc_iot, &sc->sc_ioh, NULL, NULL, 0))
 			memr = -1;
 		else
 			ior = -1;
 	}
 	if (ior != -1)
 		if (pci_mapreg_map(pa, ior, PCI_MAPREG_TYPE_IO, 0,
-		    &sc->sc_iot, &sc->sc_ioh, NULL, NULL))
+		    &sc->sc_iot, &sc->sc_ioh, NULL, NULL, 0))
 			ior = -1;
 	if (memr == -1 && ior == -1) {
 		printf("%s: can't map i/o or memory space\n", self->dv_xname);
@@ -220,8 +220,7 @@ cac_pci_attach(parent, self, aux)
 		       reg | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": can't map interrupt\n");
 		return;
 	}
@@ -275,7 +274,7 @@ int
 cac_pci_l0_intr_pending(struct cac_softc *sc)
 {
 
-	return (cac_inl(sc, CAC_42REG_STATUS) & CAC_42_EXTINT);
+	return ((cac_inl(sc, CAC_42REG_STATUS) & CAC_42_EXTINT) != 0);
 }
 
 void
@@ -289,5 +288,5 @@ int
 cac_pci_l0_fifo_full(struct cac_softc *sc)
 {
 
-	return (~cac_inl(sc, CAC_42REG_CMD_FIFO));
+	return (cac_inl(sc, CAC_42REG_CMD_FIFO) != 0);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.21 2000/07/14 14:24:54 miod Exp $	*/
+/*	$OpenBSD: param.h,v 1.27 2001/07/06 02:07:44 provos Exp $	*/
 /*	$NetBSD: param.h,v 1.34 1996/03/04 05:04:40 cgd Exp $	*/
 
 /*
@@ -44,7 +44,7 @@
  *	from: @(#)param.h	8.1 (Berkeley) 6/10/93
  */
 
-#ifndef	MACHINE
+#ifndef	_MACHINE_PARAM_H_
 
 /*
  * Machine dependent constants for the Sun3 series.
@@ -60,6 +60,10 @@
 
 #define	PGSHIFT		13		/* LOG2(NBPG) */
 
+#define	PAGE_SHIFT	13
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 #define NBSG		0x20000	/* bytes/segment */
 #define	SEGOFSET	(NBSG-1)	/* byte offset into segment */
 #define SEGSHIFT	17	        /* LOG2(NBSG) */
@@ -73,12 +77,12 @@
 
 /*
  * Constants related to network buffer management.
- * MCLBYTES must be no larger than CLBYTES (the software page size), and,
+ * MCLBYTES must be no larger than the software page size, and,
  * on machines that exchange pages of input or output buffers with mbuf
  * clusters (MAPPED_MBUFS), MCLBYTES must also be an integral multiple
  * of the hardware page size.
  */
-#define	MSIZE		128		/* size of an mbuf */
+#define	MSIZE		256		/* size of an mbuf */
 #define	MCLSHIFT	11
 #define	MCLBYTES	(1 << MCLSHIFT)	/* large enough for ether MTU */
 #define	MCLOFSET	(MCLBYTES - 1)
@@ -90,13 +94,14 @@
 #endif
 #endif
 
-#define MSGBUFSIZE	(NBPG >> 1)
+#define	MSGBUFOFF	0x200
+#define MSGBUFSIZE	(NBPG - MSGBUFOFF)
 
 /*
- * Size of kernel malloc arena in CLBYTES-sized logical pages
+ * Size of kernel malloc arena in logical pages
  */ 
 #ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(2048*1024/CLBYTES)
+#define	NKMEMCLUSTERS	(2048*1024/PAGE_SIZE)
 #endif
 
 /*
@@ -104,11 +109,12 @@
  */
 
 #include <machine/psl.h>
-
 #if defined(_KERNEL) && !defined(_LOCORE)
+#include <machine/cpu.h>
+
 extern void _delay __P((unsigned));
 #define delay(us)	_delay((us)<<8)
 #define	DELAY(n)	delay(n)
 #endif	/* _KERNEL && !_LOCORE */
 
-#endif	/* MACHINE */
+#endif	/* _MACHINE_PARAM_H_ */

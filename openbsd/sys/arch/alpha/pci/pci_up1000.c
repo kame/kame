@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_up1000.c,v 1.2 2001/04/17 14:53:34 art Exp $	*/
+/*	$OpenBSD: pci_up1000.c,v 1.5 2001/08/17 22:26:58 mickey Exp $	*/
 /* $NetBSD: pci_up1000.c,v 1.6 2000/12/28 22:59:07 sommerfeld Exp $ */
 
 /*-
@@ -68,6 +68,7 @@
 
 int     api_up1000_intr_map(void *, pcitag_t, int, int, pci_intr_handle_t *);
 const char *api_up1000_intr_string(void *, pci_intr_handle_t);
+int	api_up1000_intr_line(void *, pci_intr_handle_t);
 const struct evcnt *api_up1000_intr_evcnt(void *, pci_intr_handle_t);
 void    *api_up1000_intr_establish(void *, pci_intr_handle_t,
 	    int, int (*func)(void *), void *, char *);
@@ -75,6 +76,7 @@ void    api_up1000_intr_disestablish(void *, void *);
 
 void	*api_up1000_pciide_compat_intr_establish(void *, struct device *,
 	    struct pci_attach_args *, int, int (*)(void *), void *);
+void    api_up1000_pciide_compat_intr_disestablish(void *, void *);
 
 void
 pci_up1000_pickintr(struct irongate_config *icp)
@@ -85,6 +87,7 @@ pci_up1000_pickintr(struct irongate_config *icp)
 	pc->pc_intr_v = icp;
 	pc->pc_intr_map = api_up1000_intr_map;
 	pc->pc_intr_string = api_up1000_intr_string;
+	pc->pc_intr_line = api_up1000_intr_line;
 #if 0
 	pc->pc_intr_evcnt = api_up1000_intr_evcnt;
 #endif
@@ -93,6 +96,8 @@ pci_up1000_pickintr(struct irongate_config *icp)
 
 	pc->pc_pciide_compat_intr_establish =
 	    api_up1000_pciide_compat_intr_establish;
+	pc->pc_pciide_compat_intr_disestablish =
+	    api_up1000_pciide_compat_intr_disestablish;
 
 #if NSIO
 	sio_intr_setup(pc, iot);
@@ -156,6 +161,12 @@ api_up1000_intr_string(void *icv, pci_intr_handle_t ih)
 	return sio_intr_string(NULL /*XXX*/, ih);
 }
 
+int
+api_up1000_intr_line(void *icv, pci_intr_handle_t ih)
+{
+	return sio_intr_line(NULL /*XXX*/, ih);
+}
+
 #if 0
 const struct evcnt *
 api_up1000_intr_evcnt(void *icv, pci_intr_handle_t ih)
@@ -212,8 +223,12 @@ api_up1000_pciide_compat_intr_establish(void *icv, struct device *dev,
 	    func, arg, "up 1000 irq");
 	if (cookie == NULL)
 		return (NULL);
-	printf("%s: %s channel interrupting at %s\n", dev->dv_xname,
-	    PCIIDE_CHANNEL_NAME(chan), sio_intr_string(NULL /*XXX*/, irq));
 #endif
 	return (cookie);
+}
+
+void
+api_up1000_pciide_compat_intr_disestablish(void *v, void *cookie)
+{
+	sio_intr_disestablish(NULL, cookie);
 }

@@ -1,5 +1,5 @@
-/*	$OpenBSD: vm_param.h,v 1.20 2000/06/14 16:51:55 provos Exp $	*/
-/*	$NetBSD: vm_param.h,v 1.12 1995/03/26 20:39:16 jtc Exp $	*/
+/*	$OpenBSD: vm_param.h,v 1.25 2001/08/11 10:57:22 art Exp $	*/
+/*	$NetBSD: vm_param.h,v 1.25 2000/03/26 20:42:45 kleink Exp $	*/
 
 /* 
  * Copyright (c) 1991, 1993
@@ -105,22 +105,11 @@ typedef	int	boolean_t;
 #undef PAGE_SIZE
 #undef PAGE_MASK
 #undef PAGE_SHIFT
-#if defined(UVM)
 #define	PAGE_SIZE	uvmexp.pagesize		/* size of page */
 #define	PAGE_MASK	uvmexp.pagemask		/* size of page - 1 */
 #define	PAGE_SHIFT	uvmexp.pageshift	/* bits to shift for pages */
-#else
-#define	PAGE_SIZE	cnt.v_page_size		/* size of page */
-#define	PAGE_MASK	page_mask		/* size of page - 1 */
-#define	PAGE_SHIFT	page_shift		/* bits to shift for pages */
-#endif /* UVM */
 #endif /* !PAGE_SIZE */
 #endif /* _KERNEL */
-
-#if defined(_KERNEL) && !defined(UVM)
-extern vsize_t		page_mask;
-extern int		page_shift;
-#endif
 
 /*
  * CTL_VM identifiers
@@ -128,21 +117,10 @@ extern int		page_shift;
 #define	VM_METER	1		/* struct vmmeter */
 #define	VM_LOADAVG	2		/* struct loadavg */
 #define	VM_PSSTRINGS	3		/* PSSTRINGS */
-#if !defined(UVM)
-#define	VM_MAXID	4		/* number of valid vm ids */
-
-#define	CTL_VM_NAMES { \
-	{ 0, 0 }, \
-	{ "vmmeter", CTLTYPE_STRUCT }, \
-	{ "loadavg", CTLTYPE_STRUCT }, \
-	{ "psstrings", CTLTYPE_STRUCT }, \
-}
-
-#else
-
 #define VM_UVMEXP	4		/* struct uvmexp */
 #define VM_SWAPENCRYPT	5		/* int */
-#define	VM_MAXID	6		/* number of valid vm ids */
+#define VM_NKMEMPAGES	6		/* int - # kmem_map pages */
+#define	VM_MAXID	7		/* number of valid vm ids */
 
 #define	CTL_VM_NAMES { \
 	{ 0, 0 }, \
@@ -151,8 +129,8 @@ extern int		page_shift;
 	{ "psstrings", CTLTYPE_STRUCT }, \
 	{ "uvmexp", CTLTYPE_STRUCT }, \
 	{ "swapencrypt", CTLTYPE_NODE }, \
+	{ "nkmempages", CTLTYPE_INT }, \
 }
-#endif
 
 struct _ps_strings {
 	void	*val;
@@ -187,13 +165,8 @@ struct _ps_strings {
  * Round off or truncate to the nearest page.  These will work
  * for either addresses or counts (i.e., 1 byte rounds to 1 page).
  */
-#define	round_page(x) \
-	((vaddr_t)((((vaddr_t)(x)) + PAGE_MASK) & ~PAGE_MASK))
-#define	trunc_page(x) \
-	((vaddr_t)(((vaddr_t)(x)) & ~PAGE_MASK))
-#define	num_pages(x) \
-	((vaddr_t)((((vaddr_t)(x)) + PAGE_MASK) >> PAGE_SHIFT))
-
+#define	round_page(x) (((x) + PAGE_MASK) & ~PAGE_MASK)
+#define	trunc_page(x) ((x) & ~PAGE_MASK)
 #else
 /* out-of-kernel versions of round_page and trunc_page */
 #define	round_page(x) \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: m197_cmmu.c,v 1.3 2000/12/28 21:21:24 smurph Exp $	*/
+/*	$OpenBSD: m197_cmmu.c,v 1.10 2001/09/28 20:46:42 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -57,25 +57,28 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  */
-#ifdef MVME197
-
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/simplelock.h>
+
 #include <machine/board.h>
 #include <machine/cpus.h>
 #include <machine/cpu_number.h>
+#include <machine/locore.h>
 #include <machine/m88110.h>
 
-#define CMMU_DEBUG 1
+#ifdef DDB
+#include <ddb/db_output.h>
+#endif
 
 #ifdef DEBUG
-   #define DB_CMMU		0x4000	/* MMU debug */
+#define DB_CMMU		0x4000	/* MMU debug */
 unsigned int debuglevel = 0;
-   #define dprintf(_L_,_X_) { if (debuglevel & (_L_)) { unsigned int psr = disable_interrupts_return_psr(); printf("%d: ", cpu_number()); printf _X_;  set_psr(psr); } }
+#define dprintf(_L_,_X_) { if (debuglevel & (_L_)) { unsigned int psr = disable_interrupts_return_psr(); printf("%d: ", cpu_number()); printf _X_;  set_psr(psr); } }
 #else
-   #define dprintf(_L_,_X_)
+#define dprintf(_L_,_X_)
 #endif 
+
 #undef	SHADOW_BATC		/* don't use BATCs for now XXX nivas */
 
 /*
@@ -86,24 +89,22 @@ unsigned int debuglevel = 0;
 #define CMMU(cpu, data) cpu_cmmu[(cpu)].pair[(data)?DATA_CMMU:INST_CMMU]
 #define REGS(cpu, data) (*CMMU(cpu, data)->cmmu_regs)
 
+/* prototypes */
+void m197_cmmu_store __P((int, int, unsigned));
+int m197_cmmu_alive __P((int));
+unsigned m197_cmmu_get __P((int, int));
+void m197_cmmu_set __P((int, unsigned, int, int, int, int, vm_offset_t));
+int probe_mmu __P((vm_offset_t, int));
+void m197_cmmu_sync_cache __P((vm_offset_t, int));
+void m197_cmmu_sync_inval_cache __P((vm_offset_t, int));
+void m197_cmmu_inval_cache __P((vm_offset_t, int));
+
 /* 
  * This lock protects the cmmu SAR and SCR's; other ports 
  * can be accessed without locking it 
  *
  * May be used from "db_interface.c".
  */
-
-extern unsigned cache_policy;
-extern unsigned cpu_sets[];
-extern unsigned number_cpus;
-extern unsigned master_cpu;
-extern int      max_cpus, max_cmmus;
-extern int      cpu_cmmu_ratio;
-int init_done;
-
-/* FORWARDS */
-void m197_setup_cmmu_config(void);
-void m197_setup_board_config(void);
 
 #ifdef CMMU_DEBUG
 void
@@ -164,8 +165,7 @@ void m197_cmmu_dump_config(void)
 	return;
 }
 
-/* To be implemented as a macro for speedup - XXX-smurph */
-static void 
+void
 m197_cmmu_store(int mmu, int reg, unsigned val)
 {
 }
@@ -179,8 +179,7 @@ m197_cmmu_alive(int mmu)
 unsigned 
 m197_cmmu_get(int mmu, int reg)
 {
-   unsigned val;
-   return val;
+   return 0;
 }
 
 /*
@@ -215,7 +214,7 @@ m197_cpu_configuration_print(int master)
 	int pid = read_processor_identification_register();
 	int proctype = (pid & 0xff00) >> 8;
 	int procvers = (pid & 0xe) >> 1;
-	int mmu, cpu = cpu_number();
+	int cpu = cpu_number();
 	struct simplelock print_lock;
 
 	if (master)
@@ -246,7 +245,6 @@ m197_cmmu_init(void)
 	unsigned tmp;
 	extern void *kernel_sdt;
 	unsigned lba, pba, value;
-	init_done = 0;
 
 	/* clear BATCs */
 	for (i=0; i<8; i++) {
@@ -298,9 +296,6 @@ m197_cmmu_init(void)
 void
 m197_cmmu_shutdown_now(void)
 {
-	unsigned tmp;
-	unsigned cmmu_num;
-
 }
 
 /*
@@ -327,28 +322,22 @@ m197_cmmu_cpu_number(void)
 }
 
 /**
- **	Funcitons that actually modify CMMU registers.
+ **	Functions that actually modify CMMU registers.
  **/
-#if !DDB
-static
-#endif
 void
 m197_cmmu_remote_set(unsigned cpu, unsigned r, unsigned data, unsigned x)
 {
-	panic("m197_cmmu_remote_set() called!\n");
+	panic("m197_cmmu_remote_set() called!");
 }
 
 /*
  * cmmu_cpu_lock should be held when called if read
  * the CMMU_SCR or CMMU_SAR.
  */
-#if !DDB
-static
-#endif
 unsigned
 m197_cmmu_remote_get(unsigned cpu, unsigned r, unsigned data)
 {
-	panic("m197_cmmu_remote_get() called!\n");
+	panic("m197_cmmu_remote_get() called!");
 	return 0;
 }
 
@@ -469,7 +458,7 @@ m197_cmmu_set_pair_batc_entry(unsigned cpu, unsigned entry_no, unsigned value)
 void
 m197_cmmu_flush_remote_tlb(unsigned cpu, unsigned kernel, vm_offset_t vaddr, int size)
 {
-	register s = splhigh();
+	register int s = splhigh();
 	if (kernel) {
 		set_icmd(CMMU_ICMD_INV_SATC);
 		set_dcmd(CMMU_DCMD_INV_SATC);
@@ -503,7 +492,7 @@ m197_cmmu_pmap_activate(
 		       batc_template_t i_batc[BATC_MAX],
 		       batc_template_t d_batc[BATC_MAX])
 {
-	int entry_no;
+	/* int entry_no;*/
 
 	m197_cmmu_set_uapr(uapr);
 
@@ -541,7 +530,7 @@ m197_cmmu_pmap_activate(
 void
 m197_cmmu_flush_remote_cache(int cpu, vm_offset_t physaddr, int size)
 {
-	register s = splhigh();
+	register int s = splhigh();
 	set_icmd(CMMU_ICMD_INV_ITIC);
 	set_dcmd(CMMU_DCMD_FLUSH_ALL_INV);
 	splx(s);
@@ -563,7 +552,7 @@ m197_cmmu_flush_cache(vm_offset_t physaddr, int size)
 void
 m197_cmmu_flush_remote_inst_cache(int cpu, vm_offset_t physaddr, int size)
 {
-	register s = splhigh();
+	register int s = splhigh();
 
 	set_icmd(CMMU_ICMD_INV_ITIC);
 
@@ -587,7 +576,7 @@ m197_cmmu_flush_inst_cache(vm_offset_t physaddr, int size)
 void
 m197_cmmu_flush_remote_data_cache(int cpu, vm_offset_t physaddr, int size)
 { 
-	register s = splhigh();
+	register int s = splhigh();
 	set_dcmd(CMMU_DCMD_FLUSH_ALL_INV);
 	splx(s);
 }
@@ -609,7 +598,7 @@ m197_cmmu_flush_data_cache(vm_offset_t physaddr, int size)
 void
 m197_cmmu_sync_cache(vm_offset_t physaddr, int size)
 {
-	register s = splhigh();
+	register int s = splhigh();
 	int cpu;
 	cpu = cpu_number(); 
 	/* set_mmureg(CMMU_ICTL, CMMU_ICMD_INV_TIC); */
@@ -621,7 +610,7 @@ m197_cmmu_sync_cache(vm_offset_t physaddr, int size)
 void
 m197_cmmu_sync_inval_cache(vm_offset_t physaddr, int size)
 {
-	register s = splhigh();
+	register int s = splhigh();
 	int cpu;
 	cpu = cpu_number();
 
@@ -632,7 +621,7 @@ m197_cmmu_sync_inval_cache(vm_offset_t physaddr, int size)
 void
 m197_cmmu_inval_cache(vm_offset_t physaddr, int size)
 {
-	register s = splhigh();
+	register int s = splhigh();
 	int cpu;
 	cpu = cpu_number();
 	set_icmd(CMMU_ICMD_INV_ITIC);
@@ -643,7 +632,6 @@ m197_cmmu_inval_cache(vm_offset_t physaddr, int size)
 void
 m197_dma_cachectl(vm_offset_t va, int size, int op)
 {
-	int count;
 	if (op == DMA_CACHE_SYNC)
 		m197_cmmu_sync_cache(kvtop(va), size);
 	else if (op == DMA_CACHE_SYNC_INVAL)
@@ -689,6 +677,7 @@ m197_cmmu_show_translation(unsigned address,
 	 * indicies into tables (segment and page), and one is an offset into
 	 * a page of memory.
 	 */
+	/*
 	union {
 		unsigned bits;
 		struct {
@@ -697,26 +686,27 @@ m197_cmmu_show_translation(unsigned address,
 			page_offset:12;
 		} field;
 	} virtual_address;
-	unsigned value;
+	*/
 
+#ifdef DDB
 	if (verbose_flag)
 		db_printf("-------------------------------------------\n");
-
+#endif
 }
 
 
 void
 m197_cmmu_cache_state(unsigned addr, unsigned supervisor_flag)
 {
+	/*
 	static char *vv_name[4] =
 	{"exclu-unmod", "exclu-mod", "shared-unmod", "invalid"};
-	int cmmu_num;
+	*/
 }
 
 void
 m197_show_cmmu_info(unsigned addr)
 {
-	int cmmu_num;
 	m197_cmmu_cache_state(addr, 1);
 }
 #endif /* end if DDB */
@@ -752,8 +742,8 @@ m197_table_search(pmap_t map, vm_offset_t virt, int write, int kernel, int data)
 {
 	sdt_entry_t *sdt;
 	pt_entry_t  *pte;
-	unsigned lpa, pfa, i;
-	static entry_num = 0;
+	unsigned lpa, i;
+	static int entry_num = 0;
 
 	if (map == (pmap_t)0)
 		panic("m197_table_search: pmap is NULL");
@@ -774,8 +764,8 @@ m197_table_search(pmap_t map, vm_offset_t virt, int write, int kernel, int data)
 		if (SDT_WP(sdt))
 			return (7); /* Write Violation */
 
-		else
-			pte = (pt_entry_t *)(((sdt + SDT_ENTRIES)->table_addr)<<PDT_SHIFT) + PDTIDX(virt);
+	pte = (pt_entry_t *)(((sdt + SDT_ENTRIES)->table_addr)<<PDT_SHIFT) + PDTIDX(virt);
+
 	/*
 	 * Check whether page frame exist or not.
 	 */
@@ -789,7 +779,7 @@ m197_table_search(pmap_t map, vm_offset_t virt, int write, int kernel, int data)
 	if (write)
 		if (PDT_WP(sdt))
 			return (7); /* Write Violation */
-		/* If we get here, load the PATC. */
+	/* If we get here, load the PATC. */
 	if (entry_num > 32)
 		entry_num = 0;
 	lpa = (unsigned)virt & 0xFFFFF000;
@@ -807,7 +797,3 @@ m197_table_search(pmap_t map, vm_offset_t virt, int write, int kernel, int data)
 	}
 	return 0;
 }
-
-#endif /* MVME197 */
-
-

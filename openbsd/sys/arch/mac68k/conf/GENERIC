@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.26 2001/03/08 03:37:17 itojun Exp $
+#	$OpenBSD: GENERIC,v 1.28 2001/06/27 05:46:17 art Exp $
 #	$NetBSD: GENERIC,v 1.52 1997/01/13 23:34:07 scottr Exp $
 #
 # GENERIC - an all-in-one kernel for the mac68k

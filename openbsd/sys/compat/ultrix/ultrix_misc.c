@@ -1,4 +1,4 @@
-/*	$OpenBSD: ultrix_misc.c,v 1.16 2000/12/28 22:38:18 miod Exp $	*/
+/*	$OpenBSD: ultrix_misc.c,v 1.19 2001/07/27 21:29:53 miod Exp $	*/
 /*	$NetBSD: ultrix_misc.c,v 1.23 1996/04/07 17:23:04 jonathan Exp $	*/
 
 /*
@@ -140,9 +140,9 @@ extern char *ultrix_syscallnames[];
 #define ULTRIX_EXEC_SETREGS cpu_exec_ecoff_setregs
 #endif /* __mips__ */
 
-#ifdef vax
+#ifdef __vax__
 #define ULTRIX_EXEC_SETREGS setregs
-#endif /* mips */
+#endif /* __vax__ */
 
 
 extern void ULTRIX_EXEC_SETREGS __P((struct proc *, struct exec_package *,
@@ -332,8 +332,8 @@ ultrix_sys_mmap(p, v, retval)
 
 	if ((SCARG(&ouap, flags) & MAP_FIXED) == 0 &&
 	    SCARG(&ouap, addr) != 0 &&
-	    SCARG(&ouap, addr) < (void *)round_page(p->p_vmspace->vm_daddr+MAXDSIZ))
-		SCARG(&ouap, addr) = (void *)round_page(p->p_vmspace->vm_daddr+MAXDSIZ);
+	    SCARG(&ouap, addr) < (void *)round_page((vaddr_t)p->p_vmspace->vm_daddr+MAXDSIZ))
+		SCARG(&ouap, addr) = (void *)round_page((vaddr_t)p->p_vmspace->vm_daddr+MAXDSIZ);
 
 	SCARG(&ouap, len) = SCARG(uap, len);
 	SCARG(&ouap, prot) = SCARG(uap, prot);
@@ -372,8 +372,6 @@ ultrix_sys_setsockopt(p, v, retval)
 #define	SO_DONTLINGER (~SO_LINGER)
 	if (SCARG(uap, name) == SO_DONTLINGER) {
 		m = m_get(M_WAIT, MT_SOOPTS);
-		if (m == NULL)
-			return (ENOBUFS);
 		mtod(m, struct linger *)->l_onoff = 0;
 		m->m_len = sizeof(struct linger);
 		return (sosetopt((struct socket *)fp->f_data, SCARG(uap, level),
@@ -383,8 +381,6 @@ ultrix_sys_setsockopt(p, v, retval)
 		return (EINVAL);
 	if (SCARG(uap, val)) {
 		m = m_get(M_WAIT, MT_SOOPTS);
-		if (m == NULL)
-			return (ENOBUFS);
 		if ((error = copyin(SCARG(uap, val), mtod(m, caddr_t),
 				    (u_int)SCARG(uap, valsize))) != 0) {
 			(void) m_free(m);

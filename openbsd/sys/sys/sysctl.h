@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.h,v 1.35 2001/03/16 08:49:08 art Exp $	*/
+/*	$OpenBSD: sysctl.h,v 1.43 2001/09/28 01:42:54 millert Exp $	*/
 /*	$NetBSD: sysctl.h,v 1.16 1996/04/09 20:55:36 cgd Exp $	*/
 
 /*
@@ -154,7 +154,18 @@ struct ctlname {
 #define	KERN_MSGBUFSIZE		38	/* int: size of message buffer */
 #define KERN_MALLOCSTATS	39	/* node: malloc statistics */
 #define KERN_CPTIME		40	/* array: cp_time */
-#define	KERN_MAXID		41	/* number of valid kern ids */
+#define KERN_NCHSTATS		41	/* struct: vfs cache statistics */
+#define KERN_FORKSTAT		42	/* struct: fork statistics */
+#define KERN_NSELCOLL		43	/* int: select(2) collisions */
+#define KERN_TTY		44	/* node: tty information */
+#define	KERN_CCPU		45	/* int: ccpu */
+#define	KERN_FSCALE		46	/* int: fscale */
+#define	KERN_NPROCS		47	/* int: number of processes */
+#define	KERN_MSGBUF		48	/* message buffer, KERN_MSGBUFSIZE */
+#define	KERN_POOL		49	/* struct: pool information */
+#define	KERN_STACKGAPRANDOM	50	/* int: stackgap_random */
+#define	KERN_SYSVIPC_INFO	51	/* struct: SysV sem/shm/msg info */
+#define	KERN_MAXID		52	/* number of valid kern ids */
 
 #define	CTL_KERN_NAMES { \
 	{ 0, 0 }, \
@@ -198,6 +209,17 @@ struct ctlname {
 	{ "msgbufsize", CTLTYPE_INT }, \
 	{ "malloc", CTLTYPE_NODE }, \
 	{ "cp_time", CTLTYPE_STRUCT }, \
+	{ "nchstats", CTLTYPE_STRUCT }, \
+	{ "forkstat", CTLTYPE_STRUCT }, \
+	{ "nselcoll", CTLTYPE_INT }, \
+	{ "tty", CTLTYPE_NODE }, \
+	{ "ccpu", CTLTYPE_INT }, \
+	{ "fscale", CTLTYPE_INT }, \
+	{ "nprocs", CTLTYPE_INT }, \
+	{ "msgbuf", CTLTYPE_STRUCT }, \
+	{ "pool", CTLTYPE_NODE }, \
+	{ "stackgap_random", CTLTYPE_INT }, \
+	{ "sysvipc_info", CTLTYPE_INT }, \
 }
 
 /*
@@ -211,6 +233,13 @@ struct ctlname {
 #define	KERN_PROC_UID		5	/* by effective uid */
 #define	KERN_PROC_RUID		6	/* by real uid */
 #define	KERN_PROC_KTHREAD	7	/* also return kernel threads */
+
+/*
+ * KERN_SYSVIPC_INFO subtypes
+ */
+#define KERN_SYSVIPC_MSG_INFO	1	/* msginfo and msqid_ds */
+#define KERN_SYSVIPC_SEM_INFO	2	/* seminfo and semid_ds */
+#define KERN_SYSVIPC_SHM_INFO	3	/* shminfo and shmid_ds */
 
 /*
  * KERN_PROC subtype ops return arrays of augmented proc structures:
@@ -279,7 +308,8 @@ struct kinfo_proc {
 #define	HW_PAGESIZE	 7		/* int: software page size */
 #define	HW_DISKNAMES	 8		/* strings: disk drive names */
 #define	HW_DISKSTATS	 9		/* struct: diskstats[] */
-#define	HW_MAXID	10		/* number of valid hw ids */
+#define	HW_DISKCOUNT	10		/* int: number of disks */
+#define	HW_MAXID	11		/* number of valid hw ids */
 
 #define	CTL_HW_NAMES { \
 	{ 0, 0 }, \
@@ -290,8 +320,9 @@ struct kinfo_proc {
 	{ "physmem", CTLTYPE_INT }, \
 	{ "usermem", CTLTYPE_INT }, \
 	{ "pagesize", CTLTYPE_INT }, \
-	{ "disknames", CTLTYPE_STRUCT }, \
+	{ "disknames", CTLTYPE_STRING }, \
 	{ "diskstats", CTLTYPE_STRUCT }, \
+	{ "diskcount", CTLTYPE_INT }, \
 }
 
 /*
@@ -414,6 +445,7 @@ int sysctl_ntptime __P((char *, size_t *));
 #ifdef GPROF
 int sysctl_doprof __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif
+int sysctl_dopool __P((int *, u_int, char *, size_t *));
 
 void fill_eproc __P((struct proc *, struct eproc *));
 
@@ -437,6 +469,7 @@ int cpu_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 		    struct proc *));
 int vfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 		    struct proc *));
+int sysctl_sysvipc __P((int *, u_int, void *, size_t *));
 
 void sysctl_init __P((void));
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs.h,v 1.10 2000/05/22 17:33:18 mickey Exp $	*/
+/*	$OpenBSD: nfs.h,v 1.13 2001/09/16 00:42:44 millert Exp $	*/
 /*	$NetBSD: nfs.h,v 1.10.4.1 1996/05/27 11:23:56 fvdl Exp $	*/
 
 /*
@@ -136,20 +136,6 @@
 #endif
 
 /*
- * Expected allocation sizes for major data structures. If the actual size
- * of the structure exceeds these sizes, then malloc() will be allocating
- * almost twice the memory required. This is used in nfs_init() to warn
- * the sysadmin that the size of a structure should be reduced.
- * (These sizes are always a power of 2. If the kernel malloc() changes
- *  to one that does not allocate space in powers of 2 size, then this all
- *  becomes bunk!)
- */
-#define NFS_NODEALLOC	256
-#define NFS_MNTALLOC	512
-#define NFS_SVCALLOC	256
-#define NFS_UIDALLOC	128
-
-/*
  * Structures for the nfssvc(2) syscall. Not that anyone but nfsd and mount_nfs
  * should ever try and use it.
  */
@@ -177,9 +163,9 @@ struct nfsd_cargs {
 	char		*ncd_dirp;	/* Mount dir path */
 	uid_t		ncd_authuid;	/* Effective uid */
 	int		ncd_authtype;	/* Type of authenticator */
-	int		ncd_authlen;	/* Length of authenticator string */
+	u_int		ncd_authlen;	/* Length of authenticator string */
 	u_char		*ncd_authstr;	/* Authenticator string */
-	int		ncd_verflen;	/* and the verifier */
+	u_int		ncd_verflen;	/* and the verifier */
 	u_char		*ncd_verfstr;
 	NFSKERBKEY_T	ncd_key;	/* Session key */
 };
@@ -438,7 +424,6 @@ struct nfsrv_descript {
 	int			nd_len;		/* Length of this write */
 	int			nd_repstat;	/* Reply status */
 	u_int32_t		nd_retxid;	/* Reply xid */
-	u_int32_t		nd_duration;	/* Lease duration */
 	struct timeval		nd_starttime;	/* Time RPC initiated */
 	fhandle_t		nd_fh;		/* File handle */
 	struct ucred		nd_cr;		/* Credentials */
@@ -450,7 +435,6 @@ struct nfsrv_descript {
 #define ND_CHECK	0x04
 #define ND_LEASE	(ND_READ | ND_WRITE | ND_CHECK)
 #define ND_NFSV3	0x08
-#define ND_NQNFS	0x10
 #define ND_KERBNICK	0x20
 #define ND_KERBFULL	0x40
 #define ND_KERBAUTH	(ND_KERBNICK | ND_KERBFULL)

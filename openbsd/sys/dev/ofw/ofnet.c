@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofnet.c,v 1.4 2001/02/20 19:39:42 mickey Exp $	*/
+/*	$OpenBSD: ofnet.c,v 1.6 2001/08/08 21:49:16 miod Exp $	*/
 /*	$NetBSD: ofnet.c,v 1.4 1996/10/16 19:33:21 ws Exp $	*/
 
 /*
@@ -69,6 +69,7 @@ struct ofn_softc {
 	int sc_phandle;
 	int sc_ihandle;
 	struct arpcom sc_arpcom;
+	struct timeout sc_tmo;
 	void *dmabuf;
 };
 
@@ -162,6 +163,8 @@ printf("\nethernet dev: path %s\n", path);
 	ifp->if_watchdog = ofnwatchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
 
+	timeout_set(&of->sc_tmo, ofntimer, of);
+
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
@@ -173,7 +176,6 @@ ofnread(of)
 	struct ofn_softc *of;
 {
 	struct ifnet *ifp = &of->sc_arpcom.ac_if;
-	struct ether_header *eh;
 	struct mbuf *m, **mp, *head;
 	int l, len;
 	char *bufp;
@@ -232,15 +234,13 @@ ofnread(of)
 		}
 		if (head == 0)
 			continue;
-		eh = mtod(head, struct ether_header *);
 
 #if	NBPFILTER > 0
 		if (ifp->if_bpf) {
 			bpf->mtap(ifp->if_bpf, m);
 #endif
-		m_adj(head, sizeof(struct ether_header));
 		ifp->if_ipackets++;
-		ether_input(ifp, eh, head);
+		ether_input_mbuf(ifp, head);
 	}
 }
 
@@ -249,7 +249,7 @@ ofntimer(of)
 	struct ofn_softc *of;
 {
 	ofnread(of);
-	timeout(ofntimer, of, 1);
+	timeout_add(&of->sc_tmo, 1);
 }
 
 static void
@@ -272,7 +272,7 @@ static void
 ofnstop(of)
 	struct ofn_softc *of;
 {
-	untimeout(ofntimer, of);
+	timeout_del(&of->sc_tmo);
 	of->sc_arpcom.ac_if.if_flags &= ~IFF_RUNNING;
 }
 

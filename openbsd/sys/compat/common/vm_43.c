@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_43.c,v 1.1 1996/02/26 23:26:55 niklas Exp $	*/
+/*	$OpenBSD: vm_43.c,v 1.3 2001/08/11 22:57:56 art Exp $	*/
 /*	$NetBSD: vm_43.c,v 1.1 1996/02/05 01:58:29 christos Exp $	*/
 
 /*
@@ -63,8 +63,6 @@
 #include <miscfs/specfs/specdev.h>
 
 #include <vm/vm.h>
-#include <vm/vm_pager.h>
-#include <vm/vm_prot.h>
 
 /* ARGSUSED */
 int
@@ -124,7 +122,7 @@ compat_43_sys_mmap(p, v, retval)
 	if (SCARG(uap, flags) & OMAP_ANON)
 		SCARG(&nargs, flags) |= MAP_ANON;
 	if (SCARG(uap, flags) & OMAP_COPY)
-		SCARG(&nargs, flags) |= MAP_COPY;
+		SCARG(&nargs, flags) |= MAP_PRIVATE;
 	if (SCARG(uap, flags) & OMAP_SHARED)
 		SCARG(&nargs, flags) |= MAP_SHARED;
 	else

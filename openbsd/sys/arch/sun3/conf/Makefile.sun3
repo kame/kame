@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.sun3,v 1.25 2001/01/04 22:39:12 miod Exp $
+#	$OpenBSD: Makefile.sun3,v 1.27 2001/08/30 22:10:18 miod Exp $
 #	$NetBSD: Makefile.sun3,v 1.51 1996/09/09 21:07:08 mycroft Exp $
 
 # Makefile for OpenBSD
@@ -22,6 +22,8 @@
 # DEBUG is set to -g if debugging.
 # PROF is set to -pg if profiling.
 
+.include <bsd.own.mk>
+
 CC?=	cc
 LD?=	ld
 MKDEP?=	mkdep
@@ -32,6 +34,7 @@ STRIP?=	strip
 S!=	cd ../../../..; pwd
 .endif
 SUN3=	$S/arch/sun3
+M68K=	$S/arch/m68k
 
 INCLUDES=	-I. -I$S/arch -I$S -nostdinc
 CPPFLAGS=	${INCLUDES} ${IDENT} ${PARAM} -D_KERNEL -Dmc68020 -Dsun3
@@ -102,10 +105,12 @@ LINKFLAGS+=	-S
 
 %LOAD
 
-assym.h: $S/kern/genassym.sh ${SUN3}/sun3/genassym.cf
-	sh $S/kern/genassym.sh ${CC} ${CFLAGS} ${CPPFLAGS} \
-	    ${PARAM} < ${SUN3}/sun3/genassym.cf > assym.h.tmp && \
-	    mv -f assym.h.tmp assym.h
+assym.h: $S/kern/genassym.sh \
+	 ${M68K}/m68k/genassym.cf ${SUN3}/sun3/genassym.cf
+	cat ${M68K}/m68k/genassym.cf ${SUN3}/sun3/genassym.cf | \
+	    sh $S/kern/genassym.sh ${CC} ${CFLAGS} ${CPPFLAGS} ${PROF} \
+	    > assym.h.tmp && \
+	mv -f assym.h.tmp assym.h
 
 param.c: $S/conf/param.c
 	rm -f param.c
@@ -164,5 +169,17 @@ db_machdep.o dvma.o machdep.o pmap.o sun3_startup.o vm_machdep.o: Makefile
 
 locore.o: ${SUN3}/sun3/locore.s assym.h
 	${NORMAL_S}
+
+# The install target can be redefined by putting a
+# install-kernel-${MACHINE_NAME} target into /etc/mk.conf
+MACHINE_NAME!=  uname -n
+install: install-kernel-${MACHINE_NAME}
+.if !target(install-kernel-${MACHINE_NAME}})
+install-kernel-${MACHINE_NAME}:
+	rm -f /obsd
+	ln /bsd /obsd
+	cp bsd /nbsd
+	mv /nbsd /bsd
+.endif
 
 %RULES

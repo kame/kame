@@ -1,4 +1,4 @@
-/*	$OpenBSD: gateA20.c,v 1.6 2000/11/13 15:53:34 aaron Exp $	*/
+/*	$OpenBSD: gateA20.c,v 1.8 2001/08/18 15:34:17 mickey Exp $	*/
 
 /*
  * Ported to boot 386BSD by Julian Elischer (julian@tfs.com) Sept 1992
@@ -6,24 +6,24 @@
  * Mach Operating System
  * Copyright (c) 1992, 1991 Carnegie Mellon University
  * All Rights Reserved.
- * 
+ *
  * Permission to use, copy, modify and distribute this software and its
  * documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
+ *
  * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
  * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND FOR
  * ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
- * 
+ *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
  *  School of Computer Science
  *  Carnegie Mellon University
  *  Pittsburgh PA 15213-3890
- * 
+ *
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
@@ -36,24 +36,10 @@
 
 #include "libsa.h"
 
-#define KC_CMD_WOUT	0xd1		/* write output port */
 #define KB_A20		0xdf		/* enable A20,
 					   enable output buffer full interrupt
 					   enable data line
 					   enable clock line */
-
-
-#define A20_KBD		0
-#define A20_0x92	1
-
-/*
- * Check for an oddball IBM_L40 machine.
- */
-int
-getA20type()
-{
-	return(A20_KBD);
-}
 
 
 /*
@@ -63,8 +49,8 @@ void
 gateA20(on)
 	int on;
 {
-
-	if (getA20type() == A20_0x92) {
+	if (ps2model == 0xf82 ||
+	    (inb(IO_KBD + KBSTATP) == 0xff && inb(IO_KBD + KBDATAP) == 0xff)) {
 		int data;
 
 		/* Try to use 0x92 to turn on A20 */
@@ -77,13 +63,12 @@ gateA20(on)
 		}
 	} else {
 
-		/* XXX - These whiles might need to be changed to bounded for loops */
 		while (inb(IO_KBD + KBSTATP) & KBS_IBF);
 
 		while (inb(IO_KBD + KBSTATP) & KBS_DIB)
 			(void)inb(IO_KBD + KBDATAP);
 
-		outb(IO_KBD + KBCMDP, KC_CMD_WOUT);
+		outb(IO_KBD + KBCMDP, KBC_CMDWOUT);
 		while (inb(IO_KBD + KBSTATP) & KBS_IBF);
 
 		if (on)
@@ -96,4 +81,3 @@ gateA20(on)
 			(void)inb(IO_KBD + KBDATAP);
 	}
 }
-

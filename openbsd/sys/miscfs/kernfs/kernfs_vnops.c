@@ -1,4 +1,4 @@
-/*	$OpenBSD: kernfs_vnops.c,v 1.19 2000/03/13 04:05:15 millert Exp $	*/
+/*	$OpenBSD: kernfs_vnops.c,v 1.21 2001/06/27 04:58:42 art Exp $	*/
 /*	$NetBSD: kernfs_vnops.c,v 1.43 1996/03/16 23:52:47 christos Exp $	*/
 
 /*
@@ -60,12 +60,8 @@
 #include <sys/msgbuf.h>
 #include <miscfs/kernfs/kernfs.h>
 
-#if defined(UVM)
 #include <vm/vm.h>
 #include <uvm/uvm_extern.h>
-#else
-#include <sys/vmmeter.h>
-#endif
 
 #define KSTRING	256		/* Largest I/O available via this filesystem */
 #define	UIO_MX 32
@@ -105,11 +101,7 @@ struct kern_target kern_targets[] = {
      { DT_REG, N("ostype"),    &ostype,      KTT_STRING,   VREG, READ_MODE  },
      { DT_REG, N("osrelease"), &osrelease,   KTT_STRING,   VREG, READ_MODE  },
      { DT_REG, N("osrev"),     &osrev,       KTT_INT,      VREG, READ_MODE  },
-#if defined(UVM)
      { DT_REG, N("pagesize"),  &uvmexp.pagesize, KTT_INT,  VREG, READ_MODE  },
-#else
-     { DT_REG, N("pagesize"),  &cnt.v_page_size, KTT_INT,  VREG, READ_MODE  },
-#endif
      { DT_REG, N("physmem"),   &physmem,     KTT_INT,      VREG, READ_MODE  },
      { DT_REG, N("posix"),     &posix,       KTT_INT,      VREG, READ_MODE  },
 #if 0
@@ -189,9 +181,7 @@ struct vnodeopv_entry_desc kernfs_vnodeop_entries[] = {
 	{ &vop_ioctl_desc, kernfs_ioctl },	/* ioctl */
 	{ &vop_select_desc, kernfs_select },	/* select */
 	{ &vop_revoke_desc, kernfs_revoke },    /* revoke */
-	{ &vop_mmap_desc, kernfs_mmap },	/* mmap */
 	{ &vop_fsync_desc, kernfs_fsync },	/* fsync */
-	{ &vop_seek_desc, kernfs_seek },	/* seek */
 	{ &vop_remove_desc, kernfs_remove },	/* remove */
 	{ &vop_link_desc, kernfs_link },	/* link */
 	{ &vop_rename_desc, kernfs_rename },	/* rename */
@@ -211,11 +201,6 @@ struct vnodeopv_entry_desc kernfs_vnodeop_entries[] = {
 	{ &vop_islocked_desc, kernfs_islocked },/* islocked */
 	{ &vop_pathconf_desc, kernfs_pathconf },/* pathconf */
 	{ &vop_advlock_desc, kernfs_advlock },	/* advlock */
-	{ &vop_blkatoff_desc, kernfs_blkatoff },/* blkatoff */
-	{ &vop_valloc_desc, kernfs_valloc },	/* valloc */
-	{ &vop_vfree_desc, kernfs_vfree },	/* vfree */
-	{ &vop_truncate_desc, kernfs_truncate },/* truncate */
-	{ &vop_update_desc, kernfs_update },	/* update */
 	{ &vop_bwrite_desc, kernfs_bwrite },	/* bwrite */
 	{ (struct vnodeop_desc*)NULL, (int(*) __P((void *)))NULL }
 };
@@ -320,11 +305,7 @@ kernfs_xread(kt, off, bufp, len)
 		break;
 
 	case KTT_USERMEM:
-#if defined(UVM)
 		sprintf(*bufp, "%u\n", physmem - uvmexp.wired);
-#else
-		sprintf(*bufp, "%u\n", physmem - cnt.v_wire_count);
-#endif
 		break;
 #ifdef IPSEC
 	case KTT_IPSECSPI:

@@ -1,3 +1,4 @@
+/* $OpenBSD: if_enc.h,v 1.8 2001/06/25 05:14:00 angelos Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and 
@@ -14,8 +15,9 @@
  *
  * Copyright (C) 1995, 1996, 1997, 1998 by John Ioannidis, Angelos D. Keromytis
  * and Niels Provos.
- *	
- * Permission to use, copy, and modify this software without fee
+ * Copyright (c) 2001, Angelos D. Keromytis.
+ *
+ * Permission to use, copy, and modify this software with or without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
  * modification of this software. 
@@ -31,8 +33,8 @@
  * PURPOSE.
  */
 
-#ifndef _IF_ENC_H_
-#define _IF_ENC_H_
+#ifndef _NET_IF_ENC_H_
+#define _NET_IF_ENC_H_
 
 #define ENCMTU		(1024+512)
 #define ENC_HDRLEN	12
@@ -48,4 +50,4 @@ struct enchdr {
 };
 
 extern struct enc_softc encif[];
-#endif
+#endif /* _NET_IF_ENC_H_ */

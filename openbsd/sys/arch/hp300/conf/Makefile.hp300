@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.hp300,v 1.20 2000/06/18 20:00:54 millert Exp $
+#	$OpenBSD: Makefile.hp300,v 1.22 2001/08/30 22:10:18 miod Exp $
 #	$NetBSD: Makefile.hp300,v 1.54 1997/04/01 23:16:41 scottr Exp $
 
 # Makefile for OpenBSD
@@ -22,6 +22,8 @@
 # DEBUG is set to -g if debugging.
 # PROF is set to -pg if profiling.
 
+.include <bsd.own.mk>
+
 CC?=	cc
 LD?=	ld
 MKDEP?=	mkdep
@@ -33,6 +35,7 @@ COPTS?=		-O2
 S!=	cd ../../../..; pwd
 .endif
 HP300=	$S/arch/hp300
+M68K=	$S/arch/m68k
 
 INCLUDES=	-I. -I$S/arch -I$S -nostdinc
 CPPFLAGS=	${INCLUDES} ${IDENT} ${PARAM} -D_KERNEL \
@@ -65,7 +68,7 @@ LIBCOMPAT=	${COMPATLIB_PROF}
 .endif
 
 ### for the Motorola 68040 Floating Point Software Product
-.include "$S/arch/m68k/fpsp/Makefile.inc"
+.include "${M68K}/fpsp/Makefile.inc"
 
 # compile rules: rules are named ${TYPE}_${SUFFIX} where TYPE is NORMAL or
 # HOSTED}, and SUFFIX is the file suffix, capitalized (e.g. C for a .c file).
@@ -106,10 +109,12 @@ LINKFLAGS+=	-S
 
 %LOAD
 
-assym.h: $S/kern/genassym.sh ${HP300}/hp300/genassym.cf
-	sh $S/kern/genassym.sh ${CC} ${CFLAGS} ${CPPFLAGS} \
-	    ${PARAM} < ${HP300}/hp300/genassym.cf > assym.h.tmp && \
-	    mv -f assym.h.tmp assym.h
+assym.h: $S/kern/genassym.sh \
+	 ${M68K}/m68k/genassym.cf ${HP300}/hp300/genassym.cf
+	cat ${M68K}/m68k/genassym.cf ${HP300}/hp300/genassym.cf | \
+	    sh $S/kern/genassym.sh ${CC} ${CFLAGS} ${CPPFLAGS} ${PROF} \
+	    > assym.h.tmp && \
+	mv -f assym.h.tmp assym.h
 
 param.c: $S/conf/param.c
 	rm -f param.c
@@ -175,5 +180,17 @@ dma.o hpux_machdep.o locore.o machdep.o pmap.o pmap_boostrap.o sys_machdep.o tra
 
 locore.o: ${HP300}/hp300/locore.s assym.h
 	${NORMAL_S}
+
+# The install target can be redefined by putting a
+# install-kernel-${MACHINE_NAME} target into /etc/mk.conf
+MACHINE_NAME!=  uname -n
+install: install-kernel-${MACHINE_NAME}
+.if !target(install-kernel-${MACHINE_NAME}})
+install-kernel-${MACHINE_NAME}:
+	rm -f /obsd
+	ln /bsd /obsd
+	cp bsd /nbsd
+	mv /nbsd /bsd
+.endif
 
 %RULES

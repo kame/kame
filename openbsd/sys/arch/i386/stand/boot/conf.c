@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.16 2000/10/25 17:11:58 mickey Exp $	*/
+/*	$OpenBSD: conf.c,v 1.18 2001/08/20 20:44:49 mickey Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff
@@ -48,7 +48,7 @@
 #include <dev/cons.h>
 #include <lib/libsa/exec.h>
 
-const char version[] = "1.26";
+const char version[] = "1.28";
 int	debug = 1;
 
 const struct x_sw execsw[] = {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmpci.c,v 1.1 2000/04/27 02:19:41 millert Exp $	*/
+/*	$OpenBSD: cmpci.c,v 1.4 2001/10/03 18:20:12 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2000 Takuya SHIOZAKI
@@ -323,14 +323,13 @@ cmpci_attach(parent, self, aux)
 
 	/* map I/O space */
 	if (pci_mapreg_map(pa, CMPCI_PCI_IOBASEREG, PCI_MAPREG_TYPE_IO, 0,
-			   &sc->sc_iot, &sc->sc_ioh, NULL, NULL)) {
+			   &sc->sc_iot, &sc->sc_ioh, NULL, NULL, 0)) {
 		printf("\n%s: failed to map I/O space\n", sc->sc_dev.dv_xname);
 		return;
 	}
 
 	/* interrupt */
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			  pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("\n%s: failed to map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -435,7 +434,7 @@ cmpci_intr(handle)
 		    CMPCI_REG_CH1_INTR_ENABLE);
 	splx(s);
 
-	return 0;
+	return 1;
 }
 
 /* open/close */

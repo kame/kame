@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_misc.c,v 1.35 2001/04/02 21:43:11 niklas Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.38 2001/08/12 20:33:50 mickey Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
 /*
@@ -67,7 +67,6 @@
 #include <sys/syscallargs.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
 
 #include <compat/linux/linux_types.h>
 #include <compat/linux/linux_fcntl.h>
@@ -211,12 +210,12 @@ linux_sys_wait4(p, v, retval)
 }
 
 int
-linux_sys_setresgid(p, v, retval)
+linux_sys_setresgid16(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_setresgid_args /* {
+	struct linux_sys_setresgid16_args /* {
 		syscallarg(gid_t) rgid;
 		syscallarg(gid_t) egid;
 		syscallarg(gid_t) sgid;
@@ -278,12 +277,12 @@ linux_sys_setresgid(p, v, retval)
 }
 
 int
-linux_sys_getresgid(p, v, retval)
+linux_sys_getresgid16(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_getresgid_args /* {
+	struct linux_sys_getresgid16_args /* {
 		syscallarg(gid_t *) rgid;
 		syscallarg(gid_t *) egid;
 		syscallarg(gid_t *) sgid;
@@ -1219,12 +1218,12 @@ linux_sys_personality(p, v, retval)
  * The calls are here because of type conversions.
  */
 int
-linux_sys_setreuid(p, v, retval)
+linux_sys_setreuid16(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_setreuid_args /* {
+	struct linux_sys_setreuid16_args /* {
 		syscallarg(int) ruid;
 		syscallarg(int) euid;
 	} */ *uap = v;
@@ -1239,12 +1238,12 @@ linux_sys_setreuid(p, v, retval)
 }
 
 int
-linux_sys_setregid(p, v, retval)
+linux_sys_setregid16(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_setregid_args /* {
+	struct linux_sys_setregid16_args /* {
 		syscallarg(int) rgid;
 		syscallarg(int) egid;
 	} */ *uap = v;
@@ -1311,12 +1310,12 @@ linux_sys___sysctl(p, v, retval)
 }
 
 int
-linux_sys_setresuid(p, v, retval)
+linux_sys_setresuid16(p, v, retval)
 	struct proc *p;
 	void *v;
 	register_t *retval;
 {
-	struct linux_sys_setresuid_args /* {
+	struct linux_sys_setresuid16_args /* {
 		syscallarg(uid_t) ruid;
 		syscallarg(uid_t) euid;
 		syscallarg(uid_t) suid;

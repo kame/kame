@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_pager_i.h,v 1.5 2001/01/29 02:07:48 niklas Exp $	*/
-/*	$NetBSD: uvm_pager_i.h,v 1.7 1999/03/25 18:48:55 mrg Exp $	*/
+/*	$OpenBSD: uvm_pager_i.h,v 1.7 2001/08/11 10:57:22 art Exp $	*/
+/*	$NetBSD: uvm_pager_i.h,v 1.9 2000/05/08 23:13:42 thorpej Exp $	*/
 
 /*
  *
@@ -59,8 +59,7 @@ uvm_pageratop(kva)
 {
 	paddr_t pa;
  
-	pa = pmap_extract(pmap_kernel(), kva);
-	if (pa == 0)
+	if (__predict_false(pmap_extract(pmap_kernel(), kva, &pa) == FALSE))
 		panic("uvm_pageratop");
 	return (PHYS_TO_VM_PAGE(pa));
 } 

@@ -1,5 +1,5 @@
-/*	$OpenBSD: dz.c,v 1.2 2001/01/28 01:19:59 hugh Exp $	*/
-/*	$NetBSD: dz.c,v 1.19 2000/01/24 02:40:29 matt Exp $	*/
+/*	$OpenBSD: dz.c,v 1.6 2001/08/25 13:33:37 hugh Exp $	*/
+/*	$NetBSD: dz.c,v 1.23 2000/06/04 02:14:12 matt Exp $	*/
 /*
  * Copyright (c) 1996  Ken C. Wellsch.  All rights reserved.
  * Copyright (c) 1992, 1993
@@ -50,6 +50,7 @@
 #include <sys/kernel.h>
 #include <sys/syslog.h>
 #include <sys/device.h>
+#include <sys/timeout.h>
 
 #ifdef DDB
 #include <dev/cons.h>
@@ -109,10 +110,10 @@ static struct speedtab dzspeedtab[] =
   {      -1,	-1		}
 };
 
-static	void	dzstart __P((struct tty *));
-static	int	dzparam __P((struct tty *, struct termios *));
-static unsigned	dzmctl __P((struct dz_softc *, int, int, int));
-static	void	dzscan __P((void *));
+static	void	dzstart(struct tty *);
+static	int	dzparam(struct tty *, struct termios *);
+static	unsigned	dzmctl(struct dz_softc *, int, int, int);
+static	void	dzscan(void *);
 
 struct	cfdriver dz_cd = {
 	NULL, "dz", DV_TTY
@@ -126,14 +127,15 @@ cdev_decl(dz);
  */
 int	dz_timer = 0;	/* true if timer started */
 
+struct timeout dz_timeout;
+
 #define DZ_DZ	8		/* Unibus DZ-11 board linecount */
 #define DZ_DZV	4		/* Q-bus DZV-11 or DZQ-11 */
 
 void
-dzattach(sc)
-        struct dz_softc *sc;
+dzattach(struct dz_softc *sc)
 {
-	register int n;
+	int n;
 
 	sc->sc_rxint = sc->sc_brk = 0;
 
@@ -147,11 +149,15 @@ dzattach(sc)
 	for (n = 0; n < sc->sc_type; n++)
 		sc->sc_dz[n].dz_tty = ttymalloc();
 
+	evcnt_attach(&sc->sc_dev, "rintr", &sc->sc_rintrcnt);
+	evcnt_attach(&sc->sc_dev, "tintr", &sc->sc_tintrcnt);
+
 	/* Alas no interrupt on modem bit changes, so we manually scan */
 
 	if (dz_timer == 0) {
 		dz_timer = 1;
-		timeout(dzscan, (void *)0, hz);
+		timeout_set(&dz_timeout, dzscan, NULL);
+		timeout_add(&dz_timeout, hz);
 	}
 	printf("\n");
 	return;
@@ -160,13 +166,12 @@ dzattach(sc)
 /* Receiver Interrupt */
 
 void
-dzrint(arg)
-	void *arg;
+dzrint(void *arg)
 {
 	struct dz_softc *sc = arg;
-	register struct tty *tp;
-	register int cc, line;
-	register unsigned c;
+	struct tty *tp;
+	int cc, line;
+	unsigned c;
 	int overrun = 0;
 
 	sc->sc_rxint++;
@@ -177,7 +182,8 @@ dzrint(arg)
 		tp = sc->sc_dz[line].dz_tty;
 
 		/* Must be caught early */
-		if (sc->sc_catch && (*sc->sc_catch)(line, cc))
+		if (sc->sc_dz[line].dz_catch &&
+		    (*sc->sc_dz[line].dz_catch)(sc->sc_dz[line].dz_private, cc))
 			continue;
 
 		if (!(tp->t_state & TS_ISOPEN)) {
@@ -215,13 +221,12 @@ dzrint(arg)
 /* Transmitter Interrupt */
 
 void
-dzxint(arg)
-	void *arg;
+dzxint(void *arg)
 {
-	register struct dz_softc *sc = arg;
-	register struct tty *tp;
-	register struct clist *cl;
-	register int line, ch, csr;
+	struct dz_softc *sc = arg;
+	struct tty *tp;
+	struct clist *cl;
+	int line, ch, csr;
 	u_char tcr;
 
 	/*
@@ -278,13 +283,10 @@ dzxint(arg)
 }
 
 int
-dzopen(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+dzopen(dev_t dev, int flag, int mode, struct proc *p)
 {
-	register struct tty *tp;
-	register int unit, line;
+	struct tty *tp;
+	int unit, line;
 	struct	dz_softc *sc;
 	int s, error = 0;
 
@@ -336,14 +338,11 @@ dzopen(dev, flag, mode, p)
 
 /*ARGSUSED*/
 int
-dzclose(dev, flag, mode, p)
-	dev_t dev;
-	int flag, mode;
-	struct proc *p;
+dzclose(dev_t dev, int flag, int mode, struct proc *p)
 {
 	struct	dz_softc *sc;
-	register struct tty *tp;
-	register int unit, line;
+	struct tty *tp;
+	int unit, line;
 
 	
 	unit = DZ_I2C(minor(dev));
@@ -365,11 +364,9 @@ dzclose(dev, flag, mode, p)
 }
 
 int
-dzread (dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
+dzread(dev_t dev, struct uio *uio, int flag)
 {
-	register struct tty *tp;
+	struct tty *tp;
 	struct	dz_softc *sc;
 
 	sc = dz_cd.cd_devs[DZ_I2C(minor(dev))];
@@ -379,11 +376,9 @@ dzread (dev, uio, flag)
 }
 
 int
-dzwrite (dev, uio, flag)
-	dev_t dev;
-	struct uio *uio;
+dzwrite(dev_t dev, struct uio *uio, int flag)
 {
-	register struct tty *tp;
+	struct tty *tp;
 	struct	dz_softc *sc;
 
 	sc = dz_cd.cd_devs[DZ_I2C(minor(dev))];
@@ -394,16 +389,11 @@ dzwrite (dev, uio, flag)
 
 /*ARGSUSED*/
 int
-dzioctl (dev, cmd, data, flag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct proc *p;
+dzioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	struct	dz_softc *sc;
-	register struct tty *tp;
-	register int unit, line;
+	struct tty *tp;
+	int unit, line;
 	int error;
 
 	unit = DZ_I2C(minor(dev));
@@ -459,8 +449,7 @@ dzioctl (dev, cmd, data, flag, p)
 }
 
 struct tty *
-dztty (dev)
-        dev_t dev;
+dztty(dev_t dev)
 {
 	struct	dz_softc *sc = dz_cd.cd_devs[DZ_I2C(minor(dev))];
         struct tty *tp = sc->sc_dz[DZ_PORT(minor(dev))].dz_tty;
@@ -470,21 +459,20 @@ dztty (dev)
 
 /*ARGSUSED*/
 int
-dzstop(tp, flag)
-	register struct tty *tp;
+dzstop(struct tty *tp, int flag)
 {
 	if (tp->t_state & TS_BUSY)
 		if (!(tp->t_state & TS_TTSTOP))
 			tp->t_state |= TS_FLUSH;
+	return(0);
 }
 
 void
-dzstart(tp)
-	register struct tty *tp;
+dzstart(struct tty *tp)
 {
-	register struct dz_softc *sc;
-	register struct clist *cl;
-	register int unit, line, s;
+	struct dz_softc *sc;
+	struct clist *cl;
+	int unit, line, s;
 	char state;
 
 	unit = DZ_I2C(minor(tp->t_dev));
@@ -516,16 +504,14 @@ dzstart(tp)
 }
 
 static int
-dzparam(tp, t)
-	register struct tty *tp;
-	register struct termios *t;
+dzparam(struct tty *tp, struct termios *t)
 {
 	struct	dz_softc *sc;
-	register int cflag = t->c_cflag;
+	int cflag = t->c_cflag;
 	int unit, line;
 	int ispeed = ttspeedtab(t->c_ispeed, dzspeedtab);
 	int ospeed = ttspeedtab(t->c_ospeed, dzspeedtab);
-	register unsigned lpr;
+	unsigned lpr;
 	int s;
 
 	unit = DZ_I2C(minor(tp->t_dev));
@@ -578,13 +564,11 @@ dzparam(tp, t)
 }
 
 static unsigned
-dzmctl(sc, line, bits, how)
-	register struct dz_softc *sc;
-	int line, bits, how;
+dzmctl(struct dz_softc *sc, int line, int bits, int how)
 {
-	register unsigned status;
-	register unsigned mbits;
-	register unsigned bit;
+	unsigned status;
+	unsigned mbits;
+	unsigned bit;
 	int s;
 
 	s = spltty();
@@ -657,12 +641,11 @@ dzmctl(sc, line, bits, how)
  * Check to see if modem status bits have changed.
  */
 static void
-dzscan(arg)
-	void *arg;
+dzscan(void *arg)
 {
-	register struct dz_softc *sc;
-	register struct tty *tp;
-	register int n, bit, port;
+	struct dz_softc *sc;
+	struct tty *tp;
+	int n, bit, port;
 	unsigned csr;
 	int s;
 
@@ -711,6 +694,31 @@ dzscan(arg)
 		sc->sc_rxint = 0;
 	}
 	(void) splx(s);
-	timeout(dzscan, (void *)0, hz);
+	timeout_add(&dz_timeout, hz);
 	return;
+}
+
+/*
+ * Called after an ubareset. The DZ card is reset, but the only thing
+ * that must be done is to start the receiver and transmitter again.
+ * No DMA setup to care about.
+ */
+void
+dzreset(struct device *dev)
+{
+	struct dz_softc *sc = (void *)dev;
+	struct tty *tp;
+	int i;
+
+	for (i = 0; i < sc->sc_type; i++) {
+		tp = sc->sc_dz[i].dz_tty;
+
+		if (((tp->t_state & TS_ISOPEN) == 0))
+			continue;
+
+		dzparam(tp, &tp->t_termios);
+		dzmctl(sc, i, DML_DTR, DMSET);
+		tp->t_state &= ~TS_BUSY;
+		dzstart(tp);    /* Kick off transmitter again */
+	}
 }

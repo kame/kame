@@ -1,4 +1,4 @@
-/*	$OpenBSD: dpt_pci.c,v 1.1 1999/11/30 07:55:56 cmetz Exp $	*/
+/*	$OpenBSD: dpt_pci.c,v 1.3 2001/08/25 10:13:29 art Exp $	*/
 /*	$NetBSD: dpt_pci.c,v 1.2 1999/09/29 17:33:02 ad Exp $	*/
 
 /*
@@ -117,7 +117,7 @@ dpt_pci_attach(parent, self, aux)
 	printf(": ");
 
 	if (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0, &sc->sc_iot, 
-	    &sc->sc_ioh, NULL, NULL)) {
+	    &sc->sc_ioh, NULL, NULL, 0)) {
 		printf("can't map i/o space\n");
 		return;
 	}
@@ -130,8 +130,7 @@ dpt_pci_attach(parent, self, aux)
 		       csr | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("can't map interrupt\n");
 		return;
 	}

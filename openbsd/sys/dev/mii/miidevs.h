@@ -1,10 +1,10 @@
-/*	$OpenBSD: miidevs.h,v 1.21 2001/04/13 00:42:09 brad Exp $	*/
+/*	$OpenBSD: miidevs.h,v 1.26 2001/10/05 00:09:10 nate Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: miidevs,v 1.18 2001/04/13 00:25:02 mjacob Exp 
+ *	OpenBSD: miidevs,v 1.23 2001/10/05 00:08:51 nate Exp 
  */
 /* $NetBSD: miidevs,v 1.3 1998/11/05 03:43:43 thorpej Exp $ */
 
@@ -49,6 +49,7 @@
  * List of known MII OUIs
  */
 
+#define	MII_OUI_3COM	0x00105a	/* 3com */
 #define	MII_OUI_ALTIMA	0x0010a9	/* Altima Communications */
 #define	MII_OUI_AMD	0x00001a	/* Advanced Micro Devices */
 #define	MII_OUI_BROADCOM	0x001018	/* Broadcom Corporation */
@@ -107,18 +108,24 @@
 #define	MII_STR_xxALTIMA_AC101	"AC101 10/100 media interface"
 
 /* Broadcom Corp. PHYs */
-#define	MII_MODEL_BROADCOM_3C905C	0x0017
-#define	MII_STR_BROADCOM_3C905C	"Broadcom 3C905C internal PHY"
-#define	MII_MODEL_BROADCOM_BCM5201	0x0021
-#define	MII_STR_BROADCOM_BCM5201	"BCM5201 10/100 media interface"
 #define	MII_MODEL_xxBROADCOM_BCM5400	0x0004
 #define	MII_STR_xxBROADCOM_BCM5400	"BCM5400 1000baseTX PHY"
+#define	MII_MODEL_xxBROADCOM_BCM5401	0x0005
+#define	MII_STR_xxBROADCOM_BCM5401	"BCM5401 10/100/1000baseTX PHY"
+#define	MII_MODEL_xxBROADCOM_BCM5411	0x0007
+#define	MII_STR_xxBROADCOM_BCM5411	"BCM5411 10/100/1000baseTX PHY"
 #define	MII_MODEL_BROADCOM_BCM5400	0x0004
 #define	MII_STR_BROADCOM_BCM5400	"BCM5400 1000baseTX PHY"
 #define	MII_MODEL_BROADCOM_BCM5401	0x0005
 #define	MII_STR_BROADCOM_BCM5401	"BCM5401 1000baseTX PHY"
 #define	MII_MODEL_BROADCOM_BCM5411	0x0007
 #define	MII_STR_BROADCOM_BCM5411	"BCM5411 1000baseTX PHY"
+#define	MII_MODEL_BROADCOM_3C905C	0x0017
+#define	MII_STR_BROADCOM_3C905C	"Broadcom 3C905C internal PHY"
+#define	MII_MODEL_BROADCOM_BCM5221	0x001e
+#define	MII_STR_BROADCOM_BCM5221	"BCM5221 100baseTX PHY"
+#define	MII_MODEL_BROADCOM_BCM5201	0x0021
+#define	MII_STR_BROADCOM_BCM5201	"BCM5201 10/100 media interface"
 
 /* Davicom Semiconductor PHYs */
 #define	MII_MODEL_xxDAVICOM_DM9101	0x0000
@@ -135,6 +142,8 @@
 /* Integrated Circuit Systems PHYs */
 #define	MII_MODEL_xxICS_1890	0x0002
 #define	MII_STR_xxICS_1890	"ICS1890 10/100 media interface"
+#define	MII_MODEL_xxICS_1892	0x0003
+#define	MII_STR_xxICS_1892	"ICS1892 10/100 media interface"
 
 /* Intel PHYs */
 #define	MII_MODEL_xxINTEL_I82553	0x0000
@@ -163,6 +172,10 @@
 #define	MII_STR_NATSEMI_DP83843	"DP83843 10/100 media interface"
 #define	MII_MODEL_NATSEMI_DP83815	0x0002
 #define	MII_STR_NATSEMI_DP83815	"DP83815 10/100 integrated"
+#define	MII_MODEL_NATSEMI_DP83891	0x0005
+#define	MII_STR_NATSEMI_DP83891	"DP83891 10/100/1000 media interface"
+#define	MII_MODEL_NATSEMI_DP83861	0x0006
+#define	MII_STR_NATSEMI_DP83861	"DP83861 10/100/1000 media interface"
 
 /* Quality Semiconductor PHYs */
 #define	MII_MODEL_QUALSEMI_QS6612	0x0000

@@ -1,4 +1,4 @@
-/* $OpenBSD: pci_550.c,v 1.2 2000/11/08 20:59:25 ericj Exp $ */
+/* $OpenBSD: pci_550.c,v 1.5 2001/08/17 22:26:58 mickey Exp $ */
 /* $NetBSD: pci_550.c,v 1.18 2000/06/29 08:58:48 mrg Exp $ */
 
 /*-
@@ -98,6 +98,7 @@
 int	dec_550_intr_map __P((void *, pcitag_t, int, int,
 	    pci_intr_handle_t *));
 const char *dec_550_intr_string __P((void *, pci_intr_handle_t));
+int	dec_550_intr_line __P((void *, pci_intr_handle_t));
 const struct evcnt *dec_550_intr_evcnt __P((void *, pci_intr_handle_t));
 void	*dec_550_intr_establish __P((void *, pci_intr_handle_t,
 	    int, int (*func)(void *), void *, char *));
@@ -105,6 +106,7 @@ void	dec_550_intr_disestablish __P((void *, void *));
 
 void	*dec_550_pciide_compat_intr_establish __P((void *, struct device *,
 	    struct pci_attach_args *, int, int (*)(void *), void *));
+void    dec_550_pciide_compat_intr_disestablish __P((void *, void *));
 
 #define	DEC_550_PCI_IRQ_BEGIN	8
 #define	DEC_550_MAX_IRQ		(64 - DEC_550_PCI_IRQ_BEGIN)
@@ -145,6 +147,7 @@ pci_550_pickintr(ccp)
         pc->pc_intr_v = ccp;
         pc->pc_intr_map = dec_550_intr_map;
         pc->pc_intr_string = dec_550_intr_string;
+        pc->pc_intr_line = dec_550_intr_line;
 #if 0
 	pc->pc_intr_evcnt = dec_550_intr_evcnt;
 #endif
@@ -153,6 +156,8 @@ pci_550_pickintr(ccp)
 
 	pc->pc_pciide_compat_intr_establish =
 	    dec_550_pciide_compat_intr_establish;
+	pc->pc_pciide_compat_intr_disestablish =
+	    dec_550_pciide_compat_intr_disestablish;
 
 	/*
 	 * DEC 550's interrupts are enabled via the Pyxis interrupt
@@ -286,6 +291,19 @@ dec_550_intr_string(ccv, ih)
 	return (irqstr);
 }
 
+int
+dec_550_intr_line(ccv, ih)
+	void *ccv;
+	pci_intr_handle_t ih;
+{
+#if NSIO
+	if (DEC_550_LINE_IS_ISA(ih))
+		return (sio_intr_line(NULL /*XXX*/, DEC_550_LINE_ISA_IRQ(ih)));
+#endif
+
+	return (ih);
+}
+
 #if 0
 const struct evcnt *
 dec_550_intr_evcnt(ccv, ih)
@@ -402,6 +420,14 @@ dec_550_pciide_compat_intr_establish(v, dev, pa, chan, func, arg)
 	    func, arg, "dec 550 irq");
 #endif
 	return (cookie);
+}
+
+void
+dec_550_pciide_compat_intr_disestablish(v, cookie)
+	void *v;
+	void *cookie;
+{
+	sio_intr_disestablish(NULL, cookie);
 }
 
 void

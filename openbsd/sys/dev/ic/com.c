@@ -1,4 +1,4 @@
-/*	$OpenBSD: com.c,v 1.63 2001/04/17 04:30:49 aaron Exp $	*/
+/*	$OpenBSD: com.c,v 1.76 2001/10/05 21:01:10 mickey Exp $	*/
 /*	$NetBSD: com.c,v 1.82.4.1 1996/06/02 09:08:00 mrg Exp $	*/
 
 /*
@@ -96,16 +96,9 @@
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
 #include <dev/ic/ns16550reg.h>
-#ifdef COM_HAYESP
-#include <dev/ic/hayespreg.h>
-#endif
 #define	com_lcr	com_cfcr
 
 #include "com.h"
-
-#if NCOM_ISA || NCOM_ISAPNP
-#include <dev/isa/isavar.h>	/* XXX */
-#endif
 
 /* XXX: These belong elsewhere */
 cdev_decl(com);
@@ -113,59 +106,23 @@ bdev_decl(com);
 
 static u_char tiocm_xxx2mcr __P((int));
 
-/*
- * XXX the following two cfattach structs should be different, and possibly
- * XXX elsewhere.
- */
-int	comprobe __P((struct device *, void *, void *));
-void	comattach __P((struct device *, struct device *, void *));
 void	compwroff __P((struct com_softc *));
 void	com_raisedtr __P((void *));
-
-#if NCOM_ISA
-struct cfattach com_isa_ca = {
-	sizeof(struct com_softc), comprobe, comattach
-};
-#endif
-
-#if NCOM_ISAPNP
-struct cfattach com_isapnp_ca = {
-	sizeof(struct com_softc), comprobe, comattach
-};
-#endif
-
-#if NCOM_COMMULTI
-struct cfattach com_commulti_ca = {
-	sizeof(struct com_softc), comprobe, comattach
-};
-#endif
+void	com_enable_debugport	__P((struct com_softc *));
 
 struct cfdriver com_cd = {
 	NULL, "com", DV_TTY
 };
 
-#ifndef CONSPEED
-#define	CONSPEED B9600
-#endif
-
-#ifdef COMCONSOLE
-int	comdefaultrate = CONSPEED;		/* XXX why set default? */
-#else
 int	comdefaultrate = TTYDEF_SPEED;
-#endif
-int	comconsaddr;
 int	comconsinit;
+int	comconsaddr;
 int	comconsattached;
-int	comconsrate;
 bus_space_tag_t comconsiot;
 bus_space_handle_t comconsioh;
 tcflag_t comconscflag = TTYDEF_CFLAG;
 
-struct timeout compoll_to;
-
 int	commajor;
-int	comsopen = 0;
-int	comevents = 0;
 
 #ifdef KGDB
 #include <sys/kgdb.h>
@@ -173,7 +130,6 @@ int	comevents = 0;
 static int com_kgdb_addr;
 static bus_space_tag_t com_kgdb_iot;
 static bus_space_handle_t com_kgdb_ioh;
-static int com_kgdb_attached;
 
 int    com_kgdb_getc __P((void *));
 void   com_kgdb_putc __P((void *, int));
@@ -186,21 +142,6 @@ void   com_kgdb_putc __P((void *, int));
 #define	SET(t, f)	(t) |= (f)
 #define	CLR(t, f)	(t) &= ~(f)
 #define	ISSET(t, f)	((t) & (f))
-
-/* Macros for determining bus type. */
-#if NCOM_ISA
-#define IS_ISA(parent) \
-    (strcmp((parent)->dv_cfdata->cf_driver->cd_name, "isa") == 0)
-#else
-#define IS_ISA(parent) 0
-#endif
-
-#if NCOM_ISAPNP
-#define IS_ISAPNP(parent) \
-    (strcmp((parent)->dv_cfdata->cf_driver->cd_name, "isapnp") == 0)
-#else
-#define IS_ISAPNP(parent) 0
-#endif
 
 int
 comspeed(freq, speed)
@@ -239,277 +180,46 @@ comprobe1(iot, ioh)
 	bus_space_write_1(iot, ioh, com_lcr, 0);
 	bus_space_write_1(iot, ioh, com_iir, 0);
 	for (i = 0; i < 32; i++) {
-	    k = bus_space_read_1(iot, ioh, com_iir);
-	    if (k & 0x38) {
-		bus_space_read_1(iot, ioh, com_data); /* cleanup */
-	    } else
-		break;
+		k = bus_space_read_1(iot, ioh, com_iir);
+		if (k & 0x38) {
+			bus_space_read_1(iot, ioh, com_data); /* cleanup */
+		} else
+			break;
 	}
 	if (i >= 32)
-	    return 0;
+		return 0;
 
 	return 1;
-}
-
-#ifdef COM_HAYESP
-int
-comprobeHAYESP(hayespioh, sc)
-	bus_space_handle_t hayespioh;
-	struct com_softc *sc;
-{
-	char	val, dips;
-	int	combaselist[] = { 0x3f8, 0x2f8, 0x3e8, 0x2e8 };
-	bus_space_tag_t iot = sc->sc_iot;
-
-	/*
-	 * Hayes ESP cards have two iobases.  One is for compatibility with
-	 * 16550 serial chips, and at the same ISA PC base addresses.  The
-	 * other is for ESP-specific enhanced features, and lies at a
-	 * different addressing range entirely (0x140, 0x180, 0x280, or 0x300).
-	 */
-
-	/* Test for ESP signature */
-	if ((bus_space_read_1(iot, hayespioh, 0) & 0xf3) == 0)
-		return 0;
-
-	/*
-	 * ESP is present at ESP enhanced base address; unknown com port
-	 */
-
-	/* Get the dip-switch configurations */
-	bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_GETDIPS);
-	dips = bus_space_read_1(iot, hayespioh, HAYESP_STATUS1);
-
-	/* Determine which com port this ESP card services: bits 0,1 of  */
-	/*  dips is the port # (0-3); combaselist[val] is the com_iobase */
-	if (sc->sc_iobase != combaselist[dips & 0x03])
-		return 0;
-
-	printf(": ESP");
-
-	/* Check ESP Self Test bits. */
-	/* Check for ESP version 2.0: bits 4,5,6 == 010 */
-	bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_GETTEST);
-	val = bus_space_read_1(iot, hayespioh, HAYESP_STATUS1); /* Clear reg 1 */
-	val = bus_space_read_1(iot, hayespioh, HAYESP_STATUS2);
-	if ((val & 0x70) < 0x20) {
-		printf("-old (%o)", val & 0x70);
-		/* we do not support the necessary features */
-		return 0;
-	}
-
-	/* Check for ability to emulate 16550: bit 8 == 1 */
-	if ((dips & 0x80) == 0) {
-		printf(" slave");
-		/* XXX Does slave really mean no 16550 support?? */
-		return 0;
-	}
-
-	/*
-	 * If we made it this far, we are a full-featured ESP v2.0 (or
-	 * better), at the correct com port address.
-	 */
-
-	SET(sc->sc_hwflags, COM_HW_HAYESP);
-	printf(", 1024 byte fifo\n");
-	return 1;
-}
-#endif
-
-int
-comprobe(parent, match, aux)
-	struct device *parent;
-	void *match, *aux;
-{
-	bus_space_tag_t iot;
-	bus_space_handle_t ioh;
-	int iobase, needioh;
-	int rv = 1;
-
-	/*
-	 * XXX should be broken out into functions for isa probe and
-	 * XXX for commulti probe, with a helper function that contains
-	 * XXX most of the interesting stuff.
-	 */
-#if NCOM_ISA || NCOM_ISAPNP
-	if (IS_ISA(parent) || IS_ISAPNP(parent)) {
-		struct isa_attach_args *ia = aux;
-
-		iot = ia->ia_iot;
-		iobase = ia->ia_iobase;
-		if (IS_ISAPNP(parent)) {
-			ioh = ia->ia_ioh;
-			needioh = 0;
-		} else
-			needioh = 1;
-	} else
-#endif
-#if NCOM_COMMULTI
-	if (1) {
-		struct cfdata *cf = match;
-		struct commulti_attach_args *ca = aux;
-
-		if (cf->cf_loc[0] != -1 && cf->cf_loc[0] != ca->ca_slave)
-			return (0);
-
-		iot = ca->ca_iot;
-		iobase = ca->ca_iobase;
-		ioh = ca->ca_ioh;
-		needioh = 0;
-	} else
-#endif
-		return(0);			/* This cannot happen */
-
-#ifdef KGDB
-	if (iobase == com_kgdb_addr)
-		goto out;
-#endif
-	/* if it's in use as console, it's there. */
-	if (iobase == comconsaddr && !comconsattached)
-		goto out;
-
-	if (needioh && bus_space_map(iot, iobase, COM_NPORTS, 0, &ioh)) {
-		rv = 0;
-		goto out;
-	}
-	rv = comprobe1(iot, ioh);
-	if (needioh)
-		bus_space_unmap(iot, ioh, COM_NPORTS);
-
-out:
-#if NCOM_ISA
-	if (rv && IS_ISA(parent)) {
-		struct isa_attach_args *ia = aux;
-
-		ia->ia_iosize = COM_NPORTS;
-		ia->ia_msize = 0;
-	}
-#endif
-	return (rv);
 }
 
 void
-comattach(parent, self, aux)
-	struct device *parent, *self;
-	void *aux;
+com_attach_subr(sc)
+	struct com_softc *sc;
 {
-	struct com_softc *sc = (void *)self;
-	int iobase;
-#if NCOM_ISA || NCOM_ISAPNP || NCOM_COMMULTI
-	int irq;
-#endif
-	bus_space_tag_t iot;
-	bus_space_handle_t ioh;
-#ifdef COM_HAYESP
-	int	hayesp_ports[] = { 0x140, 0x180, 0x280, 0x300, 0 };
-	int	*hayespp;
-#endif
+	bus_space_tag_t iot = sc->sc_iot;
+	bus_space_handle_t ioh = sc->sc_ioh;
 	u_int8_t lcr;
 
-	/*
-	 * XXX should be broken out into functions for isa attach and
-	 * XXX for commulti attach, with a helper function that contains
-	 * XXX most of the interesting stuff.
-	 */
-	sc->sc_hwflags = 0;
-	sc->sc_swflags = 0;
-#if NCOM_ISA || NCOM_ISAPNP
-	if (IS_ISA(parent) || IS_ISAPNP(parent)) {
-		struct isa_attach_args *ia = aux;
+	sc->sc_ier = 0;
+	/* disable interrupts */
+	bus_space_write_1(iot, ioh, com_ier, sc->sc_ier);
 
-		/*
-		 * We're living on an isa.
-		 */
-		iobase = ia->ia_iobase;
-		iot = ia->ia_iot;
-		if (IS_ISAPNP(parent)) {
-			/* No console support! */
-			ioh = ia->ia_ioh;
-		} else {
-#ifdef KGDB
-			if ((iobase != comconsaddr) &&
-			    (iobase != com_kgdb_addr)) {
-#else
-			if (iobase != comconsaddr) {
-#endif
-				if (bus_space_map(iot, iobase, COM_NPORTS, 0,
-				    &ioh))
-					panic("comattach: io mapping failed");
-			} else
-#ifdef KGDB
-				if (iobase == comconsaddr) {
-					ioh = comconsioh;
-				} else {
-					ioh = com_kgdb_ioh;
-				}
-#else
-				ioh = comconsioh;
-#endif
-		}
-		irq = ia->ia_irq;
-	} else
-#endif
-#if NCOM_COMMULTI
-	if (1) {
-		struct commulti_attach_args *ca = aux;
-
-		/*
-		 * We're living on a commulti.
-		 */
-		iobase = ca->ca_iobase;
-		iot = ca->ca_iot;
-		ioh = ca->ca_ioh;
-		irq = IRQUNK;
-
-		if (ca->ca_noien)
-			SET(sc->sc_hwflags, COM_HW_NOIEN);
-	} else
-#endif
-		panic("comattach: impossible");
-
-	sc->sc_iot = iot;
-	sc->sc_ioh = ioh;
-	sc->sc_iobase = iobase;
-	sc->sc_frequency = COM_FREQ;
-
-	if (iobase == comconsaddr) {
+	if (sc->sc_iobase == comconsaddr) {
 		comconsattached = 1;
 
 		/*
 		 * Need to reset baud rate, etc. of next print so reset
 		 * comconsinit.  Also make sure console is always "hardwired".
 		 */
-		delay(1000);			/* wait for output to finish */
-		comconsinit = 0;
+		delay(10000);			/* wait for output to finish */
 		SET(sc->sc_hwflags, COM_HW_CONSOLE);
 		SET(sc->sc_swflags, COM_SW_SOFTCAR);
 	}
-
-#ifdef COM_HAYESP
-	/* Look for a Hayes ESP board. */
-	for (hayespp = hayesp_ports; *hayespp != 0; hayespp++) {
-		bus_space_handle_t hayespioh;
-
-#define	HAYESP_NPORTS	8			/* XXX XXX XXX ??? ??? ??? */
-		if (bus_space_map(iot, *hayespp, HAYESP_NPORTS, 0, &hayespioh))
-			continue;
-		if (comprobeHAYESP(hayespioh, sc)) {
-			sc->sc_hayespbase = *hayespp;
-			sc->sc_hayespioh = hayespioh;
-			sc->sc_fifolen = 1024;
-			break;
-		}
-		bus_space_unmap(iot, hayespioh, HAYESP_NPORTS);
-	}
-	/* No ESP; look for other things. */
-	if (*hayespp == 0) {
-#endif
 
 	/*
 	 * Probe for all known forms of UART.
 	 */
 	lcr = bus_space_read_1(iot, ioh, com_lcr);
-
 	bus_space_write_1(iot, ioh, com_lcr, 0xbf);
 	bus_space_write_1(iot, ioh, com_efr, 0);
 	bus_space_write_1(iot, ioh, com_lcr, 0);
@@ -556,7 +266,6 @@ comattach(parent, self, aux)
 		}
 		bus_space_write_1(iot, ioh, com_fifo, FIFO_ENABLE);
 	}
-
 	bus_space_write_1(iot, ioh, com_lcr, lcr);
 	if (sc->sc_uarttype == COM_UART_16450) { /* Probe for 8250 */
 		u_int8_t scr0, scr1, scr2;
@@ -615,40 +324,10 @@ comattach(parent, self, aux)
 	bus_space_write_1(iot, ioh, com_fifo, FIFO_RCV_RST | FIFO_XMT_RST);
 	(void)bus_space_read_1(iot, ioh, com_data);
 	bus_space_write_1(iot, ioh, com_fifo, 0);
-#ifdef COM_HAYESP
-	}
-#endif
 
-	/* disable interrupts */
-	bus_space_write_1(iot, ioh, com_ier, 0);
-	bus_space_write_1(iot, ioh, com_mcr, 0);
+	sc->sc_mcr = 0;
+	bus_space_write_1(iot, ioh, com_mcr, sc->sc_mcr);
 
-#if NCOM_ISA || NCOM_ISAPNP || NCOM_COMMULTI
-	if (irq != IRQUNK) {
-#if NCOM_ISA || NCOM_ISAPNP
-		if (IS_ISA(parent) || IS_ISAPNP(parent)) {
-			struct isa_attach_args *ia = aux;
-
-#ifdef KGDB
-			if (iobase == com_kgdb_addr) {
-				sc->sc_ih = isa_intr_establish(ia->ia_ic, irq,
-				    IST_EDGE, IPL_HIGH, kgdbintr, sc,
-				    sc->sc_dev.dv_xname);
-			} else {
-				sc->sc_ih = isa_intr_establish(ia->ia_ic, irq,
-				    IST_EDGE, IPL_TTY, comintr, sc,
-				    sc->sc_dev.dv_xname);
-			}
-#else
-			sc->sc_ih = isa_intr_establish(ia->ia_ic, irq,
-			    IST_EDGE, IPL_TTY, comintr, sc,
-			    sc->sc_dev.dv_xname);
-#endif /* KGDB */
-		} else
-#endif
-			panic("comattach: IRQ but can't have one");
-	}
-#endif
 #ifdef KGDB
 	/*
 	 * Allow kgdb to "take over" this port.  If this is
@@ -659,12 +338,9 @@ comattach(parent, self, aux)
 	    !ISSET(sc->sc_hwflags, COM_HW_CONSOLE)) {
 		printf("%s: kgdb\n", sc->sc_dev.dv_xname);
 		SET(sc->sc_hwflags, COM_HW_KGDB);
-		com_enable_debugport(sc);
-		com_kgdb_attached = 1;
 	}
 #endif /* KGDB */
 
-	/* XXX maybe move up some? */
 	if (ISSET(sc->sc_hwflags, COM_HW_CONSOLE)) {
 		int maj;
 
@@ -679,11 +355,15 @@ comattach(parent, self, aux)
 		printf("%s: console\n", sc->sc_dev.dv_xname);
 	}
 
-	if (!timeout_initialized(&compoll_to))
-		timeout_set(&compoll_to, compoll, NULL);
-
 	timeout_set(&sc->sc_diag_tmo, comdiag, sc);
 	timeout_set(&sc->sc_dtr_tmo, com_raisedtr, sc);
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	sc->sc_si = softintr_establish(IPL_TTY, compoll, sc);
+	if (sc->sc_si == NULL)
+		panic("%s: can't establish soft interrupt.", sc->sc_dev.dv_xname);
+#else
+	timeout_set(&sc->sc_poll_tmo, compoll, sc);
+#endif
 
 	/*
 	 * If there are no enable/disable functions, assume the device
@@ -691,9 +371,11 @@ comattach(parent, self, aux)
 	 */
 	if (!sc->enable)
 		sc->enabled = 1;
+
+	if (ISSET(sc->sc_hwflags, COM_HW_CONSOLE|COM_HW_KGDB))
+		com_enable_debugport(sc);
 }
 
-#ifdef KGDB
 void
 com_enable_debugport(sc)
 	struct com_softc *sc;
@@ -709,7 +391,6 @@ com_enable_debugport(sc)
 
 	splx(s);
 }
-#endif /* KGDB */
 
 int
 com_detach(self, flags)
@@ -740,6 +421,11 @@ com_detach(self, flags)
 
 	timeout_del(&sc->sc_dtr_tmo);
 	timeout_del(&sc->sc_diag_tmo);
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+	softintr_disestablish(sc->sc_si);
+#else
+	timeout_del(&sc->sc_poll_tmo);
+#endif
 
 	return (0);
 }
@@ -841,8 +527,9 @@ comopen(dev, flag, mode, p)
 		comparam(tp, &tp->t_termios);
 		ttsetwater(tp);
 
-		if (comsopen++ == 0)
-			timeout_add(&compoll_to, 1);
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+		timeout_add(&sc->sc_poll_tmo, 1);
+#endif
 
 		sc->sc_ibufp = sc->sc_ibuf = sc->sc_ibufs[0];
 		sc->sc_ibufhigh = sc->sc_ibuf + COM_IHIGHWATER;
@@ -868,38 +555,6 @@ comopen(dev, flag, mode, p)
 			break;
 		}
 
-#ifdef COM_HAYESP
-		/* Setup the ESP board */
-		if (ISSET(sc->sc_hwflags, COM_HW_HAYESP)) {
-			bus_space_handle_t hayespioh = sc->sc_hayespioh;
-
-			bus_space_write_1(iot, ioh, com_fifo,
-			    FIFO_DMA_MODE|FIFO_ENABLE|
-			    FIFO_RCV_RST|FIFO_XMT_RST|FIFO_TRIGGER_8);
-
-			/* Set 16550 compatibility mode */
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_SETMODE);
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			    HAYESP_MODE_FIFO|HAYESP_MODE_RTS|
-			    HAYESP_MODE_SCALE);
-
-			/* Set RTS/CTS flow control */
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_SETFLOWTYPE);
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD2, HAYESP_FLOW_RTS);
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD2, HAYESP_FLOW_CTS);
-
-			/* Set flow control levels */
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_SETRXFLOW);
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			    HAYESP_HIBYTE(HAYESP_RXHIWMARK));
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			    HAYESP_LOBYTE(HAYESP_RXHIWMARK));
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			    HAYESP_HIBYTE(HAYESP_RXLOWMARK));
-			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			    HAYESP_LOBYTE(HAYESP_RXLOWMARK));
-		} else
-#endif
 		if (ISSET(sc->sc_hwflags, COM_HW_FIFO)) {
 			u_int8_t fifo = FIFO_ENABLE|FIFO_RCV_RST|FIFO_XMT_RST;
 			u_int8_t lcr;
@@ -1033,8 +688,9 @@ comclose(dev, flag, mode, p)
 		compwroff(sc);
 	}
 	CLR(tp->t_state, TS_BUSY | TS_FLUSH);
-	if (--comsopen == 0)
-		timeout_del(&compoll_to);
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+	timeout_del(&sc->sc_poll_tmo);
+#endif
 	sc->sc_cua = 0;
 	splx(s);
 	ttyclose(tp);
@@ -1356,8 +1012,7 @@ comparam(tp, t)
 		} else
 			bus_space_write_1(iot, ioh, com_lcr, lcr);
 
-		if (!ISSET(sc->sc_hwflags, COM_HW_HAYESP) &&
-		    ISSET(sc->sc_hwflags, COM_HW_FIFO)) {
+		if (ISSET(sc->sc_hwflags, COM_HW_FIFO)) {
 			if (sc->sc_uarttype == COM_UART_TI16750) {
 				bus_space_write_1(iot, ioh, com_lcr,
 				    lcr | LCR_DLAB);
@@ -1441,21 +1096,21 @@ comstart(tp)
 	}
 	SET(tp->t_state, TS_BUSY);
 
+	/* Enable transmit completion interrupts. */
 	if (!ISSET(sc->sc_ier, IER_ETXRDY)) {
 		SET(sc->sc_ier, IER_ETXRDY);
 		bus_space_write_1(iot, ioh, com_ier, sc->sc_ier);
 	}
+
 	if (ISSET(sc->sc_hwflags, COM_HW_FIFO)) {
-#ifdef COM_HAYESP
-		u_char buffer[1024];	/* XXX: largest fifo */
-#else
 		u_char buffer[64];	/* XXX: largest fifo */
-#endif
-		u_char *cp = buffer;
-		int n = q_to_b(&tp->t_outq, cp, sc->sc_fifolen);
-		do {
-			bus_space_write_1(iot, ioh, com_data, *cp++);
-		} while (--n);
+
+		int n = q_to_b(&tp->t_outq, buffer, sc->sc_fifolen);
+		int i;
+
+		for (i = 0; i < n; i++) {
+			bus_space_write_1(iot, ioh, com_data, buffer[i]);
+		}
 	} else
 		bus_space_write_1(iot, ioh, com_data, getc(&tp->t_outq));
 out:
@@ -1512,8 +1167,7 @@ void
 compoll(arg)
 	void *arg;
 {
-	int unit;
-	struct com_softc *sc;
+	struct com_softc *sc = (struct com_softc *)arg;
 	struct tty *tp;
 	register u_char *ibufp;
 	u_char *ibufend;
@@ -1526,66 +1180,57 @@ compoll(arg)
 		TTY_FE, TTY_PE|TTY_FE
 	};
 
+	if (sc == 0 || sc->sc_ibufp == sc->sc_ibuf)
+		goto out;
+
+	tp = sc->sc_tty;
+
 	s = spltty();
-	if (comevents == 0) {
+
+	ibufp = sc->sc_ibuf;
+	ibufend = sc->sc_ibufp;
+
+	if (ibufp == ibufend) {
 		splx(s);
 		goto out;
 	}
-	comevents = 0;
+
+	sc->sc_ibufp = sc->sc_ibuf = (ibufp == sc->sc_ibufs[0]) ?
+				     sc->sc_ibufs[1] : sc->sc_ibufs[0];
+	sc->sc_ibufhigh = sc->sc_ibuf + COM_IHIGHWATER;
+	sc->sc_ibufend = sc->sc_ibuf + COM_IBUFSIZE;
+
+	if (tp == 0 || !ISSET(tp->t_state, TS_ISOPEN)) {
+		splx(s);
+		goto out;
+	}
+
+	if (ISSET(tp->t_cflag, CRTSCTS) &&
+	    !ISSET(sc->sc_mcr, MCR_RTS)) {
+		/* XXX */
+		SET(sc->sc_mcr, MCR_RTS);
+		bus_space_write_1(sc->sc_iot, sc->sc_ioh, com_mcr,
+		    sc->sc_mcr);
+	}
+
 	splx(s);
 
-	for (unit = 0; unit < com_cd.cd_ndevs; unit++) {
-		sc = com_cd.cd_devs[unit];
-		if (sc == 0 || sc->sc_ibufp == sc->sc_ibuf)
-			continue;
-
-		tp = sc->sc_tty;
-
-		s = spltty();
-
-		ibufp = sc->sc_ibuf;
-		ibufend = sc->sc_ibufp;
-
-		if (ibufp == ibufend) {
-			splx(s);
-			continue;
+	while (ibufp < ibufend) {
+		c = *ibufp++;
+		if (ISSET(*ibufp, LSR_OE)) {
+			sc->sc_overflows++;
+			if (sc->sc_errors++ == 0)
+				timeout_add(&sc->sc_diag_tmo, 60 * hz);
 		}
-
-		sc->sc_ibufp = sc->sc_ibuf = (ibufp == sc->sc_ibufs[0]) ?
-					     sc->sc_ibufs[1] : sc->sc_ibufs[0];
-		sc->sc_ibufhigh = sc->sc_ibuf + COM_IHIGHWATER;
-		sc->sc_ibufend = sc->sc_ibuf + COM_IBUFSIZE;
-
-		if (tp == 0 || !ISSET(tp->t_state, TS_ISOPEN)) {
-			splx(s);
-			continue;
-		}
-
-		if (ISSET(tp->t_cflag, CRTSCTS) &&
-		    !ISSET(sc->sc_mcr, MCR_RTS)) {
-			/* XXX */
-			SET(sc->sc_mcr, MCR_RTS);
-			bus_space_write_1(sc->sc_iot, sc->sc_ioh, com_mcr,
-			    sc->sc_mcr);
-		}
-
-		splx(s);
-
-		while (ibufp < ibufend) {
-			c = *ibufp++;
-			if (ISSET(*ibufp, LSR_OE)) {
-				sc->sc_overflows++;
-				if (sc->sc_errors++ == 0)
-					timeout_add(&sc->sc_diag_tmo, 60 * hz);
-			}
-			/* This is ugly, but fast. */
-			c |= lsrmap[(*ibufp++ & (LSR_BI|LSR_FE|LSR_PE)) >> 2];
-			(*linesw[tp->t_line].l_rint)(c, tp);
-		}
+		/* This is ugly, but fast. */
+		c |= lsrmap[(*ibufp++ & (LSR_BI|LSR_FE|LSR_PE)) >> 2];
+		(*linesw[tp->t_line].l_rint)(c, tp);
 	}
 
 out:
-	timeout_add(&compoll_to, 1);
+#ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
+	timeout_add(&sc->sc_poll_tmo, 1);
+#endif
 }
 
 #ifdef KGDB
@@ -1657,45 +1302,27 @@ comintr(arg)
 	struct timeval tv;
 	long usec;
 #endif /* PPS_SYNC */
-#ifdef COM_DEBUG
-	int n;
-	struct {
-		u_char iir, lsr, msr;
-	} iter[32];
-#endif
 
 	if (!sc->sc_tty)
 		return (0);		/* can't do squat. */
 
-#ifdef COM_DEBUG
-	n = 0;
-	if (ISSET(iter[n].iir = bus_space_read_1(iot, ioh, com_iir), IIR_NOPEND))
-		return (0);
-#else
 	if (ISSET(bus_space_read_1(iot, ioh, com_iir), IIR_NOPEND))
 		return (0);
-#endif
 
 	tp = sc->sc_tty;
 
 	for (;;) {
-#ifdef COM_DEBUG
-		iter[n].lsr =
-#endif
 		lsr = bus_space_read_1(iot, ioh, com_lsr);
 
 		if (ISSET(lsr, LSR_RXRDY)) {
 			register u_char *p = sc->sc_ibufp;
 
-			comevents = 1;
+#ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
+			softintr_schedule(sc->sc_si);
+#endif
 			do {
 				data = bus_space_read_1(iot, ioh, com_data);
 				if (ISSET(lsr, LSR_BI)) {
-#ifdef notdef
-					printf("break %02x %02x %02x %02x\n",
-					    sc->sc_msr, sc->sc_mcr, sc->sc_lcr,
-					    sc->sc_dtr);
-#endif
 #ifdef DDB
 					if (ISSET(sc->sc_hwflags,
 					    COM_HW_CONSOLE)) {
@@ -1724,24 +1351,11 @@ comintr(arg)
 #ifdef DDB
 			next:
 #endif
-#ifdef COM_DEBUG
-				if (++n >= 32)
-					goto ohfudge;
-				iter[n].lsr =
-#endif
 				lsr = bus_space_read_1(iot, ioh, com_lsr);
 			} while (ISSET(lsr, LSR_RXRDY));
 
 			sc->sc_ibufp = p;
 		}
-#ifdef COM_DEBUG
-		else if (ISSET(lsr, LSR_BI|LSR_FE|LSR_PE|LSR_OE))
-			printf("weird lsr %02x\n", lsr);
-#endif
-
-#ifdef COM_DEBUG
-		iter[n].msr =
-#endif
 		msr = bus_space_read_1(iot, ioh, com_msr);
 
 		if (msr != sc->sc_msr) {
@@ -1781,30 +1395,9 @@ comintr(arg)
 			(*linesw[tp->t_line].l_start)(tp);
 		}
 
-#ifdef COM_DEBUG
-		if (++n >= 32)
-			goto ohfudge;
-		if (ISSET(iter[n].iir = bus_space_read_1(iot, ioh, com_iir), IIR_NOPEND))
-			return (1);
-#else
 		if (ISSET(bus_space_read_1(iot, ioh, com_iir), IIR_NOPEND))
 			return (1);
-#endif
 	}
-#ifdef COM_DEBUG
-ohfudge:
-	printf("comintr: too many iterations");
-	for (n = 0; n < 32; n++) {
-		if ((n % 4) == 0)
-			printf("\ncomintr: iter[%02d]", n);
-		printf("  %02x %02x %02x", iter[n].iir, iter[n].lsr, iter[n].msr);
-	}
-	printf("\n");
-	printf("comintr: msr %02x mcr %02x lcr %02x ier %02x\n",
-	    sc->sc_msr, sc->sc_mcr, sc->sc_lcr, sc->sc_ier);
-	printf("comintr: state %08x cc %d\n", sc->sc_tty->t_state,
-	    sc->sc_tty->t_outq.c_cc);
-#endif
 }
 
 /*
@@ -1815,54 +1408,6 @@ ohfudge:
 #undef CONADDR
 	extern int CONADDR;
 #endif
-
-void
-comcnprobe(cp)
-	struct consdev *cp;
-{
-	/* XXX NEEDS TO BE FIXED XXX */
-#if defined(arc)
-	bus_space_tag_t iot = &arc_bus_io;
-#elif defined(powerpc)
-	bus_space_tag_t iot = &ppc_isa_io;
-#elif defined(hppa)
-	bus_space_tag_t iot = &hppa_bustag;
-#else
-	bus_space_tag_t iot = 0;
-#endif
-	bus_space_handle_t ioh;
-	int found;
-
-	if(CONADDR == 0) {
-		cp->cn_pri = CN_DEAD;
-		return;
-	}
-
-	comconsiot = iot;
-	if (bus_space_map(iot, CONADDR, COM_NPORTS, 0, &ioh)) {
-		cp->cn_pri = CN_DEAD;
-		return;
-	}
-	found = comprobe1(iot, ioh);
-	bus_space_unmap(iot, ioh, COM_NPORTS);
-	if (!found) {
-		cp->cn_pri = CN_DEAD;
-		return;
-	}
-
-	/* locate the major number */
-	for (commajor = 0; commajor < nchrdev; commajor++)
-		if (cdevsw[commajor].d_open == comopen)
-			break;
-
-	/* initialize required fields */
-	cp->cn_dev = makedev(commajor, CONUNIT);
-#ifdef	COMCONSOLE
-	cp->cn_pri = CN_REMOTE;		/* Force a serial port console */
-#else
-	cp->cn_pri = CN_NORMAL;
-#endif
-}
 
 /*
  * The following functions are polled getc and putc routines, shared
@@ -1903,6 +1448,8 @@ com_common_putc(iot, ioh, c)
 		continue;
 
 	bus_space_write_1(iot, ioh, com_data, c);
+	bus_space_barrier(iot, ioh, 0, COM_NPORTS,
+	    (BUS_SPACE_BARRIER_READ|BUS_SPACE_BARRIER_WRITE));
 
 	/* wait for this transmission to complete */
 	timo = 1500000;
@@ -1915,21 +1462,6 @@ com_common_putc(iot, ioh, c)
 /*
  * Following are all routines needed for COM to act as console
  */
-
-void
-comcninit(cp)
-	struct consdev *cp;
-{
-
-	comconsaddr = CONADDR;
-
-	if (bus_space_map(comconsiot, comconsaddr, COM_NPORTS, 0, &comconsioh))
-		panic("comcninit: mapping failed");
-
-	cominit(comconsiot, comconsioh, comdefaultrate);
-	comconsinit = 0;
-}
-
 void
 cominit(iot, ioh, rate)
 	bus_space_tag_t iot;
@@ -1952,6 +1484,63 @@ cominit(iot, ioh, rate)
 	splx(s);
 }
 
+void  
+comcnprobe(cp)
+	struct consdev *cp;  
+{
+	/* XXX NEEDS TO BE FIXED XXX */
+#if defined(arc)
+	bus_space_tag_t iot = &arc_bus_io;
+#elif defined(hppa)
+	bus_space_tag_t iot = &hppa_bustag;
+#else
+	bus_space_tag_t iot = 0;
+#endif
+	bus_space_handle_t ioh;
+	int found;
+
+	if(CONADDR == 0) {
+		cp->cn_pri = CN_DEAD;
+		return;
+	}
+
+	comconsiot = iot;
+	if (bus_space_map(iot, CONADDR, COM_NPORTS, 0, &ioh)) {
+		cp->cn_pri = CN_DEAD;
+		return;
+	}
+	found = comprobe1(iot, ioh);
+	bus_space_unmap(iot, ioh, COM_NPORTS);
+	if (!found) {
+		cp->cn_pri = CN_DEAD;
+		return;
+	}
+
+	/* locate the major number */
+	for (commajor = 0; commajor < nchrdev; commajor++)
+		if (cdevsw[commajor].d_open == comopen)
+			break;
+
+	/* initialize required fields */
+	cp->cn_dev = makedev(commajor, CONUNIT);
+	cp->cn_pri = CN_NORMAL;
+}
+
+void
+comcninit(cp)
+	struct consdev *cp;
+{
+
+	comconsaddr = CONADDR;
+
+	if (bus_space_map(comconsiot, comconsaddr, COM_NPORTS, 0, &comconsioh))
+		panic("comcninit: mapping failed");
+
+	cominit(comconsiot, comconsioh, comdefaultrate);
+	comconsinit = 0;
+}
+
+
 int
 comcnattach(iot, iobase, rate, frequency, cflag)
 	bus_space_tag_t iot;
@@ -1964,8 +1553,10 @@ comcnattach(iot, iobase, rate, frequency, cflag)
 		NODEV, CN_NORMAL
 	};
 
+#ifndef __sparc64__
 	if (bus_space_map(iot, iobase, COM_NPORTS, 0, &comconsioh))
 		return ENOMEM;
+#endif
 
 	cominit(iot, comconsioh, rate);
 
@@ -1993,18 +1584,7 @@ comcnputc(dev, c)
 	dev_t dev;
 	int c;
 {
-#if 0
-	/* XXX not needed? */
-	bus_space_tag_t iot = comconsiot;
-	bus_space_handle_t ioh = comconsioh;
-
-	if (comconsinit == 0) {
-		cominit(iot, ioh, comdefaultrate);
-		comconsinit = 1;
-	}
-#endif
 	com_common_putc(comconsiot, comconsioh, c);
-
 }
 
 void

@@ -1,4 +1,4 @@
-/*      $OpenBSD: pmap.h,v 1.9 2000/04/26 03:08:42 bjc Exp $     */
+/*      $OpenBSD: pmap.h,v 1.13 2001/08/18 20:50:18 art Exp $     */
 /*	$NetBSD: pmap.h,v 1.37 1999/08/01 13:48:07 ragge Exp $	   */
 
 /* 
@@ -123,7 +123,6 @@ extern	struct pmap kernel_pmap_store;
 
 /* Routines that are best to define as macros */
 #define pmap_phys_address(phys)		((u_int)(phys) << PGSHIFT)
-#define pmap_unwire(pmap, v)		/* no need */
 #define pmap_copy(a,b,c,d,e)		/* Dont do anything */
 #define pmap_update()	mtpr(0,PR_TBIA) /* Update buffes */
 #define pmap_collect(pmap)		/* No need so far */
@@ -149,4 +148,4 @@ void	pmap_pinit __P((pmap_t));
 
 #endif	/* _KERNEL */
 
-#endif PMAP_H
+#endif /* PMAP_H */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ibcs2_syscall.h,v 1.6 1999/06/07 07:18:35 deraadt Exp $	*/
+/*	$OpenBSD: ibcs2_syscall.h,v 1.8 2001/08/26 04:14:26 deraadt Exp $	*/
 
 /*
  * System call numbers.

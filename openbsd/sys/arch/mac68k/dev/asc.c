@@ -1,4 +1,4 @@
-/*	$OpenBSD: asc.c,v 1.9 1999/04/24 06:39:40 downsj Exp $	*/
+/*	$OpenBSD: asc.c,v 1.11 2001/08/23 08:17:40 miod Exp $	*/
 /*	$NetBSD: asc.c,v 1.20 1997/02/24 05:47:33 scottr Exp $	*/
 
 /*
@@ -76,6 +76,7 @@
 #include <sys/param.h>
 #include <sys/device.h>
 #include <sys/fcntl.h>
+#include <sys/timeout.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -172,6 +173,7 @@ ascattach(parent, self, aux)
 		printf(" at %x", oa->oa_addr);
 	printf("\n");
 
+	timeout_set(&sc->sc_bell_tmo, asc_stop_bell, sc);
 	mac68k_set_bell_callback(asc_ring_bell, sc);
 }
 
@@ -278,11 +280,11 @@ ascmmap(dev, off, prot)
 {
 	int unit = ASCUNIT(dev);
 	struct asc_softc *sc;
-	vm_offset_t pa;
+	paddr_t pa;
 
 	sc = asc_cd.cd_devs[unit];
 	if (off >= 0 && off < MAC68K_ASC_LEN) {
-		pa = pmap_extract(pmap_kernel(), (vm_offset_t)sc->sc_handle);
+		pmap_extract(pmap_kernel(), (vm_offset_t)sc->sc_handle, &pa);
 		return m68k_btop(pa + off);
 	}
 
@@ -335,7 +337,7 @@ asc_ring_bell(arg, freq, length, volume)
 		bus_space_write_1(sc->sc_tag, sc->sc_handle, 0x801, 2); /* enable sampled */
 	}
 	sc->sc_ringing++;
-	timeout(asc_stop_bell, sc, length);
+	timeout_add(&sc->sc_bell_tmo, length);
 
 	return (0);
 }

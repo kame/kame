@@ -1,4 +1,4 @@
-/*      $OpenBSD: wdcvar.h,v 1.17 2001/04/04 07:29:50 csapuntz Exp $     */
+/*      $OpenBSD: wdcvar.h,v 1.20 2001/07/31 06:14:05 csapuntz Exp $     */
 /*	$NetBSD: wdcvar.h,v 1.17 1999/04/11 20:50:29 bouyer Exp $	*/
 
 /*-
@@ -39,9 +39,6 @@
 
 #include <sys/timeout.h>
 
-#define	WAITTIME    (10 * hz)    /* time to wait for a completion */
-	/* this is a lot for hard drives, but not for cdroms */
-
 struct channel_queue {  /* per channel queue (may be shared) */
 	TAILQ_HEAD(xferhead, wdc_xfer) sc_xfer;
 };
@@ -71,7 +68,6 @@ struct channel_softc { /* Per channel data */
 #define WDCF_ACTIVE   0x01	/* channel is active */
 #define WDCF_ONESLAVE 0x02      /* slave-only channel */
 #define WDCF_IRQ_WAIT 0x10	/* controller is waiting for irq */
-#define WDCF_DMA_WAIT 0x20      /* controller is waiting for DMA */
 #define WDCF_VERBOSE_PROBE 0x40 /* verbose probe */
 	u_int8_t ch_status;         /* copy of status register */
 	u_int8_t ch_error;          /* copy of error register */
@@ -282,7 +278,6 @@ void	wdc_delref __P((struct channel_softc *));
 /* ATA/ATAPI specs says a device can take 31s to reset */
 #define WDC_RESET_WAIT 31000
 
-void wdc_atapibus_attach __P((struct channel_softc *));
 int   atapi_print       __P((void *, const char *));
 
 void wdc_disable_intr __P((struct channel_softc *));
@@ -293,3 +288,5 @@ void wdc_output_bytes __P((struct ata_drive_datas *drvp, void *, unsigned int));
 void wdc_input_bytes __P((struct ata_drive_datas *drvp, void *, unsigned int));
 
 void wdc_print_current_modes __P((struct channel_softc *));
+
+int wdc_ioctl __P((struct ata_drive_datas *, u_long, caddr_t, int));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: boot.c,v 1.5 2000/11/25 21:51:39 hugh Exp $ */
+/*	$OpenBSD: boot.c,v 1.8 2001/10/04 00:21:09 miod Exp $ */
 /*	$NetBSD: boot.c,v 1.4 1999/10/23 14:42:22 ragge Exp $ */
 /*-
  * Copyright (c) 1982, 1986 The Regents of the University of California.
@@ -82,8 +82,9 @@ int sluttid, senast, skip;
 
 Xmain()
 {
-	int io, type, askname, filindex = 0;
+	int io, type, filindex = 0;
 	int j, nu;
+	volatile int askname;
 
 	/* make sure the rpb is out of the way so it does not get trampled;
 	 * this will be the case if booting from net
@@ -97,7 +98,7 @@ Xmain()
 
 	askname = howto & RB_ASKNAME;
 	printf("\n\r>> OpenBSD/vax boot [%s %s] <<\n", __DATE__, __TIME__);
-	printf(">> Press enter to autoboot, or any other key to abort:  ");
+	printf(">> Press enter to autoboot now, or any other key to abort:  ");
 	sluttid = getsecs() + 5;
 	senast = 0;
 	skip = 0;
@@ -201,6 +202,8 @@ fail:			printf("usage: boot [filename] [-asd]\n");
 		while (*++arg) {
 			if (*arg == 'a')
 				howto |= RB_ASKNAME;
+			else if (*arg == 'c')
+				howto |= RB_CONFIG;
 			else if (*arg == 'd')
 				howto |= RB_KDB;
 			else if (*arg == 's')

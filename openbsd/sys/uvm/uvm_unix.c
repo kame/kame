@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_unix.c,v 1.8 2001/01/29 02:07:50 niklas Exp $	*/
-/*	$NetBSD: uvm_unix.c,v 1.8 1999/03/25 18:48:56 mrg Exp $	*/
+/*	$OpenBSD: uvm_unix.c,v 1.13 2001/08/11 10:57:22 art Exp $	*/
+/*	$NetBSD: uvm_unix.c,v 1.12 2000/03/30 12:31:50 augustss Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -83,7 +83,7 @@ sys_obreak(p, v, retval)
 	long diff;
 
 	old = (vaddr_t)vm->vm_daddr;
-	new = round_page(SCARG(uap, nsize));
+	new = round_page((vaddr_t)SCARG(uap, nsize));
 	if ((new - old) > p->p_rlimit[RLIMIT_DATA].rlim_cur)
 		return(ENOMEM);
 
@@ -128,8 +128,8 @@ uvm_grow(p, sp)
 	struct proc *p;
 	vaddr_t sp;
 {
-	register struct vmspace *vm = p->p_vmspace;
-	register int si;
+	struct vmspace *vm = p->p_vmspace;
+	int si;
 
 	/*
 	 * For user defined stacks (from sendsig).
@@ -155,9 +155,9 @@ uvm_grow(p, sp)
 	 * Really need to check vs limit and increment stack size if ok.
 	 */
 #ifdef MACHINE_STACK_GROWS_UP
-	si = clrnd(btoc(sp - USRSTACK) - vm->vm_ssize);
+	si = btoc(sp - USRSTACK) - vm->vm_ssize;
 #else
-	si = clrnd(btoc(USRSTACK-sp) - vm->vm_ssize);
+	si = btoc(USRSTACK-sp) - vm->vm_ssize;
 #endif
 	if (vm->vm_ssize + si > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur))
 		return (0);
@@ -196,9 +196,9 @@ uvm_coredump(p, vp, cred, chdr)
 	struct ucred *cred;
 	struct core *chdr;
 {
-	register struct vmspace *vm = p->p_vmspace;
-	register vm_map_t map = &vm->vm_map;
-	register vm_map_entry_t entry;
+	struct vmspace *vm = p->p_vmspace;
+	vm_map_t map = &vm->vm_map;
+	vm_map_entry_t entry;
 	vaddr_t start, end;
 	struct coreseg cseg;
 	off_t offset;

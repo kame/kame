@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.62 2001/04/06 23:41:02 art Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.79 2001/10/11 08:07:12 gluk Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -60,9 +60,6 @@
 #include <sys/tty.h>
 #include <sys/conf.h>
 #include <sys/buf.h>
-#ifdef REAL_CLISTS
-#include <sys/clist.h>
-#endif
 #include <sys/device.h>
 #include <sys/protosw.h>
 #include <sys/reboot.h>
@@ -78,6 +75,7 @@
 #endif
 #include <sys/domain.h>
 #include <sys/mbuf.h>
+#include <sys/pipe.h>
 
 #include <sys/syscall.h>
 #include <sys/syscallargs.h>
@@ -87,17 +85,14 @@
 #include <machine/cpu.h>
 
 #include <vm/vm.h>
-#include <vm/vm_pageout.h>
 
-#if defined(UVM)
 #include <uvm/uvm.h>
-#endif
 
 #include <net/if.h>
 #include <net/raw_cb.h>
 
 #if defined(CRYPTO)
-#include <crypto/crypto.h>
+#include <crypto/cryptodev.h>
 #include <crypto/cryptosoft.h>
 #endif
 
@@ -138,13 +133,10 @@ int	main __P((void *));
 void	check_console __P((struct proc *));
 void	start_init __P((void *));
 void	start_pagedaemon __P((void *));
+void	start_cleaner __P((void *));
 void	start_update __P((void *));
 void	start_reaper __P((void *));
 void    start_crypto __P((void *));
-
-#ifdef cpu_set_init_frame
-void *initframep;				/* XXX should go away */
-#endif
 
 extern char sigcode[], esigcode[];
 #ifdef SYSCALL_DEBUG
@@ -210,18 +202,23 @@ main(framep)
 	printf(copyright);
 	printf("\n");
 
-#if defined(UVM)
 	uvm_init();
-#else
-	vm_mem_init();
-	kmeminit();
-#if defined(MACHINE_NEW_NONCONTIG)
-	vm_page_physrehash();
-#endif
-#endif /* UVM */
 	disk_init();		/* must come before autoconfiguration */
 	tty_init();		/* initialise tty's */
 	cpu_startup();
+
+	/*
+	 * Initialize mbuf's.  Do this now because we might attempt to
+	 * allocate mbufs or mbuf clusters during autoconfiguration.
+	 */
+	mbinit();
+
+	/*
+	 * Initialize timeouts.
+	 */
+	timeout_startup();
+
+	cpu_configure();
 
 	/* Initialize sysctls (must be done before any processes run) */
 	sysctl_init();
@@ -230,6 +227,16 @@ main(framep)
 	 * Initialize process and pgrp structures.
 	 */
 	procinit();
+
+	/*
+	 * Initialize filedescriptors.
+	 */
+	filedesc_init();
+
+	/*
+	 * Initialize pipes.
+	 */
+	pipe_init();
 
 	/*
 	 * Create process 0 (the swapper).
@@ -279,28 +286,16 @@ main(framep)
 	limit0.pl_rlimit[RLIMIT_NOFILE].rlim_max = MIN(NOFILE_MAX,
 	    (maxfiles - NOFILE > NOFILE) ?  maxfiles - NOFILE : NOFILE);
 	limit0.pl_rlimit[RLIMIT_NPROC].rlim_cur = MAXUPRC;
-#if defined(UVM)
 	i = ptoa(uvmexp.free);
-#else
-	i = ptoa(cnt.v_free_count);
-#endif /* UVM */
 	limit0.pl_rlimit[RLIMIT_RSS].rlim_max = i;
 	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_max = i;
 	limit0.pl_rlimit[RLIMIT_MEMLOCK].rlim_cur = i / 3;
 	limit0.p_refcnt = 1;
 
 	/* Allocate a prototype map so we have something to fork. */
-#if defined(UVM)
 	uvmspace_init(&vmspace0, pmap_kernel(), round_page(VM_MIN_ADDRESS),
 	    trunc_page(VM_MAX_ADDRESS), TRUE);
 	p->p_vmspace = &vmspace0;
-#else
-	p->p_vmspace = &vmspace0;
-	vmspace0.vm_refcnt = 1;
-	vmspace0.vm_map.pmap = pmap_create(0);
-	vm_map_init(&p->p_vmspace->vm_map, round_page(VM_MIN_ADDRESS),
-	    trunc_page(VM_MAX_ADDRESS), TRUE);
-#endif /* UVM */
 
 	p->p_addr = proc0paddr;				/* XXX */
 
@@ -318,11 +313,7 @@ main(framep)
 	rqinit();
 
 	/* Configure virtual memory system, set vm rlimits. */
-#if defined(UVM)
 	uvm_init_limits(p);
-#else
-	vm_init_limits(p);
-#endif
 
 	/* Initialize the file systems. */
 #if defined(NFSSERVER) || defined(NFSCLIENT)
@@ -332,14 +323,6 @@ main(framep)
 
 	/* Start real time and statistics clocks. */
 	initclocks();
-
-	/* Initialize mbuf's. */
-	mbinit();
-
-#ifdef REAL_CLISTS
-	/* Initialize clists. */
-	clist_init();
-#endif
 
 #ifdef SYSVSHM
 	/* Initialize System V style shared memory. */
@@ -383,6 +366,13 @@ main(framep)
 	/* Start the scheduler */
 	scheduler_start();
 
+	/* Initialize signal state for process 0. */
+	signal_init();
+	p->p_sigacts = &sigacts0;
+	siginit(p);
+
+	dostartuphooks();
+
 	/* Configure root/swap devices */
 	if (md_diskconf)
 		(*md_diskconf)();
@@ -400,11 +390,7 @@ main(framep)
 	VOP_UNLOCK(rootvnode, 0, p);
 	filedesc0.fd_fd.fd_rdir = NULL;
 
-#if defined(UVM)
 	uvm_swap_init();
-#else
-	swapinit();
-#endif
 
 	/*
 	 * Now can look at time, having had a chance to verify the time
@@ -414,26 +400,11 @@ main(framep)
 	p->p_stats->p_start = runtime = mono_time = boottime = time;
 	p->p_rtime.tv_sec = p->p_rtime.tv_usec = 0;
 
-	/* Initialize signal state for process 0. */
-	signal_init();
-	p->p_sigacts = &sigacts0;
-	siginit(p);
-
 	/* Create process 1 (init(8)). */
 	if (fork1(p, SIGCHLD, FORK_FORK, NULL, 0, rval))
 		panic("fork init");
-#ifdef cpu_set_init_frame			/* XXX should go away */
-	if (rval[1]) {
-		/*
-		 * Now in process 1.
-		 */
-		initframep = framep;
-		start_init(curproc);
-		return (0);
-	}
-#else
-	cpu_set_kpc(pfind(rval[0]), start_init, pfind(rval[0]));
-#endif
+	initproc = pfind(rval[0]);
+	cpu_set_kpc(initproc, start_init, initproc);
 
 	/* Create process 2, the pageout daemon kernel thread. */
 	if (kthread_create(start_pagedaemon, NULL, NULL, "pagedaemon"))
@@ -443,17 +414,18 @@ main(framep)
 	if (kthread_create(start_reaper, NULL, NULL, "reaper"))
 		panic("fork reaper");
 
-	/* Create process 4, the update daemon kernel thread. */
-	if (kthread_create(start_update, NULL, NULL, "update")) {
-#ifdef DIAGNOSTIC
+	/* Create process 4, the cleaner daemon kernel thread. */
+	if (kthread_create(start_cleaner, NULL, NULL, "cleaner"))
+		panic("fork cleaner");
+
+	/* Create process 5, the update daemon kernel thread. */
+	if (kthread_create(start_update, NULL, NULL, "update"))
 		panic("fork update");
-#endif
-	}
 
 #ifdef CRYPTO
-	/* Create process 5, the crypto kernel thread. */
+	/* Create process 6, the crypto kernel thread. */
 	if (kthread_create(start_crypto, NULL, NULL, "crypto"))
-	        panic("crypto thread");
+		panic("crypto thread");
 #endif /* CRYPTO */
 
 	/* Create any other deferred kernel threads. */
@@ -464,11 +436,7 @@ main(framep)
 
 	randompid = 1;
 	/* The scheduler is an infinite loop. */
-#if defined(UVM)
 	uvm_scheduler();
-#else
-	scheduler();
-#endif
 	/* NOTREACHED */
 }
 
@@ -523,19 +491,6 @@ start_init(arg)
 	/*
 	 * Now in process 1.
 	 */
-	initproc = p;
-
-#ifdef cpu_set_init_frame			/* XXX should go away */
-	/*
-	 * We need to set the system call frame as if we were entered through
-	 * a syscall() so that when we call sys_execve() below, it will be able
-	 * to set the entry point (see setregs) when it tries to exec.  The
-	 * startup code in "locore.s" has allocated space for the frame and
-	 * passed a pointer to that space as main's argument.
-	 */
-	cpu_set_init_frame(p, initframep);
-#endif
-
 	check_console(p);
 
 	/*
@@ -546,19 +501,12 @@ start_init(arg)
 #else
 	addr = USRSTACK - PAGE_SIZE;
 #endif
-#if defined(UVM)
 	if (uvm_map(&p->p_vmspace->vm_map, &addr, PAGE_SIZE, 
-                    NULL, UVM_UNKNOWN_OFFSET, 
-                    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
-		    UVM_ADV_NORMAL,
-                    UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW))
-		!= KERN_SUCCESS)
+	    NULL, UVM_UNKNOWN_OFFSET, 
+	    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_COPY,
+	    UVM_ADV_NORMAL, UVM_FLAG_FIXED|UVM_FLAG_OVERLAY|UVM_FLAG_COPYONW))
+	    != KERN_SUCCESS)
 		panic("init: couldn't allocate argument space");
-#else
-	if (vm_allocate(&p->p_vmspace->vm_map, &addr, (vsize_t)PAGE_SIZE,
-	    FALSE) != 0)
-		panic("init: couldn't allocate argument space");
-#endif
 #ifdef MACHINE_STACK_GROWS_UP
 	p->p_vmspace->vm_maxsaddr = (caddr_t)addr + PAGE_SIZE;
 #else
@@ -659,11 +607,7 @@ void
 start_pagedaemon(arg)
 	void *arg;
 {
-#if defined(UVM)
 	uvm_pageout();
-#else
-	vm_pageout();
-#endif
 	/* NOTREACHED */
 }
 
@@ -672,6 +616,14 @@ start_update(arg)
 	void *arg;
 {
 	sched_sync(curproc);
+	/* NOTREACHED */
+}
+
+void
+start_cleaner(arg)
+	void *arg;
+{
+	buf_daemon(curproc);
 	/* NOTREACHED */
 }
 
@@ -686,9 +638,9 @@ start_reaper(arg)
 #ifdef CRYPTO
 void
 start_crypto(arg)
-        void *arg;
+	void *arg;
 {
-        crypto_thread();
-        /* NOTREACHED */
+	crypto_thread();
+	/* NOTREACHED */
 }
 #endif /* CRYPTO */

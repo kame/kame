@@ -50,7 +50,7 @@
 #define XMPHY_MII_BMSR		0x01
 #define XMPHY_BMSR_EXTSTS	0x0100	/* Extended status present */
 #define XMPHY_BMSR_ACOMP	0x0020	/* Autoneg complete */
-#define XMPHY_BMSR_RFAULT	0x0010	/* Remote fault condition occured */
+#define XMPHY_BMSR_RFAULT	0x0010	/* Remote fault condition occurred */
 #define XMPHY_BMSR_ANEG		0x0008	/* Autoneg capable */
 #define XMPHY_BMSR_LINK		0x0004	/* Link status */
 #define XMPHY_BMSR_EXT		0x0001	/* Extended capability */
@@ -77,8 +77,8 @@
 #define XMPHY_RF_ANEGFAIL	0x3000	/* Autonegotiation error */
 
 #define XMPHY_PAUSE_NOPAUSE	0x0000	/* No pause possible */
-#define XMPHY_PAUSE_ASYMETRIC	0x0080	/* Asymetric pause toward LP */
-#define XMPHY_PAUSE_SYMETRIC	0x0100	/* Symetric pause */
+#define XMPHY_PAUSE_ASYMMETRIC	0x0080	/* Asymmetric pause toward LP */
+#define XMPHY_PAUSE_SYMMETRIC	0x0100	/* Symmetric pause */
 #define XMPHY_PAUSE_BOTH	0x0180	/* Both sym and asym pause */
 
 #define XMPHY_MII_ANER		0x06

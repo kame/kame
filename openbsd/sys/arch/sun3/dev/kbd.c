@@ -1,4 +1,4 @@
-/*	$OpenBSD: kbd.c,v 1.5 2000/07/02 17:50:26 miod Exp $	*/
+/*	$OpenBSD: kbd.c,v 1.8 2001/08/12 12:03:02 heko Exp $	*/
 /*	$NetBSD: kbd.c,v 1.8 1996/05/17 19:32:06 gwr Exp $	*/
 
 /*
@@ -116,6 +116,7 @@
 struct kbd_softc {
 	struct	device k_dev;		/* required first: base device */
 	struct	zs_chanstate *k_cs;
+	struct timeout k_tmo;
 
 	/* Flags to communicate with kbd_softint() */
 	volatile int k_intr_flags;
@@ -284,6 +285,8 @@ kbd_attach(parent, self, aux)
 	k->k_magic1 = KBD_L1;
 	k->k_magic2 = KBD_A;
 
+	timeout_set(&k->k_tmo, kbd_repeat, k);
+
 	/* Now attach the (kd) pseudo-driver. */
 	kd_init(kbd_unit);
 }
@@ -329,7 +332,7 @@ kbdopen(dev, flags, mode, p)
 
 	if (k->k_repeating) {
 		k->k_repeating = 0;
-		untimeout(kbd_repeat, k);
+		timeout_del(&k->k_tmo);
 	}
 
 	return (0);
@@ -437,7 +440,7 @@ kbdioctl(dev, cmd, data, flag, p)
 	case KIOCGETKEY:	/* Get keymap entry (old format) */
 		error = kbd_oldkeymap(ks, cmd, (struct okiockey *)data);
 		break;
-#endif	KIOCGETKEY */
+#endif	/* KIOCGETKEY */
 
 	case KIOCSKEY:  	/* Set keymap entry */
 		/* Don't let just anyone hose the keyboard. */
@@ -842,7 +845,7 @@ kbd_repeat(void *arg)
 
 	if (k->k_repeating && k->k_repeatsym >= 0) {
 		kbd_input_keysym(k, k->k_repeatsym);
-		timeout(kbd_repeat, k, k->k_repeat_step);
+		timeout_add(&k->k_tmo, k->k_repeat_step);
 	}
 	splx(s);
 }
@@ -912,7 +915,7 @@ kbd_input_raw(k, c)
 		/* Any input stops auto-repeat (i.e. key release). */
 		if (k->k_repeating) {
 			k->k_repeating = 0;
-			untimeout(kbd_repeat, k);
+			timeout_del(&k->k_tmo);
 		}
 
 		/* Translate this code to a keysym */
@@ -928,7 +931,7 @@ kbd_input_raw(k, c)
 		/* Setup for auto-repeat after initial delay. */
 		k->k_repeating = 1;
 		k->k_repeatsym = keysym;
-		timeout(kbd_repeat, k, k->k_repeat_start);
+		timeout_add(&k->k_tmo, k->k_repeat_start);
 		return;
 	}
 
@@ -1068,7 +1071,7 @@ kbd_stint(cs)
 }
 
 /*
- * Get input from the recieve ring and pass it on.
+ * Get input from the receive ring and pass it on.
  * Note: this is called at splsoftclock()
  */
 static void

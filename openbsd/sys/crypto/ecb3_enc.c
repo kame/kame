@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: ecb3_enc.c,v 1.1 2000/02/28 23:13:04 deraadt Exp $	*/
 
 /* lib/des/ecb3_enc.c */
 /* Copyright (C) 1995 Eric Young (eay@mincom.oz.au)

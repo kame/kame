@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.22 2000/11/10 18:15:43 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.26 2001/09/14 09:12:21 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.63-1.65ish 1997/01/16 15:41:40 gwr Exp $	*/
 
 /*
@@ -153,7 +153,7 @@ userret(p, fp, oticks)
 	register struct frame *fp;
 	u_quad_t oticks;
 {
-	int sig, s;
+	int sig;
 
 	/* take pending signals */
 	while ((sig = CURSIG(p)) != 0)
@@ -163,18 +163,9 @@ userret(p, fp, oticks)
 
 	if (want_resched) {
 		/*
-		 * Since we are curproc, clock will normally just change
-		 * our priority without moving us from one queue to another
-		 * (since the running process is not on a queue.)
-		 * If that happened after we put ourselves on the run queue
-		 * but before we mi_switch()'ed, we might not be on the queue
-		 * indicated by our priority.
+		 * We're being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -209,7 +200,7 @@ trap(type, code, v, frame)
 	u_quad_t sticks;
 	int si_type;
 
-	cnt.v_trap++;
+	uvmexp.traps++;
 	p = curproc;
 	ucode = 0;
 	sig = 0;
@@ -260,7 +251,7 @@ trap(type, code, v, frame)
 			 */
 			panic("trap during panic!");
 		}
-		regdump(&frame, 128);
+		regdump((struct trapframe *)&frame, 128);
 		type &= ~T_USER;
 		if ((u_int)type < trap_types)
 			panic(trap_type[type]);
@@ -527,7 +518,7 @@ trap(type, code, v, frame)
 		}
 
 		/* OK, let the VM code handle the fault. */
-		rv = vm_fault(map, va, ftype, FALSE);
+		rv = uvm_fault(map, va, 0, ftype);
 #ifdef	DEBUG
 		if (rv && MDB_ISPID(p->p_pid)) {
 			printf("vm_fault(%x, %x, %x, 0) -> %x\n",
@@ -555,7 +546,7 @@ trap(type, code, v, frame)
 			if (rv == KERN_SUCCESS) {
 				unsigned nss;
 
-				nss = clrnd(btoc((u_int)(USRSTACK-va)));
+				nss = btoc((u_int)(USRSTACK-va));
 				if (nss > vm->vm_ssize)
 					vm->vm_ssize = nss;
 			} else if (rv == KERN_PROTECTION_FAILURE)
@@ -618,7 +609,7 @@ syscall(code, frame)
 	register_t args[8], rval[2];
 	u_quad_t sticks;
 
-	cnt.v_syscall++;
+	uvmexp.syscalls++;
 	if (!USERMODE(frame.f_sr))
 		panic("syscall");
 	p = curproc;

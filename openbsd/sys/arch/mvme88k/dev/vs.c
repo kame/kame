@@ -1,4 +1,4 @@
-/*	$OpenBSD: vs.c,v 1.5 2001/03/09 05:44:39 smurph Exp $ */
+/*	$OpenBSD: vs.c,v 1.10 2001/08/31 01:52:19 miod Exp $ */
 
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
@@ -48,26 +48,25 @@
 #include <sys/dkstat.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
+
+#include <vm/vm_param.h>
+
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
+
 #include <machine/autoconf.h>
 #include <machine/param.h>
 
-#if defined(MVME187) || defined(MVME188) || defined(MVME197)
-   #define PAGESIZE 4096
-   #include <mvme88k/dev/vsreg.h>
-   #include <mvme88k/dev/vsvar.h>
-   #include <mvme88k/dev/vme.h>		/* vme_findvec() */
-   #include <machine/mmu.h>		/* DMA_CACHE_SYNC, etc... */
-   #define ROUND_PAGE m88k_round_page
-   #define TRUNC_PAGE m88k_trunc_page
+#if defined(mvme88k)
+#include <mvme88k/dev/vsreg.h>
+#include <mvme88k/dev/vsvar.h>
+#include <mvme88k/dev/vme.h>		/* vme_findvec() */
+#include <machine/mmu.h>		/* DMA_CACHE_SYNC, etc... */
 #else
-   #include <mvme68k/dev/vsreg.h>
-   #include <mvme68k/dev/vsvar.h>
-   #include <mvme68k/dev/vme.h>		/* vme_findvec() */
-   #define ROUND_PAGE m68k_round_page
-   #define TRUNC_PAGE m68k_trunc_page
-#endif /* MVME187 */
+#include <mvme68k/dev/vsreg.h>
+#include <mvme68k/dev/vsvar.h>
+#include <mvme68k/dev/vme.h>		/* vme_findvec() */
+#endif /* mvme88k */
 
 int  vs_checkintr        __P((struct vs_softc *, struct scsi_xfer *, int *));
 void vs_chksense         __P((struct scsi_xfer *));
@@ -80,11 +79,14 @@ int  vs_poll             __P((struct vs_softc *, struct scsi_xfer *));
 void vs_scsidone         __P((struct vs_softc *, struct scsi_xfer *, int));
 M328_CQE  * vs_getcqe    __P((struct vs_softc *));
 M328_IOPB * vs_getiopb   __P((struct vs_softc *));
+void vs_copy __P((void *, void *, unsigned short));
+void vs_zero __P((void *, u_long));
+int do_vspoll __P((struct vs_softc *, int));
+void thaw_queue __P((struct vs_softc *, u_int8_t));
+void vs_link_sg_element __P((sg_list_element_t *, vm_offset_t, int));
+void vs_link_sg_list __P((sg_list_element_t *, vm_offset_t, int));
 
 static __inline__ void vs_clear_return_info __P((struct vs_softc *));
-
-extern int cold;
-extern u_int   kvtop();
 
 /* 
  * 16 bit 's' memory functions.  MVME328 is a D16 board.
@@ -323,18 +325,18 @@ vs_scsicmd(xs)
 	iopb->iopb_EVCT = (u_char)sc->sc_evec;
 
 	/*
-	 * Since the 187 doesn't support cache snooping, we have
+	 * Since the 88k doesn't support cache snooping, we have
 	 * to flush the cache for a write and flush with inval for
 	 * a read, prior to starting the IO.
 	 */
 	if (xs->flags & SCSI_DATA_IN) {	 /* read */
-#if defined(MVME187) || defined(MVME188) || defined(MVME197)
+#if defined(mvme88k)
 		dma_cachectl((vm_offset_t)xs->data, xs->datalen,
 			     DMA_CACHE_SYNC_INVAL);
 #endif      
 		iopb->iopb_OPTION |= OPT_READ;
 	} else {			 /* write */
-#if defined(MVME187) || defined(MVME188) || defined(MVME197)
+#if defined(mvme88k)
 		dma_cachectl((vm_offset_t)xs->data, xs->datalen,
 			     DMA_CACHE_SYNC);
 #endif      
@@ -427,7 +429,7 @@ vs_chksense(xs)
 	miopb->iopb_EVCT = (u_char)sc->sc_evec;
 	miopb->iopb_LEVEL = 0; /*sc->sc_ipl;*/
 	miopb->iopb_ADDR = ADDR_MOD;
-	LV(miopb->iopb_BUFF, kvtop(&xs->sense));
+	LV(miopb->iopb_BUFF, kvtop((vm_offset_t)&xs->sense));
 	LV(miopb->iopb_LENGTH, sizeof(struct scsi_sense_data));
 
 	vs_zero(mc, sizeof(M328_CQE));
@@ -891,7 +893,9 @@ vs_eintr(sc)
 		break;
 	default:
 		printf("%s: Uh oh!... Error 0x%x\n", vs_name(sc), ecode);
+#ifdef DDB
 		Debugger();
+#endif
 	}
 #ifdef SDEBUG
 	printf("%s: crsw = 0x%x iopb_type = %d iopb_len = %d wq = %d error = 0x%x\n", 
@@ -927,10 +931,6 @@ vs_alloc_scatter_gather(void)
 	M328_SG sg;
 
 	MALLOC(sg, M328_SG, sizeof(struct m328_sg), M_DEVBUF, M_WAITOK);
-	assert ( sg );
-	if ( !sg ) {
-		panic ("Memory for scatter_gather_list not available");
-	}
 	bzero(sg, sizeof(struct m328_sg));
 
 	return (sg);
@@ -1005,25 +1005,25 @@ vs_build_memory_structure(xs, iopb)
 
 	level = 0;
 	virt = starting_point_virt = (vm_offset_t)xs->data;
-	point1_phys = starting_point_phys = kvtop(xs->data);
+	point1_phys = starting_point_phys = kvtop((vm_offset_t)xs->data);
 	len = xs->datalen;
 	/*
 	 * Check if we need scatter/gather
 	 */
 
-	if (len > PAGESIZE) {
-		for (level = 0, point_virt = ROUND_PAGE(starting_point_virt+1);
+	if (len > PAGE_SIZE) {
+		for (level = 0, point_virt = round_page(starting_point_virt+1);
 		    /* if we do already scatter/gather we have to stay in the loop and jump */
 		    point_virt < virt + (vm_offset_t)len || sg ;
-		    point_virt += PAGESIZE) {			   /* out later */
+		    point_virt += PAGE_SIZE) {			   /* out later */
 
 			point2_phys = kvtop(point_virt);
 
-			if ((point2_phys - TRUNC_PAGE(point1_phys) - PAGESIZE) ||		   /* physical memory is not contiguous */
+			if ((point2_phys - trunc_page(point1_phys) - PAGE_SIZE) ||		   /* physical memory is not contiguous */
 			    (point_virt - starting_point_virt >= MAX_SG_BLOCK_SIZE && sg)) {   /* we only can access (1<<16)-1 bytes in scatter/gather_mode */
 				if (point_virt - starting_point_virt >= MAX_SG_BLOCK_SIZE) {	       /* We were walking too far for one scatter/gather block ... */
-					assert( MAX_SG_BLOCK_SIZE > PAGESIZE );
-					point_virt = TRUNC_PAGE(starting_point_virt+MAX_SG_BLOCK_SIZE-1);    /* So go back to the beginning of the last matching page */
+					assert( MAX_SG_BLOCK_SIZE > PAGE_SIZE );
+					point_virt = trunc_page(starting_point_virt+MAX_SG_BLOCK_SIZE-1);    /* So go back to the beginning of the last matching page */
 					/* and gererate the physadress of this location for the next time. */
 					point2_phys = kvtop(point_virt);
 				}

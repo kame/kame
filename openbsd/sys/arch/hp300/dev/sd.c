@@ -1,4 +1,4 @@
-/*	$OpenBSD: sd.c,v 1.21 1998/10/04 01:02:25 millert Exp $	*/
+/*	$OpenBSD: sd.c,v 1.23 2001/08/26 00:15:37 miod Exp $	*/
 /*	$NetBSD: sd.c,v 1.34 1997/07/10 18:14:10 kleink Exp $	*/
 
 /*
@@ -61,8 +61,6 @@
 #include <hp300/dev/scsireg.h>
 #include <hp300/dev/scsivar.h>
 #include <hp300/dev/sdvar.h>
-
-#include "opt_useleds.h"
 
 #ifdef USELEDS
 #include <hp300/hp300/leds.h>
@@ -324,6 +322,7 @@ sdgetcapacity(sc, dev)
 		bp->b_flags = B_READ | B_BUSY;
 		bp->b_un.b_addr = (caddr_t)capbuf;
 		bp->b_bcount = capbufsize;
+		LIST_INIT(&bp->b_dep);
 		sdstrategy(bp);
 		i = biowait(bp) ? sc->sc_sensestore.status : 0;
 		free(bp, M_DEVBUF);
@@ -641,6 +640,7 @@ sdlblkstrat(bp, bsize)
 	bzero((caddr_t)cbp, sizeof(*cbp));
 	cbp->b_proc = curproc;		/* XXX */
 	cbp->b_dev = bp->b_dev;
+	LIST_INIT(&cbp->b_dep);
 	bn = bp->b_blkno;
 	resid = bp->b_bcount;
 	addr = bp->b_un.b_addr;

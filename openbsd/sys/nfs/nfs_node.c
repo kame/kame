@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_node.c,v 1.13 1999/04/28 09:28:17 art Exp $	*/
+/*	$OpenBSD: nfs_node.c,v 1.15 2001/06/25 03:28:06 csapuntz Exp $	*/
 /*	$NetBSD: nfs_node.c,v 1.16 1996/02/18 11:53:42 fvdl Exp $	*/
 
 /*
@@ -54,7 +54,6 @@
 #include <nfs/nfs.h>
 #include <nfs/nfsnode.h>
 #include <nfs/nfsmount.h>
-#include <nfs/nqnfs.h>
 #include <nfs/nfs_var.h>
 
 LIST_HEAD(nfsnodehashhead, nfsnode) *nfsnodehashtbl;
@@ -136,6 +135,21 @@ loop:
 	MALLOC(np, struct nfsnode *, sizeof *np, M_NFSNODE, M_WAITOK);
 	bzero((caddr_t)np, sizeof *np);
 	vp->v_data = np;
+
+	/* 
+	 * Are we getting the root? If so, make sure the vnode flags
+	 * are correct 
+	 */
+	{
+		struct nfsmount *nmp = VFSTONFS(mntp);
+		if ((fhsize == nmp->nm_fhsize) &&
+		    !bcmp(fhp, nmp->nm_fh, fhsize)) {
+			if (vp->v_type == VNON)
+				vp->v_type = VDIR;
+			vp->v_flag |= VROOT;
+		}
+	}
+
 	np->n_vnode = vp;
 	/*
 	 * Insert the nfsnode in the hash queue for its new file handle
@@ -192,8 +206,7 @@ nfs_inactive(v)
 		vrele(sp->s_dvp);
 		FREE((caddr_t)sp, M_NFSREQ);
 	}
-	np->n_flag &= (NMODIFIED | NFLUSHINPROG | NFLUSHWANT | NQNFSEVICTED |
-		NQNFSNONCACHE | NQNFSWRITE);
+	np->n_flag &= (NMODIFIED | NFLUSHINPROG | NFLUSHWANT);
 
 	VOP_UNLOCK(ap->a_vp, 0, ap->a_p);
 	return (0);
@@ -211,7 +224,6 @@ nfs_reclaim(v)
 	} */ *ap = v;
 	register struct vnode *vp = ap->a_vp;
 	register struct nfsnode *np = VTONFS(vp);
-	register struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	register struct nfsdmap *dp, *dp2;
 	extern int prtactive;
 
@@ -220,13 +232,6 @@ nfs_reclaim(v)
 
 	if (np->n_hash.le_prev != NULL)
 		LIST_REMOVE(np, n_hash);
-
-	/*
-	 * For nqnfs, take it off the timer queue as required.
-	 */
-	if ((nmp->nm_flag & NFSMNT_NQNFS) && np->n_timer.cqe_next != 0) {
-		CIRCLEQ_REMOVE(&nmp->nm_timerhead, np, n_timer);
-	}
 
 	/*
 	 * Free up any directory cookie structures and

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.19 2001/02/11 06:34:37 hugh Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.24 2001/09/21 02:11:58 miod Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.67 2000/06/29 07:14:34 mrg Exp $	     */
 
 /*
@@ -44,8 +44,9 @@
 #include <sys/device.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <vm/vm_page.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <machine/vmparam.h>
 #include <machine/mtpr.h>
@@ -316,8 +317,6 @@ iounaccess(vaddr, npgs)
 	mtpr(0, PR_TBIA);
 }
 
-extern vm_map_t phys_map;
-
 /*
  * Map a user I/O request into kernel virtual address space.
  * Note: the pages are already locked by uvm_vslock(), so we
@@ -341,18 +340,18 @@ vmapbuf(bp, len)
 	if ((bp->b_flags & B_PHYS) == 0)
 		panic("vmapbuf");
 	p = bp->b_proc;
-	faddr = trunc_page((vaddr_t)bp->b_saveaddr = bp->b_data);
+	faddr = trunc_page((vaddr_t)(bp->b_saveaddr = bp->b_data));
 	off = (vaddr_t)bp->b_data - faddr;
 	len = round_page(off + len);
 	taddr = uvm_km_valloc_wait(phys_map, len);
 	bp->b_data = (caddr_t)(taddr + off);
 	len = atop(len);
 	while (len--) {
-		if ((pa = pmap_extract(vm_map_pmap(&p->p_vmspace->vm_map), faddr))
-		  == FALSE)
+		if (pmap_extract(vm_map_pmap(&p->p_vmspace->vm_map), faddr,
+				&pa) == FALSE)
 			panic("vmapbuf: null page frame");
 		pmap_enter(vm_map_pmap(phys_map), taddr, trunc_page(pa),
-		    VM_PROT_READ|VM_PROT_WRITE, TRUE, VM_PROT_READ|VM_PROT_WRITE);
+		    VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		faddr += PAGE_SIZE;
 		taddr += PAGE_SIZE;
 	}

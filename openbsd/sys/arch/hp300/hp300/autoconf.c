@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.17 1999/05/25 08:37:49 downsj Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.19 2001/09/19 21:32:19 miod Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.45 1999/04/10 17:31:02 kleink Exp $	*/
 
 /*
@@ -59,7 +59,7 @@
 /*
  * Setup the system to run on the current machine.
  *
- * Configure() is called at boot time.  Available
+ * cpu_configure() is called at boot time.  Available
  * devices are determined (from possibilities mentioned in ioconf.c),
  * and the drivers are initialized.
  */
@@ -239,7 +239,7 @@ mainbussearch(parent, match, aux)
  * Determine the device configuration for the running system.
  */
 void
-configure()
+cpu_configure()
 {
 	/*
 	 * Initialize the dev_data_lists.
@@ -465,7 +465,7 @@ getdisk(str, len, defpart, devp)
 		for (dv = alldevs.tqh_first; dv != NULL;
 		    dv = dv->dv_list.tqe_next) {
 			if (dv->dv_class == DV_DISK)
-				printf(" %s[a-h]", dv->dv_xname);
+				printf(" %s[a-p]", dv->dv_xname);
 #ifdef NFSCLIENT
 			if (dv->dv_class == DV_IFNET)
 				printf(" %s", dv->dv_xname);

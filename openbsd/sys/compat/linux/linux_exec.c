@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_exec.c,v 1.15 2001/04/01 21:30:33 art Exp $	*/
+/*	$OpenBSD: linux_exec.c,v 1.17 2001/09/19 13:28:43 art Exp $	*/
 /*	$NetBSD: linux_exec.c,v 1.13 1996/04/05 00:01:10 christos Exp $	*/
 
 /*
@@ -47,8 +47,6 @@
 #include <sys/syscallargs.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_map.h>
 
 #include <machine/cpu.h>
 #include <machine/reg.h>
@@ -114,9 +112,9 @@ struct emul emul_linux_elf = {
 	NULL,
 #endif
 	LINUX_ELF_AUX_ARGSIZ,
-	elf_copyargs,
+	elf32_copyargs,
 	setregs,
-	exec_elf_fixup,
+	exec_elf32_fixup,
 	linux_sigcode,
 	linux_esigcode,
 };
@@ -389,7 +387,7 @@ linux_elf_probe(p, epp, itp, pos, os)
 	int error;
 	size_t len;
 
-	brand = elf_check_brand(eh);
+	brand = elf32_check_brand(eh);
 	if (brand && strcmp(brand, "Linux"))
 		return (EINVAL);
 	if (itp[0]) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ncr5380sbc.c,v 1.9 1997/09/11 01:02:41 kstailey Exp $	*/
+/*	$OpenBSD: ncr5380sbc.c,v 1.13 2001/09/24 22:05:14 miod Exp $	*/
 /*	$NetBSD: ncr5380sbc.c,v 1.13 1996/10/13 01:37:25 christos Exp $	*/
 
 /*
@@ -106,7 +106,7 @@ static void	ncr5380_machine __P((struct ncr5380_softc *));
 void	ncr5380_abort __P((struct ncr5380_softc *));
 void	ncr5380_cmd_timeout __P((void *));
 /*
- * Action flags returned by the info_tranfer functions:
+ * Action flags returned by the info_transfer functions:
  * (These determine what happens next.)
  */
 #define ACT_CONTINUE	0x00	/* No flags: expect another phase */
@@ -356,13 +356,17 @@ ncr5380_init(sc)
 	struct ncr5380_softc *sc;
 {
 	int i, j;
+	struct sci_req *sr;
 
 #ifdef	NCR5380_DEBUG
 	ncr5380_debug_sc = sc;
 #endif
 
-	for (i = 0; i < SCI_OPENINGS; i++)
-		sc->sc_ring[i].sr_xs = NULL;
+	for (i = 0; i < SCI_OPENINGS; i++) {
+		sr = &sc->sc_ring[i];
+		sr->sr_xs = NULL;
+		timeout_set(&sr->sr_timeout, ncr5380_cmd_timeout, sr);
+	}
 	for (i = 0; i < 8; i++)
 		for (j = 0; j < 8; j++)
 			sc->sc_matrix[i][j] = NULL;
@@ -597,18 +601,9 @@ ncr5380_scsi_cmd(xs)
 	struct	ncr5380_softc *sc;
 	struct sci_req	*sr;
 	int s, rv, i, flags;
-	extern int cold;		/* XXX */
 
 	sc = xs->sc_link->adapter_softc;
-
 	flags = xs->flags;
-	/*
-	 * XXX: Hack: During autoconfig, force polling mode.
-	 * Needed as long as sdsize() can be called while cold,
-	 * otherwise timeouts will never call back (grumble).
-	 */
-	if (cold)
-		flags |= SCSI_POLL;
 
 	if (sc->sc_flags & NCR5380_FORCE_POLLING)
 		flags |= SCSI_POLL;
@@ -803,7 +798,7 @@ finish:
 	/* Clear our pointers to the request. */
 	sc->sc_current = NULL;
 	sc->sc_matrix[sr->sr_target][sr->sr_lun] = NULL;
-	untimeout(ncr5380_cmd_timeout, sr);
+	timeout_del(&sr->sr_timeout);
 
 	/* Make the request free. */
 	sr->sr_xs = NULL;
@@ -1042,7 +1037,7 @@ next_job:
 	if ((sr->sr_flags & SR_IMMED) == 0) {
 		i = (xs->timeout * hz) / 1000;
 		NCR_TRACE("sched: set timeout=%d\n", i);
-		timeout(ncr5380_cmd_timeout, sr, i);
+		timeout_add(&sr->sr_timeout, i);
 	}
 
 have_nexus:
@@ -1678,6 +1673,8 @@ have_msg:
 		NCR_TRACE("msg_in: PARITY_ERROR\n", 0);
 		/* Resend the last message. */
 		ncr_sched_msgout(sc, sc->sc_msgout);
+		/* Reset icmd after scheduling the REJECT cmd - jwg */
+		icmd = *sc->sci_icmd & SCI_ICMD_RMASK;
 		break;
 
 	case MSG_MESSAGE_REJECT:
@@ -1739,6 +1736,8 @@ have_msg:
 		/* fallthrough */
 	reject:
 		ncr_sched_msgout(sc, SEND_REJECT);
+		/* Reset icmd after scheduling the REJECT cmd - jwg */
+		icmd = *sc->sci_icmd & SCI_ICMD_RMASK;
 		break;
 
 	abort:
@@ -2398,7 +2397,7 @@ do_actions:
 		ncr5380_reset_scsibus(sc);
 	busfree:
 		NCR_TRACE("machine: discon, waited %d\n",
-			ncr5380_wait_nrq_timo - timo);
+			ncr5380_wait_req_timo - timo);
 
 		*sc->sci_icmd = 0;
 		*sc->sci_mode = 0;

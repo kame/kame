@@ -1,4 +1,4 @@
-/*	$OpenBSD: leds.c,v 1.2 1999/09/03 18:00:41 art Exp $	*/
+/*	$OpenBSD: leds.c,v 1.4 2001/07/25 13:25:31 art Exp $	*/
 /*	$NetBSD: leds.c,v 1.1 1997/05/05 20:54:35 thorpej Exp $	*/
 
 /*
@@ -60,8 +60,8 @@ void
 ledinit()
 {
 
-	pmap_enter(pmap_kernel(), (vm_offset_t)ledbase, (vm_offset_t)LED_ADDR,
-	    VM_PROT_READ|VM_PROT_WRITE, TRUE, VM_PROT_READ|VM_PROT_WRITE);
+	pmap_enter(pmap_kernel(), (vaddr_t)ledbase, (paddr_t)LED_ADDR,
+	    VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	ledaddr = (u_int8_t *) ((long)ledbase | (LED_ADDR & PGOFSET));
 }
 

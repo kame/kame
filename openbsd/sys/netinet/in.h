@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.h,v 1.43 2000/12/09 01:32:09 itojun Exp $	*/
+/*	$OpenBSD: in.h,v 1.54 2001/07/05 08:40:12 angelos Exp $	*/
 /*	$NetBSD: in.h,v 1.20 1996/02/13 23:41:47 christos Exp $	*/
 
 /*
@@ -256,6 +256,13 @@ struct ip_opts {
 #define IP_AUTH_LEVEL		20   /* int; authentication used */
 #define IP_ESP_TRANS_LEVEL	21   /* int; transport encryption */
 #define IP_ESP_NETWORK_LEVEL	22   /* int; full-packet encryption */
+#define IP_IPSEC_LOCAL_ID	23   /* buf; IPsec local ID */
+#define IP_IPSEC_REMOTE_ID	24   /* buf; IPsec remote ID */
+#define IP_IPSEC_LOCAL_CRED	25   /* buf; IPsec local credentials */
+#define IP_IPSEC_REMOTE_CRED	26   /* buf; IPsec remote credentials */
+#define IP_IPSEC_LOCAL_AUTH	27   /* buf; IPsec local auth material */
+#define IP_IPSEC_REMOTE_AUTH	28   /* buf; IPsec remote auth material */
+#define IP_IPCOMP_LEVEL		29   /* int; compression used */
 
 /*
  * Security levels - IPsec, not IPSO
@@ -272,6 +279,7 @@ struct ip_opts {
 #define IPSEC_AUTH_LEVEL_DEFAULT IPSEC_LEVEL_DEFAULT
 #define IPSEC_ESP_TRANS_LEVEL_DEFAULT IPSEC_LEVEL_DEFAULT
 #define IPSEC_ESP_NETWORK_LEVEL_DEFAULT IPSEC_LEVEL_DEFAULT
+#define IPSEC_IPCOMP_LEVEL_DEFAULT IPSEC_LEVEL_DEFAULT
 
 /*
  * Defaults and limits for options
@@ -307,7 +315,7 @@ struct ip_mreq {
  * Third level is protocol number.
  * Fourth level is desired variable within that protocol.
  */
-#define	IPPROTO_MAXID	(IPPROTO_ETHERIP + 1)	/* don't list to IPPROTO_MAX */
+#define	IPPROTO_MAXID	(IPPROTO_IPCOMP + 1)	/* don't list to IPPROTO_MAX */
 
 #define	CTL_IPPROTO_NAMES { \
 	{ "ip", CTLTYPE_NODE }, \
@@ -408,6 +416,17 @@ struct ip_mreq {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "etherip", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ "ipcomp", CTLTYPE_NODE }, \
 }
 
 /*
@@ -445,7 +464,8 @@ struct ip_mreq {
 #define IPCTL_IPSEC_AUTH_ALGORITHM 26
 #define	IPCTL_MTUDISC		27	/* allow path MTU discovery */
 #define	IPCTL_MTUDISCTIMEOUT	28	/* allow path MTU discovery */
-#define	IPCTL_MAXID		29
+#define	IPCTL_IPSEC_IPCOMP_ALGORITHM	29
+#define	IPCTL_MAXID		30
 
 #define	IPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -477,6 +497,7 @@ struct ip_mreq {
 	{ "ipsec-auth-alg", CTLTYPE_STRING }, \
 	{ "mtudisc", CTLTYPE_INT }, \
 	{ "mtudisctimeout", CTLTYPE_INT }, \
+	{ "ipsec-comp-alg", CTLTYPE_STRING }, \
 }
 
 /* INET6 stuff */
@@ -495,15 +516,67 @@ int	   bindresvport_sa __P((int, struct sockaddr *));
 __END_DECLS
 
 #else
+/*
+ * in_cksum_phdr:
+ *
+ *	Compute significant parts of the IPv4 checksum pseudo-header
+ *	for use in a delayed TCP/UDP checksum calculation.
+ *
+ *	Args:
+ *
+ *		src		Source IP address
+ *		dst		Destination IP address
+ *		lenproto	htons(proto-hdr-len + proto-number)
+ */
+static __inline u_int16_t __attribute__((__unused__))
+in_cksum_phdr(u_int32_t src, u_int32_t dst, u_int32_t lenproto)
+{
+	u_int32_t sum;
+
+	sum = lenproto +
+	      (u_int16_t)(src >> 16) +
+	      (u_int16_t)(src /*& 0xffff*/) +
+	      (u_int16_t)(dst >> 16) +
+	      (u_int16_t)(dst /*& 0xffff*/);
+
+	sum = (u_int16_t)(sum >> 16) + (u_int16_t)(sum /*& 0xffff*/);
+
+	if (sum > 0xffff)
+		sum -= 0xffff;
+
+	return (sum);
+}
+
+/*
+ * in_cksum_addword:
+ *
+ *	Add the two 16-bit network-order values, carry, and return.
+ */
+static __inline u_int16_t __attribute__((__unused__))
+in_cksum_addword(u_int16_t a, u_int16_t b)
+{
+	u_int32_t sum = a + b;
+
+	if (sum > 0xffff)
+		sum -= 0xffff;
+
+	return (sum);
+}
+
 int	   in_broadcast __P((struct in_addr, struct ifnet *));
 int	   in_canforward __P((struct in_addr));
 int	   in_cksum __P((struct mbuf *, int));
+int	   in4_cksum __P((struct mbuf *, u_int8_t, int, int));
+void	   in_delayed_cksum __P((struct mbuf *));
 int	   in_localaddr __P((struct in_addr));
 void	   in_socktrim __P((struct sockaddr_in *));
 char	  *inet_ntoa __P((struct in_addr));
 
+#define	in_hosteq(s,t)	((s).s_addr == (t).s_addr)
+#define	in_nullhost(x)	((x).s_addr == INADDR_ANY)
+
 #define	satosin(sa)	((struct sockaddr_in *)(sa))
 #define	sintosa(sin)	((struct sockaddr *)(sin))
 #define	ifatoia(ifa)	((struct in_ifaddr *)(ifa))
-#endif
-#endif /* !_NETINET_IN_H_ */
+#endif /* _KERNEL */
+#endif /* _NETINET_IN_H_ */

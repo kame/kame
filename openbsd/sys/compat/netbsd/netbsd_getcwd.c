@@ -1,4 +1,4 @@
-/* $OpenBSD: netbsd_getcwd.c,v 1.3 1999/09/26 11:15:43 kstailey Exp $ */
+/* $OpenBSD: netbsd_getcwd.c,v 1.5 2001/09/05 23:38:28 art Exp $ */
 /* $NetBSD: vfs_getcwd.c,v 1.3.2.3 1999/07/11 10:24:09 sommerfeld Exp $ */
 
 /*-
@@ -53,6 +53,7 @@ int proc_isunder __P((struct proc *, struct proc*)); /* missing from proc.h */
 #include <sys/dirent.h>
 #include <ufs/ufs/dir.h>	/* XXX only for DIRBLKSIZ */
 
+#include <compat/netbsd/netbsd_types.h>
 #include <compat/netbsd/netbsd_signal.h>
 #include <compat/netbsd/netbsd_syscallargs.h>
 
@@ -579,8 +580,6 @@ int netbsd_sys___getcwd(p, v, retval)
 		return ERANGE;
 
 	path = (char *)malloc(len, M_TEMP, M_WAITOK);
-	if (!path)
-		return ENOMEM;
 
 	bp = &path[len];
 	bend = bp;

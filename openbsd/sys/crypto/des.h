@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: des.h,v 1.1 2000/02/28 23:13:04 deraadt Exp $	*/
 
 /* lib/des/des.h */
 /* Copyright (C) 1995 Eric Young (eay@mincom.oz.au)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sf.c,v 1.10 2001/02/20 19:39:44 mickey Exp $ */
+/*	$OpenBSD: if_sf.c,v 1.14 2001/08/25 10:13:29 art Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -110,7 +110,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 #include <sys/device.h>
 
@@ -690,8 +689,7 @@ void sf_attach(parent, self, aux)
 #endif
 
 	/* Allocate interrupt */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-	    &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		goto fail;
 	}
@@ -739,7 +737,8 @@ void sf_attach(parent, self, aux)
 	ifp->if_start = sf_start;
 	ifp->if_watchdog = sf_watchdog;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = SF_TX_DLIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, SF_TX_DLIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	/*
@@ -876,7 +875,6 @@ int sf_newbuf(sc, c, m)
 void sf_rxeof(sc)
 	struct sf_softc		*sc;
 {
-	struct ether_header	*eh;
 	struct mbuf		*m;
 	struct ifnet		*ifp;
 	struct sf_rx_bufdesc_type0	*desc;
@@ -917,7 +915,6 @@ void sf_rxeof(sc)
 		m_adj(m0, ETHER_ALIGN);
 		m = m0;
 
-		eh = mtod(m, struct ether_header *);
 		ifp->if_ipackets++;
 
 #if NBPFILTER > 0
@@ -925,10 +922,8 @@ void sf_rxeof(sc)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
 
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
-
+		/* pass it on. */
+		ether_input_mbuf(ifp, m);
 	}
 
 	csr_write_4(sc, SF_CQ_CONSIDX,
@@ -1033,7 +1028,7 @@ int sf_intr(arg)
 	/* Re-enable interrupts. */
 	csr_write_4(sc, SF_IMR, SF_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		sf_start(ifp);
 
 	return claimed;
@@ -1235,7 +1230,7 @@ void sf_start(ifp)
 	i = SF_IDX_HI(txprod) >> 4;
 
 	while(sc->sf_ldata->sf_tx_dlist[i].sf_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1356,7 +1351,7 @@ void sf_stats_update(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
 			sc->sf_link++;
-		if (ifp->if_snd.ifq_head != NULL)
+		if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 			sf_start(ifp);
 	}
 
@@ -1381,7 +1376,7 @@ void sf_watchdog(ifp)
 	sf_reset(sc);
 	sf_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		sf_start(ifp);
 
 	return;

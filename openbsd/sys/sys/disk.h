@@ -1,4 +1,4 @@
-/*	$OpenBSD: disk.h,v 1.6 2001/01/25 03:50:53 todd Exp $	*/
+/*	$OpenBSD: disk.h,v 1.9 2001/06/22 14:10:59 deraadt Exp $	*/
 /*	$NetBSD: disk.h,v 1.11 1996/04/28 20:22:50 thorpej Exp $	*/
 
 /*
@@ -60,18 +60,22 @@ struct buf;
 struct disklabel;
 struct cpu_disklabel;
 
+struct diskstats {
+	int		ds_busy;	/* busy counter */
+	u_int64_t	ds_xfer;	/* total number of transfers */
+	u_int64_t	ds_seek;	/* total independent seek operations */
+	u_int64_t	ds_bytes;	/* total bytes transferred */
+	struct timeval	ds_attachtime;	/* time disk was attached */
+	struct timeval	ds_timestamp;	/* timestamp of last unbusy */
+	struct timeval	ds_time;	/* total time spent busy */
+};
+
 struct disk {
 	TAILQ_ENTRY(disk) dk_link;	/* link in global disklist */
-	struct lock     dk_lock;        /* disk lock */
+	struct lock	dk_lock;	/* disk lock */
 	char		*dk_name;	/* disk name */
-	int             dk_flags;       /* disk flags */
+	int		dk_flags;	/* disk flags */
 #define DKF_CONSTRUCTED  0x0001
-	int		dk_bopenmask;	/* block devices open */
-	int		dk_copenmask;	/* character devices open */
-	int		dk_openmask;	/* composite (bopen|copen) */
-	int		dk_state;	/* label state   ### */
-	int		dk_blkshift;	/* shift to convert DEV_BSIZE to blks */
-	int		dk_byteshift;	/* shift to convert bytes to blks */
 
 	/*
 	 * Metrics data; note that some metrics may have no meaning
@@ -84,6 +88,13 @@ struct disk {
 	struct timeval	dk_attachtime;	/* time disk was attached */
 	struct timeval	dk_timestamp;	/* timestamp of last unbusy */
 	struct timeval	dk_time;	/* total time spent busy */
+
+	int		dk_bopenmask;	/* block devices open */
+	int		dk_copenmask;	/* character devices open */
+	int		dk_openmask;	/* composite (bopen|copen) */
+	int		dk_state;	/* label state   ### */
+	int		dk_blkshift;	/* shift to convert DEV_BSIZE to blks*/
+	int		dk_byteshift;	/* shift to convert bytes to blks */
 
 	struct	dkdriver *dk_driver;	/* pointer to driver */
 
@@ -140,9 +151,10 @@ TAILQ_HEAD(disklist_head, disk);	/* the disklist is a TAILQ */
 
 #ifdef _KERNEL
 extern	int disk_count;			/* number of disks in global disklist */
+extern	int disk_change;		/* disk attached/detached */
 
 void	disk_init __P((void));
-int     disk_construct __P((struct disk *, char *));
+int	disk_construct __P((struct disk *, char *));
 void	disk_attach __P((struct disk *));
 void	disk_detach __P((struct disk *));
 void	disk_busy __P((struct disk *));
@@ -150,7 +162,7 @@ void	disk_unbusy __P((struct disk *, long));
 void	disk_resetstat __P((struct disk *));
 struct	disk *disk_find __P((char *));
 
-int     disk_lock __P((struct disk *));
+int	disk_lock __P((struct disk *));
 void    disk_unlock __P((struct disk *));
 
 struct device;

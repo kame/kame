@@ -1,5 +1,5 @@
 /* $NetBSD: if_awi_pcmcia.c,v 1.13 2000/03/22 11:22:20 onoe Exp $ */
-/* $OpenBSD: if_awi_pcmcia.c,v 1.7 2001/01/26 20:08:51 mickey Exp $ */
+/* $OpenBSD: if_awi_pcmcia.c,v 1.9 2001/08/17 21:52:16 deraadt Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -111,8 +111,8 @@ struct cfattach awi_pcmcia_ca = {
 };
 
 static struct awi_pcmcia_product {
-	u_int32_t	app_vendor;	/* vendor ID */
-	u_int32_t	app_product;	/* product ID */
+	u_int16_t	app_vendor;	/* vendor ID */
+	u_int16_t	app_product;	/* product ID */
 	const char	*app_cisinfo[4]; /* CIS information */
 	const char	*app_name;	/* product name */
 } awi_pcmcia_products[] = {
@@ -185,7 +185,8 @@ awi_pcmcia_enable(sc)
 	struct pcmcia_function *pf = psc->sc_pf;
 
 	/* establish the interrupt. */
-	sc->sc_ih = pcmcia_intr_establish(pf, IPL_NET, awi_intr, sc);
+	sc->sc_ih = pcmcia_intr_establish(pf, IPL_NET, awi_intr,
+	    sc, sc->sc_dev.dv_xname);
 	if (sc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt\n",
 		    sc->sc_dev.dv_xname);
@@ -346,7 +347,8 @@ awi_pcmcia_attach(parent, self, aux)
 	sc->sc_disable = awi_pcmcia_disable;
 
 	/* establish the interrupt. */
-	sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET, awi_intr, sc);
+	sc->sc_ih = pcmcia_intr_establish(psc->sc_pf, IPL_NET,
+	    awi_intr, sc, "");
 	if (sc->sc_ih == NULL) {
 		printf("%s: couldn't establish interrupt\n",
 		    sc->sc_dev.dv_xname);

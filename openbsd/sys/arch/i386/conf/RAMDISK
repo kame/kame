@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK,v 1.102 2001/04/13 05:43:03 deraadt Exp $
+#	$OpenBSD: RAMDISK,v 1.110 2001/10/10 23:43:43 millert Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -11,16 +11,13 @@ option		I586_CPU
 option		I686_CPU
 option		GPL_MATH_EMULATE	# floating point emulation
 
-option		UVM		# use the UVM virtual memory system
+option		SMALL_KERNEL
 
 #option		DUMMY_NOPS	# speed hack; recommended
 
 maxusers	4		# estimated number of users
 option		TIMEZONE=0	# time zone to adjust RTC time by
-option		DST=0		# daylight savings time used by RTC
-
-option		SWAPPAGER	# paging; REQUIRED
-option		DEVPAGER	# mmap() of devices
+option		DST=0		# daylight saving time used by RTC
 
 #makeoptions	DEBUG="-g"	# compile full symbol table
 
@@ -32,7 +29,6 @@ option		EXT2FS		# Linux ext2fs
 option		CD9660		# ISO 9660 + Rock Ridge file system
 option		MSDOSFS		# MS-DOS file system
 option		FIFO		# FIFOs; RECOMMENDED
-option		KERNFS		# /kern
 
 option		INET		# IP + ICMP + TCP + UDP
 
@@ -236,7 +232,7 @@ icsphy*	at mii? phy ?				# ICS 1890 PHYs
 #lxtphy*	at mii? phy ?			# Level1 LXT970 PHYs
 nsphy*	at mii? phy ?				# NS and compatible PHYs
 nsphyter*	at mii? phy ?			# NS and compatible PHYs
-#qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
+qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
 #sqphy*	at mii? phy ?				# Seeq 8x220 PHYs
 rlphy* at mii? phy ?				# RealTek 8139 internal PHYs
 #mtdphy*	at mii? phy ?			# Myson MTD972 PHYs
@@ -249,6 +245,5 @@ ukphy*	at mii? phy ?				# "unknown" PHYs
 pseudo-device	loop	1		# network loopback
 #pseudo-device	sl	1		# CSLIP
 #pseudo-device	ppp	1		# PPP
-#pseudo-device	pty	16		# pseudo-terminals
 pseudo-device	bpfilter 1		# packet filter
 pseudo-device	rd	1		# ramdisk

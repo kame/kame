@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_machdep.h,v 1.8 2001/03/16 00:05:24 miod Exp $ */
+/*	$OpenBSD: db_machdep.h,v 1.13 2001/08/31 01:06:29 miod Exp $ */
 /*
  * Mach Operating System
  * Copyright (c) 1993-1991 Carnegie Mellon University
@@ -36,24 +36,19 @@
 #ifndef  _M88K_DB_MACHDEP_H_
 #define  _M88K_DB_MACHDEP_H_
 
-#include <sys/types.h>
-#include <vm/vm_prot.h>
-#include <vm/vm_param.h>
-#include <vm/vm_inherit.h>
-/*#include <vm/lock.h>*/
 #include <machine/pcb.h>	/* m88100_saved_state */
 #include <machine/psl.h>
 #include <machine/trap.h>
 
-#define BKPT_SIZE        (4)                /* number of bytes in bkpt inst. */
-#define BKPT_INST       (0xF000D082U)             /* tb0, 0,r0, vector 132 */
-#define BKPT_SET(inst)  (BKPT_INST)
+#include <vm/vm_param.h>
+
+#define BKPT_SIZE	(4)		/* number of bytes in bkpt inst. */
+#define BKPT_INST	(0xF000D082U)	/* tb0, 0,r0, vector 132 */
+#define BKPT_SET(inst)	(BKPT_INST)
 
 /* Entry trap for the debugger - used for inline assembly breaks*/
 #define ENTRY_ASM       	"tb0 0, r0, 132"
 #define DDB_ENTRY_TRAP_NO	132
-
-void gimmeabreak __P((void));
 
 typedef vm_offset_t   db_addr_t;
 typedef int           db_expr_t;

@@ -1,5 +1,5 @@
-/*	$OpenBSD: ohcivar.h,v 1.11 2000/11/08 18:10:37 aaron Exp $ */
-/*	$NetBSD: ohcivar.h,v 1.24 2000/06/01 14:28:58 augustss Exp $	*/
+/*	$OpenBSD: ohcivar.h,v 1.13 2001/09/15 20:57:33 drahn Exp $ */
+/*	$NetBSD: ohcivar.h,v 1.27 2001/02/21 10:19:30 minoura Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/ohcivar.h,v 1.13 1999/11/17 22:33:41 n_hibma Exp $	*/
 
 /*
@@ -125,9 +125,17 @@ typedef struct ohci_softc {
 	void *sc_powerhook;		/* cookie from power hook */
 	void *sc_shutdownhook;		/* cookie from shutdown hook */
 #endif
+	u_int32_t sc_control;		/* Preserved during suspend/standby */
+	u_int32_t sc_intre;
+
+	u_int sc_overrun_cnt;
+	struct timeval sc_overrun_ntc;
 
 	device_ptr_t sc_child;
 
+#if defined(__OpenBSD__)
+	struct timeout sc_tmo_rhsc;
+#endif
 	char sc_dying;
 } ohci_softc_t;
 
@@ -137,5 +145,6 @@ int		ohci_intr(void *);
 int		ohci_detach(ohci_softc_t *, int);
 int		ohci_activate(device_ptr_t, enum devact);
 #endif
+Static void		ohci_rhsc_enable(void *sc);
 
 #define MS_TO_TICKS(ms) ((ms) * hz / 1000)

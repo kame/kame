@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK,v 1.5 2001/04/09 00:53:53 hugh Exp $
+#	$OpenBSD: RAMDISK,v 1.12 2001/10/10 23:43:42 millert Exp $
 
 machine 	vax			# machine type
 
@@ -26,22 +26,16 @@ option		VAX48		# VS 4000 VLC
 option 		VAX49		# VS 4000/90
 option		VAX53		# VAX 4000/10{0,5,6}
 
-option		UVM			# VAX uses UVM; REQUIRED
-
 maxusers	8		# estimated number of users
 option		TIMEZONE=0	# time zone to adjust RTC time by
-option		DST=0		# daylight savings time used by RTC
-
-option		SWAPPAGER	# paging; REQUIRED
-option		DEVPAGER	# mmap() of devices
+option		DST=0		# daylight saving time used by RTC
 
 option		FFS		# UFS
 
 option		NFSCLIENT	# Network File System client
 option		CD9660		# ISO 9660 + Rock Ridge file system
-option		MSDOSFS		# MS-DOS file system
+#option		MSDOSFS		# MS-DOS file system
 option		FIFO		# FIFOs; RECOMMENDED
-option		KERNFS		# /kern
 
 option		INET		# IP + ICMP + TCP + UDP
 
@@ -58,9 +52,6 @@ option		WSDISPLAY_DEFAULTSCREENS=8
 # 4.3BSD Reno programs and get Ultrix compatibility instead.
 # (They cannot coexist).
 #option		COMPAT_VAX1K	# Must be present to run pre-1.4 binaries.
-option		COMPAT_12
-#option		COMPAT_13
-#option		COMPAT_14
 #option		COMPAT_ULTRIX
 
 option		INSN_EMULATE	# CPU lacks some hardware instructions.
@@ -87,7 +78,7 @@ ncr0		at vsbus0 csr 0x200c0080 # VS2000/3100 SCSI-ctlr
 ncr1		at vsbus0 csr 0x200c0180 # VS2000/3100 SCSI-ctlr
 asc0		at vsbus0 csr 0x200c0080 # VS4000/60 (or VLC) SCSI-ctlr
 asc0		at vsbus0 csr 0x26000080 # VS4000/90 4000/10X MV3100/9X SCSI
-#smg0		at vsbus0 csr 0x200f0000 # Small monochrome display ctlr.
+smg0		at vsbus0 csr 0x200f0000 # Small monochrome display ctlr.
 #clr0		at vsbus0 csr 0x30000000 # 4- or 8-bitplans color graphics
 
 #hd*		at hdc0 drive?		# RD5x disks
@@ -159,12 +150,17 @@ ss*		at scsibus? target? lun?
 uk*		at scsibus? target? lun?
 
 # Workstation console
-#wscons*	at smg?
+wsdisplay0	at smg?
+
 
 #wsdisplay0	at clr0
 #wsdisplay0	at qd0
 #wsdisplay0	at qv0
-#lkc0		at dz0
+
+lkkbd0		at dz0 line 0
+wskbd*		at lkkbd? console ?
+lkms0		at dz0 line 1
+wsmouse*	at lkms?
 
 pseudo-device	loop		1	# network loopback
 pseudo-device	bpfilter	1	# packet filter

@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_page_i.h,v 1.5 2001/01/29 02:07:47 niklas Exp $	*/
-/*	$NetBSD: uvm_page_i.h,v 1.10 1999/05/24 19:10:57 thorpej Exp $	*/
+/*	$OpenBSD: uvm_page_i.h,v 1.8 2001/08/11 10:57:22 art Exp $	*/
+/*	$NetBSD: uvm_page_i.h,v 1.13 2000/05/08 23:11:53 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -124,7 +124,7 @@ uvm_unlock_fpageq(s)
 struct vm_page *
 uvm_pagelookup(obj, off)
 	struct uvm_object *obj;
-	vaddr_t off;
+	voff_t off;
 {
 	struct vm_page *pg;
 	struct pglist *buck;
@@ -216,7 +216,7 @@ uvm_pagedeactivate(pg)
 	}
 	if ((pg->pqflags & PQ_INACTIVE) == 0) {
 #ifdef DIAGNOSTIC 
-		if (pg->wire_count)
+		if (__predict_false(pg->wire_count))
 			panic("uvm_pagedeactivate: caller did not check "
 			    "wire count");
 #endif
@@ -226,8 +226,8 @@ uvm_pagedeactivate(pg)
 			TAILQ_INSERT_TAIL(&uvm.page_inactive_obj, pg, pageq);
 		pg->pqflags |= PQ_INACTIVE;
 		uvmexp.inactive++;
-		pmap_clear_reference(PMAP_PGARG(pg));
-		if (pmap_is_modified(PMAP_PGARG(pg)))
+		pmap_clear_reference(pg);
+		if (pmap_is_modified(pg))
 			pg->flags &= ~PG_CLEAN;
 	}
 }
@@ -312,7 +312,7 @@ uvm_page_lookup_freelist(pg)
 
 	lcv = vm_physseg_find(atop(VM_PAGE_TO_PHYS(pg)), NULL);
 #ifdef DIAGNOSTIC
-	if (lcv == -1)
+	if (__predict_false(lcv == -1))
 		panic("uvm_page_lookup_freelist: unable to locate physseg");
 #endif
 	return (vm_physmem[lcv].free_list);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ramdisk.c,v 1.11 1999/11/16 09:24:59 art Exp $	*/
+/*	$OpenBSD: ramdisk.c,v 1.15 2001/09/19 20:50:58 mickey Exp $	*/
 /*	$NetBSD: ramdisk.c,v 1.8 1996/04/12 08:30:09 leo Exp $	*/
 
 /*
@@ -60,11 +60,7 @@
 #include <sys/dkio.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 #include <dev/ramdisk.h>
 
@@ -90,7 +86,7 @@
 #define RD_IS_CTRL(unit) (RD_PART(unit) == RAW_PART)
 #define	MAKERDDEV(maj, unit, part)	MAKEDISKDEV(maj, unit, part)
 
-#define	RDLABELDEV(dev)	(MAKERDDEV(major(dev), RD_UNIT(dev), RAW_PART))
+#define	RDLABELDEV(dev)	(MAKERDDEV(major(dev), RD_UNIT(minor(dev)), RAW_PART))
 
 /* autoconfig stuff... */
 
@@ -161,10 +157,6 @@ rdattach(n)
 	for (i = 0; i < n; i++) {
 
 		sc = malloc(sizeof(*sc), M_DEVBUF, M_WAITOK);
-		if (!sc) {
-			printf("ramdisk: malloc for attach failed!\n");
-			return;
-		}
 		bzero((caddr_t)sc, sizeof(*sc));
 		ramdisk_devs[i] = sc;
 		sc->sc_dev.dv_unit = i;
@@ -546,11 +538,7 @@ rd_ioctl_kalloc(sc, urd, proc)
 
 	/* Sanity check the size. */
 	size = urd->rd_size;
-#if defined(UVM)
 	addr = uvm_km_zalloc(kernel_map, size);
-#else
-	addr = kmem_alloc(kernel_map, size);
-#endif
 	if (!addr)
 		return ENOMEM;
 

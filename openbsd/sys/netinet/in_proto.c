@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_proto.c,v 1.25 2000/01/27 08:09:08 angelos Exp $	*/
+/*	$OpenBSD: in_proto.c,v 1.32 2001/08/08 15:07:04 jjbg Exp $	*/
 /*	$NetBSD: in_proto.c,v 1.14 1996/02/18 18:58:32 christos Exp $	*/
 
 /*
@@ -62,20 +62,44 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)in_proto.c	8.1 (Berkeley) 6/10/93
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
-
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -84,7 +108,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/mbuf.h>
 
 #include <net/if.h>
-#include <net/radix.h>
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -103,14 +126,11 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #include <netinet/igmp_var.h>
 #include <netinet/tcp.h>
-#include <netinet/tcp_fsm.h>
-#include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
-#include <netinet/tcpip.h>
-#include <netinet/tcp_debug.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+
 /*
  * TCP/IP protocol family: IP, ICMP, UDP, TCP.
  */
@@ -143,11 +163,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/ip_mroute.h>
 #endif /* MROUTING */
 
-#ifdef IPFILTER
-void	iplinit __P((void));
-#define ip_init	iplinit
-#endif
-
 #ifdef INET6
 #include <netinet6/ip6_var.h>
 #endif /* INET6 */
@@ -178,7 +193,7 @@ struct protosw inetsw[] = {
   udp_usrreq,
   udp_init,	0,		0,		0,		udp_sysctl
 },
-{ SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD,
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_ABRTACPTDIS,
   tcp_input,	0,		tcp_ctlinput,	tcp_ctloutput,
   tcp_usrreq,
   tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,	tcp_sysctl
@@ -226,7 +241,7 @@ struct protosw inetsw[] = {
   igmp_init,	igmp_fasttimo,	igmp_slowtimo,	0,
 },
 #ifdef TPIP
-{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD,
+{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_ABRTACPTDIS,
   tpip_input,	0,		tpip_ctlinput,	tp_ctloutput,
   tp_usrreq,
   tp_init,	0,		tp_slowtimo,	tp_drain,
@@ -256,12 +271,12 @@ struct protosw inetsw[] = {
 #endif /* NSIP */
 #ifdef IPSEC
 { SOCK_RAW,   &inetdomain,    IPPROTO_AH,     PR_ATOMIC|PR_ADDR,
-  ah4_input,   rip_output,     0,              rip_ctloutput,
+  ah4_input,   rip_output,    ah4_ctlinput,   rip_ctloutput,
   rip_usrreq,
   0,          0,              0,              0,		ah_sysctl
 },
 { SOCK_RAW,   &inetdomain,    IPPROTO_ESP,    PR_ATOMIC|PR_ADDR,
-  esp4_input,  rip_output,     0,              rip_ctloutput,
+  esp4_input,  rip_output,    esp4_ctlinput,  rip_ctloutput,
   rip_usrreq,
   0,          0,              0,              0,		esp_sysctl
 },
@@ -269,6 +284,11 @@ struct protosw inetsw[] = {
   etherip_input,  rip_output, 0,              rip_ctloutput,
   rip_usrreq,
   0,          0,              0,              0,		etherip_sysctl
+},
+{ SOCK_RAW,   &inetdomain,    IPPROTO_IPCOMP, PR_ATOMIC|PR_ADDR,
+  ipcomp4_input,  rip_output, 0,              rip_ctloutput,
+  rip_usrreq,
+  0,          0,              0,              0,                ipcomp_sysctl
 },
 #endif /* IPSEC */
 #if NGRE > 0

@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_machdep.c,v 1.15 2001/04/07 21:31:24 tholo Exp $	*/
+/*	$OpenBSD: linux_machdep.c,v 1.17 2001/07/27 06:10:38 csapuntz Exp $	*/
 /*	$NetBSD: linux_machdep.c,v 1.29 1996/05/03 19:42:11 christos Exp $	*/
 
 /*
@@ -70,16 +70,13 @@
 #include <machine/linux_machdep.h>
 
 /*
- * To see whether pcvt is configured (for virtual console ioctl calls).
+ * To see whether wsdisplay is configured (for virtual console ioctl calls).
  */
 #include "wsdisplay.h"
-#include "vt.h"
 #if NWSDISPLAY > 0 && defined(WSDISPLAY_COMPAT_USL)
 #include <sys/ioctl.h>
 #include <dev/wscons/wsconsio.h>
 #include <dev/wscons/wsdisplay_usl_io.h>
-#elif NVT > 0
-#include <arch/i386/isa/pcvt/pcvt_ioctl.h>
 #endif
 
 #ifdef USER_LDT
@@ -450,7 +447,7 @@ linux_machdepioctl(p, v, retval)
 	} */ *uap = v;
 	struct sys_ioctl_args bia;
 	u_long com;
-#if (NWSDISPLAY > 0 && defined(WSDISPLAY_COMPAT_USL)) || NVT > 0
+#if (NWSDISPLAY > 0 && defined(WSDISPLAY_COMPAT_USL))
 	int error;
 	struct vt_mode lvt;
 	caddr_t bvtp, sg;
@@ -461,7 +458,7 @@ linux_machdepioctl(p, v, retval)
 	com = SCARG(uap, com);
 
 	switch (com) {
-#if (NWSDISPLAY > 0 && defined(WSDISPLAY_COMPAT_USL)) || NVT > 0
+#if (NWSDISPLAY > 0 && defined(WSDISPLAY_COMPAT_USL))
 	case LINUX_KDGKBMODE:
 		com = KDGKBMODE;
 		break;
@@ -502,32 +499,58 @@ linux_machdepioctl(p, v, retval)
 	case LINUX_VT_OPENQRY:
 		com = VT_OPENQRY;
 		break;
-	case LINUX_VT_GETMODE:
+	case LINUX_VT_GETMODE: {
+		int sig;
+
 		SCARG(&bia, com) = VT_GETMODE;
 		if ((error = sys_ioctl(p, &bia, retval)))
 			return error;
 		if ((error = copyin(SCARG(uap, data), (caddr_t)&lvt,
 		    sizeof (struct vt_mode))))
 			return error;
-		lvt.relsig = bsd_to_linux_sig[lvt.relsig];
-		lvt.acqsig = bsd_to_linux_sig[lvt.acqsig];
-		lvt.frsig = bsd_to_linux_sig[lvt.frsig];
+		/* We need to bounds check here in case there
+		   is a race with another thread */
+		if ((error = bsd_to_linux_signal(lvt.relsig, &sig)))
+			return error;
+		lvt.relsig = sig;
+
+		if ((error = bsd_to_linux_signal(lvt.acqsig, &sig)))
+			return error;
+		lvt.acqsig = sig;
+		
+		if ((error = bsd_to_linux_signal(lvt.frsig, &sig)))
+			return error;
+		lvt.frsig = sig;
+
 		return copyout((caddr_t)&lvt, SCARG(uap, data),
 		    sizeof (struct vt_mode));
-	case LINUX_VT_SETMODE:
+	}
+	case LINUX_VT_SETMODE: {
+		int sig;
+
 		com = VT_SETMODE;
 		if ((error = copyin(SCARG(uap, data), (caddr_t)&lvt,
 		    sizeof (struct vt_mode))))
 			return error;
-		lvt.relsig = linux_to_bsd_sig[lvt.relsig];
-		lvt.acqsig = linux_to_bsd_sig[lvt.acqsig];
-		lvt.frsig = linux_to_bsd_sig[lvt.frsig];
+		if ((error = linux_to_bsd_signal(lvt.relsig, &sig)))
+			return error;
+		lvt.relsig = sig;
+
+		if ((error = linux_to_bsd_signal(lvt.acqsig, &sig)))
+			return error;
+		lvt.acqsig = sig;
+
+		if ((error = linux_to_bsd_signal(lvt.frsig, &sig)))
+			return error;
+		lvt.frsig = sig;
+
 		sg = stackgap_init(p->p_emul);
 		bvtp = stackgap_alloc(&sg, sizeof (struct vt_mode));
 		if ((error = copyout(&lvt, bvtp, sizeof (struct vt_mode))))
 			return error;
 		SCARG(&bia, data) = bvtp;
 		break;
+	}
 	case LINUX_VT_DISALLOCATE:
 		/* XXX should use WSDISPLAYIO_DELSCREEN */
 		return 0;

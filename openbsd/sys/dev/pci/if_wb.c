@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wb.c,v 1.8 2001/02/20 19:39:44 mickey Exp $	*/
+/*	$OpenBSD: if_wb.c,v 1.14 2001/09/11 20:05:25 miod Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -117,9 +117,6 @@
 #endif
 
 #include <vm/vm.h>		/* for vtophys */
-#include <vm/pmap.h>		/* for vtophys */
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -136,7 +133,7 @@
 int wb_probe		__P((struct device *, void *, void *));
 void wb_attach		__P((struct device *, struct device *, void *));
 
-void wb_bfree		__P((struct mbuf *));
+void wb_bfree		__P((caddr_t, u_int, void *));
 int wb_newbuf		__P((struct wb_softc *, struct wb_chain_onefrag *,
     struct mbuf *));
 int wb_encap		__P((struct wb_softc *, struct wb_chain *,
@@ -835,8 +832,7 @@ wb_attach(parent, self, aux)
 #endif
 
 	/* Allocate interrupt */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		goto fail;
 	}
@@ -903,7 +899,9 @@ wb_attach(parent, self, aux)
 	ifp->if_start = wb_start;
 	ifp->if_watchdog = wb_watchdog;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = WB_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, WB_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
+
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	/*
@@ -1007,8 +1005,10 @@ int wb_list_rx_init(sc)
 }
 
 void
-wb_bfree(m)
-	struct mbuf *m;
+wb_bfree(buf, size, arg)
+	caddr_t			buf;
+	u_int			size;
+	void *arg;
 {
 }
 
@@ -1032,7 +1032,8 @@ wb_newbuf(sc, c, m)
 		m_new->m_ext.ext_size = m_new->m_pkthdr.len =
 		    m_new->m_len = WB_BUFBYTES;
 		m_new->m_ext.ext_free = wb_bfree;
-		m_new->m_ext.ext_ref = wb_bfree;
+		m_new->m_ext.ext_arg = NULL;
+		MCLINITREFERENCE(m_new);
 	} else {
 		m_new = m;
 		m_new->m_len = m_new->m_pkthdr.len = WB_BUFBYTES;
@@ -1056,7 +1057,6 @@ wb_newbuf(sc, c, m)
 void wb_rxeof(sc)
 	struct wb_softc		*sc;
 {
-        struct ether_header	*eh;
         struct mbuf		*m = NULL;
         struct ifnet		*ifp;
 	struct wb_chain_onefrag	*cur_rx;
@@ -1118,7 +1118,6 @@ void wb_rxeof(sc)
 		m = m0;
 
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 
 #if NBPFILTER > 0
 		/*
@@ -1127,9 +1126,8 @@ void wb_rxeof(sc)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
+		/* pass it on. */
+		ether_input_mbuf(ifp, m);
 	}
 
 	return;
@@ -1310,7 +1308,7 @@ int wb_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, WB_IMR, WB_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL) {
+	if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 		wb_start(ifp);
 	}
 
@@ -1449,7 +1447,7 @@ void wb_start(ifp)
 	start_tx = sc->wb_cdata.wb_tx_free;
 
 	while(sc->wb_cdata.wb_tx_free->wb_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1752,7 +1750,7 @@ void wb_watchdog(ifp)
 	wb_reset(sc);
 	wb_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		wb_start(ifp);
 
 	return;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.10 2000/02/22 19:27:51 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.13 2001/05/13 02:37:29 millert Exp $	*/
 /*	$NetBSD: param.h,v 1.28 1997/03/01 06:57:45 scottr Exp $	*/
 
 /*
@@ -91,6 +91,11 @@
 #define	MACHINE		"mac68k"
 
 #define	PGSHIFT		12		/* LOG2(NBPG) */
+
+#define	PAGE_SHIFT	12
+#define	PAGE_SIZE	(1 << PAGE_SHIFT)
+#define	PAGE_MASK	(PAGE_SIZE - 1)
+
 #define	KERNBASE	0x00000000	/* start of kernel virtual */
 
 #define	SEGSHIFT	22		/* LOG2(NBSEG) */
@@ -104,10 +109,10 @@
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
 /*
- * Size of kernel malloc arena in CLBYTES-sized logical pages
+ * Size of kernel malloc arena in logical pages
  */ 
 #ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(2048 * 1024 / CLBYTES)
+#define	NKMEMCLUSTERS	(2048 * 1024 / PAGE_SIZE)
 #endif
 
 #define MSGBUFSIZE	4096

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty_subr.c,v 1.10 2001/01/25 03:50:53 todd Exp $	*/
+/*	$OpenBSD: tty_subr.c,v 1.15 2001/09/28 13:03:56 art Exp $	*/
 /*	$NetBSD: tty_subr.c,v 1.13 1996/02/09 19:00:43 christos Exp $	*/
 
 /*
@@ -39,40 +39,19 @@
 #include <sys/buf.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
-#ifdef REAL_CLISTS
-#include <sys/clist.h>
-#endif
 #include <sys/malloc.h>
 
 /*
- * At compile time, choose:
- * There are two ways the TTY_QUOTE bit can be stored. If QBITS is
- * defined we allocate an array of bits -- 1/8th as much memory but
- * setbit(), clrbit(), and isset() take more cpu. If QBITS is
- * undefined, we just use an array of bytes.
- * 
  * If TTY_QUOTE functionality isn't required by a line discipline,
  * it can free c_cq and set it to NULL. This speeds things up,
  * and also does not use any extra memory. This is useful for (say)
  * a SLIP line discipline that wants a 32K ring buffer for data
  * but doesn't need quoting.
  */
-#define QBITS
-
-#ifdef QBITS
 #define QMEM(n)		((((n)-1)/NBBY)+1)
-#else
-#define QMEM(n)		(n)
-#endif
 
 void	cinit __P((void));
-int	ndqb __P((struct clist *, int));
-int	putc __P((int, struct clist *));
-#ifdef QBITS
 void	clrbits __P((u_char *, int, int));
-#endif
-int	b_to_q __P((u_char *, int, struct clist *));
-u_char *firstc __P((struct clist *, int *));
 
 /*
  * Initialize clists.
@@ -94,17 +73,10 @@ clalloc(clp, size, quot)
 {
 
 	clp->c_cs = malloc(size, M_TTYS, M_WAITOK);
-	if (!clp->c_cs)
-		return (-1);
 	bzero(clp->c_cs, size);
 
 	if (quot) {
 		clp->c_cq = malloc(QMEM(size), M_TTYS, M_WAITOK);
-		if (!clp->c_cq) {
-			free(clp->c_cs, M_TTYS);
-			clp->c_cs = NULL;
-			return (-1);
-		}
 		bzero(clp->c_cq, QMEM(size));
 	} else
 		clp->c_cq = (u_char *)0;
@@ -148,13 +120,8 @@ getc(clp)
 
 	c = *clp->c_cf & 0xff;
 	if (clp->c_cq) {
-#ifdef QBITS
 		if (isset(clp->c_cq, clp->c_cf - clp->c_cs) )
 			c |= TTY_QUOTE;
-#else
-		if (*(clp->c_cf - clp->c_cs + clp->c_cq))
-			c |= TTY_QUOTE;
-#endif
 	}
 	if (++clp->c_cf == clp->c_ce)
 		clp->c_cf = clp->c_cs;
@@ -314,15 +281,10 @@ out:
 	*clp->c_cl = c & 0xff;
 	i = clp->c_cl - clp->c_cs;
 	if (clp->c_cq) {
-#ifdef QBITS
 		if (c & TTY_QUOTE)
-			setbit(clp->c_cq, i); 
+			setbit(clp->c_cq, i);
 		else
 			clrbit(clp->c_cq, i);
-#else
-		q = clp->c_cq + i;
-		*q = (c & TTY_QUOTE) ? 1 : 0;
-#endif
 	}
 	clp->c_cc++;
 	clp->c_cl++;
@@ -332,7 +294,6 @@ out:
 	return 0;
 }
 
-#ifdef QBITS
 /*
  * optimized version of
  *
@@ -372,7 +333,6 @@ clrbits(cp, off, len)
 			cp[i] = 0x00;
 	}
 }
-#endif
 
 /*
  * Copy buffer to clist.
@@ -384,8 +344,8 @@ b_to_q(cp, count, clp)
 	int count;
 	struct clist *clp;
 {
-	register int cc;
-	register u_char *p = cp;
+	int cc;
+	u_char *p = cp;
 	int s;
 
 	if (count <= 0)
@@ -415,11 +375,7 @@ b_to_q(cp, count, clp)
 			cc = count;
 		bcopy(p, clp->c_cl, cc);
 		if (clp->c_cq) {
-#ifdef QBITS
 			clrbits(clp->c_cq, clp->c_cl - clp->c_cs, cc);
-#else
-			bzero(clp->c_cl - clp->c_cs + clp->c_cq, cc);
-#endif
 		}
 		p += cc;
 		count -= cc;
@@ -464,13 +420,8 @@ nextc(clp, cp, c)
 		cp = clp->c_cs;
 	*c = *cp & 0xff;
 	if (clp->c_cq) {
-#ifdef QBITS
 		if (isset(clp->c_cq, cp - clp->c_cs))
 			*c |= TTY_QUOTE;
-#else
-		if (*(clp->c_cf - clp->c_cs + clp->c_cq))
-			*c |= TTY_QUOTE;
-#endif
 	}
 	return cp;
 }
@@ -498,13 +449,8 @@ firstc(clp, c)
 	cp = clp->c_cf;
 	*c = *cp & 0xff;
 	if (clp->c_cq) {
-#ifdef QBITS
 		if (isset(clp->c_cq, cp - clp->c_cs))
 			*c |= TTY_QUOTE;
-#else
-		if (*(cp - clp->c_cs + clp->c_cq))
-			*c |= TTY_QUOTE;
-#endif
 	}
 	return clp->c_cf;
 }
@@ -531,13 +477,8 @@ unputc(clp)
 
 	c = *clp->c_cl & 0xff;
 	if (clp->c_cq) {
-#ifdef QBITS
 		if (isset(clp->c_cq, clp->c_cl - clp->c_cs))
 			c |= TTY_QUOTE;
-#else
-		if (*(clp->c_cf - clp->c_cs + clp->c_cq))
-			c |= TTY_QUOTE;
-#endif
 	}
 	if (clp->c_cc == 0)
 		clp->c_cf = clp->c_cl = (u_char *)0;

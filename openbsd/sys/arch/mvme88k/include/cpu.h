@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.9 2001/03/09 05:44:40 smurph Exp $ */
+/*	$OpenBSD: cpu.h,v 1.12 2001/09/23 02:52:27 miod Exp $ */
 /*
  * Copyright (c) 1996 Nivas Madhur
  * Copyright (c) 1992, 1993
@@ -48,10 +48,12 @@
 /*
  * CTL_MACHDEP definitinos.
  */
-#define	CPU_MAXID	1	/* no valid machdep ids */
+#define	CPU_CONSDEV	1	/* dev_t: console terminal device */
+#define	CPU_MAXID	2	/* number of valid machdep ids */
 
 #define	CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
+	{ "console_device", CTLTYPE_STRUCT }, \
 }
 
 #ifdef _KERNEL
@@ -83,7 +85,7 @@ struct clockframe {
 
 extern int intstack;
 
-#define	CLKF_USERMODE(framep)	((((struct trapframe *)(framep))->epsr & 80000000) == 0)
+#define	CLKF_USERMODE(framep)	((((struct trapframe *)(framep))->epsr & PSR_MODE) == 0)
 #define	CLKF_BASEPRI(framep)	(((struct trapframe *)(framep))->mask == 0)
 #define	CLKF_PC(framep)		(((struct trapframe *)(framep))->sxip & ~3)
 #define	CLKF_INTR(framep)	(((struct trapframe *)(framep))->r[31] > intstack)
@@ -112,7 +114,6 @@ extern int intstack;
 #else
 
 #define	ISIIOVA(va) 1
-#define ackbarf	((char *)(va) >= OBIO_START && (char *)(va) < (OBIO_START + OBIO_SIZE))
 #define	IIOV(pa)	((pa))
 #define	IIOP(va)	((va))
 #define	IIOPOFF(pa)	((int)(pa)-(int)OBIO_START)
@@ -127,14 +128,14 @@ extern int intstack;
 
 #define siroff(x)	(ssir &= ~x)
 
-int	ssir;
-int	want_ast;
+extern int	ssir;
+extern int	want_ast;
 
 /*
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-int	want_resched;		/* resched() was called */
+extern int	want_resched;		/* resched() was called */
 #define	need_resched()		(want_resched = 1, want_ast = 1)
 
 /*
@@ -202,4 +203,4 @@ int badvaddr __P((vm_offset_t va, int size));
 void nmihand __P((void *framep));
 
 #endif /* _KERNEL */
-#endif __MACHINE_CPU_H__
+#endif /* __MACHINE_CPU_H__ */

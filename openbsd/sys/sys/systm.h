@@ -1,4 +1,4 @@
-/*	$OpenBSD: systm.h,v 1.37 2000/01/02 06:31:28 assar Exp $	*/
+/*	$OpenBSD: systm.h,v 1.43 2001/08/26 04:10:56 deraadt Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/
 
 /*-
@@ -44,6 +44,7 @@
 #ifndef __SYSTM_H__
 #define __SYSTM_H__
 
+#include <sys/queue.h>
 #include <machine/stdarg.h>
 
 /*
@@ -77,13 +78,10 @@ extern int securelevel;		/* system security level */
 extern const char *panicstr;	/* panic message */
 extern char version[];		/* system version */
 extern char copyright[];	/* system copyright */
+extern int cold;		/* cold start flag initialized in locore */
 
 extern int nblkdev;		/* number of entries in bdevsw */
 extern int nchrdev;		/* number of entries in cdevsw */
-#if !defined(UVM)
-extern int nswdev;		/* number of swap devices */
-extern int nswap;		/* size of swap space */
-#endif
 
 extern int selwait;		/* select timeout address */
 
@@ -110,7 +108,13 @@ extern struct sysent {		/* system call table */
 	short	sy_argsize;	/* total size of arguments */
 	sy_call_t *sy_call;	/* implementing function */
 } sysent[];
-#define	SCARG(p,k)	((p)->k.datum)	/* get arg from args pointer */
+#if	BYTE_ORDER == BIG_ENDIAN
+#define SCARG(p, k)	((p)->k.be.datum)	/* get arg from args pointer */
+#elif	BYTE_ORDER == LITTLE_ENDIAN
+#define SCARG(p, k)	((p)->k.le.datum)	/* get arg from args pointer */
+#else
+#error	"what byte order is this machine?"
+#endif
 
 #if defined(_KERNEL) && defined(SYSCALL_DEBUG)
 void scdebug_call __P((struct proc *p, register_t code, register_t retval[]));
@@ -177,9 +181,7 @@ void	ttyprintf __P((struct tty *, const char *, ...))
 
 void	tablefull __P((const char *));
 
-#if defined(UVM)
 int	kcopy __P((const void *, void *, size_t));
-#endif
 
 void	bcopy __P((const void *, void *, size_t));
 void	ovbcopy __P((const void *, void *, size_t));
@@ -210,8 +212,6 @@ int	suswintr __P((caddr_t, u_int));
 
 struct timeval;
 int	hzto __P((struct timeval *));
-void	timeout __P((void (*)(void *), void *, int));
-void	untimeout __P((void (*)(void *), void *));
 void	realitexpire __P((void *));
 
 struct clockframe;
@@ -235,15 +235,41 @@ void	stopprofclock __P((struct proc *));
 void	setstatclockrate __P((int));
 
 /*
- * Shutdown hooks.  Functions to be run with all interrupts disabled
- * immediately before the system is halted or rebooted.
+ * Startup/shutdown hooks.  Startup hooks are functions running after
+ * the scheduler has started but before any threads have been created
+ * or root has been mounted The shutdown hooks are functions to be run
+ * with all interrupts disabled immediately before the system is
+ * halted or rebooted.
  */
-void	*shutdownhook_establish __P((void (*)(void *), void *));
-void	shutdownhook_disestablish __P((void *));
-void	doshutdownhooks __P((void));
+
+struct hook_desc {
+	TAILQ_ENTRY(hook_desc) hd_list;
+	void	(*hd_fn) __P((void *));
+	void	*hd_arg;
+};
+TAILQ_HEAD(hook_desc_head, hook_desc);
+
+extern struct hook_desc_head shutdownhook_list, startuphook_list;
+
+void	*hook_establish __P((struct hook_desc_head *, int, void (*)(void *),
+    void *));
+void	hook_disestablish __P((struct hook_desc_head *, void *));
+void	dohooks __P((struct hook_desc_head *));
+
+#define startuphook_establish(fn, arg) \
+	hook_establish(&startuphook_list, 1, (fn), (arg))
+#define startuphook_disestablish(vhook) \
+	hook_disestablish(&startuphook_list, (vhook))
+#define dostartuphooks() dohooks(&startuphook_list)
+
+#define shutdownhook_establish(fn, arg) \
+	hook_establish(&shutdownhook_list, 0, (fn), (arg))
+#define shutdownhook_disestablish(vhook) \
+	hook_disestablish(&shutdownhook_list, (vhook))
+#define doshutdownhooks() dohooks(&shutdownhook_list)
 
 /*
- * Power managment hooks.
+ * Power management hooks.
  */
 void	*powerhook_establish __P((void (*)(int, void *), void *));
 void	powerhook_disestablish __P((void *));
@@ -261,6 +287,7 @@ void	longjmp	__P((label_t *));
 void	consinit __P((void));
 
 void	cpu_startup __P((void));
+void	cpu_configure __P((void));
 void	cpu_set_kpc __P((struct proc *, void (*)(void *), void *));
 extern void (*md_diskconf) __P((void));
 

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.256 2001/04/24 22:13:00 deraadt Exp $
+#	$OpenBSD: GENERIC,v 1.279 2001/10/08 19:30:40 deraadt Exp $
 #	$NetBSD: GENERIC,v 1.48 1996/05/20 18:17:23 mrg Exp $
 #
 #	GENERIC -- everything that's currently supported
@@ -12,9 +12,9 @@ option		I386_CPU	# CPU classes; at least one is REQUIRED
 option		I486_CPU
 option		I586_CPU
 option		I686_CPU
-option		GPL_MATH_EMULATE	# floating point emulation
+option		GPL_MATH_EMULATE	# floating point emulation. required.
 
-option		UVM		# use the UVM virtual memory system
+option		USER_PCICONF	# user-space PCI configuration
 
 #option		VM86		# Virtual 8086 emulation
 #option		USER_LDT	# user-settable LDT; used by WINE
@@ -49,7 +49,6 @@ pci*	at mainbus0 bus ?
 
 option		PCIVERBOSE
 option		EISAVERBOSE
-#option		PCMCIAVERBOSE
 option		USBVERBOSE
 
 pchb*	at pci? dev ? function ?	# PCI-Host bridges
@@ -59,12 +58,14 @@ pci*	at pchb? bus ?
 pcib*	at pci? dev ? function ?	# PCI-ISA bridges (do nothing)
 
 # ISA PCMCIA controllers
+#option PCMCIAVERBOSE
 pcic0	at isa? port 0x3e0 iomem 0xd0000 iosiz 0x10000
 pcic1	at isa? port 0x3e2 iomem 0xe0000 iosiz 0x4000
 pcic2	at isa? port 0x3e4 iomem 0xe0000 iosiz 0x4000
-#tcic0	at isa? port 0x240 iomem 0xd0000 iosiz 0x10000
+tcic0	at isa? disable port 0x240 iomem 0xd0000 iosiz 0x10000
 
 # ISA Plug-and-Play PCMCIA controllers
+#option DEBUG_ISAPNP
 pcic*	at isapnp?
 
 # PCI PCMCIA controllers
@@ -72,7 +73,7 @@ pcic*	at pci? dev? function ?
 
 # PCMCIA bus support
 pcmcia*	at pcic? controller ? socket ?
-#pcmcia* at tcic? controller ? socket ?
+pcmcia* at tcic? controller ? socket ?
 
 # CardBus bus support
 cardbus*	at cardslot?
@@ -95,8 +96,11 @@ umodem*	at uhub? port ? configuration ?	# USB Modems/Serial
 ucom*	at umodem?
 uvisor*	at uhub? port ? configuration ?	# Handspring Visor
 ucom*	at uvisor?
-uftdi*	at uhub? port ?
+uftdi*	at uhub? port ?			# FTDI FT8U100AX serial adapter
 ucom*	at uftdi? portno ?
+uplcom* at uhub? port ?			# I/O DATA USB-RSAQ2 serial adapter
+ucom*   at uplcom? portno ? 
+
 uaudio* at uhub? port ? configuration ?	# USB Audio
 ulpt*	at uhub? port ? configuration ? # USB Printers
 ukbd*	at uhub? port ? configuration ?	# USB Keyboards
@@ -152,6 +156,8 @@ ast0	at isa? port 0x1a0 irq 5	# AST 4-port serial card
 pccom*	at ast? slave ?
 #boca0	at isa? port 0x100 irq 5	# BOCA 8-port serial cards
 #pccom*	at boca? slave ?
+#addcom0	at isa? port 0x108 irq 5	# Addonics FlexPort
+#pccom*	at addcom? slave ?
 #rtfps0	at isa? port 0x1230 irq 10	# RT 4-port serial cards
 #pccom*	at rtfps? slave ?
 #hsq0	at isa? port 0x140 irq 10	# Hostess 4-port serial card
@@ -165,6 +171,7 @@ pccom*	at puc? port ?
 # options CY_HW_RTS
 cy0	at isa? iomem 0xd4000 irq 12	# ISA cyclom serial card
 cy*	at pci?				# PCI cyclom serial card
+cz*	at pci? dev ? function ?	# Cyclades-Z multi-port serial boards
 
 lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 lpt1	at isa? port 0x278
@@ -286,6 +293,8 @@ ep*	at isa? port ? irq ?			# 3C509 ethernet
 ef*	at isapnp?				# 3C515 PnP ethernet
 ie0	at isa? port 0x360 iomem 0xd0000 irq 7	# StarLAN and 3C507
 #ie1	at isa? port 0x300 irq 10		# EtherExpress
+lc0	at isa? port 0x200 irq ?		# DEC EtherWorks
+lc1	at isa? port 0x280 irq ?		# DEC EtherWorks
 le0	at isa? port 0x360 irq 15 drq 6		# IsoLan, NE2100, and DEPCA
 ex0	at isa? port 0x320 irq 5		# Intel EtherExpress PRO/10
 #tr0	at isa? port 0xa20 iomem 0xd8000 irq ?	# IBM TROPIC based Token-Ring
@@ -325,8 +334,12 @@ skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
 sk*	at skc?					#  each port of above
 wx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 txp*	at pci? dev ? function ?		# 3com 3CR990
+nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
+bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
+#lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
 
 # Wireless network cards
+wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
 wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
 #awi*	at pcmcia? function ?			# Bay Networks IEEE 802.11FH
 an*	at pci? dev ? function ?		# Aironet IEEE 802.11DS
@@ -353,6 +366,7 @@ bmtphy*	at mii? phy ?				# Broadcom 10/100 PHYs
 brgphy*	at mii? phy ?				# Broadcom Gigabit PHYs
 eephy* at mii? phy ?				# Marvell 88E1000 series PHY
 xmphy*	at mii? phy ?				# XaQti XMAC-II PHYs
+nsgphy*	at mii? phy ?				# NS gigabit PHYs
 ukphy*	at mii? phy ?				# "unknown" PHYs
 
 pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
@@ -379,6 +393,7 @@ pas0	at isa? port 0x220 irq 7 drq 1		# ProAudio Spectrum
 gus0	at isa? disable port 0x220 irq 7 drq 1 drq2 6 # Gravis (drq2 is record drq)
 ym*	at isapnp?
 mpu*	at isapnp?
+#aria0	at isa? port 0x280 irq 10 drq 0 flags 0x1 # Prometheus Aria 16
 
 # OPL[23] FM syntheziers
 #opl0	at isa? port 0x388	# use only if not attached to sound card
@@ -419,6 +434,16 @@ audio*	at uaudio?
 audio*	at maestro?
 audio*	at yds?
 
+# FM-Radio devices
+#sf4r0	at pci?			# SoundForte RadioLink SF64-PCR FM Radio Card
+#sf2r0	at isa? port 0x384      # SoundForte RadioLink SF16-FMR2 FM Radio Card
+#az0	at isa? port 0x350      # Aztech/PackardBell FM Radio Card
+
+# FM-Radio support
+#radio*  at sf4r0
+#radio*  at sf2r0
+#radio*  at az0
+
 bktr0	at pci? dev ? function ?
 
 # Joystick driver. Probe is a little strange; add only if you have one.
@@ -432,6 +457,11 @@ hifn*	at pci? dev ? function ?	# Hi/fn 7751 crypto card
 ubsec*	at pci? dev ? function ?	# Bluesteel Networks 5xxx crypto card
 #ises*	at pci? dev ? function ?	# Pijnenburg PCC-ISES
 
+# I2O
+iop*	at pci? dev ? function ?	# I2O
+ioprbs*	at iop? tid ?			# Random block storage
+scsibus* at ioprbs?
+
 pseudo-device	pctr		1
 pseudo-device	mtrr		1	# Memory range attributes control
 pseudo-device	sequencer	1
@@ -439,5 +469,4 @@ pseudo-device	sequencer	1
 
 # mouse & keyboard multiplexor pseudo-devices
 pseudo-device	wsmux		2
-
-#option DEBUG_ISAPNP
+pseudo-device	crypto		1

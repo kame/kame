@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.12 1998/03/01 00:37:22 niklas Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.14 2001/08/20 19:48:55 miod Exp $	*/
 /*	$NetBSD: cpu.h,v 1.36 1996/09/11 00:11:42 thorpej Exp $	*/
 
 /*
@@ -153,7 +153,6 @@ void	*alloc_z2mem __P((long));
 /*
  * Prototypes from autoconf.c
  */
-void	configure __P((void));
 int	is_a1200 __P((void));
 int	is_a3000 __P((void));
 int	is_a4000 __P((void));
@@ -187,8 +186,6 @@ struct pcb;
 
 void	clearseg __P((vm_offset_t));
 void	doboot __P((void)) __attribute__((__noreturn__));
-u_long	getdfc __P((void));
-u_long	getsfc __P((void));
 void	loadustp __P((int));
 void	m68881_save __P((struct fpframe *));
 void	m68881_restore __P((struct fpframe *));

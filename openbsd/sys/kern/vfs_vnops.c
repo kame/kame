@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_vnops.c,v 1.28 2001/03/01 20:54:34 provos Exp $	*/
+/*	$OpenBSD: vfs_vnops.c,v 1.33 2001/07/16 18:25:43 millert Exp $	*/
 /*	$NetBSD: vfs_vnops.c,v 1.20 1996/02/04 02:18:41 christos Exp $	*/
 
 /*
@@ -57,14 +57,12 @@
 
 #include <vm/vm.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 int	vn_read __P((struct file *fp, off_t *off, struct uio *uio, 
 	    struct ucred *cred));
 int	vn_write __P((struct file *fp, off_t *off, struct uio *uio, 
-            struct ucred *cred));
+	    struct ucred *cred));
 int	vn_select __P((struct file *fp, int which, struct proc *p));
 int	vn_kqfilter __P((struct file *fp, struct knote *kn));
 int 	vn_closefile __P((struct file *fp, struct proc *p));
@@ -72,7 +70,8 @@ int	vn_ioctl __P((struct file *fp, u_long com, caddr_t data,
 	    struct proc *p));
 
 struct 	fileops vnops =
-	{ vn_read, vn_write, vn_ioctl, vn_select, vn_kqfilter, vn_closefile };
+	{ vn_read, vn_write, vn_ioctl, vn_select, vn_kqfilter, vn_statfile,
+	  vn_closefile };
 
 /*
  * Common code for vnode open operations.
@@ -157,7 +156,7 @@ vn_open(ndp, fmode, cmode)
 				goto bad;
 		}
 	}
-	if (fmode & O_TRUNC) {
+	if ((fmode & O_TRUNC) && vp->v_type == VREG) {
 		VOP_UNLOCK(vp, 0, p);				/* XXX */
 		VOP_LEASE(vp, p, cred, LEASE_WRITE);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);	/* XXX */
@@ -204,13 +203,9 @@ vn_writechk(vp)
 	 * the vnode, try to free it up once.  If
 	 * we fail, we can't allow writing.
 	 */
-#if defined(UVM)
 	if ((vp->v_flag & VTEXT) && !uvm_vnp_uncache(vp))
 		return (ETXTBSY);
-#else
-	if ((vp->v_flag & VTEXT) && !vnode_pager_uncache(vp))
-		return (ETXTBSY);
-#endif
+
 	return (0);
 }
 
@@ -342,7 +337,21 @@ vn_write(fp, poff, uio, cred)
 }
 
 /*
- * File table vnode stat routine.
+ * File table wrapper for vn_stat
+ */
+int
+vn_statfile(fp, sb, p)
+	struct file *fp;
+	struct stat *sb;
+	struct proc *p;
+{
+	struct vnode *vp = (struct vnode *)fp->f_data;
+
+	return vn_stat(vp, sb, p);
+}
+
+/*
+ * vnode stat routine.
  */
 int
 vn_stat(vp, sb, p)
@@ -433,7 +442,7 @@ vn_ioctl(fp, com, data, p)
 			return VOP_IOCTL(vp, com, data, fp->f_flag,
 					 p->p_ucred, p);
 		if (com == FIONBIO || com == FIOASYNC)  /* XXX */
-			return (0);                     /* XXX */
+			return (0);			/* XXX */
 		/* fall into... */
 
 	default:

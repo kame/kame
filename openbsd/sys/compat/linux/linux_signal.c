@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_signal.c,v 1.9 2001/04/09 06:52:26 tholo Exp $	*/
+/*	$OpenBSD: linux_signal.c,v 1.11 2001/08/09 14:15:22 niklas Exp $	*/
 /*	$NetBSD: linux_signal.c,v 1.10 1996/04/04 23:51:36 christos Exp $	*/
 
 /*
@@ -349,6 +349,26 @@ bsd_to_linux_sigaction(bsa, lsa)
 	if ((bsa->sa_flags & SA_SIGINFO) != 0)
 		lsa->sa_flags |= LINUX_SA_SIGINFO;
 	lsa->sa__handler = bsa->sa_handler;
+}
+
+int
+linux_to_bsd_signal(int linuxsig, int *bsdsig)
+{
+	if (linuxsig < 0 || linuxsig > LINUX__NSIG)
+		return (EINVAL);
+
+	*bsdsig = linux_to_bsd_sig[linuxsig];
+	return (0);
+}
+
+int
+bsd_to_linux_signal(int bsdsig, int *linuxsig)
+{
+	if (bsdsig < 0 || bsdsig > NSIG)
+		return (EINVAL);
+
+	*linuxsig = bsd_to_linux_sig[bsdsig];
+	return (0);
 }
 
 /*
@@ -821,16 +841,23 @@ linux_sys_sigaltstack(p, v, retval)
 	caddr_t sg;
 
 	sg = stackgap_init(p->p_emul);
-	bsd_nss = stackgap_alloc(&sg, sizeof *bsd_nss);
 
-	error = copyin(SCARG(uap, nss), &linux_ss, sizeof linux_ss);
-	if (error)
-		return (error);
+	if (SCARG(uap, nss) != NULL) {
+		bsd_nss = stackgap_alloc(&sg, sizeof *bsd_nss);
 
-	bsd_nss->ss_sp = linux_ss.ss_sp;
-	bsd_nss->ss_size = linux_ss.ss_size;
-	bsd_nss->ss_flags = linux_ss.ss_flags;
-	SCARG(&sa, nss) = bsd_nss;
+		error = copyin(SCARG(uap, nss), &linux_ss, sizeof linux_ss);
+		if (error)
+			return (error);
+
+		bsd_nss->ss_sp = linux_ss.ss_sp;
+		bsd_nss->ss_size = linux_ss.ss_size;
+		bsd_nss->ss_flags = (linux_ss.ss_flags & LINUX_SS_DISABLE) ?
+		    SS_DISABLE : 0;
+
+		SCARG(&sa, nss) = bsd_nss;
+	} else
+		SCARG(&sa, nss) = NULL;
+
 	if (SCARG(uap, oss) == NULL) {
 		SCARG(&sa, oss) = NULL;
 		return (sys_sigaltstack(p, &sa, retval));
@@ -843,7 +870,11 @@ linux_sys_sigaltstack(p, v, retval)
 
 	linux_ss.ss_sp = bsd_oss->ss_sp;
 	linux_ss.ss_size = bsd_oss->ss_size;
-	linux_ss.ss_flags = bsd_oss->ss_flags;
+	linux_ss.ss_flags = 0;
+	if (bsd_oss->ss_flags & SS_ONSTACK)
+		linux_ss.ss_flags |= LINUX_SS_ONSTACK;
+	if (bsd_oss->ss_flags & SS_DISABLE)
+		linux_ss.ss_flags |= LINUX_SS_DISABLE;
 	return (copyout(&linux_ss, SCARG(uap, oss), sizeof linux_ss));
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_trace.c,v 1.9 1998/03/01 14:12:42 niklas Exp $	*/
+/*	$OpenBSD: db_trace.c,v 1.11 2001/08/12 12:03:02 heko Exp $	*/
 /*	$NetBSD: db_trace.c,v 1.20 1997/02/05 05:10:25 scottr Exp $	*/
 
 /* 
@@ -87,9 +87,9 @@ db_var_short(varp, valp, op)
 #define	MAXINT	0x7fffffff
 
 #if 0
-#define	INKERNEL(va)	(((vm_offset_t)(va)) >= VM_MIN_KERNEL_ADDRESS && \
-			 (((vm_offset_t)(va)) < (USRSTACK - MAXSSIZ) || \
-			  ((vm_offset_t)(va)) >= USRSTACK))
+#define	INKERNEL(va)	(((vaddr_t)(va)) >= VM_MIN_KERNEL_ADDRESS && \
+			 (((vaddr_t)(va)) < (USRSTACK - MAXSSIZ) || \
+			  ((vaddr_t)(va)) >= USRSTACK))
 #else
 /* XXX - Slight hack... */
 extern int curpcb;
@@ -172,7 +172,7 @@ stacktop(regs, sp)
 #define BSR	0x61000000	/* bsr x	 */
 #ifdef	mc68020
 #define BSRL	0x61ff0000	/* bsrl x	 */
-#endif	mc68020
+#endif /* mc68020 */
 #define BYTE3	0x0000ff00
 #define LOBYTE	0x000000ff
 #define ADQMSK	0xf1ff0000
@@ -222,7 +222,7 @@ nextframe(sp, kerneltrace)
 		    addr, sp->k_caller);
 #endif
 		errflg = 0;
-#endif	0
+#endif /* 0 */
 	} else {
 		if (addr == MAXINT) {
 			/* we don't know what registers are involved here--
@@ -308,7 +308,7 @@ findentry(sp)
 		/* longword self-relative offset */
 		sp->k_caller = addr - 6;
 		sp->k_entry  = nextword + (addr - 4);
-#endif	mc68020
+#endif /* mc68020 */
 	} else {
 		instruc = nextword;
 		if ((instruc & HIWORD) == JSR) {
@@ -368,7 +368,7 @@ findentry(sp)
 				else
 				db_printf("Non-tramp jsr a0@\n");
 #endif
-#endif	0
+#endif /* 0 */
 			}
 		}
 	}

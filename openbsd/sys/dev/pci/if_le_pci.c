@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_le_pci.c,v 1.14 2001/02/26 06:46:04 tholo Exp $	*/
+/*	$OpenBSD: if_le_pci.c,v 1.17 2001/09/11 20:05:25 miod Exp $	*/
 /*	$NetBSD: if_le_pci.c,v 1.13 1996/10/25 21:33:32 cgd Exp $	*/
 
 /*-
@@ -50,8 +50,6 @@
 #include <sys/device.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -247,8 +245,7 @@ le_pci_attach(parent, self, aux)
 	    csr | PCI_COMMAND_MASTER_ENABLE);
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}

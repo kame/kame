@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_io.c,v 1.5 2001/01/29 02:07:45 niklas Exp $	*/
-/*	$NetBSD: uvm_io.c,v 1.8 1999/03/25 18:48:51 mrg Exp $	*/
+/*	$OpenBSD: uvm_io.c,v 1.8 2001/09/20 02:07:43 art Exp $	*/
+/*	$NetBSD: uvm_io.c,v 1.10 2000/06/02 12:02:44 pk Exp $	*/
 
 /*
  *
@@ -48,7 +48,6 @@
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm.h>
 
@@ -133,8 +132,6 @@ uvm_io(map, uio)
 		if (sz > togo)
 			sz = togo;
 		error = uiomove((caddr_t) (kva + pageoffset), sz, uio);
-		if (error)
-			break;
 		togo -= sz;
 		baseva += chunksz;
 
@@ -150,6 +147,13 @@ uvm_io(map, uio)
 
 		if (dead_entries != NULL)
 			uvm_unmap_detach(dead_entries, AMAP_REFALL);
+
+		/*
+		 * We defer checking the error return from uiomove until
+		 * here so that we won't leak memory.
+		 */
+		if (error)
+			break;
 	}
 
 	/*

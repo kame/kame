@@ -1,4 +1,4 @@
-# 	$OpenBSD: RAMDISK,v 1.23 1999/10/29 14:14:27 art Exp $
+# 	$OpenBSD: RAMDISK,v 1.29 2001/10/09 21:35:45 deraadt Exp $
 # 	$NetBSD: GENERIC,v 1.28.2.1 1996/07/02 23:55:22 jtc Exp $
 
 # Machine architecture; required by config(8)
@@ -6,8 +6,6 @@ machine		sparc
 
 # maxusers means mostly "let's get small" in terms of kernel malloc's
 maxusers	2
-# force default minimum number of buffers and dependents
-option		NBUF=16
 
 # the size for MINIROOTSIZE must insure: 16384+size(bsd) < RELOC(boot,bootxx)
 option		RAMDISK_HOOKS
@@ -16,16 +14,15 @@ option		MINIROOTSIZE=4352
 #option		DDB		# need this to see what's happening
 
 option		TIMEZONE=0	# time zone to adjust RTC time by
-option		DST=0		# daylight savings time used by RTC
+option		DST=0		# daylight saving time used by RTC
 
-option		UVM		# UVM virtual memory system
+option		SMALL_KERNEL
 option		DIAGNOSTIC	# internal consistency checks
 option		FFS		# UFS
 option		NFSCLIENT	# Network File System client
 option		CD9660		# ISO 9660 + Rock Ridge file system
 #option		FDESC		# /dev/fd
 #option		FIFO		# FIFOs; RECOMMENDED
-option		KERNFS		# /kern
 option		INET		# IP + ICMP + TCP + UDP
 option		BOOT_CONFIG	# add support for boot -c
 

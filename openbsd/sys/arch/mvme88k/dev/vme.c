@@ -1,4 +1,4 @@
-/*	$OpenBSD: vme.c,v 1.9 2001/03/09 05:44:39 smurph Exp $ */
+/*	$OpenBSD: vme.c,v 1.13 2001/09/11 20:05:24 miod Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1995 Theo de Raadt
@@ -43,12 +43,12 @@
 #include <sys/fcntl.h>
 #include <sys/device.h>
 #include <vm/vm.h>
-#include <vm/vm_map.h>
-#include <vm/vm_kern.h>
-#include "machine/autoconf.h"
-#include "machine/cpu.h"
-#include "machine/frame.h"
-#include "machine/pmap.h"
+
+#include <machine/autoconf.h>
+#include <machine/cpu.h>
+#include <machine/frame.h>
+#include <machine/locore.h>
+#include <machine/pmap.h>
 
 #include "pcctwo.h"
 #include "syscon.h"
@@ -61,14 +61,18 @@
 int  vmematch __P((struct device *, void *, void *));
 void vmeattach __P((struct device *, struct device *, void *));
 
-void vme2chip_init __P((struct vmesoftc *sc));
-u_long vme2chip_map __P((u_long base, int len, int dwidth));
+void vme2chip_init __P((struct vmesoftc *));
+u_long vme2chip_map __P((u_long, int, int));
 int vme2abort __P((void *));
 int sysconabort __P((void *));
-int     intr_findvec __P((int start, int end));
+void * vmemap __P((struct vmesoftc *, void *, int, int));
+void vmeunmap __P((void *, int));
+int vmeprint __P((void *, const char *));
 
-static int vmebustype;
-static int vmevecbase;
+void vmesyscon_init __P((struct vmesoftc *));
+
+int vmebustype;
+int vmevecbase;
 
 struct vme2reg *sys_vme2 = NULL;
 
@@ -291,7 +295,6 @@ vmeattach(parent, self, args)
 	struct vmesoftc *sc = (struct vmesoftc *)self;
 	struct confargs *ca = args;
 	struct vme2reg *vme2;
-	int scon;
 
 	/* XXX any initialization to do? */
 
@@ -301,6 +304,9 @@ vmeattach(parent, self, args)
 	switch (ca->ca_bustype) {
 #if NPCCTWO > 0
 	case BUS_PCCTWO:
+	{
+		int scon;
+
 		vme2 = (struct vme2reg *)sc->sc_vaddr;
 		/* Sanity check that the Bug is set up right */
 		if (VME2_GET_VBR1(vme2) >= 0xF0) {
@@ -309,20 +315,23 @@ vmeattach(parent, self, args)
 		vmevecbase = VME2_GET_VBR1(vme2) + 0x10;
 		scon = (vme2->vme2_tctl & VME2_TCTL_SCON);
 		printf(": vector base 0x%x, %ssystem controller\n", vmevecbase, scon ? "" : "not ");
-		if (scon) sys_vme2 = vme2;
+		if (scon)
+			sys_vme2 = vme2;
 		vme2chip_init(sc);
+	}
 		break;
 #endif
 #if NSYSCON > 0
 	case BUS_SYSCON:
-		{
-			char sconc;
-			vmevecbase = 0x80;  /* Hard coded for MVME188 */
-			sconc = *(char *)GLOBAL1;
-			sconc &= M188_SYSCON;
-			printf(": %ssystem controller\n", scon ? "" : "not ");
-			vmesyscon_init(sc);
-		}
+	{
+		char sconc;
+
+		vmevecbase = 0x80;  /* Hard coded for MVME188 */
+		sconc = *(char *)GLOBAL1;
+		sconc &= M188_SYSCON;
+		printf(": %ssystem controller\n", sconc ? "" : "not ");
+		vmesyscon_init(sc);
+	}
 		break;
 #endif
 	}

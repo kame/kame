@@ -1,4 +1,4 @@
-/*	$OpenBSD: file.h,v 1.10 2001/03/01 20:54:35 provos Exp $	*/
+/*	$OpenBSD: file.h,v 1.12 2001/05/15 09:00:19 deraadt Exp $	*/
 /*	$NetBSD: file.h,v 1.11 1995/03/26 20:24:13 jtc Exp $	*/
 
 /*
@@ -45,6 +45,7 @@
 struct proc;
 struct uio;
 struct knote;
+struct stat;
 
 /*
  * Kernel descriptor table.
@@ -57,6 +58,7 @@ struct file {
 #define	DTYPE_SOCKET	2	/* communications endpoint */
 #define	DTYPE_PIPE	3	/* pipe */
 #define	DTYPE_KQUEUE	4	/* event queue */
+#define	DTYPE_CRYPTO	5	/* crypto */
 	short	f_type;		/* descriptor type */
 	long	f_count;	/* reference count */
 	long	f_msgcount;	/* references from message queue */
@@ -71,9 +73,11 @@ struct file {
 		int	(*fo_ioctl)	__P((struct file *fp, u_long com,
 					    caddr_t data, struct proc *p));
 		int	(*fo_select)	__P((struct file *fp, int which,
-					    struct proc *p));
+					     struct proc *p));
 		int	(*fo_kqfilter)	__P((struct file *fp,
-					    struct knote *kn));
+					     struct knote *kn));
+		int	(*fo_stat)	__P((struct file *fp, struct stat *sb,
+					     struct proc *p));
 		int	(*fo_close)	__P((struct file *fp, struct proc *p));
 	} *f_ops;
 	off_t	f_offset;

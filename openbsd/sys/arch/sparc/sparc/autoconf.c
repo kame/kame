@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.37 2001/01/29 03:59:05 jason Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.41 2001/09/19 21:32:19 miod Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.73 1997/07/29 09:41:53 fair Exp $ */
 
 /*
@@ -62,6 +62,7 @@
 #include <sys/socket.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
+#include <sys/user.h>
 
 #include <net/if.h>
 
@@ -350,8 +351,8 @@ bootstrap()
 		/* Map Interrupt Enable Register */
 		pmap_enter(pmap_kernel(), INTRREG_VA,
 			   INT_ENABLE_REG_PHYSADR | PMAP_NC | PMAP_OBIO,
-			   VM_PROT_READ | VM_PROT_WRITE, 1,
-			   VM_PROT_READ | VM_PROT_WRITE);
+			   VM_PROT_READ | VM_PROT_WRITE,
+			   VM_PROT_READ | VM_PROT_WRITE | PMAP_WIRED);
 		/* Disable all interrupts */
 		*((unsigned char *)INTRREG_VA) = 0;
 	}
@@ -786,11 +787,13 @@ st_crazymap(n)
  * command.
  */
 void
-configure()
+cpu_configure()
 {
 	struct confargs oca;
 	register int node = 0;
 	register char *cp;
+	int s;
+	extern struct user *proc0paddr;
 
 	/* Initialize the mountroot_hook list. */
 	LIST_INIT(&mrh_list);
@@ -837,14 +840,14 @@ configure()
 					memregcf = cf;
 		}
 		if (memregcf == NULL)
-			panic("configure: no memreg found!");
+			panic("cpu_configure: no memreg found!");
 
 		rr.rr_iospace = PMAP_OBIO;
 		rr.rr_paddr = (void *)memregcf->cf_loc[0];
 		rr.rr_len = NBPG;
 		par_err_reg = (u_int *)bus_map(&rr, NBPG);
 		if (par_err_reg == NULL)
-			panic("configure: ROM hasn't mapped memreg!");
+			panic("cpu_configure: ROM hasn't mapped memreg!");
 	}
 #endif
 #if defined(SUN4C)
@@ -885,6 +888,18 @@ configure()
 	setroot();
 	swapconf();
 	cold = 0;
+
+
+	/*
+	 * Re-zero proc0's user area, to nullify the effect of the
+	 * stack running into it during auto-configuration.
+	 * XXX - should fix stack usage.
+	 */
+	s = splhigh();
+	bzero(proc0paddr, sizeof(struct user));
+
+	pmap_redzone();
+	splx(s);
 }
 
 /*
@@ -1053,7 +1068,7 @@ int autoconf_nzs = 0;	/* must be global so obio.c can see it */
 /*
  * Attach the mainbus.
  *
- * Our main job is to attach the CPU (the root node we got in configure())
+ * Our main job is to attach the CPU (the root node we got in cpu_configure())
  * and iterate down the list of `mainbus devices' (children of that node).
  * We also record the `node id' of the default frame buffer, if any.
  */
@@ -1770,7 +1785,7 @@ getdisk(str, len, defpart, devp)
 		for (dv = alldevs.tqh_first; dv != NULL;
 		    dv = dv->dv_list.tqe_next) {
 			if (dv->dv_class == DV_DISK)
-				printf(" %s[a-h]", dv->dv_xname);
+				printf(" %s[a-p]", dv->dv_xname);
 #ifdef NFSCLIENT
 			if (dv->dv_class == DV_IFNET)
 				printf(" %s", dv->dv_xname);

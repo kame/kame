@@ -1,4 +1,4 @@
-#	$OpenBSD: files.pci,v 1.105 2001/04/13 00:27:57 mjacob Exp $
+#	$OpenBSD: files.pci,v 1.116 2001/10/05 18:57:28 nate Exp $
 #	$NetBSD: files.pci,v 1.20 1996/09/24 17:47:15 christos Exp $
 #
 # Config file and device description for machine-independent PCI code.
@@ -14,7 +14,7 @@ file	dev/pci/pci_subr.c		pci
 
 # Generic VGA
 attach	vga at pci with vga_pci
-file	dev/pci/vga_pci.c		vga_pci		needs-flag
+file	dev/pci/vga_pci.c		vga_pci
 
 device	tga: wsemuldisplaydev, rasops8, rasops32
 attach	tga at pci
@@ -70,6 +70,10 @@ file	dev/pci/twe_pci.c		twe_pci
 # AMI MegaRAID Express x00/Elite 1500/Express 1x00 RAID Controllers
 attach	ami at pci with ami_pci
 file	dev/pci/ami_pci.c		ami_pci
+
+# I2O
+attach	iop at pci with iop_pci
+file	dev/pci/iop_pci.c		iop_pci
 
 # Ensoniq AudioPCI S5016, 1371
 device	eap: audio, auconv, mulaw, ac97
@@ -273,6 +277,15 @@ file	dev/pci/if_ti.c			ti
 attach	ne at pci with ne_pci: rtl80x9
 file	dev/pci/if_ne_pci.c		ne_pci
 
+# Sun GEM ethernet
+attach	gem at pci with gem_pci
+file	dev/pci/if_gem_pci.c		gem_pci
+
+# Hi/fn 6500
+device	lofn: crypto
+attach	lofn at pci
+file	dev/pci/lofn.c			lofn
+
 # Hi/fn 7751 
 device	hifn: crypto
 attach	hifn at pci
@@ -346,6 +359,11 @@ attach	puc at pci
 file	dev/pci/puc.c			puc
 file	dev/pci/pucdata.c		puc
 
+# WaveLAN/PrismII card behind a PLX 805x dumb bridge
+# device declaration in sys/conf/files
+attach	wi at pci with wi_pci
+file	dev/pci/if_wi_pci.c		wi_pci
+
 # Aironet 4500/4800 802.11 DS WLAN
 # device declaration in sys/conf/files
 attach	an at pci with an_pci
@@ -364,3 +382,33 @@ file	dev/pci/iha_pci.c		iha_pci
 device	pcscp: scsi, ncr53c9x
 attach	pcscp at pci
 file	dev/pci/pcscp.c			pcscp
+
+# Guillemot Maxi Radio FM 2000 Radio Card
+device	mr: radio, pci
+attach	mr at pci
+file	dev/pci/maxiradio.c		mr	needs-flag
+
+# MediaForte SoundForte SF64-PCR Radio card
+device	sf4r: radio, pci, tea5757
+attach	sf4r at pci
+file	dev/pci/sf64pcr.c		sf4r	needs-flag
+
+# National Semiconductor DP83820/DP83821 based GigE
+device	nge: ether, ifnet, mii, ifmedia, mii_phy
+attach	nge at pci
+file	dev/pci/if_nge.c		nge
+
+# Cyclades-Z series of intelligent multi-port serial adapters
+device	cz
+attach	cz at pci
+file	dev/pci/cz.c			cz		needs-flag
+
+# Level-1 LXT1001 Gigabit MAC
+device	lge: ether, ifnet, mii, ifmedia, mii_phy
+attach	lge at pci
+file	dev/pci/if_lge.c		lge
+
+# Broadcom BCM570x gigabit ethernet
+device	bge: ether, ifnet, mii, ifmedia, mii_phy
+attach	bge at pci
+file	dev/pci/if_bge.c		bge

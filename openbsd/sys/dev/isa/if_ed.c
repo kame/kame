@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ed.c,v 1.42 2001/02/20 19:39:39 mickey Exp $	*/
+/*	$OpenBSD: if_ed.c,v 1.48 2001/09/20 17:02:31 mpech Exp $	*/
 /*	$NetBSD: if_ed.c,v 1.105 1996/10/21 22:40:45 thorpej Exp $	*/
 
 /*
@@ -163,10 +163,6 @@ struct cfdriver ed_cd = {
 	NULL, "ed", DV_IFNET
 };
 
-#define	ETHER_MIN_LEN	64
-#define ETHER_MAX_LEN	1518
-#define	ETHER_ADDR_LEN	6
-
 #define	NIC_PUT(t, bah, nic, reg, val)	\
 	bus_space_write_1((t), (bah), ((nic) + (reg)), (val))
 #define	NIC_GET(t, bah, nic, reg)	\
@@ -202,7 +198,6 @@ ed_pcmcia_isa_attach(parent, match, aux, pc_link)
 	struct isa_attach_args *ia = aux;
 	struct pcmciadevs *dev=pc_link->device;
 	int err;
-	extern int ifqmaxlen;
 	u_char enaddr[ETHER_ADDR_LEN];
 
 	if ((int)dev->param != -1)
@@ -234,7 +229,6 @@ ed_pcmcia_isa_attach(parent, match, aux, pc_link)
 		/* clear ED_NOTPRESENT, set ED_REATTACH if needed */
 		sc->spec_flags=pc_link->flags&PCMCIA_REATTACH?ED_REATTACH:0;
 		sc->type_str = dev->model;
-		sc->sc_arpcom.ac_if.if_snd.ifq_maxlen=ifqmaxlen;
 		sc->sc_ic = ia->ia_ic;
 		return 1;
 	} else
@@ -503,6 +497,7 @@ ed_pci_attach(parent, self, aux)
 	ifp->if_watchdog = edwatchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if ((sc->spec_flags & ED_REATTACH) == 0)
@@ -519,8 +514,7 @@ ed_pci_attach(parent, self, aux)
 	printf("%s", sc->isa16bit ? "(16-bit)" : "(8-bit)");	/* XXX */
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("\n%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}
@@ -1659,6 +1653,7 @@ edattach(parent, self, aux)
 	ifp->if_watchdog = edwatchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS | IFF_MULTICAST;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Set default state for LINK0 flag (used to disable the tranceiver
@@ -1996,7 +1991,7 @@ outloop:
 		return;
 	}
 
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == 0)
 		return;
 
@@ -2299,7 +2294,7 @@ edintr(arg)
 
 			/*
 			 * Decrement buffer in-use count if not zero (can only
-			 * be zero if a transmitter interrupt occured while not
+			 * be zero if a transmitter interrupt occurred while not
 			 * actually transmitting).
 			 * If data is ready to transmit, start it transmitting,
 			 * otherwise defer until after handling receiver.
@@ -2531,7 +2526,6 @@ edread(sc, buf, len)
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct mbuf *m;
-	struct ether_header *eh;
 
 	/* Pull packet off interface. */
 	m = edget(sc, buf, len);
@@ -2542,9 +2536,6 @@ edread(sc, buf, len)
 
 	ifp->if_ipackets++;
 
-	/* We assume that the header fit entirely in one mbuf. */
-	eh = mtod(m, struct ether_header *);
-
 #if NBPFILTER > 0
 	/*
 	 * Check if there's a BPF listener on this interface.
@@ -2554,9 +2545,7 @@ edread(sc, buf, len)
 		bpf_mtap(ifp->if_bpf, m);
 #endif
 
-	/* We assume that the header fit entirely in one mbuf. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	ether_input_mbuf(ifp, m);
 }
 
 /*

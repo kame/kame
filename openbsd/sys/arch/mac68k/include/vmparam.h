@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.4 1997/11/30 06:10:37 gene Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.10 2001/09/22 18:00:09 miod Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.8 1996/11/15 14:21:00 briggs Exp $	*/
 
 /*
@@ -95,8 +95,6 @@
  */
 #define	USRTEXT		8192
 #define	USRSTACK	(-HIGHPAGES*NBPG)	/* Start of user stack */
-#define	BTOPUSRSTACK	(0x100000-HIGHPAGES)	/* btop(USRSTACK) */
-#define P1PAGES		0x100000
 #define	LOWPAGES	0
 #define HIGHPAGES	3			/* UPAGES */
 
@@ -107,33 +105,21 @@
 #define	MAXTSIZ		(8*1024*1024)		/* max text size */
 #endif
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(16*1024*1024)		/* initial data size limit */
+#define	DFLDSIZ		(32*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
 #define	MAXDSIZ		(64*1024*1024)		/* max data size */
 #endif
 #ifndef	DFLSSIZ
-#define	DFLSSIZ		(512*1024)		/* initial stack size limit */
+#define	DFLSSIZ		(2*1024*1024)		/* initial stack size limit */
 #endif
 #ifndef	MAXSSIZ
 #define	MAXSSIZ		MAXDSIZ			/* max stack size */
 #endif
 
 /*
- * Default sizes of swap allocation chunks (see dmap.h).
- * The actual values may be changed in vminit() based on MAXDSIZ.
- * With MAXDSIZ of 16Mb and NDMAP of 38, dmmax will be 1024.
- * DMMIN should be at least ctod(1) so that vtod() works.
- * vminit() insures this.
- */
-#define	DMMIN	32			/* smallest swap allocation */
-#define	DMMAX	4096			/* largest potential swap allocation */
-
-/*
  * Sizes of the system and user portions of the system page table.
  */
-/* SYSPTSIZE IS SILLY; IT SHOULD BE COMPUTED AT BOOT TIME */
-#define	SYSPTSIZE	(2 * NPTEPG)	/* 8mb */
 #define	USRPTSIZE 	(1 * NPTEPG)	/* 4mb */
 
 /*
@@ -153,18 +139,6 @@
 #endif
 
 /*
- * Boundary at which to place first MAPMEM segment if not explicitly
- * specified.  Should be a power of two.  This allows some slop for
- * the data segment to grow underneath the first mapped segment.
- */
-#define MMSEG		0x200000
-
-/*
- * The size of the clock loop.
- */
-#define	LOOPPAGES	(maxfree - firstfree)
-
-/*
  * The time for a process to be blocked before being very swappable.
  * This is a number of seconds which the system takes as being a non-trivial
  * amount of real time.  You probably shouldn't change this;
@@ -175,104 +149,47 @@
  */
 #define	MAXSLP 		20
 
-/*
- * A swapped in process is given a small amount of core without being bothered
- * by the page replacement algorithm.  Basically this says that if you are
- * swapped in you deserve some resources.  We protect the last SAFERSS
- * pages against paging and will just swap you out rather than paging you.
- * Note that each process has at least UPAGES+CLSIZE pages which are not
- * paged anyways (this is currently 8+2=10 pages or 5k bytes), so this
- * number just means a swapped in process is given around 25k bytes.
- * Just for fun: current memory prices are 4600$ a megabyte on VAX (4/22/81),
- * so we loan each swapped in process memory worth 100$, or just admit
- * that we don't consider it worthwhile and swap it out to disk which costs
- * $30/mb or about $0.75.
- */
-#define	SAFERSS		4		/* nominal ``small'' resident set size
-					   protected against replacement */
-
-/*
- * DISKRPM is used to estimate the number of paging i/o operations
- * which one can expect from a single disk controller.
- */
-#define	DISKRPM		3600
-
-/*
- * Klustering constants.  Klustering is the gathering
- * of pages together for pagein/pageout, while clustering
- * is the treatment of hardware page size as though it were
- * larger than it really is.
- *
- * KLMAX gives maximum cluster size in CLSIZE page (cluster-page)
- * units.  Note that ctod(KLMAX*CLSIZE) must be <= DMMIN in dmap.h.
- * ctob(KLMAX) should also be less than MAXPHYS (in vm_swp.c)
- * unless you like "big push" panics.
- */
-
-#define	KLMAX	(4/CLSIZE)
-#define	KLSEQL	(2/CLSIZE)		/* in klust if vadvise(VA_SEQL) */
-#define	KLIN	(4/CLSIZE)		/* default data/stack in klust */
-#define	KLTXT	(4/CLSIZE)		/* default text in klust */
-#define	KLOUT	(4/CLSIZE)
-
-/*
- * KLSDIST is the advance or retard of the fifo reclaim for sequential
- * processes data space.
- */
-#define	KLSDIST	3		/* klusters advance/retard for seq. fifo */
-
-/*
- * Paging thresholds (see vm_sched.c).
- * Strategy of 1/19/85:
- *	lotsfree is 512k bytes, but at most 1/4 of memory
- *	desfree is 200k bytes, but at most 1/8 of memory
- * Are these still valid in 1995?
- */
-#define	LOTSFREE	(512 * 1024)
-#define	LOTSFREEFRACT	4
-#define	DESFREE		(200 * 1024)
-#define	DESFREEFRACT	8
-
-/*
- * There are two clock hands, initially separated by HANDSPREAD bytes
- * (but at most all of user memory).  The amount of time to reclaim
- * a page once the pageout process examines it increases with this
- * distance and decreases as the scan rate rises.
- */
-#define	HANDSPREAD	(2 * 1024 * 1024)
-
-/*
- * The number of times per second to recompute the desired paging rate
- * and poke the pagedaemon.
- */
-#define	RATETOSCHEDPAGING	4
-
-/*
- * Believed threshold (in megabytes) for which interleaved
- * swapping area is desirable.
- */
-#define	LOTSOFMEM	2
-
-/*
- * Mach derived constants
- */
-
 /* user/kernel map constants */
-#define VM_MIN_ADDRESS		((vm_offset_t)0)
-#define VM_MAXUSER_ADDRESS	((vm_offset_t)(USRSTACK))
-#define VM_MAX_ADDRESS		((vm_offset_t)(0-(UPAGES*NBPG)))
-#define VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0)
-#define VM_MAX_KERNEL_ADDRESS	((vm_offset_t)(0-NBPG))
+#define VM_MIN_ADDRESS		((vaddr_t)0)
+#define VM_MAXUSER_ADDRESS	((vaddr_t)(USRSTACK))
+#define VM_MAX_ADDRESS		((vaddr_t)(0-(UPAGES*NBPG)))
+#define VM_MIN_KERNEL_ADDRESS	((vaddr_t)0)
+#define VM_MAX_KERNEL_ADDRESS	((vaddr_t)(0-NBPG))
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
-#define VM_PHYS_SIZE		(USRIOSIZE*CLBYTES)
-
-#define MACHINE_NONCONTIG	/* VM <=> pmap interface modifier */
+#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 /* # of kernel PT pages (initial only, can grow dynamically) */
-#define VM_KERNEL_PT_PAGES	((vm_size_t)2)		/* XXX: SYSPTSIZE */
+#define VM_KERNEL_PT_PAGES	((vsize_t)2)
+
+/*
+ * Constants which control the way the VM system deals with memory segments.
+ * Most mac68k systems have only 1 physical memory segment, but some have 2.
+ *
+ * On the systems that have multiple segments, specifically the IIsi and   
+ * IIci, the optimal configuration is to put the higher-density SIMMs in
+ * bank B.  This is because the on-board video uses main memory in bank A
+ * for the framebuffer, and a memory controller prevents access during   
+ * video refresh cycles.  Even if both banks contain the same amount of
+ * RAM, a minimum of ~320KB will be subtracted from the amount in bank A
+ * for the framebuffer (if on-board video is in use).
+ */
+#define	VM_PHYSSEG_MAX		2
+#define	VM_PHYSSEG_STRAT	VM_PSTRAT_BIGFIRST
+#define	VM_PHYSSEG_NOADD
+   
+#define	VM_NFREELIST		1
+#define	VM_FREELIST_DEFAULT	0
+
+/*
+ * pmap-specific data stored in the vm_physmem[] array.
+ */
+struct pmap_physseg {
+	struct pv_entry *pvent;         /* pv table for this seg */
+	char *attrs;                    /* page attributes for this seg */
+};
 
 /* pcb base */
 #define	pcbb(p)		((u_int)(p)->p_addr)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.22 2000/09/26 14:03:53 art Exp $	*/
+/*	$OpenBSD: conf.c,v 1.26 2001/09/28 02:53:13 mickey Exp $	*/
 /*	$NetBSD: conf.c,v 1.41 1997/02/11 07:35:49 scottr Exp $	*/
 
 /*
@@ -49,7 +49,6 @@
 
 int	ttselect	__P((dev_t, int, struct proc *));
 
-bdev_decl(sw);
 #include "st.h"
 #include "sd.h"
 #include "cd.h"
@@ -90,7 +89,6 @@ cdev_decl(ite);
 #define mmread	mmrw
 #define mmwrite	mmrw
 cdev_decl(mm);
-cdev_decl(sw);
 #include "pty.h"
 #include "ss.h"
 cdev_decl(ss);
@@ -119,11 +117,9 @@ cdev_decl(ksyms);
 cdev_decl(xfs_dev);
 #endif
 
-#ifdef IPFILTER
-#define NIPF 1
-#else
-#define NIPF 0
-#endif
+#include "pf.h"
+
+#include <altq/altqconf.h>
 
 struct cdevsw	cdevsw[] =
 {
@@ -162,7 +158,7 @@ struct cdevsw	cdevsw[] =
 	cdev_random_init(1,random),	/* 32: random data source */
 	cdev_ss_init(NSS,ss),           /* 33: SCSI scanner */
 	cdev_uk_init(NUK,uk),		/* 34: SCSI unknown */
-	cdev_gen_ipf(NIPF,ipl),         /* 35: IP filter log */
+	cdev_pf_init(NPF,pf),		/* 35: packet filter */
 	cdev_audio_init(NASC,asc),      /* 36: ASC audio device */
 	cdev_ksyms_init(NKSYMS,ksyms),	/* 37: Kernel symbols device */
 	cdev_notdef(),			/* 38 */
@@ -183,6 +179,7 @@ struct cdevsw	cdevsw[] =
 #else
 	cdev_notdef(),			/* 51 */
 #endif
+	cdev_altq_init(NALTQ,altq),	/* 52: ALTQ control interface */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: esis.c,v 1.4 1996/05/10 12:31:21 deraadt Exp $	*/
+/*	$OpenBSD: esis.c,v 1.6 2001/08/19 15:07:34 miod Exp $	*/
 /*	$NetBSD: esis.c,v 1.14 1996/05/07 02:45:04 thorpej Exp $	*/
 
 /*-
@@ -74,6 +74,7 @@ SOFTWARE.
 #include <sys/socketvar.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
+#include <sys/timeout.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -109,6 +110,9 @@ extern int      iso_systype;
 struct sockaddr_dl esis_dl = {sizeof(esis_dl), AF_LINK};
 extern char     all_es_snpa[], all_is_snpa[];
 
+struct timeout	snpac_timeout;
+struct timeout	esis_timeout;
+
 #define EXTEND_PACKET(m, mhdr, cp)\
 	if (((m)->m_next = m_getclr(M_DONTWAIT, MT_HEADER)) == NULL) {\
 		esis_stat.es_nomem++;\
@@ -137,8 +141,10 @@ esis_init()
 
 	LIST_INIT(&esis_pcb);
 
-	timeout(snpac_age, (caddr_t) 0, hz);
-	timeout(esis_config, (caddr_t) 0, hz);
+	timeout_set(&snpac_timeout, snpac_age, NULL);
+	timeout_set(&esis_timeout, esis_config, NULL);
+	timeout_add(&snpac_timeout, hz);
+	timeout_add(&esis_timeout, hz);
 
 	clnl_protox[ISO9542_ESIS].clnl_input = esis_input;
 	clnl_protox[ISO10589_ISIS].clnl_input = isis_input;
@@ -184,13 +190,11 @@ esis_usrreq(so, req, m, nam, control)
 			break;
 		}
 		MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
-		if ((so->so_pcb = rp) != NULL) {
-			bzero(so->so_pcb, sizeof(*rp));
-			LIST_INSERT_HEAD(&esis_pcb, rp, rcb_list);
-			rp->rcb_socket = so;
-			error = soreserve(so, esis_sendspace, esis_recvspace);
-		} else
-			error = ENOBUFS;
+		so->so_pcb = rp;
+		bzero(so->so_pcb, sizeof(*rp));
+		LIST_INSERT_HEAD(&esis_pcb, rp, rcb_list);
+		rp->rcb_socket = so;
+		error = soreserve(so, esis_sendspace, esis_recvspace);
 		break;
 
 	case PRU_SEND:
@@ -653,7 +657,7 @@ esis_ishinput(m, shp)
 				goto bad;
 			CTOH(buf[2], buf[3], newct);
 			if ((u_short) esis_config_time != newct) {
-				untimeout(esis_config, 0);
+				timeout_del(&esis_timeout);
 				esis_config_time = newct;
 				esis_config(NULL);
 			}
@@ -797,7 +801,7 @@ esis_config(v)
 {
 	register struct ifnet *ifp;
 
-	timeout(esis_config, (caddr_t) 0, hz * esis_config_time);
+	timeout_add(&esis_timeout, hz * esis_config_time);
 
 	/*
 	 * Report configuration for each interface that - is UP - has

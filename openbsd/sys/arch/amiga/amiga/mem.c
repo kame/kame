@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.11 2001/01/31 22:39:39 jason Exp $	*/
+/*	$OpenBSD: mem.c,v 1.14 2001/07/25 13:25:31 art Exp $	*/
 /*	$NetBSD: mem.c,v 1.18 1997/02/02 07:17:14 thorpej Exp $	*/
 
 /*
@@ -56,9 +56,7 @@
 #include <machine/cpu.h>
 
 #include <vm/vm.h>
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 extern int kernel_reload_write(struct uio *uio);
 extern u_int lowram;
@@ -148,7 +146,7 @@ mmrw(dev, uio, flags)
 #endif
 			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
 			    trunc_page(v), uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
+			    VM_PROT_READ : VM_PROT_WRITE, PMAP_WIRED);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
@@ -160,15 +158,9 @@ mmrw(dev, uio, flags)
 		case 1:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
-#if defined(UVM)
 			if (!uvm_kernacc((caddr_t)v, c,
 			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
 				return (EFAULT);
-#else
-			if (!kernacc((caddr_t)v, c,
-			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
-				return (EFAULT);
-#endif
 			if (v < NBPG) {
 #ifdef DEBUG
 				/*
@@ -178,9 +170,9 @@ mmrw(dev, uio, flags)
 				if (uio->uio_rw == UIO_READ) {
 					if (devzeropage == NULL) {
 						devzeropage = (caddr_t)
-						    malloc(CLBYTES, M_TEMP,
+						    malloc(PAGE_SIZE, M_TEMP,
 						    M_WAITOK);
-						bzero(devzeropage, CLBYTES);
+						bzero(devzeropage, PAGE_SIZE);
 					}
 					c = min(c, NBPG - (int)v);
 					v = (vm_offset_t)devzeropage;
@@ -208,10 +200,10 @@ mmrw(dev, uio, flags)
 			}
 			if (devzeropage == NULL) {
 				devzeropage = (caddr_t)
-				    malloc(CLBYTES, M_TEMP, M_WAITOK);
-				bzero(devzeropage, CLBYTES);
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				bzero(devzeropage, PAGE_SIZE);
 			}
-			c = min(iov->iov_len, CLBYTES);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(devzeropage, c, uio);
 			continue;
 

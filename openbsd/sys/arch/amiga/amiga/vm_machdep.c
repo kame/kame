@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.16 2000/11/08 11:44:00 art Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.23 2001/09/21 02:11:53 miod Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.30 1997/05/19 10:14:50 veego Exp $	*/
 
 /*
@@ -58,10 +58,7 @@
 
 #include <vm/vm.h>
 #include <sys/user.h>
-#include <vm/vm_kern.h>
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 #include <machine/pte.h>
 
 /* XXX - Put this in some header file? */
@@ -160,44 +157,41 @@ cpu_exit(p)
 {
 
 	(void)splhigh();
-#if defined(UVM)
 	uvmexp.swtch++;
-#else
-	cnt.v_swtch++;
-#endif
 	switch_exit(p);
 	/* NOTREACHED */
 }
 
 /*
  * Move pages from one kernel virtual address to another.
- * Both addresses are assumed to reside in the Sysmap,
- * and size must be a multiple of CLSIZE.
+ * Both addresses are assumed to reside in the Sysmap.
  */
 void
 pagemove(from, to, size)
-	register caddr_t from, to;
+	caddr_t from, to;
 	size_t size;
 {
-	register vm_offset_t pa;
+	vm_offset_t pa;
 
 #ifdef DEBUG
-	if (size & CLOFSET)
+	if ((size & PAGE_MASK) != 0)
 		panic("pagemove");
 #endif
 	while (size > 0) {
-		pa = pmap_extract(pmap_kernel(), (vm_offset_t)from);
+		pmap_extract(pmap_kernel(), (vm_offset_t)from, &pa);
 #ifdef DEBUG
+#if 0
 		if (pa == 0)
 			panic("pagemove 2");
-		if (pmap_extract(pmap_kernel(), (vm_offset_t)to) != 0)
+		if (pmap_extract(pmap_kernel(), (vm_offset_t)to, XXX) != FALSE)
 			panic("pagemove 3");
+#endif
 #endif
 		pmap_remove(pmap_kernel(), (vm_offset_t)from,
 		    (vm_offset_t)from + PAGE_SIZE);
 		pmap_enter(pmap_kernel(),  (vm_offset_t)to, pa,
-		    VM_PROT_READ|VM_PROT_WRITE, 1,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		    VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 		from += PAGE_SIZE;
 		to += PAGE_SIZE;
 		size -= PAGE_SIZE;
@@ -343,17 +337,14 @@ setredzone(pte, vaddr)
  */
 int
 kvtop(addr)
-	register caddr_t addr;
+	caddr_t addr;
 {
-	vm_offset_t va;
+	paddr_t pa;
 
-	va = pmap_extract(pmap_kernel(), (vm_offset_t)addr);
-	if (va == 0)
+	if (pmap_extract(pmap_kernel(), (vm_offset_t)addr, &pa) == FALSE)
 		panic("kvtop: zero page frame");
-	return((int)va);
+	return((int)pa);
 }
-
-extern vm_map_t phys_map;
 
 /*
  * Map a user I/O request into kernel virtual address space.
@@ -377,20 +368,16 @@ vmapbuf(bp, len)
 	uva = m68k_trunc_page(bp->b_saveaddr = bp->b_data);
 	off = (vaddr_t)bp->b_data - uva;
 	len = m68k_round_page(off + len);
-#if defined(UVM)
 	kva = uvm_km_valloc_wait(phys_map, len);
-#else
-	kva = kva = kmem_alloc_wait(phys_map, len);
-#endif
 	bp->b_data = (caddr_t)(kva + off);
 
 	upmap = vm_map_pmap(&bp->b_proc->p_vmspace->vm_map);
 	kpmap = vm_map_pmap(phys_map);
 	do {
-		if ((pa = pmap_extract(upmap, uva)) == 0)
+		if (pmap_extract(upmap, uva, &pa) == FALSE)
 			panic("vmapbuf: null page frame");
 		pmap_enter(kpmap, kva, pa, VM_PROT_READ|VM_PROT_WRITE,
-			   TRUE, 0);
+			   PMAP_WIRED);
                 uva += PAGE_SIZE;
                 kva += PAGE_SIZE;
                 len -= PAGE_SIZE;
@@ -419,11 +406,7 @@ vunmapbuf(bp, len)
          * pmap_remove() is unnecessary here, as kmem_free_wakeup()
          * will do it for us.
          */
-#if defined(UVM)
         uvm_km_free_wakeup(phys_map, kva, len);
-#else
-	kmem_free_wakeup(phys_map, kva, len);
-#endif
-        bp->b_data = bp->b_saveaddr;
-        bp->b_saveaddr = 0;
+	bp->b_data = bp->b_saveaddr;
+	bp->b_saveaddr = 0;
 }

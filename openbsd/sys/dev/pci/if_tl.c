@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tl.c,v 1.19 2001/04/05 02:03:12 jason Exp $	*/
+/*	$OpenBSD: if_tl.c,v 1.23 2001/08/25 10:13:29 art Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -210,7 +210,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -1154,6 +1153,7 @@ int tl_intvec_rxeof(xsc, type)
 				continue;
 		}
 
+		m->m_pkthdr.len = m->m_len = total_len;
 #if NBPFILTER > 0
 		/*
 	 	 * Handle BPF listeners. Let the BPF user see the packet, but
@@ -1164,15 +1164,11 @@ int tl_intvec_rxeof(xsc, type)
 	 	 * since it can be used again later.
 	 	 */
 		if (ifp->if_bpf) {
-			m->m_pkthdr.len = m->m_len = total_len;
 			bpf_mtap(ifp->if_bpf, m);
 		}
 #endif
-		/* Remove header from mbuf and pass it on. */
-		m->m_pkthdr.len = m->m_len =
-				total_len - sizeof(struct ether_header);
-		m->m_data += sizeof(struct ether_header);
-		ether_input(ifp, eh, m);
+		/* pass it on. */
+		ether_input_mbuf(ifp, m);
 	}
 
 	return(r);
@@ -1395,7 +1391,7 @@ int tl_intr(xsc)
 		CMD_PUT(sc, TL_CMD_ACK | r | type);
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		tl_start(ifp);
 
 	return r;
@@ -1571,7 +1567,7 @@ void tl_start(ifp)
 	start_tx = sc->tl_cdata.tl_tx_free;
 
 	while(sc->tl_cdata.tl_tx_free != NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2054,8 +2050,7 @@ tl_attach(parent, self, aux)
 	/*
 	 * Allocate our interrupt.
 	 */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}
@@ -2154,7 +2149,8 @@ tl_attach(parent, self, aux)
 	ifp->if_start = tl_start;
 	ifp->if_watchdog = tl_watchdog;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = TL_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, TL_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	/*

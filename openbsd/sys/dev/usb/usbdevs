@@ -1,4 +1,4 @@
-$OpenBSD: usbdevs,v 1.32 2001/01/30 21:07:28 deraadt Exp $
+$OpenBSD: usbdevs,v 1.35 2001/10/02 01:37:36 millert Exp $
 /* $NetBSD: usbdevs,v 1.127 2000/11/15 14:36:09 augustss Exp $ */
 
 /*
@@ -269,10 +269,12 @@ vendor ASAHIOPTICAL	0x0a17	Asahi Optical
 vendor BOCASYSTEMS	0x0a43	Boca Systems
 vendor BROADCOM		0x0a5c	Broadcom
 vendor GEOCAST		0x0a79	Geocast Network Systems
+vendor TODOS		0x0b0c	Todos Data System
 vendor MOTOROLA		0x1063	Motorola
 vendor PLX		0x10b5	PLX
 vendor BELKIN2		0x1293	Belkin Components
 vendor SILICONPORTALS	0x1527	Silicon Portals
+vendor SOHOWARE	0x15e8	SOHOware
 vendor UMAX		0x1606	UMAX Data Systems
 vendor INSIDEOUT	0x1608	Inside Out Networks
 vendor ENTREGA		0x1645	Entrega
@@ -525,8 +527,10 @@ product INTEL EASYPC_CAMERA	0x0110	Easy PC Camera
 product INTEL TESTBOARD		0x9890	82930 test board
 
 /* I/O DATA products */
-product IODATA USBETTX		0x0904	USB ETTX
 product IODATA USBETT		0x0901	USB ETT
+product IODATA USBETTX		0x0904	USB ETTX
+product IODATA USBETTXS		0x0913	USB ETTX
+product IODATA USBRSAQ		0x0a03	RSAQ1 Serial Adapter
 
 /* Iomega products */
 product IOMEGA ZIP100		0x0001	Zip 100
@@ -714,7 +718,8 @@ product PRIMAX PCGAUMS1		0x4d04	Sony PCGA-UMS1
 /* Prolific products */
 product PROLIFIC PL2301		0x0000	PL2301 Host-Host interface
 product PROLIFIC PL2302		0x0001	PL2302 Host-Host interface
-product PROLIFIC PL2303		0x04bb	PL2303 Serial adapter (IODATA USB-RSAQ2)
+product PROLIFIC RSAQ2		0x04bb	PL2303 Serial adapter (IODATA USB-RSAQ2)
+product PROLIFIC PL2303		0x2303	PL2303 Serial adapter (ATEN/IOGEAR UC232A)
 product PROLIFIC PL2305		0x2305	Parallel printer adapter
 product PROLIFIC ATAPI4		0x2307	ATAPI-4 Bridge Controller
 
@@ -759,6 +764,9 @@ product SMARTBRIDGES SMARTLINK	0x0001	SmartLink Ethernet
 product SMC 2102USB		0x0100	10Mbps Ethernet
 product SMC 2202USB		0x0200	10/100 Ethernet
 
+/* SOHOware products */
+product SOHOWARE NUB100	0x9100 10/100 USB Ethernet
+
 /* SOLID YEAR products */
 product SOLIDYEAR KEYBOARD	0x2101	Keyboard
 
@@ -793,6 +801,9 @@ product TI TUSB2046		0x2046	TUSB2046 hub
 
 /* Thrustmaster products */
 product THRUST FUSION_PAD	0xa0a3	Fusion Digital Gamepad
+
+/* Todos Data System products */
+product	TODOS ARGOS_MINI	0x0002	Argos Mini Smartcard Reader
 
 /* Trek Technology products */
 product TREK THUMBDRIVE		0x1111	ThumbDrive

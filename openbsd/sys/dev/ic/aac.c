@@ -1,4 +1,4 @@
-/*	$OpenBSD: aac.c,v 1.4 2001/04/06 04:42:06 csapuntz Exp $	*/
+/*	$OpenBSD: aac.c,v 1.8 2001/09/21 17:55:43 miod Exp $	*/
 
 /*-
  * Copyright (c) 2000 Michael Smith
@@ -52,7 +52,6 @@
 #include <machine/bus.h>
 
 #include <vm/vm.h>
-#include <vm/pmap.h>
 
 #include <scsi/scsi_all.h>
 #include <scsi/scsi_disk.h>
@@ -632,13 +631,15 @@ aac_scsi_cmd(xs)
 
 	lock = AAC_LOCK(sc);
 
-	/* Don't double enqueue if we came from gdt_chain. */
+	/* Don't double enqueue if we came from aac_chain. */
 	if (xs != LIST_FIRST(&sc->sc_queue))
 		aac_enqueue(sc, xs, 0);
 
 	while ((xs = aac_dequeue(sc))) {
 		xs->error = XS_NOERROR;
 		ccb = NULL;
+		link = xs->sc_link;
+		target = link->target;
 
 		switch (xs->cmd->opcode) {
 		case TEST_UNIT_READY:
@@ -1094,8 +1095,8 @@ aac_bio_complete(struct aac_ccb *ccb)
 		bp->b_flags |= B_ERROR;
 	
 		/* XXX be more verbose? */
-		printf("%s: I/O error %d (%s)\n", status,
-		    AAC_COMMAND_STATUS(status));
+		printf("%s: I/O error %d (%s)\n", sc->sc_dev.dv_xname,
+		    status, AAC_COMMAND_STATUS(status));
 	}
 	scsi_done(xs);
 }
@@ -1222,8 +1223,8 @@ aacminphys(bp)
 
 #if 1
 #if 0	/* As this is way more than MAXPHYS it's really not necessary. */
-	if (bp->b_bcount > ((GDT_MAXOFFSETS - 1) * PAGE_SIZE))
-		bp->b_bcount = ((GDT_MAXOFFSETS - 1) * PAGE_SIZE);
+	if (bp->b_bcount > ((AAC_MAXOFFSETS - 1) * PAGE_SIZE))
+		bp->b_bcount = ((AAC_MAXOFFSETS - 1) * PAGE_SIZE);
 #endif
 #else
 	for (off = PAGE_SIZE, pa = vtophys(buf); off < bp->b_bcount;

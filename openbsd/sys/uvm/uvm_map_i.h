@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_map_i.h,v 1.6 2001/03/09 14:20:51 art Exp $	*/
-/*	$NetBSD: uvm_map_i.h,v 1.15 1999/06/14 22:05:23 thorpej Exp $	*/
+/*	$OpenBSD: uvm_map_i.h,v 1.8 2001/08/11 10:57:22 art Exp $	*/
+/*	$NetBSD: uvm_map_i.h,v 1.17 2000/05/08 22:59:35 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -127,12 +127,17 @@ uvm_map_setup(map, min, max, flags)
 	lockinit(&map->lock, PVM, "vmmaplk", 0, 0);
 	simple_lock_init(&map->ref_lock);
 	simple_lock_init(&map->hint_lock);
+	simple_lock_init(&map->flags_lock);
 
 	/*
 	 * If the map is interrupt safe, place it on the list
 	 * of interrupt safe maps, for uvm_fault().
+	 *
+	 * We almost never set up an interrupt-safe map, but we set
+	 * up quite a few regular ones (at every fork!), so put
+	 * interrupt-safe map setup in the slow path.
 	 */
-	if (flags & VM_MAP_INTRSAFE) {
+	if (__predict_false(flags & VM_MAP_INTRSAFE)) {
 		struct vm_map_intrsafe *vmi = (struct vm_map_intrsafe *)map;
 		int s;
 
@@ -191,7 +196,7 @@ MAP_INLINE void
 uvm_map_reference(map)
 	vm_map_t map;
 {
-	if (map == NULL) {
+	if (__predict_false(map == NULL)) {
 #ifdef DIAGNOSTIC
 		printf("uvm_map_reference: reference to NULL map\n");
 #ifdef DDB
@@ -219,7 +224,7 @@ uvm_map_deallocate(map)
 {
 	int c;
 
-	if (map == NULL) {
+	if (__predict_false(map == NULL)) {
 #ifdef DIAGNOSTIC
 		printf("uvm_map_deallocate: reference to NULL map\n");
 #ifdef DDB

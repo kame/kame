@@ -1,4 +1,4 @@
-/*	$OpenBSD: ncr.c,v 1.54 2001/04/06 04:42:07 csapuntz Exp $	*/
+/*	$OpenBSD: ncr.c,v 1.61 2001/08/26 00:45:08 fgsch Exp $	*/
 /*	$NetBSD: ncr.c,v 1.63 1997/09/23 02:39:15 perry Exp $	*/
 
 /**************************************************************************
@@ -222,9 +222,10 @@
 #ifndef __OpenBSD__
 #include <sys/sysctl.h>
 #include <machine/clock.h>
+#else
+#include <sys/timeout.h>
 #endif
 #include <vm/vm.h>
-#include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #endif /* KERNEL */
 
@@ -1214,6 +1215,8 @@ struct ncb {
 	u_long		lasttime;
 #ifdef __FreeBSD__
 	struct		callout_handle timeout_ch;
+#elif defined (__OpenBSD__)
+	struct		timeout sc_timeout;
 #endif
 
 	/*-----------------------------------------------
@@ -1464,7 +1467,7 @@ static	void	ncr_attach	(pcici_t tag, int unit);
 
 #if 0
 static char ident[] =
-	"\n$OpenBSD: ncr.c,v 1.54 2001/04/06 04:42:07 csapuntz Exp $\n";
+	"\n$OpenBSD: ncr.c,v 1.61 2001/08/26 00:45:08 fgsch Exp $\n";
 #endif
 
 static const u_long	ncr_version = NCR_VERSION	* 11
@@ -3661,8 +3664,9 @@ ncr_attach(parent, self, aux)
 #endif /*__mips__*/
 
 	np->sc_pc = pc;
-	np->ccb = (ccb_p) malloc (sizeof (struct ccb), M_DEVBUF, M_WAITOK);
-	if (!np->ccb) return;
+	np->ccb = (ccb_p) malloc (sizeof (struct ccb), M_DEVBUF, M_NOWAIT);
+	if (np->ccb == NULL)
+		return;
 #if defined(__mips__)
 	pci_sync_cache(pc, (vm_offset_t)np->ccb, sizeof (struct ccb));
 	np->ccb = (struct ccb *)PHYS_TO_UNCACHED(NCR_KVATOPHYS(np, np->ccb));
@@ -3674,12 +3678,11 @@ ncr_attach(parent, self, aux)
 	**	virtual and physical memory.
 	*/
 
-	ioh_valid = (pci_mapreg_map(pa, 0x10,
-	    PCI_MAPREG_TYPE_IO, 0,
-	    &iot, &ioh, &ioaddr, NULL) == 0);
+	ioh_valid = (pci_mapreg_map(pa, 0x10, PCI_MAPREG_TYPE_IO, 0,
+	    &iot, &ioh, &ioaddr, NULL, 0) == 0);
 	memh_valid = (pci_mapreg_map(pa, 0x14,
 	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
-	    &memt, &memh, &memaddr, NULL) == 0);
+	    &memt, &memh, &memaddr, NULL, 0) == 0);
 
 #if defined(NCR_IOMAPPED)
 	if (ioh_valid) {
@@ -3714,8 +3717,7 @@ ncr_attach(parent, self, aux)
 	/*
 	**	Set up the controller chip's interrupt.
 	*/
-	retval = pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &intrhandle);
+	retval = pci_intr_map(pa, &intrhandle);
 	if (retval) {
 		printf(": couldn't map interrupt\n");
 		return;
@@ -3768,13 +3770,11 @@ static	void ncr_attach (pcici_t config_id, int unit)
 
 	if (!np) {
 		np = (ncb_p) malloc (sizeof (struct ncb), M_DEVBUF, M_WAITOK);
-		if (!np) return;
 		ncrp[unit]=np;
 	}
 	bzero (np, sizeof (*np));
 
 	np->ccb = (ccb_p) malloc (sizeof (struct ccb), M_DEVBUF, M_WAITOK);
-	if (!np->ccb) return;
 #if defined(__mips__)
 	pci_sync_cache(pc, (vm_offset_t)np->ccb, sizeof (struct ccb));
 	np->ccb = (struct ccb *)PHYS_TO_UNCACHED(NCR_KVATOPHYS(np, np->ccb));
@@ -3996,7 +3996,7 @@ static	void ncr_attach (pcici_t config_id, int unit)
 	if ((np->features & FE_RAM) && sizeof(struct script) <= 4096) {
 		if (pci_mapreg_map(pa, 0x18,
 		    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
-		    &memt, &memh, &memaddr, NULL) == 0) {
+		    &memt, &memh, &memaddr, NULL, 0) == 0) {
 			np->ram_tag = memt;
 			np->ram_handle = memh;
 			np->paddr2 = memaddr;
@@ -4264,6 +4264,7 @@ static	void ncr_attach (pcici_t config_id, int unit)
 	/*
 	**	start the timeout daemon
 	*/
+	timeout_set(&np->sc_timeout, ncr_timeout, np);
 	ncr_timeout (np);
 	np->lasttime=0;
 
@@ -4430,11 +4431,6 @@ static int32_t ncr_start (struct scsi_xfer * xp)
 	*/
 
 	flags = xp->flags;
-	if (!(flags & INUSE)) {
-		printf("%s: ?INUSE?\n", ncr_name (np));
-		xp->flags |= INUSE;
-	};
-
 	if(flags & ITSDONE) {
 		printf("%s: ?ITSDONE?\n", ncr_name (np));
 		xp->flags &= ~ITSDONE;
@@ -5869,7 +5865,7 @@ static void ncr_timeout (void *arg)
 #ifdef __FreeBSD__
 	np->timeout_ch = timeout (ncr_timeout, (caddr_t) np, step ? step : 1);
 #else
-	timeout (ncr_timeout, (caddr_t) np, step ? step : 1);
+	timeout_add(&np->sc_timeout, step ? step : 1);
 #endif
 
 	if (INB(nc_istat) & (INTF|SIP|DIP)) {
@@ -6240,7 +6236,7 @@ void ncr_exception (ncb_p np)
 #ifdef __FreeBSD__
 		untimeout (ncr_timeout, (caddr_t) np, np->timeout_ch);
 #else
-		untimeout (ncr_timeout, (caddr_t) np);
+		timeout_del(&np->sc_timeout);
 #endif
 
 		printf ("%s: halted!\n", ncr_name(np));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.33 2001/03/25 18:09:17 csapuntz Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.38 2001/09/13 14:41:50 art Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*-
@@ -52,9 +52,7 @@
 #include <sys/sched.h>
 #include <sys/timeout.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 #ifdef KTRACE
 #include <sys/ktrace.h>
@@ -277,11 +275,7 @@ schedcpu(arg)
 		}
 		splx(s);
 	}
-#if defined(UVM)
 	uvm_meter();
-#else
-	vmmeter();
-#endif
 	wakeup((caddr_t)&lbolt);
 	timeout_add(to, hz);
 }
@@ -342,18 +336,24 @@ int safepri;
  * signal needs to be delivered, ERESTART is returned if the current system
  * call should be restarted if possible, and EINTR is returned if the system
  * call should be interrupted by the signal (return EINTR).
+ *
+ * The interlock is held until the scheduler_slock (XXX) is held.  The
+ * interlock will be locked before returning back to the caller
+ * unless the PNORELOCK flag is specified, in which case the
+ * interlock will always be unlocked upon return.
  */
 int
-tsleep(ident, priority, wmesg, timo)
+ltsleep(ident, priority, wmesg, timo, interlock)
 	void *ident;
 	int priority, timo;
 	char *wmesg;
+	volatile struct simplelock *interlock;
 {
-	register struct proc *p = curproc;
-	register struct slpque *qp;
-	register int s;
-	int sig, catch = priority & PCATCH;
-	extern int cold;
+	struct proc *p = curproc;
+	struct slpque *qp;
+	int s, sig;
+	int catch = priority & PCATCH;
+	int relock = (priority & PNORELOCK) == 0;
 
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_CSW))
@@ -369,6 +369,8 @@ tsleep(ident, priority, wmesg, timo)
 		 */
 		splx(safepri);
 		splx(s);
+		if (interlock != NULL && relock == 0)
+			simple_unlock(interlock);
 		return (0);
 	}
 #ifdef DIAGNOSTIC
@@ -387,6 +389,18 @@ tsleep(ident, priority, wmesg, timo)
 	*(qp->sq_tailp = &p->p_forw) = 0;
 	if (timo)
 		timeout_add(&p->p_sleep_to, timo);
+	/*
+	 * We can now release the interlock; the scheduler_slock
+	 * is held, so a thread can't get in to do wakeup() before
+	 * we do the switch.
+	 *
+	 * XXX We leave the code block here, after inserting ourselves
+	 * on the sleep queue, because we might want a more clever
+	 * data structure for the sleep queues at some point.
+	 */
+	if (interlock != NULL)
+		simple_unlock(interlock);
+
 	/*
 	 * We put ourselves on the sleep queue and start our timeout
 	 * before calling CURSIG, as we could stop there, and a wakeup
@@ -428,6 +442,8 @@ resume:
 			if (KTRPOINT(p, KTR_CSW))
 				ktrcsw(p, 0, 0);
 #endif
+			if (interlock != NULL && relock)
+				simple_lock(interlock);
 			return (EWOULDBLOCK);
 		}
 	} else if (timo)
@@ -437,6 +453,8 @@ resume:
 		if (KTRPOINT(p, KTR_CSW))
 			ktrcsw(p, 0, 0);
 #endif
+		if (interlock != NULL && relock)
+			simple_lock(interlock);
 		if (p->p_sigacts->ps_sigintr & sigmask(sig))
 			return (EINTR);
 		return (ERESTART);
@@ -445,6 +463,8 @@ resume:
 	if (KTRPOINT(p, KTR_CSW))
 		ktrcsw(p, 0, 0);
 #endif
+	if (interlock != NULL && relock)
+		simple_lock(interlock);
 	return (0);
 }
 
@@ -484,7 +504,6 @@ sleep(ident, priority)
 	register struct proc *p = curproc;
 	register struct slpque *qp;
 	register int s;
-	extern int cold;
 
 #ifdef DIAGNOSTIC
 	if (priority > PZERO) {
@@ -674,7 +693,6 @@ preempt(newp)
 
 
 /*
- * The machine independent parts of mi_switch().
  * Must be called at splstatclock() or higher.
  */
 void
@@ -732,11 +750,7 @@ mi_switch()
 	/*
 	 * Pick a new current process and record its start time.
 	 */
-#if defined(UVM)
 	uvmexp.swtch++;
-#else
-	cnt.v_swtch++;
-#endif
 	cpu_switch(p);
 	microtime(&runtime);
 }
@@ -783,7 +797,6 @@ setrunnable(p)
 	case SSLEEP:
 		unsleep(p);		/* e.g. when sending signals */
 		break;
-
 	case SIDL:
 		break;
 	}

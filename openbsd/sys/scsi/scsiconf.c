@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.c,v 1.55 2001/01/22 19:11:48 csapuntz Exp $	*/
+/*	$OpenBSD: scsiconf.c,v 1.62 2001/10/08 01:50:48 drahn Exp $	*/
 /*	$NetBSD: scsiconf.c,v 1.57 1996/05/02 01:09:01 neil Exp $	*/
 
 /*
@@ -134,8 +134,8 @@ scsiprint(aux, pnp)
 
 int
 scsibusmatch(parent, match, aux)
-        struct device *parent;
-        void *match, *aux;
+	struct device *parent;
+	void *match, *aux;
 {
 
 	return 1;
@@ -147,13 +147,12 @@ scsibusmatch(parent, match, aux)
  */
 void
 scsibusattach(parent, self, aux)
-        struct device *parent, *self;
-        void *aux;
+	struct device *parent, *self;
+	void *aux;
 {
 	struct scsibus_softc *sb = (struct scsibus_softc *)self;
 	struct scsi_link *sc_link_proto = aux;
 	int nbytes, i;
-	extern int cold;
 
 	if (!cold)
 		scsi_autoconf = 0;
@@ -167,6 +166,9 @@ scsibusattach(parent, self, aux)
 		sb->adapter_link->luns = 8;
 
 	printf(": %d targets\n", sb->sc_buswidth);
+
+	/* Initialize shared data. */
+	scsi_init();
 
 	nbytes = sb->sc_buswidth * sizeof(struct scsi_link **);
 	sb->sc_link = (struct scsi_link ***)malloc(nbytes, M_DEVBUF, M_NOWAIT);
@@ -479,6 +481,8 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	 "MST     ", "SnapLink        ", ""},     SDEV_NOLUNS},
 	{{T_DIRECT, T_FIXED,
 	 "NEC     ", "D3847           ", "0307"}, SDEV_NOLUNS},
+	{{T_DIRECT, T_REMOV,
+	 "OLYMPUS ", "C-", ""}, SDEV_NOCDB6|SDEV_NOSYNCCACHE},
 	{{T_DIRECT, T_FIXED,
 	 "QUANTUM ", "ELS85S          ", ""},	  SDEV_AUTOSAVE},
 	{{T_DIRECT, T_FIXED,
@@ -518,6 +522,10 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	 "TEAC", "FC-1",                 ""},     SDEV_NOSTARTUNIT},
 	{{T_DIRECT, T_FIXED,
 	 "NEC ", "SD120S-200      ",	 "0001"}, SDEV_NOLUNS},
+        {{T_DIRECT, T_FIXED,
+         "MICROP", "4421-07",		 ""},     SDEV_NOTAGS},
+        {{T_DIRECT, T_FIXED,
+         "SEAGATE", "ST150176LW",        "0002"}, SDEV_NOTAGS},
 
 	/* XXX: QIC-36 tape behind Emulex adapter.  Very broken. */
 	{{T_SEQUENTIAL, T_REMOV,
@@ -619,7 +627,7 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
  */
 int
 scsibusprint(aux, pnp)
-	void       *aux;
+	void	*aux;
 	const char *pnp;
 {
 	struct scsibus_attach_args *sa = aux;
@@ -635,11 +643,11 @@ scsibusprint(aux, pnp)
 
 	inqbuf = sa->sa_inqbuf;
 
-        target = sa->sa_sc_link->target;
-        lun = sa->sa_sc_link->lun;
+	target = sa->sa_sc_link->target;
+	lun = sa->sa_sc_link->lun;
 
-        type = inqbuf->device & SID_TYPE;
-        removable = inqbuf->dev_qual2 & SID_REMOVABLE ? 1 : 0;
+	type = inqbuf->device & SID_TYPE;
+	removable = inqbuf->dev_qual2 & SID_REMOVABLE ? 1 : 0;
 
 	/*
 	 * Figure out basic device type and qualifier.
@@ -706,14 +714,14 @@ scsibusprint(aux, pnp)
 		}
 	}
 
-        scsi_strvis(vendor, inqbuf->vendor, 8);
-        scsi_strvis(product, inqbuf->product, 16);
-        scsi_strvis(revision, inqbuf->revision, 4);
+	scsi_strvis(vendor, inqbuf->vendor, 8);
+	scsi_strvis(product, inqbuf->product, 16);
+	scsi_strvis(revision, inqbuf->revision, 4);
 
-        printf(" targ %d lun %d: <%s, %s, %s> SCSI%d %d/%s %s%s",
-            target, lun, vendor, product, revision,
-            inqbuf->version & SID_ANSII, type, dtype,
-            removable ? "removable" : "fixed", qtype);
+	printf(" targ %d lun %d: <%s, %s, %s> SCSI%d %d/%s %s%s",
+	    target, lun, vendor, product, revision,
+	    inqbuf->version & SID_ANSII, type, dtype,
+	    removable ? "removable" : "fixed", qtype);
 
 	return (UNCONF);
 }
@@ -740,11 +748,14 @@ scsi_probedev(scsi, target, lun)
 		return;
 
 	sc_link = malloc(sizeof(*sc_link), M_DEVBUF, M_NOWAIT);
+	if (sc_link == NULL)
+		return;
 	*sc_link = *scsi->adapter_link;
 	sc_link->target = target;
 	sc_link->lun = lun;
 	sc_link->device = &probe_switch;
 	sc_link->inquiry_flags = 0;
+	sc_link->inquiry_flags2 = 0;
 
 	/*
 	 * Ask the device what it is
@@ -820,6 +831,7 @@ scsi_probedev(scsi, target, lun)
 	 * Save INQUIRY "flags" (SID_Linked, etc.) for low-level drivers.
 	 */
 	sc_link->inquiry_flags = inqbuf.flags;
+	sc_link->inquiry_flags2 = inqbuf.flags2;
 
 	/*
 	 * note what BASIC type of device it is

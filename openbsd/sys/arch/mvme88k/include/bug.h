@@ -1,4 +1,4 @@
-/*	$OpenBSD: bug.h,v 1.5 2001/01/14 20:25:23 smurph Exp $ */
+/*	$OpenBSD: bug.h,v 1.7 2001/08/26 14:31:07 miod Exp $ */
 #ifndef __MACHINE_BUG_H__
 #define __MACHINE_BUG_H__
 #include <machine/bugio.h>
@@ -8,9 +8,9 @@ struct bugenv {
 	int	dlun;
 	int	ipl;
 	int	ctlr;
-	int	(*entry)();
+	int	(*entry) __P((void));
 	int	cfgblk;
 	char	*argstart;
 	char	*argend;
 };
-#endif __MACHINE_BUG_H__
+#endif /* __MACHINE_BUG_H__ */

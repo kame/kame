@@ -1,10 +1,10 @@
-/*	$OpenBSD: cardbusdevs_data.h,v 1.9 2001/01/27 21:16:11 deraadt Exp $	*/
+/*	$OpenBSD: cardbusdevs_data.h,v 1.12 2001/08/22 16:34:31 aaron Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: cardbusdevs,v 1.8 2001/01/08 21:38:04 mickey Exp 
+ *	OpenBSD: cardbusdevs,v 1.10 2001/07/09 23:09:29 niklas Exp 
  */
 /*	$NetBSD: cardbusdevs,v 1.7 1999/12/11 22:22:34 explorer Exp $	*/
 
@@ -73,6 +73,14 @@ struct cardbus_known_product cardbus_known_product[] = {
 	    "56k Global Modem",
 	},
 	{
+	    CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_FE2500,
+	    "FE2500",
+	},
+	{
+	    CARDBUS_VENDOR_ABOCOM, CARDBUS_PRODUCT_ABOCOM_PCM200,
+	    "PCM200",
+	},
+	{
 	    CARDBUS_VENDOR_ADMTEK, CARDBUS_PRODUCT_ADMTEK_AN985,
 	    "AN985",
 	},
@@ -112,6 +120,10 @@ struct cardbus_known_product cardbus_known_product[] = {
 	    CARDBUS_VENDOR_XIRCOM, CARDBUS_PRODUCT_XIRCOM_MODEM56,
 	    "56k Modem",
 	},
+	{
+	    CARDBUS_VENDOR_XIRCOM, CARDBUS_PRODUCT_XIRCOM_CBEM56G,
+	    "CBEM56G Modem",
+	},
 	{ 0, 0, NULL }
 };
 
@@ -135,6 +147,10 @@ struct cardbus_known_vendor cardbus_known_vendors[] = {
 	{
 	    CARDBUS_VENDOR_ADMTEK, 0,
 	    "ADMtek",
+	},
+	{
+	    CARDBUS_VENDOR_ABOCOM, 0,
+	    "Abocom",
 	},
 	{
 	    CARDBUS_VENDOR_INTEL, 0,

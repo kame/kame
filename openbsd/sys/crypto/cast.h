@@ -1,4 +1,4 @@
-/*      $OpenBSD$       */
+/*      $OpenBSD: cast.h,v 1.1 2000/02/28 23:13:04 deraadt Exp $       */
 
 /*
  *	CAST-128 in C

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.i386,v 1.82 2001/04/09 07:14:14 tholo Exp $
+#	$OpenBSD: files.i386,v 1.92 2001/08/25 10:13:29 art Exp $
 #	$NetBSD: files.i386,v 1.73 1996/05/07 00:58:36 thorpej Exp $
 #
 # new style config file for i386 architecture
@@ -30,8 +30,7 @@ file	arch/i386/i386/i686_mem.c	mtrr
 file	arch/i386/i386/k6_mem.c		mtrr
 file	arch/i386/i386/microtime.s
 file	arch/i386/i386/ns_cksum.c	ns
-file	arch/i386/i386/pmap.c		!pmap_old & uvm
-file	arch/i386/i386/pmap.old.c	pmap_old | !uvm
+file	arch/i386/i386/pmap.c
 file	arch/i386/i386/process_machdep.c
 file	arch/i386/i386/procfs_machdep.c	procfs
 file	arch/i386/i386/random.s
@@ -39,10 +38,10 @@ file	arch/i386/i386/sys_machdep.c
 file	arch/i386/i386/trap.c
 file	arch/i386/i386/vm_machdep.c
 file	arch/i386/i386/dkcsum.c		bios
-file	lib/libz/adler32.c		!ppp_deflate
+file	lib/libz/adler32.c		!ppp_deflate & !ipsec
 file	dev/cons.c
 file	dev/cninit.c
-file	arch/i386/i386/wscons_machdep.c
+file	arch/i386/i386/wscons_machdep.c	wsdisplay
 major	{vnd = 14}
 
 #
@@ -58,10 +57,12 @@ include "../../../scsi/files.scsi"
 major	{sd = 4}
 major	{st = 5}
 major	{cd = 6}
-
-# RAM Disk for install floppy
-file arch/i386/i386/rd_root.c		ramdisk_hooks
 major	{rd = 17}
+
+#
+# I2O
+#
+include "dev/i2o/files.i2o"
 
 #
 # Machine-independent ATAPI drivers
@@ -89,7 +90,6 @@ file	arch/i386/i386/mainbus.c	mainbus
 
 include "../../../dev/pci/files.pci"
 file	arch/i386/pci/pci_machdep.c	pci
-file	arch/i386/pci/pci_compat.c	pci	# XXX compatibility
 file	arch/i386/pci/pciide_machdep.c	pciide
 file	arch/i386/pci/pcic_pci_machdep.c	pcic_pci
 
@@ -143,17 +143,6 @@ attach	pc at isa
 device	pcconskbd
 attach	pcconskbd at pckbc
 file	arch/i386/isa/pccons.c		pc | pcconskbd needs-flag
-
-# PC console support a la "pcvt"
-device	vt: tty, pckbcport
-attach	vt at isa
-file	arch/i386/isa/pcvt/pcvt_drv.c	vt needs-flag
-file	arch/i386/isa/pcvt/pcvt_ext.c	vt needs-flag
-file	arch/i386/isa/pcvt/pcvt_kbd.c	vt needs-flag
-file	arch/i386/isa/pcvt/pcvt_mouse.c	vt needs-flag
-file	arch/i386/isa/pcvt/pcvt_out.c	vt needs-flag
-file	arch/i386/isa/pcvt/pcvt_sup.c	vt needs-flag
-file	arch/i386/isa/pcvt/pcvt_vtf.c	vt needs-flag
 
 # PC Mice; Logitech-style, Microsoft-style, and PS/2-style
 device	lms: wsmousedev

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ccd.c,v 1.41 1999/11/26 16:46:17 art Exp $	*/
+/*	$OpenBSD: ccd.c,v 1.44 2001/09/19 20:50:58 mickey Exp $	*/
 /*	$NetBSD: ccd.c,v 1.33 1996/05/05 04:21:14 thorpej Exp $	*/
 
 /*-
@@ -117,11 +117,7 @@
 #include <dev/ccdvar.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 #ifdef __GNUC__
 #define INLINE static __inline
@@ -222,7 +218,7 @@ getccdbuf()
 
 	cbp = malloc(sizeof (struct ccdbuf), M_DEVBUF, M_WAITOK);
 	bzero(cbp, sizeof (struct ccdbuf));
-	cbp->cb_sg = malloc(sizeof (struct ccdseg) * MAXBSIZE / CLBYTES,
+	cbp->cb_sg = malloc(sizeof (struct ccdseg) * MAXBSIZE >> PAGE_SHIFT,
 	    M_DEVBUF, M_WAITOK);
 	return (cbp);
 }
@@ -777,14 +773,14 @@ ccdstart(cs, bp)
 	    M_WAITOK);
 	bzero(cbpp, 2 * cs->sc_nccdisks * sizeof(struct ccdbuf *));
 	addr = bp->b_data;
-	old_io = old_io || ((vaddr_t)addr & CLOFSET); /* XXX !claligned */
+	old_io = old_io || ((vaddr_t)addr & PAGE_MASK);
 	for (bcount = bp->b_bcount; bcount > 0; bcount -= rcount) {
 		rcount = ccdbuffer(cs, bp, bn, addr, bcount, cbpp, old_io);
 		
 		/*
 		 * This is the old, slower, but less restrictive, mode of
 		 * operation.  It allows interleaves which are not multiples
-		 * of CLBYTES and mirroring.
+		 * of PAGE_SIZE and mirroring.
 		 */
 		if (old_io) {
 			if ((cbpp[0]->cb_buf.b_flags & B_READ) == 0)
@@ -933,13 +929,8 @@ ccdbuffer(cs, bp, bn, addr, bcount, cbpp, old_io)
 			nbp->b_data = addr;
 		else {
 			do {
-#if defined(UVM)
 				nbp->b_data = (caddr_t) uvm_km_valloc(ccdmap,
 							    bp->b_bcount);
-#else
-				nbp->b_data = (caddr_t) kmem_alloc_pageable(
-							 ccdmap, bp->b_bcount);
-#endif
 
 				/*
 				 * XXX Instead of sleeping, we might revert
@@ -989,9 +980,8 @@ ccdbuffer(cs, bp, bn, addr, bcount, cbpp, old_io)
 			printf("ccdbuffer: sg %d (%p/%x) off %x\n",
 			    cbp->cb_sgcnt, addr, bcount, old_bcount);
 #endif
-		pagemove(addr, nbp->b_data + old_bcount,
-		    clrnd(round_page(bcount)));
-		nbp->b_bufsize += clrnd(round_page(bcount));
+		pagemove(addr, nbp->b_data + old_bcount, round_page(bcount));
+		nbp->b_bufsize += round_page(bcount);
 		cbp->cb_sg[cbp->cb_sgcnt].cs_sgaddr = addr;
 		cbp->cb_sg[cbp->cb_sgcnt].cs_sglen = bcount;
 		cbp->cb_sgcnt++;
@@ -1087,15 +1077,11 @@ ccdiodone(vbp)
 				    cbp->cb_sg[i].cs_sglen, off);
 #endif
 			pagemove(vbp->b_data + off, cbp->cb_sg[i].cs_sgaddr,
-			    clrnd(round_page(cbp->cb_sg[i].cs_sglen)));
+			    round_page(cbp->cb_sg[i].cs_sglen));
 			off += cbp->cb_sg[i].cs_sglen;
 		}
 
-#if defined(UVM)
 		uvm_km_free(ccdmap, (vaddr_t)vbp->b_data, count);
-#else
-		kmem_free(ccdmap, (vaddr_t)vbp->b_data, count);
-#endif
 		if (ccd_need_kvm) {
 			ccd_need_kvm = 0;
 			wakeup(ccdmap);
@@ -1226,7 +1212,7 @@ ccdioctl(dev, cmd, data, flag, p)
 		 * must use the old I/O code (by design), as must mirror
 		 * setups (until implemented in the new code).
 		 */
-		if (ccio->ccio_ileave % (CLBYTES / DEV_BSIZE) != 0 ||
+		if (ccio->ccio_ileave % (PAGE_SIZE / DEV_BSIZE) != 0 ||
 		    (ccd.ccd_flags & CCDF_MIRROR))
 			ccd.ccd_flags |= CCDF_OLD;
 
@@ -1310,13 +1296,8 @@ ccdioctl(dev, cmd, data, flag, p)
 		 * XXX doable via a freelist implementation though.
 		 */
 		if (!ccdmap && !(ccd.ccd_flags & CCDF_OLD))
-#if defined(UVM)
 			ccdmap = uvm_km_suballoc(kernel_map, &min, &max,
 			    CCD_CLUSTERS * MAXBSIZE, FALSE, FALSE, NULL);
-#else
-			ccdmap = kmem_suballoc(kernel_map, &min, &max,
-			    CCD_CLUSTERS * MAXBSIZE, FALSE);
-#endif
 
 		/* Attach the disk. */
 		cs->sc_dkdev.dk_name = cs->sc_xname;

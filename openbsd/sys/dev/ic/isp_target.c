@@ -1,4 +1,4 @@
-/* $OpenBSD: isp_target.c,v 1.4 2001/04/04 22:08:55 mjacob Exp $ */
+/* $OpenBSD: isp_target.c,v 1.6 2001/10/06 22:45:52 mjacob Exp $ */
 /*
  * Machine and OS Independent Target Mode Code for the Qlogic SCSI/FC adapters.
  *
@@ -47,9 +47,11 @@
 
 #ifdef	ISP_TARGET_MODE
 static const char atiocope[] =
-    "ATIO returned for lun %d because it was in the middle of Bus Device Reset";
+    "ATIO returned for lun %d because it was in the middle of Bus Device Reset "
+    "on bus %d";
 static const char atior[] =
-    "ATIO returned for lun %d from initiator %d because a Bus Reset occurred";
+    "ATIO returned on for lun %d on from IID %d because a Bus Reset occurred "
+    "on bus %d";
 
 static void isp_got_msg(struct ispsoftc *, int, in_entry_t *);
 static void isp_got_msg_fc(struct ispsoftc *, int, in_fcentry_t *);
@@ -172,12 +174,18 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 			status = inotp->in_status & 0xff;
 			seqid = inotp->in_seqid;
 			if (IS_DUALBUS(isp)) {
-				bus = (inotp->in_iid & 0x80) >> 7;
-				inotp->in_iid &= ~0x80;
+				bus = GET_BUS_VAL(inotp->in_iid);
+				SET_BUS_VAL(inotp->in_iid, 0);
 			}
 		}
-		isp_prt(isp, ISP_LOGTDEBUG1,
-		    "Immediate Notify, status=0x%x seqid=0x%x", status, seqid);
+		isp_prt(isp, ISP_LOGTDEBUG0,
+		    "Immediate Notify On Bus %d, status=0x%x seqid=0x%x",
+		    bus, status, seqid);
+
+		/*
+		 * ACK it right away.
+		 */
+		isp_notify_ack(isp, (status == IN_RESET)? NULL : vptr);
 		switch (status) {
 		case IN_RESET:
 			(void) isp_async(isp, ISPASYNC_BUS_RESET, &bus);
@@ -195,8 +203,9 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 			break;
 		case IN_ABORT_TASK:
 			isp_prt(isp, ISP_LOGWARN,
-			    "Abort Task for Initiator %d RX_ID 0x%x",
+			    "Abort Task from IID %d RX_ID 0x%x",
 			    inot_fcp->in_iid, seqid);
+			(void) isp_async(isp, ISPASYNC_TARGET_ACTION, &bus);
 			break;
 		case IN_PORT_LOGOUT:
 			isp_prt(isp, ISP_LOGWARN,
@@ -216,7 +225,6 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 			    "bad status (0x%x) in isp_target_notify", status);
 			break;
 		}
-		isp_notify_ack(isp, vptr);
 		break;
 
 	case RQSTYPE_NOTIFY_ACK:
@@ -266,7 +274,7 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
  */
 int
 isp_lun_cmd(struct ispsoftc *isp, int cmd, int bus, int tgt, int lun,
-    u_int32_t opaque)
+    int cmd_cnt, int inot_cnt, u_int32_t opaque)
 {
 	lun_entry_t el;
 	u_int16_t iptr, optr;
@@ -277,8 +285,8 @@ isp_lun_cmd(struct ispsoftc *isp, int cmd, int bus, int tgt, int lun,
 	if (IS_DUALBUS(isp)) {
 		el.le_rsvd = (bus & 0x1) << 7;
 	}
-	el.le_cmd_count = DFLT_CMD_CNT;
-	el.le_in_count = DFLT_INOTIFY;
+	el.le_cmd_count = cmd_cnt;
+	el.le_in_count = inot_cnt;
 	if (cmd == RQSTYPE_ENABLE_LUN) {
 		if (IS_SCSI(isp)) {
 			el.le_flags = LUN_TQAE|LUN_DISAD;
@@ -301,7 +309,7 @@ isp_lun_cmd(struct ispsoftc *isp, int cmd, int bus, int tgt, int lun,
 	if (IS_SCSI(isp)) {
 		el.le_tgt = tgt;
 		el.le_lun = lun;
-	} else if (isp->isp_maxluns <= 16) {
+	} else if ((FCPARAM(isp)->isp_fwattr & ISP_FW_ATTR_SCCLUN) == 0) {
 		el.le_lun = lun;
 	}
 	el.le_timeout = 2;
@@ -368,10 +376,10 @@ isp_target_put_atio(struct ispsoftc *isp, void *arg)
 		at2_entry_t *aep = arg;
 		atun._atio2.at_header.rqs_entry_type = RQSTYPE_ATIO2;
 		atun._atio2.at_header.rqs_entry_count = 1;
-		if (isp->isp_maxluns > 16) {
+		if (FCPARAM(isp)->isp_fwattr & ISP_FW_ATTR_SCCLUN) {
 			atun._atio2.at_scclun = (u_int16_t) aep->at_scclun;
 		} else {
-			atun._atio2.at_lun = (u_int8_t) aep->at_scclun;
+			atun._atio2.at_lun = (u_int8_t) aep->at_lun;
 		}
 		atun._atio2.at_status = CT_OK;
 	} else {
@@ -427,7 +435,7 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int16_t hdl)
 		cto->ct_header.rqs_entry_type = RQSTYPE_CTIO2;
 		cto->ct_header.rqs_entry_count = 1;
 		cto->ct_iid = aep->at_iid;
-		if (isp->isp_maxluns <= 16) {
+		if ((FCPARAM(isp)->isp_fwattr & ISP_FW_ATTR_SCCLUN) == 0) {
 			cto->ct_lun = aep->at_lun;
 		}
 		cto->ct_rxid = aep->at_rxid;
@@ -438,7 +446,7 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int16_t hdl)
 		}
 		if (aep->at_datalen) {
 			cto->ct_resid = aep->at_datalen;
-			cto->ct_flags |= CT2_DATA_UNDER;
+			cto->rsp.m1.ct_scsi_status |= CT2_DATA_UNDER;
 		}
 		if ((sts & 0xff) == SCSI_CHECK && (sts & ECMD_SVALID)) {
 			cto->rsp.m1.ct_resp[0] = 0xf0;
@@ -447,7 +455,7 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int16_t hdl)
 			cto->rsp.m1.ct_resp[12] = (code >> 24) & 0xff;
 			cto->rsp.m1.ct_resp[13] = (code >> 16) & 0xff;
 			cto->rsp.m1.ct_senselen = 16;
-			cto->ct_flags |= CT2_SNSLEN_VALID;
+			cto->rsp.m1.ct_scsi_status |= CT2_SNSLEN_VALID;
 		}
 		cto->ct_syshandle = hdl;
 	} else {
@@ -487,15 +495,19 @@ isp_target_async(struct ispsoftc *isp, int bus, int event)
 	 * upstream, but these do not require any immediate notify actions
 	 * so we return when done.
 	 */
+	case ASYNC_LIP_F8:
 	case ASYNC_LIP_OCCURRED:
 	case ASYNC_LOOP_UP:
 	case ASYNC_LOOP_DOWN:
-		evt.ev_bus = bus;
-		evt.ev_event = event;
-		(void) isp_async(isp, ISPASYNC_TARGET_EVENT, &evt);
-		return;
-
 	case ASYNC_LOOP_RESET:
+	case ASYNC_PTPMODE:
+		/*
+		 * These don't require any immediate notify actions. We used
+		 * treat them like SCSI Bus Resets, but that was just plain
+		 * wrong. Let the normal CTIO completion report what occurred.
+		 */
+                return;
+
 	case ASYNC_BUS_RESET:
 	case ASYNC_TIMEOUT_RESET:
 		if (IS_FC(isp)) {
@@ -567,13 +579,20 @@ isp_got_msg(struct ispsoftc *isp, int bus, in_entry_t *inp)
 static void
 isp_got_msg_fc(struct ispsoftc *isp, int bus, in_fcentry_t *inp)
 {
+	int lun;
 	static const char f1[] = "%s from iid %d lun %d seq 0x%x";
 	static const char f2[] = 
 	    "unknown %s 0x%x lun %d iid %d task flags 0x%x seq 0x%x\n";
 
+	if (FCPARAM(isp)->isp_fwattr & ISP_FW_ATTR_SCCLUN) {
+		lun = inp->in_scclun;
+	} else {
+		lun = inp->in_lun;
+	}
+
 	if (inp->in_status != IN_MSG_RECEIVED) {
 		isp_prt(isp, ISP_LOGINFO, f2, "immediate notify status",
-		    inp->in_status, inp->in_lun, inp->in_iid,
+		    inp->in_status, lun, inp->in_iid,
 		    inp->in_task_flags,  inp->in_seqid);
 	} else {
 		tmd_msg_t msg;
@@ -581,37 +600,33 @@ isp_got_msg_fc(struct ispsoftc *isp, int bus, in_fcentry_t *inp)
 		MEMZERO(&msg, sizeof (msg));
 		msg.nt_bus = bus;
 		msg.nt_iid = inp->in_iid;
-		if (isp->isp_maxluns > 16) {
-			msg.nt_lun = inp->in_scclun;
-		} else {
-			msg.nt_lun = inp->in_lun;
-		}
 		msg.nt_tagval = inp->in_seqid;
+		msg.nt_lun = lun;
 
 		if (inp->in_task_flags & TASK_FLAGS_ABORT_TASK) {
 			isp_prt(isp, ISP_LOGINFO, f1, "ABORT TASK",
-			    inp->in_iid, inp->in_lun, inp->in_seqid);
+			    inp->in_iid, msg.nt_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_ABORT_TAG;
 		} else if (inp->in_task_flags & TASK_FLAGS_CLEAR_TASK_SET) {
 			isp_prt(isp, ISP_LOGINFO, f1, "CLEAR TASK SET",
-			    inp->in_iid, inp->in_lun, inp->in_seqid);
+			    inp->in_iid, msg.nt_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_CLEAR_QUEUE;
 		} else if (inp->in_task_flags & TASK_FLAGS_TARGET_RESET) {
 			isp_prt(isp, ISP_LOGINFO, f1, "TARGET RESET",
-			    inp->in_iid, inp->in_lun, inp->in_seqid);
+			    inp->in_iid, msg.nt_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_BUS_DEV_RESET;
 		} else if (inp->in_task_flags & TASK_FLAGS_CLEAR_ACA) {
 			isp_prt(isp, ISP_LOGINFO, f1, "CLEAR ACA",
-			    inp->in_iid, inp->in_lun, inp->in_seqid);
+			    inp->in_iid, msg.nt_lun, inp->in_seqid);
 			/* ???? */
 			msg.nt_msg[0] = MSG_REL_RECOVERY;
 		} else if (inp->in_task_flags & TASK_FLAGS_TERMINATE_TASK) {
 			isp_prt(isp, ISP_LOGINFO, f1, "TERMINATE TASK",
-			    inp->in_iid, inp->in_lun, inp->in_seqid);
+			    inp->in_iid, msg.nt_lun, inp->in_seqid);
 			msg.nt_msg[0] = MSG_TERM_IO_PROC;
 		} else {
 			isp_prt(isp, ISP_LOGWARN, f2, "task flag",
-			    inp->in_status, inp->in_lun, inp->in_iid,
+			    inp->in_status, msg.nt_lun, inp->in_iid,
 			    inp->in_task_flags,  inp->in_seqid);
 		}
 		if (msg.nt_msg[0]) {
@@ -641,7 +656,7 @@ isp_notify_ack(struct ispsoftc *isp, void *arg)
 			in_fcentry_t *inp = arg;
 			MEMCPY(storage, arg, sizeof (isphdr_t));
 			na->na_iid = inp->in_iid;
-			if (isp->isp_maxluns > 16) {
+			if (FCPARAM(isp)->isp_fwattr & ISP_FW_ATTR_SCCLUN) {
 				na->na_lun = inp->in_scclun;
 			} else {
 				na->na_lun = inp->in_lun;
@@ -727,7 +742,8 @@ isp_handle_atio(struct ispsoftc *isp, at_entry_t *aep)
 		 * not increment it. Therefore we should never get
 		 * this status here.
 		 */
-		isp_prt(isp, ISP_LOGERR, atiocope, lun);
+		isp_prt(isp, ISP_LOGERR, atiocope, lun,
+		    GET_BUS_VAL(aep->at_iid));
 		break;
 
 	case AT_CDB:		/* Got a CDB */
@@ -747,7 +763,8 @@ isp_handle_atio(struct ispsoftc *isp, at_entry_t *aep)
 		 * Ignore it because the async event will clear things
 		 * up for us.
 		 */
-		isp_prt(isp, ISP_LOGWARN, atior, lun, aep->at_iid);
+		isp_prt(isp, ISP_LOGWARN, atior, lun,
+		    GET_IID_VAL(aep->at_iid), GET_BUS_VAL(aep->at_iid));
 		break;
 
 
@@ -765,7 +782,7 @@ isp_handle_atio2(struct ispsoftc *isp, at2_entry_t *aep)
 {
 	int lun;
 
-	if (isp->isp_maxluns > 16) {
+	if (FCPARAM(isp)->isp_fwattr & ISP_FW_ATTR_SCCLUN) {
 		lun = aep->at_scclun;
 	} else {
 		lun = aep->at_lun;
@@ -811,7 +828,7 @@ isp_handle_atio2(struct ispsoftc *isp, at2_entry_t *aep)
 		 * not increment it. Therefore we should never get
 		 * this status here.
 		 */
-		isp_prt(isp, ISP_LOGERR, atiocope, lun);
+		isp_prt(isp, ISP_LOGERR, atiocope, lun, 0);
 		break;
 
 	case AT_CDB:		/* Got a CDB */
@@ -830,7 +847,7 @@ isp_handle_atio2(struct ispsoftc *isp, at2_entry_t *aep)
 		 * Ignore it because the async event will clear things
 		 * up for us.
 		 */
-		isp_prt(isp, ISP_LOGERR, atior, lun, aep->at_iid);
+		isp_prt(isp, ISP_LOGERR, atior, lun, aep->at_iid, 0);
 		break;
 
 
@@ -903,7 +920,7 @@ isp_handle_ctio(struct ispsoftc *isp, ct_entry_t *ct)
 		 * set, then sends us an Immediate Notify entry.
 		 */
 		if (fmsg == NULL)
-			fmsg = "ABORT TASK sent by Initiator";
+			fmsg = "ABORT TAG message sent by Initiator";
 
 		isp_prt(isp, ISP_LOGWARN, "CTIO destroyed by %s", fmsg);
 		break;
@@ -958,16 +975,7 @@ isp_handle_ctio(struct ispsoftc *isp, ct_entry_t *ct)
 	case CT_NOACK:
 		if (fmsg == NULL)
 			fmsg = "unacknowledged Immediate Notify pending";
-
 		isp_prt(isp, ISP_LOGERR, "CTIO returned by f/w- %s", fmsg);
-#if	0
-			if (status & SENSEVALID) {
-				bcopy((caddr_t) (cep + CTIO_SENSE_OFFSET),
-				    (caddr_t) &cdp->cd_sensedata,
-				    sizeof(scsi_sense_t));
-				cdp->cd_flags |= CDF_SENSEVALID;
-			}
-#endif
 		break;
 	default:
 		isp_prt(isp, ISP_LOGERR, "Unknown CTIO status 0x%x",
@@ -997,11 +1005,11 @@ isp_handle_ctio(struct ispsoftc *isp, ct_entry_t *ct)
 			    ct->ct_syshandle, ct->ct_status & ~QLTM_SVALID);
 		}
 	} else {
-			/*
-			 * Final CTIO completed. Release DMA resources and
-			 * notify platform dependent layers.
-			 */
-		if (ct->ct_flags & CT_DATAMASK) {
+		/*
+		 * Final CTIO completed. Release DMA resources and
+		 * notify platform dependent layers.
+		 */
+		if ((ct->ct_flags & CT_DATAMASK) != CT_NO_DATA) {
 			ISP_DMAFREE(isp, xs, ct->ct_syshandle);
 		}
 		isp_prt(isp, pl, "final CTIO complete");
@@ -1028,6 +1036,11 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 	}
 
 	switch(ct->ct_status & ~QLTM_SVALID) {
+	case CT_BUS_ERROR:
+		isp_prt(isp, ISP_LOGERR, "PCI DMA Bus Error");
+		/* FALL Through */
+	case CT_DATA_OVER:
+	case CT_DATA_UNDER:
 	case CT_OK:
 		/*
 		 * There are generally 2 possibilities as to why we'd get
@@ -1040,19 +1053,18 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 
 	case CT_BDR_MSG:
 		/*
-		 * Bus Device Reset message received or the SCSI Bus has
-		 * been Reset; the firmware has gone to Bus Free.
+		 * Target Reset function received.
 		 *
 		 * The firmware generates an async mailbox interupt to
 		 * notify us of this and returns outstanding CTIOs with this
 		 * status. These CTIOs are handled in that same way as
 		 * CT_ABORTED ones, so just fall through here.
 		 */
-		fmsg = "Bus Device Reset";
+		fmsg = "TARGET RESET Task Management Function Received";
 		/*FALLTHROUGH*/
 	case CT_RESET:
 		if (fmsg == NULL)
-			fmsg = "Bus Reset";
+			fmsg = "LIP Reset";
 		/*FALLTHROUGH*/
 	case CT_ABORTED:
 		/*
@@ -1061,7 +1073,7 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 		 * set, then sends us an Immediate Notify entry.
 		 */
 		if (fmsg == NULL)
-			fmsg = "ABORT TASK sent by Initiator";
+			fmsg = "ABORT Task Management Function Received";
 
 		isp_prt(isp, ISP_LOGERR, "CTIO2 destroyed by %s", fmsg);
 		break;
@@ -1073,37 +1085,17 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 		isp_prt(isp, ISP_LOGERR, "CTIO2 had wrong data directiond");
 		break;
 
-	case CT_NOPATH:
-		/*
-		 * CTIO rejected by the firmware due "no path for the
-		 * nondisconnecting nexus specified". This means that
-		 * we tried to access the bus while a non-disconnecting
-		 * command is in process.
-		 */
-		isp_prt(isp, ISP_LOGERR,
-		    "Firmware rejected CTIO2 for bad nexus %d->%d",
-		    ct->ct_iid, ct->ct_lun);
-		break;
-
 	case CT_RSELTMO:
-		fmsg = "Reselection";
+		fmsg = "failure to reconnect to initiator";
 		/*FALLTHROUGH*/
 	case CT_TIMEOUT:
 		if (fmsg == NULL)
-			fmsg = "Command";
+			fmsg = "command";
 		isp_prt(isp, ISP_LOGERR, "Firmware timed out on %s", fmsg);
 		break;
 
 	case CT_ERR:
 		fmsg = "Completed with Error";
-		/*FALLTHROUGH*/
-	case CT_PHASE_ERROR:	/* Bus phase sequence error */
-		if (fmsg == NULL)
-			fmsg = "Phase Sequence Error";
-		/*FALLTHROUGH*/
-	case CT_TERMINATED:
-		if (fmsg == NULL)
-			fmsg = "terminated by TERMINATE TRANSFER";
 		/*FALLTHROUGH*/
 	case CT_LOGOUT:
 		if (fmsg == NULL)
@@ -1112,19 +1104,13 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 	case CT_PORTNOTAVAIL:
 		if (fmsg == NULL)
 			fmsg = "Port not available";
+	case CT_PORTCHANGED:
+		if (fmsg == NULL)
+			fmsg = "Port Changed";
 	case CT_NOACK:
 		if (fmsg == NULL)
 			fmsg = "unacknowledged Immediate Notify pending";
-
 		isp_prt(isp, ISP_LOGERR, "CTIO returned by f/w- %s", fmsg);
-#if	0
-			if (status & SENSEVALID) {
-				bcopy((caddr_t) (cep + CTIO_SENSE_OFFSET),
-				    (caddr_t) &cdp->cd_sensedata,
-				    sizeof(scsi_sense_t));
-				cdp->cd_flags |= CDF_SENSEVALID;
-			}
-#endif
 		break;
 
 	case CT_INVRXID:
@@ -1164,6 +1150,9 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 			    ct->ct_syshandle, ct->ct_status & ~QLTM_SVALID);
 		}
 	} else {
+		if ((ct->ct_flags & CT2_DATAMASK) != CT2_NO_DATA) {
+			ISP_DMAFREE(isp, xs, ct->ct_syshandle);
+		}
 		if (ct->ct_flags & CT_SENDSTATUS) {
 			/*
 			 * Sent status and command complete.
@@ -1180,7 +1169,6 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 			 * notify platform dependent layers.
 			 */
 			isp_prt(isp, pl, "data CTIO complete");
-			ISP_DMAFREE(isp, xs, ct->ct_syshandle);
 		}
 		(void) isp_async(isp, ISPASYNC_TARGET_ACTION, ct);
 		/*

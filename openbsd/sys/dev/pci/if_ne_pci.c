@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ne_pci.c,v 1.8 2001/03/12 05:37:00 aaron Exp $	*/
+/*	$OpenBSD: if_ne_pci.c,v 1.10 2001/08/25 10:13:29 art Exp $	*/
 /*	$NetBSD: if_ne_pci.c,v 1.8 1998/07/05 00:51:24 jonathan Exp $	*/
 
 /*-
@@ -213,7 +213,7 @@ ne_pci_attach(parent, self, aux)
 
 #ifdef __NetBSD__
 	if (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
-	    &nict, &nich, NULL, NULL)) {
+	    &nict, &nich, NULL, NULL, 0)) {
 		printf(": can't map i/o space\n");
 		return;
 	}
@@ -259,8 +259,7 @@ ne_pci_attach(parent, self, aux)
 	dsc->init_card = npp->npp_init_card;
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: audio.c,v 1.25 2001/01/28 09:45:26 aaron Exp $	*/
+/*	$OpenBSD: audio.c,v 1.29 2001/09/20 17:02:31 mpech Exp $	*/
 /*	$NetBSD: audio.c,v 1.105 1998/09/27 16:43:56 christos Exp $	*/
 
 /*
@@ -86,7 +86,6 @@
 #include <dev/rndvar.h>
 
 #include <vm/vm.h>
-#include <vm/vm_prot.h>
 
 #include <machine/endian.h>
 
@@ -801,10 +800,10 @@ audiommap(dev, off, prot)
 
         if (unit >= audio_cd.cd_ndevs ||
             (sc = audio_cd.cd_devs[unit]) == NULL)
-                return ENXIO;
+                return (-1);
 
         if (sc->sc_dying)
-                return (EIO);
+                return (-1);
 
 	sc->sc_refcnt ++;
 	switch (AUDIODEV(dev)) {
@@ -1166,7 +1165,7 @@ audio_close(dev, flags, ifmt, p)
 	struct audio_hw_if *hw = sc->hw_if;
 	int s;
 
-	DPRINTF(("audio_close: unit=%d\n", unit));
+	DPRINTF(("audio_close: unit=%d flags=0x%x\n", unit, flags));
 
 	s = splaudio();
         /* Stop recording. */
@@ -1197,11 +1196,16 @@ audio_close(dev, flags, ifmt, p)
 	
 	hw->close(sc->hw_hdl);
 	
-	if (flags & FREAD) {
+	/*
+	 * If flags has neither read nor write then reset both
+	 * directions. Encountered when someone runs revoke(2).
+	 */
+
+	if ((flags & FREAD) || ((flags & (FREAD|FWRITE)) == 0)) {
 		sc->sc_open &= ~AUOPEN_READ;
 		sc->sc_mode &= ~AUMODE_RECORD;
 	}
-	if (flags & FWRITE) {
+	if ((flags & FWRITE) || ((flags & (FREAD|FWRITE)) == 0)) {
 		sc->sc_open &= ~AUOPEN_WRITE;
 		sc->sc_mode &= ~(AUMODE_PLAY|AUMODE_PLAY_ALL);
 	}
@@ -1600,7 +1604,7 @@ audio_write(dev, uio, ioflag)
 			saveerror = error;
 			error = audiostartp(sc);
 			if (saveerror != 0) {
-				/* Report the first error that occured. */
+				/* Report the first error that occurred. */
 				error = saveerror;
 			}
 		}

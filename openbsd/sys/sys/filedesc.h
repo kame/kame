@@ -1,4 +1,4 @@
-/*	$OpenBSD: filedesc.h,v 1.9 2000/11/16 20:02:20 provos Exp $	*/
+/*	$OpenBSD: filedesc.h,v 1.11 2001/10/07 22:42:07 art Exp $	*/
 /*	$NetBSD: filedesc.h,v 1.14 1996/04/09 20:55:28 cgd Exp $	*/
 
 /*
@@ -102,7 +102,6 @@ struct filedesc0 {
  * Per-process open flags.
  */
 #define	UF_EXCLOSE 	0x01		/* auto-close on exec */
-#define	UF_MAPPED 	0x02		/* mapped from device */
 
 /*
  * Storage required per open file descriptor.
@@ -113,6 +112,7 @@ struct filedesc0 {
 /*
  * Kernel global variables and routines.
  */
+void	filedesc_init __P((void));
 int	dupfdopen __P((struct filedesc *fdp, int indx, int dfd, int mode,
 	    int error));
 int	fdalloc __P((struct proc *p, int want, int *result));

@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.44 2001/03/29 02:18:44 mickey Exp $	*/
+/*	$OpenBSD: locore.S,v 1.46 2001/09/20 18:33:03 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Michael Shalayeff
@@ -168,7 +168,7 @@ ENTRY($start,0)
 
 	/* zero fake trapframe and proc0 u-area */
 	copy	arg3, t2
-	ldi	NBPG+TF_SIZE, t1
+	ldi	NBPG+TRAPFRAME_SIZEOF, t1
 $start_zero_tf
 	stws,ma r0, 4(t2)
 	addib,>= -8, t1, $start_zero_tf
@@ -179,21 +179,21 @@ $start_zero_tf
 	 * initialize the pcb
 	 * arg0 will be available space for hppa_init()
 	 */
-	ldo	NBPG+TF_SIZE(arg3), sp
+	ldo	NBPG+TRAPFRAME_SIZEOF(arg3), sp
 	mtctl	arg3, cr30
-	stw	r0, u_pcb+pcb_onfault(arg3)
-	stw	r0, u_pcb+pcb_space(arg3)	/* XXX HPPA_SID_KERNEL == 0 */
-	stw	arg3, u_pcb+pcb_uva(arg3)
+	stw	r0, U_PCB+PCB_ONFAULT(arg3)
+	stw	r0, U_PCB+PCB_SPACE(arg3)	/* XXX HPPA_SID_KERNEL == 0 */
+	stw	arg3, U_PCB+PCB_UVA(arg3)
 	ldil	L%USPACE, arg0
 	add	arg3, arg0, arg0
 	ldil	L%proc0paddr, t1
 	stw	arg3, R%proc0paddr(t1)
 	ldil	L%proc0, t2
-	stw	arg3, R%proc0+p_addr(t2)
+	stw	arg3, R%proc0+P_ADDR(t2)
 
 	ldil	L%TFF_LAST, t1
-	stw	t1, TF_FLAGS-TF_SIZE(sp)
-	stw	arg3, TF_CR30-TF_SIZE(sp)
+	stw	t1, TF_FLAGS-TRAPFRAME_SIZEOF(sp)
+	stw	arg3, TF_CR30-TRAPFRAME_SIZEOF(sp)
 
 	/*
 	 * We need to set the Q bit so that we can take TLB misses after we
@@ -533,15 +533,15 @@ $syscall
 	 */
 	ldil	L%curproc, t3
 	ldw	R%curproc(sr1, t3), t3
-	ldw	p_addr(sr1, t3), t2	/* XXX can use ,sl */
+	ldw	P_ADDR(sr1, t3), t2	/* XXX can use ,sl */
 
 	/* calculate kernel sp, load, create kernel stack frame */
 	copy	sp, t4
-	ldo	NBPG+TF_SIZE(t2), t3
+	ldo	NBPG+TRAPFRAME_SIZEOF(t2), t3
 	ldo	HPPA_FRAME_SIZE+HPPA_FRAME_MAXARGS(t3), sp
-	stw	t1, TF_R22 -TF_SIZE(sr1, t3)	/* syscall # */
-	stw	t4, TF_R30 -TF_SIZE(sr1, t3)	/* user stack */
-	stw	r1, TF_CR15-TF_SIZE(sr1, t3)	/* eiem */
+	stw	t1, TF_R22 -TRAPFRAME_SIZEOF(sr1, t3)	/* syscall # */
+	stw	t4, TF_R30 -TRAPFRAME_SIZEOF(sr1, t3)	/* user stack */
+	stw	r1, TF_CR15-TRAPFRAME_SIZEOF(sr1, t3)	/* eiem */
 	mtctl	r1, eiem
 
 	/*
@@ -549,25 +549,25 @@ $syscall
 	 * will be saved accordingly in either syscall()
 	 * or deeper called functions
 	 */
-	stw	r27, TF_R27-TF_SIZE(sr1, t3)	/* dp */
-	stw	r3 , TF_R3 -TF_SIZE(sr1, t3)
+	stw	r27, TF_R27-TRAPFRAME_SIZEOF(sr1, t3)	/* dp */
+	stw	r3 , TF_R3 -TRAPFRAME_SIZEOF(sr1, t3)
 #ifdef DDB
 	/* save callee-save registers */
-	stw	r4 , TF_R4 -TF_SIZE(sr1, t3)
-	stw	r5 , TF_R5 -TF_SIZE(sr1, t3)
-	stw	r6 , TF_R6 -TF_SIZE(sr1, t3)
-	stw	r7 , TF_R7 -TF_SIZE(sr1, t3)
-	stw	r8 , TF_R8 -TF_SIZE(sr1, t3)
-	stw	r9 , TF_R9 -TF_SIZE(sr1, t3)
-	stw	r10, TF_R10-TF_SIZE(sr1, t3)
-	stw	r11, TF_R11-TF_SIZE(sr1, t3)
-	stw	r12, TF_R12-TF_SIZE(sr1, t3)
-	stw	r13, TF_R13-TF_SIZE(sr1, t3)
-	stw	r14, TF_R14-TF_SIZE(sr1, t3)
-	stw	r15, TF_R15-TF_SIZE(sr1, t3)
-	stw	r16, TF_R16-TF_SIZE(sr1, t3)
-	stw	r17, TF_R17-TF_SIZE(sr1, t3)
-	stw	r18, TF_R18-TF_SIZE(sr1, t3)
+	stw	r4 , TF_R4 -TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r5 , TF_R5 -TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r6 , TF_R6 -TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r7 , TF_R7 -TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r8 , TF_R8 -TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r9 , TF_R9 -TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r10, TF_R10-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r11, TF_R11-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r12, TF_R12-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r13, TF_R13-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r14, TF_R14-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r15, TF_R15-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r16, TF_R16-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r17, TF_R17-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r18, TF_R18-TRAPFRAME_SIZEOF(sr1, t3)
 #endif
 	stw	r0, 0(sr1, t3)	/* terminate frame */
 	copy	r0 , r3
@@ -605,48 +605,48 @@ $syscall
 	 */
 
 	ldo	4(r31), arg1
-	stw	r31, TF_IIOQH-TF_SIZE(sr1, t3)
-	stw	arg1, TF_IIOQT-TF_SIZE(sr1, t3)
+	stw	r31, TF_IIOQH-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg1, TF_IIOQT-TRAPFRAME_SIZEOF(sr1, t3)
 
 	mfsp	sr0, arg0
-	stw	arg0, TF_IISQH-TF_SIZE(sr1, t3)
-	stw	arg0, TF_IISQT-TF_SIZE(sr1, t3)
+	stw	arg0, TF_IISQH-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg0, TF_IISQT-TRAPFRAME_SIZEOF(sr1, t3)
 
-	stw	arg0, TF_CR20-TF_SIZE(sr1, t3)
-	stw	r31, TF_CR21-TF_SIZE(sr1, t3)
+	stw	arg0, TF_CR20-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r31, TF_CR21-TRAPFRAME_SIZEOF(sr1, t3)
 
 	mfsp	sr3, arg0
-	stw	arg0, TF_SR3-TF_SIZE(sr1, t3)
-	stw	r28, TF_CR8-TF_SIZE(sr1, t3)	/* pidr1 */
+	stw	arg0, TF_SR3-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	r28, TF_CR8-TRAPFRAME_SIZEOF(sr1, t3)	/* pidr1 */
 
 	mfctl	iir, arg0	/* XXX bogus */
 	ldil	TFF_LAST|TFF_SYS, arg1
-	stw	arg0, TF_CR19-TF_SIZE(sr1, t3)
-	stw	arg1, TF_FLAGS-TF_SIZE(sr1, t3)
+	stw	arg0, TF_CR19-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg1, TF_FLAGS-TRAPFRAME_SIZEOF(sr1, t3)
 
 	mfsp	sr0, arg0
 	mfsp	sr0, arg1
 	mfsp	sr2, arg2
 	mfsp	sr4, arg3
-	stw	arg0, TF_SR0-TF_SIZE(sr1, t3)
-	stw	arg1, TF_SR1-TF_SIZE(sr1, t3)
-	stw	arg2, TF_SR2-TF_SIZE(sr1, t3)
-	stw	arg3, TF_SR4-TF_SIZE(sr1, t3)
+	stw	arg0, TF_SR0-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg1, TF_SR1-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg2, TF_SR2-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg3, TF_SR4-TRAPFRAME_SIZEOF(sr1, t3)
 
 	mfsp	sr5, arg0
 	mfsp	sr6, arg1
 	mfsp	sr7, arg2
 	mfctl	pidr2, arg3
-	stw	arg0, TF_SR5-TF_SIZE(sr1, t3)
-	stw	arg1, TF_SR6-TF_SIZE(sr1, t3)
-	stw	arg2, TF_SR7-TF_SIZE(sr1, t3)
-	stw	arg3, TF_CR9-TF_SIZE(sr1, t3)
+	stw	arg0, TF_SR5-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg1, TF_SR6-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg2, TF_SR7-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg3, TF_CR9-TRAPFRAME_SIZEOF(sr1, t3)
 
 #if pbably_not_worth_it
 	mfctl	pidr3, arg2
 	mfctl	pidr4, arg3
-	stw	arg2, TF_CR12-TF_SIZE(sr1, t3)
-	stw	arg3, TF_CR13-TF_SIZE(sr1, t3)
+	stw	arg2, TF_CR12-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg3, TF_CR13-TRAPFRAME_SIZEOF(sr1, t3)
 #endif
 
 #ifdef DDB
@@ -655,13 +655,13 @@ $syscall
 	 */
 	mfctl	eirr, arg0
 	mfctl	hptmask, arg1
-	stw	arg0, TF_CR23-TF_SIZE(sr1, t3)
-	stw	arg1, TF_CR24-TF_SIZE(sr1, t3)
+	stw	arg0, TF_CR23-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg1, TF_CR24-TRAPFRAME_SIZEOF(sr1, t3)
 
 	mfctl	vtop, arg0
 	mfctl	cr28, arg1
-	stw	arg0, TF_CR25-TF_SIZE(sr1, t3)
-	stw	arg1, TF_CR28-TF_SIZE(sr1, t3)
+	stw	arg0, TF_CR25-TRAPFRAME_SIZEOF(sr1, t3)
+	stw	arg1, TF_CR28-TRAPFRAME_SIZEOF(sr1, t3)
 #endif
 
 	/* setup kernel context */
@@ -674,7 +674,7 @@ $syscall
 	mtsp	r0, sr6
 	mtsp	r0, sr7
 
-	ldo	-TF_SIZE(t3), arg0
+	ldo	-TRAPFRAME_SIZEOF(t3), arg0
 	ldo	4(t3), arg1
 
 	ldil	L%$global$,dp
@@ -690,7 +690,7 @@ $syscall
 
 	ldil	L%curproc, r1
 	ldw	R%curproc(r1), r1
-	ldw	p_md(r1), t3
+	ldw	P_MD(r1), t3
 
 	.exit
 	.procend
@@ -1044,7 +1044,7 @@ LEAF_ENTRY(TLABEL(emu))
 	comb,=,n t1, t2, $fpusw_done
 	comb,=,n r0, t1, $fpusw_nosave
 
-	/* ldo	pcb_fpregs+u_pcb(t1), t1 */
+	/* ldo	PCB_FPREGS+U_PCB(t1), t1 */
 
 	fstds,ma fr0 , 8(t3)	/* fr0 must be saved first */
 	fstds,ma fr1 , 8(t3)
@@ -1087,7 +1087,7 @@ $fpusw_nosave
 	ldo	1(t3), t3
 	stw	t3, R%fpu_csw(t1)
 
-	ldo	31*8+pcb_fpregs+u_pcb(t2), t3
+	ldo	31*8+PCB_FPREGS+U_PCB(t2), t3
 
 	fldds,ma -8(t3), fr31
 	fldds,ma -8(t3), fr30
@@ -1147,7 +1147,7 @@ ENTRY(TLABEL(excpt),0)
 	.import	$fpemu_stack, data
 	ldil	L%$fpemu_stack, r31
 	ldo	R%$fpemu_stack(r31), r31
-	ldo	R%TF_SIZE+HPPA_FRAME_SIZE(r31), sp
+	ldo	R%TRAPFRAME_SIZEOF+HPPA_FRAME_SIZE(r31), sp
 
 	stw	r1 , TF_R1 (r31)
 	stw	r2 , TF_R2 (r31)
@@ -1284,19 +1284,19 @@ $tlbd_t
 	 * Chase the list of entries for this hash bucket until we find
 	 * the correct mapping or NULL.
 	 */
-	ldw	hpt_entry(r24), r24
+	ldw	HPT_ENTRY(r24), r24
 $hash_loop_tlbd_t
 	comb,=,n r0, r24, TLABEL(all)
-	ldw	pv_va(r24), r25
-	ldw	pv_space(r24), r17
+	ldw	PV_VA(r24), r25
+	ldw	PV_SPACE(r24), r17
 	comb,<>,n r9, r25, $hash_loop_tlbd_t
-	ldw	pv_hash(r24), r24
+	ldw	PV_HASH(r24), r24
 	comb,<>,n r8, r17, $hash_loop_tlbd_t
-	ldw	pv_hash(r24), r24
+	ldw	PV_HASH(r24), r24
 
 	VTAG	/* (r8,r9) -> r16 */
 	/* Set the dirty bit for this physical page. */
-	ldw	pv_tlbprot(r24), r25
+	ldw	PV_TLBPROT(r24), r25
 	b	$tlb_inshpt_t
 	depi	1, TLB_DIRTY_POS, 1, r25
 #else
@@ -1332,47 +1332,47 @@ $dtlbna_t
 	HPTENT
 	mtctl	r24, cr28
 
-	ldw	hpt_tag(r24),r17
+	ldw	HPT_TAG(r24),r17
 	VTAG	/* (r8,r9) -> r16 */
 
 	/* Compare the tag against the HPT entry.
 	   If it matches, then do the TLB insertion. */
 	comb,<>,n r16, r17, $tlb_gottalook_t
 
-	ldw	hpt_tlbpage(r24), r17
+	ldw	HPT_TLBPAGE(r24), r17
 	b	$tlb_gothpt_t
-	ldw	hpt_tlbprot(r24), r25
+	ldw	HPT_TLBPROT(r24), r25
 
 $tlb_gottalook_t
 	/*
 	 * Chase the list of entries for this hash bucket until we find
 	 * the correct mapping or NULL.
 	 */
-	ldw	hpt_entry(r24),r24
+	ldw	HPT_ENTRY(r24),r24
 $hash_loop_t
 	comb,=,n r0, r24, $tlbiflpa
-	ldw	pv_va(r24),r25
-	ldw	pv_space(r24),r17
+	ldw	PV_VA(r24),r25
+	ldw	PV_SPACE(r24),r17
 	comb,<>,n r9,r25,$hash_loop_t
-	ldw	pv_hash(r24),r24
+	ldw	PV_HASH(r24),r24
 	comb,<>,n r8,r17,$hash_loop_t
-	ldw	pv_hash(r24),r24
+	ldw	PV_HASH(r24),r24
 
 	/* Now set things up to enter the real mapping that we want */
-	ldw	pv_tlbprot(r24),r25
+	ldw	PV_TLBPROT(r24),r25
 	depi	1, TLB_REF_POS, 1, r25
 
 	/*
 	 * Load the HPT cache with the miss information for the next time.
 	 */
 $tlb_inshpt_t
-	stw	r25, pv_tlbprot(r24)
-	ldw	pv_tlbpage(r24),r17
+	stw	r25, PV_TLBPROT(r24)
+	ldw	PV_TLBPAGE(r24),r17
 	mfctl	cr28, r24
 
-	stw	r16, hpt_tag(r24)
-	stw	r25, hpt_tlbprot(r24)
-	stw	r17, hpt_tlbpage(r24)
+	stw	r16, HPT_TAG(r24)
+	stw	r25, HPT_TLBPROT(r24)
+	stw	r17, HPT_TLBPAGE(r24)
 
 $tlb_gothpt_t
 	mfsp	sr1, r16
@@ -1450,19 +1450,19 @@ $tlbd_l
 	 * Chase the list of entries for this hash bucket until we find
 	 * the correct mapping or NULL.
 	 */
-	ldw	hpt_entry(r24), r16
+	ldw	HPT_ENTRY(r24), r16
 $hash_loop_tlbd_l
 	comb,=,n r0, r16, TLABEL(all)
-	ldw	pv_va(r16), r25
-	ldw	pv_space(r16), r17
+	ldw	PV_VA(r16), r25
+	ldw	PV_SPACE(r16), r17
 	comb,<>,n r9, r25, $hash_loop_tlbd_l
-	ldw	pv_hash(r16), r16
+	ldw	PV_HASH(r16), r16
 	comb,<>,n r8, r17, $hash_loop_tlbd_l
-	ldw	pv_hash(r16), r16
+	ldw	PV_HASH(r16), r16
 
 	/* Set the dirty bit for this physical page. */
-	ldw	pv_tlbpage(r16), r17
-	ldw	pv_tlbprot(r16), r25
+	ldw	PV_TLBPAGE(r16), r17
+	ldw	PV_TLBPROT(r16), r25
 	b	$tlb_inshpt_l
 	depi	1, TLB_DIRTY_POS, 1, r25
 
@@ -1486,19 +1486,19 @@ $dtlb_l
 	 * Chase the list of entries for this hash bucket until we find
 	 * the correct mapping or NULL.
 	 */
-	ldw	hpt_entry(r24), r16
+	ldw	HPT_ENTRY(r24), r16
 $hash_loop_l
 	comb,=,n r0, r16, $tlbiflpa
-	ldw	pv_va(r16), r25
-	ldw	pv_space(r16), r17
+	ldw	PV_VA(r16), r25
+	ldw	PV_SPACE(r16), r17
 	comb,<>,n r9, r25, $hash_loop_l
-	ldw	pv_hash(r16), r16
+	ldw	PV_HASH(r16), r16
 	comb,<>,n r8, r17, $hash_loop_l
-	ldw	pv_hash(r16), r16
+	ldw	PV_HASH(r16), r16
 
 	/* Now set things up to enter the real mapping that we want */
-	ldw	pv_tlbpage(r16), r17
-	ldw	pv_tlbprot(r16), r25
+	ldw	PV_TLBPAGE(r16), r17
+	ldw	PV_TLBPROT(r16), r25
 	depi	1, TLB_REF_POS, 1, r25
 
 	/*
@@ -1506,13 +1506,13 @@ $hash_loop_l
 	 * The HPT entry address was saved by the HPTENT
 	 */
 $tlb_inshpt_l
-	stw	r25, pv_tlbprot(r16)
+	stw	r25, PV_TLBPROT(r16)
 	VTAG	/* (r8,r9) -> r16 */
 
-	stw	r16, hpt_tag(r24)
-	stw	r25, hpt_tlbprot(r24)
+	stw	r16, HPT_TAG(r24)
+	stw	r25, HPT_TLBPROT(r24)
 	bb,<	r1, TFF_ITLB_POS, $tlb_itlb_l
-	stw	r17, hpt_tlbpage(r24)
+	stw	r17, HPT_TLBPAGE(r24)
 
 	.word	0x04111440	; idtlbaf	r17
 	.word	0x04191400	; idtlbpf	r25
@@ -1654,7 +1654,7 @@ ENTRY(TLABEL(all),0)
 	mfctl	cr30, t2
 	depi	1, T_USER_POS, 1, r1
 	depi	1, TFF_LAST_POS, 1, r1
-	ldw	u_pcb+pcb_uva(t2), sp
+	ldw	U_PCB+PCB_UVA(t2), sp
 	ldo	NBPG(sp), sp
 
 $trap_from_kernel
@@ -1678,7 +1678,7 @@ $trap_from_kernel
 	mfctl	tr7, r1
 
 	copy	sp, t3
-	ldo	HPPA_FRAME_SIZE+TF_SIZE(sp), sp
+	ldo	HPPA_FRAME_SIZE+TRAPFRAME_SIZEOF(sp), sp
 	rfir
 	nop
 $trapnowvirt
@@ -1848,7 +1848,7 @@ $trapnowvirt
 
 	/* means curproc have actually changed */
 	b	$syscall_return
-	ldw	p_md(t2), t3
+	ldw	P_MD(t2), t3
 
 	.export	$trap$all$end, entry
 $trap$all$end
@@ -2127,30 +2127,30 @@ LEAF_ENTRY(name)				! \
 	comb,>>= arg0, t1, fusubadaddr		! \
 	ldil	L%curproc, t1			! \
 	ldw	R%curproc(t1), t1		! \
-	ldw	p_addr(t1), t1			! \
+	ldw	P_ADDR(t1), t1			! \
 	ldil	L%fusufault, t2			! \
 	ldo	R%fusufault(t2), t2		! \
-	ldw	u_pcb+pcb_onfault(t1), t3	! \
-	stw	t2, u_pcb+pcb_onfault(t1)	! \
-	ldw	u_pcb+pcb_space(t1), t2		! \
+	ldw	U_PCB+PCB_ONFAULT(t1), t3	! \
+	stw	t2, U_PCB+PCB_ONFAULT(t1)	! \
+	ldw	U_PCB+PCB_SPACE(t1), t2		! \
 	mtsp	t2, sr1
 
 #define	FUX(name,insn)				  \
 	FUSUX(name)				! \
 	insn	0(sr1, arg0), ret0		! \
 	bv	r0(rp)				! \
-	stw	r0, u_pcb+pcb_onfault(t1)	! \
+	stw	r0, U_PCB+PCB_ONFAULT(t1)	! \
 EXIT(name)
 
 #define	SUX(name,insn)				  \
 	FUSUX(name)				! \
 	insn	arg1, 0(sr1, arg0)		! \
 	bv	r0(rp)				! \
-	stw	r0, u_pcb+pcb_onfault(t1)	! \
+	stw	r0, U_PCB+PCB_ONFAULT(t1)	! \
 EXIT(name)
 
 LEAF_ENTRY(fusufault)
-	stw	r0, u_pcb+pcb_onfault(t1)
+	stw	r0, U_PCB+PCB_ONFAULT(t1)
 ALTENTRY(fusubadaddr)
 	bv	0(rp)
 	ldi	-1, ret0
@@ -2181,10 +2181,10 @@ LEAF_ENTRY(spstrcpy)
 	/* setup fault handler */
 	ldil	L%curproc, r31
 	ldw	R%curproc(r31), r31
-	ldw	p_addr(r31), r31
+	ldw	P_ADDR(r31), r31
 	ldil	L%copy_on_fault, t2
 	ldo	R%copy_on_fault(t2), t2
-	stw	t2, pcb_onfault+u_pcb(r31)
+	stw	t2, PCB_ONFAULT+U_PCB(r31)
 
 	ldw	HPPA_FRAME_ARG(4)(sp), ret1
 	mfsp	sr2, ret0	/* XXX need this? */
@@ -2201,7 +2201,7 @@ $spstrcpy_loop
 
 $spstrcpy_exit
 	/* reset fault handler */
-	stw	r0, pcb_onfault+u_pcb(r31)
+	stw	r0, PCB_ONFAULT+U_PCB(r31)
 	copy	r0, ret0
 	mtsp	ret0, sr2	/* XXX need this? */
 	sub	arg1, arg0, arg1
@@ -2254,11 +2254,11 @@ EXIT(microtime)
 	.align	32
 ENTRY(setrunqueue,0)
 #ifdef DIAGNOSTIC
-	ldw	p_back(arg0), t1
+	ldw	P_BACK(arg0), t1
 	comb,<>,n r0, t1, $setrunqueue_panic
-	ldw	p_wchan(arg0), t1
+	ldw	P_WCHAN(arg0), t1
 	comb,<>,n r0, t1, $setrunqueue_panic
-	ldb	p_stat(arg0), t1
+	ldb	P_STAT(arg0), t1
 	comib,=,n SRUN, t1, $setrunqueue_ok
 $setrunqueue_panic
 	copy	arg0, arg1
@@ -2276,7 +2276,7 @@ Lsrqpstr
 $setrunqueue_ok
 #endif
 
-	ldb	p_priority(arg0), t2
+	ldb	P_PRIORITY(arg0), t2
 	ldil	L%qs, t4
 	extru	t2, 29, 5, t1
 	ldo	R%qs(t4), t4
@@ -2300,12 +2300,12 @@ $setrunqueue_ok
 	bv,n	%r0(r1)
 	nop
 #endif
-	ldw	p_back(t4), t2
-	stw	t4, p_forw(arg0)
-	stw	arg0, p_back(t4)
-	stw	arg0, p_forw(t2)
+	ldw	P_BACK(t4), t2
+	stw	t4, P_FORW(arg0)
+	stw	arg0, P_BACK(t4)
+	stw	arg0, P_FORW(t2)
 	bv	0(rp)
-	stw	t2, p_back(arg0)
+	stw	t2, P_BACK(arg0)
 Lsrqfmt
 	.asciz	"setrunqueue: bit=%x, qs=%p\n"
 	.align	8
@@ -2317,7 +2317,7 @@ EXIT(setrunqueue)
  */
 	.align	32
 ENTRY(remrunqueue,0)
-	ldb	p_priority(arg0), t2
+	ldb	P_PRIORITY(arg0), t2
 	extru	t2, 29, 5, t1
 	mtsar	t1
 	ldil	L%whichqs, t2
@@ -2342,11 +2342,11 @@ Lrrqpstr
 	.align	8
 remrunqueue_ok
 #endif
-	ldw	p_back(arg0), t4
-	stw	r0, p_back(arg0)
-	ldw	p_forw(arg0), arg0
-	stw	arg0, p_forw(t4)
-	stw	t4, p_back(arg0)
+	ldw	P_BACK(arg0), t4
+	stw	r0, P_BACK(arg0)
+	ldw	P_FORW(arg0), arg0
+	stw	arg0, P_FORW(t4)
+	stw	t4, P_BACK(arg0)
 	comb,<>	t4, arg0, Lqnempty
 	nop
 
@@ -2410,7 +2410,7 @@ getbit
 	ldo	R%qs(t2), t2
 	sh3add	t4, t2, t2
 
-	ldw	p_forw(t2), arg1
+	ldw	P_FORW(t2), arg1
 #ifdef DIAGNOSTIC
 	comb,<>	t2, arg1, link_ok
 	nop
@@ -2430,10 +2430,10 @@ Lcspstr
 	.align	8
 link_ok
 #endif
-	ldw	p_forw(arg1), arg0
-	stw	arg0, p_forw(t2)
-	stw	t2, p_back(arg0)
-	stw	r0, p_back(arg1)
+	ldw	P_FORW(arg1), arg0
+	stw	arg0, P_FORW(t2)
+	stw	t2, P_BACK(arg0)
+	stw	r0, P_BACK(arg1)
 
 	comb,<> arg0, t2, sw_qnempty
 	nop
@@ -2447,10 +2447,10 @@ sw_qnempty
 	stw	r0, R%want_resched(t3)
 
 #ifdef DIAGNOSTIC
-	ldw	p_wchan(arg1), t1
+	ldw	P_WCHAN(arg1), t1
 	comb,<>,n r0, t1, switch_error
 	copy	arg1, t2
-	ldb	p_stat(arg1), t1
+	ldb	P_STAT(arg1), t1
 	comib,<>,n SRUN, t1, switch_error
 	copy	arg1, t2
 #endif
@@ -2468,7 +2468,7 @@ sw_qnempty
 	 *
 	 * arg2: old proc
 	 */
-	ldw	p_md(arg2), t1
+	ldw	P_MD(arg2), t1
 	copy	sp, t2
 	ldo	HPPA_FRAME_SIZE+16*4(sp), sp
 	ldw	TF_R30(t1), t3
@@ -2502,7 +2502,7 @@ switch_exited
 	 *
 	 * arg1: new proc
 	 */
-	ldw	p_md(arg1), t1
+	ldw	P_MD(arg1), t1
 	ldw	TF_CR30(t1), t2
 	ldw	TF_R30(t1), sp
 	ldw	TF_CR9(t1), t3
@@ -2586,16 +2586,18 @@ ENTRY(switch_trampoline,0)
 	ldw	R%curproc(t1), t2
 	.call
 	b	$syscall_return
-	ldw	p_md(t2), t3
+	ldw	P_MD(t2), t3
 EXIT(switch_trampoline)
 
 /*
  * Signal "trampoline" code. Invoked from RTE setup by sendsig().
  */
 ENTRY(sigcode,0)
-	/* TODO call signal handler */
-
-	/*ldo	SIGF_SC(sp), arg0*/
+	.call
+	blr	r0, rp
+	bv,n	r0(arg3)
+	nop
+	copy	r3, arg0
 	ldil	L%SYSCALLGATE, r1
 	.call
 	ble	4(sr7, r1)

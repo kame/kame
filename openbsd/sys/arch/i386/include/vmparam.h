@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.16 2001/03/22 23:36:52 niklas Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.21 2001/09/22 18:00:09 miod Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.15 1994/10/27 04:16:34 cgd Exp $	*/
 
 /*-
@@ -56,7 +56,7 @@
  * Immediately after the user structure is the page table map, and then
  * kernal address space.
  */
-#define	USRTEXT		CLBYTES
+#define	USRTEXT		PAGE_SIZE
 #define	USRSTACK	VM_MAXUSER_ADDRESS
 
 /*
@@ -75,15 +75,6 @@
 #ifndef	MAXSSIZ
 #define	MAXSSIZ		(32*1024*1024)		/* max stack size */
 #endif
-
-/*
- * Default sizes of swap allocation chunks (see dmap.h).
- * The actual values may be changed in vminit() based on MAXDSIZ.
- * With MAXDSIZ of 16Mb and NDMAP of 38, dmmax will be 1024.
- */
-#define	DMMIN	32			/* smallest swap allocation */
-#define	DMMAX	4096			/* largest potential swap allocation */
-#define	DMTEXT	1024			/* swap allocation for text */
 
 /*
  * Size of shared memory map
@@ -108,33 +99,9 @@
  */
 #define	MAXSLP 		20
 
-/*
- * A swapped in process is given a small amount of core without being bothered
- * by the page replacement algorithm.  Basically this says that if you are
- * swapped in you deserve some resources.  We protect the last SAFERSS
- * pages against paging and will just swap you out rather than paging you.
- * Note that each process has at least UPAGES+CLSIZE pages which are not
- * paged anyways (this is currently 8+2=10 pages or 5k bytes), so this
- * number just means a swapped in process is given around 25k bytes.
- * Just for fun: current memory prices are 4600$ a megabyte on VAX (4/22/81),
- * so we loan each swapped in process memory worth 100$, or just admit
- * that we don't consider it worthwhile and swap it out to disk which costs
- * $30/mb or about $0.75.
- * { wfj 6/16/89: Retail AT memory expansion $800/megabyte, loan of $17
- *   on disk costing $7/mb or $0.18 (in memory still 100:1 in cost!) }
- */
-#define	SAFERSS		8		/* nominal ``small'' resident set size
-					   protected against replacement */
-
-/*
- * Mach derived constants
- */
-
 /* XXX Compatibility */
-#ifdef PMAP_NEW
 #define APTDPTDI	PDSLOT_APTE
 #define PTDPTDI		PDSLOT_PTE
-#endif
 
 /* user/kernel map constants */
 #define VM_MIN_ADDRESS		((vm_offset_t)0)
@@ -145,10 +112,8 @@
 
 /* virtual sizes (bytes) for various kernel submaps */
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
-#define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
-#define VM_PHYS_SIZE		(USRIOSIZE*CLBYTES)
-
-#define	MACHINE_NEW_NONCONTIG	/* VM <=> pmap interface modifier */
+#define VM_KMEM_SIZE		(NKMEMCLUSTERS*PAGE_SIZE)
+#define VM_PHYS_SIZE		(USRIOSIZE*PAGE_SIZE)
 
 #define	VM_PHYSSEG_MAX	4	/* actually we could have this many segments */
 #define	VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
@@ -161,17 +126,9 @@
 /*
  * pmap specific data stored in the vm_physmem[] array 
  */
-#if defined(PMAP_NEW)
 struct pmap_physseg {
 	struct pv_head *pvhead;		/* pv_head array */
 	char *attrs;			/* attrs array */
 };
-#else
-struct pmap_physseg {
-	struct pv_entry *pvent;		/* pv_entry array */
-	char *attrs;			/* attrs array */
-}; 
-#endif               
-
 
 #endif /* _MACHINE_VM_PARAM_H_ */

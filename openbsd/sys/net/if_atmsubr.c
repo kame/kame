@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_atmsubr.c,v 1.13 2000/09/12 04:09:11 itojun Exp $       */
+/*      $OpenBSD: if_atmsubr.c,v 1.16 2001/06/27 06:07:38 kjc Exp $       */
 
 /*
  *
@@ -107,16 +107,23 @@ atm_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t etype = 0;			/* if using LLC/SNAP */
-	int s, error = 0, sz;
+	int s, error = 0, sz, len;
 	struct atm_pseudohdr atmdst, *ad;
 	register struct mbuf *m = m0;
 	register struct rtentry *rt;
 	struct atmllc *atmllc;
 	u_int32_t atm_flags;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
-	ifp->if_lastchange = time;
+
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m,
+		     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
 
 	/*
 	 * check route
@@ -161,14 +168,6 @@ atm_output(ifp, m0, dst, rt0)
 				etype = ETHERTYPE_IP;
 			else
 				etype = ETHERTYPE_IPV6;
-# ifdef ATM_PVCEXT
-			if (ifp->if_flags & IFF_POINTOPOINT) {
-				/* pvc subinterface */
-				struct pvcsif *pvcsif = (struct pvcsif *)ifp;
-				atmdst = pvcsif->sif_aph;
-				break;
-			}
-# endif
 			if (!atmresolve(rt, m, dst, &atmdst)) {
 				m = NULL; 
 				/* XXX: atmresolve already free'd it */
@@ -236,15 +235,14 @@ atm_output(ifp, m0, dst, rt0)
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-
+	len = m->m_pkthdr.len;
 	s = splimp();
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	ifp->if_obytes += len;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -275,7 +273,6 @@ atm_input(ifp, ah, m, rxhand)
 		m_freem(m);
 		return;
 	}
-	ifp->if_lastchange = time;
 	ifp->if_ibytes += m->m_pkthdr.len;
 
 	if (rxhand) {
@@ -298,7 +295,8 @@ atm_input(ifp, ah, m, rxhand)
 	   */
 	  if (ATM_PH_FLAGS(ah) & ATM_PH_LLCSNAP) {
 	    struct atmllc *alc;
-	    if (m->m_len < sizeof(*alc) && (m = m_pullup(m, sizeof(*alc))) == 0)
+	    if (m->m_len < sizeof(*alc) &&
+		(m = m_pullup(m, sizeof(*alc))) == NULL)
 		  return; /* failed */
 	    alc = mtod(m, struct atmllc *);
 	    if (bcmp(alc, ATMLLC_HDR, 6)) {

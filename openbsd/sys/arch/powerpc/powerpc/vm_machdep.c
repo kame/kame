@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.14 2001/04/03 20:27:26 art Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.24 2001/09/21 17:33:15 miod Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.1 1996/09/30 16:34:57 ws Exp $	*/
 
 /*
@@ -40,13 +40,11 @@
 #include <sys/vnode.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 
-#ifdef UVM
 #include <uvm/uvm_extern.h>
-#endif
 
 #include <machine/pcb.h>
+#include <machine/fpu.h>
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -71,7 +69,8 @@ cpu_fork(p1, p2, stack, stacksize)
 	
 	pcb->pcb_pm = p2->p_vmspace->vm_map.pmap;
 
-	pcb->pcb_pmreal = (struct pmap *)pmap_extract(pmap_kernel(), (vm_offset_t)pcb->pcb_pm);
+	pmap_extract(pmap_kernel(),
+		 (vm_offset_t)pcb->pcb_pm, (paddr_t *)&pcb->pcb_pmreal);
 	
 	/*
 	 * Setup the trap frame for the new process
@@ -83,8 +82,10 @@ cpu_fork(p1, p2, stack, stacksize)
 	/*
 	 * If specified, give the child a different stack.
 	 */
-	if (stack != NULL)
+	if (stack != NULL) {
+		tf = trapframe(p2);
 		tf->fixreg[1] = (register_t)stack + stacksize;
+	}
 
 	stktop2 = (caddr_t)((u_long)stktop2 & ~15);	/* Align stack pointer */
 	
@@ -137,7 +138,8 @@ cpu_swapin(p)
 {
 	struct pcb *pcb = &p->p_addr->u_pcb;
 	
-	pcb->pcb_pmreal = (struct pmap *)pmap_extract(pmap_kernel(), (vm_offset_t)pcb->pcb_pm);
+	pmap_extract(pmap_kernel(),
+		(vm_offset_t)pcb->pcb_pm, (paddr_t *)pcb->pcb_pmreal);
 }
 
 /*
@@ -148,14 +150,14 @@ pagemove(from, to, size)
 	caddr_t from, to;
 	size_t size;
 {
-	vm_offset_t pa, va;
+	vaddr_t va;
+	paddr_t pa;
 	
 	for (va = (vm_offset_t)from; size > 0; size -= NBPG) {
-		pa = pmap_extract(pmap_kernel(), va);
-		pmap_remove(pmap_kernel(), va, va + NBPG);
-		pmap_enter(pmap_kernel(), (vm_offset_t)to, pa,
-			   VM_PROT_READ | VM_PROT_WRITE, 1,
-			   VM_PROT_READ | VM_PROT_WRITE);
+		pmap_extract(pmap_kernel(), va, &pa);
+		pmap_kremove(va, NBPG);
+		pmap_kenter_pa((vm_offset_t)to, pa,
+			   VM_PROT_READ | VM_PROT_WRITE );
 		va += NBPG;
 		to += NBPG;
 	}
@@ -193,32 +195,29 @@ cpu_coredump(p, vp, cred, chdr)
 {
 	struct coreseg cseg;
 	struct md_coredump md_core;
-	struct trapframe *tf;
 	int error;
 	
-#if 1
 	CORE_SETMAGIC(*chdr, COREMAGIC, MID_ZERO, 0);
 	chdr->c_hdrsize = ALIGN(sizeof *chdr);
 	chdr->c_seghdrsize = ALIGN(sizeof cseg);
 	chdr->c_cpusize = sizeof md_core;
 
-	process_read_regs(p, &md_core);
+	process_read_regs(p, &(md_core.regs));
 	
 	CORE_SETMAGIC(cseg, CORESEGMAGIC, MID_ZERO, CORE_CPU);
 	cseg.c_addr = 0;
 	cseg.c_size = chdr->c_cpusize;
 
-	if (error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&cseg, chdr->c_seghdrsize,
+	if ((error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&cseg, chdr->c_seghdrsize,
 			    (off_t)chdr->c_hdrsize, UIO_SYSSPACE,
-			    IO_NODELOCKED|IO_UNIT, cred, NULL, p))
+			    IO_NODELOCKED|IO_UNIT, cred, NULL, p)))
 		return error;
-	if (error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&md_core, sizeof md_core,
-			    (off_t)(chdr->c_hdrsize + chdr->c_seghdrsize), UIO_SYSSPACE,
-			    IO_NODELOCKED|IO_UNIT, cred, NULL, p))
+	if ((error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&md_core, sizeof md_core,
+			    (off_t)(chdr->c_hdrsize + chdr->c_seghdrsize),
+			    UIO_SYSSPACE, IO_NODELOCKED|IO_UNIT, cred, NULL, p)))
 		return error;
 
 	chdr->c_nseg++;
-#endif
 	return 0;
 }
 
@@ -237,19 +236,15 @@ vmapbuf(bp, len)
 	if (!(bp->b_flags & B_PHYS))
 		panic("vmapbuf");
 #endif
-	faddr = trunc_page(bp->b_saveaddr = bp->b_data);
+	faddr = trunc_page((vaddr_t)(bp->b_saveaddr = bp->b_data));
 	off = (vm_offset_t)bp->b_data - faddr;
 	len = round_page(off + len);
-#ifdef UVM
 	taddr = uvm_km_valloc_wait(phys_map, len);
-#else
-	taddr = kmem_alloc_wait(phys_map, len);
-#endif
 	bp->b_data = (caddr_t)(taddr + off);
 	for (; len > 0; len -= NBPG) {
-		pa = pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map), faddr);
+		pmap_extract(vm_map_pmap(&bp->b_proc->p_vmspace->vm_map), faddr, &pa);
 		pmap_enter(vm_map_pmap(phys_map), taddr, pa,
-			   VM_PROT_READ | VM_PROT_WRITE, 1, 0);
+			   VM_PROT_READ | VM_PROT_WRITE, PMAP_WIRED);
 		faddr += NBPG;
 		taddr += NBPG;
 	}
@@ -269,14 +264,10 @@ vunmapbuf(bp, len)
 	if (!(bp->b_flags & B_PHYS))
 		panic("vunmapbuf");
 #endif
-	addr = trunc_page(bp->b_data);
+	addr = trunc_page((vaddr_t)bp->b_data);
 	off = (vm_offset_t)bp->b_data - addr;
 	len = round_page(off + len);
-#ifdef UVM
 	uvm_km_free_wakeup(phys_map, addr, len);
-#else
-	kmem_free_wakeup(phys_map, addr, len);
-#endif
 	bp->b_data = bp->b_saveaddr;
 	bp->b_saveaddr = 0;
 }

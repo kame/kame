@@ -1,5 +1,5 @@
-/*	$OpenBSD: mem.c,v 1.11 1999/12/14 18:24:02 downsj Exp $	*/
-/*	$NetBSD: mem.c,v 1.17 1997/06/10 18:51:31 veego Exp $	*/
+/*	$OpenBSD: mem.c,v 1.15 2001/07/25 13:25:31 art Exp $	*/
+/*	$NetBSD: mem.c,v 1.25 1999/03/27 00:30:06 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -56,6 +56,7 @@
 #include <machine/cpu.h>
 
 #include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 extern u_int lowram;
 extern char *extiobase;
@@ -102,11 +103,12 @@ mmrw(dev, uio, flags)
 	struct uio *uio;
 	int flags;
 {
-	vm_offset_t o, v;
+	vaddr_t o, v;
 	int c;
 	struct iovec *iov;
 	int error = 0;
 	static int physlock;
+	vm_prot_t prot;
 
 	if (minor(dev) == 0) {
 		/* lock against other uses of shared vmmap */
@@ -142,21 +144,22 @@ mmrw(dev, uio, flags)
 				goto unlock;
 			}
 
-			pmap_enter(pmap_kernel(), (vm_offset_t)vmmap,
-			    trunc_page(v), uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
+			prot = uio->uio_rw == UIO_READ ? VM_PROT_READ :
+			    VM_PROT_WRITE;
+			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
+			    trunc_page(v), prot, prot|PMAP_WIRED);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
-			pmap_remove(pmap_kernel(), (vm_offset_t)vmmap,
-			    (vm_offset_t)vmmap + NBPG);
+			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
+			    (vaddr_t)vmmap + NBPG);
 			continue;
 
 /* minor device 1 is kernel memory */
 		case 1:
 			v = uio->uio_offset;
 			c = min(iov->iov_len, MAXPHYS);
-			if (!kernacc((caddr_t)v, c,
+			if (!uvm_kernacc((caddr_t)v, c,
 			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
 				return (EFAULT);
 
@@ -191,10 +194,10 @@ mmrw(dev, uio, flags)
 			 */
 			if (devzeropage == NULL) {
 				devzeropage = (caddr_t)
-				    malloc(CLBYTES, M_TEMP, M_WAITOK);
-				bzero(devzeropage, CLBYTES);
+				    malloc(PAGE_SIZE, M_TEMP, M_WAITOK);
+				bzero(devzeropage, PAGE_SIZE);
 			}
-			c = min(iov->iov_len, CLBYTES);
+			c = min(iov->iov_len, PAGE_SIZE);
 			error = uiomove(devzeropage, c, uio);
 			continue;
 
@@ -203,7 +206,7 @@ mmrw(dev, uio, flags)
 		}
 		if (error)
 			break;
-		iov->iov_base += c;
+		iov->iov_base = (caddr_t)iov->iov_base + c;
 		iov->iov_len -= c;
 		uio->uio_offset += c;
 		uio->uio_resid -= c;

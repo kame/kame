@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.24 2001/03/30 05:13:46 drahn Exp $	*/
+/*	$OpenBSD: trap.c,v 1.33 2001/09/20 13:46:04 drahn Exp $	*/
 /*	$NetBSD: trap.c,v 1.3 1996/10/13 03:31:37 christos Exp $	*/
 
 /*
@@ -40,20 +40,25 @@
 #include <sys/user.h>
 #include <sys/ktrace.h>
 
-#include <vm/vm.h>
-#include <vm/vm_kern.h>
-
-#ifdef UVM
-#include <uvm/uvm_extern.h>
-#endif
-
 #include <machine/cpu.h>
+#include <machine/fpu.h>
 #include <machine/frame.h>
 #include <machine/pcb.h>
 #include <machine/pmap.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
 #include <machine/db_machdep.h>
+
+#include <vm/vm.h>
+
+#include <uvm/uvm_extern.h>
+
+#include <ddb/db_extern.h>
+#include <ddb/db_sym.h>
+
+static int fix_unaligned __P((struct proc *p, struct trapframe *frame));
+int badaddr __P((char *addr, u_int32_t len));
+void trap __P((struct trapframe *frame));
 
 /* These definitions should probably be somewhere else				XXX */
 #define	FIRSTARG	3		/* first argument is in reg 3 */
@@ -63,7 +68,8 @@
 volatile int want_resched;
 
 #ifdef DDB
-u_int32_t db_dumpframe(u_int32_t);
+void ppc_dumpbt __P((struct trapframe *frame));
+
 void
 ppc_dumpbt(struct trapframe *frame)
 {
@@ -76,6 +82,7 @@ ppc_dumpbt(struct trapframe *frame)
 	return;
 }
 #endif
+
 void
 trap(frame)
 	struct trapframe *frame;
@@ -84,6 +91,8 @@ trap(frame)
 	int type = frame->exc;
 	u_quad_t sticks;
 	union sigval sv;
+	char *name;
+	db_expr_t offset;
 
 	if (frame->srr1 & PSL_PR) {
 		type |= EXC_USER;
@@ -102,7 +111,7 @@ trap(frame)
 		{
 			faultbuf *fb;
 
-			if (fb = p->p_addr->u_pcb.pcb_onfault) {
+			if ((fb = p->p_addr->u_pcb.pcb_onfault)) {
 				p->p_addr->u_pcb.pcb_onfault = 0;
 				frame->srr0 = fb->pc;		/* PC */
 				frame->srr1 = fb->sr;		/* SR */
@@ -137,17 +146,12 @@ trap(frame)
 				ftype = VM_PROT_READ | VM_PROT_WRITE;
 			else
 				ftype = VM_PROT_READ;
-#ifdef UVM
 			if (uvm_fault(map, trunc_page(va), 0, ftype)
 			    == KERN_SUCCESS)
-#else
-			if (vm_fault(map, trunc_page(va), ftype, FALSE)
-			    == KERN_SUCCESS)
-#endif
 			{
 				return;
 			}
-			if (fb = p->p_addr->u_pcb.pcb_onfault) {
+			if ((fb = p->p_addr->u_pcb.pcb_onfault)) {
 				p->p_addr->u_pcb.pcb_onfault = 0;
 				frame->srr0 = fb->pc;		/* PC */
 				frame->fixreg[1] = fb->sp;	/* SP */
@@ -169,16 +173,9 @@ printf("kern dsi on addr %x iar %x\n", frame->dar, frame->srr0);
 				vftype = VM_PROT_WRITE;
 			} else
 				vftype = ftype = VM_PROT_READ;
-#ifdef UVM
 			if (uvm_fault(&p->p_vmspace->vm_map,
 				     trunc_page(frame->dar), 0, ftype)
-			    == KERN_SUCCESS)
-#else
-			if (vm_fault(&p->p_vmspace->vm_map,
-				     trunc_page(frame->dar), ftype, FALSE)
-			    == KERN_SUCCESS)
-#endif
-			{
+			    == KERN_SUCCESS) {
 				break;
 			}
 #if 0
@@ -196,16 +193,9 @@ printf("dsi on addr %x iar %x lr %x\n", frame->dar, frame->srr0,frame->lr);
 			int ftype;
 			
 			ftype = VM_PROT_READ | VM_PROT_EXECUTE;
-#ifdef UVM
 			if (uvm_fault(&p->p_vmspace->vm_map,
 				     trunc_page(frame->srr0), 0, ftype)
-			    == KERN_SUCCESS)
-#else
-			if (vm_fault(&p->p_vmspace->vm_map,
-				     trunc_page(frame->srr0), ftype, FALSE)
-			    == KERN_SUCCESS)
-#endif
-			{
+			    == KERN_SUCCESS) {
 				break;
 			}
 		}
@@ -227,11 +217,7 @@ printf("isi iar %x\n", frame->srr0);
 			int nsys, n;
 			register_t args[10];
 			
-#ifdef UVM
 			uvmexp.syscalls++;
-#else
-			cnt.v_syscall++;
-#endif
 			
 			nsys = p->p_emul->e_nsysent;
 			callp = p->p_emul->e_sysent;
@@ -269,9 +255,8 @@ printf("isi iar %x\n", frame->srr0);
 			n = NARGREG - (params - (frame->fixreg + FIRSTARG));
 			if (argsize > n * sizeof(register_t)) {
 				bcopy(params, args, n * sizeof(register_t));
-				if (error = copyin(MOREARGS(frame->fixreg[1]),
-						   args + n,
-						   argsize - n * sizeof(register_t))) {
+				if ((error = copyin(MOREARGS(frame->fixreg[1]),
+				   args + n, argsize - n * sizeof(register_t)))) {
 #ifdef	KTRACE
 					/* Can't get all the arguments! */
 					if (KTRPOINT(p, KTR_SYSCALL))
@@ -338,8 +323,18 @@ syscall_bad:
 		break;
 
 	case EXC_ALI|EXC_USER:
-		/* alignment exception, kill process */
-		trapsignal(p, SIGSEGV, VM_PROT_EXECUTE, SEGV_MAPERR, sv);
+		/* alignment exception 
+		 * we check to see if this can be fixed up
+		 * by the code that fixes the typical gcc misaligned code
+		 * then kill the process if not.
+		 */
+		if (fix_unaligned(p, frame) == 0) {
+			frame->srr0 += 4;
+		} else {
+			sv.sival_int = frame->srr0;
+			trapsignal(p, SIGSEGV, VM_PROT_EXECUTE, SEGV_MAPERR,
+				sv);
+		}
 		break;
 
 	default:
@@ -353,15 +348,19 @@ mpc_print_pci_stat();
 		/* set up registers */
 		db_save_regs(frame);
 #endif
-		panic ("trap type %x at %x lr %x\n",
-			type, frame->srr0, frame->lr);
+		db_find_sym_and_offset(frame->srr0, &name, &offset);
+		if (!name) {
+			name = "0";
+			offset = frame->srr0;
+		}
+		panic ("trap type %x at %x (%s+0x%x) lr %x\n",
+			type, frame->srr0, name, offset, frame->lr);
 
 
 	case EXC_PGM|EXC_USER:
 	{
 		char *errstr[8];
 		int errnum = 0;
-		int i;
 
 		if (frame->srr1 & (1<<(31-11))) { 
 			/* floating point enabled program exception */
@@ -407,7 +406,7 @@ for (i = 0; i < errnum; i++) {
 		/* should check for correct byte here or panic */
 #ifdef DDB
 		db_save_regs(frame);
-		db_trap(T_BREAKPOINT);
+		db_trap(T_BREAKPOINT, 0);
 #else
 		panic("trap EXC_PGM");
 #endif
@@ -421,11 +420,7 @@ for (i = 0; i < errnum; i++) {
 
 	astpending = 0;		/* we are about to do it */
 
-#ifdef UVM
 	uvmexp.softs++;
-#else
-	cnt.v_soft++;
-#endif
 
 	if (p->p_flag & P_OWEUPC) {
 		p->p_flag &= ~P_OWEUPC;
@@ -436,28 +431,19 @@ for (i = 0; i < errnum; i++) {
 	{
 		int sig;
 
-		while (sig = CURSIG(p))
+		while ((sig = CURSIG(p)))
 			postsig(sig);
 	}
 
 	p->p_priority = p->p_usrpri;
 	if (want_resched) {
-		int s, sig;
+		int sig;
 
 		/*
-		 * Since we are curproc, a clock interrupt could
-		 * change our priority without changing run queues
-		 * (the running process is not kept on a run queue).
-		 * If this happened after we setrunqueue ourselves but
-		 * before switch()'ed, we might not be on the queue
-		 * indicated by our priority.
+		 * We're being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
-		while (sig = CURSIG(p))
+		preempt(NULL);
+		while ((sig = CURSIG(p)))
 			postsig(sig);
 	}
 
@@ -498,8 +484,7 @@ child_return(p)
 }
 
 static inline void
-setusr(content)
-	int content;
+setusr(int content)
 {
 	asm volatile ("isync; mtsr %0,%1; isync"
 		      :: "n"(USER_SR), "r"(content));
@@ -512,9 +497,10 @@ badaddr(addr, len)
 {
 	faultbuf env;
 	u_int32_t v;
+	register void *oldh = curpcb->pcb_onfault;
 
 	if (setfault(env)) {
-		curpcb->pcb_onfault = 0;
+		curpcb->pcb_onfault = oldh;
 		return EFAULT;
 	}
 	switch(len) {
@@ -528,7 +514,7 @@ badaddr(addr, len)
 		v = *((volatile u_int8_t *)addr);
 		break;
 	}
-	curpcb->pcb_onfault = 0;
+	curpcb->pcb_onfault = oldh;
 	return(0);
 }
 
@@ -541,9 +527,10 @@ copyin(udaddr, kaddr, len)
 	void *p;
 	size_t l;
 	faultbuf env;
+	register void *oldh = curpcb->pcb_onfault;
 
 	if (setfault(env)) {
-		curpcb->pcb_onfault = 0;
+		curpcb->pcb_onfault = oldh;
 		return EFAULT;
 	}
 	while (len > 0) {
@@ -557,7 +544,7 @@ copyin(udaddr, kaddr, len)
 		kaddr += l;
 		len -= l;
 	}
-	curpcb->pcb_onfault = 0;
+	curpcb->pcb_onfault = oldh;
 	return 0;
 }
 
@@ -570,9 +557,10 @@ copyout(kaddr, udaddr, len)
 	void *p;
 	size_t l;
 	faultbuf env;
+	register void *oldh = curpcb->pcb_onfault;
 
 	if (setfault(env)) {
-		curpcb->pcb_onfault = 0;
+		curpcb->pcb_onfault = oldh;
 		return EFAULT;
 	}
 	while (len > 0) {
@@ -586,6 +574,55 @@ copyout(kaddr, udaddr, len)
 		kaddr += l;
 		len -= l;
 	}
-	curpcb->pcb_onfault = 0;
+	curpcb->pcb_onfault = oldh;
 	return 0;
+}
+
+/*
+ * For now, this only deals with the particular unaligned access case
+ * that gcc tends to generate.  Eventually it should handle all of the
+ * possibilities that can happen on a 32-bit PowerPC in big-endian mode.
+ */
+
+static int
+fix_unaligned(p, frame)
+	struct proc *p;
+	struct trapframe *frame;
+{
+	int indicator = EXC_ALI_OPCODE_INDICATOR(frame->dsisr);
+
+	switch (indicator) {
+	case EXC_ALI_LFD:
+	case EXC_ALI_STFD:
+		{
+			int reg = EXC_ALI_RST(frame->dsisr);
+			double *fpr = &p->p_addr->u_pcb.pcb_fpu.fpr[reg];
+
+			/* Juggle the FPU to ensure that we've initialized
+			 * the FPRs, and that their current state is in
+			 * the PCB.
+			 */
+			if (fpuproc != p) {
+				if (fpuproc)
+					save_fpu(fpuproc);
+				enable_fpu(p);
+			}
+			save_fpu(p);
+
+			if (indicator == EXC_ALI_LFD) {
+				if (copyin((void *)frame->dar, fpr,
+				    sizeof(double)) != 0)
+					return -1;
+				enable_fpu(p);
+			} else {
+				if (copyout(fpr, (void *)frame->dar,
+				    sizeof(double)) != 0)
+					return -1;
+			}
+			return 0;
+		}
+		break;
+	}
+
+	return -1;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.40 2001/03/29 00:12:54 mickey Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.46 2001/07/25 13:25:31 art Exp $	*/
 
 /*
  * Copyright (c) 1998-2001 Michael Shalayeff
@@ -409,7 +409,7 @@ pmap_free_pv(struct pv_entry *pv)
 		printf("pmap_free_pv(%p)\n", pv);
 #endif
 
-	pvp = (struct pv_page *) trunc_page(pv);
+	pvp = (struct pv_page *) trunc_page((vaddr_t)pv);
 	switch (++pvp->pvp_nfree) {
 	case 1:
 		TAILQ_INSERT_TAIL(&pv_page_freelist, pvp, pvp_list);
@@ -756,7 +756,7 @@ pmap_bootstrap(vstart, vend)
 		atop(virtual_avail), totalphysmem + i, VM_FREELIST_DEFAULT);
 	/* we have only one initial phys memory segment */
 	vm_physmem[0].pmseg.pvent = (struct pv_entry *)addr;
-	mtctl(addr, CR_PSEG);
+	/* mtctl(addr, CR_PSEG); */
 
 	/* here will be a hole due to the kernel memory alignment
 	   and we use it for pmap_steal_memory */
@@ -974,14 +974,14 @@ pmap_destroy(pmap)
 	splx(s);
 }
 /*
- * pmap_enter(pmap, va, pa, prot, wired, access_type)
+ * pmap_enter(pmap, va, pa, prot, flags)
  *	Create a translation for the virtual address (va) to the physical
  *	address (pa) in the pmap with the protection requested. If the
  *	translation is wired then we can not allow a page fault to occur
  *	for this mapping.
  */
 int
-_pmap_enter(pmap, va, pa, prot, flags)
+pmap_enter(pmap, va, pa, prot, flags)
 	pmap_t pmap;
 	vaddr_t va;
 	paddr_t pa;
@@ -991,8 +991,8 @@ _pmap_enter(pmap, va, pa, prot, flags)
 	register struct pv_entry *pv, *ppv;
 	u_int tlbpage, tlbprot;
 	pa_space_t space;
-	boolean_t wired = (flags & PMAP_WIRED) != 0;
 	boolean_t waswired;
+	boolean_t wired = (flags & PMAP_WIRED) != 0;
 	int s;
 
 	pa = hppa_trunc_page(pa);
@@ -1003,16 +1003,16 @@ _pmap_enter(pmap, va, pa, prot, flags)
 		    prot, wired? "" : "un");
 #endif
 
-	if (!(pv = pmap_find_pv(pa))) {
-		if (flags & PMAP_CANFAIL)
-			return (KERN_RESOURCE_SHORTAGE);
+	if (!(pv = pmap_find_pv(pa)))
 		panic("pmap_enter: pmap_find_pv failed");
-	}
 
 	va = hppa_trunc_page(va);
 	space = pmap_sid(pmap, va);
 	tlbpage = tlbbtop(pa);
 	tlbprot = TLB_REF | pmap_prot(pmap, prot) | pmap->pmap_pid;
+
+	if (flags & VM_PROT_WRITE)
+		tlbprot |= TLB_DIRTY;
 
 	if (!(ppv = pmap_find_va(space, va))) {
 		/*
@@ -1074,6 +1074,7 @@ _pmap_enter(pmap, va, pa, prot, flags)
 	if (pmapdebug & PDB_ENTER)
 		printf("pmap_enter: leaving\n");
 #endif
+
 	return (KERN_SUCCESS);
 }
 
@@ -1263,7 +1264,7 @@ pmap_protect(pmap, sva, eva, prot)
 }
 
 /*
- *	Routine:	pmap_change_wiring
+ *	Routine:	pmap_unwire
  *	Function:	Change the wiring attribute for a map/virtual-address
  *			pair.
  *	In/out conditions:
@@ -1273,19 +1274,16 @@ pmap_protect(pmap, sva, eva, prot)
  * only used to unwire pages and hence the mapping entry will exist.
  */
 void
-pmap_change_wiring(pmap, va, wired)
-	register pmap_t	pmap;
+pmap_unwire(pmap, va)
+	pmap_t	pmap;
 	vaddr_t	va;
-	boolean_t	wired;
 {
-	register struct pv_entry *pv;
-	boolean_t waswired;
+	struct pv_entry *pv;
 
 	va = hppa_trunc_page(va);
 #ifdef PMAPDEBUG
 	if (pmapdebug & PDB_FOLLOW)
-		printf("pmap_change_wiring(%p, %x, %swire)\n",
-		    pmap, va, wired? "": "un");
+		printf("pmap_unwire(%p, %x)\n", pmap, va);
 #endif
 
 	if (!pmap)
@@ -1294,13 +1292,9 @@ pmap_change_wiring(pmap, va, wired)
 	simple_lock(&pmap->pmap_lock);
 
 	if ((pv = pmap_find_va(pmap_sid(pmap, va), va)) == NULL)
-		panic("pmap_change_wiring: can't find mapping entry");
+		panic("pmap_unwire: can't find mapping entry");
 
-	waswired = pv->pv_tlbprot & TLB_WIRED;
-	if (wired && !waswired) {
-		pv->pv_tlbprot |= TLB_WIRED;
-		pmap->pmap_stats.wired_count++;
-	} else if (!wired && waswired) {
+	if (pv->pv_tlbprot & TLB_WIRED) {
 		pv->pv_tlbprot &= ~TLB_WIRED;
 		pmap->pmap_stats.wired_count--;
 	}
@@ -1308,17 +1302,19 @@ pmap_change_wiring(pmap, va, wired)
 }
 
 /*
- * pmap_extract(pmap, va)
- *	returns the physical address corrsponding to the
- *	virtual address specified by pmap and va if the
- *	virtual address is mapped and 0 if it is not.
+ * pmap_extract(pmap, va, pap)
+ *	fills in the physical address corrsponding to the
+ *	virtual address specified by pmap and va into the
+ *	storage pointed to by pap and returns TRUE if the
+ *	virtual address is mapped. returns FALSE in not mapped.
  */
-paddr_t
-pmap_extract(pmap, va)
+boolean_t
+pmap_extract(pmap, va, pap)
 	pmap_t pmap;
 	vaddr_t va;
+	paddr_t *pap;
 {
-	register struct pv_entry *pv;
+	struct pv_entry *pv;
 
 	va = hppa_trunc_page(va);
 #ifdef PMAPDEBUG
@@ -1327,9 +1323,11 @@ pmap_extract(pmap, va)
 #endif
 
 	if (!(pv = pmap_find_va(pmap_sid(pmap, va), va & ~PGOFSET)))
-		return(0);
-	else
-		return tlbptob(pv->pv_tlbpage) + (va & PGOFSET);
+		return (FALSE);
+	else {
+		*pap = tlbptob(pv->pv_tlbpage) + (va & PGOFSET);
+		return (TRUE);
+	}
 }
 
 /*

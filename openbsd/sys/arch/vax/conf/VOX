@@ -1,4 +1,4 @@
-#	$OpenBSD: VOX,v 1.2 1997/10/08 07:13:50 niklas Exp $
+#	$OpenBSD: VOX,v 1.4 2001/10/10 23:43:42 millert Exp $
 #
 # simple VS2000 configuration file.
 #
@@ -13,10 +13,6 @@ option		"VAX410"	# VS 2000
 
 # Max users on system; this is just a hint
 maxusers	8
-
-# pagers
-option		SWAPPAGER
-option		DEVPAGER
 
 # Kernel compiled-in symbolic debugger & system call tracer
 option		DDB
@@ -51,10 +47,6 @@ option		FIFO
 # 4.3BSD Reno programs and get Ultrix compatibility instead.
 # (They cannot coexist).
 #option		COMPAT_43
-#option		COMPAT_09
-#option		COMPAT_10
-#option		COMPAT_11
-#option		COMPAT_12
 #option		COMPAT_ULTRIX
 #option		TCP_COMPAT_42
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ahc_pci.c,v 1.21 2001/01/22 22:36:52 deraadt Exp $	*/
+/*	$OpenBSD: ahc_pci.c,v 1.26 2001/09/21 17:55:43 miod Exp $	*/
 /*	$NetBSD: ahc_pci.c,v 1.9 1996/10/21 22:56:24 thorpej Exp $	*/
 
 /*
@@ -200,6 +200,9 @@ void *match, *aux;
 		case PCI_PRODUCT_ADP2_3950U2B:
 		case PCI_PRODUCT_ADP2_3950U2D:
 		case PCI_PRODUCT_ADP2_AIC7896:
+		case PCI_PRODUCT_ADP2_AIC7899B:
+		case PCI_PRODUCT_ADP2_AIC7899D:
+		case PCI_PRODUCT_ADP2_AIC7899F:
 		case PCI_PRODUCT_ADP2_AIC7899:
 		case PCI_PRODUCT_ADP2_3960D:
 			return (1);
@@ -360,6 +363,7 @@ void *aux;
 			break;
 		default:
 			/* TTT */
+			break;
 		}
 	}
 
@@ -377,7 +381,7 @@ void *aux;
 		case PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT:
 		case PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_64BIT:
 			ioh_valid = (pci_mapreg_map(pa, AHC_PCI_MEMADDR,
-				memtype, 0, &iot, &ioh, NULL, NULL) == 0);
+				memtype, 0, &iot, &ioh, NULL, NULL, 0) == 0);
 			break;
 		default:
 			ioh_valid = 0;
@@ -388,7 +392,7 @@ void *aux;
 #endif
 	{
 		ioh_valid = (pci_mapreg_map(pa, AHC_PCI_IOADDR,
-		    PCI_MAPREG_TYPE_IO, 0, &iot, &ioh, NULL, NULL) == 0);
+		    PCI_MAPREG_TYPE_IO, 0, &iot, &ioh, NULL, NULL, 0) == 0);
 	}
 
 	if (!ioh_valid) {
@@ -465,9 +469,8 @@ void *aux;
 					|TARGCRCENDEN|TARGCRCCNTEN);
 	}
 
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
-		printf(": couldn't map interrupt\n", ahc->sc_dev.dv_xname);
+	if (pci_intr_map(pa, &ih)) {
+		printf(": couldn't map interrupt\n");
 		ahc_free(ahc);
 		return;
 	}

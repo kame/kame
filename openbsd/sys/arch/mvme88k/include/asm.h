@@ -1,3 +1,5 @@
+/*	$OpenBSD: asm.h,v 1.14 2001/09/21 02:19:31 miod Exp $	*/
+
 /*
  * Mach Operating System
  * Copyright (c) 1993-1992 Carnegie Mellon University
@@ -29,37 +31,36 @@
 #define __MACHINE_M88K_ASM_H__
 
 #ifdef __STDC__
-#	define FUNC(NAME) _##NAME
+#define	_C_LABEL(name)		_ ## name
 #else
-#	define FUNC(NAME) _/**/NAME
+#define	_C_LABEL(name)		_/**/name
 #endif
 
-/* Define EH_DEBUG to be non-zero to compile-in various debugging things */
-#ifndef	EH_DEBUG
-#define EH_DEBUG 1
-#endif	EH_DEBUG
+#define	_ASM_LABEL(name)	name
 
-#if 0
-/* this gives the offsets into various structures of various elements, etc */
-#include "assym.s"
-#endif
+#define	_ENTRY(name) \
+	.text; .align 8; .globl name; name:
 
-#define	ENTRY(NAME) \
-    .align 8; .globl FUNC(NAME); FUNC(NAME):
-    
+#define	ENTRY(name)		_ENTRY(_C_LABEL(name))
+#define	ASENTRY(name)		_ENTRY(_ASM_LABEL(name))
 
-#define  LABEL(name)	 name:  .globl name ;
-/*
- * _LABEL(name)
- *	Defines one visible only to the file, unless debugging
- * 	is enabled, in which case it's visible to the world (and
- *	hence to debuggers, and such).
- */
-#if EH_DEBUG
-#  define _LABEL(name)	name:	.globl name ;
-#else
-#  define _LABEL(name)	name:               ;
-#endif
+#define	GLOBAL(name) \
+	.globl _C_LABEL(name); _C_LABEL(name):
+
+#define ASGLOBAL(name) \
+	.globl _ASM_LABEL(name); _ASM_LABEL(name):
+
+#define	LOCAL(name) \
+	_C_LABEL(name):
+
+#define	ASLOCAL(name) \
+	_ASM_LABEL(name):
+
+#define	BSS(name, size) \
+	.comm	_C_LABEL(name), size
+
+#define	ASBSS(name, size) \
+	.comm	_ASM_LABEL(name), size
 
 #define RTE	NOP ; rte
 
@@ -285,9 +286,9 @@
 #define DEBUG_JKDB_BIT			21
 #define DEBUG_BUGCALL_BIT		22
 #define DEBUG_NON_MASK_BIT	   23		/* MVME197 Non-Maskable Interrupt */
-#define DEBUG_197_READ_BIT    25    /* MVME198 Data Read Miss (Software Table Searches) */
-#define DEBUG_197_WRITE_BIT   26    /* MVME198 Data Write Miss (Software Table Searches) */
-#define DEBUG_197_INST_BIT    27    /* MVME198 Inst ATC Miss (Software Table Searches) */
+#define DEBUG_197_READ_BIT    25    /* MVME197 Data Read Miss (Software Table Searches) */
+#define DEBUG_197_WRITE_BIT   26    /* MVME197 Data Write Miss (Software Table Searches) */
+#define DEBUG_197_INST_BIT    27    /* MVME197 Inst ATC Miss (Software Table Searches) */
 
 #define DEBUG_UNKNOWN_BIT		31
 
@@ -323,4 +324,4 @@
 #define VME_CMMU_D3		0xFFF7F000 	/* MVME188 data CMMU 3 */
 #endif /* CMMU_DEFS */
 
-#endif __MACHINE_M88K_ASM_H__
+#endif /* __MACHINE_M88K_ASM_H__ */

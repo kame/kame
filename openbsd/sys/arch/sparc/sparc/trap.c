@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.27 2001/04/06 04:42:06 csapuntz Exp $	*/
+/*	$OpenBSD: trap.c,v 1.32 2001/09/19 20:50:57 mickey Exp $	*/
 /*	$NetBSD: trap.c,v 1.58 1997/09/12 08:55:01 pk Exp $ */
 
 /*
@@ -66,7 +66,7 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
+#include <uvm/uvm_extern.h>
 
 #include <sparc/sparc/asm.h>
 #include <machine/cpu.h>
@@ -87,8 +87,6 @@
 #include <sparc/fpu/fpu_extern.h>
 #include <sparc/sparc/memreg.h>
 #include <sparc/sparc/cpuvar.h>
-
-extern int cold;
 
 #ifdef DEBUG
 int	rwindow_debug = 0;
@@ -215,7 +213,7 @@ userret(p, pc, oticks)
 	int pc;
 	u_quad_t oticks;
 {
-	int sig, s;
+	int sig;
 
 	/* take pending signals */
 	while ((sig = CURSIG(p)) != 0)
@@ -230,18 +228,9 @@ userret(p, pc, oticks)
 	}
 	if (want_resched) {
 		/*
-		 * Since we are curproc, clock will normally just change
-		 * our priority without moving us from one queue to another
-		 * (since the running process is not on a queue.)
-		 * If that happened after we put ourselves on the run queue
-		 * but before we switched, we might not be on the queue
-		 * indicated by our priority.
+		 * We're being preempted.
 		 */
-		s = splstatclock();
-		setrunqueue(p);
-		p->p_stats->p_ru.ru_nivcsw++;
-		mi_switch();
-		splx(s);
+		preempt(NULL);
 		while ((sig = CURSIG(p)) != 0)
 			postsig(sig);
 	}
@@ -290,11 +279,7 @@ trap(type, psr, pc, tf)
 	/* This steps the PC over the trap. */
 #define	ADVANCE (n = tf->tf_npc, tf->tf_pc = n, tf->tf_npc = n + 4)
 
-#if defined(UVM)
 	uvmexp.traps++;
-#else
-	cnt.v_trap++;
-#endif
 	/*
 	 * Generally, kernel traps cause a panic.  Any exceptions are
 	 * handled early here.
@@ -667,11 +652,7 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 	u_quad_t sticks;
 	union sigval sv;
 
-#if defined(UVM)
 	uvmexp.traps++;
-#else
-	cnt.v_trap++;
-#endif
 	if ((p = curproc) == NULL)	/* safety check */
 		p = &proc0;
 	sticks = p->p_sticks;
@@ -715,13 +696,8 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 		if (cold)
 			goto kfault;
 		if (va >= KERNBASE) {
-#if defined(UVM)
 			if (uvm_fault(kernel_map, va, 0, ftype) == KERN_SUCCESS)
 				return;
-#else
-			if (vm_fault(kernel_map, va, ftype, 0) == KERN_SUCCESS)
-				return;
-#endif
 			goto kfault;
 		}
 	} else
@@ -741,11 +717,7 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 		goto out;
 
 	/* alas! must call the horrible vm code */
-#if defined(UVM)
 	rv = uvm_fault(&vm->vm_map, (vaddr_t)va, 0, ftype);
-#else
-	rv = vm_fault(&vm->vm_map, (vaddr_t)va, ftype, FALSE);
-#endif
 
 	/*
 	 * If this was a stack access we keep track of the maximum
@@ -756,7 +728,7 @@ mem_access_fault(type, ser, v, pc, psr, tf)
 	 */
 	if ((caddr_t)va >= vm->vm_maxsaddr) {
 		if (rv == KERN_SUCCESS) {
-			unsigned nss = clrnd(btoc(USRSTACK - va));
+			unsigned nss = btoc(USRSTACK - va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 		} else if (rv == KERN_PROTECTION_FAILURE)
@@ -830,11 +802,7 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 	u_quad_t sticks;
 	union sigval sv;
 
-#if defined(UVM)
 	uvmexp.traps++;
-#else
-	cnt.v_trap++;
-#endif
 	if ((p = curproc) == NULL)	/* safety check */
 		p = &proc0;
 	sticks = p->p_sticks;
@@ -968,13 +936,8 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 		if (cold)
 			goto kfault;
 		if (va >= KERNBASE) {
-#if defined(UVM)
 			if (uvm_fault(kernel_map, va, 0, ftype) == KERN_SUCCESS)
 				return;
-#else
-			if (vm_fault(kernel_map, va, ftype, 0) == KERN_SUCCESS)
-				return;
-#endif
 			goto kfault;
 		}
 	} else
@@ -983,11 +946,7 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 	vm = p->p_vmspace;
 
 	/* alas! must call the horrible vm code */
-#if defined(UVM)
 	rv = uvm_fault(&vm->vm_map, (vaddr_t)va, 0, ftype);
-#else
-	rv = vm_fault(&vm->vm_map, (vaddr_t)va, ftype, FALSE);
-#endif
 	/*
 	 * If this was a stack access we keep track of the maximum
 	 * accessed stack size.  Also, if vm_fault gets a protection
@@ -997,7 +956,7 @@ mem_access_fault4m(type, sfsr, sfva, tf)
 	 */
 	if ((caddr_t)va >= vm->vm_maxsaddr) {
 		if (rv == KERN_SUCCESS) {
-			unsigned nss = clrnd(btoc(USRSTACK - va));
+			unsigned nss = btoc(USRSTACK - va);
 			if (nss > vm->vm_ssize)
 				vm->vm_ssize = nss;
 		} else if (rv == KERN_PROTECTION_FAILURE)
@@ -1064,11 +1023,7 @@ syscall(code, tf, pc)
 	extern struct pcb *cpcb;
 #endif
 
-#if defined(UVM)
 	uvmexp.syscalls++;
-#else
-	cnt.v_syscall++;
-#endif
 	p = curproc;
 #ifdef DIAGNOSTIC
 	if (tf->tf_psr & PSR_PS)

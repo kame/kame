@@ -1,5 +1,5 @@
-/*	$OpenBSD: uvm_glue.c,v 1.11 2001/04/03 15:28:06 aaron Exp $	*/
-/*	$NetBSD: uvm_glue.c,v 1.23 1999/05/28 20:49:51 thorpej Exp $	*/
+/*	$OpenBSD: uvm_glue.c,v 1.20 2001/09/19 20:50:59 mickey Exp $	*/
+/*	$NetBSD: uvm_glue.c,v 1.36 2000/06/18 05:20:27 simonb Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -83,7 +83,6 @@
 
 #include <vm/vm.h>
 #include <vm/vm_page.h>
-#include <vm/vm_kern.h>
 
 #include <uvm/uvm.h>
 
@@ -122,8 +121,8 @@ uvm_kernacc(addr, len, rw)
 	vaddr_t saddr, eaddr;
 	vm_prot_t prot = rw == B_READ ? VM_PROT_READ : VM_PROT_WRITE;
 
-	saddr = trunc_page(addr);
-	eaddr = round_page(addr+len);
+	saddr = trunc_page((vaddr_t)addr);
+	eaddr = round_page((vaddr_t)addr+len);
 	vm_map_lock_read(kernel_map);
 	rv = uvm_map_checkprot(kernel_map, saddr, eaddr, prot);
 	vm_map_unlock_read(kernel_map);
@@ -155,22 +154,18 @@ uvm_useracc(addr, len, rw)
 	size_t len;
 	int rw;
 {
+	vm_map_t map;
 	boolean_t rv;
 	vm_prot_t prot = rw == B_READ ? VM_PROT_READ : VM_PROT_WRITE;
 
-#if (defined(i386) || defined(pc532)) && !defined(PMAP_NEW)
-	/*
-	 * XXX - specially disallow access to user page tables - they are
-	 * in the map.  This is here until i386 & pc532 pmaps are fixed...
-	 */
-	if ((vaddr_t) addr >= VM_MAXUSER_ADDRESS
-	    || (vaddr_t) addr + len > VM_MAXUSER_ADDRESS
-	    || (vaddr_t) addr + len <= (vaddr_t) addr)
-		return (FALSE);
-#endif
+	/* XXX curproc */
+	map = &curproc->p_vmspace->vm_map;
 
-	rv = uvm_map_checkprot(&curproc->p_vmspace->vm_map,
-			trunc_page(addr), round_page(addr+len), prot);
+	vm_map_lock_read(map);
+	rv = uvm_map_checkprot(map, trunc_page((vaddr_t)addr),
+	    round_page((vaddr_t)addr+len), prot);
+	vm_map_unlock_read(map);
+
 	return(rv);
 }
 
@@ -189,7 +184,7 @@ uvm_useracc(addr, len, rw)
  */
 void
 uvm_chgkprot(addr, len, rw)
-	register caddr_t addr;
+	caddr_t addr;
 	size_t len;
 	int rw;
 {
@@ -198,18 +193,17 @@ uvm_chgkprot(addr, len, rw)
 	vaddr_t sva, eva;
 
 	prot = rw == B_READ ? VM_PROT_READ : VM_PROT_READ|VM_PROT_WRITE;
-	eva = round_page(addr + len);
-	for (sva = trunc_page(addr); sva < eva; sva += PAGE_SIZE) {
+	eva = round_page((vaddr_t)addr + len);
+	for (sva = trunc_page((vaddr_t)addr); sva < eva; sva += PAGE_SIZE) {
 		/*
 		 * Extract physical address for the page.
 		 * We use a cheezy hack to differentiate physical
 		 * page 0 from an invalid mapping, not that it
 		 * really matters...
 		 */
-		pa = pmap_extract(pmap_kernel(), sva|1);
-		if (pa == 0)
+		if (pmap_extract(pmap_kernel(), sva, &pa) == FALSE)
 			panic("chgkprot: invalid page");
-		pmap_enter(pmap_kernel(), sva, pa&~1, prot, TRUE, 0);
+		pmap_enter(pmap_kernel(), sva, pa, prot, PMAP_WIRED);
 	}
 }
 #endif
@@ -221,16 +215,24 @@ uvm_chgkprot(addr, len, rw)
  * - XXXCDC: consider nuking this (or making it a macro?)
  */
 
-void
+int
 uvm_vslock(p, addr, len, access_type)
 	struct proc *p;
 	caddr_t	addr;
 	size_t	len;
 	vm_prot_t access_type;
 {
+	vm_map_t map;
+	vaddr_t start, end;
+	int rv;
 
-	uvm_fault_wire(&p->p_vmspace->vm_map, trunc_page(addr), 
-	    round_page(addr+len), access_type);
+	map = &p->p_vmspace->vm_map;
+	start = trunc_page((vaddr_t)addr);
+	end = round_page((vaddr_t)addr + len);
+
+	rv = uvm_fault_wire(map, start, end, access_type);
+
+	return (rv);
 }
 
 /*
@@ -246,8 +248,8 @@ uvm_vsunlock(p, addr, len)
 	caddr_t	addr;
 	size_t	len;
 {
-	uvm_fault_unwire(&p->p_vmspace->vm_map, trunc_page(addr), 
-		round_page(addr+len));
+	uvm_fault_unwire(&p->p_vmspace->vm_map, trunc_page((vaddr_t)addr),
+		round_page((vaddr_t)addr+len));
 }
 
 /*
@@ -295,7 +297,7 @@ uvm_fork(p1, p2, shared, stack, stacksize)
 		panic("uvm_fork: uvm_fault_wire failed: %d", rv);
 
 	/*
-	 * p_stats currently point at fields in the user struct.  Copy
+	 * p_stats currently points at a field in the user struct.  Copy
 	 * parts of p_stats, and zero out the rest.
 	 */
 	p2->p_stats = &up->u_stats;
@@ -405,8 +407,8 @@ uvm_swapin(p)
 void
 uvm_scheduler()
 {
-	register struct proc *p;
-	register int pri;
+	struct proc *p;
+	int pri;
 	struct proc *pp;
 	int ppri;
 	UVMHIST_FUNC("uvm_scheduler"); UVMHIST_CALLED(maphist);
@@ -497,7 +499,7 @@ loop:
 void
 uvm_swapout_threads()
 {
-	register struct proc *p;
+	struct proc *p;
 	struct proc *outp, *outp2;
 	int outpri, outpri2;
 	int didswap = 0;
@@ -567,7 +569,7 @@ uvm_swapout_threads()
 
 static void
 uvm_swapout(p)
-	register struct proc *p;
+	struct proc *p;
 {
 	vaddr_t addr;
 	int s;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcb.h,v 1.7 2001/01/12 07:29:27 smurph Exp $ */
+/*	$OpenBSD: pcb.h,v 1.9 2001/09/28 20:46:39 miod Exp $ */
 /*
  * Copyright (c) 1996 Nivas Madhur
  * Mach Operating System
@@ -49,7 +49,7 @@
 
 /*
  * This must always be an even number of words long so that our stack
- * will always be properly aligned (88k need 8 byte alignmet). Also,
+ * will always be properly aligned (88k need 8 byte alignment). Also,
  * place r14 on double word boundary so that we can use st.d while
  * saving the regs.
  */
@@ -105,4 +105,4 @@ struct md_coredump {
 	struct	trapframe md_tf;
 };
 
-#endif _M88K_PCB_H_
+#endif /* _M88K_PCB_H_ */

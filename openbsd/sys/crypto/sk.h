@@ -1,4 +1,4 @@
-/*	$OpenBSD$	*/
+/*	$OpenBSD: sk.h,v 1.1 2000/02/28 23:13:05 deraadt Exp $	*/
 
 /* lib/des/sk.h */
 /* Copyright (C) 1995 Eric Young (eay@mincom.oz.au)

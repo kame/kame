@@ -1,5 +1,45 @@
-/*	$OpenBSD: ip_mroute.c,v 1.20 2000/11/10 15:33:10 provos Exp $	*/
+/*	$OpenBSD: ip_mroute.c,v 1.23 2001/09/26 17:37:52 deraadt Exp $	*/
 /*	$NetBSD: ip_mroute.c,v 1.27 1996/05/07 02:40:50 thorpej Exp $	*/
+
+/*
+ * Copyright (c) 1989 Stephen Deering
+ * Copyright (c) 1992, 1993
+ *      The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Stephen Deering of Stanford University.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *      This product includes software developed by the University of
+ *      California, Berkeley and its contributors.
+ * 4. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *      @(#)ip_mroute.c 8.2 (Berkeley) 11/15/93
+ * $Id: ip_mroute.c,v 1.23 2001/09/26 17:37:52 deraadt Exp $
+ */
 
 /*
  * IP multicast forwarding procedures
@@ -26,9 +66,12 @@
 #include <sys/kernel.h>
 #include <sys/ioctl.h>
 #include <sys/syslog.h>
+#include <sys/timeout.h>
+
 #include <net/if.h>
 #include <net/route.h>
 #include <net/raw_cb.h>
+
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet/in_systm.h>
@@ -82,6 +125,8 @@ extern int rsvp_on;
 
 #define		EXPIRE_TIMEOUT	(hz / 4)	/* 4x / second */
 #define		UPCALL_EXPIRE	6		/* number of timeouts */
+struct timeout	upcalls_timeout;
+struct timeout	tbf_timeout;
 
 /*
  * Define the token bucket filter structures
@@ -413,7 +458,8 @@ ip_mrouter_init(so, m)
 
 	pim_assert = 0;
 
-	timeout(expire_upcalls, (caddr_t)0, EXPIRE_TIMEOUT);
+	timeout_set(&upcalls_timeout, expire_upcalls, NULL);
+	timeout_add(&upcalls_timeout, EXPIRE_TIMEOUT);
 
 	if (mrtdebug)
 		log(LOG_DEBUG, "ip_mrouter_init\n");
@@ -445,7 +491,7 @@ ip_mrouter_done()
 	numvifs = 0;
 	pim_assert = 0;
 	
-	untimeout(expire_upcalls, (caddr_t)NULL);
+	timeout_del(&upcalls_timeout);
 	
 	/*
 	 * Free all multicast forwarding cache entries.
@@ -1211,7 +1257,7 @@ expire_upcalls(v)
 	}
 
 	splx(s);
-	timeout(expire_upcalls, (caddr_t)0, EXPIRE_TIMEOUT);
+	timeout_add(&upcalls_timeout, EXPIRE_TIMEOUT);
 }
 
 /*
@@ -1417,8 +1463,7 @@ encap_send(ip, vifp, m)
 	 */
 	ip_copy = mtod(mb_copy, struct ip *);
 	*ip_copy = multicast_encap_iphdr;
-	ip_copy->ip_id = ip_randomid();
-	HTONS(ip_copy->ip_id);
+	ip_copy->ip_id = htons(ip_randomid());
 	ip_copy->ip_len = len;
 	ip_copy->ip_src = vifp->v_lcl_addr;
 	ip_copy->ip_dst = vifp->v_rmt_addr;
@@ -1555,7 +1600,8 @@ tbf_control(vifp, m, ip, p_len)
 		} else {
 			/* queue packet and timeout till later */
 			tbf_queue(vifp, m, ip);
-			timeout(tbf_reprocess_q, vifp, 1);
+			timeout_set(&tbf_timeout, tbf_reprocess_q, vifp);
+			timeout_add(&tbf_timeout, 1);
 		}
 	} else {
 		if (vifp->v_tbf.q_len >= MAXQSIZE &&
@@ -1666,7 +1712,7 @@ tbf_reprocess_q(arg)
 	tbf_process_q(vifp);
 
 	if (vifp->v_tbf.q_len)
-		timeout(tbf_reprocess_q, vifp, 1);
+		timeout_add(&tbf_timeout, 1);
 }
 
 /* function that will selectively discard a member of the queue

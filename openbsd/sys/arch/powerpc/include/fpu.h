@@ -1,4 +1,4 @@
-/*	$OpenBSD: fpu.h,v 1.3 1997/10/13 10:53:44 pefo Exp $	*/
+/*	$OpenBSD: fpu.h,v 1.5 2001/09/01 15:49:05 drahn Exp $	*/
 
 /*-
  * Copyright (C) 1996 Wolfgang Solfrank.
@@ -30,8 +30,8 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef	_MACHINE_FPU_H_
-#define	_MACHINE_FPU_H_
+#ifndef	_POWERPC_FPU_H_
+#define	_POWERPC_FPU_H_
 
 #define	FPCSR_FX	0x80000000
 #define	FPCSR_FEX	0x40000000
@@ -66,4 +66,6 @@
 #define	FPCSR_NI	0x00000004
 #define	FPCSR_RN	0x00000003
 
-#endif	/* _MACHINE_FPU_H_ */
+void enable_fpu(struct proc *p);
+void save_fpu(struct proc *p);
+#endif	/* _POWERPC_FPU_H_ */

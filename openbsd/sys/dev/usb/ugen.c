@@ -1,5 +1,5 @@
-/*	$OpenBSD: ugen.c,v 1.14 2001/01/28 09:43:41 aaron Exp $ */
-/*	$NetBSD: ugen.c,v 1.43 2000/10/24 14:53:59 augustss Exp $	*/
+/*	$OpenBSD: ugen.c,v 1.16 2001/09/20 17:02:31 mpech Exp $ */
+/*	$NetBSD: ugen.c,v 1.45 2000/12/13 04:05:14 augustss Exp $	*/
 /*	$FreeBSD: src/sys/dev/usb/ugen.c,v 1.26 1999/11/17 22:33:41 n_hibma Exp $	*/
 
 /*
@@ -509,7 +509,7 @@ ugen_do_read(struct ugen_softc *sc, int endpt, struct uio *uio, int flag)
 
 	switch (sce->edesc->bmAttributes & UE_XFERTYPE) {
 	case UE_INTERRUPT:
-		/* Block until activity occured. */
+		/* Block until activity occurred. */
 		s = splusb();
 		while (sce->q.c_cc == 0) {
 			if (flag & IO_NDELAY) {

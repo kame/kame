@@ -1,4 +1,4 @@
-/*	$OpenBSD: tp_emit.c,v 1.4 2000/02/25 04:26:11 itojun Exp $	*/
+/*	$OpenBSD: tp_emit.c,v 1.7 2001/06/23 03:54:58 angelos Exp $	*/
 /*	$NetBSD: tp_emit.c,v 1.8 1996/03/16 23:13:48 christos Exp $	*/
 
 /*-
@@ -199,18 +199,20 @@ tp_emit(dutype, tpcb, seq, eot, data)
 			m->m_nextpkt = MNULL;
 			m->m_data = m->m_pktdat;
 			m->m_flags = M_PKTHDR;
-			bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
+			m->m_pkthdr.rcvif = 0;
+			m->m_pkthdr.len = 0;
+			m_tag_init(m);
 		}
 	} else {
 		MGETHDR(m, M_DONTWAIT, TPMT_TPHDR);
 	}
-	m->m_data += max_hdr;
 	if (m == NULL) {
 		if (data != (struct mbuf *) 0)
 			m_freem(data);
 		error = ENOBUFS;
 		goto done;
 	}
+	m->m_data += max_hdr;
 	m->m_len = sizeof(struct tpdu);
 	m->m_act = MNULL;
 

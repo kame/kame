@@ -1,4 +1,4 @@
-/*	$OpenBSD: types.h,v 1.8 2000/11/16 04:33:47 ericj Exp $	*/
+/*	$OpenBSD: types.h,v 1.11 2001/09/01 05:48:18 jason Exp $	*/
 /*	$NetBSD: types.h,v 1.6 1996/12/05 00:13:47 cgd Exp $	*/
 
 /*-
@@ -42,10 +42,6 @@
 #include <sys/cdefs.h>
 
 #if !defined(_ANSI_SOURCE) && !defined(_POSIX_SOURCE)
-typedef struct _physadr {
-	long	r[1];
-} *physadr;
-
 typedef struct label_t {
 	long	val[10];
 } label_t;
@@ -73,14 +69,14 @@ typedef	unsigned short		 uint16_t;
 typedef	int			  int32_t;
 typedef	unsigned int		u_int32_t;
 typedef	unsigned int		 uint32_t;
-typedef	long			  int64_t;
-typedef	unsigned long		u_int64_t;
-typedef	unsigned long		 uint64_t;
+typedef	long long		  int64_t;
+typedef	unsigned long long	u_int64_t;
+typedef	unsigned long long	 uint64_t;
 
-typedef int64_t			register_t;
+typedef long			register_t;
 
 #define	__BROKEN_INDIRECT_CONFIG
-
-#define __HAVE_NWSCONS
+#define	__HAVE_DEVICE_REGISTER
+#define	__HAVE_NWSCONS
 
 #endif	/* _MACHTYPES_H_ */

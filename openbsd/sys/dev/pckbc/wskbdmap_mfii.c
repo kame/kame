@@ -1,4 +1,4 @@
-/*	$OpenBSD: wskbdmap_mfii.c,v 1.5 2001/03/09 15:25:01 aaron Exp $ */
+/*	$OpenBSD: wskbdmap_mfii.c,v 1.13 2001/10/04 23:23:46 mickey Exp $ */
 /*	$NetBSD: wskbdmap_mfii.c,v 1.15 2000/05/19 16:40:04 drochner Exp $	*/
 
 /*-
@@ -133,11 +133,11 @@ static const keysym_t pckbd_keydesc_us[] = {
     KC(88),  KS_Cmd_Screen11,	KS_f12,
     KC(127),			KS_Pause, /* Break */
     KC(156),			KS_KP_Enter,
-    KC(157),			KS_Control_R,
+    KC(157), KS_Cmd1,		KS_Control_R,
     KC(170),			KS_Print_Screen,
     KC(181),			KS_KP_Divide,
     KC(183),			KS_Print_Screen,
-    KC(184),			KS_Alt_R,	KS_Multi_key,
+    KC(184), KS_Cmd2,		KS_Alt_R,	KS_Multi_key,
 #if 0
     KC(198),  KS_Cmd_ResetClose, /* CTL-Break */
 #endif
@@ -512,6 +512,158 @@ static const keysym_t pckbd_keydesc_iopener[] = {
     KC(88), 			KS_f11,
 };
 
+static const keysym_t pckbd_keydesc_ru[] = {
+/*  pos      normal		shifted		altgr			shift-altgr */
+    KC(7),   KS_6,		KS_asciicircum,	KS_6,			KS_comma,
+    KC(8),   KS_7,		KS_ampersand,	KS_7,			KS_period,
+    KC(16),  KS_q,		KS_Q,		KS_Cyrillic_ishort,	KS_Cyrillic_ISHORT,
+    KC(17),  KS_w,		KS_W,		KS_Cyrillic_tse,	KS_Cyrillic_TSE,
+    KC(18),  KS_e,		KS_E,		KS_Cyrillic_u,		KS_Cyrillic_U,
+    KC(19),  KS_r,		KS_R,		KS_Cyrillic_ka,		KS_Cyrillic_KA,
+    KC(20),  KS_t,		KS_T,		KS_Cyrillic_ie,		KS_Cyrillic_IE,
+    KC(21),  KS_y,		KS_Y,		KS_Cyrillic_en,		KS_Cyrillic_EN,
+    KC(22),  KS_u,		KS_U,		KS_Cyrillic_ge,		KS_Cyrillic_GE,
+    KC(23),  KS_i,		KS_I,		KS_Cyrillic_sha,	KS_Cyrillic_SHA,
+    KC(24),  KS_o,		KS_O,		KS_Cyrillic_scha,	KS_Cyrillic_SCHA,
+    KC(25),  KS_p,		KS_P,		KS_Cyrillic_ze,		KS_Cyrillic_ZE,
+    KC(26),  KS_bracketleft,	KS_braceleft,	KS_Cyrillic_ha,		KS_Cyrillic_HA,
+    KC(27),  KS_bracketright,	KS_braceright,	KS_Cyrillic_hsighn,	KS_Cyrillic_HSIGHN,
+    KC(30),  KS_a,		KS_A,		KS_Cyrillic_ef,		KS_Cyrillic_EF,
+    KC(31),  KS_s,		KS_S,		KS_Cyrillic_yeru,	KS_Cyrillic_YERU,
+    KC(32),  KS_d,		KS_D,		KS_Cyrillic_ve,		KS_Cyrillic_VE,
+    KC(33),  KS_f,		KS_F,		KS_Cyrillic_a,		KS_Cyrillic_A,
+    KC(34),  KS_g,		KS_G,		KS_Cyrillic_pe,		KS_Cyrillic_PE,
+    KC(35),  KS_h,		KS_H,		KS_Cyrillic_er,		KS_Cyrillic_ER,
+    KC(36),  KS_j,		KS_J,		KS_Cyrillic_o,		KS_Cyrillic_O,
+    KC(37),  KS_k,		KS_K,		KS_Cyrillic_el,		KS_Cyrillic_EL,
+    KC(38),  KS_l,		KS_L,		KS_Cyrillic_de,		KS_Cyrillic_DE,
+    KC(39),  KS_semicolon,	KS_colon,	KS_Cyrillic_zhe,	KS_Cyrillic_ZHE,
+    KC(40),  KS_apostrophe,	KS_quotedbl,	KS_Cyrillic_e,		KS_Cyrillic_E,
+    KC(44),  KS_z,		KS_Z,		KS_Cyrillic_ya,		KS_Cyrillic_YA,
+    KC(45),  KS_x,		KS_X,		KS_Cyrillic_che,	KS_Cyrillic_CHE,
+    KC(46),  KS_c,		KS_C,		KS_Cyrillic_es,		KS_Cyrillic_ES,
+    KC(47),  KS_v,		KS_V,		KS_Cyrillic_em,		KS_Cyrillic_EM,
+    KC(48),  KS_b,		KS_B,		KS_Cyrillic_i,		KS_Cyrillic_I,
+    KC(49),  KS_n,		KS_N,		KS_Cyrillic_te,		KS_Cyrillic_TE,
+    KC(50),  KS_m,		KS_M,		KS_Cyrillic_ssighn,	KS_Cyrillic_SSIGHN,
+    KC(51),  KS_comma,		KS_less,	KS_Cyrillic_be,		KS_Cyrillic_BE,
+    KC(52),  KS_period,		KS_greater,	KS_Cyrillic_yu,		KS_Cyrillic_YU,
+    KC(53),  KS_slash,		KS_question,	KS_Cyrillic_yo,		KS_Cyrillic_YO,
+    KC(184), KS_Mode_switch,   KS_Multi_key,
+};
+
+static const keysym_t pckbd_keydesc_ua[] = {
+/*  pos      normal		shifted		altgr			shift-altgr */
+    KC(7),   KS_6,		KS_asciicircum,	KS_6,			KS_comma,
+    KC(8),   KS_7,		KS_ampersand,	KS_7,			KS_period,
+    KC(12),   KS_minus,		KS_underscore,	KS_Cyrillic_iukr,			KS_Cyrillic_IUKR,
+    KC(13),   KS_equal,		KS_plus,	KS_Cyrillic_yeukr,			KS_Cyrillic_YEUKR,
+    KC(16),  KS_q,		KS_Q,		KS_Cyrillic_ishort,	KS_Cyrillic_ISHORT,
+    KC(17),  KS_w,		KS_W,		KS_Cyrillic_tse,	KS_Cyrillic_TSE,
+    KC(18),  KS_e,		KS_E,		KS_Cyrillic_u,		KS_Cyrillic_U,
+    KC(19),  KS_r,		KS_R,		KS_Cyrillic_ka,		KS_Cyrillic_KA,
+    KC(20),  KS_t,		KS_T,		KS_Cyrillic_ie,		KS_Cyrillic_IE,
+    KC(21),  KS_y,		KS_Y,		KS_Cyrillic_en,		KS_Cyrillic_EN,
+    KC(22),  KS_u,		KS_U,		KS_Cyrillic_ge,		KS_Cyrillic_GE,
+    KC(23),  KS_i,		KS_I,		KS_Cyrillic_sha,	KS_Cyrillic_SHA,
+    KC(24),  KS_o,		KS_O,		KS_Cyrillic_scha,	KS_Cyrillic_SCHA,
+    KC(25),  KS_p,		KS_P,		KS_Cyrillic_ze,		KS_Cyrillic_ZE,
+    KC(26),  KS_bracketleft,	KS_braceleft,	KS_Cyrillic_ha,		KS_Cyrillic_HA,
+    KC(27),  KS_bracketright,	KS_braceright,	KS_Cyrillic_hsighn,	KS_Cyrillic_HSIGHN,
+    KC(30),  KS_a,		KS_A,		KS_Cyrillic_ef,		KS_Cyrillic_EF,
+    KC(31),  KS_s,		KS_S,		KS_Cyrillic_yeru,	KS_Cyrillic_YERU,
+    KC(32),  KS_d,		KS_D,		KS_Cyrillic_ve,		KS_Cyrillic_VE,
+    KC(33),  KS_f,		KS_F,		KS_Cyrillic_a,		KS_Cyrillic_A,
+    KC(34),  KS_g,		KS_G,		KS_Cyrillic_pe,		KS_Cyrillic_PE,
+    KC(35),  KS_h,		KS_H,		KS_Cyrillic_er,		KS_Cyrillic_ER,
+    KC(36),  KS_j,		KS_J,		KS_Cyrillic_o,		KS_Cyrillic_O,
+    KC(37),  KS_k,		KS_K,		KS_Cyrillic_el,		KS_Cyrillic_EL,
+    KC(38),  KS_l,		KS_L,		KS_Cyrillic_de,		KS_Cyrillic_DE,
+    KC(39),  KS_semicolon,	KS_colon,	KS_Cyrillic_zhe,	KS_Cyrillic_ZHE,
+    KC(40),  KS_apostrophe,	KS_quotedbl,	KS_Cyrillic_e,		KS_Cyrillic_E,
+    KC(41),  KS_grave,	KS_asciitilde,	KS_Cyrillic_gheukr,		KS_Cyrillic_GHEUKR,
+    KC(43),  KS_backslash,	KS_bar,	KS_Cyrillic_yi,		KS_Cyrillic_YI,
+    KC(44),  KS_z,		KS_Z,		KS_Cyrillic_ya,		KS_Cyrillic_YA,
+    KC(45),  KS_x,		KS_X,		KS_Cyrillic_che,	KS_Cyrillic_CHE,
+    KC(46),  KS_c,		KS_C,		KS_Cyrillic_es,		KS_Cyrillic_ES,
+    KC(47),  KS_v,		KS_V,		KS_Cyrillic_em,		KS_Cyrillic_EM,
+    KC(48),  KS_b,		KS_B,		KS_Cyrillic_i,		KS_Cyrillic_I,
+    KC(49),  KS_n,		KS_N,		KS_Cyrillic_te,		KS_Cyrillic_TE,
+    KC(50),  KS_m,		KS_M,		KS_Cyrillic_ssighn,	KS_Cyrillic_SSIGHN,
+    KC(51),  KS_comma,		KS_less,	KS_Cyrillic_be,		KS_Cyrillic_BE,
+    KC(52),  KS_period,		KS_greater,	KS_Cyrillic_yu,		KS_Cyrillic_YU,
+    KC(53),  KS_slash,		KS_question,	KS_Cyrillic_yo,		KS_Cyrillic_YO,
+    KC(184), KS_Mode_switch,   KS_Multi_key,
+};
+
+static const keysym_t pckbd_keydesc_sg[] = {
+/*  pos      normal		shifted		altgr		shift-altgr */
+    KC(2),   KS_1,		KS_plus,	KS_bar,
+    KC(3),   KS_2,		KS_quotedbl,	KS_at,
+    KC(4),   KS_3,		KS_asterisk,	KS_numbersign,
+    KC(5),   KS_4,		KS_ccedilla,
+    KC(7),   KS_6,		KS_ampersand,	KS_notsign,
+    KC(8),   KS_7,		KS_slash,	KS_brokenbar,
+    KC(9),   KS_8,		KS_parenleft,	KS_cent,
+    KC(10),  KS_9,		KS_parenright,
+    KC(11),  KS_0,		KS_equal,
+    KC(12),  KS_apostrophe,	KS_question,	KS_dead_acute,
+    KC(13),  KS_dead_circumflex,KS_dead_grave,	KS_dead_tilde,
+    KC(18),  KS_e,		KS_E,		KS_currency,
+    KC(21),  KS_z,
+    KC(26),  KS_udiaeresis,	KS_egrave,	KS_bracketleft,
+    KC(27),  KS_dead_diaeresis,	KS_exclam,	KS_bracketright,
+    KC(39),  KS_odiaeresis,	KS_eacute,
+    KC(40),  KS_adiaeresis,	KS_agrave,	KS_braceleft,
+    KC(41),  KS_section,	KS_degree,	KS_dead_abovering,
+    KC(43),  KS_dollar,		KS_sterling,	KS_braceright,
+    KC(44),  KS_y,
+    KC(51),  KS_comma,		KS_semicolon,
+    KC(52),  KS_period,		KS_colon,
+    KC(53),  KS_minus,		KS_underscore,
+    KC(86),  KS_less,		KS_greater,	KS_backslash,
+    KC(184), KS_Mode_switch,	KS_Multi_key,
+};
+
+static const keysym_t pckbd_keydesc_sg_nodead[] = {
+/*  pos      normal		shifted		altgr		shift-altgr */
+    KC(12),  KS_apostrophe,	KS_question,	KS_acute,
+    KC(13),  KS_asciicircum,	KS_grave,	KS_asciitilde,
+    KC(27),  KS_diaeresis,	KS_exclam,	KS_bracketright
+};
+
+static const keysym_t pckbd_keydesc_sf[] = {
+/*  pos      normal            shifted         altgr           shift-altgr */
+    KC(26),  KS_egrave,        KS_udiaeresis,  KS_bracketleft,
+    KC(39),  KS_eacute,        KS_odiaeresis,
+    KC(40),  KS_agrave,        KS_adiaeresis,  KS_braceleft
+};
+
+static const keysym_t pckbd_keydesc_pt[] = {
+/*  pos      normal            shifted         altgr           shift-altgr */
+    KC(3),   KS_2,             KS_quotedbl,    KS_at,
+    KC(4),   KS_3,             KS_numbersign,  KS_sterling,
+    KC(5),   KS_4,             KS_dollar,
+    KC(7),   KS_6,             KS_ampersand,
+    KC(8),   KS_7,             KS_slash,       KS_braceleft,
+    KC(9),   KS_8,             KS_parenleft,   KS_bracketleft,
+    KC(10),  KS_9,             KS_parenright,  KS_bracketright,
+    KC(11),  KS_0,             KS_equal,       KS_braceright,
+    KC(12),  KS_apostrophe,    KS_question,
+    KC(13),  KS_less,          KS_greater,
+    KC(26),  KS_plus,          KS_asterisk,
+    KC(27),  KS_dead_acute,    KS_dead_grave,
+    KC(39),  KS_ccedilla,      KS_Ccedilla,
+    KC(40),  KS_masculine,     KS_ordfeminine,
+    KC(41),  KS_backslash,     KS_bar,
+    KC(43),  KS_dead_tilde,    KS_dead_circumflex,
+    KC(51),  KS_comma,         KS_semicolon,
+    KC(52),  KS_period,        KS_colon,
+    KC(53),  KS_minus,         KS_underscore,
+    KC(86),  KS_less,          KS_greater,
+    KC(184), KS_Mode_switch,   KS_Multi_key,
+};
+
 #define KBD_MAP(name, base, map) \
 			{ name, base, sizeof(map)/sizeof(keysym_t), map }
 
@@ -542,6 +694,13 @@ const struct wscons_keydesc pckbd_keydesctab[] = {
 		pckbd_keydesc_swapctrlcaps),
 	KBD_MAP(KB_ES,			KB_US,	pckbd_keydesc_es),
 	KBD_MAP(KB_BE,			KB_US,	pckbd_keydesc_be),
+	KBD_MAP(KB_RU,			KB_US,	pckbd_keydesc_ru),
+	KBD_MAP(KB_UA,			KB_US,	pckbd_keydesc_ua),
+	KBD_MAP(KB_SG,			KB_US,	pckbd_keydesc_sg),
+	KBD_MAP(KB_SG | KB_NODEAD,	KB_SG,	pckbd_keydesc_sg_nodead),
+	KBD_MAP(KB_SF,			KB_SG,	pckbd_keydesc_sf),
+	KBD_MAP(KB_SF | KB_NODEAD,	KB_SF,	pckbd_keydesc_sg_nodead),
+	KBD_MAP(KB_PT,			KB_US,	pckbd_keydesc_pt),
 	{0, 0, 0, 0}
 };
 

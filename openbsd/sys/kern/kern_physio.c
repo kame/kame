@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_physio.c,v 1.9 2000/11/09 16:46:52 art Exp $	*/
+/*	$OpenBSD: kern_physio.c,v 1.13 2001/06/27 04:49:44 art Exp $	*/
 /*	$NetBSD: kern_physio.c,v 1.28 1997/05/19 10:43:28 pk Exp $	*/
 
 /*-
@@ -51,9 +51,7 @@
 
 #include <vm/vm.h>
 
-#if defined(UVM)
 #include <uvm/uvm_extern.h>
-#endif
 
 /*
  * The routines implemented in this file are described in:
@@ -100,17 +98,11 @@ physio(strategy, bp, dev, flags, minphys, uio)
 	 */
 	if (uio->uio_segflg == UIO_USERSPACE)
 		for (i = 0; i < uio->uio_iovcnt; i++)
-#if defined(UVM) /* XXXCDC: map not locked, rethink */
+			/* XXX - obsolete now that vslock can error? */
 			if (!uvm_useracc(uio->uio_iov[i].iov_base,
-				     uio->uio_iov[i].iov_len,
-				     (flags == B_READ) ? B_WRITE : B_READ))
-				return (EFAULT);
-#else
-			if (!useracc(uio->uio_iov[i].iov_base,
 			    uio->uio_iov[i].iov_len,
 			    (flags == B_READ) ? B_WRITE : B_READ))
 				return (EFAULT);
-#endif
 
 	/* Make sure we have a buffer, creating one if necessary. */
 	if ((nobuf = (bp == NULL)) != 0)
@@ -183,12 +175,13 @@ physio(strategy, bp, dev, flags, minphys, uio)
 			 * restores it.
 			 */
 			PHOLD(p);
-#if defined(UVM)
-                        uvm_vslock(p, bp->b_data, todo, (flags & B_READ) ?
-				VM_PROT_READ | VM_PROT_WRITE : VM_PROT_READ);
-#else
-			vslock(bp->b_data, todo);
-#endif
+			if (uvm_vslock(p, bp->b_data, todo, (flags & B_READ) ?
+			    VM_PROT_READ | VM_PROT_WRITE : VM_PROT_READ) !=
+			    KERN_SUCCESS) {
+				bp->b_flags |= B_ERROR;
+				bp->b_error = EFAULT;
+				goto after_unlock;
+			}
 			vmapbuf(bp, todo);
 
 			/* [call strategy to start the transfer] */
@@ -219,11 +212,8 @@ physio(strategy, bp, dev, flags, minphys, uio)
 			 *    locked]
 			 */
 			vunmapbuf(bp, todo);
-#if defined(UVM)
 			uvm_vsunlock(p, bp->b_data, todo);
-#else
-			vsunlock(bp->b_data, todo);
-#endif
+after_unlock:
 			PRELE(p);
 
 			/* remember error value (save a splbio/splx pair) */
@@ -242,9 +232,9 @@ physio(strategy, bp, dev, flags, minphys, uio)
 				panic("done > todo; strategy broken");
 #endif
 			iovp->iov_len -= done;
-                        iovp->iov_base += done;
-                        uio->uio_offset += done;
-                        uio->uio_resid -= done;
+			iovp->iov_base = (caddr_t)iovp->iov_base + done;
+			uio->uio_offset += done;
+			uio->uio_resid -= done;
 
 			/*
 			 * Now, check for an error.
@@ -290,18 +280,6 @@ struct buf *
 getphysbuf()
 {
 	struct buf *bp;
-#if !defined(UVM)
-	int s;
-
-	s = splbio();
-        while (bswlist.b_actf == NULL) {
-                bswlist.b_flags |= B_WANTED;
-                tsleep((caddr_t)&bswlist, PRIBIO + 1, "getphys", 0);
-        }
-        bp = bswlist.b_actf;
-        bswlist.b_actf = bp->b_actf;
-        splx(s);
-#else
 
 	bp = malloc(sizeof(*bp), M_TEMP, M_WAITOK);
 	bzero(bp, sizeof(*bp));
@@ -309,7 +287,7 @@ getphysbuf()
 	/* XXXCDC: are the following two lines necessary? */
 	bp->b_rcred = bp->b_wcred = NOCRED;
 	bp->b_vnbufs.le_next = NOLIST;
-#endif
+
 	return (bp);
 }
 
@@ -323,16 +301,6 @@ void
 putphysbuf(bp)
 	struct buf *bp;
 {
-#if !defined(UVM)
-        bp->b_actf = bswlist.b_actf;
-        bswlist.b_actf = bp;
-        if (bp->b_vp)
-                brelvp(bp);
-        if (bswlist.b_flags & B_WANTED) {
-                bswlist.b_flags &= ~B_WANTED;
-                wakeup(&bswlist);
-        }
-#else
 	/* XXXCDC: is this necesary? */
 	if (bp->b_vp)
 		brelvp(bp);
@@ -340,7 +308,6 @@ putphysbuf(bp)
 	if (bp->b_flags & B_WANTED)
 		panic("putphysbuf: private buf B_WANTED");
 	free(bp, M_TEMP);
-#endif
 }
 
 /*

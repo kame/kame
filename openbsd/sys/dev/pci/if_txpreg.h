@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_txpreg.h,v 1.17 2001/04/15 21:03:22 jason Exp $ */
+/*	$OpenBSD: if_txpreg.h,v 1.31 2001/08/24 21:11:14 jason Exp $ */
 
 /*
  * Copyright (c) 2001 Aaron Campbell <aaron@monkey.org>.
@@ -102,7 +102,7 @@
 #define	TXP_CMD_RX_FILTER_READ			0x06
 #define	TXP_CMD_READ_STATISTICS			0x07
 #define	TXP_CMD_CYCLE_STATISTICS		0x08
-#define	TXP_CMD_ERROR_READ			0x09
+#define	TXP_CMD_CLEAR_STATISTICS		0x09
 #define	TXP_CMD_MEMORY_READ			0x0a
 #define	TXP_CMD_MEMORY_WRITE_SINGLE		0x0b
 #define	TXP_CMD_VARIABLE_SECTION_READ		0x0c
@@ -165,11 +165,14 @@
 #define	TXP_CMD_GET_IP_ADDRESS			0x4a
 #define	TXP_CMD_READ_PCI_REG			0x4c
 #define	TXP_CMD_WRITE_PCI_REG			0x4d
+#define	TXP_CMD_OFFLOAD_READ			0x4e
 #define	TXP_CMD_OFFLOAD_WRITE			0x4f
 #define	TXP_CMD_HELLO_RESPONSE			0x57
 #define	TXP_CMD_ENABLE_RX_FILTER		0x58
 #define	TXP_CMD_RX_FILTER_CAPABILITY		0x59
 #define	TXP_CMD_HALT				0x5d
+#define	TXP_CMD_READ_IPSEC_INFO			0x54
+#define	TXP_CMD_GET_IPSEC_ENABLE		0x67
 #define	TXP_CMD_INVALID				0xffff
 
 #define	TXP_FRAGMENT		0x0000
@@ -247,8 +250,9 @@ struct txp_tx_desc {
 #define	TX_PFLAGS_PRIO		0x00000040	/* priority field valid */
 #define	TX_PFLAGS_UDPCKSUM	0x00000080	/* udp checksum */
 #define	TX_PFLAGS_PADFRAME	0x00000100	/* pad frame */
-#define	TX_PFLAGS_VLANTAG_M	0x000ff000	/* vlan tag mask */
-#define	TX_PFLAGS_VLANPRI_M	0x00300000	/* vlan priority mask */
+#define	TX_PFLAGS_VLANTAG_M	0x0ffff000	/* vlan tag mask */
+#define	TX_PFLAGS_VLANPRI_M	0x00700000	/* vlan priority mask */
+#define	TX_PFLAGS_VLANTAG_S	12		/* amount to shift tag */
 
 struct txp_rx_desc {
 	volatile u_int8_t	rx_flags;	/* type/descriptor flags */
@@ -295,11 +299,11 @@ struct txp_rx_desc {
 #define	RX_STAT_IPFRAG		0x00000008	/* fragment, ipsec not done */
 #define	RX_STAT_IPSEC		0x00000010	/* ipsec decoded packet */
 #define	RX_STAT_IPCKSUMBAD	0x00000020	/* ip checksum failed */
-#define	RX_STAT_TCPCKSUMBAD	0x00000040	/* tcp checksum failed */
-#define	RX_STAT_UDPCKSUMBAD	0x00000080	/* udp checksum failed */
+#define	RX_STAT_UDPCKSUMBAD	0x00000040	/* udp checksum failed */
+#define	RX_STAT_TCPCKSUMBAD	0x00000080	/* tcp checksum failed */
 #define	RX_STAT_IPCKSUMGOOD	0x00000100	/* ip checksum succeeded */
-#define	RX_STAT_TCPCKSUMGOOD	0x00000200	/* tcp checksum succeeded */
-#define	RX_STAT_UDPCKSUMGOOD	0x00000400	/* udp checksum succeeded */
+#define	RX_STAT_UDPCKSUMGOOD	0x00000200	/* udp checksum succeeded */
+#define	RX_STAT_TCPCKSUMGOOD	0x00000400	/* tcp checksum succeeded */
 
 
 struct txp_rxbuf_desc {
@@ -307,6 +311,14 @@ struct txp_rxbuf_desc {
 	volatile u_int32_t	rb_paddrhi;
 	volatile u_int32_t	rb_vaddrlo;
 	volatile u_int32_t	rb_vaddrhi;
+};
+
+/* Extension descriptor */
+struct txp_ext_desc {
+	volatile u_int32_t	ext_1;
+	volatile u_int32_t	ext_2;
+	volatile u_int32_t	ext_3;
+	volatile u_int32_t	ext_4;
 };
 
 struct txp_cmd_desc {
@@ -485,7 +497,7 @@ struct txp_hostvar {
 #define	STAT_ROM_EEPROM_LOAD		0x00000002
 #define	STAT_WAITING_FOR_BOOT		0x00000007
 #define	STAT_RUNNING			0x00000009
-#define	STAT_WAITING_FOR_HOST_REQUEST	0x0000000D
+#define	STAT_WAITING_FOR_HOST_REQUEST	0x0000000d
 #define	STAT_WAITING_FOR_SEGMENT	0x00000010
 #define	STAT_SLEEPING			0x00000011
 #define	STAT_HALTED			0x00000014
@@ -496,6 +508,17 @@ struct txp_hostvar {
 #define	CMD_ENTRIES			32
 #define	RSP_ENTRIES			32
 
+#define	OFFLOAD_TCPCKSUM		0x00000002	/* tcp checksum */
+#define	OFFLOAD_UDPCKSUM		0x00000004	/* udp checksum */
+#define	OFFLOAD_IPCKSUM			0x00000008	/* ip checksum */
+#define	OFFLOAD_IPSEC			0x00000010	/* ipsec enable */
+#define	OFFLOAD_BCAST			0x00000020	/* broadcast throttle */
+#define	OFFLOAD_DHCP			0x00000040	/* dhcp prevention */
+#define	OFFLOAD_VLAN			0x00000080	/* vlan enable */
+#define	OFFLOAD_FILTER			0x00000100	/* filter enable */
+#define	OFFLOAD_TCPSEG			0x00000200	/* tcp segmentation */
+#define	OFFLOAD_MASK			0xfffffffe	/* mask off low bit */
+
 /*
  * Macros for converting array indices to offsets within the descriptor
  * arrays.  The chip operates on offsets, but it's much easier for us
@@ -505,9 +528,8 @@ struct txp_hostvar {
 #define	TXP_OFFSET2IDX(off)	((off) >> 4)
 
 struct txp_dma_alloc {
-	caddr_t			dma_vaddr;
 	u_int64_t		dma_paddr;
-	bus_size_t		dma_siz;
+	caddr_t			dma_vaddr;
 	bus_dmamap_t		dma_map;
 	bus_dma_segment_t	dma_seg;
 	int			dma_nseg;
@@ -534,15 +556,15 @@ struct txp_tx_ring {
 	volatile u_int32_t	*r_off;		/* hostvar index pointer */
 };
 
+struct txp_swdesc {
+	struct mbuf *		sd_mbuf;
+	bus_dmamap_t		sd_map;
+};
+
 struct txp_rx_ring {
 	struct txp_rx_desc	*r_desc;	/* base address of descs */
 	volatile u_int32_t	*r_roff;	/* hv read offset ptr */
 	volatile u_int32_t	*r_woff;	/* hv write offset ptr */
-};
-
-/* Software transmit list */
-struct txp_swtx {
-	struct mbuf		*tx_mbuf;
 };
 
 struct txp_softc {
@@ -555,6 +577,7 @@ struct txp_softc {
 	bus_dma_tag_t		sc_dmat;	/* dma tag */
 	struct txp_cmd_ring	sc_cmdring;
 	struct txp_rsp_ring	sc_rspring;
+	struct txp_swdesc	sc_txd[TX_ENTRIES];
 	void *			sc_ih;
 	struct timeout		sc_tick;
 	struct ifmedia		sc_ifmedia;
@@ -569,6 +592,7 @@ struct txp_softc {
 	struct txp_dma_alloc	sc_cmdring_dma, sc_rspring_dma;
 	struct txp_dma_alloc	sc_rxbufring_dma;
 	int			sc_cold;
+	u_int32_t		sc_rx_capability, sc_tx_capability;
 };
 
 #define	TXP_DEVNAME(sc)		((sc)->sc_cold ? "" : (sc)->sc_dev.dv_xname)
@@ -587,7 +611,18 @@ struct txp_fw_section_header {
 	u_int32_t	addr;
 };
 
+#define	TXP_MAX_SEGLEN	0xffff
+#define	TXP_MAX_PKTLEN	0x0800
+
 #define	WRITE_REG(sc,reg,val) \
     bus_space_write_4((sc)->sc_bt, (sc)->sc_bh, reg, val)
 #define	READ_REG(sc,reg) \
     bus_space_read_4((sc)->sc_bt, (sc)->sc_bh, reg)
+
+#ifdef __HAS_NEW_BUS_DMAMAP_SYNC
+#define	txp_bus_dmamap_sync(tag, map, off, len, op)	\
+    bus_dmamap_sync((tag), (map), (off), (len), (op))
+#else
+#define	txp_bus_dmamap_sync(tag, map, off, len, op)	\
+    bus_dmamap_sync((tag), (map), (op))
+#endif

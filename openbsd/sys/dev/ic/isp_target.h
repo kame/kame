@@ -1,3 +1,5 @@
+/*	$OpenBSD: isp_target.h,v 1.8 2001/10/06 22:45:52 mjacob Exp $	*/
+
 /* @(#)isp_target.h 1.3 */
 /*
  * Qlogic Target Mode Structure and Flag Definitions
@@ -333,8 +335,8 @@ typedef struct {
  */
 #define	GET_IID_VAL(x)		(x & 0x3f)
 #define	GET_BUS_VAL(x)		((x >> 7) & 0x1)
-#define	SET_IID_VAL(y, x)	(y | (x & 0x3f))
-#define	SET_BUS_VAL(y, x)	(y | ((x & 0x1) << 7))
+#define	SET_IID_VAL(y, x)	y = ((y & ~0x3f) | (x & 0x3f))
+#define	SET_BUS_VAL(y, x)	y = ((y & 0x3f) | ((x & 0x1) << 7))
 
 /*
  * ct_flags values
@@ -361,13 +363,16 @@ typedef struct {
 #define CT_INVAL	0x06	/* request for disabled lun */
 #define CT_NOPATH	0x07	/* invalid ITL nexus */
 #define	CT_INVRXID	0x08	/* (FC only) Invalid RX_ID */
+#define	CT_DATA_OVER	0x09	/* (FC only) Data Overrun */
 #define CT_RSELTMO	0x0A	/* reselection timeout after 2 tries */
 #define CT_TIMEOUT	0x0B	/* timed out */
 #define CT_RESET	0x0E	/* SCSI Bus Reset occurred */
 #define	CT_PARITY	0x0F	/* Uncorrectable Parity Error */
+#define	CT_BUS_ERROR	0x10	/* (FC Only) DMA PCI Error */
 #define	CT_PANIC	0x13	/* Unrecoverable Error */
 #define CT_PHASE_ERROR	0x14	/* Bus phase sequence error */
 #define CT_BDR_MSG	0x17	/* Bus Device Reset msg received */
+#define	CT_DATA_UNDER	0x15	/* (FC only) Data Underrun */
 #define CT_TERMINATED	0x19	/* due to Terminate Transfer mbox cmd */
 #define	CT_PORTNOTAVAIL	0x28	/* port not available */
 #define	CT_LOGOUT	0x29	/* port logout */
@@ -427,6 +432,14 @@ typedef struct {
 			u_int16_t ct_scsi_status;
 			u_int32_t ct_xfrlen;
 			ispds_t ct_dataseg[ISP_RQDSEG_T2];
+			/*
+			 * For CTIO3, an ispds64_t would go here, padded
+			 * to the end of the request.
+			 */
+			/*
+			 * For CTIO4, an ispdlist_t would go here, padded
+			 * to the end of the request.
+			 */
 		} m0;
 		struct {
 			u_int16_t _reserved;
@@ -682,10 +695,11 @@ int isp_target_notify(struct ispsoftc *, void *, u_int16_t *);
 
 /*
  * Enable/Disable/Modify a logical unit.
+ * (softc, cmd, bus, tgt, lun, cmd_cnt, inotify_cnt, opaque)
  */
-#define	DFLT_CMD_CNT	32	/* XX */
-#define	DFLT_INOTIFY	(4)
-int isp_lun_cmd(struct ispsoftc *, int, int, int, int, u_int32_t);
+#define	DFLT_CMND_CNT	32
+#define	DFLT_INOT_CNT	4
+int isp_lun_cmd(struct ispsoftc *, int, int, int, int, int, int, u_int32_t);
 
 /*
  * General request queue 'put' routine for target mode entries.

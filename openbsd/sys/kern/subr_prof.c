@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_prof.c,v 1.6 1996/05/02 13:12:22 deraadt Exp $	*/
+/*	$OpenBSD: subr_prof.c,v 1.8 2001/09/19 20:50:59 mickey Exp $	*/
 /*	$NetBSD: subr_prof.c,v 1.12 1996/04/22 01:38:50 christos Exp $	*/
 
 /*-
@@ -49,6 +49,8 @@
 #ifdef GPROF
 #include <sys/malloc.h>
 #include <sys/gmon.h>
+#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 /*
  * Froms is actually a bunch of unsigned shorts indexing tos
@@ -63,6 +65,8 @@ kmstartup()
 {
 	char *cp;
 	struct gmonparam *p = &_gmonparam;
+	int size;
+
 	/*
 	 * Round lowpc and highpc to multiples of the density we're using
 	 * so the rest of the scaling (here and in gprof) stays in ints.
@@ -81,13 +85,12 @@ kmstartup()
 	else if (p->tolimit > MAXARCS)
 		p->tolimit = MAXARCS;
 	p->tossize = p->tolimit * sizeof(struct tostruct);
-	cp = (char *)malloc(p->kcountsize + p->fromssize + p->tossize,
-	    M_GPROF, M_NOWAIT);
+	size = p->kcountsize + p->fromssize + p->tossize;
+	cp = (char *)uvm_km_zalloc(kernel_map, round_page(size));
 	if (cp == 0) {
 		printf("No memory for profiling.\n");
 		return;
 	}
-	bzero(cp, p->kcountsize + p->tossize + p->fromssize);
 	p->tos = (struct tostruct *)cp;
 	cp += p->tossize;
 	p->kcount = (u_short *)cp;

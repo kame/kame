@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_rl_pci.c,v 1.2 2001/04/13 15:58:44 aaron Exp $ */
+/*	$OpenBSD: if_rl_pci.c,v 1.5 2001/09/11 20:05:25 miod Exp $ */
 
 /*
  * Copyright (c) 1997, 1998
@@ -63,9 +63,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
-#include <vm/vm_kern.h>
-#include <vm/vm_extern.h>
 #include <machine/bus.h>
 
 #include <dev/mii/mii.h>
@@ -174,8 +171,7 @@ rl_pci_attach(parent, self, aux)
 	/*
 	 * Allocate our interrupt.
 	 */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}

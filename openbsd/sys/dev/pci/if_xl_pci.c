@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_xl_pci.c,v 1.7 2000/10/14 15:44:21 aaron Exp $	*/
+/*	$OpenBSD: if_xl_pci.c,v 1.9 2001/08/25 10:13:29 art Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -72,7 +72,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 /*
  * The following #define causes the code to use PIO to access the
@@ -282,8 +281,7 @@ xl_pci_attach(parent, self, aux)
 	/*
 	 * Allocate our interrupt.
 	 */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}

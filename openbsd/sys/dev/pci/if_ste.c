@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ste.c,v 1.10 2001/02/20 19:39:45 mickey Exp $ */
+/*	$OpenBSD: if_ste.c,v 1.14 2001/08/25 10:13:29 art Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -65,7 +65,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 #include <sys/device.h>
 
@@ -604,7 +603,7 @@ int ste_intr(xsc)
 	/* Re-enable interrupts */
 	CSR_WRITE_2(sc, STE_IMR, STE_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		ste_start(ifp);
 
 	return claimed;
@@ -617,7 +616,6 @@ int ste_intr(xsc)
 void ste_rxeof(sc)
 	struct ste_softc		*sc;
 {
-        struct ether_header	*eh;
         struct mbuf		*m;
         struct ifnet		*ifp;
 	struct ste_chain_onefrag	*cur_rx;
@@ -675,7 +673,6 @@ again:
 		}
 
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = total_len;
 
@@ -684,9 +681,8 @@ again:
 			bpf_mtap(ifp->if_bpf, m);
 #endif
 
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
+		/* pass it on. */
+		ether_input_mbuf(ifp, m);
 	}
 
 	/*
@@ -821,7 +817,7 @@ void ste_stats_update(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
 			sc->ste_link++;
-		if (ifp->if_snd.ifq_head != NULL)
+		if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 			ste_start(ifp);
 	}
 
@@ -943,8 +939,7 @@ void ste_attach(parent, self, aux)
 #endif
 
 	/* Allocate interrupt */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin, pa->pa_intrline,
-	    &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		goto fail;
 	}
@@ -989,7 +984,8 @@ void ste_attach(parent, self, aux)
 	ifp->if_start = ste_start;
 	ifp->if_watchdog = ste_watchdog;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = STE_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, STE_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	sc->sc_mii.mii_ifp = ifp;
@@ -1436,7 +1432,7 @@ void ste_start(ifp)
 			break;
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1491,7 +1487,7 @@ void ste_watchdog(ifp)
 	ste_reset(sc);
 	ste_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		ste_start(ifp);
 
 	return;

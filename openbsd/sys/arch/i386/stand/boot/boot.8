@@ -1,4 +1,4 @@
-.\"	$OpenBSD: boot.8,v 1.25 2001/01/16 16:43:14 mickey Exp $
+.\"	$OpenBSD: boot.8,v 1.28 2001/09/03 11:34:17 deraadt Exp $
 .\"
 .\" Copyright (c) 1997-2001 Michael Shalayeff
 .\" All rights reserved.
@@ -134,8 +134,8 @@ timeout period has expired.
 The following commands are accepted at the
 .Nm
 prompt:
-.Bl -tag -width stty_device_speed_____
-.It boot Op Ar image Op Fl abcds
+.Bl -tag -width shorten
+.It boot Op Ar image Op Fl acds
 Boots the kernel image specified by
 .Ar image
 with any options given.
@@ -145,6 +145,24 @@ either or both can be omitted (':' is not needed if both are omitted),
 in which case values from
 .Nm
 variables will be used.
+.Bl -tag -width _a_
+.It Fl a
+Causes the kernel to ask for the
+.Nm root
+device to use.
+.It Fl c
+Causes the kernel to go into
+.Xr boot_config 8
+before performing
+.Xr autoconf 4
+procedures.
+.It Fl d
+Causes the kernel to drop into
+.Xr ddb 4
+at the earliest convinient point.
+.It Fl s
+Causes the kernel to boot single-user.
+.El
 .It echo Op Ar args
 Displays
 .Ar args
@@ -155,7 +173,7 @@ commands, if any.
 .It machine Op Ar command
 Issues machine-dependent commands.
 These are defined for i386 architecture:
-.Bl -tag -width diskinfo_
+.Bl -tag -width diskinfo
 .It Nm diskinfo
 Prints a list of hard disks installed on your system including:
 BIOS device number, and the BIOS geometry.
@@ -193,7 +211,7 @@ useful by the BIOS).
 machine mem -0x100000@0xf00000
 .Ed
 .Pp
-which effectively excludes 15-16M range from the map of usefull memory.
+which effectively excludes 15-16M range from the map of useful memory.
 .It Nm regs
 Prints contents of processor registers if compiled with
 .Em DEBUG .
@@ -312,9 +330,13 @@ kernel image
 .El
 .Sh SEE ALSO
 .Xr gzip 1 ,
+.Xr autoconf 4 ,
+.Xr ddb 4 ,
+.Xr boot_config 8 ,
 .Xr boot_i386 8 ,
 .Xr fdisk 8 ,
-.Xr installboot 8
+.Xr installboot 8 ,
+.Xr reboot 8
 .Pp
 RFC 1950 describes the zlib library interface.
 .Pp

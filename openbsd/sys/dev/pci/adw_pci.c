@@ -1,4 +1,4 @@
-/*	$OpenBSD: adw_pci.c,v 1.7 2001/04/11 04:05:17 krw Exp $ */
+/*	$OpenBSD: adw_pci.c,v 1.10 2001/08/25 10:13:29 art Exp $ */
 /* $NetBSD: adw_pci.c,v 1.7 2000/05/26 15:13:46 dante Exp $	 */
 
 /*
@@ -77,8 +77,8 @@
 
 /******************************************************************************/
 
-static int adw_pci_match __P((struct device *, void *, void *));
-static void adw_pci_attach __P((struct device *, struct device *, void *));
+int adw_pci_match __P((struct device *, void *, void *));
+void adw_pci_attach __P((struct device *, struct device *, void *));
 
 struct cfattach adw_pci_ca =
 {
@@ -91,7 +91,7 @@ struct cfattach adw_pci_ca =
  * If we find one, note it's address (slot) and call
  * the actual probe routine to check it out.
  */
-static int
+int
 adw_pci_match(parent, match, aux)
 	struct device  *parent;
 	void           *match;
@@ -111,7 +111,7 @@ adw_pci_match(parent, match, aux)
 }
 
 
-static void
+void
 adw_pci_attach(parent, self, aux)
 	struct device  *parent, *self;
 	void           *aux;
@@ -162,7 +162,7 @@ adw_pci_attach(parent, self, aux)
 	 * Map Device Registers for I/O
 	 */
 	if (pci_mapreg_map(pa, PCI_BASEADR_IO, PCI_MAPREG_TYPE_IO, 0,
-			   &iot, &ioh, NULL, NULL)) {
+			   &iot, &ioh, NULL, NULL, 0)) {
 		printf("\n%s: unable to map device registers\n",
 		       sc->sc_dev.dv_xname);
 		return;
@@ -182,8 +182,7 @@ adw_pci_attach(parent, self, aux)
 	/*
 	 * Map Interrupt line
 	 */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf("\n%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
 		return;
 	}

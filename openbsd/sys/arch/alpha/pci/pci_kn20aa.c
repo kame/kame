@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_kn20aa.c,v 1.11 1999/01/11 05:11:03 millert Exp $	*/
+/*	$OpenBSD: pci_kn20aa.c,v 1.14 2001/09/29 07:14:35 mickey Exp $	*/
 /*	$NetBSD: pci_kn20aa.c,v 1.21 1996/11/17 02:05:27 cgd Exp $	*/
 
 /*
@@ -61,6 +61,7 @@
 int	dec_kn20aa_intr_map __P((void *, pcitag_t, int, int,
 	    pci_intr_handle_t *));
 const char *dec_kn20aa_intr_string __P((void *, pci_intr_handle_t));
+int	dec_kn20aa_intr_line __P((void *, pci_intr_handle_t));
 void	*dec_kn20aa_intr_establish __P((void *, pci_intr_handle_t,
 	    int, int (*func)(void *), void *, char *));
 void	dec_kn20aa_intr_disestablish __P((void *, void *));
@@ -89,11 +90,13 @@ pci_kn20aa_pickintr(ccp)
         pc->pc_intr_v = ccp;
         pc->pc_intr_map = dec_kn20aa_intr_map;
         pc->pc_intr_string = dec_kn20aa_intr_string;
+        pc->pc_intr_line = dec_kn20aa_intr_line;
         pc->pc_intr_establish = dec_kn20aa_intr_establish;
         pc->pc_intr_disestablish = dec_kn20aa_intr_disestablish;
 
         /* Not supported on KN20AA. */
         pc->pc_pciide_compat_intr_establish = NULL;
+        pc->pc_pciide_compat_intr_disestablish = NULL;
 
 	kn20aa_pci_intr = alpha_shared_intr_alloc(KN20AA_MAX_IRQ);
 	for (i = 0; i < KN20AA_MAX_IRQ; i++)
@@ -188,6 +191,14 @@ dec_kn20aa_intr_string(ccv, ih)
         return (irqstr);
 }
 
+int
+dec_kn20aa_intr_line(ccv, ih)
+	void *ccv;
+	pci_intr_handle_t ih;
+{
+	return (ih);
+}
+
 void *
 dec_kn20aa_intr_establish(ccv, ih, level, func, arg, name)
         void *ccv, *arg;
@@ -215,7 +226,21 @@ void
 dec_kn20aa_intr_disestablish(ccv, cookie)
         void *ccv, *cookie;
 {
-	panic("dec_kn20aa_intr_disestablish not implemented"); /* XXX */
+	struct alpha_shared_intrhand *ih = cookie;
+	unsigned int irq = ih->ih_num;
+	int s;
+
+	s = splhigh();
+
+	alpha_shared_intr_disestablish(kn20aa_pci_intr, cookie,
+	    "kn20aa irq");
+	if (alpha_shared_intr_isactive(kn20aa_pci_intr, irq) == 0) {
+		kn20aa_disable_intr(irq);
+		alpha_shared_intr_set_dfltsharetype(kn20aa_pci_intr, irq,
+		    IST_NONE);
+		/* scb_free(0x900 + SCB_IDXTOVEC(irq)); */
+	}
+	splx(s);
 }
 
 void

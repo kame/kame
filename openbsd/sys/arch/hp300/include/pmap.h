@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.5 1997/07/06 08:02:13 downsj Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.8 2001/08/18 20:50:18 art Exp $	*/
 /*	$NetBSD: pmap.h,v 1.13 1997/06/10 18:58:19 veego Exp $	*/
 
 /* 
@@ -93,13 +93,11 @@ typedef struct pmap	*pmap_t;
 /*
  * Macros for speed
  */
-#define PMAP_ACTIVATE(pmapp, pcbp, iscurproc) \
-	if ((pmapp)->pm_stchanged) { \
-		(pcbp)->pcb_ustp = m68k_btop((vm_offset_t)(pmapp)->pm_stpa); \
-		if (iscurproc) \
-			loadustp((pcbp)->pcb_ustp); \
-		(pmapp)->pm_stchanged = FALSE; \
-	}
+#define PMAP_ACTIVATE(pmap, loadhw)					\
+{									\
+        if ((loadhw))							\
+                loadustp(m68k_btop((paddr_t)(pmap)->pm_stpa));		\
+}
 #define PMAP_DEACTIVATE(pmapp, pcbp)
 
 /*
@@ -109,7 +107,7 @@ typedef struct pmap	*pmap_t;
 struct pv_entry {
 	struct pv_entry	*pv_next;	/* next pv_entry */
 	struct pmap	*pv_pmap;	/* pmap where mapping lies */
-	vm_offset_t	pv_va;		/* virtual address for mapping */
+	vaddr_t		pv_va;		/* virtual address for mapping */
 	st_entry_t	*pv_ptste;	/* non-zero if VA maps a PT page */
 	struct pmap	*pv_ptpmap;	/* if pv_ptste, pmap for PT page */
 	int		pv_flags;	/* flags */
@@ -148,13 +146,15 @@ extern struct pmap	kernel_pmap_store;
 
 extern struct pv_entry	*pv_table;	/* array of entries, one per page */
 
-#define pmap_page_index(pa)		atop(pa - vm_first_phys)
-#define pa_to_pvh(pa)			(&pv_table[pmap_page_index(pa)])
-
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 
 extern pt_entry_t	*Sysmap;
 extern char		*vmmap;		/* map for mem, dumps, etc. */
+
+#ifdef M68K_MMU_HP
+void	pmap_prefer __P((vaddr_t, vaddr_t *));
+#define	PMAP_PREFER(foff, vap)	pmap_prefer((foff), (vap))
+#endif
 
 #endif /* !_HP300_PMAP_H_ */

@@ -1,47 +1,14 @@
-/*	$OpenBSD: mmu.h,v 1.7 2001/03/09 05:44:40 smurph Exp $ */
-/*
- * Ashura Project
- */
-/*
- * HISTORY
- *
- * Original SCCS ID in ISEDL 
- * @(#)mmu.h 1.22		 90/09/20 19:13:34
- */
+/*	$OpenBSD: mmu.h,v 1.12 2001/08/24 22:47:18 miod Exp $ */
 
 #ifndef	__MACHINE_MMU_H__
 #define	__MACHINE_MMU_H__
-
-/* for m88k_pgbytes, m8kk_pgshift */
-#include <machine/vmparam.h> 
-
 
 /*
  * Parameters which determine the 'geometry' of the M88K page tables in memory.
  */
 #define SDT_BITS	10	/* M88K segment table size bits */
 #define PDT_BITS	10	/* M88K page table size bits */
-#define PG_BITS		M88K_PGSHIFT	/* M88K hardware page size bits */
-
-/*
- * Shifts and masks for M88K (hardware) page
- */
-/* M88K_PGBYTES, PG_SHIFT in vm_param.h */
-#define M88K_PGOFSET	(M88K_PGBYTES-1)	/* offset into M88K page */
-#define M88K_PGMASK	(~M88K_PGOFSET)		/* page mask */ 
-
-/*
- * Convert byte address to page frame number
- */
-#define M88K_BTOP(x)	(((unsigned) (x)) >> M88K_PGSHIFT)
-#define M88K_PTOB(x)	(((unsigned) (x)) << M88K_PGSHIFT)
-
-/* 
- * Round off or truncate to the nearest page. These will work for
- * either addresses of counts. (i.e. 1 byte round to 1 page bytes).
- */
-#define M88K_TRUNC_PAGE(x)	(((unsigned) (x) & M88K_PGMASK))
-#define M88K_ROUND_PAGE(x)	M88K_TRUNC_PAGE((x) + M88K_PGOFSET)
+#define PG_BITS		PAGE_SHIFT	/* M88K hardware page size bits */
 
 /*
  * M88K area descriptors
@@ -55,7 +22,7 @@ typedef struct cmmu_apr {
 			g:1,		/* global (cache control) */
 			ci:1,		/* cache inhibit */
 			rsvC:5,		/* reserved */
-			te:1;		/* transration enable */
+			te:1;		/* translation enable */
 } cmmu_apr_t;
 
 typedef union apr_template {
@@ -206,17 +173,13 @@ typedef union batc_template {
 #define LOG2_PDT_SIZE			(PDT_BITS + 2)
 #define LOG2_PDT_TABLE_GROUP_SIZE	(PAGE_SHIFT - LOG2_PDT_SIZE)
 #define PDT_TABLE_GROUP_SIZE		(1 << LOG2_PDT_TABLE_GROUP_SIZE)
-#if defined(UVM)
 #define PT_FREE(tbl)	uvm_km_free(kernel_map, (vaddr_t)tbl, PAGE_SIZE)
-#else
-#define PT_FREE(tbl)	kmem_free(kernel_map, (vm_offset_t)tbl, PAGE_SIZE)
-#endif
 
 
 /*
  * Va spaces mapped by tables and PDT table group.
  */
-#define PDT_VA_SPACE			(PDT_ENTRIES * M88K_PGBYTES)
+#define PDT_VA_SPACE			(PDT_ENTRIES * PAGE_SIZE)
 #define PDT_TABLE_GROUP_VA_SPACE	(PDT_VA_SPACE * PDT_TABLE_GROUP_SIZE)
 
 /*
@@ -234,42 +197,10 @@ typedef union batc_template {
 /*
  * Alignment checks for pages (must lie on page boundaries).
  */
-#define PAGE_ALIGNED(ad)	(((vm_offset_t)(ad) & ~M88K_PGMASK) == 0)
+#define PAGE_ALIGNED(ad)	(((vm_offset_t)(ad) & PAGE_MASK) == 0)
 #define	CHECK_PAGE_ALIGN(ad,who)	\
     if (!PAGE_ALIGNED(ad))		\
     	printf("%s: addr  %x not page aligned.\n", who, ad)
-
-/*
- * Validate PTE's for all hardware pages in a VM page.
- * "ptes_per_vm_page" should be set in pmap_bootstrap.
- *
- * PARAMETERS:
- *		pt_entry_t 	*start;
- * 		unsigned long	template;
- */
-#define DO_PTES(start, template)			\
-{							\
-    int i_;						\
-    pt_entry_t *p_ = start;				\
-							\
-    for (i_ = ptes_per_vm_page; i_>0; i_--) {		\
-	*(int *)p_++ = (unsigned long)(template);	\
-	template += M88K_PGBYTES;			\
-	/* (unsigned long)(template) for m88k C compiler\
-		'90.7.24	Fuzzy		*/	\
-    }							\
-}
-
-/*
- * Flags for cmmu_store() <cmmu.s>
- */
-#define STORE_CMD	0
-#define STORE_UAPR	4
-#define STORE_SAPR	8
-#define STORE_BATCWP	0x400
-
-#define C_CMMU		0
-#define D_CMMU		0x1000
 
 /*
  * Parameters for ATC(TLB) fulsh
@@ -295,7 +226,7 @@ typedef union batc_template {
 #define CACHE_MASK	(~(unsigned)(CACHE_INH | CACHE_GLOBAL | CACHE_WT))
 
 /*
- * Prototype for invalidate_pte found in "motorola/m88k/m88100/misc.s"
+ * Prototype for invalidate_pte found in locore_asm_routines.S
  */
 unsigned invalidate_pte(pt_entry_t *pointer);
 
@@ -307,12 +238,12 @@ extern vm_offset_t kmapva;
 	sdt = (sdt_entry_t *)kmapva + SDTIDX(va) + SDT_ENTRIES;		\
 	(pte_template_t *)(sdt->table_addr << PDT_SHIFT) + PDTIDX(va);	\
 })
-u_int kvtop( );
+extern u_int kvtop __P((vm_offset_t));
 
 #define DMA_CACHE_SYNC		0x1
 #define DMA_CACHE_SYNC_INVAL	0x2
 #define DMA_CACHE_INV		0x3
 extern void dma_cachectl(vm_offset_t, int, int);
 
-#endif __MACHINE_MMU_H__
+#endif /* __MACHINE_MMU_H__ */
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.c,v 1.25 2001/04/04 02:39:17 jason Exp $	*/
+/*	$OpenBSD: bpf.c,v 1.30 2001/10/02 18:04:35 deraadt Exp $	*/
 /*	$NetBSD: bpf.c,v 1.33 1997/02/21 23:59:35 thorpej Exp $	*/
 
 /*
@@ -44,28 +44,17 @@
 #include "bpfilter.h"
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/mbuf.h>
-#include <sys/time.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
-#include <sys/user.h>
 #include <sys/ioctl.h>
-#include <sys/map.h>
 #include <sys/conf.h>
 #include <sys/vnode.h>
-
 #include <sys/file.h>
-#include <sys/tty.h>
-#include <sys/uio.h>
-
-#include <sys/protosw.h>
 #include <sys/socket.h>
-#include <sys/errno.h>
 #include <sys/kernel.h>
 
 #include <net/if.h>
-
 #include <net/bpf.h>
 #include <net/bpfdesc.h>
 
@@ -75,7 +64,7 @@
 
 #define BPF_BUFSIZE 8192	/* 4096 too small for FDDI frames */
 
-#define PRINET  6			/* interruptible */
+#define PRINET  26			/* interruptible */
 
 /*
  * The default read buffer size is patchable.
@@ -169,8 +158,6 @@ bpf_movein(uio, linktype, mp, sockp)
 		return (EIO);
 
 	MGETHDR(m, M_WAIT, MT_DATA);
-	if (m == 0)
-		return (ENOBUFS);
 	m->m_pkthdr.rcvif = 0;
 	m->m_pkthdr.len = len - hlen;
 
@@ -520,6 +507,9 @@ bpfwrite(dev, uio, ioflag)
 		return (EMSGSIZE);
 	}
 
+	if (d->bd_hdrcmplt)
+		dst.sa_family = pseudo_AF_HDRCMPLT;
+
 	s = splsoftnet();
 	error = (*ifp->if_output)(ifp, m, &dst, (struct rtentry *)0);
 	splx(s);
@@ -562,6 +552,8 @@ bpf_reset_d(d)
  *  BIOCGSTATS		Get packet stats.
  *  BIOCIMMEDIATE	Set immediate mode.
  *  BIOCVERSION		Get filter language version.
+ *  BIOCGHDRCMPLT	Get "header already complete" flag
+ *  BIOCSHDRCMPLT	Set "header already complete" flag
  */
 /* ARGSUSED */
 int
@@ -738,6 +730,14 @@ bpfioctl(dev, cmd, addr, flag, p)
 			bv->bv_minor = BPF_MINOR_VERSION;
 			break;
 		}
+
+	case BIOCGHDRCMPLT:	/* get "header already complete" flag */
+		*(u_int *)addr = d->bd_hdrcmplt;
+		break;
+
+	case BIOCSHDRCMPLT:	/* set "header already complete" flag */
+		d->bd_hdrcmplt = *(u_int *)addr ? 1 : 0;
+		break;
 
 
 	case FIONBIO:		/* Non-blocking I/O */
@@ -1069,6 +1069,8 @@ bpf_catchpacket(d, pkt, pktlen, snaplen, cpfn)
 	register struct bpf_hdr *hp;
 	register int totlen, curlen;
 	register int hdrlen = d->bd_bif->bif_hdrlen;
+	struct timeval tv;
+
 	/*
 	 * Figure out how many bytes to move.  If the packet is
 	 * greater or equal to the snapshot length, transfer that
@@ -1113,7 +1115,9 @@ bpf_catchpacket(d, pkt, pktlen, snaplen, cpfn)
 	 * Append the bpf header.
 	 */
 	hp = (struct bpf_hdr *)(d->bd_sbuf + curlen);
-	microtime(&hp->bh_tstamp);
+	microtime(&tv);
+	hp->bh_tstamp.tv_sec = tv.tv_sec;
+	hp->bh_tstamp.tv_usec = tv.tv_usec;
 	hp->bh_datalen = pktlen;
 	hp->bh_hdrlen = hdrlen;
 	/*
@@ -1145,14 +1149,7 @@ bpf_allocbufs(d)
 	register struct bpf_d *d;
 {
 	d->bd_fbuf = (caddr_t)malloc(d->bd_bufsize, M_DEVBUF, M_WAITOK);
-	if (d->bd_fbuf == 0)
-		return (ENOBUFS);
-
 	d->bd_sbuf = (caddr_t)malloc(d->bd_bufsize, M_DEVBUF, M_WAITOK);
-	if (d->bd_sbuf == 0) {
-		free(d->bd_fbuf, M_DEVBUF);
-		return (ENOBUFS);
-	}
 	d->bd_slen = 0;
 	d->bd_hlen = 0;
 	return (0);
@@ -1255,45 +1252,4 @@ bpfdetach(ifp)
 			pbp = &bp->bif_next;
 	}
 	ifp->if_bpf = NULL;
-}
-
-/* XXX This routine belongs in net/if.c. */
-/*
- * Set/clear promiscuous mode on interface ifp based on the truth value
- * of pswitch.  The calls are reference counted so that only the first
- * "on" request actually has an effect, as does the final "off" request.
- * Results are undefined if the "off" and "on" requests are not matched.
- */
-int
-ifpromisc(ifp, pswitch)
-	struct ifnet *ifp;
-	int pswitch;
-{
-	struct ifreq ifr;
-
-	if (pswitch) {
-		/*
-		 * If the device is not configured up, we cannot put it in
-		 * promiscuous mode.
-		 */
-		if ((ifp->if_flags & IFF_UP) == 0)
-			return (ENETDOWN);
-		if (ifp->if_pcount++ != 0)
-			return (0);
-		ifp->if_flags |= IFF_PROMISC;
-	} else {
-		if (--ifp->if_pcount > 0)
-			return (0);
-		ifp->if_flags &= ~IFF_PROMISC;
-		/*
-		 * If the device is not configured up, we should not need to
-		 * turn off promiscuous mode (device should have turned it
-		 * off when interface went down; and will look at IFF_PROMISC
-		 * again next time interface comes up).
-		 */
-		if ((ifp->if_flags & IFF_UP) == 0)
-			return (0);
-	}
-	ifr.ifr_flags = ifp->if_flags;
-	return ((*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr));
 }

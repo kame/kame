@@ -1,4 +1,4 @@
-/* $OpenBSD: vga.c,v 1.23 2001/04/14 04:44:01 aaron Exp $ */
+/* $OpenBSD: vga.c,v 1.27 2001/08/03 16:17:47 tholo Exp $ */
 /* $NetBSD: vga.c,v 1.28.2.1 2000/06/30 16:27:47 simonb Exp $ */
 
 /*
@@ -28,9 +28,10 @@
  * rights to redistribute these changes.
  */
 
+#include "vga.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/timeout.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
@@ -86,40 +87,15 @@ struct vgascreen {
 	int vga_rollover;
 };
 
-struct vga_config {
-	struct vga_handle hdl;
-
-	int vc_type;
-	int nscreens;
-	LIST_HEAD(, vgascreen) screens;
-	struct vgascreen *active; /* current display */
-	const struct wsscreen_descr *currenttype;
-	int currentfontset1, currentfontset2;
-
-	struct vgafont *vc_fonts[8];
-
-	struct vgascreen *wantedscreen;
-	void (*switchcb) __P((void *, int, int));
-	void *switchcbarg;
-
-#ifdef arc
-	paddr_t (*vc_mmap) __P((void *, off_t, int));
-#endif
-
-	struct timeout vc_switch_timeout;
-};
-
-static int vgaconsole, vga_console_type, vga_console_attached;
-static struct vgascreen vga_console_screen;
-static struct vga_config vga_console_vc;
+int vgaconsole, vga_console_type, vga_console_attached;
+struct vgascreen vga_console_screen;
+struct vga_config vga_console_vc;
 
 int vga_selectfont __P((struct vga_config *, struct vgascreen *,
-			const char *, const char *));
-void vga_init_screen __P((struct vga_config *, struct vgascreen *,
-			  const struct wsscreen_descr *,
-			  int, long *));
-void vga_init __P((struct vga_config *, bus_space_tag_t,
-		   bus_space_tag_t));
+    const char *, const char *));
+void	vga_init_screen __P((struct vga_config *, struct vgascreen *,
+    const struct wsscreen_descr *, int, long *));
+void	vga_init __P((struct vga_config *, bus_space_tag_t, bus_space_tag_t));
 void vga_setfont __P((struct vga_config *, struct vgascreen *));
 
 int vga_mapchar __P((void *, int, unsigned int *));
@@ -127,7 +103,7 @@ void vga_putchar __P((void *, int, int, u_int, long));
 int vga_alloc_attr __P((void *, int, int, int, long *));
 void	vga_copyrows __P((void *, int, int, int));
 
-const struct wsdisplay_emulops vga_emulops = {
+static const struct wsdisplay_emulops vga_emulops = {
 	pcdisplay_cursor,
 	vga_mapchar,
 	vga_putchar,
@@ -245,6 +221,7 @@ int	vga_show_screen __P((void *, void *, int,
 			     void (*) (void *, int, int), void *));
 int	vga_load_font __P((void *, void *, struct wsdisplay_font *));
 void	vga_scrollback __P((void *, void *, int));
+void	vga_burner __P((void *v, u_int on, u_int flags));
 u_int16_t vga_getchar __P((void *, int, int));
 
 void vga_doswitch __P((struct vga_config *));
@@ -257,7 +234,8 @@ const struct wsdisplay_accessops vga_accessops = {
 	vga_show_screen,
 	vga_load_font,
 	vga_scrollback,
-	vga_getchar
+	vga_getchar,
+	vga_burner
 };
 
 /*
@@ -541,11 +519,14 @@ vga_extended_attach(self, iot, memt, type, map)
 		vc = &vga_console_vc;
 		vga_console_attached = 1;
 	} else {
-		vc = malloc(sizeof(struct vga_config), M_DEVBUF, M_WAITOK);
+		vc = malloc(sizeof(struct vga_config), M_DEVBUF, M_NOWAIT);
+		if (vc == NULL)
+			return;
 		bzero(vc, sizeof(struct vga_config));
 		vga_init(vc, iot, memt);
 	}
 
+	vc->vc_softc = self;
 	vc->vc_type = type;
 #ifdef arc
 	vc->vc_mmap = map;
@@ -610,6 +591,13 @@ vga_ioctl(v, cmd, data, flag, p)
 	struct proc *p;
 {
 	struct vga_config *vc = v;
+#if NVGA_PCI > 0
+	int error;
+
+	if (vc->vc_type == WSDISPLAY_TYPE_PCIVGA &&
+	    (error = vga_pci_ioctl(v, cmd, data, flag, p)) != ENOTTY)
+		return (error);
+#endif
 
 	switch (cmd) {
 	case WSDISPLAYIO_GTYPE:
@@ -1251,6 +1239,35 @@ vga_putchar(c, row, col, uc, attr)
 		vga_scrollback(scr->cfg, scr, 0);
 
 	pcdisplay_putchar(c, row, col, uc, attr);
+}
+
+void
+vga_burner(v, on, flags)
+	void *v;
+	u_int on, flags;
+{
+	struct vga_config *vc = v;
+	struct vga_handle *vh = &vc->hdl;
+	u_int8_t r;
+	int s;
+
+	s = splhigh();
+	vga_ts_write(vh, syncreset, 0x01);
+	if (on) {
+		vga_ts_write(vh, mode, (vga_ts_read(vh, mode) & ~0x20));
+		r = vga_6845_read(vh, mode) | 0x80;
+		DELAY(10000);
+		vga_6845_write(vh, mode, r);
+	} else {
+		vga_ts_write(vh, mode, (vga_ts_read(vh, mode) | 0x20));
+		if (flags & WSDISPLAY_BURN_VBLANK) {
+			r = vga_6845_read(vh, mode) & ~0x80;
+			DELAY(10000);
+			vga_6845_write(vh, mode, r);
+		}
+	}
+	vga_ts_write(vh, syncreset, 0x03);
+	splx(s);
 }
 
 u_int16_t

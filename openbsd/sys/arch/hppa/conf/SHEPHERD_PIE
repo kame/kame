@@ -1,4 +1,4 @@
-#	$OpenBSD: SHEPHERD_PIE,v 1.10 2000/08/15 20:31:19 mickey Exp $
+#	$OpenBSD: SHEPHERD_PIE,v 1.13 2001/10/10 23:43:42 millert Exp $
 #
 # Diskless kernel config
 #
@@ -16,8 +16,6 @@ option	HP7200_CPU,HP7250_CPU		# PCXT, PCXT'
 #option	HP8200_CPU			# PCXU2
 #option	HP8500_CPU			# PCXW
 
-option	SWAPPAGER, DEVPAGER
-
 option		DDB		# in-kernel debugger
 #makeoptions	DEBUG="-g"	# compile full symbol table
 option		DIAGNOSTIC	# internal consistency checks
@@ -27,8 +25,7 @@ option		KMEMSTATS
 
 option		PMAPDEBUG
 
-option		COMPAT_11	# NetBSD 1.1,
-option		COMPAT_43	# and 4.3BSD
+option		COMPAT_43	# Compatibility with 4.3BSD
 
 #option		LKM		# loadable kernel modules
 
@@ -54,7 +51,7 @@ option		BOOT_CONFIG	# add support for boot -c
 maxusers	8
 
 option		TIMEZONE=0	# time zone to adjust RTC time by
-option		DST=0		# daylight savings time used by RTC
+option		DST=0		# daylight saving time used by RTC
 
 #option	 	COMPAT_HPUX	# HP-UX binary compatibility
 

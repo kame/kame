@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.4 2001/02/22 03:26:23 drahn Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.20 2001/09/18 13:59:23 drahn Exp $	*/
 /*	$NetBSD: pmap.h,v 1.1 1996/09/30 16:34:29 ws Exp $	*/
 
 /*-
@@ -32,8 +32,8 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef	_MACHINE_PMAP_H_
-#define	_MACHINE_PMAP_H_
+#ifndef	_POWERPC_PMAP_H_
+#define	_POWERPC_PMAP_H_
 
 #include <machine/pte.h>
 
@@ -52,14 +52,22 @@ typedef u_int sr_t;
 /* V->P mapping data */
 typedef int pmapv_t;
 #define VP_SR_SIZE	32
-#define VP_SR_MASK	VP_SR_SIZE-1
+#define VP_SR_MASK	(VP_SR_SIZE-1)
 #define VP_SR_POS 	27
 #define VP_IDX1_SIZE	1024
-#define VP_IDX1_MASK	VP_IDX1_SIZE-1
+#define VP_IDX1_MASK	(VP_IDX1_SIZE-1)
 #define VP_IDX1_POS 	17
 #define VP_IDX2_SIZE	32
-#define VP_IDX2_MASK	VP_IDX2_SIZE-1
+#define VP_IDX2_MASK	(VP_IDX2_SIZE-1)
 #define VP_IDX2_POS 	12
+
+void pmap_kenter_cache( vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable);
+
+/* cache flags */
+#define PMAP_CACHE_DEFAULT	0 	/* WB cache managed mem, devices not */
+#define PMAP_CACHE_CI		1 	/* cache inhibit */
+#define PMAP_CACHE_WT		2 	/* writethru */
+#define PMAP_CACHE_WB		3	/* writeback */
 
 /*
  * Pmap stuff
@@ -72,23 +80,36 @@ struct pmap {
 };
 
 typedef	struct pmap *pmap_t;
+boolean_t ptemodify(paddr_t pa, u_int mask, u_int val);
 
 #ifdef	_KERNEL
 extern struct pmap kernel_pmap_;
 #define	pmap_kernel()	(&kernel_pmap_)
+int ptebits(paddr_t pa, int bit);
 
-#define pmap_clear_modify(pa)		(ptemodify((pa), PTE_CHG, 0))
-#define	pmap_clear_reference(pa)	(ptemodify((pa), PTE_REF, 0))
-#define	pmap_is_modified(pa)		(ptebits((pa), PTE_CHG))
-#define	pmap_is_referenced(pa)		(ptebits((pa), PTE_REF))
-#define	pmap_change_wiring(pm, va, wired)
 
+#define pmap_clear_modify(page)	 (ptemodify(VM_PAGE_TO_PHYS(page), PTE_CHG, 0))
+#define	pmap_clear_reference(page) (ptemodify(VM_PAGE_TO_PHYS(page), PTE_REF, 0))
+#define	pmap_is_modified(page)	 (ptebits(VM_PAGE_TO_PHYS(page), PTE_CHG))
+#define	pmap_is_referenced(page) (ptebits(VM_PAGE_TO_PHYS(page), PTE_REF))
+#define	pmap_unwire(pm, va)
 #define	pmap_phys_address(x)		(x)
 
 #define pmap_resident_count(pmap)       ((pmap)->pm_stats.resident_count) 
 
+/*
+ * Alternate mapping methods for pool.
+ * Really simple. 0x0->0x80000000 contain 1->1 mappings of the physical
+ * memory.
+ */
+#define PMAP_MAP_POOLPAGE(pa)	((vaddr_t)pa)
+#define PMAP_UNMAP_POOLPAGE(va)	((paddr_t)va)
+
 void pmap_bootstrap __P((u_int kernelstart, u_int kernelend));
+
+void pmap_real_memory __P((vm_offset_t *start, vm_size_t *size));
+void switchexit __P((struct proc *));
 
 #endif	/* _KERNEL */
 #endif	/* _LOCORE */
-#endif	/* _MACHINE_PMAP_H_ */
+#endif	/* _POWERPC_PMAP_H_ */

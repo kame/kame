@@ -1,4 +1,4 @@
-/*	$OpenBSD: pccbb.c,v 1.17 2001/02/01 03:38:08 aaron Exp $ */
+/*	$OpenBSD: pccbb.c,v 1.26 2001/08/25 10:13:30 art Exp $ */
 /*	$NetBSD: pccbb.c,v 1.42 2000/06/16 23:41:35 cgd Exp $	*/
 
 /*
@@ -82,10 +82,8 @@ struct cfdriver cbb_cd = {
 
 #if defined CBB_DEBUG
 #define DPRINTF(x) printf x
-#define STATIC
 #else
 #define DPRINTF(x)
-#define STATIC static
 #endif
 
 int	pcicbbmatch __P((struct device *, void *, void *));
@@ -154,7 +152,7 @@ int	pccbb_pcmcia_io_map __P((pcmcia_chipset_handle_t, int, bus_addr_t,
     bus_size_t, struct pcmcia_io_handle *, int *));
 void	pccbb_pcmcia_io_unmap __P((pcmcia_chipset_handle_t, int));
 void   *pccbb_pcmcia_intr_establish __P((pcmcia_chipset_handle_t,
-    struct pcmcia_function *, int, int (*)(void *), void *));
+    struct pcmcia_function *, int, int (*)(void *), void *, char *));
 void	pccbb_pcmcia_intr_disestablish __P((pcmcia_chipset_handle_t,
     void *));
 void	pccbb_pcmcia_socket_enable __P((pcmcia_chipset_handle_t));
@@ -417,16 +415,17 @@ pccbbattach(parent, self, aux)
 	    PCI_MAPREG_MEM_ADDR(sock_base) != 0xfffffff0) {
 		/* The address must be valid. */
 		if (pci_mapreg_map(pa, PCI_SOCKBASE, PCI_MAPREG_TYPE_MEM, 0,
-		    &sc->sc_base_memt, &sc->sc_base_memh, &sockbase, NULL)) {
+		    &sc->sc_base_memt, &sc->sc_base_memh, &sockbase, NULL, 0))
+		    {
 			printf("%s: can't map socket base address 0x%x\n",
 			    sc->sc_dev.dv_xname, sock_base);
 			/*
 			 * I think it's funny: socket base registers must be
 			 * mapped on memory space, but ...
 			 */
-			if (pci_mapreg_map(pa, PCI_SOCKBASE, PCI_MAPREG_TYPE_IO,
-			    0, &sc->sc_base_memt, &sc->sc_base_memh, &sockbase,
-			    NULL)) {
+			if (pci_mapreg_map(pa, PCI_SOCKBASE,
+			    PCI_MAPREG_TYPE_IO, 0, &sc->sc_base_memt,
+			    &sc->sc_base_memh, &sockbase, NULL, 0)) {
 				printf("%s: can't map socket base address"
 				    " 0x%lx: io mode\n", sc->sc_dev.dv_xname,
 				    sockbase);
@@ -472,20 +471,21 @@ pccbbattach(parent, self, aux)
 	sc->sc_dmat = pa->pa_dmat;
 	sc->sc_tag = pa->pa_tag;
 	sc->sc_function = pa->pa_function;
-
-	sc->sc_intrline = pa->pa_intrline;
+	sc->sc_sockbase = sock_base;
+	sc->sc_busnum = busreg;
 	sc->sc_intrtag = pa->pa_intrtag;
 	sc->sc_intrpin = pa->pa_intrpin;
 
 	sc->sc_pcmcia_flags = flags;   /* set PCMCIA facility */
 
 	/* Map and establish the interrupt. */
-	if (pci_intr_map(pc, sc->sc_intrtag, sc->sc_intrpin,
-	    sc->sc_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}
 	intrstr = pci_intr_string(pc, ih);
+	/* must do this after intr is mapped and established */
+	sc->sc_intrline = pci_intr_line(ih);
 
 	/*
 	 * XXX pccbbintr should be called under the priority lower
@@ -984,7 +984,7 @@ pccbbintr_function(sc)
 		 * sentense instead of switch-case sentense because of
 		 * avoiding duplicate case value error.  More than one
 		 * IPL_XXX use same value.  It depends on
-		 * implimentation.
+		 * implementation.
 		 */
 		splchanged = 1;
 #if 0
@@ -1279,8 +1279,9 @@ struct cb_poll_str {
 
 static struct cb_poll_str cb_poll[10];
 static int cb_poll_n = 0;
+static struct timeout cb_poll_timeout;
 
-static void cb_pcmcia_poll __P((void *arg));
+void cb_pcmcia_poll __P((void *arg));
 
 void
 cb_pcmcia_poll(arg)
@@ -1292,7 +1293,8 @@ cb_pcmcia_poll(arg)
 	int s;
 	u_int32_t spsr;		       /* socket present-state reg */
 
-	timeout(cb_pcmcia_poll, arg, hz / 10);
+	timeout_set(&cb_poll_timeout, cb_pcmcia_poll, arg);
+	timeout_add(&cb_poll_timeout, hz / 10);
 	switch (poll->level) {
 	case IPL_NET:
 		s = splnet();
@@ -1686,11 +1688,8 @@ pccbb_intr_establish(sc, irq, level, func, arg)
 	/* 
 	 * Allocate a room for interrupt handler structure.
 	 */
-	if (NULL == (newpil =
-	    (struct pccbb_intrhand_list *)malloc(sizeof(struct
-	    pccbb_intrhand_list), M_DEVBUF, M_WAITOK))) {
-		return NULL;
-	}
+	newpil = (struct pccbb_intrhand_list *)
+		malloc(sizeof(struct pccbb_intrhand_list), M_DEVBUF, M_WAITOK);
 
 	newpil->pil_func = func;
 	newpil->pil_arg = arg;
@@ -2679,8 +2678,9 @@ struct pccbb_poll_str {
 
 static struct pccbb_poll_str pccbb_poll[10];
 static int pccbb_poll_n = 0;
+static struct timeout pccbb_poll_timeout;
 
-static void pccbb_pcmcia_poll __P((void *arg));
+void pccbb_pcmcia_poll __P((void *arg));
 
 void
 pccbb_pcmcia_poll(arg)
@@ -2692,7 +2692,8 @@ pccbb_pcmcia_poll(arg)
 	int s;
 	u_int32_t spsr;		       /* socket present-state reg */
 
-	timeout(pccbb_pcmcia_poll, arg, hz * 2);
+	timeout_set(&pccbb_poll_timeout, pccbb_pcmcia_poll, arg);
+	timeout_add(&pccbb_poll_timeout, hz * 2);
 	switch (poll->level) {
 	case IPL_NET:
 		s = splnet();
@@ -2739,12 +2740,13 @@ pccbb_pcmcia_poll(arg)
  * This function enables PC-Card interrupt.  PCCBB uses PCI interrupt line.
  */
 void *
-pccbb_pcmcia_intr_establish(pch, pf, ipl, func, arg)
+pccbb_pcmcia_intr_establish(pch, pf, ipl, func, arg, xname)
 	pcmcia_chipset_handle_t pch;
 	struct pcmcia_function *pf;
 	int ipl;
 	int (*func) __P((void *));
 	void *arg;
+	char *xname;
 {
 	struct pcic_handle *ph = (struct pcic_handle *)pch;
 	struct pccbb_softc *sc = (struct pccbb_softc *)ph->ph_parent;
@@ -3017,10 +3019,9 @@ pccbb_winset(align, sc, bst)
 	struct pccbb_win_chain *chainp;
 	int offs;
 
-	win[0].win_start = 0xffffffff;
-	win[0].win_limit = 0;
-	win[1].win_start = 0xffffffff;
-	win[1].win_limit = 0;
+	win[0].win_start = win[1].win_start = 0xffffffff;
+	win[0].win_limit = win[1].win_limit = 0;
+	win[0].win_flags = win[1].win_flags = 0;
 
 	chainp = TAILQ_FIRST(&sc->sc_iowindow);
 	offs = 0x2c;
@@ -3114,16 +3115,14 @@ pccbb_winset(align, sc, bst)
 	    pci_conf_read(pc, tag, offs + 12) + align));
 
 	if (bst == sc->sc_memt) {
-		if (win[0].win_flags & PCCBB_MEM_CACHABLE) {
-			pcireg_t bcr = pci_conf_read(pc, tag, PCI_BCR_INTR);
+		pcireg_t bcr = pci_conf_read(pc, tag, PCI_BCR_INTR);
+
+		bcr &= ~(CB_BCR_PREFETCH_MEMWIN0 | CB_BCR_PREFETCH_MEMWIN1);
+		if (win[0].win_flags & PCCBB_MEM_CACHABLE)
 			bcr |= CB_BCR_PREFETCH_MEMWIN0;
-			pci_conf_write(pc, tag, PCI_BCR_INTR, bcr);
-		}
-		if (win[1].win_flags & PCCBB_MEM_CACHABLE) {
-			pcireg_t bcr = pci_conf_read(pc, tag, PCI_BCR_INTR);
+		if (win[1].win_flags & PCCBB_MEM_CACHABLE)
 			bcr |= CB_BCR_PREFETCH_MEMWIN1;
-			pci_conf_write(pc, tag, PCI_BCR_INTR, bcr);
-		}
+		pci_conf_write(pc, tag, PCI_BCR_INTR, bcr);
 	}
 }
 
@@ -3154,6 +3153,14 @@ pccbb_powerhook(why, arg)
 	}
 
 	if (why == PWR_RESUME) {
+		if (pci_conf_read (sc->sc_pc, sc->sc_tag, PCI_SOCKBASE) == 0)
+			/* BIOS did not recover this register */
+			pci_conf_write (sc->sc_pc, sc->sc_tag,
+					PCI_SOCKBASE, sc->sc_sockbase);
+		if (pci_conf_read (sc->sc_pc, sc->sc_tag, PCI_BUSNUM) == 0)
+			/* BIOS did not recover this register */
+			pci_conf_write (sc->sc_pc, sc->sc_tag,
+					PCI_BUSNUM, sc->sc_busnum);
 		/* CSC Interrupt: Card detect interrupt on */
 		reg = bus_space_read_4(base_memt, base_memh, CB_SOCKET_MASK);
 		/* Card detect intr is turned on. */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.56 2001/03/28 20:03:07 angelos Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.74 2001/06/25 02:06:40 angelos Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -33,33 +33,51 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)udp_usrreq.c	8.4 (Berkeley) 1/21/94
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
 
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
-
 #include <sys/param.h>
-#include <sys/malloc.h>
+#include <sys/systm.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/errno.h>
-#include <sys/stat.h>
-#include <sys/systm.h>
-#include <sys/proc.h>
-
-#include <vm/vm.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -75,20 +93,10 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
-#ifdef IPSEC
-#include <netinet/ip_ipsp.h>
-#endif
-
-#include <machine/stdarg.h>
-
 #ifdef INET6
 #ifndef INET
 #include <netinet/in.h>
 #endif
-#include <netinet/ip6.h>
-#include <netinet6/in6_var.h>
-#include <netinet6/ip6_var.h>
-#include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
 
 extern int ip6_defhlim;
@@ -116,7 +124,6 @@ extern	struct baddynamicports baddynamicports;
 void
 udp_init()
 {
-
 	in_pcbinit(&udbtable, udbhashsize);
 }
 
@@ -172,6 +179,7 @@ udp_input(m, va_alist)
 	struct ip6_hdr *ipv6;
 #endif /* INET6 */
 #ifdef IPSEC
+	struct m_tag *mtag;
 	struct tdb_ident *tdbi;
 	struct tdb *tdb;
 	int error, s;
@@ -199,8 +207,6 @@ udp_input(m, va_alist)
 		break;
 #endif /* INET6 */
 	default:
-		printf("udp_input: received unknown IP version %d",
-		    mtod(m, struct ip *)->ip_v);
 		goto bad;
 	}
 
@@ -223,7 +229,8 @@ udp_input(m, va_alist)
 	 * Get IP and UDP header together in first mbuf.
 	 */
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
-		if ((m = m_pullup2(m, iphlen + sizeof(struct udphdr))) == 0) {
+		if ((m = m_pullup2(m, iphlen + sizeof(struct udphdr))) ==
+		    NULL) {
 			udpstat.udps_hdrops++;
 			return;
 		}
@@ -287,13 +294,27 @@ udp_input(m, va_alist)
 	} else
 #endif /* INET6 */
 	if (uh->uh_sum) {
-		bzero(((struct ipovly *)ip)->ih_x1,
-		    sizeof ((struct ipovly *)ip)->ih_x1);
-		((struct ipovly *)ip)->ih_len = uh->uh_ulen;
-		if ((uh->uh_sum = in_cksum(m, len + sizeof (struct ip))) != 0) {
-			udpstat.udps_badsum++;
-			m_freem(m);
-			return;
+		if ((m->m_pkthdr.csum & M_UDP_CSUM_IN_OK) == 0) {
+			if (m->m_pkthdr.csum & M_UDP_CSUM_IN_BAD) {
+				udpstat.udps_badsum++;
+				udpstat.udps_inhwcsum++;
+				m_freem(m);
+				return;
+			}
+
+			bzero(((struct ipovly *)ip)->ih_x1,
+			      sizeof ((struct ipovly *)ip)->ih_x1);
+			((struct ipovly *)ip)->ih_len = uh->uh_ulen;
+		
+			if ((uh->uh_sum = in_cksum(m, len +
+			    sizeof (struct ip))) != 0) {
+				udpstat.udps_badsum++;
+				m_freem(m);
+				return;
+			}
+		} else {
+			m->m_pkthdr.csum &= ~M_UDP_CSUM_IN_OK;
+			udpstat.udps_inhwcsum++;
 		}
 	} else
 		udpstat.udps_nosum++;
@@ -505,7 +526,6 @@ udp_input(m, va_alist)
 #endif /* INET6 */
 			{
 				*ip = save_ip;
-				HTONS(ip->ip_id);
 				uh->uh_sum = savesum;
 				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT,
 					0, 0);
@@ -515,21 +535,47 @@ udp_input(m, va_alist)
 	}
 
 #ifdef IPSEC
-	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
-
+	mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
         s = splnet();
-        if (tdbi == NULL)
-                tdb = NULL;
-        else
+	if (mtag != NULL) {
+		tdbi = (struct tdb_ident *)(mtag + 1);
 	        tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
-
+	} else
+		tdb = NULL;
 	ipsp_spd_lookup(m, srcsa.sa.sa_family, iphlen, &error,
-			IPSP_DIRECTION_IN, tdb, inp);
+	    IPSP_DIRECTION_IN, tdb, inp);
+
+	/* Latch SA only if the socket is connected */
+	if (inp->inp_tdb_in != tdb &&
+	    (inp->inp_socket->so_state & SS_ISCONNECTED)) {
+		if (tdb) {
+		        tdb_add_inp(tdb, inp, 1);
+			if (inp->inp_ipsec_remoteid == NULL &&
+			    tdb->tdb_srcid != NULL) {
+				inp->inp_ipsec_remoteid = tdb->tdb_srcid;
+				tdb->tdb_srcid->ref_count++;
+			}
+			if (inp->inp_ipsec_remotecred == NULL &&
+			    tdb->tdb_remote_cred != NULL) {
+				inp->inp_ipsec_remotecred =
+				    tdb->tdb_remote_cred;
+				tdb->tdb_remote_cred->ref_count++;
+			}
+			if (inp->inp_ipsec_remoteauth == NULL &&
+			    tdb->tdb_remote_auth != NULL) {
+				inp->inp_ipsec_remoteauth =
+				    tdb->tdb_remote_auth;
+				tdb->tdb_remote_auth->ref_count++;
+			}
+		} else { /* Just reset */
+		        TAILQ_REMOVE(&inp->inp_tdb_in->tdb_inp_in, inp,
+				     inp_tdb_in_next);
+			inp->inp_tdb_in = NULL;
+		}
+	}
         splx(s);
 
-	/* No SA latching done for UDP */
-
-	/* Error or otherwise drop-packet indication */
+	/* Error or otherwise drop-packet indication. */
 	if (error)
 		goto bad;
 #endif /*IPSEC */
@@ -672,8 +718,7 @@ udp6_ctlinput(cmd, sa, d)
 		sa6 = *(struct sockaddr_in6 *)sa;
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			/* should be impossible */
 			return;
 		}
 #endif
@@ -689,8 +734,7 @@ udp6_ctlinput(cmd, sa, d)
 						     ip6cp->ip6c_finaldst);
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			/* should be impossible */
 			return;
 		}
 #endif
@@ -699,8 +743,7 @@ udp6_ctlinput(cmd, sa, d)
 		sa6 = *(struct sockaddr_in6 *)sa;
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			/* should be impossible */
 			return;
 		}
 #endif
@@ -728,8 +771,7 @@ udp6_ctlinput(cmd, sa, d)
 							 &ip6->ip6_src);
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			/* should be impossible */
 			return;
 		}
 #endif
@@ -917,15 +959,16 @@ udp_output(m, va_alist)
 	ui->ui_ulen = ui->ui_len;
 
 	/*
-	 * Stuff checksum and output datagram.
+	 * Compute the pseudo-header checksum; defer further checksumming
+	 * until ip_output() or hardware (if it exists).
 	 */
-
-	ui->ui_sum = 0;
 	if (udpcksum) {
-		if ((ui->ui_sum = in_cksum(m, sizeof (struct udpiphdr) +
-		    len)) == 0)
-			ui->ui_sum = 0xffff;
-	}
+		m->m_pkthdr.csum |= M_UDPV4_CSUM_OUT;
+		ui->ui_sum = in_cksum_phdr(ui->ui_src.s_addr,
+		    ui->ui_dst.s_addr, htons((u_int16_t)len +
+			sizeof (struct udphdr) + IPPROTO_UDP));
+	} else
+		ui->ui_sum = 0;
 	((struct ip *)ui)->ip_len = sizeof (struct udpiphdr) + len;
 	((struct ip *)ui)->ip_ttl = inp->inp_ip.ip_ttl;	
 	((struct ip *)ui)->ip_tos = inp->inp_ip.ip_tos;
@@ -1112,9 +1155,6 @@ udp_usrreq(so, req, m, addr, control)
 		break;
 
 	case PRU_SEND:
-#ifdef IPSEC
-	    /* XXX Find IPsec TDB */
-#endif
 #ifdef INET6
 		if (inp->inp_flags & INP_IPV6)
 			return (udp6_output(inp, m, addr, control));
@@ -1175,7 +1215,6 @@ udp_usrreq(so, req, m, addr, control)
 
 release:
 	if (control) {
-		printf("udp control data unexpectedly retained\n");
 		m_freem(control);
 	}
 	if (m)

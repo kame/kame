@@ -1,4 +1,4 @@
-/*	$OpenBSD: gscbus.c,v 1.11 2001/03/22 23:29:27 mickey Exp $	*/
+/*	$OpenBSD: gscbus.c,v 1.14 2001/10/04 22:01:30 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -114,7 +114,7 @@ void	gsc_dmamem_free __P((void *, bus_dma_segment_t *, int));
 int	gsc_dmamem_map __P((void *, bus_dma_segment_t *,
 			    int, size_t, caddr_t *, int));
 void	gsc_dmamem_unmap __P((void *, caddr_t, size_t));
-int	gsc_dmamem_mmap __P((void *, bus_dma_segment_t *, int, int, int, int));
+paddr_t	gsc_dmamem_mmap __P((void *, bus_dma_segment_t *, int, off_t, int, int));
 
 int
 gscmatch(parent, cfdata, aux)   
@@ -141,9 +141,10 @@ gscattach(parent, self, aux)
 	sc->sc_intrmask = 0;
 	bzero(sc->sc_intrvs, sizeof(sc->sc_intrvs));
 
+#ifdef USELEDS
 	if (machine_ledaddr)
 		printf(": %sleds", machine_ledword? "word" : "");
-
+#endif
 	printf ("\n");
 
 	sc->sc_ih = cpu_intr_establish(IPL_IO, ga->ga_irq,
@@ -398,12 +399,12 @@ gsc_dmamem_unmap(v, kva, size)
 
 }
 
-int
+paddr_t
 gsc_dmamem_mmap(v, segs, nsegs, off, prot, flags)
 	void *v;
 	bus_dma_segment_t *segs;
 	int nsegs;
-	int off;
+	off_t off;
 	int prot;
 	int flags;
 {

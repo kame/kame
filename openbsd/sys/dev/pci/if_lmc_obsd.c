@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_lmc_obsd.c,v 1.6 2001/02/22 02:01:53 chris Exp $ */
+/*	$OpenBSD: if_lmc_obsd.c,v 1.11 2001/09/11 20:05:25 miod Exp $ */
 /*	$NetBSD: if_lmc_nbsd.c,v 1.1 1999/03/25 03:32:43 explorer Exp $	*/
 
 /*-
@@ -102,8 +102,6 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_kern.h>
 
 #if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 #include <net/if_sppp.h>
@@ -160,10 +158,14 @@
  * Sigh.  Every OS puts these in different places.  NetBSD and FreeBSD use
  * a C preprocessor that allows this hack, but BSDI does not.  Grr.
  */
-#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include INCLUDE_PATH_PREFIX "if_lmc_types.h"
 #include INCLUDE_PATH_PREFIX "if_lmcioctl.h"
 #include INCLUDE_PATH_PREFIX "if_lmcvar.h"
+#elif defined(__OpenBSD__)
+#include <dev/pci/if_lmc_types.h>
+#include <dev/pci/if_lmcioctl.h>
+#include <dev/pci/if_lmcvar.h>
 #else /* BSDI */
 #include "i386/pci/if_lmctypes.h"
 #include "i386/pci/if_lmcioctl.h"
@@ -303,12 +305,10 @@ lmc_pci_attach(struct device * const parent,
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 
 		ioh_valid = (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO,
-					    0, &iot, &ioh, NULL, NULL) == 0);
+		    0, &iot, &ioh, NULL, NULL, 0) == 0);
 		memh_valid = (pci_mapreg_map(pa, PCI_CBMA,
-					     PCI_MAPREG_TYPE_MEM |
-					     PCI_MAPREG_MEM_TYPE_32BIT,
-					     0, &memt, &memh, NULL,
-					     NULL) == 0);
+		    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0, &memt,
+		    &memh, NULL, NULL, 0) == 0);
 #endif
 
 
@@ -357,8 +357,7 @@ lmc_pci_attach(struct device * const parent,
 
 	lmc_read_macaddr(sc);
 
-        if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-                         pa->pa_intrline, &intrhandle)) {
+        if (pci_intr_map(pa, &intrhandle)) {
 		 printf("%s: couldn't map interrupt\n",
 			sc->lmc_dev.dv_xname);
 		return;

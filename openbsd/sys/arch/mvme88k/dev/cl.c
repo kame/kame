@@ -1,4 +1,4 @@
-/*	$OpenBSD: cl.c,v 1.10 2001/03/09 05:44:38 smurph Exp $ */
+/*	$OpenBSD: cl.c,v 1.14 2001/08/31 01:05:44 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Dale Rahn. All rights reserved.
@@ -41,15 +41,23 @@
 #include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/device.h>
+#include <sys/syslog.h>
+
 #include <machine/cpu.h>
 #include <machine/autoconf.h>
+#include <machine/psl.h>
+
 #include <dev/cons.h>
 #include <mvme88k/dev/clreg.h>
-#include <sys/syslog.h>
+
 #include "cl.h"
 #include "pcctwo.h"
 #include <mvme88k/dev/pcctworeg.h>
-#include <machine/psl.h>
+
+#ifdef	DDB
+#include <ddb/db_var.h>
+#endif
+
 #define splcl()	splx(IPL_TTY)
 
 /* min timeout 0xa, what is a good value */
@@ -65,10 +73,11 @@
 #define CL_TXINTR	0x02
 #define CL_RXINTR	0x02
 
+#define	CLCD_DO_POLLED_INPUT
+
 #ifdef DEBUG
 #undef DEBUG
 #endif
-#define DEBUG_KERN 1
 struct cl_cons {
 	void	*cl_paddr;
 	volatile struct clreg *cl_vaddr;
@@ -148,8 +157,10 @@ struct {
 /* prototypes */
 int clcnprobe __P((struct consdev *cp));
 int clcninit __P((struct consdev *cp));
+int cl_instat __P((struct clsoftc *sc));
 int clcngetc __P((dev_t dev));
 int clcnputc __P((dev_t dev, u_char c));
+void clcnpollc __P((dev_t, int));
 u_char cl_clkdiv __P((int speed));
 u_char cl_clknum __P((int speed));
 u_char cl_clkrxtimeout __P((int speed));
@@ -166,7 +177,9 @@ void cl_parity __P((struct clsoftc *sc, int channel));
 void cl_frame __P((struct clsoftc *sc, int channel));
 void cl_break __P(( struct clsoftc *sc, int channel));
 int clmctl __P((dev_t dev, int bits, int how));
+#ifdef DEBUG
 void cl_dumpport __P((int channel));
+#endif
 
 int	clprobe __P((struct device *parent, void *self, void *aux));
 void	clattach __P((struct device *parent, struct device *self, void *aux));
@@ -183,6 +196,9 @@ void clputc __P((struct clsoftc *sc, int unit, u_char c));
 u_char clgetc __P((struct clsoftc *sc, int *channel));
 #if 0
 void cloutput __P( (struct tty *tp));
+#endif
+#ifdef	CLCD_DO_POLLED_INPUT
+void cl_chkinput __P((void));
 #endif
 
 struct cfattach cl_ca = {       
@@ -984,7 +1000,7 @@ int
 clcngetc(dev)
 	dev_t dev;
 {
-	u_char val, reoir, licr, isrl, data, fifo_cnt;
+	u_char val, reoir, licr, isrl, data = 0, fifo_cnt;
 #if 0
 	u_char status;
 #endif
@@ -1128,10 +1144,7 @@ if (unit == 0) {
 	return;
 }
 
-/*
 #ifdef CLCD_DO_POLLED_INPUT
-*/
-#if 1
 void
 cl_chkinput()
 {
@@ -1236,7 +1249,7 @@ clccparam(sc, par, channel)
 	if (par->c_ospeed == 0) { 
 		/* dont kill the console */
 		if(sc->sc_cl[channel].cl_consio == 0) {
-			/* disconnect, drop RTS DTR stop reciever */
+			/* disconnect, drop RTS DTR stop receiver */
 			sc->cl_reg->cl_msvr_rts = 0x00;
 			sc->cl_reg->cl_msvr_dtr = 0x00;
 			sc->cl_reg->cl_ccr = 0x05;
@@ -1635,7 +1648,7 @@ cl_rxintr(arg)
 	int i;
 	u_char reoir;
 	u_char buffer[CL_FIFO_MAX +1];
-#ifdef CONSOLEBREAKDDB
+#ifdef DDB
 	int wantddb = 0;
 #endif
 	
@@ -1670,7 +1683,7 @@ cl_rxintr(arg)
 		reoir = 0x08;
 	} else
 	if (risrl & 0x01) {
-#ifdef CONSOLEBREAKDDB
+#ifdef DDB
 		if (sc->sc_cl[channel].cl_consio)
 			wantddb = 1;
 #endif
@@ -1797,8 +1810,8 @@ log(LOG_WARNING, "cl_txintr: DMAMODE channel %x dmabsts %x risrl %x risrh %x\n",
 		reoir = 0x08;
 		sc->cl_reg->cl_reoir = reoir;
 	}
-#ifdef CONSOLEBREAKDDB
-	if (wantddb)
+#ifdef DDB
+	if (wantddb != 0 && db_console != 0)
 		Debugger();
 #endif
 	return 1;
@@ -1844,39 +1857,16 @@ cl_break (sc, channel)
 	struct clsoftc *sc;
 	int channel;
 {
-#ifdef DEBUG_KERN
-	Debugger();
+#ifdef DDB
+	if (db_console != 0)
+		Debugger();
 #else
 	log(LOG_WARNING, "%s%d[%d]: break detected\n", cl_cd.cd_name, 0, channel);
 #endif
 	return;
 }
 
-void
-cl_dumpport0()
-{
-	cl_dumpport(0);
-	return;
-}
-void
-cl_dumpport1()
-{
-	cl_dumpport(1);
-	return;
-}
-void
-cl_dumpport2()
-{
-	cl_dumpport(2);
-	return;
-}
-void
-cl_dumpport3()
-{
-	cl_dumpport(3);
-	return;
-}
-
+#ifdef DEBUG
 void
 cl_dumpport(channel)
 	int channel;
@@ -1922,6 +1912,7 @@ cl_dumpport(channel)
 	rcor = cl_reg->cl_rcor;
 	tbpr = cl_reg->cl_tbpr;
 	rpilr = cl_reg->cl_rpilr;
+	rir = cl_reg->cl_rir;
 	ier = cl_reg->cl_ier;
 	ccr = cl_reg->cl_ccr;
 	tcor = cl_reg->cl_tcor;
@@ -1997,3 +1988,4 @@ cl_dumpport(channel)
 	printf("}\n");
 	return;
 }
+#endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.41 2001/04/06 04:42:09 csapuntz Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.52 2001/07/21 09:26:06 itojun Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -33,31 +33,52 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_subr.c	8.1 (Berkeley) 6/10/93
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
 
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
-
 #include <sys/param.h>
-#include <sys/proc.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
+#include <sys/proc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
-#include <sys/errno.h>
-#include <sys/time.h>
 #include <sys/kernel.h>
 
 #include <net/route.h>
@@ -78,9 +99,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <dev/rndvar.h>
 
 #ifdef INET6
-#include <netinet6/ip6_var.h>
-#include <netinet6/tcpipv6.h>
-#include <sys/domain.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6protosw.h>
 #endif /* INET6 */
@@ -217,13 +235,15 @@ tcp_template(tp)
 
 			bzero(ipovly->ih_x1, sizeof ipovly->ih_x1);
 			ipovly->ih_pr = IPPROTO_TCP;
-			ipovly->ih_len = htons(sizeof (struct tcpiphdr) -
-				sizeof (struct ip));
+			ipovly->ih_len = htons(sizeof (struct tcphdr));
 			ipovly->ih_src = inp->inp_laddr;
 			ipovly->ih_dst = inp->inp_faddr;
 
 			th = (struct tcphdr *)(mtod(m, caddr_t) +
 				sizeof(struct ip));
+			th->th_sum = in_cksum_phdr(ipovly->ih_src.s_addr,
+			    ipovly->ih_dst.s_addr,
+			    htons(sizeof (struct tcphdr) + IPPROTO_TCP));
 		}
 		break;
 #endif /* INET */
@@ -239,13 +259,13 @@ tcp_template(tp)
 			ipv6->ip6_flow = htonl(0x60000000) |
 			    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff));  
 						  
-
 			ipv6->ip6_nxt = IPPROTO_TCP;
 			ipv6->ip6_plen = htons(sizeof(struct tcphdr)); /*XXX*/
 			ipv6->ip6_hlim = in6_selecthlim(inp, NULL);	/*XXX*/
 
 			th = (struct tcphdr *)(mtod(m, caddr_t) +
 				sizeof(struct ip6_hdr));
+			th->th_sum = 0;
 		}
 		break;
 #endif /* INET6 */
@@ -259,7 +279,6 @@ tcp_template(tp)
 	th->th_off = 5;
 	th->th_flags = 0;
 	th->th_win = 0;
-	th->th_sum = 0;
 	th->th_urp = 0;
 	return (m);
 }
@@ -350,13 +369,13 @@ tcp_respond(tp, template, m, ack, seq, flags)
 			xchg(((struct ip6_hdr *)ti)->ip6_dst,\
 			    ((struct ip6_hdr *)ti)->ip6_src,\
 			    struct in6_addr);
-			th = (void *)ti + sizeof(struct ip6_hdr);
+			th = (void *)((caddr_t)ti + sizeof(struct ip6_hdr));
 		} else
 #endif /* INET6 */
 		{
 			m->m_len = sizeof (struct tcpiphdr);
 			xchg(ti->ti_dst.s_addr, ti->ti_src.s_addr, u_int32_t);
-			th = (void *)ti + sizeof(struct ip);
+			th = (void *)((caddr_t)ti + sizeof(struct ip));
 		}
 		xchg(th->th_dport, th->th_sport, u_int16_t);
 #undef xchg
@@ -406,6 +425,13 @@ tcp_respond(tp, template, m, ack, seq, flags)
 	{
 		bzero(ti->ti_x1, sizeof ti->ti_x1);
 		ti->ti_len = htons((u_short)tlen - sizeof(struct ip));
+
+		/*
+		 * There's no point deferring to hardware checksum processing
+		 * here, as we only send a minimal TCP packet whose checksum
+		 * we need to compute in any case.
+		 */
+		th->th_sum = 0;
 		th->th_sum = in_cksum(m, tlen);
 		((struct ip *)ti)->ip_len = tlen;
 		((struct ip *)ti)->ip_ttl = ip_defttl;
@@ -1094,16 +1120,12 @@ tcp_rndiss_init()
 tcp_seq
 tcp_rndiss_next()
 {
-	u_int16_t tmp;
-
         if (tcp_rndiss_cnt >= TCP_RNDISS_MAX ||
 	    time.tv_sec > tcp_rndiss_reseed)
                 tcp_rndiss_init();
 	
-	get_random_bytes(&tmp, sizeof(tmp));
-
-	/* (tmp & 0x7fff) ensures a 32768 byte gap between ISS */
+	/* (arc4random() & 0x7fff) ensures a 32768 byte gap between ISS */
 	return ((tcp_rndiss_encrypt(tcp_rndiss_cnt++) | tcp_rndiss_msb) <<16) |
-		(tmp & 0x7fff);
+		(arc4random() & 0x7fff);
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.20 2000/09/26 14:03:53 art Exp $ */
+/*	$OpenBSD: conf.c,v 1.24 2001/09/28 02:53:13 mickey Exp $ */
 
 /*-
  * Copyright (c) 1995 Theo de Raadt
@@ -74,7 +74,6 @@
 
 int	ttselect	__P((dev_t, int, struct proc *));
 
-bdev_decl(sw);
 #include "st.h"
 #include "sd.h"
 #include "cd.h"
@@ -115,7 +114,6 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #define mmread  mmrw
 #define mmwrite mmrw
 cdev_decl(mm);
-cdev_decl(sw);
 
 #include "sram.h"
 cdev_decl(sram);
@@ -178,11 +176,9 @@ dev_decl(filedesc,open);
 
 #include "tun.h"
 
-#ifdef IPFILTER
-#define NIPF 1
-#else
-#define NIPF 0
-#endif
+#include "pf.h"
+
+#include <altq/altqconf.h>
 
 struct cdevsw	cdevsw[] =
 {
@@ -225,7 +221,7 @@ struct cdevsw	cdevsw[] =
 	cdev_lkm_dummy(),		/* 36 */
 	cdev_lkm_dummy(),		/* 37 */
 	cdev_lkm_dummy(),		/* 38 */
-	cdev_gen_ipf(NIPF,ipl),         /* 39: IP filter */
+	cdev_pf_init(NPF,pf),		/* 39: packet filter */
 	cdev_random_init(1,random),	/* 40: random data source */
 	cdev_uk_init(NUK,uk),		/* 41: unknown SCSI */
 	cdev_ss_init(NSS,ss),           /* 42: SCSI scanner */
@@ -242,6 +238,7 @@ struct cdevsw	cdevsw[] =
 #else
 	cdev_lkm_dummy(),		/* 51 */
 #endif
+	cdev_altq_init(NALTQ,altq),	/* 52: ALTQ control interface */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

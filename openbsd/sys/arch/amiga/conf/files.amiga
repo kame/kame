@@ -1,4 +1,4 @@
-#	$OpenBSD: files.amiga,v 1.39 2000/10/12 19:36:52 espie Exp $
+#	$OpenBSD: files.amiga,v 1.43 2001/08/25 11:37:26 espie Exp $
 #	$NetBSD: files.amiga,v 1.62 1997/08/27 19:32:47 is Exp $
 
 
@@ -96,9 +96,6 @@ attach	grfcc at mainbus
 file	arch/amiga/dev/grf_cc.c		grfcc needs-flag
 file	arch/amiga/dev/ite_cc.c		grfcc & ite
 
-# RAM disk
-file	arch/amiga/dev/rd_root.c	ramdisk_hooks
-
 pseudo-device	view
 file	arch/amiga/dev/view.c		view | grfcc needs-count
 file	arch/amiga/dev/grfabs.c		grfcc | view
@@ -130,7 +127,7 @@ file	arch/amiga/dev/grf_ul.c		grful needs-flag
 file	arch/amiga/dev/ite_ul.c		grful & ite
 file	arch/amiga/dev/grf_ultms.g	grful
 
-# CyberVison 64 grf (ite5 grf5)
+# CyberVision 64 grf (ite5 grf5)
 device	grfcv: grfbus
 attach	grfcv at zbus
 file	arch/amiga/dev/grf_cv.c		grfcv needs-flag
@@ -172,7 +169,7 @@ device	qn:	ifnet, ether
 attach	qn at zbus
 file	arch/amiga/dev/if_qn.c		qn needs-flag
 
-# Ariadne ethernet card (will merge into le soon)
+# Ariadne ethernet card
 device	ae:	ifnet, ether
 attach	ae at zbus
 file	arch/amiga/dev/if_ae.c		ae needs-count
@@ -369,9 +366,6 @@ file	arch/amiga/amiga/vm_machdep.c
 file	arch/amiga/amiga/cc.c
 file	arch/amiga/amiga/db_memrw.c	ddb
 
-# XXX to be moved to files.m68k after 2.2
-file	arch/m68k/m68k/regdump.c
-
 major	{wd = 0}
 major	{fd = 2}
 major	{sd = 4}
@@ -387,7 +381,7 @@ major	{rd = 16}
 include "../../../compat/sunos/files.sunos"
 file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
 
-# PCIC pcmcia contoller
+# PCIC pcmcia controller
 # XXX this needs to be done very late, so it's done here.  This feels
 # like a kludge, but it might be for the best.
 
@@ -412,6 +406,6 @@ file	dev/isa/i82365_isasubr.c	pcic_isa | pcic_isapnp
 include "dev/pcmcia/files.pcmcia"
 
 #
-# Media Indepedent Interface (mii)
+# Media Independent Interface (mii)
 #
 include "../../../dev/mii/files.mii"

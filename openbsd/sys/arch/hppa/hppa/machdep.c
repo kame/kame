@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.31 2001/03/29 00:47:53 mickey Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.40 2001/09/19 20:50:56 mickey Exp $	*/
 
 /*
  * Copyright (c) 1999-2000 Michael Shalayeff
@@ -68,7 +68,6 @@
 #include <sys/syscallargs.h>
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
 #include <uvm/uvm_page.h>
 #include <uvm/uvm.h>
 
@@ -463,8 +462,8 @@ hptsize=256;	/* XXX one page for now */
 		    MAXBSIZE * 7 / 10;
 
 	/* More buffer pages than fits into the buffers is senseless. */
-	if (bufpages > nbuf * MAXBSIZE / CLBYTES)
-		bufpages = nbuf * MAXBSIZE / CLBYTES;
+	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
+		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
 
 	if (nswbuf == 0) {
 		nswbuf = (nbuf / 2) &~ 1;
@@ -475,11 +474,6 @@ hptsize=256;	/* XXX one page for now */
 	v = vstart;
 #define valloc(name, type, num) (name) = (type *)v; v = (vaddr_t)((name)+(num))
 
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-
-	valloc(timeouts, struct timeout, ntimeout);
 	valloc(buf, struct buf, nbuf);
 
 #ifdef SYSVSHM
@@ -640,7 +634,7 @@ cpu_startup()
 		 * but has no physical memory allocated for it.
 		 */
 		curbuf = (vaddr_t) buffers + (i * MAXBSIZE);
-		curbufsize = CLBYTES * ((i < residual) ? (base+1) : base);
+		curbufsize = PAGE_SIZE * ((i < residual) ? (base+1) : base);
 
 		while (curbufsize) {
 			if ((pg = uvm_pagealloc(NULL, 0, NULL, 0)) == NULL)
@@ -648,7 +642,7 @@ cpu_startup()
 				    "buffer cache");
 			pmap_enter(kernel_map->pmap, curbuf,
 			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    TRUE, VM_PROT_READ|VM_PROT_WRITE);
+			    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
@@ -667,27 +661,15 @@ cpu_startup()
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
-	/*
-	 * Finally, allocate mbuf pool.  Since mclrefcnt is an off-size
-	 * we use the more space efficient malloc in place of kmem_alloc.
-	 */
-	mclrefcnt = (char *)malloc(NMBCLUSTERS+CLBYTES/MCLBYTES,
-	    M_MBUF, M_NOWAIT);
-	bzero(mclrefcnt, NMBCLUSTERS+CLBYTES/MCLBYTES);
-	mb_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&mbutl, &maxaddr,
+	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
 	    VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
-
-	/*
-	 * Initialize timeouts
-	 */
-	timeout_init();
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
 	printf("avail mem = %ld\n", ptoa(uvmexp.free));
 	printf("using %d buffers containing %d bytes of memory\n",
-	    nbuf, bufpages * CLBYTES);
+	    nbuf, bufpages * PAGE_SIZE);
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
@@ -704,7 +686,6 @@ cpu_startup()
 		printf("kernel does not support -c; continuing..\n");
 #endif
 	}
-	configure();
 }
 
 /*

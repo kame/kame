@@ -1,4 +1,4 @@
-/*	$OpenBSD: auich.c,v 1.8 2001/04/16 03:18:18 deraadt Exp $	*/
+/*	$OpenBSD: auich.c,v 1.15 2001/09/10 17:38:54 mickey Exp $	*/
 
 /*
  * Copyright (c) 2000,2001 Michael Shalayeff
@@ -109,40 +109,7 @@
 #define		AUICH_GSCI	0x00001	/* gpi status change */
 #define		AUICH_GSTS_BITS	"\020\01gsci\02miict\03moint\06piint\07point\010mint\011pcr\012scr\013pri\014sri\015b1s12\016b2s12\017b3s12\020rcs\021ad3\022md3"
 #define	AUICH_CAS		0x34	/* 1/8 bit */
-#define	AUICH_SEMATIMO	1000	/* us */
-
-#define	AUICH_MIXER_RESET		0x00
-#define	AUICH_MIXER_MUTE		0x02
-#define	AUICH_MIXER_HDFMUTE	0x04
-#define	AUICH_MIXER_MONOMUTE	0x06
-#define	AUICH_MIXER_TONE		0x08
-#define	AUICH_MIXER_BEEPMUTE	0x0a
-#define	AUICH_MIXER_PHONEMUTE	0x0c
-#define	AUICH_MIXER_MICMUTE	0x0e
-#define	AUICH_MIXER_LINEMUTE	0x10
-#define	AUICH_MIXER_CDMUTE	0x12
-#define	AUICH_MIXER_VDMUTE	0x14
-#define	AUICH_MIXER_AUXMUTE	0x16
-#define	AUICH_MIXER_PCMMUTE	0x18
-#define	AUICH_MIXER_RECSEL	0x1a
-#define	AUICH_MIXER_RECGAIN	0x1c
-#define	AUICH_MIXER_RECGAINMIC	0x1e
-#define	AUICH_MIXER_GP		0x20
-#define	AUICH_MIXER_3DCTRL	0x22
-#define	AUICH_MIXER_RESERVED	0x24
-#define	AUICH_PM			0x26
-#define		AUICH_PM_PCMI	0x100
-#define		AUICH_PM_PCMO	0x200
-#define		AUICH_PM_MICI	0x400
-#define	AUICH_EXTAUDIO		0x28
-#define	AUICH_EXTAUCTRL		0x2a
-#define	AUICH_PCMRATE		0x2c
-#define	AUICH_PCM3dRATE		0x2e
-#define	AUICH_PCMLFERATE		0x30
-#define	AUICH_PCMLRRATE		0x32
-#define	AUICH_MICADCRATE		0x34
-#define	AUICH_CLFEMUTE		0x36
-#define	AUICH_LR3DMUTE		0x38
+#define	AUICH_SEMATIMO		1000	/* us */
 
 /*
  * according to the dev/audiovar.h AU_RING_SIZE is 2^16, what fits
@@ -234,6 +201,7 @@ static const struct auich_devtype {
 	{ PCI_PRODUCT_INTEL_82801AA_ACA, 0, "ICH" },
 	{ PCI_PRODUCT_INTEL_82801AB_ACA, 0, "ICH0" },
 	{ PCI_PRODUCT_INTEL_82801BA_ACA, 0, "ICH2" },
+	{ PCI_PRODUCT_INTEL_82801CA_CAM, 0, "ICH3" },
 	{ PCI_PRODUCT_INTEL_82440MX_ACA, 0, "440MX" },
 };
 
@@ -326,12 +294,12 @@ auich_attach(parent, self, aux)
 	int i;
 
 	if (pci_mapreg_map(pa, AUICH_NAMBAR, PCI_MAPREG_TYPE_IO, 0,
-			   &sc->iot, &sc->mix_ioh, NULL, &mix_size)) {
+			   &sc->iot, &sc->mix_ioh, NULL, &mix_size, 0)) {
 		printf(": can't map codec i/o space\n");
 		return;
 	}
 	if (pci_mapreg_map(pa, AUICH_NABMBAR, PCI_MAPREG_TYPE_IO, 0,
-			   &sc->iot, &sc->aud_ioh, NULL, &aud_size)) {
+			   &sc->iot, &sc->aud_ioh, NULL, &aud_size, 0)) {
 		printf(": can't map device i/o space\n");
 		bus_space_unmap(sc->iot, sc->mix_ioh, mix_size);
 		return;
@@ -343,8 +311,7 @@ auich_attach(parent, self, aux)
 	pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
 	    csr | PCI_COMMAND_MASTER_ENABLE);
 
-	if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": can't map interrupt\n");
 		bus_space_unmap(sc->iot, sc->aud_ioh, aud_size);
 		bus_space_unmap(sc->iot, sc->mix_ioh, mix_size);
@@ -416,8 +383,8 @@ auich_read_codec(v, reg, val)
 
 	if (i > 0) {
 		*val = bus_space_read_2(sc->iot, sc->mix_ioh, reg);
-		DPRINTF(AUICH_DEBUG_CODECIO,
-		    ("auich_read_codec(%x, %x)\n", reg, *val));
+		DPRINTF(AUICH_DEBUG_CODECIO, ("%s: read_codec(%x, %x)\n",
+		    sc->sc_dev.dv_xname, reg, *val));
 
 		return 0;
 	} else {
@@ -436,13 +403,13 @@ auich_write_codec(v, reg, val)
 	struct auich_softc *sc = v;
 	int i;
 
-	DPRINTF(AUICH_DEBUG_CODECIO, ("auich_write_codec(%x, %x)\n", reg, val));
-
 	/* wait for an access semaphore */
 	for (i = AUICH_SEMATIMO; i-- &&
 	    bus_space_read_1(sc->iot, sc->aud_ioh, AUICH_CAS) & 1; DELAY(1));
 
 	if (i > 0) {
+		DPRINTF(AUICH_DEBUG_CODECIO, ("%s: write_codec(%x, %x)\n",
+		    sc->sc_dev.dv_xname, reg, val));
 		bus_space_write_2(sc->iot, sc->mix_ioh, reg, val);
 		return 0;
 	} else {
@@ -553,7 +520,7 @@ auich_set_params(v, setmode, usemode, play, rec)
 	struct audio_params *play, *rec;
 {
 	struct auich_softc *sc = v;
-	u_int16_t val, rate;
+	int error;
 
 	if (setmode & AUMODE_PLAY) {
 		play->factor = 1;
@@ -586,17 +553,11 @@ auich_set_params(v, setmode, usemode, play, rec)
 				play->sw_code = change_sign16_swap_bytes;
 			break;
 		default:
-			return EINVAL;
+			return (EINVAL);
 		}
 
-		auich_read_codec(sc, AUICH_PM, &val);
-		auich_write_codec(sc, AUICH_PM, val | AUICH_PM_PCMO);
-
-		auich_write_codec(sc, AUICH_PCMRATE, play->sample_rate);
-		auich_read_codec(sc, AUICH_PCMRATE, &rate);
-		play->sample_rate = rate;
-
-		auich_write_codec(sc, AUICH_PM, val);
+		if ((error = ac97_set_rate(sc->codec_if, play, AUMODE_PLAY)))
+			return (error);
 	}
 
 	if (setmode & AUMODE_RECORD) {
@@ -618,30 +579,24 @@ auich_set_params(v, setmode, usemode, play, rec)
 			rec->sw_code = ulinear8_to_alaw;
 			break;
 		case AUDIO_ENCODING_SLINEAR_BE:
-			if (play->precision == 16)
-				play->sw_code = swap_bytes;
+			if (rec->precision == 16)
+				rec->sw_code = swap_bytes;
 			else
-				play->sw_code = change_sign8;
+				rec->sw_code = change_sign8;
 			break;
 		case AUDIO_ENCODING_ULINEAR_BE:
-			if (play->precision == 16)
-				play->sw_code = swap_bytes_change_sign16;
+			if (rec->precision == 16)
+				rec->sw_code = swap_bytes_change_sign16;
 			break;
 		default:
-			return EINVAL;
+			return (EINVAL);
 		}
 
-		auich_read_codec(sc, AUICH_PM, &val);
-		auich_write_codec(sc, AUICH_PM, val | AUICH_PM_PCMI);
-
-		auich_write_codec(sc, AUICH_PCMLFERATE, play->sample_rate);
-		auich_read_codec(sc, AUICH_PCMLFERATE, &rate);
-		play->sample_rate = rate;
-
-		auich_write_codec(sc, AUICH_PM, val);
+		if ((error = ac97_set_rate(sc->codec_if, rec, AUMODE_RECORD)))
+			return (error);
 	}
 
-	return 0;
+	return (0);
 }
 
 int
@@ -735,8 +690,7 @@ auich_allocm(v, size, pool, flags)
 	p = malloc(sizeof(*p), pool, flags);
 	if (!p)
 		return NULL;
-
-	bzero(p, sizeof(p));
+	bzero(p, sizeof(*p));
 
 	p->size = size;
 	if ((error = bus_dmamem_alloc(sc->dmat, p->size, NBPG, 0, p->segs,
