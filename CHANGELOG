@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2650 2004/07/27 13:11:59 suz Exp $
+$KAME: CHANGELOG,v 1.2651 2004/07/29 17:01:24 jinmei Exp $
 
 <200407>
+2004-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6s.c: allowed a Request/Renew/Release
+	message to be unicasted when it is forwarded from a relay.
+	From: Bilal Ahmed
+
 2004-07-27  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/net/if*.c: removed a "malloc() failure" warning message
  	  at start-up time on freebsd5.
