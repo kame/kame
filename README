@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.70 2004/05/21 08:35:37 itojun Exp $
+	$KAME: README,v 1.71 2004/06/21 16:26:23 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -45,7 +45,7 @@ The kit comes with BSD-like copyright.  In short, the code is FREELY
 available but with NO WARRANTY.  Even commercial use is OK.  Please
 refer to the COPYRIGHT file for more details.  The copyright holder is
 WIDE Project instead of KAME Project.  This is because KAME Project is
-to be terminated in March 2002 (may be extended).
+to be terminated in March 2006 (may be extended).
 
 READ CAREFULLY: Several countries have legal enforcement for
 export/import/use of cryptographic software.  Check it before playing
