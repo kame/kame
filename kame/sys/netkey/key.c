@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.175 2000/12/05 09:22:11 sakane Exp $	*/
+/*	$KAME: key.c,v 1.176 2000/12/05 18:01:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -573,8 +573,8 @@ found:
 }
 
 /*
- * allocating a SA entry for a *OUTBOUND* packet.
- * checking each request entries in SP, and acquire SA if need.
+ * allocating an SA entry for an *OUTBOUND* packet.
+ * checking each request entries in SP, and acquire an SA if need.
  * OUT:	0: there are valid requests.
  *	ENOENT: policy may be valid, but SA with REQUIRE is on acquiring.
  */
@@ -3897,7 +3897,13 @@ key_cmpspidx_withmask(spidx0, spidx1)
 		 && satosin6(&spidx0->src)->sin6_port !=
 		    satosin6(&spidx1->src)->sin6_port)
 			return 0;
-		if (satosin6(&spidx0->src)->sin6_scope_id !=
+		/*
+		 * scope_id check. if sin6_scope_id is 0, we regard it
+		 * as a wildcard scope, which matches any scope zone ID. 
+		 */
+		if (satosin6(&spidx0->src)->sin6_scope_id &&
+		    satosin6(&spidx1->src)->sin6_scope_id &&
+		    satosin6(&spidx0->src)->sin6_scope_id !=
 		    satosin6(&spidx1->src)->sin6_scope_id)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin6(&spidx0->src)->sin6_addr,
@@ -3926,6 +3932,10 @@ key_cmpspidx_withmask(spidx0, spidx1)
 		 && satosin6(&spidx0->dst)->sin6_port !=
 		    satosin6(&spidx1->dst)->sin6_port)
 			return 0;
+		/*
+		 * scope_id check. if sin6_scope_id is 0, we regard it
+		 * as a wildcard scope, which matches any scope zone ID. 
+		 */
 		if (satosin6(&spidx0->dst)->sin6_scope_id !=
 		    satosin6(&spidx1->dst)->sin6_scope_id)
 			return 0;
