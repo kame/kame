@@ -1,4 +1,4 @@
-/*	$KAME: key_var.h,v 1.6 2000/03/25 07:24:13 sumikawa Exp $	*/
+/*	$KAME: key_var.h,v 1.7 2000/05/23 14:27:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,6 +87,7 @@
 }
 #endif
 
+#ifdef _KERNEL
 #define _ARRAYLEN(p) (sizeof(p)/sizeof(p[0]))
 #define _KEYLEN(key) ((u_int)((key)->sadb_key_bits >> 3))
 #define _KEYBITS(key) ((u_int)((key)->sadb_key_bits))
@@ -129,5 +130,6 @@
 	((caddr_t)&((struct sockaddr_in *)(saddr))->sin_addr.s_addr)
 #endif
 #endif /* defined(INET6) */
+#endif /*_KERNEL*/
 
 #endif /* _NETKEY_KEY_VAR_H_ */
