@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1887 2001/09/21 12:23:26 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1888 2001/09/21 12:37:08 jinmei Exp $
 
 <200109>
+2001-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrouter_select): removed the
+	default route if there was neither a default router nor the
+	default interface.
+
 2001-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c (in6_selectroute): made sure to fill
 	in retifp and retrt, regardless of the return value.  Without this
