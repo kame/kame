@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.11 2000/05/09 17:06:49 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.12 2000/05/19 06:16:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -313,7 +313,7 @@ struct nd_opt_hai {		/* Home Agent Information option (MIPv6) */
 struct icmp6_namelookup {
 	struct icmp6_hdr 	icmp6_nl_hdr;
 	u_int8_t	icmp6_nl_nonce[8];
-	u_int32_t	icmp6_nl_ttl;
+	int32_t		icmp6_nl_ttl;
 #if 0
 	u_int8_t	icmp6_nl_len;
 	u_int8_t	icmp6_nl_name[3];
