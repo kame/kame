@@ -1947,7 +1947,7 @@ in6_ifawithscope(oifp, dst)
 	int blen = -1;
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
-	struct in6_ifaddr *ifa_best = NULL, *ia;
+	struct in6_ifaddr *ifa_best = NULL;
 	
 	if (oifp == NULL) {
 		printf("in6_ifawithscope: output interface is not specified\n");
