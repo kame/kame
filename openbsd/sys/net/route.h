@@ -158,7 +158,6 @@ struct ortentry {
 #define RTF_CLONED	0x10000		/* this is a cloned route */
 
 #define RTF_CACHE	0x10000		/* cached route in general */
-#define RTF_CLONED	0x20000	 	/* route is a cloned route */
 
 #ifndef _KERNEL
 /* obsoleted */
