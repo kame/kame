@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.19 2000/05/01 03:22:31 itojun Exp $ */
+/* $Id: name6.c,v 1.20 2000/05/01 05:04:44 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -1060,30 +1060,305 @@ gethostent(void)
 #include <arpa/nameser.h>
 #include <resolv.h>
 
-#ifdef DEBUG
-#define	DNS_ASSERT(X)	if (!(X)) { fprintf(stderr, "ASSFAIL: %s %d: %s\n", __FILE__, __LINE__, #X); goto badanswer; }
+#if PACKETSZ > 1024
+#define	MAXPACKET	PACKETSZ
 #else
-#define	DNS_ASSERT(X)	if (!(X)) { goto badanswer; }
+#define	MAXPACKET	1024
 #endif
+
+typedef union {
+	HEADER hdr;
+	u_char buf[MAXPACKET];
+} querybuf;
+
+static struct hostent *getanswer __P((const querybuf *, int, const char *,
+	int, struct hostent *));
+
+#define BOUNDED_INCR(x) \
+	do { \
+		cp += x; \
+		if (cp > eom) { \
+			h_errno = NO_RECOVERY; \
+			return (NULL); \
+		} \
+	} while (0)
+
+#define BOUNDS_CHECK(ptr, count) \
+	do { \
+		if ((ptr) + (count) > eom) { \
+			h_errno = NO_RECOVERY; \
+			return (NULL); \
+		} \
+	} while (0)
+
+/*
+ * we don't need to take care about sorting, nor IPv4 mapped address here.
+ */
+static struct hostent *
+getanswer(answer, anslen, qname, qtype, template)
+	const querybuf *answer;
+	int anslen;
+	const char *qname;
+	int qtype;
+	struct hostent *template;
+{
+	register const HEADER *hp;
+	register const u_char *cp;
+	register int n;
+	const u_char *eom, *erdata;
+	char *bp, **ap, **hap;
+	int type, class, buflen, ancount, qdcount;
+	int haveanswer, had_error;
+	char tbuf[MAXDNAME];
+	const char *tname;
+	int (*name_ok) __P((const char *));
+#define host	(*template)
+	char *h_addr_ptrs[MAXADDRS + 1];
+	char *host_aliases[MAXALIASES];
+	char hostbuf[8*1024];
+
+#define DNS_ASSERT(x) \
+	do {				\
+		if (!(x)) {		\
+			cp += n;	\
+			continue;	\
+		}			\
+	} while (0)
+
+#define DNS_FATAL(x) \
+	do {				\
+		if (!(x)) {		\
+			had_error++;	\
+			continue;	\
+		}			\
+	} while (0)
+
+	tname = qname;
+	host.h_name = NULL;
+	eom = answer->buf + anslen;
+	switch (qtype) {
+	case T_A:
+	case T_AAAA:
+		name_ok = res_hnok;
+		break;
+	case T_PTR:
+		name_ok = res_dnok;
+		break;
+	default:
+		return (NULL);	/* XXX should be abort(); */
+	}
+	/*
+	 * find first satisfactory answer
+	 */
+	hp = &answer->hdr;
+	ancount = ntohs(hp->ancount);
+	qdcount = ntohs(hp->qdcount);
+	bp = hostbuf;
+	buflen = sizeof hostbuf;
+	cp = answer->buf;
+	BOUNDED_INCR(HFIXEDSZ);
+	if (qdcount != 1) {
+		h_errno = NO_RECOVERY;
+		return (NULL);
+	}
+	n = dn_expand(answer->buf, eom, cp, bp, buflen);
+	if ((n < 0) || !(*name_ok)(bp)) {
+		h_errno = NO_RECOVERY;
+		return (NULL);
+	}
+	BOUNDED_INCR(n + QFIXEDSZ);
+	if (qtype == T_A || qtype == T_AAAA) {
+		/* res_send() has already verified that the query name is the
+		 * same as the one we sent; this just gets the expanded name
+		 * (i.e., with the succeeding search-domain tacked on).
+		 */
+		n = strlen(bp) + 1;		/* for the \0 */
+		if (n >= MAXHOSTNAMELEN) {
+			h_errno = NO_RECOVERY;
+			return (NULL);
+		}
+		host.h_name = bp;
+		bp += n;
+		buflen -= n;
+		/* The qname can be abbreviated, but h_name is now absolute. */
+		qname = host.h_name;
+	}
+	ap = host_aliases;
+	*ap = NULL;
+	host.h_aliases = host_aliases;
+	hap = h_addr_ptrs;
+	*hap = NULL;
+	host.h_addr_list = h_addr_ptrs;
+	haveanswer = 0;
+	had_error = 0;
+	while (ancount-- > 0 && cp < eom && !had_error) {
+		n = dn_expand(answer->buf, eom, cp, bp, buflen);
+		DNS_FATAL(n >= 0);
+		DNS_FATAL((*name_ok)(bp));
+		cp += n;			/* name */
+		BOUNDS_CHECK(cp, 3 * INT16SZ + INT32SZ);
+		type = _getshort(cp);
+ 		cp += INT16SZ;			/* type */
+		class = _getshort(cp);
+ 		cp += INT16SZ + INT32SZ;	/* class, TTL */
+		n = _getshort(cp);
+		cp += INT16SZ;			/* len */
+		BOUNDS_CHECK(cp, n);
+		erdata = cp + n;
+		DNS_ASSERT(class == C_IN);
+		if ((qtype == T_A || qtype == T_AAAA) && type == T_CNAME) {
+			if (ap >= &host_aliases[MAXALIASES-1])
+				continue;
+			n = dn_expand(answer->buf, eom, cp, tbuf, sizeof tbuf);
+			DNS_FATAL(n >= 0);
+			DNS_FATAL((*name_ok)(tbuf));
+			cp += n;
+			if (cp != erdata) {
+				h_errno = NO_RECOVERY;
+				return (NULL);
+			}
+			/* Store alias. */
+			*ap++ = bp;
+			n = strlen(bp) + 1;	/* for the \0 */
+			DNS_FATAL(n < MAXHOSTNAMELEN);
+			bp += n;
+			buflen -= n;
+			/* Get canonical name. */
+			n = strlen(tbuf) + 1;	/* for the \0 */
+			DNS_FATAL(n <= buflen);
+			DNS_FATAL(n < MAXHOSTNAMELEN);
+			strcpy(bp, tbuf);
+			host.h_name = bp;
+			bp += n;
+			buflen -= n;
+			continue;
+		}
+		if (qtype == T_PTR && type == T_CNAME) {
+			n = dn_expand(answer->buf, eom, cp, tbuf, sizeof tbuf);
+			if (n < 0 || !res_dnok(tbuf)) {
+				had_error++;
+				continue;
+			}
+			cp += n;
+			if (cp != erdata) {
+				h_errno = NO_RECOVERY;
+				return (NULL);
+			}
+			/* Get canonical name. */
+			n = strlen(tbuf) + 1;	/* for the \0 */
+			if (n > buflen || n >= MAXHOSTNAMELEN) {
+				had_error++;
+				continue;
+			}
+			strcpy(bp, tbuf);
+			tname = bp;
+			bp += n;
+			buflen -= n;
+			continue;
+		}
+		DNS_ASSERT(type == qtype);
+		switch (type) {
+		case T_PTR:
+			DNS_ASSERT(strcasecmp(tname, bp) == 0);
+			n = dn_expand(answer->buf, eom, cp, bp, buflen);
+			DNS_FATAL(n >= 0);
+			DNS_FATAL(res_hnok(bp));
+#if MULTI_PTRS_ARE_ALIASES
+			cp += n;
+			if (cp != erdata) {
+				h_errno = NO_RECOVERY;
+				return (NULL);
+			}
+			if (!haveanswer)
+				host.h_name = bp;
+			else if (ap < &host_aliases[MAXALIASES-1])
+				*ap++ = bp;
+			else
+				n = -1;
+			if (n != -1) {
+				n = strlen(bp) + 1;	/* for the \0 */
+				if (n >= MAXHOSTNAMELEN) {
+					had_error++;
+					break;
+				}
+				bp += n;
+				buflen -= n;
+			}
+			break;
+#else
+			host.h_name = bp;
+			h_errno = NETDB_SUCCESS;
+			return (&host);
+#endif
+		case T_A:
+		case T_AAAA:
+			DNS_ASSERT(strcasecmp(host.h_name, bp) == 0);
+			DNS_ASSERT(n == host.h_length);
+			if (!haveanswer) {
+				register int nn;
+
+				host.h_name = bp;
+				nn = strlen(bp) + 1;	/* for the \0 */
+				bp += nn;
+				buflen -= nn;
+			}
+			bp = (char *)ALIGN(bp);
+
+			DNS_FATAL(bp + n < &hostbuf[sizeof hostbuf]);
+			DNS_ASSERT(hap < &h_addr_ptrs[MAXADDRS-1]);
+#ifdef FILTER_V4MAPPED
+			if (type == T_AAAA) {
+				struct in6_addr in6;
+				memcpy(&in6, cp, sizeof(in6));
+				DNS_ASSERT(IN6_IS_ADDR_V4MAPPED(&in6) == 0);
+			}
+#endif
+			bcopy(cp, *hap++ = bp, n);
+			bp += n;
+			buflen -= n;
+			cp += n;
+			if (cp != erdata) {
+				h_errno = NO_RECOVERY;
+				return (NULL);
+			}
+			break;
+		default:
+			abort();
+		}
+		if (!had_error)
+			haveanswer++;
+	}
+	if (haveanswer) {
+		*ap = NULL;
+		*hap = NULL;
+		if (!host.h_name) {
+			n = strlen(qname) + 1;	/* for the \0 */
+			if (n > buflen || n >= MAXHOSTNAMELEN)
+				goto no_recovery;
+			strcpy(bp, qname);
+			host.h_name = bp;
+			bp += n;
+			buflen -= n;
+		}
+		h_errno = NETDB_SUCCESS;
+		return (&host);
+	}
+ no_recovery:
+	h_errno = NO_RECOVERY;
+	return (NULL);
+
+#undef DNS_ASSERT
+#undef DNS_FATAL
+}
 
 static struct hostent *
 _dns_ghbyname(const char *name, int af, int *errp)
 {
 	int n;
-	u_char answer[BUFSIZ];
-	char tbuf[MAXDNAME+1];
-	HEADER *hp;
-	u_char *cp, *eom;
+	struct hostent *hp;
 	int qtype;
-	int type, class, ancount, qdcount;
-	u_long ttl;
-	char hostbuf[BUFSIZ];
-	char *bp;
-	char *alist[MAXALIASES];
-	char *hlist[MAXADDRS];
 	struct hostent hbuf;
-	int buflen;
-	int na, nh;
+	querybuf buf;
 
 	if ((_res.options & RES_INIT) == 0) {
 		if (res_init() < 0) {
@@ -1091,113 +1366,29 @@ _dns_ghbyname(const char *name, int af, int *errp)
 			return NULL;
 		}
 	}
-	hbuf.h_aliases = alist;
+	memset(&hbuf, 0, sizeof(hbuf));
 	hbuf.h_addrtype = af;
 	hbuf.h_length = ADDRLEN(af);
-	hbuf.h_addr_list = hlist;
-	na = nh = 0;
 
-#ifdef INET6
-	qtype = (af == AF_INET6 ? T_AAAA : T_A);
-#else
-	qtype = T_A;
-#endif 
-	n = res_search(name, C_IN, qtype, answer, sizeof(answer));
+	switch (af) {
+#ifdef AF_INET6
+	case AF_INET6:
+		qtype = T_AAAA;
+		break;
+#endif
+	case AF_INET:
+		qtype = T_A;
+		break;
+	default:
+		*errp = NO_RECOVERY;
+		return NULL;
+	}
+	n = res_search(name, C_IN, qtype, buf.buf, sizeof(buf));
 	if (n < 0) {
 		*errp = h_errno;
 		return NULL;
 	}
-	hp = (HEADER *)answer;
-	eom = answer + n;
-	ancount = ntohs(hp->ancount);
-	qdcount = ntohs(hp->qdcount);
-	DNS_ASSERT(qdcount == 1);
-	cp = answer + sizeof(HEADER);
-	bp = hostbuf;
-	buflen = sizeof(hostbuf);
-
-	n = dn_expand(answer, eom, cp, bp, buflen);
-	DNS_ASSERT(n >= 0);
-	cp += n + QFIXEDSZ;
-	hbuf.h_name = bp;
-	n = strlen(bp) + 1;
-	bp += n;
-	buflen -= n;
-	while (ancount-- > 0 && cp < eom) {
-		n = dn_expand(answer, eom, cp, bp, buflen);
-		DNS_ASSERT(n >= 0);
-		cp += n;		/* name */
-		type = _getshort(cp);
-		cp += 2;		/* type */
-		class = _getshort(cp);
-		cp += 2;		/* class */
-		ttl = _getlong(cp);
-		cp += 4;		/* ttl */
-		n = _getshort(cp);
-		cp += 2;		/* len */
-		DNS_ASSERT(class == C_IN);
-		switch (type) {
-		case T_CNAME:
-			if (na >= MAXALIASES-1) {
-				cp += n;
-				break;
-			}
-			n = dn_expand(answer, eom, cp, tbuf, sizeof(tbuf));
-			DNS_ASSERT(n >= 0);
-			cp += n;
-			/* alias */
-			alist[na++] = bp;
-			n = strlen(bp) + 1;
-			bp += n;
-			buflen -= n;
-			/* canon */
-			n = strlen(tbuf) + 1;
-			DNS_ASSERT(n < buflen);
-			strcpy(bp, tbuf);
-			hbuf.h_name = bp;
-			bp += n;
-			buflen -= n;
-			break;
-		case T_A:
-#ifdef INET6
-		case T_AAAA:
-#endif 
-			if (hbuf.h_name)
-				DNS_ASSERT(strcasecmp(hbuf.h_name, bp) == 0);
-			DNS_ASSERT(type == qtype);
-			bp = (char *)ALIGN(bp);
-			DNS_ASSERT(n == hbuf.h_length);
-			DNS_ASSERT(n < buflen);
-#ifdef FILTER_V4MAPPED
-			if (type == T_AAAA) {
-				struct in6_addr in6;
-				memcpy(&in6, cp, sizeof(in6));
-				if (IN6_IS_ADDR_V4MAPPED(&in6)) {
-					cp += n;
-					break;
-				}
-			}
-#endif
-			if (nh < MAXADDRS-1) {
-				hlist[nh++] = bp;
-				memcpy(bp, cp, n);
-				bp += n;
-				buflen -= n;
-			}
-			cp += n;
-			break;
-		default:
-			cp += n;
-			break;
-		}
-	}
-	if (nh == 0) {
-  badanswer:
-		*errp = NO_RECOVERY;
-		return NULL;
-	}
-	alist[na] = NULL;
-	hlist[nh] = NULL;
+	hp = getanswer(&buf, n, name, qtype, &hbuf);
 	return _hpcopy(&hbuf, errp);
 }
 
@@ -1205,22 +1396,17 @@ static struct hostent *
 _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 {
 	int n;
-	u_char answer[BUFSIZ];
-	HEADER *hp;
-	u_char c, *cp, *eom;
-	int type, class, ancount, qdcount;
-	u_long ttl;
-	char hostbuf[BUFSIZ];
+	struct hostent *hp;
+	u_char c, *cp;
 	char *bp;
-	char *alist[MAXALIASES];
-	char *hlist[2];
 	struct hostent hbuf;
-	int buflen;
 	int na;
 #ifdef INET6
 	static const char hex[] = "0123456789abcdef";
 #endif
-	char *tname = NULL;
+	querybuf buf;
+	char qbuf[MAXDNAME+1];
+	char *hlist[2];
 
 #ifdef INET6
 	/* XXX */
@@ -1234,18 +1420,15 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 			return NULL;
 		}
 	}
+	memset(&hbuf, 0, sizeof(hbuf));
 	hbuf.h_name = NULL;
-	hbuf.h_aliases = alist;
 	hbuf.h_addrtype = af;
 	hbuf.h_length = addrlen;
-	hbuf.h_addr_list = hlist;
-	hlist[0] = (char *)addr;
-	hlist[1] = NULL;
 	na = 0;
 
 	/* XXX assumes that MAXDNAME is big enough */
 	n = 0;
-	bp = hostbuf;
+	bp = qbuf;
 	cp = (u_char *)addr+addrlen-1;
 	switch (af) {
 #ifdef INET6
@@ -1273,81 +1456,18 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		strcpy(bp, "in-addr.arpa");
 		break;
 	}
-	tname = strdup(hostbuf);
 
-	n = res_query(hostbuf, C_IN, T_PTR, answer, sizeof(answer));
+	n = res_query(qbuf, C_IN, T_PTR, buf.buf, sizeof buf.buf);
 	if (n < 0) {
 		*errp = h_errno;
-		if (tname)
-			free(tname);
 		return NULL;
 	}
-	hp = (HEADER *)answer;
-	eom = answer + n;
-	ancount = ntohs(hp->ancount);
-	qdcount = ntohs(hp->qdcount);
-	DNS_ASSERT(qdcount == 1);
-	cp = answer + sizeof(HEADER);
-	bp = hostbuf;
-	buflen = sizeof(hostbuf);
-
-	n = dn_expand(answer, eom, cp, bp, buflen);
-	DNS_ASSERT(n >= 0);
-	cp += n + QFIXEDSZ;
-	if (tname)
-		free(tname);
-	tname = strdup(bp);
-	while (ancount-- > 0 && cp < eom) {
-		n = dn_expand(answer, eom, cp, bp, buflen);
-		DNS_ASSERT(n >= 0);
-		cp += n;		/* name */
-		type = _getshort(cp);
-		cp += 2;		/* type */
-		class = _getshort(cp);
-		cp += 2;		/* class */
-		ttl = _getlong(cp);
-		cp += 4;		/* ttl */
-		n = _getshort(cp);
-		cp += 2;		/* len */
-		DNS_ASSERT(class == C_IN);
-		switch (type) {
-		case T_PTR:
-			if (tname)
-				DNS_ASSERT(strcasecmp(tname, bp) == 0);
-			n = dn_expand(answer, eom, cp, bp, buflen);
-			DNS_ASSERT(n >= 0);
-			cp += n;
-			if (na >= MAXALIASES-1)
-				break;
-			if (hbuf.h_name == NULL)
-				hbuf.h_name = bp;
-			else
-				alist[na++] = bp;
-			n = strlen(bp) + 1;
-			bp += n;
-			buflen -= n;
-			break;
-		case T_CNAME:
-			if (tname)
-				free(tname);
-			tname = strdup(bp);
-			cp += n;
-			break;
-		default:
-  badanswer:
-			*errp = NO_RECOVERY;
-			if (tname)
-				free(tname);
-			return NULL;
-		}
-	}
-	if (tname)
-		free(tname);
-	if (hbuf.h_name == NULL) {
-		*errp = h_errno;
-		return NULL;
-	}
-	alist[na] = NULL;
+	hp = getanswer(&buf, n, qbuf, T_PTR, &hbuf);
+	hbuf.h_addrtype = af;
+	hbuf.h_length = addrlen;
+	hbuf.h_addr_list = hlist;
+	hlist[0] = (char *)addr;
+	hlist[1] = NULL;
 	return _hpcopy(&hbuf, errp);
 }
 
