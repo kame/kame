@@ -2994,9 +2994,7 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 	struct syn_cache *sc;
 	struct syn_cache_head *scp;
 	struct mbuf *ipopts;
-#ifdef IPSEC
 	size_t ipsechdrsiz;
-#endif
 
 	tp = sototcpcb(so);
 
