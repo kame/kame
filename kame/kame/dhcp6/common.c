@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.35 2002/05/01 07:01:15 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.36 2002/05/01 08:05:07 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -612,6 +612,51 @@ dhcp6_get_options(p, ep, optinfo)
 		opt, optlen);
 	return(-1);
 }
+
+#define COPY_OPTION(t, l, v, p) do { \
+	if ((void *)(ep) - (void *)(p) < (l) + sizeof(struct dhcp6opt)) { \
+		dprintf(LOG_INFO, "option buffer short for %s", dhcpoptstr((t))); \
+		return(-1); \
+	} \
+	(p)->dh6opt_type = htons((t)); \
+	(p)->dh6opt_len = htons((l)); \
+	if ((l)) \
+		memcpy((p) + 1, (v), (l)); \
+	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
+ 	(len) += sizeof(struct dhcp6opt) + (l); \
+	dprintf(LOG_DEBUG, "set DHCP option %s", dhcpoptstr((t))); \
+} while (0)
+
+int
+dhcp6_set_options(bp, ep, optinfo)
+	struct dhcp6opt *bp, *ep;
+	struct dhcp6_optinfo *optinfo;
+{
+	struct dhcp6opt *p = bp;
+	int len = 0;
+
+	if (optinfo->clientID.duid_len) {
+		COPY_OPTION(DH6OPT_CLIENTID, optinfo->clientID.duid_len,
+			    optinfo->clientID.duid_id, p);
+	}
+
+	if (optinfo->serverID.duid_len) {
+		COPY_OPTION(DH6OPT_SERVERID, optinfo->serverID.duid_len,
+			    optinfo->serverID.duid_id, p);
+	}
+
+	if (optinfo->rapidcommit)
+		COPY_OPTION(DH6OPT_RAPID_COMMIT, 0, NULL, p);
+
+	if (optinfo->dns.n) {
+		COPY_OPTION(DH6OPT_DNS,
+			    optinfo->dns.n * sizeof(struct in6_addr),
+			    optinfo->dns.list, p);
+	}
+
+	return(len);
+}
+#undef COPY_OPTION
 
 char *
 dhcpoptstr(type)

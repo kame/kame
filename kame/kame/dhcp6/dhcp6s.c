@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.60 2002/05/01 07:01:15 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.61 2002/05/01 08:05:08 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -368,7 +368,7 @@ server6_react(siz, from, fromlen)
 
 	switch (dh6->dh6_msgtype) {
 	case DH6_INFORM_REQ:
-		server6_react_informreq(rdatabuf, siz, from, fromlen);
+		(void)server6_react_informreq(rdatabuf, siz, from, fromlen);
 		break;
 	default:
 		dprintf(LOG_INFO, "unknown or unsupported msgtype %s",
@@ -390,11 +390,11 @@ server6_react_informreq(buf, siz, from, fromlen)
 	ssize_t len;
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
-	int error;
+	int error, ns, optlen;
 	struct dhcp6opt *opt, *eopt;
-	struct duid client_duid, request_duid;
-	char *ext, *ep, *p;
-	struct dhcp6_optinfo optinfo;
+	char *ext, *ep, *p, *dnsbuf = NULL;
+	struct dhcp6_optinfo optinfo, roptinfo;
+	struct dnslist *d;
 
 	dprintf(LOG_DEBUG, "server6_react_informreq");
 
@@ -456,60 +456,44 @@ server6_react_informreq(buf, siz, from, fromlen)
 	dh6p->dh6_msgtypexid = dh6r->dh6_msgtypexid;
 	dh6p->dh6_msgtype = DH6_REPLY;
 
-	/* attach necessary options */
-	opt = (struct dhcp6opt *)ext;
+	/*
+	 * attach necessary options
+	 */
+	dhcp6_init_options(&roptinfo);
 
 	/* server information option */
-	if ((char *)(opt + 1) + server_duid.duid_len > ep) {
-		dprintf(LOG_INFO, "server6_react_informreq: "
-			"short buffer for server info");
-		return(-1);
-	}
-	opt->dh6opt_type = htons(DH6OPT_SERVERID);
-	opt->dh6opt_len = htons(server_duid.duid_len);
-	p = (char *)(opt + 1);
-	memcpy(p, server_duid.duid_id, server_duid.duid_len);
-	opt = (struct dhcp6opt *)(p + server_duid.duid_len);
-	len += sizeof(*opt) + server_duid.duid_len;
+	roptinfo.serverID = server_duid;
 
 	/* copy client information back (if provided) */
-	if (client_duid.duid_id) {
-		if ((char *)(opt + 1) + client_duid.duid_len > ep) {
-			dprintf(LOG_INFO, "server6_react_informreq: "
-				"short buffer for client info");
-			return(-1);
-		}
+	if (optinfo.clientID.duid_id)
+		roptinfo.clientID = optinfo.clientID;
 
-		opt->dh6opt_type = htons(DH6OPT_CLIENTID);
-		opt->dh6opt_len = htons(client_duid.duid_len);
-		p = (char *)(opt + 1);
-		memcpy(p, client_duid.duid_id, client_duid.duid_len);
-		opt = (struct dhcp6opt *)(p + client_duid.duid_len);
-		len += sizeof(*opt) + client_duid.duid_len;
-	}
-
-	/* attach additional options. */
 	/* DNS server */
-	if (ext + sizeof(*opt) + sizeof(struct in6_addr) <= ep &&
-	    TAILQ_FIRST(&dnslist)) {
-		struct dnslist *d;
-
-		opt->dh6opt_type = htons(DH6OPT_DNS);
-		opt->dh6opt_len = 0;
-		len += sizeof(*opt);
-
-		p = (char *)(opt + 1);
-		for (d = TAILQ_FIRST(&dnslist); d; d = TAILQ_NEXT(d, link)) {
-			if (p + sizeof(struct in6_addr) > ep)
-				break;
-
-			memcpy(p, &d->addr, sizeof(struct in6_addr));
-			opt->dh6opt_len += sizeof(struct in6_addr);
-			p += sizeof(struct in6_addr);
-			len += sizeof(struct in6_addr);
+	for (ns = 0, d = TAILQ_FIRST(&dnslist); d; d = TAILQ_NEXT(d, link))
+		ns++;
+	if (ns) {
+		optinfo.dns.n = ns;
+		if ((dnsbuf = malloc(sizeof(struct in6_addr) * ns)) == NULL) {
+			dprintf(LOG_WARNING, "server6_react_informreq: "
+				"malloc failed for DNS list");
+			goto end;
 		}
-		opt->dh6opt_len = htons(opt->dh6opt_len);
+		for (p = dnsbuf, d = TAILQ_FIRST(&dnslist); d;
+		     d = TAILQ_NEXT(d, link)) {
+			memcpy(p, &d->addr, sizeof(struct in6_addr));
+			p += sizeof(struct in6_addr);
+		}
 	}
+
+	/* set options in the reply message */
+	if ((optlen = dhcp6_set_options((struct dhcp6opt *)ext,
+					(struct dhcp6opt *)ep,
+					&roptinfo)) < 0) {
+		dprintf(LOG_INFO, "server6_react_informreq: "
+			"failed to construct reply options");
+		goto end;
+	}
+	len += optlen;
 
 	dst.sin6_addr = ((struct sockaddr_in6 *)from)->sin6_addr;
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
@@ -519,6 +503,10 @@ server6_react_informreq(buf, siz, from, fromlen)
 			addr2str((struct sockaddr *)&dst));
 		/* NOTREACHED */
 	}
+
+  end:
+	if (dnsbuf)
+		free(dnsbuf);
 
 	return 0;
 }

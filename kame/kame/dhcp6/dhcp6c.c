@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.68 2002/05/01 07:01:15 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.69 2002/05/01 08:05:07 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -583,12 +583,14 @@ static void
 client6_send(ifp, s)
 	struct dhcp_if *ifp;
 {
-	char buf[BUFSIZ];
+	/* char buf[BUFSIZ]; */
+	char buf[sizeof(struct dhcp6) + 22];
 	struct sockaddr_in6 dst;
 	int error;
 	struct dhcp6 *dh6;
 	struct dhcp6opt *opt;
-	ssize_t len;
+	struct dhcp6_optinfo optinfo;
+	ssize_t optlen, len;
 
 	dh6 = (struct dhcp6 *)buf;
 	memset(dh6, 0, sizeof(*dh6));
@@ -612,32 +614,29 @@ client6_send(ifp, s)
 	dh6->dh6_xid |= htonl(ifp->xid);
 	len = sizeof(*dh6);
 
+	/*
+	 * construct options
+	 */
+	dhcp6_init_options(&optinfo);
+
 	/* client ID */
-	opt = (struct dhcp6opt *)(dh6 + 1);
-	opt->dh6opt_type = htons(DH6OPT_CLIENTID);
-	opt->dh6opt_len = htons(client_duid.duid_len);
-	len += sizeof(*opt) + client_duid.duid_len;
-	if (len > sizeof(buf)) {
-		dprintf(LOG_NOTICE, "internal buffer short for DUID");
-		return;
-	}
-	memcpy((void *)(opt + 1), client_duid.duid_id, client_duid.duid_len);
-	opt = (struct dhcp6opt *)(buf + len);
+	optinfo.clientID = client_duid;
 
 	/* rapid commit */
 	if (ifp->state == DHCP6S_SOLICIT &&
 	    (ifp->flags & DHCIFF_RAPID_COMMIT)) {
-		len += sizeof(*opt);
-		if (len > sizeof(buf)) {
-			dprintf(LOG_NOTICE,
-				"internal buffer short for rapid commit");
-			return;
-		}
-		opt->dh6opt_type = htons(DH6OPT_RAPID_COMMIT);
-		opt->dh6opt_len = 0;
-
-		opt++;
+		optinfo.rapidcommit = 1;
 	}
+
+	/* set options in the message */
+	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
+					(struct dhcp6opt *)(buf + sizeof(buf)),
+					&optinfo)) < 0) {
+		dprintf(LOG_INFO, "client6_send: "
+			"failed to construct options");
+		return;
+	}
+	len += optlen;
 
 	switch (ifp->state) {
 	case DHCP6S_SOLICIT:
