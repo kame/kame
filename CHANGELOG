@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1197 2000/08/14 12:24:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1198 2000/08/15 07:25:28 itojun Exp $
 
 <200008> 
+Tue Aug 15 16:24:51 JST 2000  itojun@iijlab.net
+	* kame/sys/net/if_stf.c, kame/sys/netinet/in_gif.c:
+	  repair IN_MULTICAST() check for bsdi/freebsd.
+	  IN_MULTICAST() and IN_CLASS[A-D] macro has different endianness
+	  in *BSDs.
+
 Mon Aug 14 21:22:20 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/devel/boehm-gc: upgrade to 5.0a7
 	* netbsd/pkgsrc/www/w3m: upgrade to 0.1.10
