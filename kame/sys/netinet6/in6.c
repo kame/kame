@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.208 2001/07/24 09:01:11 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.209 2001/07/24 09:08:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1117,11 +1117,12 @@ in6_update_ifa(ifp, ifra, ia)
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 				    i6mm_chain);
 			} else {
-				log(LOG_WARNING,
+				log(LOG_ERR,
 				    "in6_update_ifa: addmulti failed for "
 				    "%s on %s (errno=%d)\n",
 				    ip6_sprintf(&mltaddr.sin6_addr), 
 				    if_name(ifp), error);
+				goto cleanup;
 			}
 		}
 
@@ -1153,15 +1154,17 @@ in6_update_ifa(ifp, ifra, ia)
 			info.rti_info[RTAX_IFA] =
 				(struct sockaddr *)&ia->ia_addr;
 			info.rti_flags = RTF_UP | RTF_CLONING; /* XXX(why?) */
-			rtrequest1(RTM_ADD, &info, NULL);
+			error = rtrequest1(RTM_ADD, &info, NULL);
 #else
-			rtrequest(RTM_ADD,
-				  (struct sockaddr *)&mltaddr,
-				  (struct sockaddr *)&ia->ia_addr,
-				  (struct sockaddr *)&mltmask,
-				  RTF_UP|RTF_CLONING,  /* xxx */
-				  (struct rtentry **)0);
+			error = rtrequest(RTM_ADD,
+			    (struct sockaddr *)&mltaddr,
+			    (struct sockaddr *)&ia->ia_addr,
+			    (struct sockaddr *)&mltmask,
+			    RTF_UP | RTF_CLONING,  /* xxx */
+			    (struct rtentry **)0);
 #endif
+			if (error)
+				goto cleanup;
 		}
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
 		if (imm) {
@@ -1173,6 +1176,7 @@ in6_update_ifa(ifp, ifra, ia)
 			    "%s on %s (errno=%d)\n",
 			    ip6_sprintf(&mltaddr.sin6_addr), 
 			    if_name(ifp), error);
+			goto cleanup;
 		}
 
 		/*
@@ -1193,6 +1197,7 @@ in6_update_ifa(ifp, ifra, ia)
 				    "%s on %s (errno=%d)\n",
 				    ip6_sprintf(&mltaddr.sin6_addr), 
 				    if_name(ifp), error);
+				/* XXX not very fatal, go on... */
 			}
 		}
 #ifdef __FreeBSD__
@@ -1207,12 +1212,13 @@ in6_update_ifa(ifp, ifra, ia)
 		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
 		if (!in6m) {
-			rtrequest(RTM_ADD,
-				  (struct sockaddr *)&mltaddr,
-				  (struct sockaddr *)&ia->ia_addr,
-				  (struct sockaddr *)&mltmask,
-				  RTF_UP,
-				  (struct rtentry **)0);
+			error = rtrequest(RTM_ADD,
+			    (struct sockaddr *)&mltaddr,
+			    (struct sockaddr *)&ia->ia_addr,
+			    (struct sockaddr *)&mltmask,
+			    RTF_UP, (struct rtentry **)0);
+			if (error)
+				goto cleanup;
 		}
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
 		if (imm) {
@@ -1224,6 +1230,7 @@ in6_update_ifa(ifp, ifra, ia)
 			    "(errno=%d)\n",
 			    ip6_sprintf(&mltaddr.sin6_addr), 
 			    if_name(ifp), error);
+			goto cleanup;
 		}
 	}
 
@@ -1282,6 +1289,17 @@ in6_update_ifa(ifp, ifra, ia)
 	if (hostIsNew)
 		in6_unlink_ifa(ia, ifp);
 	return(error);
+
+  cleanup:
+	/*
+	 * leave from multicast groups we have joined for the interface
+	 */
+	while ((imm = ia->ia6_memberships.lh_first) != NULL) {
+		LIST_REMOVE(imm, i6mm_chain);
+		in6_leavegroup(imm);
+	}
+	in6_purgeaddr(&ia->ia_ifa);
+	return error;
 }
 
 void
