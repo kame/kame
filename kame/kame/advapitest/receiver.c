@@ -42,7 +42,7 @@
 
 #define DEFPORT 9079		/* XXX hardcoding */
 
-char *pr_addr(struct sockaddr *addr, int numeric);
+char *pr_addr __P((struct sockaddr *, int));
 
 int
 main(argc, argv)
