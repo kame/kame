@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.13 2000/11/08 10:21:55 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.14 2000/11/09 15:44:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -184,7 +184,7 @@ if_dump()
 				fprintf(fp, "vltime: %ld",
 					(long)pfx->validlifetime);
 			if (pfx->vltimeexpire != 0)
-				fprintf(fp, "(decr,expire %d), ",
+				fprintf(fp, "(decr,expire %ld), ", (long)
 					pfx->vltimeexpire > now.tv_sec ?
 					pfx->vltimeexpire - now.tv_sec : 0);
 			else
@@ -195,7 +195,7 @@ if_dump()
 				fprintf(fp, "pltime: %ld",
 					(long)pfx->preflifetime);
 			if (pfx->pltimeexpire != 0)
-				fprintf(fp, "(decr,expire %d), ",
+				fprintf(fp, "(decr,expire %ld), ", (long)
 					pfx->pltimeexpire > now.tv_sec ?
 					pfx->pltimeexpire - now.tv_sec : 0);
 			else

@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.42 2000/11/08 16:11:45 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.43 2000/11/09 15:44:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1349,7 +1349,7 @@ sock_open()
 			if ((mreq.ipv6mr_interface = if_nametoindex(mcastif))
 			    == 0) {
 				syslog(LOG_ERR,
-				       "<%s> invalid interface: mcastif",
+				       "<%s> invalid interface: %s",
 				       __FUNCTION__, mcastif);
 				exit(1);
 			}
