@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.360 1999/12/22 07:13:55 jinmei Exp $
+$Id: CHANGELOG,v 1.361 1999/12/22 07:32:17 itojun Exp $
 
 <199912>
+Wed Dec 22 16:30:56 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/ip6_forward.c: (IPv6 IPsec tunnelling)
+	  when returning icmp6 too big, never return mtu value < 1280.
+	  Suggested by Hiroshi Miyata <miyata@ydc.co.jp>, based on RFC2473 7.1.
+
+	  the code is still incomplete as we do not do fragmentation in
+	  ip6_forward().  when doing tunnel ingress, ip6_forward() should
+	  call ip6_output() after certain point so that we can generated
+	  fragmented outputs.
+	  
 1999-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_pcb.h: clarified IN6P_xxx macros;
 	- removed unused definitions.
