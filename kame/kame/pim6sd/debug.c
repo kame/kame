@@ -261,6 +261,7 @@ fdump(i)
     if (fp != NULL)
     {
 	dump_vifs(fp);
+	dump_nbrs(fp);
 	dump_pim_mrt(fp);
 	dump_rp_set(fp);
 	(void) fclose(fp);
@@ -293,18 +294,15 @@ dump_vifs(fp)
 {
     vifi_t          vifi;
     register struct uvif *v;
-    pim_nbr_entry_t *n;
     struct phaddr  *pa;
-    int             width;
     int             i;
 
-    fprintf(fp, "\nMulticast Interface Table\n %-4s %-6s %-43s %5s %-14s %s",
-	    "Mif", " PhyIF", "Local-Address/Prefixlen","Scope", "Flags",
-	    "Neighbors\n");
+    fprintf(fp, "\nMulticast Interface Table\n %-4s %-6s %-43s %5s %-14s\n",
+	    "Mif", " PhyIF", "Local-Address/Prefixlen","Scope", "Flags");
 
     for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
     {
-	int             firstaddr = 1;
+	int firstaddr = 1;
 	for (pa = v->uv_addrs; pa; pa = pa->pa_next)
 	{
 	    if (!firstaddr)
@@ -321,11 +319,8 @@ dump_vifs(fp)
 		    (v->uv_flags & MIFF_REGISTER)?"regist":v->uv_name,
 		    net6name(&pa->pa_addr.sin6_addr,
 			     &pa->pa_subnetmask));
-
 	    fprintf(fp," %-5d", pa->pa_addr.sin6_scope_id);
-	    firstaddr = 0;
 
-	    width = 0;
 	    if (v->uv_flags & MIFF_REGISTER)
 		fprintf(fp, " REGISTER");
 	    if (v->uv_flags & VIFF_DISABLED)
@@ -335,47 +330,57 @@ dump_vifs(fp)
 	    if (v->uv_flags & VIFF_DOWN)
 		fprintf(fp, " DOWN");
 	    if (v->uv_flags & VIFF_DR)
-	    {
 		fprintf(fp, " DR");
-		width += 3;
-	    }
 	    if (v->uv_flags & VIFF_PIM_NBR)
-	    {
 		fprintf(fp, " PIM");
-		width += 4;
-	    }
 #if 0				/* impossible */
 	    if (v->uv_flags & VIFF_DVMRP_NBR)
 	    {
 		fprintf(fp, " DVMRP");
-		width += 6;
 	    }
 #endif
 	    if (v->uv_flags & VIFF_NONBRS)
-	    {
 		fprintf(fp, " %-12s", "NO-NBR");
-		width += 6;
-	    }
 
-	    if ((n = v->uv_pim_neighbors) != NULL)
-	    {
-		/* Print the first neighbor on the same line */
-		for (i = width; i <= 15; i++)
-		    fprintf(fp, " ");
-		fprintf(fp, "%-12s\n",
-			inet6_fmt(&n->address.sin6_addr));
-		for (n = n->next; n != NULL; n = n->next)
-		    fprintf(fp, "%86s %-15s\n", "", /* XXX hardcoding... */
-			    inet6_fmt(&n->address.sin6_addr));
-
-	    }
-	    else
-		fprintf(fp, "\n");
+	    fprintf(fp, "\n");
 	}
     }
     fprintf(fp, "\n");
 }
 
+void
+dump_nbrs(fp)
+	FILE *fp;
+{
+	struct uvif *v;
+	vifi_t vifi;
+	pim_nbr_entry_t *n;
+	int first = 1;
+
+	fprintf(fp, "PIM Neighbor List\n");
+	fprintf(fp, " %-3s %6s %-40s %-5s\n",
+		"Mif", "PhyIF", "Address", "Timer");
+
+	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
+		if ((n = v->uv_pim_neighbors) != NULL) {
+			if (first) {
+				fprintf(fp, " %-3u %6s", vifi,
+					(v->uv_flags & MIFF_REGISTER)?"regist":
+					v->uv_name);
+				first = 0;
+			}
+			else
+				fprintf(fp, " %3s %6s", "", "");
+			for (; n != NULL; n = n->next) {
+				fprintf(fp, " %-40s %-5u\n",
+					inet6_fmt(&n->address.sin6_addr),
+					n->timer);
+			}
+		}
+	}
+
+	fprintf(fp, "\n");
+}
 
 /*
  * Log errors and other messages to the system log daemon and to stderr,

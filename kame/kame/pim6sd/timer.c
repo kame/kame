@@ -245,8 +245,10 @@ age_vifs()
 	    query_groups(v);
     }
 
-    IF_DEBUG(DEBUG_IF)
+    IF_DEBUG(DEBUG_IF) {
 	dump_vifs(log_fp);
+	;
+    }
 }
 
 /*

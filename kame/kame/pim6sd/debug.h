@@ -143,6 +143,7 @@ extern void dump            __P((int i));
 extern void fdump           __P((int i));
 extern void cdump           __P((int i));
 extern void dump_vifs       __P((FILE *fp));
+extern void dump_nbrs       __P((FILE *fp));
 extern void dump_pim_mrt        __P((FILE *fp));
 extern int  dump_rp_set     __P((FILE *fp));
 
