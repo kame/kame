@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.13 2000/12/03 00:53:58 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.14 2001/01/23 05:16:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,41 +104,43 @@ dest6_input(mp, offp, proto)
 
 	/* search header for all options. */
 	for (optlen = 0; dstoptlen > 0; dstoptlen -= optlen, opt += optlen) {
-		switch(*opt) {
-		 case IP6OPT_PAD1:
-			 optlen = 1;
-			 break;
-		 case IP6OPT_PADN:
-			 if (dstoptlen < IP6OPT_MINLEN) {
-				 ip6stat.ip6s_toosmall++;
-				 goto bad;
-			 }
-			 optlen = *(opt + 1) + 2;
-			 break;
+		switch (*opt) {
+		case IP6OPT_PAD1:
+			optlen = 1;
+			break;
+		case IP6OPT_PADN:
+			if (dstoptlen < IP6OPT_MINLEN) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
+			optlen = *(opt + 1) + 2;
+			break;
 
 #ifdef MIP6
-		 case IP6OPT_BINDING_UPDATE:
-		 case IP6OPT_BINDING_ACK:
-		 case IP6OPT_BINDING_REQ:
-		 case IP6OPT_HOME_ADDRESS:
+		case IP6OPT_BINDING_UPDATE:
+		case IP6OPT_BINDING_ACK:
+		case IP6OPT_BINDING_REQ:
+		case IP6OPT_HOME_ADDRESS:
 			if (mip6_store_dstopt_pre_hook) {
-				if ((*mip6_store_dstopt_pre_hook)(m, opt, off, dstoptlen) != 0)
+				if ((*mip6_store_dstopt_pre_hook)(m, opt,
+				    off, dstoptlen) != 0)
 					goto bad;
 			}
 			optlen = *(opt + 1) + 2;
 			break;
 #endif /* MIP6 */
 
-		 default:		/* unknown option */
-			 if (dstoptlen < IP6OPT_MINLEN) {
-				 ip6stat.ip6s_toosmall++;
-				 goto bad;
-			 }
-			 if ((optlen = ip6_unknown_opt(opt, m,
-						       opt-mtod(m, u_int8_t *))) == -1)
-				 return(IPPROTO_DONE);
-			 optlen += 2;
-			 break;
+		default:		/* unknown option */
+			if (dstoptlen < IP6OPT_MINLEN) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
+			optlen = ip6_unknown_opt(opt, m,
+			    opt - mtod(m, u_int8_t *));
+			if (optlen == -1)
+				return (IPPROTO_DONE);
+			optlen += 2;
+			break;
 		}
 	}
 
@@ -149,14 +151,14 @@ dest6_input(mp, offp, proto)
 		 * process stored options.
 		 */
 		if ((*mip6_rec_ctrl_sig_hook)(m, *offp) != 0)
-			return(IPPROTO_DONE);
+			return (IPPROTO_DONE);
 	}
 #endif /* MIP6 */
 
 	*offp = off;
-	return(dstopts->ip6d_nxt);
+	return (dstopts->ip6d_nxt);
 
   bad:
 	m_freem(m);
-	return(IPPROTO_DONE);
+	return (IPPROTO_DONE);
 }
