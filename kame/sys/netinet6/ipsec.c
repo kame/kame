@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.96 2001/02/28 13:31:59 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.97 2001/02/28 15:41:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,7 +195,7 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ECN,
 	ecn, CTLFLAG_RW,	&ip6_ipsec_ecn,	0, "");
 SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEBUG,
 	debug, CTLFLAG_RW,	&ipsec_debug,	0, "");
-SYSCTL_INT(_net_inet_ipsec6, IPSECCTL_ESP_RANDPAD,
+SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ESP_RANDPAD,
 	esp_randpad, CTLFLAG_RW,	&ip6_esp_randpad,	0, "");
 #endif /*__FreeBSD__*/
 #endif /* INET6 */
