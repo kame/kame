@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.4 2000/09/27 02:53:15 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.5 2000/10/01 04:13:31 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -79,10 +79,10 @@ main(argc, argv)
 
 	while ((ch = getopt(argc, argv, "d:D:h:l:p:s:")) != EOF)
 		switch(ch) {
-		case 'd':
+		case 'D':
 			dsthdr1len = atoi(optarg);
 			break;
-		case 'D':
+		case 'd':
 			dsthdr2len = atoi(optarg);
 			break;
 		case 'h':
@@ -199,7 +199,7 @@ main(argc, argv)
 		err(1, "bind");
 #endif
 
-	msg.msg_name = res->ai_addr;
+	msg.msg_name = (void *)res->ai_addr;
 	msg.msg_namelen = res->ai_addrlen;
 	msgiov.iov_base = (void *)databuf;
 	msgiov.iov_len = datalen;

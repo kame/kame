@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.10 2000/09/27 02:53:14 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.11 2000/10/01 04:13:31 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -323,7 +323,7 @@ print_opthdr(void *extbuf)
 		switch (type) {
 		/*
 		 * Note that inet6_opt_next automatically skips any padding
-		 * optins.
+		 * options.
 		 */
 		case IP6OPT_JUMBO:
 			offset = 0;
