@@ -238,13 +238,6 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			{
 				char scopebuf[MAXHOSTNAMELEN], *s;
 				int scopelen;
-				/*
-				 * the following constraint is imposed by
-				 * if_indextoname(), called in ip6_sa2str().
-				 */
-#if MAXHOSTNAMELEN < IF_NAMESIZE
-# error assumption failed (scopelen)
-#endif
 				/* ip6_sa2str never fails */
 				(void)ip6_sa2str((struct sockaddr_in6 *)sa,
 						 scopebuf, sizeof(scopebuf), 0);
@@ -338,9 +331,10 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	}
 #endif
  
-	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6)) {
+	/* if_indextoname() does not take buffer size.  not a good api... */
+	if ((IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6)) &&
+	    bufsiz >= IF_NAMESIZE) {
 		char *p = if_indextoname(ifindex, buf);
-
 		if (p)
 			return(p);
 	}
