@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.18 2001/08/12 08:11:02 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.19 2001/09/18 03:00:32 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -151,7 +151,7 @@ main(argc, argv)
 		hints.ai_socktype = SOCK_DGRAM; /* not used */
 		hints.ai_protocol = IPPROTO_UDP; /* not used */
 		if ((error = getaddrinfo(nexthop, NULL, &hints, &res)) < 0) {
-			errx(1, "getaddrinfo for nexthop: ",
+			errx(1, "getaddrinfo for nexthop: %s",
 			     gai_strerror(error));
 		}
 		memcpy(&ss_next, res->ai_addr, res->ai_addrlen);
