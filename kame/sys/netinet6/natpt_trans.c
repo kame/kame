@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.45 2001/09/11 07:57:31 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.46 2001/09/19 09:47:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -127,6 +127,8 @@ struct ulc4
 	}		ulc_tu;
 };
 
+
+extern	int	udpcksum;	/* defined in netinet/udp_usrreq.c	*/
 
 #ifdef __FreeBSD__
 MALLOC_DECLARE(M_NATPT);
@@ -584,7 +586,11 @@ natpt_translateUDPv6To4(struct pcv *cv6, struct pAddr *pad)
 	cv4.ip_p = IPPROTO_UDP;
 	cv4.ip.ip4->ip_p = IPPROTO_UDP;
 	natpt_watchUDP6(&cv4);
-	natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_UDP, cv6, &cv4);
+	if (udpcksum) {
+		natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_UDP, cv6, &cv4);
+	} else {
+		cv4.pyld.udp->uh_sum = 0;
+	}
 	return (m4);
 }
 
@@ -1367,7 +1373,11 @@ natpt_translateUDPv4To4(struct pcv *cv4from, struct pAddr *pad)
 		return (NULL);
 
 	cv4to.ip_p = IPPROTO_UDP;
-	natpt_fixTCPUDP44cksum(IPPROTO_UDP, cv4from, &cv4to);
+	if (udpcksum) {
+		natpt_fixTCPUDP44cksum(IPPROTO_UDP, cv4from, &cv4to);
+	} else {
+		cv4to.pyld.udp->uh_sum = 0;
+	}
 	return (m4);
 }
 
