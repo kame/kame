@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.h,v 1.2 1999/08/21 18:30:57 sakane Exp $ */
+/* YIPS @(#)$Id: misc.h,v 1.3 1999/08/23 02:49:54 sakane Exp $ */
 
 #define YDUMP_BIN 0
 #define YDUMP_HEX 1
@@ -42,15 +42,15 @@ extern int plog0 __P((const char *, ...));
 extern int plog __P((const char *, const char *, ...));
 extern int plog2 __P((struct sockaddr *, const char *, const char *,
 	...));
-extern int pdump __P((void *, int, int));
-extern u_char *mem2str __P((const u_char *, int));
+extern int pdump __P((void *, size_t, int));
+extern u_char *mem2str __P((const u_char *, size_t));
 extern char *strtob __P((char *, int, size_t *));
 
 extern int saddrcmp_woport __P((struct sockaddr *addr1,
 	struct sockaddr *addr2));
 extern int saddrcmp __P((struct sockaddr *addr1, struct sockaddr *addr2));
-extern caddr_t hexstr2val __P((caddr_t buf, u_int len));
-extern void *get_newbuf __P((void *src, u_int len));
+extern caddr_t hexstr2val __P((caddr_t buf, size_t len));
+extern void *get_newbuf __P((void *src, size_t len));
 extern struct sockaddr *get_localaddr __P((struct sockaddr *));
 extern int recvfromto __P((int, void *, size_t, int, struct sockaddr *,
 	int *, struct sockaddr *, int *));

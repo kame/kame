@@ -26,13 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.c,v 1.1 1999/08/08 23:31:26 itojun Exp $ */
+/* YIPS @(#)$Id: vmbuf.c,v 1.2 1999/08/23 02:49:55 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "var.h"
 #include "vmbuf.h"

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.2 1999/08/16 16:27:25 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.3 1999/08/23 02:49:54 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1029,7 +1029,7 @@ int
 pfkey_resend_getspi(sc)
 	struct sched *sc;
 {
-	int s = (int)sc->ptr1;
+	int s = (int)(long)sc->ptr1;
 	struct isakmp_ph2 *iph2 = (struct isakmp_ph2 *)sc->ptr2;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(LOCATION, "resend packet.\n"));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.3 1999/08/21 22:16:45 itojun Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.4 1999/08/23 02:49:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -132,11 +132,11 @@ timetostr(t)
 int
 pdump(buf0, len, mode)
 	void *buf0;
-	int len;
+	size_t len;
 	int mode;
 {
 	caddr_t buf = (caddr_t)buf0;
-	int i;
+	size_t i;
 
 	for (i = 0; i < len; i++) {
 		if (mode == YDUMP_BIN) {
@@ -158,11 +158,11 @@ pdump(buf0, len, mode)
 u_char *
 mem2str(buf, mlen)
 	const u_char *buf;
-	int mlen;
+	size_t mlen;
 {
 	u_char *new;
-	u_int len = (mlen * 2) + mlen / 8 + 10;
-	u_int i, j;
+	size_t len = (mlen * 2) + mlen / 8 + 10;
+	size_t i, j;
 
 	if ((new = malloc(len)) == 0) return(0);
 
@@ -185,7 +185,8 @@ strtob(str, base, len)
 	int base;
 	size_t *len;
 {
-	int f, i;
+	int f;
+	size_t i;
 	char *dst;
 	u_char *rp;
 	char *p, b[3], *bp;
@@ -289,7 +290,7 @@ saddrcmp(addr1, addr2)
 caddr_t
 hexstr2val(buf, len)
 	caddr_t buf;
-	u_int len;
+	size_t len;
 {
 	caddr_t res, bp;
 	caddr_t p = buf;
@@ -314,7 +315,7 @@ hexstr2val(buf, len)
 void *
 get_newbuf(src, len)
 	void *src;
-	u_int len;
+	size_t len;
 {
 	caddr_t new;
 
