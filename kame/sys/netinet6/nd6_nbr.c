@@ -218,7 +218,7 @@ nd6_ns_input(m, off, icmp6len)
 		 */
 		return;
 	}
-	myaddr6 = IFA_IN6(ifa);
+	myaddr6 = *IFA_IN6(ifa);
 	anycast = ((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_ANYCAST;
 	tentative = ((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_TENTATIVE;
 	if (((struct in6_ifaddr *)ifa)->ia6_flags & IN6_IFF_DUPLICATED)

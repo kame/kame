@@ -489,7 +489,7 @@ ip6_input(m)
 			continue;	/* just for safety */
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
-		if (IN6_ARE_ADDR_EQUAL(&IFA_IN6(ifa), &ip6->ip6_dst)) {
+		if (IN6_ARE_ADDR_EQUAL(IFA_IN6(ifa), &ip6->ip6_dst)) {
 			ours = 1;
 			goto hbhcheck;
 		}

@@ -104,6 +104,7 @@ struct	in6_ifaddr {
 	int	ia6_flags;
 
 	struct in6_addrlifetime ia6_lifetime;	/* NULL = infty */
+	struct ifprefix *ia6_ifpr; /* back pointer to ifprefix */
 };
 
 struct	in6_ifreq {
@@ -127,6 +128,10 @@ struct	in6_aliasreq {
 	int	ifra_flags;
 	struct in6_addrlifetime ifra_lifetime;
 };
+
+/* prefix type macro */
+#define IN6_PREFIX_ND	1
+#define IN6_PREFIX_RR	2
 
 /*
  * prefix related flags passed between kernel(NDP related part) and
@@ -163,6 +168,7 @@ struct  in6_prefixreq {
 #define PR_ORIG_RA	0
 #define PR_ORIG_RR	1
 #define PR_ORIG_STATIC	2
+#define PR_ORIG_KERNEL	3
 
 #define ipr_raf_onlink		ipr_flags.prf_ra.onlink
 #define ipr_raf_auto		ipr_flags.prf_ra.autonomous
@@ -209,14 +215,15 @@ struct	in6_rrenumreq {
  * Given a pointer to an in6_ifaddr (ifaddr),
  * return a pointer to the addr as a sockaddr_in6
  */
-#define IA6_IN6(ia)	(&(((struct in6_ifaddr *)(ia))->ia_addr.sin6_addr))
-#define IA6_DSTIN6(ia)	(&(((struct in6_ifaddr *)(ia))->ia_dstaddr.sin6_addr))
-#define IA6_MASKIN6(ia)	(&(((struct in6_ifaddr *)(ia))->ia_prefixmask.sin6_addr))
-#define IA6_SIN6(ia)	(&(((struct in6_ifaddr *)(ia))->ia_addr))
-#define IA6_DSTSIN6(ia)	(&(((struct in6_ifaddr *)(ia))->ia_dstaddr))
-#define IFA_IN6(x)	(((struct sockaddr_in6 *)((x)->ifa_addr))->sin6_addr)
+#define IA6_IN6(ia)	(&((ia)->ia_addr.sin6_addr))
+#define IA6_DSTIN6(ia)	(&((ia)->ia_dstaddr.sin6_addr))
+#define IA6_MASKIN6(ia)	(&((ia)->ia_prefixmask.sin6_addr))
+#define IA6_SIN6(ia)	(&((ia)->ia_addr))
+#define IA6_DSTSIN6(ia)	(&((ia)->ia_dstaddr))
+#define IFA_IN6(x)	(&((struct sockaddr_in6 *)((x)->ifa_addr))->sin6_addr)
+#define IFA_DSTIN6(x)	(&((struct sockaddr_in6 *)((x)->ifa_dstaddr))->sin6_addr)
 
-#define IFPR_IN6(x)	(((struct sockaddr_in6 *)((x)->ifpr_prefix))->sin6_addr)
+#define IFPR_IN6(x)	(&((struct sockaddr_in6 *)((x)->ifpr_prefix))->sin6_addr)
 
 #define IN6_ARE_MASKED_ADDR_EQUAL(d, a, m)	(	\
 	(((d)->s6_addr32[0] ^ (a)->s6_addr32[0]) & (m)->s6_addr32[0]) == 0 && \
@@ -487,7 +494,13 @@ struct in6_ifaddr *in6ifa_ifpwithaddr __P((struct ifnet *,
 					     struct in6_addr *));
 char	*ip6_sprintf __P((struct in6_addr *));
 int	in6_matchlen __P((struct in6_addr *, struct in6_addr *));
-int	in6_prefix_ioctl __P((u_long cmd, caddr_t data, struct ifnet *ifp));
+int	in6_are_prefix_equal __P((struct in6_addr *p1, struct in6_addr *p2,
+				  int len));
+void	in6_prefixlen2mask __P((struct in6_addr *maskp, int len));
+int	in6_prefix_ioctl __P((struct socket *so, u_long cmd, caddr_t data,
+			      struct ifnet *ifp));
+int	in6_prefix_add_ifid __P((int iilen, struct in6_ifaddr *ia));
+void	in6_prefix_remove_ifid __P((int iilen, struct in6_ifaddr *ia));
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_IN6_VAR_H_ */

@@ -1709,7 +1709,7 @@ nolladdropt:;
 
 	/*
 	 * Redirected header option spec (RFC2461 4.6.3) talks nothing
-	 * about padding/trancate rule for the original IP packet.
+	 * about padding/truncate rule for the original IP packet.
 	 * From the discussion on IPv6imp in Feb 1999, the consensus was:
 	 * - "attach as much as possible" is the goal
 	 * - pad if not aligned (original size can be guessed by original

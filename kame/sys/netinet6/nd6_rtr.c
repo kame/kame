@@ -71,8 +71,6 @@ static void pfxlist_onlink_check __P((void));
 static void nd6_detach_prefix __P((struct nd_prefix *));
 static void nd6_attach_prefix __P((struct nd_prefix *));
 
-static int in6_are_prefix_equal __P((struct in6_addr *, struct in6_addr *, int));
-static void in6_prefixlen2mask __P((struct in6_addr *, int));
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
 					 struct in6_addrlifetime *lt6));
 
@@ -1388,56 +1386,6 @@ in6_ifdel(ifp, in6)
 		  (struct rtentry **)0);
 */
 	return 0;
-}
-
-static int
-in6_are_prefix_equal(p1, p2, len)
-	struct in6_addr *p1, *p2;
-	int len;
-{
-	int bytelen, bitlen;
-
-	/* sanity check */
-	if (0 > len || len > 128) {
-		log(LOG_ERR, "in6_are_prefix_equal: invalid prefix length(%d)\n",
-		    len);
-		return(0);
-	}
-
-	bytelen = len / 8;
-	bitlen = len % 8;
-
-	if (bcmp(&p1->s6_addr, &p2->s6_addr, bytelen))
-		return(0);
-	if (p1->s6_addr[bytelen] >> (8 - bitlen) !=
-	    p2->s6_addr[bytelen] >> (8 - bitlen))
-		return(0);
-
-	return(1);
-}
-
-static void
-in6_prefixlen2mask(maskp, len)
-	struct in6_addr *maskp;
-	int len;
-{
-	u_char maskarray[8] = {0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff};
-	int bytelen, bitlen, i;
-
-	/* sanity check */
-	if (0 > len || len > 128) {
-		log(LOG_ERR, "in6_prefixlen2mask: invalid prefix length(%d)\n",
-		    len);
-		return;
-	}
-
-	bzero(maskp, sizeof(*maskp));
-	bytelen = len / 8;
-	bitlen = len % 8;
-	for (i = 0; i < bytelen; i++)
-		maskp->s6_addr[i] = 0xff;
-	if (bitlen)
-		maskp->s6_addr[bytelen] = maskarray[bitlen - 1];
 }
 
 int

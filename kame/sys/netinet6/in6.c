@@ -82,6 +82,7 @@
 #endif
 #include <sys/time.h>
 #include <sys/kernel.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -277,7 +278,7 @@ in6_ifremloop(struct ifaddr *ifa)
 
 		/* If only one ifa for the loopback entry, delete it. */
 		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-			if (IN6_ARE_ADDR_EQUAL(&IFA_IN6(ifa),
+			if (IN6_ARE_ADDR_EQUAL(IFA_IN6(ifa),
 					       &ia->ia_addr.sin6_addr)) {
 				ia_count++;
 				if (ia_count > 1)
@@ -527,7 +528,7 @@ in6_control(so, cmd, data, ifp)
 			return(EPERM);
 		/*fall through*/
 	case SIOCGIFPREFIX_IN6:
-		return(in6_prefix_ioctl(cmd, data, ifp));
+		return(in6_prefix_ioctl(so, cmd, data, ifp));
 	}
 
 	switch (cmd) {
@@ -634,6 +635,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGIFAFLAG_IN6:
 	case SIOCGIFNETMASK_IN6:
 	case SIOCGIFDSTADDR_IN6:
+	case SIOCGIFALIFETIME_IN6:
 		/* must think again about its semantics */
 		if (ia == 0)
 			return(EADDRNOTAVAIL);
@@ -863,10 +865,22 @@ in6_control(so, cmd, data, ifp)
 			nd6_dad_start((struct ifaddr *)ia, NULL);
 			break;
 		case IFT_DUMMY:
+		case IFT_FAITH:
 		case IFT_GIF:
 		case IFT_LOOP:
 		default:
 			break;
+		}
+
+		if (hostIsNew) {
+			int iilen;
+			int error_local = 0;
+
+			iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
+				in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+			error_local = in6_prefix_add_ifid(iilen, ia);
+			if (error == 0)
+				error = error_local;
 		}
 
 		return(error);
@@ -923,7 +937,13 @@ in6_control(so, cmd, data, ifp)
 			else
 				printf("Didn't unlink in6_ifaddr from list\n");
 		}
+		{
+			int iilen;
 
+			iilen = (sizeof(oia->ia_prefixmask.sin6_addr) << 3) -
+				in6_mask2len(&oia->ia_prefixmask.sin6_addr);
+			in6_prefix_remove_ifid(iilen, oia);
+		}
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		if (oia->ia6_multiaddrs.lh_first == NULL) {
 			IFAFREE(&oia->ia_ifa);
@@ -1042,7 +1062,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp);
 			if (!ifa)
 				return EADDRNOTAVAIL;
-			hostid = &IFA_IN6(ifa);
+			hostid = IFA_IN6(ifa);
 
 		 	/* prefixlen must be <= 64. */
 			if (64 < iflr->prefixlen)
@@ -1145,7 +1165,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				continue;
 			if (!cmp)
 				break;
-			bcopy(&IFA_IN6(ifa), &candidate, sizeof(candidate));
+			bcopy(IFA_IN6(ifa), &candidate, sizeof(candidate));
 			candidate.s6_addr32[0] &= mask.s6_addr32[0];
 			candidate.s6_addr32[1] &= mask.s6_addr32[1];
 			candidate.s6_addr32[2] &= mask.s6_addr32[2];
@@ -1608,7 +1628,7 @@ in6ifa_ifpforlinklocal(ifp)
 			continue;	/* just for safety */
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
-		if (IN6_IS_ADDR_LINKLOCAL(&IFA_IN6(ifa)))
+		if (IN6_IS_ADDR_LINKLOCAL(IFA_IN6(ifa)))
 			break;
 	}
 
@@ -1636,7 +1656,7 @@ in6ifa_ifpwithaddr(ifp, addr)
 			continue;	/* just for safety */
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
-		if (IN6_ARE_ADDR_EQUAL(addr, &IFA_IN6(ifa)))
+		if (IN6_ARE_ADDR_EQUAL(addr, IFA_IN6(ifa)))
 			break;
 	}
 
@@ -1798,6 +1818,56 @@ struct in6_addr *src, *dst;
 	return match;
 }
 
+int
+in6_are_prefix_equal(p1, p2, len)
+	struct in6_addr *p1, *p2;
+	int len;
+{
+	int bytelen, bitlen;
+
+	/* sanity check */
+	if (0 > len || len > 128) {
+		log(LOG_ERR, "in6_are_prefix_equal: invalid prefix length(%d)\n",
+		    len);
+		return(0);
+	}
+
+	bytelen = len / 8;
+	bitlen = len % 8;
+
+	if (bcmp(&p1->s6_addr, &p2->s6_addr, bytelen))
+		return(0);
+	if (p1->s6_addr[bytelen] >> (8 - bitlen) !=
+	    p2->s6_addr[bytelen] >> (8 - bitlen))
+		return(0);
+
+	return(1);
+}
+
+void
+in6_prefixlen2mask(maskp, len)
+	struct in6_addr *maskp;
+	int len;
+{
+	u_char maskarray[8] = {0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff};
+	int bytelen, bitlen, i;
+
+	/* sanity check */
+	if (0 > len || len > 128) {
+		log(LOG_ERR, "in6_prefixlen2mask: invalid prefix length(%d)\n",
+		    len);
+		return;
+	}
+
+	bzero(maskp, sizeof(*maskp));
+	bytelen = len / 8;
+	bitlen = len % 8;
+	for (i = 0; i < bytelen; i++)
+		maskp->s6_addr[i] = 0xff;
+	if (bitlen)
+		maskp->s6_addr[bytelen] = maskarray[bitlen - 1];
+}
+
 /*
  * return the best address out of the same scope
  */
@@ -1840,14 +1910,14 @@ in6_ifawithscope(ifp, dst)
 			continue;
 		}
 
-		if (dst_scope == in6_addrscope(&IFA_IN6(ifa))) {
+		if (dst_scope == in6_addrscope(IFA_IN6(ifa))) {
 			/*
 			 * call in6_matchlen() as few as possible
 			 */
 			if (besta) {
 				if (blen == -1)
 					blen = in6_matchlen(&besta->ia_addr.sin6_addr, dst);
-				tlen = in6_matchlen(&IFA_IN6(ifa), dst);
+				tlen = in6_matchlen(IFA_IN6(ifa), dst);
 				if (tlen > blen) {
 					blen = tlen;
 					besta = (struct in6_ifaddr *)ifa;
@@ -1930,14 +2000,14 @@ in6_ifawithifp(ifp, dst)
 			continue;
 		}
 
-		if (dst_scope == in6_addrscope(&IFA_IN6(ifa))) {
+		if (dst_scope == in6_addrscope(IFA_IN6(ifa))) {
 			/*
 			 * call in6_matchlen() as few as possible
 			 */
 			if (besta) {
 				if (blen == -1)
 					blen = in6_matchlen(&besta->ia_addr.sin6_addr, dst);
-				tlen = in6_matchlen(&IFA_IN6(ifa), dst);
+				tlen = in6_matchlen(IFA_IN6(ifa), dst);
 				if (tlen > blen) {
 					blen = tlen;
 					besta = (struct in6_ifaddr *)ifa;
