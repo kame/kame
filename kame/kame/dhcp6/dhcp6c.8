@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.14 2002/04/25 03:02:39 jinmei Exp $
+.\"	$KAME: dhcp6c.8,v 1.15 2002/05/23 08:51:23 jinmei Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -36,6 +36,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
+.Op Fl c Ar configfile
 .Op Fl Ddf
 .Ar interface
 .\"
@@ -48,6 +49,10 @@ to configure the specified
 The command line options are:
 .Bl -tag -width indent
 .\"
+.It Fl c Ar configfile
+Use
+.Ar configfile
+as the configuration file.
 .It Fl d
 Print debugging messages.
 .It Fl D
@@ -74,10 +79,12 @@ will reinvoke itself, unless it is still soliciting servers or
 requesting resources.
 .\"
 .Sh FILES
-.Bl -tag -width /var/run/dhcp6c.pid -compact
+.Bl -tag -width /usr/local/v6/etc/dhcp6c.conf -compact
 .It Pa /var/run/dhcp6c.pid
 contains pid of the currently running
 .Nm dhcp6c .
+.It Pa /usr/local/v6/etc/dhcp6c.conf
+is the default configuration file.
 .It Pa /etc/dhcp6c_duid
 is the default file to store the client's DUID.
 .El
@@ -87,7 +94,7 @@ is the default file to store the client's DUID.
 .Xr dhcp6s 8
 .Rs
 .%A Ralph Droms, Editor
-.%D 21 Dec 2001
+.%D 22 Apr 2002
 .%T Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
 .%R internet draft
 .%N draft-ietf-dhc-dhcpv6-24.txt

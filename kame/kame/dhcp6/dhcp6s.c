@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.83 2002/05/23 03:30:09 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.84 2002/05/23 08:51:23 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -151,7 +151,7 @@ main(argc, argv)
 	int ch;
 	struct in6_addr a;
 	struct dhcp6_listval *dlv;
-	char *progname;
+	char *progname, *conffile = DHCP6S_CONF;
 
 	if ((progname = strrchr(*argv, '/')) == NULL)
 		progname = *argv;
@@ -161,8 +161,11 @@ main(argc, argv)
 	TAILQ_INIT(&dnslist);
 
 	srandom(time(NULL) & getpid());
-	while ((ch = getopt(argc, argv, "dDfn:")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dDfn:")) != -1) {
 		switch (ch) {
+		case 'c':
+			conffile = optarg;
+			break;
 		case 'd':
 			debug = 1;
 			break;
@@ -207,7 +210,7 @@ main(argc, argv)
 
 	ifinit(device);
 
-	if ((cfparse(DHCP6S_CONF)) != 0) {
+	if ((cfparse(conffile)) != 0) {
 		dprintf(LOG_ERR, "%s" "failed to parse configuration file",
 			FNAME);
 		exit(1);
@@ -223,7 +226,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: dhcp6s [-dDf] [-n dnsserv] intface\n");
+		"usage: dhcp6s [-c configfile] [-dDf] [-n dnsserv] intface\n");
 	exit(0);
 }
 

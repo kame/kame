@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.86 2002/05/23 03:30:09 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.87 2002/05/23 08:51:23 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -124,7 +124,7 @@ main(argc, argv)
 	char **argv;
 {
 	int ch, pid;
-	char *progname;
+	char *progname, *conffile = DHCP6C_CONF;
 	FILE *pidfp;
 	struct dhcp6_if *ifp;
 	struct dhcp6_event *ev;
@@ -136,8 +136,11 @@ main(argc, argv)
 	else
 		progname++;
 
-	while ((ch = getopt(argc, argv, "dDf")) != -1) {
+	while ((ch = getopt(argc, argv, "c:dDf")) != -1) {
 		switch (ch) {
+		case 'c':
+			conffile = optarg;
+			break;
 		case 'd':
 			debug = 1;
 			break;
@@ -177,7 +180,7 @@ main(argc, argv)
 
 	ifinit(device);
 
-	if ((cfparse(DHCP6C_CONF)) != 0) {
+	if ((cfparse(conffile)) != 0) {
 		dprintf(LOG_ERR, "%s" "failed to parse configuration file",
 			FNAME);
 		exit(1);
@@ -209,7 +212,7 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: dhcpc [-dDf] intface\n");
+	fprintf(stderr, "usage: dhcpc [-c configfile] [-dDf] intface\n");
 }
 
 /*------------------------------------------------------------*/
