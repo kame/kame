@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.106 2000/09/21 06:07:55 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.107 2000/09/21 06:15:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.106 2000/09/21 06:07:55 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.107 2000/09/21 06:15:48 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1351,6 +1351,7 @@ ipsecdoi_updatespi(iph2)
 	struct saproto *pr;
 	int i;
 	int error = -1;
+	u_int8_t *spi;
 
 	pair = get_proppair(iph2->sa_ret, IPSECDOI_TYPE_PH2);
 	if (pair == NULL)
@@ -1381,8 +1382,10 @@ ipsecdoi_updatespi(iph2)
 		if (!pr)
 			goto end;
 
-		memcpy((caddr_t)p->prop + sizeof(*p->prop), &pr->spi,
-			pr->spisize);
+		spi = (u_int8_t *)&pr->spi;
+		spi += sizeof(pr->spi);
+		spi -= pr->spisize;
+		memcpy((caddr_t)p->prop + sizeof(*p->prop), spi, pr->spisize);
 	}
 
 	error = 0;
@@ -2563,12 +2566,14 @@ setph2proposal0(iph2, pp, pr)
 		spi += sizeof(pr->spi) - sizeof(u_int16_t);
 		p->l -= sizeof(pr->spi);
 		p->l += sizeof(u_int16_t);
+		spi[0] = 0x00;
+		spi[0] = 0x02;	/*wellknown, deflate*/
 		break;
 	default:
 		prop->spi_size = sizeof(pr->spi);
+		memcpy(prop + 1, spi, prop->spi_size);
 		break;
 	}
-	memcpy(prop + 1, spi, prop->spi_size);
 
 	/* create transform */
 	trnsoff = sizeof(*prop) + prop->spi_size;
