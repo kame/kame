@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.18 2005/03/03 01:27:32 ryuji Exp $	*/
+/*	$KAME: fsm.c,v 1.19 2005/03/03 01:31:13 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2202,6 +2202,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 				break;
 			}
 		} else if (mpt->mpt_regmode == NEMO_EXPLICIT) {
+			switch (ip6mhba->ip6mhba_status) {
 			case IP6_MH_BAS_MR_NOT_PERMIT:
 				/* send it to another home agent */
 				break;
@@ -2215,8 +2216,8 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 			default:
 				break;
 			}
-
 		}
+	}
 
 #endif /* MIP_NEMO */
 
