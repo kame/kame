@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.50 2002/05/26 13:12:07 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.51 2002/05/26 14:42:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -252,6 +252,7 @@ static char sccsid[] = "@(#)traceroute.c	8.1 (Berkeley) 6/6/93";
 #include <sys/uio.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
+#include <sys/sysctl.h>
 
 #include <netinet/in.h>
 
@@ -360,6 +361,8 @@ main(argc, argv)
 	static u_char *rcvcmsgbuf;
 	char hbuf[NI_MAXHOST], src0[NI_MAXHOST];
 	char *ep;
+	int mib[4] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_DEFHLIM };
+	size_t size = sizeof(max_hops);
 
 	/*
 	 * Receive ICMP
@@ -372,6 +375,9 @@ main(argc, argv)
 	/* revoke privs */
 	seteuid(getuid());
 	setuid(getuid());
+
+	(void) sysctl(mib, sizeof(mib)/sizeof(mib[0]), &max_hops, &size,
+	    NULL, 0);
 
 	/* set a minimum set of socket options */
 	on = 1;
