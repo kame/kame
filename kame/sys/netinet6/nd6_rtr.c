@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.103 2001/03/02 14:51:57 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.104 2001/03/02 16:31:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1137,7 +1137,6 @@ prelist_update(new, dr, m)
 		pr = newpr;
 	}
 
-  addrconf:
 	/*
 	 * Address autoconfiguration based on Section 5.5.3 of RFC 2462.
 	 * Note that pr must be non NULL at this point.
