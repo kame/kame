@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.28 2001/05/08 22:13:01 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.29 2001/05/08 22:13:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -221,7 +221,6 @@ main(argc, argv)
 static void
 usage()
 {
-
 	fprintf(stderr, "usage: bindtest [-[1|2]6APlst] -p port\n");
 }
 
