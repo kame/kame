@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.145 2002/06/12 01:19:38 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.146 2002/06/12 01:30:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,28 +213,28 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ESP_RANDPAD,
 #endif /* INET6 */
 
 static struct secpolicy *ipsec_checkpcbcache __P((struct mbuf *,
-	struct inpcbpolicy *pcbsp, int));
+	struct inpcbpolicy *, int));
 static int ipsec_fillpcbcache __P((struct inpcbpolicy *, struct mbuf *,
 	struct secpolicy *, int));
 static int ipsec_invalpcbcache __P((struct inpcbpolicy *, int));
 static int ipsec_setspidx_mbuf
 	__P((struct secpolicyindex *, int, struct mbuf *, int));
 static int ipsec_setspidx __P((struct mbuf *, struct secpolicyindex *, int));
-static void ipsec4_get_ulp __P((struct mbuf *m, struct secpolicyindex *, int));
+static void ipsec4_get_ulp __P((struct mbuf *, struct secpolicyindex *, int));
 static int ipsec4_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #ifdef INET6
-static void ipsec6_get_ulp __P((struct mbuf *m, struct secpolicyindex *, int));
+static void ipsec6_get_ulp __P((struct mbuf *, struct secpolicyindex *, int));
 static int ipsec6_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #endif
 static struct inpcbpolicy *ipsec_newpcbpolicy __P((void));
 static void ipsec_delpcbpolicy __P((struct inpcbpolicy *));
 #if 0
 static int ipsec_deepcopy_pcbpolicy __P((struct inpcbpolicy *));
-static struct secpolicy *ipsec_deepcopy_policy __P((struct secpolicy *src));
+static struct secpolicy *ipsec_deepcopy_policy __P((struct secpolicy *));
 #endif
 static int ipsec_set_policy
 	__P((struct secpolicy **, int, caddr_t, size_t, int));
-static int ipsec_get_policy __P((struct secpolicy *pcb_sp, struct mbuf **mp));
+static int ipsec_get_policy __P((struct secpolicy *, struct mbuf **));
 static void vshiftl __P((unsigned char *, int, int));
 static int ipsec_in_reject __P((struct secpolicy *, struct mbuf *));
 static size_t ipsec_hdrsiz __P((struct secpolicy *));
