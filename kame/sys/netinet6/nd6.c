@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.111 2001/02/08 02:47:11 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.112 2001/02/08 09:15:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -885,28 +885,6 @@ nd6_purge(ifp)
 			sdl = (struct sockaddr_dl *)rt->rt_gateway;
 			if (sdl->sdl_index == ifp->if_index)
 				nd6_free(rt);
-		}
-		ln = nln;
-	}
-
-	/*
-	 * Neighbor cache entry for interface route can be retained. Nuke it.
-	 */
-	ln = llinfo_nd6.ln_next;
-	while (ln && ln != &llinfo_nd6) {
-		struct rtentry *rt;
-		struct sockaddr_dl *sdl;
-
-		nln = ln->ln_next;
-		rt = ln->ln_rt;
-		if (rt && rt->rt_gateway &&
-		    rt->rt_gateway->sa_family == AF_LINK) {
-			sdl = (struct sockaddr_dl *)rt->rt_gateway;
-			if (sdl->sdl_index == ifp->if_index) {
-				rtrequest(RTM_DELETE, rt_key(rt),
-				    (struct sockaddr *)0, rt_mask(rt), 0,
-				    (struct rtentry **)0);
-			}
 		}
 		ln = nln;
 	}
