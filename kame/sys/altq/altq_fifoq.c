@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.c,v 1.4 2000/07/25 10:12:30 kjc Exp $	*/
+/*	$KAME: altq_fifoq.c,v 1.5 2000/07/28 09:20:54 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_fifoq.c,v 1.4 2000/07/25 10:12:30 kjc Exp $
+ * $Id: altq_fifoq.c,v 1.5 2000/07/28 09:20:54 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -229,6 +229,7 @@ fifoqioctl(dev, cmd, addr, flag, p)
 			q_stats->xmit_bytes   	= q->q_stats.xmit_bytes;
 			q_stats->drop_packets 	= q->q_stats.drop_packets;
 			q_stats->drop_bytes   	= q->q_stats.drop_bytes;
+			q_stats->period   	= q->q_stats.period;
 		} while (0);
 		break;
 
@@ -335,6 +336,8 @@ fifoq_dequeue(ifq, op)
 #ifdef FIFOQ_STATS
 	q->q_stats.xmit_packets++;
 	q->q_stats.xmit_bytes += m->m_pkthdr.len;
+	if (q->q_len == 0)
+		q->q_stats.period++;
 #endif
 	return (m);
 }

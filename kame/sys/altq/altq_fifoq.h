@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.h,v 1.3 2000/07/25 10:12:30 kjc Exp $	*/
+/*	$KAME: altq_fifoq.h,v 1.4 2000/07/28 09:20:54 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_fifoq.h,v 1.3 2000/07/25 10:12:30 kjc Exp $
+ * $Id: altq_fifoq.h,v 1.4 2000/07/28 09:20:54 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_FIFOQ_H_
@@ -46,6 +46,7 @@ typedef struct fifoq_state {
 		u_int		drop_packets;
 		u_quad_t	xmit_bytes;
 		u_quad_t	drop_bytes;
+		u_int		period;
 	} q_stats;
 } fifoq_state_t;
 
@@ -61,6 +62,7 @@ struct fifoq_getstats {
 	u_int		drop_packets;
 	u_quad_t	xmit_bytes;
 	u_quad_t	drop_bytes;
+	u_int		period;
 };
 
 struct fifoq_conf {
