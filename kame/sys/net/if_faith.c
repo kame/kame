@@ -52,7 +52,11 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <sys/sockio.h>
+#else
 #include <sys/ioctl.h>
+#endif
 #include <sys/time.h>
 #ifdef __bsdi__
 #include <machine/cpu.h>
@@ -216,6 +220,12 @@ faithoutput(ifp, m, dst, rt)
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
 	switch (dst->sa_family) {
+#ifdef INET
+	case AF_INET:
+		ifq = &ipintrq;
+		isr = NETISR_IP;
+		break;
+#endif
 #ifdef INET6
 	case AF_INET6:
 		ifq = &ip6intrq;
@@ -300,6 +310,10 @@ faithioctl(ifp, cmd, data)
 			break;
 		}
 		switch (ifr->ifr_addr.sa_family) {
+#ifdef INET
+		case AF_INET:
+			break;
+#endif
 #ifdef INET6
 		case AF_INET6:
 			break;
