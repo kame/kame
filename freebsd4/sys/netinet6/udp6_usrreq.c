@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.8 2000/04/21 10:46:39 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.9 2000/05/05 16:13:04 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -528,7 +528,8 @@ udp6_output(in6p, m, addr6, control, p)
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt,
 					       p &&
-					       suser(p), 0)) != 0)
+					       suser(p),
+					       0)) != 0)
 			goto release;
 		in6p->in6p_outputopts = &opt;
 	}

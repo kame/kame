@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.28 2000/05/05 13:27:13 sumikawa Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.29 2000/05/05 16:13:04 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -510,7 +510,7 @@ SYSCTL_PROC(_net_inet6_udp6, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
 int
 udp6_output(in6p, m, addr6, control, p)
 	register struct inpcb *in6p;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *addr6;
 	struct mbuf *control;
 	struct proc *p;
@@ -525,9 +525,10 @@ udp6_output(in6p, m, addr6, control, p)
 	int flags;
 
 	if (control) {
-		if (error = ip6_setpktoptions(control, &opt,
-					      p &&
-					      suser(p->p_ucred, &p->p_acflag), 0))
+		if ((error = ip6_setpktoptions(control, &opt,
+					       p &&
+					       suser(p->p_ucred, &p->p_acflag),
+					       0)) != 0)
 			goto release;
 		in6p->in6p_outputopts = &opt;
 	}
