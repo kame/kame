@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.70 2003/05/23 05:22:09 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.71 2003/06/27 07:32:38 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -179,6 +179,7 @@ hexstring	0x{hexdigit}+
 <S_SAINF>anonymous	{ YYD; return(ANONYMOUS); }
 <S_SAINF>{blcl}any{elcl}	{ YYD; return(PORTANY); }
 <S_SAINF>any		{ YYD; return(ANY); }
+<S_SAINF>from		{ YYD; return(FROM); }
 	/* sainfo spec */
 <S_SAINF>{bcl}		{ BEGIN S_SAINFS; return(BOC); }
 <S_SAINF>{semi}		{ BEGIN S_INI; return(EOS); }
@@ -225,7 +226,8 @@ hexstring	0x{hexdigit}+
 <S_RMTS>dh_group	{ YYD; return(DH_GROUP); }
 <S_RMTS>nonce_size	{ YYD; return(NONCE_SIZE); }
 <S_RMTS>generate_policy	{ YYD; return(GENERATE_POLICY); }
-<S_RMTS>support_mip6	{ YYD; return(SUPPORT_MIP6); }
+<S_RMTS>support_mip6	{ YYD; yywarn("it is obsoleted.  use \"support_proxy\"."); return(SUPPORT_PROXY); }
+<S_RMTS>support_proxy	{ YYD; return(SUPPORT_PROXY); }
 <S_RMTS>initial_contact	{ YYD; return(INITIAL_CONTACT); }
 <S_RMTS>proposal_check	{ YYD; return(PROPOSAL_CHECK); }
 <S_RMTS>obey		{ YYD; yylval.num = PROP_CHECK_OBEY; return(PROPOSAL_CHECK_LEVEL); }

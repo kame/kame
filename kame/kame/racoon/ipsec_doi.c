@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.161 2003/05/23 06:49:17 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.162 2003/06/27 07:32:38 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2866,16 +2866,15 @@ ipsecdoi_setph2proposal(iph2)
 }
 
 /*
- * return 1 if all of the proposed protocols are transport mode.
+ * return 1 if all of the given protocols are transport mode.
  */
 int
-ipsecdoi_transportmode(iph2)
-	struct ph2handle *iph2;
-{
+ipsecdoi_transportmode(pp)
 	struct saprop *pp;
+{
 	struct saproto *pr = NULL;
 
-	for (pp = iph2->proposal; pp; pp = pp->next) {
+	for (; pp; pp = pp->next) {
 		for (pr = pp->head; pr; pr = pr->next) {
 			if (pr->encmode != IPSECDOI_ATTR_ENC_MODE_TRNS)
 				return 0;
@@ -3350,48 +3349,16 @@ ipsecdoi_setid2(iph2)
 		return -1;
 	}
 
-	if (!iph2->sainfo->idv) {
-		iph2->id = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.src,
+	iph2->id = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.src,
 					sp->spidx.prefs, sp->spidx.ul_proto);
-		if (iph2->id == NULL) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to get ID for %s\n",
-				spidx2str(&sp->spidx));
-			return -1;
-		}
-		plog(LLV_DEBUG, LOCATION, NULL, "use local ID type %s\n",
-			s_ipsecdoi_ident(((struct ipsecdoi_id_b *)iph2->id->v)->type));
-	} else {
-		struct ipsecdoi_id_b id_b;
-		vchar_t *ident;
-
-		id_b.type = idtype2doi(iph2->sainfo->idvtype);
-		if (id_b.type == 255) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to convert ID type to DOI.\n");
-			return -1;
-		}
-		id_b.proto_id = 0;
-		id_b.port = 0;
-
-		ident = getidval(iph2->sainfo->idvtype, iph2->sainfo->idv);
-		if (!ident) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to get ID value.\n");
-			return -1;
-		}
-		iph2->id = vmalloc(sizeof(id_b) + ident->l);
-		if (iph2->id == NULL) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to get ID buffer.\n");
-			vfree(ident);
-			return -1;
-		}
-
-		memcpy(iph2->id->v, &id_b, sizeof(id_b));
-		memcpy(iph2->id->v + sizeof(id_b), ident->v, ident->l);
-		vfree(ident);
+	if (iph2->id == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to get ID for %s\n",
+			spidx2str(&sp->spidx));
+		return -1;
 	}
+	plog(LLV_DEBUG, LOCATION, NULL, "use local ID type %s\n",
+		s_ipsecdoi_ident(((struct ipsecdoi_id_b *)iph2->id->v)->type));
 
 	/* remote side */
 	iph2->id_p = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.dst,
