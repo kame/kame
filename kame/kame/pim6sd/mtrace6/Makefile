@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.2 1999/09/13 01:23:22 jinmei Exp $
+# $Id: Makefile,v 1.3 2000/02/25 06:35:42 itojun Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -88,10 +88,12 @@ BINMODE = 4555
 .if (${OPSYS} == "BSD/OS")
 CC=	gcc
 .endif
-.if (${OPSYS} != "NetBSD")
 CFLAGS+=-Wall
+.if (${OPSYS} != "NetBSD")
+CFLAGS+= -I$(.CURDIR)/.. -DHAVE_GETIFADDRS
+.else
+CPPFLAGS+= -I$(.CURDIR)/.. -DHAVE_GETIFADDRS
 .endif
-CFLAGS+= -I$(.CURDIR)/..
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
