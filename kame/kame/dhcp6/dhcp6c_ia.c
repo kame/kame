@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.13 2003/02/10 14:06:05 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.14 2003/03/06 11:44:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -105,10 +105,18 @@ update_ia(iatype, ialist, ifp, serverid)
 		}
 
 		/* validate parameters */
+		/*
+		 * If a client receives an IA_NA with T1 greater than T2, and
+		 * both T1 and T2 are greater than 0, the client discards the
+		 * IA_NA option and processes the remainder of the message as
+		 * though the server had not included the invalid IA_NA option.
+		 * [dhcpv6-interop-00, Section 2]
+		 * We apply the same rule to IA_PD as well.
+		 */
 		if (iav->val_ia.t2 != 0 && iav->val_ia.t1 > iav->val_ia.t2) {
 			dprintf(LOG_INFO, "%s" "invalid IA: T1(%lu) > T2(%lu)",
 			    FNAME, iav->val_ia.t1, iav->val_ia.t2);
-			continue; /* XXX: or should we try to recover? */
+			continue;
 		}
 
 		/* locate or make the local IA */

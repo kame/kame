@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.20 2003/02/06 13:43:31 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.21 2003/03/06 11:44:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -134,8 +134,9 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 	struct timeval timo;
 
 	/*
-	 * Parameter check: reject prefixes where pltime is larger than vltime,
-	 * though the spec is silent on this point.
+	 * A client discards any addresses for which the preferred
+         * lifetime is greater than the valid lifetime.
+	 * [dhcpv6-interop-00, Section 9] 
 	 */
 	if (pinfo->vltime != DHCP6_DURATITION_INFINITE &&
 	    (pinfo->pltime == DHCP6_DURATITION_INFINITE ||
