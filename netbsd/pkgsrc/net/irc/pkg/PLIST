@@ -1,6 +1,7 @@
 bin/irc
-lib/ircd/ircd.m4
 lib/ircd/example.conf
+lib/ircd/iauth.conf
+lib/ircd/ircd.m4
 sbin/ircd
 sbin/iauth
 sbin/chkconf
@@ -11,3 +12,4 @@ man/man5/iauth.conf.5
 man/man8/ircd.8
 man/man8/iauth.8
 man/man8/ircdwatch.8
+@dirrm lib/ircd
