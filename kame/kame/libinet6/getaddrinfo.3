@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)gethostbyname.3	8.4 (Berkeley) 5/25/95
-.\"     $Id: getaddrinfo.3,v 1.7 2000/01/17 07:59:13 itojun Exp $
+.\"     $Id: getaddrinfo.3,v 1.8 2000/01/17 08:13:03 itojun Exp $
 .\"
 .Dd May 25, 1995
 .Dt GETADDRINFO 3
@@ -58,11 +58,11 @@
 The
 .Fn getaddrinfo
 function is defined for protocol-independent nodename-to-address translation.
-It performs functionality of 
+It performs the functionality of
 .Xr gethostbyname 3
 and
 .Xr getservbyname 3 ,
-in more sophisticated manner.
+but in a more sophisticated manner.
 .Pp
 The
 .Li addrinfo
@@ -264,7 +264,7 @@ Otherwise an error of
 .Dv EAI_NONAME
 is returned.
 This flag prevents any type of name resolution service (e.g., the DNS)
-from being called.                                               
+from being called.
 .Pp
 All of the information returned by
 .Fn getaddrinfo
@@ -438,7 +438,7 @@ freeaddrinfo(res0);
 .El
 .\"
 .Sh DIAGNOSTICS
-Error return status from 
+Error return status from
 .Fn getaddrinfo
 is zero on success and non-zero on errors.
 Non-zero error codes are defined in
@@ -446,40 +446,40 @@ Non-zero error codes are defined in
 and as follows:
 .Pp
 .Bl -tag -width EAI_ADDRFAMILY -compact
-.It Dv EAI_ADDRFAMILY 
-address family for
+.It Dv EAI_ADDRFAMILY
+Address family for
 .Fa nodename
-not supported
+not supported.
 .It Dv EAI_AGAIN
-temporary failure in name resolution
+Temporary failure in name resolution.
 .It Dv EAI_BADFLAGS
-invalid value for
-.Fa ai_flags
+Invalid value for
+.Fa ai_flags .
 .It Dv EAI_FAIL
-non-recoverable failure in name resolution
+Non-recoverable failure in name resolution.
 .It Dv EAI_FAMILY
 .Fa ai_family
-not supported
+not supported.
 .It Dv EAI_MEMORY
-memory allocation failure
+Memory allocation failure.
 .It Dv EAI_NODATA
-no address associated with
-.Fa nodename
+No address associated with
+.Fa nodename .
 .It Dv EAI_NONAME
 .Fa nodename
 nor
 .Fa servname
-provided, or not known
+provided, or not known.
 .It Dv EAI_SERVICE
 .Fa servname
 not supported for
-.Fa ai_socktype
+.Fa ai_socktype .
 .It Dv EAI_SOCKTYPE
 .Fa ai_socktype
-not supported
+not supported.
 .It Dv EAI_SYSTEM
-system error returned in
-.Va errno
+System error returned in
+.Va errno .
 .El
 .Pp
 If called with proper argument,
