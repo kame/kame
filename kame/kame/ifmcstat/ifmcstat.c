@@ -75,7 +75,7 @@ struct	nlist nl[] = {
 };
 
 const char *inet6_n2a __P((struct in6_addr *));
-int main __P((void));
+int main __P((int, char **));
 char *ifname __P((struct ifnet *));
 void kread __P((u_long, void *, int));
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -136,7 +136,9 @@ const char *inet6_n2a(p)
 		return "(invalid)";
 }
 
-int main()
+int main(argc, argv)
+	int argc;
+	char **argv;
 {
 	char	buf[_POSIX2_LINE_MAX], ifname[IFNAMSIZ];
 	struct	ifnet	*ifp, *nifp, ifnet;
@@ -146,8 +148,22 @@ int main()
 	struct ethercom ec;
 	struct sockaddr_dl sdl;
 #endif
+	const char *kernel = NULL;
+	int c;
 
-	if ((kvmd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) == NULL) {
+	switch (argc) {
+	case 1:
+		kernel = NULL;
+		break;
+	case 2:
+		kernel = argv[1];
+		break;
+	default:
+		fprintf(stderr, "usage: ifmcstat [kernel]\n");
+		exit(1);
+	}
+
+	if ((kvmd = kvm_openfiles(kernel, NULL, NULL, O_RDONLY, buf)) == NULL) {
 		perror("kvm_openfiles");
 		exit(1);
 	}
@@ -221,7 +237,7 @@ char *ifname(ifp)
 
 	KREAD(ifp, &ifnet, struct ifnet);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	strncpy(buf, ifnet.if_xname, BUFSIZ);
+	strlcpy(buf, ifnet.if_xname, sizeof(buf));
 #else
 	KREAD(ifnet.if_name, ifnamebuf, sizeof(ifnamebuf));
 	snprintf(buf, sizeof(buf), "%s%d", ifnamebuf,
