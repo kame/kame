@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.9 2000/05/24 09:56:52 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.10 2000/06/07 08:33:54 sakane Exp $ */
 
 #define PORT_ISAKMP 500
 
@@ -68,8 +68,9 @@ extern int isakmp_send __P((struct ph1handle *iph1, vchar_t *buf));
 extern void isakmp_ph1resend __P((struct ph1handle *iph1));
 extern void isakmp_ph2resend __P((struct ph2handle *iph2));
 extern void isakmp_ph1expire __P((struct ph1handle *iph1));
-extern void isakmp_ph1restart __P((struct ph1handle *iph1));
+extern void isakmp_ph1delete __P((struct ph1handle *iph1));
 extern void isakmp_ph2expire __P((struct ph2handle *iph2));
+extern void isakmp_ph2delete __P((struct ph2handle *));
 
 extern int isakmp_post_acquire __P((struct ph2handle *iph2));
 extern int isakmp_post_getspi __P((struct ph2handle *iph2));

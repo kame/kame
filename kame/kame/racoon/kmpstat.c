@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.10 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.11 2000/06/07 08:33:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -772,7 +772,6 @@ char *header3 =
 				pd->version);
 			if (ARRAYLEN(estr) > pd->etype)
 				printf("%s ", estr[pd->etype]);
-			printf("%1d ", pd->inuse & 3);
 		}
 
 		tm = localtime(&pd->created);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.41 2000/05/31 16:14:52 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.42 2000/06/07 08:33:54 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1077,15 +1077,24 @@ pk_recvupdate(mhp)
 	/* update status */
 	iph2->status = PHASE2ST_ESTABLISHED;
 
-	iph2->sce = sched_new(iph2->approval->lifetime * 0.8,
+	/*
+	 * since we are going to reuse the phase2 handler, we need to
+	 * remain it and refresh all the references between ph1 and ph2 to use.
+	 */
+	unbindph12(iph2);
+
+	iph2->sce = sched_new(iph2->approval->lifetime,
 				isakmp_ph2expire, iph2);
 
     {
 	char *xsrc = strdup(saddrwop2str(iph2->src));
 	plog(logp, LOCATION, NULL,
-		"established IPsec-SAs for %s-%s\n",
+		"established IPsec-SAs %s/%s/%s-%s spi:%ld\n",
+		s_pfkey_satype(msg->sadb_msg_satype),
+		s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
 		xsrc,
-		saddrwop2str(iph2->dst));
+		saddrwop2str(iph2->dst),
+		ntohl(sa->sadb_sa_spi));
 	free(xsrc);
     }
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
@@ -1211,7 +1220,6 @@ pk_recvadd(mhp)
 	return 0;
 }
 
-/* EXPIRE process will be done in isakmp_ph2expire(). */
 static int
 pk_recvexpire(mhp)
 	caddr_t *mhp;
@@ -1241,7 +1249,7 @@ pk_recvexpire(mhp)
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
 		plog(logp, LOCATION, NULL,
-			"invalid proto_id %d\n", msg->sadb_msg_satype);
+			"ERROR: invalid proto_id %d\n", msg->sadb_msg_satype);
 		return -1;
 	}
 
@@ -1249,17 +1257,61 @@ pk_recvexpire(mhp)
 	if (iph2 == NULL) {
 		char *xsrc = strdup(saddrwop2str(src));
 		plog(logp, LOCATION, NULL,
-			"no SA found %s/%s/%s->%s\n",
+			"ERROR: no such a SA found %s/%s/%s->%s spi:%ld\n",
 			s_pfkey_satype(msg->sadb_msg_satype),
 			s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
 			xsrc,
-			saddrwop2str(dst));
+			saddrwop2str(dst),
+			ntohl(sa->sadb_sa_spi));
 		free(xsrc);
 		return -1;
 	}
 
-	/* iph2expire() checks it. */
-	iph2->inuse = 2;
+	SCHED_KILL(iph2->sce);
+
+	YIPSDEBUG(DEBUG_STAMP,
+		char *xsrc = strdup(saddrwop2str(src));
+		plog(logp, LOCATION, NULL,
+			"expire IPsec SA %s/%s/%s->%s spi:%ld\n",
+			s_pfkey_satype(msg->sadb_msg_satype),
+			s_ipsecdoi_encmode(~msg->sadb_msg_mode & 3),
+			saddrwop2str(iph2->src),
+			saddrwop2str(iph2->dst),
+			ntohl(sa->sadb_sa_spi));
+		free(xsrc));
+
+	iph2->status = PHASE2ST_EXPIRED;
+
+	/* INITIATOR, begin phase 2 exchange. */
+	/* allocate buffer for status management of pfkey message */
+	if (iph2->side == INITIATOR) {
+
+		initph2(iph2);
+
+		/* update status for re-use */
+		iph2->status = PHASE2ST_STATUS2;
+
+		/* start isakmp initiation by using ident exchange */
+		if (isakmp_post_acquire(iph2) < 0) {
+			plog(logp, LOCATION, iph2->dst,
+				"failed to begin ipsec sa "
+				"re-negotication.\n");
+			unbindph12(iph2);
+			remph2(iph2);
+			delph2(iph2);
+			return -1;
+		}
+
+		return 0;
+		/*NOTREACHED*/
+	}
+
+	/* If not received SADB_EXPIRE, INITIATOR delete ph2handle. */
+	/* RESPONDER always delete ph2handle, keep silent.  RESPONDER doesn't
+	 * manage IPsec SA, so delete the list */
+	unbindph12(iph2);
+	remph2(iph2);
+	delph2(iph2);
 
 	return 0;
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.61 2000/05/24 09:39:17 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.62 2000/06/07 08:33:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1302,40 +1302,29 @@ isakmp_ph1expire(iph1)
 
 	iph1->status = PHASE1ST_EXPIRED;
 
-	isakmp_ph1restart(iph1);
+	iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
 
 	return;
 }
 
-/* may called from scheduler */
+/* called from scheduler */
 void
-isakmp_ph1restart(iph1)
+isakmp_ph1delete(iph1)
 	struct ph1handle *iph1;
 {
-	/* XXX to do retry counter */
+	SCHED_INIT(iph1->sce);
 
 	if (LIST_FIRST(&iph1->ph2tree) != NULL) {
-		/* XXX should I check iph2->status ? */
-		iph1->inuse = 2;	/* sa needed */
-		sched_new(1, isakmp_ph1restart, iph1);
+		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
 		return;
 	}
 
-	/* if it's initiator, begin re-negosiation */
-	if (iph1->side == INITIATOR && iph1->inuse != 1) {
+	/* don't re-negosiation when the phase 1 SA expires. */
 
-		if (iph1->inuse == 0)
-			iph1->inuse = 1;	/* sa may not needed */
-		else
-			iph1->inuse = 0;	/* reset */
-
-		YIPSDEBUG(DEBUG_STAMP,
-			plog(logp, LOCATION, NULL,
-				"restart phase1 negotiation %s\n",
-				isakmp_pindex(&iph1->index, iph1->msgid)));
-
-		(void)isakmp_ph1begin_i(iph1->rmconf, iph1->remote);
-	}
+	YIPSDEBUG(DEBUG_STAMP,
+		plog(logp, LOCATION, NULL,
+			"delete phase1 sa %s\n",
+			isakmp_pindex(&iph1->index, iph1->msgid)));
 
 	remph1(iph1);
 	delph1(iph1);
@@ -1343,7 +1332,12 @@ isakmp_ph1restart(iph1)
 	return;
 }
 
-/* called from scheduler */
+/* called from scheduler.
+ * this function will call only isakmp_ph2expire2().
+ * phase 2 handler remain forever if kernel doesn't send phase SA expires
+ * by something cause.  That's why this function is called after phase 2 SA
+ * expires in the userland.
+ */
 void
 isakmp_ph2expire(iph2)
 	struct ph2handle *iph2;
@@ -1355,56 +1349,28 @@ isakmp_ph2expire(iph2)
 			saddrwop2str(iph2->dst)));
 	SCHED_INIT(iph2->sce);
 
-	iph2->status = PHASE2ST_EXPIRED;
+	iph2->sce = sched_new(10, isakmp_ph2delete, iph2);
 
-	/* INITIATOR, begin phase 2 exchange. */
-	/* allocate buffer for status management of pfkey message */
-	if (iph2->side == INITIATOR && iph2->inuse != 1) {
+	return;
+}
 
-		if (iph2->inuse == 0)
-			iph2->inuse = 1;
-		else
-			iph2->inuse = 0;
+/* called from scheduler. */
+void
+isakmp_ph2delete(iph2)
+	struct ph2handle *iph2;
+{
+	SCHED_INIT(iph2->sce);
 
+	YIPSDEBUG(DEBUG_STAMP,
+		plog(logp, LOCATION, NULL,
+			"delete phase2 sa %s->%s\n",
+			saddrwop2str(iph2->src),
+			saddrwop2str(iph2->dst)));
 
-		/*
-		 * since we are going to reuse the structure, we need to
-		 * refresh all the references between ph1 and ph2
-		 */
-		unbindph12(iph2);
-		remph2(iph2);
-		insph2(iph2);
-
-		/*
-		 * initialize iph2. note that we do not initialize pointers
-		 * here.
-		 */
-		initph2(iph2);
-
-		/* update status for re-use */
-		iph2->status = PHASE2ST_STATUS2;
-
-		/* start isakmp initiation by using ident exchange */
-		if (isakmp_post_acquire(iph2) < 0) {
-			plog(logp, LOCATION, iph2->dst,
-				"failed to begin ipsec sa "
-				"negotication.\n");
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
-			return;
-		}
-
-		return;
-		/*NOTREACHED*/
-	}
-
-	/* If not received SADB_EXPIRE, INITIATOR delete ph2handle. */
-	/* RESPONDER always delete ph2handle, keep silent.  RESPONDER doesn't
-	 * manage IPsec SA, so delete the list */
 	unbindph12(iph2);
 	remph2(iph2);
 	delph2(iph2);
+
 	return;
 }
 
@@ -1510,6 +1476,9 @@ isakmp_chkph1there(iph2)
 		/* give up phase 1 */
 		plog(logp, LOCATION, iph2->dst,
 			"gived up to wait isakmp-sa negotiation.\n");
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"delete phase 2 handler.\n"));
 
 		/* XXX send acquire to kernel as error */
 
