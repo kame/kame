@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.107 2002/06/08 06:57:11 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.108 2002/06/08 11:16:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -642,8 +642,8 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 
 	ip6->ip6_plen = htons((u_short)icmp6len);
 	nd_ns->nd_ns_cksum = 0;
-	nd_ns->nd_ns_cksum
-		= in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
+	nd_ns->nd_ns_cksum =
+	    in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
 
 #ifdef IPSEC
 	/* Don't lookup socket */
@@ -1153,7 +1153,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	nd_na->nd_na_flags_reserved = flags;
 	nd_na->nd_na_cksum = 0;
 	nd_na->nd_na_cksum =
-		in6_cksum(m, IPPROTO_ICMPV6, sizeof(struct ip6_hdr), icmp6len);
+	    in6_cksum(m, IPPROTO_ICMPV6, sizeof(struct ip6_hdr), icmp6len);
 
 #ifdef IPSEC
 	/* Don't lookup socket */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.80 2002/06/07 14:37:04 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.81 2002/06/08 11:16:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -700,7 +700,6 @@ int	in6_addr2zoneid __P((struct ifnet *, struct in6_addr *, u_int32_t *));
 int	in6_matchlen __P((struct in6_addr *, struct in6_addr *));
 int	in6_are_prefix_equal __P((struct in6_addr *, struct in6_addr *, int));
 void	in6_prefixlen2mask __P((struct in6_addr *, int));
-void	in6_prefix_remove_ifid __P((int, struct in6_ifaddr *));
 void	in6_purgeprefix __P((struct ifnet *));
 
 int	in6_is_addr_deprecated __P((struct sockaddr_in6 *));

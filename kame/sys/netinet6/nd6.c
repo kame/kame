@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.278 2002/06/08 06:57:10 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.279 2002/06/08 11:16:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -287,7 +287,7 @@ nd6_setmtu0(ifp, ndi)
 	 * Decreasing the interface MTU under IPV6 minimum MTU may cause
 	 * undesirable situation.  We thus notify the operator of the change
 	 * explicitly.  The check for omaxmtu is necessary to restrict the
-	 * log to the case of changing the MTU, not initializing it. 
+	 * log to the case of changing the MTU, not initializing it.
 	 */
 	if (omaxmtu >= IPV6_MMTU && ndi->maxmtu < IPV6_MMTU) {
 		log(LOG_NOTICE, "nd6_setmtu0: "

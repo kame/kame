@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.280 2002/06/08 07:32:05 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.281 2002/06/08 11:16:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -802,7 +802,7 @@ ip6_input(m)
 	     * already done through looking up the routing table.
 	     */
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-				&rt6_key(ip6_forward_rt.ro_rt)->sin6_addr)
+	    &rt6_key(ip6_forward_rt.ro_rt)->sin6_addr)
 #endif
 	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP) {
 		struct in6_ifaddr *ia6 =
