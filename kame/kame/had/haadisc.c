@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.5 2002/04/03 07:17:14 k-sugyou Exp $	*/
+/*	$KAME: haadisc.c,v 1.6 2002/11/01 10:10:08 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.5 2002/04/03 07:17:14 k-sugyou Exp $
+ * $Id: haadisc.c,v 1.6 2002/11/01 10:10:08 keiichi Exp $
  */
 
 /*
@@ -140,7 +140,7 @@ static void ra_input __P((int, struct nd_router_advert *, struct in6_pktinfo *,
 			  struct sockaddr_in6 *));
 void nd6_option_init __P((void *, int, union nd_opts *));
 int nd6_options __P((union nd_opts *));
-static void haad_request_input __P((int, struct ha_discov_req *,
+static void haad_request_input __P((int, struct dhaad_req *,
 				    struct in6_pktinfo *, struct sockaddr_in6 *,
 				    int));
 static void haad_reply_output __P((u_int16_t, struct sockaddr_in6 *,
@@ -360,9 +360,9 @@ sock_open()
 #ifdef ICMP6_FILTER
     ICMP6_FILTER_SETBLOCKALL(&filt);
     ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
-    ICMP6_FILTER_SETPASS(ICMP6_HADISCOV_REQUEST, &filt);
-#ifdef ICMP6_HADISCOV_REQUEST_KAME
-    ICMP6_FILTER_SETPASS(ICMP6_HADISCOV_REQUEST_KAME, &filt);
+    ICMP6_FILTER_SETPASS(ICMP6_DHAAD_REQUEST, &filt);
+#ifdef ICMP6_DHAAD_REQUEST_KAME
+    ICMP6_FILTER_SETPASS(ICMP6_DHAAD_REQUEST_KAME, &filt);
 #endif
     if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		   sizeof(filt)) < 0) {
@@ -554,9 +554,9 @@ icmp6_recv()
 	}
 	ra_input(len, (struct nd_router_advert *)icp, pi, &from);
 	break;
-    case ICMP6_HADISCOV_REQUEST:
-#ifdef ICMP6_HADISCOV_REQUEST_KAME
-    case ICMP6_HADISCOV_REQUEST_KAME:
+    case ICMP6_DHAAD_REQUEST:
+#ifdef ICMP6_DHAAD_REQUEST_KAME
+    case ICMP6_DHAAD_REQUEST_KAME:
 #endif
 	if (icp->icmp6_code) {
 		syslog(LOG_NOTICE,
@@ -568,7 +568,7 @@ icmp6_recv()
 		if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 		return;
 	}
-	if (len < sizeof(struct ha_discov_req)) {
+	if (len < sizeof(struct dhaad_req)) {
 		syslog(LOG_NOTICE,
 		       "<%s> HAAD Request from %s on %s does not have enough "
 		       "length (len = %d)",
@@ -578,7 +578,7 @@ icmp6_recv()
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf), len);
 		return;
 	}
-	haad_request_input(len, (struct ha_discov_req *)icp, pi, &from, icp->icmp6_type);
+	haad_request_input(len, (struct dhaad_req *)icp, pi, &from, icp->icmp6_type);
 	break;
     default:
 	/* should not occur */
@@ -883,7 +883,7 @@ nd6_options(ndopts)
 static void
 haad_request_input(len, haad_req, pi, src, type)
     int len;
-    struct ha_discov_req *haad_req;
+    struct dhaad_req *haad_req;
     struct in6_pktinfo *pi;
     struct sockaddr_in6 *src;
     int type;
@@ -892,7 +892,7 @@ haad_request_input(len, haad_req, pi, src, type)
     struct hagent_ifinfo *haif;
     int ifga_index = -1;
 
-    msgid = haad_req->discov_req_id;
+    msgid = haad_req->dhaad_req_id;
 
     /* determine home link by global address */
     haif = haif_findwithaddr(&pi->ipi6_addr, &ifga_index);
@@ -926,7 +926,7 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
 {
     struct cmsghdr *cm;
     struct in6_pktinfo *pi;
-    struct ha_discov_rep *hap;
+    struct dhaad_rep *hap;
     struct in6_addr *hagent_addr;
     struct in6_addr src = in6addr_any;
     int len, nhaa, count;
@@ -943,22 +943,22 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
 	    src = ((struct sockaddr_in6 *)(haif->haif_gavec[ifga_index].global->ifa_addr))->sin6_addr;
 
     /* create ICMPv6 message */
-    hap = (struct ha_discov_rep *)buf;
-    bzero(hap, sizeof (struct ha_discov_rep));
-#ifdef ICMP6_HADISCOV_REQUEST_KAME
-    hap->discov_rep_type = (type == ICMP6_HADISCOV_REQUEST_KAME ?
-				ICMP6_HADISCOV_REPLY_KAME :
-				ICMP6_HADISCOV_REPLY);
+    hap = (struct dhaad_rep *)buf;
+    bzero(hap, sizeof (struct dhaad_rep));
+#ifdef ICMP6_DHAAD_REQUEST_KAME
+    hap->dhaad_rep_type = (type == ICMP6_DHAAD_REQUEST_KAME ?
+				ICMP6_DHAAD_REPLY_KAME :
+				ICMP6_DHAAD_REPLY);
 #else
-    hap->discov_rep_type = ICMP6_HADISCOV_REPLY;
+    hap->dhaad_rep_type = ICMP6_DHAAD_REPLY;
 #endif
-    hap->discov_rep_code = 0;
-    hap->discov_rep_cksum = 0;
-    hap->discov_rep_id = msgid;
-    len = sizeof (struct ha_discov_rep);
+    hap->dhaad_rep_code = 0;
+    hap->dhaad_rep_cksum = 0;
+    hap->dhaad_rep_id = msgid;
+    len = sizeof (struct dhaad_rep);
     hagent_addr = (struct in6_addr *)(hap + 1);
     count = (IPV6_MMTU - sizeof (struct ip6_hdr) -
-	     sizeof (struct ha_discov_rep)) / sizeof (struct in6_addr);
+	     sizeof (struct dhaad_rep)) / sizeof (struct in6_addr);
     /* pick home agent global addresses for this home address */
      if ((nhaa = hal_pick(reqaddr, hagent_addr, &src, haif, count)) < 0) {
 	syslog(LOG_ERR, __FUNCTION__ "cannot fild any home agents in home agent list.\n");

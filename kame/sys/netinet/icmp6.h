@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.77 2002/10/17 13:54:14 jinmei Exp $	*/
+/*	$KAME: icmp6.h,v 1.78 2002/11/01 10:10:08 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -168,8 +168,8 @@ struct icmp6_hdr {
 #define IND_ADVERT			142	/* inverse neighbor advertisment */
 
 /* Folloing numbers are defined in the mobile-ip draft. */
-#define ICMP6_HADISCOV_REQUEST		150	/* XXX To be authorized */
-#define ICMP6_HADISCOV_REPLY		151	/* XXX To be authorized */
+#define ICMP6_DHAAD_REQUEST		150	/* XXX To be authorized */
+#define ICMP6_DHAAD_REPLY		151	/* XXX To be authorized */
 #define ICMP6_MOBILEPREFIX_SOLICIT	152	/* XXX To be authorized */
 #define ICMP6_MOBILEPREFIX_ADVERT	153	/* XXX To be authorized */
 
@@ -414,28 +414,28 @@ struct ind_neighbor_advert {	/* inverse neighbor advertisement */
 #define ind_na_cksum		ind_na_hdr.icmp6_cksum
 #define ind_na_flags_reserved	ind_na_hdr.icmp6_data32[0]
 
-struct ha_discov_req {          /* HA Address Discovery Request */
-	struct icmp6_hdr	ha_dreq_hdr;
+struct dhaad_req {		/* HA Address Discovery Request */
+	struct icmp6_hdr	dhaad_req_hdr;
 } __attribute__((__packed__));
 
-#define discov_req_type		ha_dreq_hdr.icmp6_type
-#define discov_req_code		ha_dreq_hdr.icmp6_code
-#define discov_req_cksum	ha_dreq_hdr.icmp6_cksum
-#define discov_req_id		ha_dreq_hdr.icmp6_data16[0]
-#define discov_req_reserved1	ha_dreq_hdr.icmp6_data16[1]
+#define dhaad_req_type		dhaad_req_hdr.icmp6_type
+#define dhaad_req_code		dhaad_req_hdr.icmp6_code
+#define dhaad_req_cksum		dhaad_req_hdr.icmp6_cksum
+#define dhaad_req_id		dhaad_req_hdr.icmp6_data16[0]
+#define dhaad_req_reserved1	dhaad_req_hdr.icmp6_data16[1]
 
-struct ha_discov_rep {		/* HA Address Discovery Reply */
-	struct icmp6_hdr	ha_drep_hdr;
-	u_int32_t		ha_drep_reserved2;
-	u_int32_t		ha_drep_reserved3;
+struct dhaad_rep {		/* HA Address Discovery Reply */
+	struct icmp6_hdr	dhaad_rep_hdr;
+	u_int32_t		dhaad_rep_reserved2;
+	u_int32_t		dhaad_rep_reserved3;
 	/* could be followed by Home Agent addresses */
 } __attribute__((__packed__));
 
-#define discov_rep_type		ha_drep_hdr.icmp6_type
-#define discov_rep_code		ha_drep_hdr.icmp6_code
-#define discov_rep_cksum	ha_drep_hdr.icmp6_cksum
-#define discov_rep_id		ha_drep_hdr.icmp6_data16[0]
-#define discov_rep_reserved1	ha_drep_hdr.icmp6_data16[1]
+#define dhaad_rep_type		dhaad_rep_hdr.icmp6_type
+#define dhaad_rep_code		dhaad_rep_hdr.icmp6_code
+#define dhaad_rep_cksum		dhaad_rep_hdr.icmp6_cksum
+#define dhaad_rep_id		dhaad_rep_hdr.icmp6_data16[0]
+#define dhaad_rep_reserved1	dhaad_rep_hdr.icmp6_data16[1]
 
 struct mobile_prefix_solicit {	/* Mobile Prefix Solicitation */
 	struct icmp6_hdr	mp_sol_hdr;

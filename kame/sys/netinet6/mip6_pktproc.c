@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.76 2002/11/01 03:31:30 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.77 2002/11/01 10:10:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1508,7 +1508,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		mip6log((LOG_INFO,
 			 "%s:%d: the peer addr is unspecified.\n",
 			 __FILE__, __LINE__));
-		mip6_icmp6_ha_discov_req_output(sc);
+		mip6_icmp6_dhaad_req_output(sc);
 		return (0);
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.148 2002/11/01 09:35:12 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.149 2002/11/01 10:10:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -372,7 +372,7 @@ mip6_home_registration(sc)
 						 "%s:%d: "
 						 "no home agent.  start ha discovery.\n",
 						 __FILE__, __LINE__));
-					mip6_icmp6_ha_discov_req_output(sc);
+					mip6_icmp6_dhaad_req_output(sc);
 					haaddr = &sin6_any;
 				} else {
 					if ((mha = msha->msha_mha) == NULL) {
@@ -720,7 +720,7 @@ mip6_bu_send_bu(mbu)
 			    "%s:%d: "
 			    "no home agent.  start DHAAD.\n",
 			    __FILE__, __LINE__));
-			error = mip6_icmp6_ha_discov_req_output(mbu->mbu_hif);
+			error = mip6_icmp6_dhaad_req_output(mbu->mbu_hif);
 			if (error) {
 				mip6log((LOG_ERR,
 				    "%s:%d: failed to send DHAAD request.\n",

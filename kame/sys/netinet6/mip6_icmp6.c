@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.56 2002/11/01 03:31:30 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.57 2002/11/01 10:10:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -101,7 +101,7 @@
 extern struct mip6_bc_list mip6_bc_list;
 extern struct mip6_subnet_list mip6_subnet_list;
 
-u_int16_t mip6_hadiscovid = 0;
+u_int16_t mip6_dhaad_id = 0;
 
 static const struct sockaddr_in6 haanyaddr_ifid64 = {
 	sizeof(struct sockaddr_in6),	/* sin6_len */
@@ -125,8 +125,8 @@ static const struct sockaddr_in6 haanyaddr_ifidnn = {
 static void mip6_icmp6_find_addr __P((struct mbuf *, int, int,
 				      struct sockaddr_in6 *,
 				      struct sockaddr_in6 *));
-static int mip6_icmp6_ha_discov_rep_input __P((struct mbuf *, int, int));
-static int mip6_ha_discov_ha_list_insert __P((struct hif_softc *,
+static int mip6_icmp6_dhaad_rep_input __P((struct mbuf *, int, int));
+static int mip6_dhaad_ha_list_insert __P((struct hif_softc *,
 					      struct mip6_ha *));
 static int mip6_icmp6_create_haanyaddr __P((struct sockaddr_in6 *,
 					    struct mip6_prefix *));
@@ -174,10 +174,10 @@ mip6_icmp6_input(m, off, icmp6len)
 		}
 		break;
 
-	case ICMP6_HADISCOV_REPLY:
+	case ICMP6_DHAAD_REPLY:
 		if (!MIP6_IS_MN)
 			break;
-		error = mip6_icmp6_ha_discov_rep_input(m, off, icmp6len);
+		error = mip6_icmp6_dhaad_rep_input(m, off, icmp6len);
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s:%d: failed to process a DHAAD reply.\n",
@@ -545,14 +545,14 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 }
 
 static int
-mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
+mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	struct mbuf *m;
 	int off;
 	int icmp6len;
 {
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *sin6src, *sin6dst;
-	struct ha_discov_rep *hdrep;
+	struct dhaad_rep *hdrep;
 	u_int16_t hdrep_id;
 	struct mip6_ha *mha, *mha_prefered = NULL;
 	struct in6_addr *haaddrs, *haaddrptr;
@@ -568,9 +568,9 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	}
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
-	hdrep = (struct ha_discov_rep *)((caddr_t)ip6 + off);
+	hdrep = (struct dhaad_rep *)((caddr_t)ip6 + off);
 #else
-	IP6_EXTHDR_GET(hdrep, struct ha_discov_rep *, m, off, icmp6len);
+	IP6_EXTHDR_GET(hdrep, struct dhaad_rep *, m, off, icmp6len);
 	if (hdrep == NULL) {
 		mip6log((LOG_ERR,
 			 "%s:%d: failed to EXTHDR_GET.\n",
@@ -581,18 +581,18 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	haaddrs = (struct in6_addr *)(hdrep + 1);
 
 	/* sainty check. */
-	if (hdrep->discov_rep_code != 0) {
+	if (hdrep->dhaad_rep_code != 0) {
 		m_freem(m);
 		return (EINVAL);
 	}
 
 	/* find hif that matches this receiving hadiscovid of DHAAD reply. */
-	hdrep_id = hdrep->discov_rep_id;
+	hdrep_id = hdrep->dhaad_rep_id;
 	hdrep_id = ntohs(hdrep_id);
 	for (sc = TAILQ_FIRST(&hif_softc_list);
 	     sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		if (sc->hif_hadiscovid == hdrep_id)
+		if (sc->hif_dhaad_id == hdrep_id)
 			break;
 	}
 	if (sc == NULL) {
@@ -603,13 +603,13 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	}
 
 	/* reset rate limitation factor. */
-	sc->hif_hadiscov_count = 0;
+	sc->hif_dhaad_count = 0;
 
 	/*
 	 * check if the home agent list contains sending the home
 	 * agent's own address.
 	 */
-	hacount = (icmp6len - sizeof(struct ha_discov_rep))
+	hacount = (icmp6len - sizeof(struct dhaad_rep))
 		/ sizeof(struct in6_addr);
 	haaddrptr = haaddrs;
 	for (i = 0; i < hacount; i++) {
@@ -681,7 +681,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 				return (ENOMEM);
 			}
 			mip6_ha_list_insert(&mip6_ha_list, mha);
-			mip6_ha_discov_ha_list_insert(sc, mha);
+			mip6_dhaad_ha_list_insert(sc, mha);
 		}
 		mha_prefered = mha;
 	}
@@ -729,7 +729,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 				return (ENOMEM);
 			}
 			mip6_ha_list_insert(&mip6_ha_list, mha);
-			mip6_ha_discov_ha_list_insert(sc, mha);
+			mip6_dhaad_ha_list_insert(sc, mha);
 		}
 		if (mha_prefered == NULL) {
 			/*
@@ -774,7 +774,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 }
 
 static int
-mip6_ha_discov_ha_list_insert(sc, mha)
+mip6_dhaad_ha_list_insert(sc, mha)
 	struct hif_softc *sc;
 	struct mip6_ha *mha;
 {
@@ -815,7 +815,7 @@ mip6_ha_discov_ha_list_insert(sc, mha)
 }
 
 int
-mip6_icmp6_ha_discov_req_output(sc)
+mip6_icmp6_dhaad_req_output(sc)
 	struct hif_softc *sc;
 {
 	struct sockaddr_in6 haanyaddr;
@@ -824,7 +824,7 @@ mip6_icmp6_ha_discov_req_output(sc)
 	struct mip6_prefix *mpfx;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
-	struct ha_discov_req *hdreq;
+	struct dhaad_req *hdreq;
 	u_int32_t icmp6len, off;
 	int error;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -839,8 +839,8 @@ mip6_icmp6_ha_discov_req_output(sc)
 	}
 
 	/* rate limitation. */
-	if (sc->hif_hadiscov_count != 0) {
-		if (sc->hif_hadiscov_lastsent + (1 << sc->hif_hadiscov_count)
+	if (sc->hif_dhaad_count != 0) {
+		if (sc->hif_dhaad_lastsent + (1 << sc->hif_dhaad_count)
 		   > time_second)
 			return (0);
 	}
@@ -858,7 +858,7 @@ mip6_icmp6_ha_discov_req_output(sc)
 		return (EINVAL);
 
 	/* allocate the buffer for the ip packet and DHAAD request. */
-	icmp6len = sizeof(struct ha_discov_req);
+	icmp6len = sizeof(struct dhaad_req);
 	m = mip6_create_ip6hdr(&hif_coa, &haanyaddr,
 			       IPPROTO_ICMPV6, icmp6len);
 	if (m == NULL) {
@@ -870,18 +870,18 @@ mip6_icmp6_ha_discov_req_output(sc)
 		return (ENOBUFS);
 	}
 
-	sc->hif_hadiscovid = mip6_hadiscovid++;
+	sc->hif_dhaad_id = mip6_dhaad_id++;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	hdreq = (struct ha_discov_req *)(ip6 + 1);
-	bzero((caddr_t)hdreq, sizeof(struct ha_discov_req));
-	hdreq->discov_req_type = ICMP6_HADISCOV_REQUEST;
-	hdreq->discov_req_code = 0;
-	hdreq->discov_req_id = htons(sc->hif_hadiscovid);
+	hdreq = (struct dhaad_req *)(ip6 + 1);
+	bzero((caddr_t)hdreq, sizeof(struct dhaad_req));
+	hdreq->dhaad_req_type = ICMP6_DHAAD_REQUEST;
+	hdreq->dhaad_req_code = 0;
+	hdreq->dhaad_req_id = htons(sc->hif_dhaad_id);
 
 	/* calculate checksum for this DHAAD request packet. */
 	off = sizeof(struct ip6_hdr);
-	hdreq->discov_req_cksum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len);
+	hdreq->dhaad_req_cksum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len);
 
 	/* send the DHAAD request packet to the home agent anycast address. */
 	if (!ip6_setpktaddrs(m, &hif_coa, &haanyaddr)) {
@@ -898,14 +898,14 @@ mip6_icmp6_ha_discov_req_output(sc)
 	}
 
 	/* update rate limitation factor. */
-	sc->hif_hadiscov_lastsent = time_second;
-	if (sc->hif_hadiscov_count++ > MIP6_DHAAD_RETRIES) {
+	sc->hif_dhaad_lastsent = time_second;
+	if (sc->hif_dhaad_count++ > MIP6_DHAAD_RETRIES) {
 		/*
 		 * XXX the spec says that the number of retires for
 		 * DHAAD request is restricted to DHAAD_RETRIES(=3).
 		 * But, we continue retrying until we receive a reply.
 		 */
-		sc->hif_hadiscov_count = MIP6_DHAAD_RETRIES;
+		sc->hif_dhaad_count = MIP6_DHAAD_RETRIES;
 	}
 
 	return (0);
