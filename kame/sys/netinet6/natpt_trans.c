@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.80 2002/03/07 16:27:31 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.81 2002/03/08 04:10:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -818,6 +818,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	struct mbuf	*m6;
 	struct ip	*ip4 = mtod(cv4->m, struct ip *);
 	struct ip6_hdr	*ip6;
+	struct ip6_frag	*frag6;
 	struct icmp	*icmp4;
 	struct icmp6_hdr	*icmp6;
 	caddr_t		icmp4end;
@@ -837,7 +838,8 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	cv6.flags  = cv4->flags;
 
 	ip6->ip6_nxt  = IPPROTO_ICMPV6;
-	natpt_composeIPv6Hdr(cv4, pad, ip6);
+	if ((frag6 = natpt_composeIPv6Hdr(cv4, pad, ip6)) != NULL)
+		cv6.pyld.caddr += sizeof(struct ip6_frag);
 	ip6->ip6_src.s6_addr32[0] = natpt_prefix.s6_addr32[0];
 	ip6->ip6_src.s6_addr32[1] = natpt_prefix.s6_addr32[1];
 	ip6->ip6_src.s6_addr32[2] = natpt_prefix.s6_addr32[2];
@@ -888,10 +890,10 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	}
 
 	if (icmp6len != 0) {
-		ip6->ip6_plen = ntohs(sizeof(struct icmp6_hdr) + icmp6len);
+		ip6->ip6_plen = sizeof(struct icmp6_hdr) + icmp6len;
 		cv6.m->m_pkthdr.len
 			= cv6.m->m_len
-			= sizeof(struct ip6_hdr) + htons(ip6->ip6_plen);
+			= sizeof(struct ip6_hdr) + ip6->ip6_plen;
 	}
 
 	icmp4 = cv4->pyld.icmp4;
@@ -899,10 +901,22 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	icmp6->icmp6_id  = icmp4->icmp_id;
 	icmp6->icmp6_seq = icmp4->icmp_seq;
 
-	icmp6->icmp6_cksum = 0;
-	icmp6->icmp6_cksum = in6_cksum(cv6.m, IPPROTO_ICMPV6,
-				       sizeof(struct ip6_hdr), ntohs(ip6->ip6_plen));
+	{
+		u_int32_t	off = sizeof(struct ip6_hdr);
+		u_int32_t	len = ip6->ip6_plen;
 
+		if (frag6) {
+			cv6.m->m_len += sizeof(struct ip6_frag);
+			cv6.m->m_pkthdr.len += sizeof(struct ip6_frag);
+			ip6->ip6_plen += sizeof(struct ip6_frag);
+
+			off += sizeof(struct ip6_frag);
+		}
+		icmp6->icmp6_cksum = 0;
+		icmp6->icmp6_cksum = in6_cksum(cv6.m, IPPROTO_ICMPV6, off, len);
+	}
+
+	HTONS(ip6->ip6_plen);
 	return (m6);
 }
 
@@ -2435,7 +2449,12 @@ natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 	ip6->ip6_dst  = pad->in6src;
 	ip6->ip6_src  = pad->in6dst;
 
-	if (isFragment(cv4) || needFragment(cv4)) {
+	/*
+	 * RFC2765 3.1 said:
+	 * ... IPv4 packets with DF not set will always result in a
+	 * fragment header being added to the packet ...
+	 */
+	if (isFragment(cv4) || needFragment(cv4) || isNoDF(cv4)) {
 		frg6 = (struct ip6_frag *)(caddr_t)(ip6 + 1);
 		frg6->ip6f_nxt = ip6->ip6_nxt;
 		frg6->ip6f_reserved = 0;
@@ -2450,6 +2469,9 @@ natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 		if (!needFragment(cv4)
 		    && ((ip4->ip_off & IP_OFFMASK) != 0)
 		    && ((ip4->ip_off & IP_MF) == 0))
+			ip6->ip6_plen = ip4->ip_len - sizeof(struct ip) +
+				sizeof(struct ip6_frag);
+		else if (isNoDF(cv4))
 			ip6->ip6_plen = ip4->ip_len - sizeof(struct ip) +
 				sizeof(struct ip6_frag);
 		else

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.43 2002/02/21 19:06:54 sumikawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.44 2002/03/08 04:10:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -483,6 +483,8 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 		cv4->flags |= NEED_FRAGMENT;
 	if ((ip->ip_off & IP_DF) != 0)
 		cv4->flags |= SET_DF;
+	else
+		cv4->flags |= NO_DF;
 
 	return (ip->ip_p);
 }
