@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.57 2002/09/06 05:11:17 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.58 2002/09/06 06:21:07 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -464,10 +464,10 @@ mld6_input(m, off)
 #endif
 
 #ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, MLD_MINLEN,);
+	IP6_EXTHDR_CHECK(m, off, sizeof(*mldh),);
 	mldh = (struct mld_hdr *)(mtod(m, caddr_t) + off);
 #else
-	IP6_EXTHDR_GET(mldh, struct mld_hdr *, m, off, MLD_MINLEN);
+	IP6_EXTHDR_GET(mldh, struct mld_hdr *, m, off, sizeof(*mldh));
 	if (mldh == NULL) {
 		icmp6stat.icp6s_tooshort++;
 		return;
@@ -966,8 +966,7 @@ mld6_sendpkt(in6m, type, dst)
 	mldh->mld_addr = in6m->in6m_sa.sin6_addr;
 	in6_clearscope(&mldh->mld_addr); /* XXX */
 
-	mldh->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6,
-				    sizeof(struct ip6_hdr),
+	mldh->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6, sizeof(struct ip6_hdr),
 				    MLD_MINLEN);
 
 	/* construct multicast option */
