@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.2 2000/04/26 08:20:51 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.3 2000/04/26 08:35:20 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -20,35 +20,6 @@ identifier fqdn "foo.kame.net";
 # "log" specifies logging level.  It is followed by either "info", "notify",
 # "debug" or "debug2".
 log notify;
-
-# "padding" defines some parameter of padding.  You should not touch these.
-padding {
-	maximum_length 20;	# maximum padding length.
-	randomize off;		# enable randomize length.
-	restrict_check off;	# enable restrict check.
-	exclusive_tail off;	# extract last one octet.
-}
-
-# if no listen directive is specified, racoon will listen to all
-# available interface addresses.
-listen {
-	#isakmp ::1 [7000];
-	#isakmp 203.178.141.194 ;
-	#admin [7002];		# administrative's port by kmpstat.
-	#strict_address; 	# required all addresses must be bound.
-}
-
-# Specification of default various timer.
-timer {
-	# These value can be changed per remote node.
-	counter 5;		# maximum trying count to send.
-	interval 20 sec;	# maximum interval to resend.
-	persend 1;		# the number of packets per a send.
-
-	# timer for waiting to complete each phase.
-	phase1 30 sec;
-	phase2 15 sec;
-}
 
 remote anonymous
 {

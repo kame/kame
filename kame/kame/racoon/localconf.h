@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.5 2000/03/13 10:28:35 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.6 2000/04/26 08:35:19 sakane Exp $ */
 
 /* local configuration */
 
@@ -47,6 +47,10 @@
 #define LC_IDENTTYPE_SECRET	5
 #define LC_IDENTTYPE_MAX	6
 
+#define LC_DEFAULT_PAD_MAXSIZE		20
+#define LC_DEFAULT_PAD_RANDOM		FALSE
+#define LC_DEFAULT_PAD_STRICT		FALSE
+#define LC_DEFAULT_PAD_EXCLTAIL		FALSE
 #define LC_DEFAULT_RETRY_COUNTER	5
 #define LC_DEFAULT_RETRY_INTERVAL	20
 #define LC_DEFAULT_COUNT_PERSEND	1
