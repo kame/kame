@@ -1,5 +1,9 @@
 .if exists(/usr/pkg/lib/libcrypto.a) || exists(/usr/pkg/lib/libcrypto.so.1.0) || exists(/usr/local/ssl/lib/libcrypto.a)
+.if exists(/usr/local/ssl/bin/openssl)
+OPENSSLVER!=	/usr/local/ssl/bin/openssl version
+.else
 OPENSSLVER!=	openssl version
+.endif
 .if defined(OPENSSLVER) && ${OPENSSLVER} == "OpenSSL 0.9.4 09 Aug 1999"
 SUBDIR+=racoon kmpstat eaytest
 .else
