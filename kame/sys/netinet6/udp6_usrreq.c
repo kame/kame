@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.48 2000/04/18 03:48:32 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.49 2000/04/18 04:07:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -574,7 +574,7 @@ udp6_ctlinput(cmd, sa, d)
 	}
 }
 
-#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3) && !(defined(__bsdi__) && _BSDI_VERSION < 199802)
 int
 udp6_output(in6p, m, addr6, control)
 	register struct in6pcb *in6p;
