@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.737 2000/03/30 17:07:33 sumikawa Exp $
+$Id: CHANGELOG,v 1.738 2000/04/01 13:49:59 itojun Exp $
 
 <200003>
+Sat Apr  1 22:47:12 JST 2000  itojun@iijlab.net
+	* sys/sys/socket.h (all platforms): avoid namespace pollution
+	  for CMSG_ALIGN().
+
 Thu Mar 30 14:10:35 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4: turn off gif and faith temporally.
 	  basic catching up was done. I checked ping[46]/telnet6/ssh[46]
