@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.25 2000/01/18 09:54:49 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.26 2000/04/05 09:10:56 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -342,6 +342,15 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	int error = -1;
 	struct isakmp_pl_n *n;
 	int spisiz = 0;		/* see below */
+#ifdef YIPS_DEBUG
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+	char s1[NI_MAXSERV], s2[NI_MAXSERV];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -371,6 +380,15 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	/* copy remote address */
 	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
 		return -1;
+
+	YIPSDEBUG(DEBUG_NOTIFY,
+		getnameinfo(iph1->local, iph1->local->sa_len,
+		    h1, sizeof(h1), s1, sizeof(s1), niflags);
+		getnameinfo(iph1->remote, iph1->remote->sa_len,
+		    h2, sizeof(h2), s2, sizeof(s2), niflags);
+		plog(logp, LOCATION, NULL,
+			"new initiator iph1 %p: local %s %s remote %s %s\n",
+			iph1, h1, s1, h2, s2));
 
 	tlen = sizeof(*n) + spisiz;
 	if (data)
@@ -532,6 +550,15 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	char *p;
 	int tlen;
 	int error = -1;
+#ifdef YIPS_DEBUG
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+	char s1[NI_MAXSERV], s2[NI_MAXSERV];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -574,6 +601,15 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		/* initialized total buffer length */
 		tlen = 0;
 	}
+
+	YIPSDEBUG(DEBUG_NOTIFY,
+		getnameinfo(iph2->src, iph2->src->sa_len,
+		    h1, sizeof(h1), s1, sizeof(s1), niflags);
+		getnameinfo(iph2->dst, iph2->dst->sa_len,
+		    h2, sizeof(h2), s2, sizeof(s2), niflags);
+		plog(logp, LOCATION, NULL,
+			"new initiator iph2 %p: src %s %s dst %s %s iph1 %p\n",
+			iph2, h1, s1, h2, s2, iph1));
 
 	insph2(iph2);
 	bindph12(iph1, iph2);

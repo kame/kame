@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.24 2000/03/24 16:32:02 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.25 2000/04/05 09:10:56 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -1296,6 +1296,15 @@ pk_recvacquire(mhp)
 	struct sadb_msg *msg;
 	struct policyindex spidxtmp, *spidx;
 	struct ph2handle *iph2;
+#ifdef YIPS_DEBUG
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+	char s1[NI_MAXSERV], s2[NI_MAXSERV];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+#endif
 
 	/* ignore this message becauase of local test mode. */
 	if (f_local)
@@ -1394,6 +1403,15 @@ pk_recvacquire(mhp)
 	iph2->src = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]));
 	if (iph2->src == NULL)
 		return -1;
+
+	YIPSDEBUG(DEBUG_NOTIFY,
+		getnameinfo(iph2->src, iph2->src->sa_len,
+		    h1, sizeof(h1), s1, sizeof(s1), niflags);
+		getnameinfo(iph2->dst, iph2->dst->sa_len,
+		    h2, sizeof(h2), s2, sizeof(s2), niflags);
+		plog(logp, LOCATION, NULL,
+			"new acquire iph2 %p: src %s %s dst %s %s\n",
+			iph2, h1, s1, h2, s2));
 
 	insph2(iph2);
 

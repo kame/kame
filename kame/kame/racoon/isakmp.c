@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.52 2000/03/22 20:46:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.53 2000/04/05 09:10:56 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -582,6 +582,15 @@ isakmp_ph1begin_i(rmconf, remote)
 {
 	struct ph1handle *iph1;
 	struct etypes *e;
+#ifdef YIPS_DEBUG
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+	char s1[NI_MAXSERV], s2[NI_MAXSERV];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+#endif
 
 	/* get new entry to isakmp status table. */
 	iph1 = newph1();
@@ -598,6 +607,15 @@ isakmp_ph1begin_i(rmconf, remote)
 	/* XXX copy remote address */
 	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
 		return -1;
+
+	YIPSDEBUG(DEBUG_NOTIFY,
+		getnameinfo(iph1->local, iph1->local->sa_len,
+		    h1, sizeof(h1), s1, sizeof(s1), niflags);
+		getnameinfo(iph1->remote, iph1->remote->sa_len,
+		    h2, sizeof(h2), s2, sizeof(s2), niflags);
+		plog(logp, LOCATION, NULL,
+			"new initiator iph1 %p: local %s %s remote %s %s\n",
+			iph1, h1, s1, h2, s2));
 
 	(void)insph1(iph1);
 
@@ -642,6 +660,15 @@ isakmp_ph1begin_r(msg, remote, etype)
 	struct remoteconf *rmconf;
 	struct ph1handle *iph1;
 	struct etypes *etypeok;
+#ifdef YIPS_DEBUG
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+	char s1[NI_MAXSERV], s2[NI_MAXSERV];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+#endif
 
 	/* look for my configuration */
 	rmconf = getrmconf(remote);
@@ -677,6 +704,15 @@ isakmp_ph1begin_r(msg, remote, etype)
 	/* XXX copy remote address */
 	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
 		return -1;
+
+	YIPSDEBUG(DEBUG_NOTIFY,
+		getnameinfo(iph1->local, iph1->local->sa_len,
+		    h1, sizeof(h1), s1, sizeof(s1), niflags);
+		getnameinfo(iph1->remote, iph1->remote->sa_len,
+		    h2, sizeof(h2), s2, sizeof(s2), niflags);
+		plog(logp, LOCATION, NULL,
+			"new responder iph1 %p: local %s %s remote %s %s\n",
+			iph1, h1, s1, h2, s2));
 
 	(void)insph1(iph1);
 
@@ -722,6 +758,15 @@ isakmp_ph2begin_r(iph1, msg)
 	struct isakmp *isakmp = (struct isakmp *)msg->v;
 	struct ph2handle *iph2 = 0;
 	int error;
+#ifdef YIPS_DEBUG
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+	char s1[NI_MAXSERV], s2[NI_MAXSERV];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+#endif
 
 	iph2 = newph2();
 	if (iph2 == NULL)
@@ -748,6 +793,15 @@ isakmp_ph2begin_r(iph1, msg)
 		delph2(iph2);
 		return -1;
 	}
+
+	YIPSDEBUG(DEBUG_NOTIFY,
+		getnameinfo(iph2->src, iph2->src->sa_len,
+		    h1, sizeof(h1), s1, sizeof(s1), niflags);
+		getnameinfo(iph2->dst, iph2->dst->sa_len,
+		    h2, sizeof(h2), s2, sizeof(s2), niflags);
+		plog(logp, LOCATION, NULL,
+			"new responder iph2 %p: src %s %s dst %s %s iph1 %p\n",
+			iph2, h1, s1, h2, s2, iph1));
 
 	/* add new entry to isakmp status table */
 	insph2(iph2);
