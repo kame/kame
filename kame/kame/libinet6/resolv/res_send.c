@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.17 2001/09/05 08:57:46 jinmei Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.18 2001/09/05 12:45:11 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -661,7 +661,7 @@ read_len:
 			 * connecting?
 			 */
 			if (!(_res.options & RES_INSECURE1) &&
-			    _res.nscount == 1 || (try == 0 && ns == 0)) {
+			    (_res.nscount == 1 || (try == 0 && ns == 0))) {
 				/*
 				 * Connect only if we are sure we won't
 				 * receive a response from another server.
