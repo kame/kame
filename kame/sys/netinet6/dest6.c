@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.42 2002/06/09 14:43:57 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.43 2002/06/28 14:11:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,7 +70,7 @@
 #endif /* MIP6 */
 
 #ifdef MIP6
-static int	dest6_send_bm __P((struct sockaddr_in6 *,
+static int	dest6_send_be __P((struct sockaddr_in6 *,
 				   struct sockaddr_in6 *,
 				   struct sockaddr_in6 *));
 #endif /* MIP6 */
@@ -138,7 +138,7 @@ dest6_input(mp, offp, proto)
 			optlen = *(opt + 1) + 2;
 			break;
 		case IP6OPT_HOME_ADDRESS:
-			/* HA option must appear only once */
+			/* HAO must appear only once */
 			n = ip6_addaux(m);
 			if (!n) {
 				/* not enough core */
@@ -202,7 +202,7 @@ dest6_input(mp, offp, proto)
 			 * cache nor ESP header. we have no clue to
 			 * beleive this HAO is a correct one.
 			 */
-			(void)dest6_send_bm(dst_sa, src_sa, &home_sa);
+			(void)dest6_send_be(dst_sa, src_sa, &home_sa);
 			goto bad;
 		verified:
 #endif /* MIP6 */
@@ -274,10 +274,10 @@ dest6_input(mp, offp, proto)
 
 #ifdef MIP6
 /*
- * send a binding missing message.
+ * send a binding error message.
  */
 static int
-dest6_send_bm(src, dst, home)
+dest6_send_be(src, dst, home)
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
 	struct sockaddr_in6 *home;
