@@ -14,8 +14,8 @@ DPADD+=	${LIBIPSEC}
 BINOWN= root
 BINMODE=4555
 
-SRCS=	traceroute.c savestr.c ifaddrlist.c 
-SRCS+= version.c as.c
+SRCS=	traceroute.c ifaddrlist.c 
+SRCS+=	version.c as.c
 
 AWKS=	median.awk mean.awk 
 

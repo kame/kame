@@ -78,7 +78,6 @@ struct rtentry;
 #endif
 
 #include "ifaddrlist.h"
-#include "savestr.h"
 
 
 /* Not all systems have IFF_LOOPBACK */
@@ -137,7 +136,7 @@ ifaddrlist(struct ifaddrlist **ipaddrp, char *errbuf, int buflen)
 				continue;
 
 		al->addr = sin->sin_addr.s_addr;
-		al->device = savestr(ifa->ifa_name);
+		al->device = strdup(ifa->ifa_name);
 		++al;
 		++nipaddr;
 	}
@@ -222,7 +221,7 @@ ifaddrlist(struct ifaddrlist **ipaddrp, char *errbuf, int buflen)
 		device[sizeof(device) - 1] = '\0';
 
 		al->addr = sin->sin_addr.s_addr;
-		al->device = savestr(device);
+		al->device = strdup(device);
 		++al;
 		++nipaddr;
 	}
