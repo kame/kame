@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.290 2001/12/20 09:19:39 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.291 2001/12/20 09:27:29 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -25,7 +25,9 @@ Table of Contents
 	1.4.2 Stateless address autoconfiguration on hosts
 	1.4.3 DHCPv6
 	1.5 Generic tunnel interface
-	1.6 Source Address Selection
+	1.6 Address Selection
+	1.6.1 Source Address Selection
+	1.6.2 Destination Address Ordering
 	1.7 Jumbo Payload
 	1.8 Loop prevention in header processing
 	1.9 ICMPv6
@@ -657,7 +659,9 @@ If you would like to configure an IPv4-in-IPv6 tunnel with gif interface,
 read gif(4) carefully.  You may need to remove IPv6 link-local address
 automatically assigned to the gif interface.
 
-1.6 Source Address Selection
+1.6 Address Selection
+
+1.6.1 Source Address Selection
 
 The KAME kernel chooses the source address for an outgoing packet
 sent from a user application as follows:
@@ -727,6 +731,16 @@ the privacy, there is a system-wide sysctl(3) variable
 "net.inet6.ip6.prefer_tempaddr".  When the variable is set to
 non-zero, the kernel will rather prefer temporary addresses.  The
 default value of this variable is 0.
+
+1.6.2 Destination Address Ordering
+
+KAME's getaddrinfo(3) supports the destination address ordering
+algorithm described in draft-ietf-ipngwg-default-addr-select-xx.txt .
+Getaddrinfo(3) needs to know the source address for each destination
+address and policy entries (described in the previous section) for the
+source and destination addresses.  To get the source address, the
+library function opens a UDP socket and tries to connect(2) for the
+destination.  To get the policy entry, the function issues sysctl(3).
 
 1.7 Jumbo Payload
 
