@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.56 2000/04/04 08:47:34 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.57 2000/04/07 13:25:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -749,7 +749,7 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 #ifdef INET6
 	case AF_INET6:
 	{
-		struct ip6_hdr *ip6_hdr;
+		struct ip6_hdr *ip6;
 		struct ip6_hdr ip6buf;
 
 		/* sanity check 1 for minimum ip header length */
@@ -766,15 +766,15 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 		 * get IPv6 header packet.  usually the mbuf is contiguous
 		 * and we need no copies.
 		 */
-		if (m->m_len >= sizeof(*ip6_hdr))
-			ip6_hdr = mtod(m, struct ip6_hdr *);
+		if (m->m_len >= sizeof(*ip6))
+			ip6 = mtod(m, struct ip6_hdr *);
 		else {
 			m_copydata(m, 0, sizeof(ip6buf), (caddr_t)&ip6buf);
-			ip6_hdr = &ip6buf;
+			ip6 = &ip6buf;
 		}
 
 		/* some more checks on IPv4 header. */
-		if ((ip6_hdr->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
+		if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
 			KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
 				printf("ipsec_setspidx_mbuf: "
 					"wrong ip version on packet "
@@ -782,10 +782,10 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 			goto bad;
 		}
 
-		bcopy(&ip6_hdr->ip6_src, _INADDRBYSA(&spidx->src),
-			sizeof(ip6_hdr->ip6_src));
-		bcopy(&ip6_hdr->ip6_dst, _INADDRBYSA(&spidx->dst),
-			sizeof(ip6_hdr->ip6_dst));
+		bcopy(&ip6->ip6_src, _INADDRBYSA(&spidx->src),
+			sizeof(ip6->ip6_src));
+		bcopy(&ip6->ip6_dst, _INADDRBYSA(&spidx->dst),
+			sizeof(ip6->ip6_dst));
 
 		ipsec6_get_ulp(m, spidx);
 		break;
@@ -1956,12 +1956,18 @@ ipsec4_encapsulate(m, sav)
 	}
 #endif
 
+	if (m->m_len < sizeof(*ip))
+		panic("ipsec4_encapsulate: assumption failed (first mbuf length)");
+
 	ip = mtod(m, struct ip *);
 #ifdef _IP_VHL
 	hlen = _IP_VHL_HL(ip->ip_vhl) << 2;
 #else
 	hlen = ip->ip_hl << 2;
 #endif
+
+	if (m->m_len != hlen)
+		panic("ipsec4_encapsulate: assumption failed (first mbuf length)");
 
 	/* generate header checksum */
 	ip->ip_sum = 0;
@@ -1980,8 +1986,6 @@ ipsec4_encapsulate(m, sav)
 	 * grow the mbuf to accomodate the new IPv4 header.
 	 * NOTE: IPv4 options will never be copied.
 	 */
-	if (m->m_len != hlen)
-		panic("ipsec4_encapsulate: assumption failed (first mbuf length)");
 	if (M_LEADINGSPACE(m->m_next) < hlen) {
 		struct mbuf *n;
 		MGET(n, M_DONTWAIT, MT_DATA);
