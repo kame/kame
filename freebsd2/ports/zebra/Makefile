@@ -3,7 +3,7 @@
 # Date created:		So  31 Mai 1998 11:00:30 CEST
 # Whom:			Andreas Klemm <andreas@klemm.gtn.com>
 #
-# $Id: Makefile,v 1.8 2000/03/12 02:13:56 itojun Exp $
+# $Id: Makefile,v 1.9 2000/04/02 13:35:04 itojun Exp $
 #
 
 DISTNAME=	zebra-0.85
@@ -21,8 +21,8 @@ post-install:
 	@${ECHO} "===>     installing zebra startup file..."
 	@${SED} -e "s=!!PREFIX!!=${PREFIX}=" \
 		< ${FILESDIR}/zebra.sh  \
-		> ${PREFIX}/etc/rc.d/zebra.sh 
-	@chmod 555 ${PREFIX}/etc/rc.d/zebra.sh
+		> ${PREFIX}/etc/rc.d/zebra.sh.sample
+	@chmod 555 ${PREFIX}/etc/rc.d/zebra.sh.sample
 	@${ECHO} "===>     done."
 
 .include <bsd.port.mk>

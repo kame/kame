@@ -4,7 +4,7 @@ sbin/ospf6d
 sbin/ripd
 sbin/ripngd
 sbin/zebra
-etc/rc.d/zebra.sh
+etc/rc.d/zebra.sh.sample
 etc/zebra/bgpd.conf.sample
 etc/zebra/bgpd.conf.sample2
 etc/zebra/README.mbgp
