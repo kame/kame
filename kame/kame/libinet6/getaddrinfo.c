@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.161 2004/04/09 16:31:25 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.162 2004/04/11 06:50:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -506,7 +506,7 @@ getaddrinfo(hostname, servname, hints, res)
 	/*
 	 * post-2553: AI_ALL and AI_V4MAPPED are effective only against
 	 * AF_INET6 query.  They need to be ignored if specified in other
-	 * occassions.
+	 * occasions.
 	 */
 	switch (pai->ai_flags & (AI_ALL | AI_V4MAPPED)) {
 	case AI_V4MAPPED:
