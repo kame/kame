@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.114 2000/12/15 13:43:55 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.115 2000/12/15 15:25:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2109,7 +2109,6 @@ isakmp_printpacket(msg, from, my, decoded)
 		return;
 
 #ifdef YIPS_DEBUG
-doit:
 	plog(LLV_DEBUG, LOCATION, NULL, "begin.\n");
 
 	gettimeofday(&tv, NULL);
