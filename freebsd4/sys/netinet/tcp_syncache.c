@@ -554,6 +554,7 @@ syncache_socket(sc, lso)
 	/*
 	 * Insert new socket into hash list.
 	 */
+	inp->inp_inc.inc_isipv6 = sc->sc_inc.inc_isipv6;
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
 		sa6_copy_addr(&sc->sc_inc.inc6_lsa, &inp->in6p_lsa);
