@@ -105,6 +105,10 @@ __RCSID("$NetBSD: lpd.c,v 1.17 1998/07/18 05:04:40 lukem Exp $");
 #include "pathnames.h"
 #include "extern.h"
 
+/* XXX from libc/net/rcmd.c */
+extern int __ivaliduser_sa __P((FILE *, struct sockaddr *, socklen_t,
+		const char *, const char *));
+
 int	lflag;				/* log requests flag */
 int	sflag;				/* secure (no inet) flag */
 int	from_remote;			/* from remote socket */
@@ -562,7 +566,7 @@ chkhost(f)
 	hostf = fopen(_PATH_HOSTSEQUIV, "r");
 again:
 	if (hostf) {
-		if (__ivaliduser_sa(hostf, f, DUMMY, DUMMY) == 0) {
+		if (__ivaliduser_sa(hostf, f, f->sa_len, DUMMY, DUMMY) == 0) {
 			(void)fclose(hostf);
 			return;
 		}
