@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.104 2000/08/12 08:08:00 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.105 2000/08/12 09:47:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -601,8 +601,8 @@ ip6_input(m)
 		struct in6hash *ih;
 
 		if ((ih = in6h_lookup(&ip6->ip6_dst, m->m_pkthdr.rcvif)) !=
-		    NULL) {
-			ia = ih->in6h_ifa;
+		    NULL &&
+		    (ia = ih->in6h_ifa) != NULL) {
 			if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
 				m->m_flags |= M_ANYCAST6;
 			ours = 1;
