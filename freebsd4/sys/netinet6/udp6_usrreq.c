@@ -63,6 +63,7 @@
  * $FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6 2000/01/18 09:02:19 shin Exp $
  */
 
+#include "opt_inet6.h"
 #include "opt_ipsec.h"
 
 #include <sys/param.h>
@@ -91,10 +92,10 @@
 #include <netinet/ip_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
-#include <netinet6/icmp6.h>
+#include <netinet/icmp6.h>
 #include <netinet6/udp6_var.h>
 #include <netinet6/ip6protosw.h>
 
