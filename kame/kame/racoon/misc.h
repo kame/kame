@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.h,v 1.4 2000/01/09 01:31:28 itojun Exp $ */
+/* YIPS @(#)$Id: misc.h,v 1.5 2000/02/23 06:57:59 sakane Exp $ */
 
 #define GET_NEWBUF(dst, t, src, len) \
 	((dst) = (t)get_newbuf((src), (len)))
@@ -35,7 +35,7 @@
 
 extern int bindump __P((void *, size_t));
 extern int hexdump __P((void *, size_t));
-extern char *bit2str __P((int n, int bl));
-extern void *get_newbuf __P((void *src, size_t len));
+extern char *bit2str __P((int, int));
+extern void *get_newbuf __P((void *, size_t));
 extern const char *debug_location __P((char *, int, char *));
-
+extern int getfsize __P((char *));
