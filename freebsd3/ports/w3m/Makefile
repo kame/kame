@@ -6,7 +6,7 @@
 #
 
 PORTNAME=	w3m
-PORTVERSION=	0.1.11p
+PORTVERSION=	0.1.11.p
 CATEGORIES+=	www ipv6
 MASTER_SITES=	ftp://ei5nazha.yz.yamagata-u.ac.jp/w3m/dev/ \
 		ftp://ftp.firedrake.org/w3m/dev/ \
