@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.80 2002/02/04 05:22:20 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.81 2002/02/14 08:47:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -389,7 +389,7 @@ void nd6_purge __P((struct ifnet *));
 void nd6_nud_hint __P((struct rtentry *, struct sockaddr_in6 *, int));
 int nd6_resolve __P((struct ifnet *, struct rtentry *,
 		     struct mbuf *, struct sockaddr *, u_char *));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ > 4)
 void nd6_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
 void nd6_rtrequest __P((int, struct rtentry *, struct sockaddr *));

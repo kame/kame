@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.227 2002/02/09 06:49:46 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.228 2002/02/14 08:47:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1251,7 +1251,7 @@ nd6_nud_hint(rt, dst6, force)
 }
 
 void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ > 4)
 nd6_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;

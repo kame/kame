@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.95 2002/02/04 06:51:10 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.96 2002/02/14 08:47:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,8 @@ extern struct mip6_bc_list mip6_bc_list;
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
+
+extern int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf **));
 
 #ifdef NEW_STRUCT_ROUTE
 struct	route ip6_forward_rt;
@@ -652,6 +654,24 @@ ip6_forward(m, srcrt)
 		}
     }
 #endif /* PFIL_HOOKS */
+
+#if defined(__FreeBSD__) && __FreeBSD__ > 4
+	/*
+	 * Check if we want to allow this packet to be processed.
+	 * Consider it to be bad if not.
+	 */
+	if (fr_checkp) {
+		struct	mbuf	*m1 = m;
+
+		if ((*fr_checkp)((struct ip *)ip6, sizeof(*ip6),
+				 rt->rt_ifp, 1, &m1) != 0)
+			goto freecopy;
+		m = m1;
+		if (m == NULL)
+			goto freecopy;
+		ip6 = mtod(m, struct ip6_hdr *);
+	}
+#endif
 
 #if defined(__OpenBSD__) && NPF > 0
 	if (pf_test6(PF_OUT, rt->rt_ifp, &m) != PF_PASS) {
