@@ -1,19 +1,19 @@
 TODO list for synchronization with FreeBSD 3.4-RELEASE
 
 sys: done
-include:
+include: done
 etc
-	mtree:
+	mtree: done
 lib
-	libutil:
-	libftpio:
-	libskey:
+	libutil: done
+	libftpio: doen
+	libskey: done
 libexec
-	rlogind:
-	telnetd:
-	ftpd:
-	rshd:
-	tftpd:
+	ftpd: done
+	rlogind: done
+	rshd: done
+	telnetd: done
+	tftpd: done
 ports
 	bump the major version of several shared libraries: done
 	sync with ports-current
