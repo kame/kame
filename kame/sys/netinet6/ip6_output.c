@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.435 2004/03/12 08:38:09 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.436 2004/03/12 08:48:49 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -315,7 +315,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct route_in6 ip6route;
 #endif
 	struct rtentry *rt = NULL;
-	struct sockaddr_in6 *dst, dst_sa;
+	struct sockaddr_in6 *dst, src_sa, dst_sa;
 	struct in6_addr finaldst;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
@@ -324,9 +324,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
 	int clone = 0;
-#if 0
 	u_int32_t zone;
-#endif
 #ifdef NEW_STRUCT_ROUTE
 	struct route *ro_pmtu = NULL;
 #else
@@ -1150,7 +1148,10 @@ skip_ipsec2:;
 		origifp = ia->ia_ifp;
 	else
 		origifp = ifp;
-#if 0
+	bzero(&src_sa, sizeof(src_sa));
+	src_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = sizeof(src_sa);
+	in6_recoverscope(&src_sa, &ip6->ip6_src, NULL);
 	if (in6_addr2zoneid(origifp, &src_sa.sin6_addr, &zone) ||
 	    zone != src_sa.sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
@@ -1171,14 +1172,11 @@ skip_ipsec2:;
 #endif
 		goto badscope;
 	}
-#endif
 
 	/* scope check is done. */
 	goto routefound;
 
-#if 0
   badscope:
-#endif
 	ip6stat.ip6s_badscope++;
 	in6_ifstat_inc(origifp, ifs6_out_discard);
 	if (error == 0)
