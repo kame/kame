@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2668 2004/09/29 08:37:23 suz Exp $
+$KAME: CHANGELOG,v 1.2669 2004/09/30 22:23:05 jinmei Exp $
+
+<200410>
+2004-10-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_rmx.c (in6_clsroute):
+	* freebsd4/sys/netinet/in_rmx.c (in_clsroute):
+	avoided duplicate free (and system crash) when
+	net.inet[6].ip[6].rtexpire is set to 0.
 
 <200409>
 2004-09-29  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
