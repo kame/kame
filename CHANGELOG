@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.540 2000/02/08 17:03:12 itojun Exp $
+$Id: CHANGELOG,v 1.541 2000/02/08 19:30:21 sumikawa Exp $
 
 <200002>
+Wed Feb  9 04:28:50 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/apache12: remove this port since it's too old.
+
 Wed Feb  9 01:09:21 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/gated-ipv6, freebsd[23]/ports/net/gated-ipv6:
 	  upgrade base version to gated-ipv6, 2000/2/3.
