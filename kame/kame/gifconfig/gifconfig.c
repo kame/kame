@@ -361,7 +361,7 @@ ifconfig(argc, argv, af, rafp)
 	else
 		metric = ifr.ifr_metric;
 
-#ifdef SIOCGIFMTU
+#if defined(SIOCGIFMTU) && !defined(__OpenBSD__)
 	if (ioctl(s, SIOCGIFMTU, (caddr_t)&ifr) < 0)
 		perror("ioctl (SIOCGIFMTU)");
 	else

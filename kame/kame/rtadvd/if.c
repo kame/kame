@@ -49,6 +49,9 @@
 #ifdef __bsdi__
 # include <netinet/if_ether.h>
 #endif
+#ifdef __OpenBSD__
+#include <netinet/if_ether.h>
+#endif
 #include <unistd.h>
 #include <errno.h>
 #include <stdlib.h>
