@@ -1854,7 +1854,7 @@ res_querydomainN(name, domain, target)
 			h_errno = NO_RECOVERY;
 			return (-1);
 		}
-		if (n-- != 0 && name[n] == '.') {
+		if (n > 0 && name[--n] == '.') {
 			strncpy(nbuf, name, n);
 			nbuf[n] = '\0';
 		} else
