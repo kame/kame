@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/05 10:09:55 $
+		     $Date: 1999/10/05 10:11:33 $
 
 
 Here is a summary of differences between KAME STABLE 19990809 and STABLE
@@ -42,7 +42,7 @@ PLATFORM DIFFERENCES
 As we support various platforms, there are several differences between
 those platforms.  Here is a brief list of important differences:
 - ALTQ
-	ALTQ 1.2 is merged into:	KAME/FreeBSD228, KAME/FreeBSD33,
+	ALTQ 2.0 is merged into:	KAME/FreeBSD228, KAME/FreeBSD33,
 					KAME/NetBSD141
 	No ALTQ support in:		KAME/BSDI31, KAME/OpenBSD25
 - IPsec
