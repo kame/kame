@@ -1123,6 +1123,8 @@ ipsec_init_policy(so, pcb_sp)
 		new->priv = 1;
 	else
 		new->priv = 0;
+#elif defined(HAVE_NRL_INPCB)
+	new->priv = so->so_state & SS_PRIV;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 	if (so->so_cred != 0 && so->so_cred->pc_ucred->cr_uid == 0)
 		new->priv = 1;
