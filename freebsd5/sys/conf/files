@@ -1476,11 +1476,11 @@ netinet6/udp6_usrreq.c	optional inet6
 net/if_hif.c		count hif optional mip6 mip6_mobile_node
 netinet6/mobility6.c	optional inet6 mip6
 netinet6/mip6_cncore.c	optional mip6
+netinet6/mip6_icmp6.c	optional mip6
 netinet6/mip6_hacore.c	optional mip6 mip6_home_agent
 netinet6/mip6_mncore.c	optional mip6 mip6_mobile_node
 netinet6/mip6_prefix.c	optional mip6 mip6_mobile_node
 netinet6/mip6_halist.c	optional mip6 mip6_mobile_node
-netinet6/mip6_icmp6.c	optional mip6 mip6_mobile_node
 netinet6/mip6_fsm.c	optional mip6 mip6_mobile_node
 netipsec/ipsec.c	optional fast_ipsec
 netipsec/ipsec_input.c	optional fast_ipsec
