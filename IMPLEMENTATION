@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.160 2000/09/20 23:37:31 sakane Exp $
+	$KAME: IMPLEMENTATION,v 1.161 2000/09/20 23:45:21 itojun Exp $
 
 1. IPv6
 
@@ -1679,9 +1679,9 @@ list just for reference purposes.
 	CISCO IOS, Cryptek, Checkpoint FW-1, Data Fellows (F-Secure),
 	Ericsson, Fitel, FreeS/WAN, hifn, HITACHI, IBM AIX, IIJ, Intel Canada,
 	Intel Packet Protect, MEW NetCocoon , MGCS, Microsoft WinNT/2000,
-	NAI PGPnet, NIST (linux IPsec + plutoplus), NEC IX5000, Netscreen,
-	NxNetworks, OpenBSD isakmpd, Pivotal, Radguard, RapidStream, RedCreek,
-	Routerware, SSH (both IPv4/IPv6), Secure Computing, Soliton,
+	NAI PGPnet, NetLock, NIST (linux IPsec + plutoplus), NEC IX5000,
+	Netscreen, NxNetworks, OpenBSD isakmpd, Pivotal, Radguard, RapidStream,
+	RedCreek, Routerware, SSH (both IPv4/IPv6), Secure Computing, Soliton,
 	Sun Solaris8, TIS/NAI Gauntret, Toshiba, VPNet, Yamaha RT series
 
 Here are (some of) platforms we have tested IPComp/IKE interoperability
