@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.10 2001/10/31 08:07:24 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.11 2001/11/15 05:13:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -77,9 +77,9 @@ void	 appendPAddr6		__P((struct logmsg *, struct cSlot *, struct mAddr *));
 void	 appendPort		__P((struct logmsg *, struct mAddr *));
 void	 makeTSlotLine		__P((char *, int, struct tSlot *,
 				     struct tcpstate *, int));
-void	 appendPAddrXL		__P((struct logmsg *, struct pAddr *, int));
-void	 appendPAddrXL4		__P((struct logmsg *, struct pAddr *));
-void	 appendPAddrXL6		__P((struct logmsg *, struct pAddr *, int));
+void	 appendPAddrXL		__P((struct logmsg *, struct pAddr *, int, int));
+void	 appendPAddrXL4		__P((struct logmsg *, struct pAddr *, int));
+void	 appendPAddrXL6		__P((struct logmsg *, struct pAddr *, int, int));
 void	 appendpAddrXL6long	__P((struct logmsg *, struct in6_addr *, u_short));
 void	 appendpAddrXL6short	__P((struct logmsg *, struct in6_addr *, u_short));
 void	 concat			__P((struct logmsg *, char *, ...));
@@ -249,8 +249,8 @@ makeTSlotLine(char *wow, int size, struct tSlot *tsl,
 	default:		concat(&lmsg, "unk   ");	break;
 	}
 
-	appendPAddrXL(&lmsg, &tsl->local, type);
-	appendPAddrXL(&lmsg, &tsl->remote, type);
+	appendPAddrXL(&lmsg, &tsl->local, type, 0);
+	appendPAddrXL(&lmsg, &tsl->remote, type, 1);
 
 	concat(&lmsg, "%6d%6d ", tsl->tofrom, tsl->fromto);
 
@@ -282,41 +282,62 @@ makeTSlotLine(char *wow, int size, struct tSlot *tsl,
 
 
 void
-appendPAddrXL(struct logmsg *lmsg, struct pAddr *pad, int type)
+appendPAddrXL(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
 	if (pad->sa_family == AF_INET)
-		appendPAddrXL4(lmsg, pad);
+		appendPAddrXL4(lmsg, pad, inv);
 	else
-		appendPAddrXL6(lmsg, pad, type);
+		appendPAddrXL6(lmsg, pad, type, inv);
 }
 
 
 void
-appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad)
+appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int inv)
 {
 	char	Bow[128];
 	char	Wow[128];
 
-	inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
-	snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
-	concat(lmsg, "%-22s", Wow);
+	if (inv == 0) {
+	    inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
+	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
+	    concat(lmsg, "%-22s", Wow);
 
-	inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
-	snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
-	concat(lmsg, "%-22s", Wow);
+	    inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
+	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
+	    concat(lmsg, "%-22s", Wow);
+	} else {
+	    inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
+	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
+	    concat(lmsg, "%-22s", Wow);
+
+	    inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
+	    snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
+	    concat(lmsg, "%-22s", Wow);
+	}
 }
 
 
 void
-appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type)
+appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
-	if (type != 0) {
-		appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
-		appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+	if (inv == 0) {
+	    if (type != 0) {
+		    appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
+		    appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
 
+	    } else {
+		    appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
+		    appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+	    }
 	} else {
-		appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
-		appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+	    if (type != 0) {
+		    appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+		    appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
+
+	    } else {
+		    appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+		    appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
+	    }
 	}
 }
 
