@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.101 2002/07/17 08:46:33 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.102 2003/01/20 13:46:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1003,6 +1003,7 @@ ifinfo(ifname, argc, argv)
 	}
 
 	printf("linkmtu=%d", ND.linkmtu);
+	printf(", maxmtu=%d", ND.maxmtu);
 	printf(", curhlim=%d", ND.chlim);
 	printf(", basereachable=%ds%dms",
 	    ND.basereachable / 1000, ND.basereachable % 1000);
