@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.22 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.23 2000/11/07 15:39:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -555,7 +555,7 @@ set_satrnsbysainfo(pr, sainfo)
 	case IPSECDOI_PROTO_IPSEC_ESP:
 		if (sainfo->algs[algclass_ipsec_enc] == NULL) {
 			plog(logp, LOCATION, NULL,
-				"no auth algorithm found\n");
+				"no encryption algorithm found\n");
 			goto err;
 		}
 		t = 1;
