@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.33 2000/09/06 07:07:18 sumikawa Exp $
+# $Id: Makefile,v 1.34 2000/09/23 19:35:50 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -36,6 +36,7 @@ SUBDIR+=	mpg123
 SUBDIR+=	mrt
 SUBDIR+=	ncftp3
 SUBDIR+=	netperf
+SUBDIR+=	netcat
 SUBDIR+=	netris
 SUBDIR+=	newbie
 SUBDIR+=	openssh
