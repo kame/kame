@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.102 2003/01/21 12:05:37 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.103 2003/01/21 12:55:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -74,6 +74,7 @@
 #include "prefixconf.h"
 
 static int debug = 0;
+static int exit_ok = 0;
 static u_long sig_flags = 0;
 #define SIGF_TERM 0x1
 #define SIGF_HUP 0x2
@@ -94,7 +95,7 @@ static void client6_init __P((void));
 static void client6_ifinit __P((void));
 static void free_resources __P((void));
 static void client6_mainloop __P((void));
-static int check_exit __P((void));
+static void check_exit __P((void));
 static void process_signals __P((void));
 static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
 						 struct duid *));
@@ -452,10 +453,13 @@ free_resources()
 	}
 }
 
-static int
+static void
 check_exit()
 {
 	struct dhcp6_if *ifp;
+
+	if (!exit_ok)
+		return;
 
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		/*
@@ -463,7 +467,7 @@ check_exit()
 		 * exit for now.
 		 */
 		if (!TAILQ_EMPTY(&ifp->event_list))
-			return (1);
+			return;
 	}
 
 	/* We have no existing event.  Do exit. */
@@ -476,6 +480,7 @@ static void
 process_signals()
 {
 	if ((sig_flags & SIGF_TERM)) {
+		exit_ok = 1;
 		free_resources();
 		unlink(DHCP6C_PIDFILE);
 		check_exit();
@@ -1096,7 +1101,7 @@ client6_send_release(ev)
 		goto end;
 	}
 
-	/* configuration information to be renewed */
+	/* configuration information to be released */
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
 	     evd = TAILQ_NEXT(evd, link)) {
 		switch(evd->type) {
