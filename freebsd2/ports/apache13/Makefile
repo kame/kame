@@ -29,7 +29,7 @@ MASTER_SITES=   http://www.apache.org/dist/ \
 #PATCH_SITES=    http://www.apache.org/info/css-security/
 #PATCHFILES=     apache_1.3.11_css_patch.txt
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	apache-1.3.11-v6-20000208a.diff.gz
+PATCHFILES=	apache-1.3.11-v6-20000220a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
@@ -75,7 +75,7 @@ post-install:
 		${ECHO} "Installing ${PREFIX}/etc/rc.d/apache.sh startup file."; \
 		${ECHO} "#!/bin/sh" > ${PREFIX}/etc/rc.d/apache.sh; \
 		${ECHO} "[ -x ${PREFIX}/sbin/apachectl ] && ${PREFIX}/sbin/apachectl start > /dev/null && ${ECHO} -n ' apache'" >> ${PREFIX}/etc/rc.d/apache.sh; \
-		${CHMOD} 751 ${PREFIX}/etc/rc.d/apache.sh; \
+		chmod 751 ${PREFIX}/etc/rc.d/apache.sh; \
 	fi
 
 .include <bsd.port.mk>
