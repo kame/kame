@@ -110,7 +110,8 @@ init_sin6(struct sockaddr_in6 *sin6, const char *addr_ascii)
 	memset(sin6, 0, sizeof(*sin6));
 	sin6->sin6_len = sizeof(*sin6);
 	sin6->sin6_family = AF_INET6;
-	inet_pton(AF_INET6, addr_ascii, &sin6->sin6_addr);
+	if (inet_pton(AF_INET6, addr_ascii, &sin6->sin6_addr) != 1)
+		; /* XXX do something */
 }
 
 #if 0  /* XXX: not necessary ?? */
