@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.113 2004/08/19 12:35:45 suz Exp $	*/
+/*	$KAME: common.c,v 1.114 2004/08/19 12:57:33 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1873,7 +1873,7 @@ sprint_auth(optinfo)
 	opth.dh6opt_type = htons((t)); \
 	opth.dh6opt_len = htons((l)); \
 	memcpy((p), &opth, sizeof(opth)); \
-	if ((l) && (v)) \
+	if ((l)) \
 		memcpy((p) + 1, (v), (l)); \
 	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
  	(len) += sizeof(struct dhcp6opt) + (l); \
@@ -1900,8 +1900,10 @@ dhcp6_set_options(bp, ep, optinfo)
 			    optinfo->serverID.duid_id, p);
 	}
 
-	if (optinfo->rapidcommit)
-		COPY_OPTION(DH6OPT_RAPID_COMMIT, 0, NULL, p);
+	if (optinfo->rapidcommit) {
+		char dummy; /* to avoid compilation error in "gcc34 -Werror" */
+		COPY_OPTION(DH6OPT_RAPID_COMMIT, 0, &dummy, p);
+	}
 
 	if (optinfo->pref != DH6OPT_PREF_UNDEF) {
 		u_int8_t p8 = (u_int8_t)optinfo->pref;
