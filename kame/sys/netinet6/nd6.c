@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.216 2001/10/28 17:19:25 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.217 2001/11/06 11:21:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -869,28 +869,27 @@ nd6_purge(ifp)
 	struct nd_defrouter *dr, *ndr;
 	struct nd_prefix *pr, *npr;
 
-	/* Nuke default router list entries toward ifp */
-	if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
-		/*
-		 * We defer removal of default router list entries, as
-		 * they may have routes installed into the kernel.
-		 */
-		for (; dr; dr = ndr) {
-			ndr = TAILQ_NEXT(dr, dr_entry);
-			if (dr->installed)
-				continue;
+	/*
+	 * Nuke default router list entries toward ifp.
+	 * We defer removal of default router list entries that is installed
+	 * in the routing table, in order to keep additional side effects as
+	 * small as possible.
+	 */
+	for (dr = TAILQ_FIRST(&nd_defrouter); dr; dr = ndr) {
+		ndr = TAILQ_NEXT(dr, dr_entry);
+		if (dr->installed)
+			continue;
 
-			if (dr->ifp == ifp)
-				defrtrlist_del(dr);
-		}
-		for (; dr; dr = ndr) {
-			ndr = TAILQ_NEXT(dr, dr_entry);
-			if (!dr->installed)
-				continue;
+		if (dr->ifp == ifp)
+			defrtrlist_del(dr);
+	}
+	for (dr = TAILQ_FIRST(&nd_defrouter); dr; dr = ndr) {
+		ndr = TAILQ_NEXT(dr, dr_entry);
+		if (!dr->installed)
+			continue;
 
-			if (dr->ifp == ifp)
-				defrtrlist_del(dr);
-		}
+		if (dr->ifp == ifp)
+			defrtrlist_del(dr);
 	}
 
 	/* Nuke prefix list entries toward ifp */
