@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.36 2001/12/04 04:24:39 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.37 2002/05/17 22:41:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -493,8 +493,11 @@ getipnodebyaddr(const void *src, size_t len, int af, int *errp)
 			memcpy(&addrbuf, src, len);
 			src = &addrbuf;
 		}
-		if (IN6_IS_ADDR_UNSPECIFIED((struct in6_addr *)src))
+		if (IN6_IS_ADDR_UNSPECIFIED((struct in6_addr *)src) ||
+		    IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)src) ||
+		    IN6_IS_ADDR_SITELOCAL((struct in6_addr *)src)) {
 			return NULL;
+		}
 		if (IN6_IS_ADDR_V4MAPPED((struct in6_addr *)src)
 		||  IN6_IS_ADDR_V4COMPAT((struct in6_addr *)src)) {
 			src = (char *)src +
