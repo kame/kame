@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.2 2001/06/16 09:40:00 jinmei Exp $
+$KAME: FAQ,v 1.3 2001/06/18 04:52:57 itojun Exp $
 
 
 GENERAL
@@ -51,6 +51,17 @@ Which version of IPv6/IPsec does KAME support?
 
 INSTALLATION
 ============
+Q: I heard that *BSDs have integrated KAME code already.  Do I still need to
+install KAME patches?
+	Depends on your goal.  Roughly speaking,
+	- If you want IPv6 for normal day-to-day use, you will be happy with
+	  *BSD integrated code (no need for KAME patches).
+	- If you want a bleeding-edge IPv6 code (including experimental and
+	  unstable ones) you'd need to install KAME patches.
+
+	http://www.kame.net/project-overview.html#release talks about this
+	topic in more detail.
+
 Q: I replaced kernel and rebooted, and lost IPv4 connectivity.  Why is it?
 	There are several possibiltiies, but it is almost always
 	due to the kernel configuration differences.  If you have
@@ -282,6 +293,13 @@ Q: I think I have problem with tunnel, how to track it?
 	another advise: always use "-n" when you try ping6 or
 	traceroute6.  reverse lookup can make it harder to track
 	down.
+
+Q: my operating system does not have gifconfig(8).
+	On NetBSD and OpenBSD, gifconfig(8) is integrated into ifconfig(8),
+	"tunnel" keyword.
+
+Q: would like to know the merge status of KAME kit to *BSD.
+	See http://www.kame.net/dev/cvsweb.cgi/kame/COVERAGE.
 
 
 LICENSE AND CRYPTO EXPORT
