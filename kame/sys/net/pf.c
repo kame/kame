@@ -4871,7 +4871,7 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 		ip->ip_sum = 0;
 		if (sw_csum & CSUM_DELAY_IP) {
 			if (ip->ip_v == IPVERSION &&
-			    ip->ip_hl << 2 == sizeof(*ip)) {
+			    (ip->ip_hl << 2) == sizeof(*ip)) {
 				ip->ip_sum = in_cksum_hdr(ip);
 			} else {
 				ip->ip_sum = in_cksum(m, ip->ip_hl << 2);
