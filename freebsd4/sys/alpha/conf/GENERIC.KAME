@@ -145,7 +145,7 @@ pseudo-device	ppp	1	# Kernel PPP
 pseudo-device	tun		# Packet tunnel.
 pseudo-device	pty		# Pseudo-ttys (telnet etc)
 pseudo-device	md		# Memory "disks"
-#pseudo-device	gif	4	# IPv6 and IPv4 tunneling
+pseudo-device	gif	4	# IPv6 and IPv4 tunneling
 #pseudo-device	faith	1	# IPv6-to-IPv4 relaying/(translation)
 
 # The `bpf' pseudo-device enables the Berkeley Packet Filter.
@@ -171,8 +171,8 @@ pseudo-device	bpf		#Berkeley packet filter
 # KAME extensions
 #
 
-#options 	IPSEC			#IP security
-#options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
+options 	IPSEC			#IP security
+options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	"IPSEC_IPV6FWD"         #IP security tunnel for IPv6
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
