@@ -1,8 +1,30 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.566 2000/02/16 15:41:39 itojun Exp $
+$Id: CHANGELOG,v 1.567 2000/02/17 05:38:45 itojun Exp $
 
 <200002>
+Thu Feb 17 14:36:07 JST 2000  itojun@iijlab.net
+	* sys/netinet6/nd6.c: better support for proxy NDP (per NA entry,
+	  just like arp -s).  routing entry marked with RTF_ANNONUCE
+	  (= RTF_PROTO2) will get announced by proxy ND.  on ND table, proxy
+	  NDP entry will stay as permanent/reachable entry.
+	  
+	  To use this stuff, you need to backout bbn changes in rtsock.c.
+	  otherwise ndp -s will not work and you can not set proxy ND entry.
+	  (bbn rt_setif() overwrites sockaddr_dl in gateway portion)
+
+	  TODO:
+	  - proxy NA delay on output (RFC2461 7.2.8)
+	  - anycast NA delay on output (RFC2461 7.2.7)
+	* */usr.sbin/ndp: proxy ND support (ndp -s has "proxy" keyword added).
+
+	  TODO: proxy ND for global address X, where X is outside of prefixes
+	  assigned to the interface we would do proxy ND.  currently we try to
+	  grab link-layer information from RTM_GET.  so if X is outside of
+	  configured prefixes, we can't configure X for proxy NDing, or static
+	  ND entry.  we may need to explicitly pass "interface" information
+	  to ndp -s.
+
 Thu Feb 17 00:40:39 JST 2000  itojun@iijlab.net
 	* sys/net/if_gif.c: fix IFF_LINK0 (multi destination mode), which
 	  was broken during ip_encap.c migration.
