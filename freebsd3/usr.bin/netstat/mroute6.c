@@ -156,9 +156,9 @@ mroute6pr(mfcaddr, mifaddr)
 			}
 			
 			printf(" %-*.*s", WID_ORG, WID_ORG,
-			       routename6(&mfc.mf6c_origin.sin6_addr));
+			       routename6(&mfc.mf6c_origin));
 			printf(" %-*.*s", WID_GRP, WID_GRP,
-			       routename6(&mfc.mf6c_mcastgrp.sin6_addr));
+			       routename6(&mfc.mf6c_mcastgrp));
 
 			for (waitings = 0, rtep = mfc.mf6c_stall; rtep; ) {
 				waitings++;

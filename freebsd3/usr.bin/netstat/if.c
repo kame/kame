@@ -79,7 +79,7 @@ static void sidewaysintpr __P((u_int, u_long));
 static void catchalarm __P((int));
 
 #ifdef INET6
-char *netname6 __P((struct in6_addr *, struct in6_addr *));
+char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
 static char ntop_buf[INET6_ADDRSTRLEN];		/* for inet_ntop() */
 #endif
 
@@ -255,8 +255,8 @@ intpr(interval, ifnetaddr, pfunc)
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
 				printf("%-11.11s ",
-				    netname6(&ifaddr.in6.ia_addr.sin6_addr,
-					&ifaddr.in6.ia_prefixmask.sin6_addr));
+				       netname6(&ifaddr.in6.ia_addr,
+						&ifaddr.in6.ia_prefixmask.sin6_addr));
 				printf("%-17.17s ",
 				    (char *)inet_ntop(AF_INET6,
 					&sin6->sin6_addr,
