@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.61 1999/08/24 18:57:53 sumikawa Exp $
+$Id: CHANGELOG,v 1.62 1999/08/25 02:28:14 itojun Exp $
 
 <199908>
+Wed Aug 25 11:24:43 JST 1999  itojun@iijlab.net
+	* kame/racoon: Fix compilation on NetBSD/alpha.
+	  Fix portability issue with ssleay/openssl.  However, we cast
+	  most of parameters to des_xx() into void *, which is not a very
+	  good way to solve this issue.
+
 Wed Aug 25 02:31:54 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* freebsd3/ports/pfs: add pfs(personal file system)
 	* freebsd[23]/ports/emacs20: more sophisticated IPv6
