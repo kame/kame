@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.13 2000/11/01 10:35:38 nyan Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.23 2001/07/30 17:31:41 wpaul Exp $
 
 machine		pc98
 cpu		I386_CPU
@@ -95,6 +95,9 @@ options		SYM_SETUP_LP_PROBE_MAP=0x40
 				# Allow ncr to attach legacy NCR devices when 
 				# both sym and ncr are configured
 
+# PC-9801-100
+device	aic0	at isa? port 0x1840 irq 5 flags 0x10000
+
 #
 # WD33C93 SCSI card (55/92 like board)
 #
@@ -114,8 +117,15 @@ device bs0 at isa? port IO_SCSI irq 5 drq 3 flags 0
 # Logitec LHA-20x
 #device bs0 at isa? port IO_SCSI irq 5 drq 3 flags 0x50000
 
-# PC-9801-100
-device	aic0	at isa? port 0x1840 irq 5 flags 0x10000
+#
+# host adapter using WD33C93[ABC] chip (C bus)
+#
+#device		ct0	at isa?					# GENERIC
+#device		ct0	at isa? flags 0x10000			# SC98
+#device		ct0	at isa? flags 0x20000			# TEXA
+#device		ct0	at isa? flags 0x30000			# ELECOM
+#device		ct0	at isa? iomem 0xdc000 flags 0x40000	# SMIT
+#device		ct0	at isa? flags 0x50000			# LOGITEC
 
 device		ncv		# NCR 53C500
 device		nsp		# Workbit Ninja SCSI-3
@@ -240,28 +250,30 @@ device		olpt0	at isa? port IO_LPT
 
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
-device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
-device		tx		# SMC 9432TX (83c170 ``EPIC'')
 device		vx		# 3Com 3c590, 3c595 (``Vortex'')
-device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
+device		txp		# 3Com 3cR990 (``Typhoon'')
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 # NOTE: Be sure to keep the 'device miibus' line in order to use these NICs!
 device		miibus		# MII bus support
 device		dc		# DEC/Intel 21143 and various workalikes
-device		pcn		# AMD Am79C79x PCI 10/100 NICs
+device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		pcn		# AMD Am79C97x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
 device		tl		# Texas Instruments ThunderLAN
+device		tx		# SMC EtherPower II (83c170 ``EPIC'')
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
+device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
 # ISA Ethernet NICs.
 #
 # DP8390 NIC
+# 'device ed' requires 'device miibus'
 #
 # ed0: generic driver/EtherEZ98
 # ed1: LANEED LD-BDN
@@ -364,7 +376,7 @@ pseudo-device	ppp	1	# Kernel PPP
 pseudo-device	tun		# Packet tunnel.
 pseudo-device	pty		# Pseudo-ttys (telnet etc)
 pseudo-device	md		# Memory "disks"
-pseudo-device	gif	4	# IPv6 and IPv4 tunneling
+pseudo-device	gif		# IPv6 and IPv4 tunneling
 pseudo-device	faith	1	# IPv6-to-IPv4 relaying (translation)
 
 # The `bpf' pseudo-device enables the Berkeley Packet Filter.

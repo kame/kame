@@ -25,7 +25,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.10 2000/10/03 18:46:53 wpaul Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.15 2001/07/30 17:31:41 wpaul Exp $
 
 machine		alpha
 cpu		EV4
@@ -138,14 +138,14 @@ device          ppi             # Parallel port interface device
  
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
-device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		txp		# 3Com 3cR990 (``Typhoon'')
 device		le		# Lance
-device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 device		miibus		# MII bus support
 device		dc		# DEC/Intel 21143 and workalikes
-device		pcn		# AMD Am79C79x PCI 10/100 NICs
+device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		pcn		# AMD Am79C97x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
@@ -153,6 +153,7 @@ device		ste		# Sundance ST201 (D-Link DFE-550TX)
 device		tl		# Texas Instruments ThunderLAN
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
+device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
 # Pseudo devices - the number indicates how many units to allocated.
@@ -163,7 +164,7 @@ pseudo-device	ppp	1	# Kernel PPP
 pseudo-device	tun		# Packet tunnel.
 pseudo-device	pty		# Pseudo-ttys (telnet etc)
 pseudo-device	md		# Memory "disks"
-pseudo-device	gif	4	# IPv6 and IPv4 tunneling
+pseudo-device	gif		# IPv6 and IPv4 tunneling
 #pseudo-device	faith	1	# IPv6-to-IPv4 relaying/(translation)
 
 # The `bpf' pseudo-device enables the Berkeley Packet Filter.
