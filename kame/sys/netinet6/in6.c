@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.55 2000/02/25 00:32:23 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.56 2000/03/02 07:11:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -565,11 +565,14 @@ in6_control(so, cmd, data, ifp)
 			ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 			ia->ia_addr.sin6_family = AF_INET6;
 			ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
-			ia->ia_ifa.ifa_dstaddr
-				= (struct sockaddr *)&ia->ia_dstaddr;
 			if (ifp->if_flags & IFF_POINTOPOINT) {
+				ia->ia_ifa.ifa_dstaddr
+					= (struct sockaddr *)&ia->ia_dstaddr;
 				ia->ia_dstaddr.sin6_family = AF_INET6;
 				ia->ia_dstaddr.sin6_len = sizeof(ia->ia_dstaddr);
+			} else {
+				ia->ia_ifa.ifa_dstaddr = NULL;
+				bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
 			}
 			ia->ia_ifa.ifa_netmask
 				= (struct sockaddr *)&ia->ia_prefixmask;
@@ -1234,6 +1237,9 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
 				bcopy(&ia->ia_dstaddr, &ifra.ifra_dstaddr,
 					ia->ia_dstaddr.sin6_len);
+			} else {
+				bzero(&ifra.ifra_dstaddr,
+				    sizeof(ifra.ifra_dstaddr));
 			}
 			bcopy(&ia->ia_prefixmask, &ifra.ifra_dstaddr,
 				ia->ia_prefixmask.sin6_len);
