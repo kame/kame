@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.6 2000/01/02 13:09:23 sakane Exp $
+# YIPS $Id: Makefile.in,v 1.7 2000/01/09 01:05:55 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -20,7 +20,7 @@ INSTALL=@INSTALL@
 PROG=	racoon kmpstat eaytest
 #PROG+=	pfkey
 OBJS=	handler.o isakmp.o isakmp_inf.o ipsec_doi.o pfkey.o main.o \
-	post_com.o schedule.o session.o crypto.o cfparse.o cftoken.o \
+	post_com.o schedule.o session.o crypto_openssl.o cfparse.o cftoken.o \
 	admin.o misc.o vmbuf.o \
 	@LIBOBJS@
 #OBJS+=	signing.o
@@ -36,8 +36,8 @@ kmpstat: kmpstat.o misc.o vmbuf.o
 pfkey: dummy.o
 	$(CC) $(LDFLAGS) -o $@ dummy.o
 
-eaytest: eaytest.o crypto.o 
-	$(CC) $(LDFLAGS) -o $@ eaytest.o crypto.o misc.o vmbuf.o $(LIBS)
+eaytest: eaytest.o crypto_openssl.o 
+	$(CC) $(LDFLAGS) -o $@ eaytest.o crypto_openssl.o misc.o vmbuf.o $(LIBS)
 
 signing: signing.o
 	$(CC) $(LDFLAGS) -o $@ signing.o
