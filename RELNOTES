@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/11/24 00:41:04 $
+		     $Date: 1999/12/09 12:42:06 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -27,6 +27,11 @@ and the next STABLE release,
   between userland and the kernel.  Because of STABLE cut-off date we do not
   supply fixes for this.  If you would like to use racoon, please use more
   recent SNAP kit instead.
+- Intel EtherExpress Pro (fxp driver) has some problem with the
+  initialization sequence KAME is using (a set of ioctl calls).  The driver
+  will become unusable if consequtive calls to fxp_init() are made.
+  This problem occurs only with specific revision of the card.
+  It is not KAME problem, it is problem in fxp driver.
 
 PLATFORM DIFFERENCES
 ====================
