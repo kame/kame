@@ -11,16 +11,4 @@ exclude tcp6_timer.c
 exclude tcp6_timer.h
 exclude tcp6_usrreq.c
 exclude tcp6_var.h
-exclude natpt_defs.h
-exclude natpt_dispatch.c
-exclude natpt_list.c
-exclude natpt_list.h
-exclude natpt_log.c
-exclude natpt_log.h
-exclude natpt_rule.c
-exclude natpt_soctl.h
-exclude natpt_trans.c
-exclude natpt_tslot.c
-exclude natpt_usrreq.c
-exclude natpt_var.h
 exclude in6_src.c
