@@ -1724,7 +1724,7 @@ inetd_setproctitle(a, s)
 		if (getnameinfo((struct sockaddr *)&ss, ss.ss_len,
 				hbuf, sizeof(hbuf), NULL, 0,
 				NI_NUMERICHOST) != 0)
-			strcpy(hbuf, "invalid");
+			strcpy(hbuf, "?");
 		(void)snprintf(buf, sizeof buf, "-%s [%s]", a, hbuf);
 	} else
 		(void)snprintf(buf, sizeof buf, "-%s", a);
@@ -2203,7 +2203,7 @@ dolog(sep, ctrl)
 	}
 
 	if (getnameinfo(sa, sa->sa_len, buf, sizeof(buf), NULL, 0, 0) != 0)
-		strcpy(buf, "invalid");
+		strcpy(buf, "?");
 	host = buf;
 
 	switch (sep->se_log & ~MULOG_RFC931) {
