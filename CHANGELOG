@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2402 2003/05/30 01:26:15 itojun Exp $
+$KAME: CHANGELOG,v 1.2403 2003/06/02 06:55:45 jinmei Exp $
 
 <200305>
 Fri May 30 10:25:33 JST 2003  itojun@iijlab.net
@@ -16,7 +16,7 @@ Thu May 29 18:01:28 JST 2003 sakane@kame.net
 2003-05-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/setkey/{token.l, parse.y}: added a new keyword "null"
 	as the null encryption algorithm.  The old keyword "simple" was
-	obsoleted.  Backward compatibility is provided with a warning
+	obsolete.  Backward compatibility is provided with a warning
 	message. [KAME PR 475]
 
 Fri May 23 16:00:26 JST 2003 sakane@kame.net
