@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_priq.c,v 1.4 2002/11/08 06:36:18 kjc Exp $	*/
+/*	$KAME: qdisc_priq.c,v 1.5 2003/06/27 09:44:00 kjc Exp $	*/
 /*
  * Copyright (C) 2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -48,10 +48,10 @@
 void
 priq_stat_loop(int fd, const char *ifname, int count, int interval)
 {
-	struct class_stats stats1[PRIQ_MAXPRI], stats2[PRIQ_MAXPRI];
+	struct priq_classstats stats1[PRIQ_MAXPRI], stats2[PRIQ_MAXPRI];
 	char clnames[PRIQ_MAXPRI][128];
 	struct priq_class_stats	get_stats;
-	struct class_stats	*sp, *lp, *new, *last, *tmp;
+	struct priq_classstats	*sp, *lp, *new, *last, *tmp;
 	struct timeval		cur_time, last_time;
 	int			i;
 	double			sec;

@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_hfsc.c,v 1.6 2002/11/08 06:35:00 kjc Exp $	*/
+/*	$KAME: qdisc_hfsc.c,v 1.7 2003/06/27 09:43:59 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -51,10 +51,10 @@
 void
 hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 {
-	struct class_stats	stats1[NCLASSES], stats2[NCLASSES];
+	struct hfsc_classstats	stats1[NCLASSES], stats2[NCLASSES];
 	char			clnames[NCLASSES][128];
 	struct hfsc_class_stats	get_stats;
-	struct class_stats	*sp, *lp, *new, *last, *tmp;
+	struct hfsc_classstats	*sp, *lp, *new, *last, *tmp;
 	struct timeval		cur_time, last_time;
 	int			i;
 	double			sec;
