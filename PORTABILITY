@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.26 2000/01/06 14:45:39 itojun Exp $
+	$Id: PORTABILITY,v 1.27 2000/01/06 14:48:08 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -208,7 +208,8 @@ across those possibilities.
   like to see them defined in standard document.
 
 - sysctl(3) support in kernel.
-  FreeBSD: linker hack #define in SYSCTL_INT().  no need to recompile sysctl(8).
+  FreeBSD: linker hack #define in sys/sysctl.h, like SYSCTL_INT().
+	no need to recompile sysctl(8).
 	SYSCTL_INT(_net_inet6_tcp6, TCP6CTL_SYN_CACHE_INTER,
 	    syn_cache_interval, CTLFLAG_RW, &tcp6_syn_cache_interval, 0, "");
   OpenBSD/NetBSD: xx_sysctl() needs to be supplied from inet6sw.
