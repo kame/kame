@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1593 2001/03/06 00:25:14 itojun Exp $
+$KAME: CHANGELOG,v 1.1594 2001/03/06 11:24:18 jinmei Exp $
 
 <200103>
+2001-03-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (nd6_prefix_onlink): set RTF_GATEWAY
+	to an interface direct route when nd6_need_cache() is false, in
+	order to prevent nd6_rtrequest() from setting RTF_LLINFO (which
+	annoys the ndp(8) command).
+	This change is based on a report from nobumichi ozoe
+	<nobumichi_ozoe@ydc.co.jp>.
+
 Tue Mar  6 09:22:56 JST 2001  itojun@iijlab.net
 	* sys/netinet6/raw_ip6.c: permit IPV6_CHECKSUM socket option for
 	  the following cases only (previously it was allowed for any AF_INET6
