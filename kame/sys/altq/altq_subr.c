@@ -1,7 +1,7 @@
-/*	$KAME: altq_subr.c,v 1.9 2001/09/04 06:31:15 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.10 2002/01/11 07:31:08 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -67,10 +67,19 @@
 #include <altq/altq.h>
 #include <altq/altq_conf.h>
 
+/* machine dependent clock related includes */
 #ifdef __FreeBSD__
 #include "opt_cpu.h"	/* for FreeBSD-2.2.8 to get i586_ctr_freq */
 #include <machine/clock.h>
 #endif
+#if defined(__i386__)
+#include <machine/specialreg.h>		/* for CPUID_TSC */
+#ifdef __FreeBSD__
+#include <machine/md_var.h>		/* for cpu_feature */
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+#include <machine/cpu.h>		/* for cpu_feature */
+#endif
+#endif /* __i386__ */
 
 /*
  * internal function prototypes
@@ -450,7 +459,7 @@ altq_extractflow(m, af, flow, filt_bmask)
 
 		if (ip->ip_v != 4)
 			break;
-		
+
 		fin = (struct flowinfo_in *)flow;
 		fin->fi_len = sizeof(struct flowinfo_in);
 		fin->fi_family = AF_INET;
@@ -460,7 +469,7 @@ altq_extractflow(m, af, flow, filt_bmask)
 
 		fin->fi_src.s_addr = ip->ip_src.s_addr;
 		fin->fi_dst.s_addr = ip->ip_dst.s_addr;
-    
+
 		if (filt_bmask & FIMB4_PORTS)
 			/* if port info is required, extract port numbers */
 			extract_ports4(m, ip, fin);
@@ -471,7 +480,7 @@ altq_extractflow(m, af, flow, filt_bmask)
 		}
 		return (1);
 	}
-		
+
 #ifdef INET6
 	case PF_INET6: {
 		struct flowinfo_in6 *fin6;
@@ -479,7 +488,7 @@ altq_extractflow(m, af, flow, filt_bmask)
 
 		ip6 = mtod(m, struct ip6_hdr *);
 		/* should we check the ip version? */
-		
+
 		fin6 = (struct flowinfo_in6 *)flow;
 		fin6->fi6_len = sizeof(struct flowinfo_in6);
 		fin6->fi6_family = AF_INET6;
@@ -544,11 +553,11 @@ extract_ports4(m, ip, fin)
 	u_short ip_off;
 	u_int8_t proto;
 	int 	off;
-	
+
 	fin->fi_sport = 0;
 	fin->fi_dport = 0;
 	fin->fi_gpi = 0;
-	
+
 	ip_off = ntohs(ip->ip_off);
 	/* if it is a fragment, try cached fragment info */
 	if (ip_off & IP_OFFMASK) {
@@ -583,7 +592,7 @@ extract_ports4(m, ip, fin)
 	case IPPROTO_TCP:
 	case IPPROTO_UDP: {
 		struct udphdr *udp;
-		
+
 		udp = (struct udphdr *)(mtod(m0, caddr_t) + off);
 		fin->fi_sport = udp->uh_sport;
 		fin->fi_dport = udp->uh_dport;
@@ -595,7 +604,7 @@ extract_ports4(m, ip, fin)
 	case IPPROTO_ESP:
 		if (fin->fi_gpi == 0){
 			u_int32_t *gpi;
-			
+
 			gpi = (u_int32_t *)(mtod(m0, caddr_t) + off);
 			fin->fi_gpi   = *gpi;
 		}
@@ -638,11 +647,11 @@ extract_ports6(m, ip6, fin6)
 	struct mbuf *m0;
 	int	off;
 	u_int8_t proto;
-	
+
 	fin6->fi6_gpi   = 0;
 	fin6->fi6_sport = 0;
 	fin6->fi6_dport = 0;
-	
+
 	/* locate the mbuf containing the protocol header */
 	for (m0 = m; m0 != NULL; m0 = m0->m_next)
 		if (((caddr_t)ip6 >= m0->m_data) &&
@@ -668,18 +677,18 @@ extract_ports6(m, ip6, fin6)
 		case IPPROTO_TCP:
 		case IPPROTO_UDP: {
 			struct udphdr *udp;
-			
+
 			udp = (struct udphdr *)(mtod(m0, caddr_t) + off);
 			fin6->fi6_sport = udp->uh_sport;
 			fin6->fi6_dport = udp->uh_dport;
 			fin6->fi6_proto = proto;
 			}
 			return (1);
-			
+
 		case IPPROTO_ESP:
 			if (fin6->fi6_gpi == 0) {
 				u_int32_t *gpi;
-			
+
 				gpi = (u_int32_t *)(mtod(m0, caddr_t) + off);
 				fin6->fi6_gpi   = *gpi;
 			}
@@ -711,7 +720,7 @@ extract_ports6(m, ip6, fin6)
 			/* goto the next header */
 			break;
 			}
-				
+
 		case IPPROTO_FRAGMENT:
 			/* ipv6 fragmentations are not supported yet */
 		default:
@@ -744,7 +753,7 @@ acc_add_filter(classifier, filter, class, phandle)
 	if (filter->ff_flow.fi_family != AF_INET)
 		return (EINVAL);
 #endif
-		
+
 	MALLOC(afp, struct acc_filter *, sizeof(struct acc_filter),
 	       M_DEVBUF, M_WAITOK);
 	if (afp == NULL)
@@ -757,7 +766,7 @@ acc_add_filter(classifier, filter, class, phandle)
 	i = ACC_WILDCARD_INDEX;
 	if (filter->ff_flow.fi_family == AF_INET) {
 		struct flow_filter *filter4 = &afp->f_filter;
-		
+
 		/*
 		 * if address is 0, it's a wildcard.  if address mask
 		 * isn't set, use full mask.
@@ -813,7 +822,7 @@ acc_add_filter(classifier, filter, class, phandle)
 		for (i = 0; i < 16; i++)
 			filter6->ff_flow6.fi6_src.s6_addr[i] &=
 			    filter6->ff_mask6.mask6_src.s6_addr[i];
-		
+
 		if (filter6->ff_flow6.fi6_flowlabel == 0)
 			i = ACC_WILDCARD_INDEX;
 		else
@@ -920,7 +929,7 @@ acc_classify(clfier, m, af)
 
 	if (flow.fi_family == AF_INET) {
 		struct flowinfo_in *fp = (struct flowinfo_in *)&flow;
-	
+
 		if ((classifier->acc_fbmask & FIMB4_ALL) == FIMB4_TOS) {
 			/* only tos is used */
 			LIST_FOREACH(afp,
@@ -955,7 +964,7 @@ acc_classify(clfier, m, af)
 							  &afp->f_filter, fp))
 						/* filter matched */
 						return (afp->f_class);
-				
+
 				/*
 				 * check again for filters with a dst addr
 				 * wildcard.
@@ -971,7 +980,7 @@ acc_classify(clfier, m, af)
 #ifdef INET6
 	else if (flow.fi_family == AF_INET6) {
 		struct flowinfo_in6 *fp6 = (struct flowinfo_in6 *)&flow;
-	
+
 		/* get the filter hash entry from its flow ID */
 		if (fp6->fi6_flowlabel != 0)
 			i = ACC_GET_HASH_INDEX(fp6->fi6_flowlabel);
@@ -1309,7 +1318,7 @@ ip4f_init(void)
 {
 	struct ip4_frag *fp;
 	int i;
-    
+
 	TAILQ_INIT(&ip4f_list);
 	for (i=0; i<IP4F_TABSIZE; i++) {
 		MALLOC(fp, struct ip4_frag *, sizeof(struct ip4_frag),
@@ -1358,7 +1367,7 @@ read_dsfield(m, pktattr)
 {
 	struct mbuf *m0;
 	u_int8_t ds_field = 0;
-	
+
 	if (pktattr == NULL ||
 	    (pktattr->pattr_af != AF_INET && pktattr->pattr_af != AF_INET6))
 		return ((u_int8_t)0);
@@ -1379,7 +1388,7 @@ read_dsfield(m, pktattr)
 
 	if (pktattr->pattr_af == AF_INET) {
 		struct ip *ip = (struct ip *)pktattr->pattr_hdr;
-		
+
 		if (ip->ip_v != 4)
 			return ((u_int8_t)0);	/* version mismatch! */
 		ds_field = ip->ip_tos;
@@ -1388,7 +1397,7 @@ read_dsfield(m, pktattr)
 	else if (pktattr->pattr_af == AF_INET6) {
 		struct ip6_hdr *ip6 = (struct ip6_hdr *)pktattr->pattr_hdr;
 		u_int32_t flowlabel;
-		
+
 		flowlabel = ntohl(ip6->ip6_flow);
 		if ((flowlabel >> 28) != 6)
 			return ((u_int8_t)0);	/* version mismatch! */
@@ -1444,7 +1453,7 @@ write_dsfield(m, pktattr, dsfield)
 		sum += 0xff00 + (~old & 0xff) + dsfield;
 		sum = (sum >> 16) + (sum & 0xffff);
 		sum += (sum >> 16);  /* add carry */
-		
+
 		ip->ip_sum = htons(~sum & 0xffff);
 	}
 #ifdef INET6
@@ -1474,52 +1483,86 @@ u_int32_t machclk_freq = 0;
 u_int32_t machclk_per_tick = 0;
 
 #if (defined(__i386__) || defined(__alpha__)) && !defined(ALTQ_NOPCC)
-#ifdef __FreeBSD__
-/* freebsd makes clock frequency accessible */
-#ifdef __alpha__
-extern u_int32_t cycles_per_sec;	/* alpha cpu clock frequency */
+
+#if defined(__FreeBSD__) && defined(SMP)
+#error SMP system!  use ALTQ_NOPCC option.
 #endif
+
+#ifdef __alpha__
+#ifdef __FreeBSD__
+extern u_int32_t cycles_per_sec;	/* alpha cpu clock frequency */
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+extern u_int64_t cycles_per_usec;	/* alpha cpu clock frequency */
+#endif
+#endif /* __alpha__ */
+#if defined(__i386__) && defined(__NetBSD__)
+extern u_int64_t cpu_tsc_freq;
+#endif
+
 void
 init_machclk(void) 
 {
-#if defined(__i386__)
+	/* sanity check */
+#ifdef __i386__
+	/* check if TSC is available */
+	if ((cpu_feature & CPUID_TSC) == 0) {
+		printf("altq: TSC isn't available! use ALTQ_NOPCC option.\n");
+		return;
+	}
+#endif
+
+	/*
+	 * if the clock frequency (of Pentium TSC or Alpha PCC) is
+	 * accessible, just use it.
+	 */
+#ifdef __i386__
+#ifdef __FreeBSD__
 #if (__FreeBSD_version > 300000)
 	machclk_freq = tsc_freq;
 #else
 	machclk_freq = i586_ctr_freq;
 #endif
+#elif defined(__NetBSD__)
+	machclk_freq = (u_int32_t)cpu_tsc_freq;
+#elif defined(__OpenBSD__)
+	machclk_freq = pentium_mhz * 1000000;
+#endif
 #elif defined(__alpha__)
+#ifdef __FreeBSD__
 	machclk_freq = cycles_per_sec;
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+	machclk_freq = (u_int32_t)(cycles_per_usec * 1000000);
+#endif
 #endif /* __alpha__ */
-	machclk_per_tick = machclk_freq / hz;
-}
-#else /* !__FreeBSD__ */
-/*
- * measure Pentium TSC or Alpha PCC clock frequency 
- */
-void
-init_machclk(void) 
-{
-	static int	wait;
-	struct timeval	tv_start, tv_end;
-	u_int64_t	start, end, diff;
-	int		timo;
 
-	microtime(&tv_start);
-	start = read_machclk();
-	timo = hz;	/* 1 sec */
-	(void)tsleep(&wait, PWAIT | PCATCH, "init_machclk", timo);
-	microtime(&tv_end);
-	end = read_machclk();
-	diff = (u_int64_t)(tv_end.tv_sec - tv_start.tv_sec) * 1000000
-		+ tv_end.tv_usec - tv_start.tv_usec;
-	if (diff != 0)
-		machclk_freq = (u_int)((end - start) * 1000000 / diff);
+	/*
+	 * if we don't know the clock frequency, measure it.
+	 */
+	if (machclk_freq == 0) {
+		static int	wait;
+		struct timeval	tv_start, tv_end;
+		u_int64_t	start, end, diff;
+		int		timo;
+
+		microtime(&tv_start);
+		start = read_machclk();
+		timo = hz;	/* 1 sec */
+		(void)tsleep(&wait, PWAIT | PCATCH, "init_machclk", timo);
+		microtime(&tv_end);
+		end = read_machclk();
+		diff = (u_int64_t)(tv_end.tv_sec - tv_start.tv_sec) * 1000000
+		    + tv_end.tv_usec - tv_start.tv_usec;
+		if (diff != 0)
+			machclk_freq = (u_int)((end - start) * 1000000 / diff);
+	}
+
 	machclk_per_tick = machclk_freq / hz;
 
+#ifdef ALTQ_DEBUG
 	printf("altq: CPU clock: %uHz\n", machclk_freq);
+#endif
 }
-#endif /* !__FreeBSD__ */
+
 #ifdef __alpha__
 /*
  * make a 64bit counter value out of the 32bit alpha processor cycle counter.
@@ -1543,7 +1586,7 @@ read_machclk(void)
 #else /* !i386  && !alpha */
 /* use microtime() for now */
 void
-init_machclk(void) 
+init_machclk(void)
 {
 	machclk_freq = 1000000 << MACHCLK_SHIFT;
 	machclk_per_tick = machclk_freq / hz;
