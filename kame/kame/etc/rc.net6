@@ -60,22 +60,16 @@ if [ X"$defaultiface" = X"" ]; then
     done
 fi
 # Disallow unicast packets without outgoing scope identifiers.
-# If you instead want to route such packets to a "default" interface,
-# comment out the 1st two lines, and enable the lines after them.
+# However, if you set "defaultiface", "ndp -I $defaultiface", which will be
+# called later in this file for the host case, will allow you to ommit
+# the identifiers. Then such packets will go to the default interface.
 #
 # If you configure site-locals without scope id (it is permissible config for
 # routers that are not on scope boundary), you may want to comment the latter
 # one out.
 $route add -inet6 fe80:: -prefixlen 10 ::1 -reject
 $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
-#if [ X"$defaultiface" = X"" ]; then
-#    for i in $iface; do # use the 1st interface in the list
-#	defaultiface=$iface
-#	break
-#    done
-#fi
 #if [ X"$defaultiface" != X"" ]; then
-#    $route add -inet6 fe80:: ::1 -prefixlen 10 -interface -ifp $defaultiface -cloning
 #    $route add -inet6 fec0:: ::1 -prefixlen 10 -interface -ifp $defaultiface -cloning
 #fi
 
