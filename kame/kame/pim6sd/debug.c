@@ -447,18 +447,12 @@ dump_nbrs(fp)
 		"Mif", "PhyIF", "Address", "Timer");
 
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
-		int first = 1;
-
 		if ((n = v->uv_pim_neighbors) != NULL) {
-			if (first) {
-				fprintf(fp, " %-3u %6s", vifi,
-					(v->uv_flags & MIFF_REGISTER)?"regist":
-					v->uv_name);
-				first = 0;
-			}
-			else
-				fprintf(fp, " %3s %6s", "", "");
+			fprintf(fp, " %-3u %6s", vifi,
+				(v->uv_flags & MIFF_REGISTER)?"regist":
+				v->uv_name);
 			for (; n != NULL; n = n->next) {
+				fprintf(fp, " %3s %6s", "", "");
 				fprintf(fp, " %-40s %-5u\n",
 					inet6_fmt(&n->address.sin6_addr),
 					n->timer);
