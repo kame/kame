@@ -242,6 +242,7 @@ rip6_output(m, va_alist)
 	int error = 0;
 	struct ip6_pktopts opt, *optp = NULL;
 	struct ifnet *oifp = NULL;
+	int type, code;		/* for ICMPv6 output statistics only */
 	int priv = 0;
 	va_list ap;
 
@@ -272,6 +273,22 @@ rip6_output(m, va_alist)
 		optp = &opt;
 	} else
 		optp = in6p->in6p_outputopts;
+
+	/*
+	 * For an ICMPv6 packet, we should know its type and code
+	 * to update statistics.
+	 */
+	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
+		struct icmp6_hdr *icmp6;
+		if (m->m_len < sizeof(struct icmp6_hdr) &&
+		    (m = m_pullup(m, sizeof(struct icmp6_hdr))) == NULL) {
+			error = ENOBUFS;
+			goto bad;
+		}
+		icmp6 = mtod(m, struct icmp6_hdr *);
+		type = icmp6->icmp6_type;
+		code = icmp6->icmp6_code;
+	}
 
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -381,9 +398,15 @@ rip6_output(m, va_alist)
 #ifdef IPSEC
 	m->m_pkthdr.rcvif = (struct ifnet *)so;
 #endif /*IPSEC*/
-
+	
 	error = ip6_output(m, optp, &in6p->in6p_route, 0, in6p->in6p_moptions,
 			   &oifp);
+	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
+		if (oifp)
+			icmp6_ifoutstat_inc(oifp, type, code);
+		icmp6stat.icp6s_outhist[type]++;
+	}
+
 	goto freectl;
 
  bad:

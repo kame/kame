@@ -371,7 +371,7 @@ icmp6_input(mp, offp, proto)
 
 	icmp6stat.icp6s_inhist[icmp6->icmp6_type]++;
 	icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_msg);
-	if (icmp6->icmp6_type < ICMP6_ECHO_REQUEST)
+	if (icmp6->icmp6_type < ICMP6_INFOMSG_MASK)
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 
 	switch (icmp6->icmp6_type) {
@@ -1352,54 +1352,8 @@ icmp6_reflect(m, off)
 #else
 	ip6_output(m, NULL, NULL, 0, NULL, &outif);
 #endif
-	if (outif) {
-		switch(type) {
-		 case ICMP6_DST_UNREACH:
-			 icmp6_ifstat_inc(outif, ifs6_out_dstunreach);
-			 if (code == ICMP6_DST_UNREACH_ADMIN)
-				 icmp6_ifstat_inc(outif, ifs6_out_adminprohib);
-			 break;
-		 case ICMP6_PACKET_TOO_BIG:
-			 icmp6_ifstat_inc(outif, ifs6_out_pkttoobig);
-			 break;
-		 case ICMP6_TIME_EXCEEDED:
-			 icmp6_ifstat_inc(outif, ifs6_out_timeexceed);
-			 break;
-		 case ICMP6_PARAM_PROB:
-			 icmp6_ifstat_inc(outif, ifs6_out_paramprob);
-			 break;
-		 case ICMP6_ECHO_REQUEST:
-			 icmp6_ifstat_inc(outif, ifs6_out_echo);
-			 break;
-		 case ICMP6_ECHO_REPLY:
-			 icmp6_ifstat_inc(outif, ifs6_out_echoreply);
-			 break;
-		 case MLD6_LISTENER_QUERY:
-			 icmp6_ifstat_inc(outif, ifs6_out_mldquery);
-			 break;
-		 case MLD6_LISTENER_REPORT:
-			 icmp6_ifstat_inc(outif, ifs6_out_mldreport);
-			 break;
-		 case MLD6_LISTENER_DONE:
-			 icmp6_ifstat_inc(outif, ifs6_out_mlddone);
-			 break;
-		 case ND_ROUTER_SOLICIT:
-			 icmp6_ifstat_inc(outif, ifs6_out_routersolicit);
-			 break;
-		 case ND_ROUTER_ADVERT:
-			 icmp6_ifstat_inc(outif, ifs6_out_routeradvert);
-			 break;
-		 case ND_NEIGHBOR_SOLICIT:
-			 icmp6_ifstat_inc(outif, ifs6_out_neighborsolicit);
-			 break;
-		 case ND_NEIGHBOR_ADVERT:
-			 icmp6_ifstat_inc(outif, ifs6_out_neighboradvert);
-			 break;
-		 case ND_REDIRECT:
-			 icmp6_ifstat_inc(outif, ifs6_out_redirect);
-			 break;
-		}
-	}
+	if (outif)
+		icmp6_ifoutstat_inc(outif, type, code);
 
 	return;
 
@@ -1856,6 +1810,10 @@ noredhdropt:;
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
 	ip6_output(m, NULL, NULL, 0, NULL, &outif);
+	if (outif) {
+		icmp6_ifstat_inc(outif, ifs6_out_msg);
+		icmp6_ifstat_inc(outif, ifs6_out_redirect);
+	}
 	icmp6stat.icp6s_outhist[ND_REDIRECT]++;
 
 	return;

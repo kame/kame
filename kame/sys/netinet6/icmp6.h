@@ -579,6 +579,7 @@ void	icmp6_mtuexpire __P((struct rtentry *, struct rttimer *));
 int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif
 
+/* XXX: is this the right place for these macros? */
 #define icmp6_ifstat_inc(ifp, tag) \
 do {								\
 	if ((ifp) && (ifp)->if_index < if_index			\
@@ -587,6 +588,60 @@ do {								\
 		icmp6_ifstat[(ifp)->if_index]->tag++;		\
 	}							\
 } while (0)
+
+#define icmp6_ifoutstat_inc(ifp, type, code) \
+do { \
+		icmp6_ifstat_inc(ifp, ifs6_out_msg); \
+ 		if (type < ICMP6_INFOMSG_MASK) \
+ 			icmp6_ifstat_inc(ifp, ifs6_out_error); \
+		switch(type) { \
+		 case ICMP6_DST_UNREACH: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_dstunreach); \
+			 if (code == ICMP6_DST_UNREACH_ADMIN) \
+				 icmp6_ifstat_inc(ifp, ifs6_out_adminprohib); \
+			 break; \
+		 case ICMP6_PACKET_TOO_BIG: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_pkttoobig); \
+			 break; \
+		 case ICMP6_TIME_EXCEEDED: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_timeexceed); \
+			 break; \
+		 case ICMP6_PARAM_PROB: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_paramprob); \
+			 break; \
+		 case ICMP6_ECHO_REQUEST: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_echo); \
+			 break; \
+		 case ICMP6_ECHO_REPLY: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_echoreply); \
+			 break; \
+		 case MLD6_LISTENER_QUERY: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_mldquery); \
+			 break; \
+		 case MLD6_LISTENER_REPORT: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_mldreport); \
+			 break; \
+		 case MLD6_LISTENER_DONE: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_mlddone); \
+			 break; \
+		 case ND_ROUTER_SOLICIT: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_routersolicit); \
+			 break; \
+		 case ND_ROUTER_ADVERT: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_routeradvert); \
+			 break; \
+		 case ND_NEIGHBOR_SOLICIT: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_neighborsolicit); \
+			 break; \
+		 case ND_NEIGHBOR_ADVERT: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_neighboradvert); \
+			 break; \
+		 case ND_REDIRECT: \
+			 icmp6_ifstat_inc(ifp, ifs6_out_redirect); \
+			 break; \
+		} \
+} while (0)
+
 extern int	icmp6_rediraccept;	/* accept/process redirects */
 extern int	icmp6_redirtimeout;	/* cache time for redirect routes */
 #endif /* _KERNEL */

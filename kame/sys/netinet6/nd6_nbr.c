@@ -461,6 +461,10 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
 	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, &outif);
+	if (outif) {
+		icmp6_ifstat_inc(outif, ifs6_out_msg);
+		icmp6_ifstat_inc(outif, ifs6_out_neighborsolicit);
+	}
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT]++;
 }
 
@@ -816,6 +820,10 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
 	ip6_output(m, NULL, NULL, 0, &im6o, &outif);
+	if (outif) {
+		icmp6_ifstat_inc(outif, ifs6_out_msg);
+		icmp6_ifstat_inc(outif, ifs6_out_neighboradvert);
+	}
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_ADVERT]++;
 }
 
