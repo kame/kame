@@ -1,24 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1955 2001/10/29 15:02:52 sakane Exp $
+$KAME: CHANGELOG,v 1.1956 2001/10/29 15:06:18 sakane Exp $
 
 <200110>
 Tue Oct 30 00:01:35 JST 2001 sakane@kame.net
 	* kame/sys/netkey/key.c:
 	the system wide policy should be returned when no policy found
 	in the SPD.  the packet was rejected in ipsec[46]_tunnel_validate().
-
-2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
-	* kame/sys/netinet6/natpt_{defs,rule,transtslot}.[ch]:
-	  kame/kame/natptconfig/{cfparse,misc,showsubs,yylex}.[cy]:
-	- Support bi-directional IPv4 NAT.
-	    This NAT binds global address to private address
-	    one-on-one statically.  Sessions can be initiated from
-	    hosts in the public network as well as the private
-	    network.  So, if you can set nat session as bidirectional,
-	    you can connect to the host located behind this NAT from
-	    public IPv4 network.
-	    You need several IPv4 address, an equal number of host to
-	    be connected to.  Sorry, manual page is not ready yet.
 
 Fri Oct 26 22:29:15 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6.c
@@ -40,6 +27,19 @@ Fri Oct 26 18:27:29 JST 2001 keiichi@iij.ad.jp
   	  the mip6control command you are using.)
   	- protected the mip6 ioctl path by splnet() during retreiving
   	  binding cache entries.
+
+2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs,rule,transtslot}.[ch]:
+	  kame/kame/natptconfig/{cfparse,misc,showsubs,yylex}.[cy]:
+	- Support bi-directional IPv4 NAT.
+	    This NAT binds global address to private address
+	    one-on-one statically.  Sessions can be initiated from
+	    hosts in the public network as well as the private
+	    network.  So, if you can set nat session as bidirectional,
+	    you can connect to the host located behind this NAT from
+	    public IPv4 network.
+	    You need several IPv4 address, an equal number of host to
+	    be connected to.  Sorry, manual page is not ready yet.
 
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (dump): skipped non-host routes when
