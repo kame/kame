@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.16 1999/10/20 14:30:19 itojun Exp $
+$Id: PORTABILITY,v 1.17 1999/10/31 23:34:55 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -119,6 +119,13 @@ across those possibilities.
 	MAN5=	foo.0
 	MAN8=	baz.0
 	MLINKS=	foo.5 bar.5
+  BSDI4 is much like the same as BSDI3.  The only exception is shlib
+  generation.  NODYNAMIC=yes would prevent dynamic library from created:
+	MANDIR=	/usr/local/v6/man/cat
+	MAN5=	foo.0
+	MAN8=	baz.0
+	MLINKS=	foo.5 bar.5
+	NODYNAMIC=yes	# if you do not want shlib, define it
   For NetBSD, you need to set MAN (not MAN[0-9]).  MANDIR needs to point to
   "man" directory right above "catN" or "manN" directory:
 	MANDIR=	/usr/local/v6/man
