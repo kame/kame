@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.236 2001/09/25 08:15:12 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.237 2001/09/25 08:41:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1053,7 +1053,7 @@ in6_update_ifa(ifp, ifra, ia)
 		for (i = 0; i < 4; i++)
 			ifra->ifra_prefixmask.sin6_addr.s6_addr32[i] =
 				0xffffffff;
-		plen =128;
+		plen = 128;
 #else
 		return(EINVAL);
 #endif
