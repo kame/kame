@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/19 06:13:05 $
+			$Date: 2000/01/19 07:58:25 $
 
 1. IPv6
 
@@ -1262,5 +1262,10 @@ compile ALTQ-ready kernel for other archtitectures, take the following steps:
 - copy kernel configuration file (like ALTQ.v6 or GENERIC.v6) from i386,
   and modify accordingly.
 - build a kernel.
+- before building userland, change netbsd/{lib,usr.sbin,usr.bin}/Makefile
+  (or openbsd/foobaa) so that it will visit altq-related sub directories.
+
+At this moment part of ALTQ code is not 64bit friendly (specifically,
+libaltq).  So ALTQ cannot be used on {Net,Open}BSD/alpha.
 
 						 <end of IMPLEMENTATION>
