@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.49 2004/04/22 09:40:59 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.50 2004/05/21 07:07:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -983,12 +983,7 @@ mip6_attach_haddrs(sc)
 	int error = 0;
 
 	/* remove all home addresses for sc from phisical I/F. */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
-#endif
-	{
+	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next) {
 		if (ifp->if_type == IFT_HIF)
 			continue;
 
@@ -1027,11 +1022,7 @@ mip6_detach_haddrs(sc)
 	struct in6_ifaddr *ia6;
 	int error = 0;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ia = hif_ifp->if_addrlist;
-	     ia;
-	     ia = ia_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	for (ia = TAILQ_FIRST(&hif_ifp->if_addrhead);
 	     ia;
 	     ia = ia_next)
@@ -1041,9 +1032,7 @@ mip6_detach_haddrs(sc)
 	     ia = ia_next)
 #endif
 	{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		ia_next = ia->ifa_next;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		ia_next = TAILQ_NEXT(ia, ifa_link);
 #else
 		ia_next = ia->ifa_list.tqe_next;
@@ -1188,11 +1177,7 @@ mip6_remove_haddrs(sc, ifp)
 	struct mip6_prefix *mpfx;
 	int error = 0;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ia = ifp->if_addrlist;
-	     ia;
-	     ia = ia_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	for (ia = TAILQ_FIRST(&ifp->if_addrhead);
 	     ia;
 	     ia = ia_next)
@@ -1202,9 +1187,7 @@ mip6_remove_haddrs(sc, ifp)
 	     ia = ia_next)
 #endif
 	{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		ia_next = ia->ifa_next;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		ia_next = TAILQ_NEXT(ia, ifa_link);
 #else
 		ia_next = ia->ifa_list.tqe_next;
@@ -3875,9 +3858,7 @@ mip6_bdt_create(sc, paddr)
 	    IN6_IFF_NOTREADY | IN6_IFF_ANYCAST);
 	if (ifa == NULL) {
 		/* XXX: freebsd does not have ifa_ifwithaf */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 		for (ifa = ifp->if_addrlist.tqh_first;

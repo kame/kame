@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.357 2004/05/19 09:09:50 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.358 2004/05/21 07:07:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -40,7 +40,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -53,7 +53,7 @@
 #include <sys/kernel.h>
 #include <sys/protosw.h>
 #include <sys/errno.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
@@ -68,9 +68,7 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <net/if_atm.h>
-#endif
 #include <net/route.h>
 #ifdef __NetBSD__
 #include <net/if_ether.h>
@@ -113,11 +111,11 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
 #include <sys/limits.h>
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 #include <machine/limits.h>
 #endif
 
-#if !defined(__bsdi__) && !defined(__OpenBSD__)
+#if !defined(__OpenBSD__)
 #include "loop.h"
 #endif
 #if defined(__NetBSD__)
@@ -164,7 +162,7 @@ static struct sockaddr_in6 all1_sa;
 static void nd6_setmtu0 __P((struct ifnet *, struct nd_ifinfo *));
 static void nd6_slowtimo __P((void *));
 static int regen_tmpaddr __P((struct in6_ifaddr *));
-#if (defined(__FreeBSD__) || defined(__NetBSD__))
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 static void nd6_rtdrain __P((struct rtentry *, struct rttimer *));
 #endif
 static struct llinfo_nd6 *nd6_free __P((struct rtentry *, int));
@@ -174,7 +172,7 @@ static void nd6_llinfo_timer __P((void *));
 struct callout nd6_slowtimo_ch = CALLOUT_INITIALIZER;
 struct callout nd6_timer_ch = CALLOUT_INITIALIZER;
 extern struct callout in6_tmpaddrtimer_ch;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 struct callout nd6_slowtimo_ch;
 struct callout nd6_timer_ch;
 extern struct callout in6_tmpaddrtimer_ch;
@@ -214,7 +212,7 @@ nd6_init()
 	nd6_init_done = 1;
 
 	/* start timer */
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
 #elif defined(__OpenBSD__)
@@ -488,7 +486,7 @@ nd6_llinfo_settimer(ln, tick)
 	struct llinfo_nd6 *ln;
 	long tick;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 	int s;
@@ -502,7 +500,7 @@ nd6_llinfo_settimer(ln, tick)
 	if (tick < 0) {
 		ln->ln_expire = 0;
 		ln->ln_ntick = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 		callout_stop(&ln->ln_timer_ch);
 #elif defined(__OpenBSD__)
 		timeout_del(&ln->ln_timer_ch);
@@ -513,7 +511,7 @@ nd6_llinfo_settimer(ln, tick)
 		ln->ln_expire = time_second + tick / hz;
 		if (tick > INT_MAX) {
 			ln->ln_ntick = tick - INT_MAX;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_reset(&ln->ln_timer_ch, INT_MAX,
 			    nd6_llinfo_timer, ln);
 #elif defined(__OpenBSD__)
@@ -523,7 +521,7 @@ nd6_llinfo_settimer(ln, tick)
 #endif
 		} else {
 			ln->ln_ntick = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 			callout_reset(&ln->ln_timer_ch, tick,
 			    nd6_llinfo_timer, ln);
 #elif defined(__OpenBSD__)
@@ -662,7 +660,7 @@ nd6_timer(ignored_arg)
 	int s;
 	struct nd_defrouter *dr;
 	struct nd_prefix *pr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 	struct in6_ifaddr *ia6, *nia6;
@@ -673,7 +671,7 @@ nd6_timer(ignored_arg)
 #else
 	s = splnet();
 #endif
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,
 	    nd6_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -829,13 +827,8 @@ regen_tmpaddr(ia6)
 	struct in6_ifaddr *public_ifa6 = NULL;
 
 	ifp = ia6->ia_ifa.ifa_ifp;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa;
-	     ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
+	     ifa = ifa->ifa_list.tqe_next) {
 		struct in6_ifaddr *it6;
 
 		if (ifa->ifa_addr->sa_family != AF_INET6)
@@ -1158,7 +1151,7 @@ nd6_free(rt, gc)
 {
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo, *next;
 	struct nd_defrouter *dr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -1322,17 +1315,10 @@ nd6_nud_hint(rt, dst6, force)
 }
 
 void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 nd6_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;
 	struct rt_addrinfo *info; /* xxx unused */
-#else
-nd6_rtrequest(req, rt, sa)
-	int	req;
-	struct rtentry *rt;
-	struct sockaddr *sa; /* xxx unused */
-#endif
 {
 	struct sockaddr *gate = rt->rt_gateway;
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo;
@@ -1465,7 +1451,7 @@ nd6_rtrequest(req, rt, sa)
 		ln->ln_rt = rt;
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		callout_init(&ln->ln_timer_ch, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__NetBSD__) || defined(__FreeBSD__)
 		callout_init(&ln->ln_timer_ch);
 #elif defined(__OpenBSD__)
 		timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
@@ -1510,15 +1496,7 @@ nd6_rtrequest(req, rt, sa)
 				SDL(gate)->sdl_alen = ifp->if_addrlen;
 			}
 			if (nd6_useloopback) {
-#ifdef __bsdi__
-#if _BSDI_VERSION >= 199802
-				extern struct ifnet *loifp;
-				rt->rt_ifp = loifp;	/* XXX */
-#else
-				extern struct ifnet loif;
-				rt->rt_ifp = &loif;	/* XXX */
-#endif
-#elif defined(__OpenBSD__)
+#if defined(__OpenBSD__)
 				rt->rt_ifp = lo0ifp;	/* XXX */
 #else
 				rt->rt_ifp = &loif[0];	/* XXX */
@@ -1572,7 +1550,7 @@ nd6_rtrequest(req, rt, sa)
 		 * if this is a cached route, which is very likely,
 		 * put it in the timer queue.
 		 */
-#if (defined(__FreeBSD__) || defined(__NetBSD__))
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 		if (!(rt->rt_flags & (RTF_STATIC | RTF_ANNOUNCE)) && !mine)
 			rt_add_cache(rt, nd6_rtdrain);
 #endif /* freebsd and rtf_cache */
@@ -2134,7 +2112,7 @@ nd6_slowtimo(ignored_arg)
 	struct nd_ifinfo *nd6if;
 	struct ifnet *ifp;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
 #elif defined(__OpenBSD__)
@@ -2143,12 +2121,7 @@ nd6_slowtimo(ignored_arg)
 #else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
-#endif
-	{
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list)) {
 		nd6if = ND_IFINFO(ifp);
 		if (nd6if->basereachable && /* already initialized */
 		    (nd6if->recalctm -= ND6_SLOWTIMER_INTERVAL) <= 0) {
@@ -2259,7 +2232,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 #endif
 				if ((rt = rt->rt_gwroute) == 0)
 					senderr(EHOSTUNREACH);
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 				/* the "G" test below also prevents rt == rt0 */
 				if ((rt->rt_flags & RTF_GATEWAY) ||
 				    (rt->rt_ifp != ifp)) {
@@ -2586,13 +2559,8 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	return (error);
 }
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 static int nd6_sysctl_drlist(SYSCTL_HANDLER_ARGS);
 static int nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS);
-#else
-static int nd6_sysctl_drlist SYSCTL_HANDLER_ARGS;
-static int nd6_sysctl_prlist SYSCTL_HANDLER_ARGS;
-#endif
 #ifdef SYSCTL_DECL
 SYSCTL_DECL(_net_inet6_icmp6);
 #endif
@@ -2602,11 +2570,7 @@ SYSCTL_NODE(_net_inet6_icmp6, ICMPV6CTL_ND6_PRLIST, nd6_prlist,
 	CTLFLAG_RD, nd6_sysctl_prlist, "");
 
 static int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 nd6_sysctl_drlist(SYSCTL_HANDLER_ARGS)
-#else
-nd6_sysctl_drlist SYSCTL_HANDLER_ARGS
-#endif
 {
 	if (req->newptr)
 		return EPERM;
@@ -2615,11 +2579,7 @@ nd6_sysctl_drlist SYSCTL_HANDLER_ARGS
 }
 
 static int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS)
-#else
-nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
-#endif
 {
 	if (req->newptr)
 		return EPERM;

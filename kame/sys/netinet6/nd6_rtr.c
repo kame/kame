@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.251 2004/04/19 04:37:25 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.252 2004/05/21 07:07:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -47,7 +47,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
@@ -243,7 +243,7 @@ nd6_ra_input(m, off, icmp6len)
 #endif
 	union nd_opts ndopts;
 	struct nd_defrouter *dr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef  __FreeBSD__
 	long time_second;
 #endif
 	char *lladdr = NULL;
@@ -297,7 +297,7 @@ nd6_ra_input(m, off, icmp6len)
 	/*
 	 * Default Router Information 
 	 */
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	time_second = time.tv_sec;
 #endif
 	bzero(&dr0, sizeof(dr0));
@@ -355,7 +355,7 @@ nd6_ra_input(m, off, icmp6len)
 		struct nd_opt_prefix_info *pi = NULL;
 		struct nd_prefixctl pr;
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		time_second = time.tv_sec;
 #endif
 		for (pt = (struct nd_opt_hdr *)ndopts.nd_opts_pi;
@@ -542,21 +542,12 @@ nd6_rtmsg(cmd, rt)
 	struct rt_addrinfo info;
 
 	bzero((caddr_t)&info, sizeof(info));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* BSDI4 */
-	/* maybe this is unnecessary */
-	info.rti_flags = rt->rt_flags;
-#endif
 	info.rti_info[RTAX_DST] = rt_key(rt);
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 	if (rt->rt_ifp) {
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		info.rti_info[RTAX_IFP] =
-		    rt->rt_ifp->if_addrlist->ifa_addr;
-#else
 		info.rti_info[RTAX_IFP] =
 		    TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
-#endif
 		info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 	}
 
@@ -608,7 +599,7 @@ defrouter_addifreq(ifp)
 	struct ifaddr *ifa;
 	struct rtentry *newrt = NULL;
 	int error, flags;
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 	struct rt_addrinfo info;
 #endif
 
@@ -636,7 +627,7 @@ defrouter_addifreq(ifp)
 
 	/* RTF_CLONING is necessary to make sure to perform ND */
 	flags = ifa->ifa_flags | RTF_CLONING;
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 	bzero(&info, sizeof(info));
 	info.rti_info[RTAX_DST] = (struct sockaddr *)&def;
 	info.rti_info[RTAX_GATEWAY] = (struct sockaddr *)ifa->ifa_addr;
@@ -1177,7 +1168,7 @@ nd6_prelist_add(pr, dr, newp)
 		free(new, M_IP6NDP);
 		return(error);
 	}
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	new->ndpr_lastupdate = time.tv_sec;
 #else
 	new->ndpr_lastupdate = time_second;
@@ -1330,7 +1321,7 @@ prelist_update(new, dr, m)
 			pr->ndpr_vltime = new->ndpr_vltime;
 			pr->ndpr_pltime = new->ndpr_pltime;
 			(void)in6_init_prefix_ltimes(pr); /* XXX error case? */
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 			pr->ndpr_lastupdate = time.tv_sec;
 #else
 			pr->ndpr_lastupdate = time_second;
@@ -1417,9 +1408,7 @@ prelist_update(new, dr, m)
 	 * form an address.  Note that even a manually configured address
 	 * should reject autoconfiguration of a new address.
 	 */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
@@ -1427,7 +1416,7 @@ prelist_update(new, dr, m)
 	{
 		struct in6_ifaddr *ifa6;
 		u_int32_t storedlifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		long time_second = time.tv_sec;
 #endif
 
@@ -1880,9 +1869,7 @@ nd6_prefix_onlink(pr)
 	    IN6_IFF_NOTREADY | IN6_IFF_ANYCAST);
 	if (ifa == NULL) {
 		/* XXX: freebsd does not have ifa_ifwithaf */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
 #else
 		for (ifa = ifp->if_addrlist.tqh_first;
@@ -2163,7 +2150,7 @@ in6_tmpifadd(ia0, forcegen)
 	int trylimit = 3;	/* XXX: adhoc value */
 	u_int32_t randid[2];
 	u_int32_t vltime0, pltime0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
 #endif
 
@@ -2282,7 +2269,7 @@ in6_tmpifadd(ia0, forcegen)
 int
 in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -2310,7 +2297,7 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 static void
 in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.448 2004/05/20 08:15:55 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.449 2004/05/21 07:07:31 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -97,12 +97,10 @@
 
 #ifdef __FreeBSD__
 #include "opt_ip6fw.h"
-#if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
-#endif
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -123,11 +121,8 @@
 #include <sys/socketvar.h>
 #include <sys/systm.h>
 #include <sys/syslog.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 #include <sys/kernel.h>
-#endif
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-#include <machine/pcpu.h>
 #endif
 #include <sys/proc.h>
 
@@ -139,7 +134,7 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __OpenBSD__
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #endif
@@ -147,10 +142,10 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -187,7 +182,7 @@ extern int ipsec_ipcomp_default_level;
 #endif
 #endif /* IPSEC */
 
-#if !defined(__bsdi__) && !defined(__OpenBSD__)
+#ifndef __OpenBSD__
 #include "loop.h"
 #endif
 
@@ -230,7 +225,7 @@ struct ip6_exthdrs {
 
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **,
 			   int, int));
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 	struct socket *, struct sockopt *));
 static int ip6_getpcbopt __P((struct ip6_pktopts *, int, struct sockopt *));
@@ -263,14 +258,7 @@ static int ip6_getpmtu __P((struct route_in6 *, struct route_in6 *, struct ifnet
 #endif
 static int copypktopts __P((struct ip6_pktopts *, struct ip6_pktopts *, int));
 
-#ifdef __bsdi__
-#if _BSDI_VERSION < 199802
-extern struct ifnet loif;
-#else
-extern struct ifnet *loifp;
-#endif
-#endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 extern struct ifnet loif[NLOOP];
 #endif
 
@@ -336,9 +324,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	u_int8_t sproto = 0;
 #else
 	int needipsec = 0;
-#endif
-#if defined(__bsdi__) && _BSDI_VERSION < 199802
-	struct ifnet *loifp = &loif;
 #endif
 #ifdef MIP6
 	struct mip6_pktopts mip6opt;
@@ -1100,7 +1085,7 @@ skip_ipsec2:;
 	/* adjust pointer */
 	ip6 = mtod(m, struct ip6_hdr *);
 
-#if defined(__bsdi__) || defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 		clone = 1;
 #endif
@@ -1320,11 +1305,11 @@ skip_ipsec2:;
 	in6_clearscope(&ip6->ip6_src);
 	in6_clearscope(&ip6->ip6_dst);
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 	/*
 	 * Check with the firewall...
 	 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	if (ip6_fw_enable && ip6_fw_chk_ptr) {
 #else
 	if (ip6_fw_chk_ptr) {
@@ -1462,12 +1447,9 @@ skip_ipsec2:;
 			/* Record statistics for this interface address. */
 #if defined(__NetBSD__) && defined(IFA_STATS)
 			ia6->ia_ifa.ifa_data.ifad_outbytes += m->m_pkthdr.len;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 			ia6->ia_ifa.if_opackets++;
 			ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
-#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-			ia6->ia_ifa.ifa_opackets++;
-			ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
 #endif
 		}
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -1629,12 +1611,9 @@ sendorfree:
 #if defined(__NetBSD__) && defined(IFA_STATS)
 				ia6->ia_ifa.ifa_data.ifad_outbytes +=
 					m->m_pkthdr.len;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 				ia6->ia_ifa.if_opackets++;
 				ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
-#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-				ia6->ia_ifa.ifa_opackets++;
-				ia6->ia_ifa.ifa_obytes += m->m_pkthdr.len;
 #endif
 			}
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -1888,11 +1867,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 			sa6_dst->sin6_len = sizeof(struct sockaddr_in6);
 			sa6_dst->sin6_addr = *dst;
 
-#ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route. */
-			rtcalloc((struct route *)ro_pmtu);
-#else
 			rtalloc((struct route *)ro_pmtu);
-#endif
 		}
 	}
 	if (ro_pmtu->ro_rt) {
@@ -1944,7 +1919,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 /*
  * IP6 socket option processing.
  */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int
 ip6_ctloutput(so, sopt)
 	struct socket *so;
@@ -1966,12 +1941,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct tdb_ident *tdbip, tdbi;
 	int s;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct inpcb *in6p = sotoinpcb(so);
 	int error, optval;
 	int level, op, optname;
 	int optlen;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 	struct thread *p;
 #else
 	struct proc *p;
@@ -1982,7 +1957,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 		op = sopt->sopt_dir;
 		optname = sopt->sopt_name;
 		optlen = sopt->sopt_valsize;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 		p = sopt->sopt_td;
 #else
 		p = sopt->sopt_p;
@@ -2005,12 +1980,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 	optlen = m ? m->m_len : 0;
-#endif /* FreeBSD >= 3 */
+#endif
 	error = optval = 0;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
+#if defined(__NetBSD__)
 	privileged = (p == 0 || suser(p->p_ucred, &p->p_acflag)) ? 0 : 1;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 	privileged = (p == 0 || suser(p)) ? 0 : 1;
 #else
 	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
@@ -2020,7 +1995,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 	if (level == IPPROTO_IPV6) {
 		switch (op) {
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		case SOPT_SET:
 #else
 		case PRCO_SETOPT:
@@ -2031,7 +2006,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_PKTOPTIONS:
 #endif
 			{
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				struct mbuf *m;
 
 				error = soopt_getm(sopt, &m); /* XXX */
@@ -2086,7 +2061,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 					error = EINVAL;
 					break;
 				}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyin(sopt, &optval,
 					sizeof optval, sizeof optval);
 				if (error)
@@ -2102,7 +2077,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 					else {
 						/* -1 = kernel default */
 						in6p->in6p_hops = optval;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 						if ((in6p->in6p_vflag &
 						     INP_IPV4) != 0)
 							in6p->inp_ip_ttl = optval;
@@ -2231,14 +2206,12 @@ do { \
 #else
 					OPTSET(IN6P_IPV6_V6ONLY);
 #endif
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__FreeBSD__)
 					OPTSET(IN6P_IPV6_V6ONLY);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 					if (optval)
 						in6p->in6p_vflag &= ~INP_IPV4;
 					else
 						in6p->in6p_vflag |= INP_IPV4;
-#endif
 #else
 					if ((ip6_v6only && optval) ||
 					    (!ip6_v6only && !optval))
@@ -2271,7 +2244,7 @@ do { \
 					error = EINVAL;
 					break;
 				}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyin(sopt, &tclass,
 					sizeof tclass, sizeof tclass);
 				if (error)
@@ -2296,7 +2269,7 @@ do { \
 					error = EINVAL;
 					break;
 				}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyin(sopt, &optval,
 					sizeof optval, sizeof optval);
 				if (error)
@@ -2325,7 +2298,7 @@ do { \
 					error = EINVAL;
 					break;
 				}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyin(sopt, &optval,
 					sizeof optval, sizeof optval);
 				if (error)
@@ -2368,7 +2341,7 @@ do { \
 			{
 				/* new advanced API (2292bis) */
 				u_char *optbuf;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				u_char optbuf_storage[MCLBYTES];
 #endif
 				int optlen;
@@ -2380,7 +2353,7 @@ do { \
 					break;
 				}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				/*
 				 * We only ensure valsize is not too large
 				 * here.  Further validation will be done
@@ -2392,7 +2365,7 @@ do { \
 					break;
 				optlen = sopt->sopt_valsize;
 				optbuf = optbuf_storage;
-#else  /* !fbsd3 */
+#else
 				if (m && m->m_next) {
 					error = EINVAL;	/* XXX */
 					break;
@@ -2418,7 +2391,7 @@ do { \
 			case IPV6_MULTICAST_LOOP:
 			case IPV6_JOIN_GROUP:
 			case IPV6_LEAVE_GROUP:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			    {
 				if (sopt->sopt_valsize > MLEN) {
 					error = EMSGSIZE;
@@ -2436,7 +2409,7 @@ do { \
 			case MCAST_JOIN_SOURCE_GROUP:
 			case MCAST_LEAVE_SOURCE_GROUP:
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			    {
 				struct mbuf *m;
 
@@ -2445,7 +2418,7 @@ do { \
 					break;
 				}
 				/* XXX */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 				MGET(m, sopt->sopt_td ? M_WAIT : M_DONTWAIT, MT_HEADER);
 #else
 				MGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT, MT_HEADER);
@@ -2455,7 +2428,7 @@ do { \
 					break;
 				}
 				if (sopt->sopt_valsize > MLEN) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 					MCLGET(m, sopt->sopt_td ? M_WAIT : M_DONTWAIT);
 #else
 					MCLGET(m, sopt->sopt_p ? M_WAIT : M_DONTWAIT);
@@ -2482,16 +2455,11 @@ do { \
 				error =	ip6_setmoptions(optname,
 							&in6p->in6p_moptions,
 							m);
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-				if (in6p->in6p_moptions != NULL)
-					in6p->in6p_flags |= INP_IPV6_MCAST; /* XXX */
-#endif
 #endif
 				break;
 
-#ifndef __bsdi__
 			case IPV6_PORTRANGE:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyin(sopt, &optval,
 				    sizeof optval, sizeof optval);
 				if (error)
@@ -2521,7 +2489,6 @@ do { \
 					break;
 				}
 				break;
-#endif
 
 #ifdef __OpenBSD__
 			case IPSEC6_OUTSA:
@@ -2611,11 +2578,11 @@ do { \
 			    {
 				caddr_t req = NULL;
 				size_t len = 0;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				struct mbuf *m;
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef _FreeBSD__
 				if ((error = soopt_getm(sopt, &m)) != 0) /* XXX */
 					break;
 				if ((error = soopt_mcopyin(sopt, m)) != 0) /* XXX */
@@ -2627,25 +2594,25 @@ do { \
 				}
 				error = ipsec6_set_policy(in6p, optname, req,
 							  len, privileged);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				m_freem(m);
 #endif
 			    }
 				break;
 #endif /* KAME IPSEC */
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 			case IPV6_FW_ADD:
 			case IPV6_FW_DEL:
 			case IPV6_FW_FLUSH:
 			case IPV6_FW_ZERO:
 			    {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				struct mbuf *m;
 				struct mbuf **mp = &m;
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				if (ip6_fw_ctl_ptr == NULL)
 					return EINVAL;
 				/* XXX */
@@ -2676,7 +2643,7 @@ do { \
 #endif
 			break;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		case SOPT_GET:
 #else
 		case PRCO_GETOPT:
@@ -2696,7 +2663,7 @@ do { \
 				 * to simplify this part by always returning
 				 * empty data.
 				 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 					sopt->sopt_valsize = 0;
 #else
 					*mp = m_get(M_WAIT, MT_SOOPTS);
@@ -2715,9 +2682,7 @@ do { \
 
 			case IPV6_FAITH:
 			case IPV6_V6ONLY:
-#ifndef __bsdi__
 			case IPV6_PORTRANGE:
-#endif
 			case IPV6_RECVTCLASS:
 			case IPV6_AUTOFLOWLABEL:
 				switch (optname) {
@@ -2759,14 +2724,13 @@ do { \
 					break;
 
 				case IPV6_V6ONLY:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 					optval = OPTBIT(IN6P_IPV6_V6ONLY);
 #else
 					optval = (ip6_v6only != 0); /* XXX */
 #endif
 					break;
 
-#ifndef __bsdi__
 				case IPV6_PORTRANGE:
 				    {
 					int flags;
@@ -2779,7 +2743,6 @@ do { \
 						optval = 0;
 					break;
 				    }
-#endif
 				case IPV6_RECVTCLASS:
 					optval = OPTBIT(IN6P_TCLASS);
 					break;
@@ -2790,7 +2753,7 @@ do { \
 				}
 				if (error)
 					break;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyout(sopt, &optval,
 					sizeof optval);
 #else
@@ -2828,10 +2791,10 @@ do { \
 				mtuinfo.ip6m_mtu = (u_int32_t)pmtu;
 				optdata = (void *)&mtuinfo;
 				optdatalen = sizeof(mtuinfo);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyout(sopt, optdata,
 				    optdatalen);
-#else  /* !FreeBSD3 */
+#else
 				if (optdatalen > MCLBYTES)
 					return (EMSGSIZE); /* XXX */
 				*mp = m = m_get(M_WAIT, MT_SOOPTS);
@@ -2839,7 +2802,7 @@ do { \
 					MCLGET(m, M_WAIT);
 				m->m_len = optdatalen;
 				bcopy(optdata, mtod(m, void *), optdatalen);
-#endif /* FreeBSD3 */
+#endif
 				break;
 			}
 
@@ -2865,14 +2828,14 @@ do { \
 					optval = OPTBIT(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS);
 					break;
 				}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = sooptcopyout(sopt, &optval,
 				    sizeof optval);
 #else
 				*mp = m = m_get(M_WAIT, MT_SOOPTS);
 				m->m_len = sizeof(int);
 				*mtod(m, int *) = optval;
-#endif /* FreeBSD3 */
+#endif
 				break;
 			case IPV6_PKTINFO:
 			case IPV6_HOPOPTS:
@@ -2885,7 +2848,7 @@ do { \
 			case IPV6_DONTFRAG:
 			case IPV6_USE_MIN_MTU:
 			case IPV6_PREFER_TEMPADDR:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 				    optname, sopt);
 #else
@@ -2899,7 +2862,7 @@ do { \
 			case IPV6_MULTICAST_LOOP:
 			case IPV6_JOIN_GROUP:
 			case IPV6_LEAVE_GROUP:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			    {
 				struct mbuf *m;
 				error = ip6_getmoptions(sopt->sopt_name,
@@ -2974,7 +2937,7 @@ do { \
 			  {
 				caddr_t req = NULL;
 				size_t len = 0;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				struct mbuf *m = NULL;
 				struct mbuf **mp = &m;
 				size_t ovalsize = sopt->sopt_valsize;
@@ -2994,7 +2957,7 @@ do { \
 					len = m->m_len;
 				}
 				error = ipsec6_get_policy(in6p, req, len, mp);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /* XXX */
 				if (error == 0 && m)
@@ -3004,10 +2967,10 @@ do { \
 			  }
 #endif /* KAME IPSEC */
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 			case IPV6_FW_GET:
 			  {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				struct mbuf *m;
 				struct mbuf **mp = &m;
 #endif
@@ -3021,7 +2984,7 @@ do { \
 					return EINVAL;
 				}
 				error = (*ip6_fw_ctl_ptr)(optname, mp);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /* XXX */
 				if (error == 0 && m)
@@ -3050,7 +3013,7 @@ do { \
 #ifndef offsetof
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int
 ip6_raw_ctloutput(so, sopt)
 	struct socket *so;
@@ -3071,13 +3034,13 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 #else
 	struct in6pcb *in6p = sotoin6pcb(so);
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	int level, op, optname;
 #else
 	struct mbuf *m = *mp;
-#endif /* FreeBSD >= 3 */
+#endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	if (sopt) {
 		level = sopt->sopt_level;
 		op = sopt->sopt_dir;
@@ -3087,7 +3050,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		panic("ip6_raw_ctloutput: arg soopt is NULL");
 #else
 	optlen = m ? m->m_len : 0;
-#endif /* FreeBSD >= 3 */
+#endif
 
 	if (level != IPPROTO_IPV6) {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -3108,7 +3071,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 		 * The current behavior does not meet 2292bis.
 		 */
 		switch (op) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 		case SOPT_SET:
 #else
 		case PRCO_SETOPT:
@@ -3117,7 +3080,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 				break;
 			}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			error = sooptcopyin(sopt, &optval, sizeof(optval),
 					    sizeof(optval));
 			if (error)
@@ -3136,7 +3099,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 				in6p->in6p_cksum = optval;
 			break;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef _FreeBSD__
 		case SOPT_GET:
 #else
 		case PRCO_GETOPT:
@@ -3146,13 +3109,13 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 			else
 				optval = in6p->in6p_cksum;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 			error = sooptcopyout(sopt, &optval, sizeof(optval));
 #else
 			*mp = m = m_get(M_WAIT, MT_SOOPTS);
 			m->m_len = sizeof(int);
 			*mtod(m, int *) = optval;
-#endif /* FreeBSD3 */
+#endif
 			break;
 
 		default:
@@ -3183,7 +3146,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
  * specifying behavior of outgoing packets.
  */
 static int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 ip6_pcbopts(pktopt, m, so, sopt)
 #else
 ip6_pcbopts(pktopt, m, so)
@@ -3191,20 +3154,18 @@ ip6_pcbopts(pktopt, m, so)
 	struct ip6_pktopts **pktopt;
 	struct mbuf *m;
 	struct socket *so;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct sockopt *sopt;
 #endif
 {
 	struct ip6_pktopts *opt = *pktopt;
 	int error = 0;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	struct thread *p = sopt->sopt_td;
 #else
 	struct proc *p = sopt->sopt_p;
 #endif
-#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-	struct proc *p = PCPU(curproc);	/* XXX */
 #else
 	struct proc *p = curproc;	/* XXX */
 #endif
@@ -3289,7 +3250,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv, uproto)
 	return (ip6_setpktopt(optname, buf, len, opt, priv, 1, 0, uproto));
 }
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 static int
 ip6_getpcbopt(pktopt, optname, sopt)
 	struct ip6_pktopts *pktopt;
@@ -3399,9 +3360,9 @@ ip6_getpcbopt(pktopt, optname, mp)
 		return (ENOPROTOOPT);
 	}
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	error = sooptcopyout(sopt, optdata, optdatalen);
-#else  /* !FreeBSD3 */
+#else
 	if (optdatalen > MCLBYTES)
 		return (EMSGSIZE); /* XXX */
 	*mp = m = m_get(M_WAIT, MT_SOOPTS);
@@ -3410,7 +3371,7 @@ ip6_getpcbopt(pktopt, optname, mp)
 	m->m_len = optdatalen;
 	if (optdatalen)
 		bcopy(optdata, mtod(m, void *), optdatalen);
-#endif /* FreeBSD3 */
+#endif
 
 	return (error);
 }

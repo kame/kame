@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.155 2004/04/22 05:36:45 keiichi Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.156 2004/05/21 07:07:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,7 +91,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__OpenBSD__)
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
@@ -469,7 +469,7 @@ rip6_output(m, va_alist)
 	in6p = sotoin6pcb(so);
 
 	priv = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
     {
 	struct proc *p = curproc;	/* XXX */
 
@@ -665,7 +665,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 #endif
 
 	priv = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv++;
 #else
@@ -675,11 +675,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)nam,
-		    (struct ifnet *)control
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-				    , p
-#endif
-				    ));
+		    (struct ifnet *)control, p));
 
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
@@ -769,13 +765,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EINVAL;
 			break;
 		}
-		if (
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		   (ifnet == 0) ||
-#else
-		   (ifnet.tqh_first == 0) ||
-#endif
-		   (addr->sin6_family != AF_INET6)) {
+		if ((ifnet.tqh_first == 0) || (addr->sin6_family != AF_INET6)) {
 			error = EADDRNOTAVAIL;
 			break;
 		}
@@ -824,12 +814,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EINVAL;
 			break;
 		}
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		if (ifnet == 0)
-#else
-		if (ifnet.tqh_first == 0)
-#endif
-		{
+		if (ifnet.tqh_first == 0) {
 			error = EADDRNOTAVAIL;
 			break;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.28 2004/04/22 09:40:59 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.29 2004/05/21 07:07:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -540,14 +540,11 @@ mip6_bc_proxy_control(target, local, cmd)
 	{
 		struct ifaddr *ifa_dl;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa_dl = ifp->if_addrlist; ifa_dl; ifa_dl = ifa->ifa_next)
-#else
 		for (ifa_dl = ifp->if_addrlist.tqh_first; ifa_dl;
-		     ifa_dl = ifa_dl->ifa_list.tqe_next)
-#endif
+		     ifa_dl = ifa_dl->ifa_list.tqe_next) {
 			if (ifa_dl->ifa_addr->sa_family == AF_LINK)
 				break;
+		}
 
 		if (!ifa_dl)
 			return (EINVAL);
