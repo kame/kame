@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/21 04:50:32 $
+		     $Date: 2000/04/23 05:23:22 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -72,5 +72,6 @@ Many of old ones have been solved.
   We supply ports/pkgsrc for easier installation on kame/freebsd[23]
   and kame/netbsd.
 
+- stf interface may not work correctly on freebsd3.
 
 							<end of RELNOTES>
