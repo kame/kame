@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.44 2001/08/17 10:04:17 sakane Exp $
+$KAME: helsinki-result.jp,v 1.45 2001/08/17 10:43:40 itojun Exp $
 
 
 generic
@@ -31,6 +31,9 @@ generic
 	長いKEYMATの計算のとき、必要鍵長の計算にbugあり (修正済)
 
 	ndpをbypassさせるフラグかポリシがあった方がいいかも。
+	一応ipsec_setsocket(NULL)はしている。ip6_output()にフラグ渡す?
+	美しくない... (itojun)
+
 
 latest isakmpd on KAME
 	Tue Aug 14 01:42:55 JST 2001
@@ -46,6 +49,12 @@ d or the spi expired.
 USAGI linux
 	Tue Aug 14 01:42:55 JST 2001
 	なんか今はまっているらしい。
+
+	Wed Aug 15 JST
+	ESP 3des, desのmanual keyは成功
+
+	Thu Aug 16 JST
+	とりあえずplutoだけ動かした。phase 2は完了するが結果の鍵が違う。
 
 
 Compaq Tru54 UNIX X5.1B-BL4
@@ -81,6 +90,7 @@ Compaq Tru54 UNIX X5.1B-BL4
 	opensslのバージョン下げちゃったので
 	ipv6 address as subjectAltName は出来ず。
 
+
 Sun
 	Thu Aug 16 16:30 EEST 2001
 	phase1: RSA signature, 3des, sha1, dh5
@@ -90,6 +100,7 @@ Sun
 
 	Sunは phase2のAESの鍵長をつけてなかった。draftによるとmust。
 	racoon側がdefault鍵長をセットするようにして対応。
+
 
 IBM AIX 5.1
 	Tue Aug 14 17:33:43 JST 2001
@@ -104,6 +115,8 @@ IBM AIX 5.1
 	ibm isakmpd に問題あるっぽい。
 
 	san diegoでやった時は manual だったかな？
+	そうです(itojun)
+
 
 F-Secure VPN+ 5.40
 	Tue Aug 14 19:44:15 JST 2001
@@ -136,6 +149,7 @@ F-Secure VPN+ 5.40
 	DH公開情報は事前に計算しとく方がいいかも
 	f-secureはsubjectAltNameにアドレス書かないとパケットだせない。
 	f-secureはsubjectAltNameを1つしか受けつけない。
+
 
 SecGo CryptoIP v3
 	Tue Aug 14 21:41:36 JST 2001
@@ -337,6 +351,7 @@ isakmpd (jakob@openbsd)
 	問題なし。
 	isakmpdは subjectAltNameを1つしか受けつけない。
 
+
 Fitec
 	Wed Aug 15 13:00
 	RSA signature
@@ -373,6 +388,7 @@ SSH
 	racoonはfujixeroxがサインした証明書でもOK
 
 	AES phase1 がうまくいかない。間違いなくracoonの問題。
+
 
 freeswan
 	IPv4, IPComp + ESP, transport mode
@@ -438,7 +454,8 @@ draft-shacham-ippcp-rfc2393bis-08.txt
 	IPv4, IPComp + ESP, transport mode
 	phase 1 3DES + SHA1, group 5, lifetime = 10min
 	phase 2 3DES + SHA1 + deflate, group 5, lifetime = 2min
-	再挑戦。修正確認。
+	再挑戦。修正できたことを確認。
+
 
 netopia
 	Wed Aug 15 19:00 JST頃
