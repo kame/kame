@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.89 2002/12/13 10:32:55 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.90 2002/12/13 10:43:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1504,7 +1504,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	if (need_rr) {
 		bu_size += PADLEN(bu_size, 2, 0);
 		nonce_size = sizeof(struct ip6m_opt_nonce);
-		nonce_size += PADLEN(bu_size + nonce_size, 4, 2);
+		nonce_size += PADLEN(bu_size + nonce_size, 8, 2);
 		auth_size = AUTH_SIZE;
 		auth_size += PADLEN(bu_size + nonce_size + auth_size, 8, 0);
 #ifdef RR_DBG
@@ -1680,9 +1680,9 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		key_bu) == 0) {
 		need_auth = 1;
 		if (refresh_size == 0)
-			ba_size += PADLEN(ba_size, 8, 6);
+			ba_size += PADLEN(ba_size, 8, 2);
 		else
-			refresh_size += PADLEN(ba_size + refresh_size, 8, 6);
+			refresh_size += PADLEN(ba_size + refresh_size, 8, 2);
 		auth_size = AUTH_SIZE;
 	}
 	ip6ma_size = ba_size + refresh_size + auth_size;
