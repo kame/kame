@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.11 2001/09/20 06:26:32 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.12 2001/09/20 07:14:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -462,9 +462,19 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 	 * find a home agent address based on the homeaddress of the
 	 * mobile node.
 	 */
-	haifa = in6_ifawithifp(rifp, haddr);
+    {
+	struct sockaddr_in6 haddr_sin;
 
-	/* XXX TODO */
+	bzero(&haddr_sin, sizeof(haddr_sin));
+	haddr_sin.sin6_len = sizeof(haddr_sin);
+	haddr_sin.sin6_family = AF_INET6;
+	haddr_sin.sin6_addr = *haddr;
+
+	haifa = (struct in6_ifaddr *)
+		ifa_ifwithnet((struct sockaddr *)&haddr_sin);
+    }
+
+        /* XXX TODO */
 	/* collect ha list on the home link and create a list */
 
 	/* create a home agent address list */
