@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.138 2001/04/10 15:38:41 thorpej Exp $	*/
+/*	$KAME: isakmp.c,v 1.139 2001/05/24 06:43:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1596,6 +1596,15 @@ isakmp_post_acquire(iph2)
 			"no configuration found for %s.\n",
 			saddrwop2str(iph2->dst));
 		return -1;
+	}
+
+	/* if passive mode, ignore the acquire message */
+	if (rmconf->passive) {
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"because of passive mode, "
+			"ignore the acquire message for %s.\n",
+			saddrwop2str(iph2->dst));
+		return 0;
 	}
 
 	/* search isakmp status table by address with masking port */

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.58 2001/04/11 06:11:55 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.59 2001/05/24 06:43:24 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -271,6 +271,7 @@ hexstring	0x{hexdigit}+
 <S_RMTS>exact		{ YYD; yylval.num = PROP_CHECK_EXACT; return(PROPOSAL_CHECK_LEVEL); }
 <S_RMTS>claim		{ YYD; yylval.num = PROP_CHECK_CLAIM; return(PROPOSAL_CHECK_LEVEL); }
 <S_RMTS>keepalive	{ YYD; return(KEEPALIVE); }
+<S_RMTS>passive		{ YYD; return(PASSIVE); }
 <S_RMTS>lifetime	{ YYD; return(LIFETIME); }
 <S_RMTS>time		{ YYD; return(LIFETYPE_TIME); }
 <S_RMTS>byte		{ YYD; return(LIFETYPE_BYTE); }

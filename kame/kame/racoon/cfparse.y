@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.98 2001/04/11 06:11:55 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.99 2001/05/24 06:43:24 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -146,7 +146,7 @@ static int fix_lifebyte __P((u_long));
 %token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE VERIFY_CERT SEND_CERT SEND_CR
 %token IDENTIFIERTYPE MY_IDENTIFIER PEERS_IDENTIFIER
 %token DNSSEC CERT_X509
-%token NONCE_SIZE DH_GROUP KEEPALIVE INITIAL_CONTACT
+%token NONCE_SIZE DH_GROUP KEEPALIVE PASSIVE INITIAL_CONTACT
 %token PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL
 %token GENERATE_POLICY SUPPORT_MIP6
 %token POST_COMMAND
@@ -1050,6 +1050,7 @@ remote_spec
 		}
 		dh_group_num EOS
 	|	KEEPALIVE { cur_rmconf->keepalive = TRUE; } EOS
+	|	PASSIVE SWITH { cur_rmconf->passive = TRUE; } EOS
 	|	GENERATE_POLICY SWITCH { cur_rmconf->gen_policy = $2; } EOS
 	|	SUPPORT_MIP6 SWITCH { cur_rmconf->support_mip6 = $2; } EOS
 	|	INITIAL_CONTACT SWITCH { cur_rmconf->ini_contact = $2; } EOS
