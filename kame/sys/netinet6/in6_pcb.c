@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.84 2001/02/08 18:02:08 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.85 2001/02/23 09:17:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,7 +141,7 @@ in6_pcballoc(so, head)
 	in6p->in6p_prev = head;
 	in6p->in6p_next->in6p_prev = in6p;
 #if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
-	if (ip6_bindv6only)
+	if (ip6_v6only)
 		in6p->in6p_flags |= IN6P_BINDV6ONLY;
 #else
 	in6p->in6p_flags |= IN6P_BINDV6ONLY;	/*just for safety*/

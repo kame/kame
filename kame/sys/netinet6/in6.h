@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.77 2001/02/09 06:17:40 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.78 2001/02/26 08:02:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -622,9 +622,7 @@ struct ip6_mtuinfo {
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #define IPV6CTL_MAPPED_ADDR	23
 #endif
-#ifdef __NetBSD__
-#define IPV6CTL_BINDV6ONLY	24
-#endif
+#define IPV6CTL_V6ONLY		24
 #ifdef __FreeBSD__
 #define IPV6CTL_RTEXPIRE	25	/* cloned route expiration time */
 #define IPV6CTL_RTMINEXPIRE	26	/* min value for expiration time */
@@ -653,16 +651,6 @@ struct ip6_mtuinfo {
 #define __IPV6CTL_NAMES_MAPPED_ADDR	0
 #define __IPV6CTL_TYPE_MAPPED_ADDR	0
 #define __IPV6CTL_VARS_MAPPED_ADDR	0
-#endif
-
-#ifdef IPV6CTL_BINDV6ONLY
-#define __IPV6CTL_NAMES_BINDV6ONLY	"bindv6only"
-#define __IPV6CTL_TYPE_BINDV6ONLY	CTLTYPE_INT
-#define __IPV6CTL_VARS_BINDV6ONLY	&ip6_bindv6only
-#else
-#define __IPV6CTL_NAMES_BINDV6ONLY	0
-#define __IPV6CTL_TYPE_BINDV6ONLY	0
-#define __IPV6CTL_VARS_BINDV6ONLY	0
 #endif
 
 #ifdef IPV6CTL_RTEXPIRE
@@ -761,7 +749,7 @@ struct ip6_mtuinfo {
 	{ "use_deprecated", CTLTYPE_INT }, \
 	{ "rr_prune", CTLTYPE_INT }, \
 	{ __IPV6CTL_NAMES_MAPPED_ADDR, __IPV6CTL_TYPE_MAPPED_ADDR }, \
-	{ __IPV6CTL_NAMES_BINDV6ONLY, __IPV6CTL_TYPE_BINDV6ONLY }, \
+	{ "v6only", CTLTYPE_INT }, \
 	{ __IPV6CTL_NAMES_RTEXPIRE, __IPV6CTL_TYPE_RTEXPIRE }, \
 	{ __IPV6CTL_NAMES_MINEXPIRE, __IPV6CTL_TYPE_MINEXPIRE }, \
 	{ __IPV6CTL_NAMES_MAXCACHE, __IPV6CTL_TYPE_MAXCACHE }, \
@@ -801,7 +789,7 @@ struct ip6_mtuinfo {
 	&ip6_use_deprecated, \
 	&ip6_rr_prune, \
 	__IPV6CTL_VARS_MAPPED_ADDR, \
-	__IPV6CTL_VARS_BINDV6ONLY, \
+	&ip6_v6only, \
 	__IPV6CTL_VARS_RTEXPIRE, \
 	__IPV6CTL_VARS_MINEXPIRE, \
 	__IPV6CTL_VARS_MAXCACHE, \

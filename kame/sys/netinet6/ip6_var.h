@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.57 2001/02/09 06:17:41 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.58 2001/02/26 08:02:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -288,8 +288,10 @@ extern int	ip6_rr_prune;		/* router renumbering prefix
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 extern int	ip6_mapped_addr_on;
 #endif
-#if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
-extern int	ip6_bindv6only;
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2) || (defined(__bsdi__) && _BSDI_VERSION < 199802)
+extern const int	ip6_v6only;
+#else
+extern int	ip6_v6only;
 #endif
 
 extern struct socket *ip6_mrouter; 	/* multicast routing daemon */
