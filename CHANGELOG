@@ -1,14 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1632 2001/04/02 12:47:29 itojun Exp $
+$KAME: CHANGELOG,v 1.1633 2001/04/03 12:46:14 itojun Exp $
 
 <200104>
-Mon Apr  2 21:45:42 JST 2001  itojun@iijlab.net
-	* sys/netinet6/tcp6_output.c (freebsd2/bsdi3):
-	  support IPV6_MIN_MTU setsockopt on tcp (freebsd2/bsdi3).
+Mon Apr  3 JST 2001  itojun@iijlab.net
+	* sys/netinet6/tcp6_output.c (freebsd2/bsdi3),
+	  sys/netinet/tcp_output.c (netbsd/openbsd/bsdi4):
+	  support IPV6_USE_MIN_MTU setsockopt on IPv6 tcp.
 	  - pass IPV6_MINMTU down to ip6_output,
 	  - on outgoing segment packing use 1280 (IPV6_MMTU) as packet size,
-	    instead of MSS heard from the peer.
+	    instead of MSS heard from the peer (except bsdi4/openbsd).
 
 	  design memo:
 	  do we need to play with MSS advertisement to the peer?  I don't
@@ -18,6 +19,8 @@ Mon Apr  2 21:45:42 JST 2001  itojun@iijlab.net
 	  though i agree that it is be useful to decrase MSS advertisement
 	  to trick inbound PMTUD behavior, i believe it is a separate topic
 	  from IPV6_MIN_MTU.
+
+	  TODO: generate packets fit into 1280 bytes for bsdi4/openbsd
 
 2001-04-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi3/sys/net/if.c (ifa_ifwithnet): disabled the check for
