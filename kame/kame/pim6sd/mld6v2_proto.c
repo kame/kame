@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.40 2004/06/14 04:33:46 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.41 2004/06/14 04:38:47 suz Exp $
  */
 
 /*
@@ -571,19 +571,6 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	 	return;
 
 	switch (mard->record_type) {
-	case ALLOW_NEW_SOURCES:
-	case BLOCK_OLD_SOURCES:
-	    if (uv_group == NULL) {
-	    	log_msg(LOG_DEBUG, 0,
-			"cannot accept source-list-change-record"
-			"for non-existent record");
-	    	return;
-	    }
-	default:
-	    ;	/* do nothing */
-	}
-
-	switch (mard->record_type) {
 	case CHANGE_TO_INCLUDE_MODE:
 	    if (numsrc == 0) {
 	        if (uv_group == NULL) {
@@ -706,6 +693,12 @@ accept_multicast_record(vifi, mard, src, grp, uv_group)
 	    break;
 
 	case BLOCK_OLD_SOURCES:
+	    if (uv_group == NULL) {
+	    	log_msg(LOG_DEBUG, 0,
+			"cannot accept BLOCK_OLD_SOURCE record"
+			"for non-existent group");
+	    	return;
+	    }
 	    /*
 	     * Unlike RFC2710 section 4 p.7 (Routers in Non-Querier state 
 	     * MUST ignore Done messages), MLDv2 non-querier should 
