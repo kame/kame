@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.43 2000/11/30 11:13:35 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.44 2000/11/30 12:30:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1049,7 +1049,7 @@ esp6_ctlinput(cmd, sa, d)
 		 */
 		bzero(&ip6cp1, sizeof(ip6cp1));
 		ip6cp1.ip6c_src = ip6cp->ip6c_src;
-		pfctlinput2(cmd, sa, (void *)ip6cp);
+		pfctlinput2(cmd, sa, (void *)&ip6cp1);
 	} else {
 		/* we normally notify any pcb here */
 	}
