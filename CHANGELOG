@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1255 2000/09/06 07:21:56 itojun Exp $
+$KAME: CHANGELOG,v 1.1256 2000/09/06 07:33:42 sakane Exp $
 
 <200009>
 Wed Sep  6 16:20:45 JST 2000  itojun@iijlab.net
@@ -35,6 +35,12 @@ Fri Sep  1 02:30:02 JST 2000  itojun@iijlab.net
 	* kame/racoon: allow comment line in pre-shared key setting.
 
 <200008>
+Thu Aug 31 23:47:31 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Enable to send either the DN or SubjectAltName as ID payload.
+	Compared between the value of ID payload and the name of the
+	certificate if it needed.
+
 Thu Aug 31 20:04:27 JST 2000  itojun@iijlab.net
 	* freebsd2/ports/sendmail.beta: upgrade to 8.11.0.
 
