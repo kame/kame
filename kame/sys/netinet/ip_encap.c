@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.28 2000/04/19 02:25:57 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.29 2000/04/19 02:48:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,7 +41,8 @@
  *	mobile-ip6 (uses RFC2473)
  *	6to4 tunnel
  * Here's a list of protocol that want protocol #4:
- *	RFC1853 IPv4-in-IPv4 tunnel
+ *	RFC1853 IPv4-in-IPv4 tunnelling
+ *	RFC2003 IPv4 encapsulation within IPv4
  *	RFC2344 reverse tunnelling for mobile-ip4
  *	RFC2401 IPsec tunnel
  * Well, what can I say.  They impose different en/decapsulation mechanism
