@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.77 2002/02/05 01:04:17 jinmei Exp $	*/
+/*	$KAME: ip_encap.c,v 1.78 2002/03/14 08:21:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -887,16 +887,16 @@ encap6_ctlinput(cmd, sa, d0)
 
 		/*
 		 * Check to see if we have a valid encap configuration.
+		 * XXX works only for table-based lookup (which uses sa6_src
+		 * and sa).  does not work for function-based lookup (which
+		 * uses m).
 		 */
-		if (0) {	/* XXX: does not seem to work! */
-			match = encap6_lookup(m, off, nxt,
-					      (struct sockaddr_in6 *)sa6_src,
-					      (struct sockaddr_in6 *)sa,
-					      OUTBOUND);
+		match = encap6_lookup(m, off, nxt,
+		    (struct sockaddr_in6 *)sa6_src, (struct sockaddr_in6 *)sa,
+		    OUTBOUND);
 
-			if (match)
-				valid++;
-		}
+		if (match)
+			valid++;
 
 		/*
 		 * Depending on the value of "valid" and routing table
