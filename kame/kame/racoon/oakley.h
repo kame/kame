@@ -1,4 +1,4 @@
-/*	$KAME: oakley.h,v 1.20 2001/08/13 14:42:11 sakane Exp $	*/
+/*	$KAME: oakley.h,v 1.21 2001/08/13 19:45:17 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,6 +240,22 @@
 	"60C980DD 98EDD3DF FFFFFFFF FFFFFFFF"
 
 #define MAXPADLWORD	20
+
+struct hmac_algorithm {
+	char *name;
+	caddr_t (*init) __P((vchar_t *));
+	void (*update) __P((caddr_t, vchar_t *));
+	vchar_t *(*final) __P((caddr_t));
+	vchar_t *(*one) __P((vchar_t *, vchar_t *));
+};
+
+struct hash_algorithm {
+	char *name;
+	caddr_t (*init) __P((void));
+	void (*update) __P((caddr_t, vchar_t *));
+	vchar_t *(*final) __P((caddr_t));
+	vchar_t *(*one) __P((vchar_t *));
+};
 
 struct cipher_algorithm {
 	char *name;

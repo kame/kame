@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.90 2001/08/08 10:02:53 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.91 2001/08/13 19:45:17 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,40 @@ struct dhgroup dhgroup[MAXDHGROUP];
 static vchar_t oakley_prime768;
 static vchar_t oakley_prime1024;
 static vchar_t oakley_prime1536;
+
+static struct hash_algorithm hashdef[] = {
+{ "NULL",	NULL,			NULL,
+		NULL,			NULL, },
+{ "md5",	eay_md5_init,		eay_md5_update,
+		eay_md5_final,		eay_md5_one, },
+{ "sha1",	eay_sha1_init,		eay_sha1_update,
+		eay_sha1_final,		eay_sha1_one, },
+{ "*dummy*",	NULL,			NULL,
+		NULL,			NULL, },
+{ "sha2_256",	eay_sha2_256_init,	eay_sha2_256_update,
+		eay_sha2_256_final,	eay_sha2_256_one, },
+{ "sha2_384",	eay_sha2_384_init,	eay_sha2_384_update,
+		eay_sha2_384_final,	eay_sha2_384_one, },
+{ "sha2_512",	eay_sha2_512_init,	eay_sha2_512_update,
+		eay_sha2_512_final,	eay_sha2_512_one, },
+};
+
+static struct hmac_algorithm hmacdef[] = {
+{ "NULL",	NULL,			NULL,
+		NULL,			NULL, },
+{ "md5",	eay_hmacmd5_init,		eay_hmacmd5_update,
+		eay_hmacmd5_final,		eay_hmacmd5_one, },
+{ "sha1",	eay_hmacsha1_init,		eay_hmacsha1_update,
+		eay_hmacsha1_final,		eay_hmacsha1_one, },
+{ "*dummy*",	NULL,			NULL,
+		NULL,			NULL, },
+{ "sha2_256",	eay_hmacsha2_256_init,	eay_hmacsha2_256_update,
+		eay_hmacsha2_256_final,	eay_hmacsha2_256_one, },
+{ "hmac_sha2_384",	eay_hmacsha2_384_init,	eay_hmacsha2_384_update,
+		eay_hmacsha2_384_final,	eay_hmacsha2_384_one, },
+{ "hmac_sha2_512",	eay_hmacsha2_512_init,	eay_hmacsha2_512_update,
+		eay_hmacsha2_512_final,	eay_hmacsha2_512_one, },
+};
 
 static struct cipher_algorithm cipher[] = {
 { "NULL",	NULL,			NULL,			NULL, },
@@ -314,41 +348,32 @@ oakley_prf(key, buf, iph1)
 	vchar_t *key, *buf;
 	struct ph1handle *iph1;
 {
-	vchar_t *res;
-
-	if (iph1->approval == NULL) {
-		/*
-		 * it's before negotiating hash algorithm.
-		 * We use md5 as default.
-		 */
-		goto defs;
-	}
+	vchar_t *res = NULL;
+	int type;
 
 #ifdef ENABLE_STATS
     {
 	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
-	switch (iph1->approval->dh_group) {
-	default:
-		switch (iph1->approval->hashtype) {
-		case OAKLEY_ATTR_HASH_ALG_MD5:
-defs:
-			plog(LLV_DEBUG, LOCATION, NULL, "hmac-md5 used.\n");
-			res = eay_hmacmd5_one(key, buf);
-			break;
-		case OAKLEY_ATTR_HASH_ALG_SHA:
-			plog(LLV_DEBUG, LOCATION, NULL, "hmac-sha1 used.\n");
-			res = eay_hmacsha1_one(key, buf);
-			break;
-		default:
-			plog(LLV_ERROR, LOCATION, NULL,
-				"hash type %d isn't supported.\n",
-				iph1->approval->hashtype);
-			return NULL;
-			break;
-		}
+	if (iph1->approval == NULL) {
+		/*
+		 * it's before negotiating hash algorithm.
+		 * We use md5 as default.
+		 */
+		type = OAKLEY_ATTR_HASH_ALG_MD5;
+	} else
+		type = iph1->approval->hashtype;
+
+	if (type > ARRAYLEN(hmacdef) && hmacdef[type].one == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid hmac hash algoriym was passed.\n");
+		return NULL;
 	}
+	plog(LLV_DEBUG, LOCATION, NULL, "hmac hash(%s)\n",
+		hmacdef[type].name);
+	res = (hmacdef[type].one)(key, buf);
+
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
 	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
@@ -368,47 +393,36 @@ oakley_hash(buf, iph1)
 	vchar_t *buf;
 	struct ph1handle *iph1;
 {
-	vchar_t *res;
-
-	if (iph1->approval == NULL) {
-		/*
-		 * it's before negotiating hash algorithm.
-		 * We use md5 as default.
-		 */
-		goto defs;
-	}
+	vchar_t *res = NULL;
+	int type;
 
 #ifdef ENABLE_STATS
     {
 	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
-	switch (iph1->approval->dh_group) {
-	default:
-		switch (iph1->approval->hashtype) {
-		case OAKLEY_ATTR_HASH_ALG_MD5:
-defs:
-			plog(LLV_DEBUG, LOCATION, NULL,
-				"use md5 to calculate phase 1.\n");
-			res = eay_md5_one(buf);
-			break;
-		case OAKLEY_ATTR_HASH_ALG_SHA:
-			plog(LLV_DEBUG, LOCATION, NULL,
-				"use sha1 to calculate phase 1.\n");
-			res = eay_sha1_one(buf);
-			break;
-		default:
-			plog(LLV_ERROR, LOCATION, NULL,
-				"hash type %d isn't supported.\n",
-				iph1->approval->hashtype);
-			return NULL;
-			break;
-		}
+	if (iph1->approval == NULL) {
+		/*
+		 * it's before negotiating hash algorithm.
+		 * We use md5 as default.
+		 */
+		type = OAKLEY_ATTR_HASH_ALG_MD5;
+	} else
+		type = iph1->approval->hashtype;
+
+	if (type > ARRAYLEN(hashdef) && hashdef[type].one == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid hash algoriym was passed.\n");
+		return NULL;
 	}
+	plog(LLV_DEBUG, LOCATION, NULL, "hash(%s)\n",
+		hashdef[type].name);
+	res = (hashdef[type].one)(buf);
+
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
 	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
-		s_attr_isakmp_hash(iph1->approval->hashtype),
+		hashdef[iph1->approval->hashtype].name,
 		buf->l, timedelta(&start, &end));
     }
 #endif
