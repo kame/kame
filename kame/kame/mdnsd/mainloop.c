@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.26 2000/05/31 13:17:30 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.27 2000/05/31 13:35:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -79,8 +79,8 @@ static int encode_myaddrs __P((const char *, u_int16_t, u_int16_t, char *,
 #if 0
 static const struct sockaddr *getsa __P((const char *, const char *, int));
 #endif
-static int getans __P((int, char *, int, struct sockaddr *));
-static int relay __P((char *, int, struct sockaddr *));
+static int getans __P((char *, int, struct sockaddr *));
+static int relay __P((int, char *, int, struct sockaddr *));
 static int serve __P((int, char *, int, struct sockaddr *));
 
 #ifndef INADDR_LOOPBACK
@@ -172,8 +172,8 @@ mainloop0(i)
 		 * otherwise, relay lookup request from local
 		 * node to multicast-capable servers.
 		 */
-		if (serve(sock[0], buf, l, (struct sockaddr *)&from) != 0)
-			relay(buf, l, (struct sockaddr *)&from);
+		if (serve(sock[i], buf, l, (struct sockaddr *)&from) != 0)
+			relay(i, buf, l, (struct sockaddr *)&from);
 	} else {
 		/*
 		 * if got a query from remote, try to transmit answer.
@@ -181,8 +181,8 @@ mainloop0(i)
 		 * fill it into our local answer cache and send
 		 * the reply to the originator.
 		 */
-		if (serve(sock[0], buf, l, (struct sockaddr *)&from) != 0)
-			getans(sock[0], buf, l, (struct sockaddr *)&from);
+		if (serve(sock[i], buf, l, (struct sockaddr *)&from) != 0)
+			getans(buf, l, (struct sockaddr *)&from);
 	}
 
 	return 0;
@@ -574,8 +574,7 @@ getsa(host, port, socktype)
 #endif
 
 static int
-getans(s, buf, len, from)
-	int s;
+getans(buf, len, from)
 	char *buf;
 	int len;
 	struct sockaddr *from;
@@ -621,7 +620,7 @@ getans(s, buf, len, from)
 	hp->ra = 0;	/* recursion not supported */
 	if (dflag)
 		dnsdump("getans O", buf, len, (struct sockaddr *)&qc->from);
-	if (sendto(s, buf, len, 0, (struct sockaddr *)&qc->from,
+	if (sendto(sock[qc->sockidx], buf, len, 0, (struct sockaddr *)&qc->from,
 	    qc->from.ss_len) != len) {
 		delqcache(qc);
 		goto fail;
@@ -643,7 +642,8 @@ fail:
 }
 
 static int
-relay(buf, len, from)
+relay(sidx, buf, len, from)
+	int sidx;
 	char *buf;
 	int len;
 	struct sockaddr *from;
@@ -664,6 +664,7 @@ relay(buf, len, from)
 	if (hp->qr == 0 && hp->opcode == QUERY) {
 		/* query, no recurse - multicast it */
 		qc = newqcache(from, buf, len);
+		qc->sockidx = sidx;
 
 		ord = hp->rd;
 
@@ -672,11 +673,16 @@ relay(buf, len, from)
 
 		sent = 0;
 		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
+			printnsdb(ns);
 			for (i = 0; i < nsock; i++) {
-				if (sockaf[i] != ns->addr.ss_family)
+				if (sockaf[i] != ns->addr.ss_family) {
+					printf("sock %d af mismatch\n", i);
 					continue;
-				if (sockflag[i] & SOCK_MEDIATOR)
+				}
+				if (sockflag[i] & SOCK_MEDIATOR) {
+					printf("sock %d mediator\n", i);
 					continue;
+				}
 
 				hp->rd = ord;
 				/* never ask for recursion on multicast query */
@@ -689,6 +695,7 @@ relay(buf, len, from)
 					dnsdump("relay O", buf, len, sa);
 				if (sendto(sock[i], buf, len, 0, sa,
 				    sa->sa_len) == len) {
+					dprintf("sock %d sent\n");
 					sent++;
 					gettimeofday(&ns->lasttx, NULL);
 					break;	/* try the next nameserver */
@@ -701,7 +708,7 @@ relay(buf, len, from)
 			delqcache(qc);
 			return -1;
 		} else
-			dprintf("sent\n");
+			dprintf("sent to %d sockets\n", sent);
 
 		return 0;
 	} else
