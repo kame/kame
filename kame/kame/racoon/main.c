@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.6 2000/05/11 09:18:56 sakane Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.7 2000/06/28 05:23:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -215,7 +215,14 @@ parse(ac, av)
 		case 'v':
 			vflag++;
 			break;
-		case 'Z': /* only to use local test */
+		case 'Z':
+			/*
+			 * only local test.
+			 * pk_sendadd() on initiator side is always failed
+			 * even if this flag is used.  Because there is same
+			 * spi in the SAD which is inserted by pk_sendgetspi()
+			 * on responder side.
+			 */
 			printf("Local test mode.\n");
 			f_local = 1;
 			break;
