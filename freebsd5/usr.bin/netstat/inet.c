@@ -622,21 +622,6 @@ dccp_stats(u_long off __unused, const char *name, int af1 __unused)
 	p(dccps_opackets, "\t%lu packet%s output\n");
 	p(dccps_obytes, "\t%lu byte%s output\n");
 
-	printf("\n\tTFRC Sender:\n");
-	p(tfrcs_send_conn, "\t%lu connection%s established\n");
-	p(tfrcs_send_fbacks, "\t%lu correct feedback packet%s received\n");
-	p(tfrcs_send_noopt, "\t%lu dropped feedback packet%s (missing option)\n");
-	p(tfrcs_send_nomem, "\t%lu send%s refused (no memory for history)\n");
-	p(tfrcs_send_erropt, "\t%lu send%s refused (unable to add option)\n");
-
-	printf("\tTFRC Receiver:\n");
-	p(tfrcs_recv_conn, "\t%lu connection%s established\n");
-	p(tfrcs_recv_fbacks, "\t%lu correct feedback packet%s received\n");
-	p(tfrcs_recv_losts, "\t%lu lost packet%s\n");
-	p(tfrcs_recv_noopt, "\t%lu dropped packet%s (missing option)\n");
-	p(tfrcs_recv_nomem, "\t%lu dropped packet%s (no memory for history)\n");
-	p(tfrcs_recv_erropt, "\t%lu feedback packet%s failed option adding on feedback packet\n");
-
 	printf("\n\tTCPlike Sender:\n");
 	p(tcplikes_send_conn, "\t%lu connection%s established\n");
 	p(tcplikes_send_reploss, "\t%lu data packet%s reported lost\n");
