@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.1 1999/08/08 23:31:23 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.2 1999/11/04 03:16:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -670,6 +670,7 @@ set_combuf_sockaddr(buf, family, name, port)
 
 	memset(&hint, 0, sizeof(hint));
 	hint.ai_family = PF_UNSPEC;
+	hint.ai_socktype = SOCK_STREAM;
 
 	if ((error = getaddrinfo(name, port, &hint, &ai)) != 0) {
 		printf("%s, %s/%s\n", gai_strerror(error), name, port);

@@ -802,6 +802,7 @@ parse_addr(host, port, flag)
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = flag;
 	error = getaddrinfo(host, port, &hints, &res);
 	if (error) {
