@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.39 2000/06/07 23:35:18 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.40 2000/06/20 19:44:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -118,6 +118,9 @@
 #include <netinet/ip_ecn.h>
 
 #include <netinet/ip_encap.h>
+#ifdef __OpenBSD__
+#include <netinet/ip_ipsp.h>
+#endif
 
 #include <machine/stdarg.h>
 
@@ -367,6 +370,10 @@ stf_getsrcifa6(ifp)
 	return NULL;
 }
 
+#ifndef offsetof
+#define offsetof(s, e) ((int)&((s *)0)->e)
+#endif
+
 static int
 stf_output(ifp, m, dst, rt)
 	struct ifnet *ifp;
@@ -374,6 +381,81 @@ stf_output(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	struct rtentry *rt;
 {
+#ifdef __OpenBSD__
+	struct stf_softc *sc;
+	struct sockaddr_in6 *dst6;
+	struct tdb tdb;
+	struct xformsw xfs;
+	int error;
+	int hlen, poff;
+	struct ip6_hdr *ip6;
+	struct in6_ifaddr *ia6;
+	struct mbuf *mp;
+	u_int16_t plen;
+
+	sc = (struct stf_softc*)ifp;
+	dst6 = (struct sockaddr_in6 *)dst;
+
+	/* just in case */
+	if ((ifp->if_flags & IFF_UP) == 0) {
+		m_freem(m);
+		return ENETDOWN;
+	}
+
+	/*
+	 * If we don't have an ip4 address that match my inner ip6 address,
+	 * we shouldn't generate output.  Without this check, we'll end up
+	 * using wrong IPv4 source.
+	 */
+	ia6 = stf_getsrcifa6(ifp);
+	if (ia6 == NULL) {
+		m_freem(m);
+		return ENETDOWN;
+	}
+
+	if (m->m_len < sizeof(*ip6)) {
+		m = m_pullup(m, sizeof(*ip6));
+		if (!m)
+			return ENOBUFS;
+	}
+	ip6 = mtod(m, struct ip6_hdr *);
+
+	/* setup dummy tdb.  it highly depends on ipipoutput() code. */
+	bzero(&tdb, sizeof(tdb));
+	bzero(&xfs, sizeof(xfs));
+	tdb.tdb_src.sin.sin_family = AF_INET;
+	tdb.tdb_src.sin.sin_len = sizeof(struct sockaddr_in);
+	bcopy(GET_V4(&((struct sockaddr_in6 *)&ia6->ia_addr)->sin6_addr),
+	    &tdb.tdb_src.sin.sin_addr, sizeof(tdb.tdb_src.sin.sin_addr));
+	tdb.tdb_dst.sin.sin_family = AF_INET;
+	tdb.tdb_dst.sin.sin_len = sizeof(struct sockaddr_in);
+	bcopy(GET_V4(&dst6->sin6_addr), &tdb.tdb_dst.sin.sin_addr,
+	    sizeof(tdb.tdb_dst.sin.sin_addr));
+	tdb.tdb_xform = &xfs;
+	xfs.xf_type = -1;	/* not XF_IP4 */
+
+	hlen = sizeof(struct ip6_hdr);
+	poff = offsetof(struct ip6_hdr, ip6_nxt);
+
+	/* encapsulate into IPv4 packet */
+	mp = NULL;
+	error = ipip_output(m, &tdb, &mp, hlen, poff);
+	if (error)
+		return error;
+	else if (mp == NULL)
+		return EFAULT;
+
+	m = mp;
+
+	/* ip_output needs host-order length.  it should be nuked */
+	m_copydata(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
+	    (caddr_t) &plen);
+	NTOHS(plen);
+	m_copyback(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
+	    (caddr_t) &plen);
+
+	return ip_output(m, NULL, NULL, 0, NULL, NULL);
+#else
 	struct stf_softc *sc;
 	struct sockaddr_in6 *dst6;
 	struct sockaddr_in *dst4;
@@ -449,10 +531,7 @@ stf_output(ifp, m, dst, rt)
 		}
 	}
 
-#ifndef __OpenBSD__
 	return ip_output(m, NULL, &sc->sc_ro, 0, NULL);
-#else
-	return ip_output(m, NULL, &sc->sc_ro, 0, NULL, NULL);
 #endif
 }
 
