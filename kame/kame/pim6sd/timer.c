@@ -231,6 +231,7 @@ age_vifs()
 	    IF_NOT_TIMEOUT(curr_nbr->timer)
 		continue;
 
+	    v->uv_pim6_nbr_timo++;
 	    IF_DEBUG(DEBUG_PIM_HELLO)
 		log(LOG_DEBUG, 0,
 		    "%s on %s is dead , delete it",
