@@ -1,6 +1,5 @@
-/*	$NetBSD: ping.c,v 1.47.2.1 1999/06/24 16:23:03 perry Exp $	*/
+/*	$NetBSD: ping.c,v 1.55.4.2 2000/10/18 02:04:49 tv Exp $	*/
 
-/* slightly modified for experiment by itojun@itojun.org */
 /*
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -63,7 +62,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: ping.c,v 1.47.2.1 1999/06/24 16:23:03 perry Exp $");
+__RCSID("$NetBSD: ping.c,v 1.55.4.2 2000/10/18 02:04:49 tv Exp $");
 #endif
 
 #include <stdio.h>
@@ -637,7 +636,7 @@ main(int argc, char *argv[])
 	if (tcgetattr (0, &ts) != -1) {
 		reset_kerninfo = !(ts.c_lflag & NOKERNINFO);
 		ts.c_lflag |= NOKERNINFO;
-		tcsetattr (0, TCSANOW, &ts);
+		tcsetattr (STDIN_FILENO, TCSANOW, &ts);
 	}
 #endif
 
@@ -1031,14 +1030,14 @@ pr_pack(u_char *buf,
 			    &opack_icmp.icmp_data[PHDR_LEN],
 			    datalen-PHDR_LEN)) {
 			for (i=PHDR_LEN; i<datalen; i++) {
-				if (icp->icmp_data[PHDR_LEN+i]
-				    != opack_icmp.icmp_data[PHDR_LEN+i])
+				if (icp->icmp_data[i] !=
+				    opack_icmp.icmp_data[i])
 					break;
 			}
 			PR_PACK_SUB();
 			(void)printf("\nwrong data byte #%d should have been"
-				     " %#x but was %#x",
-				     i, (u_char)opack_icmp.icmp_data[i],
+				     " %#x but was %#x", i,
+				     (u_char)opack_icmp.icmp_data[i],
 				     (u_char)icp->icmp_data[i]);
 			for (i=PHDR_LEN; i<datalen; i++) {
 				if ((i%16) == PHDR_LEN)
@@ -1332,7 +1331,7 @@ finish(int s)
 
 	if (reset_kerninfo && tcgetattr (0, &ts) != -1) {
 		ts.c_lflag &= ~NOKERNINFO;
-		tcsetattr (0, TCSANOW, &ts);
+		tcsetattr (STDIN_FILENO, TCSANOW, &ts);
 	}
 	(void)signal(SIGINFO, SIG_IGN);
 #else
