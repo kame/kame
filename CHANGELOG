@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2136 2002/04/24 07:49:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.2137 2002/04/24 07:56:35 jinmei Exp $
 
 <200204>
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6.h: removed the "dh6_servaddr" member from
+	the dhcp6{} structure, which had been removed from the
+	specification.
+	Note that interoperability with implementations in older KAME
+	snaps had been lost by this change.
+
 2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c (main): changed the behaivor of the -m
 	option as follows:
