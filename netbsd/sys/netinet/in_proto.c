@@ -217,7 +217,7 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,
 },
 #endif /* INET6 */
-#if 0
+#if 0	/*visited from encap4_input*/
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
   ipip_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,	/* XXX */
