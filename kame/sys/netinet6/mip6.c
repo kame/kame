@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.60 2001/10/11 12:58:20 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.61 2001/10/17 05:10:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1217,6 +1217,16 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 		 * needed.  if a rthdr from the upper layer already
 		 * exists, we use it (not route optimized).
 		 */
+		/*
+		 * XXX: todo.
+		 *
+		 * recently the multiple rthdrs (one is specified by
+		 * the caller of ip6_output, and the other is MIP6's)
+		 * should be merged.  see the thread of discussion on
+		 * the mopbile-ip mailing list started at Tue, 04 Sep
+		 * 2001 12:51:34 -0700 with the subject 'Coexistence
+		 * with other uses for routing header'.
+		 */
 		error = mip6_rthdr_create_withdst(pktopt_rthdr, dst);
 		if (error) {
 			mip6log((LOG_ERR,
@@ -1841,12 +1851,12 @@ mip6_addr_exchange(m, dstm)
 	struct mbuf *m;    /* includes IPv6 header */
 	struct mbuf *dstm; /* includes homeaddress destopt */
 {
-	struct ip6_opt_home_address *ha_opt;
-	struct ip6_dest *dh;
+	struct ip6_opt_home_address *haopt;
+	struct ip6_dest *dstopt;
 	struct ip6_hdr *ip6;
 	struct in6_addr ip6_src;
 	u_int8_t *opt;
-	int ii, len;
+	int ii, dstoptlen;
 
 	/* sanity check */
 	if (!MIP6_IS_MN) {
@@ -1854,54 +1864,54 @@ mip6_addr_exchange(m, dstm)
 	}
 
 	if (dstm == NULL) {
-		/* home address destopt not exists. */
+		/* home address destopt does not exist. */
 		return (0);
 	}
 	
 	/* Find Home Address option */
-	dh = mtod(dstm, struct ip6_dest *);
-	len = (dh->ip6d_len + 1) << 3;
-	if (len > dstm->m_len) {
+	dstopt = mtod(dstm, struct ip6_dest *);
+	dstoptlen = (dstopt->ip6d_len + 1) << 3;
+	if (dstoptlen > dstm->m_len) {
 		mip6log((LOG_ERR,
 			 "%s: haddr destopt illegal mbuf length.\n",
 			 __FUNCTION__));
 		return (EINVAL);
 	}
 
-	ha_opt = NULL;
+	haopt = NULL;
 	ii = 2;
 	
-	opt = (u_int8_t *)dh + ii;
-	while (ii < len) {
+	opt = (u_int8_t *)dstopt + ii;
+	while (ii < dstoptlen) {
 		switch (*opt) {
 			case IP6OPT_PAD1:
 				ii += 1;
 				opt += 1;
 				break;
 			case IP6OPT_HOME_ADDRESS:
-				ha_opt = (struct ip6_opt_home_address *)opt;
+				haopt = (struct ip6_opt_home_address *)opt;
 				break;
 			default:
 				ii += *(opt + 1) + 2;
 				opt += *(opt + 1) + 2;
 				break;
 		}
-		if (ha_opt) break;
+		if (haopt) break;
 	}
 
-	if (ha_opt == NULL) {
+	if (haopt == NULL) {
 		mip6log((LOG_INFO,
 			 "%s: haddr dest opt not found.\n",
 			 __FUNCTION__));
 		return (0);
 	}
 
-	/* Change the IP6 source address to the care-of address */
+	/* Swap the IPv6 homeaddress and the care-of address. */
 	ip6 = mtod(m, struct ip6_hdr *);
-	ip6_src = ip6->ip6_src;
+	bcopy(&ip6->ip6_src, &ip6_src, sizeof(ip6->ip6_src));
+	bcopy(haopt->ip6oh_addr, &ip6->ip6_src, sizeof(haopt->ip6oh_addr));
+	bcopy(&ip6_src, haopt->ip6oh_addr, sizeof(ip6_src));
 
-	ip6->ip6_src = *(struct in6_addr *)ha_opt->ip6oh_addr;
-	bcopy((caddr_t)&ip6_src, ha_opt->ip6oh_addr, sizeof(struct in6_addr));
 	return (0);
 }
 
