@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/07/27 07:40:56 $
+			$Date: 2000/07/27 13:45:16 $
 
 1. IPv6
 
@@ -1093,9 +1093,10 @@ Here are couple of comments:
 - If IPv6 TCP packet has IPv6 unspecified address, it is an attack attempt.
   The form can be used as a trigger for TCP DoS attack.  KAME code already
   filters them out.
-- The following examples are illegal cases.  It seems that there's general
+- The following examples are seemingly illegal.  It seems that there's general
   consensus among ipngwg for those.  (1) mobile-ip6 home address option,
   (2) offlink packets (so routers should not forward them).
+  KAME implmements (2) already.
 
 KAME code is carefully written to avoid such incidents.  More specifically,
 KAME kernel will reject packets with certain source/dstination address in IPv6
