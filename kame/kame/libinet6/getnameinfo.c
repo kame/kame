@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.55 2001/07/23 06:01:30 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.56 2001/08/19 05:50:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,8 +37,10 @@
  *   modified).  ipngwg rough consensus seems to follow RFC2553.
  * - What is "local" in NI_FQDN?
  * - NI_NAMEREQD and NI_NUMERICHOST conflict with each other.
- * - (KAME extension) NI_WITHSCOPEID when called with global address,
- *   and sin6_scope_id filled
+ * - (KAME extension) always attach textual scopeid (fe80::1%lo0), if
+ *   sin6_scope_id is filled - standardization status?
+ *   XXX breaks backward compat for code that expects no scopeid on
+ *   !NI_WITHSCOPEID.  beware on merge.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -327,9 +329,10 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 		char zonebuf[MAXHOSTNAMELEN];
 		int zonelen;
 
-		/* ip6_sa2str never fails */
 		zonelen = ip6_sa2str((const struct sockaddr_in6 *)sa,
 				      zonebuf, sizeof(zonebuf), flags);
+		if (zonelen < 0)
+			return EAI_MEMORY;
 		if (zonelen + 1 + numaddrlen + 1 > hostlen)
 			return EAI_MEMORY;
 
@@ -350,12 +353,20 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	size_t bufsiz;
 	int flags;
 {
-	unsigned int ifindex = (unsigned int)sa6->sin6_scope_id;
-	const struct in6_addr *a6 = &sa6->sin6_addr;
+	unsigned int ifindex;
+	const struct in6_addr *a6;
+	int n;
+
+	ifindex = (unsigned int)sa6->sin6_scope_id;
+	a6 = &sa6->sin6_addr;
 
 #ifdef NI_NUMERICSCOPE
 	if ((flags & NI_NUMERICSCOPE) != 0) {
-		return(snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id));
+		n = snprintf(buf, bufsiz, "%u", sa6->sin6_scope_id);
+		if (n < 0 || n >= bufsiz)
+			return -1;
+		else
+			return n;
 	}
 #endif
 
@@ -369,6 +380,10 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	}
 
 	/* last resort */
-	return(snprintf(buf, bufsiz, "%u", sa6->sin6_scope_id));
+	n = snprintf(buf, bufsiz, "%u", sa6->sin6_scope_id);
+	if (n < 0 || n >= bufsiz)
+		return -1;
+	else
+		return n;
 }
 #endif /* INET6 */
