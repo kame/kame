@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.54 2001/07/26 08:25:00 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.55 2001/07/26 08:28:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,6 +41,7 @@
  *	if (rt) {
  *		RTFREE();
  *	}
+ *
  * - whether the IPv4 input routine convert the byte order of some fileds
  *   of the IP header (x: convert to the host byte order, s: strip the header
  *   length for possible reassembly)
