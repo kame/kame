@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: gif.4,v 1.4.2.3 2000/04/16 16:41:45 itojun Exp $
+.\"     $Id: gif.4,v 1.4.2.4 2000/04/16 16:46:49 itojun Exp $
 .\"
 .Dd April 10, 1999
 .Dt GIF 4
@@ -238,9 +238,11 @@ The
 device first appeared in WIDE hydrangea IPv6 kit.
 .\"
 .Sh BUGS
-Since there are many tunnelling protocol specifications exist,
+There are many tunnelling protocol specifications,
+defined differently from each other.
 .Nm
-may not interoperate with peers that are picky about outer header fields.
+may not interoperate with peers which are based on different specifications,
+and are picky about outer header fields.
 For example, you cannot usually use
 .Nm
 to talk with IPsec devices that use IPsec tunnel mode.
