@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.127 2000/10/23 03:44:25 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.128 2000/10/24 09:49:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1799,6 +1799,10 @@ do { \
 #ifdef HAVE_NRL_INPCB
 				error =	ip6_setmoptions(optname,
 					&inp->inp_moptions6, m);
+#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+				if (inp->inp_moptions6 != NULL)
+					inp->inp_flags |= INP_IPV6_MCAST; /* XXX */
+#endif
 #else
 				error =	ip6_setmoptions(optname,
 					&in6p->in6p_moptions, m);

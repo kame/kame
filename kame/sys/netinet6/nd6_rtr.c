@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.53 2000/10/03 11:51:18 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.54 2000/10/24 09:49:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -732,10 +732,15 @@ defrouter_select()
 			 */
 			bzero(&anydr, sizeof(anydr));
 			defrouter_delreq(&anydr, 0);
-			if (nd6_defifp) {
+			if (nd6_defifp &&
+			    ip6_forwarding == 0) {
 				/*
 				 * Install a route to the default interface
 				 * as default route.
+				 * XXX: we enable this for host only, because
+				 * this may override a default route installed
+				 * a user process (e.g. routing daemon) in a
+				 * router case.
 				 */
 				defrouter_addifreq(nd6_defifp);
 			}
