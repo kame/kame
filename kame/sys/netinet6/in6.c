@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.98 2000/07/07 03:00:42 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.99 2000/07/11 17:00:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -208,7 +208,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 {
 	struct sockaddr_in6 lo_sa;
 	struct sockaddr_in6 all1_sa;
-	struct rtentry *nrt = NULL;
+	struct rtentry *nrt = NULL, **nrtp = NULL;
 	
 	bzero(&lo_sa, sizeof(lo_sa));
 	bzero(&all1_sa, sizeof(all1_sa));
@@ -223,10 +223,12 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	 * This request for deletion could fail, e.g. when we remove
 	 * an address right after adding it.
 	 */
+	if (cmd == RTM_ADD)
+		nrtp = &nrt;
 	rtrequest(cmd, ifa->ifa_addr,
 		  (struct sockaddr *)&lo_sa,
 		  (struct sockaddr *)&all1_sa,
-		  RTF_UP|RTF_HOST, &nrt);
+		  RTF_UP|RTF_HOST, nrtp);
 
 	/*
 	 * Make sure rt_ifa be equal to IFA, the second argument of the
