@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1970 2001/11/07 03:32:03 keiichi Exp $
+$KAME: CHANGELOG,v 1.1971 2001/11/07 14:15:45 jinmei Exp $
 
 <200111>
+2001-11-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_update_ifa): when a user (perhaps
+	mistakenly) tried to install an IPv6 address with 0 valid
+	lifetime, just returned without any operation that had side
+	effects.  There should be no difference on the behaviour from the
+	user's side, but the code should be safer than before because of
+	the lack of the effects.
+
 Wed Nov  7 12:30:49 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_var.h,mip6_binding.c
         - add ifnet info to the binding cache structure 
