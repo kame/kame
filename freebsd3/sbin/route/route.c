@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)route.c	8.3 (Berkeley) 3/19/94";
 #endif
 static const char rcsid[] =
-	"$Id: route.c,v 1.29 1998/07/28 06:25:35 charnier Exp $";
+  "$FreeBSD: src/sbin/route/route.c,v 1.29.2.3 1999/08/29 15:15:22 peter Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -552,11 +552,6 @@ newroute(argc, argv)
 	if (uid) {
 		errx(EX_NOPERM, "must be root to alter routing table");
 	}
-#define	NEXTARG {							\
-	--argc;								\
-	if (*++argv == NULL)						\
-		usage(*--argv);						\
-}
 	cmd = argv[0];
 	if (*cmd != 'g')
 		shutdown(s, 0); /* Don't want to read back our messages */
@@ -639,36 +634,43 @@ newroute(argc, argv)
 				flags |= RTF_STATIC;
 				break;
 			case K_IFA:
-				argc--;
+				if (!--argc)
+					usage((char *)NULL);
 				(void) getaddr(RTA_IFA, *++argv, 0);
 				break;
 			case K_IFP:
-				argc--;
+				if (!--argc)
+					usage((char *)NULL);
 				(void) getaddr(RTA_IFP, *++argv, 0);
 				break;
 			case K_GENMASK:
-				argc--;
+				if (!--argc)
+					usage((char *)NULL);
 				(void) getaddr(RTA_GENMASK, *++argv, 0);
 				break;
 			case K_GATEWAY:
-				argc--;
+				if (!--argc)
+					usage((char *)NULL);
 				(void) getaddr(RTA_GATEWAY, *++argv, 0);
 				break;
 			case K_DST:
-				argc--;
+				if (!--argc)
+					usage((char *)NULL);
 				ishost = getaddr(RTA_DST, *++argv, &hp);
 				dest = *argv;
 				break;
 			case K_NETMASK:
-				argc--;
+				if (!--argc)
+					usage((char *)NULL);
 				(void) getaddr(RTA_NETMASK, *++argv, 0);
 				/* FALLTHROUGH */
 			case K_NET:
 				forcenet++;
 				break;
 			case K_PREFIXLEN:
-				NEXTARG;
-				if (prefixlen(*argv) == -1) {
+				if (!--argc)
+					usage((char *)NULL);
+				if (prefixlen(*++argv) == -1) {
 					forcenet = 0;
 					ishost = 1;
 				} else {
@@ -684,8 +686,9 @@ newroute(argc, argv)
 			case K_SSTHRESH:
 			case K_RTT:
 			case K_RTTVAR:
-				NEXTARG;
-				set_metric(*argv, key);
+				if (!--argc)
+					usage((char *)NULL);
+				set_metric(*++argv, key);
 				break;
 			default:
 				usage(1+*argv);
@@ -864,7 +867,8 @@ getaddr(which, s, hpp)
 				(ifconf.ifc_buf + ifconf.ifc_len);
 			    ifr < ifr_end;
 			    ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
-						    + ifr->ifr_addr.sa_len)) {
+				    + MAX(ifr->ifr_addr.sa_len,
+					sizeof(ifr->ifr_addr)))) {
 				dl = (struct sockaddr_dl *)&ifr->ifr_addr;
 				if (ifr->ifr_addr.sa_family == AF_LINK
 				    && (ifr->ifr_flags & IFF_POINTOPOINT)
