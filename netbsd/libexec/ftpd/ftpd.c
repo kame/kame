@@ -1982,7 +1982,7 @@ extended_port(const char *arg)
 	p = NULL;
 	(void)strtoul(result[2], &p, 10);
 	if (!*result[2] || *p)
-		goto protounsupp;
+		goto parsefail;
 	p = NULL;
 	proto = strtoul(result[0], &p, 10);
 	if (!*result[0] || *p)
