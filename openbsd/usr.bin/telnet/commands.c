@@ -2392,41 +2392,6 @@ tn(argc, argv)
 	    return 0;
 	}
     }
-#if 0
-    if (portp) {
-	if (*portp == '-') {
-	    portp++;
-	    telnetport = 1;
-	} else
-	    telnetport = 0;
-	port = atoi(portp);
-	if (port == 0) {
-	    sp = getservbyname(portp, "tcp");
-	    if (sp)
-		port = sp->s_port;
-	    else {
-		printf("%s: bad port number\r\n", portp);
-		seteuid(getuid());
-		setuid(getuid());
-		return 0;
-	    }
-	} else {
-	    port = htons(port);
-	}
-    } else {
-	if (sp == 0) {
-	    sp = getservbyname("telnet", "tcp");
-	    if (sp == 0) {
-		fprintf(stderr, "telnet: tcp/telnet: unknown service\r\n");
-		seteuid(getuid());
-		setuid(getuid());
-		return 0;
-	    }
-	    port = sp->s_port;
-	}
-	telnetport = 1;
-    }
-#endif
 
     net = -1;
     retry = 0;
@@ -2441,10 +2406,6 @@ tn(argc, argv)
 	    printf("Trying %s...\r\n", hbuf);
 	}
 	net = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-#if 0
-	seteuid(getuid());
-	setuid(getuid());
-#endif
 	if (net < 0)
 	    continue;
 
