@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.11 2002/03/15 05:14:12 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.12 2002/04/04 06:44:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -124,6 +124,8 @@ struct hif_softc {
 	struct hif_subnet      *hif_hs_current;
 	struct hif_subnet      *hif_hs_prev;
 	u_int16_t              hif_hadiscovid;
+	long                   hif_hadiscov_lastsent;
+	u_int8_t               hif_hadiscov_count;
 	struct in6_addr        hif_ifid;
 };
 

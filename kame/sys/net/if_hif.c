@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.24 2002/03/15 05:14:12 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.25 2002/04/04 06:44:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -222,6 +222,8 @@ hifattach(dummy)
 		sc->hif_hs_prev = NULL;
 
 		sc->hif_hadiscovid = 0;
+		sc->hif_hadiscov_lastsent = 0;
+		sc->hif_hadiscov_count = 0;
 
 		sc->hif_ifid = in6addr_any;
 

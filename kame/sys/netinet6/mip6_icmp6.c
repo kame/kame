@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.40 2002/03/13 17:00:47 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.41 2002/04/04 06:44:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -763,6 +763,9 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 		return (0);
 	}
 
+	/* reset rate limitation factor. */
+	sc->hif_hadiscov_count = 0;
+
 	/*
 	 * check if the home agent list contains sending the home
 	 * agent's own address.
@@ -971,6 +974,9 @@ mip6_icmp6_ha_discov_req_output(sc)
 	struct ha_discov_req *hdreq;
 	u_int32_t icmp6len, off;
 	int error;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	/* pick up one home subnet. */
 	hs = TAILQ_FIRST(&sc->hif_hs_list_home);
@@ -979,11 +985,12 @@ mip6_icmp6_ha_discov_req_output(sc)
 		return (EINVAL);
 	}
 
-	/*
-	 * XXX: TODO
-	 *
-	 * rate limitation.
-	 */
+	/* rate limitation. */
+	if (sc->hif_hadiscov_count != 0) {
+		if(sc->hif_hadiscov_lastsent + (1 << sc->hif_hadiscov_count)
+		   > time_second)
+			return (0);
+	}
 
 	/*
 	 * we must determine the home agent subnet anycast address.
@@ -1041,6 +1048,18 @@ mip6_icmp6_ha_discov_req_output(sc)
 			 "%s:%d: "
 			 "failed to send a DHAAD request (errno = %d)\n",
 			 __FILE__, __LINE__, error));
+		return (error);
+	}
+
+	/* update rate limitation factor. */
+	sc->hif_hadiscov_lastsent = time_second;
+	if(sc->hif_hadiscov_count++ > MIP6_DHAAD_RETRIES) {
+		/*
+		 * XXX the spec says that the number of retires for
+		 * DHAAD request is restricted to DHAAD_RETRIES(=3).
+		 * But, we continue retrying until we receive a reply.
+		 */
+		sc->hif_hadiscov_count = MIP6_DHAAD_RETRIES;
 	}
 
 	return (0);
