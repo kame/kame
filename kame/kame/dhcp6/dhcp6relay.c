@@ -41,6 +41,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <stdlib.h>		/* XXX: freebsd2 needs this for opt{arg,ind} */
 #include <err.h>
 #include <string.h>
 
@@ -212,14 +213,23 @@ relay6_init()
 	}
 
 	/* initialize special socket addresses */
-	memset(&sa6_all_servers, 0, sizeof(sa6_all_servers));
-	sa6_all_servers.sin6_family = AF_INET6;
-	sa6_all_servers.sin6_len = sizeof(sa6_all_servers);
-	if (inet_pton(AF_INET6, DH6ADDR_ALLSERVER, &sa6_all_servers.sin6_addr)
-	    != 1) {
-		errx(1, "inet_pton failed for %s", DH6ADDR_ALLSERVER);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+	hints.ai_flags = AI_PASSIVE;
+	error = getaddrinfo(DH6ADDR_ALLSERVER, DH6PORT_UPSTREAM, &hints, &res);
+	if (error) {
+		errx(1, "getaddrinfo: %s", gai_strerror(error));
 		/* NOTREACHED */
 	}
+	if (res->ai_family != PF_INET6 ||
+	    res->ai_addrlen < sizeof(sa6_all_servers)) {
+		/* this should be impossible, but check for safety */
+		errx(1, "getaddrinfor returned a bogus address");
+		/* NOTREACHED */
+	}
+	memcpy(&sa6_all_servers, res->ai_addr, sizeof(sa6_all_servers));
 
 	/* initialize send/receive buffer */
 	iov[0].iov_base = (caddr_t)rdatabuf;
@@ -558,7 +568,7 @@ relay6_react_solicit(buf, siz, dev)
 		return;
 	}
 
-	/* forward the solict to servers */
+	/* forward the solictation to servers */
 	smh.msg_name = (caddr_t)&sa6_all_servers;
 	smh.msg_namelen = sizeof(sa6_all_servers);
 	iov[0].iov_base = buf;
