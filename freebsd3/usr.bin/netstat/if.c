@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)if.c	8.3 (Berkeley) 4/28/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.24.2.3 1999/08/29 15:31:28 peter Exp $";
+  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.24.2.4 2000/01/03 17:49:34 jkh Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -278,7 +278,7 @@ intpr(interval, ifnetaddr)
 			hexprint:
 				while (--n >= 0)
 					m += printf("%02x%c", *cp++ & 0xff,
-						    n > 0 ? '.' : ' ');
+						    n > 0 ? ':' : ' ');
 				m = 30 - m;
 				while (m-- > 0)
 					putchar(' ');

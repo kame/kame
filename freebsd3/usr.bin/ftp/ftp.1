@@ -1,4 +1,4 @@
-.\" $FreeBSD: src/usr.bin/ftp/ftp.1,v 1.8.2.4 1999/08/29 15:28:12 peter Exp $
+.\" $FreeBSD: src/usr.bin/ftp/ftp.1,v 1.8.2.6 2000/03/10 14:47:32 sheldonh Exp $
 .\" 	$NetBSD: ftp.1,v 1.21 1997/06/10 21:59:58 lukem Exp $
 .\"
 .\" Copyright (c) 1985, 1989, 1990, 1993
@@ -661,7 +661,7 @@ Retrieve
 and display with the program defined in
 .Ev PAGER 
 (which defaults to
-.Xr less 1 ).
+.Xr more 1 ) .
 .It Ic passive
 Toggle passive mode.  If passive mode is turned on
 (default is off), the ftp client will
@@ -1153,7 +1153,7 @@ Failing the above checks, if
 is enabled,
 local file names are expanded
 according to the rules used in the
-.Xr csh  1  ;
+.Xr csh 1 ;
 c.f. the
 .Ic glob
 command.
