@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2031 2001/12/27 13:11:57 jinmei Exp $
+$KAME: CHANGELOG,v 1.2032 2001/12/27 15:39:50 jinmei Exp $
 
 <200112>
+2001-12-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): do not separate
+	the case for IPV6_RTHDRDSTOPTS and the case for IPV6_DSTOPTS,
+	according to rfc2292bis-03.
+	* kame/sys/netinet6/ip6_var.h: accordingly replaced the dest1 and
+	dest2 members of ip6_recvpktopts{} with a single "dest" member.
+
 2001-12-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd/usr.sbin/ip6addrctl: a dedicated directory was digged in
 	order for the tool to be compiled as a standard package.
