@@ -547,11 +547,11 @@ in_pcbdetach(v)
 		(void)m_freem(inp->inp_options);
 	if (inp->inp_route.ro_rt)
 		rtfree(inp->inp_route.ro_rt);
-#if 0 /*def INET6*/
-	if (inp->inp_flags & INP_IPV6_MCAST)
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6)
 		ip6_freemoptions(inp->inp_moptions6);
 	else 
-#endif /* INET6 */
+#endif
 		ip_freemoptions(inp->inp_moptions);
 #ifdef IPSEC
 	/* XXX IPsec cleanup here */
@@ -903,7 +903,7 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	 * address of that interface as our source address.
 	 */
 	if (IN_MULTICAST(sin->sin_addr.s_addr) &&
-#if 0	/*def INET6*/
+#if 0 /*def INET6*/
 	    mopts != NULL &&
 	    !(inp->inp_flags & INP_IPV6_MCAST))
 #else
