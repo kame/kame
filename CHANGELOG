@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1915 2001/10/16 10:32:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.1916 2001/10/16 14:59:20 sakane Exp $
 
 <200110>
+Tue Oct 16 23:56:34 JST 2001 sakane@kame.net
+	* kame/kame/racoon:
+	to compare the policy between own policy and peer's policy in the
+	responder side, it should be loose.  for example, the initiator
+	proposes "any", and the responder requires "tcp", this case is
+	admitted.  also, the initiator proposes "tcp", and the responder
+	accepts "any", this case is admitted too.  however this behavior
+	should be considered.
+
 Tue Oct 16 19:22:52 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_binding.c
 	fix the bug of the validation routine of an incoming tunneled
