@@ -508,7 +508,7 @@ main(int argc, char *argv[])
 #endif
 
 	memset(&flags, 0, sizeof(flags));
-	openlog(*argv, LOG_PID, LOG_DAEMON);
+	openlog("rrenumd", LOG_PID, LOG_DAEMON);
 
 	/* get options */
 	while ((ch = getopt(argc, argv, "c:sdf"

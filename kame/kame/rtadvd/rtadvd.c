@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.23 2000/05/16 13:34:14 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.24 2000/05/22 21:58:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,7 +153,7 @@ main(argc, argv)
 	FILE *pidfp;
 	pid_t pid;
 
-	openlog(*argv, LOG_NDELAY|LOG_PID, LOG_DAEMON);
+	openlog("rtadvd", LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
 	/* get command line options and arguments */
 #ifdef MIP6
