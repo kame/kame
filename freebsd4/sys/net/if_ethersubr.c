@@ -113,6 +113,8 @@ bdg_forward_t *bdg_forward_ptr;
 bdgtakeifaces_t *bdgtakeifaces_ptr;
 struct bdg_softc *ifp2sc = NULL;
 
+int	(*vrrp_input_p)(struct ether_header *eh, struct mbuf *m);
+
 int	(*vlan_input_p)(struct ether_header *eh, struct mbuf *m);
 int	(*vlan_input_tag_p)(struct ether_header *eh, struct mbuf *m,
 		u_int16_t t);
@@ -466,6 +468,10 @@ ether_input(ifp, eh, m)
 			return;
 	}
 
+	if (vrrp_input_p != NULL) {
+		(*vrrp_input_p)(eh, m);
+	}
+
 	/* Check for bridging mode */
 	if (BDG_ACTIVE(ifp) ) {
 		struct ifnet *bif;
@@ -566,10 +572,12 @@ ether_demux(ifp, eh, m)
 				    sdl->sdl_family == AF_LINK)
 					break;
 
-			if (sdl && bcmp(LLADDR(sdl), eh->ether_shost,
-			    ETHER_ADDR_LEN) == 0) {
-				m_freem(m);
-				return;
+			if (ifp->if_type != IFT_VRRP) {
+				if (sdl && bcmp(LLADDR(sdl), eh->ether_shost,
+				    ETHER_ADDR_LEN) == 0) {
+					m_freem(m);
+					return;
+				}
 			}
 		}
 		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,

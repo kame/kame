@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.286 2002/06/19 14:37:45 k-sugyou Exp $	*/
+/*	$KAME: nd6.c,v 1.287 2002/07/08 06:22:47 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2323,6 +2323,9 @@ nd6_need_cache(ifp)
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:
 #endif
+#ifdef IFT_VRRP
+	case IFT_VRRP:
+#endif
 	case IFT_GIF:		/* XXX need more cases? */
 		return(1);
 	default:
@@ -2353,6 +2356,9 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 #endif
 #ifdef IFT_IEEE80211
 		case IFT_IEEE80211:
+#endif
+#ifdef IFT_VRRP
+		case IFT_VRRP:
 #endif
 			ETHER_MAP_IPV6_MULTICAST(&SIN6(dst)->sin6_addr,
 						 desten);

@@ -503,6 +503,11 @@ ROOTDEVNAME		opt_rootdevname.h
 FDC_DEBUG		opt_fdc.h
 PCFCLOCK_VERBOSE	opt_pcfclock.h
 PCFCLOCK_MAX_RETRIES	opt_pcfclock.h
+<<<<<<< options
+
+#VRRP
+=======
 
 # Polling device handling
 DEVICE_POLLING		opt_global.h
+>>>>>>> 1.33

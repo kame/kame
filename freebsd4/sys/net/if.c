@@ -1643,6 +1643,7 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	case IFT_FDDI:
 	case IFT_XETHER:
 	case IFT_ISO88025:
+	case IFT_VRRP:
 	case IFT_L2VLAN:
 		bcopy(lladdr, ((struct arpcom *)ifp->if_softc)->ac_enaddr, len);
 		bcopy(lladdr, LLADDR(sdl), len);

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.114 2002/06/19 14:37:45 k-sugyou Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.115 2002/07/08 06:22:47 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1198,6 +1198,9 @@ nd6_ifptomac(ifp)
 #endif
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:
+#endif
+#ifdef IFT_VRRP
+	case IFT_VRRP:
 #endif
 #ifdef __NetBSD__
 		return LLADDR(ifp->if_sadl);

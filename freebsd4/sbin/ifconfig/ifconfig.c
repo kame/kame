@@ -246,6 +246,10 @@ struct	cmd {
 	{ "vlandev",	NEXTARG,	setvlandev },
 	{ "-vlandev",	NEXTARG,	unsetvlandev },
 #endif
+#ifdef USE_VRRPS
+	{ "vrrpdev",	NEXTARG,	setvrrpdev },
+	{ "-vrrpdev",	NEXTARG,	unsetvrrpdev },
+#endif
 #if 0
 	/* XXX `create' special-cased below */
 	{"create",	0,		clone_create },
@@ -360,6 +364,9 @@ struct	afswtch {
 	{ "ieee80211", AF_UNSPEC, ieee80211_status, NULL, NULL, },  /* XXX not real!! */
 #endif
 #endif
+#ifdef USE_VRRPS
+	{ "vrrp", AF_UNSPEC, vrrp_status, NULL, NULL, },  /* XXX not real!! */
+#endif	
 	{ 0,	0,	    0,		0 }
 };
 
@@ -1113,6 +1120,7 @@ status(afp, addrcount, sdl, ifm, ifam)
 	struct	rt_addrinfo info;
 	int allfamilies, s;
 	struct ifstat ifs;
+	u_char iftype;
 
 	if (afp == NULL) {
 		allfamilies = 1;
@@ -1133,6 +1141,7 @@ status(afp, addrcount, sdl, ifm, ifam)
 	if (ifm->ifm_data.ifi_mtu)
 		printf(" mtu %ld", ifm->ifm_data.ifi_mtu);
 	putchar('\n');
+	iftype = ifm->ifm_data.ifi_type;
 
 	if (ioctl(s, SIOCGIFCAP, (caddr_t)&ifr) == 0) {
 		if (ifr.ifr_curcap != 0) {
@@ -1175,8 +1184,12 @@ status(afp, addrcount, sdl, ifm, ifam)
 		media_status(s, NULL);
 #endif
 #ifdef USE_VLANS
-	if (allfamilies || afp->af_status == vlan_status)
+	if (iftype == IFT_L2VLAN && (allfamilies || afp->af_status == vlan_status))
 		vlan_status(s, NULL);
+#endif
+#ifdef USE_VRRPS
+	if (iftype == IFT_VRRP && (allfamilies || afp->af_status == vrrp_status))
+		vrrp_status(s, NULL);
 #endif
 #ifdef USE_IEEE80211
 	if (allfamilies || afp->af_status == ieee80211_status)
@@ -1190,6 +1203,9 @@ status(afp, addrcount, sdl, ifm, ifam)
 	    afp->af_status != link_status
 #ifdef USE_VLANS
 	    && afp->af_status != vlan_status
+#endif
+#ifdef USE_VRRPS
+	    && afp->af_status != vrrp_status
 #endif
 		)
 		warnx("%s has no %s interface address!", name, afp->af_name);

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.295 2002/06/18 07:35:15 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.296 2002/07/08 06:22:46 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2769,6 +2769,7 @@ in6if_do_dad(ifp)
 #ifdef IFT_DUMMY
 	case IFT_DUMMY:
 #endif
+	case IFT_VRRP:
 	case IFT_FAITH:
 		/*
 		 * These interfaces do not have the IFF_LOOPBACK flag,
