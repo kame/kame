@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.83 2000/11/09 17:45:30 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.84 2000/12/07 12:07:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2805,6 +2805,18 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			 */
 			ipsec6stat.out_nosa++;
 			error = ENOENT;
+
+			/*
+			 * Notify the fact that the packet is discarded
+			 * to ourselves. I believe this is better than
+			 * just silently discarding. (jinmei@kame.net)
+			 * XXX: should we restrict the error to TCP packets?
+			 * XXX: should we directly notify sockets via
+			 *      pfctlinputs?
+			 */
+			icmp6_error(state->m, ICMP6_DST_UNREACH,
+				    ICMP6_DST_UNREACH_ADMIN, 0);
+			state->m = NULL; /* icmp6_error freed the mbuf */
 			goto bad;
 		}
 
