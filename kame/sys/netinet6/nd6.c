@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.107 2001/02/06 03:45:16 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.108 2001/02/06 04:08:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2292,12 +2292,10 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	
   sendpkt:
 
-#ifndef OLD_LOOPBACK_IF
 	if (ifp->if_flags & IFF_LOOPBACK) {
 		return((*ifp->if_output)(origifp, m, (struct sockaddr *)dst,
 					 rt));
 	}
-#endif
 	return((*ifp->if_output)(ifp, m, (struct sockaddr *)dst, rt));
 
   bad:

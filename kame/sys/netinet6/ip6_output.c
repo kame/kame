@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.154 2001/02/06 01:26:59 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.155 2001/02/06 04:08:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1097,17 +1097,10 @@ skip_ipsec2:;
 	}
 	else
 		origifp = ifp;
-#ifdef OLD_LOOPBACK_IF
-	if ((ifp->if_flags & IFF_LOOPBACK) == 0)
-#else
-	if (1)
-#endif
-	{
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-			ip6->ip6_src.s6_addr16[1] = 0;
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
-			ip6->ip6_dst.s6_addr16[1] = 0;
-	}
+	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+		ip6->ip6_src.s6_addr16[1] = 0;
+	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
+		ip6->ip6_dst.s6_addr16[1] = 0;
 
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	/*
@@ -3849,11 +3842,7 @@ ip6_mloopback(ifp, m, dst)
 	}
 #endif
 
-#ifdef OLD_LOOPBACK_IF
-	if ((ifp->if_flags & IFF_LOOPBACK) == 0)
-#else
 	if (1)
-#endif
 	{
 		ip6 = mtod(copym, struct ip6_hdr *);
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
