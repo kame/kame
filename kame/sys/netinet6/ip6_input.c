@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.131 2000/11/09 10:16:26 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.132 2000/11/09 13:37:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -217,7 +217,7 @@ struct ip6stat ip6stat;
 
 static void ip6_init2 __P((void *));
 static void ip6_deldstifaddr __P((struct mbuf *));
-static void ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
+static struct mbuf *ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
 
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
 #ifdef PULLDOWN_TEST
@@ -627,7 +627,7 @@ ip6_input(m)
 					m->m_flags |= M_ANYCAST6;
 #endif
 				/* record address information into m_aux. */
-				ip6_setdstifaddr(m, ia6);
+				(void)ip6_setdstifaddr(m, ia6);
 #ifdef MEASURE_PERFORMANCE
 				ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
@@ -659,7 +659,7 @@ ip6_input(m)
 				m->m_flags |= M_ANYCAST6;
 #endif
 			/* record address information into m_aux. */
-			ip6_setdstifaddr(m, ia6);
+			(void)ip6_setdstifaddr(m, ia6);
 
 #ifdef MEASURE_PERFORMANCE
 			ctr_end = read_tsc();
@@ -761,7 +761,7 @@ ip6_input(m)
 		/*
 		 * record address information into m_aux.
 		 */
-		ip6_setdstifaddr(m, ia6);
+		(void)ip6_setdstifaddr(m, ia6);
 
 		/*
 		 * packets to a tentative, duplicated, or somehow invalid
@@ -884,8 +884,15 @@ ip6_input(m)
 		struct in6_ifaddr *ia6;
 
 		ia6 = in6_ifawithifp(deliverifp, &ip6->ip6_dst);
-		if (ia6)
-			ip6_setdstifaddr(m, ia6);
+		if (ia6) {
+			if (!ip6_setdstifaddr(m, ia6)) {
+				/*
+				 * XXX maybe we should drop the packet here,
+				 * as we could not provide enough information
+				 * to the upper layers.
+				 */
+			}
+		}
 	}
 
 	/*
@@ -1083,7 +1090,7 @@ ip6_deldstifaddr(m)
 		m_aux_delete(m, n);
 }
 
-static void
+static struct mbuf *
 ip6_setdstifaddr(m, ia6)
 	struct mbuf *m;
 	struct in6_ifaddr *ia6;
@@ -1095,9 +1102,12 @@ ip6_setdstifaddr(m, ia6)
 		if (M_TRAILINGSPACE(n) >= sizeof(ia6)) {
 			n->m_len = sizeof(ia6);
 			*mtod(n, struct in6_ifaddr **) = ia6;
-		} else
+		} else {
 			m_aux_delete(m, n);
+			n = NULL;
+		}
 	}
+	return n;
 }
 
 struct in6_ifaddr *
