@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.7 2001/09/20 10:22:13 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.8 2001/10/09 11:00:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,12 +213,7 @@ hifattach(dummy)
 		sc->hif_location = HIF_LOCATION_UNKNOWN;
 
 		/* Initialize home prefix list, HA list, BU list */
-#ifdef MIP6_OLD
-		LIST_INIT(&sc->hif_pfx_list);
-		LIST_INIT(&sc->hif_ha_list);
-#endif
 		LIST_INIT(&sc->hif_bu_list);
-
 		TAILQ_INIT(&sc->hif_hs_list_home);
 		TAILQ_INIT(&sc->hif_hs_list_foreign);
 		sc->hif_hs_current = NULL;
@@ -640,131 +635,6 @@ hif_coa_list_find_withifp(hcoa_list, ifp)
 
 	return (hcoa);
 }
-
-#ifdef MIP6_OLD
-struct hif_ha *
-hif_ha_create(onhomelink, mha)
-     u_int8_t onhomelink;
-     struct mip6_ha *mha;
-{
-	struct hif_ha *hha;
-
-	hha = malloc(sizeof(struct hif_ha), M_TEMP, M_NOWAIT);
-	if (hha) {
-		hha->hha_onhomelink = onhomelink;
-		hha->hha_mha = mha;
-	}
-
-	return (hha);
-}
-
-int
-hif_ha_list_insert(hha_list, hha)
-     struct hif_ha_list *hha_list;
-     struct hif_ha *hha;
-{
-	if (hha == NULL)
-		return (-1);
-
-	LIST_INSERT_HEAD(hha_list, hha, hha_entry);
-
-	return (0);
-}
-
-int
-hif_ha_list_remove_withmha(hha_list, mha)
-     struct hif_ha_list *hha_list;
-     struct mip6_ha *mha;
-{
-	struct hif_ha *hha;
-
-	for (hha = LIST_FIRST(hha_list); hha;
-	     hha = LIST_NEXT(hha, hha_entry)) {
-		if (hha->hha_mha == mha)
-			break;
-	}
-	if (hha) {
-		LIST_REMOVE(hha, hha_entry);
-		free(hha, M_TEMP);
-	}
-	return (0);
-}
-
-int
-hif_ha_list_isonhomelink(hha_list, rtaddr)
-     struct hif_ha_list *hha_list;
-     struct in6_addr *rtaddr;
-{
-	struct hif_ha *hha;
-	int onhomelink = 0;
-
-	for (hha = LIST_FIRST(hha_list); hha;
-	     hha = LIST_NEXT(hha, hha_entry)) {
-		if ((hha->hha_onhomelink)
-		    && (IN6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_lladdr,
-					   rtaddr)
-			|| IN6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_gaddr,
-					      rtaddr))) {
-			onhomelink = 1;
-			break;
-		}
-	}
-
-	return (onhomelink);
-}
-
-struct hif_ha *
-hif_ha_list_find_onhomelink(hha_list)
-     struct hif_ha_list *hha_list;
-{
-	struct hif_ha *hha;
-
-	for (hha = LIST_FIRST(hha_list); hha;
-	     hha = LIST_NEXT(hha, hha_entry)) {
-		if (hha->hha_onhomelink)
-			break;
-	}
-
-	return (hha);
-}
-
-struct hif_ha *
-hif_ha_list_find_preferable(hha_list)
-     struct hif_ha_list *hha_list;
-{
-	struct hif_ha *hha, *best;
-
-	best = LIST_FIRST(hha_list);
-	for (hha = LIST_FIRST(hha_list); hha;
-	     hha = LIST_NEXT(hha, hha_entry)) {
-		if ((best) && (best->hha_mha)
-		    && (hha) && (hha->hha_mha)) {
-			if (best->hha_mha->mha_pref < hha->hha_mha->mha_pref)
-				best = hha;
-		}
-	}
-
-	return (best);
-}
-
-struct hif_ha *
-hif_ha_list_find_withaddr(hha_list, rtaddr)
-     struct hif_ha_list *hha_list;
-     struct in6_addr *rtaddr;
-{
-	struct hif_ha *hha;
-
-	for (hha = LIST_FIRST(hha_list);
-	     hha;
-	     hha = LIST_NEXT(hha, hha_entry)) {
-		if (IN6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_lladdr, rtaddr)
-		    || IN6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_gaddr, rtaddr))
-			break;
-	}
-
-	return (hha);
-}
-#endif /* MIP6_OLD */
 
 static int
 hif_ha_list_update_withioctl(sc, data)

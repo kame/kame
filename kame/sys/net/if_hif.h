@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.3 2001/09/20 10:22:13 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.4 2001/10/09 11:00:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,11 +152,6 @@ struct hif_softc {
 	TAILQ_ENTRY(hif_softc) hif_entry;
 	int                    hif_location;             /* cur location */
 	int                    hif_location_prev; /* XXX */
-
-#ifdef MIP6_OLD
-	LIST_HEAD(mip6_pfx_list, mip6_pfx) hif_pfx_list; /* list of pfxes */
-	LIST_HEAD(hif_ha_list, hif_ha) hif_ha_list;      /* list of HAs */
-#endif
 	LIST_HEAD(mip6_bu_list, mip6_bu) hif_bu_list;    /* list of BUs */
 	struct hif_subnet_list hif_hs_list_home;
 	struct hif_subnet_list hif_hs_list_foreign;
@@ -169,14 +164,6 @@ struct hif_coa {
 	TAILQ_ENTRY(hif_coa) hcoa_entry;
 	struct ifnet         *hcoa_ifp;
 };
-
-#ifdef MIP6_OLD
-struct hif_ha {
-	LIST_ENTRY(hif_ha) hha_entry;
-	u_int8_t           hha_onhomelink;
-	struct mip6_ha     *hha_mha;
-};
-#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 int hif_ioctl				__P((struct ifnet *, int, caddr_t));
@@ -215,16 +202,6 @@ struct hif_subnet *hif_subnet_list_find_withhaaddr
 struct hif_softc *hif_list_find_withhaddr __P((struct in6_addr *));
 
 struct hif_ha *hif_ha_create __P((u_int8_t, struct mip6_ha *));
-
-#if 0
-int hif_ha_list_insert __P((struct hif_ha_list *, struct hif_ha *hha));
-int hif_ha_list_remove_withmha __P((struct hif_ha_list *, struct mip6_ha *));
-int hif_ha_list_isonhomelink __P((struct hif_ha_list *, struct in6_addr *));
-struct hif_ha *hif_ha_list_find_onhomelink __P((struct hif_ha_list *));
-struct hif_ha *hif_ha_list_find_preferable __P((struct hif_ha_list *));
-struct hif_ha *hif_ha_list_find_withaddr __P((struct hif_ha_list *,
-					      struct in6_addr *));
-#endif
 
 #endif /* _KERNEL */
 
