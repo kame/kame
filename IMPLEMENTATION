@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.211 2001/05/07 06:33:37 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.212 2001/05/07 18:22:08 jinmei Exp $
 
 1. IPv6
 
@@ -1899,10 +1899,10 @@ to make the distributed develoment smooth.
   where "(dollar)" is the dollar character ($), and around "$" are tabs.
   (this is for C. For other language, you should use its own comment
   line.)
-  Once commited to the CVS repository, this line would contain its
+  Once commited to the CVS repository, this line will contain its
   version number (see, for example, at the top of this file).  This
   would make it easy to report a bug.
-- when creating a new file with WIDE copyright, tap "make copyright.c" at
+- when creating a new file with the WIDE copyright, tap "make copyright.c" at
   the top-level, and use copyright.c as a template.  KAME RCS tag will be
   included automatically.
 - when editting a third-party package, keep its own coding style as
