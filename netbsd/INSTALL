@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.11 2000/11/22 10:50:11 itojun Exp $
+$Id: INSTALL,v 1.12 2000/12/01 16:28:18 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -82,64 +82,24 @@ D-1. Reboot with the command you like.
 
 E. Configurations, in short
 ===========================
-E-1. Most of configuration files are placed in /usr/local/v6/etc.
-     You may want to copy those foo.sample files into non-sample (foo),
-     edit as necessary.  You may also want to invoke /usr/local/v6/etc/rc.net6
-     from /etc/rc.local, by adding the following into /etc/rc.local:
-	if [ -f /usr/local/v6/etc/rc.net6 ]; then
-		sh /usr/local/v6/etc/rc.net6
-	fi
+E-1. Most of configuration files are shipped with normal OS distribution,
+     and are in located in /etc.  If you need special configuration file for
+     KAME-origin daemons, configuration files need to be placed in
+     /usr/local/v6/etc.  You may want to copy /usr/local/v6/etc/foo.sample into
+     /usr/local/v6/etc/foo, and edit as necessary.
 
-E-2. If you would like to use IPv6-ready inetd, you will need to stop using
-     /usr/sbin/inetd and switch to /usr/local/v6/sbin/inetd.
-     To do this, please replace the following section in /etc/rc:
-
->if checkyesno inetd; then
->	if [ -r /etc/inetd.conf ]; then
->		echo -n ' inetd'
->		inetd $inetd_flags
->	else
->		echo
->		logger -s "WARNING: /etc/inetd.conf not readable; " \
->		    "inetd not started."
->	fi
->fi
-
-     into this:
-
->if checkyesno inetd; then
->	if [ -r /etc/inetd.conf ]; then
->		echo -n ' inetd'
->		if [ -x /usr/local/v6/sbin/inetd ]; then
->			/usr/local/v6/sbin/inetd $inetd_flags
->		else
->			inetd $inetd_flags
->		fi
->	else
->		echo
->		logger -s "WARNING: /etc/inetd.conf not readable; " \
->		    "inetd not started."
->	fi
->fi
-
-     Configuration file is placed in /etc/inetd.conf, but with enhanced syntax
-     (it is backward compatible so do not be afraid).  Consult manpages
-     for details.  You only need add lines for IPv6-ready daemons with "tcp6"
-     or "udp6", like below:
->ftp	stream	tcp6	nowait	root	/usr/local/v6/libexec/ftpd	ftpd -l
-
-E-3. If you wish to use ALTQ, you may need to invoke /dev/MAKEDEV.altq.
+E-2. If you wish to use ALTQ, you may need to invoke /dev/MAKEDEV.altq.
 	# cd /dev
 	# sh MAKEDEV.altq all
 
-E-4. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
+E-3. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      For daily use, you will need to add both of (or either of) them
      into your command search path (consult manpage for your favorite
      shell).  Make sure to make them used before /usr/bin or /usr/sbin,
      otherwise you end up using OS-supplied (hence not IPv6 nor IPsec capable)
      commands.
 
-E-5. There are batch of documents installed into /usr/local/v6/man
+E-4. There are batch of documents installed into /usr/local/v6/man
      and /usr/local/v6/share/doc.  Please read them as necessary.
      If you wish to develop your own programs, we suggest you to read through
      supplied documents, RFCs, and other documents to learn how.
