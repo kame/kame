@@ -1,4 +1,4 @@
-/*	$NetBSD: authenc.c,v 1.5 1997/10/16 06:46:50 mikel Exp $	*/
+/*	$NetBSD: authenc.c,v 1.6.4.1 2000/06/22 07:09:04 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -38,16 +38,16 @@
 #if 0
 static char sccsid[] = "@(#)authenc.c	8.2 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: authenc.c,v 1.5 1997/10/16 06:46:50 mikel Exp $");
+__RCSID("$NetBSD: authenc.c,v 1.6.4.1 2000/06/22 07:09:04 thorpej Exp $");
 #endif
 #endif /* not lint */
 
-#if	defined(AUTHENTICATION)
+#if	defined(AUTHENTICATION) || defined(ENCRYPTION)
 #include "telnetd.h"
 #include <libtelnet/misc.h>
 
 	int
-net_write(str, len)
+telnet_net_write(str, len)
 	unsigned char *str;
 	int len;
 {
@@ -62,6 +62,13 @@ net_write(str, len)
 	void
 net_encrypt()
 {
+#ifdef	ENCRYPTION
+	char *s = (nclearto > nbackp) ? nclearto : nbackp;
+	if (s < nfrontp && encrypt_output) {
+		(*encrypt_output)((unsigned char *)s, nfrontp - s);
+	}
+	nclearto = nfrontp;
+#endif	/* ENCRYPTION */
 }
 
 	int
@@ -87,4 +94,4 @@ telnet_gets(prompt, result, length, echo)
 {
 	return((char *)0);
 }
-#endif	/* defined(AUTHENTICATION) */
+#endif	/* defined(AUTHENTICATION) || defined(ENCRYPTION) */

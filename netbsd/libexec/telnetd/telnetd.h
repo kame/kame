@@ -1,4 +1,4 @@
-/*	$NetBSD: telnetd.h,v 1.5.6.1 2000/01/23 12:01:43 he Exp $	*/
+/*	$NetBSD: telnetd.h,v 1.6 2000/01/21 17:08:34 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993

@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_term.c,v 1.15.2.1 2000/01/08 18:10:46 he Exp $	*/
+/*	$NetBSD: sys_term.c,v 1.18.4.2 2000/12/15 00:37:19 he Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)sys_term.c	8.4+1 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: sys_term.c,v 1.15.2.1 2000/01/08 18:10:46 he Exp $");
+__RCSID("$NetBSD: sys_term.c,v 1.18.4.2 2000/12/15 00:37:19 he Exp $");
 #endif
 #endif /* not lint */
 
@@ -189,6 +189,9 @@ char **addarg __P((char **, char *));
 void scrub_env __P((void));
 int getent __P((char *, char *));
 char *getstr __P((char *, char **));
+#ifdef KRB5
+extern void kerberos5_cleanup __P((void));
+#endif
 
 /*
  * init_termbuf()
@@ -1697,6 +1700,11 @@ start_login(host, autologin, name)
 #if	defined (AUTHENTICATION)
 	if (auth_level >= 0 && autologin == AUTH_VALID) {
 # if	!defined(NO_LOGIN_F)
+#  if	defined(FORWARD)
+		if (got_forwarded_creds)
+			argv = addarg(argv, "-F");
+		else
+#  endif /* FORWARD */
 		argv = addarg(argv, "-f");
 		argv = addarg(argv, "--");
 		argv = addarg(argv, name);
@@ -1873,22 +1881,50 @@ addarg(argv, val)
 /*
  * scrub_env()
  *
- * Remove a few things from the environment that
- * don't need to be there.
+ * We only accept the environment variables listed below.
  */
+
 void
 scrub_env()
 {
-	register char **cpp, **cpp2;
+	static const char *reject[] = {
+		"TERMCAP=/",
+		NULL
+	};
+
+	static const char *accept[] = {
+		"XAUTH=", "XAUTHORITY=", "DISPLAY=",
+		"TERM=",
+		"EDITOR=",
+		"PAGER=",
+		"LOGNAME=",
+		"POSIXLY_CORRECT=",
+		"TERMCAP=",
+		"PRINTER=",
+		NULL
+	};
+
+	char **cpp, **cpp2;
+	const char **p;
 
 	for (cpp2 = cpp = environ; *cpp; cpp++) {
-		if (strncmp(*cpp, "LD_", 3) &&
-		    strncmp(*cpp, "_RLD_", 5) &&
-		    strncmp(*cpp, "LIBPATH=", 8) &&
-		    strncmp(*cpp, "IFS=", 4))
+		int reject_it = 0;
+
+		for(p = reject; *p; p++)
+			if(strncmp(*cpp, *p, strlen(*p)) == 0) {
+				reject_it = 1;
+				break;
+			}
+		if (reject_it)
+			continue;
+
+		for(p = accept; *p; p++)
+			if(strncmp(*cpp, *p, strlen(*p)) == 0)
+				break;
+		if(*p != NULL)
 			*cpp2++ = *cpp;
 	}
-	*cpp2 = 0;
+	*cpp2 = NULL;
 }
 
 /*
@@ -1982,6 +2018,9 @@ cleanup(sig)
 #  endif /* CRAY */
 	rmut(line);
 	close(pty);
+#ifdef KRB5
+	kerberos5_cleanup();
+#endif
 	(void) shutdown(net, 2);
 #  ifdef CRAY
 	if (t == 0)
