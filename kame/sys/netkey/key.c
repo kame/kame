@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.117 2000/05/25 02:08:46 itojun Exp $	*/
+/*	$KAME: key.c,v 1.118 2000/05/31 14:51:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3828,7 +3828,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 
 	switch (spidx0->src.ss_family) {
 	case AF_INET:
-		if (satosin(&spidx0->src)->sin_port !=
+		if (satosin(&spidx0->src)->sin_port != IPSEC_PORT_ANY
+		 && satosin(&spidx0->src)->sin_port !=
 		    satosin(&spidx1->src)->sin_port)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin(&spidx0->src)->sin_addr,
@@ -3836,7 +3837,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 			return 0;
 		break;
 	case AF_INET6:
-		if (satosin6(&spidx0->src)->sin6_port !=
+		if (satosin6(&spidx0->src)->sin6_port != IPSEC_PORT_ANY
+		 && satosin6(&spidx0->src)->sin6_port !=
 		    satosin6(&spidx1->src)->sin6_port)
 			return 0;
 		if (satosin6(&spidx0->src)->sin6_scope_id !=
@@ -3855,7 +3857,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 
 	switch (spidx0->dst.ss_family) {
 	case AF_INET:
-		if (satosin(&spidx0->dst)->sin_port !=
+		if (satosin(&spidx0->src)->sin_port != IPSEC_PORT_ANY
+		 && satosin(&spidx0->dst)->sin_port !=
 		    satosin(&spidx1->dst)->sin_port)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin(&spidx0->dst)->sin_addr,
@@ -3863,7 +3866,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 			return 0;
 		break;
 	case AF_INET6:
-		if (satosin6(&spidx0->dst)->sin6_port !=
+		if (satosin6(&spidx0->src)->sin6_port != IPSEC_PORT_ANY
+		 && satosin6(&spidx0->dst)->sin6_port !=
 		    satosin6(&spidx1->dst)->sin6_port)
 			return 0;
 		if (satosin6(&spidx0->dst)->sin6_scope_id !=
