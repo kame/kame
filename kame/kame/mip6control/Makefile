@@ -24,4 +24,12 @@ MAN8=	mip6control.8
 MAN=	mip6control.8
 .endif
 
+afterinstall:
+	${INSTALL} -c -m 755 \
+		${.CURDIR}/mip6makeconfig.sh \
+		${DESTDIR}${PREFIX}/sbin/
+	${INSTALL} -c -m 755 \
+		${.CURDIR}/mip6seccontrol.sh \
+		${DESTDIR}${PREFIX}/sbin/
+
 .include <bsd.prog.mk>

@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 2002/02/22 02:58:49 k-sugyou Exp $
+# $Id: Makefile,v 1.2 2003/11/25 10:02:58 keiichi Exp $
 #
 SRCDIR=	${.CURDIR}/../../kame/mip6control
 
@@ -18,5 +18,13 @@ LDADD+=	-L${.OBJDIR}/../../lib/libinet6 -L/usr/local/v6/lib -linet6
 MAN=	mip6control.8
 
 .PATH:	${SRCDIR}
+
+afterinstall:
+	${INSTALL} -c -m 755 \
+		${SRCDIR}/mip6makeconfig.sh \
+		${BINDIR}
+	${INSTALL} -c -m 755 \
+		${SRCDIR}/mip6seccontrol.sh \
+		${BINDIR}
 
 .include <bsd.prog.mk>
