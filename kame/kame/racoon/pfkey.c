@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.92 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.93 2000/12/15 14:27:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1243,7 +1243,7 @@ pk_recvadd(mhp)
 	 * because they must be updated by SADB_UPDATE message
 	 */
 
-	plog(LLV_ERROR, LOCATION, NULL,
+	plog(LLV_INFO, LOCATION, NULL,
 		"IPsec-SA established: %s\n",
 		sadbsecas2str(iph2->src, iph2->dst,
 			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
@@ -1290,7 +1290,7 @@ pk_recvexpire(mhp)
 		return -1;
 	}
 
-	plog(LLV_ERROR, LOCATION, NULL,
+	plog(LLV_INFO, LOCATION, NULL,
 		"IPsec-SA expired: %s\n",
 		sadbsecas2str(src, dst,
 			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
