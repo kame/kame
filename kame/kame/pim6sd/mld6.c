@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.33 2001/08/09 08:46:57 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.34 2001/08/09 10:12:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -113,7 +113,7 @@ int mld6_socket;		/* socket for all network I/O */
 struct sockaddr_in6 allrouters_group = {sizeof(struct sockaddr_in6), AF_INET6};
 struct sockaddr_in6 allnodes_group = {sizeof(struct sockaddr_in6), AF_INET6};
 
-/* Extenals */
+/* Externals */
 
 extern struct in6_addr in6addr_linklocal_allnodes;
 
