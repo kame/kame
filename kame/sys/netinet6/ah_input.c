@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.69 2002/02/04 06:20:30 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.70 2002/02/28 13:51:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,7 @@
 
 #ifdef INET6
 #include <netinet6/ip6_var.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -1095,6 +1095,7 @@ ah6_ctlinput(cmd, sa, d)
 	} else {
 		m = NULL;
 		ip6 = NULL;
+		off = 0;
 	}
 
 	if (ip6) {
