@@ -2112,14 +2112,16 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 			if (inp == NULL)
 				return (0);
 		}
-#else
-		inp = in_pcblookup_connect(tb6, saddr->v4, sport,
+#elif defined(__NetBSD__)
+		inp = in_pcblookup_connect(tb, saddr->v4, sport,
 		    daddr->v4, dport);
 		if (inp == NULL) {
-			inp = in_pcblookup_bind(tb6, daddr->v4, dport);
+			inp = in_pcblookup_bind(tb, daddr->v4, dport);
 			if (inp == NULL)
 				return (0);
 		}
+#elif defined(__FreeBSD__)
+#error notyet
 #endif
 		break;
 #ifdef INET6
@@ -2141,13 +2143,15 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 			if (inp == NULL)
 				return (0);
 		}
-#else
+#elif defined(__NetBSD__)
 		in6p = in6_pcblookup_connect(tb6, &s, sport, &d, dport, 0);
 		if (in6p == NULL) {
 			in6p = in6_pcblookup_bind(tb6, &d, dport, 0);
 			if (in6p == NULL)
 				return (0);
 		}
+#elif defined(__FreeBSD__)
+#error notyet
 #endif
 		break;
 	}
