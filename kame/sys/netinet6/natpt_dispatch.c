@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.34 2001/12/12 14:15:09 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.35 2001/12/13 05:43:56 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -41,6 +41,9 @@
 #include <sys/socket.h>
 #include <sys/syslog.h>
 #include <sys/systm.h>
+
+#include <net/if.h>
+#include <net/if_var.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -253,6 +256,23 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		}
 	}
 
+	/*
+	 * If IPv4 packet is too big to translate into IPv6, return
+	 * icmp "packet too big" error.
+	 */
+	if (needFragment(&cv4)
+	    && isDFset(&cv4)) {
+		n_long		dest = 0;
+		struct ifnet	destif;
+
+		bzero(&destif, sizeof(struct ifnet));
+		destif.if_mtu = IPV6_MMTU;
+
+		NTOHS(cv4.ip.ip4->ip_id);
+		icmp_error(cv4.m, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
+		return (IPPROTO_DONE);	/* discard this packet without free. */
+	}
+
 	if (cv4.fromto == NATPT_FROM) {
 		pad = &cv4.ats->remote;
 		cv4.ats->fromto++;
@@ -458,6 +478,8 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 		cv4->flags |= NEXT_FRAGMENT;
 	if (NATPT_FRGHDRSZ + cv4->plen > IPV6_MMTU)
 		cv4->flags |= NEED_FRAGMENT;
+	if ((ip->ip_off & IP_DF) != 0)
+		cv4->flags |= SET_DF;
 
 	return (ip->ip_p);
 }
