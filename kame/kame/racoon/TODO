@@ -1,4 +1,4 @@
-$Id: TODO,v 1.12 2000/08/23 13:58:35 sakane Exp $
+$Id: TODO,v 1.13 2000/08/23 14:02:52 sakane Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -20,10 +20,8 @@ o Support scoped (link-local and site-local) IPv6 addresses.
 o kmstat should be improved.
 o aggressive mode DH group checks/handling on responder side.
 o Informational Exchange processing properly.
-o support RESPONDER-LIFETIME and rekeying
 
 SHOULD
-o To be supported bytes lifetimes for ISAKMP-SA.
 o fix flag for logging
 o more acceptable check.
 o New group mode should be considered.
@@ -66,53 +64,6 @@ o consistency of function name.
 o deep copy configuration entry to hander.  It's easy to reload configuration.
 o don't keep to hold keymat values, do it ?
 o local address's field in isakmpsa handler must be kicked out to rmconf.
-
-MAY
-o Effective code.
-o more fix strnames.c.
-
-TO BE TESTED.
-o IKE retransmit behavior
-	see, draft-*-ipsec-rekeying*.txt
-o Reboot recovery (peer reboot losing it's security associations)
-	see, draft-*-ipsec-rekeying*.txt
-o Scenarios
-	- End-to-End transport long lived security associations
-	  (over night, data transfer >1Gb) with frequent dynamic rekey
-	- End-to-GW tunnel long lived security associations
-	  (over night, data transfer >1Gb) with frequent dynamic rekey
-	- Policy change events while under SA load
-	- End-to-End SA through IPSec tunnels, initiation both ways
-	- Client End-to-End through client-to-GW tunnel SA, initiate from
-	  client for tunnel, then initiation both ways for end-to-end
-	- Client-to-GW transport SA for secure management
-o behavior to receive multiple auth method proposals and AND proposal
-
-and to be written many many :-p
-
-----------------------------------------------------------------------
-to be negotiate SA peer's addresses per policy ?.
-
-config:
-policy {
-	# Specification of a remote IP address of SA.
-	association remote 172.168.2.2 ;
-
-	# local address can(may or should?) be omited.
-	# NOTE: If you specify "local" address, you must take care of "listen"
-	# directive.  If the IP address you specify here doesn't exist in the
-	# directive, it causes your negotiation failure happened.
-	association local 172.168.1.1 ;
-
-	# "negotiation" specifies address(es) which is used to negotiated SAs.
-	# They are omited usually because of the same addresses that are
-	# specifyed by "association" directive.  MobileIP may use them ?
-	negotiation remote 172.168.2.2 ;
-
-	# NOTE: See above "association" directive.
-	negotiation local 172.168.1.1 ;
-}
-
 o configuration should be made easier. 
   one idea is to allow user to "define" certain set of directives, like:
 	TRANS_3DES = protocol esp {
@@ -149,3 +100,28 @@ o for lifetime and key length, something like this should be useful.
   - propose N
   - accept between X and Y
 o wildcard "accept any proposal" policy should be allowed.
+
+MAY
+o To be supported bytes lifetimes for ISAKMP-SA.
+o Effective code.
+o more fix strnames.c.
+
+TO BE TESTED.
+o IKE retransmit behavior
+	see, draft-*-ipsec-rekeying*.txt
+o Reboot recovery (peer reboot losing it's security associations)
+	see, draft-*-ipsec-rekeying*.txt
+o Scenarios
+	- End-to-End transport long lived security associations
+	  (over night, data transfer >1Gb) with frequent dynamic rekey
+	- End-to-GW tunnel long lived security associations
+	  (over night, data transfer >1Gb) with frequent dynamic rekey
+	- Policy change events while under SA load
+	- End-to-End SA through IPSec tunnels, initiation both ways
+	- Client End-to-End through client-to-GW tunnel SA, initiate from
+	  client for tunnel, then initiation both ways for end-to-end
+	- Client-to-GW transport SA for secure management
+o behavior to receive multiple auth method proposals and AND proposal
+
+and to be written many many.
+
