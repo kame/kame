@@ -2,11 +2,12 @@
 # Date created:		5 Apr 1999 17:00 JST
 # Whom:			TANAKA Takashi <tanaka@tahi.org>
 #
-# $KAME: Makefile,v 1.3 2001/10/19 07:43:31 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2002/10/18 10:07:40 suz Exp $
+# $TAHI: ports/FreeBSD-current/ct/Makefile,v 1.12 2002/10/18 05:55:52 akisada Exp $
 #
 
 PORTNAME=	ct
-PORTVERSION=	1.3
+PORTVERSION=	2.0
 DISTNAME=	${PORTNAME}-${PORTVERSION}
 CATEGORIES=	net ipv6
 MASTER_SITES=	http://www.tahi.org/release/ct/

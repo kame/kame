@@ -77,6 +77,7 @@ bin/unknown/mtuconfig.rmt
 bin/unknown/tunnel.rmt
 bin/unknown/mip6EnableCN.rmt
 bin/unknown/mip6EnableHA.rmt
+bin/unknown/mip6EnableMN.rmt
 bin/unknown/natpt.rmt
 bin/kame-freebsd/clearnc.rmt
 bin/kame-freebsd/clearprefix.rmt
@@ -95,6 +96,9 @@ bin/kame-freebsd/ipsecSetSPD.rmt
 bin/kame-freebsd/ipsecEnable.rmt
 bin/kame-freebsd/mtuconfig.rmt
 bin/kame-freebsd/tunnel.rmt
+bin/kame-freebsd/mip6EnableCN.rmt
+bin/kame-freebsd/mip6EnableHA.rmt
+bin/kame-freebsd/mip6EnableMN.rmt
 bin/hitachi-nr60/clearnc.rmt
 bin/hitachi-nr60/reboot.rmt
 bin/hitachi-nr60/reboot_async.rmt
@@ -189,6 +193,7 @@ bin/yamaha-ws-one/loginout.rmt
 bin/yamaha-ws-one/manualaddrconf.rmt
 bin/yamaha-ws-one/ping6.rmt
 bin/yamaha-ws-one/route.rmt
+bin/yamaha-ws-one/tunnel.rmt
 bin/cisco-ios/reboot.rmt
 bin/cisco-ios/reboot_async.rmt
 bin/cisco-ios/loginout.rmt
@@ -277,6 +282,7 @@ bin/manual/mtuconfig.rmt
 bin/manual/tunnel.rmt
 bin/manual/mip6EnableCN.rmt
 bin/manual/mip6EnableHA.rmt
+bin/manual/mip6EnableMN.rmt
 bin/manual/natpt.rmt
 bin/freebsd-i386/cleardefr.rmt
 bin/freebsd-i386/clearnc.rmt
@@ -324,6 +330,7 @@ bin/nec-mip6/loginout.rmt
 bin/nec-mip6/manualaddrconf.rmt
 bin/nec-mip6/mip6EnableCN.rmt
 bin/nec-mip6/mip6EnableHA.rmt
+bin/nec-mip6/mip6EnableMN.rmt
 bin/nec-mip6/mtuconfig.rmt
 bin/nec-mip6/ping6.rmt
 bin/nec-mip6/reboot.rmt
@@ -350,6 +357,57 @@ bin/sfc-mip6/reboot_async.rmt
 bin/sfc-mip6/route.rmt
 bin/sfc-mip6/rtadvd.rmt
 bin/sfc-mip6/tunnel.rmt
+bin/lcna/ipsecClearAll.rmt
+bin/lcna/ipsecSetSAD.rmt
+bin/lcna/mip6EnableCN.rmt
+bin/lcna/reboot.rmt
+bin/lcna/ipsecEnable.rmt
+bin/lcna/ipsecSetSPD.rmt
+bin/lcna/mip6EnableMN.rmt
+bin/lcna/reboot_async.rmt
+bin/mipl/mip6EnableMN.rmt
+bin/nec-ix1k/clearnc.rmt
+bin/nec-ix1k/manualaddrconf.rmt
+bin/nec-ix1k/reboot.rmt
+bin/nec-ix1k/route.rmt
+bin/nec-ix1k/loginout.rmt
+bin/nec-ix1k/ping6.rmt
+bin/nec-ix1k/reboot_async.rmt
+bin/openbsd-i386/cleardefr.rmt
+bin/openbsd-i386/clearroute.rmt
+bin/openbsd-i386/ipsecSetSAD.rmt
+bin/openbsd-i386/manualaddrconf.rmt
+bin/openbsd-i386/reboot.rmt
+bin/openbsd-i386/rtadvd.rmt
+bin/openbsd-i386/clearnc.rmt
+bin/openbsd-i386/ipsecClearAll.rmt
+bin/openbsd-i386/ipsecSetSPD.rmt
+bin/openbsd-i386/mtuconfig.rmt
+bin/openbsd-i386/reboot_async.rmt
+bin/openbsd-i386/tunnel.rmt
+bin/openbsd-i386/clearprefix.rmt
+bin/openbsd-i386/ipsecEnable.rmt
+bin/openbsd-i386/loginout.rmt
+bin/openbsd-i386/ping6.rmt
+bin/openbsd-i386/route.rmt
+bin/usagi-i386/cleardefr.rmt
+bin/usagi-i386/clearroute.rmt
+bin/usagi-i386/ipsecSetSAD.rmt
+bin/usagi-i386/manualaddrconf.rmt
+bin/usagi-i386/ping6.rmt
+bin/usagi-i386/route.rmt
+bin/usagi-i386/clearnc.rmt
+bin/usagi-i386/ipsecClearAll.rmt
+bin/usagi-i386/ipsecSetSPD.rmt
+bin/usagi-i386/mip6EnableMN.rmt
+bin/usagi-i386/reboot.rmt
+bin/usagi-i386/rtadvd.rmt
+bin/usagi-i386/clearprefix.rmt
+bin/usagi-i386/ipsecEnable.rmt
+bin/usagi-i386/loginout.rmt
+bin/usagi-i386/mtuconfig.rmt
+bin/usagi-i386/reboot_async.rmt
+bin/usagi-i386/tunnel.rmt
 man/man1/pktctl.1.gz
 man/man1/pktsend.1.gz
 doc/00README
@@ -394,6 +452,11 @@ include/stdconst.def
 @dirrm bin/kame-netbsd-i386
 @dirrm bin/nec-mip6
 @dirrm bin/sfc-mip6
+@dirrm bin/lcna
+@dirrm bin/mipl
+@dirrm bin/nec-ix1k
+@dirrm bin/openbsd-i386
+@dirrm bin/usagi-i386
 @dirrm bin
 @dirrm man/man1
 @dirrm man/cat1

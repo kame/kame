@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2255 2002/10/17 14:17:01 jinmei Exp $
+$KAME: CHANGELOG,v 1.2256 2002/10/18 10:07:39 suz Exp $
 
 <200210>
+Fri Oct 18 18:57:42 JST 2002	suz@crl.hitachi.co.jp
+	* kame/freebsd4/ports/{ct,v6eval}: updated to ver 2.0.
+
 2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/{ip6opt.c, rthdr.c}: synchronized with
 	rfc2292bis-08.  Many size_t values changed to socklen_t.  Man
