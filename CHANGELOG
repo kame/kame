@@ -1,10 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1076 2000/06/29 07:29:21 itojun Exp $
+$Id: CHANGELOG,v 1.1077 2000/06/30 08:46:10 sakane Exp $
 
 <200006>
+Fri Jun 30 17:45:23 JST 2000 sakane@ydc.co.jp
+	* freebsd[34]/usr.bin/whois.c:
+	ported whois for IPv6/4.
+	
 Thu Jun 29 16:24:35 JST 2000  itojun@iijlab.net
-	* */sys/netinet/in.c, kame/sys/netinet6/in6.c:
+	*/sys/netinet/in.c, kame/sys/netinet6/in6.c:
 	  inhibit EEXIST from in{,6}_ifinit().  history: (1) 4.4BSD ignores
 	  return value from in_ifinit() completely.  (2) previous kame code
 	  tried to handle error case better, the change raised bogus EEXIST
