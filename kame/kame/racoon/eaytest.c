@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.36 2001/09/07 05:10:48 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.37 2001/09/11 13:24:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,6 +42,9 @@
 #include <unistd.h>
 #include <err.h>
 
+#include <openssl/bio.h>
+#include <openssl/pem.h>
+
 #include "var.h"
 #include "vmbuf.h"
 #include "misc.h"
@@ -58,6 +61,8 @@ u_int32_t loglevel = 4;
 
 /* prototype */
 
+void rsatest __P((int, char **));
+static vchar_t *pem_read_buf __P((char *));
 void certtest __P((int, char **));
 static char **getcerts __P((char *));
 void ciphertest __P((int, char **));
@@ -70,6 +75,84 @@ void bntest __P((int, char **));
 void Usage __P((void));
 
 /* test */
+
+void
+rsatest(ac, av)
+	int ac;
+	char **av;
+{
+	char *text = "this is test.";
+	vchar_t src;
+	vchar_t *priv, *pub, *sig;
+	int error;
+
+	char *pkcs1 =
+"-----BEGIN RSA PRIVATE KEY-----\n"
+"MIICXQIBAAKBgQChe5/Fzk9SA0vCKBOcu9jBcLb9oLv50PeuEfQojhakY+OH8A3Q\n"
+"M8A0qIDG6uhTNGPvzCWb/+mKeOB48n5HJpLxlDFyP3kyd2yXHIZ/MN8g1nh4FsB0\n"
+"iTkk8QUCJkkan6FCOBrIeLEsGA5AdodzuR+khnCMt8vO+NFHZYKAQeynyQIDAQAB\n"
+"AoGAOfDcnCHxjhDGrwyoNNWl6Yqi7hAtQm67YAbrH14UO7nnmxAENM9MyNgpFLaW\n"
+"07v5m8IZQIcradcDXAJOUwNBN8E06UflwEYCaScIwndvr5UpVlN3e2NC6Wyg2yC7\n"
+"GarxQput3zj35XNR5bK42UneU0H6zDxpHWqI1SwE+ToAHu0CQQDNl9gUJTpg0L09\n"
+"HkbE5jeb8bA5I20nKqBOBP0v5tnzpwu41umQwk9I7Ru0ucD7j+DW4k8otadW+FnI\n"
+"G1M1MpSjAkEAyRMt4bN8otfpOpsOQWzw4jQtouohOxRFCrQTntHhU20PrQnQLZWs\n"
+"pOVzqCjRytYtkPEUA1z8QK5gGcVPcOQsowJBALmt2rwPB1NrEo5Bat7noO+Zb3Ob\n"
+"WDiYWeE8xkHd95gDlSWiC53ur9aINo6ZeP556jGIgL+el/yHHecJLrQL84sCQH48\n"
+"zUxq/C/cb++8UzneJGlPqusiJNTLiAENR1gpmlZfHT1c8Nb9phMsfu0vG29GAfuC\n"
+"bzchVLljALCNQK+2gRMCQQCNIgN+R9mRWZhFAcC1sq++YnuSBlw4VwdL/fd1Yg9e\n"
+"Ul+U98yPl/NXt8Rs4TRBFcOZjkFI8xv0hQtevTgTmgz+\n"
+"-----END RSA PRIVATE KEY-----\n\n";
+	char *pubkey =
+"-----BEGIN PUBLIC KEY-----\n"
+"MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQChe5/Fzk9SA0vCKBOcu9jBcLb9\n"
+"oLv50PeuEfQojhakY+OH8A3QM8A0qIDG6uhTNGPvzCWb/+mKeOB48n5HJpLxlDFy\n"
+"P3kyd2yXHIZ/MN8g1nh4FsB0iTkk8QUCJkkan6FCOBrIeLEsGA5AdodzuR+khnCM\n"
+"t8vO+NFHZYKAQeynyQIDAQAB\n"
+"-----END PUBLIC KEY-----\n\n";
+
+	priv = pem_read_buf(pkcs1);
+
+	src.v = text;
+	src.l = strlen(text);
+
+	/* sign */
+	sig = eay_rsa_sign(&src, priv);
+	if (sig == NULL)
+		printf("sign failed. %s\n", eay_strerror());
+	printf("RSA signed data.\n");
+	PVDUMP(sig);
+
+	/* verify */
+	pub = pem_read_buf(pubkey);
+	error = eay_rsa_verify(&src, sig, pub);
+	if (error)
+		printf("verifying failed.\n");
+	else
+		printf("verified.\n");
+}
+
+static vchar_t *
+pem_read_buf(buf)
+	char *buf;
+{
+	BIO *bio;
+	char *nm = NULL, *header = NULL;
+	unsigned char *data = NULL;
+	long len;
+	vchar_t *ret;
+	int error;
+
+	bio = BIO_new_mem_buf(buf, strlen(buf));
+	error = PEM_read_bio(bio, &nm, &header, &data, &len);
+	if (error == 0)
+		errx(1, "%s", eay_strerror());
+	ret = vmalloc(len);
+	if (ret == NULL)
+		err(1, "vmalloc");
+	memcpy(ret->v, data, len);
+
+	return ret;
+}
 
 void
 certtest(ac, av)
@@ -803,6 +886,7 @@ struct {
 	{ "hmac", hmactest, },
 	{ "cipher", ciphertest, },
 	{ "cert", certtest, },
+	{ "rsa", rsatest, },
 };
 
 int
