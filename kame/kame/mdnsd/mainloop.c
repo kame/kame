@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.19 2000/05/31 11:58:39 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.20 2000/05/31 12:10:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -159,7 +159,8 @@ mainloop0(i)
 			continue;
 		ns->prio++;
 		gettimeofday(&ns->lastrx, NULL);
-		dprintf("ns %p prio %d -> %d\n", ns, ns->prio - 1, ns->prio);
+		if (dflag)
+			printnsdb(ns);
 	}
 
 	if (ismyaddr((struct sockaddr *)&from)) {
@@ -330,11 +331,6 @@ hexdump(title, buf, len, from)
 {
 	int i;
 	char hbuf[NI_MAXHOST], pbuf[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
 	HEADER *hp;
 	const char *d, *n;
 	int count;

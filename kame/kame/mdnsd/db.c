@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.6 2000/05/31 11:58:39 itojun Exp $	*/
+/*	$KAME: db.c,v 1.7 2000/05/31 12:10:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -88,15 +88,13 @@ dbtimeo()
 	for (ns = LIST_FIRST(&nsdb); ns; ns = nns) {
 		nns = LIST_NEXT(ns, link);
 
-		if (ns->expire.tv_sec == -1 && ns->expire.tv_usec == -1) {
 #if 0
-			dprintf("ns %p expire never\n", ns);
+		if (dflag)
+			printnsdb(ns);
 #endif
+
+		if (ns->expire.tv_sec == -1 && ns->expire.tv_usec == -1)
 			continue;
-		}
-#if 0
-		dprintf("ns %p expire %lu\n", ns, (u_long)ns->expire.tv_sec);
-#endif
 
 		if (ns->expire.tv_sec > tv.tv_sec)
 			continue;
@@ -104,6 +102,8 @@ dbtimeo()
 		    ns->expire.tv_usec > tv.tv_usec)
 			continue;
 
+		if (dflag)
+			printnsdb(ns);
 		dprintf("ns %p expired\n", ns);
 		delnsdb(ns);
 	}
@@ -228,4 +228,29 @@ delnsdb(ns)
 	if (ns->comment)
 		free(ns->comment);
 	free(ns);
+}
+
+void
+printnsdb(ns)
+	struct nsdb *ns;
+{
+	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+
+	printf("ns %p", ns);
+	if (getnameinfo((struct sockaddr *)&ns->addr, ns->addr.ss_len,
+	    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) == 0) {
+		printf(" %s %s", hbuf, sbuf);
+	} else
+		printf(" addr? serv?");
+	printf(" flags %d prio %d", ns->flags, ns->prio);
+	if (ns->expire.tv_sec == -1 && ns->expire.tv_usec == -1)
+		printf(" expire never");
+	else
+		printf(" expire %lu", (u_long)ns->expire.tv_sec);
+	printf(" lasttx %lu", (u_long)ns->lasttx.tv_sec);
+	printf(" lastrx %lu", (u_long)ns->lastrx.tv_sec);
+	if (ns->comment)
+		printf(" comment \"%s\"", ns->comment);
+
+	printf("\n");
 }

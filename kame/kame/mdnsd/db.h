@@ -1,4 +1,4 @@
-/*	$KAME: db.h,v 1.6 2000/05/31 11:58:39 itojun Exp $	*/
+/*	$KAME: db.h,v 1.7 2000/05/31 12:10:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -82,3 +82,4 @@ extern struct scache *newscache __P((int, const struct sockaddr *,
 extern void delscache __P((struct scache *));
 extern struct nsdb *newnsdb __P((const struct sockaddr *, const char *, int));
 extern void delnsdb __P((struct nsdb *));
+extern void printnsdb __P((struct nsdb *));

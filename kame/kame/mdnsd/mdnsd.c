@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.14 2000/05/31 11:59:41 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.15 2000/05/31 12:10:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -71,6 +71,11 @@ static int mcastloop = 0;
 int dflag = 1;
 struct timeval hz = { 1, 0 };	/* timeout every 1 second */
 static int mflag;
+#ifdef NI_WITHSCOPEID
+const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
 
 static void usage __P((void));
 static int getsock __P((int, const char *, const char *, int, int));
@@ -274,11 +279,6 @@ getsock0(ai)
 	int s;
 	const int yes = 1;
 	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-#ifdef IN_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
 
 	if (dflag &&
 	    getnameinfo(ai->ai_addr, ai->ai_addrlen, hbuf, sizeof(hbuf),
