@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2151 2002/05/16 06:02:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2152 2002/05/17 01:39:15 jinmei Exp $
 
 <200205>
+2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported the preference option; servers can
+	specify the preference value for a particular interface.  Clients
+	can parse the preference option and take it into account of
+	choosing the best server.
+
 2002-05-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: supported the "normal" sequence of
 	client-server exchange; solicit, advertise(s), request, and then
