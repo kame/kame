@@ -45,6 +45,21 @@
 #ifndef IPV6_ADDR_SCOPE_RESERVED
 #define IPV6_ADDR_SCOPE_RESERVED	0x00
 #endif
+#ifndef IPV6_ADDR_SCOPE_NODELOCAL
+#define IPV6_ADDR_SCOPE_NODELOCAL	0x01
+#endif
+#ifndef IPV6_ADDR_SCOPE_LINKLOCAL
+#define IPV6_ADDR_SCOPE_LINKLOCAL	0x02
+#endif
+#ifndef IPV6_ADDR_SCOPE_SITELOCAL
+#define IPV6_ADDR_SCOPE_SITELOCAL	0x05
+#endif
+#ifndef IPV6_ADDR_SCOPE_ORGLOCAL
+#define IPV6_ADDR_SCOPE_ORGLOCAL	0x08	/* just used in this file */
+#endif
+#ifndef IPV6_ADDR_SCOPE_GLOBAL
+#define IPV6_ADDR_SCOPE_GLOBAL		0x0e
+#endif
 
 char *pname;
 char *addr, *port;
