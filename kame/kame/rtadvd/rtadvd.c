@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.40 2000/11/08 07:08:46 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.41 2000/11/08 14:50:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,6 +75,7 @@ struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
 static char *dumpfilename = "/var/run/rtadvd.dump"; /* XXX: should be configurable */
 static char *pidfilename = "/var/run/rtadvd.pid"; /* should be configurable */
+static char *mcastif;
 int sock, rtsock;
 #ifdef MIP6
 int mobileip6 = 0;
@@ -156,9 +157,9 @@ main(argc, argv)
 
 	/* get command line options and arguments */
 #ifdef MIP6
-#define OPTIONS "c:dDfmRs"
+#define OPTIONS "c:dDfM:mRs"
 #else
-#define OPTIONS "c:dDfRs"
+#define OPTIONS "c:dDfM:Rs"
 #endif
 	while ((ch = getopt(argc, argv, OPTIONS)) != -1) {
 #undef OPTIONS
@@ -175,6 +176,9 @@ main(argc, argv)
 		 case 'f':
 			 fflag = 1;
 			 break;
+		case 'M':
+			mcastif = optarg;
+			break;
 #ifdef MIP6
 		 case 'm':
 			 mobileip6 = 1;
@@ -1233,7 +1237,7 @@ void
 sock_open()
 {
 	struct icmp6_filter filt;
-	struct ipv6_mreq mreq_link, mreq_site;
+	struct ipv6_mreq mreq;
 	struct rainfo *ra = ralist;
 	int on;
 	/* XXX: should be max MTU attached to the node */
@@ -1313,41 +1317,53 @@ sock_open()
 	 * join all routers multicast address on each advertising interface.
 	 */
 	if (inet_pton(AF_INET6, ALLROUTERS_LINK,
-		      &mreq_link.ipv6mr_multiaddr.s6_addr)
-	    != 1) {
-		syslog(LOG_ERR, "<%s> inet_pton failed(library bug?)",
-		       __FUNCTION__);
-		exit(1);
-	}
-	if (inet_pton(AF_INET6, ALLROUTERS_SITE,
-		      &mreq_site.ipv6mr_multiaddr.s6_addr)
+		      &mreq.ipv6mr_multiaddr.s6_addr)
 	    != 1) {
 		syslog(LOG_ERR, "<%s> inet_pton failed(library bug?)",
 		       __FUNCTION__);
 		exit(1);
 	}
 	while(ra) {
-		mreq_link.ipv6mr_interface = ra->ifindex;
-		if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-			       &mreq_link,
-			       sizeof(mreq_link)) < 0) {
+		mreq.ipv6mr_interface = ra->ifindex;
+		if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
+			       sizeof(mreq)) < 0) {
 			syslog(LOG_ERR, "<%s> IPV6_JOIN_GROUP(link) on %s: %s",
 			       __FUNCTION__, ra->ifname, strerror(errno));
 			exit(1);
 		}
-		if (accept_rr) {
-			mreq_site.ipv6mr_interface = ra->ifindex;
-			if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-				       &mreq_site,
-				       sizeof(mreq_site)) < 0) {
+		ra = ra->next;
+	}
+
+	/*
+	 * When attending router renumbering, join all-sites multicast group. 
+	 */
+	if (inet_pton(AF_INET6, ALLROUTERS_SITE,
+		      &mreq.ipv6mr_multiaddr.s6_addr)
+	    != 1) {
+		syslog(LOG_ERR, "<%s> inet_pton failed(library bug?)",
+		       __FUNCTION__);
+		exit(1);
+	}
+	if (accept_rr) {
+		if (mcastif) {
+			if ((mreq.ipv6mr_interface = if_nametoindex(mcastif))
+			    == 0) {
 				syslog(LOG_ERR,
-				       "<%s> IPV6_JOIN_GROUP(site) on %s: %s",
-				       __FUNCTION__, ra->ifname,
-				       strerror(errno));
+				       "<%s> invalid interface: mcastif",
+				       __FUNCTION__, mcastif);
 				exit(1);
 			}
+		} else
+			mreq.ipv6mr_interface = ralist->ifindex;
+		if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+			       &mreq, sizeof(mreq)) < 0) {
+			syslog(LOG_ERR,
+			       "<%s> IPV6_JOIN_GROUP(site) on %s: %s",
+			       __FUNCTION__,
+			       mcastif ? mcastif : ralist->ifname,
+			       strerror(errno));
+			exit(1);
 		}
-		ra = ra->next;
 	}
 	
 	/* initialize msghdr for receiving packets */
