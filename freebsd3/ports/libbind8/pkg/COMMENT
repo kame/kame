@@ -1,0 +1,3 @@
+The Berkeley Internet Name Daemon resolver library, with IPv6 support
+including A6 and DNAME.
+
