@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.20 2002/07/14 14:54:20 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.21 2002/07/15 15:01:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -81,7 +81,7 @@
 
 /* xn + y; x must be 2^m */
 #define PADLEN(cur_offset, x, y)	\
-	(((cur_offset) + (x - 1) - y) & (x - 1)) + y
+	(y) - ((cur_offset) % (x))
 
 extern struct mip6_bc_list mip6_bc_list;
 extern struct mip6_prefix_list mip6_prefix_list;
@@ -1378,11 +1378,12 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct hif_softc *sc;
 {
 	struct ip6m_binding_update *ip6mu;
-	struct ip6m_opt_nonce *mopt_nonce;
-	struct ip6m_opt_authdata *mopt_auth;
+	struct ip6m_opt_nonce *mopt_nonce = NULL;
+	struct ip6m_opt_authdata *mopt_auth = NULL;
 	int ip6mu_size;
 	int bu_size, nonce_size, auth_size;
 	struct mip6_bu *mbu, *hrmbu;
+	int need_rr = 0;
 	SHA1_CTX sha1_ctx;
 	HMAC_CTX hmac_ctx;
 	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
@@ -1436,12 +1437,21 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		return (0);
 	}
 
+	if (!(mbu->mbu_flags & IP6MU_HOME)) {
+		need_rr = 1;
+	}
+
 	bu_size = sizeof(struct ip6m_binding_update);
-	bu_size += PADLEN(bu_size, 2, 0);
-	nonce_size = sizeof(struct ip6m_opt_nonce);
-	nonce_size += PADLEN(bu_size + nonce_size, 4, 2);
-	auth_size = sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN;
-	auth_size += PADLEN(bu_size + nonce_size + auth_size, 8, 0);
+	if (need_rr) {
+		bu_size += PADLEN(bu_size, 2, 0);
+		nonce_size = sizeof(struct ip6m_opt_nonce);
+		nonce_size += PADLEN(bu_size + nonce_size, 4, 2);
+		auth_size = sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN;
+		auth_size += PADLEN(bu_size + nonce_size + auth_size, 8, 0);
+	} else {
+		bu_size += PADLEN(bu_size, 8, 0);
+		nonce_size = auth_size = 0;
+	}
 	ip6mu_size = bu_size + nonce_size + auth_size;
 
 	MALLOC(ip6mu, struct ip6m_binding_update *,
@@ -1449,8 +1459,10 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	if (ip6mu == NULL)
 		return (ENOMEM);
 
-	mopt_nonce = (struct ip6m_opt_nonce *)((u_int8_t *)ip6mu + bu_size);
-	mopt_auth = (struct ip6m_opt_authdata *)(u_int8_t *)mopt_nonce + nonce_size;
+	if (need_rr) {
+		mopt_nonce = (struct ip6m_opt_nonce *)((u_int8_t *)ip6mu + bu_size);
+		mopt_auth = (struct ip6m_opt_authdata *)(u_int8_t *)mopt_nonce + nonce_size;
+	}
 
 	/* update sequence number of this binding update entry. */
 	mbu->mbu_seqno++;
@@ -1513,40 +1525,42 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	ip6mu->ip6mu_addr = mbu->mbu_haddr.sin6_addr;
 	in6_clearscope(&ip6mu->ip6mu_addr);
 
-	/* nonce indices and authdata insersion. */
-	/* Nonce Indicies */
-	mopt_nonce->ip6mon_type = IP6MOPT_NONCE;
-	mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
-	SET_NETVAL_S(&mopt_nonce->ip6mon_home_nonce_index,
-		     mbu->mbu_home_nonce_index);
-	SET_NETVAL_S(&mopt_nonce->ip6mon_careof_nonce_index,
-		     mbu->mbu_careof_nonce_index);
+	if (need_rr) {
+		/* nonce indices and authdata insersion. */
+		/* Nonce Indicies */
+		mopt_nonce->ip6mon_type = IP6MOPT_NONCE;
+		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
+		SET_NETVAL_S(&mopt_nonce->ip6mon_home_nonce_index,
+			     mbu->mbu_home_nonce_index);
+		SET_NETVAL_S(&mopt_nonce->ip6mon_careof_nonce_index,
+			     mbu->mbu_careof_nonce_index);
 
-	/* Auth. data */
-	mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-	mopt_auth->ip6moau_len = sizeof(struct ip6m_opt_authdata) - 2;
+		/* Auth. data */
+		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
+		mopt_auth->ip6moau_len = sizeof(struct ip6m_opt_authdata) - 2;
 
-	/* Calculate K_bu */
-	SHA1Init(&sha1_ctx);
-	SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_home_cookie,
-		   sizeof(mbu->mbu_home_cookie));
-	SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_careof_cookie,
-		   sizeof(mbu->mbu_careof_cookie));
-	SHA1Final(key_bu, &sha1_ctx);
+		/* Calculate K_bu */
+		SHA1Init(&sha1_ctx);
+		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_home_cookie,
+			   sizeof(mbu->mbu_home_cookie));
+		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_careof_cookie,
+			   sizeof(mbu->mbu_careof_cookie));
+		SHA1Final(key_bu, &sha1_ctx);
 
-	/* Calculate authenticator */
-	hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-	hmac_loop(&hmac_ctx, (u_int8_t *)&src->sin6_addr, sizeof(src->sin6_addr));
-	hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr, sizeof(dst->sin6_addr));
-	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
-	if (auth_size - (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN)) {
-		hmac_loop(&hmac_ctx,
-			  (u_int8_t *)ip6mu + bu_size + nonce_size
-			  + sizeof(struct ip6m_opt_authdata),
-			  auth_size -
-			  (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN));
+		/* Calculate authenticator */
+		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
+		hmac_loop(&hmac_ctx, (u_int8_t *)&src->sin6_addr, sizeof(src->sin6_addr));
+		hmac_loop(&hmac_ctx, (u_int8_t *)&dst->sin6_addr, sizeof(dst->sin6_addr));
+		hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, bu_size + nonce_size);
+		if (auth_size - (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN)) {
+			hmac_loop(&hmac_ctx,
+				  (u_int8_t *)ip6mu + bu_size + nonce_size
+				  + sizeof(struct ip6m_opt_authdata),
+				  auth_size -
+				  (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN));
+		}
+		hmac_result(&hmac_ctx, (u_int8_t *)(mopt_auth + 1));
 	}
-	hmac_result(&hmac_ctx, (u_int8_t *)(mopt_auth + 1));
 
 	/* calculate checksum. */
 	ip6mu->ip6mu_cksum = mip6_cksum(src, dst, ip6mu_size,
