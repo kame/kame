@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.128 2001/06/20 12:34:37 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.129 2001/06/22 13:16:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2632,7 +2632,11 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-	    "usage: ping6 [-dfHmnNqvwW"
+	    "usage: ping6 [-dfH"
+#ifdef IPV6_USE_MIN_MTU
+	    "m"
+#endif
+	    "nNqtvwW"
 #ifdef IPV6_REACHCONF
 	    "R"
 #endif
