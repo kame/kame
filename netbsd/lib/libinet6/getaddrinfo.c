@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.38 2001/01/05 14:53:05 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.39 2001/01/05 15:49:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,7 +109,7 @@ __RCSID("$NetBSD$");
 #include <rpcsvc/ypclnt.h>
 #endif
 
-#ifdef __weak_alias
+#if 0 /*def __weak_alias*/
 __weak_alias(getaddrinfo,_getaddrinfo)
 __weak_alias(freeaddrinfo,_freeaddrinfo)
 __weak_alias(gai_strerror,_gai_strerror)
