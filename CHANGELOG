@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2515 2003/12/10 09:24:14 jinmei Exp $
+$KAME: CHANGELOG,v 1.2516 2003/12/10 21:33:51 t-momose Exp $
 
 <200312>
+2003-12-11  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+	* sys/netinet6/mip6_{ha,cn}core.c, mip6_var.h:
+	Changed a method of time management for binding cache entries.
+	Use system built-in timeout functions instead of 
+	checking their expiration every second.
+
 2003-12-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (add_m6fc): corrected the
 	coverage of spl(soft)net.
