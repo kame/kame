@@ -247,6 +247,10 @@ rtfree(rt)
 	 * and there is a close function defined, call the close function
 	 */
 	rt->rt_refcnt--;
+#ifdef RTRELEASE
+	if (rt->rt_refcnt == 0)
+		RTRELEASE(rt);
+#endif
 	if(rnh->rnh_close && rt->rt_refcnt == 0) {
 		rnh->rnh_close((struct radix_node *)rt, rnh);
 	}

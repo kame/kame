@@ -134,6 +134,7 @@ struct rtentry {
 	time_t rt_lastreftime;	/* timestamp when the latest reference time */
 	u_long rt_usehist[16];	/* histogram of references for every 5 min */
 	u_long rt_reusehist[16]; /* histogram of re-use of this route */
+	u_long rt_releasehist[16]; /* histogram of release of this route*/
 };
 
 /*
@@ -333,6 +334,15 @@ struct rttimer_queue {
 		if (i > 12) \
 			i = 12; \
 		(rt)->rt_reusehist[i]++; \
+	} while (0)
+
+#define	RTRELEASE(rt) \
+	do { \
+		int i; \
+		i = (time_second - (rt)->rt_createtime) / 300; \
+		if (i > 12) \
+			i = 12; \
+		(rt)->rt_releasehist[i]++; \
 	} while (0)
 
 extern struct route_cb route_cb;
