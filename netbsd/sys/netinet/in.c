@@ -133,8 +133,8 @@ static void in_len2mask __P((struct in_addr *, int));
 static int in_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 	struct ifnet *, struct proc *));
 
-int in_addprefix __P((struct in_ifaddr *, int));
-int in_scrubprefix __P((struct in_ifaddr *));
+static int in_addprefix __P((struct in_ifaddr *, int));
+static int in_scrubprefix __P((struct in_ifaddr *));
 
 #ifndef SUBNETSARELOCAL
 #define	SUBNETSARELOCAL	1
@@ -922,7 +922,7 @@ bad:
 	  (x)->ia_dstaddr.sin_family == AF_INET) ? RTF_HOST : 0)
 
 /* (may) add a route to prefix ("connected route" in cisco terminology) */
-int
+static int
 in_addprefix(target, flags)
 	struct in_ifaddr *target;
 	int flags;
@@ -968,7 +968,7 @@ in_addprefix(target, flags)
 	return error;
 }
 
-int
+static int
 in_scrubprefix(target)
 	struct in_ifaddr *target;
 {
