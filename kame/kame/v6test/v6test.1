@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: v6test.1,v 1.1 1999/08/08 23:32:45 itojun Exp $
+.\"     $Id: v6test.1,v 1.2 1999/10/05 12:24:36 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt V6TEST 1
@@ -39,8 +39,8 @@
 .Nm
 .Op Fl s Ar src
 .Op Fl d Ar dst
-.Op Fl i Ar interface
 .Op Fl f Ar configfile
+.Fl i Ar interface
 .Ar entry ...
 .\"
 .Sh DESCRIPTION
@@ -59,9 +59,7 @@ The option lets you override the description in configuration file.
 .It Fl i Ar interface
 Send the generated IPv6 packet to
 .Ar interface .
-Default is
-.Li ep0 .
-Interfaces with
+This is not an optional argument and must always be specified.
 .Xr bpf 4
 encapsulation type
 .Dv DLT_EN10MB
