@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.37 2002/02/19 04:07:57 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.38 2002/04/01 07:50:31 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,17 +126,6 @@ dest6_input(mp, offp, proto)
 			optlen = *(opt + 1) + 2;
 			break;
 		case IP6OPT_HOME_ADDRESS:
-			/*
-			 * XXX we assume that home address option appear after
-			 * AH.  if the assumption does not hold, the validation
-			 * of AH will fail due to the address swap.
-			 */
-#if 0
-			/* be picky about alignment: 8n+6 */
-			if ((opt - (u_int8_t *)dstopts) % 8 != 6)
-				goto bad;
-#endif
-
 			/* HA option must appear only once */
 			n = ip6_addaux(m);
 			if (!n) {
