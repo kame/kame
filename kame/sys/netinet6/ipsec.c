@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.92 2001/02/15 00:30:22 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.93 2001/02/15 00:34:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3253,8 +3253,6 @@ ipsec_copypkt(m)
 {
 #ifdef __NetBSD__
 	return m_dup(m, 0, M_COPYALL, M_DONTWAIT);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	return m_dup(m, M_DONTWAIT);
 #else
 	struct mbuf *n, **mpp, *mnew;
 
