@@ -40,6 +40,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <err.h>
+#include <errno.h>
 
 #ifndef IPV6_ADDR_SCOPE_RESERVED
 #define IPV6_ADDR_SCOPE_RESERVED	0x00
@@ -76,8 +77,7 @@ void
 Usage()
 {
 	printf("Usage: %s [-l hlim] [-i ifname [-s scope]] "
-		"(addr) (port) [file]\n",
-		pname);
+		"addr port [file]\n", pname);
 	printf("\tscope: 1, 2, 5 or 14\n");
 }
 
@@ -93,39 +93,77 @@ main(ac, av)
 	parse(ac, av);
 
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_INET6;
+	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
 	error = getaddrinfo(addr, port, &hints, &res);
 	if (error != 0)
 		errx(1, "%s", gai_strerror(error));
 
+	switch (res->ai_family) {
+	case AF_INET6:
+	case AF_INET:
+		break;
+	default:
+		errno = EAFNOSUPPORT;
+		err(1, "%s %s", addr, port);
+	}
+
 	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (s < 0)
-		err(1, "socket:");
+		err(1, "socket");
 
 	/* set interface to send and bind. */
 	if (ifname != NULL) {
 		int ifindex;
+		struct in_addr a;
 
 		ifindex = if_nametoindex(ifname);
 		if (ifindex == 0)
 			err(1, "if_nametoindex");
-		error = setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-				&ifindex, sizeof(ifindex));
-		if (error < 0)
-			err(1, "setsockopt(IPV6_MULTICAST_IF)");
+		switch (res->ai_family) {
+		case AF_INET6:
+			error = setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+					&ifindex, sizeof(ifindex));
+			if (error < 0)
+				err(1, "setsockopt(IPV6_MULTICAST_IF)");
+			break;
+		case AF_INET:
+			a.s_addr = htonl(ifindex);
+			error = setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF,
+					&a, sizeof(a));
+			if (error < 0)
+				err(1, "setsockopt(IP_MULTICAST_IF)");
+			break;
+		}
 
-		error = bind_srcaddr(s, ifname, scope_limit);
-		if (error < 0)
-			errx(1, "Failed to bind source address.");
+		switch (res->ai_family) {
+		case AF_INET6:
+			error = bind_srcaddr(s, ifname, scope_limit);
+			if (error < 0)
+				errx(1, "Failed to bind source address.");
+			break;
+		}
 	}
 
 	/* set hop-limit */
 	if (hlim != 0) {
-		error = setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
-				&hlim, sizeof(hlim));
-		if (error < 0)
-			err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
+		u_char ttl;
+
+		switch (res->ai_family) {
+		case AF_INET6:
+			error = setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+					&hlim, sizeof(hlim));
+			if (error < 0)
+				err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
+			break;
+		case AF_INET:
+			ttl = hlim & 0xff;
+			error = setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL,
+					&ttl, sizeof(ttl));
+			if (error < 0)
+				err(1, "setsockopt(IP_MULTICAST_TTL)");
+			break;
+		}
 	}
 
 	/* main */
