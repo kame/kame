@@ -10,10 +10,6 @@ LDADD+=	-L${.OBJDIR}/../../lib/libaltq \
 	-L/usr/local/v6/lib -laltq
 DPADD+= ${.OBJDIR}/../../lib/libaltq/libaltq.a \
 	/usr/local/v6/lib/libaltq.a
-LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
-	-L/usr/local/v6/lib -linet6
-DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
-	/usr/local/v6/lib/libinet6.a
 LDADD+=	-lm
 DPADD+=	${LIBM}
 
