@@ -296,22 +296,22 @@ accept_pim6(pimlen)
 
     switch (pim->pim_type) {
      case PIM_HELLO:
-         receive_pim6_hello(src,(char *)(pim), pimlen);
+         receive_pim6_hello(src, (char *)(pim), pimlen);
          break;
      case PIM_REGISTER:
-       	receive_pim6_register(src , &dst ,(char *)(pim) , pimlen);  
+       	receive_pim6_register(src, &dst , (char *)(pim), pimlen);  
 		break;
      case PIM_REGISTER_STOP:
-       	 receive_pim6_register_stop(src , &dst ,(char *)(pim) , pimlen);  
+       	 receive_pim6_register_stop(src , &dst, (char *)(pim), pimlen);  
          break;
      case PIM_JOIN_PRUNE:
-         receive_pim6_join_prune(src,&dst, (char *)(pim), pimlen);
+         receive_pim6_join_prune(src, &dst, (char *)(pim), pimlen);
          break;
      case PIM_BOOTSTRAP:
-         receive_pim6_bootstrap(src,&dst, (char *)(pim), pimlen);
+         receive_pim6_bootstrap(src, &dst, (char *)(pim), pimlen);
          break;
      case PIM_ASSERT:
-         receive_pim6_assert(src,&dst, (char *)(pim), pimlen);
+         receive_pim6_assert(src, &dst, (char *)(pim), pimlen);
          break;
      case PIM_GRAFT:
      case PIM_GRAFT_ACK:
@@ -320,7 +320,7 @@ accept_pim6(pimlen)
              inet6_fmt(&src->sin6_addr));
          break;
      case PIM_CAND_RP_ADV:
-         receive_pim6_cand_rp_adv(src,&dst, (char *)(pim), pimlen);
+         receive_pim6_cand_rp_adv(src, &dst, (char *)(pim), pimlen);
          break;
      default:
          log(LOG_INFO, 0,
