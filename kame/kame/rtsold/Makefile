@@ -35,7 +35,6 @@ LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
-LDADD+=	-lkvm
 
 .if (${OPSYS} != "NetBSD")
 MAN8=	rtsold.8
