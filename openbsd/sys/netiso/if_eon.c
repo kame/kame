@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_eon.c,v 1.15 2002/03/26 19:12:56 niklas Exp $	*/
+/*	$OpenBSD: if_eon.c,v 1.17 2002/08/28 15:43:03 pefo Exp $	*/
 /*	$NetBSD: if_eon.c,v 1.15 1996/05/09 22:29:37 scottr Exp $	*/
 
 /*-
@@ -305,7 +305,7 @@ eonrtrequest(cmd, rt, info)
 		el->el_rt = rt;
 		break;
 	}
-	if (info || (gate = info->rti_info[RTAX_GATEWAY]))	/*XXX*/
+	if (info && (gate = info->rti_info[RTAX_GATEWAY]))	/*XXX*/
 		switch (gate->sa_family) {
 		case AF_LINK:
 #define SDL(x) ((struct sockaddr_dl *)x)
@@ -433,7 +433,7 @@ send:
 	}
 #endif
 
-	error = ip_output(m, (struct mbuf *) 0, ro, 0, NULL);
+	error = ip_output(m, (struct mbuf *) 0, ro, (void *)NULL, (void *)NULL);
 	m = 0;
 	if (error) {
 		ifp->if_oerrors++;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.h,v 1.34 2002/03/15 01:20:04 millert Exp $	*/
+/*	$OpenBSD: if.h,v 1.40 2002/07/03 21:19:08 miod Exp $	*/
 /*	$NetBSD: if.h,v 1.23 1996/05/07 02:40:27 thorpej Exp $	*/
 
 /*
@@ -148,6 +148,7 @@ struct ifnet {				/* and the entries */
 	void	*if_softc;		/* lower-level data for this if */
 	TAILQ_ENTRY(ifnet) if_list;	/* all struct ifnets are chained */
 	TAILQ_HEAD(, ifaddr) if_addrlist; /* linked list of addresses per if */
+	struct hook_desc_head *if_addrhooks; /* address change callbacks */
 	char	if_xname[IFNAMSIZ];	/* external name (name + unit) */
 	int	if_pcount;		/* number of promiscuous listeners */
 	caddr_t	if_bpf;			/* packet filter structure */
@@ -171,6 +172,7 @@ struct ifnet {				/* and the entries */
 					/* timer routine */
 	void	(*if_watchdog)(struct ifnet *);
 	struct	ifaltq if_snd;		/* output queue (includes altq) */
+	struct sockaddr_dl *if_sadl;	/* pointer to our sockaddr_dl */
 
 	void	*if_afdata[AF_MAX];
 };
@@ -526,10 +528,10 @@ do {									\
 #define	IFQ_INC_DROPS(ifq)		((ifq)->ifq_drops++)
 #define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
 
-struct ifnet_head ifnet;
-struct ifnet **ifindex2ifnet;
-struct ifnet *lo0ifp;
-int if_index;
+extern struct ifnet_head ifnet;
+extern struct ifnet **ifindex2ifnet;
+extern struct ifnet *lo0ifp;
+extern int if_index;
 
 void	ether_ifattach(struct ifnet *);
 void	ether_ifdetach(struct ifnet *);
@@ -540,6 +542,8 @@ int	ether_output(struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *);
 char	*ether_sprintf(u_char *);
 
+void	if_alloc_sadl(struct ifnet *);
+void	if_free_sadl(struct ifnet *);
 void	if_attach(struct ifnet *);
 void	if_attachdomain(void);
 void	if_attachtail(struct ifnet *);

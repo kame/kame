@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sk.c,v 1.23 2002/03/14 01:26:59 millert Exp $	*/
+/*	$OpenBSD: if_sk.c,v 1.25 2002/06/08 23:32:16 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
@@ -42,9 +42,9 @@
  * http://www.freebsd.org/~wpaul/SysKonnect/xmacii_datasheet_rev_c_9-29.pdf
  *	The SysKonnect GEnesis manual, http://www.syskonnect.com
  *
- * Note: XaQti has been aquired by Vitesse, and Vitesse does not have the
+ * Note: XaQti has been acquired by Vitesse, and Vitesse does not have the
  * XMAC II datasheet online. I have put my copy at people.freebsd.org as a
- * convience to others until Vitesse corrects this problem:
+ * convenience to others until Vitesse corrects this problem:
  *
  * http://people.freebsd.org/~wpaul/SysKonnect/xmacii_datasheet_rev_c_9-29.pdf
  *
@@ -700,6 +700,13 @@ sk_ioctl(ifp, command, data)
 			sk_init(sc_if);
 			break;
 		}
+		break;
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > SK_JUMBO_MTU)
+			error = EINVAL;
+		else
+			ifp->if_mtu = ifr->ifr_mtu;
+		sk_init(sc_if);
 		break;
 	case SIOCSIFFLAGS:
 		if (ifp->if_flags & IFF_UP) {

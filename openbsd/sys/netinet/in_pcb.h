@@ -1,10 +1,10 @@
-/*	$OpenBSD: in_pcb.h,v 1.40 2002/03/14 03:16:11 millert Exp $	*/
+/*	$OpenBSD: in_pcb.h,v 1.44 2002/09/04 07:26:53 itojun Exp $	*/
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -16,7 +16,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -155,11 +155,8 @@ struct inpcb {
 #define SR_WAIT           3             /* Waiting for SA */
 	TAILQ_ENTRY(inpcb) inp_tdb_in_next, inp_tdb_out_next;
 	struct tdb     *inp_tdb_in, *inp_tdb_out;
-	struct ipsec_ref *inp_ipsec_localid;
-	struct ipsec_ref *inp_ipsec_remoteid;
-	struct ipsec_ref *inp_ipsec_localcred;
+	struct ipsec_policy *inp_ipo;
 	struct ipsec_ref *inp_ipsec_remotecred;
-	struct ipsec_ref *inp_ipsec_localauth;
 	struct ipsec_ref *inp_ipsec_remoteauth;
 #define	inp_flowinfo	inp_hu.hu_ipv6.ip6_flow
 
@@ -225,7 +222,7 @@ struct inpcbtable {
  * Flags in in6p_flags
  * We define KAME's original flags in higher 16 bits as much as possible
  * for compatibility with *bsd*s.
- * XXX: Should IN6P_HIGHPORT and IN6P_LOWPORT be moved as well?  
+ * XXX: Should IN6P_HIGHPORT and IN6P_LOWPORT be moved as well?
  */
 #define IN6P_HIGHPORT		INP_HIGHPORT	/* user wants "high" port */
 #define IN6P_LOWPORT		INP_LOWPORT	/* user wants "low" port */
@@ -314,8 +311,8 @@ struct rtentry *
 
 /* INET6 stuff */
 int	in6_pcbnotify(struct inpcbtable *, struct sockaddr *,
-			   u_int, struct sockaddr *, u_int, int, void *,
-			   void (*)(struct inpcb *, int));
+	u_int, struct sockaddr *, u_int, int, void *,
+	void (*)(struct inpcb *, int));
 int	in6_selecthlim(struct inpcb *, struct ifnet *);
 int	in6_pcbsetport(struct sockaddr_in6 *, struct inpcb *, struct proc *);
 #endif /* _KERNEL */

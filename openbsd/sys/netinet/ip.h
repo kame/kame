@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip.h,v 1.7 2001/06/09 07:03:41 angelos Exp $	*/
+/*	$OpenBSD: ip.h,v 1.8 2002/05/16 14:10:51 kjc Exp $	*/
 /*	$NetBSD: ip.h,v 1.9 1995/05/15 01:22:44 cgd Exp $	*/
 
 /*
@@ -80,6 +80,11 @@ struct ip {
 #define	IPTOS_THROUGHPUT	0x08
 #define	IPTOS_RELIABILITY	0x04
 /*	IPTOS_LOWCOST		0x02 XXX */
+#if 1
+/* ECN RFC3168 obsoletes RFC2481, and these will be deprecated soon. */
+#define IPTOS_CE		0x01	/* congestion experienced */
+#define IPTOS_ECT		0x02	/* ECN-capable transport */
+#endif
 
 /*
  * Definitions for IP precedence (also in ip_tos) (hopefully unused)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sl.c,v 1.15 2002/03/14 01:27:09 millert Exp $	*/
+/*	$OpenBSD: if_sl.c,v 1.17 2002/09/11 05:38:47 itojun Exp $	*/
 /*	$NetBSD: if_sl.c,v 1.39.4.1 1996/06/02 16:26:31 thorpej Exp $	*/
 
 /*
@@ -218,6 +218,7 @@ slattach(n)
 		sc->sc_fastq.ifq_maxlen = 32;
 		IFQ_SET_READY(&sc->sc_if.if_snd);
 		if_attach(&sc->sc_if);
+		if_alloc_sadl(&sc->sc_if);
 #if NBPFILTER > 0
 		bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_SLIP, SLIP_HDRLEN);
 #endif
@@ -297,7 +298,7 @@ slopen(dev, tp)
 				error = clalloc(&tp->t_outq, 3*SLMTU, 0);
 				if (error) {
 					splx(s);
-					return(error);
+					return (error);
 				}
 			} else
 				sc->sc_oldbufsize = sc->sc_oldbufquot = 0;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: malloc.h,v 1.56 2002/03/14 01:27:14 millert Exp $	*/
+/*	$OpenBSD: malloc.h,v 1.61 2002/08/28 08:28:03 tdeval Exp $	*/
 /*	$NetBSD: malloc.h,v 1.39 1998/07/12 19:52:01 augustss Exp $	*/
 
 /*
@@ -140,7 +140,7 @@
 /* 84-91 - free */
 #define M_VMSWAP	92	/* VM swap structures */
 /* 93-96 - free */
-#define	M_RAIDFRAME	97	/* Raidframe data */
+#define	M_RAIDFRAME	97	/* RAIDframe data */
 #define M_UVMAMAP	98	/* UVM amap and related */
 #define M_UVMAOBJ	99	/* UVM aobj and related */
 /* 100 - free */
@@ -151,11 +151,13 @@
 #define M_MEMDESC	105	/* Memory range */
 #define M_UFS_EXTATTR	106	/* Extended Attributes */
 /* 107 - free */
-#define M_CRYPTO_DATA   108	/* Crypto framework data buffers (keys etc.) */
+#define M_CRYPTO_DATA	108	/* Crypto framework data buffers (keys etc.) */
 /* 109 - free */
-#define M_CREDENTIALS   110	/* IPsec-related credentials and ID info */
-#define M_PACKET_TAGS   111	/* Packet-attached information */
-/* 112-122 - free */
+#define M_CREDENTIALS	110	/* IPsec-related credentials and ID info */
+#define M_PACKET_TAGS	111	/* Packet-attached information */
+#define M_1394CTL	112	/* IEEE 1394 control structures */
+#define M_1394DATA	113	/* IEEE 1394 data buffers */
+/* 114-122 - free */
 
 /* KAME IPv6 */
 #define	M_IP6OPT	123	/* IPv6 options */
@@ -242,7 +244,7 @@
 	"adosfs bitmap", /* 71 M_ADOSFSBITMAP */ \
 	"EXT2FS node",	/* 72 M_EXT2FSNODE */ \
 	NULL, \
-	"pfkey data",   /* 74 M_PFKEY */ \
+	"pfkey data",	/* 74 M_PFKEY */ \
 	"tdb",		/* 75 M_TDB */ \
 	"xform_data",	/* 76 M_XDATA */ \
 	NULL, \
@@ -256,7 +258,7 @@
 	NULL, NULL, NULL, NULL, \
 	"VM swap",	/* 92 M_VMSWAP */ \
 	NULL, NULL, NULL, NULL, \
-	"RaidFrame data", /* 97 M_RAIDFRAME */ \
+	"RAIDframe data", /* 97 M_RAIDFRAME */ \
 	"UVM amap",	/* 98 M_UVMAMAP */ \
 	"UVM aobj",	/* 99 M_UVMAOBJ */ \
 	NULL, \
@@ -271,9 +273,10 @@
 	NULL, \
 	"IPsec creds",	/* 110 M_CREDENTIALS */ \
 	"packet tags",	/* 111 M_PACKET_TAGS */ \
+	"1394ctl",	/* 112 M_1394CTL */ \
+	"1394data",	/* 113 M_1394DATA */ \
 	NULL, NULL, NULL, NULL, NULL, \
-	NULL, NULL, NULL, NULL, NULL, \
-	NULL, \
+	NULL, NULL, NULL, NULL, \
 	"ip6_options",	/* 123 M_IP6OPT */ \
 	"NDP",		/* 124 M_IP6NDP */ \
 	"ip6rr",	/* 125 M_IP6RR */ \
@@ -374,20 +377,20 @@ struct kmembuckets {
 #else /* do not collect statistics */
 #define	MALLOC(space, cast, size, type, flags) do { \
 	register struct kmembuckets *kbp = &bucket[BUCKETINDX(size)]; \
-	long s = splimp(); \
+	long __s = splvm(); \
 	if (kbp->kb_next == NULL) { \
 		(space) = (cast)malloc((u_long)(size), type, flags); \
 	} else { \
 		(space) = (cast)kbp->kb_next; \
 		kbp->kb_next = *(caddr_t *)(space); \
 	} \
-	splx(s); \
+	splx(__s); \
 } while (0)
 
 #define	FREE(addr, type) do { \
 	register struct kmembuckets *kbp; \
 	register struct kmemusage *kup = btokup(addr); \
-	long s = splimp(); \
+	long __s = splvm(); \
 	if (1 << kup->ku_indx > MAXALLOCSAVE) { \
 		free((caddr_t)(addr), type); \
 	} else { \
@@ -399,7 +402,7 @@ struct kmembuckets {
 		*(caddr_t *)(addr) = NULL; \
 		kbp->kb_last = (caddr_t)(addr); \
 	} \
-	splx(s); \
+	splx(__s); \
 } while(0)
 #endif /* do not collect statistics */
 

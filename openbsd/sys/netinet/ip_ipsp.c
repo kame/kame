@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.146 2002/03/14 01:27:11 millert Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.149 2002/06/09 16:26:10 itojun Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -191,7 +191,7 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 	int nums, s;
 
 	/* Don't accept ranges only encompassing reserved SPIs. */
-	if (sproto != IPPROTO_IPCOMP && 
+	if (sproto != IPPROTO_IPCOMP &&
 	    (tspi < sspi || tspi <= SPI_RESERVED_MAX)) {
 		(*errval) = EINVAL;
 		return 0;
@@ -300,12 +300,62 @@ gettdb(u_int32_t spi, union sockaddr_union *dst, u_int8_t proto)
 }
 
 /*
+ * Check that credentials and IDs match. Return true if so. The t*
+ * range of arguments contains information from TDBs; the p*
+ * range of arguments contains information from policies or
+ * already established TDBs.
+ */
+int
+ipsp_aux_match(struct ipsec_ref *tsrcid, struct ipsec_ref *psrcid,
+    struct ipsec_ref *tdstid, struct ipsec_ref *pdstid,
+    struct ipsec_ref *tlcred, struct ipsec_ref *plcred,
+    struct ipsec_ref *trcred, struct ipsec_ref *prcred,
+    struct sockaddr_encap *tfilter, struct sockaddr_encap *pfilter,
+    struct sockaddr_encap *tfiltermask, struct sockaddr_encap *pfiltermask)
+{
+	if (psrcid != NULL)
+		if (tsrcid == NULL || !ipsp_ref_match(tsrcid, psrcid))
+			return 0;
+
+	if (pdstid != NULL)
+		if (tdstid == NULL || !ipsp_ref_match(tdstid, pdstid))
+			return 0;
+
+	if (plcred != NULL)
+		if (tlcred == NULL || !ipsp_ref_match(tlcred, plcred))
+			return 0;
+
+	if (prcred != NULL)
+		if (trcred == NULL || !ipsp_ref_match(trcred, prcred))
+			return 0;
+
+	/* Check for filter matches. */
+	if (tfilter->sen_type) {
+		/*
+		 * XXX We should really be doing a subnet-check (see
+		 * whether the TDB-associated filter is a subset
+		 * of the policy's. For now, an exact match will solve
+		 * most problems (all this will do is make every
+		 * policy get its own SAs).
+		 */
+		if (bcmp(tfilter, pfilter, sizeof(struct sockaddr_encap)) ||
+		    bcmp(tfiltermask, pfiltermask,
+			sizeof(struct sockaddr_encap)))
+			return 0;
+	}
+
+	return 1;
+}
+
+/*
  * Get an SA given the remote address, the security protocol type, and
  * the desired IDs.
  */
 struct tdb *
-gettdbbyaddr(union sockaddr_union *dst, struct ipsec_policy *ipo,
-    struct mbuf *m, int af)
+gettdbbyaddr(union sockaddr_union *dst, u_int8_t sproto,
+    struct ipsec_ref *srcid, struct ipsec_ref *dstid,
+    struct ipsec_ref *local_cred, struct mbuf *m, int af,
+    struct sockaddr_encap *filter, struct sockaddr_encap *filtermask)
 {
 	u_int32_t hashval;
 	struct tdb *tdbp;
@@ -313,51 +363,18 @@ gettdbbyaddr(union sockaddr_union *dst, struct ipsec_policy *ipo,
 	if (tdbaddr == NULL)
 		return (struct tdb *) NULL;
 
-	hashval = tdb_hash(0, dst, ipo->ipo_sproto);
+	hashval = tdb_hash(0, dst, sproto);
 
 	for (tdbp = tdbaddr[hashval]; tdbp != NULL; tdbp = tdbp->tdb_anext)
-		if ((tdbp->tdb_sproto == ipo->ipo_sproto) &&
+		if ((tdbp->tdb_sproto == sproto) &&
 		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
 		    (!bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa)))) {
-			/*
-			 * If the IDs are not set, this was probably a
-			 * manually-keyed SA, so it can be used for
-			 * any type of traffic.
-			 */
-			if (tdbp->tdb_srcid != NULL) {
-				if (ipo->ipo_srcid != NULL &&
-				    !ipsp_ref_match(ipo->ipo_srcid,
-					tdbp->tdb_srcid))
-					continue;
-				/* Otherwise, this is fine. */
-			}
-
-			if (tdbp->tdb_dstid != NULL) {
-				if (ipo->ipo_dstid != NULL &&
-				    !ipsp_ref_match(ipo->ipo_dstid,
-					tdbp->tdb_dstid))
-					continue;
-				/* Otherwise, this is fine. */
-			}
-
-			/* Check for credential matches. */
-			if (tdbp->tdb_local_cred != NULL) {
-				if (ipo->ipo_local_cred != NULL &&
-				    !ipsp_ref_match(ipo->ipo_local_cred,
-					tdbp->tdb_local_cred))
-					continue;
-			} else if (ipo->ipo_local_cred != NULL)
-				continue; /* If no credential was used
-					   * in the TDB, try to
-					   * establish a new SA with
-					   * the given credential,
-					   * since some type of access
-					   * control may be done on
-					   * the other side based on
-					   * that credential.
-					   */
-
-			/* XXX Check for filter matches. */
+			/* Do IDs and local credentials match ? */
+			if (!ipsp_aux_match(tdbp->tdb_srcid, srcid,
+			    tdbp->tdb_dstid, dstid, tdbp->tdb_local_cred,
+			    local_cred, NULL, NULL, &tdbp->tdb_filter, filter,
+			    &tdbp->tdb_filtermask, filtermask))
+				continue;
 			break;
 		}
 
@@ -369,8 +386,10 @@ gettdbbyaddr(union sockaddr_union *dst, struct ipsec_policy *ipo,
  * the desired IDs.
  */
 struct tdb *
-gettdbbysrc(union sockaddr_union *src, struct ipsec_policy *ipo,
-    struct mbuf *m, int af)
+gettdbbysrc(union sockaddr_union *src, u_int8_t sproto,
+    struct ipsec_ref *srcid, struct ipsec_ref *dstid,
+    struct mbuf *m, int af, struct sockaddr_encap *filter,
+    struct sockaddr_encap *filtermask)
 {
 	u_int32_t hashval;
 	struct tdb *tdbp;
@@ -378,34 +397,18 @@ gettdbbysrc(union sockaddr_union *src, struct ipsec_policy *ipo,
 	if (tdbsrc == NULL)
 		return (struct tdb *) NULL;
 
-	hashval = tdb_hash(0, src, ipo->ipo_sproto);
+	hashval = tdb_hash(0, src, sproto);
 
 	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext)
-		if ((tdbp->tdb_sproto == ipo->ipo_sproto) &&
+		if ((tdbp->tdb_sproto == sproto) &&
 		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
 		    (!bcmp(&tdbp->tdb_src, src, SA_LEN(&src->sa)))) {
-			/*
-			 * If the IDs are not set, this was probably a
-			 * manually-keyed SA, so it can be used for
-			 * any type of traffic.
-			 */
-			if (tdbp->tdb_srcid != NULL) {
-				if (ipo->ipo_dstid != NULL &&
-				    !ipsp_ref_match(ipo->ipo_dstid,
-					tdbp->tdb_srcid))
-					continue;
-				/* Otherwise, this is fine. */
-			}
-
-			if (tdbp->tdb_dstid != NULL) {
-				if (ipo->ipo_srcid != NULL &&
-				    !ipsp_ref_match(ipo->ipo_srcid,
-					tdbp->tdb_dstid))
-					continue;
-				/* Otherwise, this is fine. */
-			}
-
-			/* XXX Check for filter matches. */
+			/* Check whether IDs match */
+			if (!ipsp_aux_match(tdbp->tdb_srcid, dstid,
+			    tdbp->tdb_dstid, srcid, NULL, NULL, NULL, NULL,
+			    &tdbp->tdb_filter, filter, &tdbp->tdb_filtermask,
+			    filtermask))
+				continue;
 			break;
 		}
 
@@ -1210,7 +1213,7 @@ ipsp_skipcrypto_mark(struct tdb_ident *tdbi)
 {
 	struct tdb *tdb;
 	int s = spltdb();
- 
+
 	tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
 	if (tdb != NULL) {
 		tdb->tdb_flags |= TDBF_SKIPCRYPTO;
@@ -1225,7 +1228,7 @@ ipsp_skipcrypto_unmark(struct tdb_ident *tdbi)
 {
 	struct tdb *tdb;
 	int s = spltdb();
- 
+
 	tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
 	if (tdb != NULL) {
 		tdb->tdb_flags &= ~TDBF_SKIPCRYPTO;
@@ -1234,6 +1237,19 @@ ipsp_skipcrypto_unmark(struct tdb_ident *tdbi)
 	splx(s);
 }
 
+/* Return true if the two structures match. */
+int
+ipsp_ref_match(struct ipsec_ref *ref1, struct ipsec_ref *ref2)
+{
+	if (ref1->ref_type != ref2->ref_type ||
+	    ref1->ref_len != ref2->ref_len ||
+	    bcmp(ref1 + 1, ref2 + 1, ref1->ref_len))
+		return 0;
+
+	return 1;
+}
+
+#ifdef notyet
 /*
  * Go down a chain of IPv4/IPv6/ESP/AH/IPiP chains creating an tag for each
  * IPsec header encountered. The offset where the first header, as well
@@ -1469,15 +1485,4 @@ ipsp_parse_headers(struct mbuf *m, int off, u_int8_t proto)
 		}
 	}
 }
-
-/* Return true if the two structures match. */
-int
-ipsp_ref_match(struct ipsec_ref *ref1, struct ipsec_ref *ref2)
-{
-	if (ref1->ref_type != ref2->ref_type ||
-	    ref1->ref_len != ref2->ref_len ||
-	    bcmp(ref1 + 1, ref2 + 1, ref1->ref_len))
-		return 0;
-
-	return 1;
-}
+#endif /* notyet */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxp.c,v 1.33 2002/03/15 22:15:09 art Exp $	*/
+/*	$OpenBSD: fxp.c,v 1.39 2002/06/14 21:34:59 todd Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -102,7 +102,7 @@
  * aligns the packet after the Ethernet header at a 32-bit
  * boundary.  HOWEVER!  This means that the RFA is misaligned!
  */
-#define	RFA_ALIGNMENT_FUDGE	(2 + sizeof(bus_dmamap_t))
+#define	RFA_ALIGNMENT_FUDGE	(2 + sizeof(bus_dmamap_t *))
 
 /*
  * Inline function to copy a 16-bit aligned 32-bit quantity.
@@ -179,15 +179,6 @@ void fxp_scb_cmd(struct fxp_softc *, u_int8_t);
 static int tx_threshold = 64;
 
 /*
- * Number of completed TX commands at which point an interrupt
- * will be generated to garbage collect the attached buffers.
- * Must be at least one less than FXP_NTXCB, and should be
- * enough less so that the transmitter doesn't becomes idle
- * during the buffer rundown (which would reduce performance).
- */
-#define FXP_CXINT_THRESH 120
-
-/*
  * TxCB list index mask. This is used to do list wrap-around.
  */
 #define FXP_TXCB_MASK	(FXP_NTXCB - 1)
@@ -258,7 +249,7 @@ fxp_power(why, arg)
 	if (why != PWR_RESUME)
 		fxp_stop(sc, 0);
 	else {
-		ifp = &sc->arpcom.ac_if;
+		ifp = &sc->sc_arpcom.ac_if;
 		if (ifp->if_flags & IFF_UP)
 			fxp_init(sc);
 	}
@@ -363,8 +354,8 @@ fxp_attach_common(sc, enaddr, intrstr)
 	 */
 	fxp_read_eeprom(sc, (u_int16_t *)enaddr, 0, 3);
 
-	ifp = &sc->arpcom.ac_if;
-	bcopy(enaddr, sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
+	ifp = &sc->sc_arpcom.ac_if;
+	bcopy(enaddr, sc->sc_arpcom.ac_enaddr, ETHER_ADDR_LEN);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 	ifp->if_softc = sc;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
@@ -382,7 +373,7 @@ fxp_attach_common(sc, enaddr, intrstr)
 #endif
 
 	printf(": %s, address %s\n", intrstr,
-	    ether_sprintf(sc->arpcom.ac_enaddr));
+	    ether_sprintf(sc->sc_arpcom.ac_enaddr));
 
 	/*
 	 * Initialize our media structures and probe the MII.
@@ -463,7 +454,7 @@ int
 fxp_detach(sc)
 	struct fxp_softc *sc;
 {
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 
 	/* Unhook our tick handler. */
 	timeout_del(&sc->stats_update_to);
@@ -668,8 +659,10 @@ fxp_start(ifp)
 			m_copydata(m0, 0, m0->m_pkthdr.len, mtod(m, caddr_t));
 			m->m_pkthdr.len = m->m_len = m0->m_pkthdr.len;
 			if (bus_dmamap_load_mbuf(sc->sc_dmat, txs->tx_map,
-			    m, BUS_DMA_NOWAIT) != 0)
+			    m, BUS_DMA_NOWAIT) != 0) {
+				m_freem(m);
 				break;
+			}
 		}
 
 		IFQ_DEQUEUE(&ifp->if_snd, m0);
@@ -738,7 +731,7 @@ fxp_intr(arg)
 	void *arg;
 {
 	struct fxp_softc *sc = arg;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	u_int8_t statack;
 	int claimed = 0, rnr;
 
@@ -786,6 +779,8 @@ fxp_intr(arg)
 				}
 				--txcnt;
 				txs = txs->tx_next;
+				FXP_TXCB_SYNC(sc, txs,
+				    BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
 			}
 			sc->sc_cbt_cons = txs;
 			sc->sc_cbt_cnt = txcnt;
@@ -888,7 +883,7 @@ fxp_stats_update(arg)
 	void *arg;
 {
 	struct fxp_softc *sc = arg;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct fxp_stats *sp = &sc->sc_ctrl->stats;
 	int s;
 
@@ -920,7 +915,7 @@ fxp_stats_update(arg)
 	 * then assume the receiver has locked up and attempt to clear
 	 * the condition by reprogramming the multicast filter. This is
 	 * a work-around for a bug in the 82557 where the receiver locks
-	 * up if it gets certain types of garbage in the syncronization
+	 * up if it gets certain types of garbage in the synchronization
 	 * bits prior to the packet header. This bug is supposed to only
 	 * occur in 10Mbps mode, but has been seen to occur in 100Mbps
 	 * mode as well (perhaps due to a 10/100 speed transition).
@@ -976,7 +971,7 @@ fxp_stop(sc, drain)
 	struct fxp_softc *sc;
 	int drain;
 {
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int i;
 
 	/*
@@ -1078,7 +1073,7 @@ fxp_init(xsc)
 	void *xsc;
 {
 	struct fxp_softc *sc = xsc;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct fxp_cb_config *cbp;
 	struct fxp_cb_ias *cb_ias;
 	struct fxp_cb_tx *txp;
@@ -1184,8 +1179,8 @@ fxp_init(xsc)
 	cb_ias->cb_status = 0;
 	cb_ias->cb_command = FXP_CB_COMMAND_IAS | FXP_CB_COMMAND_EL;
 	cb_ias->link_addr = 0xffffffff;
-	bcopy(sc->arpcom.ac_enaddr, (void *)cb_ias->macaddr,
-	    sizeof(sc->arpcom.ac_enaddr));
+	bcopy(sc->sc_arpcom.ac_enaddr, (void *)cb_ias->macaddr,
+	    sizeof(sc->sc_arpcom.ac_enaddr));
 
 	/*
 	 * Start the IAS (Individual Address Setup) command/DMA.
@@ -1467,7 +1462,7 @@ fxp_ioctl(ifp, command, data)
 
 	s = splimp();
 
-	if ((error = ether_ioctl(ifp, &sc->arpcom, command, data)) > 0) {
+	if ((error = ether_ioctl(ifp, &sc->sc_arpcom, command, data)) > 0) {
 		splx(s);
 		return (error);
 	}
@@ -1480,7 +1475,7 @@ fxp_ioctl(ifp, command, data)
 #ifdef INET
 		case AF_INET:
 			fxp_init(sc);
-			arp_ifinit(&sc->arpcom, ifa);
+			arp_ifinit(&sc->sc_arpcom, ifa);
 			break;
 #endif
 #ifdef NS
@@ -1529,8 +1524,8 @@ fxp_ioctl(ifp, command, data)
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		error = (command == SIOCADDMULTI) ?
-		    ether_addmulti(ifr, &sc->arpcom) :
-		    ether_delmulti(ifr, &sc->arpcom);
+		    ether_addmulti(ifr, &sc->sc_arpcom) :
+		    ether_delmulti(ifr, &sc->sc_arpcom);
 		if (error == ENETRESET) {
 			/*
 			 * Multicast list has changed; set the hardware
@@ -1573,7 +1568,7 @@ fxp_mc_setup(sc, doit)
 	int doit;
 {
 	struct fxp_cb_mcs *mcsp = &sc->sc_ctrl->u.mcs;
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct ether_multistep step;
 	struct ether_multi *enm;
 	int nmcasts;
@@ -1587,7 +1582,7 @@ fxp_mc_setup(sc, doit)
 
 	nmcasts = 0;
 	if (!(ifp->if_flags & IFF_ALLMULTI)) {
-		ETHER_FIRST_MULTI(step, &sc->arpcom, enm);
+		ETHER_FIRST_MULTI(step, &sc->sc_arpcom, enm);
 		while (enm != NULL) {
 			if (nmcasts >= MAXMCADDR) {
 				ifp->if_flags |= IFF_ALLMULTI;

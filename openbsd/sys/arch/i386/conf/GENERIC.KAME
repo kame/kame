@@ -35,7 +35,5 @@ options 	ALTQ_PRIQ	#priority queue
 #options 	ALTQ_NOPCC	#don't use processor cycle counter
 #options 	ALTQ_DEBUG	#for debugging
 
-options 	TCP_ECN		# ECN support in TCP
-
 # Source-Specific Multicast (SSM)
 #options 	IGMPV3		# IPv4

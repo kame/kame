@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vr.c,v 1.25 2002/04/03 08:44:08 deraadt Exp $	*/
+/*	$OpenBSD: if_vr.c,v 1.26 2002/05/14 16:54:45 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998

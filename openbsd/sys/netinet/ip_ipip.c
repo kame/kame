@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipip.c,v 1.22 2001/12/06 20:14:53 angelos Exp $ */
+/*	$OpenBSD: ip_ipip.c,v 1.27 2002/07/05 23:12:19 angelos Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -407,7 +407,7 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	struct ip *ipo;
 #endif /* INET */
 
-#ifdef INET6    
+#ifdef INET6
 	struct ip6_hdr *ip6, *ip6o;
 #endif /* INET6 */
 
@@ -493,6 +493,7 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		else {
 			m_freem(m);
 			*mp = NULL;
+			ipipstat.ipips_family++;
 			return EAFNOSUPPORT;
 		}
 
@@ -568,6 +569,7 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 			} else {
 				m_freem(m);
 				*mp = NULL;
+				ipipstat.ipips_family++;
 				return EAFNOSUPPORT;
 			}
 
@@ -583,7 +585,7 @@ ipip_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 		m_freem(m);
 		*mp = NULL;
 		ipipstat.ipips_family++;
-		return ENOBUFS;
+		return EAFNOSUPPORT;
 	}
 
 	ipipstat.ipips_opackets++;

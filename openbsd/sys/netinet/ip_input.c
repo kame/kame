@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.100 2002/03/14 01:27:11 millert Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.107 2002/09/04 19:04:38 dhartmei Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -196,6 +196,8 @@ static __inline void ipq_unlock(void);
 
 struct pool ipqent_pool;
 
+struct ipstat ipstat;
+
 static __inline int
 ipq_lock_try()
 {
@@ -286,7 +288,7 @@ ip_init()
 	ipintrq.ifq_maxlen = ipqmaxlen;
 	TAILQ_INIT(&in_ifaddr);
 	if (ip_mtudisc != 0)
-		ip_mtudisc_timeout_q = 
+		ip_mtudisc_timeout_q =
 		    rt_timer_queue_create(ip_mtudisc_timeout);
 
 	/* Fill in list of ports not to allocate dynamically. */
@@ -551,7 +553,10 @@ ipv4_input(m)
 		m_freem(m);
 	} else {
 #ifdef IPSEC
-	        /* IPsec policy check for forwarded packets */
+	        /*
+		 * IPsec policy check for forwarded packets. Look at
+		 * inner-most IPsec SA used.
+		 */
 		mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
                 s = splnet();
 		if (mtag != NULL) {
@@ -570,7 +575,10 @@ ipv4_input(m)
 			return;
 		}
 
-		/* Fall through, forward packet */
+		/*
+		 * Fall through, forward packet. Outbound IPsec policy
+		 * checking will occur in ip_output().
+		 */
 #endif /* IPSEC */
 
 		ip_forward(m, 0);
@@ -641,7 +649,7 @@ found:
 				ipq_unlock();
 				goto bad;
 			}
-			    
+
 			ipqe = pool_get(&ipqent_pool, PR_NOWAIT);
 			if (ipqe == NULL) {
 				ipstat.ips_rcvmemdrop++;
@@ -673,7 +681,8 @@ found:
          * That's because we really only care about the properties of
          * the protected packet, and not the intermediate versions.
          * While this is not the most paranoid setting, it allows
-         * some flexibility in handling of nested tunnels etc.
+         * some flexibility in handling nested tunnels (in setting up
+	 * the policies).
          */
         if ((ip->ip_p == IPPROTO_ESP) || (ip->ip_p == IPPROTO_AH) ||
 	    (ip->ip_p == IPPROTO_IPCOMP))
@@ -698,8 +707,18 @@ found:
 	if ((ip->ip_p == IPPROTO_TCP) || (ip->ip_p == IPPROTO_UDP))
 	  goto skipipsec;
 
-	/* IPsec policy check for local-delivery packets */
-	mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL); 
+	/*
+	 * IPsec policy check for local-delivery packets. Look at the
+	 * inner-most SA that protected the packet. This is in fact
+	 * a bit too restrictive (it could end up causing packets to
+	 * be dropped that semantically follow the policy, e.g., in
+	 * certain SA-bundle configurations); but the alternative is
+	 * very complicated (and requires keeping track of what
+	 * kinds of tunneling headers have been seen in-between the
+	 * IPsec headers), and I don't think we lose much functionality
+	 * that's needed in the real world (who uses bundles anyway ?).
+	 */
+	mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
         s = splnet();
 	if (mtag) {
 		tdbi = (struct tdb_ident *)(mtag + 1);
@@ -710,7 +729,7 @@ found:
 	    tdb, NULL);
         splx(s);
 
-	/* Error or otherwise drop-packet indication */
+	/* Error or otherwise drop-packet indication. */
 	if (error) {
 	        ipstat.ips_cantforward++;
 		m_freem(m);
@@ -738,7 +757,7 @@ in_iawithaddr(ina, m)
 {
 	register struct in_ifaddr *ia;
 
-	for (ia = in_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next) {
+	TAILQ_FOREACH(ia, &in_ifaddr, ia_list) {
 		if ((ina.s_addr == ia->ia_addr.sin_addr.s_addr) ||
 		    ((ia->ia_ifp->if_flags & (IFF_LOOPBACK|IFF_LINK1)) ==
 			(IFF_LOOPBACK|IFF_LINK1) &&
@@ -1315,9 +1334,7 @@ ip_weadvertise(addr)
 	rt = rtalloc1(sintosa(&sin), 0);
 	if (rt == 0)
 		return 0;
-	
-	RTFREE(rt);
-	
+
 	if ((rt->rt_flags & RTF_GATEWAY) || (rt->rt_flags & RTF_LLINFO) == 0 ||
 	    rt->rt_gateway->sa_family != AF_LINK) {
 		RTFREE(rt);
@@ -1330,7 +1347,7 @@ ip_weadvertise(addr)
 			if (ifa->ifa_addr->sa_family != rt->rt_gateway->sa_family)
 				continue;
 
-			if (!bcmp(LLADDR((struct sockaddr_dl *)ifa->ifa_addr), 
+			if (!bcmp(LLADDR((struct sockaddr_dl *)ifa->ifa_addr),
 			    LLADDR((struct sockaddr_dl *)rt->rt_gateway),
 			    ETHER_ADDR_LEN)) {
 				RTFREE(rt);
@@ -1589,8 +1606,8 @@ ip_forward(m, srcrt)
 	}
 
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,
-	    (IP_FORWARDING | (ip_directedbcast ? IP_ALLOWBROADCAST : 0)), 
-	    0, NULL, NULL);
+	    (IP_FORWARDING | (ip_directedbcast ? IP_ALLOWBROADCAST : 0)),
+	    0, (void *)NULL, (void *)NULL);
 	if (error)
 		ipstat.ips_cantforward++;
 	else {
@@ -1707,7 +1724,7 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 		    &ip_mtudisc);
 		if (ip_mtudisc != 0 && ip_mtudisc_timeout_q == NULL) {
-			ip_mtudisc_timeout_q = 
+			ip_mtudisc_timeout_q =
 			    rt_timer_queue_create(ip_mtudisc_timeout);
 		} else if (ip_mtudisc == 0 && ip_mtudisc_timeout_q != NULL) {
 			rt_timer_queue_destroy(ip_mtudisc_timeout_q, TRUE);
@@ -1719,7 +1736,7 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 		   &ip_mtudisc_timeout);
 		if (ip_mtudisc_timeout_q != NULL)
-			rt_timer_queue_change(ip_mtudisc_timeout_q, 
+			rt_timer_queue_change(ip_mtudisc_timeout_q,
 					      ip_mtudisc_timeout);
 		return (error);
 	case IPCTL_IPPORT_FIRSTAUTO:
@@ -1781,7 +1798,7 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				   &ipsec_expire_acquire));
 	case IPCTL_IPSEC_IPCOMP_ALGORITHM:
 	        return (sysctl_tstring(oldp, oldlenp, newp, newlen,
-				       ipsec_def_comp, 
+				       ipsec_def_comp,
 				       sizeof(ipsec_def_comp)));
 	default:
 		return (EOPNOTSUPP);

@@ -1,11 +1,9 @@
-#	$OpenBSD: GENERIC,v 1.86 2002/03/14 00:42:25 miod Exp $
+#	$OpenBSD: GENERIC,v 1.91 2002/09/26 21:44:37 deraadt Exp $
 #
 #	Machine-independent option; used by all architectures for their
 #	GENERIC kernel
 
 #option		INSECURE	# default to secure
-
-option		NTP		# hooks supporting the Network Time Protocol
 
 option		DDB		# in-kernel debugger
 #option		DDB_SAFE_CONSOLE # allow break into ddb during boot
@@ -40,6 +38,7 @@ option		MFS		# memory file system
 #option		XFS		# xfs filesystem
 
 option		TCP_SACK	# Selective Acknowledgements for TCP
+option		TCP_ECN		# Explicit Congestion Notification for TCP
 #option		TCP_FACK	# Forward Acknowledgements for TCP
 #option		TCP_SIGNATURE	# TCP MD5 Signatures, for BGP routing sessions
 
@@ -95,6 +94,7 @@ pseudo-device	tb	1	# tablet line discipline
 pseudo-device	vnd	4	# paging to files
 pseudo-device	ccd	4	# concatenated disk devices
 pseudo-device	ksyms	1	# kernel symbols device
+pseudo-device	systrace 1	# system call tracing device
 
 # for IPv6
 pseudo-device	gif	4	# IPv[46] over IPv[46] tunnel (RFC1933)

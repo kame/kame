@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.61 2002/03/14 01:27:11 millert Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.65 2002/08/28 15:43:03 pefo Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -34,11 +34,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
- * 
+ *
  * NRL grants permission for redistribution and use in source and binary
  * forms, with or without modification, of the software and documentation
  * created at NRL provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -53,7 +53,7 @@
  * 4. Neither the name of the NRL nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
  * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -65,7 +65,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * The views and conclusions contained in the software and documentation
  * are those of the authors and should not be interpreted as representing
  * official policies, either expressed or implied, of the US Naval
@@ -134,9 +134,7 @@ int	tcp_do_rfc1323 = TCP_DO_RFC1323;
 #endif
 int	tcp_do_sack = TCP_DO_SACK;		/* RFC 2018 selective ACKs */
 int	tcp_ack_on_push = 0;	/* set to enable immediate ACK-on-PUSH */
-#if 1 /* TCP_ECN */
 int	tcp_do_ecn = 0;		/* RFC3168 ECN enabled/disabled? */
-#endif
 
 #ifndef TCBHASHSIZE
 #define	TCBHASHSIZE	128
@@ -205,7 +203,7 @@ tcp_init()
  *
  * To support IPv6 in addition to IPv4 and considering that the sizes of
  * the IPv4 and IPv6 headers are not the same, we now use a separate pointer
- * for the TCP header.  Also, we made the former tcpiphdr header pointer 
+ * for the TCP header.  Also, we made the former tcpiphdr header pointer
  * into just an IP overlay pointer, with casting as appropriate for v6. rja
  */
 struct mbuf *
@@ -240,7 +238,7 @@ tcp_template(tp)
 		 * The link header, network header, TCP header, and TCP options
 		 * all must fit in this mbuf. For now, assume the worst case of
 		 * TCP options size. Eventually, compute this from tp flags.
-		 */ 
+		 */
 		if (m->m_len + MAX_TCPOPTLEN + max_linkhdr >= MHLEN) {
 			MCLGET(m, M_DONTWAIT);
 			if ((m->m_flags & M_EXT) == 0) {
@@ -275,18 +273,18 @@ tcp_template(tp)
 #ifdef INET6
 	case AF_INET6:
 		{
-			struct ip6_hdr *ipv6;
+			struct ip6_hdr *ip6;
 
-			ipv6 = mtod(m, struct ip6_hdr *);
+			ip6 = mtod(m, struct ip6_hdr *);
 
-			ipv6->ip6_src = inp->inp_laddr6;
-			ipv6->ip6_dst = inp->inp_faddr6;
-			ipv6->ip6_flow = htonl(0x60000000) |
-			    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff));  
-						  
-			ipv6->ip6_nxt = IPPROTO_TCP;
-			ipv6->ip6_plen = htons(sizeof(struct tcphdr)); /*XXX*/
-			ipv6->ip6_hlim = in6_selecthlim(inp, NULL);	/*XXX*/
+			ip6->ip6_src = inp->inp_laddr6;
+			ip6->ip6_dst = inp->inp_faddr6;
+			ip6->ip6_flow = htonl(0x60000000) |
+			    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff));
+
+			ip6->ip6_nxt = IPPROTO_TCP;
+			ip6->ip6_plen = htons(sizeof(struct tcphdr)); /*XXX*/
+			ip6->ip6_hlim = in6_selecthlim(inp, NULL);	/*XXX*/
 
 			th = (struct tcphdr *)(mtod(m, caddr_t) +
 				sizeof(struct ip6_hdr));
@@ -339,29 +337,24 @@ tcp_respond(tp, template, m, ack, seq, flags)
 	register struct tcpiphdr *ti = (struct tcpiphdr *)template;
 #ifdef INET6
 	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
-	int is_ipv6 = 0;   /* true iff IPv6 */
 #endif /* INET6 */
+	int af;		/* af on wire */
 
 	if (tp) {
 		win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
-#ifdef INET6
 		/*
 		 * If this is called with an unconnected
 		 * socket/tp/pcb (tp->pf is 0), we lose.
 		 */
-		is_ipv6 = (tp->pf == PF_INET6);
+		af = tp->pf;
 
 		/*
 		 * The route/route6 distinction is meaningless
 		 * unless you're allocating space or passing parameters.
 		 */
-#endif /* INET6 */
 		ro = &tp->t_inpcb->inp_route;
-	}
-#ifdef INET6
-	else
-		is_ipv6 = (((struct ip *)ti)->ip_v == 6);
-#endif /* INET6 */
+	} else
+		af = (((struct ip *)ti)->ip_v == 6) ? AF_INET6 : AF_INET;
 	if (m == 0) {
 		m = m_gethdr(M_DONTWAIT, MT_HEADER);
 		if (m == NULL)
@@ -372,16 +365,18 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		tlen = 0;
 #endif
 		m->m_data += max_linkhdr;
+		switch (af) {
 #ifdef INET6
-		if (is_ipv6) {
+		case AF_INET6:
 			src6 = &tp->t_inpcb->in6p_lsa;
 			dst6 = &tp->t_inpcb->in6p_fsa;
-			bcopy(ti, mtod(m, caddr_t), sizeof(struct tcphdr) +
-			    sizeof(struct ip6_hdr));
-		} else
+			break;
 #endif /* INET6 */
+		case AF_INET:
 			bcopy(ti, mtod(m, caddr_t), sizeof(struct tcphdr) +
 			    sizeof(struct ip));
+			break;
+		}
 
 		ti = mtod(m, struct tcpiphdr *);
 		flags = TH_ACK;
@@ -390,9 +385,10 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		m->m_next = 0;
 		m->m_data = (caddr_t)ti;
 		tlen = 0;
-#define xchg(a,b,type) { type t; t=a; a=b; b=t; }
+#define xchg(a,b,type) do { type t; t=a; a=b; b=t; } while (0)
+		switch (af) {
 #ifdef INET6
-		if (is_ipv6) {
+		case AF_INET6:
 			if (ip6_getpktaddrs(m, &src6, &dst6)) {
 				m_freem(m);
 				return;
@@ -401,32 +397,33 @@ tcp_respond(tp, template, m, ack, seq, flags)
 			ndst6 = *src6;
 			src6 = &nsrc6;
 			dst6 = &ndst6;
-
 			m->m_len = sizeof(struct tcphdr) + sizeof(struct ip6_hdr);
-			xchg(((struct ip6_hdr *)ti)->ip6_dst,\
-			    ((struct ip6_hdr *)ti)->ip6_src,\
-			    struct in6_addr);
+			xchg(((struct ip6_hdr *)ti)->ip6_dst,
+			    ((struct ip6_hdr *)ti)->ip6_src, struct in6_addr);
 			th = (void *)((caddr_t)ti + sizeof(struct ip6_hdr));
-		} else
+			break;
 #endif /* INET6 */
-		{
+		case AF_INET:
 			m->m_len = sizeof (struct tcpiphdr);
 			xchg(ti->ti_dst.s_addr, ti->ti_src.s_addr, u_int32_t);
 			th = (void *)((caddr_t)ti + sizeof(struct ip));
+			break;
 		}
 		xchg(th->th_dport, th->th_sport, u_int16_t);
 #undef xchg
 	}
+	switch (af) {
 #ifdef INET6
-	if (is_ipv6) {
-		tlen += sizeof(struct tcphdr) + sizeof(struct ip6_hdr); 
+	case AF_INET6:
+		tlen += sizeof(struct tcphdr) + sizeof(struct ip6_hdr);
 		th = (struct tcphdr *)((caddr_t)ti + sizeof(struct ip6_hdr));
-	} else
+		break;
 #endif /* INET6 */
-	{
+	case AF_INET:
 		ti->ti_len = htons((u_int16_t)(sizeof (struct tcphdr) + tlen));
 		tlen += sizeof (struct tcpiphdr);
 		th = (struct tcphdr *)((caddr_t)ti + sizeof(struct ip));
+		break;
 	}
 
 	m->m_len = tlen;
@@ -444,8 +441,10 @@ tcp_respond(tp, template, m, ack, seq, flags)
 	th->th_win = htons((u_int16_t)win);
 	th->th_urp = 0;
 
+	switch (af) {
 #ifdef INET6
-	if (is_ipv6) {
+	case AF_INET6:
+	    {
 		int ip6oflags;
 
 		((struct ip6_hdr *)ti)->ip6_flow   = htonl(0x60000000);
@@ -474,9 +473,10 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
 		    (struct route_in6 *)ro, ip6oflags, NULL, NULL);
 #endif
-	} else
+		break;
+	    }
 #endif /* INET6 */
-	{
+	case AF_INET:
 		bzero(ti->ti_x1, sizeof ti->ti_x1);
 		ti->ti_len = htons((u_short)tlen - sizeof(struct ip));
 
@@ -489,8 +489,8 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		th->th_sum = in_cksum(m, tlen);
 		((struct ip *)ti)->ip_len = tlen;
 		((struct ip *)ti)->ip_ttl = ip_defttl;
-		ip_output(m, NULL, ro, ip_mtudisc ? IP_MTUDISC : 0, NULL,
-			  tp ? tp->t_inpcb : NULL);
+		ip_output(m, (void *)NULL, ro, ip_mtudisc ? IP_MTUDISC : 0,
+			(void *)NULL, tp ? tp->t_inpcb : (void *)NULL);
 	}
 }
 
@@ -545,7 +545,7 @@ tcp_newtcpcb(struct inpcb *inp)
 #endif
 
 #ifdef INET6
-	if (inp->inp_flags & INP_IPV6) 
+	if (inp->inp_flags & INP_IPV6)
 		inp->inp_ipv6.ip6_hlim = ip6_defhlim;
 	else
 #endif /* INET6 */
@@ -622,7 +622,7 @@ tcp_close(struct tcpcb *tp)
 
 	/*
 	 * If we sent enough data to get some meaningful characteristics,
-	 * save them in the routing entry.  'Enough' is arbitrarily 
+	 * save them in the routing entry.  'Enough' is arbitrarily
 	 * defined as the sendpipesize (default 4K) * 16.  This would
 	 * give us 16 rtt samples assuming we only get one sample per
 	 * window (the usual case on a long haul net).  16 samples is
@@ -751,7 +751,7 @@ tcp_drain()
 }
 
 /*
- * Compute proper scaling value for receiver window from buffer space 
+ * Compute proper scaling value for receiver window from buffer space
  */
 
 void
@@ -790,7 +790,7 @@ tcp_notify(inp, error)
 	} else if (TCPS_HAVEESTABLISHED(tp->t_state) == 0 &&
 	    tp->t_rxtshift > 3 && tp->t_softerror)
 		so->so_error = error;
-	else 
+	else
 		tp->t_softerror = error;
 	wakeup((caddr_t) &so->so_timeo);
 	sorwakeup(so);
@@ -1046,7 +1046,7 @@ tcp_mtudisc_increase(inp, errno)
 		 */
 		if (rt->rt_flags & RTF_HOST)
 			in_rtchange(inp, errno);
-		
+
 		/* also takes care of congestion window */
 		tcp_mss(tp, -1);
 	}
@@ -1156,7 +1156,7 @@ tcp_rndiss_encrypt(val)
 	u_int16_t val;
 {
 	u_int16_t sum = 0, i;
-  
+
 	for (i = 0; i < TCP_RNDISS_ROUNDS; i++) {
 		sum += 0x79b9;
 		val ^= ((u_int16_t)tcp_rndiss_sbox[(val^sum) & 0x7f]) << 7;
@@ -1172,7 +1172,7 @@ tcp_rndiss_init()
 	get_random_bytes(tcp_rndiss_sbox, sizeof(tcp_rndiss_sbox));
 
 	tcp_rndiss_reseed = time.tv_sec + TCP_RNDISS_OUT;
-	tcp_rndiss_msb = tcp_rndiss_msb == 0x8000 ? 0 : 0x8000; 
+	tcp_rndiss_msb = tcp_rndiss_msb == 0x8000 ? 0 : 0x8000;
 	tcp_rndiss_cnt = 0;
 }
 
@@ -1182,7 +1182,7 @@ tcp_rndiss_next()
         if (tcp_rndiss_cnt >= TCP_RNDISS_MAX ||
 	    time.tv_sec > tcp_rndiss_reseed)
                 tcp_rndiss_init();
-	
+
 	/* (arc4random() & 0x7fff) ensures a 32768 byte gap between ISS */
 	return ((tcp_rndiss_encrypt(tcp_rndiss_cnt++) | tcp_rndiss_msb) <<16) |
 		(arc4random() & 0x7fff);

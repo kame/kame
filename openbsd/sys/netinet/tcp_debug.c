@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_debug.c,v 1.10 2001/06/08 03:53:46 angelos Exp $	*/
+/*	$OpenBSD: tcp_debug.c,v 1.12 2002/06/09 16:26:11 itojun Exp $	*/
 /*	$NetBSD: tcp_debug.c,v 1.10 1996/02/13 23:43:36 christos Exp $	*/
 
 /*
@@ -34,11 +34,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
- * 
+ *
  * NRL grants permission for redistribution and use in source and binary
  * forms, with or without modification, of the software and documentation
  * created at NRL provided that the following conditions are met:
- * 
+ *
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
@@ -53,7 +53,7 @@
  * 4. Neither the name of the NRL nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
  * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -65,7 +65,7 @@
  * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- * 
+ *
  * The views and conclusions contained in the software and documentation
  * are those of the authors and should not be interpreted as representing
  * official policies, either expressed or implied, of the US Naval
@@ -141,23 +141,25 @@ tcp_trace(act, ostate, tp, headers, req, len)
 		td->td_cb = *tp;
 	else
 		bzero((caddr_t)&td->td_cb, sizeof (*tp));
+	switch (tp->pf) {
 #ifdef INET6
-	if (tp->pf == PF_INET6) {
+	case PF_INET6:
 		if (ti) {
 			th = &ti6->ti6_t;
 			td->td_ti6 = *ti6;
-		} else {
+		} else
 			bzero(&td->td_ti6, sizeof(struct tcpipv6hdr));
-		}
-	} else
+		break;
 #endif /* INET6 */
-	{
+	case PF_INET:
 		if (ti) {
 			th = &ti->ti_t;
 			td->td_ti = *ti;
-		} else {
+		} else
 			bzero(&td->td_ti, sizeof(struct tcpiphdr));
-		}
+		break;
+	default:
+		return;
 	}
 
 	td->td_req = req;

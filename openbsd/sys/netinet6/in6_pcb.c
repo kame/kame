@@ -1,4 +1,4 @@
-/*	$OpenBSD: in6_pcb.c,v 1.28 2002/03/14 01:27:12 millert Exp $	*/
+/*	$OpenBSD: in6_pcb.c,v 1.32 2002/09/11 03:15:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,7 +263,7 @@ in6_pcbbind(inp, nam)
 			if (ia &&
 			    ((struct in6_ifaddr *)ia)->ia6_flags &
 			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|IN6_IFF_DETACHED))
-				return(EADDRNOTAVAIL);
+				return (EADDRNOTAVAIL);
 		}
 		if (lport) {
 			struct inpcb *t;
@@ -443,11 +443,11 @@ in6_pcbconnect(inp, nam)
 	(void)&src6;				/* XXX fool gcc */
 
 	if (nam->m_len != sizeof(*sin6))
-		return(EINVAL);
+		return (EINVAL);
 	if (sin6->sin6_family != AF_INET6)
-		return(EAFNOSUPPORT);
+		return (EAFNOSUPPORT);
 	if (sin6->sin6_port == 0)
-		return(EADDRNOTAVAIL);
+		return (EADDRNOTAVAIL);
 
 	/* reject IPv4 mapped address, we have no support for it */
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
@@ -486,7 +486,7 @@ in6_pcbconnect(inp, nam)
 		if (sinp == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
-			return(error);
+			return (error);
 		}
 		bzero(&mapped_sa6, sizeof(mapped_sa6));
 		mapped_sa6.sin6_family = AF_INET6;
@@ -507,7 +507,7 @@ in6_pcbconnect(inp, nam)
 		if (src6 == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
-			return(error);
+			return (error);
 		}
 		if (ifp && sin6->sin6_scope_id == 0 &&
 		    (error = scope6_setzoneid(ifp, sin6)) != 0) {
@@ -532,7 +532,7 @@ in6_pcbconnect(inp, nam)
 	if (in_pcblookup(inp->inp_table, sin6, sin6->sin6_port,
 	    SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa) ? src6 : &inp->in6p_lsa,
 	    inp->inp_lport, INPLOOKUP_IPV6)) {
-		return(EADDRINUSE);
+		return (EADDRINUSE);
 	}
 	if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa) ||
 	    (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6) &&
@@ -549,7 +549,7 @@ in6_pcbconnect(inp, nam)
 		inp->inp_flowinfo |=
 		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	in_pcbrehash(inp);
-	return(0);
+	return (0);
 }
 
 /*

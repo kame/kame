@@ -1,4 +1,4 @@
-/*	$OpenBSD: xl.c,v 1.35 2002/03/14 01:26:55 millert Exp $	*/
+/*	$OpenBSD: xl.c,v 1.41 2002/08/22 19:08:50 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -142,8 +142,6 @@
 #include <net/bpf.h>
 #endif
 
-#include <uvm/uvm_extern.h>              /* for vtophys */
-
 #include <dev/ic/xlreg.h>
 
 int xl_newbuf(struct xl_softc *, struct xl_chain_onefrag *);
@@ -211,7 +209,7 @@ xl_power(why, arg)
 	if (why != PWR_RESUME)
 		xl_stop(sc);
 	else {
-		ifp = &sc->arpcom.ac_if;
+		ifp = &sc->sc_arpcom.ac_if;
 		if (ifp->if_flags & IFF_UP) {
 			xl_reset(sc, 1);
 			xl_init(sc);
@@ -635,13 +633,10 @@ void xl_setmulti(sc)
 	struct xl_softc		*sc;
 {
 	struct ifnet		*ifp;
-	struct arpcom *ac = &sc->arpcom;
-	struct ether_multi *enm;
-	struct ether_multistep step;
+	struct arpcom *ac = &sc->sc_arpcom;
 	u_int8_t		rxfilt;
-	int			mcnt = 0;
 
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 
 	XL_SEL_WIN(5);
 	rxfilt = CSR_READ_1(sc, XL_W5_RX_FILTER);
@@ -652,13 +647,7 @@ void xl_setmulti(sc)
 		return;
 	}
 
-	ETHER_FIRST_MULTI(step, ac, enm);
-	while (enm != NULL) {
-		mcnt++;
-		ETHER_NEXT_MULTI(step, enm);
-	}
-
-	if (mcnt)
+	if (ac->ac_multicnt > 0)
 		rxfilt |= XL_RXFILTER_ALLMULTI;
 	else
 		rxfilt &= ~XL_RXFILTER_ALLMULTI;
@@ -676,13 +665,13 @@ void xl_setmulti_hash(sc)
 {
 	struct ifnet		*ifp;
 	int			h = 0, i;
-	struct arpcom *ac = &sc->arpcom;
+	struct arpcom *ac = &sc->sc_arpcom;
 	struct ether_multi *enm;
 	struct ether_multistep step;
 	u_int8_t		rxfilt;
 	int			mcnt = 0;
 
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 
 	XL_SEL_WIN(5);
 	rxfilt = CSR_READ_1(sc, XL_W5_RX_FILTER);
@@ -731,16 +720,16 @@ void xl_testpacket(sc)
 	struct ifnet		*ifp;
 	int			error;
 
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 
 	if (m == NULL)
 		return;
 
-	bcopy(&sc->arpcom.ac_enaddr,
+	bcopy(&sc->sc_arpcom.ac_enaddr,
 		mtod(m, struct ether_header *)->ether_dhost, ETHER_ADDR_LEN);
-	bcopy(&sc->arpcom.ac_enaddr,
+	bcopy(&sc->sc_arpcom.ac_enaddr,
 		mtod(m, struct ether_header *)->ether_shost, ETHER_ADDR_LEN);
 	mtod(m, struct ether_header *)->ether_type = htons(3);
 	mtod(m, unsigned char *)[14] = 0;
@@ -769,7 +758,7 @@ void xl_setcfg(sc)
 		icfg |= (XL_XCVR_AUTO << XL_ICFG_CONNECTOR_BITS);
 
 	CSR_WRITE_4(sc, XL_W3_INTERNAL_CFG, icfg);
-	CSR_WRITE_4(sc, XL_COMMAND, XL_CMD_COAX_STOP);
+	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_COAX_STOP);
 }
 
 void xl_setmode(sc, media)
@@ -1091,7 +1080,9 @@ xl_list_tx_init_90xB(sc)
 	ld = sc->xl_ldata;
 	for (i = 0; i < XL_TX_LIST_CNT; i++) {
 		cd->xl_tx_chain[i].xl_ptr = &ld->xl_tx_list[i];
-		cd->xl_tx_chain[i].xl_phys = vtophys(&ld->xl_tx_list[i]);
+		cd->xl_tx_chain[i].xl_phys =
+		    sc->sc_listmap->dm_segs[0].ds_addr +   
+		    offsetof(struct xl_list_data, xl_tx_list[i]);
 		if (i == (XL_TX_LIST_CNT - 1))
 			cd->xl_tx_chain[i].xl_next = &cd->xl_tx_chain[0];
 		else
@@ -1125,6 +1116,7 @@ int xl_list_rx_init(sc)
 	struct xl_chain_data	*cd;
 	struct xl_list_data	*ld;
 	int			i;
+	bus_addr_t		next;
 
 	cd = &sc->xl_cdata;
 	ld = sc->xl_ldata;
@@ -1134,15 +1126,17 @@ int xl_list_rx_init(sc)
 			(struct xl_list_onefrag *)&ld->xl_rx_list[i];
 		if (xl_newbuf(sc, &cd->xl_rx_chain[i]) == ENOBUFS)
 			return(ENOBUFS);
+		next = sc->sc_listmap->dm_segs[0].ds_addr;
 		if (i == (XL_RX_LIST_CNT - 1)) {
 			cd->xl_rx_chain[i].xl_next = &cd->xl_rx_chain[0];
-			ld->xl_rx_list[i].xl_next =
-			    vtophys(&ld->xl_rx_list[0]);
+			next +=
+			    offsetof(struct xl_list_data, xl_rx_list[0]);
 		} else {
 			cd->xl_rx_chain[i].xl_next = &cd->xl_rx_chain[i + 1];
-			ld->xl_rx_list[i].xl_next =
-			    vtophys(&ld->xl_rx_list[i + 1]);
+			next +=
+			    offsetof(struct xl_list_data, xl_rx_list[i + 1]);
 		}
+		ld->xl_rx_list[i].xl_next = next;
 	}
 
 	cd->xl_rx_head = &cd->xl_rx_chain[0];
@@ -1158,6 +1152,7 @@ int xl_newbuf(sc, c)
 	struct xl_chain_onefrag	*c;
 {
 	struct mbuf		*m_new = NULL;
+	bus_dmamap_t		map;
 
 	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 	if (m_new == NULL)
@@ -1170,14 +1165,30 @@ int xl_newbuf(sc, c)
 	}
 
 	m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
+	if (bus_dmamap_load(sc->sc_dmat, sc->sc_rx_sparemap,
+	    mtod(m_new, caddr_t), MCLBYTES, NULL, BUS_DMA_NOWAIT) != 0) {
+		printf("%s: rx load failed\n", sc->sc_dev.dv_xname);
+		m_freem(m_new);
+		return (ENOBUFS);
+	}
+	map = c->map;
+	c->map = sc->sc_rx_sparemap;
+	sc->sc_rx_sparemap = map;
 
 	/* Force longword alignment for packet payload. */
 	m_adj(m_new, ETHER_ALIGN);
 
+	bus_dmamap_sync(sc->sc_dmat, c->map, 0, c->map->dm_mapsize,
+	    BUS_DMASYNC_PREREAD);
+
 	c->xl_mbuf = m_new;
-	c->xl_ptr->xl_frag.xl_addr = vtophys(mtod(m_new, caddr_t));
-	c->xl_ptr->xl_frag.xl_len = MCLBYTES | XL_LAST_FRAG;
+	c->xl_ptr->xl_frag.xl_addr = c->map->dm_segs[0].ds_addr + ETHER_ALIGN;
+	c->xl_ptr->xl_frag.xl_len = c->map->dm_segs[0].ds_len | XL_LAST_FRAG;
 	c->xl_ptr->xl_status = 0;
+
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
+	    ((caddr_t)c->xl_ptr - sc->sc_listkva), sizeof(struct xl_list),
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	return(0);
 }
@@ -1191,6 +1202,11 @@ int xl_rx_resync(sc)
 	pos = sc->xl_cdata.xl_rx_head;
 
 	for (i = 0; i < XL_RX_LIST_CNT; i++) {
+		bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
+		    ((caddr_t)pos->xl_ptr - sc->sc_listkva),
+		    sizeof(struct xl_list),
+		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+
 		if (pos->xl_ptr->xl_status)
 			break;
 		pos = pos->xl_next;
@@ -1214,16 +1230,21 @@ void xl_rxeof(sc)
         struct mbuf		*m;
         struct ifnet		*ifp;
 	struct xl_chain_onefrag	*cur_rx;
-	int			total_len = 0;
-	u_int16_t		rxstat;
+	int			total_len = 0, sumflags = 0;
+	u_int32_t		rxstat;
 
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 
 again:
 
 	while((rxstat = sc->xl_cdata.xl_rx_head->xl_ptr->xl_status)) {
 		cur_rx = sc->xl_cdata.xl_rx_head;
 		sc->xl_cdata.xl_rx_head = cur_rx->xl_next;
+
+		bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
+		    ((caddr_t)cur_rx->xl_ptr - sc->sc_listkva),
+		    sizeof(struct xl_list),
+		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
 
 		/*
 		 * If an error occurs, update stats, clear the
@@ -1254,6 +1275,9 @@ again:
 		m = cur_rx->xl_mbuf;
 		total_len = cur_rx->xl_ptr->xl_status & XL_RXSTAT_LENMASK;
 
+		bus_dmamap_sync(sc->sc_dmat, cur_rx->map, 0,
+		    cur_rx->map->dm_mapsize, BUS_DMASYNC_POSTREAD);
+
 		/*
 		 * Try to conjure up a new mbuf cluster. If that
 		 * fails, it means we have an out of memory condition and
@@ -1278,6 +1302,25 @@ again:
 			bpf_mtap(ifp->if_bpf, m);
 		}
 #endif
+
+		if (sc->xl_type == XL_TYPE_905B) {
+			if (rxstat & XL_RXSTAT_IPCKERR)
+				sumflags |= M_IPV4_CSUM_IN_BAD;
+			else if (rxstat & XL_RXSTAT_IPCKOK)
+				sumflags |= M_IPV4_CSUM_IN_OK;
+
+			if (rxstat & XL_RXSTAT_TCPCKERR)
+				sumflags |= M_TCP_CSUM_IN_BAD;
+			else if (rxstat & XL_RXSTAT_TCPCKOK)
+				sumflags |= M_TCP_CSUM_IN_OK;
+
+			if (rxstat & XL_RXSTAT_UDPCKERR)
+				sumflags |= M_UDP_CSUM_IN_BAD;
+			else if (rxstat & XL_RXSTAT_UDPCKOK)
+				sumflags |= M_UDP_CSUM_IN_OK;
+
+			m->m_pkthdr.csum = sumflags;
+		}
 		ether_input_mbuf(ifp, m);
 	}
 
@@ -1298,7 +1341,8 @@ again:
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_STALL);
 		xl_wait(sc);
 		CSR_WRITE_4(sc, XL_UPLIST_PTR,
-			vtophys(&sc->xl_ldata->xl_rx_list[0]));
+		    sc->sc_listmap->dm_segs[0].ds_addr +
+		    offsetof(struct xl_list_data, xl_rx_list[0]));
 		sc->xl_cdata.xl_rx_head = &sc->xl_cdata.xl_rx_chain[0];
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_UNSTALL);
 		goto again;
@@ -1317,7 +1361,7 @@ void xl_txeof(sc)
 	struct xl_chain		*cur_tx;
 	struct ifnet		*ifp;
 
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 
 	/* Clear the timeout timer. */
 	ifp->if_timer = 0;
@@ -1334,14 +1378,27 @@ void xl_txeof(sc)
 	while(sc->xl_cdata.xl_tx_head != NULL) {
 		cur_tx = sc->xl_cdata.xl_tx_head;
 
+		bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
+		    ((caddr_t)cur_tx->xl_ptr - sc->sc_listkva),
+		    sizeof(struct xl_list),
+		    BUS_DMASYNC_POSTREAD | BUS_DMASYNC_POSTWRITE);
+
 		if (CSR_READ_4(sc, XL_DOWNLIST_PTR))
 			break;
 
 		sc->xl_cdata.xl_tx_head = cur_tx->xl_next;
-		m_freem(cur_tx->xl_mbuf);
-		cur_tx->xl_mbuf = NULL;
 		ifp->if_opackets++;
+		if (cur_tx->map->dm_nsegs != 0) {
+			bus_dmamap_t map = cur_tx->map;
 
+			bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
+			    BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->sc_dmat, map);
+		}
+		if (cur_tx->xl_mbuf != NULL) {
+			m_freem(cur_tx->xl_mbuf);
+			cur_tx->xl_mbuf = NULL;
+		}
 		cur_tx->xl_next = sc->xl_cdata.xl_tx_free;
 		sc->xl_cdata.xl_tx_free = cur_tx;
 	}
@@ -1353,7 +1410,9 @@ void xl_txeof(sc)
 		if (CSR_READ_4(sc, XL_DMACTL) & XL_DMACTL_DOWN_STALLED ||
 			!CSR_READ_4(sc, XL_DOWNLIST_PTR)) {
 			CSR_WRITE_4(sc, XL_DOWNLIST_PTR,
-				vtophys(sc->xl_cdata.xl_tx_head->xl_ptr));
+			    sc->sc_listmap->dm_segs[0].ds_addr +
+			    ((caddr_t)sc->xl_cdata.xl_tx_head->xl_ptr -
+			    sc->sc_listkva));
 			CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_UNSTALL);
 		}
 	}
@@ -1369,7 +1428,7 @@ xl_txeof_90xB(sc)
 	struct ifnet *ifp;
 	int idx;
 
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 
 	idx = sc->xl_cdata.xl_tx_cons;
 	while(idx != sc->xl_cdata.xl_tx_prod) {
@@ -1427,7 +1486,9 @@ void xl_txeoc(sc)
 			} else {
 				if (sc->xl_cdata.xl_tx_head != NULL)
 					CSR_WRITE_4(sc, XL_DOWNLIST_PTR,
-					    vtophys(sc->xl_cdata.xl_tx_head->xl_ptr));
+					    sc->sc_listmap->dm_segs[0].ds_addr +
+					    ((caddr_t)sc->xl_cdata.xl_tx_head->xl_ptr -
+					    sc->sc_listkva));
 			}
 			/*
 			 * Remember to set this for the
@@ -1474,7 +1535,7 @@ int xl_intr(arg)
 	int claimed = 0;
 
 	sc = arg;
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 
 	while ((status = CSR_READ_2(sc, XL_STATUS)) & XL_INTRS) {
 
@@ -1540,7 +1601,7 @@ void xl_stats_update(xsc)
 	bzero((char *)&xl_stats, sizeof(struct xl_stats));
 
 	sc = xsc;
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 	if (sc->xl_hasmii)
 		mii = &sc->sc_mii;
 
@@ -1587,29 +1648,29 @@ int xl_encap(sc, c, m_head)
 	struct xl_chain		*c;
 	struct mbuf		*m_head;
 {
-	int			frag = 0;
-	struct xl_frag		*f = NULL;
-	int			total_len;
-	struct mbuf		*m;
+	int			frag, total_len;
+	bus_dmamap_t		map;
+
+	map = sc->sc_tx_sparemap;
+
+reload:
+	if (bus_dmamap_load_mbuf(sc->sc_dmat, map,
+	    m_head, BUS_DMA_NOWAIT) != 0)
+		return (ENOBUFS);
 
 	/*
  	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
  	 * of fragments or hit the end of the mbuf chain.
 	 */
-	m = m_head;
-	total_len = 0;
-
-	for (m = m_head, frag = 0; m != NULL; m = m->m_next) {
-		if (m->m_len != 0) {
-			if (frag == XL_MAXFRAGS)
-				break;
-			total_len+= m->m_len;
-			c->xl_ptr->xl_frag[frag].xl_addr =
-					vtophys(mtod(m, vm_offset_t));
-			c->xl_ptr->xl_frag[frag].xl_len = m->m_len;
-			frag++;
-		}
+	for (frag = 0, total_len = 0; frag < map->dm_nsegs; frag++) {
+		if ((XL_TX_LIST_CNT - (sc->xl_cdata.xl_tx_cnt + frag)) < 3)
+			return (ENOBUFS);
+		if (frag == XL_MAXFRAGS)
+			break;
+		total_len += map->dm_segs[frag].ds_len;
+		c->xl_ptr->xl_frag[frag].xl_addr = map->dm_segs[frag].ds_addr;
+		c->xl_ptr->xl_frag[frag].xl_len = map->dm_segs[frag].ds_len;
 	}
 
 	/*
@@ -1620,7 +1681,7 @@ int xl_encap(sc, c, m_head)
 	 * pointers/counters; it wouldn't gain us anything,
 	 * and would waste cycles.
 	 */
-	if (m != NULL) {
+	if (frag != map->dm_nsegs) {
 		struct mbuf		*m_new = NULL;
 
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
@@ -1638,16 +1699,23 @@ int xl_encap(sc, c, m_head)
 		m_new->m_pkthdr.len = m_new->m_len = m_head->m_pkthdr.len;
 		m_freem(m_head);
 		m_head = m_new;
-		f = &c->xl_ptr->xl_frag[0];
-		f->xl_addr = vtophys(mtod(m_new, caddr_t));
-		f->xl_len = total_len = m_new->m_len;
-		frag = 1;
+		goto reload;
 	}
 
+	bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
+	    BUS_DMASYNC_PREWRITE);
+
 	c->xl_mbuf = m_head;
-	c->xl_ptr->xl_frag[frag - 1].xl_len |=  XL_LAST_FRAG;
+	sc->sc_tx_sparemap = c->map;
+	c->map = map;
+	c->xl_ptr->xl_frag[frag - 1].xl_len |= XL_LAST_FRAG;
 	c->xl_ptr->xl_status = total_len;
 	c->xl_ptr->xl_next = 0;
+
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
+	    offsetof(struct xl_list_data, xl_tx_list[0]),
+	    sizeof(struct xl_list) * XL_TX_LIST_CNT,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	return(0);
 }
@@ -1699,7 +1767,10 @@ void xl_start(ifp)
 		/* Chain it together. */
 		if (prev != NULL) {
 			prev->xl_next = cur_tx;
-			prev->xl_ptr->xl_next = vtophys(cur_tx->xl_ptr);
+			prev->xl_ptr->xl_next =
+			    sc->sc_listmap->dm_segs[0].ds_addr +
+			    ((caddr_t)cur_tx->xl_ptr - sc->sc_listkva);
+
 		}
 		prev = cur_tx;
 
@@ -1738,7 +1809,8 @@ void xl_start(ifp)
 	if (sc->xl_cdata.xl_tx_head != NULL) {
 		sc->xl_cdata.xl_tx_tail->xl_next = start_tx;
 		sc->xl_cdata.xl_tx_tail->xl_ptr->xl_next =
-					vtophys(start_tx->xl_ptr);
+		    sc->sc_listmap->dm_segs[0].ds_addr +
+		    ((caddr_t)start_tx->xl_ptr - sc->sc_listkva);
 		sc->xl_cdata.xl_tx_tail->xl_ptr->xl_status &=
 					~XL_TXSTAT_DL_INTR;
 		sc->xl_cdata.xl_tx_tail = cur_tx;
@@ -1747,7 +1819,9 @@ void xl_start(ifp)
 		sc->xl_cdata.xl_tx_tail = cur_tx;
 	}
 	if (!CSR_READ_4(sc, XL_DOWNLIST_PTR))
-		CSR_WRITE_4(sc, XL_DOWNLIST_PTR, vtophys(start_tx->xl_ptr));
+		CSR_WRITE_4(sc, XL_DOWNLIST_PTR,
+		    sc->sc_listmap->dm_segs[0].ds_addr +
+		    ((caddr_t)start_tx->xl_ptr - sc->sc_listkva));
 
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_UNSTALL);
 
@@ -1783,34 +1857,53 @@ int xl_encap_90xB(sc, c, m_head)
 	struct xl_chain *c;
 	struct mbuf *m_head;
 {
-	int frag = 0;
 	struct xl_frag *f = NULL;
-	struct mbuf *m;
 	struct xl_list *d;
+	int frag;
+	bus_dmamap_t map;
 
 	/*
 	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
 	 * of fragments or hit the end of the mbuf chain.
 	 */
+	map = sc->sc_tx_sparemap;
 	d = c->xl_ptr;
 	d->xl_status = 0;
 	d->xl_next = 0;
 
-	for (m = m_head, frag = 0; m != NULL; m = m->m_next) {
-		if (m->m_len != 0) {
-			if (frag == XL_MAXFRAGS)
-				break;
-			f = &d->xl_frag[frag];
-			f->xl_addr = vtophys(mtod(m, vm_offset_t));
-			f->xl_len = m->m_len;
-			frag++;
-		}
+	if (bus_dmamap_load_mbuf(sc->sc_dmat, map,
+	    m_head, BUS_DMA_NOWAIT) != 0)
+		return (ENOBUFS);
+
+	for (frag = 0; frag < map->dm_nsegs; frag++) {
+		if (frag == XL_MAXFRAGS)
+			break;
+		f = &d->xl_frag[frag];
+		f->xl_addr = map->dm_segs[frag].ds_addr;
+		f->xl_len = map->dm_segs[frag].ds_len;
 	}
 
+	bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
+	    BUS_DMASYNC_PREWRITE);
+
 	c->xl_mbuf = m_head;
+	sc->sc_tx_sparemap = c->map;
+	c->map = map;
 	c->xl_ptr->xl_frag[frag - 1].xl_len |= XL_LAST_FRAG;
 	c->xl_ptr->xl_status = XL_TXSTAT_RND_DEFEAT;
+
+	if (m_head->m_pkthdr.csum & M_IPV4_CSUM_OUT)
+		c->xl_ptr->xl_status |= XL_TXSTAT_IPCKSUM;
+	if (m_head->m_pkthdr.csum & M_TCPV4_CSUM_OUT)
+		c->xl_ptr->xl_status |= XL_TXSTAT_TCPCKSUM;
+	if (m_head->m_pkthdr.csum & M_UDPV4_CSUM_OUT)
+		c->xl_ptr->xl_status |= XL_TXSTAT_UDPCKSUM;
+
+	bus_dmamap_sync(sc->sc_dmat, sc->sc_listmap,
+	    offsetof(struct xl_list_data, xl_tx_list[0]),
+	    sizeof(struct xl_list) * XL_TX_LIST_CNT,
+	    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
 
 	return(0);
 }
@@ -1895,7 +1988,7 @@ void xl_init(xsc)
 	void			*xsc;
 {
 	struct xl_softc		*sc = xsc;
-	struct ifnet		*ifp = &sc->arpcom.ac_if;
+	struct ifnet		*ifp = &sc->sc_arpcom.ac_if;
 	int			s, i;
 	u_int16_t		rxfilt = 0;
 	struct mii_data		*mii = NULL;
@@ -1923,7 +2016,7 @@ void xl_init(xsc)
 	XL_SEL_WIN(2);
 	for (i = 0; i < ETHER_ADDR_LEN; i++) {
 		CSR_WRITE_1(sc, XL_W2_STATION_ADDR_LO + i,
-				sc->arpcom.ac_enaddr[i]);
+				sc->sc_arpcom.ac_enaddr[i]);
 	}
 
 	/* Clear the station mask. */
@@ -2028,7 +2121,8 @@ void xl_init(xsc)
 	 */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_STALL);
 	xl_wait(sc);
-	CSR_WRITE_4(sc, XL_UPLIST_PTR, vtophys(&sc->xl_ldata->xl_rx_list[0]));
+	CSR_WRITE_4(sc, XL_UPLIST_PTR, sc->sc_listmap->dm_segs[0].ds_addr +
+	    offsetof(struct xl_list_data, xl_rx_list[0]));
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_UP_UNSTALL);
 	xl_wait(sc);
 
@@ -2039,7 +2133,8 @@ void xl_init(xsc)
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_STALL);
 		xl_wait(sc);
 		CSR_WRITE_4(sc, XL_DOWNLIST_PTR,
-		    vtophys(&sc->xl_ldata->xl_tx_list[0]));
+		    sc->sc_listmap->dm_segs[0].ds_addr +
+		    offsetof(struct xl_list_data, xl_tx_list[0]));
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_DOWN_UNSTALL);
 		xl_wait(sc);
 	}
@@ -2229,7 +2324,7 @@ xl_ioctl(ifp, command, data)
 
 	s = splimp();
 
-	if ((error = ether_ioctl(ifp, &sc->arpcom, command, data)) > 0) {
+	if ((error = ether_ioctl(ifp, &sc->sc_arpcom, command, data)) > 0) {
 		splx(s);
 		return error;
 	}
@@ -2241,7 +2336,7 @@ xl_ioctl(ifp, command, data)
 #ifdef INET
 		case AF_INET:
 			xl_init(sc);
-			arp_ifinit(&sc->arpcom, ifa);
+			arp_ifinit(&sc->sc_arpcom, ifa);
 			break;
 #endif /* INET */
 		default:
@@ -2288,8 +2383,8 @@ xl_ioctl(ifp, command, data)
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		error = (command == SIOCADDMULTI) ?
-		    ether_addmulti(ifr, &sc->arpcom) :
-		    ether_delmulti(ifr, &sc->arpcom);
+		    ether_addmulti(ifr, &sc->sc_arpcom) :
+		    ether_delmulti(ifr, &sc->sc_arpcom);
 
 		if (error == ENETRESET) {
 			/*
@@ -2366,6 +2461,13 @@ xl_freetxrx(sc)
 	 * Free data in the RX lists.
 	 */
 	for (i = 0; i < XL_RX_LIST_CNT; i++) {
+		if (sc->xl_cdata.xl_rx_chain[i].map->dm_nsegs != 0) {
+			bus_dmamap_t map = sc->xl_cdata.xl_rx_chain[i].map;
+
+			bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
+			    BUS_DMASYNC_POSTREAD);
+			bus_dmamap_unload(sc->sc_dmat, map);
+		}
 		if (sc->xl_cdata.xl_rx_chain[i].xl_mbuf != NULL) {
 			m_freem(sc->xl_cdata.xl_rx_chain[i].xl_mbuf);
 			sc->xl_cdata.xl_rx_chain[i].xl_mbuf = NULL;
@@ -2377,6 +2479,13 @@ xl_freetxrx(sc)
 	 * Free the TX list buffers.
 	 */
 	for (i = 0; i < XL_TX_LIST_CNT; i++) {
+		if (sc->xl_cdata.xl_tx_chain[i].map->dm_nsegs != 0) {
+			bus_dmamap_t map = sc->xl_cdata.xl_tx_chain[i].map;
+
+			bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
+			    BUS_DMASYNC_POSTWRITE);
+			bus_dmamap_unload(sc->sc_dmat, map);
+		}
 		if (sc->xl_cdata.xl_tx_chain[i].xl_mbuf != NULL) {
 			m_freem(sc->xl_cdata.xl_tx_chain[i].xl_mbuf);
 			sc->xl_cdata.xl_tx_chain[i].xl_mbuf = NULL;
@@ -2395,7 +2504,7 @@ void xl_stop(sc)
 {
 	struct ifnet *ifp;
 
-	ifp = &sc->arpcom.ac_if;
+	ifp = &sc->sc_arpcom.ac_if;
 	ifp->if_timer = 0;
 
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RX_DISABLE);
@@ -2436,9 +2545,7 @@ xl_attach(sc)
 	struct xl_softc *sc;
 {
 	u_int8_t enaddr[ETHER_ADDR_LEN];
-	struct ifnet *ifp = &sc->arpcom.ac_if;
-	caddr_t roundptr;
-	u_int round;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int i, media = IFM_ETHER|IFM_100_TX|IFM_FDX;
 	struct ifmedia *ifm;
 
@@ -2453,9 +2560,63 @@ xl_attach(sc)
 		    sc->sc_dev.dv_xname);
 		return;
 	}
-	bcopy(enaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
+	bcopy(enaddr, (char *)&sc->sc_arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
-	printf(" address %s\n", ether_sprintf(sc->arpcom.ac_enaddr));
+	if (bus_dmamem_alloc(sc->sc_dmat, sizeof(struct xl_list_data),
+	    PAGE_SIZE, 0, sc->sc_listseg, 1, &sc->sc_listnseg,
+	    BUS_DMA_NOWAIT) != 0) {
+		printf(": can't alloc list mem\n");
+		return;
+	}
+	if (bus_dmamem_map(sc->sc_dmat, sc->sc_listseg, sc->sc_listnseg,
+	    sizeof(struct xl_list_data), &sc->sc_listkva,
+	    BUS_DMA_NOWAIT) != 0) {
+		printf(": can't map list mem\n");
+		return;
+	}
+	if (bus_dmamap_create(sc->sc_dmat, sizeof(struct xl_list_data), 1,
+	    sizeof(struct xl_list_data), 0, BUS_DMA_NOWAIT,
+	    &sc->sc_listmap) != 0) {
+		printf(": can't alloc list map\n");
+		return;
+	}
+	if (bus_dmamap_load(sc->sc_dmat, sc->sc_listmap, sc->sc_listkva,
+	    sizeof(struct xl_list_data), NULL, BUS_DMA_NOWAIT) != 0) {
+		printf(": can't load list map\n");
+		return;
+	}
+	sc->xl_ldata = (struct xl_list_data *)sc->sc_listkva;
+	bzero(sc->xl_ldata, sizeof(struct xl_list_data));
+
+	for (i = 0; i < XL_RX_LIST_CNT; i++) {
+		if (bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1, MCLBYTES,
+		    0, BUS_DMA_NOWAIT,
+		    &sc->xl_cdata.xl_rx_chain[i].map) != 0) {
+			printf(": can't create rx map\n");
+			return;
+		}
+	}
+	if (bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1, MCLBYTES, 0,
+	    BUS_DMA_NOWAIT, &sc->sc_rx_sparemap) != 0) {
+		printf(": can't create rx spare map\n");
+		return;
+	}
+
+	for (i = 0; i < XL_TX_LIST_CNT; i++) {
+		if (bus_dmamap_create(sc->sc_dmat, MCLBYTES,
+		    XL_TX_LIST_CNT - 3, MCLBYTES, 0, BUS_DMA_NOWAIT,
+		    &sc->xl_cdata.xl_tx_chain[i].map) != 0) {
+			printf(": can't create tx map\n");
+			return;
+		}
+	}
+	if (bus_dmamap_create(sc->sc_dmat, MCLBYTES, XL_TX_LIST_CNT - 3,
+	    MCLBYTES, 0, BUS_DMA_NOWAIT, &sc->sc_tx_sparemap) != 0) {
+		printf(": can't create tx spare map\n");
+		return;
+	}
+
+	printf(" address %s\n", ether_sprintf(sc->sc_arpcom.ac_enaddr));
 
 	if (sc->xl_flags & (XL_FLAG_INVERT_LED_PWR|XL_FLAG_INVERT_MII_PWR)) {
 		u_int16_t n;
@@ -2471,30 +2632,6 @@ xl_attach(sc)
 
 		CSR_WRITE_2(sc, 12, n);
 	}
-
-	sc->xl_ldata_ptr = malloc(sizeof(struct xl_list_data) + 8,
-	    M_DEVBUF, M_NOWAIT);
-	if (sc->xl_ldata_ptr == NULL) {
-		printf("%s: no memory for list buffers\n",sc->sc_dev.dv_xname);
-		return;
-	}
-
-	sc->xl_ldata = (struct xl_list_data *)sc->xl_ldata_ptr;
-#ifdef __alpha__
-	round = (u_int64_t)sc->xl_ldata_ptr & 0xf;
-#else
-	round = (u_int32_t)sc->xl_ldata_ptr & 0xf;
-#endif
-	roundptr = sc->xl_ldata_ptr;
-	for (i = 0; i < 8; i++) {
-		if (round % 8) {
-			round++;
-			roundptr++;
-		} else
-			break;
-	}
-	sc->xl_ldata = (struct xl_list_data *)roundptr;
-	bzero(sc->xl_ldata, sizeof(struct xl_list_data));
 
 	/*
 	 * Figure out the card type. 3c905B adapters have the
@@ -2514,9 +2651,11 @@ xl_attach(sc)
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = xl_ioctl;
 	ifp->if_output = ether_output;
-	if (sc->xl_type == XL_TYPE_905B)
+	if (sc->xl_type == XL_TYPE_905B) {
 		ifp->if_start = xl_start_90xB;
-	else
+		ifp->if_capabilities = IFCAP_CSUM_IPv4|IFCAP_CSUM_TCPv4|
+		    IFCAP_CSUM_UDPv4;
+	} else
 		ifp->if_start = xl_start;
 	ifp->if_watchdog = xl_watchdog;
 	ifp->if_baudrate = 10000000;
@@ -2526,7 +2665,7 @@ xl_attach(sc)
 
 #if NVLAN > 0
 	if (sc->xl_type == XL_TYPE_905B)
-		ifp->if_capabilities = IFCAP_VLAN_MTU;
+		ifp->if_capabilities |= IFCAP_VLAN_MTU;
 	/*
 	 * XXX
 	 * Do other cards filter large packets or simply pass them through?
@@ -2681,7 +2820,7 @@ int
 xl_detach(sc)
 	struct xl_softc *sc;
 {
-	struct ifnet *ifp = &sc->arpcom.ac_if;
+	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 
 	/* Unhook our tick handler. */
 	timeout_del(&sc->xl_stsup_tmo);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tun.c,v 1.41 2002/03/14 01:27:09 millert Exp $	*/
+/*	$OpenBSD: if_tun.c,v 1.43 2002/06/30 13:04:36 itojun Exp $	*/
 /*	$NetBSD: if_tun.c,v 1.24 1996/05/07 02:40:48 thorpej Exp $	*/
 
 /*
@@ -109,6 +109,7 @@ int	tunioctl(dev_t, u_long, caddr_t, int, struct proc *);
 int	tunread(dev_t, struct uio *, int);
 int	tunwrite(dev_t, struct uio *, int);
 int	tunselect(dev_t, int, struct proc *);
+int	tunkqfilter(dev_t, struct knote *);
 
 
 static int tuninit(struct tun_softc *);
@@ -151,6 +152,7 @@ tunattach(n)
 		ifp->if_ibytes = 0;
 		ifp->if_obytes = 0;
 		if_attach(ifp);
+		if_alloc_sadl(ifp);
 #if NBPFILTER > 0
 		bpfattach(&ifp->if_bpf, ifp, DLT_LOOP, sizeof(u_int32_t));
 #endif
@@ -742,6 +744,14 @@ tunselect(dev, rw, p)
 	splx(s);
 	TUNDEBUG(("%s: tunselect waiting\n", ifp->if_xname));
 	return 0;
+}
+
+/* Does not currently work */
+
+int
+tunkqfilter(dev_t dev,struct knote *kn)
+{
+	return (1);
 }
 
 #ifdef ALTQ

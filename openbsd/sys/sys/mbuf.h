@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.h,v 1.60 2002/03/15 01:20:04 millert Exp $	*/
+/*	$OpenBSD: mbuf.h,v 1.66 2002/07/03 21:19:08 miod Exp $	*/
 /*	$NetBSD: mbuf.h,v 1.19 1996/02/09 18:25:14 christos Exp $	*/
 
 /*
@@ -36,7 +36,7 @@
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
  */
 
-#ifndef M_WAITOK
+#ifndef _SYS_MALLOC_H_
 #include <sys/malloc.h>
 #endif
 #include <sys/pool.h>
@@ -141,14 +141,15 @@ struct mbuf {
 /* mbuf pkthdr flags, also in m_flags */
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
-#define M_CONF		0x0400  /* packet was encrypted (ESP-transport) */
-#define M_AUTH		0x0800  /* packet was authenticated (AH) */
-#define M_COMP		0x1000  /* packet was compressed (IPCOMP) */
-#define M_NOTIFICATION  0x2000  /* Notification Event */
+#define M_CONF		0x0400  /* payload was encrypted (ESP-transport) */
+#define M_AUTH		0x0800  /* payload was authenticated (AH or ESP auth) */
+#define M_COMP		0x1000  /* payload was compressed (IPCOMP) */
+#define M_AUTH_AH	0x2000  /* header was authenticated (AH) */
+#define M_NOTIFICATION  0x4000  /* Notification Event */
 
 /* Checksumming flags */
 #define	M_IPV4_CSUM_OUT		0x0001	/* IPv4 checksum needed */
-#define M_TCPV4_CSUM_OUT	0x2002	/* TCP checksum needed */
+#define M_TCPV4_CSUM_OUT	0x0002	/* TCP checksum needed */
 #define	M_UDPV4_CSUM_OUT	0x0004	/* UDP checksum needed */
 #define	M_IPV4_CSUM_IN_OK	0x0008	/* IPv4 checksum verified */
 #define	M_IPV4_CSUM_IN_BAD	0x0010	/* IPv4 checksum bad */
@@ -522,7 +523,7 @@ void _sk_mclget(struct mbuf *, int);
 /* length to m_copy to copy all */
 #define	M_COPYALL	1000000000
 
-/* compatiblity with 4.3 */
+/* compatibility with 4.3 */
 #define  m_copy(m, o, l)	m_copym((m), (o), (l), M_DONTWAIT)
 
 /*
@@ -569,10 +570,10 @@ struct	mbstat mbstat;
 extern	int nmbclust;			/* limit on the # of clusters */
 extern	int mblowat;			/* mbuf low water mark */
 extern	int mcllowat;			/* mbuf cluster low water mark */
-int	max_linkhdr;			/* largest link-level header */
-int	max_protohdr;			/* largest protocol header */
-int	max_hdr;			/* largest link+protocol header */
-int	max_datalen;			/* MHLEN - max_hdr */
+extern	int max_linkhdr;		/* largest link-level header */
+extern	int max_protohdr;		/* largest protocol header */
+extern	int max_hdr;			/* largest link+protocol header */
+extern	int max_datalen;		/* MHLEN - max_hdr */
 extern	int mbtypes[];			/* XXX */
 extern struct pool mbpool;
 extern struct pool mclpool;
@@ -637,6 +638,8 @@ struct m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define PACKET_TAG_GRE				9  /* GRE processing done */
 #define PACKET_TAG_IN_PACKET_CHECKSUM		10 /* NIC checksumming done */
 #define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
+#define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
+#define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
 
 #ifdef MBTYPES
 int mbtypes[] = {				/* XXX */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_lmc.c,v 1.13 2001/11/06 19:53:19 miod Exp $ */
+/*	$OpenBSD: if_lmc.c,v 1.15 2002/06/30 13:04:36 itojun Exp $ */
 /*	$NetBSD: if_lmc.c,v 1.1 1999/03/25 03:32:43 explorer Exp $	*/
 
 /*-
@@ -49,7 +49,7 @@
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
  * 2. The name of the author may not be used to endorse or promote products
- *    derived from this software withough specific prior written permission
+ *    derived from this software without specific prior written permission
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -1447,6 +1447,7 @@ lmc_attach(lmc_softc_t * const sc)
 #endif
   
 	if_attach(ifp);
+	if_alloc_sadl(ifp);
 
 #if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 	sppp_attach((struct ifnet *)&sc->lmc_sppp);

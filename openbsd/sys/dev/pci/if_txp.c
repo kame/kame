@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_txp.c,v 1.63 2002/03/14 01:26:59 millert Exp $	*/
+/*	$OpenBSD: if_txp.c,v 1.66 2002/07/11 20:27:04 jason Exp $	*/
 
 /*
  * Copyright (c) 2001
@@ -243,8 +243,10 @@ txp_attach(parent, self, aux)
 
 	txp_set_filter(sc);
 
+	p1 = htole16(p1);
 	sc->sc_arpcom.ac_enaddr[0] = ((u_int8_t *)&p1)[1];
 	sc->sc_arpcom.ac_enaddr[1] = ((u_int8_t *)&p1)[0];
+	p2 = htole32(p2);
 	sc->sc_arpcom.ac_enaddr[2] = ((u_int8_t *)&p2)[3];
 	sc->sc_arpcom.ac_enaddr[3] = ((u_int8_t *)&p2)[2];
 	sc->sc_arpcom.ac_enaddr[4] = ((u_int8_t *)&p2)[1];
@@ -394,7 +396,7 @@ txp_download_fw(sc)
 	}
 
 	/* Tell boot firmware to get ready for image */
-	WRITE_REG(sc, TXP_H2A_1, fileheader->addr);
+	WRITE_REG(sc, TXP_H2A_1, letoh32(fileheader->addr));
 	WRITE_REG(sc, TXP_H2A_0, TXP_BOOTCMD_RUNTIME_IMAGE);
 
 	if (txp_download_fw_wait(sc)) {
@@ -405,11 +407,12 @@ txp_download_fw(sc)
 	secthead = (struct txp_fw_section_header *)(((u_int8_t *)tc990image) +
 	    sizeof(struct txp_fw_file_header));
 
-	for (sect = 0; sect < fileheader->nsections; sect++) {
+	for (sect = 0; sect < letoh32(fileheader->nsections); sect++) {
 		if (txp_download_fw_section(sc, secthead, sect))
 			return (-1);
 		secthead = (struct txp_fw_section_header *)
-		    (((u_int8_t *)secthead) + secthead->nbytes + sizeof(*secthead));
+		    (((u_int8_t *)secthead) + letoh32(secthead->nbytes) +
+			sizeof(*secthead));
 	}
 
 	WRITE_REG(sc, TXP_H2A_0, TXP_BOOTCMD_DOWNLOAD_COMPLETE);
@@ -482,29 +485,30 @@ txp_download_fw_section(sc, sect, sectnum)
 	}
 
 	/* Make sure this section doesn't go past the end */
-	rseg += sect->nbytes;
+	rseg += letoh32(sect->nbytes);
 	if (rseg >= sizeof(tc990image)) {
 		printf(": fw truncated section %d\n", sectnum);
 		return (-1);
 	}
 
 	/* map a buffer, copy segment to it, get physaddr */
-	if (txp_dma_malloc(sc, sect->nbytes, &dma, 0)) {
+	if (txp_dma_malloc(sc, letoh32(sect->nbytes), &dma, 0)) {
 		printf(": fw dma malloc failed, section %d\n", sectnum);
 		return (-1);
 	}
 
-	bcopy(((u_int8_t *)sect) + sizeof(*sect), dma.dma_vaddr, sect->nbytes);
+	bcopy(((u_int8_t *)sect) + sizeof(*sect), dma.dma_vaddr,
+	    letoh32(sect->nbytes));
 
 	/*
 	 * dummy up mbuf and verify section checksum
 	 */
 	m.m_type = MT_DATA;
 	m.m_next = m.m_nextpkt = NULL;
-	m.m_len = sect->nbytes;
+	m.m_len = letoh32(sect->nbytes);
 	m.m_data = dma.dma_vaddr;
 	m.m_flags = 0;
-	csum = in_cksum(&m, sect->nbytes);
+	csum = in_cksum(&m, letoh32(sect->nbytes));
 	if (csum != sect->cksum) {
 		printf(": fw section %d, bad cksum (expected 0x%x got 0x%x)\n",
 		    sectnum, sect->cksum, csum);
@@ -515,9 +519,9 @@ txp_download_fw_section(sc, sect, sectnum)
 	bus_dmamap_sync(sc->sc_dmat, dma.dma_map, 0,
 	    dma.dma_map->dm_mapsize, BUS_DMASYNC_PREWRITE);
 
-	WRITE_REG(sc, TXP_H2A_1, sect->nbytes);
-	WRITE_REG(sc, TXP_H2A_2, sect->cksum);
-	WRITE_REG(sc, TXP_H2A_3, sect->addr);
+	WRITE_REG(sc, TXP_H2A_1, letoh32(sect->nbytes));
+	WRITE_REG(sc, TXP_H2A_2, letoh16(sect->cksum));
+	WRITE_REG(sc, TXP_H2A_3, letoh32(sect->addr));
 	WRITE_REG(sc, TXP_H2A_4, dma.dma_paddr >> 32);
 	WRITE_REG(sc, TXP_H2A_5, dma.dma_paddr & 0xffffffff);
 	WRITE_REG(sc, TXP_H2A_0, TXP_BOOTCMD_SEGMENT_AVAILABLE);
@@ -570,11 +574,11 @@ txp_intr(vsc)
 			txp_rxbuf_reclaim(sc);
 
 		if (sc->sc_txhir.r_cnt && (sc->sc_txhir.r_cons !=
-		    TXP_OFFSET2IDX(*(sc->sc_txhir.r_off))))
+		    TXP_OFFSET2IDX(letoh32(*(sc->sc_txhir.r_off)))))
 			txp_tx_reclaim(sc, &sc->sc_txhir, &sc->sc_txhiring_dma);
 
 		if (sc->sc_txlor.r_cnt && (sc->sc_txlor.r_cons !=
-		    TXP_OFFSET2IDX(*(sc->sc_txlor.r_off))))
+		    TXP_OFFSET2IDX(letoh32(*(sc->sc_txlor.r_off)))))
 			txp_tx_reclaim(sc, &sc->sc_txlor, &sc->sc_txloring_dma);
 
 		isr = READ_REG(sc, TXP_ISR);
@@ -604,8 +608,8 @@ txp_rx_reclaim(sc, r, dma)
 	u_int32_t roff, woff;
 	int sumflags = 0, idx;
 
-	roff = *r->r_roff;
-	woff = *r->r_woff;
+	roff = letoh32(*r->r_roff);
+	woff = letoh32(*r->r_woff);
 	idx = roff / sizeof(struct txp_rx_desc);
 	rxd = r->r_desc + idx;
 
@@ -617,7 +621,7 @@ txp_rx_reclaim(sc, r, dma)
 
 		if (rxd->rx_flags & RX_FLAGS_ERROR) {
 			printf("%s: error 0x%x\n", sc->sc_dev.dv_xname,
-			    rxd->rx_stat);
+			    letoh32(rxd->rx_stat));
 			ifp->if_ierrors++;
 			goto next;
 		}
@@ -631,7 +635,7 @@ txp_rx_reclaim(sc, r, dma)
 		bus_dmamap_destroy(sc->sc_dmat, sd->sd_map);
 		m = sd->sd_mbuf;
 		free(sd, M_DEVBUF);
-		m->m_pkthdr.len = m->m_len = rxd->rx_len;
+		m->m_pkthdr.len = m->m_len = letoh16(rxd->rx_len);
 
 #ifdef __STRICT_ALIGNMENT
 		{
@@ -673,25 +677,25 @@ txp_rx_reclaim(sc, r, dma)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
 
-		if (rxd->rx_stat & RX_STAT_IPCKSUMBAD)
+		if (rxd->rx_stat & htole32(RX_STAT_IPCKSUMBAD))
 			sumflags |= M_IPV4_CSUM_IN_BAD;
-		else if (rxd->rx_stat & RX_STAT_IPCKSUMGOOD)
+		else if (rxd->rx_stat & htole32(RX_STAT_IPCKSUMGOOD))
 			sumflags |= M_IPV4_CSUM_IN_OK;
 
-		if (rxd->rx_stat & RX_STAT_TCPCKSUMBAD)
+		if (rxd->rx_stat & htole32(RX_STAT_TCPCKSUMBAD))
 			sumflags |= M_TCP_CSUM_IN_BAD;
-		else if (rxd->rx_stat & RX_STAT_TCPCKSUMGOOD)
+		else if (rxd->rx_stat & htole32(RX_STAT_TCPCKSUMGOOD))
 			sumflags |= M_TCP_CSUM_IN_OK;
 
-		if (rxd->rx_stat & RX_STAT_UDPCKSUMBAD)
+		if (rxd->rx_stat & htole32(RX_STAT_UDPCKSUMBAD))
 			sumflags |= M_UDP_CSUM_IN_BAD;
-		else if (rxd->rx_stat & RX_STAT_UDPCKSUMGOOD)
+		else if (rxd->rx_stat & htole32(RX_STAT_UDPCKSUMGOOD))
 			sumflags |= M_UDP_CSUM_IN_OK;
 
 		m->m_pkthdr.csum = sumflags;
 
 #if NVLAN > 0
-		if (rxd->rx_stat & RX_STAT_VLAN) {
+		if (rxd->rx_stat & htole32(RX_STAT_VLAN)) {
 			if (vlan_input_tag(m, htons(rxd->rx_vlan >> 16)) < 0)
 				ifp->if_noproto++;
 			goto next;
@@ -714,10 +718,10 @@ next:
 			idx++;
 			rxd++;
 		}
-		woff = *r->r_woff;
+		woff = letoh32(*r->r_woff);
 	}
 
-	*r->r_roff = woff;
+	*r->r_roff = htole32(woff);
 }
 
 void
@@ -730,8 +734,8 @@ txp_rxbuf_reclaim(sc)
 	struct txp_swdesc *sd;
 	u_int32_t i, end;
 
-	end = TXP_OFFSET2IDX(hv->hv_rx_buf_read_idx);
-	i = TXP_OFFSET2IDX(hv->hv_rx_buf_write_idx);
+	end = TXP_OFFSET2IDX(letoh32(hv->hv_rx_buf_read_idx));
+	i = TXP_OFFSET2IDX(letoh32(hv->hv_rx_buf_write_idx));
 
 	if (++i == RXBUF_ENTRIES)
 		i = 0;
@@ -781,7 +785,7 @@ txp_rxbuf_reclaim(sc)
 		    i * sizeof(struct txp_rxbuf_desc),
 		    sizeof(struct txp_rxbuf_desc), BUS_DMASYNC_PREWRITE);
 
-		hv->hv_rx_buf_write_idx = TXP_IDX2OFFSET(i);
+		hv->hv_rx_buf_write_idx = htole32(TXP_IDX2OFFSET(i));
 
 		if (++i == RXBUF_ENTRIES) {
 			i = 0;
@@ -807,7 +811,7 @@ txp_tx_reclaim(sc, r, dma)
 	struct txp_dma_alloc *dma;
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	u_int32_t idx = TXP_OFFSET2IDX(*(r->r_off));
+	u_int32_t idx = TXP_OFFSET2IDX(letoh32(*(r->r_off)));
 	u_int32_t cons = r->r_cons, cnt = r->r_cnt;
 	struct txp_tx_desc *txd = r->r_desc + cons;
 	struct txp_swdesc *sd = sc->sc_txd + cons;
@@ -899,8 +903,8 @@ txp_alloc_rings(sc)
 		goto bail_boot;
 	}
 	bzero(sc->sc_host_dma.dma_vaddr, sizeof(struct txp_hostvar));
-	boot->br_hostvar_lo = sc->sc_host_dma.dma_paddr & 0xffffffff;
-	boot->br_hostvar_hi = sc->sc_host_dma.dma_paddr >> 32;
+	boot->br_hostvar_lo = htole32(sc->sc_host_dma.dma_paddr & 0xffffffff);
+	boot->br_hostvar_hi = htole32(sc->sc_host_dma.dma_paddr >> 32);
 	sc->sc_hostvar = (struct txp_hostvar *)sc->sc_host_dma.dma_vaddr;
 
 	/* high priority tx ring */
@@ -910,9 +914,9 @@ txp_alloc_rings(sc)
 		goto bail_host;
 	}
 	bzero(sc->sc_txhiring_dma.dma_vaddr, sizeof(struct txp_tx_desc) * TX_ENTRIES);
-	boot->br_txhipri_lo = sc->sc_txhiring_dma.dma_paddr & 0xffffffff;
-	boot->br_txhipri_hi = sc->sc_txhiring_dma.dma_paddr >> 32;
-	boot->br_txhipri_siz = TX_ENTRIES * sizeof(struct txp_tx_desc);
+	boot->br_txhipri_lo = htole32(sc->sc_txhiring_dma.dma_paddr & 0xffffffff);
+	boot->br_txhipri_hi = htole32(sc->sc_txhiring_dma.dma_paddr >> 32);
+	boot->br_txhipri_siz = htole32(TX_ENTRIES * sizeof(struct txp_tx_desc));
 	sc->sc_txhir.r_reg = TXP_H2A_1;
 	sc->sc_txhir.r_desc = (struct txp_tx_desc *)sc->sc_txhiring_dma.dma_vaddr;
 	sc->sc_txhir.r_cons = sc->sc_txhir.r_prod = sc->sc_txhir.r_cnt = 0;
@@ -937,9 +941,9 @@ txp_alloc_rings(sc)
 		goto bail_txhiring;
 	}
 	bzero(sc->sc_txloring_dma.dma_vaddr, sizeof(struct txp_tx_desc) * TX_ENTRIES);
-	boot->br_txlopri_lo = sc->sc_txloring_dma.dma_paddr & 0xffffffff;
-	boot->br_txlopri_hi = sc->sc_txloring_dma.dma_paddr >> 32;
-	boot->br_txlopri_siz = TX_ENTRIES * sizeof(struct txp_tx_desc);
+	boot->br_txlopri_lo = htole32(sc->sc_txloring_dma.dma_paddr & 0xffffffff);
+	boot->br_txlopri_hi = htole32(sc->sc_txloring_dma.dma_paddr >> 32);
+	boot->br_txlopri_siz = htole32(TX_ENTRIES * sizeof(struct txp_tx_desc));
 	sc->sc_txlor.r_reg = TXP_H2A_3;
 	sc->sc_txlor.r_desc = (struct txp_tx_desc *)sc->sc_txloring_dma.dma_vaddr;
 	sc->sc_txlor.r_cons = sc->sc_txlor.r_prod = sc->sc_txlor.r_cnt = 0;
@@ -952,9 +956,9 @@ txp_alloc_rings(sc)
 		goto bail_txloring;
 	}
 	bzero(sc->sc_rxhiring_dma.dma_vaddr, sizeof(struct txp_rx_desc) * RX_ENTRIES);
-	boot->br_rxhipri_lo = sc->sc_rxhiring_dma.dma_paddr & 0xffffffff;
-	boot->br_rxhipri_hi = sc->sc_rxhiring_dma.dma_paddr >> 32;
-	boot->br_rxhipri_siz = RX_ENTRIES * sizeof(struct txp_rx_desc);
+	boot->br_rxhipri_lo = htole32(sc->sc_rxhiring_dma.dma_paddr & 0xffffffff);
+	boot->br_rxhipri_hi = htole32(sc->sc_rxhiring_dma.dma_paddr >> 32);
+	boot->br_rxhipri_siz = htole32(RX_ENTRIES * sizeof(struct txp_rx_desc));
 	sc->sc_rxhir.r_desc =
 	    (struct txp_rx_desc *)sc->sc_rxhiring_dma.dma_vaddr;
 	sc->sc_rxhir.r_roff = &sc->sc_hostvar->hv_rx_hi_read_idx;
@@ -969,9 +973,9 @@ txp_alloc_rings(sc)
 		goto bail_rxhiring;
 	}
 	bzero(sc->sc_rxloring_dma.dma_vaddr, sizeof(struct txp_rx_desc) * RX_ENTRIES);
-	boot->br_rxlopri_lo = sc->sc_rxloring_dma.dma_paddr & 0xffffffff;
-	boot->br_rxlopri_hi = sc->sc_rxloring_dma.dma_paddr >> 32;
-	boot->br_rxlopri_siz = RX_ENTRIES * sizeof(struct txp_rx_desc);
+	boot->br_rxlopri_lo = htole32(sc->sc_rxloring_dma.dma_paddr & 0xffffffff);
+	boot->br_rxlopri_hi = htole32(sc->sc_rxloring_dma.dma_paddr >> 32);
+	boot->br_rxlopri_siz = htole32(RX_ENTRIES * sizeof(struct txp_rx_desc));
 	sc->sc_rxlor.r_desc =
 	    (struct txp_rx_desc *)sc->sc_rxloring_dma.dma_vaddr;
 	sc->sc_rxlor.r_roff = &sc->sc_hostvar->hv_rx_lo_read_idx;
@@ -986,9 +990,9 @@ txp_alloc_rings(sc)
 		goto bail_rxloring;
 	}
 	bzero(sc->sc_cmdring_dma.dma_vaddr, sizeof(struct txp_cmd_desc) * CMD_ENTRIES);
-	boot->br_cmd_lo = sc->sc_cmdring_dma.dma_paddr & 0xffffffff;
-	boot->br_cmd_hi = sc->sc_cmdring_dma.dma_paddr >> 32;
-	boot->br_cmd_siz = CMD_ENTRIES * sizeof(struct txp_cmd_desc);
+	boot->br_cmd_lo = htole32(sc->sc_cmdring_dma.dma_paddr & 0xffffffff);
+	boot->br_cmd_hi = htole32(sc->sc_cmdring_dma.dma_paddr >> 32);
+	boot->br_cmd_siz = htole32(CMD_ENTRIES * sizeof(struct txp_cmd_desc));
 	sc->sc_cmdring.base = (struct txp_cmd_desc *)sc->sc_cmdring_dma.dma_vaddr;
 	sc->sc_cmdring.size = CMD_ENTRIES * sizeof(struct txp_cmd_desc);
 	sc->sc_cmdring.lastwrite = 0;
@@ -1000,9 +1004,9 @@ txp_alloc_rings(sc)
 		goto bail_cmdring;
 	}
 	bzero(sc->sc_rspring_dma.dma_vaddr, sizeof(struct txp_rsp_desc) * RSP_ENTRIES);
-	boot->br_resp_lo = sc->sc_rspring_dma.dma_paddr & 0xffffffff;
-	boot->br_resp_hi = sc->sc_rspring_dma.dma_paddr >> 32;
-	boot->br_resp_siz = CMD_ENTRIES * sizeof(struct txp_rsp_desc);
+	boot->br_resp_lo = htole32(sc->sc_rspring_dma.dma_paddr & 0xffffffff);
+	boot->br_resp_hi = htole32(sc->sc_rspring_dma.dma_paddr >> 32);
+	boot->br_resp_siz = htole32(CMD_ENTRIES * sizeof(struct txp_rsp_desc));
 	sc->sc_rspring.base = (struct txp_rsp_desc *)sc->sc_rspring_dma.dma_vaddr;
 	sc->sc_rspring.size = RSP_ENTRIES * sizeof(struct txp_rsp_desc);
 	sc->sc_rspring.lastwrite = 0;
@@ -1014,9 +1018,9 @@ txp_alloc_rings(sc)
 		goto bail_rspring;
 	}
 	bzero(sc->sc_rxbufring_dma.dma_vaddr, sizeof(struct txp_rxbuf_desc) * RXBUF_ENTRIES);
-	boot->br_rxbuf_lo = sc->sc_rxbufring_dma.dma_paddr & 0xffffffff;
-	boot->br_rxbuf_hi = sc->sc_rxbufring_dma.dma_paddr >> 32;
-	boot->br_rxbuf_siz = RXBUF_ENTRIES * sizeof(struct txp_rxbuf_desc);
+	boot->br_rxbuf_lo = htole32(sc->sc_rxbufring_dma.dma_paddr & 0xffffffff);
+	boot->br_rxbuf_hi = htole32(sc->sc_rxbufring_dma.dma_paddr >> 32);
+	boot->br_rxbuf_siz = htole32(RXBUF_ENTRIES * sizeof(struct txp_rxbuf_desc));
 	sc->sc_rxbufs = (struct txp_rxbuf_desc *)sc->sc_rxbufring_dma.dma_vaddr;
 	for (i = 0; i < RXBUF_ENTRIES; i++) {
 		sd = (struct txp_swdesc *)malloc(sizeof(struct txp_swdesc),
@@ -1058,8 +1062,8 @@ txp_alloc_rings(sc)
 	bus_dmamap_sync(sc->sc_dmat, sc->sc_rxbufring_dma.dma_map,
 	    0, sc->sc_rxbufring_dma.dma_map->dm_mapsize,
 	    BUS_DMASYNC_PREWRITE);
-	sc->sc_hostvar->hv_rx_buf_write_idx = (RXBUF_ENTRIES - 1) *
-	    sizeof(struct txp_rxbuf_desc);
+	sc->sc_hostvar->hv_rx_buf_write_idx = htole32((RXBUF_ENTRIES - 1) *
+	    sizeof(struct txp_rxbuf_desc));
 
 	/* zero dma */
 	if (txp_dma_malloc(sc, sizeof(u_int32_t), &sc->sc_zero_dma,
@@ -1068,8 +1072,8 @@ txp_alloc_rings(sc)
 		goto bail_rxbufring;
 	}
 	bzero(sc->sc_zero_dma.dma_vaddr, sizeof(u_int32_t));
-	boot->br_zero_lo = sc->sc_zero_dma.dma_paddr & 0xffffffff;
-	boot->br_zero_hi = sc->sc_zero_dma.dma_paddr >> 32;
+	boot->br_zero_lo = htole32(sc->sc_zero_dma.dma_paddr & 0xffffffff);
+	boot->br_zero_hi = htole32(sc->sc_zero_dma.dma_paddr >> 32);
 
 	/* See if it's waiting for boot, and try to boot it */
 	for (i = 0; i < 10000; i++) {
@@ -1524,11 +1528,11 @@ txp_command(sc, id, in1, in2, in3, out1, out2, out3, wait)
 		return (0);
 
 	if (out1 != NULL)
-		*out1 = rsp->rsp_par1;
+		*out1 = letoh16(rsp->rsp_par1);
 	if (out2 != NULL)
-		*out2 = rsp->rsp_par2;
+		*out2 = letoh32(rsp->rsp_par2);
 	if (out3 != NULL)
-		*out3 = rsp->rsp_par3;
+		*out3 = letoh32(rsp->rsp_par3);
 	free(rsp, M_DEVBUF);
 	return (0);
 }
@@ -1559,11 +1563,12 @@ txp_command2(sc, id, in1, in2, in3, in_extp, in_extn, rspp, wait)
 	bzero(cmd, sizeof(*cmd));
 
 	cmd->cmd_numdesc = in_extn;
-	cmd->cmd_seq = seq = sc->sc_seq++;
-	cmd->cmd_id = id;
-	cmd->cmd_par1 = in1;
-	cmd->cmd_par2 = in2;
-	cmd->cmd_par3 = in3;
+	seq = sc->sc_seq++;
+	cmd->cmd_seq = htole16(seq);
+	cmd->cmd_id = htole16(id);
+	cmd->cmd_par1 = htole16(in1);
+	cmd->cmd_par2 = htole32(in2);
+	cmd->cmd_par3 = htole32(in3);
 	cmd->cmd_flags = CMD_FLAGS_TYPE_CMD |
 	    (wait ? CMD_FLAGS_RESP : 0) | CMD_FLAGS_VALID;
 
@@ -1592,8 +1597,8 @@ txp_command2(sc, id, in1, in2, in3, in_extp, in_extn, rspp, wait)
 	for (i = 0; i < 10000; i++) {
 		bus_dmamap_sync(sc->sc_dmat, sc->sc_host_dma.dma_map, 0,
 		    sizeof(struct txp_hostvar), BUS_DMASYNC_POSTREAD);
-		idx = hv->hv_resp_read_idx;
-		if (idx != hv->hv_resp_write_idx) {
+		idx = letoh32(hv->hv_resp_read_idx);
+		if (idx != letoh32(hv->hv_resp_write_idx)) {
 			*rspp = NULL;
 			if (txp_response(sc, idx, id, seq, rspp))
 				return (-1);
@@ -1623,10 +1628,10 @@ txp_response(sc, ridx, id, seq, rspp)
 	struct txp_hostvar *hv = sc->sc_hostvar;
 	struct txp_rsp_desc *rsp;
 
-	while (ridx != hv->hv_resp_write_idx) {
+	while (ridx != letoh32(hv->hv_resp_write_idx)) {
 		rsp = (struct txp_rsp_desc *)(((u_int8_t *)sc->sc_rspring.base) + ridx);
 
-		if (id == rsp->rsp_id && rsp->rsp_seq == seq) {
+		if (id == letoh16(rsp->rsp_id) && letoh16(rsp->rsp_seq) == seq) {
 			*rspp = (struct txp_rsp_desc *)malloc(
 			    sizeof(struct txp_rsp_desc) * (rsp->rsp_numdesc + 1),
 			    M_DEVBUF, M_NOWAIT);
@@ -1638,13 +1643,13 @@ txp_response(sc, ridx, id, seq, rspp)
 
 		if (rsp->rsp_flags & RSP_FLAGS_ERROR) {
 			printf("%s: response error: id 0x%x\n",
-			    TXP_DEVNAME(sc), rsp->rsp_id);
+			    TXP_DEVNAME(sc), letoh16(rsp->rsp_id));
 			txp_rsp_fixup(sc, rsp, NULL);
-			ridx = hv->hv_resp_read_idx;
+			ridx = letoh32(hv->hv_resp_read_idx);
 			continue;
 		}
 
-		switch (rsp->rsp_id) {
+		switch (letoh16(rsp->rsp_id)) {
 		case TXP_CMD_CYCLE_STATISTICS:
 		case TXP_CMD_MEDIA_STATUS_READ:
 			break;
@@ -1653,12 +1658,12 @@ txp_response(sc, ridx, id, seq, rspp)
 			break;
 		default:
 			printf("%s: unknown id(0x%x)\n", TXP_DEVNAME(sc),
-			    rsp->rsp_id);
+			    letoh16(rsp->rsp_id));
 		}
 
 		txp_rsp_fixup(sc, rsp, NULL);
-		ridx = hv->hv_resp_read_idx;
-		hv->hv_resp_read_idx = ridx;
+		ridx = letoh32(hv->hv_resp_read_idx);
+		hv->hv_resp_read_idx = letoh32(ridx);
 	}
 
 	return (0);
@@ -1673,7 +1678,7 @@ txp_rsp_fixup(sc, rsp, dst)
 	struct txp_hostvar *hv = sc->sc_hostvar;
 	u_int32_t i, ridx;
 
-	ridx = hv->hv_resp_read_idx;
+	ridx = letoh32(hv->hv_resp_read_idx);
 
 	for (i = 0; i < rsp->rsp_numdesc + 1; i++) {
 		if (dst != NULL)
@@ -1684,10 +1689,11 @@ txp_rsp_fixup(sc, rsp, dst)
 			ridx = 0;
 		} else
 			src++;
-		sc->sc_rspring.lastwrite = hv->hv_resp_read_idx = ridx;
+		sc->sc_rspring.lastwrite = ridx;
+		hv->hv_resp_read_idx = htole32(ridx);
 	}
 	
-	hv->hv_resp_read_idx = ridx;
+	hv->hv_resp_read_idx = htole32(ridx);
 }
 
 int
@@ -1699,14 +1705,14 @@ txp_cmd_desc_numfree(sc)
 	u_int32_t widx, ridx, nfree;
 
 	widx = sc->sc_cmdring.lastwrite;
-	ridx = hv->hv_cmd_read_idx;
+	ridx = letoh32(hv->hv_cmd_read_idx);
 
 	if (widx == ridx) {
 		/* Ring is completely free */
-		nfree = br->br_cmd_siz - sizeof(struct txp_cmd_desc);
+		nfree = letoh32(br->br_cmd_siz) - sizeof(struct txp_cmd_desc);
 	} else {
 		if (widx > ridx)
-			nfree = br->br_cmd_siz -
+			nfree = letoh32(br->br_cmd_siz) -
 			    (widx - ridx + sizeof(struct txp_cmd_desc));
 		else
 			nfree = ridx - widx - sizeof(struct txp_cmd_desc);
@@ -1848,14 +1854,16 @@ txp_show_descriptor(d)
 	case CMD_FLAGS_TYPE_CMD:
 		/* command descriptor */
 		printf("[cmd flags 0x%x num %d id %d seq %d par1 0x%x par2 0x%x par3 0x%x]\n",
-		    cmd->cmd_flags, cmd->cmd_numdesc, cmd->cmd_id, cmd->cmd_seq,
-		    cmd->cmd_par1, cmd->cmd_par2, cmd->cmd_par3);
+		    cmd->cmd_flags, cmd->cmd_numdesc, letoh16(cmd->cmd_id),
+		    letoh16(cmd->cmd_seq), letoh16(cmd->cmd_par1),
+		    letoh32(cmd->cmd_par2), letoh32(cmd->cmd_par3));
 		break;
 	case CMD_FLAGS_TYPE_RESP:
 		/* response descriptor */
 		printf("[rsp flags 0x%x num %d id %d seq %d par1 0x%x par2 0x%x par3 0x%x]\n",
-		    rsp->rsp_flags, rsp->rsp_numdesc, rsp->rsp_id, rsp->rsp_seq,
-		    rsp->rsp_par1, rsp->rsp_par2, rsp->rsp_par3);
+		    rsp->rsp_flags, rsp->rsp_numdesc, letoh16(rsp->rsp_id),
+		    letoh16(rsp->rsp_seq), letoh16(rsp->rsp_par1),
+		    letoh32(rsp->rsp_par2), letoh32(rsp->rsp_par3));
 		break;
 	case CMD_FLAGS_TYPE_DATA:
 		/* data header (assuming tx for now) */
@@ -1872,8 +1880,9 @@ txp_show_descriptor(d)
 	default:
 		printf("[unknown(%x) flags 0x%x num %d id %d seq %d par1 0x%x par2 0x%x par3 0x%x]\n",
 		    cmd->cmd_flags & CMD_FLAGS_TYPE_M,
-		    cmd->cmd_flags, cmd->cmd_numdesc, cmd->cmd_id, cmd->cmd_seq,
-		    cmd->cmd_par1, cmd->cmd_par2, cmd->cmd_par3);
+		    cmd->cmd_flags, cmd->cmd_numdesc, letoh16(cmd->cmd_id),
+		    letoh16(cmd->cmd_seq), letoh16(cmd->cmd_par1),
+		    letoh32(cmd->cmd_par2), letoh32(cmd->cmd_par3));
 		break;
 	}
 }

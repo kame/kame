@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.c,v 1.40 2002/03/27 17:13:47 ian Exp $	*/
+/*	$OpenBSD: if_ether.c,v 1.45 2002/06/09 16:26:10 itojun Exp $	*/
 /*	$NetBSD: if_ether.c,v 1.31 1996/05/11 12:59:58 mycroft Exp $	*/
 
 /*
@@ -57,6 +57,8 @@
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/route.h>
+#include <net/if_fddi.h>
+#include <net/if_types.h>
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -119,10 +121,11 @@ arptimer(arg)
 
 	s = splsoftnet();
 	timeout_add(to, arpt_prune * hz);
-	for (la = llinfo_arp.lh_first; la != 0; la = nla) {
+	for (la = LIST_FIRST(&llinfo_arp); la != LIST_END(&llinfo_arp);
+	    la = nla) {
 		register struct rtentry *rt = la->la_rt;
 
-		nla = la->la_list.le_next;
+		nla = LIST_NEXT(la, la_list);
 		if (rt->rt_expire && rt->rt_expire <= time.tv_sec)
 			arptfree(la); /* timer has expired; clear */
 	}
@@ -157,8 +160,26 @@ arp_rtrequest(req, rt, info)
 		timeout_set(&arptimer_to, arptimer, &arptimer_to);
 		timeout_add(&arptimer_to, hz);
 	}
-	if (rt->rt_flags & RTF_GATEWAY)
+
+	if (rt->rt_flags & RTF_GATEWAY) {
+		if (req != RTM_ADD)
+			return;
+
+		/*
+		 * linklayers with particular link MTU limitation.  it is a bit
+		 * awkward to have FDDI handling here, we should split ARP from
+		 * netinet/if_ether.c like NetBSD does.
+		 */
+		switch (rt->rt_ifp->if_type) {
+		case IFT_FDDI:
+			if (rt->rt_ifp->if_mtu > FDDIIPMTU)
+				rt->rt_rmx.rmx_mtu = FDDIIPMTU;
+			break;
+		}
+
 		return;
+	}
+
 	switch (req) {
 
 	case RTM_ADD:
@@ -185,6 +206,18 @@ arp_rtrequest(req, rt, info)
 			 * from it do not need their expiration time set.
 			 */
 			rt->rt_expire = time.tv_sec;
+			/*
+			 * linklayers with particular link MTU limitation.
+			 */
+			switch (rt->rt_ifp->if_type) {
+			case IFT_FDDI:
+				if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0 &&
+				    (rt->rt_rmx.rmx_mtu > FDDIIPMTU ||
+				     (rt->rt_rmx.rmx_mtu == 0 &&
+				      rt->rt_ifp->if_mtu > FDDIIPMTU)))
+					rt->rt_rmx.rmx_mtu = FDDIIPMTU;
+				break;
+			}
 			break;
 		}
 		/* Announce a new entry if requested. */
@@ -512,6 +545,17 @@ in_arpinput(m)
 		}
 	}
 
+	if (ia == NULL) {
+		struct ifaddr *ifa;
+
+		TAILQ_FOREACH(ifa, &m->m_pkthdr.rcvif->if_addrlist, ifa_list) {
+			if (ifa->ifa_addr->sa_family == AF_INET)
+				break;
+		}
+		if (ifa)
+			ia = (struct in_ifaddr *)ifa;
+	}
+
 	if (ia == NULL)
 		goto out;
 
@@ -546,7 +590,7 @@ in_arpinput(m)
 		  	if (rt->rt_flags & RTF_PERMANENT_ARP) {
 				log(LOG_WARNING,
 				   "arp: attempt to overwrite permanent "
-				   "entry for %s by %s on %s\n", 
+				   "entry for %s by %s on %s\n",
 				   inet_ntoa(isaddr),
 				   ether_sprintf(ea->arp_sha),
 				   ac->ac_if.if_xname);
@@ -562,7 +606,7 @@ in_arpinput(m)
 			} else {
 				log(LOG_INFO,
 				   "arp info overwritten for %s by %s on %s\n",
-			    	   inet_ntoa(isaddr), 
+			    	   inet_ntoa(isaddr),
 				   ether_sprintf(ea->arp_sha),
 				   ac->ac_if.if_xname);
 				rt->rt_expire = 1; /* no longer static */
@@ -844,8 +888,8 @@ revarpwhoarewe(ifp, serv_in, clnt_in)
 	struct in_addr *clnt_in;
 {
 	int result, count = 20;
-	
-	if (myip_initialized) 
+
+	if (myip_initialized)
 		return EIO;
 
 	myip_ifp = ifp;
@@ -859,7 +903,7 @@ revarpwhoarewe(ifp, serv_in, clnt_in)
 	revarp_in_progress = 0;
 	if (!myip_initialized)
 		return ENETUNREACH;
-	
+
 	bcopy((caddr_t)&srv_ip, serv_in, sizeof(*serv_in));
 	bcopy((caddr_t)&myip, clnt_in, sizeof(*clnt_in));
 	return 0;
