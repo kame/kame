@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.33 2000/01/13 06:48:14 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.34 2000/01/13 07:24:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2897,6 +2897,17 @@ ipsecdoi_setph2proposal0(iph2, keys, b)
 	if (b->authtype)
 		len += sizeof(struct isakmp_data);
 
+	switch (b->ipsp->pfs_group) {
+	case OAKLEY_ATTR_GRP_DESC_MODP768:
+	case OAKLEY_ATTR_GRP_DESC_MODP1024:
+	case OAKLEY_ATTR_GRP_DESC_MODP1536:
+		len += sizeof(struct isakmp_data);
+		break;
+	case 0:
+	default:
+		break;
+	}
+
 	p = vrealloc(p, p->l + len);
 	if (p == NULL)
 		return NULL;
@@ -3009,6 +3020,18 @@ setph2attr(buf, sa, len)
 
 	if (sa->encklen)
 		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_KEY_LENGTH, sa->encklen);
+
+	switch (sa->ipsp->pfs_group) {
+	case OAKLEY_ATTR_GRP_DESC_MODP768:
+	case OAKLEY_ATTR_GRP_DESC_MODP1024:
+	case OAKLEY_ATTR_GRP_DESC_MODP1536:
+		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_GRP_DESC,
+			sa->ipsp->pfs_group);
+		break;
+	case 0:
+	default:
+		break;
+	}
 
 	*len = p - buf;
 
