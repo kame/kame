@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.763 2000/04/12 07:51:48 jinmei Exp $
+$Id: CHANGELOG,v 1.764 2000/04/12 12:36:31 jinmei Exp $
 
 <200003>
+2000-04-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6[cs].c: tiny fixes to decrease compilation
+	errors;
+	- corrected arguments for inet_pton().
+	- supplemented a header file.
+
 2000-04-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6[ds]d/mld6.c (accept_mld6): reflected the change
 	of mrt6msg{}; check the overlaid MLD6 type field instead of
