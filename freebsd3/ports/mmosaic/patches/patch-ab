@@ -1,5 +1,5 @@
-*** gui-popup.c.orig	Wed Oct 13 22:46:32 1999
---- gui-popup.c	Tue Apr 18 02:20:39 2000
+*** src/gui-popup.c.orig	Wed Oct 13 22:46:32 1999
+--- src/gui-popup.c	Tue Apr 18 02:20:39 2000
 ***************
 *** 242,248 ****
      {0, NULL, NULL}, NULL, 0, NULL, NULL, NULL, NULL, 1}, 
