@@ -453,7 +453,6 @@ server6_react_solicit(agent, buf, siz)
 	} else {
 		dst.sin6_addr = dh6s->dh6sol_cliaddr;
 		dst.sin6_scope_id = if_nametoindex(device);
-		dh6a->dh6adv_flags = DH6ADV_SERVPRESENT;
 		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 			errx(1, "inet_pton failed");
 			/* NOTREACHED */
@@ -469,6 +468,7 @@ server6_react_solicit(agent, buf, siz)
 		myaddr.s6_addr[2] = myaddr.s6_addr[3] = 0;
 #endif
 	memcpy(&dh6a->dh6adv_serveraddr, &myaddr, sizeof(myaddr));
+	dh6a->dh6adv_flags = DH6ADV_SERVPRESENT;
 	dh6a->dh6adv_pref = 255;	/*XXX*/
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
