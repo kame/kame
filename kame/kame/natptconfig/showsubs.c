@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.4 2001/09/02 19:32:28 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.5 2001/09/05 04:15:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -49,8 +49,6 @@
 #include <arpa/inet.h>
 
 #include <netinet6/natpt_defs.h>
-
-#include "cfparse.h"
 
 
 /*
@@ -268,7 +266,7 @@ appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad)
 void
 appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type)
 {
-	if (type == SLONG) {
+	if (type != 0) {
 		appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
 		appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
 

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.11 2001/09/02 19:28:34 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.12 2001/09/05 04:15:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -391,7 +391,7 @@ opt_long
 		:
 		    { $$ = 0; }
 		| SLONG
-		    { $$ = SLONG; }
+		    { $$ = 1; }
 		;
 
 opt_decimal
