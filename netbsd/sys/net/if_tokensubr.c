@@ -725,5 +725,7 @@ token_ifdetach(ifp)
 #if NBPFILTER > 0
 	bpfdetach(ifp);
 #endif
+#if 0	/* done in if_detach() */
 	if_free_sadl(ifp);
+#endif
 }

@@ -997,7 +997,9 @@ sppp_detach(struct ifnet *ifp)
 	if (sp->hisauth.name) free(sp->hisauth.name, M_DEVBUF);
 	if (sp->hisauth.secret) free(sp->hisauth.secret, M_DEVBUF);
 
+#if 0	/* done in if_detach() */
 	if_free_sadl(ifp);
+#endif
 }
 
 /*
