@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.64 2003/05/09 08:48:57 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.65 2003/05/10 01:58:45 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -165,12 +165,11 @@ udp6_input(mp, offp, proto)
 	struct ip6_recvpktopts opts;
 	int off = *offp;
 	int plen, ulen;
-	struct sockaddr_in6 src, dst, fromsa;
+	struct sockaddr_in6 src, dst, fromsa, tosa;
 #ifdef MLDV2
 	struct sock_msf *msf;
 	struct ip6_moptions *im6o;
 	struct in6_multi_mship *imm;
-	struct sockaddr_in6 src_h;
 	struct sock_msf_source *msfsrc;
 #endif	
 
@@ -208,8 +207,10 @@ udp6_input(mp, offp, proto)
 	 * hidden from applications.
 	 */
 	fromsa = src;
+	tosa = dst;
 #ifndef SCOPEDROUTING
 	in6_clearscope(&fromsa.sin6_addr);
+	in6_clearscope(&tosa.sin6_addr);
 #endif
 
 	udpstat.udps_ipackets++;
@@ -281,12 +282,12 @@ udp6_input(mp, offp, proto)
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst))
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &tosa))
 					continue;
 			}
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
-							&src) ||
+							&fromsa) ||
 				    in6p->in6p_fport != uh->uh_sport) {
 					continue;
 				}
@@ -364,16 +365,12 @@ udp6_input(mp, offp, proto)
 			 */
 			if ((im6o = in6p->in6p_moptions) == NULL)
 				continue;
-			bzero(&src_h, sizeof(src_h));
-			src_h.sin6_family = AF_INET6;
-			src_h.sin6_len = sizeof(src_h);
-			bcopy(&ip6->ip6_src, &src_h.sin6_addr, sizeof(ip6->ip6_src));
 			for (imm = LIST_FIRST(&im6o->im6o_memberships);
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
 
 				if (SS_CMP(&imm->i6mm_maddr->in6m_sa,
-				    !=, &dst))
+				    !=, &tosa))
 					continue;
 
 				msf = imm->i6mm_msf;
@@ -399,9 +396,9 @@ udp6_input(mp, offp, proto)
 				LIST_FOREACH(msfsrc, msf->msf_head, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, &src_h))
+					if (SS_CMP(&msfsrc->src, <, &fromsa))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, &src_h)) {
+					if (SS_CMP(&msfsrc->src, >, &fromsa)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
@@ -418,9 +415,9 @@ udp6_input(mp, offp, proto)
 				LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, &src_h))
+					if (SS_CMP(&msfsrc->src, <, &fromsa))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, &src_h)) {
+					if (SS_CMP(&msfsrc->src, >, &fromsa)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;
