@@ -1,4 +1,4 @@
-/*	$KAME: schedule.c,v 1.16 2001/10/02 01:59:40 sakane Exp $	*/
+/*	$KAME: schedule.c,v 1.17 2001/10/08 23:42:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,14 +78,18 @@ schedular()
 	now = current_time();
 
         for (p = TAILQ_FIRST(&sctree); p; p = next) {
+		/* if the entry has been daed, remove it */
 		if (p->dead)
 			goto next_schedule;
 
+		/* if the time hasn't come, proceed to the next entry */
 		if (now < p->xtime) {
 			next = TAILQ_NEXT(p, chain);
 			continue;
 		}
 
+		/* mark it with dead. and call the function. */
+		p->dead = 1;
 		if (p->func != NULL)
 			(p->func)(p->param);
 
