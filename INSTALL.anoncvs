@@ -1,6 +1,6 @@
-Installation procedure - grabbinb tree via cvsup
+Installation procedure - grabbing tree via anoncvs
 KAME project
-$Id: INSTALL.anoncvs,v 1.3 1999/08/14 14:12:50 itojun Exp $
+$Id: INSTALL.anoncvs,v 1.4 1999/08/25 02:29:04 itojun Exp $
 
 
 You can grab the latest KAME tree via anonymous cvs (anoncvs).
