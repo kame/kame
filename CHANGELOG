@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1247 2000/08/31 17:33:15 itojun Exp $
+$KAME: CHANGELOG,v 1.1248 2000/08/31 17:37:05 itojun Exp $
 
 <200008>
 Fri Sep  1 02:30:02 JST 2000  itojun@iijlab.net
-	* netbsd/lib/libinet6/getaddrinfo.c: on /etc/hosts lookup, set
+	* {net,open}bsd/lib/libinet6/getaddrinfo.c: on /etc/hosts lookup, set
 	  "official host name" (the leftmost hostname) into ai_canonname.
 	  this is to synchronize with practice in gethostby*.
 	  comment from ume.
