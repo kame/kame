@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.102 2002/04/19 08:30:52 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.103 2002/04/22 07:49:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2657,10 +2657,9 @@ natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct ip *ip4)
 	ip4->ip_ttl = ip6->ip6_hlim;	/* Time To Live */
 	ip4->ip_src = pad->in4dst;		/* source addresss */
 	ip4->ip_dst = pad->in4src;		/* destination address */
-	ip4->ip_p = (ip6->ip6_nxt == IPPROTO_ICMPV6)
+	ip4->ip_p = (cv6->ip_p == IPPROTO_ICMPV6)
 		? IPPROTO_ICMP
-		: ip6->ip6_nxt;
-
+		: cv6->ip_p;
 
 	if (cv6->fh) {
 		u_int16_t	offlg = ntohs(fh6.ip6f_offlg);
