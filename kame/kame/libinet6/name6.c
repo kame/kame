@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.25 2000/06/26 16:44:40 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.26 2000/06/27 16:16:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1200,21 +1200,23 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 		} \
 	} while (0)
 
+/* XXX do {} while (0) cannot be put here */
 #define DNS_ASSERT(x) \
-	do {				\
+	{				\
 		if (!(x)) {		\
 			cp += n;	\
 			continue;	\
 		}			\
-	} while (0)
+	}
 
+/* XXX do {} while (0) cannot be put here */
 #define DNS_FATAL(x) \
-	do {				\
+	{				\
 		if (!(x)) {		\
 			had_error++;	\
 			continue;	\
 		}			\
-	} while (0)
+	}
 
 	tname = qname;
 	template->h_name = NULL;
@@ -1474,6 +1476,8 @@ _dns_ghbyname(const char *name, int af, int *errp)
 		return NULL;
 	}
 	hp = getanswer(&buf, n, name, qtype, &hbuf, errp);
+	if (!hp)
+		return NULL;
 	return _hpcopy(&hbuf, errp);
 }
 
@@ -1548,6 +1552,8 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		return NULL;
 	}
 	hp = getanswer(&buf, n, qbuf, T_PTR, &hbuf, errp);
+	if (!hp)
+		return NULL;
 	hbuf.h_addrtype = af;
 	hbuf.h_length = addrlen;
 	hbuf.h_addr_list = hlist;
