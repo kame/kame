@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.169 2001/01/23 09:52:45 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.170 2001/01/26 08:01:57 jinmei Exp $
 
 1. IPv6
 
@@ -1741,5 +1741,27 @@ KAME kit includes Ericsson mobile-ip6 code.  The integration is just started
 (in Feb 2000), and we will need some more time to integrate it better.
 
 See kame/mip6config/{QUICKSTART,README_MIP6.txt} for more details.
+
+7. Coding style
+
+The KAME developers basically do not make a bother about coding
+style.  However, there is still some agreement on the style, in order
+to make the distribute develoment smooth.
+
+- the tab character should be 8-byte long.
+- each line should be within 80 characters.
+- keep a single open/close bracket in a comment such as the following
+  line:
+	putchar('(');	/* ) */
+  with this, some vi users would have a hard time to match a pair of
+  brackets.  Although this type of bracket seems clumsy and is even
+  harmful for some other type of vi users and Emacs users, the
+  agreement in the KAME developers is to allow it.
+- when editting a third-party package, keep its own coding style as
+  much as possible, even if the style does not follow the items above.
+
+When you want to contribute something to the KAME project, and if you
+do not mind the agreement, it would be helpful for the project to keep
+these rules.
 
 						 <end of IMPLEMENTATION>
