@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.27 2000/12/02 07:09:35 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.28 2000/12/02 18:01:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,6 +145,9 @@
  * - protosw for IPv4 (sys/netinet)
  *	FreeBSD4: struct ipprotosw in netinet/ipprotosw.h
  *	others: struct protosw in sys/protosw.h
+ *
+ * - protosw.  NetBSD 1.5 has extra member for ipfilter.  NetBSD 1.5 requires
+ *   PR_LISTEN flag bit with protocols that permit listen/accept (like tcp).
  *
  * - header files with defopt (opt_xx.h)
  *	FreeBSD3: opt_{inet,ipsec,ip6fw,altq}.h
