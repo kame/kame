@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.58 2001/08/14 08:29:02 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.59 2001/08/16 03:55:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -398,10 +398,12 @@ encap4_input(m, va_alist)
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 #else
+#ifdef MROUTING
 	if (proto == IPPROTO_IPV4) {
 		ipip_input(m, off, proto);
 		return;
 	}
+#endif
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
