@@ -1,4 +1,4 @@
-.\"	$KAME: pim6dd.8,v 1.10 2001/03/02 02:22:21 jinmei Exp $
+.\"	$KAME: pim6dd.8,v 1.11 2003/05/09 05:20:02 suz Exp $
 .\"
 .\" Copyright (C) 1998 WIDE Project.
 .\" All rights reserved.
@@ -51,7 +51,7 @@ Specify alternate location,
 .Ar configfile ,
 for configuration file.
 By default,
-.Pa /usr/local/v6/etc/pim6dd.conf
+.Pa /etc/pim6dd.conf
 is used.
 .It Fl d
 Specify debug levels. If this option is specified without any arguments,
@@ -72,7 +72,7 @@ interfaces, i.e., interfaces that have the IFF_MULTICAST flag set (excluding
 the "loopback interface" and interaces that do not have an IPv6 address).
 To override the default configuration,
 configuration commands may be placed in
-.Pa /usr/local/v6/etc/pim6dd.conf
+.Pa /etc/pim6dd.conf
 .Po
 or an alternative file, specified by the 
 .Sq Fl c
@@ -84,8 +84,8 @@ ignores interfaces that do not have an IPv6 address.
 Such interfaces should not appear in the configuration file.
 .\"
 .Sh FILES
-.Bl -tag -width /usr/local/v6/etc/pim6dd.conf -compact
-.It Pa /usr/local/v6/etc/pim6dd.conf
+.Bl -tag -width /etc/pim6dd.conf -compact
+.It Pa /etc/pim6dd.conf
 The default configuration file.
 .El
 .Sh SEE ALSO

@@ -1,4 +1,4 @@
-/*	$KAME: pathnames.h,v 1.4 2001/06/25 04:54:13 itojun Exp $	*/
+/*	$KAME: pathnames.h,v 1.5 2003/05/09 05:20:02 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -40,7 +40,7 @@
  */
 
 
-#define _PATH_PIM6D_CONF		"/usr/local/v6/etc/pim6dd.conf"
+#define _PATH_PIM6D_CONF		"/etc/pim6dd.conf"
 
 #if (defined(BSD) && (BSD >= 199103))
 #define _PATH_PIM6D_PID		"/var/run/pim6dd.pid"
