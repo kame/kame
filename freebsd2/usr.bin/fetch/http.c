@@ -596,6 +596,12 @@ retry:
 	if (n >= NIOV)
 		err(EX_SOFTWARE, "request vector length exceeded: %d", n);
 
+	if (fs->fs_verbose > 1) {
+		int i;
+		for (i = 0; i < n; i++)
+			fprintf(stderr, "%s", iov[i].iov_base);
+	}
+
 	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (s < 0) {
 		warn("socket");
