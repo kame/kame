@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6relay.8,v 1.11 2000/12/05 08:36:47 itojun Exp $
+.\"	$KAME: dhcp6relay.8,v 1.12 2002/04/25 03:02:57 jinmei Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -81,7 +81,7 @@ servers.
 .%D 5 May 2000
 .%T Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
 .%R internet draft
-.%N draft-ietf-dhc-dhcpv6-15.txt
+.%N draft-ietf-dhc-dhcpv6-24.txt
 .%O work in progress material
 .Re
 .\"
@@ -91,6 +91,8 @@ The
 command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .\"
 .Sh BUGS
+The current implementation does not conform to the latest draft.
+.Pp
 The current implementation handles DHCP Solicit and DHCP Advertise
 messages only.
 .Bl -enum
