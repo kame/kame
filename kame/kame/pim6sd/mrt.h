@@ -139,16 +139,16 @@ typedef struct build_jp_message {
 
 
 typedef struct pim_nbr_entry {
-	struct pim_nbr_entry 	*next;			/* link to next neighbor          */
-	struct pim_nbr_entry 	*prev;			/* link to prev neighbor          */ 
-	struct sockaddr_in6 	address;		/* neighbor address               */
-	vifi_t 					vifi;   /* which interface                */	
-	u_int16 				timer; 	/* for timing out neighbor        */	
-	build_jp_message_t 		*build_jp_message;  /* A structure for fairly
-                                           		 * complicated Join/Prune
-                                           		 * message construction.
-                                           		 */
- 
+	struct pim_nbr_entry 	*next; /* link to next neighbor */
+	struct pim_nbr_entry 	*prev; /* link to prev neighbor */ 
+	struct sockaddr_in6 	address; /* (primary) neighbor address */
+	struct phaddr		*aux_addrs; /* additional addresses */
+	vifi_t 			vifi;   /* which interface                */
+	u_int16 		timer; 	/* for timing out neighbor        */
+	build_jp_message_t	*build_jp_message;  /* A structure for fairly
+						     * complicated Join/Prune
+						     * message construction.
+						     */
 } pim_nbr_entry_t;
 
 typedef struct srcentry {

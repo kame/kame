@@ -116,6 +116,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include "defs.h"
 #include "mrt.h"
 #include "vif.h"
@@ -131,13 +132,19 @@
 #include "kern.h"
 #include "routesock.h"
 
+struct pim_hello_options {
+    int holdtime;		/* mandatory */
+    struct phaddr *addrs;	/* additional addresses (experimental) */
+};
+
 /*
  * Local functions definitions.
  */
-
-static int parse_pim6_hello 			__P((char *pktPtr , int datalen , struct sockaddr_in6 *src,
-						     u_int16 *holdtime));
-
+static int parse_pim6_hello __P((char *pktPtr, int datalen,
+				 struct sockaddr_in6 *src,
+				 struct pim_hello_options *));
+static void set_pim6_nbr_param __P((pim_nbr_entry_t *,
+				    struct pim_hello_options *));
 static int send_pim6_register_stop 		__P((struct sockaddr_in6 *reg_src , struct sockaddr_in6 *reg_dst , 
 	                       		     	     struct sockaddr_in6 *inner_source,
 		                	             struct sockaddr_in6 *inner_grp));
@@ -179,7 +186,9 @@ receive_pim6_hello(src, pim_message, datalen)
     u_int8         		*data_ptr;
     srcentry_t     		*srcentry_ptr;
     mrtentry_t     		*mrtentry_ptr;
-
+    struct pim_hello_options	hopts;
+    struct phaddr *addr, *naddr;
+    int result = TRUE;
 
     if ((mifi = find_vif_direct(src)) == NO_VIF)
     {
@@ -201,10 +210,13 @@ receive_pim6_hello(src, pim_message, datalen)
 
     data_ptr = (u_int8 *) (pim_message + sizeof(struct pim));
 
-    /* Get the Holdtime (in seconds) from the message. Return if error. */
-
-    if (parse_pim6_hello(pim_message, datalen, src, &holdtime) == FALSE)
-	return (FALSE);
+    /* Get Hello options (including Holdtime in seconds) from the message. */
+    memset(&hopts, 0, sizeof(hopts));
+    if (parse_pim6_hello(pim_message, datalen, src, &hopts) == FALSE) {
+	result = FALSE;
+	goto end;
+    }
+    holdtime = hopts.holdtime;
     IF_DEBUG(DEBUG_PIM_HELLO | DEBUG_PIM_TIMER)
 	log(LOG_DEBUG, 0, "PIM HELLO holdtime from %s is %u",
 	    inet6_fmt(&src->sin6_addr), holdtime);
@@ -232,14 +244,13 @@ receive_pim6_hello(src, pim_message, datalen)
 		 * wants to inform us by sending "holdtime=0". Thanks buddy
 		 * and see you again!
 		 */
-
 		log(LOG_INFO, 0, "PIM HELLO received: neighbor %s going down",
 		    inet6_fmt(&src->sin6_addr));
 		delete_pim6_nbr(nbr);
-		return (TRUE);
+		goto end;
 	    }
-	    SET_TIMER(nbr->timer, holdtime);
-	    return (TRUE);
+	    set_pim6_nbr_param(nbr, &hopts);
+	    goto end;
 	}
 	else
 	    /*
@@ -257,7 +268,7 @@ receive_pim6_hello(src, pim_message, datalen)
     new_nbr = (pim_nbr_entry_t *) malloc(sizeof(pim_nbr_entry_t));
     new_nbr->address 		= *src;
     new_nbr->vifi 		= mifi;
-    SET_TIMER(new_nbr->timer, holdtime);
+    set_pim6_nbr_param(new_nbr, &hopts);
     new_nbr->build_jp_message 	= (build_jp_message_t *) NULL;
     new_nbr->next 		= nbr;
     new_nbr->prev 		= prev_nbr;
@@ -288,12 +299,12 @@ receive_pim6_hello(src, pim_message, datalen)
 	 */
 
 	if ((bsr_length = create_pim6_bootstrap_message(pim6_send_buf)))
-    		send_pim6(pim6_send_buf, &v->uv_linklocal->pa_addr , src , PIM_BOOTSTRAP,
-	     		  bsr_length);
-
+    		send_pim6(pim6_send_buf, &v->uv_linklocal->pa_addr, src,
+			  PIM_BOOTSTRAP, bsr_length);
 
 	/* The router with highest network address is the elected DR */
-	if (inet6_lessthan(&v->uv_linklocal->pa_addr,&v->uv_pim_neighbors->address))
+	if (inet6_lessthan(&v->uv_linklocal->pa_addr,
+			   &v->uv_pim_neighbors->address))
 	{
 	    /*
 	     * I was the DR, but not anymore. Remove all register_vif from
@@ -333,12 +344,44 @@ receive_pim6_hello(src, pim_message, datalen)
      * TODO: XXX: does a new neighbor change any routing entries info? Need
      * to trigger joins?
      */
-
     IF_DEBUG(DEBUG_PIM_HELLO)
-	log(LOG_DEBUG,0,"I'have got a new neighbor %s on vif %s",inet6_fmt(&src->sin6_addr),v->uv_name);
-    return (TRUE);
+	log(LOG_DEBUG, 0, "I've got a new neighbor %s on vif %s",
+	    inet6_fmt(&src->sin6_addr), v->uv_name);
+
+ end:
+    /* free all temporary option data and return */
+    for (addr = hopts.addrs; addr; addr = naddr) {
+	naddr = addr->pa_next;
+	free(addr);
+    }
+    return(result);
 }
 
+static void
+set_pim6_nbr_param(nbr, opts)
+    pim_nbr_entry_t *nbr;
+    struct pim_hello_options *opts;
+{
+    struct phaddr *pa, *next_pa;
+
+    if (opts == NULL)
+	return;
+
+    /* set holdtime */
+    SET_TIMER(nbr->timer, opts->holdtime);
+
+    /*
+     * Replace addtional addresses.
+     * XXX: we just replace them, but should we do something special if
+     *      there's change in the list?
+     */
+    for (pa = nbr->aux_addrs; pa; pa = next_pa) {
+	next_pa = pa->pa_next;
+	free(pa);
+    }
+    nbr->aux_addrs = opts->addrs;
+    opts->addrs = NULL;		/* copied */
+}
 
 void
 delete_pim6_nbr(nbr_delete)
@@ -354,6 +397,7 @@ delete_pim6_nbr(nbr_delete)
     rp_grp_entry_t *rp_grp_entry_ptr;
     rpentry_t      *rpentry_ptr;
     struct uvif    *v;
+    struct phaddr *pa, *next_pa;
 
     v = &uvifs[nbr_delete->vifi];
 
@@ -510,17 +554,22 @@ delete_pim6_nbr(nbr_delete)
 	}
     }
 
+    /* free additional addresses */
+    for (pa = nbr_delete->aux_addrs; pa; pa = next_pa) {
+	next_pa = pa->pa_next;
+	free(pa);
+    }
     free((char *) nbr_delete);
 }
 
 
 /* TODO: simplify it! */
 static int
-parse_pim6_hello(pim_message, datalen, src, holdtime)
+parse_pim6_hello(pim_message, datalen, src, opts)
     char           	*pim_message;
     int             	datalen;
     struct sockaddr_in6 *src;
-    u_int16        	*holdtime;
+    struct pim_hello_options *opts;
 {
     u_int8         *pim_hello_message;
     u_int8         *data_ptr, *lim;
@@ -546,22 +595,53 @@ parse_pim6_hello(pim_message, datalen, src, holdtime)
 		IF_DEBUG(DEBUG_PIM_HELLO)
 		    log(LOG_INFO, 0,
 		    "PIM HELLO Holdtime from %s: invalid OptionLength = %u",
-			inet6_fmt(&src->sin6_addr), option_length);
+			sa6_fmt(src), option_length);
 		return (FALSE);
 	    }
-	    GET_HOSTSHORT(*holdtime, data_ptr);
+	    GET_HOSTSHORT(opts->holdtime, data_ptr);
 	    holdtime_received_ok = TRUE;
 	    break;
 	case PIM_MESSAGE_HELLO_ADDRESSES:
 	    for (lim = data_ptr + option_length; data_ptr < lim; ) {
-		if (*data_ptr != ADDRF_IPv6 || /* XXX */
-		    data_ptr + 18 >= lim)
+		struct phaddr *addr;
+
+		if (*data_ptr != ADDRF_IPv6) {
+		    log(LOG_INFO, 0,
+			"PIM HELLO additional address from %s:"
+			"unsupported address type (%d)",
+			sa6_fmt(src), *data_ptr);
+		    return(FALSE); /* XXX: should skip */
+		}
+		if (data_ptr + 18 > lim) { /* 18 = sizeof(encoded ipv6 addr) */
+		    IF_DEBUG(DEBUG_PIM_HELLO)
+		    log(LOG_INFO, 0,
+			"PIM HELLO additional address from %s: "
+			"length inconsistent", sa6_fmt(src));
 		    return(FALSE);
+		}
 
 		GET_EUADDR6(&encod_uniaddr, data_ptr);
 		IF_DEBUG(DEBUG_PIM_HELLO)
 		    log(LOG_DEBUG, 0, "PIM HELLO additional address %s",
 			inet6_fmt(&encod_uniaddr.unicast_addr));
+		if (IN6_ARE_ADDR_EQUAL(&encod_uniaddr.unicast_addr,
+				       &src->sin6_addr)) {
+		    IF_DEBUG(DEBUG_PIM_HELLO)
+			log(LOG_DEBUG, 0,
+			    "   same as the neighbor's own address (ignored)");
+		    continue;
+		}
+
+		if ((addr = (struct phaddr *)malloc(sizeof(*addr))) == NULL)
+		    log(LOG_ERR, errno, "malloc failed in pim6 hello parsing");
+
+		/* XXX: we only use part of the structure */
+		memset(addr, 0, sizeof(*addr));
+		addr->pa_addr.sin6_family = AF_INET6;
+		addr->pa_addr.sin6_len = sizeof(struct sockaddr_in6);
+		addr->pa_addr.sin6_addr = encod_uniaddr.unicast_addr;
+		addr->pa_next = opts->addrs;
+		opts->addrs = addr;
 	    }
 	    break;
 	default:
@@ -588,7 +668,8 @@ parse_pim6_hello(pim_message, datalen, src, holdtime)
 
     if (datalen != 0)		/* malformed packet */
 	return(FALSE);
-    
+
+    /* holdtime is actually mandatory, so we return FALSE if not included. */
     return (holdtime_received_ok);
 }
 

@@ -214,46 +214,54 @@ set_incoming(srcentry_ptr, srctype)
     /*
      * The upstream router must be a (PIM router) neighbor, otherwise we are
      * in big trouble ;-). 
-     * Yes but the neighbors are link-local and the rp is global ipv6..
      */
-
-    /* WARNING WARNING WARNING WARNING */
-    /*
-     * If the router is directly connected to the RP, the next hop is the
-     * globally reachable address of the RP: NOT link-local neighbor but an
-     * IPv6 global neighbor... 
-     * the upstream router is the globally reachable router...
-     */
-    /* WARNING WARNING WARNING WARNING */
     v = &uvifs[srcentry_ptr->incoming];
-    if (inet6_equal(&source, &neighbor_addr))
-    {
-	/* XXX: what if we have more than one neighbor on this link?? */
-	srcentry_ptr->upstream = v->uv_pim_neighbors;
- 	return (TRUE);
-    }
 
     for (n = v->uv_pim_neighbors; n != NULL; n = n->next)
     {
+	struct phaddr *pa;
+
+#if 0
+	/* we must go through all entries for aux_addr match */
 	if (inet6_lessthan(&neighbor_addr, &n->address))
 	    continue;
+#endif
 	if (inet6_equal(&neighbor_addr, &n->address))
 	{
 	    /*
 	     * The upstream router is found in the list of neighbors. We are
 	     * safe!
 	     */
-
 	    srcentry_ptr->upstream = n;
 	    IF_DEBUG(DEBUG_RPF)
 		log(LOG_DEBUG, 0,
 		    "For src %s, iif is %d, next hop router is %s",
-		    inet6_fmt(&source.sin6_addr), srcentry_ptr->incoming,
-		    inet6_fmt(&neighbor_addr.sin6_addr));
+		    sa6_fmt(&source), srcentry_ptr->incoming,
+		    sa6_fmt(&neighbor_addr));
 	    return (TRUE);
 	}
-	else
-	    break;
+
+	/*
+	 * If the router is directly connected to the RP, the next hop is the
+	 * globally reachable address of the RP: NOT link-local neighbor but an
+	 * IPv6 global neighbor.
+	 * Thus, we search through the list of additional addresses of the
+	 * neighbor to see if an additional address matches the RP address.
+	 * XXX: is there a scope issue here? maybe yes for a site-local RP.
+	 */
+	for (pa = n->aux_addrs; pa; pa = pa->pa_next) {
+	    if (inet6_equal(&neighbor_addr, &pa->pa_addr)) {
+		IF_DEBUG(DEBUG_RPF)
+		    log(LOG_DEBUG, 0,
+			"For src %s, iif is %d, next hop router is %s"
+			" (aux_addr match)",
+			sa6_fmt(&source), srcentry_ptr->incoming,
+			sa6_fmt(&neighbor_addr));
+
+		srcentry_ptr->upstream = n;
+		return (TRUE);
+	    }
+	}
     }
 
     /* TODO: control the number of messages! */

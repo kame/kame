@@ -511,6 +511,7 @@ dump_nbrs(fp)
 	struct uvif *v;
 	vifi_t vifi;
 	pim_nbr_entry_t *n;
+	struct phaddr *pa;
 
 	fprintf(fp, "PIM Neighbor List\n");
 	fprintf(fp, " %-3s %6s %-40s %-5s\n",
@@ -529,8 +530,12 @@ dump_nbrs(fp)
 				else
 					fprintf(fp, " %3s %6s", "", "");
 				fprintf(fp, " %-40s %-5u\n",
-					inet6_fmt(&n->address.sin6_addr),
-					n->timer);
+					sa6_fmt(&n->address), n->timer);
+
+				for (pa = n->aux_addrs; pa; pa = pa->pa_next) {
+				    fprintf(fp, "%16s%s\n", "",
+					    sa6_fmt(&pa->pa_addr));
+				}
 			}
 		}
 	}
