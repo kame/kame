@@ -276,7 +276,11 @@ kame
 		jenkins rekey 読めばわかるかも。
 
 	IPcomp と ESP を併用する時のlifetimeって？
-		bunndle なら一緒にするはず。
+		bundle なら一緒にするはず。
 		通常 ESP の lifetime は 28800(s)
 		けど、 ipcomp の lifetime って∞でも良いくらいなのに。
-		IPcomp のネゴって必要なんだろうか？
+		IPcomp のネゴって必要なんだろうか？ (i.e.  相手がipcomp capable
+		かわかればよい。それ以上のネゴの必要性は疑問)
+	-> IPComp capable nodeの情報を蓄えるにはメモリを食う。
+	   メモリいつまでも食ってるのは嫌。
+	   よってlifetimeも「いちおう」必要。
