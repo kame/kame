@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.28 2000/08/06 13:18:13 kjc Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.29 2000/08/21 02:29:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1075,6 +1075,9 @@ ip6_mforward(ip6, ifp, m)
 	register struct mbuf *mm;
 	int s;
 	mifi_t mifi;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 #ifdef MRT6DEBUG
 	if (mrt6debug & DEBUG_FORWARD)
@@ -1091,6 +1094,28 @@ ip6_mforward(ip6, ifp, m)
 	    IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst))
 		return 0;
 	ip6->ip6_hlim--;
+
+	/*
+	 * Source address check: do not forward packets with unspecified
+	 * source. It was discussed in July 2000, on ipngwg mailing list.
+	 * This is rather more serious than unicast cases, because some
+	 * MLD packets can be sent with the unspecified source address
+	 * (although such packets must normally set 1 to the hop limit field).
+	 */
+	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
+		ip6stat.ip6s_cantforward++;
+		if (ip6_log_time + ip6_log_interval < time_second) {
+			ip6_log_time = time_second;
+			log(LOG_DEBUG,
+			    "cannot forward "
+			    "from %s to %s nxt %d received on %s\n",
+			    ip6_sprintf(&ip6->ip6_src),
+			    ip6_sprintf(&ip6->ip6_dst),
+			    ip6->ip6_nxt,
+			    if_name(m->m_pkthdr.rcvif));
+		}
+		return 0;
+	}
 
 	/*
 	 * Determine forwarding mifs from the forwarding cache table
