@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.63 2004/05/10 02:01:06 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.64 2004/05/16 02:04:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,8 +145,8 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		/*
 		 * do nothing in this case.
 		 * in case you are wondering if "&&" is more correct than
-		 * "||" here: rfc2553bis-03 says that serv == NULL OR
-		 * servlen == 0 means that the caller does not want the result.
+		 * "||" here: RFC3493 says that serv == NULL OR servlen == 0
+		 * means that the caller does not want the result.
 		 */
 	} else {
 		if (flags & NI_NUMERICSERV)
@@ -175,7 +175,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			flags |= NI_NUMERICHOST;
 		v4a >>= IN_CLASSA_NSHIFT;
 		if (v4a == 0)
-			flags |= NI_NUMERICHOST;			
+			flags |= NI_NUMERICHOST;
 		break;
 #ifdef INET6
 	case AF_INET6:
@@ -192,9 +192,8 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 				flags |= NI_NUMERICHOST;
 			break;
 		default:
-			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 				flags |= NI_NUMERICHOST;
-			}
 			else if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
 				flags |= NI_NUMERICHOST;
 			break;
@@ -207,8 +206,8 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		/*
 		 * do nothing in this case.
 		 * in case you are wondering if "&&" is more correct than
-		 * "||" here: rfc2553bis-03 says that host == NULL or
-		 * hostlen == 0 means that the caller does not want the result.
+		 * "||" here: RFC3493 says that host == NULL or hostlen == 0
+		 * means that the caller does not want the result.
 		 */
 	} else if (flags & NI_NUMERICHOST) {
 		int numaddrlen;
@@ -255,7 +254,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #if 0
 			/*
 			 * commented out, since "for local host" is not
-			 * implemented here - see RFC2553 p30
+			 * implemented here - see RFC3493 section 6.2.
 			 */
 			if (flags & NI_NOFQDN) {
 				char *p;
