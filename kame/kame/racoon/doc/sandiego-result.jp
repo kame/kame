@@ -79,6 +79,11 @@ vs network associates
 		md5/sha1 x des/3des, esp, transport のはずなんだけど…
 		チェックしてもらってる最中。
 
+	ふつうの: ばっちり、rekey放題もばっちり
+		phase 1: pre-shared/sha1/3des/dh2/10min
+		phase 2: esp/md5/cast128/dh2/5min
+	明日dh5をやる予定。
+
 vs intel
 	base mode: initiator/responder共に敵がHASHの計算間違っているらしい。
 		再戦予定。
