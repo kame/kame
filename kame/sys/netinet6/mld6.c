@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.89 2004/01/26 10:11:40 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.90 2004/01/29 00:38:35 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1761,18 +1761,19 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			numsrc = in6mm_src->i6ms_alw->numsrc;
 		if (in6mm_src->i6ms_blk != NULL)
 			numsrc = max(numsrc, in6mm_src->i6ms_blk->numsrc);
-	}
-	/*
-	 * XXX following is tentative process. this should not be executed.
-	 * this is just to avoid "loop" by timer.
-	 */
-	if (numsrc == 0) {
-		if (*m0 != NULL) {
-		 	mld_sendbuf(*m0, in6m->in6m_ifp);
-			*m0 = NULL;
-		} else if (in6mm_src->i6ms_robvar > 0)
-			--in6mm_src->i6ms_robvar;
-		return;
+		/*
+		 * XXX following is tentative process. this should not 
+		 * be executed. this is just to avoid "loop" by timer.
+		 */
+		if (numsrc == 0) {
+			if (*m0 != NULL) {
+				mld_sendbuf(*m0, in6m->in6m_ifp);
+				*m0 = NULL;
+			} else if (in6mm_src->i6ms_robvar > 0) {
+				--in6mm_src->i6ms_robvar;
+			}
+			return;
+		}
 	}
 
 	if (m == NULL) {
