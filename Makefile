@@ -6,7 +6,7 @@ KERNCONF?=	GENERIC.KAME
 KERNCONF?=	GENERIC.v6
 .endif
 
-DEVELOPER=	NO
+DEVELOPER?=	NO
 .if ${DEVELOPER} == "YES"
 CVSHOST=	cvs.kame.net
 .else
