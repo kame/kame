@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.163 2003/01/16 06:45:37 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.164 2003/01/17 10:26:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1161,6 +1161,7 @@ mip6_process_hurbu(bi)
 	}
 
 	/* return BA */
+	bi->mbc_lifetime = 0; /* ID-19 10.3.2. the lifetime MUST be 0. */
 	bi->mbc_send_ba = 1;	/* Need it ? */
 	
 	return (0);
