@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.214 2002/10/28 03:48:13 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.215 2002/10/28 10:04:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -230,6 +230,7 @@ nd6_ra_input(m, off, icmp6len)
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_router_advert *nd_ra;
 	struct sockaddr_in6 *src_sa6;
+	struct nd_defrouter dr0;
 #if 0
 	int flags; /* = nd_ra->nd_ra_flags_reserved; */
 	int is_managed = ((flags & ND_RA_FLAG_MANAGED) != 0);
@@ -237,6 +238,9 @@ nd6_ra_input(m, off, icmp6len)
 #endif
 	union nd_opts ndopts;
 	struct nd_defrouter *dr;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second;
+#endif
 
 	/*
 	 * We only accept RAs only when
@@ -286,13 +290,12 @@ nd6_ra_input(m, off, icmp6len)
 		goto freeit;
 	}
 
-    {
-	struct nd_defrouter dr0;
-	u_int32_t advreachable = nd_ra->nd_ra_reachable;
+	/*
+	 * Default Router Information 
+	 */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
+	time_second = time.tv_sec;
 #endif
-
 	Bzero(&dr0, sizeof(dr0));
 	dr0.rtaddr = *src_sa6;
 	dr0.flags  = nd_ra->nd_ra_flags_reserved;
@@ -303,7 +306,9 @@ nd6_ra_input(m, off, icmp6len)
 	dr0.advint_expire = 0;	/* Mobile IPv6 */
 	dr0.advints_lost = 0;	/* Mobile IPv6 */
 	/* unspecified or not? (RFC 2461 6.3.4) */
-	if (advreachable) {
+	if (nd_ra->nd_ra_reachable) {
+		u_int32_t advreachable = nd_ra->nd_ra_reachable;
+
 		NTOHL(advreachable);
 		if (advreachable <= MAX_REACHABLE_TIME &&
 		    ndi->basereachable != advreachable) {
@@ -317,7 +322,6 @@ nd6_ra_input(m, off, icmp6len)
 	if (nd_ra->nd_ra_curhoplimit)
 		ndi->chlim = nd_ra->nd_ra_curhoplimit;
 	dr = defrtrlist_update(&dr0);
-    }
 
 	/*
 	 * prefix
@@ -326,10 +330,10 @@ nd6_ra_input(m, off, icmp6len)
 		struct nd_opt_hdr *pt;
 		struct nd_opt_prefix_info *pi = NULL;
 		struct nd_prefix pr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		long time_second = time.tv_sec;
-#endif
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		time_second = time.tv_sec;
+#endif
 		for (pt = (struct nd_opt_hdr *)ndopts.nd_opts_pi;
 		     pt <= (struct nd_opt_hdr *)ndopts.nd_opts_pi_end;
 		     pt = (struct nd_opt_hdr *)((caddr_t)pt +
