@@ -4,7 +4,7 @@
 # Date created:         Sat Aug 3, 1996
 # Whom:                 David O'Brien (obrien@cs.ucdavis.edu)
 #
-# $Id: Makefile,v 1.2 1999/09/02 16:10:04 itojun Exp $
+# $Id: Makefile,v 1.3 1999/09/03 12:27:35 itojun Exp $
 #
 
 DISTNAME=	rsync-2.3.1
@@ -16,7 +16,7 @@ MASTER_SITES=	ftp://samba.anu.edu.au/pub/rsync/  \
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	rsync-231-v6-19990902a.diff.gz
+PATCHFILES=	rsync-231-v6-19990903a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@itojun.org
