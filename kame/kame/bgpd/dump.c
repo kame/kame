@@ -551,7 +551,7 @@ bgp_route_nextentry(listhead, prev)
 	if (prev->next)
 		return(prev->next);
 
-	for (brl = prev->head; brl != listhead; brl = brl->next) {
+	for (brl = prev->head->next; brl != listhead; brl = brl->next) {
 		if (brl->entry)
 			return(brl->entry);
 	}
