@@ -53,6 +53,6 @@ $TEST -f 99 localhost ''
 echo
 
 echo '== the following items are local to KAME.'
-$TEST fe80::1@lo0 http
-$TEST fe80::1@$IF http
+$TEST fe80::1%lo0 http
+$TEST fe80::1%$IF http
 echo
