@@ -253,6 +253,41 @@ typedef __socklen_t	socklen_t;
 #define socklen_t	__socklen_t
 #endif
 
+/*
+ * Flags for getrrsetbyname()
+ */
+#define RRSET_VALIDATED		1
+
+/*
+ * Return codes for getrrsetbyname()
+ */
+#define ERRSET_SUCCESS		0
+#define ERRSET_NOMEMORY		1
+#define ERRSET_FAIL		2
+#define ERRSET_INVAL		3
+#define ERRSET_NONAME		4
+#define ERRSET_NODATA		5
+
+/*
+ * Structures used by getrrsetbyname() and freerrset()
+ */
+struct rdatainfo {
+	unsigned int		rdi_length;	/* length of data */
+	unsigned char		*rdi_data;	/* record data */
+};
+
+struct rrsetinfo {
+	unsigned int		rri_flags;	/* RRSET_VALIDATED ... */
+	unsigned int		rri_rdclass;	/* class number */
+	unsigned int		rri_rdtype;	/* RR type number */
+	unsigned int		rri_ttl;	/* time to live */
+	unsigned int		rri_nrdatas;	/* size of rdatas array */
+	unsigned int		rri_nsigs;	/* size of sigs array */
+	char			*rri_name;	/* canonical name */
+	struct rdatainfo	*rri_rdatas;	/* individual records */
+	struct rdatainfo	*rri_sigs;	/* individual signatures */
+};
+
 __BEGIN_DECLS
 void		endhostent __P((void));
 void		endnetent __P((void));
@@ -301,6 +336,9 @@ void		freeaddrinfo __P((struct addrinfo *));
 char		*gai_strerror __P((int));
 #endif
 void		setservent __P((int));
+int		getrrsetbyname __P((const char *, unsigned int, unsigned int,
+			unsigned int, struct rrsetinfo **));
+void		freerrset __P((struct rrsetinfo *));
 __END_DECLS
 
 #endif /* !_NETDB_H_ */
