@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.172 2000/12/11 19:27:06 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.173 2000/12/12 04:29:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,8 +163,17 @@ static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
 extern int pmtu_expire;
 
 /* XXX do these values make any sense? */
-int icmp6_mtudisc_hiwat = 1280;
-int icmp6_mtudisc_lowat = 256;
+static int icmp6_mtudisc_hiwat = 1280;
+static int icmp6_mtudisc_lowat = 256;
+
+/*
+ * keep track of # of redirect routes.
+ */
+static struct rttimer_queue *icmp6_redirect_timeout_q = NULL;
+
+/* XXX do these values make any sense? */
+static int icmp6_redirect_hiwat = 1280;
+static int icmp6_redirect_lowat = 1024;
 #endif
 
 static void icmp6_errcount __P((struct icmp6errstat *, int, int));
@@ -191,6 +200,7 @@ static int icmp6_notify_error __P((struct mbuf *, int, int, int));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
 static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
+static void icmp6_redirect_timeout __P((struct rtentry *, struct rttimer *));
 #endif
 
 #ifdef COMPAT_RFC1885
@@ -211,6 +221,7 @@ icmp6_init()
 	mld6_init();
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	icmp6_mtudisc_timeout_q = rt_timer_queue_create(pmtu_expire);
+	icmp6_redirect_timeout_q = rt_timer_queue_create(icmp6_redirtimeout);
 #endif
 }
 
@@ -2533,6 +2544,25 @@ icmp6_redirect_input(m, off)
 #ifdef __bsdi__
 		extern int icmp_redirtimeout;	/*XXX*/
 #endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		unsigned long rtcount;
+		struct rtentry *newrt = NULL;
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		/*
+		 * do not install redirect route, if the number of entries
+		 * is too much (> hiwat).
+		 */
+		rtcount = rt_timer_count(icmp6_redirect_timeout_q);
+		if (rtcount > icmp6_redirect_hiwat)
+			return;
+		else if (rtcount > icmp6_redirect_lowat) {
+			/*
+			 * XXX nuke a victim, install the new one.
+			 */
+		}
+#endif
 
 		bzero(&sdst, sizeof(sdst));
 		bzero(&sgw, sizeof(sgw));
@@ -2548,10 +2578,20 @@ icmp6_redirect_input(m, off)
 			   (struct sockaddr *)&ssrc,
 #ifdef __bsdi__
 			   icmp_redirtimeout
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+			   &newrt
 #else
 			   (struct rtentry **)NULL
-#endif /*__FreeBSD__, __NetBSD__, __bsdi__*/
+#endif
 			   );
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		if (newrt) {
+			(void)rt_timer_add(rt, icmp6_redirect_timeout,
+			    icmp6_redirect_timeout_q);
+			rtfree(newrt);
+		}
+#endif
 	}
 	/* finally update cached route in each socket via pfctlinput */
     {
@@ -3190,6 +3230,20 @@ icmp6_mtudisc_timeout(rt, r)
 		if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0) {
 			rt->rt_rmx.rmx_mtu = 0;
 		}
+	}
+}
+
+static void
+icmp6_redirect_timeout(rt, r)
+	struct rtentry *rt;
+	struct rttimer *r;
+{
+	if (rt == NULL)
+		panic("icmp6_redirect_timeout: bad route to timeout");
+	if ((rt->rt_flags & (RTF_GATEWAY | RTF_DYNAMIC | RTF_HOST)) ==
+	    (RTF_GATEWAY | RTF_DYNAMIC | RTF_HOST)) {
+		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
+		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 	}
 }
 #endif /*__NetBSD__ || __OpenBSD__*/
