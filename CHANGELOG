@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2595 2004/04/20 08:05:30 suz Exp $
+$KAME: CHANGELOG,v 1.2596 2004/04/20 10:13:00 suz Exp $
 
 <200404>
+2004-04-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/icmp6.c: ICMPv6 packets regarding multicast 
+	routing (e.g. MLDv1 report) shouldn't be a target of MSF, although
+	draft-vida-mld-v2-08.txt says only MLDv2 is such exception.
+	(otherwise multicast routing process cannot receive such packets,
+	 which prevents it from shifting to MLDv1-compatible-mode)
+
 2004-04-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/mldv2.c: fixed a MLDv2-enabled freebsd[45] kernel 
 	crash due to an improper termincation of layer2 multicast listening.

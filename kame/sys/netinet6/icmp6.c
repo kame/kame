@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.382 2004/04/09 05:37:46 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.383 2004/04/20 10:13:00 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2418,12 +2418,18 @@ icmp6_rip6_input(mp, off)
 			continue;
 #ifdef MLDV2
 		/*
-		 * every multicast packet (except MLDv2 packet) is a target
-		 * of per-socket MSF
+		 * every multicast packet (except multicast routing related
+		   packet) is a target of per-socket MSF.
+		 * Although draft-vida-mld-v2-08.txt says only MLDv2 is the
+		 * exception of source-filtering, any ICMPv6 packet regarding
+		 * multicast routing should also be the exception; otherwise
+		 * multicast routing process cannot receive such packets.
 		 */
 		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 			if (icmp6->icmp6_type != MLDV2_LISTENER_REPORT &&
-			    icmp6->icmp6_type != MLD_LISTENER_QUERY) {
+			    icmp6->icmp6_type != MLD_LISTENER_QUERY &&
+			    icmp6->icmp6_type != MLD_LISTENER_REPORT &&
+			    icmp6->icmp6_type != MLD_LISTENER_DONE) {
 				if (match_msf6_per_socket(in6p, &ip6->ip6_src,
 							  &ip6->ip6_dst) == 0) {
 					continue;
