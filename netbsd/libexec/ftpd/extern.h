@@ -83,6 +83,7 @@ void	parse_conf __P((char *));
 void	pass __P((char *));
 void	passive __P((void));
 void	long_passive __P((char *, int));
+void	protounsupp __P((void));
 void	perror_reply __P((int, const char *));
 void	pwd __P((void));
 void	removedir __P((char *));

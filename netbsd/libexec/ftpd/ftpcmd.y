@@ -331,7 +331,7 @@ cmd
 				;
 			else {
 		protounsupp:
-				reply(522, "Unsupported protocol.");
+				protounsupp();
 				usedefault = 1;
 				goto eprt_done;
 			}
@@ -433,19 +433,17 @@ cmd
 
 	| EPSV SP NUMBER CRLF
 		{
-			int pf;
 			switch ($3) {
 			case 1:
-				pf = PF_INET;
+				long_passive("EPSV", PF_INET);
 				break;
 			case 2:
-				pf = PF_INET6;
+				long_passive("EPSV", PF_INET6);
 				break;
 			default:
-				pf = -1;	/*junk*/
+				protounsupp();
 				break;
 			}
-			long_passive("EPSV", pf);
 		}
 
 	| EPSV SP ALL CRLF

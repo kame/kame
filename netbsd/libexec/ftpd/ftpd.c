@@ -1894,6 +1894,32 @@ long_passive(char *cmd, int pf)
 }
 
 /*
+ * 522 Protocol not supported (proto,...)
+ */
+void
+protounsupp()
+{
+	int proto[] = { 0, AF_INET, AF_INET6, 0 };
+	int *p;
+	unsigned long bitmap = 0;
+	int s;
+
+	for (p = &proto[1]; *p; p++) {
+		s = socket(*p, SOCK_STREAM, 0);
+		if (s >= 0) {
+			bitmap |= 1 << (p - &proto[0]);
+			close(s);
+		}
+	}
+
+	/* XXX should be generalized */
+	reply(522, "Protocol not supported, use (%s%s%s)",
+	    (bitmap & (1 << 1)) ? "1" : "",
+	    (bitmap & ((1 << 1) | (1 << 2))) ? "," : "",
+	    (bitmap & (1 << 2)) ? "2" : "");
+}
+
+/*
  * Generate unique name for file with basename "local".
  * The file named "local" is already known to exist.
  * Generates failure reply on error.
