@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.94 2003/01/17 11:42:19 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.95 2003/01/17 11:44:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -243,7 +243,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa->sin6_addr) ||
 	    IN6_IS_ADDR_LOOPBACK(&src_sa->sin6_addr)) {
-		m_freem(m);
+		m_freem(m0);
 		return (EINVAL);
 	}
 
