@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.67 2001/07/21 09:21:32 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.68 2001/07/23 12:15:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -374,13 +374,14 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	/* estimate the size of message */
 	maxlen = sizeof(*ip6) + sizeof(*nd_ns);
 	maxlen += (sizeof(struct nd_opt_hdr) + ifp->if_addrlen + 7) & ~7;
-	if (max_linkhdr + maxlen >= MCLBYTES) {
 #ifdef DIAGNOSTIC
+	if (max_linkhdr + maxlen >= MCLBYTES) {
 		printf("nd6_ns_output: max_linkhdr + maxlen >= MCLBYTES "
 		    "(%d + %d > %d)\n", max_linkhdr, maxlen, MCLBYTES);
-#endif
-		return;
+		panic("nd6_ns_output: insufficient MCLBYTES");
+		/* NOTREACHED */
 	}
+#endif
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m && max_linkhdr + maxlen >= MHLEN) {
