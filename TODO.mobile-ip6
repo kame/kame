@@ -1,11 +1,11 @@
 TODOs for mobile-ip6
 KAME project
-$Id: TODO.mobile-ip6,v 1.3 2000/02/08 04:26:53 itojun Exp $
+$Id: TODO.mobile-ip6,v 1.4 2000/02/08 05:28:55 itojun Exp $
 
 
 - Nuke in6_control() calls from within the kernel.  it is not supposed to be
   called.  Ericsson patch that allowed proc == NULL raises big security
-  problem.
+  problem.  I've removed that part so the code may not be functional.
 - Indentation.  mip6*.c is not consistent even within a files.  At least
   rule should be consistent across the file.
 - KLD support for platforms that support it.
@@ -17,3 +17,16 @@ $Id: TODO.mobile-ip6,v 1.3 2000/02/08 04:26:53 itojun Exp $
   rnh->rnh_walktree is suggested.
 - Test.
 - relationship with IPsec.
+
+done:
+- ioctl should use error code declared in sys/errno.h, not others.
+- "struct input_data" in mip6_common.h is way too generic name and
+  I've changed it into mip6_input_data.
+- function prototypes with __P().
+- rtadvd needs to preserve non-mobileip6 behavior so I added a command
+  line option (-m).
+- tcpdump can use netinet6/mip6.h decls so I've used them.
+  may need to back out the change or integrate part of mip6.h into
+  print-{icmp6,ip6opts}.c when we integrate the change into
+  tcpdump.org tree.
+- portability fixes for non-freebsd3.
