@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.62 2000/07/21 06:42:06 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.63 2000/07/21 12:38:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1005,7 +1005,7 @@ statinit:;
  * We don't need this function in bsdi, because interfaces are never removed
  * from the ifnet list in bsdi.
  */
-#ifndef __bsdi__
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 void
 in6_ifdetach(ifp)
 	struct ifnet *ifp;
