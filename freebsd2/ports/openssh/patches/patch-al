@@ -1,17 +1,20 @@
-diff -ru /home/green/ssh/mpaux.c ./mpaux.c
---- /home/green/ssh/mpaux.c	Thu Oct 28 03:32:00 1999
-+++ ./mpaux.c	Mon Nov  8 00:06:40 1999
-@@ -17,11 +17,11 @@
- #include "includes.h"
- RCSID("$Id: patch-al,v 1.1 1999/11/25 10:56:33 sumikawa Exp $");
+--- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/ssh.h	Sun Nov 28 16:47:46 1999
++++ ssh.h	Sun Nov 28 17:00:07 1999
+@@ -61,7 +61,7 @@
+  */
+ #define SSH_SERVICE_NAME	"ssh"
  
--#include <ssl/bn.h>
-+#include <openssl/bn.h>
- #include "getput.h"
- #include "xmalloc.h"
+-#define ETCDIR			"/etc"
++#define ETCDIR			"__PREFIX__/etc"
+ #define PIDDIR			"/var/run"
  
--#include <ssl/md5.h>
-+#include <openssl/md5.h>
+ /*
+@@ -78,7 +78,7 @@
+ #define SERVER_CONFIG_FILE	ETCDIR "/sshd_config"
+ #define HOST_CONFIG_FILE	ETCDIR "/ssh_config"
  
- void
- compute_session_id(unsigned char session_id[16],
+-#define SSH_PROGRAM		"/usr/bin/ssh"
++#define SSH_PROGRAM		"__PREFIX__/bin/ssh"
+ 
+ /*
+  * The process id of the daemon listening for connections is saved here to

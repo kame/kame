@@ -1,14 +1,20 @@
-diff -ru /home/green/ssh/scp/Makefile ./scp/Makefile
---- /home/green/ssh/scp/Makefile	Tue Oct 26 03:31:00 1999
-+++ ./scp/Makefile	Mon Nov  8 00:13:21 1999
-@@ -10,8 +10,8 @@
- BINMODE?=555
- .endif
- 
--BINDIR=	/usr/bin
--MAN=	scp.1
-+BINDIR=	/bin
-+MAN1=	scp.1
- 
- SRCS=	scp.c
- 
+--- sshd_config.orig	Fri Jan  7 01:27:30 2000
++++ sshd_config	Fri Jan  7 01:31:01 2000
+@@ -3,12 +3,13 @@
+ Port 22
+ #ListenAddress 0.0.0.0
+ #ListenAddress ::
+-HostKey /etc/ssh_host_key
++HostKey __PREFIX__/etc/ssh_host_key
+ ServerKeyBits 768
+-LoginGraceTime 600
++LoginGraceTime 60
+ KeyRegenerationInterval 3600
+-PermitRootLogin yes
+-#
++PermitRootLogin no
++# Rate-limit sshd connections to 5 connections per 10 seconds
++ConnectionsPerPeriod 5/10
+ # Don't read ~/.rhosts and ~/.shosts files
+ IgnoreRhosts yes
+ # Uncomment if you don't trust ~/.ssh/known_hosts for RhostsRSAAuthentication

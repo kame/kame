@@ -1,14 +1,38 @@
-diff -ru /home/green/ssh/auth-rsa.c ./auth-rsa.c
---- /home/green/ssh/auth-rsa.c	Wed Nov  3 03:36:00 1999
-+++ ./auth-rsa.c	Mon Nov  8 00:06:40 1999
-@@ -25,8 +25,8 @@
- #include "mpaux.h"
- #include "uidswap.h"
+--- includes.h.orig	Tue Jan 18 14:08:10 2000
++++ includes.h	Tue Jan 18 14:13:01 2000
+@@ -24,12 +24,12 @@
+ #include <sys/select.h>
+ #include <sys/param.h>
+ #include <sys/ioctl.h>
+-#include <sys/endian.h>
+ #include <sys/stat.h>
+ #include <sys/wait.h>
+ #include <sys/time.h>
+ #include <sys/un.h>
+ #include <sys/resource.h>
++#include <machine/endian.h>
  
--#include <ssl/rsa.h>
--#include <ssl/md5.h>
-+#include <openssl/rsa.h>
-+#include <openssl/md5.h>
+ #include <netinet/in.h>
+ #include <netinet/in_systm.h>
+@@ -38,7 +38,6 @@
+ #include <arpa/inet.h>
+ #include <netdb.h>
  
- /* Flags that may be set in authorized_keys options. */
- extern int no_port_forwarding_flag;
+-#include <netgroup.h>
+ #include <stdio.h>
+ #include <ctype.h>
+ #include <errno.h>
+@@ -65,5 +64,13 @@
+  * client program.  Socketpairs do not seem to work on all systems.
+  */
+ #define USE_PIPES 1
++
++#if defined(__FreeBSD__) && __FreeBSD__ <= 3
++/*
++ * Data types.
++ */
++typedef u_char          sa_family_t;
++typedef u_int32_t       socklen_t;
++#endif
+ 
+ #endif				/* INCLUDES_H */

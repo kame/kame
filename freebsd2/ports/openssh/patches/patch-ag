@@ -1,12 +1,36 @@
-diff -ru /home/green/ssh/cipher.c ./cipher.c
---- /home/green/ssh/cipher.c	Wed Nov  3 03:36:00 1999
-+++ ./cipher.c	Mon Nov  8 00:06:40 1999
-@@ -17,7 +17,7 @@
- #include "ssh.h"
- #include "cipher.h"
+--- /usr/ports/distfiles/OpenSSH-1.2/src/usr.bin/ssh/ssh/Makefile	Wed Nov 17 20:52:33 1999
++++ ./ssh/Makefile	Tue Nov 23 19:26:08 1999
+@@ -2,22 +2,16 @@
  
--#include <ssl/md5.h>
-+#include <openssl/md5.h>
+ PROG=	ssh
+ BINOWN=	root
+-
+-.if (${MACHINE_ARCH} == "alpha" || ${MACHINE_ARCH} == "powerpc" || \
+-	${MACHINE_ARCH} == "hppa")
+-BINMODE=0000
+-.else
+-BINMODE?=4555
+-.endif
+-
+-BINDIR=	/usr/bin
+-MAN=	ssh.1
++BINMODE=4555
++BINDIR=	/bin
++MAN1=	ssh.1
+ LINKS=	${BINDIR}/ssh ${BINDIR}/slogin
+ MLINKS=	ssh.1 slogin.1
  
- /*
-  * What kind of tripple DES are these 2 routines?
+ SRCS=	ssh.c sshconnect.c log-client.c readconf.c clientloop.c
+ 
+ .include <bsd.own.mk> # for AFS
++.include "../Makefile.inc"
+ 
+ .if (${KERBEROS} == "yes")
+ CFLAGS+= -DKRB4 -I/usr/include/kerberosIV
+@@ -32,5 +26,5 @@
+ 
+ .include <bsd.prog.mk>
+ 
+-LDADD+=	-lutil -lz -lcrypto
++LDADD+=	-lutil -lz ${CRYPTOLIBS}
+ DPADD+=	${LIBCRYPTO} ${LIBUTIL} ${LIBZ}
