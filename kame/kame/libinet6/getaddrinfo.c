@@ -1038,6 +1038,9 @@ ip6_str2scopeid(scope, sin6)
 	/* try to convert to a numeric id as a last resort */
   trynumeric:
 	scopeid = (int)strtoul(scope, &ep, 10);
-	return (*ep == '\0') ? scopeid : -1;
+	if (*ep == '\0')
+		return scopeid == 0 ? -1 : scopeid;
+	else
+		return -1;
 }
 #endif 
