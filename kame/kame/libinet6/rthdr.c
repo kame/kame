@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.13 2003/06/06 06:31:03 suz Exp $	*/
+/*	$KAME: rthdr.c,v 1.14 2003/06/06 06:31:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,212 +41,214 @@
 
 size_t
 inet6_rthdr_space(type, seg)
-    int type, seg;
+	int type, seg;
 {
-    switch(type) {
-     case IPV6_RTHDR_TYPE_0:
-	 if (seg < 1 || seg > 23)
-	     return(0);
+	switch (type) {
+	case IPV6_RTHDR_TYPE_0:
+		if (seg < 1 || seg > 23)
+			return (0);
 #ifdef COMPAT_RFC2292
-	 return(CMSG_SPACE(sizeof(struct in6_addr) * (seg - 1)
-			   + sizeof(struct ip6_rthdr0)));
+		return (CMSG_SPACE(sizeof(struct in6_addr) * (seg - 1) +
+		    sizeof(struct ip6_rthdr0)));
 #else
-	 return(CMSG_SPACE(sizeof(struct in6_addr) * seg
-			   + sizeof(struct ip6_rthdr0)));
+		return (CMSG_SPACE(sizeof(struct in6_addr) * seg +
+		    sizeof(struct ip6_rthdr0)));
 #endif 
-     default:
+	default:
 #ifdef DEBUG
-	 fprintf(stderr, "inet6_rthdr_space: unknown type(%d)\n", type);
+		fprintf(stderr, "inet6_rthdr_space: unknown type(%d)\n", type);
 #endif 
-	 return(0);
-    }
+		return (0);
+	}
 }
 
 struct cmsghdr *
 inet6_rthdr_init(bp, type)
-    void *bp;
-    int type;
+	void *bp;
+	int type;
 {
-    struct cmsghdr *ch = (struct cmsghdr *)bp;
-    struct ip6_rthdr *rthdr;
+	struct cmsghdr *ch = (struct cmsghdr *)bp;
+	struct ip6_rthdr *rthdr;
 
-    rthdr = (struct ip6_rthdr *)CMSG_DATA(ch);
+	rthdr = (struct ip6_rthdr *)CMSG_DATA(ch);
 
-    ch->cmsg_level = IPPROTO_IPV6;
-    ch->cmsg_type = IPV6_RTHDR;
+	ch->cmsg_level = IPPROTO_IPV6;
+	ch->cmsg_type = IPV6_RTHDR;
 
-    switch(type) {
-     case IPV6_RTHDR_TYPE_0:
+	switch (type) {
+	case IPV6_RTHDR_TYPE_0:
 #ifdef COMPAT_RFC2292
-	 ch->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr0) - sizeof(struct in6_addr));
+		ch->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr0) -
+		    sizeof(struct in6_addr));
 #else
-	 ch->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr0));
+		ch->cmsg_len = CMSG_LEN(sizeof(struct ip6_rthdr0));
 #endif 
 
-	 bzero(rthdr, sizeof(struct ip6_rthdr0));
-	 rthdr->ip6r_type = IPV6_RTHDR_TYPE_0;
-	 return(ch);
-     default:
+		bzero(rthdr, sizeof(struct ip6_rthdr0));
+		    rthdr->ip6r_type = IPV6_RTHDR_TYPE_0;
+		return (ch);
+	default:
 #ifdef DEBUG
-	 fprintf(stderr, "inet6_rthdr_init: unknown type(%d)\n", type);
+		fprintf(stderr, "inet6_rthdr_init: unknown type(%d)\n", type);
 #endif 
-	 return(NULL);
-    }
+		return (NULL);
+	}
 }
 
 /* ARGSUSED */
 int
 inet6_rthdr_add(cmsg, addr, flags)
-    struct cmsghdr *cmsg;
-    const struct in6_addr *addr;
-    u_int flags;
+	struct cmsghdr *cmsg;
+	const struct in6_addr *addr;
+	u_int flags;
 {
-    struct ip6_rthdr *rthdr;
+	struct ip6_rthdr *rthdr;
 
-    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
+	rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
-    switch(rthdr->ip6r_type) {
-     case IPV6_RTHDR_TYPE_0:
-     {
-	 struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
-	 if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT) {
+	switch (rthdr->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+	{
+		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
+		if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT) {
 #ifdef DEBUG
-	     fprintf(stderr, "inet6_rthdr_add: unsupported flag(%u)\n", flags);
+			fprintf(stderr,
+			    "inet6_rthdr_add: unsupported flag(%u)\n", flags);
 #endif 
-	     return(-1);
-	 }
-	 if (rt0->ip6r0_segleft == 23) {
+			return (-1);
+		}
+		if (rt0->ip6r0_segleft == 23) {
 #ifdef DEBUG
-	     fprintf(stderr, "inet6_rthdr_add: segment overflow\n");
+			fprintf(stderr, "inet6_rthdr_add: segment overflow\n");
 #endif 
-	     return(-1);
-	 }
+			return (-1);
+		}
 
 #ifdef COMPAT_RFC1883		/* XXX */
-	 if (flags == IPV6_RTHDR_STRICT) {
-	     int c, b;
-	     c = rt0->ip6r0_segleft / 8;
-	     b = rt0->ip6r0_segleft % 8;
-	     rt0->ip6r0_slmap[c] |= (1 << (7 - b));
-	 }
+		if (flags == IPV6_RTHDR_STRICT) {
+			int c, b;
+			c = rt0->ip6r0_segleft / 8;
+			b = rt0->ip6r0_segleft % 8;
+			rt0->ip6r0_slmap[c] |= (1 << (7 - b));
+		}
 #else
-	 if (flags != IPV6_RTHDR_LOOSE)
-	    return (-1);
+		if (flags != IPV6_RTHDR_LOOSE)
+			return (-1);
 #endif 
-	 rt0->ip6r0_segleft++;
-	 bcopy(addr, (caddr_t)rt0 + ((rt0->ip6r0_len + 1) << 3),
-	       sizeof(struct in6_addr));
-	 rt0->ip6r0_len += sizeof(struct in6_addr) >> 3;
-	 cmsg->cmsg_len = CMSG_LEN((rt0->ip6r0_len + 1) << 3);
-	 break;
-     }
-     default:
+		rt0->ip6r0_segleft++;
+		bcopy(addr, (caddr_t)rt0 + ((rt0->ip6r0_len + 1) << 3),
+		    sizeof(struct in6_addr));
+		rt0->ip6r0_len += sizeof(struct in6_addr) >> 3;
+		cmsg->cmsg_len = CMSG_LEN((rt0->ip6r0_len + 1) << 3);
+		break;
+	}
+	default:
 #ifdef DEBUG
-	 fprintf(stderr, "inet6_rthdr_add: unknown type(%u)\n",
-		 rthdr->ip6r_type);
+		fprintf(stderr, "inet6_rthdr_add: unknown type(%u)\n",
+		    rthdr->ip6r_type);
 #endif 
-	 return(-1);
-    }
+		return (-1);
+	}
 
-    return(0);
+	return (0);
 }
 
 /* ARGSUSED */
 int
 inet6_rthdr_lasthop(cmsg, flags)
-    struct cmsghdr *cmsg;
-    unsigned int flags;
+	struct cmsghdr *cmsg;
+	unsigned int flags;
 {
-    struct ip6_rthdr *rthdr;
+	struct ip6_rthdr *rthdr;
 
-    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
+	rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
-    switch(rthdr->ip6r_type) {
-     case IPV6_RTHDR_TYPE_0:
-     {
-	 struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
+	switch (rthdr->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+	{
+		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
 #ifdef COMPAT_RFC1883		/* XXX */
-	 if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT) {
+		if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT) {
 #ifdef DEBUG
-	     fprintf(stderr, "inet6_rthdr_lasthop: unsupported flag(%u)\n", flags);
+			fprintf(stderr, "inet6_rthdr_lasthop: unsupported flag(%u)\n", flags);
 #endif 
-	     return(-1);
-	 }
+			return (-1);
+		}
 #endif /* COMPAT_RFC1883 */
-	 if (rt0->ip6r0_segleft > 23) {
+		if (rt0->ip6r0_segleft > 23) {
 #ifdef DEBUG
-	     fprintf(stderr, "inet6_rthdr_add: segment overflow\n");
+			fprintf(stderr, "inet6_rthdr_add: segment overflow\n");
 #endif 
-	     return(-1);
-	 }
+			return (-1);
+		}
 #ifdef COMPAT_RFC1883		/* XXX */
-	 if (flags == IPV6_RTHDR_STRICT) {
-	     int c, b;
-	     c = rt0->ip6r0_segleft / 8;
-	     b = rt0->ip6r0_segleft % 8;
-	     rt0->ip6r0_slmap[c] |= (1 << (7 - b));
-	 }
+		if (flags == IPV6_RTHDR_STRICT) {
+			int c, b;
+			c = rt0->ip6r0_segleft / 8;
+			b = rt0->ip6r0_segleft % 8;
+			rt0->ip6r0_slmap[c] |= (1 << (7 - b));
+		}
 #else
-	 if (flags != IPV6_RTHDR_LOOSE)
-	    return (-1);
+		if (flags != IPV6_RTHDR_LOOSE)
+			return (-1);
 #endif /* COMPAT_RFC1883 */
-	 break;
-     }
-     default:
-#ifdef DEBUG
-	 fprintf(stderr, "inet6_rthdr_lasthop: unknown type(%u)\n",
-		 rthdr->ip6r_type);
-#endif 
-	 return(-1);
-    }
+		break;
+	}
+	default:
+		#ifdef DEBUG
+		fprintf(stderr, "inet6_rthdr_lasthop: unknown type(%u)\n",
+		    rthdr->ip6r_type);
+		#endif 
+		return (-1);
+	}
 
-    return(0);
+	return (0);
 }
 
 #if 0
 int
 inet6_rthdr_reverse(in, out)
-    const struct cmsghdr *in;
-    struct cmsghdr *out;
+	const struct cmsghdr *in;
+	struct cmsghdr *out;
 {
 #ifdef DEBUG
-    fprintf(stderr, "inet6_rthdr_reverse: not implemented yet\n");
+	fprintf(stderr, "inet6_rthdr_reverse: not implemented yet\n");
 #endif 
-    return -1;
+	return -1;
 }
 #endif
 
 int
 inet6_rthdr_segments(cmsg)
-    const struct cmsghdr *cmsg;
+	const struct cmsghdr *cmsg;
 {
-    struct ip6_rthdr *rthdr;
+	struct ip6_rthdr *rthdr;
 
-    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
+	rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
-    switch(rthdr->ip6r_type) {
-    case IPV6_RTHDR_TYPE_0:
-      {
-	struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
+	switch (rthdr->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+	{
+		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
 
-	if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
+		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
 #ifdef DEBUG
-	    fprintf(stderr, "inet6_rthdr_segments: invalid size(%u)\n",
-		rt0->ip6r0_len);
+			fprintf(stderr, "inet6_rthdr_segments: invalid size(%u)\n",
+			    rt0->ip6r0_len);
 #endif 
-	    return -1;
+			return -1;
+		}
+
+		return (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
 	}
 
-	return (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
-      }
-
-    default:
+	default:
 #ifdef DEBUG
-	fprintf(stderr, "inet6_rthdr_segments: unknown type(%u)\n",
-	    rthdr->ip6r_type);
+		fprintf(stderr, "inet6_rthdr_segments: unknown type(%u)\n",
+		    rthdr->ip6r_type);
 #endif 
-	return -1;
-    }
+		return -1;
+	}
 }
 
 struct in6_addr *
@@ -254,92 +256,96 @@ inet6_rthdr_getaddr(cmsg, idx)
     struct cmsghdr *cmsg;
     int idx;
 {
-    struct ip6_rthdr *rthdr;
+	struct ip6_rthdr *rthdr;
 
-    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
+	rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
-    switch(rthdr->ip6r_type) {
-    case IPV6_RTHDR_TYPE_0:
-      {
-	struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
-	int naddr;
+	switch (rthdr->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+	{
+		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
+		int naddr;
 
-	if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
+		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
 #ifdef DEBUG
-	    fprintf(stderr, "inet6_rthdr_getaddr: invalid size(%u)\n",
-		rt0->ip6r0_len);
+			fprintf(stderr,
+			    "inet6_rthdr_getaddr: invalid size(%u)\n",
+			    rt0->ip6r0_len);
 #endif 
-	    return NULL;
-	}
-	naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
-	if (idx <= 0 || naddr < idx) {
+			return NULL;
+		}
+		naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
+		if (idx <= 0 || naddr < idx) {
 #ifdef DEBUG
-	    fprintf(stderr, "inet6_rthdr_getaddr: invalid idx(%d)\n", idx);
+			fprintf(stderr,
+			    "inet6_rthdr_getaddr: invalid idx(%d)\n", idx);
 #endif 
-	    return NULL;
-	}
+			return NULL;
+		}
 #ifdef COMPAT_RFC2292
-	return(((struct in6_addr *)(rt0 + 1)) + idx - 1);
+		return (((struct in6_addr *)(rt0 + 1)) + idx - 1);
 #else
-	return(((struct in6_addr *)(rt0 + 1)) + idx);
+		return (((struct in6_addr *)(rt0 + 1)) + idx);
 #endif
-      }
+	}
 
-    default:
+	default:
 #ifdef DEBUG
-	fprintf(stderr, "inet6_rthdr_getaddr: unknown type(%u)\n",
-	    rthdr->ip6r_type);
+		fprintf(stderr, "inet6_rthdr_getaddr: unknown type(%u)\n",
+		    rthdr->ip6r_type);
 #endif 
-	return NULL;
-    }
+		return NULL;
+	}
 }
 
 int
 inet6_rthdr_getflags(cmsg, idx)
-    const struct cmsghdr *cmsg;
-    int idx;
+	const struct cmsghdr *cmsg;
+	int idx;
 {
-    struct ip6_rthdr *rthdr;
+	struct ip6_rthdr *rthdr;
 
-    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
+	rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
-    switch(rthdr->ip6r_type) {
-    case IPV6_RTHDR_TYPE_0:
-      {
-	struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
-	int naddr;
+	switch (rthdr->ip6r_type) {
+	case IPV6_RTHDR_TYPE_0:
+	{
+		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
+		int naddr;
 
-	if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
+		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
 #ifdef DEBUG
-	    fprintf(stderr, "inet6_rthdr_getflags: invalid size(%u)\n",
-		rt0->ip6r0_len);
+			fprintf(stderr,
+			    "inet6_rthdr_getflags: invalid size(%u)\n",
+			    rt0->ip6r0_len);
 #endif 
-	    return -1;
-	}
-	naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
-	if (idx < 0 || naddr < idx) {
+			return -1;
+		}
+		naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
+		if (idx < 0 || naddr < idx) {
 #ifdef DEBUG
-	    fprintf(stderr, "inet6_rthdr_getflags: invalid idx(%d)\n", idx);
+			fprintf(stderr,
+			    "inet6_rthdr_getflags: invalid idx(%d)\n", idx);
 #endif 
-	    return -1;
-	}
+			return -1;
+		}
 #ifdef COMPAT_RFC1883		/* XXX */
-	if (rt0->ip6r0_slmap[idx / 8] & (0x80 >> (idx % 8)))
-	    return IPV6_RTHDR_STRICT;
-	else
-	    return IPV6_RTHDR_LOOSE;
+		if (rt0->ip6r0_slmap[idx / 8] & (0x80 >> (idx % 8)))
+			return IPV6_RTHDR_STRICT;
+		else
+			return IPV6_RTHDR_LOOSE;
 #else
-	return IPV6_RTHDR_LOOSE;
+		return IPV6_RTHDR_LOOSE;
 #endif /* COMPAT_RFC1883 */
-      }
+	}
 
-    default:
+	default:
 #ifdef DEBUG
-	fprintf(stderr, "inet6_rthdr_getflags: unknown type(%u)\n",
-	    rthdr->ip6r_type);
+		fprintf(stderr, "inet6_rthdr_getflags: unknown type(%u)\n",
+		    rthdr->ip6r_type);
 #endif 
-	return -1;
-    }
+		return -1;
+	}
 }
 
 /*
@@ -350,11 +356,11 @@ inet6_rthdr_getflags(cmsg, idx)
 socklen_t
 inet6_rth_space(int type, int segments)
 {
-	switch(type) {
+	switch (type) {
 	case IPV6_RTHDR_TYPE_0:
-		return(((segments * 2) + 1) << 3);
+		return (((segments * 2) + 1) << 3);
 	default:
-		return(0);	/* type not suppported */
+		return (0);	/* type not suppported */
 	}
 }
 
@@ -364,11 +370,11 @@ inet6_rth_init(void *bp, socklen_t bp_len, int type, int segments)
 	struct ip6_rthdr *rth = (struct ip6_rthdr *)bp;
 	struct ip6_rthdr0 *rth0;
 
-	switch(type) {
+	switch (type) {
 	case IPV6_RTHDR_TYPE_0:
 		/* length validation */
 		if (bp_len < inet6_rth_space(IPV6_RTHDR_TYPE_0, segments))
-			return(NULL);
+			return (NULL);
 
 		memset(bp, 0, bp_len);
 		rth0 = (struct ip6_rthdr0 *)rth;
@@ -378,10 +384,10 @@ inet6_rth_init(void *bp, socklen_t bp_len, int type, int segments)
 		rth0->ip6r0_reserved = 0;
 		break;
 	default:
-		return(NULL);	/* type not supported */
+		return (NULL);	/* type not supported */
 	}
 
-	return(bp);
+	return (bp);
 }
 
 int
@@ -391,7 +397,7 @@ inet6_rth_add(void *bp, const struct in6_addr *addr)
 	struct ip6_rthdr0 *rth0;
 	struct in6_addr *nextaddr;
 
-	switch(rth->ip6r_type) {
+	switch (rth->ip6r_type) {
 	case IPV6_RTHDR_TYPE_0:
 		rth0 = (struct ip6_rthdr0 *)rth;
 		nextaddr = (struct in6_addr *)(rth0 + 1) + rth0->ip6r0_segleft;
@@ -399,10 +405,10 @@ inet6_rth_add(void *bp, const struct in6_addr *addr)
 		rth0->ip6r0_segleft++;
 		break;
 	default:
-		return(-1);	/* type not supported */
+		return (-1);	/* type not supported */
 	}
 
-	return(0);
+	return (0);
 }
 
 int
@@ -412,14 +418,14 @@ inet6_rth_reverse(const void *in, void *out)
 	struct ip6_rthdr0 *rth0_in, *rth0_out;
 	int i, segments;
 
-	switch(rth_in->ip6r_type) {
+	switch (rth_in->ip6r_type) {
 	case IPV6_RTHDR_TYPE_0:
 		rth0_in = (struct ip6_rthdr0 *)in;
 		rth0_out = (struct ip6_rthdr0 *)out;
 
 		/* parameter validation XXX too paranoid? */
 		if (rth0_in->ip6r0_len % 2)
-			return(-1);
+			return (-1);
 		segments = rth0_in->ip6r0_len / 2;
 
 		/* we can't use memcpy here, since in and out may overlap */
@@ -441,10 +447,10 @@ inet6_rth_reverse(const void *in, void *out)
 		
 		break;
 	default:
-		return(-1);	/* type not supported */
+		return (-1);	/* type not supported */
 	}
 
-	return(0);
+	return (0);
 }
 
 int
@@ -454,7 +460,7 @@ inet6_rth_segments(const void *bp)
 	struct ip6_rthdr0 *rh0;
 	int addrs;
 
-	switch(rh->ip6r_type) {
+	switch (rh->ip6r_type) {
 	case IPV6_RTHDR_TYPE_0:
 		rh0 = (struct ip6_rthdr0 *)bp;
 
@@ -464,11 +470,11 @@ inet6_rth_segments(const void *bp)
 		 */
 		if ((rh0->ip6r0_len % 2) != 0 ||
 		    (addrs = (rh0->ip6r0_len >> 1)) < rh0->ip6r0_segleft)
-			return(-1);
+			return (-1);
 
-		return(addrs);
+		return (addrs);
 	default:
-		return(-1);	/* unknown type */
+		return (-1);	/* unknown type */
 	}
 }
 
@@ -479,7 +485,7 @@ inet6_rth_getaddr(const void *bp, int idx)
 	struct ip6_rthdr0 *rh0;
 	int rthlen, addrs;
 
-	switch(rh->ip6r_type) {
+	switch (rh->ip6r_type) {
 	case IPV6_RTHDR_TYPE_0:
 		 rh0 = (struct ip6_rthdr0 *)bp;
 		 rthlen = (rh0->ip6r0_len + 1) << 3;
@@ -490,14 +496,14 @@ inet6_rth_getaddr(const void *bp, int idx)
 		 */
 		if ((rthlen % 2) != 0 ||
 		    (addrs = (rthlen >> 1)) < rh0->ip6r0_segleft)
-			return(NULL);
+			return (NULL);
 
 		if (idx < 0 || addrs <= idx)
-			return(NULL);
+			return (NULL);
 
-		return(((struct in6_addr *)(rh0 + 1)) + idx);
+		return (((struct in6_addr *)(rh0 + 1)) + idx);
 	default:
-		return(NULL);	/* unknown type */
+		return (NULL);	/* unknown type */
 		break;
 	}
 }
