@@ -1,9 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.117 1999/09/16 00:45:00 itojun Exp $
+$Id: CHANGELOG,v 1.118 1999/09/16 04:53:47 itojun Exp $
 
 
 <199909>
+Thu Sep 16 13:50:42 JST 1999  itojun@iijlab.net
+	* kame/libipsec/pfkey.c: Temporary workaround against KAME PR 154.
+	  If you use setkey to dump many keys in the kernel, or to add
+	  many keys at one time, PF_KEY socket buffer will overflow
+	  (because PF_KEY socket is SOCK_DGRAM, there's no flow control).
+
+	  To address this issue we added setsockopt(SO_{SND,RCV}BUF) into
+	  pfkey_open().  This allows the PF_KEY socket to hold roughly 1000
+	  keys in the buffer.  More fundamental fix should follow.
+
 Thu Sep 16 09:44:03 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/tcptrace, freebsd[23]/pkgsrc/net/tcptrace:
 	  upgrade to 5.2.1.
