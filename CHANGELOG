@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1837 2001/08/12 08:13:57 jinmei Exp $
+$KAME: CHANGELOG,v 1.1838 2001/08/13 13:06:48 sakane Exp $
 
 <200108>
+Mon Aug 13 22:03:28 JST 2001 sakane@kame.net
+	* kame/racoon:
+	supported MODP 2048, 3072, 4096 and 8192-bit.
+	these are described in draft-ietf-ipsec-ike-modp-groups-01.txt
+
 2001-08-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_setpktoption): newly added,
 	in order to centralize the routine for handling outgoing packet
