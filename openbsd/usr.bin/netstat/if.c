@@ -202,7 +202,7 @@ intpr(interval, ifnetaddr)
 					while (multiaddr != 0) {
 						kread(multiaddr, (char *)&inm,
 						    sizeof inm);
-						printf("\n%23s %-17.17s ", "",
+						printf("\n%25s %-17.17s ", "",
 						    routename(inm.inm_addr.s_addr));
 						multiaddr = (u_long)inm.inm_list.le_next;
 					}
@@ -239,7 +239,7 @@ intpr(interval, ifnetaddr)
 				if (aflag) {
 					u_long multiaddr;
 					struct in6_multi inm;
-					char ntop_buf[INET6_ADDRSTRLEN];
+					char hbuf[INET6_ADDRSTRLEN];
 		
 					multiaddr = (u_long)ifaddr.in6.ia6_multiaddrs.lh_first;
 					while (multiaddr != 0) {
@@ -247,15 +247,14 @@ intpr(interval, ifnetaddr)
 						    sizeof(inm));
 						multiaddr = (u_long)inm.in6m_entry.le_next;
 						inet_ntop(AF_INET6, &inm.in6m_addr,
-							ntop_buf, sizeof(ntop_buf));
-						cp = ntop_buf;
+							hbuf, sizeof(hbuf));
+						cp = hbuf;
 						if (vflag)
 							n = strlen(cp) < 17 ? 17 : strlen(cp);
 						else
 							n = 17;
-						printf("\n%23s %-*.*s ", "",
-							n, n, ntop_buf,
-							inm.in6m_refcount);
+						printf("\n%25s %-*.*s ", "",
+							n, n, hbuf);
 					}
 				}
 				break;
