@@ -20,7 +20,7 @@ CPPFLAGS+=-DHAVE_IDEA_H=1
 .if exists(/usr/pkg/include/ssleay/cversion.h) || exists(/usr/pkg/include/openssl/cversion.h)
 CPPFLAGS+=-DHAVE_CVERSION_H=1
 .endif
-.if exists(/usr/pkg/include/ssleay/opensslv.h) || exists(/usr/pkg/include/openssl/opensslv.h)
+.if exists(/usr/pkg/include/ssleay/opensslv.h) || exists(/usr/pkg/include/openssl/opensslv.h) || exists(/usr/local/ssl/include/openssl/opensslv.h)
 CPPFLAGS+=-DHAVE_OPENSSLV_H=1
 .endif
 .if exists(/usr/local/ssl/include/openssl)
