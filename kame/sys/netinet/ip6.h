@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.19 2001/07/03 15:34:39 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.20 2001/07/05 23:32:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -393,8 +393,8 @@ do {									\
 do {									\
 	struct mbuf *t;							\
 	IP6_EXTHDR_STAT(mbstat.m_exthdrget0++);				\
-	if ((off) == 0)							\
-		(val) = (typ)mtod(m, caddr_t);				\
+	if ((off) == 0 && (m)->m_len > len)				\
+		(val) = (typ)mtod((m), caddr_t);			\
 	else {								\
 		t = m_pulldown((m), (off), (len), NULL);		\
 		if (t) {						\
