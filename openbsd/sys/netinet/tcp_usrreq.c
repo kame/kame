@@ -208,7 +208,12 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Give the socket an address.
 	 */
 	case PRU_BIND:
-		error = in_pcbbind(inp, nam);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			error = in6_pcbbind(inp, nam);
+		else
+#endif
+			error = in_pcbbind(inp, nam);
 		if (error)
 			break;
 #ifdef INET6
@@ -231,8 +236,14 @@ tcp_usrreq(so, req, m, nam, control)
 	 * Prepare to accept connections.
 	 */
 	case PRU_LISTEN:
-		if (inp->inp_lport == 0)
-			error = in_pcbbind(inp, NULL);
+		if (inp->inp_lport == 0) {
+#ifdef INET6
+			if (inp->inp_flags & INP_IPV6)
+				error = in6_pcbbind(inp, NULL);
+			else
+#endif
+				error = in_pcbbind(inp, NULL);
+		}
 		/* If the in_pcbbind() above is called, the tp->pf
 		   should still be whatever it was before. */
 		if (error == 0)
@@ -263,6 +274,13 @@ tcp_usrreq(so, req, m, nam, control)
 				error = EINVAL;
 				break;
 			}
+
+			if (inp->inp_lport == 0) {
+				error = in6_pcbbind(inp, NULL);
+				if (error)
+					break;
+			}
+			error = in6_pcbconnect(inp, nam);
 		} else if (sin->sin_family == AF_INET)
 #endif /* INET6 */
 		{
@@ -278,14 +296,15 @@ tcp_usrreq(so, req, m, nam, control)
 				error = EINVAL;
 				break;
 			}
+
+			if (inp->inp_lport == 0) {
+				error = in_pcbbind(inp, NULL);
+				if (error)
+					break;
+			}
+			error = in_pcbconnect(inp, nam);
 		}
 
-		if (inp->inp_lport == 0) {
-			error = in_pcbbind(inp, NULL);
-			if (error)
-				break;
-		}
-		error = in_pcbconnect(inp, nam);
 		if (error)
 			break;
 
@@ -372,7 +391,12 @@ tcp_usrreq(so, req, m, nam, control)
 	 * of the peer, storing through addr.
 	 */
 	case PRU_ACCEPT:
-		in_setpeeraddr(inp, nam);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			in6_setpeeraddr(inp, nam);
+		else
+#endif
+			in_setpeeraddr(inp, nam);
 		break;
 
 	/*
@@ -460,11 +484,21 @@ tcp_usrreq(so, req, m, nam, control)
 		break;
 
 	case PRU_SOCKADDR:
-		in_setsockaddr(inp, nam);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			in6_setsockaddr(inp, nam);
+		else
+#endif
+			in_setsockaddr(inp, nam);
 		break;
 
 	case PRU_PEERADDR:
-		in_setpeeraddr(inp, nam);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			in6_setpeeraddr(inp, nam);
+		else
+#endif
+			in_setpeeraddr(inp, nam);
 		break;
 
 	/*
