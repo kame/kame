@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.81 2001/01/22 13:55:29 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.82 2001/01/22 14:56:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -620,63 +620,73 @@ in6_ifattach_linklocal(ifp, altifp)
 	struct ifnet *ifp;
 	struct ifnet *altifp;	/* secondary EUI64 source */
 {
-	struct in6_ifaddr *ia;
+	struct in6_aliasreq ifra;
+	int error;
 
 	/*
-	 * configure link-local address
+	 * configure link-local address.
 	 */
-	ia = (struct in6_ifaddr *)malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
-	bzero((caddr_t)ia, sizeof(*ia));
-	ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
-	if (ifp->if_flags & IFF_POINTOPOINT)
-		ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
-	else
-		ia->ia_ifa.ifa_dstaddr = NULL;
-	ia->ia_ifa.ifa_netmask = (struct sockaddr *)&ia->ia_prefixmask;
-	ia->ia_ifp = ifp;
-
-	bzero(&ia->ia_prefixmask, sizeof(ia->ia_prefixmask));
-	ia->ia_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_prefixmask.sin6_family = AF_INET6;
+	bzero(&ifra, sizeof(ifra));
+	/*
+	 * in6_update_ifa() does not use ifra_name, but we accurately set it
+	 * for safety.
+	 */
+	strncpy(ifra.ifra_name, if_name(ifp), sizeof(ifra.ifra_name));
+	ifra.ifra_addr.sin6_family = AF_INET6;
+	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
+	ifra.ifra_addr.sin6_addr.s6_addr16[0] = htons(0xfe80);
 #ifdef SCOPEDROUTING
-	/* take into accound the sin6_scope_id field for routing */
-	ia->ia_prefixmask.sin6_scope_id = 0xffffffff;
+	ifra.ifra_addr.sin6_addr.s6_addr16[1] = 0
+#else
+	ifra.ifra_addr.sin6_addr.s6_addr16[1] = htons(ifp->if_index); /* XXX */
 #endif
-	ia->ia_prefixmask.sin6_addr = in6mask64;
-
-	/* just in case */
-	bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
-	ia->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_dstaddr.sin6_family = AF_INET6;
-
-	bzero(&ia->ia_addr, sizeof(ia->ia_addr));
-	ia->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_addr.sin6_family = AF_INET6;
-	ia->ia_addr.sin6_addr.s6_addr16[0] = htons(0xfe80);
-	ia->ia_addr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
-	ia->ia_addr.sin6_addr.s6_addr32[1] = 0;
-	if (ifp->if_flags & IFF_LOOPBACK) {
-		ia->ia_addr.sin6_addr.s6_addr32[2] = 0;
-		ia->ia_addr.sin6_addr.s6_addr32[3] = htonl(1);
+	ifra.ifra_addr.sin6_addr.s6_addr32[1] = 0;
+	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
+		ifra.ifra_addr.sin6_addr.s6_addr32[2] = 0;
+		ifra.ifra_addr.sin6_addr.s6_addr32[3] = htonl(1);
 	} else {
-		if (get_ifid(ifp, altifp, &ia->ia_addr.sin6_addr) != 0) {
+		if (get_ifid(ifp, altifp, &ifra.ifra_addr.sin6_addr) != 0) {
 #ifdef ND6_DEBUG
 			printf("%s: no ifid available\n", if_name(ifp));
 #endif
-			free(ia, M_IFADDR);
 			return -1;
 		}
 	}
 #ifdef SCOPEDROUTING
-	ia->ia_addr.sin6_scope_id = in6_addr2scopeid(ifp,
-						     &ia->ia_addr.sin6_addr);
+	ifra.ifra_addr.sin6_scope_id =
+		in6_addr2scopeid(ifp,  &ifra.ifra_addr.sin6_addr);
 #endif
 
-	ia->ia_ifa.ifa_metric = ifp->if_metric;
+	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
+	ifra.ifra_prefixmask.sin6_family = AF_INET6;
+	ifra.ifra_prefixmask.sin6_addr = in6mask64;
+#ifdef SCOPEDROUTING
+	/* take into accound the sin6_scope_id field for routing */
+	ifra.ifra_prefixmask.sin6_scope_id = 0xffffffff;
+#endif
+	/* link-local addresses should NEVER expire. */
+	ifra.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
+	ifra.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
 
-	if (in6_ifattach_addaddr(ifp, ia) != 0) {
-		/* ia will be freed on failure */
-		return -1;
+	/*
+	 * Do not let in6_update_ifa() do DAD, since we have (probably) even
+	 * not joined all-nodes multicast group. (And we need at least
+	 * one unicast address configured to join the multicast group.
+	 * Here's a some kind of chicken egg problem).
+	 * Instead, in6_if_up() will do DAD later.
+	 */
+	ifra.ifra_flags |= IN6_IFF_NODAD;
+
+	/*
+	 * Now call in6_update_ifa() to do a bunch of procedures to configure
+	 * a link-local address. We can set NULL to the 3rd argument, because
+	 * we know there's no other link-local address on the interface.
+	 */
+	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
+		log(LOG_ERR, "in6_ifattach_linklocal: failed to configure "
+		    "a link-local address on %s (errno=%d)\n",
+		    if_name(ifp), error);
+		return(-1);
 	}
 
 	return 0;
@@ -855,8 +865,6 @@ in6_ifattach(ifp, altifp)
 	static size_t if_indexlim = 8;
 	struct sockaddr_in6 mltaddr;
 	struct sockaddr_in6 mltmask;
-	struct sockaddr_in6 gate;
-	struct sockaddr_in6 mask;
 	struct in6_ifaddr *ia;
 	struct in6_addr in6;
 #ifdef __FreeBSD__
@@ -950,7 +958,7 @@ in6_ifattach(ifp, altifp)
 	}
 
 	/*
-	 * assign link-local address, if there's none 
+	 * assign a link-local address, if there's none. 
 	 */
 	ia = in6ifa_ifpforlinklocal(ifp, 0);
 	if (ia == NULL) {
@@ -958,48 +966,31 @@ in6_ifattach(ifp, altifp)
 			return;
 		ia = in6ifa_ifpforlinklocal(ifp, 0);
 
-		if (ia == NULL) {
-			printf("%s: failed to add link-local address\n",
+		if (ia == NULL) { /* impossible! */
+			log(LOG_ERR, "%s: failed to add link-local address\n",
 			    if_name(ifp));
 
 			/* we can't initialize multicasts without link-local */
 			goto statinit;
 		}
-	}
-
-	if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
-		int e;
 
 		/*
-		 * route local address to loopback
+		 * Adjust the flags so that in6_if_up will perform DAD.
+		 * I believe we should basically do DAD on non-loopback
+		 * interfaces. (20010122 jinmei@kame.net)
 		 */
-		bzero(&gate, sizeof(gate));
-		gate.sin6_len = sizeof(struct sockaddr_in6);
-		gate.sin6_family = AF_INET6;
-		gate.sin6_addr = in6addr_loopback;
-		bzero(&mask, sizeof(mask));
-		mask.sin6_len = sizeof(struct sockaddr_in6);
-		mask.sin6_family = AF_INET6;
-		mask.sin6_addr = in6mask64;
-		e = rtrequest(RTM_ADD,
-			      (struct sockaddr *)&ia->ia_addr,
-			      (struct sockaddr *)&gate,
-			      (struct sockaddr *)&mask,
-			      RTF_UP|RTF_HOST,
-			      (struct rtentry **)0);
-		if (e) {
-			printf("in6_ifattach: failed to set a loopback route up "
-			       "(errno=%d).\n", e);
-			/* XXX: what should we think about such a situation? */
+		if ((ifp->if_flags & IFF_LOOPBACK) == 0) {
+			ia->ia6_flags &= ~IN6_IFF_NODAD;
+			ia->ia6_flags |= IN6_IFF_TENTATIVE;
 		}
 	}
 
 	/*
-	 * assign loopback address for loopback interface
-	 * XXX multiple loopback interface case
+	 * assign loopback address for loopback interface.
+	 * XXX multiple loopback interface case.
 	 */
 	in6 = in6addr_loopback;
-	if (ifp->if_flags & IFF_LOOPBACK) {
+	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
 		if (in6ifa_ifpwithaddr(ifp, &in6) == NULL) {
 			if (in6_ifattach_loopback(ifp) != 0)
 				return;
