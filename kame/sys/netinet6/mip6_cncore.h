@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.7 2003/09/06 09:13:52 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.8 2003/10/16 08:12:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -87,8 +87,8 @@ int mip6_bc_send_ba(struct sockaddr_in6 *, struct sockaddr_in6 *,
     struct mip6_mobility_options *);
 
 /* return routablity processing. */
-int mip6_get_nonce(int, mip6_nonce_t *);
-int mip6_get_nodekey(int, mip6_nodekey_t *);
+int mip6_get_nonce(u_int16_t, mip6_nonce_t *);
+int mip6_get_nodekey(u_int16_t, mip6_nodekey_t *);
 void mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
     mip6_nonce_t *, u_int8_t, void *);
 int mip6_is_valid_bu(struct ip6_hdr *, struct ip6m_binding_update *,
