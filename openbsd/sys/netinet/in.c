@@ -102,7 +102,10 @@
 #include <net/route.h>
 
 #include <netinet/in.h>
+#include <netinet/in_systm.h>
 #include <netinet/in_var.h>
+#include <netinet/ip.h>
+#include <netinet/in_pcb.h>
 #include <netinet/igmp_var.h>
 
 #ifdef MROUTING
