@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.2 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.3 2000/05/31 15:10:33 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -307,10 +307,12 @@ set_satrnsbysainfo(pr, sainfo)
 				"no auth algorithm found\n");
 			goto err;
 		}
-		for (t = 1, a = sainfo->algs[algclass_ipsec_auth];
-		     a;
-		     t++, a = a->next) {
+		t = 1;
+		for (a = sainfo->algs[algclass_ipsec_auth]; a; a = a->next) {
 
+			if (a->alg == IPSECDOI_ATTR_AUTH_NONE)
+				continue;
+				
 			/* allocate satrns */
 			newtr = newsatrns();
 			if (newtr == NULL) {
@@ -319,7 +321,7 @@ set_satrnsbysainfo(pr, sainfo)
 				goto err;
 			}
 
-			newtr->trns_no = t;
+			newtr->trns_no = t++;
 			newtr->trns_id = ipsecdoi_authalg2trnsid(a->alg);
 			newtr->authtype = a->alg;
 
@@ -332,12 +334,9 @@ set_satrnsbysainfo(pr, sainfo)
 				"no auth algorithm found\n");
 			goto err;
 		}
-		for (t = 1, a = sainfo->algs[algclass_ipsec_enc];
-		     a;
-		     t++, a = a->next) {
-
-			b = sainfo->algs[algclass_ipsec_auth];
-			do {
+		t = 1;
+		for (a = sainfo->algs[algclass_ipsec_enc]; a; a = a->next) {
+			for (b = sainfo->algs[algclass_ipsec_auth]; b; b = b->next) {
 				/* allocate satrns */
 				newtr = newsatrns();
 				if (newtr == NULL) {
@@ -346,7 +345,7 @@ set_satrnsbysainfo(pr, sainfo)
 					goto err;
 				}
 
-				newtr->trns_no = t;
+				newtr->trns_no = t++;
 				newtr->trns_id = a->alg;
 				newtr->encklen = a->encklen;
 				newtr->authtype = b ? b->alg : 0;
@@ -356,9 +355,7 @@ set_satrnsbysainfo(pr, sainfo)
 				/* if no auth algorithm is needed */
 				if (b == NULL)
 					break;
-
-				b = b->next;
-			} while (b);
+			}
 		}
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
@@ -367,9 +364,8 @@ set_satrnsbysainfo(pr, sainfo)
 				"no ipcomp algorithm found\n");
 			goto err;
 		}
-		for (t = 1, a = sainfo->algs[algclass_ipsec_comp];
-		     a;
-		     t++, a = a->next) {
+		t = 1;
+		for (a = sainfo->algs[algclass_ipsec_comp]; a; a = a->next) {
 
 			/* allocate satrns */
 			newtr = newsatrns();
@@ -379,7 +375,7 @@ set_satrnsbysainfo(pr, sainfo)
 				goto err;
 			}
 
-			newtr->trns_no = t;
+			newtr->trns_no = t++;
 			newtr->trns_id = a->alg;
 
 			inssatrns(pr, newtr);
