@@ -1,8 +1,8 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2526 2004/01/15 01:01:41 itojun Exp $
+$KAME: CHANGELOG,v 1.2527 2004/01/16 05:22:44 itojun Exp $
 
 <200401>
-Thu Jan 14 JST 2004  itojun@iijlab.net
+Fri Jan 16 JST 2004  itojun@iijlab.net
 	* racoon/isakmp_inf.c: validation of hash payload was missing.
 	  code from IIJ SEIL team.  [attack script is in public knowledge,
 	  users of racoon must upgrade]
