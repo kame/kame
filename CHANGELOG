@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2462 2003/08/26 01:10:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.2463 2003/08/26 13:42:04 keiichi Exp $
 
 <200308>
+Tue Aug 26 22:37:38 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/net/if_hif.*,netnet6/mip6*
+	support multiple global addresses handling of a home agent.
+	support selecting alternative home agent mechanism when
+	the current registered home agent seems to be unavailable.
+
 2003-08-22 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd[45]/sys/netinet/igmp.c, kame/sys/netinet/in_msf.c
 	fixed an IGMPv3-related buffer overrun in freebsd[45].
