@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.308 1999/12/01 11:22:00 sakane Exp $
+$Id: CHANGELOG,v 1.309 1999/12/01 12:52:05 jinmei Exp $
 
 <199912>
+1999-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c: the `-S sourceaddr' option was added,
+	which specifies the source address of outgoing packets.
+
 Wed Dec  1 20:16:04 JST 1999 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Sync kernel.  Tunnel mode enabled again.  The status comes back 
