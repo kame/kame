@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1373 2000/11/08 16:29:48 sakane Exp $
+$KAME: CHANGELOG,v 1.1374 2000/11/08 17:17:12 sakane Exp $
 
 <200011>
+Thu Nov  9 02:17:10 JST 2000 sakane@ydc.co.jp
+	*racoon:
+	Ignored a acquire message if its destination address matches
+	a multicast address.
+
 Thu Nov  9 01:30:20 JST 2000 sakane@ydc.co.jp
 	* setkey:
 	Print a timestamp on each dump line by using -x option.
