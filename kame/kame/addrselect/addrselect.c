@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.5 2001/09/26 14:39:30 jinmei Exp $	*/
+/*	$KAME: addrselect.c,v 1.6 2001/12/10 23:58:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -148,6 +148,8 @@ get_policy()
 		new->pc_policy = *pol;
 		TAILQ_INSERT_TAIL(&policyhead, new, pc_entry);
 	}
+
+	free(buf);
 }
 
 static void
