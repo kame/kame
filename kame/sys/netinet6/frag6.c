@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.38 2002/04/26 10:31:52 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.39 2002/05/14 08:49:27 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -431,8 +431,8 @@ frag6_input(mp, offp, proto)
 			q6->ip6q_down->ip6af_head |= htonl(IPTOS_ECN_CE << 20);
 	}
 	if (ecn == IPTOS_ECN_NOTECT && ecn0 != IPTOS_ECN_NOTECT) {
-		goto dropfrag;
 		free(ip6af, M_FTABLE);
+		goto dropfrag;
 	}
 
 	/*
