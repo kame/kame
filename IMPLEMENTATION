@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.177 2001/01/27 08:17:16 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.178 2001/01/28 15:50:24 itojun Exp $
 
 1. IPv6
 
@@ -1765,9 +1765,9 @@ to make the distribute develoment smooth.
   Once commited to the CVS repository, this line would contain its
   version number (see, for example, at the top of this file).  This
   would make it easy to report a bug.
-- when creating a new file, copy the content of the COPYRIGHT file as
-  comment lines to the top of the file (just after the "dollar-KAME" line
-  mentioned above).
+- when creating a new file with WIDE copyright, tap "make copyright.c" at
+  the top-level, and use copyright.c as a template.  KAME RCS tag will be
+  included automatically.
 - when editting a third-party package, keep its own coding style as
   much as possible, even if the style does not follow the items above.
 
