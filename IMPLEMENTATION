@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.209 2001/04/25 06:37:40 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.210 2001/04/27 17:28:42 itojun Exp $
 
 1. IPv6
 
@@ -1542,7 +1542,7 @@ the connection will be relayed toward IPv4 destination 163.221.202.12.
 faithd must be invoked on FAITH-relay dual stack node.
 
 For more details, consult kame/kame/faithd/README and
-draft-ietf-ngtrans-tcpudp-relay-02.txt.
+draft-ietf-ngtrans-tcpudp-relay-04.txt.
 
 3.2 IPv6-to-IPv4 header translator
 
