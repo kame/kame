@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.324 1999/12/09 00:58:59 itojun Exp $
+$Id: CHANGELOG,v 1.325 1999/12/09 04:15:32 jinmei Exp $
 
 <199912>
+1999-12-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrouter_select): was added to
+	conform to Section 6.3.6 of RFC 2461. This change contains several
+	non-trivial modifications in the neighbor discovery handling in
+	kernel, so please be careful updating.
+	KAME's original mobile node support was also modified; a prefix
+	becomes detached if it has no (probably) reachable advertising
+	router.
+	TODO: 6.3.6. 3) is to be implemented.
+
 Thu Dec  9 09:46:58 JST 1999  itojun@iiljab.net
 	* kame/sys/netinet6/ip6_input.c (non-bsdi):
 	  don't initialize non-lo0 loopback interface.  they will be
