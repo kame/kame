@@ -1,4 +1,4 @@
-/*	$NetBSD: trpt.c,v 1.9 1999/07/01 19:15:03 itojun Exp $	*/
+/*	$NetBSD: trpt.c,v 1.12 2001/09/11 15:45:01 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -81,7 +81,7 @@ __COPYRIGHT(
 #if 0
 static char sccsid[] = "@(#)trpt.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: trpt.c,v 1.9 1999/07/01 19:15:03 itojun Exp $");
+__RCSID("$NetBSD: trpt.c,v 1.12 2001/09/11 15:45:01 thorpej Exp $");
 #endif
 #endif /* not lint */
 
@@ -144,7 +144,9 @@ static caddr_t tcp_pcbs[TCP_NDEBUG];
 static n_time ntime;
 static int aflag, follow, sflag, tflag;
 
-extern	char *__progname;
+/* see sys/netinet/tcp_debug.c */
+struct  tcp_debug tcp_debug[TCP_NDEBUG];
+int tcp_debx;
 
 int	main __P((int, char *[]));
 void	dotrace __P((caddr_t));
@@ -510,9 +512,10 @@ skipact:
 		register int i;
 
 		for (i = 0; i < TCPT_NTIMERS; i++) {
-			if (tp->t_timer[i] == 0)
+			if ((tp->t_timer[i].c_flags & CALLOUT_ACTIVE) == 0)
 				continue;
-			printf("%s%s=%d", cp, tcptimers[i], tp->t_timer[i]);
+			printf("%s%s=%llu", cp, tcptimers[i],
+			    (unsigned long long) tp->t_timer[i].c_time);
 			if (i == TCPT_REXMT)
 				printf(" (t_rxtshft=%d)", tp->t_rxtshift);
 			cp = ", ";
@@ -545,6 +548,6 @@ usage()
 {
 
 	(void) fprintf(stderr, "usage: %s [-afjst] [-p hex-address]"
-	    " [-N system] [-M core]\n", __progname);
+	    " [-N system] [-M core]\n", getprogname());
 	exit(1);
 }

@@ -1,4 +1,4 @@
-.\"	$NetBSD: trpt.8,v 1.11 1999/03/22 18:44:13 garbled Exp $
+.\"	$NetBSD: trpt.8,v 1.13 2002/02/02 02:03:48 wiz Exp $
 .\"
 .\" Copyright (c) 1983, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -59,7 +59,7 @@ when a socket is marked for
 (see
 .Xr setsockopt 2 ) ,
 and prints a readable description of these records.
-When no options are supplied, 
+When no options are supplied,
 .Nm
 prints all the trace records found in the system
 grouped according to
@@ -110,9 +110,9 @@ is as follows.
 Isolate the problem and enable debugging on the
 socket(s) involved in the connection.
 Find the address of the protocol control blocks
-associated with the sockets using the 
+associated with the sockets using the
 .Fl A
-option to 
+option to
 .Xr netstat 1 .
 Then run
 .Nm
@@ -136,10 +136,6 @@ default kernel memory
 .It Pa /netbsd
 default system namelist
 .El
-.Sh SEE ALSO
-.Xr netstat 1 ,
-.Xr setsockopt 2 ,
-.Xr trsp 8
 .Sh DIAGNOSTICS
 .Bl -tag -width Ds
 .It Sy no namelist
@@ -147,14 +143,18 @@ When the system image doesn't
 contain the proper symbols to find the trace buffer;
 others which should be self explanatory.
 .El
+.Sh SEE ALSO
+.Xr netstat 1 ,
+.Xr setsockopt 2 ,
+.Xr trsp 8
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Bx 4.2 .
 .Sh BUGS
 Should also print the data for each input or output,
 but this is not saved in the trace record.
 .Pp
 The output format is inscrutable and should be described
 here.
-.Sh HISTORY
-The
-.Nm
-command appeared in
-.Bx 4.2 .
