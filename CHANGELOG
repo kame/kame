@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1874 2001/09/14 16:15:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1875 2001/09/15 02:21:14 jinmei Exp $
 
 <200109>
 2001-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -25,7 +25,7 @@ Thu Sep 13 08:12:46 JST 2001 sakane@kame.net
 	* kame/sys/netinet6/ipsec.c:
 	fixed to process a IPv6 packet when ah transport after esp tunnel
 	should be applied.  the SA of AH transport could not be selected
-	from the SAD because of this bug. 
+	from the SAD because of this bug.
 
 Wed Sep 12 16:19:42 JST 2001 sakane@kame.net
 	* kame/racoon/proposal.c:
