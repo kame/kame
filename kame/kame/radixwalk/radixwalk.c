@@ -1,4 +1,4 @@
-/*	$KAME: radixwalk.c,v 1.8 2001/08/20 07:17:57 itojun Exp $	*/
+/*	$KAME: radixwalk.c,v 1.9 2002/03/28 10:07:54 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -88,12 +88,15 @@ const char *corefile = NULL;
 
 struct rdtree *get_tree __P((struct radix_node *));
 struct sockaddr *kgetsa __P((struct sockaddr *));
+
+u_long rt_topaddr, mt_topaddr;
+
 void kread __P((u_long, char *, int));
 void print_tree __P((struct rdtree *, int, int, int));
-void print_addr __P((struct sockaddr *, struct sockaddr *));
+void print_addr __P((struct sockaddr *, struct sockaddr *, int));
 void print_mask6 __P((struct sockaddr_in6 *));
 void print_mask4 __P((struct sockaddr_in *));
-u_long kinit __P((void));
+void kinit __P((void));
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #define rn_b rn_bit
@@ -101,11 +104,13 @@ u_long kinit __P((void));
 #define rn_r rn_right
 #endif
 
+#define AF_MASK AF_MAX
+
 void
 usage()
 {
-	fprintf(stderr, "usage: radixwalk [-a] [-f inet[46]] [-i indenttype] "
-		"[-N kernel] [-M core]\n");
+	fprintf(stderr, "usage: radixwalk [-a] [-f (inet[46]|mask)] "
+		"[-i indenttype] [-N kernel] [-M core]\n");
 	exit(1);
 }
 
@@ -116,7 +121,6 @@ main(argc, argv)
 {
 	int i, ch;
 	struct radix_node_head *rt_tables[AF_MAX+1], *rnh, head;
-	u_long topaddr;
 	struct rdtree *t;
 
 	indenttype = LINE;
@@ -136,6 +140,8 @@ main(argc, argv)
 				af = AF_INET;
 			else if (strcasecmp(optarg, "inet") == 0)
 				af = AF_INET;
+			else if (strcasecmp(optarg, "mask") == 0)
+				af = AF_MASK;
 			else
 				errx(1, "unsupported address family: %s",
 				     optarg);
@@ -168,10 +174,10 @@ main(argc, argv)
 		/* NOTREACHED */
 	}
 
-	topaddr = kinit();
-	kget(topaddr, rt_tables);
+	kinit();
+	kget(rt_topaddr, rt_tables);
 
-	for (i = 0; i <= AF_MAX; i++) {
+	for (i = 0; i < AF_MAX; i++) {
 		if ((rnh = rt_tables[i]) == NULL)
 			continue;
 		kget(rnh, head);
@@ -197,6 +203,18 @@ main(argc, argv)
 		}
 	}
 
+	if (af == AF_UNSPEC || af == AF_MASK) {
+		kget(mt_topaddr, head);
+		kget(head.rnh_treetop, head); /* ??? */
+
+		rtoffset = 0;
+		t = get_tree(head.rnh_treetop);
+
+		if (af == AF_UNSPEC)
+			printf("Mask:\n");
+		print_tree(t, 0, 0, AF_MASK);
+	}
+
 	exit(0);
 }
 
@@ -210,6 +228,9 @@ get_tree(rn)
 	int depth_l, depth_r;
 	struct sockaddr *sa;
 	struct rtentry rt, *rtp;
+
+	if (rn == NULL)
+		return(NULL);
 
 	if ((rdt = (struct rdtree *)malloc(sizeof(*rdt))) == NULL)
 		err(1, "get_tree: malloc");
@@ -307,22 +328,25 @@ kread(addr, buf, size)
 		errx(1, "%s", kvm_geterr(kvmd));
 }
 
-u_long
+void
 kinit()
 {
 	char buf[_POSIX2_LINE_MAX];
-	struct nlist nl[] = {{"_rt_tables"}, {""}};
+	struct nlist nl[] = {{"_rt_tables"}, {"_mask_rnhead"}, {""}};
 
 	kvmd = kvm_openfiles(kernelfile, corefile, NULL, O_RDONLY, buf);
 	if (kvmd != NULL) {
 		if (kvm_nlist(kvmd, nl) < 0)
 			errx(1, "kvm_nlist: %s", kvm_geterr(kvmd));
-		if (nl[0].n_type == 0)
+		if (nl[0].n_type == 0 || nl[1].n_type == 0)
 			errx(1, "no namelist");
 	} else
 		errx(1, "kvm not available");
 
-	return(nl[0].n_value);
+	rt_topaddr = nl[0].n_value;
+	mt_topaddr = nl[1].n_value;
+
+	return;
 }
 
 void
@@ -354,7 +378,7 @@ print_tree(tn, depth, rightp, family)
 			printf("(%d)", depth);
 		print_addr((struct sockaddr *)&tn->rd_key,
 			   (tn->rd_rtflags & RTF_HOST) ? NULL :
-			   (struct sockaddr *)&tn->rd_mask);
+			   (struct sockaddr *)&tn->rd_mask, family);
 		if (tn->rd_dup != NULL)
 			print_tree(tn->rd_dup, depth, 0, family);
 		if (indenttype == LINE && indent)
@@ -396,8 +420,9 @@ print_tree(tn, depth, rightp, family)
 }
 
 void
-print_addr(addr, mask)
+print_addr(addr, mask, family)
 	struct sockaddr *addr, *mask;
+	int family;
 {
 	char addrbuf[NI_MAXHOST];
 
@@ -405,6 +430,12 @@ print_addr(addr, mask)
 		printf("null\n");
 		return;
 	}
+
+	if (family == AF_MASK) {
+		printf("%d\n", addr->sa_len);
+		return;
+	}
+
 	if (addr->sa_family == AF_UNSPEC) {
 		/* probably a root node */
 		putchar('\n');
