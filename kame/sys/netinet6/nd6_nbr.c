@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.153 2004/12/27 05:41:19 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.154 2005/01/21 03:14:49 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -499,6 +499,10 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 		struct in6_addr *hsrc = NULL;
 
 		if (ln && ln->ln_hold) {
+			/*
+			 * assuming every packet in ln_hold has the same IP
+			 * header
+			 */
 			hip6 = mtod(ln->ln_hold, struct ip6_hdr *);
 			hsrc = &hip6->ip6_src;
 		}
@@ -921,12 +925,25 @@ nd6_na_input(m, off, icmp6len)
 	rt->rt_flags &= ~RTF_REJECT;
 	ln->ln_asked = 0;
 	if (ln->ln_hold) {
-		/*
-		 * we assume ifp is not a loopback here, so just set the 2nd
-		 * argument as the 1st one.
-		 */
-		nd6_output(ifp, ifp, ln->ln_hold,
-		    (struct sockaddr_in6 *)rt_key(rt), rt);
+		struct mbuf *m_hold, *m_hold_next;
+
+		for (m_hold = ln->ln_hold; m_hold; m_hold = m_hold_next) {
+			struct mbuf *mpkt = NULL;
+			
+			m_hold_next = m_hold->m_nextpkt;
+			mpkt = m_copym(m_hold, 0, M_COPYALL, M_DONTWAIT);
+			if (mpkt == NULL) {
+				m_freem(m_hold);
+				break;
+			}
+			mpkt->m_nextpkt = NULL;
+			/*
+			 * we assume ifp is not a loopback here, so just set
+			 * the 2nd argument as the 1st one.
+			 */
+			nd6_output(ifp, ifp, mpkt,
+			    (struct sockaddr_in6 *)rt_key(rt), rt);
+		}
 		ln->ln_hold = NULL;
 	}
 

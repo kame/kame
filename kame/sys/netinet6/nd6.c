@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.369 2005/01/20 09:14:05 t-momose Exp $	*/
+/*	$KAME: nd6.c,v 1.370 2005/01/21 03:14:49 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -608,6 +608,10 @@ nd6_llinfo_timer(arg)
 		} else {
 			struct mbuf *m = ln->ln_hold;
 			if (m) {
+				/*
+				 * assuming every packet in ln_hold has the
+				 * same IP header
+				 */
 				ln->ln_hold = NULL;
 				icmp6_error2(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_ADDR, 0, rt->rt_ifp);
@@ -2116,12 +2120,28 @@ fail:
 			nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 
 			if (ln->ln_hold) {
-				/*
-				 * we assume ifp is not a p2p here, so just
-				 * set the 2nd argument as the 1st one.
-				 */
-				nd6_output(ifp, ifp, ln->ln_hold,
-				    (struct sockaddr_in6 *)rt_key(rt), rt);
+				struct mbuf *m_hold, *m_hold_next;
+				for (m_hold = ln->ln_hold; m_hold;
+				     m_hold = m_hold_next) {
+					struct mbuf *mpkt = NULL;
+			
+					m_hold_next = m_hold->m_nextpkt;
+					mpkt = m_copym(m_hold, 0, M_COPYALL, M_DONTWAIT);
+					if (mpkt == NULL) {
+						m_freem(m_hold);
+						break;
+					}
+					mpkt->m_nextpkt = NULL;
+
+					/*
+					 * we assume ifp is not a p2p here, so
+					 * just set the 2nd argument as the 
+					 * 1st one.
+					 */
+					nd6_output(ifp, ifp, mpkt,
+					     (struct sockaddr_in6 *)rt_key(rt),
+					     rt);
+				}
 				ln->ln_hold = NULL;
 			}
 		} else if (ln->ln_state == ND6_LLINFO_INCOMPLETE) {
@@ -2494,14 +2514,24 @@ again:
 
 	/*
 	 * There is a neighbor cache entry, but no ethernet address
-	 * response yet.  Replace the held mbuf (if any) with this
-	 * latest one.
+	 * response yet.  Append this latest packet to the end of the
+	 * packet queue in the mbuf
 	 */
 	if (ln->ln_state == ND6_LLINFO_NOSTATE)
 		ln->ln_state = ND6_LLINFO_INCOMPLETE;
-	if (ln->ln_hold)
-		m_freem(ln->ln_hold);
-	ln->ln_hold = m;
+	if (ln->ln_hold) {
+		struct mbuf *m_hold, *m_hold_last; 
+
+		m_hold = m_hold_last = ln->ln_hold;
+		while (m_hold) {
+			m_hold_last = m_hold;
+			m_hold = m_hold->m_nextpkt;
+		}
+		m_hold_last->m_nextpkt = m;
+	} else {
+		ln->ln_hold = m;
+	}
+
 	/*
 	 * If there has been no NS for the neighbor after entering the
 	 * INCOMPLETE state, send the first solicitation.

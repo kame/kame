@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2717 2005/01/17 09:53:51 suz Exp $
+$KAME: CHANGELOG,v 1.2718 2005/01/21 03:14:48 suz Exp $
 
 <200501>
+2005-01-21  suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/{nd6.c, nd6_nbr.c}: fixed a loss of fragmented 
+	  packets when the corresponding NDP state is not resolved.
+
 2005-01-17  suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/icmp6.c: ignores ICMPv6 code field in case of 
 	  ICMPv6 Packet-Too-Big.
