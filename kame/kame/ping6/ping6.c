@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.139 2001/10/26 01:43:46 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.140 2001/11/05 07:42:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,10 +144,15 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define socklen_t	int
 #endif
 
+struct tv32 {
+	u_int32_t tv32_sec;
+	u_int32_t tv32_usec;
+};
+
 #define MAXPACKETLEN	131072
 #define	IP6LEN		40
 #define ICMP6ECHOLEN	8	/* icmp echo header len excluding time */
-#define ICMP6ECHOTMLEN sizeof(struct timeval)
+#define ICMP6ECHOTMLEN sizeof(struct tv32)
 #define ICMP6_NIQLEN	(ICMP6ECHOLEN + 8)
 /* FQDN case, 64 bits of nonce + 32 bits ttl */
 #define ICMP6_NIRLEN	(ICMP6ECHOLEN + 12)
@@ -648,7 +653,7 @@ main(argc, argv)
 		errx(1, "-f and -i incompatible options");
 
 	if ((options & F_NOUSERDATA) == 0) {
-		if (datalen >= sizeof(struct timeval)) {
+		if (datalen >= sizeof(struct tv32)) {
 			/* we can time transfer */
 			timing = 1;
 		} else
@@ -1265,9 +1270,14 @@ pinger()
 		icp->icmp6_code = 0;
 		icp->icmp6_id = htons(ident);
 		icp->icmp6_seq = ntohs(seq);
-		if (timing)
-			(void)gettimeofday((struct timeval *)
-					   &outpack[ICMP6ECHOLEN], NULL);
+		if (timing) {
+			struct timeval tv;
+			struct tv32 *tv32;
+			(void)gettimeofday(&tv, NULL);
+			tv32 = (struct tv32 *)&outpack[ICMP6ECHOLEN];
+			tv32->tv32_sec = htonl(tv.tv_sec);
+			tv32->tv32_usec = htonl(tv.tv_usec);
+		}
 		cc = ICMP6ECHOLEN + datalen;
 	}
 
@@ -1405,7 +1415,8 @@ pr_pack(buf, cc, mhdr)
 	int fromlen;
 	u_char *cp = NULL, *dp, *end = buf + cc;
 	struct in6_pktinfo *pktinfo = NULL;
-	struct timeval tv, *tp;
+	struct timeval tv, tp;
+	struct tv32 *tpp;
 	double triptime = 0;
 	int dupflag;
 	size_t off;
@@ -1447,8 +1458,10 @@ pr_pack(buf, cc, mhdr)
 		seq = ntohs(icp->icmp6_seq);
 		++nreceived;
 		if (timing) {
-			tp = (struct timeval *)(icp + 1);
-			tvsub(&tv, tp);
+			tpp = (struct tv32 *)(icp + 1);
+			tp.tv_sec = ntohl(tpp->tv32_sec);
+			tp.tv_usec = ntohl(tpp->tv32_usec);
+			tvsub(&tv, &tp);
 			triptime = ((double)tv.tv_sec) * 1000.0 +
 			    ((double)tv.tv_usec) / 1000.0;
 			tsum += triptime;
@@ -2566,7 +2579,7 @@ fill(bp, patp)
 /* xxx */
 	if (ii > 0)
 		for (kk = 0;
-		    kk <= MAXDATALEN - (8 + sizeof(struct timeval) + ii);
+		    kk <= MAXDATALEN - (8 + sizeof(struct tv32) + ii);
 		    kk += ii)
 			for (jj = 0; jj < ii; ++jj)
 				bp[jj + kk] = pat[jj];
