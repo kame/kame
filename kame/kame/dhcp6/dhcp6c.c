@@ -41,10 +41,10 @@
 #  include <time.h>
 # endif
 #endif
+#include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
-#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 
