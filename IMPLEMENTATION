@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.168 2000/12/11 05:08:27 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.169 2001/01/23 09:52:45 itojun Exp $
 
 1. IPv6
 
@@ -113,6 +113,11 @@ draft-ietf-ipngwg-rfc2292bis-01.txt:
 	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
+draft-ietf-mobileip-ipv6-09.txt: Mobility Support in IPv6
+    * Default installation recognizes home address option (in destination
+      options header).  No sub-options are supported.  interaction with
+      IPsec, and/or 2292bis API, needs further study.
+    * Ericsson mobile-ip6 code is integrated in the tree.  See section 6.
 draft-ietf-ngtrans-tcpudp-relay-01.txt:
 	An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
