@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.102 2000/08/14 13:31:17 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.103 2000/08/14 17:53:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2656,10 +2656,13 @@ in6h_addhash(ih)
 
 	/* Add to tail of hash list, as address is at end of address list */
 	for (prev = &in6hash[HASH6(&ih->in6h_addr) % in6_nhash]; *prev;
-	     prev = &((*prev)->in6h_next))
-		;
+	     prev = &((*prev)->in6h_next)) {
+		/* however, we always prefer non-global addresses */
+		if (IN6_IS_ADDR_LINKLOCAL(&(*prev)->in6h_addr))
+			break;
+	}
+	ih->in6h_next = *prev;
 	*prev = ih;
-	ih->in6h_next = NULL;
 }
 
 static void
