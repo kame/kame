@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.49 2001/08/16 20:35:29 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.50 2001/08/16 20:44:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -65,8 +65,6 @@ static int p_aiflags = 0, p_aifamily = PF_UNSPEC;
 
 /* temporary buffer */
 static caddr_t pp_key;
-
-extern char cmdarg[8192];
 
 static struct addrinfo *parse_addr __P((char *, char *));
 static int setvarbuf __P((char *, int *, struct sadb_ext *, int, caddr_t, int));
@@ -1135,8 +1133,6 @@ parse_init()
 
 	p_aiflags = 0;
 	p_aifamily = PF_UNSPEC;
-
-	memset(cmdarg, 0, sizeof(cmdarg));
 
 	return;
 }
