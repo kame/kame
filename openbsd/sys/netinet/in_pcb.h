@@ -157,6 +157,21 @@ struct inpcb {
 	struct	icmp6_filter *inp_icmp6filt;
 };
 
+/*
+ * The followings are for convenience to compile the KAME code shared with
+ * other *BSDs.
+ */
+#define in6p_socket inp_socket
+#define in6p_inputopts inp_inputopts6
+#define in6p_outputopts inp_outputopts6
+#define in6p_hops inp_hops
+#define in6p_lport inp_lport
+#define in6p_laddr inp_laddr6
+#define in6p_faddr inp_faddr6
+#define in6p_moptions inp_moptions6
+#define in6p_flags inp_flags
+#define in6p_route inp_route
+
 struct inpcbtable {
 	CIRCLEQ_HEAD(, inpcb) inpt_queue;
 	LIST_HEAD(inpcbhead, inpcb) *inpt_hashtbl;
