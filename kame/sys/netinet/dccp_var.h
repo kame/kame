@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.17 2004/10/27 07:57:49 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.18 2004/10/28 04:27:23 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -259,18 +259,6 @@ extern const char *dccpstates[];
 
 #ifdef __FreeBSD__
 SYSCTL_DECL(_net_inet_dccp);
-#endif
-
-#ifdef __OpenBSD__
-#ifndef callout_init
-#define callout_init(args)
-#define callout_reset(c, ticks, func, arg) \
-	do { \
-		timeout_set((c), (func), (arg)); \
-		timeout_add((c), (ticks)); \
-	} while (0)
-#define callout_stop(c)	timeout_del(c)
-#endif
 #endif
 
 extern struct	pr_usrreqs dccp_usrreqs;

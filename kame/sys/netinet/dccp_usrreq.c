@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.32 2004/09/29 08:36:01 suz Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.33 2004/10/28 04:27:23 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -751,7 +751,13 @@ dccp_input(struct mbuf *m, ...)
 				DCCP_DEBUG((LOG_INFO, "XXX: len=%d, data_off=%d\n", len, data_off));
 				dccp_add_option(dp, DCCP_OPT_DATA_DISCARD, test, 0);
 			}
-			callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
+#ifdef __OpenBSD__
+			timeout_set(&dp->connect_timer, dccp_connect_t, dp);
+			timeout_add(&dp->connect_timer, DCCP_CONNECT_TIMER);
+#else
+			callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER,
+			    dccp_connect_t, dp);
+#endif
 			dccp_output(dp, 0);
 			break;
 
@@ -784,8 +790,13 @@ dccp_input(struct mbuf *m, ...)
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
 			dp->ack_snd = dp->seq_rcv;
 
+#ifdef __OpenBSD__
+			timeout_del(&dp->retrans_timer);
+			timeout_del(&dp->connect_timer);
+#else
 			callout_stop(&dp->retrans_timer);
 			callout_stop(&dp->connect_timer);
+#endif
 
 			/* First check if we have negotiated a cc */
 			if (dp->cc_in_use[0] > 0 && dp->cc_in_use[1] > 0) {
@@ -820,7 +831,11 @@ dccp_input(struct mbuf *m, ...)
 				dp = dccp_close(dp);
 				return;
 			} else {
+#ifdef __OpenBSD__
+				timeout_del(&dp->retrans_timer);
+#else
 				callout_stop(&dp->retrans_timer);
+#endif
 				dp->state = DCCPS_TIME_WAIT;
 			}
 		}
@@ -833,7 +848,11 @@ dccp_input(struct mbuf *m, ...)
 		case DCCP_TYPE_DATAACK:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP ACK/DATAACK\n"));
 
+#ifdef __OpenBSD__
+			timeout_del(&dp->connect_timer);
+#else
 			callout_stop(&dp->connect_timer);
+#endif
 
 			dp->ack_rcv = ntohl(dah->dah_ack << 8); /* Ack num */
 
@@ -867,7 +886,11 @@ dccp_input(struct mbuf *m, ...)
 
 		case DCCP_TYPE_RESET:
 			dp->state = DCCPS_TIME_WAIT;
+#ifdef __OpenBSD__
+			timeout_del(&dp->retrans_timer);
+#else
 			callout_stop(&dp->retrans_timer);
+#endif
 			break;
 
 		default:
@@ -927,8 +950,15 @@ dccp_input(struct mbuf *m, ...)
 		case DCCP_TYPE_RESET:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP RESET\n"));
 			dp->state = DCCPS_TIME_WAIT;
+#ifdef __OpenBSD__
+			timeout_del(&dp->retrans_timer);
+			timeout_set(&dp->timewait_timer, dccp_timewait_t, dp);
+			timeout_add(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER);
+#else
 			callout_stop(&dp->retrans_timer);
-			callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER, dccp_timewait_t, dp);
+			callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER,
+			    dccp_timewait_t, dp);
+#endif
 			break;
 	
 		case DCCP_TYPE_MOVE:
@@ -944,14 +974,22 @@ dccp_input(struct mbuf *m, ...)
 		switch (dh->dh_type) {
 		case DCCP_TYPE_CLOSE:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP CLOSE (State DCCPS_SERVER_CLOSE)\n"));
+#ifdef __OpenBSD__
+			timeout_del(&dp->retrans_timer);
+#else
 			callout_stop(&dp->retrans_timer);
+#endif
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 			dp = dccp_close(dp);
 			goto badunlocked;
 
 		case DCCP_TYPE_RESET:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP RESET\n"));
+#ifdef __OpenBSD__
+			timeout_del(&dp->retrans_timer);
+#else
 			callout_stop(&dp->retrans_timer);
+#endif
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 			dp->state = DCCPS_TIME_WAIT;
 			break;
@@ -972,9 +1010,19 @@ dccp_input(struct mbuf *m, ...)
 			break;
 		case DCCP_TYPE_RESET:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP RESET\n"));
+#ifdef __OpenBSD__
+			timeout_del(&dp->retrans_timer);
+#else
 			callout_stop(&dp->retrans_timer);
+#endif
 			dp->state = DCCPS_TIME_WAIT;
-			callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER, dccp_timewait_t, dp);
+#ifdef __OpenBSD__
+			timeout_set(&dp->timewait_timer, dccp_timewait_t, dp);
+			timeout_add(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER);
+#else
+			callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER,
+			    dccp_timewait_t, dp);
+#endif
 			break;
 		default:
 			DCCP_DEBUG((LOG_INFO, "Got a %u packet while in client_close stage!\n", dh->dh_type));
@@ -1893,10 +1941,17 @@ dccp_close(struct dccpcb *dp)
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_close!\n"));
 
 	/* Stop all timers */
+#ifdef __OpenBSD__
+	timeout_del(&dp->connect_timer);
+	timeout_del(&dp->retrans_timer);
+	timeout_del(&dp->close_timer);
+	timeout_del(&dp->timewait_timer);
+#else
 	callout_stop(&dp->connect_timer);
 	callout_stop(&dp->retrans_timer);
 	callout_stop(&dp->close_timer);
 	callout_stop(&dp->timewait_timer);
+#endif
 
 	if (dp->cc_in_use[0] > 0)
 		(*cc_sw[dp->cc_in_use[0]].cc_send_free)(dp->cc_state[0]);
@@ -2212,8 +2267,15 @@ dccp_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	if (error != 0)
 		goto bad;
 
+#ifdef __OpenBSD__
+	timeout_set(&dp->retrans_timer, dccp_retrans_t, dp);
+	timeout_add(&dp->retrans_timer, dp->retrans);
+	timeout_set(&dp->connect_timer, dccp_connect_t, dp);
+	timeout_add(&dp->connect_timer, DCCP_CONNECT_TIMER);
+#else
 	callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
 	callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
+#endif
 
 	test[0] = dp->pref_cc;
 	/* FIX THIS LATER */
@@ -2474,8 +2536,17 @@ dccp_disconnect2(struct dccpcb *dp)
 		sbflush(&so->so_rcv);
 		if (dp->state == DCCPS_ESTAB) {
 			dp->retrans = 100;
-			callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
-			callout_reset(&dp->close_timer, DCCP_CLOSE_TIMER, dccp_close_t, dp);
+#ifdef __OpenBSD__
+			timeout_set(&dp->retrans_timer, dccp_retrans_t, dp);
+			timeout_add(&dp->retrans_timer, dp->retrans);
+			timeout_set(&dp->close_timer, dccp_close_t, dp);
+			timeout_add(&dp->close_timer, DCCP_CLOSE_TIMER);
+#else
+			callout_reset(&dp->retrans_timer, dp->retrans,
+			    dccp_retrans_t, dp);
+			callout_reset(&dp->close_timer, DCCP_CLOSE_TIMER,
+			    dccp_close_t, dp);
+#endif
 			if (dp->who == DCCP_CLIENT) {
 				dp->state = DCCPS_CLIENT_CLOSE;
 			} else {
@@ -2754,6 +2825,7 @@ dccp_newdccpcb(struct inpcb *inp)
 	callout_init(&dp->retrans_timer, 0);
 	callout_init(&dp->close_timer, 0);
 	callout_init(&dp->timewait_timer, 0);
+#elif defined(__OpenBSD__)
 #else
 	callout_init(&dp->connect_timer);
 	callout_init(&dp->retrans_timer);
@@ -3347,7 +3419,13 @@ dccp_close_t(void *dcb)
 		INP_LOCK(dp->d_inpcb);
 		dccp_output(dp, DCCP_TYPE_RESET + 2);
 		/*dp->state = DCCPS_TIME_WAIT; */
-		callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER, dccp_timewait_t, dp);
+#ifdef __OpenBSD__
+		timeout_set(&dp->timewait_timer, dccp_timewait_t, dp);
+		timeout_add(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER);
+#else
+		callout_reset(&dp->timewait_timer, DCCP_TIMEWAIT_TIMER,
+		    dccp_timewait_t, dp);
+#endif
 		INP_UNLOCK(dp->d_inpcb);
 	}
 	INP_INFO_WUNLOCK(&dccpbinfo);
@@ -3371,10 +3449,19 @@ dccp_retrans_t(void *dcb)
 	inp = dp->d_inpcb;
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&dccpbinfo);
+#ifdef __OpenBSD__
+	timeout_del(&dp->retrans_timer);
+#else
 	callout_stop(&dp->retrans_timer);
+#endif
 	dccp_output(dp, 0);
 	dp->retrans = dp->retrans * 2;
+#ifdef __OpenBSD__
+	timeout_set(&dp->retrans_timer, dccp_retrans_t, dp);
+	timeout_add(&dp->retrans_timer, dp->retrans);
+#else
 	callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
+#endif
 	INP_UNLOCK(inp);
 	splx(s);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.13 2004/09/29 08:36:01 suz Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.14 2004/10/28 04:27:23 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -243,6 +243,7 @@ void *tcplike_send_init(struct dccpcb* pcb)
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&cb->rto_timer, 0);
 	callout_init(&cb->free_timer, 0);
+#elif defined(__OpenBSD__)
 #else
 	callout_init(&cb->rto_timer);
 	callout_init(&cb->free_timer);
@@ -314,14 +315,23 @@ void tcplike_send_free(void *ccb)
 	/* untimeout any active timer */
 	if (cb->rto_timer_callout) {
 		TCPLIKE_DEBUG((LOG_INFO, "Untimeout RTO Timer\n"));
+#ifdef __OpenBSD__
+		timeout_del(&cb->rto_timer);
+#else
 		callout_stop(&cb->rto_timer);
+#endif
 		cb->rto_timer_callout = 0;
 	}
 	
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
 #endif
-	callout_reset(&cb->free_timer, 10*hz, tcplike_send_term, (void*)cb);
+#ifdef __OpenBSD__
+	timeout_set(&cb->free_timer, tcplike_send_term, (void *)cb);
+	timeout_add(&cb->free_timer, 10 * hz);
+#else
+	callout_reset(&cb->free_timer, 10 * hz, tcplike_send_term, (void *)cb);
+#endif
 }
 
 /* Ask TCPlike wheter one can send a packet or not 
@@ -352,7 +362,15 @@ int tcplike_send_packet(void *ccb, long datasize)
 		if (!cb->rto_timer_callout) {
 			LOSS_DEBUG((LOG_INFO, "Trigger TCPlike RTO timeout timer. Ticks = %u\n", cb->rto));
 			ticks = (long)cb->rto;
-			callout_reset(&cb->rto_timer, ticks, tcplike_rto_timeout, (void *)cb);
+#ifdef __OpenBSD__
+			timeout_set(&cb->rto_timer, tcplike_rto_timeout,
+			    (void *)cb);
+			timeout_add(&cb->rto_timer, ticks);
+			    tcplike_rto_timeout, (void *)cb);
+#else
+			callout_reset(&cb->rto_timer, ticks,
+			    tcplike_rto_timeout, (void *)cb);
+#endif
 			cb->rto_timer_callout = 1;
 		}
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -373,7 +391,11 @@ int tcplike_send_packet(void *ccb, long datasize)
 	/* untimeout any active timer */
 	if (cb->rto_timer_callout) {
 		LOSS_DEBUG((LOG_INFO, "Untimeout RTO Timer\n"));
+#ifdef __OpenBSD__
+		timeout_del(&cb->rto_timer);
+#else
 		callout_stop(&cb->rto_timer);
+#endif
 		cb->rto_timer_callout = 0;
 	}
 
@@ -672,7 +694,11 @@ void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 	if (cb->cwnd > cb->outstanding && cb->rto_timer_callout) {
                 LOSS_DEBUG((LOG_INFO, "Force DCCP_OUTPUT, CWND = %u Outstanding = %u\n",
                             cb->cwnd, cb->outstanding));
+#ifdef __OpenBSD__
+		timeout_del(&cb->rto_timer);
+#else
 		callout_stop(&cb->rto_timer);
+#endif
 		cb->rto_timer_callout = 0;
 		
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -891,7 +917,8 @@ void *tcplike_recv_init(struct dccpcb *pcb)
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&ccb->free_timer, 0);
-#else
+#elif defined(__OpenBSD__)
+#endif
 	callout_init(&ccb->free_timer);
 #endif
 	
@@ -947,7 +974,12 @@ void tcplike_recv_free(void *ccb)
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
 #endif
-	callout_reset(&cb->free_timer, 10*hz, tcplike_recv_term, (void*)cb);
+#ifdef __OpenBSD__
+	timeout_set(&cb->free_timer, tcplike_recv_term, (void *)cb);
+	timeout_add(&cb->free_timer, 10 * hz);
+#else
+	callout_reset(&cb->free_timer, 10 * hz, tcplike_recv_term, (void *)cb);
+#endif
 }
 
 /*
