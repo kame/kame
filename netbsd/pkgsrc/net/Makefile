@@ -9,6 +9,7 @@
     SUBDIR += gated-ipv6
     SUBDIR += irc
     SUBDIR += mrt
+    SUBDIR += mtr
     SUBDIR += ncftp3
     SUBDIR += newbie
     SUBDIR += rsync
