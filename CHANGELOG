@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.584 2000/02/21 06:51:16 itojun Exp $
+$Id: CHANGELOG,v 1.585 2000/02/21 11:49:41 itojun Exp $
 
 <200002>
+Mon Feb 21 20:48:13 JST 2000  itojun@iijlab.net
+	* {freebsd[23],netbsd}/usr.sbin/racoon/Makefile.inc:
+	  add library paths for "USA resident" case (link separate librsaref).
+
 Mon Feb 21 15:53:56 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/www/apache: upgrade to 1.3.11 with IPv6 patch.
 
