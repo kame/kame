@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.639 2000/02/29 18:27:49 itojun Exp $
+$Id: CHANGELOG,v 1.640 2000/03/01 03:38:58 itojun Exp $
 
 <200003>
+Wed Mar  1 12:38:07 JST 2000  itojun@iijlab.net
+	* libpcap/gencode.c: fix "ip host foo" or "ip6 host foo" where foo has
+	  both A and AAAA.  From: Bill Fenner, FreeBSD PR: 17083
+
 Wed Mar  1 03:27:06 JST 2000  itojun@iijlab.net
 	* libinet6/rthdr.c: fix alignment constraint in rthdr_*.
 	  From: shin@kame.net for freebsd-current
