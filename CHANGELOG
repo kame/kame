@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1492 2001/01/21 11:13:17 jinmei Exp $
+$KAME: CHANGELOG,v 1.1493 2001/01/21 11:14:36 jinmei Exp $
 
 <200101>
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -15,8 +15,8 @@ Sun Jan 21 00:26:47 PST 2001  itojun@iijlab.net
 
 Sun Jan 21 01:37:23 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* sys/netinet6/{nd6.c,nd6_nbr.c,nd6.h}: implement garbage
-	  correction for stale NDP entry which described in RFC2461
-	  5.3. Each entry will removed in 1day in default.
+	  collection for a stale NDP entry, as described in RFC2461
+	  5.3. Each entry will be removed in 1day by default.
 
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/bin/ping/ping.c: corrected the output format when the
