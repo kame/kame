@@ -509,6 +509,7 @@ static int chrtoblktbl[] = {
 	/* 72 */	NODEV,
 	/* 73 */	NODEV,
 	/* 74 */	NODEV,
+	/* 75 */	NODEV,
 };
 
 /*
