@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.71 2000/11/28 13:26:58 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.72 2000/11/29 05:16:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -553,7 +553,6 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 	u_int16_t fport = fport_arg, lport = lport_arg;
 	int errno;
 	int nmatch = 0;
-	int do_rtchange = (notify == in6_rtchange);
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 0;
@@ -574,7 +573,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 		lport = 0;
 		bzero((caddr_t)laddr6, sizeof(*laddr6));
 
-		do_rtchange = 1;
+		if (cmd != PRC_HOSTDEAD)
+			notify = in6_rtchange;
 	}
 
 	if (notify == NULL)
@@ -601,25 +601,6 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 			ip6_notify_pmtu(in6p, (struct sockaddr_in6 *)dst,
 					(u_int32_t *)cmdarg);
 		}
-
-		if (do_rtchange) {
-			struct sockaddr_in6 *dst6;
-
-			/*
-			 * Since a non-connected PCB might have a cached route,
-			 * we always call in6_rtchange without matching
-			 * the PCB to the src/dst pair.
-			 *
-			 * XXX: we assume in6_rtchange does not free the PCB.
-			 */
-			dst6 = (struct sockaddr_in6 *)&in6p->in6p_route.ro_dst;
-			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &faddr6))
-				in6_rtchange(in6p, errno);
-
-			continue; /* there's nothing to do any more */
-		}
-
-		/* at this point, we can assume that NOTIFY is not NULL. */
 
 		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6) ||
 		    in6p->in6p_socket == 0 ||
