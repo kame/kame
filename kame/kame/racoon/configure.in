@@ -523,5 +523,8 @@ else
 fi
 AC_SUBST(sysconfdir_x)
 
+dnl Checks for getifaddrs
+AC_CHECK_FUNCS(getifaddrs)
+
 AC_OUTPUT(Makefile samples/basic.conf samples/policy.conf samples/psk.txt
 	samples/psk.txt samples/racoon.conf samples/remote.conf samples/sa.conf)

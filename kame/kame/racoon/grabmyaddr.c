@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.9 2000/04/05 04:48:41 sakane Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.10 2000/04/17 16:00:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -46,6 +46,9 @@
 #include <unistd.h>
 #endif
 #include <netdb.h>
+#ifdef HAVE_GETIFADDRS
+#include <ifaddrs.h>
+#endif 
 
 #include "var.h"
 #include "misc.h"
@@ -59,10 +62,13 @@
 #include "sockmisc.h"
 #include "isakmp_var.h"
 
+#ifndef HAVE_GETIFADDRS
 static unsigned int if_maxindex __P((void));
+#endif
 static void clear_myaddr __P((struct myaddrs **));
 static struct myaddrs *find_myaddr __P((struct myaddrs *, struct myaddrs *));
 
+#ifndef HAVE_GETIFADDRS
 static unsigned int
 if_maxindex()
 {
@@ -77,6 +83,7 @@ if_maxindex()
 	if_freenameindex(p0);
 	return max;
 }
+#endif
 
 static void
 clear_myaddr(db)
@@ -124,6 +131,81 @@ find_myaddr(db, p)
 void
 grab_myaddrs()
 {
+#ifdef HAVE_GETIFADDRS
+	struct myaddrs *p, *q, *old;
+	struct ifaddrs *ifa0, *ifap;
+#ifdef INET6
+#ifdef __KAME__
+	struct sockaddr_in6 *sin6;
+#endif
+#endif
+
+#if defined(YIPS_DEBUG)
+	char _addr1_[NI_MAXHOST];
+#endif
+
+	if (getifaddrs(&ifa0)) {
+		plog(logp, LOCATION, NULL,
+			"getifaddrs failed: %s\n", strerror(errno));
+		exit(1);
+		/*NOTREACHED*/
+	}
+
+	old = lcconf->myaddrs;
+
+	for (ifap = ifa0; ifap; ifap = ifap->ifa_next) {
+
+		if (ifap->ifa_addr->sa_family != AF_INET
+		 && ifap->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		p = newmyaddr();
+		if (p == NULL) {
+			exit(1);
+			/*NOTREACHED*/
+		}
+		p->addr = dupsaddr(ifap->ifa_addr);
+		if (p->addr == NULL) {
+			exit(1);
+			/*NOTREACHED*/
+		}
+#ifdef INET6
+#ifdef __KAME__
+		if (ifap->ifa_addr->sa_family == AF_INET6) {
+			sin6 = (struct sockaddr_in6 *)p->addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)
+			 || IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
+				sin6->sin6_scope_id =
+					ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+				sin6->sin6_addr.s6_addr[2] = 0;
+				sin6->sin6_addr.s6_addr[3] = 0;
+			}
+		}
+#endif
+#endif
+		YIPSDEBUG(DEBUG_NET,
+			if (getnameinfo(p->addr, p->addr->sa_len,
+					_addr1_, sizeof(_addr1_),
+					NULL, 0,
+					NI_NUMERICHOST | niflags))
+				strcpy(_addr1_, "(invalid)");
+			plog(logp, LOCATION, NULL,
+				"my interface: %s (%s)\n",
+				_addr1_, ifap->ifa_name));
+		q = find_myaddr(old, p);
+		if (q)
+			p->sock = q->sock;
+		else
+			p->sock = -1;
+		p->next = lcconf->myaddrs;
+		lcconf->myaddrs = p;
+	}
+
+	freeifaddrs(ifa0);
+
+	clear_myaddr(&old);
+
+#else /*!HAVE_GETIFADDRS*/
 	int s;
 	unsigned int maxif;
 	int len;
@@ -230,6 +312,7 @@ grab_myaddrs()
 	clear_myaddr(&old);
 
 	free(iflist);
+#endif /*HAVE_GETIFADDRS*/
 }
 
 int
