@@ -1,4 +1,4 @@
-SRCS=	bicdtest.c
+SRCS=	bindtest.c
 OBJS=	bindtest.o 
 
 bindtest: $(OBJS)
