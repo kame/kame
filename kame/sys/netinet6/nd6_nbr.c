@@ -713,7 +713,12 @@ nd6_na_input(m, off, icmp6len)
 	rt->rt_flags &= ~RTF_REJECT;
 	ln->ln_asked = 0;
 	if (ln->ln_hold) {
+#ifdef OLDIP6OUTPUT
 		(*ifp->if_output)(ifp, ln->ln_hold, rt_key(rt), rt);
+#else
+		nd6_output(ifp, ln->ln_hold,
+			   (struct sockaddr_in6 *)rt_key(rt), rt);
+#endif 
 		ln->ln_hold = 0;
 	}
 }

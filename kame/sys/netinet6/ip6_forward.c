@@ -211,9 +211,13 @@ ip6_forward(m, srcrt)
 	}
 #endif
 
+#ifdef OLDIP6OUTPUT
 	error = (*rt->rt_ifp->if_output)(rt->rt_ifp, m,
 					 (struct sockaddr *)dst,
 					 ip6_forward_rt.ro_rt);
+#else
+	error = nd6_output(rt->rt_ifp, m, dst, rt);
+#endif 
 	if (error) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_out_discard);
 		ip6stat.ip6s_cantforward++;
