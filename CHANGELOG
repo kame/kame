@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1360 2000/11/02 14:18:02 itojun Exp $
+$KAME: CHANGELOG,v 1.1361 2000/11/05 09:42:20 jinmei Exp $
 
 <200011>
 Thu Nov  2 23:17:07 JST 2000  itojun@iijlab.net
@@ -31,7 +31,7 @@ Tue Oct 31 13:33:38 JST 2000  itojun@iijlab.net
 2000-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/if.c (if_getmtu): made some clarifications:
 	  - first try getifaddrs(), and then do SIOCGIFMTU for safety. The
-	    revised logic will safe environments with poor getifaddrs()
+	    revised logic will relieve environments with poor getifaddrs()
 	    implementation.
 	  - avoid referring to freed data by delaying to call freeifaddrs().
 	* kame/kame/rtadvd/rtadvd.conf.5: insistently noted that the
