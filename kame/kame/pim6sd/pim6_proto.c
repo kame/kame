@@ -3425,7 +3425,11 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 
     if (local_address(&new_bsr_address) != NO_VIF)
     {
-		return (FALSE);		/* The new BSR is one of my local addresses */
+	IF_DEBUG(DEBUG_RPF | DEBUG_PIM_BOOTSTRAP)
+	    log(LOG_DEBUG, 0,
+		"receive_pim6_bootstrap: Bootstrap from myself(%s), ignored.",
+		inet6_fmt(&new_bsr_address.sin6_addr));
+	return (FALSE);		/* The new BSR is one of my local addresses */
     }
 
     /*
@@ -3443,22 +3447,27 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	&& (inet6_greaterthan(&curr_bsr_address, &new_bsr_address))))
     {
 	/* The message's BSR is less preferred than the current BSR */
+	log(LOG_DEBUG, 0,
+	    "receive_pim6_bootstrap: BSR(%s, prio=%d) is less preferred"
+	    " than the current BSR(%s, prio=%d)",
+	    inet6_fmt(&new_bsr_address.sin6_addr), new_bsr_priority,
+	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority);
 	return (FALSE);		/* Ignore the received BSR message */
     }
 
-
     /* Check the iif, if this was PIM-ROUTERS multicast */
-    if (IN6_ARE_ADDR_EQUAL(&dst->sin6_addr ,&allpim6routers_group.sin6_addr))
+    if (IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &allpim6routers_group.sin6_addr))
     {
-
 	k_req_incoming(&new_bsr_address, &rpfc);
 	if ((rpfc.iif == NO_VIF) ||
 	    IN6_IS_ADDR_UNSPECIFIED(&rpfc.rpfneighbor.sin6_addr))
 	{
 	    /* coudn't find a route to the BSR */
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_bootstrap: can't find a route to the BSR(%s)",
+		inet6_fmt(&new_bsr_address.sin6_addr));
 	    return (FALSE);
 	}
-
 
 	neighbor_addr = *src;
 	incoming = rpfc.iif;
@@ -3466,6 +3475,9 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	if (uvifs[incoming].uv_flags &
 	    (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
 	{
+	  log(LOG_NOTICE, 0,
+	      "receive_pim6_bootstrap: Bootstrap from an invalid interface(%s)",
+	      uvifs[incoming].uv_name);
 	    return (FALSE);	/* Shoudn't arrive on that interface */
 	}
 
@@ -3480,39 +3492,46 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		rpf_neighbor = n;
 		break;
 	    }
-    		return (FALSE);	/* No neighbor toward BSR found */
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_bootstrap: Bootstrap from an unrecognized "
+		"neighbor(%s) on %s",
+		inet6_fmt(&neighbor_addr.sin6_addr), uvifs[incoming].uv_name);
+	    return (FALSE);	/* No neighbor toward BSR found */
 	}
 
+	/* redundant checks? */
 	if ((n == (pim_nbr_entry_t *) NULL ))
 	{
-		    return (FALSE);	/* Sender of this message is not the RPF*/
+	    return (FALSE);	/* Sender of this message is not the RPF*/
 	}
 				 			/* neighbor */
-	if(!(inet6_equal(&n->address,src)))
+	if(!(inet6_equal(&n->address, src)))
 	{
 		return (FALSE);
 	}
-
-
     }
     else
     {
 	if (local_address(dst) == NO_VIF)
 	    /*
 	     * TODO: XXX: this situation should be handled earlier: The
-	     * destination is neither ALL_PIM_ROUTERS neither me
+	     * destination is neither ALL_PIM_ROUTERS nor me
 	     */
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_bootstrap: Bootstrap with an invalid dst(%s)",
+		inet6_fmt(&dst->sin6_addr));
 	    return (FALSE);
 
 	/* Probably unicasted from the current DR */
 	if (cand_rp_list != (cand_rp_t *) NULL)
 	{
-
 	    /*
 	     * Hmmm, I do have a Cand-RP-list, but some neighbor has a
 	     * different opinion and is unicasting it to me. Ignore this guy.
 	     */
-
+	    log(LOG_INFO, 0,
+		"receive_pim6_bootstrap: Bootstrap received but we already "
+		"have RPs. ignored.");
 	    return (FALSE);
 	}
 	for (mifi = 0; mifi < numvifs; mifi++)
@@ -3530,12 +3549,15 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	{
 	    /* Cannot find the receiving iif toward that DR */
 	    IF_DEBUG(DEBUG_RPF | DEBUG_PIM_BOOTSTRAP)
-		log(LOG_DEBUG, 0, "Unicast boostrap message from %s to ignored: cannot find iif", inet6_fmt(&src->sin6_addr), inet6_fmt(&dst->sin6_addr));
+		log(LOG_DEBUG, 0,
+		    "Unicast boostrap message from %s to %s ignored: "
+		    "cannot find iif",
+		    inet6_fmt(&src->sin6_addr), inet6_fmt(&dst->sin6_addr));
 	    return (FALSE);
 	}
 	/*
 	 * TODO: check the sender is directly connected and I am really the
-	 * DR
+	 * DR.
 	 */
     }
 
@@ -3568,10 +3590,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,
           	&allpim6routers_group, PIM_BOOTSTRAP,
             datalen - sizeof(struct pim));
-
-	 
     }
-
 
     max_data_ptr = (u_int8 *) pim_message + datalen;
  
