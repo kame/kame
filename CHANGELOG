@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1881 2001/09/19 10:14:14 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1882 2001/09/19 13:25:33 jinmei Exp $
 
 <200109>
+2001-09-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/v6test/: added some tiny improvements/corrections:
+	- added missing NTOHS
+	- corrected checksum calculation for packets with routing headers
+	- made the checksum calculation routine against invalid packets
+	The fist two were based on comments from Yutaka Shimizu
+	<jacky@open.tjsys.co.jp>.
+
 2001-09-03 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* freebsd4/sys/netinet/udp_usrreq.c:
 	- Remove 'static' attribute from variable "udpcksum".
