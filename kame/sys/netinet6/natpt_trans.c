@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.30 2001/05/29 03:21:19 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.31 2001/05/29 08:22:14 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -936,7 +936,7 @@ translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
 	if (parse227(ftp4.arg, kk, &sin) == NULL)
 	    return (0);
 	snprintf(Wow, sizeof(Wow), 
-		 "229 Entering Extended Passive Mode (|||%d|)\r\n", sin.sin_port);
+		 "229 Entering Extended Passive Mode (|||%d|)\r\n", ntohs(sin.sin_port));
 	delta = rewriteMbuf(cv6->m, kb, (kk-kb), Wow, strlen(Wow));
 	break;
     }
@@ -1780,7 +1780,7 @@ parse227(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
 
     bzero(sin, sizeof(struct sockaddr_in));
     sin->sin_family = AF_INET;
-    sin->sin_port = inport;
+    sin->sin_port = htons(inport);
     sin->sin_addr = inaddr;
 
     return ((struct sockaddr *)sin);
