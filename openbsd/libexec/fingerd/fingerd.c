@@ -113,17 +113,17 @@ main(argc, argv)
 
 	if (logging) {
 		struct hostent *hp;
-		struct sockaddr_in sin;
+		struct sockaddr_storage ss;
+		struct sockaddr *sa;
 		int sval;
+		char hbuf[MAXHOSTNAMELEN];
 
-		sval = sizeof(sin);
-		if (getpeername(0, (struct sockaddr *)&sin, &sval) < 0)
+		sa = (struct sockaddr *)&ss;
+		sval = sizeof(ss);
+		if (getpeername(0, sa, &sval) < 0)
 			err("getpeername: %s", strerror(errno));
-		if ((hp = gethostbyaddr((char *)&sin.sin_addr.s_addr,
-		    sizeof(sin.sin_addr.s_addr), AF_INET)))
-			hname = strdup(hp->h_name);
-		else
-			hname = strdup(inet_ntoa(sin.sin_addr));
+		getnameinfo(sa, sval, hbuf, sizeof(hbuf), NULL, 0, 0);
+		hname = strdup(hbuf);
 		if (hname == NULL)
 			err("Out of memory");
 	}
