@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.13 1999/08/13 12:38:51 itojun Exp $
+$Id: CHANGELOG,v 1.14 1999/08/13 12:40:00 itojun Exp $
 
 <199908>
 Fri Aug 13 21:34:39 JST 1999  itojun@iijlab.net
@@ -10,7 +10,8 @@ Fri Aug 13 21:34:39 JST 1999  itojun@iijlab.net
 	  is available.
 	  Default value is 1 (allows deprecated address as a last resort).
 	  By making it 0, deprecated address will never be used, even as a
-	  last resort, when selecting source address for new connection.
+	  last resort, when selecting source address for new connection
+	  (past KAME code always behaved like this).
 	  Note that explicit bind(2) is disallowed against deprecated address.
 
 Fri Aug 13 19:39:33 JST 1999 sakane@ydc.co.jp
