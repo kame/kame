@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.89 2002/06/14 15:32:56 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.90 2002/06/21 06:51:45 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -501,7 +501,7 @@ client6_hup(sig)
 	int sig;
 {
 
-	dprintf(LOG_INFO, "%s" "client6_hup: received a SIGHUP", FNAME);
+	dprintf(LOG_INFO, "%s" "received a SIGHUP", FNAME);
 	signaled = 1;
 }
 
