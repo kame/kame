@@ -1,4 +1,4 @@
-/* $KAME: radixwalk.c,v 1.4 2000/08/22 09:12:55 jinmei Exp $ */
+/*	$KAME: radixwalk.c,v 1.5 2001/07/17 14:55:36 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -92,6 +92,12 @@ void print_addr __P((struct sockaddr *, struct sockaddr *));
 void print_mask6 __P((struct sockaddr_in6 *));
 void print_mask4 __P((struct sockaddr_in *));
 u_long kinit __P((void));
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#define rn_b rn_bit
+#define rn_l rn_left
+#define rn_r rn_right
+#endif
 
 void
 usage()
