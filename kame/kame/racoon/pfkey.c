@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.80 2000/09/16 06:11:02 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.81 2000/09/16 08:32:36 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.80 2000/09/16 06:11:02 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.81 2000/09/16 08:32:36 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -831,7 +831,7 @@ pk_sendgetspi(iph2)
 				mode,
 				iph2->dst,		/* src of SA */
 				iph2->src,		/* dst of SA */
-				0, 0, 0, iph2->seq) < 0) {
+				0, 0, pr->reqid_in, iph2->seq) < 0) {
 			plog(logp, LOCATION, NULL,
 				"ipseclib failed send getspi (%s)\n",
 				ipsec_strerror());
