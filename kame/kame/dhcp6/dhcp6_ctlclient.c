@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctlclient.c,v 1.3 2004/09/07 04:47:18 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctlclient.c,v 1.4 2004/09/07 04:56:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -525,7 +525,7 @@ make_interface_object(argc, argv, bpp, lenp)
 	char **argv, **bpp;
 {
 	int iflen;
-	int argc_passed = 0, passed;
+	int argc_passed = 0;
 
 	if (argc == 0) {
 		warnx("make_interface_object: interface not specified");
