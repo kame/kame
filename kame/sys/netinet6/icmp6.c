@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.256 2001/11/01 13:14:56 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.257 2001/11/06 13:09:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2137,9 +2137,10 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 				ltime = ND6_INFINITE_LIFETIME;
 			else {
 				if (ifa6->ia6_lifetime.ia6t_expire >
-				    time_second)
-					ltime = ifa6->ia6_lifetime.ia6t_expire - time_second;
-				else
+				    time_second) {
+					ltime = ifa6->ia6_lifetime.ia6t_expire
+						- time_second;
+				} else
 					ltime = 0;
 			}
 			if (ltime > 0x7fffffff)
