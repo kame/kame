@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.335 2003/12/05 01:35:18 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.336 2004/01/13 03:00:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1611,7 +1611,7 @@ nd6_rtrequest(req, rt, sa)
 				if (in6m) {
 #ifdef MLDV2
 					int error;
-					in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 0);
+					in6_delmulti(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
 #else
 					in6_delmulti(in6m);
 #endif
