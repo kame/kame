@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.83 2000/08/31 07:31:48 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.84 2000/08/31 07:32:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1406,7 +1406,7 @@ pr_pack(buf, cc, mhdr)
 				}
 
 				if ((end - (u_char *)ni) < ICMP6_NIRLEN) {
-					/* case of refusion, unkown */
+					/* case of refusion, unknown */
 					/*(*/
 					putchar(')');
 					goto fqdnend;
