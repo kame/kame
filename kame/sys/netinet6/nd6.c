@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.51 2000/04/07 15:36:05 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.52 2000/04/11 03:37:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,6 +185,11 @@ nd6_ifattach(ifp)
 	}
 
 #define ND nd_ifinfo[ifp->if_index]
+
+	/* don't initialize if called twice */
+	if (ND.linkmtu)
+		return;
+
 	ND.linkmtu = ifindex2ifnet[ifp->if_index]->if_mtu;
 	ND.chlim = IPV6_DEFHLIM;
 	ND.basereachable = REACHABLE_TIME;
