@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.40 2001/07/15 09:50:28 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.41 2001/07/19 05:22:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1289,7 +1289,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
     ip6->ip6_vfc |=  IPV6_VERSION;
     ip6->ip6_plen = htons(cv4->plen);
     ip6->ip6_nxt  = IPPROTO_TCP;
-    ip6->ip6_hlim = ip4->ip_ttl -1;
+    ip6->ip6_hlim = ip4->ip_ttl;
     ip6->ip6_src  = pad->in6src;
     ip6->ip6_dst  = pad->in6dst;
 
@@ -1408,7 +1408,7 @@ translatingICMPv6To4(struct _cv *cv6, struct pAddr *pad)
     ip4->ip_len = htons(ip6->ip6_plen);	/* Payload length			*/
     ip4->ip_id	= 0;			/* Identification			*/
     ip4->ip_off = 0;			/* flag and fragment offset		*/
-    ip4->ip_ttl = ip6->ip6_hlim - 1;	/* Time To Live				*/
+    ip4->ip_ttl = ip6->ip6_hlim;	/* Time To Live				*/
     ip4->ip_p	= cv6->ip_payload;	/* Final Payload			*/
     ip4->ip_src = pad->in4src;		/* source addresss			*/
     ip4->ip_dst = pad->in4dst;		/* destination address			*/
