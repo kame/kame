@@ -1,0 +1,14 @@
+--- ./login.c.orig	Sat Nov 13 16:50:45 1999
++++ ./login.c	Sat Nov 13 17:59:23 1999
+@@ -20,7 +20,11 @@
+ #include "includes.h"
+ RCSID("$Id: patch-ak,v 1.1 1999/11/17 22:24:20 sumikawa Exp $");
+ 
++#if defined(__FreeBSD__)
++#include <libutil.h>
++#else
+ #include <util.h>
++#endif
+ #include <utmp.h>
+ #include "ssh.h"
+ 
