@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.198 2001/07/27 07:38:51 itojun Exp $	*/
+/*	$KAME: key.c,v 1.199 2001/07/27 07:54:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1158,9 +1158,14 @@ key_delsp(sp)
 		if (isr->tunifp) {
 			int s;
 
-			(void)gif_delete_tunnel(isr->tunifp);
+			/*
+			 * XXX look at reference counter.  don't kill it if
+			 * it is shared with others.
+			 */
 			s = splimp();
+			(void)gif_delete_tunnel(isr->tunifp);
 			if_down(isr->tunifp);
+			(void)sec_destroy(isr->tunifp);
 			splx(s);
 
 			/* XXX more garbage-collection */
@@ -1860,6 +1865,7 @@ key_spdadd(so, m, mhp)
 	if (ipsec_tunnel_device) {
 		for (req = newsp->req; req; req = req->next) {
 			struct ifnet *ifp;
+			int s;
 
 			if (req->saidx.mode != IPSEC_MODE_TUNNEL)
 				continue;
@@ -1870,9 +1876,12 @@ key_spdadd(so, m, mhp)
 				keydb_delsecpolicy(newsp);
 				return key_senderror(so, m, EINVAL);
 			}
+
+			s = splimp();
 			error = gif_set_tunnel(ifp,
 			    (struct sockaddr *)&req->saidx.src,
 			    (struct sockaddr *)&req->saidx.dst);
+			splx(s);
 			switch (error) {
 			case 0:
 				req->tunifp = ifp;
@@ -1881,10 +1890,12 @@ key_spdadd(so, m, mhp)
 			case EEXIST:
 				/*
 				 * XXX find another tunnel for the same outer
-				 * pair
+				 * pair.  share it with others.
 				 */
 			default:
+				s = splimp();
 				(void)sec_destroy(ifp);
+				splx(s);
 				keydb_delsecpolicy(newsp);
 				return key_senderror(so, m, EINVAL);
 			}
