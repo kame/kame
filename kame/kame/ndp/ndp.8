@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ndp.8,v 1.2 1999/10/07 05:26:13 itojun Exp $
+.\"     $Id: ndp.8,v 1.3 1999/12/09 16:43:42 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt NDP 8
@@ -55,6 +55,9 @@
 .Ar filename
 .Nm ndp
 .Fl H
+.Nm ndp
+.Fl I
+.Ar interface
 .Nm ndp
 .Fl i
 .Ar interface
@@ -97,7 +100,12 @@ Parse the file specified by
 .It Fl H
 Harmonize consistency between the routing table and the default router
 list; install the top entry of the list into the kernel routing table.
+.It Fl I
+.Ar interface
+Specifies the default interface used as the default route when
+there is no default router.
 .It Fl i
+.Ar interface
 view ND information for specified interface.
 .It Fl l
 Do not truncate numeric IPv6 address.
