@@ -80,24 +80,45 @@ int     sig;
 /* rfc931 - return remote user name, given socket structures */
 
 void    rfc931(rmt_sin, our_sin, dest)
-struct sockaddr_in *rmt_sin;
-struct sockaddr_in *our_sin;
+struct sockaddr *rmt_sin;
+struct sockaddr *our_sin;
 char   *dest;
 {
     unsigned rmt_port;
     unsigned our_port;
-    struct sockaddr_in rmt_query_sin;
-    struct sockaddr_in our_query_sin;
+    struct sockaddr_storage rmt_query_sin;
+    struct sockaddr_storage our_query_sin;
     char    user[256];			/* XXX */
     char    buffer[512];		/* XXX */
     char   *cp;
     char   *result = unknown;
     FILE   *fp;
+    int salen;
+    u_short *rmt_portp;
+    u_short *our_portp;
 
 #ifdef __GNUC__
     (void)&result; /* Avoid longjmp clobbering */
     (void)&fp;	/* XXX gcc */
 #endif
+
+    if (rmt_sin->sa_family != our_sin->sa_family) {
+	STRN_CPY(dest, result, STRING_LENGTH);
+	return;
+    }
+    switch (rmt_sin->sa_family) {
+    case AF_INET:
+	salen = sizeof(struct sockaddr_in);
+	break;
+#ifdef INET6
+    case AF_INET6:
+	salen = sizeof(struct sockaddr_in6);
+	break;
+#endif
+    default:
+	STRN_CPY(dest, result, STRING_LENGTH);
+	return;
+    }
 
     /*
      * Use one unbuffered stdio stream for writing to and for reading from
@@ -109,7 +130,7 @@ char   *dest;
      * sockets.
      */
 
-    if ((fp = fsocket(AF_INET, SOCK_STREAM, 0)) != 0) {
+    if ((fp = fsocket(rmt_sin->sa_family, SOCK_STREAM, 0)) != 0) {
 	setbuf(fp, (char *) 0);
 
 	/*
@@ -129,15 +150,35 @@ char   *dest;
 	     * addresses from the query socket.
 	     */
 
-	    our_query_sin = *our_sin;
-	    our_query_sin.sin_port = htons(ANY_PORT);
-	    rmt_query_sin = *rmt_sin;
-	    rmt_query_sin.sin_port = htons(RFC931_PORT);
+	    memcpy(&our_query_sin, our_sin, salen);
+	    switch (our_query_sin.ss_family) {
+	    case AF_INET:
+		our_portp = &((struct sockaddr_in *)&our_query_sin)->sin_port;
+		break;
+#ifdef INET6
+	    case AF_INET6:
+		our_portp = &((struct sockaddr_in6 *)&our_query_sin)->sin6_port;
+		break;
+#endif
+	    }
+	    *rmt_portp = htons(ANY_PORT);
+	    memcpy(&rmt_query_sin, rmt_sin, salen);
+	    switch (rmt_query_sin.ss_family) {
+	    case AF_INET:
+		rmt_portp = &((struct sockaddr_in *)&rmt_query_sin)->sin_port;
+		break;
+#ifdef INET6
+	    case AF_INET6:
+		rmt_portp = &((struct sockaddr_in6 *)&rmt_query_sin)->sin6_port;
+		break;
+#endif
+	    }
+	    *rmt_portp = htons(RFC931_PORT);
 
 	    if (bind(fileno(fp), (struct sockaddr *) & our_query_sin,
-		     sizeof(our_query_sin)) >= 0 &&
+		     salen) >= 0 &&
 		connect(fileno(fp), (struct sockaddr *) & rmt_query_sin,
-			sizeof(rmt_query_sin)) >= 0) {
+			salen) >= 0) {
 
 		/*
 		 * Send query to server. Neglect the risk that a 13-byte
@@ -146,8 +187,8 @@ char   *dest;
 		 */
 
 		fprintf(fp, "%u,%u\r\n",
-			ntohs(rmt_sin->sin_port),
-			ntohs(our_sin->sin_port));
+			ntohs(*rmt_portp),
+			ntohs(*our_portp));
 		fflush(fp);
 
 		/*
@@ -161,8 +202,8 @@ char   *dest;
 		    && ferror(fp) == 0 && feof(fp) == 0
 		    && sscanf(buffer, "%u , %u : USERID :%*[^:]:%255s",
 			      &rmt_port, &our_port, user) == 3
-		    && ntohs(rmt_sin->sin_port) == rmt_port
-		    && ntohs(our_sin->sin_port) == our_port) {
+		    && ntohs(*rmt_portp) == rmt_port
+		    && ntohs(*our_portp) == our_port) {
 
 		    /*
 		     * Strip trailing carriage return. It is part of the

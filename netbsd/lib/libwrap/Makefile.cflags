@@ -11,3 +11,5 @@ CPPFLAGS+=-DPROCESS_OPTIONS -DNETGROUP
 # we don't want to use it in wrapper-related utilities (such as
 # tcpdmatch) that include this file.
 #CPPFLAGS+=-DPARANOID
+
+CPPFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len -DINET6

@@ -12,7 +12,7 @@
 struct host_info {
     char    name[STRING_LENGTH];	/* access via eval_hostname(host) */
     char    addr[STRING_LENGTH];	/* access via eval_hostaddr(host) */
-    struct sockaddr_in *sin;		/* socket address or 0 */
+    struct sockaddr *sin;		/* socket address or 0 */
     struct t_unitdata *unit;		/* TLI transport address or 0 */
     struct request_info *request;	/* for shared information */
 };
@@ -81,7 +81,7 @@ extern void shell_cmd			/* execute shell command */
 extern char *percent_x			/* do %<char> expansion */
 		__P((char *, int, char *, struct request_info *));
 extern void rfc931			/* client name from RFC 931 daemon */
-		__P((struct sockaddr_in *, struct sockaddr_in *, char *));
+		__P((struct sockaddr *, struct sockaddr *, char *));
 extern void clean_exit			/* clean up and exit */
 		__P((struct request_info *));
 extern void refuse			/* clean up and exit */
