@@ -1,9 +1,6 @@
-$Id: TODO,v 1.11 2000/07/16 04:18:55 sakane Exp $
+$Id: TODO,v 1.12 2000/08/23 13:58:35 sakane Exp $
 
-Sorry that `racoon' is not stable yet.  But she can exchange the key
-in limited environment.  Try to run with racoon.conf in the case
-which IPsec-SA required.  Please tell me, sakane@ydc.co.jp, bug report
-except following items.  I do modify continuously until she will be stable.
+Please send any questions or bug reports to snap-users@kame.net.
 
 TODO list
 
