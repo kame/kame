@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.119 2002/06/10 06:15:22 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.120 2002/06/10 07:47:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2614,7 +2614,7 @@ natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct ip *ip4)
 #endif
 	ip4->ip_tos = (ntohl(ip6->ip6_flow) & IPV6_FLOWINFO_MASK) >> 20;
 					/* copy traffic class (all 8bits) */
-	ip4->ip_len = sizeof(struct ip) + ntohs(ip6->ip6_plen);
+	ip4->ip_len = sizeof(struct ip) + cv6->plen;
 	ip4->ip_id  = 0;			/* Identification */
 	ip4->ip_off = 0;			/* flag and fragment offset */
 	ip4->ip_ttl = ip6->ip6_hlim;	/* Time To Live */
