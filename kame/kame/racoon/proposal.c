@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.33 2001/05/24 07:11:40 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.34 2001/07/10 04:07:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -901,7 +901,7 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 {
 	struct saprop *newpp;
 	struct ipsecrequest *req;
-	int encmodesv;
+	int encmodesv = IPSEC_MODE_TRANSPORT; /* use only when complex_bundle */
 
 	newpp = newsaprop();
 	if (newpp == NULL) {
@@ -914,18 +914,21 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	newpp->lifebyte = iph2->sainfo->lifebyte;
 	newpp->pfs_group = iph2->sainfo->pfs_group;
 
-	encmodesv = IPSECDOI_ATTR_ENC_MODE_ANY;
-
 	if (lcconf->complex_bundle)
 		goto skip1;
 
-	/* decide encryption mode */
+	/*
+	 * decide the encryption mode of this SA bundle.
+	 * the mode becomes tunnel mode when there is even one policy
+	 * of tunnel mode in the SPD.  otherwise the mode becomes
+	 * transport mode.
+	 */
+	encmodesv = IPSEC_MODE_TRANSPORT;
 	for (req = sp_out->req; req; req = req->next) {
 		if (req->saidx.mode == IPSEC_MODE_TUNNEL) {
 			encmodesv = pfkey2ipsecdoi_mode(req->saidx.mode);
 			break;
 		}
-		encmodesv = pfkey2ipsecdoi_mode(req->saidx.mode);
 	}
 
     skip1:
