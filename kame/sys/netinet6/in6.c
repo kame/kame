@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.108 2000/10/24 07:13:27 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.109 2000/10/24 07:19:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1457,6 +1457,12 @@ in6_ifscrub(ifp, ia, delloop)
 	if ((ia->ia_flags & IFA_ROUTE) == 0)
 		return;
 
+	/*
+	 * We should check the existence of dstaddr, because link-local
+	 * addresses can be configured without particular destinations
+	 * even on point-to-point or loopback interfaces.
+	 * In this case, kernel would panic in rtinit()...
+	 */
 	if (ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT) &&
 	    (ia->ia_ifa.ifa_dstaddr != NULL))
 		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
