@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)paths.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/include/paths.h,v 1.9.6.1 2000/12/11 01:03:16 obrien Exp $
+ * $FreeBSD: src/include/paths.h,v 1.9.6.2 2001/08/01 05:02:00 obrien Exp $
  */
 
 #ifndef _PATHS_H_
@@ -49,6 +49,7 @@
 #define	_PATH_BSHELL	"/bin/sh"
 #define	_PATH_CONSOLE	"/dev/console"
 #define	_PATH_CSHELL	"/bin/csh"
+#define	_PATH_DEFTAPE	"/dev/sa0"
 #define	_PATH_DEVDB	"/var/run/dev.db"
 #define	_PATH_DEVNULL	"/dev/null"
 #define	_PATH_DEVZERO	"/dev/zero"

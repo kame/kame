@@ -28,7 +28,7 @@
  *
  *	from: @(#)clnt.h 1.31 88/02/08 SMI
  *	from: @(#)clnt.h	2.1 88/07/29 4.0 RPCSRC
- * $FreeBSD: src/include/rpc/clnt.h,v 1.11 1999/08/27 23:45:03 peter Exp $
+ * $FreeBSD: src/include/rpc/clnt.h,v 1.11.2.1 2001/06/28 21:44:09 iedowse Exp $
  */
 
 /*
@@ -232,6 +232,7 @@ typedef struct __rpc_client {
  */
 #define CLSET_RETRY_TIMEOUT 4   /* set retry timeout (timeval) */
 #define CLGET_RETRY_TIMEOUT 5   /* get retry timeout (timeval) */
+#define CLSET_CONNECT		20	/* Use connect() for UDP. (int) */
 
 /*
  * Operations which GSSAPI needs. (Bletch.)
