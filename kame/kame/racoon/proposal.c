@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.27 2001/02/21 05:19:11 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.28 2001/02/22 00:59:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -899,17 +899,8 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	struct secpolicy *sp_in, *sp_out;
 {
 	struct saprop *newpp;
-	struct secpolicy *sp, *sp2;
 	struct ipsecrequest *req;
 	int encmodesv;
-
-	if (iph2->side == INITIATOR) {
-		sp = sp_out;
-		sp2 = sp_in;
-	} else {
-		sp = sp_in;
-		sp2 = sp_out;
-	}
 
 	newpp = newsaprop();
 	if (newpp == NULL) {
@@ -928,7 +919,7 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 		goto skip1;
 
 	/* decide encryption mode */
-	for (req = sp->req; req; req = req->next) {
+	for (req = sp_out->req; req; req = req->next) {
 		if (req->saidx.mode == IPSEC_MODE_TUNNEL) {
 			encmodesv = pfkey2ipsecdoi_mode(req->saidx.mode);
 			break;
@@ -937,7 +928,7 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	}
 
     skip1:
-	for (req = sp->req; req; req = req->next) {
+	for (req = sp_out->req; req; req = req->next) {
 		struct saproto *newpr;
 		struct sockaddr *psaddr = NULL;
 		struct sockaddr *pdaddr = NULL;
@@ -994,10 +985,10 @@ set_proposal_from_policy(iph2, sp_in, sp_out)
 	}
 
 	/* get reqid_in from inbound policy */
-	if (sp2) {
+	if (sp_in) {
 		struct saproto *pr;
 
-		req = sp2->req;
+		req = sp_in->req;
 		pr = newpp->head;
 		while (req && pr) {
 			pr->reqid_in = req->saidx.reqid;
