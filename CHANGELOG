@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.578 2000/02/20 15:04:46 sumikawa Exp $
+$Id: CHANGELOG,v 1.579 2000/02/20 16:49:47 jinmei Exp $
 
 <200002>
+2000-02-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd: tons of changes and improvements including:
+	+ static routes support
+	+ input/output filter for BGP4+ routes
+	+ configurable description about RIPng interfaces and BGP4+ peers
+	+ exportation of interface direct routes to IBGP peers
+	+ configurable logging level
+	+ collecting much more statistics
+	+ new configuration parser using lex and yacc
+	(TODO: revise bgpd.conf.5 accordingly)
+
 Sun Feb 20 23:45:24 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/{tcpdump,libpcap}: upgrade to 2/14 weekly snapshot.
 	* freebsd[23]/ports/apache13: upgrade to latest IPv6 patch.
