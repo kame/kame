@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.46 2001/02/08 16:30:29 itojun Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.47 2001/03/25 08:41:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1132,8 +1132,10 @@ delete_each_prefix(struct rr_prefix *rpp, u_char origin)
 		s = splnet();
 #endif
 		rap = LIST_FIRST(&rpp->rp_addrhead);
-		if (rap == NULL)
+		if (rap == NULL) {
+			splx(s);
 			break;
+		}
 		LIST_REMOVE(rap, ra_entry);
 		splx(s);
 		if (rap->ra_addr == NULL) {
