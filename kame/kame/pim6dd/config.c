@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: config.c,v 1.2 1999/08/17 13:38:03 itojun Exp $
+ *  $Id: config.c,v 1.3 1999/12/30 09:23:08 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -86,6 +86,8 @@ config_vifs_from_kernel()
     ifc.ifc_len = num_ifreq * sizeof(struct ifreq);
     ifc.ifc_buf = calloc(ifc.ifc_len, sizeof(char));
     while (ifc.ifc_buf) {
+	caddr_t newbuf;
+
 	if (ioctl(udp_socket, SIOCGIFCONF, (char *)&ifc) < 0)
 	    log(LOG_ERR, errno, "ioctl SIOCGIFCONF");
 	
@@ -104,7 +106,10 @@ config_vifs_from_kernel()
 	
 	num_ifreq *= 2;
 	ifc.ifc_len = num_ifreq * sizeof(struct ifreq);
-	ifc.ifc_buf = realloc(ifc.ifc_buf, ifc.ifc_len);
+	newbuf = realloc(ifc.ifc_buf, ifc.ifc_len);
+	if (newbuf == NULL)
+	    free(ifc.ifc_buf);
+	ifc.ifc_buf = newbuf;
     }
     if (ifc.ifc_buf == NULL)
 	log(LOG_ERR, 0, "config_vifs_from_kernel: ran out of memory");
