@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.7 2003/10/18 08:23:35 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.8 2003/10/18 08:26:22 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1103,7 +1103,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	struct socket *so = inp->inp_socket;
 	struct mbuf *m;
 
-	struct ip *ip;
+	struct ip *ip = NULL;
 	struct dccphdr *dh;
 	struct dccp_requesthdr *drqh;
 	struct dccp_ackhdr *dah;
@@ -1117,7 +1117,7 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	long len;
 	int isipv6 = 0;
 #ifdef INET6
-	struct ip6_hdr *ip6;
+	struct ip6_hdr *ip6 = NULL;
 
 	isipv6 = (dp->d_inpcb->inp_vflag & INP_IPV6) != 0;
 #endif
@@ -1293,8 +1293,8 @@ again:
 #ifdef INET6
 	if (isipv6) {
 		ip6 = mtod(m, struct ip6_hdr *);
-		dh = (struct dccphdr *)(ip6 + 1)
-		ip6->ip6_flow = (ip6->di6_flow & ~IPV6_FLOWINFO_MASK) |
+		dh = (struct dccphdr *)(ip6 + 1);
+		ip6->ip6_flow = (ip6->ip6_flow & ~IPV6_FLOWINFO_MASK) |
 			(inp->in6p_flowinfo & IPV6_FLOWINFO_MASK);
 		ip6->ip6_vfc = (ip6->ip6_vfc & ~IPV6_VERSION_MASK) |
 			 (IPV6_VERSION & IPV6_VERSION_MASK);
@@ -1305,7 +1305,7 @@ again:
 #endif
 	{
 		ip = mtod(m, struct ip *);
-		dh = (struct dccphdr *)(ip6 + 1)
+		dh = (struct dccphdr *)(ip6 + 1);
 		bzero(ip, sizeof(ip));
 		ip->ip_p = IPPROTO_DCCP;
 		ip->ip_src = inp->inp_laddr;
@@ -1327,37 +1327,22 @@ again:
 	DCCP_DEBUG((LOG_INFO, "Sending with seq %u, (dp->seq_snd = %u)\n\n", dh->dh_seq, dp->seq_snd));
 
 	if (dh->dh_type == DCCP_TYPE_REQUEST) {
-#ifdef INET6
-		if (isipv6)
-			drqh = (struct dccp_requesthdr *)(di6 +1);
-		else
-#endif
-			drqh = (struct dccp_requesthdr *)(di +1);
+		drqh = (struct dccp_requesthdr *)(dh + 1);
 		drqh->drqh_sname = 0; /* Service name must be 0 if not used */
-		optp = (u_char *)(drqh +1);
+		optp = (u_char *)(drqh + 1);
 
 	} else if (dh->dh_type == DCCP_TYPE_RESET) {
-#ifdef INET6
-		if (isipv6)
-			drth = (struct dccp_resethdr *)(di6 +1);
-		else
-#endif
-			drth = (struct dccp_resethdr *)(di +1);
+		drth = (struct dccp_resethdr *)(dh + 1);
 		drth->drth_res = 0; /* Reserved field should be zero */
 		drth->drth_ack = htonl(dp->seq_rcv) >> 8;
 		drth->drth_reason = 0; /* FIX, must be able to specify reason  */
 		drth->drth_data1 = 0;
 		drth->drth_data2 = 0;
 		drth->drth_data3 = 0;
-		optp = (u_char *)(drth +1);
+		optp = (u_char *)(drth + 1);
 
 	} else if (extrah_len) {
-#ifdef INET6
-		if (isipv6)
-			dah = (struct dccp_ackhdr *)(di6 +1);
-		else
-#endif
-			dah = (struct dccp_ackhdr *)(di +1);
+		dah = (struct dccp_ackhdr *)(dh + 1);
 		dah->dah_res = 0; /* Reserved field should be zero */
 
 		if (dp->state == DCCPS_ESTAB) {
@@ -1366,15 +1351,10 @@ again:
 		} else
 			dah->dah_ack = htonl(dp->seq_rcv) >> 8;
 		
-		optp = (u_char *)(dah +1);
+		optp = (u_char *)(dah + 1);
 
 	} else {
-#ifdef INET6
-		if (isipv6)
-			optp = (u_char *)(di6 +1);
-		else
-#endif
-			optp = (u_char *)(di +1);
+		optp = (u_char *)(dh + 1);
 
 	}
 
@@ -2347,11 +2327,11 @@ dccp_add_feature_option(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char 
 			dp->optlen++;
 		} else {
 			if (opt == DCCP_OPT_CONFIRM) {
-				dp->options[dp->optlen +1] = val_len + 3;
+				dp->options[dp->optlen + 1] = val_len + 3;
 				dp->options[dp->optlen +2] = feature;
 				dp->optlen += 3;
 			} else {
-				dp->options[dp->optlen +1] = val_len + 2;
+				dp->options[dp->optlen + 1] = val_len + 2;
 				dp->optlen += 2;
 			}
 	
@@ -2426,7 +2406,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 				DCCP_DEBUG((LOG_INFO, "Got an unknown option, option = %u!\n", opt));
 			}
 		} else if (opt > 32 && opt < 36) {
-			size = options[i+1];
+			size = options[i+ 1];
 			if (size < 3 || size > 10) {
 				DCCP_DEBUG((LOG_INFO, "Error, option size = %u\n", size));
 				return;
@@ -2434,12 +2414,12 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 			/* Feature negotiations are options 33 to 35 */ 
 			DCCP_DEBUG((LOG_INFO, "Got option %u, size = %u, feature = %u\n", opt, size, options[i+2]));
 			bcopy(options + i + 3, val, size -3);
-			DCCP_DEBUG((LOG_INFO, "Calling dccp_feature neg(%u, %u, options[%u + 1], %u)!\n", (u_int)dp, opt, i+1, (size - 3)));
+			DCCP_DEBUG((LOG_INFO, "Calling dccp_feature neg(%u, %u, options[%u + 1], %u)!\n", (u_int)dp, opt, i+ 1, (size - 3)));
 			dccp_feature_neg(dp, opt, options[i+2], (size -3) , val);
 			i += size - 1;
 
 		} else if (opt < 128) {
-			size = options[i+1];
+			size = options[i+ 1];
 			if (size < 3 || size > 10) {
 				DCCP_DEBUG((LOG_INFO, "Error, option size = %u\n", size));
 				return;
@@ -2506,7 +2486,7 @@ dccp_parse_options(struct dccpcb *dp, char *options, int optlen)
 
 		} else {
 			DCCP_DEBUG((LOG_INFO, "Got a CCID option, do nothing!"));
-			size = options[i+1];
+			size = options[i+ 1];
 			if (size < 3 || size > 10) {
 				DCCP_DEBUG((LOG_INFO, "Error, option size = %u\n", size));
 				return;
@@ -2525,7 +2505,7 @@ dccp_add_feature(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char *val, u
 
 	if (DCCP_MAX_OPTIONS > (dp->featlen + val_len + 3)) {
 		dp->features[dp->featlen] = opt;
-		dp->features[dp->featlen +1] = val_len + 3;
+		dp->features[dp->featlen + 1] = val_len + 3;
 		dp->features[dp->featlen +2] = feature;
 		dp->featlen += 3;
 		for (i = 0; i<val_len; i++) {
@@ -2549,7 +2529,7 @@ dccp_remove_feature(struct dccpcb *dp, u_int8_t opt, u_int8_t feature)
 
 	while (i < dp->featlen) {
 		t_opt = dp->features[i];
-		len = dp->features[i+1];
+		len = dp->features[i+ 1];
 
 		if (i + len > dp->featlen) {
 			DCCP_DEBUG((LOG_INFO, "Error, len = %u and i(%u) + len > dp->featlen (%u)\n", len, i, dp->featlen));
@@ -2611,8 +2591,8 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 				DCCP_DEBUG((LOG_INFO, "Got DCCP_OPT_CONFIRM on CCID %u\n", val[0]));
 				dccp_remove_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC);
 				if (dp->cc_in_use[1] < 1) {
-					dp->cc_state[1] = (*cc_sw[val[0] +1].cc_recv_init)(dp);
-					dp->cc_in_use[1] = val[0] +1;
+					dp->cc_state[1] = (*cc_sw[val[0] + 1].cc_recv_init)(dp);
+					dp->cc_in_use[1] = val[0] + 1;
 				} else {
 					DCCP_DEBUG((LOG_INFO, "We already have negotiated a CC!!!\n"));
 				}
@@ -3001,16 +2981,16 @@ void dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
 	
 	*t = *t & (~(0x03 << (offset *2))); /* turn off bits, 00 is rcvd, 11 is missing */
 
-	dp->av_ts = seqnr+1;
+	dp->av_ts = seqnr + 1;
 	if (dp->av_ts == 0x1000000)
 		dp->av_ts = 0;
 
 	if (gap > (dp->av_size - 128)) {
 		n = malloc(dp->av_size/2, M_PCB, M_DONTWAIT | M_ZERO); /* old size * 2 */
-		memset (n+dp->av_size/4,0xff,dp->av_size/4); /* new half all missing */
+		memset (n + dp->av_size / 4, 0xff, dp->av_size / 4); /* new half all missing */
 		dc = (dp->ackvector + (dp->av_size/4)) - dp->av_hp;
-		memcpy (n,dp->av_hp, dc); /* tail to end */
-		memcpy (n+dc,dp->ackvector,dp->av_hp - dp->ackvector); /* start to tail */
+		memcpy (n, dp->av_hp, dc); /* tail to end */
+		memcpy (n+dc, dp->ackvector, dp->av_hp - dp->ackvector); /* start to tail */
 		dp->av_size = dp->av_size * 2; /* counted in items, so it';s a doubling */
 		free (dp->ackvector, M_PCB);
 		dp->av_hp = dp->ackvector = n;
