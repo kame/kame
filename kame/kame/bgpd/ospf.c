@@ -264,8 +264,7 @@ ospf_sendmsg(sin, pktinfo, len)
   struct ospfhdr       *oh;
   u_int16_t             cksum;
   static char *cmsg = NULL;	/* buffer for ancillary data */
-  static int cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-	  CMSG_SPACE(sizeof(int)); 
+  int cmsglen;
 
 #ifdef DEBUG_OSPF
   char                in6txt[INET6_ADDRSTRLEN];
@@ -280,6 +279,8 @@ ospf_sendmsg(sin, pktinfo, len)
   memset(  areaid, 0, INET_ADDRSTRLEN);
   memset(  ifname, 0, IFNAMSIZ);
 #endif
+
+  cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int)); 
 
   if (cmsg == NULL && (cmsg = malloc(cmsglen)) == NULL) {
     syslog(LOG_ERR, "<%s>: malloca failed", __FUNCTION__);
@@ -387,8 +388,7 @@ ospf_input()
   struct msghdr        rmsghdr;            /* Adv. API                  */
   struct iovec         rmsgiov;            /* buffer for data (gather)  */
   static char *cmsg = NULL;	/* buffer for ancillary data */
-  static int cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-    CMSG_SPACE(sizeof(int));
+  int cmsglen;
   struct cmsghdr      *ch;                 /* Adv. API */
   struct in6_pktinfo  *rpktinfo;           /* received I/F address */
   struct in6_pktinfo   spktinfo;           /* sending source I/F   */
@@ -413,6 +413,8 @@ ospf_input()
   memset(  areaid, 0, INET_ADDRSTRLEN);
   memset(  ifname, 0, IFNAMSIZ);
 #endif
+
+  cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
 
   memset(&fsock,    0, sizeof(struct sockaddr_in6)); /* sender's address   */
   memset(ospfbuf,   0, OSPF_BUFSIZ);

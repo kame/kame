@@ -224,7 +224,9 @@ bgp_read(struct rpcb *bnp, int total)
 	struct msghdr rcvmh;
 	struct iovec iov[2];
 	static u_char *rcvmsgbuf = NULL;
-	static int rcvmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	static int rcvmsglen;
+
+	rcvmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 
 	/* We can safely call read without block only once */
 #ifdef OLDADVAPI

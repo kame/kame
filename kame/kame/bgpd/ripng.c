@@ -352,14 +352,15 @@ rip_input()
   struct msghdr       rmsghdr;            /* Adv. API */
   struct iovec        rmsgiov;            /* buffer for data (gather)  */
   static char *cmsg = NULL;	/* buffer for ancillary data */
-  static int cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-	  CMSG_SPACE(sizeof(int));
+  int cmsglen;
   struct cmsghdr     *ch;                 /* Adv. API */
   struct in6_pktinfo *rpktinfo;           /* received I/F address */
   struct in6_pktinfo  spktinfo;           /* sending source I/F   */
   int                *rhoplimit;          /* Adv. API */
 
   char                ifname[IFNAMSIZ];
+
+  cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
 
   memset(&fsock,    0, sizeof(struct sockaddr_in6)); /* sender's addr/port */
   memset(ripbuf,    0, RIPNG_BUFSIZ);
@@ -1164,12 +1165,13 @@ rip_sendmsg(sin, pktinfo, len)
   struct msghdr       smsghdr;            /* Adv. API */
   struct iovec        smsgiov;            /* Adv. API */
   static char *cmsg = NULL;	/* buffer for ancillary data */
-  static int cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-    CMSG_SPACE(sizeof(int));
+  int cmsglen;
   struct cmsghdr     *ch;                 /* Adv. API */
   int                 shoplimit;          /* Adv. API */
   char                ifname[IFNAMSIZ];
   struct riphdr      *rp;    /* RIPng header   */
+
+  cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(sizeof(int));
 
   memset(ifname, 0, IFNAMSIZ);
 
