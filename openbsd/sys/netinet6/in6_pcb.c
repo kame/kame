@@ -298,7 +298,7 @@ in6_pcbbind(inp, nam)
 	}
 
 	if (lport == 0) {
-		error = in6_pcbsetport(&inp->in6p_lsa, inp);
+		error = in6_pcbsetport(&inp->in6p_lsa, inp, p);
 		if (error != 0)
 			return error;
 	} else
@@ -310,9 +310,10 @@ in6_pcbbind(inp, nam)
 }
 
 int
-in6_pcbsetport(laddr, inp)
+in6_pcbsetport(laddr, inp, p)
 	struct sockaddr_in6 *laddr;
 	struct inpcb *inp;
+	struct proc *p;
 {
 	struct socket *so = inp->inp_socket;
 	struct inpcbtable *table = inp->inp_table;
@@ -322,7 +323,6 @@ in6_pcbsetport(laddr, inp)
 	int count;
 	int loopcount = 0;
 	int wild = INPLOOKUP_IPV6;
-	struct proc *p = curproc;		/* XXX */
 	int error;
 
 	/* XXX we no longer support IPv4 mapped address, so no tweaks here */

@@ -331,7 +331,7 @@ in6_pcbbind(in6p, nam)
 
 	if (lport == 0) {
 		int e;
-		if ((e = in6_pcbsetport(&in6p->in6p_lsa, in6p)) != 0)
+		if ((e = in6_pcbsetport(&in6p->in6p_lsa, in6p, p)) != 0)
 			return(e);
 	}
 	else

@@ -317,6 +317,6 @@ int	in6_pcbnotify(struct inpcbtable *, struct sockaddr *,
 			   u_int, struct sockaddr *, u_int, int, void *,
 			   void (*)(struct inpcb *, int));
 int	in6_selecthlim(struct inpcb *, struct ifnet *);
-int	in6_pcbsetport(struct sockaddr_in6 *, struct inpcb *);
+int	in6_pcbsetport(struct sockaddr_in6 *, struct inpcb *, struct proc *);
 #endif /* _KERNEL */
 #endif /* _NETINET_IN_PCB_H_ */

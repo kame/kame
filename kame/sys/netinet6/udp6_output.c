@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.61 2002/06/09 14:44:03 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.62 2002/08/26 11:36:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -356,12 +356,7 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 		if (in6p->in6p_lport == 0 &&
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		    (error = in6_pcbsetport(lsa6, in6p, p)) != 0
-#else
-		    (error = in6_pcbsetport(lsa6, in6p)) != 0
-#endif
-			)
+		    (error = in6_pcbsetport(lsa6, in6p, p)) != 0)
 			goto release;
 	} else {
 		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {

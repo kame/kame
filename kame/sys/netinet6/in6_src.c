@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.120 2002/07/30 12:23:35 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.121 2002/08/26 11:36:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -981,9 +981,10 @@ in6_selecthlim(in6p, ifp)
 #define IN6PLOOKUP_WILDCARD INPLOOKUP_WILDCARD
 #endif
 int
-in6_pcbsetport(laddr, in6p)
+in6_pcbsetport(laddr, in6p, p)
 	struct sockaddr_in6 *laddr;
 	struct in6pcb *in6p;
+	struct proc *p;
 {
 	struct socket *so = in6p->in6p_socket;
 	struct in6pcb *head = in6p->in6p_head;
@@ -1001,8 +1002,6 @@ in6_pcbsetport(laddr, in6p)
 	if (in6p->in6p_flags & IN6P_LOWPORT) {
 #ifdef __NetBSD__
 #ifndef IPNOPRIVPORTS
-		struct proc *p = curproc;		/* XXX */
-
 		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
 			return (EACCES);
 #endif
