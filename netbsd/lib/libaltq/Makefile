@@ -6,7 +6,6 @@ CPPFLAGS+=-DALTQ -DINET6
 
 .PATH:	${.CURDIR}/../../kame/libaltq
 
-MKLINT=no
 MKPIC=no
 
 .include <bsd.lib.mk>
