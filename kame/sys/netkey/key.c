@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.122 2000/06/10 06:39:54 sakane Exp $	*/
+/*	$KAME: key.c,v 1.123 2000/06/10 14:19:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4352,7 +4352,7 @@ key_proto2satype(proto)
 /* %%% PF_KEY */
 /*
  * SADB_GETSPI processing is to receive
- *	<base, src address, dst address, (SPI range)>
+ *	<base, (SA2), src address, dst address, (SPI range)>
  * from the IKMPd, to assign a unique spi value, to hang on the INBOUND
  * tree with the status of LARVAL, and send
  *	<base, SA(*), address(SD)>
@@ -4639,7 +4639,7 @@ key_do_getnewspi(spirange, saidx)
 /*
  * SADB_UPDATE processing
  * receive
- *   <base, SA, (lifetime(HSC),) address(SD), (address(P),)
+ *   <base, SA, (SA2), (lifetime(HSC),) address(SD), (address(P),)
  *       key(AE), (identity(SD),) (sensitivity)>
  * from the ikmpd, and update a secasvar entry whose status is SADB_SASTATE_LARVAL.
  * and send
@@ -4847,7 +4847,7 @@ key_getsavbyseq(sah, seq)
 /*
  * SADB_ADD processing
  * add a entry to SA database, when received
- *   <base, SA, (lifetime(HSC),) address(SD), (address(P),)
+ *   <base, SA, (SA2), (lifetime(HSC),) address(SD), (address(P),)
  *       key(AE), (identity(SD),) (sensitivity)>
  * from the ikmpd,
  * and send
@@ -5130,8 +5130,6 @@ key_delete(so, m, mhp)
 	struct secashead *sah;
 	struct secasvar *sav;
 	u_int16_t proto;
-	u_int8_t mode;
-	u_int32_t reqid;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -5161,23 +5159,22 @@ key_delete(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
-	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
-		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
-		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
-	} else {
-		mode = IPSEC_MODE_ANY;
-		reqid = 0;
-	}
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
 	src0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_DST]);
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, IPSEC_MODE_ANY, 0, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
-	if ((sah = key_getsah(&saidx)) == NULL) {
+	LIST_FOREACH(sah, &sahtree, chain) {
+		if (sah->state == SADB_SASTATE_DEAD)
+			continue;
+		if (key_cmpsaidx_withmode(&sah->saidx, &saidx))
+			break;
+	}
+	if (sah == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_delete: no SA found.\n");
 #endif
@@ -5245,8 +5242,6 @@ key_get(so, m, mhp)
 	struct secashead *sah;
 	struct secasvar *sav;
 	u_int16_t proto;
-	u_int8_t mode;
-	u_int32_t reqid;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -5276,23 +5271,22 @@ key_get(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
-	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
-		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
-		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
-	} else {
-		mode = IPSEC_MODE_ANY;
-		reqid = 0;
-	}
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
 	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
 	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, IPSEC_MODE_ANY, 0, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
-	if ((sah = key_getsah(&saidx)) == NULL) {
+	LIST_FOREACH(sah, &sahtree, chain) {
+		if (sah->state == SADB_SASTATE_DEAD)
+			continue;
+		if (key_cmpsaidx_withmode(&sah->saidx, &saidx))
+			break;
+	}
+	if (sah == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_get: no SA found.\n");
 #endif
@@ -5837,8 +5831,6 @@ key_acquire2(so, m, mhp)
 	struct secasindex saidx;
 	struct secashead *sah;
 	u_int16_t proto;
-	u_int8_t mode;
-	u_int32_t reqid;
 	int error;
 
 	/* sanity check */
@@ -5911,22 +5903,21 @@ key_acquire2(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
-	if (mhp->ext[SADB_X_EXT_SA2] != NULL) {
-		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
-		reqid = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_reqid;
-	} else {
-		mode = IPSEC_MODE_ANY;
-		reqid = 0;
-	}
 
 	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
 	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, mode, reqid, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, IPSEC_MODE_ANY, 0, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA index */
-	if ((sah = key_getsah(&saidx)) != NULL) {
+	LIST_FOREACH(sah, &sahtree, chain) {
+		if (sah->state == SADB_SASTATE_DEAD)
+			continue;
+		if (key_cmpsaidx_withmode(&sah->saidx, &saidx))
+			break;
+	}
+	if (sah != NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_acquire2: a SA exists already.\n");
 #endif
@@ -6146,7 +6137,7 @@ key_freereg(so)
 /*
  * SADB_EXPIRE processing
  * send
- *   <base, SA, lifetime(C and one of HS), address(SD)>
+ *   <base, SA, SA2, lifetime(C and one of HS), address(SD)>
  * to KMD by PF_KEY.
  * NOTE: We send only soft lifetime extension.
  *
