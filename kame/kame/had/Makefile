@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
+#	$KAME: Makefile,v 1.3 2003/02/18 09:57:06 t-momose Exp $
 #
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -27,7 +27,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile,v 1.2 2002/01/17 01:08:48 k-sugyou Exp $
+# $Id: Makefile,v 1.3 2003/02/18 09:57:06 t-momose Exp $
 #
 
 .if exists(${.CURDIR}/../Makefile.opsys)
@@ -47,7 +47,7 @@ CFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 CPPFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 .endif
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
-	-L/usr/local/v6/lib -linet6
+	-L/usr/local/v6/lib -linet6 -lkvm
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a

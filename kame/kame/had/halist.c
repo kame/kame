@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.3 2002/01/22 16:32:38 karino Exp $	*/
+/*	$KAME: halist.c,v 1.4 2003/02/18 09:57:07 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.3 2002/01/22 16:32:38 karino Exp $
+ * $Id: halist.c,v 1.4 2003/02/18 09:57:07 t-momose Exp $
  */
 
 /*
@@ -115,9 +115,6 @@ static struct hagent_gaddr *hal_gaddr_find __P((struct hagent_entry *,
 static void hal_expire __P((struct hagent_entry *, long));
 static void hal_gaddr_expire __P((struct hagent_gaddr *, long));
 void hal_gaddr_clean __P((struct hagent_entry *));
-static int get_gaddr __P((struct hagent_gaddr *, struct in6_addr *,
-			  struct in6_addr *));
-static void create_mask __P((struct in6_addr *, u_int8_t));
 static void hal_dump __P((FILE *));
 static void halent_dump __P((FILE *, struct hagent_entry *));
 static void gaddr_dump __P((FILE *, struct hagent_gaddr *));
@@ -813,12 +810,7 @@ hal_pick(req_addr, hagent_addrs, src_addr, haif, count)
 {
     int first, naddr;
     struct hagent_entry *hap, *selfhalp = NULL;
-
-#define IN6_ARE_ADDR_MASKEQUAL(x,y,z) (\
-	(((x).__u6_addr.__u6_addr32[0] & (y).__u6_addr.__u6_addr32[0]) == ((z).__u6_addr.__u6_addr32[0] & (y).__u6_addr.__u6_addr32[0])) && \
-	(((x).__u6_addr.__u6_addr32[1] & (y).__u6_addr.__u6_addr32[1]) == ((z).__u6_addr.__u6_addr32[1] & (y).__u6_addr.__u6_addr32[1])) && \
-	(((x).__u6_addr.__u6_addr32[2] & (y).__u6_addr.__u6_addr32[2]) == ((z).__u6_addr.__u6_addr32[2] & (y).__u6_addr.__u6_addr32[2])) && \
-	(((x).__u6_addr.__u6_addr32[3] & (y).__u6_addr.__u6_addr32[3]) == ((z).__u6_addr.__u6_addr32[3] & (y).__u6_addr.__u6_addr32[3])))
+    struct hagent_gaddr ha_gaddr;
 
     /* shuffle home agent entries with same preference */
     hal_shuffle(haif);
@@ -831,8 +823,9 @@ hal_pick(req_addr, hagent_addrs, src_addr, haif, count)
     for (first = 1, naddr = 0, hap = haif->halist_pref.hagent_next_pref;
 	 hap && naddr < count; hap = hap->hagent_next_pref) {
 	if (get_gaddr(hap->hagent_galist.hagent_next_gaddr, 
-		       req_addr, hagent_addrs))
+		       req_addr, &ha_gaddr))
 	    continue;
+	*hagent_addrs = ha_gaddr.hagent_gaddr;
 	if (hap == selfhalp) {
 	    *src_addr = *hagent_addrs;
 	    if (first)
@@ -846,13 +839,13 @@ hal_pick(req_addr, hagent_addrs, src_addr, haif, count)
 }
 
 /*
- * pick up a global address that machies given prefix
+ * pick up a global address that matches given prefix
  */
 int
 get_gaddr(hagent_gaddr, req_addr, dest)
     struct hagent_gaddr *hagent_gaddr;
     struct in6_addr *req_addr;
-    struct in6_addr *dest;
+    struct hagent_gaddr *dest;
 {
     struct in6_addr mask;
     u_int8_t old_plen = 128;
@@ -863,7 +856,7 @@ get_gaddr(hagent_gaddr, req_addr, dest)
 	old_plen = hagent_gaddr->hagent_prefixlen;
 	if (IN6_ARE_ADDR_MASKEQUAL(*req_addr, mask, 
 				   hagent_gaddr->hagent_gaddr)) {
-	    *dest = hagent_gaddr->hagent_gaddr;
+	    *dest = *hagent_gaddr;
 	    return 0;
 	}
 	hagent_gaddr = hagent_gaddr->hagent_next_gaddr;
@@ -905,7 +898,7 @@ haif_find(ifindex)
 }
 
 struct hagent_ifinfo *
-haif_findwithaddr(ha_addr, index)
+haif_findwithanycast(ha_addr, index)
     struct in6_addr *ha_addr;
     int *index;
 {
@@ -916,6 +909,30 @@ haif_findwithaddr(ha_addr, index)
 	for (j = 0; j < haifinfo_tab[i].gavec_used; ++j) {
 	    ifap = haifinfo_tab[i].haif_gavec[j].anycast;
 	    /* find the information on interface anycast address */
+	    if (ifap != NULL &&
+	        IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)(ifap->ifa_addr))->sin6_addr,
+				   ha_addr))
+		{
+		    *index = j;
+		    return &haifinfo_tab[i];
+		}
+	}
+    }
+    return NULL;
+}
+
+struct hagent_ifinfo *
+haif_findwithunicast(ha_addr, index)
+    struct in6_addr *ha_addr;
+    int *index;
+{
+    int i, j;
+    struct ifaddrs *ifap;
+
+    for (i = 0; i < ifnum; ++i) {
+	for (j = 0; j < haifinfo_tab[i].gavec_used; ++j) {
+	    ifap = haifinfo_tab[i].haif_gavec[j].global;
+	    /* find the information on interface unicast address */
 	    if (ifap != NULL &&
 	        IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)(ifap->ifa_addr))->sin6_addr,
 				   ha_addr))

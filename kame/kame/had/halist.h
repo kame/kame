@@ -1,4 +1,4 @@
-/*	$KAME: halist.h,v 1.4 2002/11/05 05:13:58 k-sugyou Exp $	*/
+/*	$KAME: halist.h,v 1.5 2003/02/18 09:57:07 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.h,v 1.4 2002/11/05 05:13:58 k-sugyou Exp $
+ * $Id: halist.h,v 1.5 2003/02/18 09:57:07 t-momose Exp $
  */
 
 /*
@@ -179,10 +179,22 @@ int hal_pick __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
 		  struct hagent_ifinfo *, int));
 void haif_prefix_add __P((struct hagent_ifinfo *, struct in6_addr *, u_int8_t));
 struct hagent_ifinfo *haif_find __P((int));
-struct hagent_ifinfo *haif_findwithaddr __P((struct in6_addr *, int *));
+struct hagent_ifinfo *haif_findwithanycast __P((struct in6_addr *, int *));
+struct hagent_ifinfo *haif_findwithunicast __P((struct in6_addr *, int *));
 struct hagent_entry *hal_find __P((struct hagent_ifinfo *, struct in6_addr *));
 void haif_prefix_update __P((struct hagent_ifinfo *, struct in6_addr *,
 			     u_int8_t, u_int32_t));
 int haif_getifaddrs __P((void));
 void haadisc_dump_file __P((char *dumpfile));
 void haadisc_hup __P(());
+
+int get_gaddr __P((struct hagent_gaddr *, struct in6_addr *,
+                          struct hagent_gaddr *));
+void create_mask __P((struct in6_addr *, u_int8_t));
+
+#define IN6_ARE_ADDR_MASKEQUAL(x,y,z) (\
+	(((x).__u6_addr.__u6_addr32[0] & (y).__u6_addr.__u6_addr32[0]) == ((z).__u6_addr.__u6_addr32[0] & (y).__u6_addr.__u6_addr32[0])) && \
+	(((x).__u6_addr.__u6_addr32[1] & (y).__u6_addr.__u6_addr32[1]) == ((z).__u6_addr.__u6_addr32[1] & (y).__u6_addr.__u6_addr32[1])) && \
+	(((x).__u6_addr.__u6_addr32[2] & (y).__u6_addr.__u6_addr32[2]) == ((z).__u6_addr.__u6_addr32[2] & (y).__u6_addr.__u6_addr32[2])) && \
+	(((x).__u6_addr.__u6_addr32[3] & (y).__u6_addr.__u6_addr32[3]) == ((z).__u6_addr.__u6_addr32[3] & (y).__u6_addr.__u6_addr32[3])))
+

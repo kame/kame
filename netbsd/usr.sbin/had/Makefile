@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 2002/02/22 02:58:48 k-sugyou Exp $
+# $Id: Makefile,v 1.2 2003/02/18 09:57:07 t-momose Exp $
 #
 SRCDIR=	${.CURDIR}/../../kame/had
 
@@ -9,7 +9,7 @@ SRCS=	haadisc.c halist.c timestamp.c
 CPPFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 
 DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a /usr/local/v6/lib/libinet6.a
-LDADD+=	-L${.OBJDIR}/../../lib/libinet6 -L/usr/local/v6/lib -linet6
+LDADD+=	-L${.OBJDIR}/../../lib/libinet6 -L/usr/local/v6/lib -linet6 -lkvm
 
 MAN=	had.8
 
