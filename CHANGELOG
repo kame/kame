@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1254 2000/09/06 07:11:02 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1255 2000/09/06 07:21:56 itojun Exp $
 
 <200009>
+Wed Sep  6 16:20:45 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/fetchmail: update to 5.5.1
+
 Wed Sep  6 16:08:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/xmms: xmms-1.2.2 with IPv6 patch
 	  From: ume@mahoroba.org
