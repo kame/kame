@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.6 2000/04/20 05:58:15 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.7 2000/05/17 03:22:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -95,8 +95,11 @@ scope6_ifattach(ifp)
 	 * Should we rather hardcode here?
 	 */
 	SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = ifp->if_index;
+#ifdef MULTI_SCOPE
+	/* by default, we don't care about scope boundary for these scopes. */
 	SID.s6id_list[IPV6_ADDR_SCOPE_SITELOCAL] = 1;
 	SID.s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL] = 1;
+#endif
 #undef SID
 
 	splx(s);
