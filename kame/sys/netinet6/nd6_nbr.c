@@ -325,13 +325,26 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	struct in6_ifaddr *ia = NULL;
 	struct ip6_moptions im6o;
 	int icmp6len;
+	int maxlen;
 	caddr_t mac;
 	struct ifnet *outif = NULL;
 	
 	if (IN6_IS_ADDR_MULTICAST(taddr6))
 		return;
 
-	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL)
+	/* estimate the size of message */
+	maxlen = sizeof(*ip6) + sizeof(*nd_ns);
+	maxlen += (sizeof(struct nd_opt_hdr) + ifp->if_addrlen + 7) & ~7;
+
+	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	if (m && max_linkhdr + maxlen >= MHLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			m = NULL;
+		}
+	}
+	if (m == NULL)
 		return;
 
 	if (daddr6 == NULL || IN6_IS_ADDR_MULTICAST(daddr6)) {
@@ -343,7 +356,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 
 	icmp6len = sizeof(*nd_ns);
 	m->m_pkthdr.len = m->m_len = sizeof(*ip6) + icmp6len;
-	MH_ALIGN(m, m->m_len + 16); /* 1+1+6 is enought. but just in case */
+	m->m_data += max_linkhdr;	/*or MH_ALIGN() equivalent?*/
 
 	/* fill neighbor solicitation packet */
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -754,10 +767,23 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 	struct in6_ifaddr *ia = NULL;
 	struct ip6_moptions im6o;
 	int icmp6len;
+	int maxlen;
 	caddr_t mac;
 	struct ifnet *outif = NULL;
-	
-	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL)
+
+	/* estimate the size of message */
+	maxlen = sizeof(*ip6) + sizeof(*nd_na);
+	maxlen += (sizeof(struct nd_opt_hdr) + ifp->if_addrlen + 7) & ~7;
+
+	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	if (m && max_linkhdr + maxlen >= MHLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			m = NULL;
+		}
+	}
+	if (m == NULL)
 		return;
 
 	if (IN6_IS_ADDR_MULTICAST(daddr6)) {
@@ -769,7 +795,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 
 	icmp6len = sizeof(*nd_na);
 	m->m_pkthdr.len = m->m_len = sizeof(struct ip6_hdr) + icmp6len;
-	MH_ALIGN(m, m->m_len + 16); /* 1+1+6 is enough. but just in case */
+	m->m_data += max_linkhdr;	/*or MH_ALIGN() equivalent?*/
 
 	/* fill neighbor advertisement packet */
 	ip6 = mtod(m, struct ip6_hdr *);
