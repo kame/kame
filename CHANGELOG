@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1992 2001/11/28 06:10:09 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1993 2001/11/29 09:37:12 itojun Exp $
 
 <200111>
+Thu Nov 29 18:32:39 JST 2001  itojun@iijlab.net
+	* openbsd: switched to openbsd 3.0.  still needs a torture-testing.
+	  ALTQ is unavailable for the moment.
+
 2001-11-28 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{defs,dispatch,trans,tslot,var}.[ch]:
 	- Support translation from fragmented IPv6 packet to IPv4.
