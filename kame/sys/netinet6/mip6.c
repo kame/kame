@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.99 2001/12/28 07:02:59 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.100 2002/01/08 02:40:57 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -39,6 +39,7 @@
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_ipsec.h"
+#include "opt_inet6.h"
 #include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
@@ -85,6 +86,7 @@
 #include <netkey/keydb.h>
 #endif
 
+#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 
 extern struct mip6_subnet_list mip6_subnet_list;

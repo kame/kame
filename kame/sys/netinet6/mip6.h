@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.42 2001/12/28 06:18:55 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.43 2002/01/08 02:40:57 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -30,15 +30,6 @@
 
 #ifndef _MIP6_H_
 #define _MIP6_H_
-
-#include <net/if_hif.h>
-
-#include <netinet6/in6_var.h>
-#include <netinet6/nd6.h>
-
-#include <netinet/ip_encap.h>
-
-#include <netinet6/mip6_var.h>
 
 #define SIOCENABLEMN _IOW('m', 120, int)
 #define SIOCENABLEHA _IOW('m', 121, int)
@@ -90,7 +81,6 @@ struct mip6_subopt_authdata {
 	/* followed by authentication data (variable length) */
 } __attribute__ ((__packed__));
 
-#ifdef _KERNEL
 
 #define MIP6_BU_HOME_REG   0
 #define MIP6_BU_HOME_UNREG 1
@@ -103,8 +93,10 @@ struct mip6_subopt_authdata {
 #define MIP6_TUNNEL_CHANGE 1
 #define MIP6_TUNNEL_DELETE 2
 
-extern struct mip6_config mip6_config;
+#ifdef _KERNEL
+struct encaptab;
 
+extern struct mip6_config mip6_config;
 extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
 
 void mip6_init __P((void));

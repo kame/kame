@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.28 2001/09/21 08:50:05 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.29 2002/01/08 02:40:59 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,9 @@
 #include <netinet/icmp6.h>
 
 #ifdef MIP6
+#include <net/if_hif.h>
+#include <netinet6/nd6.h>
+#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.273 2002/01/07 11:45:20 kjc Exp $	*/
+/*	$KAME: ip6_output.c,v 1.274 2002/01/08 02:40:57 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,6 +158,8 @@ extern int ipsec_ipcomp_default_level;
 
 #ifdef MIP6
 #include <sys/syslog.h>
+#include <net/if_hif.h> 
+#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
 

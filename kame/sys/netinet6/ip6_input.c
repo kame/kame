@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.242 2001/12/27 17:40:10 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.243 2002/01/08 02:40:57 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,6 +136,8 @@
 #include <netinet6/raw_ip6.h>
 #endif
 #ifdef MIP6
+#include <net/if_hif.h> 
+#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif
 

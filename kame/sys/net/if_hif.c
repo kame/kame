@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.15 2001/12/04 10:36:56 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.16 2002/01/08 02:40:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,6 +133,8 @@ t.
 #include <netinet/ip_encap.h>
 #include <net/if_hif.h>
 
+#include <netinet6/nd6.h>
+#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 
 #include "hif.h"

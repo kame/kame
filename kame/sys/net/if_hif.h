@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.6 2001/12/04 10:36:56 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.7 2002/01/08 02:40:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,15 +75,6 @@ t.
 
 #ifndef _NET_IF_HIF_H_
 #define _NET_IF_HIF_H_
-
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-#if defined(_KERNEL) && !defined(_LKM)
-#include "opt_inet6.h"
-#endif
-#endif
-
-#include <netinet/in.h>
-#include <netinet6/mip6_var.h>
 
 #define HIF_MTU 1500 /* XXX */
 

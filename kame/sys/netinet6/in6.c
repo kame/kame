@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.256 2001/12/24 10:39:29 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.257 2002/01/08 02:40:56 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -124,6 +124,8 @@
 #endif
 
 #ifdef MIP6
+#include <net/if_hif.h> 
+#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.57 2002/01/07 12:45:25 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.58 2002/01/08 02:40:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -39,6 +39,7 @@
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_ipsec.h"
+#include "opt_inet6.h"
 #include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
@@ -85,6 +86,8 @@
 #include <netkey/keydb.h>
 #endif /* IPSEC && !__OpenBSD__ */
 
+#include <netinet/ip_encap.h>
+#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 
 extern struct protosw mip6_tunnel_protosw;
