@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.60 2000/08/03 15:20:39 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.61 2000/08/03 15:22:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1231,7 +1231,7 @@ pr_pack(buf, cc, mhdr)
 			 break;
 		 case NI_QTYPE_SUPTYPES:
 			 printf("NodeInfo Supported Qtypes");
-			 if (ntohs(ni->ni_flags) & 0x0001) {
+			 if ((ni->ni_flags & NI_SUPTYPE_FLAG_COMPRESS) != 0) {
 				printf(", compressed bitmap");
 				break;
 			 }
