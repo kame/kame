@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.31 2000/06/10 14:17:43 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.32 2000/08/31 06:16:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -47,6 +47,8 @@
 
 #define CALLOC(size, cast) (cast)calloc(1, (size))
 
+static int findsupportedmap __P((int));
+static int setsupportedmap __P((struct sadb_supported *));
 static int pfkey_send_x1 __P((int, u_int, u_int, u_int, struct sockaddr *,
 	struct sockaddr *, u_int32_t, u_int32_t, u_int, caddr_t,
 	u_int, u_int, u_int, u_int, u_int, u_int32_t, u_int32_t,
@@ -70,66 +72,131 @@ static caddr_t pfkey_setsadblifetime __P((caddr_t, u_int, u_int32_t, u_int32_t,
 static caddr_t pfkey_setsadbxsa2 __P((caddr_t, u_int32_t, u_int32_t));
 
 /*
+ * make and search supported algorithm structure.
+ */
+static struct sadb_supported *ipsec_supported[] = { NULL, NULL, NULL, };
+
+static int supported_map[] = {
+	SADB_SATYPE_AH,
+	SADB_SATYPE_ESP,
+	SADB_X_SATYPE_IPCOMP,
+};
+
+static int
+findsupportedmap(satype)
+	int satype;
+{
+	int i;
+
+	for (i = 0; i < sizeof(supported_map)/sizeof(supported_map[0]); i++)
+		if (supported_map[i] == satype)
+			return i;
+	return -1;
+}
+
+static int
+setsupportedmap(sup)
+	struct sadb_supported *sup;
+{
+	struct sadb_supported **ipsup;
+
+	switch (sup->sadb_supported_exttype) {
+	case SADB_EXT_SUPPORTED_AUTH:
+		ipsup = &ipsec_supported[findsupportedmap(SADB_SATYPE_AH)];
+		break;
+	case SADB_EXT_SUPPORTED_ENCRYPT:
+		ipsup = &ipsec_supported[findsupportedmap(SADB_SATYPE_ESP)];
+		break;
+	default:
+		__ipsec_errcode = EIPSEC_INVAL_SATYPE;
+		return -1;
+	}
+
+	if (*ipsup)
+		free(*ipsup);
+
+	*ipsup = malloc(sup->sadb_supported_len);
+	if (!*ipsup) {
+		__ipsec_set_strerror(strerror(errno));
+		return -1;
+	}
+	memcpy(*ipsup, sup, sup->sadb_supported_len);
+
+	return 0;
+}
+
+/*
  * check key length against algorithm specified.
- * supported is either SADB_EXT_SUPPORTED_ENCRYPT or SADB_EXT_SUPPORTED_AUTH.
- * Refer to keyv2.h to get more info.
+ * This function is called with SADB_EXT_SUPPORTED_{AUTH,ENCRYPT} as the
+ * augument, and only calls to ipsec_check_keylen2();
  * keylen is the unit of bit.
  * OUT:
  *	-1: invalid.
  *	 0: valid.
  */
-struct sadb_msg *ipsec_supported = NULL;
-
 int
 ipsec_check_keylen(supported, alg_id, keylen)
 	u_int supported;
 	u_int alg_id;
 	u_int keylen;
 {
-	u_int tlen;
-	caddr_t p;
-	struct sadb_supported *sup;
-	struct sadb_alg *alg;
+	int satype;
 
 	/* validity check */
-	if (ipsec_supported == NULL) {
-		__ipsec_errcode = EIPSEC_DO_GET_SUPP_LIST;
-		return -1;
-	}
 	switch (supported) {
 	case SADB_EXT_SUPPORTED_AUTH:
+		satype = SADB_SATYPE_AH;
+		break;
 	case SADB_EXT_SUPPORTED_ENCRYPT:
+		satype = SADB_SATYPE_ESP;
 		break;
 	default:
 		__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
 		return -1;
 	}
 
-	tlen = ipsec_supported->sadb_msg_len - sizeof(struct sadb_msg);
-	p = (caddr_t)ipsec_supported + sizeof(struct sadb_msg);
+	return ipsec_check_keylen2(satype, alg_id, keylen);
+}
 
-	for (;
-	     tlen > 0;
-	     tlen -= sup->sadb_supported_len, p += sup->sadb_supported_len) {
+/*
+ * check key length against algorithm specified.
+ * satype is one of satype defined at pfkeyv2.h.
+ * keylen is the unit of bit.
+ * OUT:
+ *	-1: invalid.
+ *	 0: valid.
+ */
+int
+ipsec_check_keylen2(satype, alg_id, keylen)
+	u_int satype;
+	u_int alg_id;
+	u_int keylen;
+{
+	int algno;
+	u_int tlen;
+	caddr_t p;
 
-		sup = (struct sadb_supported *)p;
+	/* validity check */
+	algno = findsupportedmap(satype);
+	if (algno == -1) {
+		__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+		return -1;
+	}
+	if (ipsec_supported[algno] == NULL) {
+		__ipsec_errcode = EIPSEC_DO_GET_SUPP_LIST;
+		return -1;
+	}
 
-		if (sup->sadb_supported_exttype != supported)
-			continue;
+	tlen = ipsec_supported[algno]->sadb_supported_len
+		- sizeof(struct sadb_supported);
+	p = (caddr_t)(ipsec_supported[algno] + 1);
+	while (tlen > 0) {
 
-	    {
-		u_int ttlen = sup->sadb_supported_len;
-		caddr_t pp = p + sizeof(*sup);
+		if (((struct sadb_alg *)p)->sadb_alg_id == alg_id)
+			goto found;
 
-		for (;
-		     ttlen > 0;
-	     	     ttlen -= sizeof(*alg), pp += sizeof(*alg)) {
-			alg = (struct sadb_alg *)pp;
-
-			if (alg->sadb_alg_id == alg_id)
-				goto found;
-	    	}
-	    }
+		tlen -= sizeof(struct sadb_alg);
+		p += sizeof(struct sadb_alg);
 	}
 
 	__ipsec_errcode = EIPSEC_NOT_SUPPORTED;
@@ -137,8 +204,8 @@ ipsec_check_keylen(supported, alg_id, keylen)
 	/* NOTREACHED */
 
     found:
-	if (keylen < alg->sadb_alg_minbits
-	 || keylen > alg->sadb_alg_maxbits) {
+	if (keylen < ((struct sadb_alg *)p)->sadb_alg_minbits
+	 || keylen > ((struct sadb_alg *)p)->sadb_alg_maxbits) {
 		__ipsec_errcode = EIPSEC_INVAL_KEYLEN;
 		return -1;
 	}
@@ -418,7 +485,29 @@ pfkey_send_register(so, satype)
 	int so;
 	u_int satype;
 {
-	int len;
+	int len, algno;
+
+	if (satype == PF_UNSPEC) {
+		for (algno = 0;
+		     algno < sizeof(supported_map)/sizeof(supported_map[0]);
+		     algno++) {
+			if (ipsec_supported[algno]) {
+				free(ipsec_supported[algno]);
+				ipsec_supported[algno] = NULL;
+			}
+		}
+	} else {
+		algno = findsupportedmap(satype);
+		if (algno == -1) {
+			__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+			return -1;
+		}
+
+		if (ipsec_supported[algno]) {
+			free(ipsec_supported[algno]);
+			ipsec_supported[algno] = NULL;
+		}
+	}
 
 	if ((len = pfkey_send_x3(so, SADB_REGISTER, satype)) < 0)
 		return -1;
@@ -439,35 +528,72 @@ pfkey_recv_register(so)
 {
 	pid_t pid = getpid();
 	struct sadb_msg *newmsg;
-	struct sadb_supported *sup;
-	caddr_t p;
-	int tlen;
+	int error = -1;
 
 	/* receive message */
 	do {
 		if ((newmsg = pfkey_recv(so)) == NULL)
 			return -1;
-
 	} while (newmsg->sadb_msg_type != SADB_REGISTER
 	    || newmsg->sadb_msg_pid != pid);
 
 	/* check and fix */
 	newmsg->sadb_msg_len = PFKEY_UNUNIT64(newmsg->sadb_msg_len);
 
-	tlen = newmsg->sadb_msg_len - sizeof(struct sadb_msg);
-	p = (caddr_t)newmsg + sizeof(struct sadb_msg);
+	error = pfkey_set_supported(newmsg, newmsg->sadb_msg_len);
+	free(newmsg);
+
+	if (error == 0)
+		__ipsec_errcode = EIPSEC_NO_ERROR;
+
+	return error;
+}
+
+/*
+ * receiving SADB_REGISTER message from the kernel, and copy buffer for
+ * sadb_supported returned into ipsec_supported.
+ * NOTE: sadb_msg_len must be host order.
+ * IN:
+ *	tlen: msg length, it's to makeing sure.
+ * OUT:
+ *	 0: success and return length sent.
+ *	-1: error occured, and set errno.
+ */
+int
+pfkey_set_supported(msg, tlen)
+	struct sadb_msg *msg;
+	int tlen;
+{
+	struct sadb_supported *sup;
+	caddr_t p;
+
+	/* validity */
+	if (msg->sadb_msg_len != tlen) {
+		__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+		return -1;
+	}
+
+	p = (caddr_t)msg + sizeof(struct sadb_msg);
+	tlen -= sizeof(struct sadb_msg);
+
 	while (tlen > 0) {
 		sup = (struct sadb_supported *)p;
+
 		switch (sup->sadb_supported_exttype) {
 		case SADB_EXT_SUPPORTED_AUTH:
 		case SADB_EXT_SUPPORTED_ENCRYPT:
-			sup->sadb_supported_len = PFKEY_EXTLEN(sup);
 			break;
 		default:
 			__ipsec_errcode = EIPSEC_INVAL_SATYPE;
-			free(newmsg);
 			return -1;
 		}
+
+		/* fixed length */
+		sup->sadb_supported_len = PFKEY_EXTLEN(sup);
+
+		/* set supported map */
+		if (setsupportedmap(sup) != 0)
+			return -1;
 
 		tlen -= sup->sadb_supported_len;
 		p += sup->sadb_supported_len;
@@ -478,12 +604,8 @@ pfkey_recv_register(so)
 		return -1;
 	}
 
-	if (ipsec_supported != NULL)
-		free(ipsec_supported);
-
-	ipsec_supported = newmsg;
-
 	__ipsec_errcode = EIPSEC_NO_ERROR;
+
 	return 0;
 }
 
