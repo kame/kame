@@ -90,14 +90,13 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>		/* netinet/in_pcb.h */
 #include <netinet6/ip6.h>
 #include <netinet6/icmp6.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/in6_pcb.h>
+#else
+#include <netinet/in_pcb.h>
 #endif
-#include <netinet/in_pcb.h>	/* for INP_HIGHPORT */
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 
@@ -1593,6 +1592,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 #endif /* MAPPED_ADDR_ENABLED */
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				case IPV6_PORTRANGE:
 				    {
 					int flags;
@@ -1609,6 +1609,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 						optval = 0;
 					break;
 				    }
+#endif
 				}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				error = sooptcopyout(sopt, &optval,
