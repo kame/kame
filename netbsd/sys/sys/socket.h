@@ -79,7 +79,11 @@
 /*
  * Data types.
  */
+/* in both sys/socket.h and netdb.h */
+#ifndef __SOCKLEN_T_DEFINED
 typedef	unsigned int	socklen_t;
+#define __SOCKLEN_T_DEFINED
+#endif
 
 /*
  * Socket types.

@@ -90,7 +90,6 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
-#include <sys/socket.h>
 
 #include <inttypes.h>
 
@@ -239,6 +238,15 @@ struct addrinfo {
  */
 #define SCOPE_DELIMITER '%'
 #endif /* !_XOPEN_SOURCE */
+
+/*
+ * data types - basically forward decl for getnameinfo()
+ */
+/* in both sys/socket.h and netdb.h */
+#ifndef __SOCKLEN_T_DEFINED
+typedef	unsigned int	socklen_t;
+#define __SOCKLEN_T_DEFINED
+#endif
 
 __BEGIN_DECLS
 void		endhostent __P((void));
