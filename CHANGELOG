@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1848 2001/08/22 10:27:48 kjc Exp $
+$KAME: CHANGELOG,v 1.1849 2001/08/28 08:48:31 jinmei Exp $
 
 <200108>
 2001-08-22  kjc@csl.sony.co.jp
@@ -1679,7 +1679,7 @@ Tue Feb 13 18:42:17 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	This variable can be configured via sysctl
 	net.inet6.ip6.auto_linklocal or by the IP6_AUTO_LINKLOCAL kernel
 	compilation option.  If you configure the variable via sysctl, you
-	should be sure that no interfaces has been up.
+	should be sure that no interface has been up.
 	Note that the variable effects all interfaces.  When you set the
 	variable to 0, you should configure link-local addresses for all
 	interfaces that you might want to use.
