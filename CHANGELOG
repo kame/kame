@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.845 2000/05/01 03:23:38 itojun Exp $
+$Id: CHANGELOG,v 1.846 2000/05/01 05:05:47 itojun Exp $
 
 <200005>
+Mon May  1 14:05:02 JST 2000  itojun@iijlab.net
+	* kame/libinet6/name6.c: use BIND 4.9.7 DNS answer parser to remove
+	  any of vulnerability old name6.c might have.
+
 Mon May  1 12:22:53 JST 2000  itojun@iijlab.net
 	* kame/libinet6: have more sanity check against validity of CNAME.
 	  (there were some advisory about this in the past, IIRC)
