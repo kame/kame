@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1552 2001/02/11 22:52:36 itojun Exp $
+$KAME: CHANGELOG,v 1.1553 2001/02/13 09:44:34 sumikawa Exp $
 
 <200102>
+Tue Feb 13 18:42:17 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/sys/{if_sppp.h,if_spppsubr.c}: supported PPPv6 for
+	  kernel level PPP.
+
 2001-02-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6if_do_dad): was added to centralize
 	the decision of whether DAD should be performed on a particular
