@@ -91,6 +91,7 @@ union	sockunion {
 	struct	sockaddr_ns sns;
 #endif
 	struct	sockaddr_dl sdl;
+	struct	sockaddr_storage ss; /* added to avoid memory overrun */
 } so_dst, so_gate, so_mask, so_genmask, so_ifa, so_ifp;
 
 typedef union sockunion *sup;
@@ -845,53 +846,35 @@ getaddr(which, s, hpp)
 	case RTA_GATEWAY:
 		su = &so_gate;
 		if (iflag) {
-			#define MAX_IFACES	400
-			int			sock;
-			struct ifreq		iflist[MAX_IFACES];
-			struct ifconf		ifconf;
-			struct ifreq		*ifr, *ifr_end, ifr_flg;
-			struct sockaddr_dl	*dl, *sdl = NULL;
+			struct ifaddrs *ifap, *ifa;
+			struct sockaddr_dl *sdl = NULL;
 
-			/* Get socket */
-			if ((sock = socket(PF_INET, SOCK_DGRAM, 0)) < 0)
-				err(1, "socket");
+			if (getifaddrs(&ifap))
+				err(1, "getifaddrs");
 
-			/* Get interface list */
-			ifconf.ifc_req = iflist;
-			ifconf.ifc_len = sizeof(iflist);
-			if (ioctl(sock, SIOCGIFCONF, &ifconf) < 0)
-				err(1, "ioctl(SIOCGIFCONF)");
+			for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+				if (ifa->ifa_addr->sa_family != AF_LINK)
+					continue;
 
-			/* Look for this interface in the list */
-			for (ifr = ifconf.ifc_req,
-			    ifr_end = (struct ifreq *)
-				(ifconf.ifc_buf + ifconf.ifc_len);
-			    ifr < ifr_end;
-			    ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
-				    + MAX(ifr->ifr_addr.sa_len,
-					sizeof(ifr->ifr_addr)))) {
-				dl = (struct sockaddr_dl *)&ifr->ifr_addr;
-				if (ifr->ifr_addr.sa_family == AF_LINK
-				    && !strncmp(s, dl->sdl_data, dl->sdl_nlen)
-				    && s[dl->sdl_nlen] == 0) {
-					memset(&ifr_flg, 0, sizeof(ifr_flg));
-					strcpy(ifr_flg.ifr_name,
-					       ifr->ifr_name);
-					if (ioctl(sock, SIOCGIFFLAGS,
-						  (caddr_t)&ifr_flg) == 0 &&
-					    ifr_flg.ifr_flags & IFF_POINTOPOINT) {
-						sdl = dl;
-						break;
-					}
-				}
+				if (strcmp(s, ifa->ifa_name) ||
+				    (ifa->ifa_flags & IFF_POINTOPOINT) == 0)
+					continue;
+
+				sdl = (struct sockaddr_dl *)ifa->ifa_addr;
 			}
-			close(sock);
-
 			/* If we found it, then use it */
 			if (sdl) {
-				su->sdl = *sdl;
+				/*
+				 * Copy is safe since we have a
+				 * sockaddr_storage member in sockunion{}.
+				 * Note that we need to copy before calling
+				 * freeifaddrs().
+				 */
+				memcpy(&su->sdl, sdl, sdl->sdl_len);
 				return(1);
 			}
+
+			freeifaddrs(ifap);
 		}
 		break;
 	case RTA_NETMASK:
