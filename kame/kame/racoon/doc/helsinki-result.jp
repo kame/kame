@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.4 2001/08/14 08:37:14 itojun Exp $
+$KAME: helsinki-result.jp,v 1.5 2001/08/14 10:52:00 itojun Exp $
 
 
 isakmpd on KAME
@@ -47,3 +47,25 @@ Compaq
 IBM
 	Tue Aug 14 17:33:43 JST 2001
 	IPv6 testしようと言われるも、先方のマシン(遠隔地)にglobal addressなし。
+
+F-Secure
+	Tue Aug 14 19:44:15 JST 2001
+	IPv4, ESP, tunnel mode
+	phase 1 3DES + SHA1, lifetime = 10min
+	phase 2 AES + SHA1, lifetime = 2min
+
+	IPv4, IPComp + ESP, transport mode
+	phase 1 3DES + SHA1, lifetime = 10min
+	phase 2 AES + SHA1 + deflate, lifetime = 2min
+
+	どちらも問題なし、rekeyもOK。
+
+	IPComp + ESP tunnel mode (IP ESP IPComp IP payload)をやろうとして
+	ipcomp/tunnel//use esp/transport//useとポリシを書いたら、
+	IKE phase 2的に
+		向こう: IPComp tunnel, ESP tunnel
+		こっち: IPComp tunnel, ESP transport
+	のproposalを比較して、no proposal chosenになる。こっちの問題
+	(bundleの取り扱い)
+
+	でっかいDH group、phase 1 SHA2-256/AESもできるらしい。後でやりたい。
