@@ -6,11 +6,12 @@ MAN=	v6test.1
 
 CPPFLAGS+=-I${SRCDIR} -DIPSEC
 CPPFLAGS+=-Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
-CPPFLAGS+=-I${.CURDIR}/../../kame/libpcap -DHAVE_PCAP
+CPPFLAGS+=-DSTDC_HEADERS=1 
+CPPFLAGS+=-I${.CURDIR}/../../kame/libpcap -DHAVE_LIBPCAP
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6 \
 	-L${.CURDIR}/../../lib/libpcap \
-	-L/usr/local/v6/lib -linet6 -lpcap
+	-L/usr/local/v6/lib -lpcap -linet6
 DPADD+= ${.CURDIR}/../lib/libinet6/libinet6.a \
 	${.CURDIR}/../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a \
