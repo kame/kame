@@ -1,8 +1,37 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1436 2000/12/12 05:19:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.1437 2000/12/12 17:07:57 thorpej Exp $
 
 <200012>
+Tue Dec 12 08:56:39 PST 2000  thorpej@zembu.com
+	* racoon/Makefile.in
+	* racoon/algorithm.c
+	* racoon/algorithm.h
+	* racoon/cfparse.y
+	* racoon/cftoken.l
+	* racoon/configure.in
+	* racoon/handler.c
+	* racoon/handler.h
+	* racoon/ipsec_doi.c
+	* racoon/isakmp.c
+	* racoon/isakmp.h
+	* racoon/isakmp_agg.c
+	* racoon/isakmp_base.c
+	* racoon/isakmp_ident.c
+	* racoon/main.c
+	* racoon/oakley.c
+	* racoon/oakley.h
+	* racoon/racoon.conf.5
+	* racoon/remoteconf.h
+	* racoon/strnames.c
+	Added files:
+	* racoon/gssapi.c
+	* racoon/gssapi.h
+	* racoon/README.gssapi
+	Implement GSSAPI using Kerberos 5 authentication for Phase 1
+	per dratf-ietf-ipsec-isakmp-gss-auth-06.txt.  Implemented by
+	Frank van der Linden <fvdl@wasabisystems.com>.
+
 2000-12-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/raw_ip6.c: used by bsdi4 for better code
 	sharing. Basically, no new feature change was introduced by this
