@@ -537,7 +537,7 @@ faith_prefix(struct sockaddr *dst)
 		switch (dst->sa_family) {
 		case AF_INET6:
 			if (sin6->sin6_scope_id == dst6->sin6_scope_id
-			 && IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &dst6->sin6_addr) == 0)
+			 && IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &dst6->sin6_addr))
 				return 0;
 			break;
 		case AF_INET:
