@@ -12,10 +12,10 @@ PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=		itojun@kame.net
 
+DEPENDS+=		openssl-0.9.4:../../security/openssl
+
 RESTRICTED=		"Crypto; export-controlled"
 MIRROR_DISTFILE=	no
-
-DEPENDS+=		openssl-0.9.4:../../security/openssl
 
 ALL_TARGET=		depend all
 

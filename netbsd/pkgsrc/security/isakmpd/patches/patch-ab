@@ -1,3 +1,4 @@
+$NetBSD$
 --- apps/certpatch/Makefile-	Tue Mar 28 00:33:02 2000
 +++ apps/certpatch/Makefile	Tue Mar 28 00:32:28 2000
 @@ -37,7 +37,8 @@
