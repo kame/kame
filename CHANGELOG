@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.951 2000/05/29 15:14:38 itojun Exp $
+$Id: CHANGELOG,v 1.952 2000/05/29 16:33:13 itojun Exp $
 
 <200005>
+Tue May 30 01:29:04 JST 2000  itojun@iijlab.net
+	* freebsd[34]/sys/net/if_loop.c: correct bpf_mtap call in if_simloop().
+	  note that ifp can be anything when if_simloop() is called.
+	  freebsd3 injected packet with no link-layer encapsulation, if
+	  interface dlt is not DLT_NULL.  freebsd4 injected packet with
+	  DLT_NULL encapsulation, even if the interface is non-DLT_NULL
+	  encapsulation.  both codes are wrong.
+
 Tue May 30 00:11:17 JST 2000  itojun@iijlab.net
 	* {bsdi4,netbsd}/usr.bin/ftp: internally convert IPv4 mapped address
 	  into real IPv4 address.  IPv4 mapped address adds too much confusion
