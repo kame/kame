@@ -703,8 +703,11 @@ rtrequest1(req, info, ret_nrt)
 				rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;
 			}
 		}
-#if 0 /*def RADIX_MPATH*/
-		/* XXX reject exactly the same key/gw pair */
+#ifdef RADIX_MPATH
+		/* do not permit exactly the same dst/mask/gw pair */
+		if (rn_mpath_capable(rnh) &&
+		    rn_mpath_conflict(rnh, rt, netmask))
+			senderr(EEXIST);
 #endif
 		rn = rnh->rnh_addaddr((caddr_t)ndst, (caddr_t)netmask,
 		    rnh, rt->rt_nodes);
