@@ -24,7 +24,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/nametoaddr.c,v 1.1 1999/08/08 23:30:15 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/nametoaddr.c,v 1.2 1999/11/25 08:21:26 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -107,6 +107,7 @@ pcap_nametoaddr(const char *name)
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;	/*not really..*/
 	error = getaddrinfo(name, NULL, &hints, &res);
 	if (error)
 		return NULL;
