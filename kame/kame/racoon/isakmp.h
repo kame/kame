@@ -26,43 +26,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.5 2000/01/02 13:08:53 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.6 2000/01/09 01:31:24 itojun Exp $ */
 
 /* refer to RFC 2408 */
 
-/* must include <netinet/in.h> */
+/* must include <netinet/in.h> first. */
+/* must include "isakmp_var.h" first. */
 
-#if !defined(_ISAKMP_H_)
-#define _ISAKMP_H_
+#define INITIATOR	0	/* synonym sender */
+#define RESPONDER	1	/* synonym receiver */
 
-typedef u_char cookie_t[8];
-typedef u_char msgid_t[4];
-
-typedef struct { /* i_cookie + r_cookie */
-	cookie_t i_ck;
-	cookie_t r_ck;
-} isakmp_index;
-
-#define INITIATOR       0	/* synonym sender */
-#define RESPONDER       1	/* synonym receiver */
-
-#define PORT_ISAKMP 500
-
-#define GENERATE  1
-#define VALIDATE  0
-
-/* Phase of oakley definition */
-#define ISAKMP_STATE_SPAWN		0
-#define ISAKMP_STATE_1			1
-#define ISAKMP_STATE_2			2
-#define ISAKMP_STATE_3			3
-#define ISAKMP_STATE_4			4
-#define ISAKMP_STATE_ESTABLISHED	5
-#define ISAKMP_STATE_EXPIRED		6
-#define ISAKMP_STATE_MAX		7
-
-#define ISAKMP_TIMER_DEFAULT     10 /* seconds */
-#define ISAKMP_TRY_DEFAULT        3 /* times */
+#define GENERATE	1
+#define VALIDATE	0
 
 /* 3.1 ISAKMP Header Format
          0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
@@ -84,37 +59,37 @@ struct isakmp {
 	cookie_t i_ck;		/* Initiator Cookie */
 	cookie_t r_ck;		/* Responder Cookie */
 	u_int8_t np;		/* Next Payload Type */
-	u_int8_t vers;
-#define ISAKMP_VERS_MAJOR	0xf0
-#define ISAKMP_VERS_MAJOR_SHIFT	4
-#define ISAKMP_VERS_MINOR	0x0f
-#define ISAKMP_VERS_MINOR_SHIFT	0
+	u_int8_t v;
 	u_int8_t etype;		/* Exchange Type */
 	u_int8_t flags;		/* Flags */
-	msgid_t msgid;
+	u_int32_t msgid;
 	u_int32_t len;		/* Length */
 };
 
 /* Next Payload Type */
-#define ISAKMP_NPTYPE_NONE   0 /* NONE*/
-#define ISAKMP_NPTYPE_SA     1 /* Security Association */
-#define ISAKMP_NPTYPE_P      2 /* Proposal */
-#define ISAKMP_NPTYPE_T      3 /* Transform */
-#define ISAKMP_NPTYPE_KE     4 /* Key Exchange */
-#define ISAKMP_NPTYPE_ID     5 /* Identification */
-#define ISAKMP_NPTYPE_CERT   6 /* Certificate */
-#define ISAKMP_NPTYPE_CR     7 /* Certificate Request */
-#define ISAKMP_NPTYPE_HASH   8 /* Hash */
-#define ISAKMP_NPTYPE_SIG    9 /* Signature */
-#define ISAKMP_NPTYPE_NONCE 10 /* Nonce */
-#define ISAKMP_NPTYPE_N     11 /* Notification */
-#define ISAKMP_NPTYPE_D     12 /* Delete */
-#define ISAKMP_NPTYPE_VID   13 /* Vendor ID */
-#define ISAKMP_NPTYPE_MAX   14
+#define ISAKMP_NPTYPE_NONE	0	/* NONE*/
+#define ISAKMP_NPTYPE_SA	1	/* Security Association */
+#define ISAKMP_NPTYPE_P		2	/* Proposal */
+#define ISAKMP_NPTYPE_T		3	/* Transform */
+#define ISAKMP_NPTYPE_KE	4	/* Key Exchange */
+#define ISAKMP_NPTYPE_ID	5	/* Identification */
+#define ISAKMP_NPTYPE_CERT	6	/* Certificate */
+#define ISAKMP_NPTYPE_CR	7	/* Certificate Request */
+#define ISAKMP_NPTYPE_HASH	8	/* Hash */
+#define ISAKMP_NPTYPE_SIG	9	/* Signature */
+#define ISAKMP_NPTYPE_NONCE	10	/* Nonce */
+#define ISAKMP_NPTYPE_N		11	/* Notification */
+#define ISAKMP_NPTYPE_D		12	/* Delete */
+#define ISAKMP_NPTYPE_VID	13	/* Vendor ID */
+#define ISAKMP_NPTYPE_MAX	14
 
-#define ISAKMP_MAJOR_VERSION  1
-#define ISAKMP_MINOR_VERSION  0
-#define ISAKMP_VERSION_NUMBER  0x10
+#define ISAKMP_MAJOR_VERSION	1
+#define ISAKMP_MINOR_VERSION	0
+#define ISAKMP_VERSION_NUMBER	0x10
+#define ISAKMP_GETMAJORV(v)	(((v) & 0xf0) >> 4)
+#define ISAKMP_SETMAJORV(v, m)	((v) = ((v) & 0x0f) | (((m) << 4) & 0xf0))
+#define ISAKMP_GETMINORV(v)	((v) & 0x0f)
+#define ISAKMP_SETMINORV(v, m)	((v) = ((v) & 0xf0) | ((m) & 0x0f))
 
 /* Exchange Type */
 #define ISAKMP_ETYPE_NONE	0	/* NONE */
@@ -123,7 +98,9 @@ struct isakmp {
 #define ISAKMP_ETYPE_AUTH	3	/* Authentication Only */
 #define ISAKMP_ETYPE_AGG	4	/* Aggressive */
 #define ISAKMP_ETYPE_INFO	5	/* Informational */
-#define ISAKMP_ETYPE_MAX	6
+/* Additional Exchange Type */
+#define ISAKMP_ETYPE_QUICK	32
+#define ISAKMP_ETYPE_NEWGRP	33
 
 /* Flags */
 #define ISAKMP_FLAG_E 0x01 /* Encryption Bit */
@@ -163,23 +140,15 @@ struct isakmp_data {
 	/* mask for type of attribute format */
 #define ISAKMP_GEN_MASK 0x8000
 
+#if 0
+/* MAY NOT be used, because of being defined in ipsec-doi. */
 /* 3.4 Security Association Payload */
-	/* MAY NOT be used, because of being defined in ipsec-doi. */
-	/*
-	If the current payload is the last in the message,
-	then the value of the next payload field will be 0.
-	This field MUST NOT contain the
-	values for the Proposal or Transform payloads as they are considered
-	part of the security association negotiation.  For example, this
-	field would contain the value "10" (Nonce payload) in the first
-	message of a Base Exchange (see Section 4.4) and the value "0" in the
-	first message of an Identity Protect Exchange (see Section 4.5).
-	*/
 struct isakmp_pl_sa {
 	struct isakmp_gen h;
 	u_int32_t doi;		/* Domain of Interpretation */
 	u_int32_t sit;		/* Situation */
 };
+#endif
 
 /* 3.5 Proposal Payload */
 	/*
@@ -219,8 +188,9 @@ struct isakmp_pl_ke {
 	/* Key Exchange Data */
 };
 
+#if 0
+/* NOTE: MUST NOT use because of being defined in ipsec-doi instead them. */
 /* 3.8 Identification Payload */
-	/* MUST NOT to be used, because of being defined in ipsec-doi. */
 struct isakmp_pl_id {
 	struct isakmp_gen h;
 	union {
@@ -229,30 +199,32 @@ struct isakmp_pl_id {
 	} d;
 	/* Identification Data */
 };
+/* A.4 ISAKMP Identification Type Values */
+#define ISAKMP_ID_IPV4_ADDR		0
+#define ISAKMP_ID_IPV4_ADDR_SUBNET	1
+#define ISAKMP_ID_IPV6_ADDR		2
+#define ISAKMP_ID_IPV6_ADDR_SUBNET	3
+#endif
 
 /* 3.9 Certificate Payload */
 struct isakmp_pl_cert {
 	struct isakmp_gen h;
 	u_int8_t encode;	/* Cert Encoding */
-	char cert;		/* Certificate Data */
-		/*
-		This field indicates the type of
-		certificate or certificate-related information contained in the
-		Certificate Data field.
-		*/
+	/* cert data follows immediately without padding */
 };
 
 /* Certificate Type */
-#define ISAKMP_CERT_NONE   0
-#define ISAKMP_CERT_PKCS   1
-#define ISAKMP_CERT_PGP    2
-#define ISAKMP_CERT_DNS    3
-#define ISAKMP_CERT_SIGN   4
-#define ISAKMP_CERT_KE     5
-#define ISAKMP_CERT_KT     6
-#define ISAKMP_CERT_CRL    7
-#define ISAKMP_CERT_ARL    8
-#define ISAKMP_CERT_SPKI   9
+#define ISAKMP_CERT_NONE	0
+#define ISAKMP_CERT_PKCS7	1
+#define ISAKMP_CERT_PGP		2
+#define ISAKMP_CERT_DNS		3
+#define ISAKMP_CERT_X509SIGN	4
+#define ISAKMP_CERT_X509KE	5
+#define ISAKMP_CERT_KERBEROS	6
+#define ISAKMP_CERT_CRL		7
+#define ISAKMP_CERT_ARL		8
+#define ISAKMP_CERT_SPKI	9
+#define ISAKMP_CERT_X509ATTR	10
 
 /* 3.10 Certificate Request Payload */
 struct isakmp_pl_cr {
@@ -262,28 +234,25 @@ struct isakmp_pl_cr {
 	Certificate Types (variable length)
 	  -- Contains a list of the types of certificates requested,
 	  sorted in order of preference.  Each individual certificate
-	  type is 1 octet.  This field is NOT requiredo
+	  type is 1 octet.  This field is NOT required.
 	*/
 	/* # Certificate Authorities (1 octet) */
 	/* Certificate Authorities (variable length) */
 };
 
 /* 3.11 Hash Payload */
-	/* may not be used, because of having only data. */
 struct isakmp_pl_hash {
 	struct isakmp_gen h;
 	/* Hash Data */
 };
 
 /* 3.12 Signature Payload */
-	/* may not be used, because of having only data. */
 struct isakmp_pl_sig {
 	struct isakmp_gen h;
 	/* Signature Data */
 };
 
 /* 3.13 Nonce Payload */
-	/* may not be used, because of having only data. */
 struct isakmp_pl_nonce {
 	struct isakmp_gen h;
 	/* Nonce Data */
@@ -343,100 +312,3 @@ struct isakmp_pl_d {
 	/* SPI(es) */
 };
 
-
-struct isakmp_ph1tab {
-	struct isakmp_ph1 *head;
-	struct isakmp_ph1 *tail;
-	int len;
-};
-
-struct isakmp_ph2tab {
-	struct isakmp_ph2 *head;
-	struct isakmp_ph2 *tail;
-	int len;
-};
-
-/* isakmp status structure */
-/* About address semantics in each case.
- *			initiator(addr=I)	responder(addr=R)
- *			src	dst		src	dst
- *			(local)	(remote)	(local)	(remote)
- * phase 1 status	I	R		R	I
- * phase 2 status	I	R		R	I
- * getspi msg		R	I		I	R
- * aquire msg		I	R
- * phase 2 1st 					R	I	XXX current.
- * ID payload		I	R		I	R	XXX future.
- */
-struct isakmp_ph1 {
-	struct isakmp_ph1 *next;
-	struct isakmp_ph1 *prev;
-
-	int status;			/* status of this SA */
-	int dir;			/* INITIATOR or RESPONDER */
-
-	isakmp_index index;
-	u_int8_t version;		/* ISAKMP version */
-	u_int8_t etype;			/* Exchange type actually for use */
-	u_int8_t flags;			/* Flags */
-	msgid_t msgid;			/* for check whether to modify or not.*/
-
-	const struct dh *dh;		/* DH; prime, static value */
-	vchar_t *dhpriv;		/* DH; private value */
-	vchar_t *dhpub;			/* DH; public value */
-	vchar_t *dhpub_p;		/* DH; partner's public value */
-	vchar_t *dhgxy;			/* DH; shared secret */
-	vchar_t *nonce;			/* nonce value */
-	vchar_t *nonce_p;		/* partner's nonce value */
-	vchar_t *skeyid;		/* SKEYID */
-	vchar_t *skeyid_d;		/* SKEYID_d */
-	vchar_t *skeyid_a;		/* SKEYID_a, i.e. hash */
-	vchar_t *skeyid_e;		/* SKEYID_e, i.e. encryption */
-	vchar_t *key;			/* cipher key */
-	vchar_t *hash;			/* HASH minus general header */
-	struct isakmp_ivm *ivm;		/* IVs */
-	vchar_t *sa;			/* SA minus gen header including p,t.*/
-	vchar_t *id;			/* ID minus gen header */
-	vchar_t *id_p;			/* partner's ID minus general header */
-
-	struct sockaddr *local;		/* pointer to the my sockaddr */
-	struct sockaddr *remote;	/* buffer for partner's sockaddr */
-	struct oakley_sa *isa;		/* Phase1 SA for use */
-	struct sched *sc;	/* back pointer to the record in schedule
-	                                used to resend. */
-	struct isakmp_conf *cfp;	/* pointer to isakmp configuration */
-	time_t created;			/* timestamp for establish */
-
-	struct isakmp_ph2tab ph2tab;	/* list on negotiating Phase 2 */
-	u_int32_t msgid2;		/* msgid counter for Phase 2 */
-};
-
-struct isakmp_ph2 {
-	struct isakmp_ph2 *next;
-	struct isakmp_ph2 *prev;
-
-	msgid_t msgid;
-	u_int8_t dir;		/* INITIATOR or RESPONDER */
-	u_int16_t status;	/* status of this SA */
-	int needpfs;		/* PFS flag, is zero if no need. */
-	const struct dh *dh;	/* DH;	prime, static value */
-	vchar_t *dhpriv;	/* DH; private value */
-	vchar_t *dhpub;		/* DH; public value */
-	vchar_t *dhpub_p;	/* DH; partner's public value */
-	vchar_t *dhgxy;		/* DH; shared secret */
-	vchar_t *id;		/* ID */
-	vchar_t *id_p;		/* ID for peer */
-	vchar_t *nonce;		/* nonce value in phase 2 */
-	vchar_t *nonce_p;	/* partner's nonce value in phase 2 */
-	vchar_t *hash;		/* HASH2 minus general header */
-	struct isakmp_ivm *ivm;	/* IVs */
-
-	struct isakmp_ph1 *ph1;	/* back pointer to isakmp status */
-	struct sched *sc;	/* back pointer to the schedule using resend */
-	struct pfkey_st *pst;	/* pointer to the pfkey status record. */
-	vchar_t *sa;		/* save SA payload sent on 1st exchange. */
-				/* including isakmp_gen */
-	struct ipsec_sa *isa;	/* values of SA for use. */
-};
-
-#endif /* !defined(_ISAKMP_H_) */

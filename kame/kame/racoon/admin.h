@@ -26,14 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.h,v 1.2 1999/12/01 11:16:55 sakane Exp $ */
-
-#if !defined(_ADMIN_H_)
-#define _ADMIN_H_
-
-#include <sys/socket.h>
-
-#define DEFAULT_ADMIN_PORT ((u_short)61225)
+/* YIPS @(#)$Id: admin.h,v 1.3 2000/01/09 01:31:20 itojun Exp $ */
 
 /* command for administration. */
 /* NOTE: host byte order. */
@@ -80,11 +73,3 @@ struct admin_com_indexes {
 	struct sockaddr_storage dst;
 };
 
-extern int sock_admin;
-extern u_int port_admin;
-
-extern int admin_handler __P((void));
-extern int admin_init __P((void));
-extern int admin_close __P((void));
-
-#endif /* !defined(_ADMIN_H_) */

@@ -26,12 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.3 1999/12/01 11:16:56 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.4 2000/01/09 01:31:24 itojun Exp $ */
 
-/* conformed to RFC2407 */
-
-#if !defined(_IPSEC_DOI_H_)
-#define _IPSEC_DOI_H_
+/* refered to RFC2407 */
 
 #define IPSEC_DOI 1
 
@@ -61,7 +58,7 @@
 #define   IPSECDOI_ESP_RC5                             4
 #define   IPSECDOI_ESP_IDEA                            5
 #define   IPSECDOI_ESP_CAST                            6
-#define   IPSECDOI_ESP_BLOWFISH                        7
+#define   IPSECDOI_ESP_BLOWFISH				7
 #define   IPSECDOI_ESP_3IDEA                           8
 #define   IPSECDOI_ESP_DES_IV32                        9
 #define   IPSECDOI_ESP_RC4                            10
@@ -92,13 +89,13 @@
 #define   IPSECDOI_ATTR_AUTH_HMAC_MD5           1
 #define   IPSECDOI_ATTR_AUTH_HMAC_SHA1          2
 #define   IPSECDOI_ATTR_AUTH_DES_MAC            3
-#define   IPSECDOI_ATTR_AUTH_KPDK               4
+#define   IPSECDOI_ATTR_AUTH_KPDK               4 /*RFC-1826(Key/Pad/Data/Key)*/
 	/*
-	When negotiating ESP without authentication, the Auth
-	Algorithm attribute MUST NOT be included in the proposal.
-	When negotiating ESP without confidentiality, the Auth
-	Algorithm attribute MUST be included in the proposal and
-	the ESP transform ID must be ESP_NULL.
+	 * When negotiating ESP without authentication, the Auth
+	 * Algorithm attribute MUST NOT be included in the proposal.
+	 * When negotiating ESP without confidentiality, the Auth
+	 * Algorithm attribute MUST be included in the proposal and
+	 * the ESP transform ID must be ESP_NULL.
 	*/
 #define IPSECDOI_ATTR_KEY_LENGTH              6 /* B */
 #define IPSECDOI_ATTR_KEY_ROUNDS              7 /* B */
@@ -106,7 +103,7 @@
 #define IPSECDOI_ATTR_COMP_PRIVALG            9 /* V */
 
 /* 4.6.1 Security Association Payload */
-struct ipsecdoi_sa {
+struct ipsecdoi_pl_sa {
 	struct isakmp_gen h;
 	struct ipsecdoi_sa_b {
 		u_int32_t doi; /* Domain of Interpretation */
@@ -122,7 +119,7 @@ struct ipsecdoi_secrecy_h {
 };
 
 /* 4.6.2 Identification Payload Content */
-struct ipsecdoi_id {
+struct ipsecdoi_pl_id {
 	struct isakmp_gen h;
 	struct ipsecdoi_id_b {
 		u_int8_t type;		/* ID Type */
@@ -150,41 +147,28 @@ struct ipsecdoi_id {
 #define IPSECDOI_NTYPE_REPLAY_STATUS		24577
 #define IPSECDOI_NTYPE_INITIAL_CONTACT		24578
 
-/* ipsec sa structure */
-struct ipsec_sa {
-	u_int8_t proto_id;		/* Protocol id */
-	int port;			/* port number */
-	vchar_t *spi;			/* spi to receive, network byte order */
-	vchar_t *spi_p;			/* spi to send, network byte order */
-	u_int8_t mode;			/* tunnel or transport */
-	u_int8_t enctype;		/* cipher type and transform id */
-	u_int8_t hashtype;		/* type of hash */
-	u_int32_t ld_bytes;		/* life duration by byte count */
-	u_int32_t ld_time;		/* life duration by timer */
-	u_int8_t dhgrp;			/* DH; group */
-	const struct dh *dh;
+/* The use for checking proposal payload. This is not exchange type. */
+#define IPSECDOI_TYPE_PH1	0
+#define IPSECDOI_TYPE_PH2	1
 
-	/* XXX src, dst and some of entries in pfkey.h should be in here. */
-	/* XXX I think to merge some part of pfkey.h */
+struct isakmpsa;
+struct ipsecsa;
+struct ipsecsakeys;
+struct ipsecdoi_pl_sa;
 
-	struct ipsec_sa *next;		/* next ipsec_sa proposal */
-};
+extern int ipsecdoi_checkph1proposal __P((struct ipsecdoi_pl_sa *sa, struct ph1handle *iph1));
+extern int ipsecdoi_checkph2proposal __P((struct ipsecdoi_pl_sa *sa, struct ph2handle *iph2));
 
-extern int isakmp_max_sas;
-extern int isakmp_max_proposals;
-extern int isakmp_max_transforms;
+extern int ipsecdoi_setid1 __P((struct ph1handle *iph1));
+extern int ipsecdoi_setid2 __P((struct ph2handle *iph2));
+extern int ipsecdoi_id2sockaddr __P((vchar_t *buf, struct sockaddr *saddr,
+	u_int8_t *prefixlen, u_int16_t *ul_proto));
 
-extern vchar_t *ipsecdoi_get_proposal __P((struct ipsecdoi_sa *, int));
-extern struct ipsec_sa *ipsecdoi_get_ipsec __P((vchar_t *));
-extern struct oakley_sa *ipsecdoi_get_oakley __P((vchar_t *));
-extern vchar_t * ipsecdoi_get_id1 __P((struct isakmp_ph1 *));
-extern int ipsecdoi_sockaddr2id __P((vchar_t **buf0, struct sockaddr *addr,
-	u_int prefixlen, u_int proto));
-extern int ipsecdoi_id2sockaddr __P((vchar_t *buf, struct sockaddr **addr,
-	u_int *prefixlen, u_int *ul_proto));
-extern int ipsecdoi_get_id2 __P((struct isakmp_ph2 *));
-struct isakmp_cf_sa;
-extern vchar_t *ipsecdoi_make_mysa __P((struct isakmp_cf_sa *cf_sa,
-	u_int32_t spi, int proptype, u_int8_t mode));
+extern vchar_t *ipsecdoi_setph1proposal __P((struct isakmpsa *proposal));
+extern vchar_t *ipsecdoi_setph2proposal __P((struct ipsecsa *proposal, struct ipsecsakeys *keys));
+extern int ipsecdoi_get_defaultlifetime __P((void));
+extern int ipsecdoi_checkalgtypes __P((int proto_id, int enc, int auth, int comp));
+extern int ipproto2doi __P((int proto));
 
-#endif /* !defined(_IPSEC_DOI_H_) */
+extern int ipsecdoi_fixsakeys __P((struct ph2handle *iph2));
+extern int ipsecdoi_initsakeys __P((struct ph2handle *iph2));

@@ -26,16 +26,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: var.h,v 1.1 1999/08/08 23:31:26 itojun Exp $ */
+/* YIPS @(#)$Id: var.h,v 1.2 2000/01/09 01:31:34 itojun Exp $ */
 
 #if !defined(_VAR_H_)
 #define _VAR_H_
 
-#include <sys/socket.h>
-
-#define MAX3(a,b,c) (a > b ? (a > c ? a : c) : (b > c ? b : c))
-
-#define CALLOC(size, cast) (cast)calloc(1, (size))
+#define MAX3(a, b, c) (a > b ? (a > c ? a : c) : (b > c ? b : c))
 
 #define ISSET(exp, bit) (((exp) & (bit)) == (bit))
 
@@ -48,13 +44,35 @@
 #define RNDUP(a) \
     ((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 
-#define BUFADDRSIZE 128
+#define ARRAYLEN(a)	(sizeof(a)/sizeof(a[0]))
+
+#define BUFSIZE    5120
+
+#ifndef FALSE
+#define FALSE 0
+#endif
+#ifndef TRUE
+#define TRUE 1
+#endif
+
+#include <stdlib.h>
+#define CALLOC(size, cast) (cast)calloc(1, (size))
+
+#include <sys/socket.h>
+#define BUFADDRSIZE 128		/* buffer size of string of address */
 #define INET_NTOP(addr, buf) \
 	inet_ntop(((struct sockaddr *)(addr))->sa_family, _INADDRBYSA(addr), buf, sizeof(buf))
 
+#include <sys/socket.h>
+#include <netdb.h>
 #define GETNAMEINFO(x, y, z) \
 	getnameinfo((x), (x)->sa_len, (y), sizeof(y), (z), sizeof(z), \
 		NI_NUMERICHOST | NI_NUMERICSERV)
 
-#define ARRAYSIZE(a) (sizeof(a)/sizeof(a[0]))
+#include <sys/queue.h>
+#ifndef LIST_FOREACH
+#define LIST_FOREACH(elm, head, field) \
+	for (elm = LIST_FIRST(head); elm; elm = LIST_NEXT(elm, field))
+#endif
+
 #endif /*!defined(_VAR_H_)*/

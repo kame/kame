@@ -26,25 +26,26 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.h,v 1.1 1999/08/08 23:31:23 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.h,v 1.2 2000/01/09 01:31:26 itojun Exp $ */
 
-#if !defined(_ISAKMP_INF_H_)
-#define _ISAKMP_INF_H_
-
-extern int isakmp_info_recv __P((struct isakmp_ph1 *, vchar_t *, struct sockaddr *));
+struct sadb_msg;
+extern int isakmp_info_recv
+	__P((struct ph1handle *, vchar_t *, struct sockaddr *));
 extern int isakmp_info_send_d2_pf __P((struct sadb_msg *));
-extern int isakmp_info_send_d2_pst __P((struct pfkey_st *));
+extern int isakmp_info_send_d2_pst __P((struct ph2handle *));
 extern int isakmp_info_send_nx __P((struct isakmp *,
-		struct sockaddr *, struct sockaddr *, int, vchar_t *));
-extern int isakmp_info_send_n1 __P((struct isakmp_ph1 *, int, vchar_t *));
-extern int isakmp_info_send_n2 __P((struct isakmp_ph2 *, int, vchar_t *, int));
-extern int isakmp_info_send_common __P((struct isakmp_ph1 *, vchar_t *,
-	u_int32_t, int));
+	struct sockaddr *, struct sockaddr *, int, vchar_t *));
+extern int isakmp_info_send_n1 __P((struct ph1handle *, int, vchar_t *));
+extern int isakmp_info_send_n2
+	__P((struct ph2handle *, int, vchar_t *, int));
+extern int isakmp_info_send_common
+	__P((struct ph1handle *, vchar_t *, u_int32_t, int));
 #if 0
-extern int isakmp_info_send __P((u_int type , struct sockaddr *remote,
-	struct isakmp_ph1 *iph1; u_int proto_id, u_int spi_size));
+extern int isakmp_info_send __P((u_int type, struct sockaddr *remote,
+	struct ph1handle *iph1; u_int proto_id, u_int spi_size));
 #else
 extern int isakmp_info_send __P((u_int type));
 #endif
 
-#endif /* !defined(_ISAKMP_INF_H_) */
+extern void isakmp_check_notify
+	__P((struct isakmp_gen *gen, struct ph1handle *iph1));

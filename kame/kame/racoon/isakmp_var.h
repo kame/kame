@@ -26,64 +26,73 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.2 1999/08/19 15:09:43 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.3 2000/01/09 01:31:27 itojun Exp $ */
 
-struct cipher_algorithm {
-	char *name;
-	vchar_t *(*encrypt) __P((vchar_t *data, vchar_t *key, caddr_t iv));
-	vchar_t *(*decrypt) __P((vchar_t *data, vchar_t *key, caddr_t iv));
-	int (*weakkey) __P((vchar_t *key));
-};
+#define PORT_ISAKMP 500
 
-/* for parsing ISAKMP header. */
-struct isakmp_parse_t {
-	u_char type;
-	int len;
-	struct isakmp_gen *ptr;
-};
+typedef u_char cookie_t[8];
+typedef u_char msgid_t[4];
 
-/* for IV management */
-struct isakmp_ivm {
-	vchar_t *iv;
-	vchar_t *ive;
-	vchar_t *ivd;
-};
+typedef struct { /* i_cookie + r_cookie */
+	cookie_t i_ck;
+	cookie_t r_ck;
+} isakmp_index;
 
-extern u_int isakmp_try;
-extern u_int isakmp_timer;
-extern int isakmp_random_padding;
-extern u_int isakmp_random_padsize;
-extern int isakmp_check_padding;
-extern int isakmp_pad_exclone;
+struct isakmp_gen;
+struct sched;
 
-extern int isakmp_main __P((vchar_t *, struct sockaddr *, struct sockaddr *));
-extern struct isakmp_ph1 *isakmp_begin_phase1 __P((struct isakmp_conf *,
-					struct sockaddr *, struct sockaddr *));
-extern struct isakmp_ivm *isakmp_new_iv __P((struct isakmp_ph1 *iph1));
-extern struct isakmp_ivm *isakmp_new_iv2 __P((struct isakmp_ph1 *iph1, msgid_t *msgid));
-extern void isakmp_free_ivm __P((struct isakmp_ivm *));
-extern vchar_t *isakmp_compute_hash1 __P((struct isakmp_ph1 *iph1,
-	msgid_t *msgid, vchar_t *body));
-extern vchar_t *isakmp_compute_hash3 __P((struct isakmp_ph1 *iph1,
-		msgid_t *msgid, vchar_t *body));
-extern u_int32_t isakmp_get_msgid2 __P((struct isakmp_ph1 *));
-extern int set_isakmp_header2 __P((vchar_t *buf, struct isakmp_ph2 *iph2, int nptype));
-extern int set_isakmp_header __P((vchar_t *buf, struct isakmp_ph1 *iph1, int nptype));
-extern int isakmp_quick_r2 __P((vchar_t *, struct sockaddr *, struct isakmp_ph2 *));
-extern int isakmp_quick_i2 __P((vchar_t *, struct sockaddr *, struct isakmp_ph2 *));
-extern int isakmp_begin_quick __P((struct isakmp_ph1 *, struct pfkey_st *));
-extern vchar_t *isakmp_parse0 __P((int, struct isakmp_gen *, int));
-extern vchar_t *isakmp_parse __P((vchar_t *, struct sockaddr *));
+struct sockaddr;
+struct ph1handle;
+struct ph2handle;
+struct remoteconf;
+struct isakmp_gen;
+struct ipsecdoi_pl_id;	/* XXX */
+struct isakmp_pl_ke;	/* XXX */
+struct isakmp_pl_nonce;	/* XXX */
 
-extern vchar_t *isakmp_do_encrypt __P((struct isakmp_ph1 *iph1,
-	vchar_t *msg, vchar_t *ivep, vchar_t *ivp));
-extern vchar_t *isakmp_do_decrypt __P((struct isakmp_ph1 *iph1,
-	vchar_t *msg, vchar_t *ivep, vchar_t *ivp));
+extern int isakmp_handler __P((int so_isakmp));
+extern int isakmp_main __P((vchar_t *msg, struct sockaddr *remote, struct sockaddr *local));
+extern int isakmp_ph1begin_i __P((struct remoteconf *rmconf, struct sockaddr *remote));
+
+extern vchar_t * isakmp_parsewoh __P((int np0, struct isakmp_gen *gen, int len));
+extern vchar_t *isakmp_parse __P((vchar_t *buf));
+
+extern int isakmp_init __P((void));
+extern u_char *isakmp_pindex __P((isakmp_index *index, u_int32_t msgid));
+extern int isakmp_open __P((void));
+extern void isakmp_close __P((void));
+extern int isakmp_send __P((struct ph1handle *iph1, vchar_t *buf));
+
+extern void isakmp_ph1resend __P((struct ph1handle *iph1));
+extern void isakmp_ph2resend __P((struct ph2handle *iph2));
+extern void isakmp_ph1expire __P((struct ph1handle *iph1));
+extern void isakmp_ph1restart __P((struct ph1handle *iph1));
+extern void isakmp_ph2expire __P((struct ph2handle *iph2));
+
+extern int isakmp_post_acquire __P((struct ph2handle *iph2));
+extern int isakmp_post_getspi __P((struct ph2handle *iph2));
+extern void isakmp_chkph1there __P((struct ph2handle *iph2));
+
+extern caddr_t isakmp_set_attr_v
+	__P((caddr_t buf, int type, caddr_t val, int len));
+extern caddr_t isakmp_set_attr_l
+	__P((caddr_t buf, int type, u_int32_t val));
+
+extern int isakmp_newcookie
+	__P((caddr_t place, struct sockaddr *remote, struct sockaddr *local));
+extern int isakmp_id2isa __P((struct ph1handle *iph1, struct ipsecdoi_pl_id *id));
+extern int isakmp_kn2isa __P((struct ph1handle *iph1, struct isakmp_pl_ke *ke, struct isakmp_pl_nonce *nonce));
+extern void isakmp_check_vendorid __P((struct isakmp_gen *gen, struct sockaddr *from));
+
+extern u_int32_t isakmp_newmsgid2 __P((struct ph1handle *iph1));
+extern caddr_t set_isakmp_header __P((vchar_t *buf, struct ph1handle *iph1, int nptype));
+extern caddr_t set_isakmp_header2 __P((vchar_t *buf, struct ph2handle *iph2, int nptype));
+extern caddr_t set_isakmp_payload __P((caddr_t buf, vchar_t *src, int nptype));
 
 #ifdef HAVE_PRINT_ISAKMP_C
 extern void isakmp_printpacket __P((vchar_t *msg, struct sockaddr *from,
 	struct sockaddr *my, int decoded));
 #endif
-extern int isakmp_newgroup_r __P((vchar_t *, struct sockaddr *,
-	struct isakmp_ph1 *));
-extern int isakmp_set_cookie __P((char *, struct sockaddr *, struct sockaddr *));
+
+extern int copy_ph1addresses __P(( struct ph1handle *iph1,
+	struct remoteconf *rmconf, struct sockaddr *remote));

@@ -26,331 +26,308 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.c,v 1.1 1999/08/08 23:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: schedule.c,v 1.2 2000/01/09 01:31:32 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/time.h>
-
-#include <netinet/in.h>
+#include <sys/queue.h>
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#ifdef HAVE_UNISTD_H
-#include <unistd.h>
-#endif
 #include <errno.h>
 
-#include "var.h"
-#include "vmbuf.h"
 #include "schedule.h"
-#include "admin.h"
-#include "misc.h"
-#include "debug.h"
 
-struct schedtab sctab;
+#define FIXY2039PROBLEM
 
-static int sched_check __P((struct sched *, int));
-static int sched_free __P((struct sched *));
-static struct sched *sched_search __P((sched_index *));
+#ifndef TAILQ_FOREACH
+#define TAILQ_FOREACH(elm, head, field) \
+        for (elm = TAILQ_FIRST(head); elm; elm = TAILQ_NEXT(elm, field))
+#endif
 
-static int sched_copy_index __P((sched_index *, sched_index *));
+static struct timeval timeout;
+
+#ifdef FIXY2039PROBLEM
+#define Y2039TIME_T	0x7fffffff
+static time_t launched;		/* time when the program launched. */
+static time_t deltaY2039;
+#endif
+
+static TAILQ_HEAD(_schedtree, sched) sctree;
+
+static void sched_add __P((struct sched *sc));
+static time_t current_time __P((void));
 
 /*
  * schedule handler
- *   return:
- *     number of schedule.
+ * OUT:
+ *	time to block until next event.
+ *	if no entry, NULL returned.
  */
-int
-schedular(num)
-	int num;
+struct timeval *
+schedular()
 {
-	static time_t oldt = 0;
-	time_t newt, diff;
-	struct sched *sc, *next;
+	time_t now, delta;
+	struct sched *p, *next;
 
-	newt = time((time_t *)0);
-	if (num)
-		diff = newt - oldt;
-	else
-		diff = 0;
+	now = current_time();
 
-	oldt = newt;
+        for (p = TAILQ_FIRST(&sctree); p; p = next) {
+		next = TAILQ_NEXT(p, chain);
 
-	num = 0;
-	for (sc = sctab.head; sc; sc = next) {
-		next = sc->next;
+		if (now < p->xtime)
+			continue;
 
-		switch (sc->status) {
-		case SCHED_ON:
-			if (sched_check(sc, diff) < 0) {
-				return(-1);
-			}
-			num++;
-			break;
+		/* remove schedule from tree before executing. */
+		TAILQ_REMOVE(&sctree, p, chain);
 
-		case SCHED_DEAD:
-			if (sched_free(sc) < 0) {
-				return(-1);
-			}
-			break;
+		if (p->func != NULL)
+			(p->func)(p->param);
 
-		case SCHED_OFF:
-		default:
-			/* ignore */
-			break;
-		}
+		free(p);
 	}
 
-	YIPSDEBUG(DEBUG_SCHED2,
-		plog(LOCATION, "# of schedule = %d.\n", num));
+	p = TAILQ_FIRST(&sctree);
+	if (p == NULL)
+		return NULL;
 
-	return(num);
-}
+	now = current_time();
 
-/* check timer */
-static int
-sched_check(sc, diff)
-	struct sched *sc;
-	int diff;
-{
-	int error = -1;
+	delta = p->xtime - now;
+	timeout.tv_sec = delta < 0 ? 0 : delta;
+	timeout.tv_usec = 0;
 
-	if (sc->tick - diff <= 0) {
-
-		YIPSDEBUG(DEBUG_SCHED2,
-		    plog(LOCATION, "tick over #%s\n", sched_pindex(&sc->index)));
-
-		/* check try counter */
-		if (sc->try - 1 <= 0) {
-			YIPSDEBUG(DEBUG_SCHED2,
-			    plog(LOCATION, "try over #%s\n", sched_pindex(&sc->index)));
-
-			if (sc->f_over != 0) {
-				(void)(sc->f_over)(sc);
-			} else {
-				YIPSDEBUG(DEBUG_SCHED,
-				    plog(LOCATION, "f_over() is null. why ?\n"));
-				goto end;
-			}
-
-		} else {
-			if (sc->f_try != 0) {
-				(void)(sc->f_try)(sc);
-			} else {
-				YIPSDEBUG(DEBUG_SCHED,
-				    plog(LOCATION, "f_try() is null. why ?\n"));
-				goto end;
-			}
-
-			sc->try--;
-		}
-
-	} else
-		sc->tick -= diff;
-
-	error = 0;
-
-end:
-	return(error);
+	return &timeout;
 }
 
 /*
- * sched_add
- *   allocate to schedule, and copy to index.
+ * add new schedule to schedule table.
  */
 struct sched *
-sched_add(tick, f_try, try, f_over, ptr1, ptr2, id)
-	u_int tick, try;
-	int (*f_try)(), (*f_over)();
-	caddr_t ptr1, ptr2;
-	int id;
+sched_new(tick, func, param)
+	time_t tick;
+	void (*func)();
+	void *param;
 {
+	static long id = 1;
 	struct sched *new;
-	static sched_index index = 1;
 
-	/* diagnostic */
-	if (sched_search(&index) != 0) {
-		YIPSDEBUG(DEBUG_SCHED,
-		    plog(LOCATION, "why already exists, (%s)\n", sched_pindex(&index)));
-		return(0);
-	}
+	new = (struct sched *)malloc(sizeof(*new));
+	if (new == NULL)
+		return NULL;
 
-	if ((new = (struct sched *)malloc(sizeof(*new))) == 0) {
-		YIPSDEBUG(DEBUG_SCHED,
-		    plog(LOCATION, "malloc (%s)\n", strerror(errno)));
-		return(0);
-	}
+	memset(new, 0, sizeof(*new));
+	new->func = func;
+	new->param = param;
 
-	memset((char *)new, 0, sizeof(*new));
-	new->status = SCHED_ON;
-	new->tick   = tick;
-	new->try    = try;
-	new->f_try  = f_try;
-	new->f_over = f_over;
-	new->ptr1   = ptr1;
-	new->ptr2   = ptr2;
-	new->identifier   = id;
+	/* for debug */
+	new->id = id++;
+	time(&new->created);
+	new->tick = tick;
 
-	sched_copy_index(&new->index, &index);
+	new->xtime = current_time() + tick;
 
 	/* add to schedule table */
-	new->next = (struct sched *)0;
-	new->prev = sctab.tail;
-
-	if (sctab.tail == 0)
-		sctab.head = new;
-	else
-		sctab.tail->next = new;
-	sctab.tail = new;
-	sctab.len++;
-
-	YIPSDEBUG(DEBUG_SCHED,
-	    plog(LOCATION, "add schedule, tick=%u (#%s)\n",
-	    tick, sched_pindex(&index)));
-
-	/* increment index */
-	index++;
+	sched_add(new);
 
 	return(new);
 }
 
-void
-sched_kill(sc)
-	struct sched **sc;
+/* add new schedule to schedule table */
+static void
+sched_add(sc)
+	struct sched *sc;
 {
-	YIPSDEBUG(DEBUG_SCHED,
-	    plog(LOCATION,
-		"kill schedule, (%s)\n", sched_pindex(&(*sc)->index)));
+	struct sched *p;
 
-	(*sc)->status = SCHED_DEAD;
-	(*sc)->tick = 0;
-	(*sc)->try = 0;
-
-	*sc = NULL;
+	TAILQ_FOREACH(p, &sctree, chain) {
+		if (sc->xtime < p->xtime) {
+			TAILQ_INSERT_BEFORE(p, sc, chain);
+			return;
+		}
+	}
+	if (p == NULL)
+		TAILQ_INSERT_TAIL(&sctree, sc, chain);
 
 	return;
 }
 
-/* free schedule */
-static int
-sched_free(sc)
-	struct sched *sc;
+/* get current time.
+ * if defined FIXY2039PROBLEM, base time is the time when called sched_init().
+ * Otherwise, conform to time(3).
+ */
+static time_t
+current_time()
 {
-	if (sched_search(&sc->index) == 0) {
-		YIPSDEBUG(DEBUG_SCHED,
-		    plog(LOCATION, "not exists, (%s)\n", sched_pindex(&sc->index)));
-		return(-1);
-	}
+	time_t n;
+#ifdef FIXY2039PROBLEM
+	time_t t;
 
-	/* reap from schedule table */
-	/* middle */
-	if (sc->prev && sc->next) {
-		sc->prev->next = sc->next;
-		sc->next->prev = sc->prev;
-	} else
-	/* tail */
-	if (sc->prev && sc->next == 0) {
-		sc->prev->next = (struct sched *)0;
-		sctab.tail = sc->prev;
-	} else
-	/* head */
-	if (sc->prev == 0 && sc->next) {
-		sc->next->prev = (struct sched *)0;
-		sctab.head = sc->next;
-	} else {
-	/* last one */
-		sctab.head = (struct sched *)0;
-		sctab.tail = (struct sched *)0;
-	}
+	time(&n);
+	t = n - launched;
+	if (t < 0)
+		t += deltaY2039;
 
-	sctab.len--;
-
-#if 0
-	YIPSDEBUG(DEBUG_SCHED,
-	    plog(LOCATION, "free schedule (%s)\n", sched_pindex(&sc->index)));
+	return t;
+#else
+	return time(&n);
 #endif
-
-	(void)free(sc);
-
-	return(0);
 }
 
-/* search schedule */
-static struct sched *
-sched_search(index)
-	sched_index *index;
-{
+void
+sched_kill(sc)
 	struct sched *sc;
+{
+	TAILQ_REMOVE(&sctree, sc, chain);
+	free(sc);
 
-	for (sc = sctab.head; sc; sc = sc->next) {
-		if (memcmp((char *)&sc->index, (char *)index, sizeof(*index)) == 0)
-			return(sc);
-	}
-
-	return(0);
+	return;
 }
 
 /*
- * copy index to dst from src
+ * for debug
  */
-static int
-sched_copy_index(dst, src)
-	sched_index *dst, *src;
+int
+sched_dump(buf, len)
+	caddr_t *buf;
+	int *len;
 {
-	memcpy((caddr_t)dst, (caddr_t)src, sizeof(*dst));
+	caddr_t new;
+	struct sched *p;
+	struct scheddump *dst;
+	int cnt = 0;
 
-	return(0);
-}
+	/* initialize */
+	*len = 0;
+	*buf = NULL;
 
-vchar_t *
-sched_dump()
-{
-	struct sched *dst, *src;
-	vchar_t *buf;
-	int tlen;
+	TAILQ_FOREACH(p, &sctree, chain)
+		cnt++;
 
-	tlen = sizeof(struct sched) * sctab.len;
+	/* no entry */
+	if (cnt == 0)
+		return -1;
 
-	if ((buf = vmalloc(tlen)) == NULL) {
-		plog(LOCATION, "vmalloc(%s)\n", strerror(errno));
-		return NULL;
-	}
-	dst = (struct sched *)buf->v;
-	for (src = sctab.head; src; src = src->next) {
-		memcpy((caddr_t)dst, (caddr_t)src, sizeof(*dst));
+	*len = cnt * sizeof(*dst);
+
+	new = malloc(*len);
+	if (new == NULL)
+		return -1;
+	dst = (struct scheddump *)new;
+
+        p = TAILQ_FIRST(&sctree);
+	while (p) {
+		dst->xtime = p->xtime;
+		dst->id = p->id;
+		dst->created = p->created;
+		dst->tick = p->tick;
+
+		p = TAILQ_NEXT(p, chain);
+		if (p == NULL) {
+			dst->last = 1;
+			break;
+		}
+		dst->last = 0;
 		dst++;
 	}
 
-	return buf;
-}
+	*buf = new;
 
-/*
- * make strings of index of schedule.
- */
-char *
-sched_pindex(index)
-	sched_index *index;
-{
-	static char buf[48];
-	caddr_t p = (caddr_t)index;
-	int len = sizeof(*index);
-	int i, j;
-
-	for (j = 0, i = 0; i < len; i++) {
-		snprintf((char *)&buf[j], sizeof(buf) - j, "%02x", p[i]);
-		j += 2;
-	}
-
-	return buf;
-}
-
-/* initialize schedule table */
-int
-sched_init(void)
-{
-	memset((char *)&sctab, 0, sizeof(sctab));
 	return 0;
 }
 
+/* initialize schedule table */
+void
+sched_init()
+{
+#ifdef FIXY2039PROBLEM
+	time(&launched);
+
+	deltaY2039 = Y2039TIME_T - launched;
+#endif
+
+	TAILQ_INIT(&sctree);
+
+	return;
+}
+
+#ifdef STEST
+#include <sys/types.h>
+#include <sys/time.h>
+#include <unistd.h>
+#include <err.h>
+
+void
+test(tick)
+	int *tick;
+{
+	printf("execute %d\n", *tick);
+	free(tick);
+}
+
+void
+getstdin()
+{
+	int *tick;
+	char buf[16];
+
+	read(0, buf, sizeof(buf));
+	if (buf[0] == 'd') {
+		struct scheddump *scbuf, *p;
+		int len;
+		sched_dump((caddr_t *)&scbuf, &len);
+		if (buf == NULL)
+			return;
+		for (p = scbuf; ; p++) {
+			printf("xtime=%ld\n", p->xtime);
+			if (p->last)
+				break;
+		}
+		free(scbuf);
+		return;
+	}
+
+	tick = (int *)malloc(sizeof(*tick));
+	*tick = atoi(buf);
+	printf("new queue tick = %d\n", *tick);
+	sched_new(*tick, test, tick);
+}
+
+int
+main()
+{
+	static fd_set mask0;
+	int nfds = 0;
+	fd_set rfds;
+	struct timeval *timeout;
+	int error;
+
+	FD_ZERO(&mask0);
+	FD_SET(0, &mask0);
+	nfds = 1;
+
+	/* initialize */
+	sched_init();
+
+	while (1) {
+		rfds = mask0;
+
+		timeout = schedular();
+
+		error = select(nfds, &rfds, (fd_set *)0, (fd_set *)0, timeout);
+		if (error < 0) {
+			switch (errno) {
+			case EINTR: continue;
+			default:
+				err(1, "select");
+			}
+			/*NOTREACHED*/
+		}
+
+		if (FD_ISSET(0, &rfds))
+			getstdin();
+	}
+}
+#endif

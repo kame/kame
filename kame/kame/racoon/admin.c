@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.2 2000/01/01 06:21:40 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.3 2000/01/09 01:31:20 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -48,66 +48,77 @@
 #endif
 
 #include "var.h"
+#include "misc.h"
 #include "vmbuf.h"
+#include "plog.h"
+#include "sockmisc.h"
+#include "debug.h"
+
 #include "schedule.h"
-#include "isakmp.h"
+#include "localconf.h"
+#include "remoteconf.h"
+#include "grabmyaddr.h"
+#include "isakmp_var.h"
 #include "handler.h"
-#include "cfparse.h"
 #include "pfkey.h"
 #include "admin.h"
-#include "misc.h"
-#include "debug.h"
+#include "admin_var.h"
 #include "session.h"
-#include "isakmp_var.h"
-
-int sock_admin;
-u_int port_admin = DEFAULT_ADMIN_PORT;
 
 static int admin_process __P((int so2, char *combuf));
+static int admin_reply __P((int so, struct admin_com *combuf, vchar_t *buf));
 static u_int admin2pfkey_proto __P((u_int proto));
-
-static char _addr1_[BUFADDRSIZE], _addr2_[BUFADDRSIZE]; /* for message */
 
 int
 admin_handler()
 {
 	int so2;
-	struct admin_com com;
-	char *combuf;
-	int len;
-
-    {
 	struct sockaddr_storage from;
 	int fromlen = sizeof(from);
+	struct admin_com com;
+	char *combuf = NULL;
+	int len;
 
-	if ((so2 = accept(sock_admin, (struct sockaddr *)&from, &fromlen)) < 0){
-		plog(LOCATION, "accept (%s)\n", strerror(errno));
+	so2 = accept(lcconf->sock_admin, (struct sockaddr *)&from, &fromlen);
+	if (so2 < 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to accept admin command (%s)\n",
+			strerror(errno));
 		return -1;
 	}
-    }
 
+	/* get buffer length */
 	while ((len = recv(so2, (char *)&com, sizeof(com), MSG_PEEK)) < 0) {
-		if (errno == EINTR) continue;
-		plog(LOCATION, "recv (%s)\n", strerror(errno));
+		if (errno == EINTR)
+			continue;
+		plog(logp, LOCATION, NULL,
+			"failed to recv admin command (%s)\n",
+			strerror(errno));
 		return -1;
 	}
 
 	/* sanity check */
 	if (len < sizeof(com)) {
-		plog(LOCATION, "Invalid header length.\n");
+		plog(logp, LOCATION, NULL,
+			"Invalid header length of admin command.\n");
 		return -1;
 	}
 
 	/* get buffer to receive */
 	if ((combuf = malloc(com.ac_len)) == 0) {
-		plog(LOCATION, "malloc (%s)\n", strerror(errno));
+		plog(logp, LOCATION, NULL,
+			"failed to alloc buffer for admin command (%s)\n",
+			strerror(errno));
 		return -1;
 	}
 
 	/* get real data */
 	while ((len = recv(so2, combuf, com.ac_len, 0)) < 0) {
-		if (errno == EINTR) continue;
-		plog(LOCATION, "recv (%s)\n", strerror(errno));
+		if (errno == EINTR)
+			continue;
+		plog(logp, LOCATION, NULL,
+			"failed to recv admin command (%s)\n",
+			strerror(errno));
 		return -1;
 	}
 
@@ -122,16 +133,18 @@ admin_handler()
 		pid_t pid;
 
 		if ((pid = fork()) < 0) {
-			plog(LOCATION, "fork (%s)\n", strerror(errno));
+			plog(logp, LOCATION, NULL,
+				"failed to fork for admin processing (%s)\n",
+				strerror(errno));
 			return -1;
 		}
 
-		/* exit if parant's process. */
+		/* parant's process. */
 		if (pid != 0)
 			goto end;
 
 		/* child's process */
-		(void)close(sock_admin);
+		admin_close();
 	}
 
 	admin_process(so2, combuf);
@@ -158,14 +171,20 @@ admin_process(so2, combuf)
 	switch (com->ac_cmd) {
 	case ADMIN_RELOAD_CONF:
 		/* don't entered because of proccessing it in other place. */
-		plog(LOCATION, "Why the way are you in.\n");
+		plog(logp, LOCATION, NULL,
+			"Why the way are you in.\n");
 		goto bad;
 
 	case ADMIN_SHOW_SCHED:
-		if ((buf = sched_dump()) == NULL)
+	{
+		caddr_t p;
+		int len;
+		if (sched_dump(&p, &len) == -1)
 			com->ac_errno = -1;
+		buf = vmalloc(len);
+		memcpy(buf->v, p, len);
+	}
 		break;
-
 	case ADMIN_SHOW_SA:
 	case ADMIN_FLUSH_SA:
 	    {
@@ -173,11 +192,12 @@ admin_process(so2, combuf)
 		case ADMIN_PROTO_ISAKMP:
 			switch (com->ac_cmd) {
 			case ADMIN_SHOW_SA:
-				if ((buf = isakmp_dump_ph1sa(com->ac_proto)) == NULL)
+				buf = dumpph1(com->ac_proto);
+				if (buf == NULL)
 					com->ac_errno = -1;
 				break;
 			case ADMIN_FLUSH_SA:
-				isakmp_flush_ph1sa(com->ac_proto);
+				flushph1(com->ac_proto);
 				break;
 			}
 			break;
@@ -191,7 +211,8 @@ admin_process(so2, combuf)
 				p = admin2pfkey_proto(com->ac_proto);
 				if (p == ~0)
 					goto bad;
-				if ((buf = pfkey_dump_sadb(p)) == NULL)
+				buf = pfkey_dump_sadb(p);
+				if (buf == NULL)
 					com->ac_errno = -1;
 			    }
 				break;
@@ -204,11 +225,12 @@ admin_process(so2, combuf)
 		case ADMIN_PROTO_INTERNAL:
 			switch (com->ac_cmd) {
 			case ADMIN_SHOW_SA:
-				if ((buf = pfkey_dump_pst(&error)) == NULL)
+				buf = NULL; /*XXX dumpph2(&error);*/
+				if (buf == NULL)
 					com->ac_errno = error;
 				break;
 			case ADMIN_FLUSH_SA:
-				pfkey_flush_pst();
+				/*XXX flushph2();*/
 				com->ac_errno = 0;
 				break;
 			}
@@ -238,46 +260,44 @@ admin_process(so2, combuf)
 		switch (com->ac_proto) {
 		case ADMIN_PROTO_ISAKMP:
 		    {
-			struct isakmp_conf *cfp;
+			struct remoteconf *rmconf;
 			struct sockaddr *remote;
 			struct sockaddr *local;
 
 			/* search appropreate configuration */
-			cfp = isakmp_cfbypeer(dst);
-			if (cfp == NULL) {
-				plog(LOCATION,
-					"no configuration is found for peer address.\n");
+			rmconf = getrmconf(dst);
+			if (rmconf == NULL) {
+				plog(logp, LOCATION, dst,
+					"no configuration found "
+					"for peer address.\n");
 				com->ac_errno = -1;
 				break;
 			}
 
 			/* get remote IP address and port number. */
-			GET_NEWBUF(remote, struct sockaddr *, dst, dst->sa_len);
+			remote = dupsaddr(dst);
 			if (remote == NULL) {
 				com->ac_errno = -1;
 				break;
 			}
-			_INPORTBYSA(remote) = _INPORTBYSA(cfp->remote);
+			_INPORTBYSA(remote) = _INPORTBYSA(rmconf->remote);
 
 			/* get local address */
-			GET_NEWBUF(local, struct sockaddr *, src, src->sa_len);
+			local = dupsaddr(src);
 			if (local == NULL) {
 				com->ac_errno = -1;
 				break;
 			}
-			_INPORTBYSA(local) = isakmp_get_localport(local);
+			_INPORTBYSA(local) = getmyaddrsport(local);
 
 			YIPSDEBUG(DEBUG_INFO,
-				GETNAMEINFO(local, _addr1_, _addr2_);
-				plog(LOCATION, "local %s %s\n",
-					_addr1_, _addr2_));
-			YIPSDEBUG(DEBUG_INFO,
-				GETNAMEINFO(remote, _addr1_, _addr2_);
-				plog(LOCATION, "remote %s %s\n",
-					_addr1_, _addr2_));
+				plog(logp, LOCATION, local,
+					"local address\n");
+				plog(logp, LOCATION, remote,
+					"remote address\n"));
 
 			/* begin ident mode */
-			if (isakmp_begin_phase1(cfp, local, remote) == NULL) {
+			if (isakmp_ph1begin_i(rmconf, remote) == NULL) {
 				com->ac_errno = -1;
 				break;
 			}
@@ -294,37 +314,13 @@ admin_process(so2, combuf)
 		break;
 
 	default:
-		plog(LOCATION, "illegal command\n");
+		plog(logp, LOCATION, NULL,
+			"illegal command\n");
 		com->ac_errno = -1;
 	}
 
-    {
-	int tlen;
-	char *retbuf = NULL;
-
-	if (buf != NULL)
-		tlen = sizeof(struct admin_com) + buf->l;
-	else
-		tlen = sizeof(struct admin_com);
-
-	if ((retbuf = malloc(tlen)) == NULL) {
-		plog(LOCATION, "malloc (%s)\n", strerror(errno));
+	if (admin_reply(so2, com, buf) < 0)
 		goto bad;
-	}
-
-	memcpy(retbuf, com, sizeof(struct admin_com));
-	((struct admin_com *)retbuf)->ac_len = tlen;
-
-	if (buf != NULL)
-		memcpy(retbuf + sizeof(struct admin_com), buf->v, buf->l);
-
-	tlen = send(so2, retbuf, tlen, 0);
-	free(retbuf);
-	if (tlen < 0) {
-		plog(LOCATION, "sendto (%s)\n", strerror(errno));
-		goto bad;
-	}
-    }
 
 	if (buf != NULL)
 		vfree(buf);
@@ -336,73 +332,44 @@ admin_process(so2, combuf)
 	return -1;
 }
 
-int
-admin_init()
+static int
+admin_reply(so, combuf, buf)
+	int so;
+	struct admin_com *combuf;
+	vchar_t *buf;
 {
-	struct addrinfo hints, *res;
-	char pbuf[10];
-	int error;
-	int tmp;
+	int tlen;
+	char *retbuf = NULL;
 
-	/*
-	 * the admin port may be connected from outer world with
-	 * any authentication.
-	 * Anyhow unix domain socket is not good.
-	 */
-	snprintf(pbuf, sizeof(pbuf), "%d", port_admin);
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = af;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
-	error = getaddrinfo(NULL, pbuf, &hints, &res);
-	if (error) {
-		plog(LOCATION, "getaddrinfo (%s)\n", gai_strerror(error));
-		return -1;
-	}
-	if (res->ai_next) {
-		plog(LOCATION, "resolved to multiple addresses, "
-			"using the first one\n");
-	}
+	if (buf != NULL)
+		tlen = sizeof(*combuf) + buf->l;
+	else
+		tlen = sizeof(*combuf);
 
-	if ((sock_admin = socket(res->ai_family, res->ai_socktype, 0)) < 0) {
-		plog(LOCATION, "socket (%s)\n", strerror(errno));
-		freeaddrinfo(res);
+	retbuf = CALLOC(tlen, char *);
+	if (retbuf == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to allocate admin buffer (%s)\n",
+			strerror(errno));
 		return -1;
 	}
 
-	tmp = 1;
-	if (setsockopt(sock_admin, SOL_SOCKET, SO_REUSEPORT,
-		       (void *)&tmp, sizeof(tmp)) < 0) {
-		plog(LOCATION, "setsockopt (%s)\n", strerror(errno));
-		close(sock_admin);
-		return -1;
-	}
+	memcpy(retbuf, combuf, sizeof(*combuf));
+	((struct admin_com *)retbuf)->ac_len = tlen;
 
-	if (bind(sock_admin, res->ai_addr, res->ai_addrlen) < 0) {
-		plog(LOCATION, "bind (%s) port=%u\n",
-			strerror(errno), port_admin);
-		(void)close(sock_admin);
-		freeaddrinfo(res);
-		return -1;
-	}
-	freeaddrinfo(res);
+	if (buf != NULL)
+		memcpy(retbuf + sizeof(*combuf), buf->v, buf->l);
 
-	if (listen(sock_admin, 5) < 0) {
-		plog(LOCATION, "listen (%s) port=%u\n",
-			strerror(errno), port_admin);
-		(void)close(sock_admin);
+	tlen = send(so, retbuf, tlen, 0);
+	free(retbuf);
+	if (tlen < 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to send admin command (%s)\n",
+			strerror(errno));
 		return -1;
 	}
-	YIPSDEBUG(DEBUG_INFO, plog(LOCATION,
-	    "using port of %d as to manage daemon.\n", port_admin));
 
 	return 0;
-}
-
-int
-admin_close()
-{
-	return(close(sock_admin));
 }
 
 static u_int
@@ -417,10 +384,96 @@ admin2pfkey_proto(proto)
 	case ADMIN_PROTO_ESP:
 		return SADB_SATYPE_ESP;
 	default:
-		plog(LOCATION,
+		plog(logp, LOCATION, NULL,
 			"Invalid proto for admin: %u\n", proto);
 		return ~0;
 	}
 	/*NOTREACHED*/
+}
+
+int
+admin_init()
+{
+	struct addrinfo hints, *res;
+	char *paddr = "127.0.0.1";	/* XXX */
+	char pbuf[10];
+	int error;
+	int tmp;
+
+	snprintf(pbuf, sizeof(pbuf), "%d", lcconf->port_admin);
+	memset(&hints, 0, sizeof(hints));
+	switch (lcconf->default_af) {
+	case 4:
+		hints.ai_family = PF_INET;
+		break;
+	case 6:
+		hints.ai_family = PF_INET6;
+		break;
+	default:
+		hints.ai_family = PF_UNSPEC;
+		break;
+	}
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	error = getaddrinfo(paddr, pbuf, &hints, &res);
+	if (error) {
+		plog(logp, LOCATION, NULL,
+			"getaddrinfo (%s)\n", gai_strerror(error));
+		return -1;
+	}
+	if (res->ai_next) {
+		/* warning */
+		plog(logp, LOCATION, NULL,
+			"resolved to multiple addresses, "
+			"using the first one\n");
+	}
+
+	lcconf->sock_admin = socket(res->ai_family, res->ai_socktype, 0);
+	if (lcconf->sock_admin < 0) {
+		plog(logp, LOCATION, NULL,
+			"socket (%s)\n", strerror(errno));
+		freeaddrinfo(res);
+		return -1;
+	}
+
+	tmp = 1;
+	if (setsockopt(lcconf->sock_admin, SOL_SOCKET, SO_REUSEPORT,
+		       (void *)&tmp, sizeof(tmp)) < 0) {
+		plog(logp, LOCATION, NULL,
+			"setsockopt (%s)\n", strerror(errno));
+		(void)close(lcconf->sock_admin);
+		freeaddrinfo(res);
+		return -1;
+	}
+
+	if (bind(lcconf->sock_admin, res->ai_addr, res->ai_addrlen) < 0) {
+		plog(logp, LOCATION, NULL,
+			"bind (%s) port=%u\n",
+			strerror(errno), lcconf->port_admin);
+		(void)close(lcconf->sock_admin);
+		freeaddrinfo(res);
+		return -1;
+	}
+	freeaddrinfo(res);
+
+	if (listen(lcconf->sock_admin, 5) < 0) {
+		plog(logp, LOCATION, NULL,
+			"listen (%s) port=%u\n",
+			strerror(errno), lcconf->port_admin);
+		(void)close(lcconf->sock_admin);
+		return -1;
+	}
+	YIPSDEBUG(DEBUG_INFO,
+		plog(logp, LOCATION, NULL,
+			"open %s[%s] as racoon management.\n",
+			paddr, pbuf));
+
+	return 0;
+}
+
+int
+admin_close()
+{
+	return(close(lcconf->sock_admin));
 }
 

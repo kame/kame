@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.7 2000/01/09 01:05:55 itojun Exp $
+# YIPS $Id: Makefile.in,v 1.8 2000/01/09 01:31:19 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -7,7 +7,8 @@ CC=	@CC@
 LDFLAGS=@LDFLAGS@
 CPPFLAGS=	@CPPFLAGS@
 OPTFLAG=@OPTFLAG@
-CFLAGS=	@CFLAGS@ @CPPFLAGS@ @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -Dss_family=__ss_family -Dss_len=__ss_len -DYY_NO_UNPUT @SSLVERDEF@
+CFLAGS=	@CFLAGS@ @CPPFLAGS@ @DEFS@ $(CPPFLAGS) $(OPTFLAG) -DIPSEC -I. -I$(srcdir) -Dss_family=__ss_family -Dss_len=__ss_len @SSLVERDEF@
+CFLAGS+=-DYY_NO_UNPUT
 LIBS=	@LIBS@
 YFLAGS+=-d
 
@@ -18,10 +19,14 @@ exec_prefix=	@exec_prefix@
 INSTALL=@INSTALL@
 
 PROG=	racoon kmpstat eaytest
-#PROG+=	pfkey
-OBJS=	handler.o isakmp.o isakmp_inf.o ipsec_doi.o pfkey.o main.o \
-	post_com.o schedule.o session.o crypto_openssl.o cfparse.o cftoken.o \
-	admin.o misc.o vmbuf.o \
+#PROG+=	pfkey signing
+OBJS=	main.o session.o isakmp.o handler.o \
+	isakmp_ident.o isakmp_agg.o \
+	isakmp_quick.o isakmp_inf.o isakmp_newg.o \
+	pfkey.o admin.o ipsec_doi.o oakley.o grabmyaddr.o signing.o \
+	policy.o localconf.o remoteconf.o crypto_openssl.o algorithm.o \
+	cfparse.o cftoken.o strnames.o \
+	vmbuf.o plog.o logger.o schedule.o str2val.o misc.o sockmisc.o \
 	@LIBOBJS@
 #OBJS+=	signing.o
 
@@ -30,17 +35,22 @@ all: $(PROG)
 racoon: $(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LIBS)
 
-kmpstat: kmpstat.o misc.o vmbuf.o
-	$(CC) $(LDFLAGS) -o $@ kmpstat.o misc.o vmbuf.o $(LIBS)
+kmpstat: kmpstat.o misc_noplog.o vmbuf.o str2val.o
+	$(CC) $(LDFLAGS) -o $@ kmpstat.o misc_noplog.o vmbuf.o str2val.o $(LIBS)
 
 pfkey: dummy.o
 	$(CC) $(LDFLAGS) -o $@ dummy.o
 
-eaytest: eaytest.o crypto_openssl.o 
-	$(CC) $(LDFLAGS) -o $@ eaytest.o crypto_openssl.o misc.o vmbuf.o $(LIBS)
+eaytest: eaytest.o crypto_openssl.o misc_noplog.o vmbuf.o str2val.o
+	$(CC) $(LDFLAGS) -o $@ eaytest.o crypto_openssl.o misc_noplog.o \
+		vmbuf.o str2val.o $(LIBS)
 
 signing: signing.o
 	$(CC) $(LDFLAGS) -o $@ signing.o
+
+# special object rules
+misc_noplog.o: misc.c
+	$(CC) -DNOUSE_PLOG -o misc_noplog.o -c misc.c
 
 # extra
 print-isakmp.o:	$(srcdir)/../tcpdump/print-isakmp.c

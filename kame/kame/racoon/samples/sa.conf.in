@@ -1,0 +1,16 @@
+# $Id: sa.conf.in,v 1.1 2000/01/09 01:31:39 itojun Exp $
+
+# Static SA configuration
+
+# See setkey (8).
+
+static_sa fec0::10 fec0::11 esp 0x10001
+	-m transport
+	-E blowfish-cbc "kamekame"
+	-A hmac-sha1 "this is the test key" ;
+
+static_sa fec0::11 fec0::10 esp 0x10002
+	-m transport
+	-E blowfish-cbc "kamekame"
+	-A hmac-sha1 "this is the test key" ;
+

@@ -26,12 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.2 1999/09/01 05:39:39 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.3 2000/01/09 01:31:29 itojun Exp $ */
 
 /* refer to RFC 2409 */
-
-#if !defined(_ISAKMP_OAKLEY_H_)
-#define _ISAKMP_OAKLEY_H_
 
 /* Attribute Classes */
 #define OAKLEY_ATTR_ENC_ALG		1 /* B */
@@ -47,9 +44,9 @@
 #define   OAKLEY_ATTR_HASH_ALG_TIGER		3
 #define OAKLEY_ATTR_AUTH_METHOD		3 /* B */
 #define   OAKLEY_ATTR_AUTH_METHOD_PSKEY		1
-#define   OAKLEY_ATTR_AUTH_METHOD_DSS		2
+#define   OAKLEY_ATTR_AUTH_METHOD_DSSSIG	2
 #define   OAKLEY_ATTR_AUTH_METHOD_RSASIG	3
-#define   OAKLEY_ATTR_AUTH_METHOD_RSA		4
+#define   OAKLEY_ATTR_AUTH_METHOD_RSAENC	4
 #define   OAKLEY_ATTR_AUTH_METHOD_RSAREV	5
 #define OAKLEY_ATTR_GRP_DESC		4 /* B */
 #define   OAKLEY_ATTR_GRP_DESC_MODP768		1
@@ -77,20 +74,7 @@
 #define OAKLEY_ATTR_KEY_LEN		14 /* B */
 #define OAKLEY_ATTR_FIELD_SIZE		15 /* B */
 #define OAKLEY_ATTR_GRP_ORDER		16 /* V */
-
-#define OAKLEY_ID_IPV4_ADDR		0
-#define OAKLEY_ID_IPV4_ADDR_SUBNET	1
-#define OAKLEY_ID_IPV6_ADDR		2
-#define OAKLEY_ID_IPV6_ADDR_SUBNET	3
-
-/* Additional Exchange Type */
-#define ISAKMP_ETYPE_QUICK		32
-#define ISAKMP_ETYPE_NEWGRP		33
-
-/* The use for checking proposal payload. This is not exchange type. */
-#define OAKLEY_MAIN_MODE		0
-#define OAKLEY_QUICK_MODE		1
-#define OAKLEY_NEWGROUP_MODE		2
+#define OAKLEY_ATTR_BLOCK_SIZE		17 /* B */
 
 #define OAKLEY_PRIME_MODP768 \
 	"FFFFFFFF FFFFFFFF C90FDAA2 2168C234 C4C6628B 80DC1CD1" \
@@ -116,12 +100,16 @@
 	"83655D23 DCA3AD96 1C62F356 208552BB 9ED52907 7096966D" \
 	"670C354E 4ABC9804 F1746C08 CA237327 FFFFFFFF FFFFFFFF"
 
-#define DEFAULTSECRETSIZE ( 128 / 8 ) /* 128 bits */
-#define DEFAULTNONCESIZE  ( 128 / 8 ) /* 128 bits */
-
 #define MAXPADLWORD	20
 
-struct dh {
+struct cipher_algorithm {
+	char *name;
+	vchar_t *(*encrypt) __P((vchar_t *data, vchar_t *key, caddr_t iv));
+	vchar_t *(*decrypt) __P((vchar_t *data, vchar_t *key, caddr_t iv));
+	int (*weakkey) __P((vchar_t *key));
+};
+
+struct dhgroup {
 	int type;
 	vchar_t *prime;
 	int gen1;
@@ -131,22 +119,50 @@ struct dh {
 	vchar_t *order;
 };
 
-/* isakmp sa structure */
-struct oakley_sa {
-	u_int32_t doi;
-	u_int32_t sit;
-	u_int8_t proto_id;		/* ISAKMP */
-	vchar_t *spi;			/* spi. MUST be zero. */
-	u_int8_t t_id;			/* IKE */
-	u_int16_t dhgrp;		/* DH: group */
-	struct dh *dh;
-	u_int8_t authtype;		/* method of authentication */
-	u_int8_t prftype;			/* type of prf */
-	u_int8_t hashtype;		/* type of hash */
-	u_int8_t enctype;			/* type of cipher */
-	u_int8_t keylen;		/* cipher key length */
-	u_int32_t ld_time;
-	u_int32_t ld_bytes;
-};
+#define MAXDHGROUP	10
 
-#endif /* !defined(_ISAKMP_OAKLEY_H_) */
+extern struct dhgroup dhgroup[MAXDHGROUP];
+
+struct ph1handle;
+struct ph2handle;
+struct isakmp_ivm;
+
+extern int oakley_get_defaultlifetime __P((void));
+
+extern void oakley_dhinit __P((void));
+extern void oakley_dhgrp_free __P((struct dhgroup *dhgrp));
+extern int oakley_dh_compute __P((const struct dhgroup *dh,
+	vchar_t *pub, vchar_t *priv, vchar_t *pub_p, vchar_t **gxy));
+extern int oakley_dh_generate
+	__P((const struct dhgroup *dh, vchar_t **pub, vchar_t **priv));
+extern int oakley_setdhgroup __P((int group, struct dhgroup **dhgrp));
+
+extern vchar_t *oakley_prf
+	__P((vchar_t *key, vchar_t *buf, struct ph1handle *iph1));
+extern vchar_t *oakley_hash __P((vchar_t *buf, struct ph1handle *iph1));
+
+extern int oakley_compute_keymat __P((struct ph2handle *iph2, int side));
+
+#if notyet
+extern vchar_t *oakley_compute_hashx __P((void));
+#endif
+extern vchar_t *oakley_compute_hash3
+	__P((struct ph1handle *iph1, u_int32_t msgid, vchar_t *body));
+extern vchar_t *oakley_compute_hash1
+	__P((struct ph1handle *iph1, u_int32_t msgid, vchar_t *body));
+extern vchar_t *oakley_compute_hash __P((struct ph1handle *iph1, int sw));
+
+extern int oakley_validate_auth __P((struct ph1handle *iph1));
+extern int oakley_getcert __P((struct ph1handle *iph1));
+extern int oakley_compute_skeyids __P((struct ph1handle *iph1));
+
+extern int oakley_compute_enckey __P((struct ph1handle *iph1));
+extern int oakley_newiv __P((struct ph1handle *iph1));
+extern struct isakmp_ivm *oakley_newiv2
+	__P((struct ph1handle *iph1, u_int32_t msgid));
+extern void oakley_delivm __P((struct isakmp_ivm *ivm));
+extern vchar_t *oakley_do_decrypt __P((struct ph1handle *iph1,
+	vchar_t *msg, vchar_t *ivdp, vchar_t *ivep));
+extern vchar_t *oakley_do_encrypt __P((struct ph1handle *iph1,
+	vchar_t *msg, vchar_t *ivep, vchar_t *ivp));
+extern int oakley_padlen __P((int len));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.7 1999/08/25 02:25:11 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.8 2000/01/09 01:31:22 itojun Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -37,7 +37,7 @@
 #include "var.h"
 #include "vmbuf.h"
 #include "oakley.h"
-#include "crypto.h"
+#include "crypto_openssl.h"
 #include "debug.h"
 
 #include <bn.h>

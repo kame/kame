@@ -26,46 +26,47 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.2 1999/09/01 05:39:40 sakane Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.3 2000/01/09 01:31:32 itojun Exp $ */
 
-typedef u_int32_t sched_index;
+#include <sys/queue.h>
 
 /* scheduling table */
+/* the head is the nearest event. */
 struct sched {
-	sched_index index;	/* index */
-	int status;		/* status for scheduling */
-	int tick;		/* tick counter */
-	int (*f_try)();		/* pointer to the function when tick over */
-	int try;		/* try counter */
-	int (*f_over)();	/* pointer to the function when try over */
-	void *ptr1;		/* buffer 1 */
-	void *ptr2;		/* buffer 2 */
-	struct sched *next;
-	struct sched *prev;
+	time_t xtime;		/* event time which is as time(3). */
+				/*
+				 * if defined FIXY2039PROBLEM, this time
+				 * is from the time when called sched_init().
+				 */
+	void (*func)();		/* call this function when timeout. */
+	void *param;		/* pointer to parameter */
 
-	int identifier;		/* id for the entry */
-#define SCHED_ID_PH1_RESEND	0
-#define SCHED_ID_PH1_LIFETIME	1
-#define SCHED_ID_PH2_RESEND	2
-#define SCHED_ID_PST_ACQUIRE	3
-#define SCHED_ID_PST_LIFETIME	4
+	long id;		/* for debug */
+	time_t created;		/* for debug */
+	time_t tick;		/* for debug */
+
+	TAILQ_ENTRY(sched) chain;
 };
 
-struct schedtab {
-	struct sched *head;
-	struct sched *tail;
-	int len;
+#define SCHED_KILL(s)                                                          \
+do {                                                                           \
+	sched_kill(s);                                                         \
+	s = NULL;                                                              \
+} while(0)
+
+#define SCHED_INIT(s)	(s) = NULL
+
+struct scheddump {
+	time_t xtime;
+	long id;
+	time_t created;
+	time_t tick;
+	int last;		/* If last record, this value is non-zero */ 
 };
 
-/* Status for scheduling */
-#define SCHED_OFF  0
-#define SCHED_ON   1
-#define SCHED_DEAD 2
+struct timeval *schedular __P((void));
+struct sched *sched_new __P((time_t tick, void (*func)(), void *param));
+void sched_kill __P((struct sched *sc));
+int sched_dump __P((caddr_t *, int *));
+void sched_init __P((void));
 
-extern int schedular __P((int));
-extern struct sched *sched_add __P((u_int, int (*)(), u_int, int (*)(),
-				caddr_t, caddr_t, int id));
-extern void sched_kill __P((struct sched **sc));
-extern vchar_t *sched_dump __P((void));
-extern char *sched_pindex __P((sched_index *index));
-extern int sched_init __P((void));

@@ -1,0 +1,98 @@
+# $Id: basic.conf.in,v 1.1 2000/01/09 01:31:38 itojun Exp $
+
+# search this file for pre_shared_key with various ID key.
+path pre_shared_key "/usr/local/etc/racoon/psk.txt" ;
+
+# racoon will search this directory if the certificate or certificate request
+# is received.
+path certificate "/usr/local/etc/racoon/cert.txt" ;
+
+# personal infomation.
+identifier vendor_id "KAME/racoon";
+identifier user_fqdn "sakane@kame.net";
+identifier fqdn "mine.kame.net";
+identifier keyid "/usr/local/etc/racoon/keyid.txt";
+
+# "log" specifies logging level.  It is followed by either "info", "notify",
+# "debug" or "debug2".
+log debug4;
+
+# "padding" defines some parameter of padding.  You should not touch these.
+padding {
+	maximum_length 20;	# maximum padding length.
+	randomize off;		# enbale randomize length.
+	restrict_check off;	# enable restrict check.
+	exclusive_tail off;	# extract last one octet.
+}
+
+# if no listen directive is specified, racoon will listen to all
+# available interface addresses.
+listen {
+	#isakmp 127.0.0.1 [7000];
+	#isakmp 202.249.11.124 [500];
+	admin [7002];	# administrative's port by kmpstat.
+}
+
+# Specification of default various timer.
+timer {
+	# These value can be changed per remote node.
+	counter 5;		# maximun trying count to send.
+	interval 20 sec;	# maximun interval to resend.
+	persend 1;		# the number of packets per a send.
+
+	# timer for waiting to complete each phase.
+	phase1 30 sec;
+	phase2 15 sec;
+}
+
+# Specification of algorithm level.  These are extracted into attribute of
+# proposal to negotiate SA.  There are seven type of class;
+#	"ISAKMP authentication method"
+#	"ISAKMP encryption algorithm"
+#	"ISAKMP hash algorithm",
+#	"ISAKMP DH group",
+#	"IPsec encryption algorithm",
+#	"IPsec authentication algorithm",
+#	"IPsec compression algorithm",
+# Each class can be defined three level; "normal", "high" and "extra_high".
+# Each level can be omited.  If so, it is interpreted that there is no
+# algorithm appropreately for use in its level.  algorithm type may be
+# defined at multiple level.
+algorithm_strength {
+	isakmp_auth_method {
+		extra_high nothing ;	# for clearance.
+		high  dsssig, rsasig, rsaenc, rsarev;
+		normal pre_shared_key ;
+	}
+	isakmp_encryption {
+		extra_high nothing ;
+		high rc5, blowfish ;
+		normal cast128, 3des, des ;
+	}
+	isakmp_hash {
+		extra_high nothing ;
+		high sha1 ;
+		normal md5 ;
+	}
+	isakmp_dh_group {
+		extra_high modp1536 ;
+		high modp1024 ;
+		normal modp768 ;
+	}
+	ipsec_encryption {
+		extra_high nothing ;
+		high rc5, blowfish ;
+		normal cast128, 3des, des ;
+	}
+	ipsec_authentication {
+		extra_high nothing ;
+		high hmac_sha1 ;
+		normal hmac_md5 ;
+	}
+	ipsec_ipcomp {
+		extra_high nothing ;
+		high deflate, lzs ;
+		normal oui, deflate, lzs ;
+	}
+}
+

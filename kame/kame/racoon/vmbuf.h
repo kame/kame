@@ -26,22 +26,30 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.h,v 1.1 1999/08/08 23:31:26 itojun Exp $ */
+/* YIPS @(#)$Id: vmbuf.h,v 1.2 2000/01/09 01:31:34 itojun Exp $ */
 
-typedef struct _vchar_ {
+/*
+ *	bp      v
+ *	v       v
+ *	........................
+ *	        <--------------> l
+ *	<----------------------> bl
+ */
+typedef struct _vchar_t_ {
+#if notyet
 	u_int32_t t;	/* type of the value */
-	size_t l;	/* length of the value */
-	caddr_t v;	/* place holder to the value in buffer */
-#if 0
-	caddr_t v0;	/* pointer to the buffer - not used any more */
+	vchar_t *n;	/* next vchar_t buffer */
+	size_t bl;	/* length of the buffer */
+	caddr_t bp;	/* pointer to the buffer */
 #endif
+	size_t l;	/* length of the value */
+	caddr_t v;	/* place holder to the pointer to the value */
 } vchar_t;
 
-extern vchar_t *vmalloc(size_t);
-extern vchar_t *vrealloc(vchar_t *, size_t);
-extern void vfree(vchar_t *);
-extern vchar_t *vdup(vchar_t *);
-extern int pvdump(vchar_t *);
-
 #define VREALLOC(ptr, size) ((ptr) = vrealloc((ptr), (size)))
+
+extern vchar_t *vmalloc __P((size_t));
+extern vchar_t *vrealloc __P((vchar_t *, size_t));
+extern void vfree __P((vchar_t *));
+extern vchar_t *vdup __P((vchar_t *));
 

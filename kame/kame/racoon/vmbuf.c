@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.c,v 1.2 1999/08/23 02:49:55 sakane Exp $ */
+/* YIPS @(#)$Id: vmbuf.c,v 1.3 2000/01/09 01:31:34 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -36,17 +36,19 @@
 #include <string.h>
 
 #include "var.h"
+#include "misc.h"
 #include "vmbuf.h"
 #include "debug.h"
 
-vchar_t *vmalloc(size_t size)
+vchar_t *
+vmalloc(size)
+	size_t size;
 {
 	vchar_t *var;
 
 	if ((var = (vchar_t *)malloc(sizeof(*var))) == NULL)
 		return NULL;
 
-	var->t = 0;
 	var->l = size;
 
 	if ((var->v = (caddr_t)calloc(size, sizeof(u_char))) == NULL) {
@@ -57,7 +59,10 @@ vchar_t *vmalloc(size_t size)
 	return var;
 }
 
-vchar_t *vrealloc(vchar_t *ptr, size_t size)
+vchar_t *
+vrealloc(ptr, size)
+	vchar_t *ptr;
+	size_t size;
 {
 	caddr_t v;
 
@@ -77,7 +82,9 @@ vchar_t *vrealloc(vchar_t *ptr, size_t size)
 	return ptr;
 }
 
-void vfree(vchar_t *var)
+void
+vfree(var)
+	vchar_t *var;
 {
 	if (var == NULL)
 		return;
@@ -90,7 +97,9 @@ void vfree(vchar_t *var)
 	return;
 }
 
-vchar_t *vdup(vchar_t *src)
+vchar_t *
+vdup(src)
+	vchar_t *src;
 {
 	vchar_t *new;
 
@@ -102,17 +111,3 @@ vchar_t *vdup(vchar_t *src)
 	return new;
 }
 
-int pvdump(vchar_t *var)
-{
-	int i;
-
-	for (i = 0; i < var->l; i++) {
-		if (i != 0 && i % 32 == 0) printf("\n");
-		if (i % 4 == 0) printf(" ");
-		printf("%02x", (unsigned char)(var->v)[i]);
-	}
-
-	printf("\n");
-
-	return 0;
-}

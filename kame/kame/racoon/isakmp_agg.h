@@ -26,6 +26,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: post_com.h,v 1.1 1999/08/08 23:31:24 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.h,v 1.1 2000/01/09 01:31:25 itojun Exp $ */
 
-extern int post_command __P((struct isakmp_ph1 *iph1));
+extern int agg_i1send __P((struct ph1handle *iph1, vchar_t *msg));
+extern int agg_i2recv __P((struct ph1handle *iph1, vchar_t *msg));
+extern int agg_i2send __P((struct ph1handle *iph1, vchar_t *msg));
+
+extern int agg_r1recv __P((struct ph1handle *iph1, vchar_t *msg));
+extern int agg_r1send __P((struct ph1handle *iph1, vchar_t *msg));
+extern int agg_r2recv __P((struct ph1handle *iph1, vchar_t *msg));
+extern int agg_r2send __P((struct ph1handle *iph1, vchar_t *msg));

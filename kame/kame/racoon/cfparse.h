@@ -26,86 +26,33 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: cfparse.h,v 1.3 1999/08/13 15:19:24 sakane Exp $ */
+/* YIPS @(#)$Id: cfparse.h,v 1.4 2000/01/09 01:31:21 itojun Exp $ */
 
-#define YIPSD_CONF_FILE "/usr/local/etc/racoon.conf"
-#define BUFSIZE    5120
+#define DEFAULT_CF_FILE "/usr/local/etc/racoon.conf"
 
-struct isakmp_cf_t {
-	u_int32_t len;
-	u_int8_t t_no;
-	u_int8_t t_id;
-	vchar_t  *data;
-	struct isakmp_cf_t *next;
-};
+#define CF_PATHTYPE_INCLUDE	0
+#define CF_PATHTYPE_PSK		1
+#define CF_PATHTYPE_CERT	2
+#define CF_PATHTYPE_MAX		3
 
-struct isakmp_cf_p {
-	u_int32_t len;
-	u_int8_t p_no;
-	u_int8_t proto_id;
-	/* u_int8_t spi_size; */
-	u_int8_t num_t;
-	/* vchar_t *spi; */
-	struct isakmp_cf_t *t;
-	struct isakmp_cf_p *next;
-};
+#define CF_PLADDR_ASSOCIATION	0
+#define CF_PLADDR_NEGOTIATION	1
 
-struct isakmp_cf_sa {
-	u_int32_t len;
-	u_int32_t doi;
-	u_int32_t sit;
-	struct isakmp_cf_p *p;
-};
+#define CF_SIDE_LOCAL		0
+#define CF_SIDE_REMOTE		1
 
-struct isakmp_cf_phase {
-	int etype;
-	struct isakmp_cf_sa sa;	/* SA */
-		/*
-		 * XXX each parameters should not be encoded as SA payload,
-		 * shouldn't they ?  because we can't check each parameters
-		 */
-	vchar_t *id_b;		/* ID body */
-	vchar_t *pskey;		/* pre-shared key */
-	u_int pfsgroup;		/* PFS group to be used. */
-	const struct dh *pfsdh;
-};
+#define CF_LIFETYPE_TIME	0
+#define CF_LIFETYPE_BYTE	1
 
-struct isakmp_conf {
-	struct sockaddr *remote;	/* remote IP address, net byte order */
-	struct isakmp_cf_phase *ph[2];	/* 0: isakmp, 1: ipsec */
-	vchar_t *vendorid;		/* vendor ID */
-
-	char *exec_path;		/* PATH for command execution */
-	char *exec_command;		/* post-command */
-	char *exec_success;		/* if success when execute command */
-	char *exec_failure;		/* if failure when execute command */
-
-	struct isakmp_conf *next;
-};
-
-#if defined(YIPS_DEBUG)
-#  define DP(str) YIPSDEBUG(DEBUG_CONF, cfdebug_print(str, yytext, yyleng))
-#  define YYD_ECHO \
-    { YIPSDEBUG(DEBUG_CONF, printf("<%d>", yy_start); ECHO ; printf("\n");); }
-#  define YIPSDP(cmd) YIPSDEBUG(DEBUG_CONF, cmd)
-#  define PLOG printf
-#else
-#  define DP(str)
-#  define YYD_ECHO
-#  define YIPSDP(cmd)
-#  define PLOG(cmd)
-#endif /* defined(YIPS_DEBUG) */
+#define CF_UNITTYPE_B	1
+#define CF_UNITTYPE_KB	1024
+#define CF_UNITTYPE_MB	(1024*1024)
+#define CF_UNITTYPE_TB	(1024*1024*1024)
+#define CF_UNITTYPE_S	1
+#define CF_UNITTYPE_M	60
+#define CF_UNITTYPE_H	(60*60)
 
 /* cfparse.y */
-extern char *racoon_conf;
-extern struct isakmp_conf cftab;
-
-extern void cf_init __P((void));
-extern int re_cfparse __P((void));
-extern int cf_post_config __P((void));
 extern int yyparse __P((void));
-
-/* cftoken.l */
-extern void yyerror __P((char *, ...));
-extern void yywarn __P((char *, ...));
 extern int cfparse __P((void));
+extern int cfreparse __P((void));

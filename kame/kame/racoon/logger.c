@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: logger.c,v 1.1 1999/08/08 23:31:23 itojun Exp $
+ * $Id: logger.c,v 1.2 2000/01/09 01:31:28 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -37,6 +37,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#ifdef HAVE_STDARG_H
+#include <stdarg.h>
+#else
+#include <varargs.h>
+#endif
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
 # include <time.h>
@@ -122,6 +127,44 @@ log_print(p, str)
 		return -1;
 	fprintf(fp, "%s", str);
 	fclose(fp);
+
+	return 0;
+}
+
+int
+log_vprint(struct log *p, const char *fmt, ...)
+{
+	va_list ap;
+
+	FILE *fp;
+
+	if (p->fname == NULL)
+		return -1;	/*XXX syslog?*/
+	fp = fopen(p->fname, "a");
+	if (fp == NULL)
+		return -1;
+	va_start(ap, fmt);
+	vfprintf(fp, fmt, ap);
+	va_end(ap);
+
+	fclose(fp);
+
+	return 0;
+}
+
+int
+log_vaprint(struct log *p, const char *fmt, va_list ap)
+{
+	FILE *fp;
+
+	if (p->fname == NULL)
+		return -1;	/*XXX syslog?*/
+	fp = fopen(p->fname, "a");
+	if (fp == NULL)
+		return -1;
+	vfprintf(fp, fmt, ap);
+	fclose(fp);
+
 	return 0;
 }
 
@@ -150,7 +193,7 @@ log_close(p)
 			strftime(ts, sizeof(ts), "%B %d %T", tm);
 			fprintf(fp, "%s: %s\n", ts, p->buf[j]);
 			if (*(p->buf[j] + strlen(p->buf[j]) - 1) != '\n')
-				fprintf(fp, "");
+				fprintf(fp, "\n");
 		}
 	}
 	fclose(fp);
@@ -176,12 +219,22 @@ log_free(p)
 }
 
 #ifdef TEST
+struct log *l;
+
+void
+vatest(const char *fmt, ...)
+{
+	va_list ap;
+	va_start(ap, fmt);
+	log_vaprint(l, fmt, ap);
+	va_end(ap);
+}
+
 int
 main(argc, argv)
 	int argc;
 	char **argv;
 {
-	struct log *l;
 	int i;
 
 	l = log_open(30, "/tmp/hoge");
@@ -193,7 +246,12 @@ main(argc, argv)
 		log_add(l, "baa");
 		log_add(l, "baz");
 	}
-	log_print(l, "hoge");
+	log_print(l, "hoge\n");
+	log_vprint(l, "hoge %s\n", "this is test");
+	vatest("%s %s\n", "this is", "vprint test");
+	abort();
 	log_free(l);
 }
+
 #endif
+

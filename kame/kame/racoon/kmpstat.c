@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.4 1999/12/02 05:29:26 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.5 2000/01/09 01:31:27 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -41,22 +41,35 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
-#include <time.h>
+#if TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
 #include <netdb.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 
 #include "var.h"
-#include "vmbuf.h"
-#include "schedule.h"
-#include "isakmp.h"
-#include "pfkey.h"
-#include "admin.h"
 #include "misc.h"
+#include "vmbuf.h"
+#include "plog.h"
 #include "debug.h"
 
-#if 1 /*quickhack */
+#include "schedule.h"
+#include "isakmp_var.h"
+#include "handler.h"
+#include "pfkey.h"
+#include "admin_var.h"
+#include "admin.h"
+
+#if 0 /*quickhack */
 struct myaddrs {
 	struct myaddrs *next;
 	struct sockaddr *addr;
@@ -104,7 +117,7 @@ struct ul_proto_tag {
 { "udp",	IPPROTO_UDP },
 };
 
-int port = DEFAULT_ADMIN_PORT;
+int port = PORT_ADMIN;
 int so;
 
 char combuf[512];
@@ -114,7 +127,7 @@ char _addr1_[BUFADDRSIZE], _addr2_[BUFADDRSIZE];
 
 char *pname;
 int long_format = 0;
-unsigned long debug = 0;
+u_int32_t debug = 0;
 
 void Usage __P((void));
 int com_init __P((void));
@@ -136,7 +149,6 @@ void dump_isakmp_sa __P((char *buf, int total_len));
 void dump_internal __P((char *buf, int tlen));
 char *pindex_isakmp __P((isakmp_index *index));
 void print_schedule __P((caddr_t buf, int len));
-char *pindex_sched __P((sched_index *index));
 char * fixed_addr __P((char *addr, char *port, int len));
 
 void
@@ -204,7 +216,7 @@ main(ac, av)
 	}
 
 	if (debug) {
-		pdump(combuf, ((struct admin_com *)combuf)->ac_len, YDUMP_HEX);
+		hexdump(combuf, ((struct admin_com *)combuf)->ac_len);
 		exit(0);
 	}
 
@@ -683,8 +695,8 @@ dump_isakmp_sa(buf, tlen)
 	char *buf;
 	int tlen;
 {
-	struct isakmp_ph1 *iph1;
-	struct isakmp_ph2 *iph2;
+	struct ph1handle *iph1;
+	struct ph2handle *iph2;
 	int len2, i;
 	char *p = buf;
 	struct sockaddr *saddr, *daddr;
@@ -714,15 +726,15 @@ char *header3 =
 
 /* phase status header */
 /* short format;
-   dir stats source address         destination address   
-   xxx xxxxx 1234567890123456789012 1234567890123456789012
+   side stats source address         destination address   
+   xxx  xxxxx 1234567890123456789012 1234567890123456789012
 */
 char *ph2_header1 = 
 "\tdir stats Source                 Destination           ";
 
 /* long format;
-   dir stats source address                                destination address
-   xxx xxxxx 123456789012345678901234567890123456789012345 123456789012345678901234567890123456789012345
+   side stats source address                                destination address
+   xxx  xxxxx 123456789012345678901234567890123456789012345 123456789012345678901234567890123456789012345
 */
 char *ph2_header2 = 
 "\tdir stats Source                                        Destination                                  ";
@@ -742,7 +754,7 @@ char *ph2_header2 =
 	}
 
 	while (tlen > 0) {
-		iph1 = (struct isakmp_ph1 *)p;
+		iph1 = (struct ph1handle *)p;
 		saddr = (struct sockaddr *)(p + sizeof(*iph1));
 		daddr = (struct sockaddr *)((caddr_t)saddr + saddr->sa_len);
 
@@ -790,7 +802,16 @@ char *ph2_header2 =
 		}
 		printf("\n");
 
-		len2 = iph1->ph2tab.len * sizeof(*iph2);
+	    {
+		int cnt = 0;
+#if 0
+		struct ph1handle *p;
+		LIST_FOREACH(p, &ph1tree, chain) {
+			cnt++;
+		}
+#endif
+		len2 = cnt * sizeof(*iph2);
+	    }
 
 		i = (sizeof(*iph1) + saddr->sa_len + daddr->sa_len);
 		p += i;
@@ -800,11 +821,11 @@ char *ph2_header2 =
 			printf("%s\n", long_format ? ph2_header2 : ph2_header1);
 
 		while (tlen > 0 && len2 > 0) {
-			iph2 = (struct isakmp_ph2 *)p;
+			iph2 = (struct ph2handle *)p;
 			saddr = (struct sockaddr *)(p + sizeof(*iph2));
 			daddr = (struct sockaddr *)((caddr_t)saddr
 				+ saddr->sa_len);
-			printf("\t%03u %05u ", iph2->dir, iph2->status);
+			printf("\t%03u %05u ", iph2->side, iph2->status);
 
 			GETNAMEINFO(saddr, _addr1_, _addr2_);
 			printf("%s ", long_format ?
@@ -834,7 +855,7 @@ dump_internal(buf, tlen)
 	char *buf;
 	int tlen;
 {
-	struct pfkey_st *pst;
+	struct ph2handle *iph2;
 	struct sockaddr *addr;
 
 /*
@@ -857,8 +878,8 @@ char *long_h1 =
 	printf("%s\n", long_format ? long_h1 : short_h1);
 
 	while (tlen > 0) {
-		pst = (struct pfkey_st *)buf;
-		addr = (struct sockaddr *)(++pst);
+		iph2 = (struct ph2handle *)buf;
+		addr = (struct sockaddr *)(++iph2);
 
 		GETNAMEINFO(addr, _addr1_, _addr2_);
 		printf("%s ", long_format ?
@@ -928,45 +949,31 @@ print_schedule(buf, len)
 	caddr_t buf;
 	int len;
 {
-	struct sched *sc = (struct sched *)buf;
+	struct scheddump *sc = (struct scheddump *)buf;
+	struct tm *tm;
+	char tbuf[56];
 
-	len /= sizeof(struct sched);
+	len /= sizeof(struct scheddump);
 
-	/*      00000000 xxxx    00000000 000 000000000000*/
-	printf("index    status  tick     try identifier\n");
+	/*      00000000 00000000 00000000 xxx........*/
+	printf("index    tick     xtime    created\n");
+
 	while (len-- > 0) {
-		printf("%8s %-4s    %-8d %3d %-12s\n",
-			pindex_sched(&sc->index),
-			sc->status < ARRAYSIZE(str_sched_stat)
-				? str_sched_stat[sc->status] : "???",
+		tm = localtime(&sc->created);
+		strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
+
+		printf("%8ld %8ld %8ld %s\n",
+			sc->id,
 			sc->tick,
-			sc->try,
-			sc->status < ARRAYSIZE(str_sched_id)
-				? str_sched_id[sc->identifier] : "???");
+			sc->xtime,
+			tbuf);
+
+		if (sc->last)
+			break;
 		sc++;
 	}
 
 	return;
-}
-
-/*
- * make strings of index of schedule.
- */
-char *
-pindex_sched(index)
-	sched_index *index;
-{
-	static char buf[48];
-	caddr_t p = (caddr_t)index;
-	int len = sizeof(*index);
-	int i, j;
-
-	for (j = 0, i = 0; i < len; i++) {
-		snprintf((char *)&buf[j], sizeof(buf) - j, "%02x", p[i]);
-		j += 2;
-	}
-
-	return buf;
 }
 
 char *

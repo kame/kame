@@ -26,8 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.h,v 1.1 1999/08/08 23:31:26 itojun Exp $ */
+/* YIPS @(#)$Id: session.h,v 1.2 2000/01/09 01:31:32 itojun Exp $ */
 
 extern int session __P((void));
 extern RETSIGTYPE signal_handler __P((int));
-extern int set_signal __P((int, RETSIGTYPE (*)()));

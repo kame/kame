@@ -26,36 +26,36 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: debug.h,v 1.1 1999/08/08 23:31:20 itojun Exp $ */
+/* YIPS @(#)$Id: debug.h,v 1.2 2000/01/09 01:31:22 itojun Exp $ */
 
-#define DEBUG_INFO    0x00000002
-#define DEBUG_NOTIFY  0x00000004
-#define DEBUG_DEBUG   0x00000008
+#define DEBUG_INFO	0x00000002	/*XX*/
+#define DEBUG_NOTIFY	0x00000004	/*XX*/
+#define DEBUG_DEBUG	0x00000008	/* output plog() to stdout */
 
-#define DEBUG_DATE    0x00000010
-#define DEBUG_ADDR    0x00000020
-#define DEBUG_DUMP    0x00000040
-#define DEBUG_STAMP   0x00000080
+#define DEBUG_DATE	0x00000010	/*XX*/
+#define DEBUG_ADDR	0x00000020	/*XX*/
+#define DEBUG_STAMP	0x10000080	/* stamp */
+#define DEBUG_USEFUL	0x20000000	/* use better during debugging */
+#define DEBUG_SVERB	0x80000000	/* super verbose */
 
-#define DEBUG_CONF    0x40000000
-#define DEBUG_SCHED2  0x20000000
-#define DEBUG_SCHED   0x10000000
-#define DEBUG_CRYPT   0x08000000
-#define DEBUG_KEY     0x04000000	/* DH, AUTH_KEY, HASH, SKEYID, KEYMAT */
-#define DEBUG_SA      0x00100000
-#define DEBUG_IPSEC   0x00x00000
-#define DEBUG_NET     0x00020000
-#define DEBUG_PFKEY   0x00010000
-#define DEBUG_PCOMM   0x00000100
-#define DEBUG_ADMIN   0x00000200
-#define DEBUG_MISC    0x00000400
+#define DEBUG_CONF	0x08000000	/* configuration. not output to log */
+#define DEBUG_FUNC	0x04000000	/* print function name */
+#define DEBUG_CRYPT	0x00800000	/*XX*/
+#define DEBUG_PFKEY	0x00400000	/* PF_KEY */
+#define DEBUG_KEY	0x00200000	/*XX*/
+#define DEBUG_IPSEC	0x00100000	/*XX*/
+#define DEBUG_SA	0x00080000	/*XX*/
+#define DEBUG_NET	0x00040000	/*XX*/
+#define DEBUG_PCOMM	0x00000800	/*XX*/
+#define DEBUG_ADMIN	0x00000400	/*XX*/
+#define DEBUG_MISC	0x00000200	/*XX*/
 
-#define DEBUG_DSA     (DEBUG_DUMP | DEBUG_SA)
-#define DEBUG_DCRYPT  (DEBUG_DUMP | DEBUG_CRYPT)
-#define DEBUG_DKEY    (DEBUG_DUMP | DEBUG_KEY)
-#define DEBUG_DNET    (DEBUG_DUMP | DEBUG_NET)
-#define DEBUG_DPFKEY  (DEBUG_DUMP | DEBUG_PFKEY)
-#define DEBUG_DMISC   (DEBUG_DUMP | DEBUG_MISC)
+#define DEBUG_DSA	(DEBUG_SVERB | DEBUG_SA)
+#define DEBUG_DCRYPT	(DEBUG_SVERB | DEBUG_CRYPT)
+#define DEBUG_DKEY	(DEBUG_SVERB | DEBUG_KEY)
+#define DEBUG_DNET	(DEBUG_SVERB | DEBUG_NET)
+#define DEBUG_DPFKEY	(DEBUG_SVERB | DEBUG_PFKEY)
+#define DEBUG_DMISC	(DEBUG_SVERB | DEBUG_MISC)
 
 #if defined(YIPS_DEBUG)
 #define YIPSDEBUG(lev,arg) if ((debug & (lev)) == (lev)) { arg; }
@@ -72,9 +72,7 @@
 #endif
 
 /* define by main.c */
-extern char *pname;
-extern unsigned long debug;
-extern int f_debug;
+extern u_int32_t debug;
+extern int f_debugcmd;
 extern int f_local;
-extern int af;
 extern int vflag;

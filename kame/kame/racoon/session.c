@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.3 1999/10/21 06:12:05 sakane Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.4 2000/01/09 01:31:32 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -42,52 +42,77 @@
 # define WIFEXITED(s)	(((s) & 255) == 0)
 #endif
 
+#ifdef IPV6_INRIA_VERSION
+#include <netinet/ipsec.h>
+#else
+#include <netinet6/ipsec.h>
+#endif
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 #include <signal.h>
-#include <errno.h>
-
-#include <netkey/keyv2.h>
 
 #include "var.h"
-#include "vmbuf.h"
-#include "isakmp.h"
-#include "pfkey.h"
-#include "admin.h"
-#include "handler.h"
-#include "debug.h"
-#include "cfparse.h"
 #include "misc.h"
-#include "session.h"
-#include "schedule.h"
+#include "vmbuf.h"
+#include "plog.h"
+#include "debug.h"
 
+#include "schedule.h"
+#include "session.h"
+#include "grabmyaddr.h"
+#include "cfparse.h"
+#include "isakmp_var.h"
+#include "admin_var.h"
+#include "pfkey.h"
+#include "handler.h"
+#include "localconf.h"
+#include "remoteconf.h"
+
+static int set_signal __P((int sig, RETSIGTYPE (*func)()));
 static int close_sockets __P((void));
 
 static int sigreq = 0;
 
-int session(void)
+int
+session(void)
 {
 	static fd_set mask0;
 	int nfds = 0;
 	fd_set rfds;
-	struct timeval timeout, *tm;
-	int num = 0;	/* number of entry in schedule */
+	struct timeval *timeout;
+	int error;
 	struct myaddrs *p;
+
+	signal_handler(0);
+
+	if (admin_init() < 0)
+		exit(1);
+
+	if (pfkey_init() < 0)
+		exit(1);
+
+	initmyaddr();
+	setmyaddrtormconf();
+
+	if (isakmp_init() < 0)
+		exit(1);
 
 	FD_ZERO(&mask0);
 
-	FD_SET(sock_admin, &mask0);
-	nfds = (nfds > sock_admin ? nfds : sock_admin);
-	FD_SET(sock_pfkey, &mask0);
-	nfds = (nfds > sock_pfkey ? nfds : sock_pfkey);
-	FD_SET(rtsock, &mask0);
-	nfds = (nfds > rtsock ? nfds : rtsock);
+	FD_SET(lcconf->sock_admin, &mask0);
+	nfds = (nfds > lcconf->sock_admin ? nfds : lcconf->sock_admin);
+	FD_SET(lcconf->sock_pfkey, &mask0);
+	nfds = (nfds > lcconf->sock_pfkey ? nfds : lcconf->sock_pfkey);
+	FD_SET(lcconf->rtsock, &mask0);
+	nfds = (nfds > lcconf->rtsock ? nfds : lcconf->rtsock);
 
-	for (p = myaddrs; p; p = p->next) {
+	for (p = lcconf->myaddrs; p; p = p->next) {
 		if (!p->addr)
 			continue;
 		FD_SET(p->sock, &mask0);
@@ -95,10 +120,8 @@ int session(void)
 	}
 	nfds++;
 
-	/* initialize */
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 0;
-	tm = &timeout;
+	/* initialize schedular */
+	sched_init();
 
 	sigreq = 0;
 	while (1) {
@@ -110,61 +133,53 @@ int session(void)
 		 */
 		switch (sigreq) {
 		case SIGHUP:
-			if (re_cfparse()) {
-				plog(LOCATION, "configuration read failed");
+			if (cfreparse()) {
+				plog(logp, LOCATION, NULL,
+					"configuration read failed");
+				/* XXX exit ? */
 				exit(1);
 			}
 			sigreq = 0;
 			break;
 		}
 
-		if (select(nfds, &rfds, (fd_set *)0, (fd_set *)0, tm) < 0) {
-			YIPSDEBUG(DEBUG_NET, plog(LOCATION,
-				"return select() with result-code=%d\n", errno));
+		/* scheduling */
+		timeout = schedular();
+
+		error = select(nfds, &rfds, (fd_set *)0, (fd_set *)0, timeout);
+		if (error < 0) {
 			switch (errno) {
-			case EINTR: continue;
+			case EINTR:
+				continue;
 			default:
-				plog(LOCATION, "select (%s)\n", strerror(errno));
-				return(-1);
+				plog(logp, LOCATION, NULL,
+					"failed to select (%s)\n",
+					strerror(errno));
+				return -1;
 			}
 			/*NOTREACHED*/
 		}
 
-		if (FD_ISSET(sock_admin, &rfds)) {
+		if (FD_ISSET(lcconf->sock_admin, &rfds))
 			admin_handler();
-		}
 
-		for (p = myaddrs; p; p = p->next) {
+		for (p = lcconf->myaddrs; p; p = p->next) {
 			if (!p->addr)
 				continue;
-			if (FD_ISSET(p->sock, &rfds)) {
+			if (FD_ISSET(p->sock, &rfds))
 				isakmp_handler(p->sock);
-			}
 		}
 
-		if (FD_ISSET(sock_pfkey, &rfds)) {
+		if (FD_ISSET(lcconf->sock_pfkey, &rfds))
 			pfkey_handler();
-		}
 
-		num = schedular(num);
-		if (num > 0) {
-			timeout.tv_sec = 1; /* XXX sufficient ? */
-			timeout.tv_usec = 0;
-			tm = &timeout;
-		} else
-		if (num == 0) {
-			tm = 0;	/* do block mode to select. */
-		} else {
-			plog(LOCATION, "error in scheduling\n");
-			return(-1);
-		}
-
-		if (FD_ISSET(rtsock, &rfds)) {
-			if (autoaddr) {
+		if (FD_ISSET(lcconf->rtsock, &rfds)) {
+			if (lcconf->autograbaddr) {
 				if (update_myaddrs()) {
 					isakmp_close();
 					grab_myaddrs();
-					isakmp_autoconf();
+					autoconf_myaddrsport();
+					setmyaddrtormconf();
 					isakmp_open();
 				}
 			} else
@@ -174,14 +189,17 @@ int session(void)
 			FD_ZERO(&mask0);
 			nfds = 0;
 
-			FD_SET(sock_admin, &mask0);
-			nfds = (nfds > sock_admin ? nfds : sock_admin);
-			FD_SET(sock_pfkey, &mask0);
-			nfds = (nfds > sock_pfkey ? nfds : sock_pfkey);
-			FD_SET(rtsock, &mask0);
-			nfds = (nfds > rtsock ? nfds : rtsock);
+			FD_SET(lcconf->sock_admin, &mask0);
+			nfds = (nfds > lcconf->sock_admin
+				? nfds : lcconf->sock_admin);
+			FD_SET(lcconf->sock_pfkey, &mask0);
+			nfds = (nfds > lcconf->sock_pfkey
+				? nfds : lcconf->sock_pfkey);
+			FD_SET(lcconf->rtsock, &mask0);
+			nfds = (nfds > lcconf->rtsock
+				? nfds : lcconf->rtsock);
 
-			for (p = myaddrs; p; p = p->next) {
+			for (p = lcconf->myaddrs; p; p = p->next) {
 				if (!p->addr)
 					continue;
 				FD_SET(p->sock, &mask0);
@@ -193,18 +211,30 @@ int session(void)
 }
 
 static int signals[] = {
-SIGHUP, SIGINT, SIGTERM, SIGUSR1, SIGUSR2, SIGCHLD, 0
+	SIGHUP,
+	SIGINT,
+	SIGTERM,
+	SIGUSR1,
+	SIGUSR2,
+	SIGCHLD,
+	0
 };
 
-RETSIGTYPE signal_handler(int sig)
+RETSIGTYPE
+signal_handler(sig)
+	int sig;
 {
 	int i;
 
 	switch (sig) {
 	case 0:
 		for (i = 0; signals[i] != 0; i++)
-			if (set_signal(signals[i], signal_handler) < 0)
-				exit(-1);
+			if (set_signal(signals[i], signal_handler) < 0) {
+				plog(logp, LOCATION, NULL,
+					"failed to set_signal (%s)\n",
+					strerror(errno));
+				exit(1);
+			}
 		break;
 
 	case SIGHUP:
@@ -225,14 +255,15 @@ RETSIGTYPE signal_handler(int sig)
 		break;
 
 	default:
-		plog(LOCATION, "caught signal, %d\n", sig);
+		plog(logp, LOCATION, NULL,
+			"caught signal %d\n", sig);
 		close_sockets();
-		exit(0);
+		exit(1);
 		break;
 	}
 }
 
-int
+static int
 set_signal(sig, func)
 	int sig;
 	RETSIGTYPE (*func)();
@@ -243,21 +274,19 @@ set_signal(sig, func)
 	sa.sa_handler = func;
 	sa.sa_flags = SA_RESTART;
 
-	if (sigemptyset(&sa.sa_mask) < 0) {
-		perror("sigemptyset");
-		return(-1);
-	}
+	if (sigemptyset(&sa.sa_mask) < 0)
+		return -1;
 
 	sigaction(sig, &sa, (struct sigaction *)0);
 
-	return(0);
+	return 0;
 }
 
 static int
 close_sockets()
 {
 	isakmp_close();
-	pfkey_close(sock_pfkey);
+	pfkey_close(lcconf->sock_pfkey);
 	(void)admin_close();
 	return 0;
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.2 2000/01/01 06:21:41 sakane Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.3 2000/01/09 01:31:28 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -35,55 +35,61 @@
 #include <netinet/in.h>
 
 #include <stdlib.h>
-#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <limits.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
 
 #include "var.h"
-#include "vmbuf.h"
-#include "cfparse.h"
-#include "isakmp.h"
-#include "handler.h"
-#include "admin.h"
-#include "debug.h"
 #include "misc.h"
-#include "pfkey.h"
+#include "vmbuf.h"
+#include "plog.h"
+#include "debug.h"
+
+#include "cfparse.h"
+#include "isakmp_var.h"
+#include "remoteconf.h"
+#include "localconf.h"
 #include "session.h"
+#include "oakley.h"
 
-static char version[] = "@(#)racoon $Revision: 1.2 $ sakane@ydc.co.jp";
+/* debug flags */
+u_int32_t debug = 0;
+int f_debugcmd = 0;	/* specifyed debug level by command line. */
+int f_local = 0;	/* local test mode.  behave like a wall. */
+int vflag = 1;		/* for print-isakmp.c */
 
-char *pname;
-
-unsigned long debug = 0;
-int f_debug = 0;
-int f_local = 0;	/* local test mode as to behave like a wall. */
-int af = AF_INET;	/* default address family */
-
-/* for print-isakmp.c */
-int vflag = 1;
+static char version[] = "@(#)racoon 2.0 sakane@ydc.co.jp";
+static char *pname;
 
 static void Usage __P((void));
-static int parse __P((int, char **));
-
-extern int cfparse __P((void));
-extern int isakmp_init __P((void));
-extern int admin_init __P((void));
+static void parse __P((int, char **));
 
 void
 Usage()
 {
-	printf("Usage: %s [-hv] [-p (port)] [-a (port)] [-f (file)] [-d (level)]\n", pname);
+	printf("Usage: %s [-hv] [-p (port)] [-a (port)] "
+#ifdef INET6
+		"[-4|-6] "
+#endif
+		"[-f (file)] [-d (level)] [-l (file)]\n", pname);
 	printf("   -h: shows these helps.\n");
 	printf("   -v: be more verbose\n");
-	printf("   -p: The daemon always use a port %d of UDP to send\n", PORT_ISAKMP);
+	printf("   -p: The daemon always use a port %d of UDP to send\n",
+		PORT_ISAKMP);
 	printf("       unless you specify a port by using this option.\n");
 	printf("   -a: You can specify a explicit port for administration.\n");
-	printf("   -f: specify the configuration file.\n");
+	printf("   -f: specify a configuration file.\n");
+	printf("   -l: specify a log file.\n");
 	printf("   -d: is specified debug mode. i.e. excuted foreground.\n");
+#ifdef INET6
+	printf("   -6: is specified IPv6 mode.\n");
+	printf("   -4: is specified IPv4 mode.\n");
+#endif
+	exit(1);
 }
 
 int
@@ -91,53 +97,51 @@ main(ac, av)
 	int ac;
 	char **av;
 {
-	plog(LOCATION, "%s\n", version);
-	plog(LOCATION, "@(#)This program includes cryptographic software written by Eric Young.\n");
-	plog(LOCATION, "@(#)His e-mail address is `eay@cryptsoft.com'.\n");
+	int error;
 
-	dh_init();
+	initlcconf();
+	initrmconf();
+	oakley_dhinit();
 
-	/* get both configuration file name and debug level */
-	if (parse(ac, av) < 0) {
+	parse(ac, av);
+
+	ploginit();
+
+	plog(logp, LOCATION, NULL,
+		"%s\n", version);
+	plog(logp, LOCATION, NULL,
+	"@(#)"
+	"This product linked software developed by the OpenSSL Project"
+	"for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
+	"\n");
+
+	error = cfparse();
+	if (error != 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to parse configuration file.\n");
 		exit(1);
 	}
 
-	if (cfparse() != 0) {
-		exit(1);
-	}
+	/* re-parse to prefer to command line parameters. */
+	parse(ac, av);
 
-	/* re-parse to prefer to parameters specified. */
-	if (parse(ac, av) < 0) {
-		exit(1);
-	}
-
-	if (!f_debug) {
+#if 0
+	if (!f_debugcmd) {
 		if (daemon(0, 0) < 0) {
-			perror("daemon");
+			plog(logp, LOCATION, NULL,
+				"failed to be daemon. (%s)\n", strerror(errno));
 			exit(1);
 		}
 	} else
 		close(0);
-
-	signal_handler(0);
-
-	if (isakmp_init() < 0) {
-		exit(1);
-	}
-
-	if (pfkey_init() < 0) {
-		exit(1);
-	}
-
-	if (admin_init() < 0) {
-		exit(1);
-	}
+#endif
 
 	session();
+
 	exit(0);
 }
 
-static int
+static void
 parse(ac, av)
 	int ac;
 	char **av;
@@ -152,7 +156,7 @@ parse(ac, av)
 
 	pname = *av;
 
-	while ((c = getopt(ac, av, "hd:p:a:f:vZ"
+	while ((c = getopt(ac, av, "hd:p:a:f:l:vZ"
 #ifdef YYDEBUG
 			"y"
 #endif
@@ -163,19 +167,25 @@ parse(ac, av)
 		switch (c) {
 		case 'd':
 			debug = strtoul(optarg, &p, 16);
-			f_debug = 1;
-			if (*p != '\0') return(-1);
+			f_debugcmd = 1;
+			if (*p != '\0') {
+				printf("invalid flag (%s)\n", optarg);
+				exit(1);
+			}
 			YIPSDEBUG(DEBUG_INFO,
-				plog(LOCATION, "debug=0x%08x\n", debug));
+				printf("debug = 0x%08x\n", debug));
 			break;
 		case 'p':
-			port_isakmp = atoi(optarg);
+			lcconf->port_isakmp = atoi(optarg);
 			break;
 		case 'a':
-			port_admin = atoi(optarg);
+			lcconf->port_admin = atoi(optarg);
 			break;
 		case 'f':
-			racoon_conf = optarg;
+			lcconf->racoon_conf = optarg;
+			break;
+		case 'l':
+			plogset(optarg);
 			break;
 		case 'v':
 			vflag++;
@@ -191,15 +201,14 @@ parse(ac, av)
 #endif
 #ifdef INET6
 		case '4':
-			af = AF_INET;
+			lcconf->default_af = AF_INET;
 			break;
 		case '6':
-			af = AF_INET6;
+			lcconf->default_af = AF_INET6;
 			break;
 #endif
 		default:
 			Usage();
-			exit(1);
 			break;
 		}
 	}
@@ -209,6 +218,6 @@ parse(ac, av)
 	optind = 1;
 	optarg = 0;
 
-	return(0);
+	return;
 }
 

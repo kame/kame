@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.2 1999/08/12 05:42:05 itojun Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.3 2000/01/09 01:31:22 itojun Exp $ */
 
 #include <sys/types.h>
 
@@ -46,12 +46,14 @@
 
 #include "var.h"
 #include "vmbuf.h"
-#include "oakley.h"
-#include "crypto.h"
 #include "misc.h"
 #include "debug.h"
+#include "str2val.h"
 
-unsigned long debug = 0;
+#include "oakley.h"
+#include "crypto_openssl.h"
+
+u_int32_t debug = 0;
 
 /* test */
 void
@@ -62,23 +64,23 @@ ciphertest()
 	vchar_t *res1, *res2;
 	char iv[8];
 
-	data.v = strtob("a7c3a855 a328a6d4 b1bd9c06 c5bd5c17 b8c5f657 bd8ea245 2a6726d0 ce3689f5", 16, &data.l);
-	key.v = strtob("fadc3844 61d6114e fadc3844 61d6114e fadc3844 61d6114e", 16, &key.l);
+	data.v = str2val("a7c3a855 a328a6d4 b1bd9c06 c5bd5c17 b8c5f657 bd8ea245 2a6726d0 ce3689f5", 16, &data.l);
+	key.v = str2val("fadc3844 61d6114e fadc3844 61d6114e fadc3844 61d6114e", 16, &key.l);
 
 	/* des */
 	printf("DES\n");
 	printf("data:\n");
-	pvdump(&data);
+	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
 	res1 = eay_des_encrypt(&data, &key, (caddr_t)iv);
 	printf("encrypto:\n");
-	pvdump(res1);
+	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
 	res2 = eay_des_decrypt(res1, &key, (caddr_t)iv);
 	printf("decrypto:\n");
-	pvdump(res2);
+	PVDUMP(res2);
 
 	vfree(res1);
 	vfree(res2);
@@ -87,17 +89,17 @@ ciphertest()
 	/* idea */
 	printf("IDEA\n");
 	printf("data:\n");
-	pvdump(&data);
+	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
 	res1 = eay_idea_encrypt(&data, &key, (caddr_t)iv);
 	printf("encrypto:\n");
-	pvdump(res1);
+	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
 	res2 = eay_idea_decrypt(res1, &key, (caddr_t)iv);
 	printf("decrypto:\n");
-	pvdump(res2);
+	PVDUMP(res2);
 
 	vfree(res1);
 	vfree(res2);
@@ -106,17 +108,17 @@ ciphertest()
 	/* blowfish */
 	printf("BLOWFISH\n");
 	printf("data:\n");
-	pvdump(&data);
+	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
 	res1 = eay_bf_encrypt(&data, &key, (caddr_t)iv);
 	printf("encrypto:\n");
-	pvdump(res1);
+	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
 	res2 = eay_bf_decrypt(res1, &key, (caddr_t)iv);
 	printf("decrypto:\n");
-	pvdump(res2);
+	PVDUMP(res2);
 
 	vfree(res1);
 	vfree(res2);
@@ -124,17 +126,17 @@ ciphertest()
 	/* rc5 */
 	printf("RC5\n");
 	printf("data:\n");
-	pvdump(&data);
+	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
 	res1 = eay_bf_encrypt(&data, &key, (caddr_t)iv);
 	printf("encrypto:\n");
-	pvdump(res1);
+	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
 	res2 = eay_bf_decrypt(res1, &key, (caddr_t)iv);
 	printf("decrypto:\n");
-	pvdump(res2);
+	PVDUMP(res2);
 
 	vfree(res1);
 	vfree(res2);
@@ -142,17 +144,17 @@ ciphertest()
 	/* 3des */
 	printf("3DES\n");
 	printf("data:\n");
-	pvdump(&data);
+	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
 	res1 = eay_3des_encrypt(&data, &key, (caddr_t)iv);
 	printf("encrypto:\n");
-	pvdump(res1);
+	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
 	res2 = eay_3des_decrypt(res1, &key, (caddr_t)iv);
 	printf("decrypto:\n");
-	pvdump(res2);
+	PVDUMP(res2);
 
 	vfree(res1);
 	vfree(res2);
@@ -160,17 +162,17 @@ ciphertest()
 	/* cast */
 	printf("CAST\n");
 	printf("data:\n");
-	pvdump(&data);
+	PVDUMP(&data);
 
 	memset(iv, 0, sizeof(iv));
 	res1 = eay_cast_encrypt(&data, &key, (caddr_t)iv);
 	printf("encrypto:\n");
-	pvdump(res1);
+	PVDUMP(res1);
 
 	memset(iv, 0, sizeof(iv));
 	res2 = eay_cast_decrypt(res1, &key, (caddr_t)iv);
 	printf("decrypto:\n");
-	pvdump(res2);
+	PVDUMP(res2);
 
 	vfree(res1);
 	vfree(res2);
@@ -183,9 +185,9 @@ hmactest()
 	vchar_t kir, ki, kr;
 	vchar_t *key, *data, *res, *data2;
 
-	kir.v = strtob("d7e6a6c1876ef0488bb74958b9fee94efdb563d4e18de4ec03a4a1842d432985", 16, &kir.l);
-	ki.v = strtob("d7e6a6c1876ef0488bb74958b9fee94e", 16, &ki.l);
-	kr.v = strtob("fdb563d4e18de4ec03a4a1842d432985", 16, &kr.l);
+	kir.v = str2val("d7e6a6c1876ef0488bb74958b9fee94efdb563d4e18de4ec03a4a1842d432985", 16, &kir.l);
+	ki.v = str2val("d7e6a6c1876ef0488bb74958b9fee94e", 16, &ki.l);
+	kr.v = str2val("fdb563d4e18de4ec03a4a1842d432985", 16, &kr.l);
 
 	key = vmalloc(strlen(keyword));
 	memcpy(key->v, keyword, key->l);
@@ -196,13 +198,13 @@ hmactest()
 	/* HMAC MD5 */
 	printf("HMAC MD5\n");
 	res = eay_hmacmd5_one(key, data);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 
 	/* HMAC SHA1 */
 	printf("HMAC SHA1\n");
 	res = eay_hmacsha1_one(key, data);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 
 	vfree(data);
@@ -215,7 +217,7 @@ hmactest()
 
 	printf("HMAC SHA1\n");
 	res = (vchar_t *)eay_hmacsha1_oneX(key, data, data2);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 
 	vfree(key);
@@ -234,7 +236,7 @@ sha1test()
 	eay_sha1_update(ctx, buf);
 	eay_sha1_update(ctx, buf);
 	res = eay_sha1_final(ctx);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 	vfree(buf);
 
@@ -243,11 +245,11 @@ sha1test()
 	memcpy(buf->v, word2, buf->l);
 	eay_sha1_update(ctx, buf);
 	res = eay_sha1_final(ctx);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 
 	res = eay_sha1_one(buf);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 	vfree(buf);
 }
@@ -265,7 +267,7 @@ md5test()
 	eay_md5_update(ctx, buf);
 	eay_md5_update(ctx, buf);
 	res = eay_md5_final(ctx);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 	vfree(buf);
 
@@ -274,11 +276,11 @@ md5test()
 	memcpy(buf->v, word2, buf->l);
 	eay_md5_update(ctx, buf);
 	res = eay_md5_final(ctx);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 
 	res = eay_md5_one(buf);
-	pvdump(res);
+	PVDUMP(res);
 	vfree(res);
 	vfree(buf);
 }
@@ -291,20 +293,20 @@ dhtest(f)
 
 	switch (f) {
 	case 0:
-		p1.v = strtob(OAKLEY_PRIME_MODP768, 16, &p1.l);
-		p2.v = strtob(OAKLEY_PRIME_MODP768, 16, &p2.l);
+		p1.v = str2val(OAKLEY_PRIME_MODP768, 16, &p1.l);
+		p2.v = str2val(OAKLEY_PRIME_MODP768, 16, &p2.l);
 		break;
 	case 1:
-		p1.v = strtob(OAKLEY_PRIME_MODP1024, 16, &p1.l);
-		p2.v = strtob(OAKLEY_PRIME_MODP1024, 16, &p2.l);
+		p1.v = str2val(OAKLEY_PRIME_MODP1024, 16, &p1.l);
+		p2.v = str2val(OAKLEY_PRIME_MODP1024, 16, &p2.l);
 		break;
 	case 2:
 	default:
-		p1.v = strtob(OAKLEY_PRIME_MODP1536, 16, &p1.l);
-		p2.v = strtob(OAKLEY_PRIME_MODP1536, 16, &p2.l);
+		p1.v = str2val(OAKLEY_PRIME_MODP1536, 16, &p1.l);
+		p2.v = str2val(OAKLEY_PRIME_MODP1536, 16, &p2.l);
 		break;
 	}
-	printf("prime number = \n"); pvdump(&p1);
+	printf("prime number = \n"); PVDUMP(&p1);
 
 	key = vmalloc(p1.l);
 
@@ -313,26 +315,26 @@ dhtest(f)
 		return(-1);
 	}
 
-	printf("private key for user 1 = \n"); pvdump(priv1);
-	printf("public key for user 1  = \n"); pvdump(pub1);
+	printf("private key for user 1 = \n"); PVDUMP(priv1);
+	printf("public key for user 1  = \n"); PVDUMP(pub1);
 
 	if (eay_dh_generate(&p2, 2, 96, &pub2, &priv2) < 0) {
 		printf("error\n");
 		return(-1);
 	}
 
-	printf("private key for user 2 = \n"); pvdump(priv2);
-	printf("public key for user 2  = \n"); pvdump(pub2);
+	printf("private key for user 2 = \n"); PVDUMP(priv2);
+	printf("public key for user 2  = \n"); PVDUMP(pub2);
 
 	/* process to generate key for user 1 */
 	memset(key->v, 0, key->l);
 	eay_dh_compute(&p1, 2, pub1, priv1, pub2, &key);
-	printf("sharing key of user 1 = \n"); pvdump(key);
+	printf("sharing key of user 1 = \n"); PVDUMP(key);
 
 	/* process to generate key for user 2 */
 	memset(key->v, 0, key->l);
 	eay_dh_compute(&p2, 2, pub2, priv2, pub1, &key);
-	printf("sharing key of user 2 = \n"); pvdump(key);
+	printf("sharing key of user 2 = \n"); PVDUMP(key);
 
 	vfree(pub1);
 	vfree(priv1);
@@ -348,7 +350,7 @@ bntest()
 	vchar_t *rn;
 
 	rn = eay_set_random((u_int32_t)96);
-	pvdump(rn);
+	PVDUMP(rn);
 	vfree(rn);
 }
 

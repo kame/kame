@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: logger.h,v 1.1 1999/08/08 23:31:23 itojun Exp $
+ * $Id: logger.h,v 1.2 2000/01/09 01:31:28 itojun Exp $
  */
 
 struct log {
@@ -41,5 +41,7 @@ struct log {
 extern struct log *log_open __P((size_t, char *));
 extern void log_add __P((struct log *, char *));
 extern int log_print __P((struct log *, char *));
+extern int log_vprint __P((struct log *, const char *, ...));
+extern int log_vaprint __P((struct log *, const char *, va_list));
 extern int log_close __P((struct log *));
 extern void log_free __P((struct log *));
