@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1041 2000/06/19 07:52:56 sakane Exp $
+$Id: CHANGELOG,v 1.1042 2000/06/19 09:23:04 sakane Exp $
 
 <200006>
+Mon Jun 19 18:23:15 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	A path name in configuration file is always complemented if it is
+	not begin from slash(/).  If it's begin from slash, a path name
+	never be complemented.
+
 Mon Jun 19 16:51:24 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	If "non_auth" is defined in racoon.conf, any transform of AH proposal
