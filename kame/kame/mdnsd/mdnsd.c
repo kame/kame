@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.56 2002/09/10 02:04:08 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.57 2002/09/19 01:43:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -601,7 +601,6 @@ addserv(n, ttl, comment)
 	struct addrinfo hints, *res;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
-	int flags;
 	struct nsdb *ns;
 	int multicast;
 
@@ -694,8 +693,7 @@ ismyaddr(sa, salen)
 	}
 #endif
 	h1[0] = h2[0] = '\0';
-	if (getnameinfo((struct sockaddr *)&ss[0],
-	    ((struct sockaddr *)&ss[0])->sa_len, h1, sizeof(h1),
+	if (getnameinfo((struct sockaddr *)&ss[0], salen, h1, sizeof(h1),
 	    p, sizeof(p), niflag) != 0)
 		return 0;
 #if 1	/*just for experiment - to run two servers on a single node*/
@@ -709,11 +707,26 @@ ismyaddr(sa, salen)
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr->sa_family != sa->sa_family)
 			continue;
-		if (ifa->ifa_addr->sa_len != sa->sa_len ||
+#ifdef HAVE_SA_LEN
+		if (ifa->ifa_addr->sa_len != salen ||
 		    ifa->ifa_addr->sa_len > sizeof(ss[1])) {
 			continue;
 		}
-		memcpy(&ss[1], ifa->ifa_addr, ifa->ifa_addr->sa_len);
+#else
+		/*
+		 * We assume that sa_len is the same if sa_family is the same,
+		 * however, it is not a safe assumption to make, so we
+		 * check if sa_family is the ones we know of.
+		 */
+		switch (ifa->ifa_addr->sa_family) {
+		case AF_INET:
+		case AF_INET6:
+			break;
+		default:
+			continue;
+		}
+#endif
+		memcpy(&ss[1], ifa->ifa_addr, salen);
 		scope[1] = 0;
 #ifdef __KAME__
 		if (((struct sockaddr *)&ss[1])->sa_family == AF_INET6) {
@@ -728,9 +741,8 @@ ismyaddr(sa, salen)
 			}
 		}
 #endif
-		if (getnameinfo((struct sockaddr *)&ss[1],
-		    ((struct sockaddr *)&ss[1])->sa_len, h2, sizeof(h2),
-		    NULL, 0, niflag) != 0)
+		if (getnameinfo((struct sockaddr *)&ss[1], salen,
+		    h2, sizeof(h2), NULL, 0, niflag) != 0)
 			continue;
 		if (strcmp(h1, h2) != 0)
 			continue;

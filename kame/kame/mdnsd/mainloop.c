@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.93 2002/09/10 02:10:33 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.94 2002/09/19 01:43:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1126,8 +1126,23 @@ match_ptrquery(n)
 			continue;
 		if (ifmatch && strcmp(ifa->ifa_name, ifmatch) != 0)
 			continue;
+#ifdef HAVE_SA_LEN
 		if (ifa->ifa_addr->sa_len < off + alen)
 			continue;
+#else
+		/*
+		 * We assume that sa_len is the same if sa_family is the same,
+		 * however, it is not a safe assumption to make, so we
+		 * check if sa_family is the ones we know of.
+		 */
+		switch (ifa->ifa_addr->sa_family) {
+		case AF_INET:
+		case AF_INET6:
+			break;
+		default:
+			continue;
+		}
+#endif
 		if (memcmp(((char *)ifa->ifa_addr) + off, addr, alen) == 0) {
 			freeifaddrs(ifap);
 			return 1;
