@@ -1,4 +1,4 @@
-SUBDIR+=sysctl inetd trpt tcpdchk tcpdmatch
+SUBDIR+=sysctl inetd trpt tcpdchk tcpdmatch wiconfig
 #SUBDIR+=lpr
 
 SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat mld6query \
