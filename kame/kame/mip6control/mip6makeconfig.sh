@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.8 2003/11/28 07:43:43 t-momose Exp $
+# $Id: mip6makeconfig.sh,v 1.9 2004/02/10 12:44:54 t-momose Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -105,7 +105,7 @@ fi
 #
 # SA addition
 #
-${cat} << EOF > ${node_dir}/add
+${cat} << EOF | sed '/^[[:space:]]*$/d' > ${node_dir}/add
 add ${mobile_node} ${home_agent}
 	${transport_protocol} ${transport_spi_mn_to_ha}
 	-m transport
