@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.299 2002/04/12 05:11:46 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.300 2002/04/12 16:08:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,8 +199,10 @@ static int icmp6_mtudisc_lowat = 256;
 static struct rttimer_queue *icmp6_redirect_timeout_q = NULL;
 
 /* XXX do these values make any sense? */
+#ifdef __OpenBSD__
 static int icmp6_redirect_hiwat = 1280;
 static int icmp6_redirect_lowat = 1024;
+#endif
 #endif
 
 #ifndef __bsdi__
@@ -1374,7 +1376,9 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	int validated;
 {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __OpenBSD__
 	unsigned long rtcount;
+#endif
 	struct icmp6_mtudisc_callback *mc;
 #endif
 	struct icmp6_hdr *icmp6 = ip6cp->ip6c_icmp6;
@@ -1400,7 +1404,9 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	if (mtu < IPV6_MMTU)
 		return;
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __NetBSD__
+	;
+#elif defined(__OpenBSD__)
 	/*
 	 * allow non-validated cases if memory is plenty, to make traffic
 	 * from non-connected pcb happy.
@@ -2849,11 +2855,13 @@ icmp6_redirect_input(m, off)
 		extern int icmp_redirtimeout;	/* XXX */
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __OpenBSD__
 		unsigned long rtcount;
+#endif
 		struct rtentry *newrt = NULL;
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __OpenBSD__
 		/*
 		 * do not install redirect route, if the number of entries
 		 * is too much (> hiwat).  note that, the node (= host) will
@@ -3609,7 +3617,7 @@ icmp6_mtudisc_clone(dst)
 		error = rtrequest((int) RTM_ADD, dst,
 		    (struct sockaddr *) rt->rt_gateway,
 		    (struct sockaddr *) 0,
-		    RTF_GATEWAY | RTF_HOST | RTF_DYNAMIC, &nrt);
+		    RTF_GATEWAY | RTF_HOST | RTF_DYNAMIC | RTF_CACHE, &nrt);
 		if (error) {
 			rtfree(rt);
 			return NULL;
@@ -3651,7 +3659,7 @@ icmp6_mtudisc_timeout(rt, r)
 {
 	if (rt == NULL)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 	if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
 		rt->rt_rmx.rmx_mtu = nd_ifinfo[rt->rt_ifp->if_index].linkmtu;
 #else  /* i.e. netbsd and openbsd */

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.239 2002/04/10 14:45:52 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.240 2002/04/12 16:08:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,7 +143,7 @@ static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
 static int regen_tmpaddr __P((struct in6_ifaddr *));
-#if defined(__FreeBSD__) && defined (RTF_CACHE)
+#if (defined(__FreeBSD__) || defined(__NetBSD__))
 static void nd6_rtdrain __P((struct rtentry *, struct rttimer *));
 #endif
 static struct llinfo_nd6 *nd6_free __P((struct rtentry *, int));
@@ -1509,7 +1509,7 @@ nd6_rtrequest(req, rt, sa)
 		 * if this is a cached route, which is very likely,
 		 * put it in the timer queue.
 		 */
-#if defined(__FreeBSD__) && defined (RTF_CACHE)
+#if (defined(__FreeBSD__) || defined(__NetBSD__))
 		if (!(rt->rt_flags & (RTF_STATIC | RTF_ANNOUNCE)) && !mine)
 			rt_add_cache(rt, nd6_rtdrain);
 #endif /* freebsd and rtf_cache */
@@ -1550,7 +1550,7 @@ nd6_rtrequest(req, rt, sa)
 	}
 }
 
-#if defined(__FreeBSD__) && defined (RTF_CACHE)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 static void
 nd6_rtdrain(rt, rtt)
 	struct rtentry *rt;
