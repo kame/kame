@@ -29,7 +29,7 @@ SRCDIR=	${.CURDIR}/../../../kame/pim6sd
 PROG=	pim6sd
 SRCS=	mld6.c mld6_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
-	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c
+	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c\
 	cfparse.y cftoken.l
 CFLAGS+= -g
 CFLAGS+=-I.
