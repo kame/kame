@@ -585,10 +585,8 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	     inp != (struct inpcb *)&head->inpt_queue; inp = ninp) {
 		ninp = inp->inp_queue.cqe_next;
 
-#ifdef INET6
 		if ((inp->inp_flags & INP_IPV6) == 0)
 			continue;
-#endif
 
 		/*
 		 * If the error designates a new path MTU for a destination
