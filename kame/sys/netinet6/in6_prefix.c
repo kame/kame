@@ -78,7 +78,9 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet6/ip6.h>
 #include <netinet6/in6_prefix.h>
+#include <netinet6/ip6_var.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static MALLOC_DEFINE(M_IP6RR, "ip6rr", "IPv6 Router Renumbering Prefix");
