@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.33 2000/06/11 17:29:33 jinmei Exp $");
+__RCSID("$Id: inet6.c,v 1.34 2000/06/12 00:44:57 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -1135,7 +1135,8 @@ icmp6_stats(off, name)
 
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
     printf(m, (unsigned long long)icmp6stat.f, plural(icmp6stat.f))
-#define p_5(f, m) printf(m, (unsigned long long)icmp6stat.f)
+#define p_5(f, m) if (icmp6stat.f || sflag <= 1) \
+    printf(m, (unsigned long long)icmp6stat.f)
 
 	p(icp6s_error, "\t%llu call%s to icmp6_error\n");
 	p(icp6s_canterror,
