@@ -22,7 +22,7 @@ SRCS+=	ifieee80211.c
 CFLAGS+=-DUSE_IEEE80211
 
 #comment out to exclude ISATAP support
-CFLAGS+=-DUSE_ISATAP -g
+CFLAGS+=-DUSE_ISATAP
 
 MAN=	ifconfig.8
 
