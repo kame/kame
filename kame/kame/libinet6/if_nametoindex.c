@@ -1,4 +1,4 @@
-/*	$KAME: if_nametoindex.c,v 1.2 2000/04/18 08:39:20 itojun Exp $	*/
+/*	$KAME: if_nametoindex.c,v 1.3 2000/04/24 09:52:23 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -27,6 +27,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <net/if.h>
 #include <net/if_dl.h>
 #include <ifaddrs.h>
 #include <stdlib.h>
