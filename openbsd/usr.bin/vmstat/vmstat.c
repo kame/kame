@@ -1,5 +1,5 @@
 /*	$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp $	*/
-/*	$OpenBSD: vmstat.c,v 1.38 2000/10/25 16:49:32 mickey Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.48 2001/03/21 23:51:47 art Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1991, 1993
@@ -48,6 +48,8 @@ static char rcsid[] = "$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp 
 #endif
 #endif /* not lint */
 
+#define __POOL_EXPOSE
+
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/proc.h>
@@ -60,6 +62,7 @@ static char rcsid[] = "$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp 
 #include <sys/ioctl.h>
 #include <sys/sysctl.h>
 #include <sys/device.h>
+#include <sys/pool.h>
 #include <vm/vm.h>
 #include <time.h>
 #include <nlist.h>
@@ -114,19 +117,9 @@ struct nlist namelist[] = {
 	{ "_allevents" },
 #define	X_FORKSTAT	13
 	{ "_forkstat" },
-#ifdef notdef
-#define	X_DEFICIT	14
-	{ "_deficit" },
-#define X_REC		15
-	{ "_rectime" },
-#define X_PGIN		16
-	{ "_pgintime" },
-#define	X_XSTATS	17
-	{ "_xstats" },
-#define X_END		28
-#else
-#define X_END		14
-#endif
+#define X_POOLHEAD	14
+	{ "_pool_head" },
+#define X_END		15
 #if defined(__pc532__)
 #define	X_IVT		(X_END)
 	{ "_ivt" },
@@ -167,6 +160,7 @@ void	cpustats __P((void));
 void	dkstats __P((void));
 void	dointr __P((void));
 void	domem __P((void));
+void	dopool __P((void));
 void	dosum __P((void));
 void	dovmstat __P((u_int, int));
 void	kread __P((int, void *, size_t));
@@ -179,8 +173,6 @@ char	**choosedrives __P((char **));
 
 /* Namelist and memory file names. */
 char	*nlistf, *memf;
-
-extern char *__progname;
 
 int
 main(argc, argv)
@@ -246,8 +238,11 @@ main(argc, argv)
 	}
 
 	kd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY, errbuf);
-	if (kd == 0)
-		errx(1, "kvm_openfiles: %s", errbuf);
+	if (kd == 0) {
+		(void)fprintf(stderr,
+		    "vmstat: kvm_openfiles: %s\n", errbuf);
+		exit(1);
+	}
 
 	if ((c = kvm_nlist(kd, namelist)) != 0) {
 
@@ -256,16 +251,17 @@ main(argc, argv)
 
 		if (c > 0) {
 			(void)fprintf(stderr,
-			    "%s: undefined symbols:", __progname);
+			    "vmstat: undefined symbols:");
 			for (c = 0;
 			    c < sizeof(namelist)/sizeof(namelist[0]); c++)
 				if (namelist[c].n_type == 0)
 					fprintf(stderr, " %s",
 					    namelist[c].n_name);
 			(void)fputc('\n', stderr);
-			exit(1);
 		} else
-			errx(1, "kvm_nlist: %s", kvm_geterr(kd));
+			(void)fprintf(stderr, "vmstat: kvm_nlist: %s\n",
+			    kvm_geterr(kd));
+		exit(1);
 	}
 
 	if (todo & VMSTAT) {
@@ -300,8 +296,10 @@ main(argc, argv)
 
 	if (todo & FORKSTAT)
 		doforkst();
-	if (todo & MEMSTAT)
+	if (todo & MEMSTAT) {
 		domem();
+		dopool();
+	}
 	if (todo & SUMSTAT)
 		dosum();
 	if (todo & TIMESTAT)
@@ -359,8 +357,11 @@ getuptime()
 		kread(X_BOOTTIME, &boottime, sizeof(boottime));
 	(void)time(&now);
 	uptime = now - boottime.tv_sec;
-	if (uptime <= 0 || uptime > 60*60*24*365*10)
-		errx(1, "time makes no sense; namelist must be wrong");
+	if (uptime <= 0 || uptime > 60*60*24*365*10) {
+		(void)fprintf(stderr,
+		    "vmstat: time makes no sense; namelist must be wrong.\n");
+		exit(1);
+	}
 	return(uptime);
 }
 
@@ -555,9 +556,9 @@ dosum()
 	(void)printf("%11u pages being paged out\n", uvmexp.paging);
 	(void)printf("%11u pages wired\n", uvmexp.wired);
 	(void)printf("%11u pages reserved for pagedaemon\n",
-	    uvmexp.reserve_pagedaemon);
+		     uvmexp.reserve_pagedaemon);
 	(void)printf("%11u pages reserved for kernel\n",
-	    uvmexp.reserve_kernel);
+		     uvmexp.reserve_kernel);
 
 	/* swap */
 	(void)printf("%11u swap pages\n", uvmexp.swpages);
@@ -577,11 +578,11 @@ dosum()
 	(void)printf("%11u swap outs\n", uvmexp.swapouts);
 	(void)printf("%11u forks\n", uvmexp.forks);
 	(void)printf("%11u forks where vmspace is shared\n",
-	    uvmexp.forks_sharevm);
+		     uvmexp.forks_sharevm);
 
 	/* daemon counters */
 	(void)printf("%11u number of times the pagedeamon woke up\n",
-	    uvmexp.pdwoke);
+		     uvmexp.pdwoke);
 	(void)printf("%11u revolutions of the clock hand\n", uvmexp.pdrevs);
 	(void)printf("%11u pages freed by pagedaemon\n", uvmexp.pdfreed);
 	(void)printf("%11u pages scanned by pagedaemon\n", uvmexp.pdscans);
@@ -718,7 +719,7 @@ dointr()
 		for (j = 0; j < 16; j++, ivp++) {
 			if (ivp->iv_vec && ivp->iv_use && ivp->iv_cnt) {
 				if (kvm_read(kd, (u_long)ivp->iv_use, iname, 63) != 63) {
-					errx(1, "iv_use: %s", kvm_geterr(kd));
+					(void)fprintf(stderr, "vmstat: iv_use: %s\n",
 					    kvm_geterr(kd));
 					exit(1);
 				}
@@ -740,9 +741,9 @@ void
 dointr()
 {
 	struct intrhand *intrhand[16], *ihp, ih;
-	u_long inttotal;
+	long inttotal;
 	time_t uptime;
-	u_long intrstray[16];
+	int intrstray[16];
 	char iname[17], fname[31];
 	int i;
 
@@ -761,7 +762,7 @@ dointr()
 			if (kvm_read(kd, (u_long)ih.ih_what, iname, 16) != 16)
 				errx(1, "vmstat: ih_what: %s", kvm_geterr(kd));
 			snprintf(fname, sizeof fname, "irq%d/%s", i, iname);
-			printf("%-16.16s %10lu %8lu\n", fname, ih.ih_count,
+			printf("%-16.16s %10ld %8ld\n", fname, ih.ih_count,
 			    ih.ih_count / uptime);
 			inttotal += ih.ih_count;
 			ihp = ih.ih_next;
@@ -769,11 +770,11 @@ dointr()
 	}
 	for (i = 0; i < 16; i++)
 		if (intrstray[i]) {
-			printf("Stray irq %-2d     %10lu %8lu\n",
+			printf("Stray irq %-2d     %10d %8d\n",
 			       i, intrstray[i], intrstray[i] / uptime);
 			inttotal += intrstray[i];
 		}
-	printf("Total            %10lu %8lu\n", inttotal, inttotal / uptime);
+	printf("Total            %10ld %8ld\n", inttotal, inttotal / uptime);
 }
 #else
 void
@@ -793,8 +794,10 @@ dointr()
 	    namelist[X_EINTRNAMES].n_value - namelist[X_INTRNAMES].n_value;
 	intrcnt = malloc((size_t)nintr);
 	intrname = malloc((size_t)inamlen);
-	if (intrcnt == NULL || intrname == NULL)
-		err(1, "malloc");
+	if (intrcnt == NULL || intrname == NULL) {
+		(void)fprintf(stderr, "vmstat: %s.\n", strerror(errno));
+		exit(1);
+	}
 	kread(X_INTRCNT, intrcnt, (size_t)nintr);
 	kread(X_INTRNAMES, intrname, (size_t)inamlen);
 	(void)printf("interrupt             total     rate\n");
@@ -811,12 +814,18 @@ dointr()
 	evptr = allevents.tqh_first;
 	while (evptr) {
 		if (kvm_read(kd, (long)evptr, (void *)&evcnt,
-		    sizeof evcnt) != sizeof evcnt)
-			errx(1, "event chain trashed: %s", kvm_geterr(kd));
+		    sizeof evcnt) != sizeof evcnt) {
+			(void)fprintf(stderr, "vmstat: event chain trashed: %s\n",
+			    kvm_geterr(kd));
+			exit(1);
+		}
 		if (strcmp(evcnt.ev_name, "intr") == 0) {
 			if (kvm_read(kd, (long)evcnt.ev_dev, (void *)&dev,
-			    sizeof dev) != sizeof dev)
-				errx(1, "event chain trashed: %s", kvm_geterr(kd));
+			    sizeof dev) != sizeof dev) {
+				(void)fprintf(stderr, "vmstat: event chain trashed: %s\n",
+				    kvm_geterr(kd));
+				exit(1);
+			}
 			if (evcnt.ev_count)
 				(void)printf("%-14s %12d %8ld\n", dev.dv_xname,
 				    evcnt.ev_count, (long)(evcnt.ev_count / uptime));
@@ -853,11 +862,11 @@ domem()
 		if (first) {
 			(void)printf("Memory statistics by bucket size\n");
 			(void)printf(
-		"    Size   In Use   Free   Requests  HighWater  Couldfree\n");
+	    	"    Size   In Use   Free   Requests  HighWater  Couldfree\n");
 			first = 0;
 		}
 		size = 1 << i;
-		(void)printf("%8d %8ld %6ld %10ld %7ld %10ld\n", size,
+		(void)printf("%8d %8ld %6ld %10ld %7ld %10ld\n", size, 
 			kp->kb_total - kp->kb_totalfree,
 			kp->kb_totalfree, kp->kb_calls,
 			kp->kb_highwat, kp->kb_couldfree);
@@ -937,6 +946,96 @@ domem()
 	     (totuse + 1023) / 1024, (totfree + 1023) / 1024, totreq);
 }
 
+void
+dopool(void)
+{
+	int first, ovflw;
+	long addr;
+	long total = 0, inuse = 0;
+	TAILQ_HEAD(,pool) pool_head;
+	struct pool pool, *pp = &pool;
+
+	kread(X_POOLHEAD, &pool_head, sizeof(pool_head));
+	addr = (long)TAILQ_FIRST(&pool_head);
+
+	for (first = 1; addr != 0; ) {
+		char name[32], maxp[32];
+		if (kvm_read(kd, addr, (void *)pp, sizeof *pp) != sizeof *pp) {
+			(void)fprintf(stderr,
+			    "vmstat: pool chain trashed: %s\n",
+			    kvm_geterr(kd));
+			exit(1);
+		}
+		if (kvm_read(kd, (long)pp->pr_wchan, name, sizeof name) < 0) {
+			(void)fprintf(stderr,
+			    "vmstat: pool name trashed: %s\n",
+			    kvm_geterr(kd));
+			exit(1);
+		}
+		name[31] = '\0';
+
+		if (first) {
+			(void)printf("Memory resource pool statistics\n");
+			(void)printf(
+			    "%-11s%5s%9s%5s%9s%6s%6s%6s%6s%6s%6s%5s\n",
+			    "Name",
+			    "Size",
+			    "Requests",
+			    "Fail",
+			    "Releases",
+			    "Pgreq",
+			    "Pgrel",
+			    "Npage",
+			    "Hiwat",
+			    "Minpg",
+			    "Maxpg",
+			    "Idle");
+			first = 0;
+		}
+		if (pp->pr_maxpages == UINT_MAX)
+			sprintf(maxp, "inf");
+		else
+			sprintf(maxp, "%u", pp->pr_maxpages);
+/*
+ * Print single word.  `ovflow' is number of characters didn't fit
+ * on the last word.  `fmt' is a format string to print this word.
+ * It must contain asterisk for field width.  `width' is a width
+ * occupied by this word.  `fixed' is a number of constant chars in
+ * `fmt'.  `val' is a value to be printed using format string `fmt'.
+ */
+#define	PRWORD(ovflw, fmt, width, fixed, val) do {	\
+	(ovflw) += printf((fmt),			\
+	    (width) - (fixed) - (ovflw) > 0 ?		\
+	    (width) - (fixed) - (ovflw) : 0,		\
+	    (val)) - (width);				\
+	if ((ovflw) < 0)				\
+		(ovflw) = 0;				\
+} while (/* CONSTCOND */0)
+		ovflw = 0;
+		PRWORD(ovflw, "%-*s", 11, 0, name);
+		PRWORD(ovflw, " %*u", 5, 1, pp->pr_size);
+		PRWORD(ovflw, " %*lu", 9, 1, pp->pr_nget);
+		PRWORD(ovflw, " %*lu", 5, 1, pp->pr_nfail);
+		PRWORD(ovflw, " %*lu", 9, 1, pp->pr_nput);
+		PRWORD(ovflw, " %*lu", 6, 1, pp->pr_npagealloc);
+		PRWORD(ovflw, " %*lu", 6, 1, pp->pr_npagefree);
+		PRWORD(ovflw, " %*d", 6, 1, pp->pr_npages);
+		PRWORD(ovflw, " %*d", 6, 1, pp->pr_hiwat);
+		PRWORD(ovflw, " %*d", 6, 1, pp->pr_minpages);
+		PRWORD(ovflw, " %*s", 6, 1, maxp);
+		PRWORD(ovflw, " %*lu\n", 5, 1, pp->pr_nidle);
+
+		inuse += (pp->pr_nget - pp->pr_nput) * pp->pr_size;
+		total += pp->pr_npages * pp->pr_pagesz;
+		addr = (long)TAILQ_NEXT(pp, pr_poollist);
+	}
+
+	inuse /= 1024;
+	total /= 1024;
+	printf("\nIn use %ldK, total allocated %ldK; utilization %.1f%%\n",
+	    inuse, total, (double)(100 * inuse) / total);
+}
+
 /*
  * kread reads something from the kernel, given its nlist index.
  */
@@ -952,21 +1051,25 @@ kread(nlx, addr, size)
 		sym = namelist[nlx].n_name;
 		if (*sym == '_')
 			++sym;
-		errx(1, "symbol %s not defined", sym);
+		(void)fprintf(stderr,
+		    "vmstat: symbol %s not defined\n", sym);
+		exit(1);
 	}
 	if (kvm_read(kd, namelist[nlx].n_value, addr, size) != size) {
 		sym = namelist[nlx].n_name;
 		if (*sym == '_')
 			++sym;
-		errx(1, "%s: %s", sym, kvm_geterr(kd));
+		(void)fprintf(stderr, "vmstat: %s: %s\n", sym, kvm_geterr(kd));
+		exit(1);
 	}
 }
 
 void
 usage()
 {
-	(void)fprintf(stderr, "usage: %s [-fimst] [-c count] [-M core] "
-	    "[-N system] [-w wait] [disks]\n", __progname);
+	(void)fprintf(stderr,
+	    "usage: vmstat [-fimst] [-c count] [-M core] \
+[-N system] [-w wait] [disks]\n");
 	exit(1);
 }
 
