@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.22 2003/08/14 10:06:07 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.23 2003/08/14 11:18:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1375,10 +1375,10 @@ mip6_route_optimize(m)
 		 */
 		mbu->mbu_coa = hif_coa;
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa.sin6_addr);
-		if (coa_lifetime < mpfx->mpfx_pltime) {
+		if (coa_lifetime < mpfx->mpfx_vltime) {
 			mbu->mbu_lifetime = coa_lifetime;
 		} else {
-			mbu->mbu_lifetime = mpfx->mpfx_pltime;
+			mbu->mbu_lifetime = mpfx->mpfx_vltime;
 		}
 		if (mip6_config.mcfg_bu_maxlifetime > 0 &&
 		    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
@@ -1442,10 +1442,10 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 		    ? MIP6_BU_PRI_FSM_STATE_WAITA
 		    : MIP6_BU_PRI_FSM_STATE_IDLE;
 	}
-	if (coa_lifetime < mpfx->mpfx_pltime) {
+	if (coa_lifetime < mpfx->mpfx_vltime) {
 		mbu->mbu_lifetime = coa_lifetime;
 	} else {
-		mbu->mbu_lifetime = mpfx->mpfx_pltime;
+		mbu->mbu_lifetime = mpfx->mpfx_vltime;
 	}
 	if (mip6_config.mcfg_bu_maxlifetime > 0 &&
 	    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
@@ -1896,10 +1896,10 @@ mip6_bu_list_notify_binding_change(sc, home)
 			mip6_bu_list_remove(&sc->hif_bu_list, mbu);
 			continue;
 		}
-		if (coa_lifetime < mpfx->mpfx_pltime) {
+		if (coa_lifetime < mpfx->mpfx_vltime) {
 			mbu->mbu_lifetime = coa_lifetime;
 		} else {
-			mbu->mbu_lifetime = mpfx->mpfx_pltime;
+			mbu->mbu_lifetime = mpfx->mpfx_vltime;
 		}
 		if (mip6_config.mcfg_bu_maxlifetime > 0 &&
 		    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
@@ -1979,7 +1979,7 @@ mip6_coa_get_lifetime(coa)
 	}
 
 	if (ia != NULL) {
-		lifetime = ia->ia6_lifetime.ia6t_preferred - time_second;
+		lifetime = ia->ia6_lifetime.ia6t_expire - time_second;
 	} else {
 		lifetime = 0;
 	}
@@ -3649,7 +3649,7 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 
 		mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
 						       src);
-		haddr_lifetime = mpfx->mpfx_pltime;
+		haddr_lifetime = mpfx->mpfx_vltime;
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa.sin6_addr);
 		lifetime = haddr_lifetime < coa_lifetime ?
 			haddr_lifetime : coa_lifetime;

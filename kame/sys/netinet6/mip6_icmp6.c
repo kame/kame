@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.71 2003/08/14 10:06:07 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.72 2003/08/14 11:18:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -982,7 +982,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		/* XXX scope? */
 		mpfx = mip6_prefix_list_find_withprefix(&prefix_sa,
 		    ndopt_pi->nd_opt_pi_prefix_len);
-		if (mpfx != NULL) {
+		if (mpfx == NULL) {
 			mpfx = mip6_prefix_create(&prefix_sa,
 			    ndopt_pi->nd_opt_pi_prefix_len,
 			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
@@ -1015,6 +1015,8 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			/* XXX multiple global address case. */
 		}
 	}
+
+	return (0);
 
  freeit:
 	m_freem(m);
