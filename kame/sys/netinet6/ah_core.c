@@ -1170,55 +1170,56 @@ again:
 		break;
 	    }
 
-	 case IPPROTO_HOPOPTS:
-	 case IPPROTO_DSTOPTS:
-	 {
-		 int hdrlen, optlen, remain;
-		 u_int8_t *optp, *lastp = p, opt;
+	case IPPROTO_HOPOPTS:
+	case IPPROTO_DSTOPTS:
+	    {
+		int hdrlen, optlen, remain;
+		u_int8_t *optp, opt;
 
-		 tlen = m->m_len - (p - mtod(m, u_char *));
-		 /* We assume all the options is contained in a single mbuf */
-		 if (tlen < sizeof(struct ip6_ext)) {
-			 error = EINVAL;
-			 goto bad;
-		 }
-		 hdrlen  = (((struct ip6_ext *)p)->ip6e_len + 1) << 3;
-		 hdrtype = (int)((struct ip6_ext *)p)->ip6e_nxt;
-		 if (tlen < hdrlen) {
-			 error = EINVAL;
-			 goto bad;
-		 }
+		tlen = m->m_len - (p - mtod(m, u_char *));
+		/* We assume all the options is contained in a single mbuf */
+		if (tlen < sizeof(struct ip6_ext)) {
+			error = EINVAL;
+			goto bad;
+		}
+		hdrlen  = (((struct ip6_ext *)p)->ip6e_len + 1) << 3;
+		hdrtype = (int)((struct ip6_ext *)p)->ip6e_nxt;
+		if (tlen < hdrlen) {
+			error = EINVAL;
+			goto bad;
+		}
 
-		 for (optp = p + 2, remain = hdrlen - 2;
-		      remain > 0; optp += optlen, remain -= optlen) {
-			 opt = optp[0];
-			 if (opt == IP6OPT_PAD1) {
-				 optlen = 1;
-			 } else {
-				 if (remain < 2) {
-					 error = EINVAL; /* malformed option */
-					 goto bad;
-				 }
-				 optlen = optp[1] + 2;
-				 if (opt & IP6OPT_MUTABLE) {
-					 (algo->update)(&algos, lastp,
-							optp + 2 - lastp);
-					 if (optlen - 2 > ZEROBUFLEN) {
-						 error = EINVAL; /* XXX */
-						 goto bad;
-					 }
-					 (algo->update)(&algos, zerobuf,
-							optlen - 2);
-					 remain -= optp - lastp + optlen;
-					 lastp = optp + optlen;
-					 optlen = 0;
-				 }
-			 }
-		 }
-		 advancewidth = hdrlen;
-		 (algo->update)(&algos, lastp, p + hdrlen - lastp);
-		 break;
-	 }
+		/* first, update the top of 2 bytes. */
+		(algo->update)(&algos, p, 2);
+
+		for (optp = p + 2, remain = hdrlen - 2;
+		     remain > 0;
+		     optp += optlen, remain -= optlen) {
+			opt = optp[0];
+			if (opt == IP6OPT_PAD1) {
+				optlen = 1;
+				(algo->update)(&algos, optp, optlen);
+				continue;
+			}
+			if (remain < 2) {
+				error = EINVAL; /* malformed option */
+				goto bad;
+			}
+			optlen = optp[1] + 2;
+			if (opt & IP6OPT_MUTABLE) {
+				(algo->update)(&algos, optp, 2);
+				if (optlen - 2 > ZEROBUFLEN) {
+					error = EINVAL; /* XXX */
+					goto bad;
+				}
+				(algo->update)(&algos, zerobuf, optlen - 2);
+				continue;
+			}
+			(algo->update)(&algos, optp, optlen);
+		}
+		advancewidth = hdrlen;
+		break;
+	    }
 	 case IPPROTO_ROUTING:
 	 {
 		 /*
