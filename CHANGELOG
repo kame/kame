@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.707 2000/03/21 09:21:22 itojun Exp $
+$Id: CHANGELOG,v 1.708 2000/03/21 12:52:43 jinmei Exp $
 
 <200003>
 Tue Mar 21 18:23:14 JST 2000  itojun@iilab.net
@@ -18,7 +18,7 @@ Mon Mar 20 21:16:30 JST 2000  itojun@iijlab.net
 
 2000-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): just sent packets on a p2p
-	interface where NUD is disabled. Withtout this fix, the following
+	interface where NUD is disabled. Without this fix, the following
 	would not work:
 	# route add -inet6 default ::1 -ifp gif0
 	Also note that you'll have to do like
