@@ -1,4 +1,4 @@
-$Id: TODO,v 1.18 2000/09/20 20:48:55 sakane Exp $
+$Id: TODO,v 1.19 2000/09/20 21:11:58 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -9,7 +9,7 @@ o The documents for users convenience.
 o split log file based on client.  printf-like config directive, i.e.
   "logfile racoon.%s.log", should be useful here.
 o fix flag for logging
-o variable-length SPI on phase 2 (for IPComp), endian issue
+o variable-length SPI on phase 2 (for IPComp)
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
