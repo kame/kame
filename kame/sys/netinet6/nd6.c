@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.155 2001/06/29 09:36:24 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.156 2001/06/29 09:42:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -856,8 +856,6 @@ nd6_purge(ifp)
 
 	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
 		/* refresh default router list */
-		bzero(&drany, sizeof(drany));
-		defrouter_delreq(&drany, 0);
 		defrouter_select();
 	}
 
