@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.10 2000/09/19 21:28:01 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.11 2000/09/19 21:50:41 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -47,6 +47,19 @@ vs Cryptek
 	- ph1 proposal mismatched because he sent DH group 1, but I expected 2.
 	- he sent 4 as ph1 spi size.  I warned and ignore it.
 
+	phase 1: initiator, main
+	    preshared, 3des-cbc, md5, DH group 1, lifetime 600 <== choiced
+	    preshared, des-cbc, sha1, DH group 1, lifetime 1000
+	phase 2: PFS group 2
+	    ESP des-cbc, hmac-sha1, transport mode, lifetime 300
+	    ESP des-cbc, hmac-md5, transport mode, lifetime 300
+	    ESP 3des-cbc, hmac-sha1, transport mode, lifetime 300 <== choiced
+	    ESP 3des-cbc, hmac-md5, transport mode, lifetime 300
+	Notes:
+	- he might send me the broken ID payload.
+	- IPsec-SA was installed, but he still sent me the notify of
+	  invalid-payload.
+
 vs SSH (IPv6)
 	phase 1: responder, aggressive
 	  either of the following:
@@ -92,6 +105,7 @@ vs HITACHI
 	phase 1: responder, main
 	    RSAsig, 3des-cbc, sha1, DH group 2, lifetime 600
 	    both subjectAltName and DN are OK.
+	    multiple subjectAltName is OK.
 	phase 2:
 		des, hmac-sha1, tunnel mode, lifetime 300	<== choiced
 		des, hmac-md5, tunnel mode, lifetime 300
