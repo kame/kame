@@ -110,6 +110,7 @@
 #include <netinet6/ip6_var.h>
 #ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
+#include <netinet6/udp6_var.h>
 #endif
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
