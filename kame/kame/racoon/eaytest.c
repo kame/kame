@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.29 2001/09/07 01:00:11 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.30 2001/09/07 01:15:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,21 +157,24 @@ char *certs[] = {
 
 /* prototype */
 
-void certtest __P((void));
-void ciphertest __P((void));
-void hmactest __P((void));
-void sha2test __P((void));
-void sha1test __P((void));
-void md5test __P((void));
-void dhtest __P((int));
-void bntest __P((void));
+void certtest __P((int, char **));
+void ciphertest __P((int, char **));
+void hmactest __P((int, char **));
+void sha2test __P((int, char **));
+void sha1test __P((int, char **));
+void md5test __P((int, char **));
+void dhtest __P((int, char **));
+void bntest __P((int, char **));
+void Usage __P((void));
 
 /* test */
 
 #include <sys/stat.h>
 #include <unistd.h>
 void
-certtest()
+certtest(ac, av)
+	int ac;
+	char **av;
 {
 	vchar_t c;
 	char *str;
@@ -294,7 +297,9 @@ certtest()
 }
 
 void
-ciphertest()
+ciphertest(ac, av)
+	int ac;
+	char **av;
 {
 	vchar_t data;
 	vchar_t key;
@@ -469,7 +474,9 @@ ciphertest()
 }
 
 void
-hmactest()
+hmactest(ac, av)
+	int ac;
+	char **av;
 {
 	char *keyword = "hehehe test secret!";
 	char *object  = "d7e6a6c1876ef0488bb74958b9fee94e";
@@ -557,7 +564,9 @@ hmactest()
 }
 
 void
-sha1test()
+sha1test(ac, av)
+	int ac;
+	char **av;
 {
 	char *word1 = "1234567890", *word2 = "12345678901234567890";
 	caddr_t ctx;
@@ -590,7 +599,9 @@ sha1test()
 }
 
 void
-md5test()
+md5test(ac, av)
+	int ac;
+	char **av;
 {
 	char *word1 = "1234567890", *word2 = "12345678901234567890";
 	caddr_t ctx;
@@ -623,8 +634,9 @@ md5test()
 }
 
 void
-dhtest(f)
-	int f;
+dhtest(ac, av)
+	int ac;
+	char **av;
 {
 	static struct {
 		char *name;
@@ -692,7 +704,9 @@ dhtest(f)
 }
 
 void
-bntest()
+bntest(ac, av)
+	int ac;
+	char **av;
 {
 	vchar_t *rn;
 
@@ -703,42 +717,56 @@ bntest()
 	vfree(rn);
 }
 
+struct {
+	char *name;
+	void (*func) __P((int, char **));
+} func[] = {
+	{ "random", bntest, },
+	{ "dh", dhtest, },
+	{ "md5", md5test, },
+	{ "sha1", sha1test, },
+	{ "hmac", hmactest, },
+	{ "cipher", ciphertest, },
+	{ "cert", certtest, },
+};
+
 int
 main(ac, av)
 	int ac;
 	char **av;
 {
+	int i;
+	int len = sizeof(func)/sizeof(func[0]);
+
 	if (strcmp(*av, "-h") == 0) {
-		printf("Usage: eaytest [dh|md5|sha1|hmac|cipher|cert]\n");
-		exit(0);
+		printf("Usage: eaytest [");
+		for (i = 0; i < len; i++) {
+			printf("%s", func[i].name);
+			if (i != len)
+				printf("|");
+		}
+		printf("]\n");
+		Usage();
 	}
 
 	if (ac == 1) {
-		bntest();
-		dhtest(0);
-		md5test();
-		sha1test();
-		hmactest();
-		ciphertest();
-		certtest();
+		for (i = 0; i < len; i++)
+			(func[i].func)(ac, av);
 	} else {
-		for (av++; *av != '\0'; av++) {
-			if (strcmp(*av, "random") == 0)
-				bntest();
-			else if (strcmp(*av, "dh") == 0)
-				dhtest(0);
-			else if (strcmp(*av, "md5") == 0)
-				md5test();
-			else if (strcmp(*av, "sha1") == 0)
-				sha1test();
-			else if (strcmp(*av, "hmac") == 0)
-				hmactest();
-			else if (strcmp(*av, "cipher") == 0)
-				ciphertest();
-			else if (strcmp(*av, "cert") == 0)
-				certtest();
+		for (i = 0; i < len; i++) {
+			if (strcmp(*av, func[i].name) == 0)
+				(func[i].func)(ac, av);
 		}
+		if (i == len)
+			Usage();
 	}
 
+	exit(0);
+}
+
+void
+Usage()
+{
+	printf("Usage: eaytest [dh|md5|sha1|hmac|cipher|cert]\n");
 	exit(0);
 }
