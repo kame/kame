@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.9 2000/04/12 07:28:20 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.10 2000/05/19 02:38:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -134,6 +134,27 @@ struct mrt6stat {
 	u_quad_t mrt6s_pkt2large;     	/* pkts dropped - size > BKT SIZE  */
 	u_quad_t mrt6s_upq_sockfull;	/* upcalls dropped - socket full   */
 };
+
+#ifdef MRT6_OINIT
+/*
+ * Struct used to communicate from kernel to multicast router
+ * note the convenient similarity to an IPv6 header.
+ * XXX old version, superseded by mrt6msg.
+ */
+struct omrt6msg {
+	u_long	    unused1;
+	u_char	    im6_msgtype;		/* what type of message	    */
+#if 0
+#define MRT6MSG_NOCACHE	1
+#define MRT6MSG_WRONGMIF	2
+#define MRT6MSG_WHOLEPKT	3		/* used for user level encap*/
+#endif
+	u_char	    im6_mbz;			/* must be zero		    */
+	u_char	    im6_mif;			/* mif rec'd on		    */
+	u_char	    unused2;
+	struct in6_addr  im6_src, im6_dst;
+};
+#endif
 
 /*
  * Structure used to communicate from kernel to multicast router.

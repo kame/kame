@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.22 2000/05/19 02:29:07 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.23 2000/05/19 02:38:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -112,6 +112,7 @@ static int register_send __P((struct ip6_hdr *, struct mif6 *,
  * except for netstat or debugging purposes.
  */
 struct socket  *ip6_mrouter  = NULL;
+int		ip6_mrouter_ver = 0;
 int		ip6_mrtproto = IPPROTO_PIM;    /* for netstat only */
 struct mrt6stat	mrt6stat;
 
@@ -235,7 +236,7 @@ static void collate();
 
 static int get_sg_cnt __P((struct sioc_sg_req6 *));
 static int get_mif6_cnt __P((struct sioc_mif_req6 *));
-static int ip6_mrouter_init __P((struct socket *, struct mbuf *));
+static int ip6_mrouter_init __P((struct socket *, struct mbuf *, int));
 static int add_m6if __P((struct mif6ctl *));
 static int del_m6if __P((mifi_t *));
 static int add_m6fc __P((struct mf6cctl *));
@@ -263,7 +264,10 @@ ip6_mrouter_set(so, sopt)
 
 	switch (sopt->sopt_name) {
 	 case MRT6_INIT:
-		 error = ip6_mrouter_init(so, m);
+#ifdef MRT6_OINIT
+	 case MRT6_OINIT:
+#endif
+		 error = ip6_mrouter_init(so, m, sopt->sopt_name);
 		 break;
 	 case MRT6_DONE:
 		 error = ip6_mrouter_done();
@@ -302,7 +306,10 @@ ip6_mrouter_set(cmd, so, m)
 		return EACCES;
 
 	switch (cmd) {
-	 case MRT6_INIT:      return ip6_mrouter_init(so, m);
+#ifdef MRT6_OINIT
+	 case MRT6_OINIT:     return ip6_mrouter_init(so, m, cmd);
+#endif
+	 case MRT6_INIT:      return ip6_mrouter_init(so, m, cmd);
 	 case MRT6_DONE:      return ip6_mrouter_done();
 	 case MRT6_ADD_MIF:   return add_m6if(mtod(m, struct mif6ctl *));
 	 case MRT6_DEL_MIF:   return del_m6if(mtod(m, mifi_t *));
@@ -464,9 +471,10 @@ set_pim6(i)
  * Enable multicast routing
  */
 static int
-ip6_mrouter_init(so, m)
+ip6_mrouter_init(so, m, cmd)
 	struct socket *so;
 	struct mbuf *m;
+	int cmd;
 {
 	int *v;
 
@@ -491,6 +499,7 @@ ip6_mrouter_init(so, m)
 	if (ip6_mrouter != NULL) return EADDRINUSE;
 
 	ip6_mrouter = so;
+	ip6_mrouter_ver = cmd;
 
 	bzero((caddr_t)mf6ctable, sizeof(mf6ctable));
 	bzero((caddr_t)nexpire, sizeof(nexpire));
@@ -601,6 +610,7 @@ ip6_mrouter_done()
 	reg_mif_num = -1;
 
 	ip6_mrouter = NULL;
+	ip6_mrouter_ver = 0;
 
 	splx(s);
 
@@ -1154,6 +1164,9 @@ ip6_mforward(ip6, ifp, m)
 
 		if (rt == NULL) {
 			struct mrt6msg *im;
+#ifdef MRT6_OINIT
+			struct omrt6msg *oim;
+#endif
 
 			/* no upcall, so make a new entry */
 			rt = (struct mf6c *)malloc(sizeof(*rt), M_MRTABLE,
@@ -1183,9 +1196,30 @@ ip6_mforward(ip6, ifp, m)
 			 */
 			sin6.sin6_addr = ip6->ip6_src;
 	
-			im = mtod(mm, struct mrt6msg *);
-			im->im6_msgtype	= MRT6MSG_NOCACHE;
-			im->im6_mbz		= 0;
+			im = NULL;
+#ifdef MRT6_OINIT
+			oim = NULL;
+#endif
+			switch (ip6_mrouter_ver) {
+#ifdef MRT6_OINIT
+			case MRT6_OINIT:
+				oim = mtod(mm, struct omrt6msg *);
+				oim->im6_msgtype = MRT6MSG_NOCACHE;
+				oim->im6_mbz = 0;
+				break;
+#endif
+			case MRT6_INIT:
+				im = mtod(mm, struct mrt6msg *);
+				im->im6_msgtype = MRT6MSG_NOCACHE;
+				im->im6_mbz = 0;
+				break;
+			default:
+				free(rte, M_MRTABLE);
+				m_freem(mb0);
+				free(rt, M_MRTABLE);
+				splx(s);
+				return EINVAL;
+			}
 
 #ifdef MRT6DEBUG
 			if (mrt6debug & DEBUG_FORWARD)
@@ -1198,7 +1232,16 @@ ip6_mforward(ip6, ifp, m)
 			     mifp++, mifi++)
 				;
 
-			im->im6_mif = mifi;
+			switch (ip6_mrouter_ver) {
+#ifdef MRT6_OINIT
+			case MRT6_OINIT:
+				oim->im6_mif = mifi;
+				break;
+#endif
+			case MRT6_INIT:
+				im->im6_mif = mifi;
+				break;
+			}
 
 			if (socket_send(ip6_mrouter, mm, &sin6) < 0) {
 				log(LOG_WARNING, "ip6_mforward: ip6_mrouter "
@@ -1346,11 +1389,11 @@ ip6_mdq(m, ifp, rt)
  * seperate.
  */
 
-#define MC6_SEND(ip6, mifp, m) do {                             \
-		if ((mifp)->m6_flags & MIFF_REGISTER) 		\
-		    register_send((ip6), (mifp), (m));	 	\
-                else                                     	\
-                    phyint_send((ip6), (mifp), (m));      	\
+#define MC6_SEND(ip6, mifp, m) do {				\
+		if ((mifp)->m6_flags & MIFF_REGISTER)		\
+		    register_send((ip6), (mifp), (m));		\
+		else						\
+		    phyint_send((ip6), (mifp), (m));		\
 } while (0)
 
 	/*
@@ -1387,6 +1430,9 @@ ip6_mdq(m, ifp, rt)
 
 				register struct mbuf *mm;
 				struct mrt6msg *im;
+#ifdef MRT6_OINIT
+				struct omrt6msg *oim;
+#endif
 
 				mm = m_copy(m, 0, sizeof(struct ip6_hdr));
 				if (mm &&
@@ -1396,9 +1442,26 @@ ip6_mdq(m, ifp, rt)
 				if (mm == NULL)
 					return ENOBUFS;
 	
-				im = mtod(mm, struct mrt6msg *);
-				im->im6_msgtype	= MRT6MSG_WRONGMIF;
-				im->im6_mbz	= 0;
+#ifdef MRT6_OINIT
+				oim = NULL;
+#endif
+				im = NULL;
+				switch (ip6_mrouter_ver) {
+#ifdef MRT6_OINIT
+				case MRT6_OINIT:
+					oim = mtod(mm, struct omrt6msg *);
+					oim->im6_msgtype = MRT6MSG_WRONGMIF;
+					oim->im6_mbz = 0;
+					break;
+#endif
+				case MRT6_INIT:
+					im = mtod(mm, struct mrt6msg *);
+					im->im6_msgtype = MRT6MSG_WRONGMIF;
+					break;
+				default:
+					m_freem(mm);
+					return EINVAL;
+				}
 
 				for (mifp = mif6table, iif = 0;
 				     iif < nummifs && mifp &&
@@ -1406,9 +1469,18 @@ ip6_mdq(m, ifp, rt)
 				     mifp++, iif++)
 					;
 
-				im->im6_mif	= iif;
-
-				sin6.sin6_addr = im->im6_src;
+				switch (ip6_mrouter_ver) {
+#ifdef MRT6_OINIT
+				case MRT6_OINIT:
+					oim->im6_mif = iif;
+					sin6.sin6_addr = oim->im6_src;
+					break;
+#endif
+				case MRT6_INIT:
+					im->im6_mif = iif;
+					sin6.sin6_addr = im->im6_src;
+					break;
+				}
 
 				mrt6stat.mrt6s_upcalls++;
 
