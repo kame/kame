@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.36 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.37 2004/09/29 08:36:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -882,8 +882,8 @@ add_entry6(struct ip6_fw_head *chainptr, struct ip6_fw *frwl)
 	u_short nbr = 0;
 	int s;
 
-	fwc = malloc(sizeof *fwc, M_IP6FW, M_DONTWAIT);
-	ftmp = malloc(sizeof *ftmp, M_IP6FW, M_DONTWAIT);
+	fwc = malloc(sizeof *fwc, M_IP6FW, M_NOWAIT);
+	ftmp = malloc(sizeof *ftmp, M_IP6FW, M_NOWAIT);
 	if (!fwc || !ftmp) {
 		dprintf(("%s malloc said no\n", err_prefix));
 		if (fwc)  free(fwc, M_IP6FW);

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.10 2004/05/26 10:07:59 itojun Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.11 2004/09/29 08:36:01 suz Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson
@@ -532,7 +532,7 @@ tfrc_send_init(struct dccpcb * pcb)
 {
 	struct tfrc_send_ccb *ccb;
 
-	ccb = malloc(sizeof(struct tfrc_send_ccb), M_PCB, M_DONTWAIT | M_ZERO);
+	ccb = malloc(sizeof(struct tfrc_send_ccb), M_PCB, M_NOWAIT | M_ZERO);
 	if (ccb == 0) {
 		TFRC_DEBUG((LOG_INFO, "Unable to allocate memory for tfrc_send_ccb!\n"));
 		return 0;
@@ -663,7 +663,7 @@ tfrc_send_packet(void *ccb, long datasize)
 
 	if ((new_packet != NULL && new_packet->t_sent.tv_sec >= 0) || new_packet == NULL) {
 		/* check to see if we have memory to add to packet history */
-		new_packet = malloc(sizeof(struct s_hist_entry), M_TEMP, M_DONTWAIT);	/* M_TEMP?? */
+		new_packet = malloc(sizeof(struct s_hist_entry), M_TEMP, M_NOWAIT);	/* M_TEMP?? */
 		if (new_packet == NULL) {
 			TFRC_DEBUG((LOG_INFO, "TFRC - Not enough memory to add packet to packet history (send refused)! (tfrc_send_packet)\n"));
 			answer = 0;
@@ -1493,7 +1493,7 @@ tfrc_recv_updateLI(struct tfrc_recv_ccb * cb, long seq_loss, u_int8_t win_loss)
 			/* create history */
 			for (i = 0; i < TFRC_RECV_IVAL_F_LENGTH + 1; i++) {
 				li_elm = malloc(sizeof(struct li_hist_entry),
-				    M_TEMP, M_DONTWAIT | M_ZERO);	/* M_TEMP?? */
+				    M_TEMP, M_NOWAIT | M_ZERO);	/* M_TEMP?? */
 				if (li_elm == NULL) {
 					TFRC_DEBUG((LOG_INFO, "TFRC - Not enough memory for loss interval history!\n"));
 					/* Empty loss interval history */
@@ -1579,7 +1579,7 @@ tfrc_recv_init(struct dccpcb * pcb)
 {
 	struct tfrc_recv_ccb *ccb;
 
-	ccb = malloc(sizeof(struct tfrc_recv_ccb), M_PCB, M_DONTWAIT | M_ZERO);
+	ccb = malloc(sizeof(struct tfrc_recv_ccb), M_PCB, M_NOWAIT | M_ZERO);
 	if (ccb == 0) {
 		TFRC_DEBUG((LOG_INFO, "TFRC - Unable to allocate memory for tfrc_recv_ccb!\n"));
 		return 0;
@@ -1702,7 +1702,7 @@ tfrc_recv_packet_recv(void *ccb, char *options, int optlen)
 
 	/* Add packet to history */
 
-	packet = malloc(sizeof(struct r_hist_entry), M_TEMP, M_DONTWAIT);	/* M_TEMP?? */
+	packet = malloc(sizeof(struct r_hist_entry), M_TEMP, M_NOWAIT);	/* M_TEMP?? */
 	if (packet == NULL) {
 		TFRC_DEBUG((LOG_INFO, "TFRC - Not enough memory to add received packet to history (consider it lost)! (tfrc_recv_packet_recv)"));
 		dccpstat.tfrcs_recv_nomem++;

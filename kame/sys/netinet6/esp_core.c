@@ -1,5 +1,5 @@
 /*	$NetBSD: esp_core.c,v 1.33 2003/08/27 00:08:31 thorpej Exp $	*/
-/*	$KAME: esp_core.c,v 1.67 2004/06/02 05:53:14 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.68 2004/09/29 08:36:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -242,7 +242,7 @@ esp_schedule(algo, sav)
 		return 0;
 
 	sav->schedlen = (*algo->schedlen)(algo);
-	sav->sched = malloc(sav->schedlen, M_SECA, M_DONTWAIT);
+	sav->sched = malloc(sav->schedlen, M_SECA, M_NOWAIT);
 	if (!sav->sched) {
 		sav->schedlen = 0;
 		return ENOBUFS;

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.12 2004/02/11 21:40:59 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.13 2004/09/29 08:36:01 suz Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -216,7 +216,7 @@ void *tcplike_send_init(struct dccpcb* pcb)
 	
 	TCPLIKE_DEBUG((LOG_INFO, "Entering tcplike_send_init()\n"));
 	
-	cb = malloc(sizeof (struct tcplike_send_ccb), M_PCB, M_DONTWAIT | M_ZERO);
+	cb = malloc(sizeof (struct tcplike_send_ccb), M_PCB, M_NOWAIT | M_ZERO);
 	if (cb == 0) {
 		TCPLIKE_DEBUG((LOG_INFO, "Unable to allocate memory for tcplike_send_ccb!\n"));
 		dccpstat.tcplikes_send_memerr++;
@@ -255,7 +255,7 @@ void *tcplike_send_init(struct dccpcb* pcb)
 
 	cb->cv_size = TCPLIKE_INITIAL_CWNDVECTOR;
 	/* 1 bit per entry */
-	cb->cwndvector = malloc(cb->cv_size/8, M_PCB, M_DONTWAIT | M_ZERO);
+	cb->cwndvector = malloc(cb->cv_size/8, M_PCB, M_NOWAIT | M_ZERO);
 	if (cb->cwndvector == NULL) {
 		MALLOC_DEBUG((LOG_INFO, "Unable to allocate memory for cwndvector\n"));
 		/* What to do now? */
@@ -778,7 +778,7 @@ void _add_to_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr)
 
 	if (gap > (cb->cv_size - 128)) {
 		MALLOC_DEBUG((LOG_INFO, "INCREASE cwndVECTOR\n"));
-		n = malloc(cb->cv_size/4, M_PCB, M_DONTWAIT); /* old size * 2 */
+		n = malloc(cb->cv_size/4, M_PCB, M_NOWAIT); /* old size * 2 */
 		if (n == NULL) {
 			MALLOC_DEBUG((LOG_INFO, "Increase cwndvector FAILED\n"));
 			dccpstat.tcplikes_send_memerr++;
@@ -873,7 +873,7 @@ void *tcplike_recv_init(struct dccpcb *pcb)
   
 	TCPLIKE_DEBUG((LOG_INFO, "Entering tcplike_recv_init()\n"));
   
-	ccb = malloc(sizeof (struct tcplike_recv_ccb), M_PCB, M_DONTWAIT | M_ZERO);
+	ccb = malloc(sizeof (struct tcplike_recv_ccb), M_PCB, M_NOWAIT | M_ZERO);
 	if (ccb == 0) {
 		TCPLIKE_DEBUG((LOG_INFO, "Unable to allocate memory for tcplike_recv_ccb!\n"));
 		dccpstat.tcplikes_recv_memerr++;
@@ -1047,7 +1047,7 @@ void _avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackt
 	struct ack_list *a;
 	ACK_DEBUG((LOG_INFO,"Adding localseq %u - ackthru %u to avlist\n", localseq, ackthru));
 	/*MALLOC_DEBUG((LOG_INFO, "New ack_list, %u\n", sizeof (struct ack_list)));*/
-	a = malloc(sizeof(struct ack_list), M_TEMP, M_DONTWAIT);
+	a = malloc(sizeof(struct ack_list), M_TEMP, M_NOWAIT);
 	if (a == NULL) {
 		MALLOC_DEBUG((LOG_INFO, "avlist_add: FAILED\n"));
 		dccpstat.tcplikes_recv_memerr++;

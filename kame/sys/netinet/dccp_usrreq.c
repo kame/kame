@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.31 2004/05/26 10:07:59 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.32 2004/09/29 08:36:01 suz Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -3664,7 +3664,7 @@ dccp_use_ackvector(struct dccpcb *dp)
 	}
 	dp->av_size = DCCP_VECTORSIZE;
 	/* need 2 bits per entry */
-	dp->ackvector = malloc(dp->av_size/4, M_PCB, M_DONTWAIT | M_ZERO);
+	dp->ackvector = malloc(dp->av_size/4, M_PCB, M_NOWAIT | M_ZERO);
 	if (dp->ackvector == 0) {
 		DCCP_DEBUG((LOG_INFO, "Unable to allocate memory for ackvector\n"));
 		/* What to do now? */
@@ -3759,7 +3759,7 @@ dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
 		dp->av_ts = 0;
 
 	if (gap > (dp->av_size - 128)) {
-		n = malloc(dp->av_size/2, M_PCB, M_DONTWAIT | M_ZERO); /* old size * 2 */
+		n = malloc(dp->av_size/2, M_PCB, M_NOWAIT | M_ZERO); /* old size * 2 */
 		memset (n + dp->av_size / 4, 0xff, dp->av_size / 4); /* new half all missing */
 		dc = (dp->ackvector + (dp->av_size/4)) - dp->av_hp;
 		memcpy (n, dp->av_hp, dc); /* tail to end */
