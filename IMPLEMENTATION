@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.373 2004/08/11 10:56:26 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.374 2004/08/11 11:04:25 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -292,6 +292,21 @@ generated to syslog (and usually to console).  The "duplicated" mark
 can be checked with ifconfig.  It is administrators' responsibility to check
 for and recover from DAD failures.  We may try to improve failure recovery
 in future KAME code.
+
+A successor version of RFC2462 (called rfc2462bis) clarifies the
+behavior when DAD fails (i.e., duplicate is detected): if the
+duplicate address is a link-local address formed from an interface
+identifier based on the hardware address which is supposed to be
+uniquely assigned (e.g., EUI-64 for an Ethernet interface), IPv6
+operation on the interface should be disabled.  The KAME
+implementation supports this as follows: if this type of duplicate is
+detected, the kernel marks "disabled" in the ND specific data
+structure for the interface.  Every IPv6 I/O operation in the kernel
+checks this mark, and the kernel will drop packets received on or
+being sent to the "disabled" interface.  Whether the IPv6 operation is
+disabled or not can be confirmed by the ndp(8) command.  See the man
+page for more details.
+
 DAD procedure may not be effective on certain network interfaces/drivers.
 If a network driver needs long initialization time (with wireless network
 interfaces this situation is popular), and the driver mistakingly raises
