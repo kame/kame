@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.375 2004/11/28 12:00:12 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.376 2004/11/28 12:00:39 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -261,7 +261,7 @@ draft-ietf-ipngwg-icmp-v3-02.txt: ICMPv6 for IPv6 specification (revised)
 draft-itojun-ipv6-tcp-to-anycast-01.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-ietf-dhc-lifetime-02.txt: Information Refresh Time Option for DHCPv6
-draft-ietf-ipv6-rfc2462bis-04.txt: IPv6 Stateless Address
+draft-ietf-ipv6-rfc2462bis-06.txt: IPv6 Stateless Address
 	Autoconfiguration (revised)
 draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies (expired)
