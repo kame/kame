@@ -189,6 +189,30 @@ else
 fi
 AC_SUBST(dhcpopt_preq)
 
+AC_MSG_CHECKING(for DHCP IA_PD option)
+AC_ARG_WITH(opt-ia-pd,
+[  --with-opt-pa-pd=VALUE  specify DHCP option value for IA_PD],
+    dhcpopt_ia_pd="$withval", dhcpopt_ia_pd=0)
+if test $dhcpopt_ia_pd = 0 ; then
+	dhcpopt_ia_pd=33
+	AC_MSG_RESULT(unspecified and using $dhcpopt_ia_pd)
+else
+	AC_MSG_RESULT(using $dhcpopt_ia_pd)
+fi
+AC_SUBST(dhcpopt_ia_pd)
+
+AC_MSG_CHECKING(for DHCP IA_PD_PREFIX option)
+AC_ARG_WITH(opt-ia-pd-prefix,
+[  --with-opt-preq=VALUE   specify DHCP option value for IA_PD prefix],
+    dhcpopt_ia_pd_prefix="$withval", dhcpopt_ia_pd_prefix=0)
+if test $dhcpopt_ia_pd_prefix = 0 ; then
+	dhcpopt_ia_pd_prefix=34
+	AC_MSG_RESULT(unspecified and using $dhcpopt_ia_pd_prefix)
+else
+	AC_MSG_RESULT(using $dhcpopt_ia_pd_prefix)
+fi
+AC_SUBST(dhcpopt_ia_pd_prefix)
+
 AC_CHECK_HEADERS(stdarg.h)
 
 AC_OUTPUT(Makefile)

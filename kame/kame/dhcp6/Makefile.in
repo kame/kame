@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.16 2002/07/04 15:03:19 jinmei Exp $
+# $Id: Makefile.in,v 1.17 2002/12/29 01:08:05 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -22,7 +22,9 @@ mandir=	@mandir@
 CFLAGS+= -DCONF_DH6OPT_DNS=@dhcpopt_dns@ \
 	-DCONF_DH6OPT_PREFIX_DELEGATION=@dhcpopt_pdel@ \
 	-DCONF_DH6OPT_PREFIX_INFORMATION=@dhcpopt_pinfo@ \
-	-DCONF_DH6OPT_PREFIX_REQUEST=@dhcpopt_preq@
+	-DCONF_DH6OPT_PREFIX_REQUEST=@dhcpopt_preq@ \
+	-DCONF_DH6OPT_IA_PD=@dhcpopt_ia_pd@ \
+	-DCONF_DH6OPT_IA_PD_PREFIX=@dhcpopt_ia_pd_prefix@
 
 GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o timer.o \
