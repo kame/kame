@@ -66,7 +66,7 @@ main(argc, argv)
 	char recvbuf[1024];	/* xxx hardcoding */
 	struct addrinfo hints, *res;
 
-	while ((ch = getopt(argc, argv, "adDhilpru")) != EOF)
+	while ((ch = getopt(argc, argv, "adDhilp:ru")) != EOF)
 		switch(ch) {
 		case 'a':
 			aflag++;
