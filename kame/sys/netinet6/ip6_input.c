@@ -1398,22 +1398,28 @@ ip6_reset_rcvopt(opts, optname)
 {
 	switch(optname) {
 	case IPV6_RECVPKTINFO:
-		m_freem(opts->pktinfo);
+		m_free(opts->pktinfo);
+		opts->pktinfo = NULL;
 		break;
 	case IPV6_RECVHOPLIMIT:
-		m_freem(opts->hlim);
+		m_free(opts->hlim);
+		opts->hlim = NULL;
 		break;
 	case IPV6_RECVHOPOPTS:
-		m_freem(opts->hbh);
+		m_free(opts->hbh);
+		opts->hbh = NULL;
 		break;
 	case IPV6_RECVRTHDRDSTOPTS:
-		m_freem(opts->dest1);
+		m_free(opts->dest1);
+		opts->dest1 = NULL;
 		break;
 	case IPV6_RECVDSTOPTS:
-		m_freem(opts->dest2);
+		m_free(opts->dest2);
+		opts->dest2 = NULL;
 		break;
 	case IPV6_RECVRTHDR:
-		m_freem(opts->rthdr);
+		m_free(opts->rthdr);
+		opts->rthdr = NULL;
 		break;
 	default:
 		printf("ip6_reset_rcvopt: invalid option name (%d)\n",
