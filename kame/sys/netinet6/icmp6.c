@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.138 2000/08/30 06:45:51 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.139 2000/08/30 09:33:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1148,6 +1148,7 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * - Proxy reply (answer even if it's not for me)
  * - joins NI group address at in6_ifattach() time only, does not cope
  *   with hostname changes by sethostname(3)
+ * - node addresses reply does not attach TTL to each address (post-05)
  */
 #ifdef __FreeBSD__
 #define hostnamelen	strlen(hostname)
