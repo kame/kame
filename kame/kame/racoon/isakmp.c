@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.4 1999/08/19 15:09:42 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.5 1999/08/20 07:14:13 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -309,7 +309,7 @@ isakmp_main(msg, remote, local)
 				if (memcmp(&isakmp->r_ck, r_ck0, sizeof(cookie_t)) != 0) {
 					YIPSDEBUG(DEBUG_NOTIFY,
 						plog(LOCATION,
-							"mulformed packet, "
+							"malformed packet, "
 							"responder's cookie was filled.\n"));
 					return -1;
 				}
@@ -383,7 +383,7 @@ isakmp_main(msg, remote, local)
 		 && (iph1 = isakmp_ph1byindex0(index)) == NULL) {
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(LOCATION,
-					"ignored, Unknown pakcet received.\n"));
+					"ignored, Unknown packet received.\n"));
 			return -1;
 		}
 
@@ -3157,8 +3157,8 @@ isakmp_ident_r1(msg, from, iph1)
 		default:
 			/*
 			 * We don't send information to the peer even
-			 * if we received mulformed packet.  Because we
-			 * can't distinguish the mulformed pakcet and
+			 * if we received malformed packet.  Because we
+			 * can't distinguish the malformed packet and
 			 * the re-sent packet.  And we do same behavior
 			 * when we expect encrypted packet.
 			 */

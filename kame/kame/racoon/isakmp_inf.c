@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.2 1999/08/19 15:09:42 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.3 1999/08/20 07:14:14 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -117,7 +117,7 @@ isakmp_info_recv(iph1, msg0, from)
 			/*FALLTHRU*/
 		default:
 			plog2(from, LOCATION,
-				"ignore, the pakcet must be encrypted.\n");
+				"ignore, the packet must be encrypted.\n");
 			goto end;
 		}
 
