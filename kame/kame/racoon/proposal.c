@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.15 2000/09/13 14:57:57 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.16 2000/09/19 02:08:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.15 2000/09/13 14:57:57 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.16 2000/09/19 02:08:09 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -764,7 +764,7 @@ printsatrns(proto_id, tr)
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
 		plog(logp, LOCATION, NULL,
-			"(trns_id=%s)\n",
+			"  (trns_id=%s)\n",
 			s_ipsecdoi_trns(proto_id, tr->trns_id));
 		break;
 	default:
