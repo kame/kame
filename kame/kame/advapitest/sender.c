@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.24 2001/12/24 16:39:54 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.25 2001/12/24 18:21:24 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -326,9 +326,9 @@ main(argc, argv)
 	}
 #endif
 #ifdef IPV6_HOPOPTS
-	if (hbhlen > 0)
+	if (hbhlen >= 0)
 		setopthdr(hbhlen, IPV6_HOPOPTS, NULL);
-	if (stickyhbhlen > 0) {
+	if (stickyhbhlen >= 0) {
 		stickylen = calc_opthlen(stickyhbhlen);
 		if ((stickybuf = malloc(stickylen)) == NULL)
 			err(1, "malloc");
@@ -341,13 +341,13 @@ main(argc, argv)
 	}
 #endif
 #ifdef IPV6_RTHDRDSTOPTS
-	if (dsthdr1len > 0)
+	if (dsthdr1len >= 0)
 		setopthdr(dsthdr1len, IPV6_RTHDRDSTOPTS, NULL);
-	if (stickyhbhlen > 0) {
-		stickylen = calc_opthlen(stickyhbhlen);
+	if (stickydsthdr1len >= 0) {
+		stickylen = calc_opthlen(stickydsthdr1len);
 		if ((stickybuf = malloc(stickylen)) == NULL)
 			err(1, "malloc");
-		setopthdr(stickyhbhlen, IPV6_RTHDRDSTOPTS, stickybuf);
+		setopthdr(stickydsthdr1len, IPV6_RTHDRDSTOPTS, stickybuf);
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RTHDRDSTOPTS, stickybuf,
 			       stickylen)) {
 			warn("setsockopt(IPV6_RTHDRDSTOPTS)");
@@ -356,13 +356,13 @@ main(argc, argv)
 	}
 #endif
 #ifdef IPV6_DSTOPTS
-	if (dsthdr2len > 0)
+	if (dsthdr2len >= 0)
 		setopthdr(dsthdr2len, IPV6_DSTOPTS, NULL);
-	if (stickyhbhlen > 0) {
-		stickylen = calc_opthlen(stickyhbhlen);
+	if (stickydsthdr2len >= 0) {
+		stickylen = calc_opthlen(stickydsthdr2len);
 		if ((stickybuf = malloc(stickylen)) == NULL)
 			err(1, "malloc");
-		setopthdr(stickyhbhlen, IPV6_DSTOPTS, stickybuf);
+		setopthdr(stickydsthdr2len, IPV6_DSTOPTS, stickybuf);
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_DSTOPTS, stickybuf,
 			       stickylen)) {
 			warn("setsockopt(IPV6_DSTOPTS)");
