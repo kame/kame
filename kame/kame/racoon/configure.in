@@ -218,6 +218,7 @@ if test "$ipseclib" != "none"; then
 		AC_CHECK_LIB($ipseclib, ipsec_strerror,
 			[LIBS="$LIBS -l$ipseclib"
 			echo "found in default location"], [
+			unset ac_cv_lib_ipsec_ipsec_strerror
 			AC_CHECK_LIB($ipseclib, ipsec_strerror,
 				[LIBS="$LIBS -L$ipseclibdir -l$ipseclib"
 				echo "found in $ipseclibdir"],
