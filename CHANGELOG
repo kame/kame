@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1218 2000/08/21 08:15:49 jinmei Exp $
+$KAME: CHANGELOG,v 1.1219 2000/08/21 08:17:24 jinmei Exp $
 
 <200008>
+2000-08-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/route6.c (ip6_rthdr0): made the code friendly
+	with the old advanced API (RFC2292). Note that the kernel
+	compilation option "COMPAT_RFC2292" is necessary to enable this.
+
 2000-08-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (prelist_update): corrected the
 	interpretation of "StoredLifetime" in the "Jim Bound algorithm".
