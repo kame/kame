@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.213 2001/07/24 09:22:50 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.214 2001/07/24 09:28:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -428,6 +428,7 @@ in6_control(so, cmd, data, ifp)
 	struct	in6_ifreq *ifr = (struct in6_ifreq *)data;
 	struct	in6_ifaddr *ia = NULL;
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
+	struct sockaddr_in6 *sa6;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
 #endif
@@ -527,10 +528,11 @@ in6_control(so, cmd, data, ifp)
 	 *
 	 * XXX is it safe to touch in6_ifreq as ifra?
 	 */
-	if (ifra->ifra_addr.sin6_family == AF_INET6) {
-		struct sockaddr_in6 *sa6 =
-			(struct sockaddr_in6 *)&ifra->ifra_addr;
-
+	if (cmd == SIOCAIFADDR_IN6 || cmd == SIOCSIFPHYADDR_IN6)
+		sa6 = &ifra->ifra_addr;
+	else
+		sa6 = &ifr->ifr_addr;
+	if (sa6->sin6_family == AF_INET6) {
 		if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
 			if (sa6->sin6_addr.s6_addr16[1] == 0) {
 				/* link ID is not embedded by the user */
@@ -547,7 +549,7 @@ in6_control(so, cmd, data, ifp)
 				sa6->sin6_scope_id = 0; /* XXX: good way? */
 			}
 		}
-		ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr);
+		ia = in6ifa_ifpwithaddr(ifp, &sa6->sin6_addr);
 	}
 
 	switch (cmd) {
