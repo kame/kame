@@ -302,10 +302,8 @@ key_sendup0(rp, m, promisc, canwait)
 			kp->kp_queue = NULL;
 		} else
 			m->m_nextpkt = NULL;	/* just for safety */
-	} else {
-		/* NOTE: kp_queue is !NULL */
+	} else
 		m->m_nextpkt = NULL;
-	}
 
 	for (; m && error == 0; m = n) {
 		n = m->m_nextpkt;
@@ -357,8 +355,10 @@ recovery:
 		 * insert m to the head of queue, as normally mbuf on the queue
 		 * is less important than others.
 		 */
-		m->m_nextpkt = kp->kp_queue;
-		kp->kp_queue = m;
+		if (m) {
+			m->m_nextpkt = kp->kp_queue;
+			kp->kp_queue = m;
+		}
 	} else {
 		/* recover the queue */
 		if (!m) {
