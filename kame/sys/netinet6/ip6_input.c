@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.188 2001/03/29 05:34:31 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.189 2001/04/01 09:08:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -631,25 +631,35 @@ ip6_input(m)
 #endif
 
 	/*
-	 * Scope check
+	 * Check against address spoofing/corruption.
 	 */
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_dst)) {
+		/*
+		 * XXX: "badscope" is not very suitable for a multicast source.
+		 */
+		ip6stat.ip6s_badscope++;
+		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
+		goto bad;
+	}
+	if ((IN6_IS_ADDR_LOOPBACK(&ip6->ip6_src) ||
+	     IN6_IS_ADDR_LOOPBACK(&ip6->ip6_dst)) &&
+	    (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
 		goto bad;
 	}
 	/*
-	 * The following check is not documented in the spec.  Malicious party
-	 * may be able to use IPv4 mapped addr to confuse tcp/udp stack and
-	 * bypass security checks (act as if it was from 127.0.0.1 by using
+	 * The following check is not documented in specs.  A malicious
+	 * party may be able to use IPv4 mapped addr to confuse tcp/udp stack
+	 * and bypass security checks (act as if it was from 127.0.0.1 by using
 	 * IPv6 src ::ffff:127.0.0.1).	Be cautious.
 	 *
-	 * This check chokes if we are in SIIT cloud.  As none of BSDs support
-	 * IPv4-less kernel compilation, we cannot support SIIT environment
-	 * at all.  So, it makes more sense for us to reject any malicious
-	 * packets for non-SIIT environment, than try to do a partical support
-	 * for SIIT environment.
+	 * This check chokes if we are in an SIIT cloud.  As none of BSDs
+	 * support IPv4-less kernel compilation, we cannot support SIIT
+	 * environment at all.  So, it makes more sense for us to reject any
+	 * malicious packets for non-SIIT environment, than try to do a
+	 * partical support for SIIT environment.
 	 */
 	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
@@ -673,19 +683,6 @@ ip6_input(m)
 	}
 #endif
 
-	if (IN6_IS_ADDR_LOOPBACK(&ip6->ip6_src) ||
-	    IN6_IS_ADDR_LOOPBACK(&ip6->ip6_dst)) {
-		if (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) {
-			ours = 1;
-			deliverifp = m->m_pkthdr.rcvif;
-			goto hbhcheck;
-		} else {
-			ip6stat.ip6s_badscope++;
-			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
-			goto bad;
-		}
-	}
-
 	/* drop packets if interface ID portion is already filled */
 	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src) &&
@@ -707,6 +704,7 @@ ip6_input(m)
 		ip6->ip6_dst.s6_addr16[1]
 			= htons(m->m_pkthdr.rcvif->if_index);
 
+#if 0 /* this case seems to be unnecessary. (jinmei, 20010401) */
 	/*
 	 * We use rt->rt_ifp to determine if the address is ours or not.
 	 * If rt_ifp is lo0, the address is ours.
@@ -729,6 +727,7 @@ ip6_input(m)
 		deliverifp = m->m_pkthdr.rcvif;
 		goto hbhcheck;
 	}
+#endif
 
 	/*
 	 * Multicast check
