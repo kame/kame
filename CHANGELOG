@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.101 1999/09/08 10:37:07 itojun Exp $
+$Id: CHANGELOG,v 1.102 1999/09/08 11:11:17 itojun Exp $
 
 
 <199909>
@@ -8,6 +8,17 @@ Wed Sep  8 19:34:57 JST 1999  itojun@iijlab.net
 	* netbsd/sys/dev/ic/sm91cxx.c: avoid duplicated multicast packet
 	  reception on promiscuous mode.  this fixes DAD failure during
 	  promiscuous mode.
+	* sys/netinet6/in6_pcb.c: allow bind(2) to non-interface address,
+	  if the socket is configred as FAITH socket.  this is for allowing
+	  ftp relay daemon to perform bind(2) on behalf of fake IPv4 address
+	  on active data connection.
+	  
+	  v6 ftp client  --control---> ftp translator ----> v4 ftp server
+		       <---data----*
+	  
+	  "*" needs to be fake IPv4 address generated from translation pool
+	  prefix and the address for v4 ftp server.
+	  From: yasuoka@iij.ad.jp
 
 1999-09-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi3/sbin/ifconfig/ifconfig.c (findaddr): used AF dependent
