@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.15 2003/02/05 15:30:33 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.16 2003/08/12 02:04:48 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -320,6 +320,12 @@ find_route(source, group, flags, create)
 	}
 	else
 	    rpentry_ptr = grpentry_ptr->active_rp_grp->rp->rpentry;
+
+	/* there can be no PIM neighbor for static-RP */
+	if (rpentry_ptr->upstream == NULL) {
+		delete_grpentry(grpentry_ptr);
+		return NULL;
+	}
     }
 
     mrtentry_ptr_wc = mrtentry_ptr_pmbr = (mrtentry_t *) NULL;
