@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.72 2000/09/18 02:16:43 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.73 2000/09/18 04:58:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,12 +199,13 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEBUG,
 
 static int ipsec_setspidx_mbuf
 	__P((struct secpolicyindex *, u_int, u_int, struct mbuf *));
-static void ipsec4_setspidx_inpcb __P((struct mbuf *, struct inpcb *pcb));
-static void ipsec4_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
+static int ipsec4_setspidx_inpcb __P((struct mbuf *, struct inpcb *pcb));
+static int ipsec_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
+static int ipsec4_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #ifdef INET6
 static void ipsec6_get_ulp __P((struct mbuf *m, struct secpolicyindex *));
-static void ipsec6_setspidx_in6pcb __P((struct mbuf *, struct in6pcb *pcb));
-static void ipsec6_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
+static int ipsec6_setspidx_in6pcb __P((struct mbuf *, struct in6pcb *pcb));
+static int ipsec6_setspidx_ipaddr __P((struct mbuf *, struct secpolicyindex *));
 #endif
 static struct inpcbpolicy *ipsec_newpcbpolicy __P((void));
 static void ipsec_delpcbpolicy __P((struct inpcbpolicy *));
@@ -254,18 +255,28 @@ ipsec4_getpolicybysock(m, dir, so, error)
 	switch (so->so_proto->pr_domain->dom_family) {
 	case AF_INET:
 		/* set spidx in pcb */
-		ipsec4_setspidx_inpcb(m, sotoinpcb(so));
-		pcbsp = sotoinpcb(so)->inp_sp;
+		*error = ipsec4_setspidx_inpcb(m, sotoinpcb(so));
 		break;
 #ifdef INET6
 	case AF_INET6:
 		/* set spidx in pcb */
-		ipsec6_setspidx_in6pcb(m, sotoin6pcb(so));
-		pcbsp = sotoin6pcb(so)->in6p_sp;
+		*error = ipsec6_setspidx_in6pcb(m, sotoin6pcb(so));
 		break;
 #endif
 	default:
 		panic("ipsec4_getpolicybysock: unsupported address family\n");
+	}
+	if (*error)
+		return NULL;
+	switch (so->so_proto->pr_domain->dom_family) {
+	case AF_INET:
+		pcbsp = sotoinpcb(so)->inp_sp;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		pcbsp = sotoin6pcb(so)->in6p_sp;
+		break;
+#endif
 	}
 
 	/* sanity check */
@@ -466,6 +477,11 @@ ipsec6_getpolicybysock(m, dir, so, error)
 	/* sanity check */
 	if (m == NULL || so == NULL || error == NULL)
 		panic("ipsec6_getpolicybysock: NULL pointer was passed.\n");
+
+#ifdef DIAGNOSTIC
+	if (so->so_proto->pr_domain->dom_family != AF_INET6)
+		panic("ipsec6_getpolicybysock: socket domain != inet6\n");
+#endif
 
 	/* set spidx in pcb */
 	ipsec6_setspidx_in6pcb(m, sotoin6pcb(so));
@@ -891,13 +907,14 @@ ipsec6_get_ulp(m, spidx)
 }
 #endif
 
-static void
+static int
 ipsec4_setspidx_inpcb(m, pcb)
 	struct mbuf *m;
 	struct inpcb *pcb;
 {
 	struct secpolicyindex *spidx;
 	struct sockaddr_in *sin1, *sin2;
+	int error;
 
 	/* sanity check */
 	if (pcb == NULL)
@@ -911,53 +928,48 @@ ipsec4_setspidx_inpcb(m, pcb)
 	bzero(&pcb->inp_sp->sp_out->spidx, sizeof(*spidx));
 
 	spidx = &pcb->inp_sp->sp_in->spidx;
+	error = ipsec_setspidx_ipaddr(m, spidx);
+	if (error)
+		return error;
 	spidx->dir = IPSEC_DIR_INBOUND;
 	sin1 = (struct sockaddr_in *)&spidx->src;
 	sin2 = (struct sockaddr_in *)&spidx->dst;
-	sin1->sin_len = sin2->sin_len = sizeof(struct sockaddr_in);
-	sin1->sin_family = sin2->sin_family = AF_INET;
-	spidx->prefs = sizeof(struct in_addr) << 3;
-	spidx->prefd = sizeof(struct in_addr) << 3;
 	spidx->ul_proto = pcb->inp_socket->so_proto->pr_protocol;
 	sin1->sin_port = pcb->inp_fport;
 	sin2->sin_port = pcb->inp_lport;
-	ipsec4_setspidx_ipaddr(m, spidx);
 
 	spidx = &pcb->inp_sp->sp_out->spidx;
+	error = ipsec_setspidx_ipaddr(m, spidx);
+	if (error)
+		return error;
 	spidx->dir = IPSEC_DIR_OUTBOUND;
 	sin1 = (struct sockaddr_in *)&spidx->src;
 	sin2 = (struct sockaddr_in *)&spidx->dst;
-	sin1->sin_len = sin2->sin_len = sizeof(struct sockaddr_in);
-	sin1->sin_family = sin2->sin_family = AF_INET;
-	spidx->prefs = sizeof(struct in_addr) << 3;
-	spidx->prefd = sizeof(struct in_addr) << 3;
 	spidx->ul_proto = pcb->inp_socket->so_proto->pr_protocol;
 	sin1->sin_port = pcb->inp_lport;
 	sin2->sin_port = pcb->inp_fport;
-	ipsec4_setspidx_ipaddr(m, spidx);
 
-	return;
+	return 0;
 }
 
-static void
-ipsec4_setspidx_ipaddr(m, spidx)
+static int
+ipsec_setspidx_ipaddr(m, spidx)
 	struct mbuf *m;
 	struct secpolicyindex *spidx;
 {
 	struct ip *ip = NULL;
 	struct ip ipbuf;
+	u_int v;
 
-	/* sanity check 1 for minimum ip header length */
 	if (m == NULL)
-		panic("ipsec4_setspidx_ipaddr: m == 0 passed.\n");
+		panic("ipsec_setspidx_ipaddr: m == 0 passed.\n");
 
 	if (m->m_pkthdr.len < sizeof(struct ip)) {
 		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
-			printf("ipsec4_setspidx_ipaddr: "
-			       "pkthdr.len(%d) < sizeof(struct ip), "
-			       "ignored.\n",
-				m->m_pkthdr.len));
-		return;
+			printf("ipsec_setspidx_ipaddr: "
+			    "pkthdr.len(%d) < sizeof(struct ip), ignored.\n",
+			    m->m_pkthdr.len));
+		return EINVAL;
 	}
 
 	if (m->m_len >= sizeof(*ip))
@@ -966,23 +978,75 @@ ipsec4_setspidx_ipaddr(m, spidx)
 		m_copydata(m, 0, sizeof(ipbuf), (caddr_t)&ipbuf);
 		ip = &ipbuf;
 	}
+#ifdef _IP_VHL
+	v = _IP_VHL_V(ip->ip_vhl);
+#else
+	v = ip->ip_v;
+#endif
+	switch (v) {
+	case 4:
+		return ipsec4_setspidx_ipaddr(m, spidx);
+#ifdef INET6
+	case 6:
+		if (m->m_pkthdr.len < sizeof(struct ip6_hdr)) {
+			KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
+				printf("ipsec_setspidx_ipaddr: "
+				    "pkthdr.len(%d) < sizeof(struct ip6_hdr), "
+				    "ignored.\n", m->m_pkthdr.len));
+			return EINVAL;
+		}
+		return ipsec6_setspidx_ipaddr(m, spidx);
+#endif
+	default:
+		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
+			printf("ipsec_setspidx_ipaddr: "
+			    "unknown IP version %u, ignored.\n", v));
+		return EINVAL;
+	}
+}
 
-	bcopy(&ip->ip_src, &((struct sockaddr_in *)&spidx->src)->sin_addr,
-	    sizeof(ip->ip_src));
-	bcopy(&ip->ip_dst, &((struct sockaddr_in *)&spidx->dst)->sin_addr,
-	    sizeof(ip->ip_dst));
+/* assumes that m is sane */
+static int
+ipsec4_setspidx_ipaddr(m, spidx)
+	struct mbuf *m;
+	struct secpolicyindex *spidx;
+{
+	struct ip *ip = NULL;
+	struct ip ipbuf;
+	struct sockaddr_in *sin;
 
-	return;
+	if (m->m_len >= sizeof(*ip))
+		ip = mtod(m, struct ip *);
+	else {
+		m_copydata(m, 0, sizeof(ipbuf), (caddr_t)&ipbuf);
+		ip = &ipbuf;
+	}
+
+	sin = (struct sockaddr_in *)&spidx->src;
+	memset(sin, 0, sizeof(*sin));
+	sin->sin_family = AF_INET;
+	sin->sin_len = sizeof(struct sockaddr_in);
+	bcopy(&ip->ip_src, &sin->sin_addr, sizeof(ip->ip_src));
+	spidx->prefs = sizeof(struct in_addr) << 3;
+
+	sin = (struct sockaddr_in *)&spidx->dst;
+	memset(sin, 0, sizeof(*sin));
+	sin->sin_family = AF_INET;
+	sin->sin_len = sizeof(struct sockaddr_in);
+	bcopy(&ip->ip_dst, &sin->sin_addr, sizeof(ip->ip_dst));
+	spidx->prefd = sizeof(struct in_addr) << 3;
+	return 0;
 }
 
 #ifdef INET6
-static void
+static int
 ipsec6_setspidx_in6pcb(m, pcb)
 	struct mbuf *m;
 	struct in6pcb *pcb;
 {
 	struct secpolicyindex *spidx;
 	struct sockaddr_in6 *sin1, *sin2;
+	int error;
 
 	/* sanity check */
 	if (pcb == NULL)
@@ -996,35 +1060,32 @@ ipsec6_setspidx_in6pcb(m, pcb)
 	bzero(&pcb->in6p_sp->sp_out->spidx, sizeof(*spidx));
 
 	spidx = &pcb->in6p_sp->sp_in->spidx;
+	error = ipsec_setspidx_ipaddr(m, spidx);
+	if (error)
+		return error;
 	spidx->dir = IPSEC_DIR_INBOUND;
 	sin1 = (struct sockaddr_in6 *)&spidx->src;
 	sin2 = (struct sockaddr_in6 *)&spidx->dst;
-	sin1->sin6_len = sin2->sin6_len = sizeof(struct sockaddr_in6);
-	sin1->sin6_family = sin2->sin6_family = AF_INET6;
-	spidx->prefs = sizeof(struct in6_addr) << 3;
-	spidx->prefd = sizeof(struct in6_addr) << 3;
 	spidx->ul_proto = pcb->in6p_socket->so_proto->pr_protocol;
 	sin1->sin6_port = pcb->in6p_fport;
 	sin2->sin6_port = pcb->in6p_lport;
-	ipsec6_setspidx_ipaddr(m, spidx);
 
 	spidx = &pcb->in6p_sp->sp_out->spidx;
+	error = ipsec_setspidx_ipaddr(m, spidx);
+	if (error)
+		return error;
 	spidx->dir = IPSEC_DIR_OUTBOUND;
 	sin1 = (struct sockaddr_in6 *)&spidx->src;
 	sin2 = (struct sockaddr_in6 *)&spidx->dst;
-	sin1->sin6_len = sin2->sin6_len = sizeof(struct sockaddr_in6);
-	sin1->sin6_family = sin2->sin6_family = AF_INET6;
-	spidx->prefs = sizeof(struct in6_addr) << 3;
-	spidx->prefd = sizeof(struct in6_addr) << 3;
 	spidx->ul_proto = pcb->in6p_socket->so_proto->pr_protocol;
 	sin1->sin6_port = pcb->in6p_lport;
 	sin2->sin6_port = pcb->in6p_fport;
-	ipsec6_setspidx_ipaddr(m, spidx);
 
-	return;
+	return 0;
 }
 
-static void
+/* assumes that m is sane */
+static int
 ipsec6_setspidx_ipaddr(m, spidx)
 	struct mbuf *m;
 	struct secpolicyindex *spidx;
@@ -1033,19 +1094,6 @@ ipsec6_setspidx_ipaddr(m, spidx)
 	struct ip6_hdr ip6buf;
 	struct sockaddr_in6 *sin6;
 
-	/* sanity check 1 for minimum ip header length */
-	if (m == NULL)
-		panic("ipsec6_setspidx_ipaddr: m == 0 passed.\n");
-
-	if (m->m_pkthdr.len < sizeof(struct ip6_hdr)) {
-		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
-			printf("ipsec6_setspidx_ipaddr: "
-			       "pkthdr.len(%d) < sizeof(struct ip6_hdr), "
-			       "ignored.\n",
-				m->m_pkthdr.len));
-		return;
-	}
-
 	if (m->m_len >= sizeof(*ip6))
 		ip6 = mtod(m, struct ip6_hdr *);
 	else {
@@ -1053,29 +1101,29 @@ ipsec6_setspidx_ipaddr(m, spidx)
 		ip6 = &ip6buf;
 	}
 
-	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
-		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
-			printf("ipsec6_setspidx_ipaddr: "
-				"wrong ip version on packet "
-				"(expected IPv6), ignored.\n"));
-		return;
-	}
-
 	sin6 = (struct sockaddr_in6 *)&spidx->src;
+	memset(sin6, 0, sizeof(*sin6));
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_src, &sin6->sin6_addr, sizeof(ip6->ip6_src));
 	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
 		sin6->sin6_addr.s6_addr16[1] = 0;
 		sin6->sin6_scope_id = ntohs(ip6->ip6_src.s6_addr16[1]);
 	}
+	spidx->prefs = sizeof(struct in6_addr) << 3;
 
 	sin6 = (struct sockaddr_in6 *)&spidx->dst;
+	memset(sin6, 0, sizeof(*sin6));
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_dst, &sin6->sin6_addr, sizeof(ip6->ip6_dst));
 	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
 		sin6->sin6_addr.s6_addr16[1] = 0;
 		sin6->sin6_scope_id = ntohs(ip6->ip6_dst.s6_addr16[1]);
 	}
+	spidx->prefd = sizeof(struct in6_addr) << 3;
 
-	return;
+	return 0;
 }
 #endif
 
