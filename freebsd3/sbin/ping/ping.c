@@ -45,7 +45,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ping/ping.c,v 1.42.2.2 1999/08/29 15:15:07 peter Exp $";
+  "$FreeBSD: src/sbin/ping/ping.c,v 1.42.2.3 1999/11/30 21:55:17 pb Exp $";
 #endif /* not lint */
 
 /*
@@ -929,7 +929,11 @@ in_cksum(addr, len)
 	register int nleft = len;
 	register u_short *w = addr;
 	register int sum = 0;
-	u_short answer = 0;
+	union {
+		u_short	us;
+		u_char	uc[2];
+	} last;
+	u_short answer;
 
 	/*
 	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
@@ -943,8 +947,9 @@ in_cksum(addr, len)
 
 	/* mop up an odd byte, if necessary */
 	if (nleft == 1) {
-		*(u_char *)(&answer) = *(u_char *)w ;
-		sum += answer;
+		last.uc[0] = *(u_char *)w;
+		last.uc[1] = 0;
+		sum += last.us;
 	}
 
 	/* add back carry outs from top 16 bits to low 16 bits */
