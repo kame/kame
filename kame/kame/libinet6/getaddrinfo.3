@@ -1,4 +1,4 @@
-.\"	$KAME: getaddrinfo.3,v 1.27 2001/01/26 13:27:56 itojun Exp $
+.\"	$KAME: getaddrinfo.3,v 1.28 2001/01/28 16:08:42 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -509,10 +509,11 @@ Non-zero error codes are defined in
 and as follows:
 .Pp
 .Bl -tag -width EAI_ADDRFAMILY -compact
-.It Dv EAI_ADDRFAMILY
-Address family for
-.Fa nodename
-not supported.
+.\" 2553bis-02 obsoletes this - don't remove it for *BSD merge, please
+.\".It Dv EAI_ADDRFAMILY
+.\"Address family for
+.\".Fa nodename
+.\"not supported.
 .It Dv EAI_AGAIN
 Temporary failure in name resolution.
 .It Dv EAI_BADFLAGS
@@ -525,9 +526,10 @@ Non-recoverable failure in name resolution.
 not supported.
 .It Dv EAI_MEMORY
 Memory allocation failure.
-.It Dv EAI_NODATA
-No address associated with
-.Fa nodename .
+.\" 2553bis-02 obsoletes this - don't remove it for *BSD merge, please
+.\".It Dv EAI_NODATA
+.\"No address associated with
+.\".Fa nodename .
 .It Dv EAI_NONAME
 .Fa nodename
 nor
