@@ -1788,7 +1788,6 @@ ipsec4_hdrsiz_tcp(tp)
 		return 0;
 	switch (tp->t_family) {
 	case AF_INET:
-		/* XXX: should use currect direction. */
 		MGETHDR(m, M_DONTWAIT, MT_DATA);
 		if (!m)
 			return 0;
