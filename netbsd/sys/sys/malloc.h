@@ -174,7 +174,8 @@
 #define	M_RR_ADDR	113	/* IPv6 Router Renumbering Ifid */
 #define M_SOFTINTR	114	/* Softinterrupt structures */
 #define	M_NATPT		115	/* Network Address Translation - Protocol Translation */
-#define M_LAST		116	/* Must be last type + 1 */
+#define	M_MSFILTER	116	/* Multicast Source Filters */
+#define	M_LAST		117	/* Must be last type + 1 */
 
 #define	INITKMEMNAMES { \
 	"free",		/* 0 M_FREE */ \
@@ -293,7 +294,8 @@
 	"rp_addr",	/* 113 M_RR_ADDR */ \
 	"softintr",	/* 114 M_SOFTINTR */ \
 	"natpt",	/* 115 M_NATPT */ \
-	NULL,		/* 116 */ \
+	"msfilter",	/* 116 M_MSFILTER */ \
+	NULL,		/* 117 */ \
 }
 
 struct kmemstats {

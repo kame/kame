@@ -1,4 +1,4 @@
-.\"	$NetBSD: sysctl.8,v 1.47.4.4 2000/09/26 15:53:04 jdolecek Exp $
+.\"	$NetBSD: sysctl.8,v 1.47.4.8 2001/06/07 16:17:50 he Exp $
 .\"
 .\" Copyright (c) 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -195,12 +195,17 @@ privilege can change the value.
 .It machdep.console_device	dev_t	no
 .It net.inet.icmp.maskrepl	integer	yes
 .It net.inet.icmp.errppslimit	integer	yes
+.It net.inet.igmp.sendwithra	integer	yes
+.It net.inet.igmp.dropwithnora	integer	yes
+.It net.inet.igmp.maxsrcfilter	integer	yes
+.It net.inet.igmp.somaxsrc	integer	yes
 .It net.inet.ip.allowsrcrt	integer	yes
 .It net.inet.ip.anonportmax	integer	yes
 .It net.inet.ip.anonportmin	integer	yes
 .It net.inet.ip.directed-broadcast	integer		yes
 .It net.inet.ip.forwarding	integer	yes
 .It net.inet.ip.forwsrcrt	integer	yes
+.It net.inet.ip.maxfragpackets	integer	yes
 .It net.inet.ip.lowportmax	integer	yes
 .It net.inet.ip.lowportmin	integer	yes
 .It net.inet.ip.mtudisc	integer	yes
@@ -390,6 +395,8 @@ fourth level IPv4/v6 identifiers
 definitions for fourth level ICMP identifiers
 .It Pa <netinet/icmp6.h>
 definitions for fourth level ICMPv6 identifiers
+.It Pa <netinet/igmp_var.h>
+definitions for fourth level IGMP identifiers
 .It Pa <netinet/tcp_var.h>
 definitions for fourth level TCP identifiers
 .It Pa <netinet/udp_var.h>

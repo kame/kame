@@ -53,3 +53,6 @@ options 	TCP_ECN		# ECN support in TCP
 #options 	RADIX_ART
 # multipath support in radix routing table
 options 	RADIX_MPATH
+
+# Source-Specific Multicast (SSM)
+#options 	IGMPV3		# IPv4

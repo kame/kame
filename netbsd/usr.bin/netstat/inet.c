@@ -506,13 +506,18 @@ igmp_stats(off, name)
     printf(m, (unsigned long long)igmpstat.f, igmpstat.f != 1 ? "ies" : "y")
 	p(igps_rcv_total, "\t%llu message%s received\n");
         p(igps_rcv_tooshort, "\t%llu message%s received with too few bytes\n");
+	p(igps_rcv_toolong, "\t%llu message%s received over MTU size\n");
         p(igps_rcv_badsum, "\t%llu message%s received with bad checksum\n");
-        py(igps_rcv_queries, "\t%llu membership quer%s received\n");
         py(igps_rcv_badqueries, "\t%llu membership quer%s received with invalid field(s)\n");
+	p(igps_rcv_nora, "\t%llu message%s received with no router alert\n");
+	py(igps_rcv_v1_queries, "\t%llu v1 membership quer%s received\n");
+	py(igps_rcv_v2_queries, "\t%llu v2 membership quer%s received\n");
+	py(igps_rcv_v3_queries, "\t%llu v3 membership quer%s received\n");
         p(igps_rcv_reports, "\t%llu membership report%s received\n");
         p(igps_rcv_badreports, "\t%llu membership report%s received with invalid field(s)\n");
         p(igps_rcv_ourreports, "\t%llu membership report%s received for groups to which we belong\n");
-        p(igps_snd_reports, "\t%llu membership report%s sent\n");
+        p(igps_snd_v1v2_reports, "\t%llu v1/v2 membership report%s sent\n");
+        p(igps_snd_v3_reports, "\t%llu v3 membership report%s sent\n");
 #undef p
 #undef py
 }

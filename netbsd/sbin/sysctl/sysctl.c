@@ -73,6 +73,7 @@ __RCSID("$NetBSD: sysctl.c,v 1.37.2.3 2000/07/22 04:40:39 simonb Exp $");
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
+#include <netinet/igmp_var.h>
 #include <netinet/ip_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
@@ -699,6 +700,7 @@ debuginit()
 struct ctlname inetname[] = CTL_IPPROTO_NAMES;
 struct ctlname ipname[] = IPCTL_NAMES;
 struct ctlname icmpname[] = ICMPCTL_NAMES;
+struct ctlname igmpname[] = IGMPCTL_NAMES;
 struct ctlname tcpname[] = TCPCTL_NAMES;
 struct ctlname udpname[] = UDPCTL_NAMES;
 #ifdef IPSEC
@@ -708,7 +710,7 @@ struct list inetlist = { inetname, IPPROTO_MAXID };
 struct list inetvars[] = {
 /*0*/	{ ipname, IPCTL_MAXID },	/* ip */
 	{ icmpname, ICMPCTL_MAXID },	/* icmp */
-	{ 0, 0 },			/* igmp */
+	{ igmpname, IGMPCTL_MAXID },	/* igmp */
 	{ 0, 0 },			/* ggmp */
 	{ 0, 0 },
 	{ 0, 0 },

@@ -1,6 +1,43 @@
 /*	$NetBSD: udp_usrreq.c,v 1.66.4.5 2001/05/09 19:37:41 he Exp $	*/
 
 /*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ */
+
+/*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
  * 
@@ -88,6 +125,9 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
+#ifdef IGMPV3
+#include <netinet/in_msf.h>
+#endif
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 #include <netinet/ip_var.h>
@@ -540,6 +580,13 @@ udp4_realinput(src, dst, m, off)
 	int rcvcnt;
 	struct in_addr *src4, *dst4;
 	struct inpcb *inp;
+#ifdef IGMPV3
+	u_int32_t src_h;
+	struct ip_moptions *imo;
+	struct sockaddr_in *sin;
+	struct sock_msf_source *msfsrc;
+	int i;
+#endif
 
 	rcvcnt = 0;
 	off += sizeof(struct udphdr);	/* now, offset of payload */
@@ -593,10 +640,90 @@ udp4_realinput(src, dst, m, off)
 					continue;
 			}
 
+#ifdef IGMPV3
+#define PASS_TO_PCB() \
+	do { \
+		last = inp; \
+		udp4_sendup(m, off, (struct sockaddr *)src, inp->inp_socket); \
+		rcvcnt++; \
+	} while (0)
+			/*
+			 * Receive multicast data which fits MSF condition.
+			 */
+			if (!IN_MULTICAST(dst4->s_addr))
+				goto bypass_msf_condition_check;
+			
+			imo = inp->inp_moptions;
+			src_h = ntohl(src4->s_addr);
+			for (i = 0; i < imo->imo_num_memberships; i++) {
+				if (imo->imo_membership[i]->inm_addr.s_addr
+				    != dst4->s_addr)
+					continue;
+				
+				/* receive data from any source */
+				if (imo->imo_msf[i]->msf_grpjoin != 0) {
+					PASS_TO_PCB();
+					break;
+				}
+				goto search_allow_list;
+
+			search_allow_list:
+				if (imo->imo_msf[i]->msf_numsrc == 0)
+					goto search_block_list;
+				
+				LIST_FOREACH(msfsrc,
+					     imo->imo_msf[i]->msf_head,
+					     list) {
+					sin = (struct sockaddr_in *)&msfsrc->src;
+					if (sin->sin_addr.s_addr < src_h)
+						continue;
+					if (sin->sin_addr.s_addr > src_h) {
+						/* terminate search, as there
+						 * will be no match */
+						break;
+					}
+					
+					PASS_TO_PCB();
+					break;
+				}
+				
+			search_block_list:
+				if (imo->imo_msf[i]->msf_blknumsrc == 0)
+					goto end_of_search;
+
+				LIST_FOREACH(msfsrc,
+					     imo->imo_msf[i]->msf_blkhead,
+					     list) {
+					sin = (struct sockaddr_in *)&msfsrc->src;
+					if (sin->sin_addr.s_addr < src_h)
+						continue;
+					if (sin->sin_addr.s_addr == src_h) {
+						/* blocks since the src matched
+						 * with block list */
+						break;
+					}
+					
+					/* terminate search, as there will be
+					 * no match */
+					msfsrc = NULL;
+					break;
+				}
+				/* blocks since the source matched with block
+				 * list */
+				if (msfsrc == NULL)
+					PASS_TO_PCB();
+				
+			end_of_search:
+				break;
+			}
+		bypass_msf_condition_check:
+#undef PASS_TO_PCB
+#else
 			last = inp;
 			udp4_sendup(m, off, (struct sockaddr *)src,
 				inp->inp_socket);
 			rcvcnt++;
+#endif
 
 			/*
 			 * Don't look for additional matches if this one does

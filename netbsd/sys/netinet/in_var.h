@@ -1,5 +1,42 @@
 /*	$NetBSD: in_var.h,v 1.39.4.1 2000/10/17 00:46:09 tv Exp $	*/
 
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ */
+
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -218,6 +255,12 @@ struct router_info {
 	struct	ifnet *rti_ifp;
 	int	rti_type;	/* type of router on this interface */
 	int	rti_age;	/* time since last v1 query */
+	u_int	rti_timer1;	/* IGMPv1 Querier Present timer */
+	u_int	rti_timer2;	/* IGMPv2 Querier Present timer */
+	u_int	rti_timer3;	/* IGMPv3 General Query (interface) timer */
+	u_int	rti_qrv;	/* Querier Robustness Variable */
+	u_int	rti_qqi;	/* Querier Interval Variable */
+	u_int	rti_qri;	/* Querier Response Interval */
 	struct	router_info *rti_next;
 };
 
@@ -236,6 +279,7 @@ struct in_multi {
 	LIST_ENTRY(in_multi) inm_list;	/* list of multicast addresses */
 	u_int	inm_state;		/* state of membership */
 	struct	router_info *inm_rti;	/* router version info */
+	struct	in_multi_source *inm_source; /* filtered source list */
 };
 
 #ifdef _KERNEL
@@ -309,8 +353,18 @@ int	in_ifinit __P((struct ifnet *,
 void	in_savemkludge __P((struct in_ifaddr *));
 void	in_restoremkludge __P((struct in_ifaddr *, struct ifnet *));
 void	in_purgemkludge __P((struct ifnet *));
+#ifdef IGMPV3
+struct	in_multi * in_addmulti __P((struct in_addr *, struct ifnet *,
+		u_int16_t, struct sockaddr_storage *, u_int, int, int *));
+void	in_delmulti __P((struct in_multi *, u_int16_t,
+		struct sockaddr_storage *, u_int, int, int *));
+struct	in_multi * in_modmulti __P((struct in_addr *, struct ifnet *, u_int16_t,
+		struct sockaddr_storage *, u_int, u_int16_t,
+		struct sockaddr_storage *, u_int, int, u_int, int *));
+#else
 struct	in_multi *in_addmulti __P((struct in_addr *, struct ifnet *));
 void	in_delmulti __P((struct in_multi *));
+#endif
 void	in_ifscrub __P((struct ifnet *, struct in_ifaddr *));
 void	in_setmaxmtu __P((void));
 const char *in_fmtaddr __P((struct in_addr));
