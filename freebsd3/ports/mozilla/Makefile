@@ -2,7 +2,7 @@
 # Date created:		31 Mar 1998
 # Whom:			eivind/dima/jseger
 #
-# $FreeBSD: ports/www/mozilla/Makefile,v 1.42 2000/04/21 02:36:44 reg Exp $
+# $FreeBSD: ports/www/mozilla/Makefile,v 1.46 2000/08/14 00:04:10 reg Exp $
 #
 
 PORTNAME=	mozilla
@@ -36,9 +36,9 @@ CONFIGURE_ARGS=					\
 		--disable-xterm-updates		\
 		--enable-cpp-exceptions		\
 		--enable-double-buffer		\
-		--disable-editor			\
-		--disable-mailnews		\
-		--disable-mathml			\
+		--enable-editor			\
+		--enable-mailnews		\
+		--enable-mathml			\
 		--enable-optimize		\
 		--enable-pics			\
 		--enable-tests			\
@@ -56,6 +56,9 @@ post-build:
 	@${SED} -e "s;@PREFIX@;${PREFIX};g" \
 		${FILESDIR}/mozilla.sh >${WRKSRC}/mozilla
 	@${CHMOD} 555 ${WRKSRC}/mozilla
+	@(cd ${WRKSRC}/dist/bin; \
+	  ${ENV} LD_LIBRARY_PATH=. MOZILLA_FIVE_HOME=. ./regxpcom; \
+	  ${ENV} LD_LIBRARY_PATH=. MOZILLA_FIVE_HOME=. ./regchrome)
 
 do-install:
 	${MKDIR} ${PREFIX}/lib/mozilla
@@ -63,7 +66,5 @@ do-install:
 	cd ${WRKSRC}/dist/bin && ${TAR} -chf - * | \
 		${TAR} -xf - -C ${PREFIX}/lib/mozilla
 	${INSTALL_SCRIPT} ${WRKSRC}/mozilla ${PREFIX}/bin
-	${TOUCH} ${PREFIX}/lib/mozilla/component.reg
-	${CHMOD} 666 ${PREFIX}/lib/mozilla/component.reg
 
 .include <bsd.port.mk>
