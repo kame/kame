@@ -514,8 +514,8 @@ udp_input(struct mbuf *m, ...)
 		if (last != NULL) {  \
 			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) { \
 				opts = NULL; \
-				if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) { \
-					ip6_savecontrol(inp, ipv6, \
+				if (ip6 && (inp->inp_flags & IN6P_CONTROLOPTS)) { \
+					ip6_savecontrol(inp, ip6, \
 							n, &opts6); \
 					opts = opts6.head; \
 				} \
