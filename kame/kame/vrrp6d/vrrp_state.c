@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_state.c,v 1.6 2003/02/25 09:29:25 ono Exp $	*/
+/*	$KAME: vrrp_state.c,v 1.7 2003/02/25 10:37:59 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -230,105 +230,6 @@ vrrp_state_get_packet(struct vrrp_vr *vr,
 	phdr->ph6_nxt = IPPROTO_VRRP;
 	return 0;
 }
-
-#if 0
-/* Operation a effectuer durant l'etat master */
-char 
-vrrp_state_master(struct vrrp_vr * vr)
-{
-	int             coderet;
-	static u_char   packet[4096];
-	struct vrrp_hdr *vrrph = (struct vrrp_hdr *) packet;
-	struct timeval  interval;
-	struct ip6_pseudohdr phdr;
-	int hlim;
-
-	for (;;) {
-		if (vrrp_misc_calcul_tmrelease(vr->adv_tm, &interval) == -1)
-			return -1;
-		coderet = vrrp_state_select(vr, &interval);
-		if (coderet > 0) {
-			bzero(&phdr, sizeof(phdr));
-			if (vrrp_state_get_packet(vr,packet, sizeof(packet), &hlim, &phdr) != 0)
-				continue;
-			if (vrrp_misc_check_vrrp_packet(vr, packet, &phdr, hlim) == -1)
-				continue;
-			if (vrrph->priority == 0) {
-				if (vr->sd_bpf == -1)
-					return -1;
-				vrrp_network_send_advertisement(vr);
-				if (vrrp_misc_calcul_tminterval(&vr->tm.adv_tm, vr->adv_int) == -1)
-					return -1;
-				continue;
-			}
-			if (vrrp_state_check_priority(vrrph, vr, &phdr.ph6_src)) {
-				if (vrrp_state_set_backup(vr) == -1)
-					return -1;
-			}
-			return 0;
-		}
-		if (coderet == 0) {
-			vrrp_network_send_advertisement(vr);
-			if (vrrp_misc_calcul_tminterval(&vr->tm.adv_tm, vr->adv_int) == -1)
-				return -1;
-			continue;
-		}
-		if (coderet == -1) {
-			syslog(LOG_ERR, "select on readfds fd_set failed: %m");
-			return -1;
-		}
-	}
-
-	/* Normally never executed */
-	return 0;
-}
-
-char 
-vrrp_state_backup(struct vrrp_vr * vr)
-{
-	int             coderet;
-	u_char          packet[4096];
-	struct vrrp_hdr *vrrph = (struct vrrp_hdr *) & packet;
-	struct timeval  interval;
-	struct ip6_pseudohdr phdr;
-	int hlim;
-
-	for (;;) {
-		if (vrrp_misc_calcul_tmrelease(&vr->tm.master_down_tm, &interval) == -1)
-			return -1;
-		coderet = vrrp_state_select(vr, &interval);
-		if (coderet > 0) {
-			bzero(&phdr, sizeof(phdr));
-			if (vrrp_state_get_packet(vr, packet, sizeof(packet), &hlim, &phdr) != 0)
-				continue;
-			if (vrrp_misc_check_vrrp_packet(vr, packet, &phdr, hlim) == -1)
-				continue;
-			if (vrrph->priority == 0) {
-				if (vrrp_misc_calcul_tminterval(&vr->tm.master_down_tm, vr->skew_time) == -1)
-					return -1;
-				continue;
-			}
-			if (vr->preempt_mode == 0 || vrrph->priority >= vr->priority)
-				if (vrrp_misc_calcul_tminterval(&vr->tm.master_down_tm, vr->master_down_int) == -1)
-					return -1;
-			continue;
-		}
-		if (coderet == -1) {
-			syslog(LOG_ERR, "select on readfds fd_set failed: %m");
-			return -1;
-		}
-		if (coderet == 0) {
-			if (vrrp_state_set_master(vr) == -1)
-				return -1;
-			else
-				return 0;
-		}
-	}
-
-	/* Normally never executed */
-	return 0;
-}
-#endif
 
 char 
 vrrp_state_check_priority(struct vrrp_hdr * vrrph, struct vrrp_vr * vr, struct in6_addr *addr)
