@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.41 2000/06/14 07:35:06 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.42 2000/06/16 12:38:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -459,7 +459,10 @@ defrouter_msg(cmd, rt)
 	struct rt_addrinfo info;
 
 	bzero((caddr_t)&info, sizeof(info));
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* BSDI4 */
+	/* maybe this is unnecessary */
 	info.rti_flags = rt->rt_flags;
+#endif
 	info.rti_info[RTAX_DST] = rt_key(rt);
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
