@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.394 2004/12/28 10:01:22 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.395 2005/01/15 01:37:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3029,7 +3029,7 @@ icmp6_redirect_output(m0, rt)
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = 255;
 	/* ip6->ip6_src must be linklocal addr for my outgoing if. */
-	bcopy(&ifp_ll6, &ip6->ip6_src, sizeof(struct in6_addr));
+	bcopy(ifp_ll6, &ip6->ip6_src, sizeof(struct in6_addr));
 	bcopy(&sip6->ip6_src, &ip6->ip6_dst, sizeof(struct in6_addr));
 
 	/* ND Redirect */
@@ -3044,7 +3044,7 @@ icmp6_redirect_output(m0, rt)
 		 */
 		if (!nexthop)
 			goto fail;
-		bcopy(&nexthop, &nd_rd->nd_rd_target,
+		bcopy(nexthop, &nd_rd->nd_rd_target,
 		    sizeof(nd_rd->nd_rd_target));
 		bcopy(&sip6->ip6_dst, &nd_rd->nd_rd_dst,
 		    sizeof(nd_rd->nd_rd_dst));
