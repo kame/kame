@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2482 2003/10/01 02:04:24 sakane Exp $
+$KAME: CHANGELOG,v 1.2483 2003/10/01 05:11:59 itojun Exp $
 
-<200309>
+<200310>
+Wed Oct  1 15:05:30 JST 2003
+	* sys/net/if.c: make ifindex2ifnet[] growing code safer.  from IIJ SEIL
+	  team.
+
 Wed Oct  1 10:58:00 JST 2003 sakane@kame.net
 	* kame/kame/racoon/oakley.c:
 	The length of the Diffie-Hellman public value MUST be equal to the
@@ -9,6 +13,7 @@ Wed Oct  1 10:58:00 JST 2003 sakane@kame.net
 	performed, prepending zero bits to the value if necessary.
 	reported by <takagaki.keiichi@jp.panasonic.com>
 
+<200309>
 2003-09-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: changed the default values of the DNS
 	(recursive) server address and the DNS search path options to
