@@ -532,8 +532,9 @@ udp6_output(in6p, m, addr6, control)
 	int plen = sizeof(struct udphdr) + ulen;
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
-	struct	in6_addr laddr6;
-	int s = 0, error = 0;
+	struct	in6_addr *laddr, *faddr;
+	u_short fport;
+	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
 	int priv;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -555,34 +556,56 @@ udp6_output(in6p, m, addr6, control)
 	}
 
 	if (addr6) {
-		laddr6 = in6p->in6p_laddr;
+		/*
+		 * IPv4 version of udp_output calls in_pcbconnect in this case,
+		 * which needs splnet and affects performance.
+		 * Since we saw no essential reason for calling in_pcbconnect,
+		 * we get rid of such kind of logic, and call in6_selectsrc
+		 * and In6_pcbsetport in order to fill in the local address
+		 * and the local port.
+		 */
+		struct sockaddr_in6 *sin6 = mtod(addr6, struct sockaddr_in6 *);
+
+		if (addr6->m_len != sizeof(*sin6)) {
+			error = EINVAL;
+			goto release;
+		}
+		if (sin6->sin6_family != AF_INET6) {
+			error = EAFNOSUPPORT;
+			goto release;
+		}
+		if (sin6->sin6_port == 0) {
+			error = EADDRNOTAVAIL;
+			goto release;
+		}
+
 		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 			error = EISCONN;
 			goto release;
 		}
-		/*
-		 * Must block input while temporarily connected.
-		 */
-#ifdef __NetBSD__
-		s = splsoftnet();
-#else
-		s = splnet();
-#endif
-		/*
-		 * XXX: the user might want to overwrite the local address
-		 * via an ancillary data.
-		 */
-		bzero(&in6p->in6p_laddr, sizeof(struct in6_addr));
-		error = in6_pcbconnect(in6p, addr6);
-		if (error) {
-			splx(s);
+
+		faddr = &sin6->sin6_addr;
+		fport = sin6->sin6_port; /* allow 0 port */
+		laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
+				      in6p->in6p_moptions,
+				      &in6p->in6p_route,
+				      &in6p->in6p_laddr, &error);
+		if (laddr == NULL) {
+			if (error == 0)
+				error = EADDRNOTAVAIL;
 			goto release;
 		}
+		if (in6p->in6p_lport == 0 &&
+		    (error = in6_pcbsetport(laddr, in6p)) != 0)
+			goto release;
 	} else {
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 			error = ENOTCONN;
 			goto release;
 		}
+		laddr = &in6p->in6p_laddr;
+		faddr = &in6p->in6p_faddr;
+		fport = in6p->in6p_fport;
 	}
 	/*
 	 * Calculate data length and get a mbuf
@@ -591,8 +614,6 @@ udp6_output(in6p, m, addr6, control)
 	M_PREPEND(m, sizeof(struct ip6_hdr) + sizeof(struct udphdr), M_DONTWAIT);
 	if (m == 0) {
 		error = ENOBUFS;
-		if (addr6)
-			splx(s);
 		goto release;
 	}
 
@@ -607,12 +628,12 @@ udp6_output(in6p, m, addr6, control)
 #endif
 	ip6->ip6_nxt	= IPPROTO_UDP;
 	ip6->ip6_hlim	= in6p->in6p_ip6.ip6_hlim; /* XXX */
-	ip6->ip6_src	= in6p->in6p_laddr;
-	ip6->ip6_dst	= in6p->in6p_faddr;
+	ip6->ip6_src	= *laddr;
+	ip6->ip6_dst	= *faddr;
 
 	udp6 = (struct udphdr *)(ip6 + 1);
-	udp6->uh_sport = in6p->in6p_lport;
-	udp6->uh_dport = in6p->in6p_fport;
+	udp6->uh_sport = in6p->in6p_lport; /* lport is always set in the PCB */
+	udp6->uh_dport = fport;
 	udp6->uh_ulen  = htons((u_short)plen);
 	udp6->uh_sum   = 0;
 
@@ -629,11 +650,6 @@ udp6_output(in6p, m, addr6, control)
 	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
 			    0, in6p->in6p_moptions);
 
-	if (addr6) {
-		in6_pcbdisconnect(in6p);
-		in6p->in6p_laddr = laddr6;
-		splx(s);
-	}
 	goto releaseopt;
 
 release:
