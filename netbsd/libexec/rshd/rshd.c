@@ -191,7 +191,6 @@ doit(fromp)
 	struct sockaddr *fromp;
 {
 	extern char *__rcmd_errstr;	/* syslog hook from libc/net/rcmd.c. */
-	struct hostent *hp;
 	struct passwd *pwd;
 	in_port_t port;
 	fd_set ready, readfrom;

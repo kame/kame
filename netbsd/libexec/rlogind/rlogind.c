@@ -227,8 +227,6 @@ doit(f, fromp)
 {
 	int master, pid, on = 1;
 	int authenticated = 0;
-	struct hostent *hp;
-	int error;
 	char utmphost[UT_HOSTSIZE + 1];
 	char *hostname;
 	char hostnamebuf[2 * MAXHOSTNAMELEN + 1];
@@ -236,9 +234,8 @@ doit(f, fromp)
 	char naddr[NI_MAXHOST];
 	char saddr[NI_MAXHOST];
 	char raddr[NI_MAXHOST];
-	int af = fromp->sa_family, alen;
+	int af = fromp->sa_family;
 	u_int16_t *portp;
-	char *addr;
 	struct addrinfo hints, *res, *res0;
 	int gaierror;
 
