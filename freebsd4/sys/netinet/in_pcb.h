@@ -254,7 +254,6 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
  */
 #define	IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
 #endif
-#define IN6P_MINMTU		0x20000000 /* use minimum MTU */
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 #define IN6P_MTU                0x80000000 /* receive path MTU */
 
@@ -320,17 +319,6 @@ void	in_pcbrehash __P((struct inpcb *));
 int	in_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 void	in_pcbremlists __P((struct inpcb *inp));
-int	prison_xinpcb __P((struct proc *p, struct inpcb *inp));
-
-#ifdef NEW_STRUCT_ROUTE
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route *,
-			 struct ifnet **, struct rtentry **, int));
-#else
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route_in6 *,
-			 struct ifnet **, struct rtentry **, int));
-#endif
 #endif /* _KERNEL */
 
 #endif /* !_NETINET_IN_PCB_H_ */
