@@ -1,6 +1,6 @@
 Installation procedure - NetBSD
 KAME project
-$Id: INSTALL,v 1.4 1999/08/23 07:31:12 itojun Exp $
+$Id: INSTALL,v 1.5 1999/09/01 09:30:30 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -37,10 +37,10 @@ Consult NetBSD documentations for more detail.
 B-1. Go down to sys/arch/ARCH/conf.
 	% cd sys/arch/ARCH/conf
 
-B-2. Make a kernel configuration file, and type "config CONFIGFILE".
+B-2. Make a kernel configuration file, and invoke "config CONFIGFILE".
      GENERIC.v6 should have commonly used IPv6 definitions, so you may want to
      copy the file to begin with.
-	% config CONFIGFILE
+	% /usr/sbin/config CONFIGFILE
 
 B-3. Build the kernel.  The process will make kernel file named "netbsd".
 	% cd ../../compile/CONFIGFILE
@@ -77,7 +77,10 @@ E. Configurations, in short
 E-1. Most of configuration files are placed in /usr/local/v6/etc.
      You may want to copy those foo.sample files into non-sample (foo),
      edit as necessary.  You may also want to invoke /usr/local/v6/etc/rc.net6
-     from /etc/rc.local. 
+     from /etc/rc.local, by adding the following into /etc/rc.local:
+	if [ -f /usr/local/v6/etc/rc.net6 ]; then
+		sh /usr/local/v6/etc/rc.net6
+	fi
 
 E-2. If you would like to use IPv6-ready inetd, you will need to stop using
      /usr/sbin/inetd and switch to /usr/local/v6/sbin/inetd.  Configuration
