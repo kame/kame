@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.59 2001/08/30 08:56:18 keiichi Exp $	*/
+/*	$KAME: esp_input.c,v 1.60 2001/09/04 08:43:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,9 +109,9 @@ extern u_char ip_protox[];
 
 void
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-esp4_input(m, off, proto)
+esp4_input(m, off)
 	struct mbuf *m;
-	int off, proto;
+	int off;
 #else
 #if __STDC__
 esp4_input(struct mbuf *m, ...)
@@ -467,7 +467,11 @@ noreplaycheck:
 				ipsecstat.in_polvio++;
 				goto bad;
 			}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			(*inetsw[ip_protox[nxt]].pr_input)(m, off);
+#else
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
+#endif
 		} else
 			m_freem(m);
 		m = NULL;

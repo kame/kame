@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.70 2001/08/30 08:56:17 keiichi Exp $	*/
+/*	$KAME: in_gif.c,v 1.71 2001/09/04 08:43:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,9 +337,9 @@ in_gif_output(ifp, family, m)
 
 void
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-in_gif_input(m, off, proto)
+in_gif_input(m, off)
 	struct mbuf *m;
-	int off, proto;
+	int off;
 #else
 #if __STDC__
 in_gif_input(struct mbuf *m, ...)
@@ -353,6 +353,8 @@ in_gif_input(m, va_alist)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
 	va_list ap;
+#else
+	int proto;
 #endif
 	struct ifnet *gifp = NULL;
 	struct ip *ip;
@@ -371,7 +373,7 @@ in_gif_input(m, va_alist)
 #endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
 	ip = mtod(m, struct ip *);
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = ip->ip_p;
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.15 2001/08/30 08:56:17 keiichi Exp $	*/
+/*	$KAME: ah.h,v 1.16 2001/09/04 08:43:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,7 +87,7 @@ extern int ah_hdrlen __P((struct secasvar *));
 
 extern size_t ah_hdrsiz __P((struct ipsecrequest *));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-extern void ah4_input __P((struct mbuf *, int, int));
+extern void ah4_input __P((struct mbuf *, int));
 #else
 extern void ah4_input __P((struct mbuf *, ...));
 #endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */

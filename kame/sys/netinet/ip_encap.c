@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.66 2001/09/04 06:50:06 sumikawa Exp $	*/
+/*	$KAME: ip_encap.c,v 1.67 2001/09/04 08:43:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -333,7 +333,7 @@ encap4_lookup(m, off, proto, dir)
 
 void
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-encap4_input(struct mbuf *m, int off, int proto)
+encap4_input(struct mbuf *m, int off)
 #else
 #if __STDC__
 encap4_input(struct mbuf *m, ...)
@@ -344,12 +344,11 @@ encap4_input(m, va_alist)
 #endif
 #endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 {
-#if defined(__OpenBSD__)
-	struct ip *ip;
-#endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
 	va_list ap;
+#else
+	int proto;
 #endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 	const struct protosw *psw;
 	struct encaptab *match;
@@ -363,9 +362,8 @@ encap4_input(m, va_alist)
 	va_end(ap);
 #endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
-#if defined(__OpenBSD__)
-	ip = mtod(m, struct ip *);
-	proto = ip->ip_p;
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+	proto = mtod(m, struct ip *)->ip_p;
 #endif
 
 	match = encap4_lookup(m, off, proto, INBOUND);
@@ -375,7 +373,11 @@ encap4_input(m, va_alist)
 		psw = match->psw;
 		if (psw && psw->pr_input) {
 			encap_fillarg(m, match);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			(*psw->pr_input)(m, off);
+#else
 			(*psw->pr_input)(m, off, proto);
+#endif
 		} else
 			m_freem(m);
 		return;
@@ -398,13 +400,13 @@ encap4_input(m, va_alist)
 #else
 #ifdef MROUTING
 	if (proto == IPPROTO_IPV4) {
-		ipip_input(m, off, proto);
+		ipip_input(m, off);
 		return;
 	}
 #endif
 
 	/* last resort: inject to raw socket */
-	rip_input(m, off, proto);
+	rip_input(m, off);
 #endif
 }
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.18 2001/08/30 08:56:18 keiichi Exp $	*/
+/*	$KAME: esp.h,v 1.19 2001/09/04 08:43:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,7 +100,7 @@ extern int esp_max_ivlen __P((void));
 /* crypt routines */
 extern int esp4_output __P((struct mbuf *, struct ipsecrequest *));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-extern void esp4_input __P((struct mbuf *, int, int));
+extern void esp4_input __P((struct mbuf *, int));
 #else
 extern void esp4_input __P((struct mbuf *, ...));
 #endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.h,v 1.8 2001/08/30 08:56:17 keiichi Exp $	*/
+/*	$KAME: in_gif.h,v 1.9 2001/09/04 08:43:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,7 +38,7 @@ extern int ip_gif_ttl;
 
 struct gif_softc;
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-void in_gif_input __P((struct mbuf *, int, int));
+void in_gif_input __P((struct mbuf *, int));
 #else
 void in_gif_input __P((struct mbuf *, ...));
 #endif /* (defined(__FreeBSD__) && __FreeBSD >= 4) */

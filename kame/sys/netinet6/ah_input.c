@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.63 2001/08/30 08:56:17 keiichi Exp $	*/
+/*	$KAME: ah_input.c,v 1.64 2001/09/04 08:43:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,9 +103,9 @@ extern u_char ip_protox[];
 
 void
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-ah4_input(m, off, proto)
+ah4_input(m, off)
 	struct mbuf *m;
-	int off, proto;
+	int off;
 #else
 #if __STDC__
 ah4_input(struct mbuf *m, ...)
@@ -587,7 +587,11 @@ ah4_input(m, va_alist)
 				ipsecstat.in_polvio++;
 				goto fail;
 			}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			(*inetsw[ip_protox[nxt]].pr_input)(m, off);
+#else
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
+#endif
 		} else
 			m_freem(m);
 		m = NULL;
