@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.59 2001/07/24 13:34:00 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.60 2001/07/24 13:44:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -323,10 +323,6 @@ in_gif_output(ifp, family, m, rt)
 			m_freem(m);
 			return ENETUNREACH;	/*XXX*/
 		}
-#if 0
-		ifp->if_mtu = sc->gif_ro.ro_rt->rt_ifp->if_mtu
-			- sizeof(struct ip);
-#endif
 	}
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.55 2001/07/24 13:34:01 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.56 2001/07/24 13:44:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -325,10 +325,6 @@ in6_gif_output(ifp, family, m, rt)
 			m_freem(m);
 			return ENETUNREACH;	/*XXX*/
 		}
-#if 0
-		ifp->if_mtu = sc->gif_ro6.ro_rt->rt_ifp->if_mtu
-			- sizeof(struct ip6_hdr);
-#endif
 	}
 	
 #ifdef IPV6_MINMTU
