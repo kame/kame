@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2042 2002/01/11 08:37:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.2043 2002/01/11 08:46:29 jinmei Exp $
 
 <200201>
+2002-01-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectif): do not use a
+	rejected or black route to pick the outgoing interface.
+	Otherwise, we could disambiguate a scoped destination with the
+	invalid route and would see some confusing results.
+
 2002-01-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_input): do not accept packets
 	to a destination that has a rejected or blackhole host route.
