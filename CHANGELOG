@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2123 2002/04/12 16:11:06 jinmei Exp $
+$KAME: CHANGELOG,v 1.2124 2002/04/18 04:06:40 jinmei Exp $
 
 <200204>
+2002-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/ip_output.c (ip_output): always freed
+	the route entry stored in iproute (if it was used) regardless of
+	the IPSEC kernel compilation option.
+	This should be a better fix to FreeBSD-SA-02:21.tcpip, and should
+	apply the kernel without the IPSEC option.
+
 2002-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/{icmp6.c, nd6.c}:
 	* netbsd/sys/netinet/if_arp.c (arp_rtdrain):
