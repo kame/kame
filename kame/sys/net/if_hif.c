@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.64 2003/09/03 03:29:46 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.65 2003/09/12 12:39:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -372,7 +372,7 @@ hif_ioctl(ifp, cmd, data)
 	case SIOCGBU_HIF:
 		{
 			struct mip6_bu *tmpmbu;
-			struct mip6_bu *mbu = hifr->ifr_ifru.ifr_mbu;
+			struct mip6_bu *mbu = &hifr->ifr_ifru.ifr_mbu;
 			int i;
 
 			i = 0;
@@ -395,7 +395,7 @@ hif_ioctl(ifp, cmd, data)
 			error = EINVAL;
 			goto hif_ioctl_done;
 		}
-		sc->hif_ifid = *hifr->ifr_ifru.ifr_ifid;
+		sc->hif_ifid = hifr->ifr_ifru.ifr_ifid;
 		
 		break;
 	}
@@ -521,9 +521,7 @@ hif_prefix_list_update_withprefix(sc, data)
 	if (hifr == NULL) {
 		return (EINVAL);
 	}
-	if ((nmpfx = hifr->ifr_ifru.ifr_mpfx) == NULL) {
-		return (EINVAL);
-	}
+	nmpfx = &hifr->ifr_ifru.ifr_mpfx;
 
 	mpfx = mip6_prefix_list_find_withprefix(&nmpfx->mpfx_prefix,
 	    nmpfx->mpfx_prefixlen);
@@ -582,9 +580,7 @@ hif_prefix_list_update_withhaaddr(sc, data)
 	if (hifr == NULL) {
 		return (EINVAL);
 	}
-	if ((nmha = hifr->ifr_ifru.ifr_mha) == NULL) {
-		return (EINVAL);
-	}
+	nmha = &hifr->ifr_ifru.ifr_mha;
 	if (IN6_IS_ADDR_UNSPECIFIED(&nmha->mha_addr.sin6_addr)
 	    ||IN6_IS_ADDR_LOOPBACK(&nmha->mha_addr.sin6_addr)
 	    ||IN6_IS_ADDR_LINKLOCAL(&nmha->mha_addr.sin6_addr)
@@ -785,9 +781,7 @@ hif_site_prefix_list_update_withioctl(sc, data)
 	if (hifr == NULL) {
 		return (EINVAL);
 	}
-	if ((nhsp = hifr->ifr_ifru.ifr_hsp) == NULL) {
-		return (EINVAL);
-	}
+	nhsp = &hifr->ifr_ifru.ifr_hsp;
 
 	for (hsp = LIST_FIRST(&sc->hif_sp_list); hsp;
 	     hsp = LIST_NEXT(hsp, hsp_entry)) {

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.24 2003/08/26 13:37:46 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.25 2003/09/12 12:39:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,34 +76,13 @@ t.
 #ifndef _NET_IF_HIF_H_
 #define _NET_IF_HIF_H_
 
+#include <netinet6/mip6_var.h>
+
 #define HIF_MTU 1280 /* XXX */
 
 #define HIF_LOCATION_UNKNOWN 0x00
 #define HIF_LOCATION_HOME    0x01
 #define HIF_LOCATION_FOREIGN 0x02
-
-#define SIOCAHOMEPREFIX_HIF _IOW('i', 120, struct hif_ifreq)
-#define SIOCGHOMEPREFIX_HIF _IOWR('i', 121, struct hif_ifreq)
-#define SIOCAHOMEAGENT_HIF  _IOW('i', 122, struct hif_ifreq)
-#define SIOCGHOMEAGENT_HIF  _IOWR('i', 123, struct hif_ifreq)
-/* 124 */
-#define SIOCGBU_HIF         _IOWR('i', 125, struct hif_ifreq)
-#define SIOCSIFID_HIF       _IOW('i', 126, struct hif_ifreq)
-#define SIOCGIFID_HIF       _IOWR('i', 127, struct hif_ifreq)
-#define SIOCASITEPREFIX_HIF _IOW('i', 128, struct hif_ifreq)
-#define SIOCGSITEPREFIX_HIF _IOWR('i', 129, struct hif_ifreq)
-
-struct hif_ifreq {
-	char     ifr_name[IFNAMSIZ];
-	u_int8_t ifr_count;
-	union {
-		struct mip6_prefix *ifr_mpfx;
-		struct mip6_ha     *ifr_mha;
-		struct mip6_bu     *ifr_mbu;
-		struct in6_addr    *ifr_ifid;
-		struct hif_site_prefix *ifr_hsp;
-	} ifr_ifru;
-};
 
 struct hif_prefix {
 	LIST_ENTRY(hif_prefix) hpfx_entry;
@@ -134,6 +113,29 @@ struct hif_softc {
 	struct in6_addr        hif_ifid;
 };
 LIST_HEAD(hif_softc_list, hif_softc);
+
+#define SIOCAHOMEPREFIX_HIF _IOW('i', 120, struct hif_ifreq)
+#define SIOCGHOMEPREFIX_HIF _IOWR('i', 121, struct hif_ifreq)
+#define SIOCAHOMEAGENT_HIF  _IOW('i', 122, struct hif_ifreq)
+#define SIOCGHOMEAGENT_HIF  _IOWR('i', 123, struct hif_ifreq)
+/* 124 */
+#define SIOCGBU_HIF         _IOWR('i', 125, struct hif_ifreq)
+#define SIOCSIFID_HIF       _IOW('i', 126, struct hif_ifreq)
+#define SIOCGIFID_HIF       _IOWR('i', 127, struct hif_ifreq)
+#define SIOCASITEPREFIX_HIF _IOW('i', 128, struct hif_ifreq)
+#define SIOCGSITEPREFIX_HIF _IOWR('i', 129, struct hif_ifreq)
+
+struct hif_ifreq {
+	char     ifr_name[IFNAMSIZ];
+	u_int8_t ifr_count;
+	union {
+		struct mip6_prefix ifr_mpfx;
+		struct mip6_ha     ifr_mha;
+		struct mip6_bu     ifr_mbu;
+		struct in6_addr    ifr_ifid;
+		struct hif_site_prefix ifr_hsp;
+	} ifr_ifru;
+};
 
 #ifdef _KERNEL
 

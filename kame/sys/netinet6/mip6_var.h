@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.105 2003/09/06 09:13:52 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.106 2003/09/12 12:39:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -39,6 +39,8 @@
 
 #ifndef _MIP6_VAR_H_
 #define _MIP6_VAR_H_
+
+#include <sys/callout.h>
 
 #define GET_NETVAL_S(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohs(v)
 #define GET_NETVAL_L(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohl(v)
