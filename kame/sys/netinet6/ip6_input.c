@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.300 2003/01/10 09:06:55 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.301 2003/01/17 09:07:43 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,6 +130,9 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+#ifdef MLDV2
+#include <netinet6/in6_msf.h>
+#endif
 #include <netinet6/scope6_var.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
@@ -711,22 +714,70 @@ ip6_input(m)
 	 */
 	if (IN6_IS_ADDR_MULTICAST(&sa6_dst.sin6_addr)) {
 	  	struct	in6_multi *in6m = 0;
+#ifdef MLDV2
+		struct in6_multi_source *in6ms;
+		struct in6_addr_source *i6as;
+#endif
 
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mcast);
 		/*
 		 * See if we belong to the destination multicast group on the
 		 * arrival interface.
 		 */
-		/* ToDo: SSM consideration for non-UDP packet here */
 		IN6_LOOKUP_MULTI(&sa6_dst, m->m_pkthdr.rcvif, in6m);
-		if (in6m)
-			ours = 1;
-		else if (!ip6_mrouter) {
+		if (!in6m)
+			goto nomatch;
+#ifdef MLDV2
+		in6ms = in6m->in6m_source;
+		/* in6ms is NULL only in case of ff02::1 and ff0{0,1}:: */
+		if (in6ms == NULL) {
+			/* assumes ff0{0,1} case has already been eliminated */
+			if (SS_IS_LOCAL_GROUP(&sa6_dst)) {
+				ours = 1;	
+				goto matched;
+			}
+			printf("grp found, but src is NULL. impossible\n");
+			goto nomatch;
+		}
+		if (in6ms->i6ms_grpjoin > 0) {
+			ours = 1;	
+			goto matched;
+		}
+		if (in6ms->i6ms_cur == NULL || in6ms->i6ms_cur->head == NULL) {
+			goto nomatch;
+		}
+		LIST_FOREACH(i6as, in6ms->i6ms_cur->head, i6as_list) {
+			if (i6as->i6as_addr.sin6_family != sa6_src.sin6_family)
+				continue;
+
+			/* matching src address found */
+			if (SS_CMP(&i6as->i6as_addr, ==, &sa6_src)) {
+				if (in6ms->i6ms_mode == MCAST_INCLUDE)
+					break;
+				goto nomatch;
+			}
+			/* matching src address not found */
+			if (SS_CMP(&i6as->i6as_addr, >, &sa6_src)) {
+				if (in6ms->i6ms_mode == MCAST_INCLUDE)
+					goto nomatch;
+				break;
+			}
+			continue;
+		}
+		if (i6as == NULL && in6ms->i6ms_mode == MCAST_INCLUDE)
+			goto nomatch;
+#endif /* MLDV2 */
+		ours = 1;
+		goto matched;
+
+	nomatch:
+		if (!ip6_mrouter) {
 			ip6stat.ip6s_notmember++;
 			ip6stat.ip6s_cantforward++;
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
 			goto bad;
 		}
+	matched:
 		deliverifp = m->m_pkthdr.rcvif;
 		goto hbhcheck;
 	}
