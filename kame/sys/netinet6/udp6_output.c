@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.28 2001/05/21 11:33:39 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.29 2001/05/21 12:42:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,7 +172,8 @@ udp6_output(in6p, m, addr6, control)
 	u_int32_t plen = sizeof(struct udphdr) + ulen;
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
-	struct	in6_addr *laddr, *faddr;
+	struct in6_addr *laddr, *faddr;
+	struct in6_addr laddr_mapped; /* XXX ugly */
 	u_short fport;
 	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
@@ -279,8 +280,34 @@ udp6_output(in6p, m, addr6, control)
 					      in6p->in6p_moptions,
 					      &in6p->in6p_route,
 					      &in6p->in6p_laddr, &error);
-		} else
-			laddr = &in6p->in6p_laddr;	/* XXX */
+		} else {
+			if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+				struct sockaddr_in *sinp, sin_dst;
+
+				bzero(&sin_dst, sizeof(sin_dst));
+				sin_dst.sin_family = AF_INET;
+				sin_dst.sin_len = sizeof(sin_dst);
+				bcopy(&faddr->s6_addr[12], &sin_dst.sin_addr,
+				      sizeof(sin_dst.sin_addr));
+				sinp = in_selectsrc(&sin_dst,
+						    (struct route *)&in6p->in6p_route,
+						    in6p->in6p_socket->so_options,
+						    NULL, &error);
+				if (sinp == NULL) {
+					if (error == 0)
+						error = EADDRNOTAVAIL;
+					goto release;
+				}
+				bzero(&laddr_mapped, sizeof(laddr_mapped));
+				laddr_mapped.s6_addr16[5] = 0xffff; /* ugly */
+				bcopy(&sinp->sin_addr,
+				      &laddr_mapped.s6_addr[12],
+				      sizeof(sinp->sin_addr));
+				laddr = &laddr_mapped;
+			} else {
+				laddr = &in6p->in6p_laddr;	/* XXX */
+			}
+		}
 		if (laddr == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -397,7 +424,7 @@ udp6_output(in6p, m, addr6, control)
 		ui = (struct udpiphdr *)ip;
 		bzero(ui->ui_x1, sizeof ui->ui_x1);
 		ui->ui_pr = IPPROTO_UDP;
-		ui->ui_len = htons(hlen + plen);
+		ui->ui_len = htons(plen);
 		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
 		bcopy(&faddr->s6_addr[12], &ui->ui_dst, sizeof(ui->ui_dst));
 		ui->ui_ulen = ui->ui_len;
