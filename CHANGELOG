@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.766 2000/04/12 13:43:42 itojun Exp $
+$Id: CHANGELOG,v 1.767 2000/04/13 11:41:09 jinmei Exp $
 
 <200003>
+2000-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/sys/netinet/tcp_input.c (tcp_input): do not call
+	ND6_HINT() if the connection status is LISTEN.
+
+2000-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_nud_hint): do not change a
+	neighbor's status unless the old status is probably reachable
+	(i.e. the link-layer address has already been resolved).
+	In response to: KAME PR sys/235.
+
 Wed Apr 12 22:11:02 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/ncftp3, netbsd/pkgsrc/net/ncftp3: upgrade to 3.0.1.
 
