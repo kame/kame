@@ -80,6 +80,9 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/systm.h>
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include <sys/kernel.h>
+#endif
 #include <sys/proc.h>
 
 #include <net/if.h>
@@ -125,8 +128,13 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_dest2;
 };
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
+			    struct socket *, struct sockopt *sopt));
+#else
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 			    struct socket *));
+#endif
 static int ip6_setmoptions __P((int, struct ip6_moptions **, struct mbuf *));
 static int ip6_getmoptions __P((int, struct ip6_moptions *, struct mbuf **));
 static int ip6_copyexthdr __P((struct mbuf **, caddr_t, int));
@@ -1196,13 +1204,13 @@ ip6_ctloutput(op, so, level, optname, mp)
 			    {
 				struct mbuf *m;
 
-				error = ip6_getm_for_soopt(sopt, &m); /* XXX */
+				error = soopt_getm(sopt, &m); /* XXX */
 				if (error != NULL)
 					break;
 				error = sooptcopyin(sopt, mtod(m, char *), m->m_len,
 						    m->m_len);
-				return (ip6_pcbopts(&in6p->inp_outputopts, m, so,
-						    sopt));
+				return (ip6_pcbopts(&in6p->in6p_outputopts,
+						    m, so, sopt));
 			    }
 #else
 				return(ip6_pcbopts(&in6p->in6p_outputopts,
@@ -1314,10 +1322,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 					break;
 				}
 				m->m_len = sopt->sopt_valsize;
-				error = sooptcopyin(sopt, mtod(m, char *), m->m_len,
-						    m->m_len);
-				error =	ip6_setmoptions(sopt->sopt_name, in6p,
-							&in6p->inp_moptions6, m);
+				error = sooptcopyin(sopt, mtod(m, char *),
+						    m->m_len, m->m_len);
+				error =	ip6_setmoptions(sopt->sopt_name,
+							&in6p->in6p_moptions,
+							m);
+				(void)m_free(m);
 			    }
 #else
 				error =	ip6_setmoptions(optname, &in6p->in6p_moptions, m);
@@ -1330,11 +1340,26 @@ ip6_ctloutput(op, so, level, optname, mp)
 				caddr_t req = NULL;
 				int len = 0;
 				int priv = 0;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				struct mbuf *m;
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				if (error = soopt_getm(sopt, &m)) /* XXX */
+					break;
+				if (error = soopt_mcopyin(sopt, m)) /* XXX */
+					break;
+#endif
 #ifdef __NetBSD__
 				if (p == 0 || suser(p->p_ucred, &p->p_acflag))
 					priv = 0;
 				else
 					priv = 1;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+				priv = (sopt->sopt_p != NULL &&
+					suser(sopt->sopt_p->p_ucred,
+					      &sopt->sopt_p->p_acflag) != 0)
+					? 0 : 1;
 #else
 				priv = (in6p->in6p_socket->so_state & SS_PRIV);
 #endif
@@ -1345,6 +1370,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 				error = ipsec_set_policy(&in6p->in6p_sp,
 				                   optname, req, len,
 				                   priv);
+
 			    }
 				break;
 #endif /* IPSEC */
@@ -1507,7 +1533,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			    {
 				struct mbuf *m;
 				error = ip6_getmoptions(sopt->sopt_name,
-						in6p->inp_moptions6, &m);
+						in6p->in6p_moptions, &m);
 				if (error == 0)
 					error = sooptcopyout(sopt,
 						mtod(m, char *), m->m_len);
@@ -1519,8 +1545,18 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 #ifdef IPSEC
 			case IPV6_IPSEC_POLICY:
+			  {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				struct mbuf *m;
+				struct mbuf **mp = &m;
+#endif
 				error = ipsec_get_policy(in6p->in6p_sp, mp);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				if (error == 0)
+					error = soopt_mcopyout(sopt, m); /* XXX */
+#endif
 				break;
+			  }
 #endif /* IPSEC */
 
 #ifdef IPV6FIREWALL
@@ -1556,14 +1592,25 @@ ip6_ctloutput(op, so, level, optname, mp)
  * with destination address if source routed.
  */
 static int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+ip6_pcbopts(pktopt, m, so, sopt)
+#else
 ip6_pcbopts(pktopt, m, so)
+#endif
 	struct ip6_pktopts **pktopt;
 	register struct mbuf *m;
 	struct socket *so;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	struct sockopt *sopt;
+#endif
 {
 	register struct ip6_pktopts *opt = *pktopt;
 	int error = 0;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	struct proc *p = sopt->sopt_p;
+#else
 	struct proc *p = curproc;	/* XXX */
+#endif
 	int priv = 0;
 
 	/* turn off any old options. */
