@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2225 2002/09/05 08:15:24 suz Exp $
+$KAME: CHANGELOG,v 1.2226 2002/09/08 16:29:43 fujisawa Exp $
 
 <200209>
+2002-09-09  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.c:
+	- Does not process a IPv4 multicast packet.
+	  This packet is processed with code in ip_input().
+	- Drop fragmented ICMPv4 packet.
+	  We can not re-calculate ICMP checksum because translator does not
+	  re-assemble this fragmented packet so we can not get an ICMP length
+	  information.
+	- Fix a problem that data transfer fails when connect from v6
+	  client to v4 FTP server, and FTP server does not use 20 as
+	  source port number in data transfer with non-passive mode.
+	- Change the expiration time of translation slot entry.
+
 Thu Sep  5 17:00:00 JST 2002	suz@crl.hitachi.co.jp
 	* freebsd4/sys/conf/{files,options}, freebsd4/sys/i386/conf/GENERIC.KAME,
 	  freebsd4/sys/netinet/{in.c,in_pcb.c,ip_output.c},
