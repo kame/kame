@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.11 2001/07/20 18:34:58 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.12 2001/09/28 07:49:58 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -354,7 +354,11 @@ art_offset(p, offset, prefixlen, t)
 #ifdef ART_BITLEN_CONSTANT
 	l = prefixlen % art_bitlen(t);
 #else
-	l = prefixlen - art_bitoffset(t);
+	l = offset + prefixlen - art_bitoffset(t);
+#endif
+#ifdef DIAGNOSTIC
+	if (0 < l || l > art_bitlen(t))
+		panic("out of range in art_offset");
 #endif
 	v = art_getidx(p, offset, art_bitlen(t));
 	if (prefixlen == 0)
@@ -496,6 +500,11 @@ art_change(t, s, o, n)
 	void *n;	/* new value */
 {
 	artidx_t v = s;
+
+#ifdef DIAGNOSTIC
+	if (v == 0)
+		panic("v == 0 in art_change");
+#endif
 
 	if (art_leaf(t, v)) {
 		art_changeleaf(t, v, o, n);
