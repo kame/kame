@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1191 2000/08/12 03:46:36 jinmei Exp $
+$KAME: CHANGELOG,v 1.1192 2000/08/13 00:46:19 itojun Exp $
 
 <200007>
+Sun Aug 13 09:45:09 JST 2000  itojun@iijlab.net
+	* kame/route6d: repair LP64 problem.  from thorpej@netbsd.org
+
 2000-08-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd: implemented an experimental (and KAME
 	proprietary) hello option "additional addresses".
