@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcpc.rb,v 1.3 2000/05/27 11:45:02 jinmei Exp $
+# $Id: dtcpc.rb,v 1.4 2000/11/22 11:11:08 itojun Exp $
 #
 
 require "socket"
@@ -194,8 +194,10 @@ if (t =~ /^\+OK/)
   system("ifconfig #{intface} up")
   STDERR.print "tunnel to #{a[2]} established.\n"
   if route == "static"
-    STDERR.print "route add -inet6 default ::1 -ifp #{intface}\n" if $debug
-    system("route add -inet6 default ::1 -ifp #{intface}")
+    STDERR.print "route add -inet6 default ::1" if $debug
+    system("route add -inet6 default ::1")
+    STDERR.print "route change -inet6 default -ifp #{intface}\n" if $debug
+    system("route change -inet6 default -ifp #{intface}")
   end
   if route == "solicit"
     STDERR.print "rtsol #{intface}\n" if $debug
