@@ -4655,7 +4655,7 @@ pf_pull_hdr(struct mbuf *m, int off, void *p, int len,
 #ifdef __OpenBSD__
 		if (m->m_pkthdr.len < off + len || h->ip_len < off + len)
 #else
-		if (m->m_pkthdr.len < off + len || intohs(h->ip_len) < off + len)
+		if (m->m_pkthdr.len < off + len || ntohs(h->ip_len) < off + len)
 #endif
 		{
 			ACTION_SET(actionp, PF_DROP);
