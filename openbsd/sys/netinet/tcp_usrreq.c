@@ -795,7 +795,6 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	if  (*oldlenp < sizeof(tir))
 		return (ENOMEM);
 	if ((error = copyin(oldp, &tir, sizeof (tir))) != 0 )
-
 		return (error);
 	switch (tir.faddr.ss_family) {
 #ifdef INET6
