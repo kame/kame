@@ -94,6 +94,9 @@ SOFTWARE.
 #include <sys/kernel.h>
 
 #include <net/if.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netiso/iso.h>
 #include <netiso/iso_errno.h>

@@ -74,10 +74,17 @@ struct isopcb {
 	struct socket  *isop_socket;	/* back pointer to socket */
 	struct sockaddr_iso *isop_laddr;
 	struct sockaddr_iso *isop_faddr;
+#ifndef NEW_STRUCT_ROUTE
 	struct route_iso {
 		struct rtentry *ro_rt;
 		struct sockaddr_iso ro_dst;
 	}               isop_route;	/* CLNP routing entry */
+#else
+	struct route	isop_route;	/* CLNP routing entry */
+#ifndef route_iso
+#define route_iso	route
+#endif
+#endif
 	struct mbuf    *isop_options;	/* CLNP options */
 	struct mbuf    *isop_optindex;	/* CLNP options index */
 	struct mbuf    *isop_clnpcache;	/* CLNP cached hdr */

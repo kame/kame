@@ -467,6 +467,8 @@ clnp_route(dst, ro, flags, first_hop, ifa)
 					 * firsthop */
 	struct iso_ifaddr **ifa;/* result: fill in with ptr to interface */
 {
+	struct sockaddr_iso *siso;
+
 	if (flags & SO_DONTROUTE) {
 		struct iso_ifaddr *ia;
 
@@ -475,11 +477,12 @@ clnp_route(dst, ro, flags, first_hop, ifa)
 			ro->ro_rt = 0;
 		}
 		bzero((caddr_t) & ro->ro_dst, sizeof(ro->ro_dst));
-		bcopy((caddr_t) dst, (caddr_t) & ro->ro_dst.siso_addr,
+		siso = (struct sockaddr_iso *)&ro->ro_dst;
+		bcopy((caddr_t) dst, (caddr_t) &siso->siso_addr,
 		      1 + (unsigned) dst->isoa_len);
-		ro->ro_dst.siso_family = AF_ISO;
-		ro->ro_dst.siso_len = sizeof(ro->ro_dst);
-		ia = iso_localifa(&ro->ro_dst);
+		siso->siso_family = AF_ISO;
+		siso->siso_len = sizeof(*siso);
+		ia = iso_localifa(siso);
 		if (ia == 0)
 			return EADDRNOTAVAIL;
 		if (ifa)
@@ -493,7 +496,7 @@ clnp_route(dst, ro, flags, first_hop, ifa)
 	 *	the same destination. If not, free it and try again.
 	 */
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
-	  (Bcmp(ro->ro_dst.siso_data, dst->isoa_genaddr, dst->isoa_len)))) {
+	  (Bcmp(siso->siso_data, dst->isoa_genaddr, dst->isoa_len)))) {
 #ifdef ARGO_DEBUG
 		if (argo_debug[D_ROUTE]) {
 			printf("clnp_route: freeing old route: ro->ro_rt %p\n",
@@ -517,9 +520,10 @@ clnp_route(dst, ro, flags, first_hop, ifa)
 	if (ro->ro_rt == 0) {
 		/* set up new route structure */
 		bzero((caddr_t) & ro->ro_dst, sizeof(ro->ro_dst));
-		ro->ro_dst.siso_len = sizeof(ro->ro_dst);
-		ro->ro_dst.siso_family = AF_ISO;
-		Bcopy(dst, &ro->ro_dst.siso_addr, 1 + dst->isoa_len);
+		siso = (struct sockaddr_iso *)&ro->ro_dst;
+		siso->siso_len = sizeof(*siso);
+		siso->siso_family = AF_ISO;
+		Bcopy(dst, &siso->siso_addr, 1 + dst->isoa_len);
 		/* allocate new route */
 #ifdef ARGO_DEBUG
 		if (argo_debug[D_ROUTE]) {

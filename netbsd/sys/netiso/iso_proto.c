@@ -78,6 +78,9 @@ SOFTWARE.
 #include <sys/mbuf.h>
 
 #include <net/radix.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netiso/iso.h>
 
