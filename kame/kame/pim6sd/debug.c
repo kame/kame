@@ -455,7 +455,7 @@ dump_nbrs(fp)
 				v->uv_name);
 			for (; n != NULL; n = n->next) {
 				if (first)
-					first == 0;
+					first = 0;
 				else
 					fprintf(fp, " %3s %6s", "", "");
 				fprintf(fp, " %-40s %-5u\n",
@@ -660,7 +660,7 @@ dump_pim_mrt(fp)
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
 
 	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
-	    for (i = 0; i <= numvifs / 10; i++) {
+	    for (vifi = 0, i = 0; i <= numvifs / 10; i++) {
 		    int j;
 
 		    fprintf(fp, " %4d", i);
