@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.306 2003/09/07 14:36:13 itojun Exp $	*/
+/*	$KAME: key.c,v 1.307 2003/09/07 15:12:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -166,6 +166,10 @@ static LIST_HEAD(_sptree, secpolicy) sptree[IPSEC_DIR_MAX];	/* SPD table */
 static LIST_HEAD(_sahtree, secashead) sahtree;			/* SAD */
 static LIST_HEAD(_regtree, secreg) regtree[SADB_SATYPE_MAX + 1];
 							/* registed list */
+
+#define SPIHASHSIZE	128
+static LIST_HEAD(_spihash, secasvar) spihash[SPIHASHSIZE];
+
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 static LIST_HEAD(_acqtree, secacq) acqtree;		/* acquiring list */
 #endif
@@ -421,6 +425,7 @@ static struct secasvar *key_newsav __P((struct mbuf *,
 	const struct sadb_msghdr *, struct secashead *, int *));
 static struct secashead *key_getsah __P((struct secasindex *));
 static struct secasvar *key_checkspidup __P((struct secasindex *, u_int32_t));
+static void key_setspi __P((struct secasvar *, u_int32_t));
 static struct secasvar *key_getsavbyspi __P((struct secashead *, u_int32_t));
 static int key_setsaval __P((struct secasvar *, struct mbuf *,
 	const struct sadb_msghdr *));
@@ -992,7 +997,6 @@ key_allocsa(family, src, dst, proto, spi)
 	caddr_t src, dst;
 	u_int32_t spi;
 {
-	struct secashead *sah;
 	struct secasvar *sav;
 	u_int stateidx, state;
 	struct sockaddr_in sin;
@@ -1032,78 +1036,75 @@ key_allocsa(family, src, dst, proto, spi)
 #else
 	s = splnet();	/*called from softclock()*/
 #endif
-	LIST_FOREACH(sah, &sahtree, chain) {
-		/*
-		 * search a valid state list for inbound packet.
-	 	 * the search order is not important.
-		 */
-		for (stateidx = 0; stateidx < arraysize; stateidx++) {
-			state = saorder_state_valid[stateidx];
-			LIST_FOREACH(sav, &sah->savtree[state], chain) {
-				/* sanity check */
-				KEY_CHKSASTATE(sav->state, state, "key_allocsav");
-				if (proto != sav->sah->saidx.proto)
-					continue;
-				if (spi != sav->spi)
-					continue;
-				if (family != sav->sah->saidx.src.ss_family ||
-				    family != sav->sah->saidx.dst.ss_family)
-					continue;
+	/*
+	 * search a valid state list for inbound packet.
+	 * the search order is not important.
+	 */
+	for (stateidx = 0; stateidx < arraysize; stateidx++) {
+		state = saorder_state_valid[stateidx];
+		LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+			if (sav->spi != spi)
+				continue;
+			if (sav->state != state)
+				continue;
+			if (proto != sav->sah->saidx.proto)
+				continue;
+			if (family != sav->sah->saidx.src.ss_family ||
+			    family != sav->sah->saidx.dst.ss_family)
+				continue;
 
 #if 0	/* don't check src */
-				/* check src address */
-				switch (family) {
-				case AF_INET:
-					bzero(&sin, sizeof(sin));
-					sin.sin_family = AF_INET;
-					sin.sin_len = sizeof(sin);
-					bcopy(src, &sin.sin_addr,
-					    sizeof(sin.sin_addr));
-					if (key_sockaddrcmp((struct sockaddr*)&sin,
-					    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
-						continue;
-
-					break;
-				case AF_INET6:
-					if (key_sockaddrcmp((struct sockaddr *)src,
-					    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
-						continue;
-					break;
-				default:
-					ipseclog((LOG_DEBUG, "key_allocsa: "
-					    "unknown address family=%d.\n",
-					    family));
+			/* check src address */
+			switch (family) {
+			case AF_INET:
+				bzero(&sin, sizeof(sin));
+				sin.sin_family = AF_INET;
+				sin.sin_len = sizeof(sin);
+				bcopy(src, &sin.sin_addr,
+				    sizeof(sin.sin_addr));
+				if (key_sockaddrcmp((struct sockaddr*)&sin,
+				    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
 					continue;
-				}
+
+				break;
+			case AF_INET6:
+				if (key_sockaddrcmp((struct sockaddr *)src,
+				    (struct sockaddr *)&sav->sah->saidx.src, 0) != 0)
+					continue;
+				break;
+			default:
+				ipseclog((LOG_DEBUG, "key_allocsa: "
+				    "unknown address family=%d.\n",
+				    family));
+				continue;
+			}
 
 #endif
-				/* check dst address */
-				switch (family) {
-				case AF_INET:
-					bzero(&sin, sizeof(sin));
-					sin.sin_family = AF_INET;
-					sin.sin_len = sizeof(sin);
-					bcopy(dst, &sin.sin_addr,
-					    sizeof(sin.sin_addr));
-					if (key_sockaddrcmp((struct sockaddr*)&sin,
-					    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
-						continue;
-
-					break;
-				case AF_INET6:
-					if (key_sockaddrcmp((struct sockaddr *)dst,
-					    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
-						continue;
-					break;
-				default:
-					ipseclog((LOG_DEBUG, "key_allocsa: "
-					    "unknown address family=%d.\n",
-					    family));
+			/* check dst address */
+			switch (family) {
+			case AF_INET:
+				bzero(&sin, sizeof(sin));
+				sin.sin_family = AF_INET;
+				sin.sin_len = sizeof(sin);
+				bcopy(dst, &sin.sin_addr,
+				    sizeof(sin.sin_addr));
+				if (key_sockaddrcmp((struct sockaddr*)&sin,
+				    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
 					continue;
-				}
 
-				goto found;
+				break;
+			case AF_INET6:
+				if (key_sockaddrcmp((struct sockaddr *)dst,
+				    (struct sockaddr *)&sav->sah->saidx.dst, 0) != 0)
+					continue;
+				break;
+			default:
+				ipseclog((LOG_DEBUG, "key_allocsa: "
+				    "unknown address family=%d.\n", family));
+				continue;
 			}
+
+			goto found;
 		}
 	}
 
@@ -1181,6 +1182,9 @@ key_delsav(sav)
 
 	if (__LIST_CHAINED(sav))
 		LIST_REMOVE(sav, chain);
+
+	if (sav->spihash.le_prev || sav->spihash.le_next)
+		LIST_REMOVE(sav, spihash);
 
 	if (sav->key_auth != NULL) {
 		bzero(_KEYBUF(sav->key_auth), _KEYLEN(sav->key_auth));
@@ -2931,7 +2935,7 @@ key_newsav(m, mhp, sah, errp)
 
 	switch (mhp->msg->sadb_msg_type) {
 	case SADB_GETSPI:
-		newsav->spi = 0;
+		key_setspi(newsav, 0);
 
 #ifdef IPSEC_DOSEQCHECK
 		/* sync sequence number */
@@ -2952,7 +2956,7 @@ key_newsav(m, mhp, sah, errp)
 			return NULL;
 		}
 		xsa = (const struct sadb_sa *)mhp->ext[SADB_EXT_SA];
-		newsav->spi = xsa->sadb_sa_spi;
+		key_setspi(newsav, xsa->sadb_sa_spi);
 		newsav->seq = mhp->msg->sadb_msg_seq;
 		break;
 	default:
@@ -3023,8 +3027,8 @@ key_checkspidup(saidx, spi)
 	struct secasindex *saidx;
 	u_int32_t spi;
 {
-	struct secashead *sah;
 	struct secasvar *sav;
+	u_int stateidx, state;
 
 	/* check address family */
 	if (saidx->src.ss_family != saidx->dst.ss_family) {
@@ -3033,15 +3037,32 @@ key_checkspidup(saidx, spi)
 	}
 
 	/* check all SAD */
-	LIST_FOREACH(sah, &sahtree, chain) {
-		if (!key_ismyaddr((struct sockaddr *)&sah->saidx.dst))
+	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+		if (sav->spi != spi)
 			continue;
-		sav = key_getsavbyspi(sah, spi);
-		if (sav != NULL)
-			return sav;
+		for (stateidx = 0;
+		     stateidx < _ARRAYLEN(saorder_state_alive);
+		     stateidx++) {
+			state = saorder_state_alive[stateidx];
+			if (sav->state == state &&
+			    key_ismyaddr((struct sockaddr *)&sav->sah->saidx.dst))
+				return sav;
+		}
 	}
 
 	return NULL;
+}
+
+static void
+key_setspi(sav, spi)
+	struct secasvar *sav;
+	u_int32_t spi;
+{
+
+	sav->spi = spi;
+	if (sav->spihash.le_prev || sav->spihash.le_next)
+		LIST_REMOVE(sav, spihash);
+	LIST_INSERT_HEAD(&spihash[spi % SPIHASHSIZE], sav, spihash);
 }
 
 /*
@@ -3064,18 +3085,15 @@ key_getsavbyspi(sah, spi)
 	     stateidx++) {
 
 		state = saorder_state_alive[stateidx];
-		LIST_FOREACH(sav, &sah->savtree[state], chain) {
-
-			/* sanity check */
-			if (sav->state != state) {
-				ipseclog((LOG_DEBUG, "key_getsavbyspi: "
-				    "invalid sav->state (queue: %u SA: %u)\n",
-				    state, sav->state));
+		LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+			if (sav->spi != spi)
 				continue;
-			}
+			if (sav->state != state)
+				continue;
+			if (sav->sah != sah)
+				continue;
 
-			if (sav->spi == spi)
-				return sav;
+			return sav;
 		}
 	}
 
@@ -4928,7 +4946,7 @@ key_getspi(so, m, mhp)
 	}
 
 	/* set spi */
-	newsav->spi = htonl(spi);
+	key_setspi(newsav, htonl(spi));
 
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 	/* delete the entry in acqtree */
@@ -7557,6 +7575,9 @@ key_init()
 
 	for (i = 0; i <= SADB_SATYPE_MAX; i++)
 		LIST_INIT(&regtree[i]);
+
+	for (i = 0; i < SPIHASHSIZE; i++)
+		LIST_INIT(&spihash[i]);
 
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 	LIST_INIT(&acqtree);

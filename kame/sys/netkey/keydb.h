@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.23 2003/09/07 05:25:20 itojun Exp $	*/
+/*	$KAME: keydb.h,v 1.24 2003/09/07 15:12:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,7 @@ struct secashead {
 struct secasvar {
 	TAILQ_ENTRY(secasvar) tailq;
 	LIST_ENTRY(secasvar) chain;
+	LIST_ENTRY(secasvar) spihash;
 
 	int refcnt;			/* reference count */
 	u_int8_t state;			/* Status of this Association */
