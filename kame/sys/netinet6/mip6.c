@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.26 2000/06/13 02:38:11 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.27 2000/07/03 17:18:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1687,13 +1687,13 @@ mip6_add_ifaddr(struct in6_addr *addr,
 		hostIsNew = 0;
 
 	if (ifra->ifra_prefixmask.sin6_len) {
-		in6_ifscrub(ifp, ia);
+		in6_ifscrub(ifp, ia, 0); /* XXX */
 		ia->ia_prefixmask = ifra->ifra_prefixmask;
 		prefixIsNew = 1;
 	}
 	if ((ifp->if_flags & IFF_POINTOPOINT) &&
 	    (ifra->ifra_dstaddr.sin6_family == AF_INET6)) {
-		in6_ifscrub(ifp, ia);
+		in6_ifscrub(ifp, ia, 0); /* XXX */
 		oldaddr = ia->ia_dstaddr;
 		ia->ia_dstaddr = ifra->ifra_dstaddr;
 		/* link-local index check: should be a separate function? */
@@ -1714,11 +1714,11 @@ mip6_add_ifaddr(struct in6_addr *addr,
 		}
 		prefixIsNew = 1; /* We lie; but effect's the same */
 	}
-	if (ifra->ifra_addr.sin6_family == AF_INET6 &&
-	    (hostIsNew || prefixIsNew))
-		{
-			error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0);
-		}
+	if (ifra->ifra_addr.sin6_family == AF_INET6) {
+		error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0,
+				   hostIsNew, prefixIsNew);
+		/* XXX: can we proceed even upon an error? */
+	}
 	if (ifra->ifra_addr.sin6_family == AF_INET6
 	    && hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
 		int error_local = 0;
