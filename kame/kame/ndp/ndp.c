@@ -503,10 +503,11 @@ dump(addr)
 	struct in6_nbrinfo *nbi;
 	struct timeval time;
 	int addrwidth;
+	char flgbuf[8];
 
 	/* Print header */
 	if (!tflag)
-		printf("%-29.29s %-18.18s %6.6s %-9.9s %2s %4s %4s\n",
+		printf("%-31.31s %-17.17s %6.6s %-9.9s %2s %4s %4s\n",
 		       "Neighbor", "Linklayer Address", "Netif", "Expire",
 		       "St", "Flgs", "Prbs");
 
@@ -564,12 +565,12 @@ again:;
 
 		if (lflag) {
 			addrwidth = strlen(host_buf);
-			if (addrwidth < 29)
-				addrwidth = 29;
+			if (addrwidth < 31)
+				addrwidth = 31;
 		} else
-			addrwidth = 29;
+			addrwidth = 31;
 
-		printf("%-*.*s %-18.18s %6.6s", addrwidth, addrwidth, host_buf,
+		printf("%-*.*s %-17.17s %6.6s", addrwidth, addrwidth, host_buf,
 		       ether_str(sdl),
 		       if_indextoname(sdl->sdl_index, ifix_buf));
 
@@ -619,31 +620,28 @@ again:;
 			warnx("failed to get neighbor information");
 			printf("  ");
 		}
-
-		/* other flags */
 		putchar(' ');
-		{
-			u_char flgbuf[8], *p = flgbuf;
 
-			flgbuf[0] = '\0';
-			if (isrouter)
-				p += sprintf((char *)p, "R");
-#ifndef RADISH
-			if (rtm->rtm_addrs & RTA_NETMASK) {
-				sin = (struct sockaddr_in6 *)
-					(sdl->sdl_len + (char *)sdl);
-				if (!IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr))
-					p += sprintf((char *)p, "P");
-				if (sin->sin6_len != sizeof(struct sockaddr_in6))
-					p += sprintf((char *)p, "W");
-			}
-#endif /*RADISH*/
-			printf("%4s", flgbuf);
+		/*
+		 * other flags. R: router, P: proxy, W: ??
+		 */
+		if ((rtm->rtm_addrs & RTA_NETMASK) == 0) {
+			snprintf(flgbuf, sizeof(flgbuf), "%s",
+				isrouter ? "R" : "");
+		} else {
+			sin = (struct sockaddr_in6 *)
+				(sdl->sdl_len + (char *)sdl);
+			snprintf(flgbuf, sizeof(flgbuf), "%s%s%s",
+				isrouter ? "R" : "",
+				!IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr)
+					? "P" : "",
+				(sin->sin6_len != sizeof(struct sockaddr_in6))
+					? "W" : "");
 		}
+		printf(" %-4.4s", flgbuf);
 
-		putchar(' ');
 		if (prbs)
-			printf("% 4d", prbs);
+			printf(" %4d", prbs);
 
 		printf("\n");
 	}
