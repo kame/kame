@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.99 2003/01/09 11:54:39 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.100 2003/01/10 08:25:47 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -303,7 +303,7 @@ stfattach(dummy)
 		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
 		if_attach(&sc->sc_if);
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		if_alloc_sadl(&sc->sc_if);
 #endif
 #if NBPFILTER > 0
