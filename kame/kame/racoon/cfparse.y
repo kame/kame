@@ -246,8 +246,9 @@ log_level
 		{
 			/* command line option has a priority than it. */
 			if (!f_debugcmd) {
-				size_t size;
-				debug |= *(u_int32_t *)str2val($1.v, 16, &size);
+				u_long v;
+				v = strtoul($1.v, NULL, 0);
+				debug |= v;
 				free($1.v);
 			}
 		}

@@ -26,10 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: str2val.c,v 1.2 2000/02/07 11:24:49 itojun Exp $ */
+/* YIPS @(#)$Id: str2val.c,v 1.3 2000/02/07 11:36:17 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <ctype.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -77,39 +78,39 @@ str2val(str, base, len)
 	size_t i;
 	char *dst;
 	char *rp;
-	char *p, b[3], *bp;
+	char *p, b[3];
 
-	for (i = 0, p = str; *p != '\0'; p++) {
-		if ( (*p >= '0' && *p <= '9')
-		  || (*p >= 'a' && *p <= 'f')
-		  || (*p >= 'A' && *p <= 'F')) {
+	i = 0;
+	for (p = str; *p != '\0'; p++) {
+		if (isxdigit(*p))
 			i++;
-		} 
+		else if (isspace(*p))
+			;
+		else
+			return NULL;
 	}
-	i = i/2;
-	if (i == 0) return(0);
+	if (i == 0 || (i % 2) != 0)
+		return NULL;
+	i /= 2;
 
-	if ((dst = malloc(i)) == 0) {
-		return(0);
-	}
+	if ((dst = malloc(i)) == NULL)
+		return NULL;
 
 	i = 0;
 	f = 0;
 	for (rp = dst, p = str; *p != '\0'; p++) {
-		if ( (*p >= '0' && *p <= '9')
-		  || (*p >= 'a' && *p <= 'f')
-		  || (*p >= 'A' && *p <= 'F')) {
+		if (isxdigit(*p)) {
 			if (!f) {
 				b[0] = *p;
 				f = 1;
 			} else {
 				b[1] = *p;
 				b[2] = '\0';
-				*rp++ = (char)strtol(b, &bp, base);
+				*rp++ = (char)strtol(b, NULL, base);
 				i++;
 				f = 0;
 			}
-		} 
+		}
 	}
 
 	*len = i;
