@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.8,v 1.12 2001/03/06 05:50:41 jinmei Exp $
+.\"	$KAME: pim6sd.8,v 1.13 2001/08/09 08:34:43 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -42,7 +42,7 @@
 .Nm
 is an IPv6 multicast routing daemon, which supports
 PIMv2(Protocol Independent Multicast Version 2) sparse mode
-for IPv6.
+and SSM(Source-Specific-Multicast) for IPv6.
 .Pp
 Options supported by
 .Nm Ns :
@@ -86,6 +86,10 @@ or an alternative file, specified by the
 .Sq Fl c
 option
 .Pc .
+If the multicast group address is within SSM-range (ff20::/12 and ff30::/12),
+.Nm 
+will behaves as an SSM routing daemon; speaking MLDv2 toward hosts and 
+uses only Shortest Path Tree for these multicast addresses.
 Note that
 .Nm
 ignores interfaces that do not have an IPv6 address.

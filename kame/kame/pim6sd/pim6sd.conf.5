@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.conf.5,v 1.14 2000/08/14 04:53:23 jinmei Exp $
+.\"	$KAME: pim6sd.conf.5,v 1.15 2001/08/09 08:35:08 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -128,6 +128,27 @@ will not send any MLD packets on the interface.
 This option is usually meaningless but will be useful when
 MLD messages are noisy (e.g. when debugging) and there is surely no
 listner on the interface.
+.\"
+.It Xo
+.Ic phyint Ar interface
+.Op llqi Ar n
+.Op robustness Ar r
+.Op query_rsp_interval Ar qri
+.Op query_interval Ar qi
+.Op mld_version Ar ver
+.Ic;
+.Xc
+Specifies MLDv2-specific parameters for the given interface. 
+.Ic llqi
+is used to specify last-listener-query-interval, and its default value is 1000ms.  
+.Ic robustness 
+is for robustness-variable for the interface and its default value is 2.
+.Ic query_rsp_interval
+and
+.Ic query_interval
+corresponds to query-response-interval and query-interval in MLDv2 Query 
+message, and their default value is 10000ms (query_rsp_interval), and
+125ms (query_interval).
 .\"
 .It Xo
 .Ic default_source_preference Ar preference;
