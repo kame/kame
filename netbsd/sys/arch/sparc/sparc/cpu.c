@@ -1,4 +1,4 @@
-/*	$NetBSD: cpu.c,v 1.92 1999/03/31 14:09:09 pk Exp $ */
+/*	$NetBSD: cpu.c,v 1.92.2.2 1999/06/25 20:57:51 perry Exp $ */
 
 /*
  * Copyright (c) 1996
@@ -633,11 +633,11 @@ getcacheinfo_sun4(sc, node)
 		ci->c_nlines = 0;
 
 		/* Override cache flush functions */
-		sc->cache_flush = noop_cache_flush;
-		sc->vcache_flush_page = noop_vcache_flush_page;
-		sc->vcache_flush_segment = noop_vcache_flush_segment;
-		sc->vcache_flush_region = noop_vcache_flush_region;
-		sc->vcache_flush_context = noop_vcache_flush_context;
+		sc->sp_cache_flush = noop_cache_flush;
+		sc->sp_vcache_flush_page = noop_vcache_flush_page;
+		sc->sp_vcache_flush_segment = noop_vcache_flush_segment;
+		sc->sp_vcache_flush_region = noop_vcache_flush_region;
+		sc->sp_vcache_flush_context = noop_vcache_flush_context;
 		break;
 	case CPUTYP_4_200:
 		ci->c_vactype = VAC_WRITEBACK;
@@ -1090,7 +1090,7 @@ viking_mmu_enable()
 /* ROSS Hypersparc */
 struct module_info module_hypersparc = {		/* UNTESTED */
 	CPUTYP_UNKNOWN,
-	VAC_WRITETHROUGH, /* should be:VAC_NONE/VAC_WRITEBACK*/
+	VAC_WRITEBACK,
 	cpumatch_hypersparc,
 	getcacheinfo_obp,
 	0,
@@ -1117,10 +1117,8 @@ cpumatch_hypersparc(sc, mp, node)
 	int	node;
 {
 	sc->cpu_type = CPUTYP_HS_MBUS;/*XXX*/
-sc->flags |= CPUFLG_CACHE_MANDATORY;
 	if (node == 0)
 		sta(0, ASI_HICACHECLR, 0);
-	printf("warning: hypersparc support still under construction\n");
 }
 
 void
@@ -1210,11 +1208,11 @@ cpumatch_turbosparc(sc, mp, node)
 	sc->mmu_enable = 0;
 	sc->cache_enable = 0;
 	sc->get_syncflt = 0;
-	sc->cache_flush = 0;
-	sc->vcache_flush_page = 0;
-	sc->vcache_flush_segment = 0;
-	sc->vcache_flush_region = 0;
-	sc->vcache_flush_context = 0;
+	sc->sp_cache_flush = 0;
+	sc->sp_vcache_flush_page = 0;
+	sc->sp_vcache_flush_segment = 0;
+	sc->sp_vcache_flush_region = 0;
+	sc->sp_vcache_flush_context = 0;
 	sc->pcache_flush_line = 0;
 }
 

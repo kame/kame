@@ -1,4 +1,4 @@
-#	$NetBSD: GENERIC,v 1.119.2.1 1999/04/12 08:26:32 tron Exp $
+#	$NetBSD: GENERIC,v 1.119.2.3 1999/06/18 17:29:02 perry Exp $
 
 #
 #if 0
@@ -236,10 +236,10 @@ mfcs1		at mfc0 unit 1		# MFC serial
 #mfcs3		at mfc1 unit 1
 #mfcp1		at mfc1 unit 0
 
-hyper*		at zbus?		# zbus HyperCom3 + HyperCom4
+hyper*		at zbus?		# zbus HyperCom3/3+/4/4+
 #hyper*		at mainbus0		# not yet: HyperCom1 + HyperCom3
 com*		at hyper? port ?	# Hypercom3/4 serial ports
-#lpt*		at hyper? port ?	# not yet: Hypercom3 parallel port
+lpt*		at hyper? port ?	# Hypercom3+/4+ parallel port
 
 #ifdef AMIGA_CONFIGURATION
 #
@@ -281,9 +281,9 @@ audio*		at melody?
 # Ethernet cards:
 le*		at zbus0		# A2065, Ameristar, Ariadne
 ne*		at zbus0		# AriadneII
-ed0		at zbus0		# Hydra, ASDG LanRover
-es0		at zbus0		# CEI A4066 EthernetPLUS
-qn0		at zbus0		# Quicknet
+ed*		at zbus0		# Hydra, ASDG LanRover
+es*		at zbus0		# CEI A4066 EthernetPLUS
+qn*		at zbus0		# Quicknet
 
 # Arcnet
 bah*		at zbus0		# C=/Ameristar A2060 / 560

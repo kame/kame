@@ -61,11 +61,11 @@
  * 
  */
 
-/* $Header: /cvsroot/src/sys/dev/ic/tropicvar.h,v 1.2.2.1 1999/04/29 22:22:08 perry Exp $ */
+/* $Header: /cvsroot/syssrc/sys/dev/ic/tropicvar.h,v 1.2.2.1 1999/04/29 22:22:08 perry Exp $ */
 /* $ACIS:if_lanvar.h 12.0$ */
 
 #if !defined(lint) && !defined(LOCORE)  && defined(RCS_HDRS)
-static char    *rcsidif_lanvar = "$Header: /cvsroot/src/sys/dev/ic/tropicvar.h,v 1.2.2.1 1999/04/29 22:22:08 perry Exp $";
+static char    *rcsidif_lanvar = "$Header: /cvsroot/syssrc/sys/dev/ic/tropicvar.h,v 1.2.2.1 1999/04/29 22:22:08 perry Exp $";
 #endif
 
 /*

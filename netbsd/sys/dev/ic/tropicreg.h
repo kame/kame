@@ -48,11 +48,11 @@
  * 
  */
 
-/* $Header: /cvsroot/src/sys/dev/ic/tropicreg.h,v 1.2 1999/03/22 23:01:37 bad Exp $ */
+/* $Header: /cvsroot/syssrc/sys/dev/ic/tropicreg.h,v 1.2 1999/03/22 23:01:37 bad Exp $ */
 /* $ACIS:if_lanreg.h 12.0$ */
 
 #if !defined(lint) && !defined(LOCORE)  && defined(RCS_HDRS)
-static char *rcsidif_lanreg = "$Header: /cvsroot/src/sys/dev/ic/tropicreg.h,v 1.2 1999/03/22 23:01:37 bad Exp $";
+static char *rcsidif_lanreg = "$Header: /cvsroot/syssrc/sys/dev/ic/tropicreg.h,v 1.2 1999/03/22 23:01:37 bad Exp $";
 #endif
 
 #define TR_SWITCH 0

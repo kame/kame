@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_map.c,v 1.36.2.1 1999/04/19 16:02:52 perry Exp $	*/
+/*	$NetBSD: uvm_map.c,v 1.36.2.3 1999/06/18 17:17:04 perry Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -112,6 +112,17 @@ struct pool uvm_vmspace_pool;
  */
 
 struct pool uvm_map_entry_pool;
+
+#ifdef PMAP_GROWKERNEL
+/*
+ * This global represents the end of the kernel virtual address
+ * space.  If we want to exceed this, we must grow the kernel
+ * virtual address space dynamically.
+ *
+ * Note, this variable is locked by kernel_map's lock.
+ */
+vaddr_t uvm_maxkaddr;
+#endif
 
 /*
  * macros
@@ -503,18 +514,14 @@ uvm_map(map, startp, size, uobj, uoffset, flags)
 		return (KERN_NO_SPACE);
 	}
 
-#if defined(PMAP_GROWKERNEL)	/* hack */
+#ifdef PMAP_GROWKERNEL
 	{
-		/* locked by kernel_map lock */
-		static vaddr_t maxkaddr = 0;
-		
 		/*
-		 * hack: grow kernel PTPs in advance.
+		 * If the kernel pmap can't map the requested space,
+		 * then allocate more resources for it.
 		 */
-		if (map == kernel_map && maxkaddr < (*startp + size)) {
-			pmap_growkernel(*startp + size);
-			maxkaddr = *startp + size;
-		}
+		if (map == kernel_map && uvm_maxkaddr < (*startp + size))
+			uvm_maxkaddr = pmap_growkernel(*startp + size);
 	}
 #endif
 
@@ -1974,14 +1981,9 @@ uvm_map_pageable(map, start, end, new_pageable)
 			 */
 			
 			if (!UVM_ET_ISSUBMAP(entry)) {  /* not submap */
-				/*
-				 * XXXCDC: protection vs. max_protection??
-				 * (wirefault uses max?)
-				 * XXXCDC: used to do it always if
-				 * uvm_obj == NULL (wrong?)
-				 */
-				if ( UVM_ET_ISNEEDSCOPY(entry) && 
-				    (entry->protection & VM_PROT_WRITE) != 0) {
+				if (UVM_ET_ISNEEDSCOPY(entry) &&
+				    ((entry->protection & VM_PROT_WRITE) ||
+				     (entry->object.uvm_obj == NULL))) {
 					amap_copy(map, entry, M_WAITOK, TRUE,
 					    start, end); 
 					/* XXXCDC: wait OK? */

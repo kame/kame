@@ -1,4 +1,4 @@
-/*	$NetBSD: ite.c,v 1.17 1999/03/30 04:25:07 minoura Exp $	*/
+/*	$NetBSD: ite.c,v 1.17.2.2 1999/07/02 16:45:19 perry Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -310,6 +310,8 @@ iteon(dev, flag)
 	if (ip->flags & ITE_INGRF)
 		return(0);
 	iteinit(dev);
+	if (flag & 2)
+		ite_reset(ip);
 #if NKBD > 0
 	mfp_send_usart (0x49);	/* XXX */
 #endif
@@ -2404,11 +2406,6 @@ itecnprobe(cd)
 	struct consdev *cd;
 {
 	int maj;
-
-	/*
-	 * bring graphics layer up.
-	 */
-	config_console();
 
 	/* locate the major number */
 	for (maj = 0; maj < nchrdev; maj++)

@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_page.c,v 1.17.2.1 1999/04/16 16:29:34 chs Exp $	*/
+/*	$NetBSD: uvm_page.c,v 1.17.2.3 1999/06/18 17:04:56 perry Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -385,6 +385,7 @@ uvm_pageboot_alloc(size)
 
 #else /* !PMAP_STEAL_MEMORY */
 
+	static boolean_t initialized = FALSE;
 	vaddr_t addr, vaddr;
 	paddr_t paddr;
 
@@ -392,23 +393,39 @@ uvm_pageboot_alloc(size)
 	size = round_page(size);
 
 	/*
-	 * on first call to this function init ourselves.   we detect this
-	 * by checking virtual_space_start/end which are in the zero'd BSS area.
+	 * on first call to this function, initialize ourselves.
 	 */
-
-	if (virtual_space_start == virtual_space_end) {
+	if (initialized == FALSE) {
 		pmap_virtual_space(&virtual_space_start, &virtual_space_end);
 
 		/* round it the way we like it */
 		virtual_space_start = round_page(virtual_space_start);
 		virtual_space_end = trunc_page(virtual_space_end);
+
+		initialized = TRUE;
 	}
 
 	/*
 	 * allocate virtual memory for this request
 	 */
+	if (virtual_space_start == virtual_space_end ||
+	    (virtual_space_end - virtual_space_start) < size)
+		panic("uvm_pageboot_alloc: out of virtual space");
 
 	addr = virtual_space_start;
+
+#ifdef PMAP_GROWKERNEL
+	/*
+	 * If the kernel pmap can't map the requested space,
+	 * then allocate more resources for it.
+	 */
+	if (uvm_maxkaddr < (addr + size)) {
+		uvm_maxkaddr = pmap_growkernel(addr + size);
+		if (uvm_maxkaddr < (addr + size))
+			panic("uvm_pageboot_alloc: pmap_growkernel() failed");
+	}
+#endif
+
 	virtual_space_start += size;
 
 	/*
