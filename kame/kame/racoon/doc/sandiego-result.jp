@@ -40,6 +40,9 @@ vs racoon
 	phase 1がaggressive modeのとき、rekeyに失敗しやすい。
 	(phase 1を待ってphase 2が再開しない)
 
+	rekeyのときにときどきno spi云々が出る。jenkins-ipsec-rekeyを
+	もっと頑張らないと駄目か?
+
 vs ashley laurent
 	phase 1 userfqdn supportいれてよんと言われた。今回間に合うのかな。
 
@@ -64,6 +67,8 @@ vs ericsson
 
 	delete payloadを受けてもこっちはphase 1を保持しつづけているが、
 	あっちはphase 1もきれたと思ってる。
+	(jenkins-rekeyからするとphase 1/2は分離して管理するのが正しいので、
+	こっちが正解)
 
 vs ibm
 	先方で試したところ、agressive modeにinterop issueがあるらしい。
@@ -187,6 +192,7 @@ vs cisco
 	ipsec SAをカーネルにいれた後、packet出力時のSA検索に
 	失敗してしまう症状続発。delete payloadをくらったときに消したSAが
 	deadのまま残ってしまい、検索をあきらめる。これは二度と消せない?
+	-> 直した。reference count問題。
 
 >206.175.160.20 206.175.161.114 
 >	esp mode=tunnel spi=372644951(0x16361c57) reqid=0(0x00000000)
@@ -237,6 +243,15 @@ kame
 
 	acquireをuserland側でフィルタするところで、フィルタしすぎに
 	なることがある。(ネゴるべきなのにネゴらない)
+	-> reference count問題とのからみか?
+	-> acquireのフィルタリングはよいことかわるいことか?
+	   kernel側はまあいいとして、userland側はkernel側情報とuserland側情報の
+	   ずれについてもうちょっと頑張らないといけないかもしれない。
+	   例えば、racoon動かしながらsetkey -Fした場合、
+	   現状: phase 2 handleは残っているが鍵はないので、一定時間フィルタする
+	   実は: 鍵がないんだからネゴった方がよい。
+	   acquireが上がったらそのSAがほんとにカーネルにあるのか検証する?
+	   acquireに「kernelのなかにはSAがある/ない」情報のextensionをつける?
 
 	kernelでah use/esp useと書いてあるのにracoon側でespしかネゴしなかった
 	場合、永遠にahのacquireが上がり続ける。
@@ -264,9 +279,11 @@ kame
 	少なくとも lifetime や PFS group には範囲が必要。
 
 	DOS対策
-		- 同じ src から、phase 1 の一発目を
-		  n秒間に m発受け取ったらDOSと思うとか？
-		- src は偽造できるから n秒間に m発受け取ったらで十分かも？
+	- 同じ src から、phase 1 の一発目を
+	  n秒間に m発受け取ったらDOSと思うとか？
+	- src は偽造できるから n秒間に m発受け取ったらで十分かも？
+	  itojunはこっちでいいと思う。ただしnとmは調整可能にしておきたい
+	  (n = 1固定でmだけ可変でもいいけど)
 
 	INITIAL CONTACT やんないと。
 
@@ -281,6 +298,6 @@ kame
 		けど、 ipcomp の lifetime って∞でも良いくらいなのに。
 		IPcomp のネゴって必要なんだろうか？ (i.e.  相手がipcomp capable
 		かわかればよい。それ以上のネゴの必要性は疑問)
-	-> IPComp capable nodeの情報を蓄えるにはメモリを食う。
-	   メモリいつまでも食ってるのは嫌。
-	   よってlifetimeも「いちおう」必要。
+	-> IPComp capable nodeかどうかの情報を蓄えるにはSAを使う。
+	   SAはメモリを食う。メモリいつまでも食ってるのは嫌。
+	   よってipcomp lifetimeも必要。
