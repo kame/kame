@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.44 2001/02/08 10:57:00 itojun Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.45 2001/02/08 11:33:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -733,12 +733,13 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 			    , curproc
 #endif
 			    );
-	if (error != 0)
+	if (error != 0) {
 		log(LOG_ERR, "in6_prefix.c: add_each_addr: addition of an addr"
 		    "%s/%d failed because in6_control failed for error %d\n",
 		    ip6_sprintf(&ifra.ifra_addr.sin6_addr), rpp->rp_plen,
 		    error);
-	return;
+		return;
+	}
 
 	/*
 	 * link beween this addr and the prefix will be done
