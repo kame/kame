@@ -43,8 +43,8 @@ network_ipv6_mobile_start()
 	echo 'Doing Mobile IPv6 network setup:'
 
 	if ! ${SYSCTL_N} net.inet6.mip6.debug 2> /dev/null; then
-	  echo 'No MIP6 kernel'
-	  return
+		echo 'No MIP6 kernel'
+		return
 	fi
 
 	case ${ipv6_mobile_debug_enable} in
@@ -65,6 +65,10 @@ network_ipv6_mobile_start()
 		;;
 	esac
 
+	if [ -z ${mdd_program} ]; then
+		mdd_program=babymdd
+	fi
+
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		${SYSCTL_W} net.inet6.ip6.accept_rtadv=1
@@ -81,9 +85,12 @@ network_ipv6_mobile_start()
 		fi
 
 		echo -n ' mnd'
-		mnd -n -i mip0
-		echo -n ' mdd'
-		mdd -n
+		echo -n " ${mdd_program}"
+		for mip_interface in ${ipv6_mobile_virtual_home_interfaces:=mip0}
+		do
+			mnd -n -i ${mip_interface}
+			${mdd_program} -h ${mip_interface}
+		done
 		echo -n ' cnd'
 		cnd -n
 		echo -n ' rtsold'

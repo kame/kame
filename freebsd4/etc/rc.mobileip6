@@ -1,5 +1,5 @@
 #! /bin/sh -x
-# $Id: rc.mobileip6,v 1.12 2005/01/26 08:27:06 keiichi Exp $
+# $Id: rc.mobileip6,v 1.13 2005/03/01 18:00:23 keiichi Exp $
 
 # Mobile IPv6 startup
 
@@ -24,6 +24,10 @@ mobileip6_pass2() {
 		;;
 	esac
 
+	if [ -z ${mdd_program} ]; then
+		mdd_program=babymdd
+	fi
+
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		# setup SPD/SA
@@ -40,10 +44,12 @@ mobileip6_pass2() {
 
 		sysctl net.inet6.ip6.accept_rtadv=1
 		echo -n ' mnd'
-		mnd -n -i mip0
-		echo -n ' mdd'
-		mdd -n
-#		newmdd -c /etc/mdd.conf fxp0
+		echo -n ' ${mdd_program}'
+		for mip_interface in ${ipv6_mobile_virtual_home_interfaces:=mip0}
+		do
+			mnd -n -i ${mip_interface}
+			${mdd_program} -h ${mip_interface}
+		done
 		echo -n ' cnd'
 		cnd -n
 		echo -n ' rtsold'
