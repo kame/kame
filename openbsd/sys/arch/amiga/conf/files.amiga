@@ -1,4 +1,4 @@
-#	$OpenBSD: files.amiga,v 1.32 1999/09/09 21:27:36 espie Exp $
+#	$OpenBSD: files.amiga,v 1.36 2000/04/12 16:10:22 aaron Exp $
 #	$NetBSD: files.amiga,v 1.62 1997/08/27 19:32:47 is Exp $
 
 
@@ -80,6 +80,7 @@ device	ite
 attach	ite at grf
 file	arch/amiga/dev/ite.c		ite needs-flag
 file	arch/amiga/dev/kbdmap.c		ite
+file	arch/amiga/dev/ite_blank.c		ite
 file	arch/amiga/dev/kf_8x8.c		ite
 file	arch/amiga/dev/kf_8x11.c	kfont_8x11
 file	arch/amiga/dev/kf_custom.c	kfont_custom
@@ -91,8 +92,6 @@ file	arch/amiga/dev/grf_cc.c		grfcc needs-flag
 file	arch/amiga/dev/ite_cc.c		grfcc & ite
 
 # RAM disk
-pseudo-device	rd
-file	dev/ramdisk.c			rd needs-flag
 file	arch/amiga/dev/rd_root.c	ramdisk_hooks
 
 pseudo-device	view
@@ -142,6 +141,11 @@ file	arch/amiga/dev/ite_et.c		grfet & ite
 # A2065, Ameristar ethernet cards
 attach	le at zbus with le_zbus
 file	arch/amiga/dev/if_le_zbus.c	le_zbus needs-flag
+
+# AriadneII ethernet card
+# device defined in sys/conf/files
+attach	ne at zbus with ne_zbus: rtl80x9
+file	arch/amiga/dev/if_ne_zbus.c	ne_zbus needs-flag
 
 # Hydra ethernet card
 device	ed:	ifnet, ether
@@ -382,7 +386,7 @@ file	arch/m68k/m68k/sunos_machdep.c	compat_sunos
 # XXX this needs to be done very late, so it's done here.  This feels
 # like a kludge, but it might be for the best.
 
-device	pcic {[controller = -1], [socket = -1]}
+device	pcic: pcmciabus
 file	dev/ic/i82365.c			pcic
 
 # PCIC pcmcia controller on ISA bus.

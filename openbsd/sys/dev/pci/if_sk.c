@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sk.c,v 1.4 1999/10/22 07:14:42 deraadt Exp $	*/
+/*	$OpenBSD: if_sk.c,v 1.6 2000/02/15 02:28:14 jason Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -151,14 +151,6 @@ void sk_phy_writereg	__P((struct sk_if_softc *, int, u_int32_t));
 u_int32_t sk_calchash	__P((caddr_t));
 void sk_setfilt		__P((struct sk_if_softc *, caddr_t, int));
 void sk_setmulti	__P((struct sk_if_softc *));
-
-#ifdef SK_USEIOSPACE
-#define SK_RES		SYS_RES_IOPORT
-#define SK_RID		SK_PCI_LOIO
-#else
-#define SK_RES		SYS_RES_MEMORY
-#define SK_RID		SK_PCI_LOMEM
-#endif
 
 #define SK_SETBIT(sc, reg, x)		\
 	CSR_WRITE_4(sc, reg, CSR_READ_4(sc, reg) | x)
@@ -725,8 +717,18 @@ sk_ioctl(ifp, command, data)
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		sk_setmulti(sc_if);
-		error = 0;
+		error = (command == SIOCADDMULTI) ?
+		    ether_addmulti(ifr, &sc_if->arpcom) :
+		    ether_delmulti(ifr, &sc_if->arpcom);
+
+		if (error == ENETRESET) {
+			/*
+			 * Multicast list has changed; set the hardware
+			 * filter accordingly.
+			 */
+			sk_setmulti(sc_if);
+			error = 0;
+		}
 		break;
 	case SIOCGIFMEDIA:
 	case SIOCSIFMEDIA:

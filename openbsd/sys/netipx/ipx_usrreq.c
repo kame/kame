@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx_usrreq.c,v 1.5 1997/01/18 17:53:54 mickey Exp $	*/
+/*	$OpenBSD: ipx_usrreq.c,v 1.8 2000/01/17 00:34:00 fgsch Exp $	*/
 
 /*-
  *
@@ -64,7 +64,6 @@
 #include <netipx/ipx_pcb.h>
 #include <netipx/ipx_if.h>
 #include <netipx/ipx_var.h>
-#include <netipx/ipx_error.h>
 #include <netipx/ipx_ip.h>
 
 #include <machine/stdarg.h>
@@ -75,8 +74,8 @@
 
 int noipxRoute;
 
-int ipxsendspace = IPXSNDQ;
-int ipxrecvspace = IPXRCVQ;
+int ipx_sendspace = IPXSNDQ;
+int ipx_recvspace = IPXRCVQ;
 
 /*
  *  This may also be called for raw listeners.
@@ -124,9 +123,9 @@ ipx_input(m, va_alist)
 	}
 	ipxp->ipxp_rpt = ipx->ipx_pt;
 	if ( ! (ipxp->ipxp_flags & IPXP_RAWIN) ) {
-		m->m_len -= sizeof (struct ipx);
-		m->m_pkthdr.len -= sizeof (struct ipx);
-		m->m_data += sizeof (struct ipx);
+		m->m_len -= sizeof(struct ipx);
+		m->m_pkthdr.len -= sizeof(struct ipx);
+		m->m_data += sizeof(struct ipx);
 	}
 	if (sbappendaddr(&ipxp->ipxp_socket->so_rcv, sipxtosa(&ipx_ipx), m,
 	    (struct mbuf *)0) == 0)
@@ -232,7 +231,7 @@ ipx_output(m0, va_alist)
 	if (ipxp->ipxp_flags & IPXP_RAWOUT) {
 		ipx = mtod(m, struct ipx *);
 	} else {
-		M_PREPEND(m, sizeof (struct ipx), M_DONTWAIT);
+		M_PREPEND(m, sizeof(struct ipx), M_DONTWAIT);
 		if (m == 0)
 			return (ENOBUFS);
 		ipx = mtod(m, struct ipx *);
@@ -240,7 +239,7 @@ ipx_output(m0, va_alist)
 		ipx->ipx_pt = ipxp->ipxp_dpt;
 		ipx->ipx_sna = ipxp->ipxp_laddr;
 		ipx->ipx_dna = ipxp->ipxp_faddr;
-		len += sizeof (struct ipx);
+		len += sizeof(struct ipx);
 	}
 
 	ipx->ipx_len = htons((u_short)len);
@@ -270,37 +269,6 @@ ipx_output(m0, va_alist)
 	 *     would require 3 subroutine calls.
 	 */
 	ro = &ipxp->ipxp_route;
-#ifdef ancient_history
-	/*
-	 * I think that this will all be handled in ipx_pcbconnect!
-	 */
-	if (ro->ro_rt) {
-		if(ipx_neteq(ipxp->ipxp_lastdst, ipx->ipx_dna)) {
-			/*
-			 * This assumes we have no GH type routes
-			 */
-			if (ro->ro_rt->rt_flags & RTF_HOST) {
-				if (!ipx_hosteq(ipxp->ipxp_lastdst, ipx->ipx_dna))
-					goto re_route;
-
-			}
-			if ((ro->ro_rt->rt_flags & RTF_GATEWAY) == 0) {
-				register struct ipx_addr *dst =
-						&satoipx_addr(ro->ro_dst);
-				dst->ipx_host = ipx->ipx_dna.ipx_host;
-			}
-			/* 
-			 * Otherwise, we go through the same gateway
-			 * and dst is already set up.
-			 */
-		} else {
-		re_route:
-			RTFREE(ro->ro_rt);
-			ro->ro_rt = (struct rtentry *)0;
-		}
-	}
-	ipxp->ipxp_lastdst = ipx->ipx_dna;
-#endif /* ancient_history */
 	if (noipxRoute)
 		ro = 0;
 	return (ipx_outputfl(m, ro, so->so_options & SO_BROADCAST));
@@ -453,7 +421,7 @@ ipx_usrreq(so, req, m, nam, control)
 		error = ipx_pcballoc(so, &ipxcbtable);
 		if (error)
 			break;
-		error = soreserve(so, ipxsendspace, ipxrecvspace);
+		error = soreserve(so, ipx_sendspace, ipx_recvspace);
 		if (error)
 			break;
 		break;
@@ -608,7 +576,7 @@ ipx_raw_usrreq(so, req, m, nam, control)
 		error = ipx_pcballoc(so, &ipxrawcbtable);
 		if (error)
 			break;
-		error = soreserve(so, ipxsendspace, ipxrecvspace);
+		error = soreserve(so, ipx_sendspace, ipx_recvspace);
 		if (error)
 			break;
 		ipxp = sotoipxpcb(so);
@@ -635,14 +603,23 @@ ipx_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (ENOTDIR);
 
 	switch (name[0]) {
+	case IPXCTL_CHECKSUM:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ipxcksum));
+	case IPXCTL_FORWARDING:	
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ipxforwarding));
+	case IPXCTL_NETBIOS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ipxnetbios));
 	case IPXCTL_RECVSPACE:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
-			&ipxrecvspace));
+		    &ipx_recvspace));
 	case IPXCTL_SENDSPACE:
 		return (sysctl_int(oldp, oldlenp, newp, newlen,
-			&ipxsendspace));
+		    &ipx_sendspace));
 	default:
 		return (ENOPROTOOPT);
 	}
-	/* NOT REACHED */
+	/* NOTREACHED */
 }

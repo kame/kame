@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.6 1999/09/07 20:50:24 mickey Exp $	*/
+/*	$OpenBSD: clock.c,v 1.9 2000/03/29 23:11:06 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -23,8 +23,8 @@
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
  * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
  * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF MIND,
+ * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
@@ -61,15 +61,7 @@ cpu_initclocks()
 {
 	extern u_int cpu_hzticks;
 	u_int time_inval;
-#ifdef USELEDS
-	static u_int hbcnt = 0;
 
-	if (!(hbcnt % 50)) {
-		register u_int r = (hbcnt / 50) % 6;
-
-		heartbeat(r < 4 && !(r % 2));
-	}
-#endif
 	/* Start the interval timer. */
 	mfctl(CR_ITMR, time_inval);
 	mtctl(time_inval + cpu_hzticks, CR_ITMR);
@@ -80,8 +72,6 @@ clock_intr (v)
 	void *v;
 {
 	struct trapframe *frame = v;
-
-/*	printf ("#"); */
 
 	/* printf ("clock int 0x%x @ 0x%x for %p\n", t,
 	   frame->tf_iioq_head, curproc); */
@@ -109,7 +99,6 @@ inittodr(t)
 {
 	struct pdc_tod tod PDC_ALIGNMENT;
 	int 	tbad = 0;
-	long	dt;
 
 	if (t < 5*SECYR) {
 		printf ("WARNING: preposterous time in file system");
@@ -124,10 +113,9 @@ inittodr(t)
 	time.tv_usec = tod.usec;
 
 	if (!tbad) {
-		dt = time.tv_sec - t;
+		u_long	dt;
 
-		if (dt < 0)
-			dt = -dt;
+		dt = (time.tv_sec < t)?  t - time.tv_sec : time.tv_sec - t;
 
 		if (dt < 2 * SECDAY)
 			return;

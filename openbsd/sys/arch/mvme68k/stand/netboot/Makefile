@@ -1,13 +1,13 @@
-#	$OpenBSD: Makefile,v 1.8 1997/10/20 00:33:48 deraadt Exp $
+#	$OpenBSD: Makefile,v 1.10 2000/01/24 05:20:56 smurph Exp $
 
 RELOC=0x3F0000
 SIZE?=	size
 
 S=	${.CURDIR}/../../../..
-DEFS= -DSUN_BOOTPARAMS
+DEFS= -DSUN_BOOTPARAMS -DRELOC=${RELOC}
 INCPATH=-I${.CURDIR} -I${.CURDIR}/../libsa -I${.CURDIR}/../libbug \
 	-I${S} -I${S}/lib/libsa
-CFLAGS=	-O2 ${DEFS} ${INCPATH} ${COPTS}
+CFLAGS=	-O2 ${DEFS} ${INCPATH} ${COPTS} -m68060
 CLEANFILES+=netboot netboot.bin
 
 .include "${S}/arch/mvme68k/stand/bugcrt/Makefile.inc"

@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.25 1999/08/17 10:32:18 niklas Exp $	*/
+/*	$OpenBSD: proc.h,v 1.30 2000/04/19 09:58:19 art Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -47,6 +47,7 @@
 #include <machine/proc.h>		/* Machine-dependent proc substruct. */
 #include <sys/select.h>			/* For struct selinfo. */
 #include <sys/queue.h>
+#include <sys/timeout.h>		/* For struct timeout. */
 
 /*
  * One structure allocated per session.
@@ -125,6 +126,7 @@ struct	proc {
 #define	p_ucred		p_cred->pc_ucred
 #define	p_rlimit	p_limit->pl_rlimit
 
+	int	p_exitsig;		/* Signal to send to parent on exit. */
 	int	p_flag;			/* P_* flags. */
 	u_char	p_os;			/* OS tag */
 	char	p_stat;			/* S* process status. */
@@ -148,11 +150,14 @@ struct	proc {
 	int	p_cpticks;	 /* Ticks of cpu time. */
 	fixpt_t	p_pctcpu;	 /* %cpu for this process during p_swtime */
 	void	*p_wchan;	 /* Sleep address. */
+	struct	timeout p_sleep_to;/* timeout for tsleep() */
 	char	*p_wmesg;	 /* Reason for sleep. */
 	u_int	p_swtime;	 /* Time swapped in or out. */
 	u_int	p_slptime;	 /* Time since last blocked. */
+	int	p_schedflags;	 /* PSCHED_* flags */
 
 	struct	itimerval p_realtimer;	/* Alarm timer. */
+	struct	timeout p_realit_to;	/* Alarm timeout. */
 	struct	timeval p_rtime;	/* Real time. */
 	u_quad_t p_uticks;		/* Statclock hits in user mode. */
 	u_quad_t p_sticks;		/* Statclock hits in system mode. */
@@ -239,6 +244,15 @@ struct	proc {
 #define	P_NOZOMBIE	0x100000	/* Pid 1 waits for me instead of dad */
 
 /*
+ * These flags are kept in p_schedflags.  p_schedflags may be modified
+ * only at splstatclock().
+ */
+#define PSCHED_SEENRR		0x0001	/* process has been in roundrobin() */
+#define PSCHED_SHOULDYIELD	0x0002	/* process should yield */
+
+#define PSCHED_SWITCHCLEAR	(PSCHED_SEENRR|PSCHED_SHOULDYIELD)
+
+/*
  * MOVE TO ucred.h?
  *
  * Shareable process credentials (always resident).  This includes a reference
@@ -283,6 +297,18 @@ struct	pcred {
 #endif
 #define	PRELE(p)	(--(p)->p_holdcnt)
 
+/*
+ * Flags to fork1().
+ */
+#define FORK_FORK	0x00000001
+#define FORK_VFORK	0x00000002
+#define FORK_RFORK	0x00000004
+#define FORK_PPWAIT	0x00000008
+#define FORK_SHAREFILES	0x00000010
+#define FORK_CLEANFILES	0x00000020
+#define FORK_NOZOMBIE	0x00000040
+#define FORK_SHAREVM	0x00000080
+
 #define	PIDHASH(pid)	(&pidhashtbl[(pid) & pidhash])
 extern LIST_HEAD(pidhashhead, proc) *pidhashtbl;
 extern u_long pidhash;
@@ -316,6 +342,8 @@ int	enterpgrp __P((struct proc *p, pid_t pgid, int mksess));
 void	fixjobc __P((struct proc *p, struct pgrp *pgrp, int entering));
 int	inferior __P((struct proc *p));
 int	leavepgrp __P((struct proc *p));
+void	yield __P((void));
+void	preempt __P((struct proc *));
 void	mi_switch __P((void));
 void	pgdelete __P((struct pgrp *pgrp));
 void	procinit __P((void));
@@ -333,10 +361,7 @@ int	tsleep __P((void *chan, int pri, char *wmesg, int timo));
 void	unsleep __P((struct proc *));
 void	wakeup __P((void *chan));
 void	exit1 __P((struct proc *, int));
-int	fork1 __P((struct proc *, int, int, void *, size_t, register_t *));
-#define	ISFORK	0
-#define	ISVFORK	1
-#define	ISRFORK	2
+int	fork1 __P((struct proc *, int, void *, size_t, register_t *));
 void	kmeminit __P((void));
 void	rqinit __P((void));
 int	groupmember __P((gid_t, struct ucred *));

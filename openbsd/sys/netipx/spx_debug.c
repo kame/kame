@@ -1,4 +1,4 @@
-/*	$OpenBSD: spx_debug.c,v 1.2 1996/10/26 09:34:56 mickey Exp $	*/
+/*	$OpenBSD: spx_debug.c,v 1.6 2000/01/15 18:52:14 fgsch Exp $	*/
 
 /*-
  *
@@ -57,7 +57,6 @@
 #include <netinet/tcp_fsm.h>
 
 #include <netipx/ipx.h>
-#include <netipx/ipx_error.h>
 #include <netipx/ipx_pcb.h>
 #include <netipx/ipx.h>
 #include <netipx/ipx_var.h>
@@ -69,6 +68,7 @@
 #include <netipx/spx_debug.h>
 
 int	spxconsdebug = 0;
+
 /*
  * spx debug routines
  */
@@ -80,8 +80,7 @@ spx_trace(act, ostate, sp, si, req)
 	struct spx *si;
 	int req;
 {
-#ifdef IPX
-#ifdef IPXDEBUG
+#ifdef SPXDEBUG
 	u_short seq, ack, len, alo;
 	int flags;
 	struct spx_debug *sd = &spx_debug[spx_debx++];
@@ -95,11 +94,11 @@ spx_trace(act, ostate, sp, si, req)
 	if (sp)
 		sd->sd_sp = *sp;
 	else
-		bzero((caddr_t)&sd->sd_sp, sizeof (*sp));
+		bzero((caddr_t)&sd->sd_sp, sizeof(*sp));
 	if (si)
 		sd->sd_si = *si;
 	else
-		bzero((caddr_t)&sd->sd_si, sizeof (*si));
+		bzero((caddr_t)&sd->sd_si, sizeof(*si));
 	sd->sd_req = req;
 	if (spxconsdebug == 0)
 		return;
@@ -171,7 +170,6 @@ spx_trace(act, ostate, sp, si, req)
 #ifndef lint
 #define p3(f)  { printf("%s = %x, ", "f", sp->s_ ## f); }
 	printf("\t"); p3(rack);p3(ralo);p3(smax);p3(flags); printf("\n");
-#endif
 #endif
 #endif
 }

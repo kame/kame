@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_extent.c,v 1.7 1999/02/17 13:15:46 fgsch Exp $	*/
+/*	$OpenBSD: subr_extent.c,v 1.9 2000/03/15 15:58:40 mickey Exp $	*/
 /*	$NetBSD: subr_extent.c,v 1.7 1996/11/21 18:46:34 cgd Exp $	*/
 
 /*-
@@ -79,8 +79,9 @@ static	void extent_register __P((struct extent *));
 /*
  * Macro to align to an arbitrary power-of-two boundary.
  */
-#define EXTENT_ALIGN(_start, _align)			\
-	(((_start) + ((_align) - 1)) & (-(_align)))
+#define EXTENT_ALIGN(_start, _align, _skew)	\
+	(((((_start) - (_skew)) + ((_align) - 1)) & (-(_align))) + (_skew))
+
 
 /*
  * Register the extent on a doubly linked list.
@@ -504,10 +505,10 @@ extent_alloc_region(ex, start, size, flags)
  * a power of 2.
  */
 int
-extent_alloc_subregion(ex, substart, subend, size, alignment, boundary,
+extent_alloc_subregion1(ex, substart, subend, size, alignment, skew, boundary,
     flags, result)
 	struct extent *ex;
-	u_long substart, subend, size, alignment, boundary;
+	u_long substart, subend, size, alignment, skew, boundary;
 	int flags;
 	u_long *result;
 {
@@ -530,7 +531,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, boundary,
 		    substart, subend);
 		panic("extent_alloc_subregion: bad subregion");
 	}
-	if ((size < 1) || (size > ((subend - substart) + 1))) {
+	if (size < 1 || (size - 1) > (subend - substart)) {
 		printf("extent_alloc_subregion: extent `%s', size 0x%lx\n",
 		    ex->ex_name, size);
 		panic("extent_alloc_subregion: bad size");
@@ -605,7 +606,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, boundary,
 	 * check is the area from the beginning of the subregion
 	 * to the first allocated region.
 	 */
-	newstart = EXTENT_ALIGN(substart, alignment);
+	newstart = EXTENT_ALIGN(substart, alignment, skew);
 	if (newstart < ex->ex_start) {
 #ifdef DIAGNOSTIC
 		printf(
@@ -636,7 +637,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, boundary,
 	 * the last allocated region (if there was one).
 	 */
 	if (rp == NULL && last != NULL)
-		newstart = EXTENT_ALIGN((last->er_end + 1), alignment);
+		newstart = EXTENT_ALIGN((last->er_end + 1), alignment, skew);
 
 	for (; rp != NULL; rp = rp->er_link.le_next) {
 		/*
@@ -712,7 +713,7 @@ extent_alloc_subregion(ex, substart, subend, size, alignment, boundary,
 		/*
 		 * Skip past the current region and check again.
 		 */
-		newstart = EXTENT_ALIGN((rp->er_end + 1), alignment);
+		newstart = EXTENT_ALIGN((rp->er_end + 1), alignment, skew);
 		if (newstart < rp->er_end) {
 			/*
 			 * Overflow condition.  Don't error out, since

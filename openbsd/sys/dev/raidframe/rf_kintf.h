@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_kintf.h,v 1.3 1999/07/30 14:45:32 peter Exp $	*/
-/*	$NetBSD: rf_kintf.h,v 1.4 1999/03/09 03:52:41 oster Exp $	*/
+/*	$OpenBSD: rf_kintf.h,v 1.5 2000/01/11 18:02:22 peter Exp $	*/
+/*	$NetBSD: rf_kintf.h,v 1.7 2000/01/09 01:29:27 oster Exp $	*/
 /*
  * rf_kintf.h
  *
@@ -37,21 +37,15 @@
 
 #include "rf_types.h"
 
-int     rf_boot(void);
-int     rf_open(dev_t dev, int flag, int fmt);
-int     rf_close(dev_t dev, int flag, int fmt);
-void    rf_strategy(struct buf * bp);
-void    rf_minphys(struct buf * bp);
-int     rf_read(dev_t dev, struct uio * uio);
-int     rf_write(dev_t dev, struct uio * uio);
-int     rf_size(dev_t dev);
-int     rf_ioctl(dev_t dev, int cmd, caddr_t data, int flag);
-void    rf_ReconKernelThread(void);
 int     rf_GetSpareTableFromDaemon(RF_SparetWait_t * req);
-caddr_t rf_MapToKernelSpace(struct buf * bp, caddr_t addr);
-int     rf_BzeroWithRemap(struct buf * bp, char *databuf, int len);
-int	rf_DoAccessKernel(RF_Raid_t * raidPtr, struct buf * bp,
-    RF_RaidAccessFlags_t flags, void (*cbFunc) (struct buf *), void *cbArg);
-	int     rf_DispatchKernelIO(RF_DiskQueue_t * queue, RF_DiskQueueData_t * req);
+void    raidstart(RF_Raid_t * raidPtr);
+int     rf_DispatchKernelIO(RF_DiskQueue_t * queue, RF_DiskQueueData_t * req);
+
+int raidwrite_component_label(dev_t, struct vnode *, RF_ComponentLabel_t *);
+int raidread_component_label(dev_t, struct vnode *, RF_ComponentLabel_t *);
+void rf_update_component_labels( RF_Raid_t *);
+int raidlookup __P((char *, struct proc *, struct vnode **));
+int raidmarkclean(dev_t dev, struct vnode *b_vp, int);
+int raidmarkdirty(dev_t dev, struct vnode *b_vp, int);
 
 #endif				/* _RF__RF_KINTF_H_ */

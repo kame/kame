@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_evenodd.c,v 1.2 1999/02/16 00:02:44 niklas Exp $	*/
-/*	$NetBSD: rf_evenodd.c,v 1.2 1999/02/05 00:06:11 oster Exp $	*/
+/*	$OpenBSD: rf_evenodd.c,v 1.4 2000/01/11 18:02:22 peter Exp $	*/
+/*	$NetBSD: rf_evenodd.c,v 1.4 2000/01/07 03:40:59 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -46,7 +46,6 @@
 #include "rf_dagdegwr.h"
 #include "rf_dagutils.h"
 #include "rf_dagfuncs.h"
-#include "rf_threadid.h"
 #include "rf_etimer.h"
 #include "rf_general.h"
 #include "rf_evenodd.h"
@@ -56,7 +55,6 @@
 #include "rf_map.h"
 #include "rf_pq.h"
 #include "rf_mcpair.h"
-#include "rf_sys.h"
 #include "rf_evenodd.h"
 #include "rf_evenodd_dagfuncs.h"
 #include "rf_evenodd_dags.h"

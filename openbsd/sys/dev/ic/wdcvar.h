@@ -1,4 +1,4 @@
-/*      $OpenBSD: wdcvar.h,v 1.4 1999/10/29 01:15:15 deraadt Exp $     */
+/*      $OpenBSD: wdcvar.h,v 1.8 2000/04/10 07:06:15 csapuntz Exp $     */
 /*	$NetBSD: wdcvar.h,v 1.17 1999/04/11 20:50:29 bouyer Exp $	*/
 
 /*-
@@ -44,7 +44,11 @@ struct channel_queue {  /* per channel queue (may be shared) */
 	TAILQ_HEAD(xferhead, wdc_xfer) sc_xfer;
 };
 
+struct channel_softc_vtbl;
+
 struct channel_softc { /* Per channel data */
+	struct channel_softc_vtbl  *_vtbl;
+
 	/* Our location */
 	int channel;
 	/* Our controller's softc */
@@ -66,13 +70,64 @@ struct channel_softc { /* Per channel data */
 	u_int8_t ch_error;          /* copy of error register */
 	/* per-drive infos */
 	struct ata_drive_datas ch_drive[2];
-	
+
 	/*
 	 * channel queues. May be the same for all channels, if hw channels
 	 * are not independants
 	 */
 	struct channel_queue *ch_queue;
 };
+
+/*
+ * Disk Controller register definitions.
+ */
+#define _WDC_REGMASK 7
+#define _WDC_AUX 8
+#define _WDC_RDONLY  16
+#define _WDC_WRONLY  32
+enum wdc_regs { 		
+	wdr_error = _WDC_RDONLY | 1,
+	wdr_precomp = _WDC_WRONLY | 1,
+	wdr_features = _WDC_WRONLY | 1,
+	wdr_seccnt = 2,
+	wdr_ireason = 2,
+	wdr_sector = 3,
+	wdr_cyl_lo = 4,
+	wdr_cyl_hi = 5,
+	wdr_sdh = 6,
+	wdr_status = _WDC_RDONLY | 7,
+	wdr_command = _WDC_WRONLY | 7,
+	wdr_altsts = _WDC_RDONLY | _WDC_AUX,
+	wdr_ctlr = _WDC_WRONLY | _WDC_AUX
+};
+
+struct channel_softc_vtbl {
+	u_int8_t (*read_reg)(struct channel_softc *, enum wdc_regs reg);
+	void (*write_reg)(struct channel_softc *, enum wdc_regs reg, 
+	    u_int8_t var);
+	
+	void (*read_raw_multi_2)(struct channel_softc *, 
+	    void *data, unsigned int nbytes);
+	void (*write_raw_multi_2)(struct channel_softc *,
+	    void *data, unsigned int nbytes);
+
+	void (*read_raw_multi_4)(struct channel_softc *,
+	    void *data, unsigned int nbytes);
+	void (*write_raw_multi_4)(struct channel_softc *,
+	    void *data, unsigned int nbytes);
+};
+
+
+#define CHP_READ_REG(chp, a)  ((chp)->_vtbl->read_reg)(chp, a)
+#define CHP_WRITE_REG(chp, a, b)  ((chp)->_vtbl->write_reg)(chp, a, b)
+#define CHP_READ_RAW_MULTI_2(chp, a, b)  \
+        ((chp)->_vtbl->read_raw_multi_2)(chp, a, b)
+#define CHP_WRITE_RAW_MULTI_2(chp, a, b)  \
+        ((chp)->_vtbl->write_raw_multi_2)(chp, a, b)
+#define CHP_READ_RAW_MULTI_4(chp, a, b)  \
+	((chp)->_vtbl->read_raw_multi_4)(chp, a, b)
+#define CHP_WRITE_RAW_MULTI_4(chp, a, b)  \
+	((chp)->_vtbl->write_raw_multi_4)(chp, a, b)
 
 struct wdc_softc { /* Per controller state */
 	struct device sc_dev;
@@ -133,6 +188,8 @@ struct wdc_xfer {
 #define C_POLL		0x0020 /* cmd is polled */
 #define C_DMA		0x0040 /* cmd uses DMA */
 #define C_SENSE		0x0080 /* cmd is a internal command */
+#define C_MEDIA_ACCESS  0x0100 /* is a media access command */
+#define C_POLL_MACHINE  0x0200 /* machine has a poll hander */
 
 	/* Informations about our location */
 	struct channel_softc *chp;
@@ -147,6 +204,20 @@ struct wdc_xfer {
 	LIST_ENTRY(wdc_xfer) free_list;
 	void (*c_start) __P((struct channel_softc *, struct wdc_xfer *));
 	int  (*c_intr)  __P((struct channel_softc *, struct wdc_xfer *, int));
+	int (*c_done)  __P((struct channel_softc *, struct wdc_xfer *, int));
+        void (*c_kill_xfer) __P((struct channel_softc *, struct wdc_xfer *));
+
+	/* Used by ATAPISCSI */
+	int timeout;
+	int endticks;
+	int delay;
+	unsigned int expect_irq:1;
+	unsigned int claim_irq:1;
+
+	int (*next) __P((struct channel_softc *, struct wdc_xfer *, int));
+	
+	/* Used for tape devices */
+	int  transfer_len;
 };
 
 /*
@@ -156,6 +227,8 @@ struct wdc_xfer {
 
 int   wdcprobe __P((struct channel_softc *));
 void  wdcattach __P((struct channel_softc *));
+int   wdcdetach __P((struct channel_softc *, int));
+int   wdcactivate __P((struct device *, enum devact));
 int   wdcintr __P((void *));
 void  wdc_exec_xfer __P((struct channel_softc *, struct wdc_xfer *));
 struct wdc_xfer *wdc_get_xfer __P((int)); /* int = WDC_NOSLEEP/CANSLEEP */
@@ -168,7 +241,8 @@ int   wdcreset	__P((struct channel_softc *, int));
 #define VERBOSE 1 
 #define SILENT 0 /* wdcreset will not print errors */
 int   wdcwait __P((struct channel_softc *, int, int, int));
-void  wdcbit_bucket __P(( struct channel_softc *, int));
+void  wdcbit_bucket __P((struct channel_softc *, int));
+
 void  wdccommand __P((struct channel_softc *, u_int8_t, u_int8_t, u_int16_t,
 	                  u_int8_t, u_int8_t, u_int8_t, u_int8_t));
 void   wdccommandshort __P((struct channel_softc *, int, int));

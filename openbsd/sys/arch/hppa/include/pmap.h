@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.9 1999/07/21 05:38:03 mickey Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.12 1999/12/12 03:16:26 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998,1999 Michael Shalayeff
@@ -113,7 +113,6 @@ struct hpt_entry {
 };
 #ifdef _KERNEL
 extern struct hpt_entry *hpt_table;
-extern u_int hpt_hashsize;
 #endif /* _KERNEL */
 
 /*
@@ -192,7 +191,7 @@ pmap_prot(struct pmap *pmap, int prot)
 }
 
 void pmap_bootstrap __P((vaddr_t *, vaddr_t *));
-void pmap_changebit __P((vaddr_t, u_int, u_int));
+void pmap_changebit __P((vm_page_t, u_int, u_int));
 #endif /* _KERNEL */
 
 #endif /* _MACHINE_PMAP_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_cnw.c,v 1.2 1999/08/24 07:11:09 fgsch Exp $	*/
+/*	$OpenBSD: if_cnw.c,v 1.6 2000/04/24 19:43:35 niklas Exp $	*/
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -341,8 +341,8 @@ cnw_disable(sc)
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 
-	pcmcia_function_disable(sc->sc_pf);
 	pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ih);
+	pcmcia_function_disable(sc->sc_pf);
 	ifp->if_flags &= ~IFF_RUNNING;
 	ifp->if_timer = 0;
 }
@@ -358,8 +358,13 @@ cnw_match(parent, match, aux)
 {
 	struct pcmcia_attach_args *pa = aux;
 
-	return (pa->manufacturer == PCMCIA_VENDOR_XIRCOM &&
-		pa->product == PCMCIA_PRODUCT_XIRCOM_XIR_CNW);
+	if (pa->manufacturer == PCMCIA_VENDOR_XIRCOM &&
+	    pa->product == PCMCIA_PRODUCT_XIRCOM_XIR_CNW_801)
+		return (1);
+	if (pa->manufacturer == PCMCIA_VENDOR_XIRCOM &&
+	    pa->product == PCMCIA_PRODUCT_XIRCOM_XIR_CNW_802)
+		return (1);
+	return (0);
 }
 
 
@@ -868,19 +873,25 @@ cnw_activate(dev, act)
 	enum devact act;
 {
 	struct cnw_softc *sc = (struct cnw_softc *)dev;
+        struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int s;
 
 	s = splnet();
 	switch (act) {
 	case DVACT_ACTIVATE:
 		pcmcia_function_enable(sc->sc_pf);
+		printf("%s:", sc->sc_dev.dv_xname);
 		sc->sc_ih =
 		    pcmcia_intr_establish(sc->sc_pf, IPL_NET, cnw_intr, sc);
+		printf("\n");
+		cnw_init(sc);
 		break;
 
 	case DVACT_DEACTIVATE:
-		pcmcia_function_disable(sc->sc_pf);
+		ifp->if_timer = 0;
+		ifp->if_flags &= ~IFF_RUNNING; /* XXX no cnw_stop() ? */
 		pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ih);
+		pcmcia_function_disable(sc->sc_pf);
 		break;
 	}
 	splx(s);

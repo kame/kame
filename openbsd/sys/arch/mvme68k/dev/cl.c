@@ -1,4 +1,4 @@
-/*	$OpenBSD: cl.c,v 1.17 1999/10/04 04:23:41 smurph Exp $ */
+/*	$OpenBSD: cl.c,v 1.20 2000/03/26 23:31:58 deraadt Exp $ */
 
 /*
  * Copyright (c) 1995 Dale Rahn. All rights reserved.
@@ -33,7 +33,6 @@
 /* DMA mode still does not work!!! */
 
 #include <sys/param.h>
-#include <sys/callout.h>
 #include <sys/conf.h>
 #include <sys/ioctl.h>
 #include <sys/proc.h>
@@ -231,22 +230,18 @@ int	clprobe(parent, self, aux)
 	void *self;
 	void *aux;
 {
-	/* probing onboard 166/167/187 CL-cd2400
+	/* probing onboard 166/167/177/187 CL-cd2400
 	 * should be previously configured, 
 	 * we can check the value before resetting the chip
 	 */
 	struct clreg *cl_reg;
 	struct confargs *ca = aux;
 	int ret;
-	if (cputyp != CPU_167 && cputyp != CPU_166
-#ifdef CPU_187
-		&& cputyp != CPU_187
-#endif
-		)
+	if (cputyp != CPU_167 && cputyp != CPU_166 && cputyp != CPU_177)
 	{
 		return 0;
 	}
-	cl_reg = (struct clreg *)ca->ca_vaddr;
+   cl_reg = (struct clreg *)ca->ca_vaddr;
 
 #if 0
 	ret = !badvaddr(&cl_reg->cl_gfrcr,1);
@@ -273,7 +268,7 @@ clattach(parent, self, aux)
 		/* if this device is configured as console,
 		 * line cl_cons.channel is the console */
 		sc->sc_cl[0].cl_consio = 1;
-		printf(" console");
+		printf(": console");
 	} else {
 		/* reset chip only if we are not console device */
 		/* wait for GFRCR */

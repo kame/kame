@@ -1,5 +1,6 @@
-/*	$OpenBSD: uhcireg.h,v 1.2 1999/08/27 09:00:29 fgsch Exp $	*/
-/*	$NetBSD: uhcireg.h,v 1.7 1999/08/22 23:19:57 augustss Exp $	*/
+/*	$OpenBSD: uhcireg.h,v 1.5 2000/04/14 22:50:26 aaron Exp $ */
+/*	$NetBSD: uhcireg.h,v 1.10 2000/04/06 23:44:21 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhcireg.h,v 1.12 1999/11/17 22:33:42 n_hibma Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -47,6 +48,7 @@
 #define  PCI_USBREV_MASK	0xff
 #define  PCI_USBREV_PRE_1_0	0x00
 #define  PCI_USBREV_1_0		0x10
+#define  PCI_USBREV_1_1		0x11
 
 #define PCI_LEGSUP		0xc0	/* Legacy Support register */
 #define  PCI_LEGSUP_USBPIRQDEN	0x2000	/* USB PIRQ D Enable */
@@ -117,8 +119,8 @@ typedef u_int32_t uhci_physaddr_t;
 #define UHCI_PTR_VF		0x00000004
 
 /*
- * The Queue Heads and Transfer Descriptors and accessed
- * by both the CPU and the USB controller which runs
+ * The Queue Heads and Transfer Descriptors are accessed
+ * by both the CPU and the USB controller which run
  * concurrently.  This means that they have to be accessed
  * with great care.  As long as the data structures are
  * not linked into the controller's frame list they cannot

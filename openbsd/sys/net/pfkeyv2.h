@@ -160,10 +160,9 @@ struct sadb_protocol {
 };
     
 #define SADB_GETSPROTO(x) ( (x) == SADB_SATYPE_AH ? IPPROTO_AH :\
-                              (x) == SADB_X_SATYPE_AH_OLD ? IPPROTO_AH :\
                                 (x) == SADB_SATYPE_ESP ? IPPROTO_ESP :\
-                                  (x) == SADB_X_SATYPE_ESP_OLD ? IPPROTO_ESP :\
-                                    IPPROTO_IPIP )
+                                    (x) == SADB_X_SATYPE_BYPASS ? IPPROTO_IP :\
+                                      IPPROTO_IPIP )
 
 #define SADB_EXT_RESERVED             0
 #define SADB_EXT_SA                   1
@@ -198,11 +197,10 @@ struct sadb_protocol {
 #define SADB_SATYPE_OSPFV2		 4
 #define SADB_SATYPE_RIPV2		 5
 #define SADB_SATYPE_MIP			 6
-#define SADB_X_SATYPE_AH_OLD		 7
-#define SADB_X_SATYPE_ESP_OLD		 8
-#define SADB_X_SATYPE_IPIP		 9
-#define SADB_X_SATYPE_TCPSIGNATURE	10
-#define SADB_SATYPE_MAX			10
+#define SADB_X_SATYPE_IPIP		 7
+#define SADB_X_SATYPE_TCPSIGNATURE	 8
+#define SADB_X_SATYPE_BYPASS		 9
+#define SADB_SATYPE_MAX			 9
 
 #define SADB_SASTATE_LARVAL   0
 #define SADB_SASTATE_MATURE   1
@@ -228,12 +226,14 @@ struct sadb_protocol {
 #define SADB_X_EALG_SKIPJACK  5
 #define SADB_EALG_MAX         5
 
-#define SADB_SAFLAGS_PFS         	0x01    /* perfect forward secrecy */
-#define SADB_X_SAFLAGS_HALFIV    	0x02    /* Used for ESP-old */
-#define SADB_X_SAFLAGS_TUNNEL	 	0x04    /* Force tunneling */
-#define SADB_X_SAFLAGS_CHAINDEL  	0x08    /* Delete whole SA chain */
-#define SADB_X_SAFLAGS_LOCALFLOW 	0x10    /* Add flow with src=0.0.0.0 */
-#define SADB_X_SAFLAGS_REPLACEFLOW	0x20    /* Replace existing flow */
+#define SADB_SAFLAGS_PFS         	0x001    /* perfect forward secrecy */
+#define SADB_X_SAFLAGS_HALFIV    	0x002    /* Used for ESP-old */
+#define SADB_X_SAFLAGS_TUNNEL	 	0x004    /* Force tunneling */
+#define SADB_X_SAFLAGS_CHAINDEL  	0x008    /* Delete whole SA chain */
+#define SADB_X_SAFLAGS_REPLACEFLOW	0x020    /* Replace existing flow */
+#define SADB_X_SAFLAGS_INGRESS_FLOW     0x040    /* Ingress ACL entry */
+#define SADB_X_SAFLAGS_RANDOMPADDING    0x080    /* Random ESP padding */
+#define SADB_X_SAFLAGS_NOREPLAY         0x100    /* No replay counter */
 
 #define SADB_IDENTTYPE_RESERVED   0
 #define SADB_IDENTTYPE_PREFIX     1
@@ -244,12 +244,59 @@ struct sadb_protocol {
 
 #define SADB_KEY_FLAGS_MAX 0
 
+#define PFKEYV2_LIFETIME_HARD      0
+#define PFKEYV2_LIFETIME_SOFT      1
+#define PFKEYV2_LIFETIME_CURRENT   2
+
+#define PFKEYV2_IDENTITY_SRC       0
+#define PFKEYV2_IDENTITY_DST       1
+
+#define PFKEYV2_ENCRYPTION_KEY     0
+#define PFKEYV2_AUTHENTICATION_KEY 1
+
+#define PFKEYV2_SOCKETFLAGS_REGISTERED 1
+#define PFKEYV2_SOCKETFLAGS_PROMISC    2
+
+#define PFKEYV2_SENDMESSAGE_UNICAST    1
+#define PFKEYV2_SENDMESSAGE_REGISTERED 2
+#define PFKEYV2_SENDMESSAGE_BROADCAST  3
+
 #ifdef _KERNEL
 struct tdb;
+struct socket;
+struct mbuf;
+
+struct pfkey_version
+{
+    int protocol;
+    int (*create)(struct socket *socket);
+    int (*release)(struct socket *socket);
+    int (*send)(struct socket *socket, void *message, int len);
+};
+
+struct pfkeyv2_socket
+{
+    struct pfkeyv2_socket *next;
+    struct socket *socket;
+    int flags;
+    uint32_t pid;
+    uint32_t registration;    /* Increase size if SATYPE_MAX > 31 */
+};
+
+struct dump_state
+{
+    struct sadb_msg *sadb_msg;
+    struct socket *socket;
+};
 
 int pfkeyv2_init(void);
 int pfkeyv2_cleanup(void);
 int pfkeyv2_parsemessage(void *, int, void **);
 int pfkeyv2_expire(struct tdb *, u_int16_t);
+int pfkeyv2_acquire(struct tdb *, int);
+
+int pfkey_register(struct pfkey_version *version);
+int pfkey_unregister(struct pfkey_version *version);
+int pfkey_sendup(struct socket *socket, struct mbuf *packet, int more);
 #endif /* _KERNEL */
 #endif /* _NET_PFKEY_V2_H */

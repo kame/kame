@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.23 1999/05/22 21:22:31 weingart Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.27 2000/04/29 20:37:31 miod Exp $	*/
 /*	$NetBSD: machdep.c,v 1.77 1996/10/13 03:47:51 christos Exp $	*/
 
 /*
@@ -55,7 +55,7 @@
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/clist.h>
-#include <sys/callout.h>
+#include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
@@ -103,7 +103,6 @@ extern vm_offset_t vmmap;	/* XXX - poor name.  See mem.c */
 
 int physmem;
 int fputype;
-int msgbufmapped;
 label_t *nofault;
 vm_offset_t vmmap;
 
@@ -188,7 +187,7 @@ allocsys(v)
 #ifdef REAL_CLISTS
 	valloc(cfree, struct cblock, nclist);
 #endif
-	valloc(callout, struct callout, ncallout);
+	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -347,12 +346,9 @@ cpu_startup()
 			       VM_MBUF_SIZE, FALSE);
 
 	/*
-	 * Initialize callouts
+	 * Initialize timeouts
 	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
-	callout[i-1].c_next = NULL;
+	timeout_init();
 
 	printf("avail mem = %ld\n", ptoa(cnt.v_free_count));
 	printf("using %d buffers containing %d bytes of memory\n",
@@ -711,7 +707,6 @@ dumpsys()
 	daddr_t blkno;
 	int error = 0;
 
-	msgbufmapped = 0;
 	if (dumpdev == NODEV)
 		return;
 	if (dumppage_va == 0)
@@ -805,7 +800,7 @@ dumpsys()
 		if ((todo & 0xf) == 0)
 			printf("\r%4d", todo);
 		pmap_enter(pmap_kernel(), vmmap, paddr | PMAP_NC,
-			VM_PROT_READ, FALSE);
+			VM_PROT_READ, FALSE, VM_PROT_READ);
 		error = (*dsw->d_dump)(dumpdev, blkno, vaddr, NBPG);
 		pmap_remove(pmap_kernel(), vmmap, vmmap + NBPG);
 		if (error)

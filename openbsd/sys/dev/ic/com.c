@@ -1,6 +1,33 @@
-/*	$OpenBSD: com.c,v 1.50 1999/08/08 16:28:17 niklas Exp $	*/
+/*	$OpenBSD: com.c,v 1.55 2000/01/27 09:05:33 mickey Exp $	*/
 /*	$NetBSD: com.c,v 1.82.4.1 1996/06/02 09:08:00 mrg Exp $	*/
 
+/*
+ * Copyright (c) 1997 - 1999, Jason Downs.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name(s) of the author(s) nor the name OpenBSD
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR(S) BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 /*-
  * Copyright (c) 1993, 1994, 1995, 1996
  *	Charles M. Hannum.  All rights reserved.
@@ -64,8 +91,6 @@
 #include <machine/bus.h>
 #include <machine/intr.h>
 
-#include <dev/isa/isavar.h>	/* XXX */
-
 #include <dev/ic/comreg.h>
 #include <dev/ic/comvar.h>
 #include <dev/ic/ns16550reg.h>
@@ -75,6 +100,10 @@
 #define	com_lcr	com_cfcr
 
 #include "com.h"
+
+#if NCOM_ISA || NCOM_ISAPNP
+#include <dev/isa/isavar.h>	/* XXX */
+#endif
 
 /* XXX: These belong elsewhere */
 cdev_decl(com);
@@ -350,7 +379,10 @@ comattach(parent, self, aux)
 	void *aux;
 {
 	struct com_softc *sc = (void *)self;
-	int iobase, irq;
+	int iobase;
+#if NCOM_ISA || NCOM_ISAPNP || NCOM_COMMULTI
+	int irq;
+#endif
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
 #ifdef COM_HAYESP
@@ -379,7 +411,7 @@ comattach(parent, self, aux)
 			/* No console support! */
 			ioh = ia->ia_ioh;
 		} else {
-	       		if (iobase != comconsaddr) {
+			if (iobase != comconsaddr) {
 				if (bus_space_map(iot, iobase, COM_NPORTS, 0,
 				    &ioh))
 					panic("comattach: io mapping failed");
@@ -482,19 +514,19 @@ comattach(parent, self, aux)
 		}
 	}
 
-#ifdef notyet
 	if (sc->sc_uarttype == COM_UART_16550A) { /* Probe for TI16750s */
 		bus_space_write_1(iot, ioh, com_lcr, lcr | LCR_DLAB);
 		bus_space_write_1(iot, ioh, com_fifo,
 		    FIFO_ENABLE | FIFO_ENABLE_64BYTE);
 		if ((bus_space_read_1(iot, ioh, com_iir) >> 5) == 7) {
+#if 0
 			bus_space_write_1(iot, ioh, com_lcr, 0);
 			if ((bus_space_read_1(iot, ioh, com_iir) >> 5) == 6)
+#endif
 				sc->sc_uarttype = COM_UART_TI16750;
 		}
 		bus_space_write_1(iot, ioh, com_fifo, FIFO_ENABLE);
 	}
-#endif
 
 	bus_space_write_1(iot, ioh, com_lcr, lcr);
 	if (sc->sc_uarttype == COM_UART_16450) { /* Probe for 8250 */
@@ -562,6 +594,7 @@ comattach(parent, self, aux)
 	bus_space_write_1(iot, ioh, com_ier, 0);
 	bus_space_write_1(iot, ioh, com_mcr, 0);
 
+#if NCOM_ISA || NCOM_ISAPNP || NCOM_COMMULTI
 	if (irq != IRQUNK) {
 #if NCOM_ISA || NCOM_ISAPNP
 		if (IS_ISA(parent) || IS_ISAPNP(parent)) {
@@ -574,7 +607,7 @@ comattach(parent, self, aux)
 #endif
 			panic("comattach: IRQ but can't have one");
 	}
-
+#endif
 #ifdef KGDB
 	if (kgdb_dev == makedev(commajor, unit)) {
 		if (ISSET(sc->sc_hwflags, COM_HW_CONSOLE))
@@ -759,14 +792,14 @@ comopen(dev, flag, mode, p)
 			bus_space_handle_t hayespioh = sc->sc_hayespioh;
 
 			bus_space_write_1(iot, ioh, com_fifo,
-			     FIFO_DMA_MODE|FIFO_ENABLE|
-			     FIFO_RCV_RST|FIFO_XMT_RST|FIFO_TRIGGER_8);
+			    FIFO_DMA_MODE|FIFO_ENABLE|
+			    FIFO_RCV_RST|FIFO_XMT_RST|FIFO_TRIGGER_8);
 
 			/* Set 16550 compatibility mode */
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_SETMODE);
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD2, 
-			     HAYESP_MODE_FIFO|HAYESP_MODE_RTS|
-			     HAYESP_MODE_SCALE);
+			    HAYESP_MODE_FIFO|HAYESP_MODE_RTS|
+			    HAYESP_MODE_SCALE);
 
 			/* Set RTS/CTS flow control */
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_SETFLOWTYPE);
@@ -776,13 +809,13 @@ comopen(dev, flag, mode, p)
 			/* Set flow control levels */
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD1, HAYESP_SETRXFLOW);
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD2, 
-			     HAYESP_HIBYTE(HAYESP_RXHIWMARK));
+			    HAYESP_HIBYTE(HAYESP_RXHIWMARK));
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			     HAYESP_LOBYTE(HAYESP_RXHIWMARK));
+			    HAYESP_LOBYTE(HAYESP_RXHIWMARK));
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			     HAYESP_HIBYTE(HAYESP_RXLOWMARK));
+			    HAYESP_HIBYTE(HAYESP_RXLOWMARK));
 			bus_space_write_1(iot, hayespioh, HAYESP_CMD2,
-			     HAYESP_LOBYTE(HAYESP_RXLOWMARK));
+			    HAYESP_LOBYTE(HAYESP_RXLOWMARK));
 		} else
 #endif
 		if (ISSET(sc->sc_hwflags, COM_HW_FIFO)) {
@@ -865,7 +898,7 @@ comopen(dev, flag, mode, p)
 			}
 		} else {
 			while (sc->sc_cua ||
-			       (!ISSET(tp->t_cflag, CLOCAL) &&
+			    (!ISSET(tp->t_cflag, CLOCAL) &&
 				!ISSET(tp->t_state, TS_CARR_ON))) {
 				SET(tp->t_state, TS_WOPEN);
 				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH, ttopen, 0);
@@ -1642,7 +1675,7 @@ ohfudge:
  */
 #include <dev/cons.h>
 
-#ifdef arc
+#if defined(arc) || defined(hppa)
 #undef CONADDR
 	extern int CONADDR;
 #endif
@@ -1652,14 +1685,14 @@ comcnprobe(cp)
 	struct consdev *cp;
 {
 	/* XXX NEEDS TO BE FIXED XXX */
-#ifdef arc
+#if defined(arc)
 	bus_space_tag_t iot = &arc_bus_io;
+#elif defined(powerpc)
+	bus_space_tag_t iot = &ppc_isa_io;
+#elif defined(hppa)
+	bus_space_tag_t iot = &hppa_bustag;
 #else
-#ifdef powerpc
-	bus_space_tag_t iot = &p4e_isa_io;
-#else
-        bus_space_tag_t iot = 0;
-#endif   
+	bus_space_tag_t iot = 0;
 #endif
 	bus_space_handle_t ioh;
 	int found;

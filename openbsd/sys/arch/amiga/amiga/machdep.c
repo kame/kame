@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.34 1999/09/03 18:00:28 art Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.38 2000/04/11 02:44:23 pjanzen Exp $	*/
 /*	$NetBSD: machdep.c,v 1.95 1997/08/27 18:31:17 is Exp $	*/
 
 /*
@@ -54,7 +54,7 @@
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/clist.h>
-#include <sys/callout.h>
+#include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
@@ -108,7 +108,6 @@
 #include "ser.h"
 #include "ether.h"
 #include "ppp.h"
-#include "bridge.h"
 
 #include <net/if.h>
 
@@ -152,7 +151,6 @@ int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
-int	msgbufmapped;		/* set when safe to use msgbuf */
 int	maxmem;			/* max memory per process */
 int	physmem = MAXMEM;	/* max supported memory, changes to actual */
 /*
@@ -327,11 +325,11 @@ cpu_startup()
 	pmapdebug = 0;
 #endif
 	/* avail_end was pre-decremented in pmap_bootstrap to compensate */
-	for (i = 0; i < btoc(sizeof (struct msgbuf)); i++)
+	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_enter(pmap_kernel(), (vm_offset_t)msgbufp, 
 		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
 		    VM_PROT_READ|VM_PROT_WRITE);
-	msgbufmapped = 1;
+	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	/*
 	 * Good {morning,afternoon,evening,night}.
@@ -364,7 +362,7 @@ again:
 #define	valloclim(name, type, num, lim) \
 	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
 /*	valloc(cfree, struct cblock, nclist); */
-	valloc(callout, struct callout, ncallout);
+	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -481,11 +479,9 @@ again:
 	    VM_MBUF_SIZE, FALSE);
 
 	/*
-	 * Initialize callouts
+	 * Initialize timeouts
 	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i - 1].c_next = &callout[i];
+	timeout_init();
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
@@ -874,6 +870,7 @@ dumpsys()
 	kcore_seg_t *kseg_p;
 	cpu_kcore_hdr_t *chdr_p;
 	char	dump_hdr[dbtob(1)];	/* XXX assume hdr fits in 1 block */
+	extern int msgbufmapped;
 
 	msgbufmapped = 0;
 	if (dumpdev == NODEV)
@@ -992,13 +989,13 @@ microtime(tvp)
 
 	*tvp = time;
 	tvp->tv_usec += clkread();
-	while (tvp->tv_usec > 1000000) {
+	while (tvp->tv_usec >= 1000000) {
 		tvp->tv_sec++;
 		tvp->tv_usec -= 1000000;
 	}
 	if (tvp->tv_sec == lasttime.tv_sec &&
 	    tvp->tv_usec <= lasttime.tv_usec &&
-	    (tvp->tv_usec = lasttime.tv_usec + 1) > 1000000) {
+	    (tvp->tv_usec = lasttime.tv_usec + 1) >= 1000000) {
 		tvp->tv_sec++;
 		tvp->tv_usec -= 1000000;
 	}
@@ -1205,7 +1202,7 @@ netintr()
 #ifdef INET6
 	if (netisr & (1 << NETISR_IPV6)) {
 		netisr &= ~(1 << NETISR_IPV6);
-		ipv6intr();
+		ip6intr();
 	}
 #endif
 #ifdef NETATALK

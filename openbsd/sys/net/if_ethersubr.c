@@ -1,5 +1,34 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.31 1999/09/01 21:38:48 jason Exp $	*/
+/*	$OpenBSD: if_ethersubr.c,v 1.35 2000/04/26 19:03:11 chris Exp $	*/
 /*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
+
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1982, 1989, 1993
@@ -79,6 +108,19 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <net/if_bridge.h>
 #endif
 
+#include "vlan.h"
+#if NVLAN > 0
+#include <net/if_vlan_var.h>
+#endif /* NVLAN > 0 */
+
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
+#endif
+
 #ifdef NS
 #include <netns/ns.h>
 #include <netns/ns_if.h>
@@ -117,11 +159,6 @@ extern u_char	aarp_org_code[ 3 ];
 #if defined(CCITT)
 #include <sys/socketvar.h>
 #endif
-
-#ifdef INET6
-#include <netinet6/in6.h>
-#include <netinet6/in6_var.h>
-#endif /* INET6 */
 
 u_char	etherbroadcastaddr[6] = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 #define senderr(e) { error = (e); goto bad;}
@@ -249,6 +286,18 @@ ether_output(ifp, m0, dst, rt0)
 		etype = htons(ETHERTYPE_IP);
 		break;
 #endif
+#ifdef INET6
+	case AF_INET6:
+#ifndef OLDIP6OUTPUT
+		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst))
+			return(0); /* it must be impossible, but... */
+#else
+		if (!nd6_resolve(ifp, rt, m, dst, (u_char *)edst))
+			return(0);	/* if not yet resolves */
+#endif
+		etype = htons(ETHERTYPE_IPV6);
+		break;
+#endif
 #ifdef NS
 	case AF_NS:
 		etype = htons(ETHERTYPE_NS);
@@ -266,14 +315,12 @@ ether_output(ifp, m0, dst, rt0)
 		etype = htons(ETHERTYPE_IPX);
  		bcopy((caddr_t)&satosipx(dst)->sipx_addr.ipx_host,
 		    (caddr_t)edst, sizeof (edst));
-		if (!bcmp((caddr_t)edst, (caddr_t)&ipx_thishost, sizeof(edst)))
-			return (looutput(ifp, m, dst, rt));
 		/* If broadcasting on a simplex interface, loopback a copy */
 		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX))
 			mcopy = m_copy(m, 0, (int)M_COPYALL);
 		break;
 #endif
-#ifdef INET6
+#if 0	/*NRL INET6*/
 	case AF_INET6:
 		/*
 		 * The bottom line here is to either queue the outgoing packet
@@ -285,7 +332,7 @@ ether_output(ifp, m0, dst, rt0)
 			 * If multicast dest., then use IPv6 -> Ethernet
 			 * mcast mapping.  Really simple.
 			 */
-			ETHER_MAP_IN6_MULTICAST(((struct sockaddr_in6 *)dst)->sin6_addr,
+			ETHER_MAP_IPV6_MULTICAST(&((struct sockaddr_in6 *)dst)->sin6_addr,
 			    edst);
 		} else {
 			/* Do unicast neighbor discovery stuff. */
@@ -526,6 +573,16 @@ ether_input(ifp, eh, m)
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
 
+	etype = ntohs(eh->ether_type);
+
+#if NVLAN > 0
+	if (etype == vlan_proto) {
+		if (vlan_input(eh, m) < 0)
+			ifp->if_data.ifi_noproto++;
+		return;
+       }
+#endif /* NVLAN > 0 */
+
 #if NBRIDGE > 0
 	/*
 	 * Tap the packet off here for a bridge, if configured and
@@ -555,7 +612,6 @@ ether_input(ifp, eh, m)
 	}
 
 decapsulate:
-	etype = ntohs(eh->ether_type);
 	switch (etype) {
 #ifdef INET
 	case ETHERTYPE_IP:
@@ -583,7 +639,7 @@ decapsulate:
 	 */
 	case ETHERTYPE_IPV6:
 		schednetisr(NETISR_IPV6);
-		inq = &ipv6intrq;
+		inq = &ip6intrq;
 		break;
 #endif /* INET6 */
 #ifdef IPX
@@ -828,9 +884,9 @@ u_char	ether_ipmulticast_min[6] = { 0x01, 0x00, 0x5e, 0x00, 0x00, 0x00 };
 u_char	ether_ipmulticast_max[6] = { 0x01, 0x00, 0x5e, 0x7f, 0xff, 0xff };
 
 #ifdef INET6
-u_char	ether_ipv6multicast_min[6] = { 0x33, 0x33, 0x00, 0x00, 0x00, 0x00 };
-u_char	ether_ipv6multicast_max[6] = { 0x33, 0x33, 0xff, 0xff, 0xff, 0xff };
-#endif /* INET6 */
+u_char	ether_ip6multicast_min[6] = { 0x33, 0x33, 0x00, 0x00, 0x00, 0x00 };
+u_char	ether_ip6multicast_max[6] = { 0x33, 0x33, 0xff, 0xff, 0xff, 0xff };
+#endif
 
 /*
  * Add an Ethernet multicast address or range of addresses to the list for a
@@ -877,17 +933,18 @@ ether_addmulti(ifr, ac)
 #endif
 #ifdef INET6
 	case AF_INET6:
-		sin6 = (struct sockaddr_in6 *)&(ifr->ifr_addr);
+		sin6 = (struct sockaddr_in6 *)
+			&(((struct in6_ifreq *)ifr)->ifr_addr);
 		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			/*
 			 * An unspecified IPv6 address means listen to all
 			 * of the IPv6 multicast addresses on this Ethernet.
 			 * (Multicast routers like this.)
 			 */
-			bcopy(ether_ipv6multicast_min, addrlo, ETHER_ADDR_LEN);
-			bcopy(ether_ipv6multicast_max, addrhi, ETHER_ADDR_LEN);
+			bcopy(ether_ip6multicast_min, addrlo, ETHER_ADDR_LEN);
+			bcopy(ether_ip6multicast_max, addrhi, ETHER_ADDR_LEN);
 		} else {
-			ETHER_MAP_IN6_MULTICAST(sin6->sin6_addr, addrlo);
+			ETHER_MAP_IPV6_MULTICAST(&sin6->sin6_addr, addrlo);
 			bcopy(addrlo, addrhi, ETHER_ADDR_LEN);
 		}
 		break;
@@ -996,10 +1053,10 @@ ether_delmulti(ifr, ac)
 			 * possibly all-routers for this interface afterwards
 			 * is not a bad idea.)
 			 */
-			bcopy(ether_ipv6multicast_min, addrlo, ETHER_ADDR_LEN);
-			bcopy(ether_ipv6multicast_max, addrhi, ETHER_ADDR_LEN);
+			bcopy(ether_ip6multicast_min, addrlo, ETHER_ADDR_LEN);
+			bcopy(ether_ip6multicast_max, addrhi, ETHER_ADDR_LEN);
 		} else {
-			ETHER_MAP_IN6_MULTICAST(sin6->sin6_addr, addrlo);
+			ETHER_MAP_IPV6_MULTICAST(&sin6->sin6_addr, addrlo);
 			bcopy(addrlo, addrhi, ETHER_ADDR_LEN);
 		}
 		break;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: freebsd_file.c,v 1.7 1999/05/31 17:34:44 millert Exp $	*/
+/*	$OpenBSD: freebsd_file.c,v 1.9 2000/05/01 19:14:23 millert Exp $	*/
 /*	$NetBSD: freebsd_file.c,v 1.3 1996/05/03 17:03:09 christos Exp $	*/
 
 /*
@@ -83,7 +83,7 @@ static char *
 convert_from_freebsd_mount_type(type)
 	int type;
 {
-	static char *netbsd_mount_type[] = {
+	static char *freebsd_mount_type[] = {
 		NULL,     /*  0 = MOUNT_NONE */
 		"ffs",	  /*  1 = "Fast" Filesystem */
 		"nfs",	  /*  2 = Network Filesystem */
@@ -106,9 +106,9 @@ convert_from_freebsd_mount_type(type)
 #endif
 	};
 
-	if (type < 0 || type >= ARRAY_LENGTH(netbsd_mount_type))
+	if (type < 0 || type >= ARRAY_LENGTH(freebsd_mount_type))
 		return (NULL);
-	return (netbsd_mount_type[type]);
+	return (freebsd_mount_type[type]);
 }
 
 int
@@ -779,3 +779,44 @@ freebsd_sys_truncate(p, v, retval)
 	FREEBSD_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
 	return sys_truncate(p, uap, retval);
 }
+
+/*
+ * Just pass on everything to our fcntl, except for F_[GS]ETOWN on pipes,
+ * where we translate to SIOC[GS]PGRP.
+ */
+int
+freebsd_sys_fcntl(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	struct freebsd_sys_fcntl_args /* {
+		syscallarg(int) fd;
+		syscallarg(int) cmd;
+		syscallarg(void *) arg;
+	} */ *uap = v;
+	int fd, cmd;
+	struct filedesc *fdp;
+	struct file *fp;
+
+	fd = SCARG(uap, fd);
+	cmd = SCARG(uap, cmd);
+
+	switch (cmd) {
+	case F_GETOWN:
+	case F_SETOWN:
+		/* Our pipes does not understand F_[GS]ETOWN.  */ 
+		fdp = p->p_fd;
+		if ((u_int)fd >= fdp->fd_nfiles ||
+		    (fp = fdp->fd_ofiles[fd]) == NULL)
+			return (EBADF);
+		if (fp->f_type == DTYPE_PIPE)
+			return ((*fp->f_ops->fo_ioctl)(fp,
+			    cmd == F_GETOWN ? SIOCGPGRP : SIOCSPGRP,
+			    (caddr_t)&SCARG(uap, arg), p));
+		break;
+	}
+
+	return (sys_fcntl(p, uap, retval));
+}
+

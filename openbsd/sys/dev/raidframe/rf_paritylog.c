@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_paritylog.c,v 1.2 1999/02/16 00:03:04 niklas Exp $	*/
-/*	$NetBSD: rf_paritylog.c,v 1.3 1999/02/05 00:06:13 oster Exp $	*/
+/*	$OpenBSD: rf_paritylog.c,v 1.4 2000/01/11 18:02:22 peter Exp $	*/
+/*	$NetBSD: rf_paritylog.c,v 1.5 2000/01/07 03:41:01 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -51,11 +51,9 @@
 #include "rf_etimer.h"
 #include "rf_paritylog.h"
 #include "rf_general.h"
-#include "rf_threadid.h"
 #include "rf_map.h"
 #include "rf_paritylogging.h"
 #include "rf_paritylogDiskMgr.h"
-#include "rf_sys.h"
 
 static RF_CommonLogData_t *
 AllocParityLogCommonData(RF_Raid_t * raidPtr)

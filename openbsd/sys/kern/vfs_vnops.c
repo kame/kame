@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_vnops.c,v 1.22 1999/08/26 08:07:10 art Exp $	*/
+/*	$OpenBSD: vfs_vnops.c,v 1.26 2000/04/25 02:10:04 deraadt Exp $	*/
 /*	$NetBSD: vfs_vnops.c,v 1.20 1996/02/04 02:18:41 christos Exp $	*/
 
 /*
@@ -53,12 +53,22 @@
 #include <sys/vnode.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
+#include <sys/cdio.h>
 
 #include <vm/vm.h>
 
 #if defined(UVM)
 #include <uvm/uvm_extern.h>
 #endif
+
+int	vn_read __P((struct file *fp, off_t *off, struct uio *uio, 
+	    struct ucred *cred));
+int	vn_write __P((struct file *fp, off_t *off, struct uio *uio, 
+            struct ucred *cred));
+int	vn_select __P((struct file *fp, int which, struct proc *p));
+int 	vn_closefile __P((struct file *fp, struct proc *p));
+int	vn_ioctl __P((struct file *fp, u_long com, caddr_t data,
+	    struct proc *p));
 
 struct 	fileops vnops =
 	{ vn_read, vn_write, vn_ioctl, vn_select, vn_closefile };
@@ -85,8 +95,7 @@ vn_open(ndp, fmode, cmode)
 	if (fmode & O_CREAT) {
 		ndp->ni_cnd.cn_nameiop = CREATE;
 		ndp->ni_cnd.cn_flags = LOCKPARENT | LOCKLEAF;
-		if (((fmode & O_EXCL) == 0) &&
-		    ((fmode & FNOSYMLINK) == 0))
+		if ((fmode & O_EXCL) == 0 && (fmode & O_NOFOLLOW) == 0)
 			ndp->ni_cnd.cn_flags |= FOLLOW;
 		if ((error = namei(ndp)) != 0)
 			return (error);
@@ -114,23 +123,22 @@ vn_open(ndp, fmode, cmode)
 				error = EEXIST;
 				goto bad;
 			}
-			if ((ndp->ni_vp->v_type == VLNK) &&
-			    ((fmode & FNOSYMLINK) != 0)) {
-				error = EFTYPE;
-				goto bad;
-			}
-
 			fmode &= ~O_CREAT;
 		}
 	} else {
 		ndp->ni_cnd.cn_nameiop = LOOKUP;
-		ndp->ni_cnd.cn_flags = FOLLOW | LOCKLEAF;
+		ndp->ni_cnd.cn_flags =
+		    ((fmode & O_NOFOLLOW) ? NOFOLLOW : FOLLOW) | LOCKLEAF;
 		if ((error = namei(ndp)) != 0)
 			return (error);
 		vp = ndp->ni_vp;
 	}
 	if (vp->v_type == VSOCK) {
 		error = EOPNOTSUPP;
+		goto bad;
+	}
+	if (vp->v_type == VLNK) {
+		error = EMLINK;
 		goto bad;
 	}
 	if ((fmode & O_CREAT) == 0) {
@@ -274,8 +282,9 @@ vn_rdwr(rw, vp, base, len, offset, segflg, ioflg, cred, aresid, p)
  * File table vnode read routine.
  */
 int
-vn_read(fp, uio, cred)
+vn_read(fp, poff, uio, cred)
 	struct file *fp;
+	off_t *poff;
 	struct uio *uio;
 	struct ucred *cred;
 {
@@ -286,12 +295,12 @@ vn_read(fp, uio, cred)
 
 	VOP_LEASE(vp, uio->uio_procp, cred, LEASE_READ);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
-	uio->uio_offset = fp->f_offset;
+	uio->uio_offset = *poff;
 	count = uio->uio_resid;
 	if (vp->v_type != VDIR)
 		error = VOP_READ(vp, uio,
 		    (fp->f_flag & FNONBLOCK) ? IO_NDELAY : 0, cred);
-	fp->f_offset += count - uio->uio_resid;
+	*poff += count - uio->uio_resid;
 	VOP_UNLOCK(vp, 0, p);
 	return (error);
 }
@@ -300,8 +309,9 @@ vn_read(fp, uio, cred)
  * File table vnode write routine.
  */
 int
-vn_write(fp, uio, cred)
+vn_write(fp, poff, uio, cred)
 	struct file *fp;
+	off_t *poff;
 	struct uio *uio;
 	struct ucred *cred;
 {
@@ -314,18 +324,18 @@ vn_write(fp, uio, cred)
 		ioflag |= IO_APPEND;
 	if (fp->f_flag & FNONBLOCK)
 		ioflag |= IO_NDELAY;
-	if ((fp->f_flag & O_FSYNC) ||
+	if ((fp->f_flag & FFSYNC) ||
 	    (vp->v_mount && (vp->v_mount->mnt_flag & MNT_SYNCHRONOUS)))
 		ioflag |= IO_SYNC;
 	VOP_LEASE(vp, uio->uio_procp, cred, LEASE_WRITE);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
-	uio->uio_offset = fp->f_offset;
+	uio->uio_offset = *poff;
 	count = uio->uio_resid;
 	error = VOP_WRITE(vp, uio, ioflag, cred);
 	if (ioflag & IO_APPEND)
-		fp->f_offset = uio->uio_offset;
+		*poff = uio->uio_offset;
 	else
-		fp->f_offset += count - uio->uio_resid;
+		*poff += count - uio->uio_resid;
 	VOP_UNLOCK(vp, 0, p);
 	return (error);
 }
@@ -418,13 +428,16 @@ vn_ioctl(fp, com, data, p)
 			*(int *)data = vattr.va_size - fp->f_offset;
 			return (0);
 		}
-		if (com == FIONBIO || com == FIOASYNC)	/* XXX */
-			return (0);			/* XXX */
-		/* fall into ... */
+		if (com == FIBMAP)
+			return VOP_IOCTL(vp, com, data, fp->f_flag,
+					 p->p_ucred, p);
+		if (com == FIONBIO || com == FIOASYNC)  /* XXX */
+			return (0);                     /* XXX */
+		/* fall into... */
 
 	default:
 		return (ENOTTY);
-
+		
 	case VFIFO:
 	case VCHR:
 	case VBLK:

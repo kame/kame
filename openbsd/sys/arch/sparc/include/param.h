@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.11 1999/07/09 21:33:37 art Exp $	*/
+/*	$OpenBSD: param.h,v 1.15 2000/03/08 22:13:23 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.29 1997/03/10 22:50:37 pk Exp $ */
 
 /*
@@ -44,6 +44,10 @@
  *
  *	@(#)param.h	8.1 (Berkeley) 6/11/93
  */
+
+#ifndef _SPARC_PARAM_H_
+#define _SPARC_PARAM_H_
+
 /*
  * Sun4M support by Aaron Brown, Harvard University.
  * Changes Copyright (c) 1995 The President and Fellows of Harvard College.
@@ -124,6 +128,8 @@ extern int nbpg, pgofset, pgshift;
 #endif
 #endif
 
+#define MSGBUFSIZE	4096		/* cannot be changed without great pain */
+
 /*
  * Size of kernel malloc arena in CLBYTES-sized logical pages.
  */
@@ -171,13 +177,7 @@ extern int nbpg, pgofset, pgshift;
 #ifndef _LOCORE
 extern vaddr_t		dvma_base;
 extern vaddr_t		dvma_end;
-extern struct map	*dvmamap;
-/*
- * The dvma resource map is defined in page units, which are numbered 1 to N.
- * Use these macros to convert to/from virtual addresses.
- */
-#define rctov(n)		(ctob(((n)-1))+dvma_base)
-#define vtorc(v)		((btoc((v)-dvma_base))+1)
+extern struct extent	*dvmamap_extent;
 
 extern caddr_t	kdvma_mapin __P((caddr_t, int, int));
 extern caddr_t	dvma_malloc __P((size_t, void *, int));
@@ -233,6 +233,9 @@ extern int mmumod;
 #	define NBPG		4096
 #	define PGOFSET		(NBPG-1)
 #	define PGSHIFT		SUN4CM_PGSHIFT
+#	define PAGE_SIZE	4096
+#	define PAGE_MASK	(PAGE_SIZE - 1)
+#	define PAGE_SHIFT	SUN4CM_PGSHIFT
 #elif defined(SUN4M) && !defined(SUN4C) && defined(SUN4)
 #	define CPU_ISSUN4M	(cputyp == CPU_SUN4M)
 #	define CPU_ISSUN4C	(0)
@@ -251,6 +254,9 @@ extern int mmumod;
 #	define NBPG		4096
 #	define PGOFSET		(NBPG-1)
 #	define PGSHIFT		SUN4CM_PGSHIFT
+#	define PAGE_SIZE	4096
+#	define PAGE_MASK	(PAGE_SIZE - 1)
+#	define PAGE_SHIFT	SUN4CM_PGSHIFT
 #elif !defined(SUN4M) && defined(SUN4C) && defined(SUN4)
 #	define CPU_ISSUN4M	(0)
 #	define CPU_ISSUN4C	(cputyp == CPU_SUN4C)
@@ -269,6 +275,9 @@ extern int mmumod;
 #	define NBPG		4096
 #	define PGOFSET		(NBPG-1)
 #	define PGSHIFT		SUN4CM_PGSHIFT
+#	define PAGE_SIZE	4096
+#	define PAGE_MASK	(PAGE_SIZE - 1)
+#	define PAGE_SHIFT	SUN4CM_PGSHIFT
 #elif !defined(SUN4M) && !defined(SUN4C) && defined(SUN4)
 #	define CPU_ISSUN4M	(0)
 #	define CPU_ISSUN4C	(0)
@@ -278,6 +287,9 @@ extern int mmumod;
 #	define NBPG		8192
 #	define PGOFSET		(NBPG-1)
 #	define PGSHIFT		SUN4_PGSHIFT
+#	define PAGE_SIZE	8192
+#	define PAGE_MASK	(PAGE_SIZE - 1)
+#	define PAGE_SHIFT	SUN4_PGSHIFT
 #elif !defined(SUN4M) && !defined(SUN4C) && !defined(SUN4)
 #	define CPU_ISSUN4M	(cputyp == CPU_SUN4M)
 #	define CPU_ISSUN4C	(cputyp == CPU_SUN4C)
@@ -288,3 +300,5 @@ extern int mmumod;
 #	define PGOFSET		pgofset
 #	define PGSHIFT		pgshift
 #endif
+
+#endif /* _SPARC_PARAM_H_ */

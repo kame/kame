@@ -1,4 +1,4 @@
-/*	$OpenBSD: systm.h,v 1.32 1999/09/12 19:44:04 weingart Exp $	*/
+/*	$OpenBSD: systm.h,v 1.37 2000/01/02 06:31:28 assar Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/
 
 /*-
@@ -102,11 +102,13 @@ extern dev_t swapdev;		/* swapping device */
 extern struct vnode *swapdev_vp;/* vnode equivalent to above */
 
 struct proc;
+
+typedef int	sy_call_t __P((struct proc *, void *, register_t *));
+
 extern struct sysent {		/* system call table */
 	short	sy_narg;	/* number of args */
 	short	sy_argsize;	/* total size of arguments */
-				/* implementing function */
-	int	(*sy_call) __P((struct proc *, void *, register_t *));
+	sy_call_t *sy_call;	/* implementing function */
 } sysent[];
 #define	SCARG(p,k)	((p)->k.datum)	/* get arg from args pointer */
 
@@ -165,6 +167,10 @@ int	vsprintf __P((char *, const char *, va_list))
     __kprintf_attribute__((__format__(__kprintf__,2,3)));
 int	sprintf __P((char *buf, const char *, ...))
     __kprintf_attribute__((__format__(__kprintf__,2,3)));
+int	vsnprintf __P((char *, size_t, const char *, va_list))
+    __kprintf_attribute__((__format__(__kprintf__,3,4)));
+int	snprintf __P((char *buf, size_t, const char *, ...))
+    __kprintf_attribute__((__format__(__kprintf__,3,4)));
 struct tty;
 void	ttyprintf __P((struct tty *, const char *, ...))
     __kprintf_attribute__((__format__(__kprintf__,2,3)));
@@ -235,6 +241,16 @@ void	setstatclockrate __P((int));
 void	*shutdownhook_establish __P((void (*)(void *), void *));
 void	shutdownhook_disestablish __P((void *));
 void	doshutdownhooks __P((void));
+
+/*
+ * Power managment hooks.
+ */
+void	*powerhook_establish __P((void (*)(int, void *), void *));
+void	powerhook_disestablish __P((void *));
+void	dopowerhooks __P((int));
+#define PWR_RESUME 0
+#define PWR_SUSPEND 1
+#define PWR_STANDBY 2
 
 struct uio;
 int	uiomove __P((caddr_t, int, struct uio *));

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.10 1999/01/23 19:41:30 rahnds Exp $
+#	$OpenBSD: GENERIC,v 1.12 2000/01/09 22:00:22 itojun Exp $
 #
 # PPC GENERIC config file
 #
@@ -13,6 +13,8 @@ option		SYS_TYPE=OFWMACH
 
 option		FIREPOWERBUGS
 options		PPC_MPC106_BUG
+option		IPX		# IPX+SPX
+option		IPXIP		# IPX tunneling over IP
 
 include "../../../conf/GENERIC"
 
@@ -78,3 +80,6 @@ ofdisk*		at openfirm?	 # used for floppy support
 #ofnet*		at openfirm?
 #ofcons*	at openfirm?
 
+# for IPv6
+pseudo-device	gif		4
+#pseudo-device	faith		1

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcmcia.c,v 1.24 1999/08/16 21:46:11 fgsch Exp $	*/
+/*	$OpenBSD: pcmcia.c,v 1.28 2000/04/28 13:36:58 niklas Exp $	*/
 /*	$NetBSD: pcmcia.c,v 1.9 1998/08/13 02:10:55 eeh Exp $	*/
 
 /*
@@ -57,6 +57,7 @@ int	pcmcia_submatch __P((struct device *, void *, void *));
 void	pcmcia_attach __P((struct device *, struct device *, void *));
 int	pcmcia_print __P((void *, const char *));
 void	pcmcia_card_detach_notify __P((struct device *, void *));
+void	pcmcia_power __P((int why, void *arg));
 
 static inline void pcmcia_socket_enable __P((pcmcia_chipset_tag_t,
 					     pcmcia_chipset_handle_t *));
@@ -101,6 +102,12 @@ pcmcia_match(parent, match, aux)
 	struct device *parent;
 	void *match, *aux;
 {
+	struct cfdata *cf = match;
+	struct pcmciabus_attach_args *paa = aux;
+
+	if (strcmp(paa->paa_busname, cf->cf_driver->cd_name))
+		return 0;
+
 	/* If the autoconfiguration got this far, there's a socket here. */
 	return (1);
 }
@@ -121,6 +128,32 @@ pcmcia_attach(parent, self, aux)
 	sc->iosize = paa->iosize;
 
 	sc->ih = NULL;
+	powerhook_establish(pcmcia_power, sc);
+}
+
+void
+pcmcia_power(why, arg)
+	int why;
+	void *arg;
+{
+	struct pcmcia_softc *sc = (struct pcmcia_softc *) arg;
+	struct pcmcia_function *pf;
+	struct device *d;
+	int act = DVACT_ACTIVATE;
+
+	if (why != PWR_RESUME)
+		act = DVACT_DEACTIVATE;
+
+	for (pf = SIMPLEQ_FIRST(&sc->card.pf_head); pf != NULL;
+	     pf = SIMPLEQ_NEXT(pf, pf_list)) {
+		if (SIMPLEQ_FIRST(&pf->cfe_head) == NULL)
+			continue;
+		d = pf->child;
+		if (d == NULL)
+			continue;
+		if (d->dv_cfdata->cf_attach->ca_activate)
+			(*d->dv_cfdata->cf_attach->ca_activate)(d, act);
+	}
 }
 
 int
@@ -145,7 +178,7 @@ pcmcia_card_attach(dev)
 
 	pcmcia_check_cis_quirks(sc);
 
-#if 0
+#if 1
 	/*
 	 * Bail now if the card has no functions, or if there was an error in
 	 * the CIS.
@@ -517,6 +550,7 @@ pcmcia_function_enable(pf)
 
  done:
 	pf->pf_flags |= PFF_ENABLED;
+	delay(1000);
 	return (0);
 
  bad:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.7 1999/09/03 18:00:29 art Exp $	*/
+/*	$OpenBSD: mem.c,v 1.9 2000/01/19 15:20:59 espie Exp $	*/
 /*	$NetBSD: mem.c,v 1.18 1997/02/02 07:17:14 thorpej Exp $	*/
 
 /*
@@ -65,6 +65,7 @@ int mmopen __P((dev_t, int, int, struct proc *));
 int mmclose __P((dev_t, int, int, struct proc *));
 int mmrw __P((dev_t, struct uio *, int));
 int mmmmap __P((dev_t, int, int));
+int mmioctl __P((dev_t, u_long, caddr_t, int, struct proc *));
 
 /*ARGSUSED*/
 int
@@ -242,6 +243,17 @@ mmmmap(dev, off, prot)
 	dev_t dev;
 	int off;
 	int prot;
+{
+	return (EOPNOTSUPP);
+}
+
+int
+mmioctl(dev, cmd, data, flags, p)
+	dev_t dev;
+	u_long cmd;
+	caddr_t data;
+	int flags;
+	struct proc *p;
 {
 	return (EOPNOTSUPP);
 }

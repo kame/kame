@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_subr.c,v 1.9 1999/04/28 09:28:15 art Exp $	*/
+/*	$OpenBSD: kern_subr.c,v 1.12 2000/04/19 09:58:20 art Exp $	*/
 /*	$NetBSD: kern_subr.c,v 1.15 1996/04/09 17:21:56 ragge Exp $	*/
 
 /*
@@ -46,6 +46,8 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
+#include <sys/kernel.h>
+#include <sys/resourcevar.h>
 
 int
 uiomove(cp, n, uio)
@@ -56,12 +58,15 @@ uiomove(cp, n, uio)
 	register struct iovec *iov;
 	u_int cnt;
 	int error = 0;
+	struct proc *p;
+
+	p = uio->uio_procp;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ && uio->uio_rw != UIO_WRITE)
 		panic("uiomove: mode");
-	if (uio->uio_segflg == UIO_USERSPACE && uio->uio_procp != curproc)
-		panic("uiomove proc");
+	if (uio->uio_segflg == UIO_USERSPACE && p != curproc)
+		panic("uiomove: proc");
 #endif
 	while (n > 0 && uio->uio_resid) {
 		iov = uio->uio_iov;
@@ -76,6 +81,8 @@ uiomove(cp, n, uio)
 		switch (uio->uio_segflg) {
 
 		case UIO_USERSPACE:
+			if (p->p_schedflags & PSCHED_SHOULDYIELD)
+				preempt(NULL);
 			if (uio->uio_rw == UIO_READ)
 				error = copyout(cp, iov->iov_base, cnt);
 			else
@@ -248,4 +255,70 @@ doshutdownhooks()
 	for (dp = shutdownhook_list.lh_first; dp != NULL; dp =
 	    dp->sfd_list.le_next)
 		(*dp->sfd_fn)(dp->sfd_arg);
+}
+
+/*
+ * "Power hook" types, functions, and variables.
+ */
+
+struct powerhook_desc {
+	LIST_ENTRY(powerhook_desc) sfd_list;
+	void	(*sfd_fn) __P((int, void *));
+	void	*sfd_arg;
+};
+
+LIST_HEAD(, powerhook_desc) powerhook_list;
+
+void *
+powerhook_establish(fn, arg)
+	void (*fn) __P((int, void *));
+	void *arg;
+{
+	struct powerhook_desc *ndp;
+
+	ndp = (struct powerhook_desc *)
+	    malloc(sizeof(*ndp), M_DEVBUF, M_NOWAIT);
+	if (ndp == NULL)
+		return NULL;
+
+	ndp->sfd_fn = fn;
+	ndp->sfd_arg = arg;
+	LIST_INSERT_HEAD(&powerhook_list, ndp, sfd_list);
+
+	return (ndp);
+}
+
+void
+powerhook_disestablish(vhook)
+	void *vhook;
+{
+#ifdef DIAGNOSTIC
+	struct powerhook_desc *dp;
+
+	for (dp = powerhook_list.lh_first; dp != NULL;
+	    dp = dp->sfd_list.le_next)
+                if (dp == vhook)
+			break;
+	if (dp == NULL)
+		panic("powerhook_disestablish: hook not established");
+#endif
+
+	LIST_REMOVE((struct powerhook_desc *)vhook, sfd_list);
+	free(vhook, M_DEVBUF);
+}
+
+/*
+ * Run power hooks.
+ */
+void
+dopowerhooks(why)
+	int why;
+{
+	struct powerhook_desc *dp;
+
+	for (dp = LIST_FIRST(&powerhook_list); 
+	     dp != NULL; 
+	     dp = LIST_NEXT(dp, sfd_list)) {
+		(*dp->sfd_fn)(why, dp->sfd_arg);
+	}
 }

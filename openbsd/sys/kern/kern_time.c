@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_time.c,v 1.14 1999/06/06 19:21:34 deraadt Exp $	*/
+/*	$OpenBSD: kern_time.c,v 1.19 2000/03/23 16:54:44 art Exp $	*/
 /*	$NetBSD: kern_time.c,v 1.20 1996/02/18 11:57:06 fvdl Exp $	*/
 
 /*
@@ -55,7 +55,7 @@
 
 #include <machine/cpu.h>
 
-static void	settime __P((struct timeval *));
+void	settime __P((struct timeval *));
 
 /* 
  * Time of day and interval timer support.
@@ -68,7 +68,7 @@ static void	settime __P((struct timeval *));
  */
 
 /* This function is used by clock_settime and settimeofday */
-static void
+void
 settime(tv)
 	struct timeval *tv;
 {
@@ -298,13 +298,33 @@ sys_settimeofday(p, v, retval)
 		return (error);
 	if (SCARG(uap, tv)) {
 		/*
+		 * Don't allow the time to be set forward so far it will wrap
+		 * and become negative, thus allowing an attacker to bypass
+		 * the next check below.  The cutoff is 1 year before rollover
+		 * occurs, so even if the attacker uses adjtime(2) to move
+		 * the time past the cutoff, it will take a very long time
+		 * to get to the wrap point.
+		 *
+		 * XXX: we check against INT_MAX since on 64-bit
+		 *	platforms, sizeof(int) != sizeof(long) and
+		 *	time_t is 32 bits even when atv.tv_sec is 64 bits.
+		 */
+		if (atv.tv_sec > INT_MAX - 365*24*60*60) {
+			printf("denied attempt to set clock forward to %ld\n",
+			    atv.tv_sec);
+			return (EPERM);
+		}
+		/*
 		 * If the system is secure, we do not allow the time to be
 		 * set to an earlier value (it may be slowed using adjtime,
 		 * but not set back). This feature prevent interlopers from
 		 * setting arbitrary time stamps on files.
 		 */
-		if (securelevel > 1 && timercmp(&atv, &time, <))
+		if (securelevel > 1 && timercmp(&atv, &time, <)) {
+			printf("denied attempt to set clock back %ld seconds\n",
+			    time.tv_sec - atv.tv_sec);
 			return (EPERM);
+		}
 		settime(&atv);
 	}
 	if (SCARG(uap, tzp))
@@ -466,10 +486,10 @@ sys_setitimer(p, v, retval)
 		return (EINVAL);
 	s = splclock();
 	if (SCARG(uap, which) == ITIMER_REAL) {
-		untimeout(realitexpire, (void *)p);
+		timeout_del(&p->p_realit_to);
 		if (timerisset(&aitv.it_value)) {
 			timeradd(&aitv.it_value, &time, &aitv.it_value);
-			timeout(realitexpire, (void *)p, hzto(&aitv.it_value));
+			timeout_add(&p->p_realit_to, hzto(&aitv.it_value));
 		}
 		p->p_realtimer = aitv;
 	} else
@@ -504,8 +524,8 @@ realitexpire(arg)
 		timeradd(&p->p_realtimer.it_value,
 		    &p->p_realtimer.it_interval, &p->p_realtimer.it_value);
 		if (timercmp(&p->p_realtimer.it_value, &time, >)) {
-			timeout(realitexpire, (void *)p,
-			    hzto(&p->p_realtimer.it_value));
+			timeout_add(&p->p_realit_to,
+				    hzto(&p->p_realtimer.it_value));
 			splx(s);
 			return;
 		}
@@ -573,4 +593,33 @@ expire:
 	} else
 		itp->it_value.tv_usec = 0;		/* sec is already 0 */
 	return (0);
+}
+
+/*
+ * ratecheck(): simple time-based rate-limit checking.  see ratecheck(9)
+ * for usage and rationale.
+ */
+int
+ratecheck(lasttime, mininterval)
+	struct timeval *lasttime;
+	const struct timeval *mininterval;
+{
+	struct timeval delta;
+	int s, rv = 0;
+
+	s = splclock(); 
+	timersub(&mono_time, lasttime, &delta);
+
+	/*
+	 * check for 0,0 is so that the message will be seen at least once,
+	 * even if interval is huge.
+	 */
+	if (timercmp(&delta, mininterval, >=) ||
+	    (lasttime->tv_sec == 0 && lasttime->tv_usec == 0)) {
+		*lasttime = mono_time;
+		rv = 1;
+	}
+	splx(s);
+
+	return (rv);
 }

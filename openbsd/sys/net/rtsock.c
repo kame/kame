@@ -1,5 +1,34 @@
-/*	$OpenBSD: rtsock.c,v 1.7 1998/08/24 20:39:40 downsj Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.11 2000/03/12 01:27:11 itojun Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
+
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1988, 1991, 1993
@@ -99,6 +128,8 @@ route_usrreq(so, req, m, nam, control)
 		int af = rp->rcb_proto.sp_protocol;
 		if (af == AF_INET)
 			route_cb.ip_count--;
+		else if (af == AF_INET6)
+			route_cb.ip6_count--;
 		else if (af == AF_NS)
 			route_cb.ns_count--;
 		else if (af == AF_ISO)
@@ -129,6 +160,8 @@ route_usrreq(so, req, m, nam, control)
 		}
 		if (af == AF_INET)
 			route_cb.ip_count++;
+		else if (af == AF_INET6)
+			route_cb.ip6_count++;
 		else if (af == AF_NS)
 			route_cb.ns_count++;
 		else if (af == AF_ISO)
@@ -153,6 +186,7 @@ route_output(m, va_alist)
 #endif
 {
 	register struct rt_msghdr *rtm = 0;
+	register struct radix_node *rn = 0;
 	register struct rtentry *rt = 0;
 	struct rtentry *saved_nrt = 0;
 	struct radix_node_head *rnh;
@@ -167,8 +201,8 @@ route_output(m, va_alist)
 	so = va_arg(ap, struct socket *);
 	va_end(ap);
 
-
-#define senderr(e) { error = e; goto flush;}
+	bzero(&info, sizeof(info));
+#define senderr(e) do { error = e; goto flush;} while (0)
 	if (m == 0 || ((m->m_len < sizeof(int32_t)) &&
 		       (m = m_pullup(m, sizeof(int32_t))) == 0))
 		return (ENOBUFS);
@@ -240,11 +274,14 @@ route_output(m, va_alist)
 	case RTM_LOCK:
 		if ((rnh = rt_tables[dst->sa_family]) == 0) {
 			senderr(EAFNOSUPPORT);
-		} else if ((rt = (struct rtentry *)
-				rnh->rnh_lookup(dst, netmask, rnh)) != NULL)
-			rt->rt_refcnt++;
-		else
+		}
+		rn = rnh->rnh_lookup(dst, netmask, rnh);
+		if (rn == NULL || (rn->rn_flags & RNF_ROOT) != 0) {
 			senderr(ESRCH);
+		}
+		rt = (struct rtentry *)rn;
+		rt->rt_refcnt++;
+
 		switch(rtm->rtm_type) {
 
 		case RTM_GET:
@@ -473,9 +510,6 @@ rt_msg1(type, rtinfo)
 	register struct sockaddr *sa;
 	int len, dlen;
 
-	m = m_gethdr(M_DONTWAIT, MT_DATA);
-	if (m == 0)
-		return (m);
 	switch (type) {
 
 	case RTM_DELADDR:
@@ -490,8 +524,18 @@ rt_msg1(type, rtinfo)
 	default:
 		len = sizeof(struct rt_msghdr);
 	}
-	if (len > MHLEN)
+	if (len > MCLBYTES)
 		panic("rt_msg1");
+	m = m_gethdr(M_DONTWAIT, MT_DATA);
+	if (m && len > MHLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			m = NULL;
+		}
+	}
+	if (m == 0)
+		return (m);
 	m->m_pkthdr.len = m->m_len = len;
 	m->m_pkthdr.rcvif = 0;
 	rtm = mtod(m, struct rt_msghdr *);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofw_machdep.c,v 1.11 1999/09/03 18:01:49 art Exp $	*/
+/*	$OpenBSD: ofw_machdep.c,v 1.14 2000/03/23 04:04:21 rahnds Exp $	*/
 /*	$NetBSD: ofw_machdep.c,v 1.1 1996/09/30 16:34:50 ws Exp $	*/
 
 /*
@@ -92,6 +92,10 @@ ofw_mem_regions(memp, availp)
 	       <= 0)
 		panic("no memory?");
 	*memp = OFmem;
+	/* HACK */
+	if (OFmem[0].size == 0) {
+		*memp = OFavail;
+	}
 	*availp = OFavail;
 }
 
@@ -241,7 +245,6 @@ ofw_intr_init()
 void
 ofw_do_pending_int()
 {
-	struct intrhand *ih;
 	int vector;
 	int pcpl;
 	int hwpend;
@@ -328,6 +331,10 @@ ofwenablepcimemio(char *name, int qhandle)
 }
 #include <machine/bat.h>
 /* HACK */
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
+#include <dev/pci/pcidevs.h>
+#include <powerpc/pci/pcibrvar.h>
 #include <powerpc/pci/mpc106reg.h>
 void
 ofwconprobe()

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.54 1999/09/03 13:52:34 ho Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.83 2000/04/19 03:37:35 angelos Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -45,32 +45,38 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/errno.h>
-#include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 
 #include <net/if.h>
 #include <net/route.h>
 
+#ifdef INET
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
-#include <netinet/in_var.h>
 #include <netinet/ip_var.h>
-#include <netinet/ip_icmp.h>
+#endif /* INET */
 
-#include <net/raw_cb.h>
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
+#endif /* INET6 */
+
 #include <net/pfkeyv2.h>
 
 #include <netinet/ip_ipsp.h>
 #include <netinet/ip_ah.h>
 #include <netinet/ip_esp.h>
+
+#include <crypto/crypto.h>
+#include <crypto/xform.h>
 
 #include <dev/rndvar.h>
 
@@ -85,13 +91,17 @@ void tdb_hashstats(void);
 #define DPRINTF(x)
 #endif
 
+#ifndef offsetof
+#define offsetof(s, e) ((int)&((s *)0)->e)
+#endif
+
 #ifdef __GNUC__
 #define INLINE static __inline
 #endif
 
 int		ipsp_kern __P((int, char **, int));
 u_int8_t       	get_sa_require  __P((struct inpcb *));
-int		check_ipsec_policy  __P((struct inpcb *, u_int32_t));
+int		check_ipsec_policy  __P((struct inpcb *, void *));
 void		tdb_rehash __P((void));
 
 extern int	ipsec_auth_default_level;
@@ -106,26 +116,6 @@ struct expclusterlist_head expclusterlist =
     TAILQ_HEAD_INITIALIZER(expclusterlist);
 struct explist_head explist = TAILQ_HEAD_INITIALIZER(explist);
 
-u_int8_t hmac_ipad_buffer[64] = {
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
-    0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36 };
-
-u_int8_t hmac_opad_buffer[64] = {
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C,
-    0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C, 0x5C };
-
 /*
  * This is the proper place to define the various encapsulation transforms.
  */
@@ -133,21 +123,14 @@ u_int8_t hmac_opad_buffer[64] = {
 struct xformsw xformsw[] = {
     { XF_IP4,	         0,               "IPv4 Simple Encapsulation",
       ipe4_attach,       ipe4_init,       ipe4_zeroize,
-      (struct mbuf * (*)(struct mbuf *, struct tdb *))ipe4_input, 
-      ipe4_output, },
-    { XF_OLD_AH,         XFT_AUTH,	 "Keyed Authentication, RFC 1828/1852",
-      ah_old_attach,     ah_old_init,     ah_old_zeroize,
-      ah_old_input,      ah_old_output, },
-    { XF_OLD_ESP,        XFT_CONF,        "Simple Encryption, RFC 1829/1851",
-      esp_old_attach,    esp_old_init,    esp_old_zeroize,
-      esp_old_input,     esp_old_output, },
-    { XF_NEW_AH,	 XFT_AUTH,	  "HMAC Authentication",
-      ah_new_attach,	 ah_new_init,     ah_new_zeroize,
-      ah_new_input,	 ah_new_output, },
-    { XF_NEW_ESP,	 XFT_CONF|XFT_AUTH,
-      "Encryption + Authentication + Replay Protection",
-      esp_new_attach,	 esp_new_init,  esp_new_zeroize,
-      esp_new_input,	 esp_new_output, },
+      (int (*)(struct mbuf *, struct tdb *, int, int))ipe4_input, 
+      ipip_output, },
+    { XF_AH,	 XFT_AUTH,	    "IPsec AH",
+      ah_attach,	ah_init,   ah_zeroize,
+      ah_input,	 	ah_output, },
+    { XF_ESP,	 XFT_CONF|XFT_AUTH, "IPsec ESP",
+      esp_attach,	esp_init,  esp_zeroize,
+      esp_input,	esp_output, },
 #ifdef TCP_SIGNATURE
     { XF_TCPSIGNATURE,	 XFT_AUTH, "TCP MD5 Signature Option, RFC 2385",
       tcp_signature_tdb_attach, 	tcp_signature_tdb_init,
@@ -161,7 +144,7 @@ struct xformsw *xformswNXFORMSW = &xformsw[sizeof(xformsw)/sizeof(xformsw[0])];
 unsigned char ipseczeroes[IPSEC_ZEROES_SIZE]; /* zeroes! */ 
 
 #define TDB_HASHSIZE_INIT 32
-static struct tdb **tdbh = NULL;
+static struct tdb **tdbh = NULL, *tdb_bypass = NULL;
 static u_int tdb_hashmask = TDB_HASHSIZE_INIT - 1;
 static int tdb_count;
 
@@ -198,20 +181,19 @@ get_sa_require(struct inpcb *inp)
 
 /*
  * Check the socket policy and request a new SA with a key management
- * daemon. Sometime the inp does not contain the destination address
+ * daemon. Sometime the inp does not contain the destination address;
  * in that case use dst.
  */
-
 int
-check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
+check_ipsec_policy(struct inpcb *inp, void *daddr)
 {
+    struct route_enc re0, *re = &re0;
+    struct sockaddr_encap *dst, *gw;
+    u_int8_t sa_require, sa_have;
+    struct tdb tdb2, *tdb = NULL;
     union sockaddr_union sunion;
     struct socket *so;
-    struct route_enc re0, *re = &re0;
-    struct sockaddr_encap *dst; 
-    u_int8_t sa_require, sa_have;
     int error, i, s;
-    struct tdb *tdb = NULL;
 
     if (inp == NULL || ((so = inp->inp_socket) == 0))
       return (EINVAL);
@@ -226,33 +208,72 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
 	bzero((caddr_t) re, sizeof(*re));
 	dst = (struct sockaddr_encap *) &re->re_dst;
 	dst->sen_family = PF_KEY;
-	dst->sen_len = SENT_IP4_LEN;
-	dst->sen_type = SENT_IP4;
-	dst->sen_ip_src = inp->inp_laddr;
-	dst->sen_ip_dst.s_addr = inp->inp_faddr.s_addr ? 
-	  inp->inp_faddr.s_addr : daddr;
-	dst->sen_proto = so->so_proto->pr_protocol;
-	switch (dst->sen_proto)
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6)
 	{
-	  case IPPROTO_UDP:
-	  case IPPROTO_TCP:
-	    dst->sen_sport = inp->inp_lport;
-	    dst->sen_dport = inp->inp_fport;
-	    break;
-	  default:
-	    dst->sen_sport = 0;
-	    dst->sen_dport = 0;
+	    dst->sen_len = SENT_IP6_LEN;
+	    dst->sen_type = SENT_IP6;
+	    dst->sen_ip6_src = inp->inp_laddr6;
+	    if (inp->inp_faddr6.s6_addr)
+	      dst->sen_ip6_dst = inp->inp_faddr6;
+	    else
+	      dst->sen_ip6_dst =  (*((struct in6_addr *) daddr));
+
+	    dst->sen_ip6_proto = so->so_proto->pr_protocol;
+
+	    switch (dst->sen_ip6_proto)
+	    {
+		case IPPROTO_UDP:
+		case IPPROTO_TCP:
+		    dst->sen_ip6_sport = htons(inp->inp_lport);
+		    dst->sen_ip6_dport = htons(inp->inp_fport);
+		    break;
+
+		default:
+		    dst->sen_ip6_sport = 0;
+		    dst->sen_ip6_dport = 0;
+	    }
 	}
-    
+#endif /* INET6 */
+
+#ifdef INET
+	if (!(inp->inp_flags & INP_IPV6))
+	{
+	    dst->sen_len = SENT_IP4_LEN;
+	    dst->sen_type = SENT_IP4;
+	    dst->sen_ip_src = inp->inp_laddr;
+
+	    if (inp->inp_faddr.s_addr)
+	      dst->sen_ip_dst = inp->inp_faddr;
+	    else
+	      dst->sen_ip_dst = (*((struct in_addr *) daddr));
+
+	    dst->sen_proto = so->so_proto->pr_protocol;
+
+	    switch (dst->sen_proto)
+	    {
+		case IPPROTO_UDP:
+		case IPPROTO_TCP:
+		    dst->sen_sport = htons(inp->inp_lport);
+		    dst->sen_dport = htons(inp->inp_fport);
+		    break;
+
+		default:
+		    dst->sen_sport = 0;
+		    dst->sen_dport = 0;
+	    }
+	}
+#endif /* INET */
+
 	/* Try to find a flow */
 	rtalloc((struct route *) re);
-    
+
 	if (re->re_rt != NULL)
 	{
-	    struct sockaddr_encap *gw;
-	    
 	    gw = (struct sockaddr_encap *) (re->re_rt->rt_gateway);
-	    
+
+#ifdef INET
 	    if (gw->sen_type == SENT_IPSP)
 	    {
 		bzero(&sunion, sizeof(sunion));
@@ -263,15 +284,32 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
 		tdb = (struct tdb *) gettdb(gw->sen_ipsp_spi, &sunion,
 					    gw->sen_ipsp_sproto);
 	    }
+#endif /* INET */
+
+#ifdef INET6
+	    if (gw->sen_type == SENT_IPSP6)
+	    {
+		bzero(&sunion, sizeof(sunion));
+	        sunion.sin6.sin6_family = AF_INET6;
+		sunion.sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sunion.sin6.sin6_addr = gw->sen_ipsp6_dst;
+	      
+		tdb = (struct tdb *) gettdb(gw->sen_ipsp6_spi, &sunion,
+					    gw->sen_ipsp6_sproto);
+	    }
+#endif /* INET6 */
+
 	    RTFREE(re->re_rt);
 	}
-    } else
+    }
+    else
       tdb = inp->inp_tdb;
 
     if (tdb)
       SPI_CHAIN_ATTRIB(sa_have, tdb_onext, tdb);
     else
       sa_have = 0;
+
     splx(s);
 
     /* Check if our requirements are met */
@@ -285,13 +323,128 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
     /* If necessary try to notify keymanagement three times */
     while (i < 3)
     {
-	/* XXX address */
-	DPRINTF(("ipsec: send SA request (%d), remote ip: %s, SA type: %d\n",
-		 i + 1, inet_ntoa4(dst->sen_ip_dst), sa_require));
+	switch (dst->sen_type)
+	{
+#ifdef INET
+	    case SENT_IP4:
+		DPRINTF(("ipsec: send SA request (%d), remote IPv4 address: %s, SA type: %d\n", i + 1, inet_ntoa4(dst->sen_ip_dst), sa_require));
+		break;
+#endif /* INET */
 
-	/* Send notify */
-	/* XXX PF_KEYv2 Notify */
-	 
+#ifdef INET6
+	    case SENT_IP6:
+		DPRINTF(("ipsec: send SA request (%d), remote IPv6 address: %s, SA type: %d\n", i + 1, inet6_ntoa4(dst->sen_ip6_dst), sa_require));
+		break;
+#endif /* INET6 */
+
+	    default:
+		DPRINTF(("ipsec: unsupported protocol family %d, cannot notify kkey management\n", dst->sen_type));
+		return EPFNOSUPPORT;
+	}
+
+	/* Initialize TDB for PF_KEY notification */
+	bzero(&tdb2, sizeof(tdb2));
+	sa_require = get_sa_require(inp);
+
+	/* Check for PFS */
+	if (ipsec_require_pfs)
+	  tdb2.tdb_flags |= TDBF_PFS;
+
+	/* Initialize expirations */
+	if (ipsec_soft_allocations > 0)
+	  tdb2.tdb_soft_allocations = ipsec_soft_allocations;
+
+	if (ipsec_exp_allocations > 0)
+	  tdb2.tdb_exp_allocations = ipsec_exp_allocations;
+
+	if (ipsec_soft_bytes > 0)
+	  tdb2.tdb_soft_bytes = ipsec_soft_bytes;
+
+	if (ipsec_exp_bytes > 0)
+	  tdb2.tdb_exp_bytes = ipsec_exp_bytes;
+
+	if (ipsec_soft_timeout > 0)
+	  tdb2.tdb_soft_timeout = ipsec_soft_timeout;
+
+	if (ipsec_exp_timeout > 0)
+	  tdb2.tdb_exp_timeout = ipsec_exp_timeout;
+
+	if (ipsec_soft_first_use > 0)
+	  tdb2.tdb_soft_first_use = ipsec_soft_first_use;
+
+	if (ipsec_exp_first_use > 0)
+	  tdb2.tdb_exp_first_use = ipsec_exp_first_use;
+
+	if (sa_require & NOTIFY_SATYPE_CONF)
+	{
+	    tdb2.tdb_satype = SADB_SATYPE_ESP;
+
+	    if (!strncasecmp(ipsec_def_enc, "des", sizeof("des")))
+	      tdb2.tdb_encalgxform = &enc_xform_des;
+	    else
+	      if (!strncasecmp(ipsec_def_enc, "3des", sizeof("3des")))
+		tdb2.tdb_encalgxform = &enc_xform_3des;
+	      else
+		if (!strncasecmp(ipsec_def_enc, "blowfish", sizeof("blowfish")))
+		  tdb2.tdb_encalgxform = &enc_xform_blf;
+		else
+		  if (!strncasecmp(ipsec_def_enc, "cast128", sizeof("cast128")))
+		    tdb2.tdb_encalgxform = &enc_xform_cast5;
+		  else
+		    if (!strncasecmp(ipsec_def_enc, "skipjack",
+				     sizeof("skipjack")))
+		      tdb2.tdb_encalgxform = &enc_xform_skipjack;
+	}
+
+	if (tdb2.tdb_satype & NOTIFY_SATYPE_AUTH)
+	{
+	    if (!(sa_require & NOTIFY_SATYPE_CONF))
+	      tdb2.tdb_satype = SADB_SATYPE_AH;
+
+	    if (!strncasecmp(ipsec_def_auth, "hmac-md5", sizeof("hmac-md5")))
+	      tdb2.tdb_authalgxform = &auth_hash_hmac_md5_96;
+	    else
+	      if (!strncasecmp(ipsec_def_auth, "hmac-sha1",
+			       sizeof("hmac-sha1")))
+		tdb2.tdb_authalgxform = &auth_hash_hmac_sha1_96;
+	      else
+		if (!strncasecmp(ipsec_def_auth, "hmac-ripemd160",
+				 sizeof("hmac_ripemd160")))
+		  tdb2.tdb_authalgxform = &auth_hash_hmac_ripemd_160_96;
+	}
+
+	/* XXX Initialize src_id/dst_id */
+
+#ifdef INET
+	if (!(inp->inp_flags & INP_IPV6))
+	{
+	    tdb2.tdb_src.sin.sin_family = AF_INET;
+	    tdb2.tdb_src.sin.sin_len = sizeof(struct sockaddr_in);
+	    tdb2.tdb_src.sin.sin_addr = inp->inp_laddr;
+
+	    tdb2.tdb_dst.sin.sin_family = AF_INET;
+	    tdb2.tdb_dst.sin.sin_len = sizeof(struct sockaddr_in);
+	    tdb2.tdb_dst.sin.sin_addr = inp->inp_faddr;
+	}
+#endif /* INET */
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6)
+	{
+	    tdb2.tdb_src.sin6.sin6_family = AF_INET6;
+	    tdb2.tdb_src.sin6.sin6_len = sizeof(struct sockaddr_in6);
+	    tdb2.tdb_src.sin6.sin6_addr = inp->inp_laddr6;
+
+	    tdb2.tdb_dst.sin6.sin6_family = AF_INET6;
+	    tdb2.tdb_dst.sin6.sin6_len = sizeof(struct sockaddr_in6);
+	    tdb2.tdb_dst.sin6.sin6_addr = inp->inp_faddr6;
+	}
+#endif /* INET6 */
+
+	/* Send PF_KEYv2 Notify */
+	if ((error = pfkeyv2_acquire(&tdb2, 0)) != 0)
+	  return error;
+
 	/* 
 	 * Wait for the keymanagement daemon to establich a new SA,
 	 * even on error check again, perhaps some other process
@@ -309,13 +462,17 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
 	 */
 	if (inp->inp_secresult == SR_SUCCESS)
 	  return (0);
+
 	/*
 	 * Key Management returned a permanent failure, we do not
-	 * need to retry again. XXX - when more than one key
-	 * management daemon is available we can not do that.
+	 * need to retry again.
+	 *
+	 * XXX when more than one key management daemon is available
+	 * XXX we can not do that.
 	 */
 	if (inp->inp_secresult == SR_FAILED)
 	  break;
+
 	i++;
     }
 
@@ -325,7 +482,6 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
 /*
  * Add an inpcb to the list of inpcb which reference this tdb directly.
  */
-
 void
 tdb_add_inp(struct tdb *tdb, struct inpcb *inp)
 {
@@ -338,8 +494,10 @@ tdb_add_inp(struct tdb *tdb, struct inpcb *inp)
 	    splx(s);
 	    return;
 	}
+
 	TAILQ_REMOVE(&inp->inp_tdb->tdb_inp, inp, inp_tdb_next);
     }
+
     inp->inp_tdb = tdb;
     TAILQ_INSERT_TAIL(&tdb->tdb_inp, inp, inp_tdb_next);
     splx(s);
@@ -359,7 +517,7 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 {
     struct tdb *tdbp;
     u_int32_t spi;
-    int nums;
+    int nums, s;
 
     /* Don't accept ranges only encompassing reserved SPIs.  */
     if (tspi < sspi || tspi <= SPI_RESERVED_MAX)
@@ -375,7 +533,7 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
     if (sspi == tspi)   /* Asking for a specific SPI */
       nums = 1;
     else
-      nums = 50;  /* XXX figure out some good value */
+      nums = 100;  /* XXX figure out some good value */
 
     while (nums--)
     {
@@ -395,9 +553,13 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 	  spi = htonl(spi);
 
 	/* Check whether we're using this SPI already */
-	if (gettdb(spi, dst, sproto) != (struct tdb *) NULL)
+	s = spltdb();
+	tdbp = gettdb(spi, dst, sproto);
+	splx(s);
+
+	if (tdbp != (struct tdb *) NULL)
 	  continue;
-	
+
 	MALLOC(tdbp, struct tdb *, sizeof(struct tdb), M_TDB, M_WAITOK);
 	bzero((caddr_t) tdbp, sizeof(struct tdb));
 	
@@ -411,8 +573,14 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 	tdbp->tdb_epoch = kernfs_epoch - 1;
 	puttdb(tdbp);
 
-	/* XXX Should set up a silent expiration for this */
-	
+	/* Setup a "silent" expiration (since TDBF_INVALID's set) */
+	if (ipsec_keep_invalid > 0)
+	{
+		tdbp->tdb_flags |= TDBF_TIMER;
+		tdbp->tdb_exp_timeout = time.tv_sec + ipsec_keep_invalid;
+		tdb_expiration(tdbp, TDBEXP_EARLY | TDBEXP_TIMEOUT);
+	}
+
 	return spi;
     }
 
@@ -464,6 +632,8 @@ tdb_hash(u_int32_t spi, union sockaddr_union *dst, u_int8_t proto)
  * When we receive an IPSP packet, we need to look up its tunnel descriptor
  * block, based on the SPI in the packet and the destination address (which
  * is really one of our addresses if we received the packet!
+ *
+ * Caller is responsible for setting at least spltdb().
  */
 
 struct tdb *
@@ -473,18 +643,49 @@ gettdb(u_int32_t spi, union sockaddr_union *dst, u_int8_t proto)
     struct tdb *tdbp;
     int s;
 
+    if (spi == 0 && proto == 0)
+    {
+	/*
+	 * tdb_bypass; a placeholder for bypass flows, allocate on
+	 * first pass.
+	 */
+	if (tdb_bypass == NULL)
+	{
+	    s = spltdb();
+	    MALLOC(tdb_bypass, struct tdb *, sizeof(struct tdb), M_TDB,
+		   M_WAITOK);
+	    tdb_count++;
+	    splx(s);
+
+	    bzero(tdb_bypass, sizeof(struct tdb));
+	    tdb_bypass->tdb_satype = SADB_X_SATYPE_BYPASS;
+	    tdb_bypass->tdb_established = time.tv_sec;
+	    tdb_bypass->tdb_epoch = kernfs_epoch - 1;
+	    tdb_bypass->tdb_flags = 0;
+
+#ifdef INET
+	    tdb_bypass->tdb_dst.sa.sa_family = AF_INET;
+#elif INET6
+	    tdb_bypass->tdb_dst.sa.sa_family = AF_INET6;
+#endif
+
+	    TAILQ_INIT(&tdb_bypass->tdb_bind_in);
+	    TAILQ_INIT(&tdb_bypass->tdb_inp);
+	}
+
+	return tdb_bypass;
+    }
+
     if (tdbh == NULL)
       return (struct tdb *) NULL;
 
     hashval = tdb_hash(spi, dst, proto);
 
-    s = spltdb();
     for (tdbp = tdbh[hashval]; tdbp != NULL; tdbp = tdbp->tdb_hnext)
       if ((tdbp->tdb_spi == spi) && 
 	  !bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa)) &&
 	  (tdbp->tdb_sproto == proto))
 	break;
-    splx(s);
 
     return tdbp;
 }
@@ -570,7 +771,9 @@ handle_expirations(void *arg)
 	if ((tdb->tdb_flags & TDBF_TIMER) &&
 	    (tdb->tdb_exp_timeout <= time.tv_sec))
 	{
-	    pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
+	    /* If it's an "invalid" TDB, do a silent expiration */
+	    if (!(tdb->tdb_flags & TDBF_INVALID))
+	      pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
 	    tdb_delete(tdb, 0, 0);
 	    continue;
 	}
@@ -611,13 +814,12 @@ handle_expirations(void *arg)
 /*
  * Ensure the tdb is in the right place in the expiration list.
  */
-
 void
 tdb_expiration(struct tdb *tdb, int flags)
 {
-    u_int64_t next_timeout = 0;
     struct tdb *t, *former_expirer, *next_expirer;
     int will_be_first, sole_reason, early;
+    u_int64_t next_timeout = 0;
     int s = spltdb();
 
     /*
@@ -807,11 +1009,16 @@ tdb_expiration(struct tdb *tdb, int flags)
 struct flow *
 find_flow(union sockaddr_union *src, union sockaddr_union *srcmask,
 	  union sockaddr_union *dst, union sockaddr_union *dstmask,
-	  u_int8_t proto, struct tdb *tdb)
+	  u_int8_t proto, struct tdb *tdb, int ingress)
 {
     struct flow *flow;
 
-    for (flow = tdb->tdb_flow; flow; flow = flow->flow_next)
+    if (ingress)
+      flow = tdb->tdb_access;
+    else
+      flow = tdb->tdb_flow;
+
+    for (; flow; flow = flow->flow_next)
       if (!bcmp(&src->sa, &flow->flow_src.sa, SA_LEN(&src->sa)) &&
 	  !bcmp(&dst->sa, &flow->flow_dst.sa, SA_LEN(&dst->sa)) &&
 	  !bcmp(&srcmask->sa, &flow->flow_srcmask.sa, SA_LEN(&srcmask->sa)) &&
@@ -838,11 +1045,16 @@ find_global_flow(union sockaddr_union *src, union sockaddr_union *srcmask,
     if (tdbh == NULL)
       return (struct flow *) NULL;
 
+    if (tdb_bypass != NULL)
+      if ((flow = find_flow(src, srcmask, dst, dstmask, proto,
+			    tdb_bypass, FLOW_EGRESS)) != (struct flow *) NULL)
+	return flow;
+
     for (i = 0; i <= tdb_hashmask; i++)
     {
 	for (tdb = tdbh[i]; tdb != NULL; tdb = tdb->tdb_hnext)
-	  if ((flow = find_flow(src, srcmask, dst, dstmask, proto, tdb)) !=
-	      (struct flow *) NULL)
+	  if ((flow = find_flow(src, srcmask, dst, dstmask, proto,
+				tdb, FLOW_EGRESS)) != (struct flow *) NULL)
 	    return flow;
     }
     return (struct flow *) NULL;
@@ -862,7 +1074,7 @@ tdb_rehash(void)
     tdb_hashmask = (tdb_hashmask << 1) | 1;
     MALLOC(new_tdbh, struct tdb **, sizeof(struct tdb *) * (tdb_hashmask + 1),
 	   M_TDB, M_WAITOK);
-    bzero(new_tdbh, sizeof(struct tdbh *) * (tdb_hashmask + 1));
+    bzero(new_tdbh, sizeof(struct tdb *) * (tdb_hashmask + 1));
     for (i = 0; i <= old_hashmask; i++)
       for (tdbp = tdbh[i]; tdbp != NULL; tdbp = tdbnp)
       {
@@ -871,6 +1083,7 @@ tdb_rehash(void)
 	  tdbp->tdb_hnext = new_tdbh[hashval];
 	  new_tdbh[hashval] = tdbp;
       }
+
     FREE(tdbh, M_TDB);
     tdbh = new_tdbh;
 }
@@ -905,6 +1118,7 @@ puttdb(struct tdb *tdbp)
     }
     tdbp->tdb_hnext = tdbh[hashval];
     tdbh[hashval] = tdbp;
+    tdbp->tdb_ref++;
     tdb_count++;
     splx(s);
 }
@@ -914,17 +1128,24 @@ puttdb(struct tdb *tdbp)
  */
 
 void
-put_flow(struct flow *flow, struct tdb *tdb)
+put_flow(struct flow *flow, struct tdb *tdb, int ingress)
 {
-    flow->flow_next = tdb->tdb_flow;
-    flow->flow_prev = (struct flow *) NULL;
-
-    tdb->tdb_flow = flow;
-
-    flow->flow_sa = tdb;
+    if (ingress)
+    {
+	flow->flow_next = tdb->tdb_access;
+	tdb->tdb_access = flow;
+    }
+    else
+    {
+	flow->flow_next = tdb->tdb_flow;
+	tdb->tdb_flow = flow;
+    }
 
     if (flow->flow_next)
       flow->flow_next->flow_prev = flow;
+
+    flow->flow_sa = tdb;
+    flow->flow_prev = (struct flow *) NULL;
 }
 
 /*
@@ -932,35 +1153,44 @@ put_flow(struct flow *flow, struct tdb *tdb)
  */
 
 void
-delete_flow(struct flow *flow, struct tdb *tdb)
+delete_flow(struct flow *flow, struct tdb *tdb, int ingress)
 {
     if (tdb)
     {
-	if (tdb->tdb_flow == flow)
-	{
-	    tdb->tdb_flow = flow->flow_next;
-	    if (tdb->tdb_flow)
-	      tdb->tdb_flow->flow_prev = (struct flow *) NULL;
-	}
+	if (ingress && (tdb->tdb_access == flow))
+	    tdb->tdb_access = flow->flow_next;
 	else
-	{
-	    flow->flow_prev->flow_next = flow->flow_next;
-	    if (flow->flow_next)
-	      flow->flow_next->flow_prev = flow->flow_prev;
-	}
+	  if (!ingress && (tdb->tdb_flow == flow))
+	    tdb->tdb_flow = flow->flow_next;
+
+	if (flow->flow_prev)
+	  flow->flow_prev->flow_next = flow->flow_next;
+
+	if (flow->flow_next)
+	  flow->flow_next->flow_prev = flow->flow_prev;
     }
 
-    ipsec_in_use--;
+    if (!ingress)
+      ipsec_in_use--;
+
     FREE(flow, M_TDB);
 }
 
 void
 tdb_delete(struct tdb *tdbp, int delchain, int expflags)
 {
-    struct tdb *tdbpp;
+    struct tdb *tdbpp, *tdbpn;
     struct inpcb *inp;
     u_int32_t hashval = tdbp->tdb_sproto + tdbp->tdb_spi;
     int s;
+
+    /* When deleting the bypass tdb, skip the hash table code. */
+    if (tdbp == tdb_bypass && tdbp != NULL)
+    {
+	s = spltdb();
+	delchain = 0;
+	goto skip_hash;
+    }
 
     if (tdbh == NULL)
       return;
@@ -979,11 +1209,15 @@ tdb_delete(struct tdb *tdbp, int delchain, int expflags)
 	{
 	    tdbpp->tdb_hnext = tdbp->tdb_hnext;
 	    tdbpp = tdbp;
+	    break;
 	}
 
+    tdbp->tdb_hnext = NULL;
+
+ skip_hash:
     /*
      * If there was something before us in the chain pointing to us,
-     * make it point nowhere
+     * make it point nowhere.
      */
     if ((tdbp->tdb_inext) &&
 	(tdbp->tdb_inext->tdb_onext == tdbp))
@@ -991,16 +1225,23 @@ tdb_delete(struct tdb *tdbp, int delchain, int expflags)
 
     /* 
      * If there was something after us in the chain pointing to us,
-     * make it point nowhere
+     * make it point nowhere.
      */
     if ((tdbp->tdb_onext) &&
 	(tdbp->tdb_onext->tdb_inext == tdbp))
       tdbp->tdb_onext->tdb_inext = NULL;
     
-    tdbpp = tdbp->tdb_onext;
-    
+    tdbpn = tdbp->tdb_onext;
+    tdbp->tdb_inext = tdbp->tdb_onext = NULL;
+
     if (tdbp->tdb_xform)
-      (*(tdbp->tdb_xform->xf_zeroize))(tdbp);
+    {
+      	(*(tdbp->tdb_xform->xf_zeroize))(tdbp);
+	tdbp->tdb_xform = NULL;
+    }
+
+    while (tdbp->tdb_access)
+      delete_flow(tdbp->tdb_access, tdbp, FLOW_INGRESS);
 
     while (tdbp->tdb_flow)
     {
@@ -1010,36 +1251,77 @@ tdb_delete(struct tdb *tdbp, int delchain, int expflags)
         bzero(&encapdst, sizeof(struct sockaddr_encap));
         bzero(&encapnetmask, sizeof(struct sockaddr_encap));
 
-        encapdst.sen_len = SENT_IP4_LEN;
         encapdst.sen_family = PF_KEY;
-        encapdst.sen_type = SENT_IP4;
-        encapdst.sen_ip_src = tdbp->tdb_flow->flow_src.sin.sin_addr;
-        encapdst.sen_ip_dst = tdbp->tdb_flow->flow_dst.sin.sin_addr;
-        encapdst.sen_proto = tdbp->tdb_flow->flow_proto;
-        encapdst.sen_sport = tdbp->tdb_flow->flow_src.sin.sin_port;
-        encapdst.sen_dport = tdbp->tdb_flow->flow_dst.sin.sin_port;
-
-        encapnetmask.sen_len = SENT_IP4_LEN;
         encapnetmask.sen_family = PF_KEY;
-        encapnetmask.sen_type = SENT_IP4;
-        encapnetmask.sen_ip_src = tdbp->tdb_flow->flow_srcmask.sin.sin_addr;
-        encapnetmask.sen_ip_dst = tdbp->tdb_flow->flow_dstmask.sin.sin_addr;
 
-        if (tdbp->tdb_flow->flow_proto)
-        {
-            encapnetmask.sen_proto = 0xff;
-            if (tdbp->tdb_flow->flow_src.sin.sin_port)
-              encapnetmask.sen_sport = 0xffff;
-            if (tdbp->tdb_flow->flow_dst.sin.sin_port)
-              encapnetmask.sen_dport = 0xffff;
-        }
+	switch (tdbp->tdb_flow->flow_src.sa.sa_family)
+	{
+	    case AF_INET:
+		encapdst.sen_len = SENT_IP4_LEN;
+		encapdst.sen_type = SENT_IP4;
+		encapdst.sen_ip_src = tdbp->tdb_flow->flow_src.sin.sin_addr;
+		encapdst.sen_ip_dst = tdbp->tdb_flow->flow_dst.sin.sin_addr;
+		encapdst.sen_proto = tdbp->tdb_flow->flow_proto;
+		encapdst.sen_sport = tdbp->tdb_flow->flow_src.sin.sin_port;
+		encapdst.sen_dport = tdbp->tdb_flow->flow_dst.sin.sin_port;
+
+		encapnetmask.sen_ip_src = tdbp->tdb_flow->flow_srcmask.sin.sin_addr;
+		encapnetmask.sen_ip_dst = tdbp->tdb_flow->flow_dstmask.sin.sin_addr;
+
+		/* Mask transport protocol and ports if applicable */
+		if (tdbp->tdb_flow->flow_proto)
+		{
+		    encapnetmask.sen_proto = 0xff;
+		    if (tdbp->tdb_flow->flow_src.sin.sin_port)
+		      encapnetmask.sen_sport = 0xffff;
+		    if (tdbp->tdb_flow->flow_dst.sin.sin_port)
+		      encapnetmask.sen_dport = 0xffff;
+		}
+		break;
+
+#if INET6
+	    case AF_INET6:
+		encapdst.sen_len = SENT_IP6_LEN;
+		encapdst.sen_type = SENT_IP6;
+		encapdst.sen_ip6_src = tdbp->tdb_flow->flow_src.sin6.sin6_addr;
+		encapdst.sen_ip6_dst = tdbp->tdb_flow->flow_dst.sin6.sin6_addr;
+		encapdst.sen_ip6_proto = tdbp->tdb_flow->flow_proto;
+		encapdst.sen_ip6_sport = tdbp->tdb_flow->flow_src.sin6.sin6_port;
+		encapdst.sen_ip6_dport = tdbp->tdb_flow->flow_dst.sin6.sin6_port;
+
+		encapnetmask.sen_ip6_src = tdbp->tdb_flow->flow_srcmask.sin6.sin6_addr;
+		encapnetmask.sen_ip6_dst = tdbp->tdb_flow->flow_dstmask.sin6.sin6_addr;
+
+		/* Mask transport protocol and ports if applicable */
+		if (tdbp->tdb_flow->flow_proto)
+		{
+		    encapnetmask.sen_ip6_proto = 0xff;
+		    if (tdbp->tdb_flow->flow_src.sin6.sin6_port)
+		      encapnetmask.sen_ip6_sport = 0xffff;
+		    if (tdbp->tdb_flow->flow_dst.sin6.sin6_port)
+		      encapnetmask.sen_ip6_dport = 0xffff;
+		}
+		break;
+#endif /* INET6 */
+
+	    default:
+#ifdef DIAGNOSTIC
+		panic("tdb_delete(): SA %s/%08x/%d has flow of unknown type %d", ipsp_address(tdbp->tdb_dst), ntohl(tdbp->tdb_spi), tdbp->tdb_sproto, tdbp->tdb_flow->flow_src.sa.sa_family);
+#endif /* DIAGNOSTIC */		
+		delete_flow(tdbp->tdb_flow, tdbp, FLOW_EGRESS);
+		continue;
+	}
+
+	/* Always the same type for address and netmask */
+	encapnetmask.sen_len = encapdst.sen_len;
+	encapnetmask.sen_type = encapdst.sen_type;
 
         rtrequest(RTM_DELETE, (struct sockaddr *) &encapdst,
                   (struct sockaddr *) 0,
                   (struct sockaddr *) &encapnetmask,
                   0, (struct rtentry **) 0);
 
-        delete_flow(tdbp->tdb_flow, tdbp);
+        delete_flow(tdbp->tdb_flow, tdbp, FLOW_EGRESS);
     }
 
     /* Cleanup SA-Bindings */
@@ -1049,6 +1331,7 @@ tdb_delete(struct tdb *tdbp, int delchain, int expflags)
         TAILQ_REMOVE(&tdbpp->tdb_bind_in, tdbpp, tdb_bind_in_next);
 	tdbpp->tdb_bind_out = NULL;
     }
+
     /* Cleanup inp references */
     for (inp = TAILQ_FIRST(&tdbp->tdb_inp); inp;
 	 inp = TAILQ_FIRST(&tdbp->tdb_inp))
@@ -1069,16 +1352,33 @@ tdb_delete(struct tdb *tdbp, int delchain, int expflags)
     }
 
     if (tdbp->tdb_srcid)
-      FREE(tdbp->tdb_srcid, M_XDATA);
+    {
+      	FREE(tdbp->tdb_srcid, M_XDATA);
+	tdbp->tdb_srcid = NULL;
+    }
 
     if (tdbp->tdb_dstid)
-      FREE(tdbp->tdb_dstid, M_XDATA);
+    {
+      	FREE(tdbp->tdb_dstid, M_XDATA);
+	tdbp->tdb_dstid = NULL;
+    }
 
-    FREE(tdbp, M_TDB);
-    tdb_count--;
+    /* If we're deleting the bypass tdb, reset the variable. */
+    if (tdbp == tdb_bypass)
+      tdb_bypass = NULL;
 
-    if (delchain && tdbpp)
-      tdb_delete(tdbpp, delchain, expflags);
+    /* Don't always delete TDBs as they may be referenced by something else */
+    if (--tdbp->tdb_ref <= 0)
+    {
+      	FREE(tdbp, M_TDB);
+    	tdb_count--;
+    }
+    else
+      tdbp->tdb_flags |= TDBF_INVALID;
+
+    if (delchain && tdbpn)
+      tdb_delete(tdbpn, delchain, expflags);
+
     splx(s);
 }
 
@@ -1102,7 +1402,7 @@ tdb_init(struct tdb *tdbp, u_int16_t alg, struct ipsecinit *ii)
     DPRINTF(("tdb_init(): no alg %d for spi %08x, addr %s, proto %d\n", 
 	     alg, ntohl(tdbp->tdb_spi), ipsp_address(tdbp->tdb_dst),
 	     tdbp->tdb_sproto));
-    
+
     return EINVAL;
 }
 
@@ -1216,8 +1516,33 @@ ipsp_kern(int off, char **bufp, int len)
 		      l += sprintf(buffer + l, "tunneling");
 		  }
 
+		  if (tdb->tdb_flags & TDBF_NOREPLAY)
+		  {
+		      if (i)
+			l += sprintf(buffer + l, ", ");
+		      else
+			i = 1;
+
+		      l += sprintf(buffer + l, "noreplay");
+		  }
+
+		  if (tdb->tdb_flags & TDBF_RANDOMPADDING)
+		  {
+		      if (i)
+			l += sprintf(buffer + l, ", ");
+		      else
+			i = 1;
+
+		      l += sprintf(buffer + l, "random padding");
+		  }
+
 		  l += sprintf(buffer + l, ">\n");
 	      }
+
+	      l += sprintf(buffer + l, "\tCrypto ID: %qu\n", tdb->tdb_cryptoid);
+
+	      l += sprintf(buffer + l, "\tCurrently referenced %d time%s\n",
+			   tdb->tdb_ref, tdb->tdb_ref == 1 ? "" : "s");
 
 	      if (tdb->tdb_xform)
 		l += sprintf(buffer + l, "\txform = <%s>\n", 
@@ -1230,6 +1555,10 @@ ipsp_kern(int off, char **bufp, int len)
 	      if (tdb->tdb_authalgxform)
 		l += sprintf(buffer + l, "\t\tAuthentication = <%s>\n",
 			     tdb->tdb_authalgxform->name);
+
+	      if (tdb->tdb_interface)
+		l += sprintf(buffer + l, "\tAssociated interface = <%s>\n",
+			     ((struct ifnet *) tdb->tdb_interface)->if_xname);
 
 	      if (tdb->tdb_bind_out)
 		l += sprintf(buffer + l,
@@ -1267,6 +1596,12 @@ ipsp_kern(int off, char **bufp, int len)
 		i++;
 
 	      l+= sprintf(buffer + l, "\tCurrently used by %d flows\n", i);
+
+	      for (i = 0, flow = tdb->tdb_access; flow; flow = flow->flow_next)
+		i++;
+
+	      l+= sprintf(buffer + l,
+			  "\t%d ingress flows specified\n", i);
 
 	      l += sprintf(buffer + l, "\t%u flows have used this SA\n",
 			   tdb->tdb_cur_allocations);
@@ -1353,7 +1688,7 @@ ipsp_kern(int off, char **bufp, int len)
 char *
 inet_ntoa4(struct in_addr ina)
 {
-    static char buf[4][4 * sizeof "123"];
+    static char buf[4][4 * sizeof "123" + 4];
     unsigned char *ucp = (unsigned char *) &ina;
     static int i = 3;
  
@@ -1363,6 +1698,22 @@ inet_ntoa4(struct in_addr ina)
     return (buf[i]);
 }
 
+#ifdef INET6
+char *
+inet6_ntoa4(struct in6_addr ina)
+{
+    static char buf[4][8 * sizeof "abcd" + 8];
+    unsigned char *ucp = (unsigned char *) &ina;
+    static int i = 3;
+
+    i = (i + 1) % 4;
+    sprintf(buf[i], "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x",
+	    ucp[0] & 0xff, ucp[1] & 0xff, ucp[2] & 0xff, ucp[3] & 0xff,
+	    ucp[4] & 0xff, ucp[5] & 0xff, ucp[6] & 0xff, ucp[7] & 0xff);
+    return (buf[i]);
+}
+#endif /* INET6 */
+
 char *
 ipsp_address(union sockaddr_union sa)
 {
@@ -1371,11 +1722,301 @@ ipsp_address(union sockaddr_union sa)
 	case AF_INET:
 	    return inet_ntoa4(sa.sin.sin_addr);
 
-#if INET6
-	    /* XXX Add AF_INET6 support here */
+#if 0 /*INET6*/
+	case AF_INET6:
+	    return inet_ntoa6(sa.sin6.sin6_addr);
 #endif /* INET6 */
 
 	default:
 	    return "(unknown address family)";
     }
+}
+
+/*
+ * Loop over a tdb chain, taking into consideration protocol tunneling. The
+ * fourth argument is set if the first encapsulation header is already in
+ * place.
+ */
+int
+ipsp_process_packet(struct mbuf *m, struct tdb *tdb, int af, int tunalready)
+{
+    int i, off, error;
+    struct mbuf *mp;
+
+#ifdef INET
+    struct ip *ip;
+#endif /* INET */
+#ifdef INET6
+    struct ip6_hdr *ip6;
+#endif /* INET6 */
+
+    /* Check that the transform is allowed by the administrator */
+    if ((tdb->tdb_sproto == IPPROTO_ESP && !esp_enable) ||
+	(tdb->tdb_sproto == IPPROTO_AH && !ah_enable))
+    {
+	DPRINTF(("ipsp_process_packet(): IPSec outbound packet dropped due to policy\n"));
+	m_freem(m);
+	return EHOSTUNREACH;
+    }
+
+    /* Sanity check */
+    if (!tdb->tdb_xform)
+    {
+	DPRINTF(("ipsp_process_packet(): uninitialized TDB\n"));
+	m_freem(m);
+	return EHOSTUNREACH;
+    }
+
+    /* Check if the SPI is invalid */
+    if (tdb->tdb_flags & TDBF_INVALID)
+    {
+	DPRINTF(("ipsp_process_packet(): attempt to use invalid SA %s/%08x/%u\n", ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi), tdb->tdb_sproto));
+	m_freem(m);
+	return ENXIO;
+    }
+
+    /* Check that the network protocol is supported */
+    switch (tdb->tdb_dst.sa.sa_family)
+    {
+#ifdef INET
+	case AF_INET:
+	    break;
+#endif /* INET */
+
+#ifdef INET6
+	case AF_INET6:
+	    break;
+#endif /* INET6 */
+
+	default:
+	    DPRINTF(("ipsp_process_packet(): attempt to use SA %s/%08x/%u for protocol family %d\n", ipsp_address(tdb->tdb_dst), ntohl(tdb->tdb_spi), tdb->tdb_sproto, tdb->tdb_dst.sa.sa_family));
+	    m_freem(m);
+	    return ENXIO;
+    }
+
+    /* Register first use if applicable, setup relevant expiration timer */
+    if (tdb->tdb_first_use == 0)
+    {
+	tdb->tdb_first_use = time.tv_sec;
+	tdb_expiration(tdb, TDBEXP_TIMEOUT);
+    }
+
+    /*
+     * Check for tunneling if we don't have the first header in place.
+     * When doing Ethernet-over-IP, we are handed an already-encapsulated
+     * frame, so we don't need to re-encapsulate.
+     */
+    if (tunalready == 0)
+    {
+	/*
+	 * If the target protocol family is different, we know we'll be
+	 * doing tunneling.
+	 */
+	if (af == tdb->tdb_dst.sa.sa_family)
+	{
+#ifdef INET
+	    if (af == AF_INET)
+	      i = sizeof(struct ip);
+#endif /* INET */
+
+#ifdef INET6
+	    if (af == AF_INET6)
+	      i = sizeof(struct ip6_hdr);
+#endif /* INET6 */
+
+	    /* Bring the network header in the first mbuf */
+	    if (m->m_len < i)
+	    {
+		if ((m = m_pullup(m, i)) == 0)
+		  return ENOBUFS;
+	    }
+
+#ifdef INET
+	    ip = mtod(m, struct ip *);
+#endif /* INET */
+
+#ifdef INET6
+	    ip6 = mtod(m, struct ip6_hdr *);
+#endif /* INET6 */
+	}
+
+	/* Do the appropriate encapsulation, if necessary */
+	if ((tdb->tdb_dst.sa.sa_family != af) || /* PF mismatch */
+	    (tdb->tdb_flags & TDBF_TUNNELING) || /* Tunneling requested */
+	    (tdb->tdb_xform->xf_type == XF_IP4) || /* ditto */
+#ifdef INET
+	    ((tdb->tdb_dst.sa.sa_family == AF_INET) &&
+	     (tdb->tdb_dst.sin.sin_addr.s_addr != INADDR_ANY) &&
+	     (tdb->tdb_dst.sin.sin_addr.s_addr != ip->ip_dst.s_addr)) ||
+#endif /* INET */
+#ifdef INET6
+	    ((tdb->tdb_dst.sa.sa_family == AF_INET6) &&
+	     (!IN6_IS_ADDR_UNSPECIFIED(&tdb->tdb_dst.sin6.sin6_addr)) &&
+	     (!IN6_ARE_ADDR_EQUAL(&tdb->tdb_dst.sin6.sin6_addr,
+				  &ip6->ip6_dst))) ||
+#endif /* INET6 */
+	    0)
+	{
+#ifdef INET
+	    /* Fix IPv4 header checksum and length */
+	    if (af == AF_INET)
+	    {
+		if ((m = m_pullup(m, sizeof(struct ip))) == 0)
+		  return ENOBUFS;
+
+		ip = mtod(m, struct ip *);
+		ip->ip_len = htons(m->m_pkthdr.len);
+		ip->ip_sum = in_cksum(m, ip->ip_hl << 2);
+	    }
+#endif /* INET */
+
+#ifdef INET6
+	    /* Fix IPv6 header payload length */
+	    if (af == AF_INET6)
+	    {
+		if ((m = m_pullup(m, sizeof(struct ip6_hdr))) == 0)
+		  return ENOBUFS;
+
+		ip6 = mtod(m, struct ip6_hdr *);
+		ip6->ip6_plen = htons(m->m_pkthdr.len);
+	    }
+#endif /* INET6 */
+
+	    /* Encapsulate -- the last two arguments are unused */
+	    error = ipip_output(m, tdb, &mp, 0, 0);
+	    if ((mp == NULL) && (!error))
+	      error = EFAULT;
+	    if (error)
+	    {
+		if (mp)
+		{
+		    m_freem(mp);
+		    mp = NULL;
+		}
+
+		return error;
+	    }
+
+	    m = mp;
+	    mp = NULL;
+	}
+
+	/* We may be done with this TDB */
+	if (tdb->tdb_xform->xf_type == XF_IP4)
+	  return ipsp_process_done(m, tdb);
+    }
+    else
+    {
+	/*
+	 * If this is just an IP-IP TDB and we're told there's already an
+	 * encapsulation header, move on.
+	 */
+	if (tdb->tdb_xform->xf_type == XF_IP4)
+	  return ipsp_process_done(m, tdb);
+    }
+
+    /* Extract some information off the headers */
+    switch (tdb->tdb_dst.sa.sa_family)
+    {
+#ifdef INET
+	case AF_INET:
+	    ip = mtod(m, struct ip *);
+	    i = ip->ip_hl << 2;
+	    off = offsetof(struct ip, ip_p);
+	    break;
+#endif /* INET */
+
+#ifdef INET6
+	case AF_INET6:
+	    ip6 = mtod(m, struct ip6_hdr *);
+	    i = sizeof(struct ip6_hdr);
+	    off = offsetof(struct ip6_hdr, ip6_nxt);
+	    break;
+#endif /* INET6 */
+    }
+
+    /* Invoke the IPsec transform */
+    return (*(tdb->tdb_xform->xf_output))(m, tdb, NULL, i, off);
+}
+
+/*
+ * Called by the IPsec output transform callbacks, to transmit the packet
+ * or do further processing, as necessary.
+ */
+int
+ipsp_process_done(struct mbuf *m, struct tdb *tdb)
+{
+#ifdef INET
+    struct ip *ip;
+#endif /* INET */
+
+#ifdef INET6
+    struct ip6_hdr *ip6;
+#endif /* INET6 */
+
+    switch (tdb->tdb_dst.sa.sa_family)
+    {
+#ifdef INET
+	case AF_INET:
+	    /* Fix the header length, for AH processing */
+	    if (tdb->tdb_dst.sa.sa_family == AF_INET)
+	    {
+		ip = mtod(m, struct ip *);
+		ip->ip_len = htons(m->m_pkthdr.len);
+	    }
+	    break;
+#endif /* INET */
+
+#ifdef INET6
+	case AF_INET6:
+	    /* Fix the header length, for AH processing */
+	    if (tdb->tdb_dst.sa.sa_family == AF_INET6)
+	    {
+		ip6 = mtod(m, struct ip6_hdr *);
+		ip6->ip6_plen = htons(m->m_pkthdr.len);
+	    }
+	    break;
+#endif /* INET6 */
+
+	default:
+	    m_freem(m);
+	    DPRINTF(("ipsp_process_done(): unknown protocol family (%d)\n",
+		     tdb->tdb_dst.sa.sa_family));
+	    return ENXIO;
+    }
+
+    /* If there's another TDB to apply, do so. */
+    if (tdb->tdb_onext)
+      return ipsp_process_packet(m, tdb->tdb_onext,
+				 tdb->tdb_onext->tdb_dst.sa.sa_family, 0);
+
+    /*
+     * If we're done with IPsec processing, transmit the packet using the
+     * appropriate network protocol (IP or IPv6).
+     */
+    switch (tdb->tdb_dst.sa.sa_family)
+    {
+#ifdef INET
+	case AF_INET:
+	    NTOHS(ip->ip_len);
+	    NTOHS(ip->ip_off);
+	    ip->ip_sum = in_cksum(m, ip->ip_hl << 2); /* Fix checksum */
+
+	    return ip_output(m, NULL, NULL, IP_ENCAPSULATED | IP_RAWOUTPUT,
+			     NULL, NULL);
+#endif /* INET */
+
+#ifdef INET6
+	case AF_INET6:
+	    ip6 = mtod(m, struct ip6_hdr *);
+	    NTOHS(ip6->ip6_plen);
+
+	    /* XXX ip6_output() has to honor those two flags... */
+	    return ip6_output(m, NULL, NULL, IP_ENCAPSULATED | IP_RAWOUTPUT,
+			      NULL, NULL);
+#endif /* INET6 */
+    }
+
+    /* Not reached */
+    return EINVAL;
 }

@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.133 1999/10/12 17:06:56 jason Exp $
+#	$OpenBSD: GENERIC,v 1.183 2000/04/27 02:19:42 millert Exp $
 #	$NetBSD: GENERIC,v 1.48 1996/05/20 18:17:23 mrg Exp $
 #
 #	GENERIC -- everything that's currently supported
@@ -14,15 +14,13 @@ option		I586_CPU
 option		I686_CPU
 option		GPL_MATH_EMULATE	# floating point emulation
 
+option		UVM		# use the UVM virtual memory system
+
 #option		VM86		# Virtual 8086 emulation
 #option		USER_LDT	# user-settable LDT; used by WINE
 option		XSERVER		# diddle with console driver
 option		APERTURE	# in-kernel aperture driver for XFree86
 
-# Some BIOSes don't get the size of extended memory right.  If you
-# have a broken BIOS, uncomment the following and set the value
-# properly for your system.
-#option		EXTMEM_SIZE=...	# size of extended memory
 #option		DUMMY_NOPS	# speed hack; recommended
 
 option		COMPAT_SVR4	# binary compatibility with SVR4
@@ -50,6 +48,7 @@ option		EISAVERBOSE
 #option		PCMCIAVERBOSE
 #option		USBVERBOSE
 
+
 pchb*	at pci? dev ? function ?	# PCI-Host bridges
 ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 pci*	at ppb? bus ?
@@ -57,11 +56,21 @@ pci*	at pchb? bus ?
 pcib*	at pci? dev ? function ?	# PCI-ISA bridges (do nothing)
 
 # ISA PCMCIA controllers
-pcic0	at isa? port 0x3e0 iomem 0xd0000 iosiz 0x4000
-pcic1	at isa? port 0x3e2 iomem 0xd4000 iosiz 0x4000
+pcic0	at isa? port 0x3e0 iomem 0xd0000 iosiz 0x10000
+pcic1	at isa? port 0x3e2 iomem 0xe0000 iosiz 0x4000
+pcic2	at isa? port 0x3e4 iomem 0xe0000 iosiz 0x4000
 
 # PCMCIA bus support
 pcmcia*	at pcic? controller ? socket ?
+
+# CardBus bus support (also see NOTE below)
+#cardbus*	at cardslot?
+#pcmcia*		at cardslot?
+#cbb*		at pci? dev ? function ?
+#cardslot*	at cbb?
+
+# NOTE: You may need to uncomment the following line for CardBus to work
+#option	BIOS32,PCIBIOS,PCIBIOS_INTR_FIXUP,PCIBIOS_BUS_FIXUP
 
 # PCI USB Controllers
 #uhci*	at pci?				# Universal Host Controller (Intel)
@@ -78,8 +87,32 @@ pcmcia*	at pcic? controller ? socket ?
 # USB Generic HID devices
 #uhid*	at uhub? port ? configuration ? interface ?
 
+# USB Printers
+#ulpt*	at uhub? port ? configuration ? interface ?
+
+# USB Mass Storage devices
+#umass*	at uhub? port ? configuration ? interface ?
+#scsibus* at umass?
+
+# USB Modems
+#umodem*	at uhub? port ? configuration ?
+#ucom*	at umodem?
+
+# USB Audio
+#uaudio* at uhub? port ? configuration ?
+
+# USB Ethernet adapters
+#aue*	at uhub? port ?			# ADMtek AN986 Pegasus based adapters
+#cue*	at uhub? port ?			# CATC USB-EL1201A based adapters
+#kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based adapters
+
+# Diamond Multimedia Rio 500
+#urio*	at uhub? port ?
+
 # USB Generic driver
 #ugen*	at uhub? port ? configuration ? interface ?
+
+puc*	at pci?				# PCI "universal" communication device
 
 npx0	at isa? port 0xf0 irq 13	# math coprocessor
 isadma0	at isa?
@@ -102,8 +135,11 @@ pccom*	at ast? slave ?
 #pccom*	at boca? slave ?
 #rtfps0	at isa? port 0x1230 irq 10	# RT 4-port serial cards
 #pccom*	at rtfps? slave ?
+#hsq0	at isa? port 0x140 irq 10	# Hostess 4-port serial card
+#pccom*	at hsq? slave ?
 pccom*	at pcmcia? function ?		# PCMCIA modems/serial ports
 pccom*	at isapnp?
+pccom*	at puc? port ?
 
 # option for using CD1400 handshaking for incoming data
 # requires a special cable that exchanges the RTS and DTR lines
@@ -114,6 +150,7 @@ cy0	at isa? iomem 0xd4000 irq 12	# ISA cyclom serial card
 lpt0	at isa? port 0x378 irq 7	# standard PC parallel ports
 lpt1	at isa? port 0x278
 lpt2	at isa? port 0x3bc
+lpt*	at puc? port ?
 
 lms0	at isa? port 0x23c irq 5	# Logitech bus mouse
 lms1	at isa? port 0x238 irq 5
@@ -135,6 +172,11 @@ ahc0	at isa? port ? irq ?		# Adaptec 284x SCSI controllers
 ahc*	at eisa? slot ?			# Adaptec 274x, aic7770 SCSI controllers
 ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
 scsibus* at ahc?
+dpt*	at pci? dev ? function ?        # DPT SmartCache/SmartRAID PCI
+dpt*	at eisa? slot ?			# DPT SmartCache/SmartRAID EISA
+scsibus* at dpt?
+gdt*	at pci? dev ? function ?	# ICP Vortex GDT RAID controllers
+scsibus* at gdt?
 isp*	at pci? dev ? function ?	# Qlogic ISP [12]0x0 SCSI/FibreChannel
 scsibus* at isp?
 aic0	at isa? port 0x340 irq 11	# Adaptec 152[02] SCSI controllers
@@ -191,6 +233,7 @@ scsibus* at atapiscsi?
 # Networking devices
 we0	at isa? port 0x280 iomem 0xd0000 irq 9	# WD/SMC 80x3 ethernet
 we1	at isa? port 0x300 iomem 0xcc000 irq 10	#
+#we2	at isa? port 0x280 iomem 0xd0000 irq 3	# WD/SMC 80x3 ethernet
 we*	at isapnp?
 ec0	at isa? port 0x250 iomem 0xd8000 irq 9	# 3C503 ethernet
 ne0	at isa? port 0x240 irq 9		# NE[12]000 ethernet
@@ -204,9 +247,12 @@ ep*	at isapnp?				# 3C509 PnP ethernet
 ep*	at isa? port ? irq ?			# 3C509 ethernet
 ef*	at isapnp?				# 3C515 PnP ethernet
 ie0	at isa? port 0x360 iomem 0xd0000 irq 7	# StarLAN and 3C507
-ie1	at isa? port 0x300 irq 10		# EtherExpress
+#ie1	at isa? port 0x300 irq 10		# EtherExpress
 le0	at isa? port 0x360 irq 15 drq 6		# IsoLan, NE2100, and DEPCA
 ex0	at isa? port 0x320 irq 5		# Intel EtherExpress PRO/10
+#tr0	at isa? port 0xa20 iomem 0xd8000 irq ?  # IBM TROPIC based Token-Ring
+#tr1	at isa? port 0xa24 iomem 0xd0000 irq ?  # IBM TROPIC based Token-Ring
+#tr*	at isa? port ? irq ?			# 3COM TROPIC based Token-Ring
 ep0	at eisa? slot ?
 ep*	at eisa? slot ?				# 3C579 ethernet
 fea*	at eisa? slot ?				# DEC DEFEA FDDI
@@ -222,20 +268,30 @@ ne*	at pcmcia? function ?			# PCMCIA based NE2000 ethernet
 ep*	at pcmcia? function ?			# PCMCIA based 3C5xx ethernet
 sm*	at pcmcia? function ?			# PCMCIA based sm ethernet
 xe*	at pcmcia? function ?			# Xircom ethernet
-wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11
 fpa*	at pci? dev ? function ?		# DEC DEFPA FDDI
 xl*	at pci? dev ? function ?		# 3c9xx ethernet
+#xl*	at cardbus? dev ? function ?		# 3c575 ethernet
 rl*	at pci? dev ? function ?		# RealTek 81[23]9 ethernet
 tx*	at pci? dev ? function ?		# SMC 83C170 EPIC ethernet
 tl*	at pci? dev ? function ?		# Compaq Thunderlan ethernet
-mx*	at pci? dev ? function ?		# Macronix PMAC ethernet
 vr*	at pci? dev ? function ?		# VIA Rhine ethernet
-pn*	at pci? dev ? function ?		# Lite-On PNIC ethernet
 wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
 ti*	at pci? dev ? function ?		# Alteon Tigon 1Gb ethernet
-ax*	at pci? dev ? function ?		# ASIX AX88140A ethernet
+sf*	at pci? dev ? function ?		# Adaptec AIC-6915 ethernet
+sis*	at pci? dev ? function ?		# SiS 900/7016 ethernet
+ste*	at pci? dev ? function ?		# Sundance ST201 ethernet
+dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
 skc*	at pci? dev ? function ?		# SysKonnect GEnesis 984x
 sk*	at skc?					#  each port of above
+wx*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
+
+# Wireless network cards
+wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
+#awi*	at pcmcia? function ?			# Bay Networks IEEE 802.11FH
+an*	at pci? dev ? function ?		# Aironet IEEE 802.11DS
+an*	at pcmcia? function ?			# Aironet IEEE 802.11DS
+#cnw*	at pcmcia? function ?			# Xircom Netwave
+ray*	at pcmcia? function ?			# Raylink Aviator2.4/Pro 802.11FH
 
 # Media Independent Interface (mii) drivers
 exphy*	at mii? phy ?				# 3Com internal PHYs
@@ -245,9 +301,10 @@ icsphy*	at mii? phy ?				# ICS 1890 PHYs
 #lxtphy*	at mii? phy ?			# Level1 LXT970 PHYs
 nsphy*	at mii? phy ?				# NS and compatible PHYs
 #qsphy*	at mii? phy ?				# Quality Semi QS6612 PHYs
-#sqphy*	at mii? phy ?				# Seeq 8x220 PHYs
+sqphy*	at mii? phy ?				# Seeq 8x220 PHYs
 rlphy* at mii? phy ?				# RealTek 8139 internal PHYs
 #mtdphy*	at mii? phy ?			# Myson MTD972 PHYs
+dcphy*	at mii? phy ?				# Digital Clone PHYs
 ukphy*	at mii? phy ?				# "unknown" PHYs
 
 pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
@@ -256,6 +313,8 @@ sp0	at pss0 port 0x530 irq 10 drq 0		# sound port driver
 eap*	at pci? dev ? function ?		# Ensoniq AudioPCI S5016
 eso*	at pci? dev ? function ?		# ESS Solo-1 PCI AudioDrive
 sv*	at pci? dev ? function ?		# S3 SonicVibes (S3 617)
+neo*	at pci? dev ? function ?		# NeoMagic 256AV/ZX
+cmpci*	at pci? dev ? function ?		# C-Media CMI8338/8738
 sb0	at isa? port 0x220 irq 5 drq 1		# SoundBlaster
 sb*	at isapnp?
 ess*	at isapnp?				# ESS Tech ES188[78], ES888
@@ -293,6 +352,9 @@ audio*  at ym?
 audio*  at eap?
 audio*	at eso?
 audio*  at sv?
+audio*	at neo?
+audio*	at cmpci?
+#audio*	at uaudio?
 
 bktr0   at pci? dev ? function ?
 
@@ -303,10 +365,14 @@ joy*	at isapnp?
 #wdt0	at pci? dev ? function ?	# Ind Computer Source PCI-WDT50x driver
 
 # crypto support
-#aeon*	at pci? dev ? function ?		# Aeon crypto card
+hifn*	at pci? dev ? function ?	# Hi/fn 7751 crypto card
 
 pseudo-device	pctr		1
+pseudo-device	mtrr		1	# Memory range attributes control
 pseudo-device	sequencer	1
 #pseudo-device	raid		4	# RAIDframe disk driver
+# for IPv6
+pseudo-device	gif		4
+#pseudo-device	faith		1
 
 #option DEBUG_ISAPNP

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_machdep.c,v 1.9 1999/08/17 10:32:18 niklas Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.11 2000/03/02 23:02:15 todd Exp $	*/
 /*	$NetBSD: vm_machdep.c,v 1.35 1996/04/26 18:38:06 gwr Exp $	*/
 
 /*
@@ -161,19 +161,19 @@ cpu_fork(p1, p2, stack, stacksize)
  * before we "pushed" this call.
  */
 void
-cpu_set_kpc(proc, func, arg)
-	struct proc *proc;
-	void (*func)(void *);
+cpu_set_kpc(prc, func, arg)
+	struct proc *prc;
+	void (*func) (void *);
 	void *arg;
 {
 	struct pcb *pcbp;
 	struct ksigframe {
 		struct switchframe sf;
-		void (*func)(void *);
+		void (*func) (void *);
 		void *arg;
 	} *ksfp;
 
-	pcbp = &proc->p_addr->u_pcb;
+	pcbp = &prc->p_addr->u_pcb;
 
 	/* Push a ksig frame onto the kernel stack. */
 	ksfp = (struct ksigframe *)pcbp->pcb_regs[11] - 1;
@@ -306,7 +306,8 @@ pagemove(from, to, size)
 		pmap_remove(pmap_kernel(),
 			(vm_offset_t)from, (vm_offset_t)from + NBPG);
 		pmap_enter(pmap_kernel(),
-			(vm_offset_t)to, pa, VM_PROT_READ|VM_PROT_WRITE, 1);
+			(vm_offset_t)to, pa, VM_PROT_READ|VM_PROT_WRITE, 1,
+			VM_PROT_READ|VM_PROT_WRITE);
 		from += NBPG;
 		to += NBPG;
 		size -= NBPG;
@@ -374,7 +375,7 @@ vmapbuf(bp, sz)
 #endif
 		pmap_enter(pmap_kernel(), kva,
 			pa | PMAP_NC,
-			VM_PROT_READ|VM_PROT_WRITE, TRUE);
+			VM_PROT_READ|VM_PROT_WRITE, TRUE, 0);
 		addr += NBPG;
 		kva  += NBPG;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.6 1999/09/18 19:01:56 mickey Exp $	*/
+/*	$OpenBSD: param.h,v 1.9 2000/02/22 20:08:16 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -44,6 +44,10 @@
 #define	ALIGNBYTES	7
 #define	ALIGN(p)	(((u_long)(p) + ALIGNBYTES) &~ ALIGNBYTES)
 
+#define	PAGE_SIZE	4096
+#define	PAGE_MASK	(PAGE_SIZE-1)
+#define	PAGE_SHIFT	12
+
 #define	NBPG		4096		/* bytes/page */
 #define	PGOFSET		(NBPG-1)	/* byte offset into page */
 #define	PGSHIFT		12		/* LOG2(NBPG) */
@@ -74,6 +78,10 @@
 #define	UPAGES		(1<<USHIFT)	/* pages of u-area */
 #define	USPACE		(UPAGES * NBPG)	/* pages for user struct and kstack */
 
+#ifndef	MSGBUFSIZE
+#define	MSGBUFSIZE	2*NBPG		/* default message buffer size */
+#endif
+
 /*
  * Constants related to network buffer management.
  * MCLBYTES must be no larger than CLBYTES (the software page size), and,
@@ -86,18 +94,14 @@
 #define	MCLBYTES	(1 << MCLSHIFT)	/* large enough for ether MTU */
 #define	MCLOFSET	(MCLBYTES - 1)
 #ifndef NMBCLUSTERS
-#ifdef GATEWAY
-#define	NMBCLUSTERS	(1024)		/* cl map size: 1MB */
-#else
-#define	NMBCLUSTERS	(512)		/* cl map size: 0.5MB */
-#endif
+#define	NMBCLUSTERS	(2048)		/* cl map size: 1MB */
 #endif
 
 /*
  * Size of kernel malloc arena in CLBYTES-sized logical pages
  */
 #ifndef NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(8192*1024/CLBYTES)
+#define	NKMEMCLUSTERS	(16 * 1024 * 1024 / CLBYTES)
 #endif
 
 /* pages ("clicks") (4096 bytes) to disk blocks */

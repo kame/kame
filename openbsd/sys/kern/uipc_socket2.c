@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket2.c,v 1.10 1999/02/19 15:06:52 millert Exp $	*/
+/*	$OpenBSD: uipc_socket2.c,v 1.14 2000/02/29 19:16:46 itojun Exp $	*/
 /*	$NetBSD: uipc_socket2.c,v 1.11 1996/02/04 02:17:55 christos Exp $	*/
 
 /*
@@ -145,9 +145,9 @@ soisdisconnected(so)
  * When an attempt at a new connection is noted on a socket
  * which accepts connections, sonewconn is called.  If the
  * connection is possible (subject to space constraints, etc.)
- * then we allocate a new structure, propoerly linked into the
+ * then we allocate a new structure, properly linked into the
  * data structure of the original socket, and return this.
- * Connstatus may be 0, or SO_ISCONFIRMING, or SO_ISCONNECTED.
+ * Connstatus may be 0, or SS_ISCONFIRMING, or SS_ISCONNECTED.
  *
  * Currently, sonewconn() is defined as sonewconn1() in socketvar.h
  * to catch calls that are missing the (new) second parameter.
@@ -777,4 +777,40 @@ sbdroprecord(sb)
 			MFREE(m, mn);
 		} while ((m = mn) != NULL);
 	}
+}
+
+/*
+ * Create a "control" mbuf containing the specified data
+ * with the specified type for presentation on a socket buffer.
+ */
+struct mbuf *
+sbcreatecontrol(p, size, type, level)
+	caddr_t p;
+	register int size;
+	int type, level;
+{
+	register struct cmsghdr *cp;
+	struct mbuf *m;
+
+	if (CMSG_SPACE(size) > MCLBYTES) {
+		printf("sbcreatecontrol: message too large %d\n", size);
+		return NULL;
+	}
+
+	if ((m = m_get(M_DONTWAIT, MT_CONTROL)) == NULL)
+		return ((struct mbuf *) NULL);
+	if (CMSG_SPACE(size) > MLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			return NULL;
+		}
+	}
+	cp = mtod(m, struct cmsghdr *);
+	bcopy(p, CMSG_DATA(cp), size);
+	m->m_len = CMSG_SPACE(size);
+	cp->cmsg_len = CMSG_LEN(size);
+	cp->cmsg_level = level;
+	cp->cmsg_type = type;
+	return (m);
 }

@@ -1,6 +1,33 @@
-/*	$OpenBSD: com_pcmcia.c,v 1.21 1999/08/16 16:51:19 deraadt Exp $	*/
+/*	$OpenBSD: com_pcmcia.c,v 1.26 2000/04/24 19:43:35 niklas Exp $	*/
 /*	$NetBSD: com_pcmcia.c,v 1.15 1998/08/22 17:47:58 msaitoh Exp $	*/
 
+/*
+ * Copyright (c) 1997 - 1999, Jason Downs.  All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name(s) of the author(s) nor the name OpenBSD
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR(S) ``AS IS'' AND ANY EXPRESS
+ * OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR(S) BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -126,13 +153,14 @@ int com_pcmcia_match __P((struct device *, void *, void *));
 void com_pcmcia_attach __P((struct device *, struct device *, void *));
 int com_pcmcia_detach __P((struct device *, int));
 void com_pcmcia_cleanup __P((void *));
+int com_pcmcia_activate __P((struct device *, enum devact));
 
 int com_pcmcia_enable __P((struct com_softc *));
 void com_pcmcia_disable __P((struct com_softc *));
 int com_pcmcia_enable1 __P((struct com_softc *));
 void com_pcmcia_disable1 __P((struct com_softc *));
 
-void com_attach __P((struct com_softc *));
+void com_pcmcia_attach2 __P((struct com_softc *));
 
 struct com_pcmcia_softc {
 	struct com_softc sc_com;		/* real "com" softc */
@@ -147,12 +175,12 @@ struct com_pcmcia_softc {
 #if NCOM_PCMCIA
 struct cfattach com_pcmcia_ca = {
 	sizeof(struct com_pcmcia_softc), com_pcmcia_match, com_pcmcia_attach,
-	com_pcmcia_detach, com_activate
+	com_pcmcia_detach, com_pcmcia_activate
 };
 #elif NPCCOM_PCMCIA
 struct cfattach pccom_pcmcia_ca = {
 	sizeof(struct com_pcmcia_softc), com_pcmcia_match, com_pcmcia_attach,
-	com_pcmcia_detach, com_activate
+	com_pcmcia_detach, com_pcmcia_activate
 };
 #endif
 
@@ -207,6 +235,33 @@ com_pcmcia_match(parent, match, aux)
 	return 0;
 }
 
+int
+com_pcmcia_activate(dev, act)
+	struct device *dev;
+	enum devact act;
+{
+	struct com_pcmcia_softc *sc = (void *) dev;
+	int s;
+
+	s = spltty();
+	switch (act) {
+	case DVACT_ACTIVATE:
+		pcmcia_function_enable(sc->sc_pf);
+		printf("%s:", sc->sc_com.sc_dev.dv_xname);
+		sc->sc_ih = pcmcia_intr_establish(sc->sc_pf, IPL_TTY,
+		    comintr, sc);
+		printf("\n");
+		break;
+
+	case DVACT_DEACTIVATE:
+		pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ih);
+		pcmcia_function_disable(sc->sc_pf);
+		break;
+	}
+	splx(s);
+	return (0);
+}
+
 void
 com_pcmcia_attach(parent, self, aux)
 	struct device *parent, *self;
@@ -223,8 +278,8 @@ com_pcmcia_attach(parent, self, aux)
 retry:
 	/* find a cfe we can use */
 
-	for (cfe = pa->pf->cfe_head.sqh_first; cfe;
-	     cfe = cfe->cfe_list.sqe_next) {
+	for (cfe = SIMPLEQ_FIRST(&pa->pf->cfe_head); cfe;
+	     cfe = SIMPLEQ_NEXT(cfe, cfe_list)) {
 #if 0
 		/*
 		 * Some modem cards (e.g. Xircom CM33) also have
@@ -287,7 +342,7 @@ found:
 	if (psc->sc_ih == NULL)
 		printf(", couldn't establish interrupt");
 
-	com_attach(sc);
+	com_pcmcia_attach2(sc);
 
 #ifdef notyet
 	sc->enabled = 0;
@@ -366,8 +421,8 @@ com_pcmcia_disable(sc)
 {
 	struct com_pcmcia_softc *psc = (struct com_pcmcia_softc *) sc;
 
-	com_pcmcia_disable1(sc);
 	pcmcia_intr_disestablish(psc->sc_pf, psc->sc_ih);
+	com_pcmcia_disable1(sc);
 }
 
 void
@@ -383,7 +438,7 @@ com_pcmcia_disable1(sc)
  * XXX This should be handled by a generic attach
  */
 void
-com_attach(sc)
+com_pcmcia_attach2(sc)
 	struct com_softc *sc;
 {
 	bus_space_tag_t iot = sc->sc_iot;

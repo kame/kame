@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.17 1999/09/05 22:20:45 tholo Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.24 2000/04/19 09:58:20 art Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*-
@@ -50,6 +50,7 @@
 #include <sys/resourcevar.h>
 #include <vm/vm.h>
 #include <sys/sched.h>
+#include <sys/timeout.h>
 
 #if defined(UVM)
 #include <uvm/uvm_extern.h>
@@ -64,10 +65,32 @@
 u_char	curpriority;		/* usrpri of curproc */
 int	lbolt;			/* once a second sleep address */
 
+void scheduler_start __P((void));
+
 void roundrobin __P((void *));
 void schedcpu __P((void *));
 void updatepri __P((struct proc *));
 void endtsleep __P((void *));
+
+void
+scheduler_start()
+{
+	static struct timeout roundrobin_to;
+	static struct timeout schedcpu_to;
+
+	/*
+	 * We avoid polluting the global namespace by keeping the scheduler
+	 * timeouts static in this function.
+	 * We setup the timeouts here and kick rundrobin and schedcpu once to
+	 * make them do their job.
+	 */
+
+	timeout_set(&roundrobin_to, roundrobin, &roundrobin_to);
+	timeout_set(&schedcpu_to, schedcpu, &schedcpu_to);
+
+	roundrobin(&roundrobin_to);
+	schedcpu(&schedcpu_to);
+}
 
 /*
  * Force switch among equal priority processes every 100ms.
@@ -77,9 +100,25 @@ void
 roundrobin(arg)
 	void *arg;
 {
+	struct timeout *to = (struct timeout *)arg;
+	int s;
 
+	if (curproc != NULL) {
+		s = splstatclock();
+		if (curproc->p_schedflags & PSCHED_SEENRR) {
+			/*
+			 * The process has already been through a roundrobin
+			 * without switching and may be hogging the CPU.
+			 * Indicate that the process should yield.
+			 */
+			curproc->p_schedflags |= PSCHED_SHOULDYIELD;
+		} else {
+			curproc->p_schedflags |= PSCHED_SEENRR;
+		}
+		splx(s);
+	}
 	need_resched();
-	timeout(roundrobin, NULL, hz / 10);
+	timeout_add(to, hz / 10);
 }
 
 /*
@@ -175,10 +214,11 @@ void
 schedcpu(arg)
 	void *arg;
 {
-	register fixpt_t loadfac = loadfactor(averunnable.ldavg[0]);
-	register struct proc *p;
-	register int s;
-	register unsigned int newcpu;
+	struct timeout *to = (struct timeout *)arg;
+	fixpt_t loadfac = loadfactor(averunnable.ldavg[0]);
+	struct proc *p;
+	int s;
+	unsigned int newcpu;
 	int phz;
 
 	/*
@@ -189,7 +229,7 @@ schedcpu(arg)
 	 */
 	phz = stathz ? stathz : profhz;
 
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	for (p = LIST_FIRST(&allproc); p != 0; p = LIST_NEXT(p, p_list)) {
 		/*
 		 * Increment time in/out of memory and sleep time
 		 * (if sleeping).  We ignore overflow; with 16-bit int's
@@ -242,7 +282,7 @@ schedcpu(arg)
 	vmmeter();
 #endif
 	wakeup((caddr_t)&lbolt);
-	timeout(schedcpu, (void *)0, hz);
+	timeout_add(to, hz);
 }
 
 /*
@@ -345,7 +385,7 @@ tsleep(ident, priority, wmesg, timo)
 		*qp->sq_tailp = p;
 	*(qp->sq_tailp = &p->p_forw) = 0;
 	if (timo)
-		timeout(endtsleep, (void *)p, timo);
+		timeout_add(&p->p_sleep_to, timo);
 	/*
 	 * We put ourselves on the sleep queue and start our timeout
 	 * before calling CURSIG, as we could stop there, and a wakeup
@@ -390,7 +430,7 @@ resume:
 			return (EWOULDBLOCK);
 		}
 	} else if (timo)
-		untimeout(endtsleep, (void *)p);
+		timeout_del(&p->p_sleep_to);
 	if (catch && (sig != 0 || (sig = CURSIG(p)) != 0)) {
 #ifdef KTRACE
 		if (KTRPOINT(p, KTR_CSW))
@@ -417,7 +457,7 @@ void
 endtsleep(arg)
 	void *arg;
 {
-	register struct proc *p;
+	struct proc *p;
 	int s;
 
 	p = (struct proc *)arg;
@@ -572,6 +612,52 @@ restart:
 }
 
 /*
+ * General yield call.  Puts the current process back on its run queue and
+ * performs a voluntary context switch.
+ */
+void
+yield()
+{
+	struct proc *p = curproc;
+	int s;
+
+	p->p_priority = p->p_usrpri;
+	s = splstatclock();
+	setrunqueue(p);
+	p->p_stats->p_ru.ru_nvcsw++;
+	mi_switch();
+	splx(s);
+}
+
+/*
+ * General preemption call.  Puts the current process back on its run queue
+ * and performs an involuntary context switch.  If a process is supplied,
+ * we switch to that process.  Otherwise, we use the normal process selection
+ * criteria.
+ */
+void
+preempt(newp)
+	struct proc *newp;
+{
+	struct proc *p = curproc;
+	int s;
+
+	/*
+	 * XXX Switching to a specific process is not supported yet.
+	 */
+	if (newp != NULL)
+		panic("preempt: cpu_preempt not yet implemented");
+
+	p->p_priority = p->p_usrpri;
+	s = splstatclock();
+	setrunqueue(p);
+	p->p_stats->p_ru.ru_nivcsw++;
+	mi_switch();
+	splx(s);
+}
+
+
+/*
  * The machine independent parts of mi_switch().
  * Must be called at splstatclock() or higher.
  */
@@ -619,6 +705,13 @@ mi_switch()
 		p->p_nice = NZERO + 4;
 		resetpriority(p);
 	}
+
+
+	/*
+	 * Process is about to yield the CPU; clear the appropriate
+	 * scheduling flags.
+	 */
+	p->p_schedflags &= ~PSCHED_SWITCHCLEAR;
 
 	/*
 	 * Pick a new current process and record its start time.
@@ -764,7 +857,7 @@ db_show_all_procs(addr, haddr, count, modif)
 		return;
 	}
 	
-	p = allproc.lh_first;
+	p = LIST_FIRST(&allproc);
 
 	switch (*mode) {
 
@@ -813,10 +906,10 @@ db_show_all_procs(addr, haddr, count, modif)
 
 			}
 		}
-		p = p->p_list.le_next;
+		p = LIST_NEXT(p, p_list);
 		if (p == 0 && doingzomb == 0) {
 			doingzomb = 1;
-			p = zombproc.lh_first;
+			p = LIST_FIRST(&zombproc);
 		}
 	}
 }

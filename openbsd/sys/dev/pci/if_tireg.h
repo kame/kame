@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tireg.h,v 1.3 1999/10/03 13:06:30 jason Exp $	*/
+/*	$OpenBSD: if_tireg.h,v 1.7 2000/03/15 03:56:49 todd Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tireg.h,v 1.11 1999/09/22 06:43:16 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_tireg.h,v 1.12 2000/01/18 00:26:29 wpaul Exp $
  */
 
 /*
@@ -82,6 +82,13 @@
 #define SGI_DEVICEID_TIGON		0x0009
 
 /*
+ * DEC vendor ID, Farallon device ID. Apparently, Farallon used
+ * the DEC vendor ID in their cards by mistake.
+ */
+#define DEC_VENDORID			0x1011
+#define DEC_DEVICEID_FARALLON_PN9000SX	0x001a
+
+/*
  * Tigon configuration and control registers.
  */
 #define TI_MISC_HOST_CTL		0x040
@@ -130,7 +137,7 @@
  */
 #define TI_FIRMWARE_MAJOR		0xc
 #define TI_FIRMWARE_MINOR		0x3
-#define TI_FIRMWARE_FIX			0xf
+#define TI_FIRMWARE_FIX			0x12
 
 /*
  * Miscelaneous Local Control register.
@@ -325,7 +332,7 @@
  */
 #define TI_OPMODE_BYTESWAP_BD		0x00000002
 #define TI_OPMODE_WORDSWAP_BD		0x00000004
-#define TI_OPMODE_WARN_ENB		0x00000008 /* not yet implimented */
+#define TI_OPMODE_WARN_ENB		0x00000008 /* not yet implemented */
 #define TI_OPMODE_BYTESWAP_DATA		0x00000010
 #define TI_OPMODE_1_DMA_ACTIVE		0x00000040
 #define TI_OPMODE_SBUS			0x00000100
@@ -335,7 +342,7 @@
 #define TI_OPMODE_NO_EVENT_INTRS	0x00001000
 #define TI_OPMODE_NO_TX_INTRS		0x00002000
 #define TI_OPMODE_NO_RX_INTRS		0x00004000
-#define TI_OPMODE_FATAL_ENB		0x40000000 /* not yet implimented */
+#define TI_OPMODE_FATAL_ENB		0x40000000 /* not yet implemented */
 
 /*
  * DMA configuration thresholds.
@@ -1114,6 +1121,7 @@ struct ti_softc {
 	struct ifmedia		ifmedia;	/* media info */
 	u_int8_t		ti_hwrev;	/* Tigon rev (1 or 2) */
 	u_int8_t		ti_linkstat;	/* Link state */
+	bus_dma_tag_t		sc_dmatag;
 	struct ti_ring_data	*ti_rdata;	/* rings */
 	struct ti_chain_data	ti_cdata;	/* mbufs */
 #define ti_ev_prodidx		ti_rdata->ti_ev_prodidx_r

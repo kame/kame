@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.11 1999/09/03 18:01:55 art Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.15 1999/12/09 21:35:28 art Exp $	*/
 /*	$NetBSD: pmap.h,v 1.30 1997/08/04 20:00:47 pk Exp $ */
 
 /*
@@ -173,6 +173,43 @@ struct segmap {
 
 typedef struct pmap *pmap_t;
 
+/*
+ * For each managed physical page, there is a list of all currently
+ * valid virtual mappings of that page.  Since there is usually one
+ * (or zero) mapping per page, the table begins with an initial entry,
+ * rather than a pointer; this head entry is empty iff its pv_pmap
+ * field is NULL.
+ *
+ * Note that these are per machine independent page (so there may be
+ * only one for every two hardware pages, e.g.).  Since the virtual
+ * address is aligned on a page boundary, the low order bits are free
+ * for storing flags.  Only the head of each list has flags.
+ *
+ * THIS SHOULD BE PART OF THE CORE MAP
+ */
+struct pvlist {
+	struct		pvlist *pv_next;	/* next pvlist, if any */
+	struct		pmap *pv_pmap;		/* pmap of this va */
+	vaddr_t		pv_va;			/* virtual address */
+	int		pv_flags;		/* flags (below) */
+};
+
+/*
+ * Flags in pv_flags.  Note that PV_MOD must be 1 and PV_REF must be 2
+ * since they must line up with the bits in the hardware PTEs (see pte.h).
+ * SUN4M bits are at a slightly different location in the PTE.
+ * Note: the REF, MOD and ANC flag bits occur only in the head of a pvlist.
+ * The cacheable bit (either PV_NC or PV_C4M) is meaningful in each
+ * individual pv entry.
+ */
+#define PV_MOD		1	/* page modified */
+#define PV_REF		2	/* page referenced */
+#define PV_NC		4	/* page cannot be cached */
+#define PV_REF4M	1	/* page referenced (SRMMU) */
+#define PV_MOD4M	2	/* page modified (SRMMU) */
+#define PV_C4M		4	/* page _can_ be cached (SRMMU) */
+#define PV_ANC		0x10	/* page has incongruent aliases */
+
 #if 0
 struct kvm_cpustate {
 	int		kvm_npmemarr;
@@ -187,7 +224,6 @@ struct kvm_cpustate {
 #define PMAP_NULL	((pmap_t)0)
 
 extern struct pmap	kernel_pmap_store;
-extern vaddr_t	vm_first_phys, vm_num_phys;
 
 /*
  * Since PTEs also contain type bits, we have to have some way
@@ -230,7 +266,6 @@ int             pmap_dumpmmu __P((int (*)__P((dev_t, daddr_t, caddr_t, size_t)),
 
 #define	pmap_kernel()	(&kernel_pmap_store)
 #define	pmap_resident_count(pmap)	pmap_count_ptes(pmap)
-#define	managed(pa)	((unsigned)((pa) - vm_first_phys) < vm_num_phys)
 
 #define PMAP_ACTIVATE(pmap, pcb, iscurproc)
 #define PMAP_DEACTIVATE(pmap, pcb)
@@ -251,7 +286,11 @@ void		*pmap_bootstrap_alloc __P((int));
 void		pmap_change_wiring __P((pmap_t, vaddr_t, boolean_t));
 void		pmap_collect __P((pmap_t));
 void		pmap_copy __P((pmap_t, pmap_t, vaddr_t, vsize_t, vaddr_t));
+#ifdef PMAP_NEW
+pmap_t		pmap_create __P((void));
+#else
 pmap_t		pmap_create __P((vsize_t));
+#endif
 void		pmap_destroy __P((pmap_t));
 void		pmap_init __P((void));
 vaddr_t		pmap_map __P((vaddr_t, paddr_t, paddr_t, int));
@@ -266,29 +305,41 @@ void		pmap_init __P((void));
 int		pmap_page_index __P((paddr_t));
 void		pmap_virtual_space __P((vaddr_t *, vaddr_t *));
 void		pmap_redzone __P((void));
-void		kvm_uncache __P((caddr_t, int));
+void		kvm_setcache __P((caddr_t, int, int));
+#define		kvm_uncache(addr, npages) kvm_setcache(addr, npages, 0)
+#define		kvm_recache(addr, npages) kvm_setcache(addr, npages, 1)
+void		pmap_cache_enable __P((void));
 struct user;
 void		switchexit __P((vm_map_t, struct user *, int));
 int		mmu_pagein __P((struct pmap *pm, vaddr_t, int));
 void		pmap_writetext __P((unsigned char *, int));
 
-#ifndef MACHINE_NEW_NONCONTIG
-u_int		pmap_free_pages __P((void));
-boolean_t	pmap_next_page __P((paddr_t *));
-#endif
-
 /* SUN4/SUN4C SPECIFIC DECLARATIONS */
 
 #if defined(SUN4) || defined(SUN4C)
+#ifdef PMAP_NEW
+boolean_t	pmap_clear_modify4_4c __P((struct vm_page *));
+boolean_t	pmap_clear_reference4_4c __P((struct vm_page *));
+#else
 void		pmap_clear_modify4_4c __P((paddr_t pa));
 void		pmap_clear_reference4_4c __P((paddr_t pa));
+#endif
 void		pmap_copy_page4_4c __P((paddr_t, paddr_t));
 void		pmap_enter4_4c __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
 				    boolean_t, vm_prot_t));
 paddr_t		pmap_extract4_4c __P((pmap_t, vaddr_t));
+#ifdef PMAP_NEW
+boolean_t	pmap_is_modified4_4c __P((struct vm_page *));
+boolean_t	pmap_is_referenced4_4c __P((struct vm_page *));
+void		pmap_kenter_pa4_4c __P((vaddr_t, paddr_t, vm_prot_t));
+void		pmap_kenter_pgs4_4c __P((vaddr_t, struct vm_page **, int));
+void		pmap_kremove4_4c __P((vaddr_t, vsize_t));
+void		pmap_page_protect4_4c __P((struct vm_page *, vm_prot_t));
+#else
 boolean_t	pmap_is_modified4_4c __P((paddr_t pa));
 boolean_t	pmap_is_referenced4_4c __P((paddr_t pa));
 void		pmap_page_protect4_4c __P((paddr_t, vm_prot_t));
+#endif
 void		pmap_protect4_4c __P((pmap_t, vaddr_t, vaddr_t, vm_prot_t));
 void		pmap_zero_page4_4c __P((paddr_t));
 void		pmap_changeprot4_4c __P((pmap_t, vaddr_t, vm_prot_t, int));
@@ -297,15 +348,29 @@ void		pmap_changeprot4_4c __P((pmap_t, vaddr_t, vm_prot_t, int));
 /* SIMILAR DECLARATIONS FOR SUN4M MODULE */
 
 #if defined(SUN4M)
+#ifdef PMAP_NEW
+boolean_t	pmap_clear_modify4m __P((struct vm_page *));
+boolean_t	pmap_clear_reference4m __P((struct vm_page *));
+#else
 void		pmap_clear_modify4m __P((paddr_t pa));
 void		pmap_clear_reference4m __P((paddr_t pa));
+#endif
 void		pmap_copy_page4m __P((paddr_t, paddr_t));
 void		pmap_enter4m __P((pmap_t, vaddr_t, paddr_t, vm_prot_t,
 				  boolean_t, vm_prot_t));
 paddr_t		pmap_extract4m __P((pmap_t, vaddr_t));
+#ifdef PMAP_NEW
+boolean_t	pmap_is_modified4m __P((struct vm_page *));
+boolean_t	pmap_is_referenced4m __P((struct vm_page *));
+void		pmap_kenter_pa4m __P((vaddr_t, paddr_t, vm_prot_t));
+void		pmap_kenter_pgs4m __P((vaddr_t, struct vm_page **, int));
+void		pmap_kremove4m __P((vaddr_t, vsize_t));
+void		pmap_page_protect4m __P((struct vm_page *, vm_prot_t));
+#else
 boolean_t	pmap_is_modified4m __P((paddr_t pa));
 boolean_t	pmap_is_referenced4m __P((paddr_t pa));
 void		pmap_page_protect4m __P((paddr_t, vm_prot_t));
+#endif
 void		pmap_protect4m __P((pmap_t, vaddr_t, vaddr_t, vm_prot_t));
 void		pmap_zero_page4m __P((paddr_t));
 void		pmap_changeprot4m __P((pmap_t, vaddr_t, vm_prot_t, int));
@@ -320,6 +385,9 @@ void		pmap_changeprot4m __P((pmap_t, vaddr_t, vm_prot_t, int));
 #define		pmap_extract		pmap_extract4_4c
 #define		pmap_is_modified	pmap_is_modified4_4c
 #define		pmap_is_referenced	pmap_is_referenced4_4c
+#define		pmap_kenter_pa		pmap_kenter_pa4_4c
+#define		pmap_kenter_pgs		pmap_kenter_pgs4_4c
+#define		pmap_kremove		pmap_kremove4_4c
 #define		pmap_page_protect	pmap_page_protect4_4c
 #define		pmap_protect		pmap_protect4_4c
 #define		pmap_zero_page		pmap_zero_page4_4c
@@ -334,6 +402,9 @@ void		pmap_changeprot4m __P((pmap_t, vaddr_t, vm_prot_t, int));
 #define		pmap_extract		pmap_extract4m
 #define		pmap_is_modified	pmap_is_modified4m
 #define		pmap_is_referenced	pmap_is_referenced4m
+#define		pmap_kenter_pa		pmap_kenter_pa4m
+#define		pmap_kenter_pgs		pmap_kenter_pgs4m
+#define		pmap_kremove		pmap_kremove4m
 #define		pmap_page_protect	pmap_page_protect4m
 #define		pmap_protect		pmap_protect4m
 #define		pmap_zero_page		pmap_zero_page4m
@@ -341,15 +412,31 @@ void		pmap_changeprot4m __P((pmap_t, vaddr_t, vm_prot_t, int));
 
 #else  /* must use function pointers */
 
+#ifdef PMAP_NEW
+extern boolean_t	(*pmap_clear_modify_p) __P((struct vm_page *));
+extern boolean_t	(*pmap_clear_reference_p) __P((struct vm_page *));
+#else
 extern void		(*pmap_clear_modify_p) __P((paddr_t pa));
 extern void		(*pmap_clear_reference_p) __P((paddr_t pa));
+#endif
 extern void		(*pmap_copy_page_p) __P((paddr_t, paddr_t));
 extern void		(*pmap_enter_p) __P((pmap_t, vaddr_t, paddr_t,
 					     vm_prot_t, boolean_t, vm_prot_t));
 extern paddr_t		(*pmap_extract_p) __P((pmap_t, vaddr_t));
+#ifdef PMAP_NEW
+extern boolean_t	(*pmap_is_modified_p) __P((struct vm_page *));
+extern boolean_t	(*pmap_is_referenced_p) __P((struct vm_page *));
+extern void		(*pmap_kenter_pa_p) __P((vaddr_t, paddr_t, vm_prot_t));
+extern void		(*pmap_kenter_pgs_p) __P((vaddr_t, struct vm_page **,
+						  int));
+extern void		(*pmap_kremove_p) __P((vaddr_t, vsize_t));
+extern void		(*pmap_page_protect_p) __P((struct vm_page *, 
+						    vm_prot_t));
+#else
 extern boolean_t	(*pmap_is_modified_p) __P((paddr_t pa));
 extern boolean_t	(*pmap_is_referenced_p) __P((paddr_t pa));
 extern void		(*pmap_page_protect_p) __P((paddr_t, vm_prot_t));
+#endif
 extern void		(*pmap_protect_p) __P((pmap_t, vaddr_t, vaddr_t,
 					       vm_prot_t));
 extern void		(*pmap_zero_page_p) __P((paddr_t));
@@ -363,6 +450,9 @@ extern void		(*pmap_changeprot_p) __P((pmap_t, vaddr_t,
 #define		pmap_extract		(*pmap_extract_p)
 #define		pmap_is_modified	(*pmap_is_modified_p)
 #define		pmap_is_referenced	(*pmap_is_referenced_p)
+#define		pmap_kenter_pa		(*pmap_kenter_pa_p)
+#define		pmap_kenter_pgs		(*pmap_kenter_pgs_p)
+#define		pmap_kremove		(*pmap_kremove_p)
 #define		pmap_page_protect	(*pmap_page_protect_p)
 #define		pmap_protect		(*pmap_protect_p)
 #define		pmap_zero_page		(*pmap_zero_page_p)

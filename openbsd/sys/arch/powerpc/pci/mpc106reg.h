@@ -1,4 +1,4 @@
-/*	$OpenBSD: mpc106reg.h,v 1.3 1998/10/09 02:09:19 rahnds Exp $ */
+/*	$OpenBSD: mpc106reg.h,v 1.6 2000/03/20 07:10:50 rahnds Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom
@@ -38,95 +38,30 @@
 #ifndef _MACHINE_MPC106REG_H_
 #define _MACHINE_MPC106REG_H_
 
-/* Where we map the PCI memory space */
+/* Where we map the PCI memory space - MAP A*/
 #define MPC106_V_PCI_MEM_SPACE	0xc0000000	/* Viritual */
 #define MPC106_P_PCI_MEM_SPACE	0xc0000000	/* Physical */
 
-/* Where we map the PCI I/O space */
+/* Where we map the PCI I/O space - MAP A*/
 #define MPC106_P_ISA_IO_SPACE	0x80000000
 #define MPC106_V_ISA_IO_SPACE	0x80000000
 #define MPC106_V_PCI_IO_SPACE	0x80000000
+#define MPC106_P_PCI_IO_SPACE	0x80000000
 
 /* Where we map the config space */
 #define MPC106_PCI_CONF_SPACE	(MPC106_V_ISA_IO_SPACE + 0x00800000)
 
+/* Where we map the PCI memory space - MAP B*/
+#define MPC106_P_PCI_MEM_SPACE_MAP_B	0x80000000	/* Physical */
+
+/* Where we map the PCI I/O space - MAP B*/
+#define MPC106_P_PCI_IO_SPACE_MAP_B	0xfe000000
+
 /* offsets from base pointer */
-#define MPC106_CONF_BASE	(MPC106_V_ISA_IO_SPACE + 0x0cf8)
-#define MPC106_CONF_DATA	(MPC106_V_ISA_IO_SPACE + 0x0cfc)
-#define	MPC106_REGOFFS(x)	((x << 24) | 0x80)
+#define	MPC106_REGOFFS(x)	((x) | 0x80000000)
 
 /* Where PCI devices sees CPU memory. */
 #define	MPC106_PCI_CPUMEM	0x80000000
-
-static __inline void
-mpc_cfg_write_1(reg, val)
-	u_int32_t reg;
-	u_int8_t val;
-{
-	out32(MPC106_CONF_BASE, MPC106_REGOFFS(reg));
-	outb(MPC106_CONF_DATA + (reg & 3), val);
-}
-
-static __inline void
-mpc_cfg_write_2(reg, val)
-	u_int32_t reg;
-	u_int16_t val;
-{
-        u_int32_t _p_ = MPC106_CONF_DATA + (reg & 2);
-
-	out32(MPC106_CONF_BASE, MPC106_REGOFFS(reg));
-	__asm__ volatile("sthbrx %0, 0, %1\n" :: "r"(val), "r"(_p_));
-	__asm__ volatile("sync"); __asm__ volatile("eieio");
-}
-
-static __inline void
-mpc_cfg_write_4(reg, val)
-	u_int32_t reg;
-	u_int32_t val;
-{
-        u_int32_t _p_ = MPC106_CONF_DATA;
-
-	out32(MPC106_CONF_BASE, MPC106_REGOFFS(reg));
-	__asm__ volatile("stwbrx %0, 0, %1\n" :: "r"(val), "r"(_p_));
-	__asm__ volatile("sync"); __asm__ volatile("eieio");
-}
-
-static __inline u_int8_t
-mpc_cfg_read_1(reg)
-	u_int32_t reg;
-{
-	u_int8_t _v_;
-
-	out32(MPC106_CONF_BASE, MPC106_REGOFFS(reg));
-	_v_ = inb(MPC106_CONF_DATA);
-	return(_v_);
-}
-
-static __inline u_int16_t
-mpc_cfg_read_2(reg)
-	u_int32_t reg;
-{
-	u_int16_t _v_;
-        u_int32_t _p_ = MPC106_CONF_DATA + (reg & 2);
-
-	out32(MPC106_CONF_BASE, MPC106_REGOFFS(reg));
-	__asm__ volatile("lhbrx %0, 0, %1\n" : "=r"(_v_) : "r"(_p_));
-	__asm__ volatile("sync"); __asm__ volatile("eieio");
-	return(_v_);
-}
-
-static __inline u_int32_t
-mpc_cfg_read_4(reg)
-	u_int32_t reg;
-{
-	u_int32_t _v_;
-        u_int32_t _p_ = MPC106_CONF_DATA;
-
-	out32(MPC106_CONF_BASE, MPC106_REGOFFS(reg));
-	__asm__ volatile("lwbrx %0, 0, %1\n" : "=r"(_v_) : "r"(_p_));
-	__asm__ volatile("sync"); __asm__ volatile("eieio");
-	return(_v_);
-}
 
 #define MPC106_PCI_VENDOR		0x00
 #define MPC106_PCI_DEVICE		0x02
@@ -135,5 +70,21 @@ mpc_cfg_read_4(reg)
 #define MPC106_PCI_REVID		0x08
 
 #define	MPC106_PCI_PMGMT		0x70
+
+void
+mpc_cfg_write_1( struct pcibr_config *cp, u_int32_t reg, u_int8_t val);
+void
+mpc_cfg_write_2( struct pcibr_config *cp, u_int32_t reg, u_int16_t val);
+void
+mpc_cfg_write_4( struct pcibr_config *cp, u_int32_t reg, u_int32_t val);
+
+u_int8_t
+mpc_cfg_read_1( struct pcibr_config *cp, u_int32_t reg);
+
+u_int16_t
+mpc_cfg_read_2( struct pcibr_config *cp, u_int32_t reg);
+
+u_int32_t
+mpc_cfg_read_4( struct pcibr_config *cp, u_int32_t reg);
 
 #endif /* _MACHINE_MPC106REG_H_ */

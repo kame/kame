@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_var.h,v 1.24 1999/08/06 18:17:38 deraadt Exp $	*/
+/*	$OpenBSD: tcp_var.h,v 1.26 1999/12/21 17:49:28 provos Exp $	*/
 /*	$NetBSD: tcp_var.h,v 1.17 1996/02/13 23:44:24 christos Exp $	*/
 
 /*
@@ -103,7 +103,7 @@ struct tcpcb {
 	int retran_data;		/* amount of outstanding retx. data  */
 #endif /* TCP_FACK */
 #endif /* TCP_SACK */
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 	tcp_seq snd_last;		/* for use in fast recovery */
 #endif
 /* receive sequence variables */
@@ -324,6 +324,9 @@ int	 tcp_attach __P((struct socket *));
 void	 tcp_canceltimers __P((struct tcpcb *));
 struct tcpcb *
 	 tcp_close __P((struct tcpcb *));
+#if defined(INET6) && !defined(TCP6)
+void	 tcp6_ctlinput __P((int, struct sockaddr *, void *));
+#endif
 void	 *tcp_ctlinput __P((int, struct sockaddr *, void *));
 int	 tcp_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 struct tcpcb *
@@ -335,13 +338,16 @@ void	 tcp_dooptions __P((struct tcpcb *, u_char *, int, struct tcphdr *,
 void	 tcp_drain __P((void));
 void	 tcp_fasttimo __P((void));
 void	 tcp_init __P((void));
+#if defined(INET6) && !defined(TCP6)
+int	 tcp6_input __P((struct mbuf **, int *, int));
+#endif
 void	 tcp_input __P((struct mbuf *, ...));
 int	 tcp_mss __P((struct tcpcb *, u_int));
 struct tcpcb *
 	 tcp_newtcpcb __P((struct inpcb *));
 void	 tcp_notify __P((struct inpcb *, int));
 int	 tcp_output __P((struct tcpcb *));
-void	 tcp_pulloutofband __P((struct socket *, u_int, struct mbuf *));
+void	 tcp_pulloutofband __P((struct socket *, u_int, struct mbuf *, int));
 void	 tcp_quench __P((struct inpcb *, int));
 int	 tcp_reass __P((struct tcpcb *, struct tcphdr *, struct mbuf *, int *));
 void	 tcp_respond __P((struct tcpcb *, caddr_t, struct mbuf *, tcp_seq,
@@ -356,6 +362,10 @@ void	 tcp_trace __P((int, int, struct tcpcb *, caddr_t, int, int));
 struct tcpcb *
 	 tcp_usrclosed __P((struct tcpcb *));
 int	 tcp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+#if defined(INET6) && !defined(TCP6)
+int	 tcp6_usrreq __P((struct socket *,
+	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
+#endif
 int	 tcp_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *));
 void	 tcp_xmit_timer __P((struct tcpcb *, int));
@@ -373,10 +383,10 @@ int	 tcp_sack_partialack __P((struct tcpcb *, struct tcphdr *));
 void	 tcp_print_holes __P((struct tcpcb *tp));
 #endif
 #endif /* TCP_SACK */
-#if defined(TCP_NEWRENO) || defined(TCP_SACK)
+#if defined(TCP_SACK)
 int	 tcp_newreno __P((struct tcpcb *, struct tcphdr *));
 u_long	 tcp_seq_subtract  __P((u_long, u_long )); 
-#endif /* TCP_NEWRENO || TCP_SACK */
+#endif /* TCP_SACK */
 #ifdef TCP_SIGNATURE
 int	tcp_signature_apply __P((caddr_t, caddr_t, unsigned int));
 #endif /* TCP_SIGNATURE */

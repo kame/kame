@@ -1,4 +1,4 @@
-/*	$OpenBSD: socket.h,v 1.29 1999/06/06 23:19:08 deraadt Exp $	*/
+/*	$OpenBSD: socket.h,v 1.33 2000/04/03 06:00:29 itojun Exp $	*/
 /*	$NetBSD: socket.h,v 1.14 1996/02/09 18:25:36 christos Exp $	*/
 
 /*
@@ -38,6 +38,11 @@
 
 #ifndef _SYS_SOCKET_H_
 #define	_SYS_SOCKET_H_
+
+/*
+ * needed for ALIGNBYTES
+ */
+#include <machine/param.h>
 
 /*
  * Definitions related to sockets: types, address families, options.
@@ -144,6 +149,14 @@ struct sockaddr {
 /*
  * Sockaddr type which can hold any sockaddr type available
  * in the system.
+ *
+ * Note: __ss_{len,family} is defined in RFC2553.  During RFC2553 discussion
+ * the field name went back and forth between ss_len and __ss_len,
+ * and RFC2553 specifies it to be __ss_len.  openbsd picked ss_len.
+ * For maximum portability, userland programmer would need to
+ * (1) make the code never touch ss_len portion (cast it into sockaddr and
+ * touch sa_len), or (2) add "-Dss_len=__ss_len" into CFLAGS to unify all
+ * occurences (including header file) to __ss_len.
  */
 struct sockaddr_storage {
 	u_int8_t    ss_len;		/* total length */
@@ -169,6 +182,7 @@ struct sockproto {
 #define	PF_LOCAL	AF_LOCAL
 #define	PF_UNIX		PF_LOCAL	/* backward compatibility */
 #define	PF_INET		AF_INET
+#define	PF_INET6	AF_INET6
 #define	PF_IMPLINK	AF_IMPLINK
 #define	PF_PUP		AF_PUP
 #define	PF_CHAOS	AF_CHAOS
@@ -333,25 +347,30 @@ struct cmsghdr {
 };
 
 /* given pointer to struct cmsghdr, return pointer to data */
-#define	CMSG_DATA(cmsg)		((u_char *)((cmsg) + 1))
+#define	CMSG_DATA(cmsg) \
+	((u_char *)(cmsg) + __CMSG_ALIGN(sizeof(struct cmsghdr)))
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
-	(((caddr_t)(cmsg) + (cmsg)->cmsg_len + sizeof(struct cmsghdr) > \
+	(((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len) + \
+			    __CMSG_ALIGN(sizeof(struct cmsghdr)) > \
 	    (mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)NULL : \
-	    (struct cmsghdr *)((caddr_t)(cmsg) + ALIGN((cmsg)->cmsg_len)))
+	    (struct cmsghdr *)((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len)))
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 
 /* Round len up to next alignment boundary */
-#define	CMSG_ALIGN(len)	(((len)+sizeof(long)-1) & ~(sizeof(long)-1))
+#define	__CMSG_ALIGN(len)	ALIGN(len)
+#ifdef _KERNEL
+#define CMSG_ALIGN(n)		__CMSG_ALIGN(n)
+#endif
 
 /* Length of the contents of a control message of length len */
-#define	CMSG_LEN(len)	(CMSG_ALIGN(sizeof(struct cmsghdr)) + (len))
+#define	CMSG_LEN(len)	(__CMSG_ALIGN(sizeof(struct cmsghdr)) + (len))
 
 /* Length of the space taken up by a padded control message of length len */
-#define	CMSG_SPACE(len)	(CMSG_ALIGN(sizeof(struct cmsghdr)) + CMSG_ALIGN(len))
+#define	CMSG_SPACE(len)	(__CMSG_ALIGN(sizeof(struct cmsghdr)) + __CMSG_ALIGN(len))
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x01		/* access rights (array of int) */
@@ -409,6 +428,8 @@ __END_DECLS
 #  define COMPAT_OLDSOCK
 #  define MSG_COMPAT	0x8000
 # endif
+
+void	pfctlinput __P((int, struct sockaddr *));
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_SOCKET_H_ */

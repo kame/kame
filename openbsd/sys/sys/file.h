@@ -1,4 +1,4 @@
-/*	$OpenBSD: file.h,v 1.4 1998/03/01 19:33:54 deraadt Exp $	*/
+/*	$OpenBSD: file.h,v 1.7 2000/04/20 06:32:00 deraadt Exp $	*/
 /*	$NetBSD: file.h,v 1.11 1995/03/26 20:24:13 jtc Exp $	*/
 
 /*
@@ -60,10 +60,12 @@ struct file {
 	long	f_msgcount;	/* references from message queue */
 	struct	ucred *f_cred;	/* credentials associated with descriptor */
 	struct	fileops {
-		int	(*fo_read)	__P((struct file *fp, struct uio *uio,
-					    struct ucred *cred));
-		int	(*fo_write)	__P((struct file *fp, struct uio *uio,
-					    struct ucred *cred));
+		int	(*fo_read)	__P((struct file *fp, off_t *, 
+					     struct uio *uio,
+					     struct ucred *cred));
+		int	(*fo_write)	__P((struct file *fp, off_t *,
+					     struct uio *uio,
+					     struct ucred *cred));
 		int	(*fo_ioctl)	__P((struct file *fp, u_long com,
 					    caddr_t data, struct proc *p));
 		int	(*fo_select)	__P((struct file *fp, int which,
@@ -78,5 +80,16 @@ LIST_HEAD(filelist, file);
 extern struct filelist filehead;	/* head of list of open files */
 extern int maxfiles;			/* kernel limit on number of open files */
 extern int nfiles;			/* actual number of open files */
+extern struct fileops vnops;		/* vnode operations for files */
+
+int     dofileread __P((struct proc *, int, struct file *, void *, size_t,
+            off_t *, register_t *));
+int     dofilewrite __P((struct proc *, int, struct file *, const void *,
+            size_t, off_t *, register_t *));
+
+int     dofilereadv __P((struct proc *, int, struct file *,
+            const struct iovec *, int, off_t *, register_t *));
+int     dofilewritev __P((struct proc *, int, struct file *,
+            const struct iovec *, int, off_t *, register_t *));
 
 #endif /* _KERNEL */

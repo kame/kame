@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_icmp.c,v 1.18 1999/09/26 23:59:15 deraadt Exp $	*/
+/*	$OpenBSD: ip_icmp.c,v 1.20 1999/12/28 07:43:40 itojun Exp $	*/
 /*	$NetBSD: ip_icmp.c,v 1.19 1996/02/13 23:42:22 christos Exp $	*/
 
 /*
@@ -84,6 +84,12 @@ int	icmpmaskrepl = 0;
 int	icmpbmcastecho = 0;
 #ifdef ICMPPRINTFS
 int	icmpprintfs = 0;
+#endif
+
+#if 0
+static int	ip_next_mtu __P((int, int));
+#else
+/*static*/ int	ip_next_mtu __P((int, int));
 #endif
 
 extern	struct protosw inetsw[];
@@ -284,7 +290,7 @@ icmp_input(m, va_alist)
 			break;
 
 		case ICMP_UNREACH_NEEDFRAG:
-#ifdef INET6
+#if 0 /*NRL INET6*/
 			if (icp->icmp_nextmtu) {
 				extern int ipv6_trans_mtu
 				    __P((struct mbuf **, int, int));
@@ -385,6 +391,10 @@ icmp_input(m, va_alist)
 			printf("deliver to protocol %d\n", icp->icmp_ip.ip_p);
 #endif
 		icmpsrc.sin_addr = icp->icmp_ip.ip_dst;
+		/*
+		 * XXX if the packet contains [IPv4 AH TCP], we can't make a
+		 * notification to TCP layer.
+		 */
 		ctlfunc = inetsw[ip_protox[icp->icmp_ip.ip_p]].pr_ctlinput;
 		if (ctlfunc)
 			(*ctlfunc)(code, sintosa(&icmpsrc), &icp->icmp_ip);
@@ -501,7 +511,7 @@ reflect:
 	}
 
 raw:
-	rip_input(m, 0);
+	rip_input(m);
 	return;
 
 freeit:

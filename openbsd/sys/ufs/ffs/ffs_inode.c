@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_inode.c,v 1.12 1999/02/26 03:56:30 art Exp $	*/
+/*	$OpenBSD: ffs_inode.c,v 1.15 1999/12/06 07:23:21 art Exp $	*/
 /*	$NetBSD: ffs_inode.c,v 1.10 1996/05/11 18:27:19 mycroft Exp $	*/
 
 /*
@@ -64,14 +64,6 @@
 
 static int ffs_indirtrunc __P((struct inode *, daddr_t, daddr_t, daddr_t, int,
 			       long *));
-
-int
-ffs_init(vfsp)
-	struct vfsconf *vfsp;
-{
-	softdep_initialize();
-	return (ufs_init(vfsp));
-}
 
 /*
  * Update the access, modified, and inode change times as specified by the
@@ -253,8 +245,6 @@ ffs_truncate(v)
 	if (osize < length) {
 		if (length > fs->fs_maxfilesize)
 			return (EFBIG);
-		offset = blkoff(fs, length - 1);
-		lbn = lblkno(fs, length - 1);
 		aflags = B_CLRBUF;
 		if (ap->a_flags & IO_SYNC)
 			aflags |= B_SYNC;
@@ -285,10 +275,11 @@ ffs_truncate(v)
 
 	/*
 	 * Shorten the size of the file. If the file is not being
-	 * truncated to a block boundry, the contents of the
+	 * truncated to a block boundary, the contents of the
 	 * partial block following the end of the file must be
-	 * zero'ed in case it ever become accessable again because
-	 * of subsequent file growth.
+	 * zero'ed in case it ever become accessible again because
+	 * of subsequent file growth. Directories however are not
+	 * zero'ed as they should grow back initialized to empty.
 	 */
 	offset = blkoff(fs, length);
 	if (offset == 0) {
@@ -309,7 +300,9 @@ ffs_truncate(v)
 #else
 		(void) vnode_pager_uncache(ovp);
 #endif
-		bzero((char *)bp->b_data + offset, (u_int)(size - offset));
+		if (ovp->v_type != VDIR)
+			bzero((char *)bp->b_data + offset,
+			      (u_int)(size - offset));
 		allocbuf(bp, size);
 		if (aflags & B_SYNC)
 			bwrite(bp);

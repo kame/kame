@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_timer.c,v 1.14 1999/09/01 21:38:21 provos Exp $	*/
+/*	$OpenBSD: tcp_timer.c,v 1.16 1999/12/21 17:49:28 provos Exp $	*/
 /*	$NetBSD: tcp_timer.c,v 1.14 1996/02/13 23:44:09 christos Exp $	*/
 
 /*
@@ -177,7 +177,7 @@ tcp_timers(tp, timer)
 	register struct tcpcb *tp;
 	int timer;
 {
-	register int rexmt;
+	short rto;
 #ifdef TCP_SACK
 	struct sackhole *p, *q;
 	/*
@@ -229,8 +229,11 @@ tcp_timers(tp, timer)
 			break;
 		}
 		tcpstat.tcps_rexmttimeo++;
-		rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
-		TCPT_RANGESET((long) tp->t_rxtcur, rexmt,
+		rto = TCP_REXMTVAL(tp);
+		if (rto < tp->t_rttmin)
+			rto = tp->t_rttmin;
+		TCPT_RANGESET((long) tp->t_rxtcur,
+		    rto * tcp_backoff[tp->t_rxtshift],
 		    tp->t_rttmin, TCPTV_REXMTMAX);
 		tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
 		/*
@@ -247,13 +250,13 @@ tcp_timers(tp, timer)
 			tp->t_srtt = 0;
 		}
 		tp->snd_nxt = tp->snd_una;
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 		/*
 		 * Note:  We overload snd_last to function also as the
 		 * snd_last variable described in RFC 2582
 		 */
 		tp->snd_last = tp->snd_max;
-#endif /* TCP_SACK or TCP_NEWRENO */
+#endif /* TCP_SACK */
 		/*
 		 * If timing a segment in this window, stop the timer.
 		 */
@@ -306,9 +309,12 @@ tcp_timers(tp, timer)
 		 * (no responses to probes) reaches the maximum
 		 * backoff that we would use if retransmitting.
 		 */
+		rto = TCP_REXMTVAL(tp);
+		if (rto < tp->t_rttmin)
+			rto = tp->t_rttmin;
 		if (tp->t_rxtshift == TCP_MAXRXTSHIFT &&
 		    (tp->t_idle >= tcp_maxpersistidle ||
-		     tp->t_idle >= TCP_REXMTVAL(tp) * tcp_totbackoff)) {
+		     tp->t_idle >= rto * tcp_totbackoff)) {
 			tcpstat.tcps_persistdrop++;
 			tp = tcp_drop(tp, ETIMEDOUT);
 			break;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_exec.c,v 1.11 1999/09/10 20:27:40 art Exp $	*/
+/*	$OpenBSD: linux_exec.c,v 1.13 1999/11/26 16:44:28 art Exp $	*/
 /*	$NetBSD: linux_exec.c,v 1.13 1996/04/05 00:01:10 christos Exp $	*/
 
 /*
@@ -72,7 +72,9 @@ const char linux_emul_path[] = "/emul/linux";
 extern int linux_error[];
 extern char linux_sigcode[], linux_esigcode[];
 extern struct sysent linux_sysent[];
+#ifdef SYSCALL_DEBUG
 extern char *linux_syscallnames[];
+#endif
 
 int exec_linux_aout_prep_zmagic __P((struct proc *, struct exec_package *));
 int exec_linux_aout_prep_nmagic __P((struct proc *, struct exec_package *));
@@ -86,7 +88,11 @@ struct emul emul_linux_aout = {
 	LINUX_SYS_syscall,
 	LINUX_SYS_MAXSYSCALL,
 	linux_sysent,
+#ifdef SYSCALL_DEBUG
 	linux_syscallnames,
+#else
+	NULL,
+#endif
 	LINUX_AOUT_AUX_ARGSIZ,
 	linux_aout_copyargs,
 	setregs,
@@ -102,7 +108,11 @@ struct emul emul_linux_elf = {
 	LINUX_SYS_syscall,
 	LINUX_SYS_MAXSYSCALL,
 	linux_sysent,
+#ifdef SYSCALL_DEBUG
 	linux_syscallnames,
+#else
+	NULL,
+#endif
 	LINUX_ELF_AUX_ARGSIZ,
 	elf_copyargs,
 	setregs,
@@ -267,7 +277,7 @@ exec_linux_aout_prep_nmagic(p, epp)
 	    VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->a_data, NBPG);
+	baddr = round_page(epp->ep_daddr + execp->a_data);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
@@ -301,7 +311,7 @@ exec_linux_aout_prep_omagic(p, epp)
 	    LINUX_N_TXTOFF(*execp, OMAGIC), VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE);
 
 	/* set up command for bss segment */
-	baddr = roundup(epp->ep_daddr + execp->a_data, NBPG);
+	baddr = round_page(epp->ep_daddr + execp->a_data);
 	bsize = epp->ep_daddr + epp->ep_dsize - baddr;
 	if (bsize > 0)
 		NEW_VMCMD(&epp->ep_vmcmds, vmcmd_map_zero, bsize, baddr,
@@ -315,7 +325,7 @@ exec_linux_aout_prep_omagic(p, epp)
 	 * Compensate `ep_dsize' for the amount of data covered by the last
 	 * text page. 
 	 */
-	dsize = epp->ep_dsize + execp->a_text - roundup(execp->a_text, NBPG);
+	dsize = epp->ep_dsize + execp->a_text - round_page(execp->a_text);
 	epp->ep_dsize = (dsize > 0) ? dsize : 0;
 	return (exec_setup_stack(p, epp));
 }
@@ -457,7 +467,7 @@ linux_sys_uselib(p, v, retval)
 		return (ENOEXEC);
 
 	magic = LINUX_N_MAGIC(&hdr);
-	taddr = hdr.a_entry & (~(NBPG - 1));
+	taddr = trunc_page(hdr.a_entry);
 	tsize = hdr.a_text;
 	daddr = taddr + tsize;
 	dsize = hdr.a_data + hdr.a_bss;
@@ -476,7 +486,7 @@ linux_sys_uselib(p, v, retval)
 	    hdr.a_text + hdr.a_data, taddr, vp, LINUX_N_TXTOFF(hdr, magic),
 	    VM_PROT_READ|VM_PROT_EXECUTE|VM_PROT_WRITE);
 
-	baddr = roundup(daddr + hdr.a_data, NBPG);
+	baddr = round_page(daddr + hdr.a_data);
 	bsize = daddr + dsize - baddr;
         if (bsize > 0) {
                 NEW_VMCMD(&vcset, vmcmd_map_zero, bsize, baddr,

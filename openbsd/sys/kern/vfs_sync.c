@@ -1,5 +1,4 @@
-/*       $OpenBSD: vfs_sync.c,v 1.5 1998/11/12 04:36:32 csapuntz Exp $  */
-
+/*       $OpenBSD: vfs_sync.c,v 1.12 2000/03/23 15:57:33 art Exp $  */
 
 /*
  *  Portions of this code are:
@@ -59,11 +58,13 @@
 /*
  * The workitem queue.
  */ 
-#define SYNCER_MAXDELAY	60		/* maximum sync delay time */
+#define SYNCER_MAXDELAY	32		/* maximum sync delay time */
 #define SYNCER_DEFAULT 30		/* default sync delay time */
 int syncer_maxdelay = SYNCER_MAXDELAY;	/* maximum delay time */
 time_t syncdelay = SYNCER_DEFAULT;	/* time to delay syncing vnodes */
-int rushjob;				/* number of slots to run ASAP */
+
+int rushjob = 0;			/* number of slots to run ASAP */
+int stat_rush_requests = 0;		/* number of rush requests */
  
 static int syncer_delayno = 0;
 static long syncer_last;
@@ -71,6 +72,8 @@ LIST_HEAD(synclist, vnode);
 static struct synclist *syncer_workitem_pending;
 
 extern struct simplelock mountlist_slock;
+
+struct proc *syncerproc;
 
 /*
  * The workitem queue.
@@ -125,19 +128,21 @@ vn_syncer_add_to_worklist(vp, delay)
 	int s, slot;
 
 	s = splbio();
+
+	if (vp->v_flag & VONSYNCLIST)
+		LIST_REMOVE(vp, v_synclist);
+
 	if (delay > syncer_maxdelay)
 		delay = syncer_maxdelay;
 	slot = (syncer_delayno + delay) % syncer_last;
 	LIST_INSERT_HEAD(&syncer_workitem_pending[slot], vp, v_synclist);
+	vp->v_flag |= VONSYNCLIST;
 	splx(s);
 }
 
 /*
  * System filesystem synchronizer daemon.
  */
-
-
-extern int lbolt;
 
 void 
 sched_sync(p)
@@ -147,6 +152,8 @@ sched_sync(p)
 	struct vnode *vp;
 	long starttime;
 	int s;
+
+	syncerproc = curproc;
 
 	for (;;) {
 		starttime = time.tv_sec;
@@ -171,7 +178,6 @@ sched_sync(p)
 				/*
 				 * Move ourselves to the back of the sync list.
 				 */
-				LIST_REMOVE(vp, v_synclist);
 				vn_syncer_add_to_worklist(vp, syncdelay);
 			}
 		}
@@ -209,6 +215,27 @@ sched_sync(p)
 	}
 }
 
+/*
+ * Request the syncer daemon to speed up its work.
+ * We never push it to speed up more than half of its
+ * normal turn time, otherwise it could take over the cpu.
+ */
+int
+speedup_syncer()
+{
+	int s;
+
+	s = splhigh();
+	if (syncerproc && syncerproc->p_wchan == &lbolt)
+		setrunnable(syncerproc);
+	splx(s);
+	if (rushjob < syncdelay / 2) {
+		rushjob += 1;
+		stat_rush_requests += 1;
+		return 1;
+	}
+	return 0;
+}
 
 /*
  * Routine to create and manage a filesystem syncer vnode.
@@ -243,38 +270,38 @@ struct vnodeopv_desc sync_vnodeop_opv_desc =
  */
 int
 vfs_allocate_syncvnode(mp)
-      struct mount *mp;
+	struct mount *mp;
 {
-      struct vnode *vp;
-      static long start, incr, next;
-      int error;
+	struct vnode *vp;
+	static long start, incr, next;
+	int error;
 
-      /* Allocate a new vnode */
-      if ((error = getnewvnode(VT_VFS, mp, sync_vnodeop_p, &vp)) != 0) {
-              mp->mnt_syncer = NULL;
-              return (error);
-      }
-      vp->v_writecount = 1;
-      vp->v_type = VNON;
-      /*
-       * Place the vnode onto the syncer worklist. We attempt to
-       * scatter them about on the list so that they will go off
-       * at evenly distributed times even if all the filesystems
-       * are mounted at once.
-       */
-      next += incr;
-      if (next == 0 || next > syncer_maxdelay) {
-              start /= 2;
-              incr /= 2;
-              if (start == 0) {
-                      start = syncer_maxdelay / 2;
-                      incr = syncer_maxdelay;
-              }
-              next = start;
-      }
-      vn_syncer_add_to_worklist(vp, next);
-      mp->mnt_syncer = vp;
-      return (0);
+	/* Allocate a new vnode */
+	if ((error = getnewvnode(VT_VFS, mp, sync_vnodeop_p, &vp)) != 0) {
+		mp->mnt_syncer = NULL;
+		return (error);
+	}
+	vp->v_writecount = 1;
+	vp->v_type = VNON;
+	/*
+	 * Place the vnode onto the syncer worklist. We attempt to
+	 * scatter them about on the list so that they will go off
+	 * at evenly distributed times even if all the filesystems
+	 * are mounted at once.
+	 */
+	next += incr;
+	if (next == 0 || next > syncer_maxdelay) {
+		start /= 2;
+		incr /= 2;
+		if (start == 0) {
+			start = syncer_maxdelay / 2;
+			incr = syncer_maxdelay;
+		}
+		next = start;
+	}
+	vn_syncer_add_to_worklist(vp, next);
+	mp->mnt_syncer = vp;
+	return (0);
 }
 
 /*
@@ -284,43 +311,43 @@ int
 sync_fsync(v)
 	void *v;
 {
-      struct vop_fsync_args /* {
-              struct vnode *a_vp;
-              struct ucred *a_cred;
-              int a_waitfor;
-              struct proc *a_p;
-      } */ *ap = v;
+	struct vop_fsync_args /* {
+		struct vnode *a_vp;
+		struct ucred *a_cred;
+		int a_waitfor;
+		struct proc *a_p;
+	} */ *ap = v;
+	struct vnode *syncvp = ap->a_vp;
+	struct mount *mp = syncvp->v_mount;
+	int asyncflag;
 
-      struct vnode *syncvp = ap->a_vp;
-      struct mount *mp = syncvp->v_mount;
-      int asyncflag;
+	/*
+	 * We only need to do something if this is a lazy evaluation.
+	 */
+	if (ap->a_waitfor != MNT_LAZY)
+		return (0);
 
-      /*
-       * We only need to do something if this is a lazy evaluation.
-       */
-      if (ap->a_waitfor != MNT_LAZY)
-              return (0);
+	/*
+	 * Move ourselves to the back of the sync list.
+	 */
+	vn_syncer_add_to_worklist(syncvp, syncdelay);
 
-      /*
-       * Move ourselves to the back of the sync list.
-       */
-      LIST_REMOVE(syncvp, v_synclist);
-      vn_syncer_add_to_worklist(syncvp, syncdelay);
+	/*
+	 * Walk the list of vnodes pushing all that are dirty and
+	 * not already on the sync list.
+	 */
+	simple_lock(&mountlist_slock);
+	if (vfs_busy(mp, LK_NOWAIT, &mountlist_slock, ap->a_p) == 0) {
+		asyncflag = mp->mnt_flag & MNT_ASYNC;
+		mp->mnt_flag &= ~MNT_ASYNC;
+		VFS_SYNC(mp, MNT_LAZY, ap->a_cred, ap->a_p);
+		if (asyncflag)
+			mp->mnt_flag |= MNT_ASYNC;
+		vfs_unbusy(mp, ap->a_p);
+	} else
+		simple_unlock(&mountlist_slock);
 
-      /*
-       * Walk the list of vnodes pushing all that are dirty and
-       * not already on the sync list.
-       */
-      simple_lock(&mountlist_slock);
-      if (vfs_busy(mp, LK_NOWAIT, &mountlist_slock, ap->a_p) == 0) {
-              asyncflag = mp->mnt_flag & MNT_ASYNC;
-              mp->mnt_flag &= ~MNT_ASYNC;
-              VFS_SYNC(mp, MNT_LAZY, ap->a_cred, ap->a_p);
-              if (asyncflag)
-                      mp->mnt_flag |= MNT_ASYNC;
-              vfs_unbusy(mp, ap->a_p);
-      }
-      return (0);
+	return (0);
 }
 
 /*
@@ -329,22 +356,23 @@ sync_fsync(v)
 int
 sync_inactive(v)
 	void *v;
-	
 {
-      struct vop_inactive_args /* {
-               struct vnode *a_vp;
-               struct proc *a_p;
-      } */ *ap = v;
+	struct vop_inactive_args /* {
+		struct vnode *a_vp;
+		struct proc *a_p;
+	} */ *ap = v;
 
-      struct vnode *vp = ap->a_vp;
+	struct vnode *vp = ap->a_vp;
 
-      if (vp->v_usecount == 0)
-              return (0);
-      vp->v_mount->mnt_syncer = NULL;
-      LIST_REMOVE(vp, v_synclist);
-      vp->v_writecount = 0;
-      vput(vp);
-      return (0);
+	if (vp->v_usecount == 0) {
+		VOP_UNLOCK(vp, 0, ap->a_p);
+		return (0);
+	}
+	vp->v_mount->mnt_syncer = NULL;
+	LIST_REMOVE(vp, v_synclist);
+	vp->v_writecount = 0;
+	vput(vp);
+	return (0);
 }
 
 /*

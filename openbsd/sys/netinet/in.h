@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.h,v 1.23 1999/04/11 19:41:36 niklas Exp $	*/
+/*	$OpenBSD: in.h,v 1.38 2000/02/09 07:37:14 itojun Exp $	*/
 /*	$NetBSD: in.h,v 1.20 1996/02/13 23:41:47 christos Exp $	*/
 
 /*
@@ -48,7 +48,7 @@
  * Protocols
  */
 #define	IPPROTO_IP		0		/* dummy for IP */
-#define IPPROTO_HOPOPTS		IPPROTO_IP	/* Hop-by-hop option header. */
+#define IPPROTO_HOPOPTS		IPPROTO_IP	/* Hop-by-hop option header */
 #define	IPPROTO_ICMP		1		/* control message protocol */
 #define	IPPROTO_IGMP		2		/* group mgmt protocol */
 #define	IPPROTO_GGP		3		/* gateway^2 (deprecated) */
@@ -61,15 +61,21 @@
 #define	IPPROTO_IDP		22		/* xns idp */
 #define	IPPROTO_TP		29 		/* tp-4 w/ class negotiation */
 #define IPPROTO_IPV6		41		/* IPv6 in IPv6 */
-#define IPPROTO_ROUTING		43		/* Routing header. */
-#define IPPROTO_FRAGMENT	44		/* Fragmentation/reassembly header. */
+#define IPPROTO_ROUTING		43		/* Routing header */
+#define IPPROTO_FRAGMENT	44		/* Fragmentation/reassembly header */
+#define IPPROTO_RSVP		46		/* resource reservation */
+#define	IPPROTO_GRE		47		/* GRE encap, RFCs 1701/1702 */
 #define	IPPROTO_ESP		50		/* Encap. Security Payload */
 #define	IPPROTO_AH		51		/* Authentication header */
+#define	IPPROTO_MOBILE		55		/* IP Mobility, RFC 2004 */
 #define IPPROTO_ICMPV6		58		/* ICMP for IPv6 */
 #define IPPROTO_NONE		59		/* No next header */
-#define IPPROTO_DSTOPTS		60		/* Destination options header. */
+#define IPPROTO_DSTOPTS		60		/* Destination options header */
 #define	IPPROTO_EON		80		/* ISO cnlp */
+#define IPPROTO_ETHERIP		97		/* Ethernet in IPv4 */
 #define	IPPROTO_ENCAP		98		/* encapsulation header */
+#define IPPROTO_PIM		103		/* Protocol indep. multicast */
+#define IPPROTO_IPCOMP		108		/* IP Payload Comp. Protocol */
 #define	IPPROTO_RAW		255		/* raw IP packet */
 
 #define	IPPROTO_MAX		256
@@ -132,24 +138,8 @@ struct in_addr {
 	in_addr_t s_addr;
 };
 
-/*
- * IP Version 6 Internet address
- */
-struct in6_addr {
-	union {
-		u_int8_t s6u_addr8[16];
-		u_int16_t s6u_addr16[8];
-		u_int32_t s6u_addr32[4];
-	} s6_u;
-#define s6_addr s6_u.s6u_addr8
-/*
- * The rest are common, but not guaranteed to be portable. 64 bit access are
- * not available because the in6_addr in a sockaddr_in6 is not 64 bit aligned.
- */
-#define s6_addr8 s6_u.s6u_addr8
-#define s6_addr16 s6_u.s6u_addr16
-#define s6_addr32 s6_u.s6u_addr32
-};
+/* last return value of *_input(), meaning "all job for this pkt is done".  */
+#define	IPPROTO_DONE		257
 
 /*
  * Definitions of bits in internet address integers.
@@ -216,85 +206,6 @@ struct in6_addr {
 #define	IN_LOOPBACKNET		127			/* official! */
 
 /*
- * Tests for IPv6 address types
- */
-
-#define	IN6_IS_ADDR_LINKLOCAL(addr) \
-	(((addr)->s6_addr32[0] & htonl(0xffc00000)) == htonl(0xfe800000))
-
-#define	IN6_IS_ADDR_LOOPBACK(addr) \
-	(((addr)->s6_addr32[0] == 0) && ((addr)->s6_addr32[1] == 0) && \
-	 ((addr)->s6_addr32[2] == 0) && ((addr)->s6_addr32[3] == htonl(1)))
-
-#define	IN6_IS_ADDR_MULTICAST(addr) \
-	((addr)->s6_addr8[0] == 0xff)
-	
-#define	IN6_IS_ADDR_SITELOCAL(addr) \
-	(((addr)->s6_addr32[0] & htonl(0xffc00000)) == htonl(0xfec00000))
-
-#define	IN6_IS_ADDR_UNSPECIFIED(addr) \
-	(((addr)->s6_addr32[0] == 0) && ((addr)->s6_addr32[1] == 0) && \
-	 ((addr)->s6_addr32[2] == 0) && ((addr)->s6_addr32[3] == 0))
-
-#define	IN6_IS_ADDR_V4COMPAT(addr) \
-	(((addr)->s6_addr32[0] == 0) && ((addr)->s6_addr32[1] == 0) && \
-	 ((addr)->s6_addr32[2] == 0) && ((addr)->s6_addr32[3] & ~htonl(1)))
-
-#define	IN6_IS_ADDR_V4MAPPED(addr) \
-	(((addr)->s6_addr32[0] == 0) && ((addr)->s6_addr32[1] == 0) && \
-	 ((addr)->s6_addr32[2] == htonl(0xffff)))
-
-#define	IN6_ARE_ADDR_EQUAL(addr1, addr2) \
-	(((addr1)->s6_addr32[0] == (addr2)->s6_addr32[0]) && \
-	 ((addr1)->s6_addr32[1] == (addr2)->s6_addr32[1]) && \
-	 ((addr1)->s6_addr32[2] == (addr2)->s6_addr32[2]) && \
-	 ((addr1)->s6_addr32[3] == (addr2)->s6_addr32[3]))
-
-/*
- * IPv6 Multicast scoping.  The scope is stored
- * in the bottom 4 bits of the second byte of the
- * multicast address.
- */
-		     /* 0x0 */	/* reserved */
-#define	IN6_NODE_LOCAL	0x1	/* node-local scope */
-#define	IN6_LINK_LOCAL	0x2	/* link-local scope */
-		     /* 0x3 */	/* (unassigned) */
-		     /* 0x4 */	/* (unassigned) */
-#define	IN6_SITE_LOCAL	0x5	/* site-local scope */
-		     /* 0x6 */	/* (unassigned) */
-		     /* 0x7 */	/* (unassigned) */
-#define	IN6_ORG_LOCAL	0x8	/* organization-local scope */
-		     /* 0x9 */	/* (unassigned) */
-		     /* 0xA */	/* (unassigned) */
-		     /* 0xB */	/* (unassigned) */
-		     /* 0xC */	/* (unassigned) */
-		     /* 0xD */	/* (unassigned) */
-#define	IN6_GLOBAL	0xE	/* global scope */
-		     /* 0xF */	/* reserved */
-
-#define	IN6_MSCOPE(addr)	((addr)->s6_addr8[1] & 0x0f)
-
-#define	IN6_IS_ADDR_MC_NODELOCAL(addr) \
-	(IN6_IS_ADDR_MULTICAST(addr) && (IN6_MSCOPE(addr) == IN6_NODE_LOCAL))
-#define	IN6_IS_ADDR_MC_LINKLOCAL(addr) \
-	(IN6_IS_ADDR_MULTICAST(addr) && (IN6_MSCOPE(addr) == IN6_LINK_LOCAL))
-#define	IN6_IS_ADDR_MC_SITELOCAL(addr) \
-	(IN6_IS_ADDR_MULTICAST(addr) && (IN6_MSCOPE(addr) == IN6_SITE_LOCAL))
-#define	IN6_IS_ADDR_MC_ORGLOCAL(addr) \
-	(IN6_IS_ADDR_MULTICAST(addr) && (IN6_MSCOPE(addr) == IN6_ORG_LOCAL))
-#define	IN6_IS_ADDR_MC_GLOBAL(addr) \
-	(IN6_IS_ADDR_MULTICAST(addr) && (IN6_MSCOPE(addr) == IN6_GLOBAL))
-
-/*
- * Definitions of the IPv6 special addresses
- */
-extern const struct in6_addr in6addr_any;
-#define IN6ADDR_ANY_INIT {{{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 }}}
-
-extern const struct in6_addr in6addr_loopback;
-#define IN6ADDR_LOOPBACK_INIT {{{ 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1 }}}
-
-/*
  * IP Version 4 socket address.
  */
 struct sockaddr_in {
@@ -305,18 +216,7 @@ struct sockaddr_in {
 	int8_t	    sin_zero[8];
 };
 
-/*
- * IP Version 6 socket address.
- */
-#define SIN6_LEN 1
-struct sockaddr_in6 {
-	u_int8_t	sin6_len;
-	sa_family_t	sin6_family;
-	in_port_t	sin6_port;
-	u_int32_t	sin6_flowinfo;
-	struct in6_addr	sin6_addr;
-	u_int32_t	sin6_scope_id;
-};
+#define INET_ADDRSTRLEN                 16
 
 /*
  * Structure used to describe IP options.
@@ -359,26 +259,6 @@ struct ip_opts {
 #define IP_ESP_TRANS_LEVEL	21   /* u_char; transport encryption */
 #define IP_ESP_NETWORK_LEVEL	22   /* u_char; full-packet encryption */
 
-#define IPV6_MULTICAST_IF	23   /* u_int; set/get multicast interface */
-#define IPV6_MULTICAST_HOPS	24   /* int; set/get multicast hop limit */
-#define IPV6_MULTICAST_LOOP	25   /* u_int; set/get multicast loopback */
-#define IPV6_JOIN_GROUP		26   /* ipv6_mreq; join multicast group */
-#define IPV6_ADD_MEMBERSHIP	IPV6_JOIN_GROUP /* XXX - for compatibility */
-#define IPV6_LEAVE_GROUP	27   /* ipv6_mreq: leave multicast group */
-#define IPV6_DROP_MEMBERSHIP	IPV6_LEAVE_GROUP /* XXX - for compatibility */
-#define IPV6_ADDRFORM		28   /* int; get/set form of returned addrs */
-#define IPV6_UNICAST_HOPS	29   /* int; get/set unicast hop limit */
-#define IPV6_PKTINFO		30   /* int; receive in6_pktinfo as cmsg */
-#define IPV6_HOPLIMIT		31   /* int; receive int hoplimit as cmsg */
-#define IPV6_NEXTHOP		32   /* int; receive sockaddr_in6 as cmsg */
-#define IPV6_HOPOPTS		33   /* int; receive hop options as cmsg */
-#define IPV6_DSTOPTS		34   /* int; receive dst options as cmsg */
-#define IPV6_RTHDR		35   /* int; receive routing header as cmsg */
-#define IPV6_PKTOPTIONS		36   /* int; send/receive cmsgs for TCP */
-#define IPV6_CHECKSUM		37   /* int; offset to place send checksum */
-#define ICMPV6_FILTER		38   /* struct icmpv6_filter; get/set filter */
-#define ICMP6_FILTER		ICMP6_FILTER
-
 #define IPSEC_OUTSA		39   /* set the outbound SA for a socket */
 
 /*
@@ -398,14 +278,6 @@ struct ip_opts {
 #define IPSEC_ESP_NETWORK_LEVEL_DEFAULT IPSEC_LEVEL_DEFAULT
 
 /*
- * IPv6 Routing header types
- */
-#define IPV6_RTHDR_TYPE_0	0 /* IPv6 Routing header type 0 */   
-
-#define IPV6_RTHDR_LOOSE	0 /* this hop need not be a neighbor */
-#define IPV6_RTHDR_STRICT	1 /* this hop must be a neighbor */
-
-/*
  * Defaults and limits for options
  */
 #define	IP_DEFAULT_MULTICAST_TTL  1	/* normally limit m'casts to 1 hop  */
@@ -421,22 +293,6 @@ struct ip_mreq {
 };
 
 /*
- * Argument structure for IPV6_ADD_MEMBERSHIP and IPV6_DROP_MEMBERSHIP.
- */
-struct ipv6_mreq {
-	struct	in6_addr	ipv6mr_multiaddr; /* IPv6 multicast addr */
-	unsigned int		ipv6mr_interface; /* Interface index */
-};
-
-/*
- * Argument structure for IPV6_PKTINFO control messages
- */
-struct in6_pktinfo {
-	struct in6_addr ipi6_addr;
-	unsigned int ipi6_ifindex;
-};
-
-/*
  * Argument for IP_PORTRANGE:
  * - which range to search when port is unspecified at bind() or connect()
  */
@@ -448,7 +304,6 @@ struct in6_pktinfo {
  * Buffer lengths for strings containing printable IP addresses
  */
 #define INET_ADDRSTRLEN		16
-#define INET6_ADDRSTRLEN	46
 
 /*
  * Definitions for inet sysctl operations.
@@ -456,14 +311,14 @@ struct in6_pktinfo {
  * Third level is protocol number.
  * Fourth level is desired variable within that protocol.
  */
-#define	IPPROTO_MAXID	(IPPROTO_AH + 1)	/* don't list to IPPROTO_MAX */
+#define	IPPROTO_MAXID	(IPPROTO_ETHERIP + 1)	/* don't list to IPPROTO_MAX */
 
 #define	CTL_IPPROTO_NAMES { \
 	{ "ip", CTLTYPE_NODE }, \
 	{ "icmp", CTLTYPE_NODE }, \
 	{ "igmp", CTLTYPE_NODE }, \
 	{ "ggp", CTLTYPE_NODE }, \
-	{ "ip4", CTLTYPE_NODE }, \
+	{ "ipip", CTLTYPE_NODE }, \
 	{ 0, 0 }, \
 	{ "tcp", CTLTYPE_NODE }, \
 	{ 0, 0 }, \
@@ -506,11 +361,57 @@ struct in6_pktinfo {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, \
-	{ 0, 0 }, \
+	{ "gre", CTLTYPE_NODE }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "esp", CTLTYPE_NODE }, \
 	{ "ah", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ "mobileip", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ "etherip", CTLTYPE_NODE }, \
 }
 
 /*
@@ -530,7 +431,21 @@ struct in6_pktinfo {
 #define IPCTL_IPPORT_HILASTAUTO	10
 #define	IPCTL_IPPORT_MAXQUEUE	11
 #define	IPCTL_ENCDEBUG		12
-#define	IPCTL_MAXID		13
+#define IPCTL_GIF_TTL		13	/* default TTL for gif encap packet */
+#define IPCTL_IPSEC_ACL		14	/* ingress IPsec access control */
+#define IPCTL_IPSEC_EMBRYONIC_SA_TIMEOUT	15 /* new SA lifetime */
+#define IPCTL_IPSEC_REQUIRE_PFS 16
+#define IPCTL_IPSEC_SOFT_ALLOCATIONS            17
+#define IPCTL_IPSEC_ALLOCATIONS 18
+#define IPCTL_IPSEC_SOFT_BYTES  19
+#define IPCTL_IPSEC_BYTES       20
+#define IPCTL_IPSEC_TIMEOUT     21
+#define IPCTL_IPSEC_SOFT_TIMEOUT 22
+#define IPCTL_IPSEC_SOFT_FIRSTUSE 23
+#define IPCTL_IPSEC_FIRSTUSE    24
+#define IPCTL_IPSEC_ENC_ALGORITHM 25
+#define IPCTL_IPSEC_AUTH_ALGORITHM 26
+#define	IPCTL_MAXID		27
 
 #define	IPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -546,7 +461,26 @@ struct in6_pktinfo {
 	{ "porthilast", CTLTYPE_INT }, \
 	{ "maxqueue", CTLTYPE_INT }, \
 	{ "encdebug", CTLTYPE_INT }, \
+	{ "gifttl", CTLTYPE_INT }, \
+	{ "ipsec-acl", CTLTYPE_INT }, \
+	{ "ipsec-invalid-life", CTLTYPE_INT }, \
+	{ "ipsec-pfs", CTLTYPE_INT }, \
+	{ "ipsec-soft-allocs", CTLTYPE_INT }, \
+	{ "ipsec-allocs", CTLTYPE_INT }, \
+	{ "ipsec-soft-bytes", CTLTYPE_INT }, \
+	{ "ipsec-bytes", CTLTYPE_INT }, \
+	{ "ipsec-timeout", CTLTYPE_INT }, \
+	{ "ipsec-soft-timeout", CTLTYPE_INT }, \
+	{ "ipsec-soft-firstuse", CTLTYPE_INT }, \
+	{ "ipsec-firstuse", CTLTYPE_INT }, \
+	{ "ipsec-enc-alg", CTLTYPE_STRING }, \
+	{ "ipsec-auth-alg", CTLTYPE_STRING }, \
 }
+
+/* INET6 stuff */
+#define __KAME_NETINET_IN_H_INCLUDED_
+#include <netinet6/in6.h>
+#undef __KAME_NETINET_IN_H_INCLUDED_
 
 #ifndef _KERNEL
 
@@ -554,6 +488,8 @@ struct in6_pktinfo {
 
 __BEGIN_DECLS
 int	   bindresvport __P((int, struct sockaddr_in *));
+struct sockaddr;
+int	   bindresvport_sa __P((int, struct sockaddr *));
 __END_DECLS
 
 #else

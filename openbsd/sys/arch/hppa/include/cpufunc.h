@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpufunc.h,v 1.10 1999/08/12 18:45:33 mickey Exp $	*/
+/*	$OpenBSD: cpufunc.h,v 1.16 2000/04/24 17:39:54 mickey Exp $	*/
 
 /*
  * Copyright (c) 1998 Michael Shalayeff
@@ -70,8 +70,8 @@
 #define hptbtop(b) ((b) >> 17)
 
 /* Get space register for an address */
-static __inline u_int ldsid(vaddr_t p) {
-	register u_int ret;
+static __inline register_t ldsid(vaddr_t p) {
+	register_t ret;
 	__asm __volatile("ldsid (%1),%0" : "=r" (ret) : "r" (p));
 	return ret;
 }
@@ -86,8 +86,8 @@ static __inline u_int ldsid(vaddr_t p) {
 #define rsm(v,r) __asm __volatile("rsm %1,%0": "=r" (r): "i" (v))
 
 /* Move to system mask. Old value of system mask is returned. */
-static __inline u_int mtsm(u_int mask) {
-	register u_int ret;
+static __inline register_t mtsm(register_t mask) {
+	register_t ret;
 	__asm __volatile("ssm 0,%0\n\t"
 			 "mtsm %1": "=&r" (ret) : "r" (mask));
 	return ret;
@@ -95,7 +95,7 @@ static __inline u_int mtsm(u_int mask) {
 
 static __inline register_t get_psw(void)
 {
-	register u_int ret;
+	register_t ret;
 	__asm __volatile("break %1, %2\n\tcopy %%ret0, %0" : "=r" (ret)
 		: "i" (HPPA_BREAK_KERNEL), "i" (HPPA_BREAK_GET_PSW)
 		: "r28");
@@ -104,7 +104,7 @@ static __inline register_t get_psw(void)
 
 static __inline register_t set_psw(register_t psw)
 {
-	register u_int ret;
+	register_t ret;
 	__asm __volatile("copy	%0, %%arg0\n\tbreak %1, %2\n\tcopy %%ret0, %0"
 		: "=r" (ret)
 		: "i" (HPPA_BREAK_KERNEL), "i" (HPPA_BREAK_SET_PSW), "0" (psw)
@@ -122,24 +122,36 @@ static __inline void
 ficache(pa_space_t sp, vaddr_t va, vsize_t size)
 {
 	extern int icache_stride;
-	register vaddr_t eva = (va + size + icache_stride-1) & ~(icache_stride-1);
+	vaddr_t eva = (va + size + icache_stride - 1) & ~(icache_stride - 1);
 
 	mtsp(sp, 1);
 	while (va < eva)
-		__asm __volatile ("fic,m %2(%%sr1, %1)"
-				  : "=r" (va): "0" (va), "r" (icache_stride));
+		__asm __volatile ("fic,m %1(%%sr1, %0)"
+				  : "+r" (va) : "r" (icache_stride));
 }
 
 static __inline void
 fdcache(pa_space_t sp, vaddr_t va, vsize_t size)
 {
 	extern int dcache_stride;
-	register vaddr_t eva = (va + size + dcache_stride-1) & ~(dcache_stride-1);
+	vaddr_t eva = (va + size + dcache_stride-1) & ~(dcache_stride - 1);
 
 	mtsp(sp, 1);
 	while (va < eva)
-		__asm __volatile ("fdc,m %2(%%sr1, %1)"
-				  : "=r" (va): "0" (va), "r" (dcache_stride));
+		__asm __volatile ("fdc,m %1(%%sr1, %0)"
+				  : "+r" (va) : "r" (dcache_stride));
+}
+
+static __inline void
+pdcache(pa_space_t sp, vaddr_t va, vsize_t size)
+{
+	extern int dcache_stride;
+	vaddr_t eva = (va + size + dcache_stride - 1) & ~(dcache_stride - 1);
+
+	mtsp(sp, 1);
+	while (va < eva)
+		__asm __volatile ("pdc,m %1(%%sr1, %0)"
+				  : "+r" (va) : "r" (dcache_stride));
 }
 
 static __inline void
@@ -198,13 +210,55 @@ pdtlbe(pa_space_t sp, vaddr_t va)
 	__asm volatile("pdtlbe %%r0(%%sr1, %0)":: "r" (va));
 }
 
+#ifdef USELEDS
+#define	PALED_NETSND	0x01
+#define	PALED_NETRCV	0x02
+#define	PALED_DISK	0x04
+#define	PALED_HEARTBEAT	0x08
+#define	PALED_LOADMASK	0xf0
+
+#define	PALED_DATA	0x01
+#define	PALED_STROBE	0x02
+
+extern volatile u_int8_t *machine_ledaddr;
+extern int machine_ledword, machine_leds;
+
+static __inline void
+ledctl(int on, int off, int toggle)
+{
+	if (machine_ledaddr) {
+		int r;
+
+		if (on)
+			machine_leds |= on;
+		if (off)
+			machine_leds &= ~off;
+		if (toggle)
+			machine_leds ^= toggle;
+			
+		r = ~machine_leds;	/* it seems they should be reversed */
+
+		if (machine_ledword)
+			*machine_ledaddr = r;
+		else {
+			register int b;
+			for (b = 0x80; b; b >>= 1) {
+				*machine_ledaddr = (r & b)? PALED_DATA : 0;
+				DELAY(1);
+				*machine_ledaddr = ((r & b)? PALED_DATA : 0) |
+				    PALED_STROBE;
+			}
+		}
+	}
+}
+#endif
+
 #ifdef _KERNEL
 void fcacheall __P((void));
 void ptlball __P((void));
 int btlb_insert __P((pa_space_t space, vaddr_t va, paddr_t pa,
 		     vsize_t *lenp, u_int prot));
 hppa_hpa_t cpu_gethpa __P((int n));
-void heartbeat __P((int on));
 #endif
 
 #endif /* _MACHINE_CPUFUNC_H_ */

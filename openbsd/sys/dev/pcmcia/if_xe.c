@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_xe.c,v 1.9 1999/09/16 11:28:42 niklas Exp $	*/
+/*	$OpenBSD: if_xe.c,v 1.14 2000/04/24 21:15:33 niklas Exp $	*/
 
 /*
  * Copyright (c) 1999 Niklas Hallqvist, C Stone, Job de Haas
@@ -216,9 +216,9 @@ xe_pcmcia_match(parent, match, aux)
 	switch (pa->manufacturer) {
 	case PCMCIA_VENDOR_COMPAQ:
 	case PCMCIA_VENDOR_COMPAQ2:
-	case PCMCIA_VENDOR_INTEL:
 		return (0);
 
+	case PCMCIA_VENDOR_INTEL:
 	case PCMCIA_VENDOR_XIRCOM:
 		/* XXX Per-productid checking here. */
 		return (1);
@@ -404,7 +404,7 @@ xe_pcmcia_attach(parent, self, aux)
 	sc->sc_mii.mii_readreg = xe_mdi_read;
 	sc->sc_mii.mii_writereg = xe_mdi_write;
 	sc->sc_mii.mii_statchg = xe_statchg;
-	ifmedia_init(&sc->sc_mii.mii_media, 0, xe_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, xe_mediachange,
 	    xe_mediastatus);
 	DPRINTF(XED_MII | XED_CONFIG,
 	    ("bmsr %x\n", xe_mdi_read(&sc->sc_dev, 0, 1)));
@@ -466,10 +466,8 @@ xe_pcmcia_detach(dev, flags)
 	int rv = 0;
 
 	for (msc = LIST_FIRST(&sc->sc_mii.mii_phys); msc;
-	    msc = LIST_FIRST(&sc->sc_mii.mii_phys)) {
-		LIST_REMOVE(msc, mii_list);
-		rv |= config_detach(&msc->mii_dev, flags);
-	}
+	    msc = LIST_FIRST(&sc->sc_mii.mii_phys))
+		rv |= mii_detach(msc, flags);
 
 	pcmcia_io_unmap(psc->sc_pf, psc->sc_io_window);
 	pcmcia_io_free(psc->sc_pf, &psc->sc_pcioh);
@@ -486,19 +484,26 @@ xe_pcmcia_activate(dev, act)
 	enum devact act;
 {
 	struct xe_pcmcia_softc *sc = (struct xe_pcmcia_softc *)dev;
+	struct ifnet *ifp = &sc->sc_xe.sc_arpcom.ac_if;
 	int s;
 
 	s = splnet();
 	switch (act) {
 	case DVACT_ACTIVATE:
 		pcmcia_function_enable(sc->sc_pf);
+		printf("%s:", sc->sc_xe.sc_dev.dv_xname);
 		sc->sc_xe.sc_ih =
 		    pcmcia_intr_establish(sc->sc_pf, IPL_NET, xe_intr, sc);
+		printf("\n");
+		xe_init(&sc->sc_xe);
 		break;
 
 	case DVACT_DEACTIVATE:
-		pcmcia_function_disable(sc->sc_pf);
+		ifp->if_timer = 0;
+		if (ifp->if_flags & IFF_RUNNING)
+			xe_stop(&sc->sc_xe);
 		pcmcia_intr_disestablish(sc->sc_pf, sc->sc_xe.sc_ih);
+		pcmcia_function_disable(sc->sc_pf);
 		break;
 	}
 	splx(s);
@@ -939,7 +944,7 @@ xe_mdi_pulse_bits(sc, data, len)
 	u_int32_t mask;
 
 	for (mask = 1 << (len - 1); mask; mask >>= 1)
-		xe_mdi_pulse (sc, data & mask);
+		xe_mdi_pulse(sc, data & mask);
 }
 
 /* Read a PHY register. */
@@ -1271,7 +1276,6 @@ xe_ioctl(ifp, command, data)
 		 * such as IFF_PROMISC are handled.
 		 */
 		if (ifp->if_flags & IFF_UP) {
-			xe_full_reset(sc);
 			xe_init(sc);
 		} else {
 			if (ifp->if_flags & IFF_RUNNING)
@@ -1353,7 +1357,7 @@ xe_set_address(sc)
 		for (page = 0x50, num = arp->ac_multicnt; num > 0 && enm;
 		    num--) {
 			if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
-			    sizeof (enm->enm_addrlo)) != 0) {
+			    sizeof(enm->enm_addrlo)) != 0) {
 				/*
 				 * The multicast address is really a range;
 				 * it's easier just to accept all multicasts.
@@ -1380,7 +1384,7 @@ xe_set_address(sc)
 }
 
 void
-xe_cycle_power (sc)
+xe_cycle_power(sc)
 	struct xe_softc *sc;
 {
 	bus_space_tag_t bst = sc->sc_bst;
@@ -1400,7 +1404,7 @@ xe_cycle_power (sc)
 }
 
 void
-xe_full_reset (sc)
+xe_full_reset(sc)
 	struct xe_softc *sc;
 {
 	bus_space_tag_t bst = sc->sc_bst;
@@ -1408,7 +1412,7 @@ xe_full_reset (sc)
 	bus_addr_t offset = sc->sc_offset;
 
 	/* Do an as extensive reset as possible on all functions. */
-	xe_cycle_power (sc);
+	xe_cycle_power(sc);
 	bus_space_write_1(bst, bsh, offset + CR, SOFT_RESET);
 	DELAY(20000);
 	bus_space_write_1(bst, bsh, offset + CR, 0);
@@ -1552,7 +1556,7 @@ xe_full_reset (sc)
 
 #ifdef XEDEBUG
 void
-xe_reg_dump (sc)
+xe_reg_dump(sc)
 	struct xe_softc *sc;
 {
 	int page, i;

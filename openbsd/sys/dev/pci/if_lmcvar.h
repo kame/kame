@@ -1,3 +1,4 @@
+/*	$OpenBSD: if_lmcvar.h,v 1.4 2000/02/06 20:56:02 chris Exp $ */
 /*	$NetBSD: if_lmcvar.h,v 1.1 1999/03/25 03:32:43 explorer Exp $	*/
 
 /*-
@@ -62,20 +63,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if !defined(_DEVAR_H)
-#define _DEVAR_H
-
 #define LMC_MTU 1500
 #define PPP_HEADER_LEN 4
 #define BIG_PACKET
-
-/*
- * Intel CPUs should use I/O mapped access.  XXXMLG Is this true on NetBSD
- * too?
- */
-#if defined(__i386__)
-#define	LMC_IOMAPPED
-#endif
 
 /*
  * This turns on all sort of debugging stuff and make the
@@ -141,12 +131,6 @@
     bus_space_write_1((sc)->lmc_bustag, (sc)->lmc_bushandle, (sc)->lmc_csrs.csr, (val))
 #endif /* __NetBSD__ */
 
-#ifdef LMC_IOMAPPED
-#define	LMC_EISA_CSRSIZE	16
-#define	LMC_EISA_CSROFFSET	0
-#define	LMC_PCI_CSRSIZE	8
-#define	LMC_PCI_CSROFFSET	0
-
 #if !defined(__NetBSD__) && !defined(__OpenBSD__)
 #define	LMC_CSR_READ(sc, csr)			(inl((sc)->lmc_csrs.csr))
 #define	LMC_CSR_WRITE(sc, csr, val)   	outl((sc)->lmc_csrs.csr, val)
@@ -154,8 +138,6 @@
 #define	LMC_CSR_READBYTE(sc, csr)		(inb((sc)->lmc_csrs.csr))
 #define	LMC_CSR_WRITEBYTE(sc, csr, val)	outb((sc)->lmc_csrs.csr, val)
 #endif /* __NetBSD__ */
-
-#else /* LMC_IOMAPPED */
 
 #define	LMC_PCI_CSRSIZE	8
 #define	LMC_PCI_CSROFFSET	0
@@ -170,12 +152,9 @@
 #define	LMC_CSR_WRITE(sc, csr, val)	((void)(*(sc)->lmc_csrs.csr = (val)))
 #endif /* __NetBSD__ */
 
-#endif /* LMC_IOMAPPED */
-
 /*
  * This structure contains "pointers" for the registers on
- * the various 21x4x chips.  CSR0 through CSR8 are common
- * to all chips.  After that, it gets messy...
+ * the various 21x4x chips.
  */
 typedef struct {
     lmc_csrptr_t csr_busmode;			/* CSR0 */
@@ -187,7 +166,7 @@ typedef struct {
     lmc_csrptr_t csr_command;			/* CSR6 */
     lmc_csrptr_t csr_intr;			/* CSR7 */
     lmc_csrptr_t csr_missed_frames;		/* CSR8 */
-    lmc_csrptr_t csr_9;			/* CSR9 */
+    lmc_csrptr_t csr_9;				/* CSR9 */
     lmc_csrptr_t csr_10;			/* CSR10 */
     lmc_csrptr_t csr_11;			/* CSR11 */
     lmc_csrptr_t csr_12;			/* CSR12 */
@@ -258,11 +237,8 @@ struct lmc_ringinfo {
 
 #define	LMC_RX_BUFLEN		((MCLBYTES < 2048 ? MCLBYTES : 2048) - 16)
 
-/*
- * The various controllers support.  Technically the DE425 is just
- * a 21040 on EISA.  But since it remarkably difference from normal
- * 21040s, we give it its own chip id.
- */
+#define	LMC_LINK_UP		1
+#define	LMC_LINK_DOWN		0
 
 typedef enum {
     LMC_21140, LMC_21140A,
@@ -306,7 +282,7 @@ struct lmc___softc {
     struct isadev lmc_id;		/* ISA device */
     struct intrhand lmc_ih;		/* intrrupt vectoring */
     struct atshutdown lmc_ats;		/* shutdown hook */
-    struct	p2pcom lmc_p2pcom;	/* point-to-point common stuff */
+    struct p2pcom lmc_p2pcom;		/* point-to-point common stuff */
     
 #define lmc_if	lmc_p2pcom.p2p_if	/* network-visible interface */
 #endif /* __bsdi__ */
@@ -371,6 +347,13 @@ struct lmc___softc {
 #if defined(__NetBSD__) && NRND > 0
     rndsource_element_t    lmc_rndsource;
 #endif
+
+    u_int32_t	lmc_crcSize;
+    u_int32_t	tx_clockState;
+    char	lmc_yel, lmc_blue, lmc_red;	/* for T1 and DS3 */
+    char	lmc_timing;			/* for HSSI and SSI */
+    u_int16_t	t1_alarm1_status;
+    u_int16_t	t1_alarm2_status;
 };
 
 /*
@@ -463,8 +446,7 @@ static const char * const lmc_status_bits[] = {
 };
 
 /*
- * This driver supports a maximum of 32 tulip boards.
- * This should be enough for the forseeable future.
+ * This driver supports a maximum of 32 devices.
  */
 #define	LMC_MAX_DEVICES	32
 
@@ -605,5 +587,3 @@ extern struct cfdriver lmc_cd;
 	 && ((u_int16_t *)a1)[2] == 0xFFFFU)
 
 typedef int lmc_spl_t;
-
-#endif /* !defined(_DEVAR_H) */

@@ -1,8 +1,8 @@
-/*	$OpenBSD: pccom.c,v 1.32 1999/08/08 01:34:15 niklas Exp $	*/
+/*	$OpenBSD: pccom.c,v 1.34 1999/11/28 12:07:02 downsj Exp $	*/
 /*	$NetBSD: com.c,v 1.82.4.1 1996/06/02 09:08:00 mrg Exp $	*/
 
 /*
- * Copyright (c) 1997 - 1998, Jason Downs.  All rights reserved.
+ * Copyright (c) 1997 - 1999, Jason Downs.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Jason Downs for the
- *      OpenBSD system.
- * 4. Neither the name(s) of the author(s) nor the name OpenBSD
+ * 3. Neither the name(s) of the author(s) nor the name OpenBSD
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -544,19 +540,19 @@ comattach(parent, self, aux)
 		bus_space_write_1(iot, ioh, com_dlbh, dlbh);
 	}
 
-#ifdef notyet
 	if (sc->sc_uarttype == COM_UART_16550A) { /* Probe for TI16750s */
 		bus_space_write_1(iot, ioh, com_lcr, lcr | LCR_DLAB);
 		bus_space_write_1(iot, ioh, com_fifo,
 		    FIFO_ENABLE | FIFO_ENABLE_64BYTE);
 		if ((bus_space_read_1(iot, ioh, com_iir) >> 5) == 7) {
+#if 0
 			bus_space_write_1(iot, ioh, com_lcr, 0);
 			if ((bus_space_read_1(iot, ioh, com_iir) >> 5) == 6)
+#endif
 				sc->sc_uarttype = COM_UART_TI16750;
 		}
 		bus_space_write_1(iot, ioh, com_fifo, FIFO_ENABLE);
 	}
-#endif
 
 	/* Reset the LCR (latch access is probably enabled). */
 	bus_space_write_1(iot, ioh, com_lcr, lcr);
@@ -604,13 +600,11 @@ comattach(parent, self, aux)
 		SET(sc->sc_hwflags, COM_HW_FIFO);
 		sc->sc_fifolen = 32;
 		break;
-#ifdef notyet
 	case COM_UART_TI16750:
 		printf(": ti16750, 64 byte fifo\n");
 		SET(sc->sc_hwflags, COM_HW_FIFO);
 		sc->sc_fifolen = 64;
 		break;
-#endif
 	case COM_UART_XR16850:
 		printf(": xr16850 (rev %d), 128 byte fifo\n", sc->sc_uartrev);
 		SET(sc->sc_hwflags, COM_HW_FIFO);
@@ -822,11 +816,9 @@ comopen(dev, flag, mode, p)
 			bus_space_write_1(iot, ioh, com_efr, 0);
 			bus_space_write_1(iot, ioh, com_lcr, 0);
 			break;
-#ifdef notyet
 		case COM_UART_TI16750:
 			bus_space_write_1(iot, ioh, com_ier, 0);
 			break;
-#endif
 		}
 
 #ifdef COM_HAYESP
@@ -879,13 +871,11 @@ comopen(dev, flag, mode, p)
 				else
 					fifo |= FIFO_RCV3_TRIGGER_60|FIFO_XMT3_TRIGGER_56;
 				break;
-#ifdef notyet
 			case COM_UART_TI16750:
 				fifo |= FIFO_ENABLE_64BYTE;
 				lcr = bus_space_read_1(iot, ioh, com_lcr);
 				bus_space_write_1(iot, ioh, com_lcr,
 				    lcr | LCR_DLAB);
-#endif
 			default:
 				if (tp->t_ispeed <= 1200)
 					fifo |= FIFO_TRIGGER_1;
@@ -915,10 +905,8 @@ comopen(dev, flag, mode, p)
 				    com_lsr), LSR_RXRDY))
 				    	break;
 			}
-#ifndef notyet
 			if (sc->sc_uarttype == COM_UART_TI16750)
 				bus_space_write_1(iot, ioh, com_lcr, lcr);
-#endif
 		}
 
 		/* flush any pending I/O */
@@ -1062,11 +1050,9 @@ compwroff(sc)
 		bus_space_write_1(iot, ioh, com_ier, IER_SLEEP);
 		bus_space_write_1(iot, ioh, com_lcr, 0);
 		break;
-#ifdef notyet
 	case COM_UART_TI16750:
 		bus_space_write_1(iot, ioh, com_ier, IER_SLEEP);
 		break;
-#endif
 	}
 }
 
@@ -1335,9 +1321,7 @@ comparam(tp, t)
 		if (!ISSET(sc->sc_hwflags, COM_HW_HAYESP) &&
 		    ISSET(sc->sc_hwflags, COM_HW_FIFO)) {
 			u_int8_t fifo = FIFO_ENABLE;
-#ifdef notyet
 			u_int8_t lcr2;
-#endif
 
 			switch (sc->sc_uarttype) {
 			case COM_UART_ST16650V2:
@@ -1352,13 +1336,11 @@ comparam(tp, t)
 				else
 					fifo |= FIFO_RCV3_TRIGGER_60|FIFO_XMT3_TRIGGER_56;
 				break;
-#ifdef notyet
 			case COM_UART_TI16750:
 				fifo |= FIFO_ENABLE_64BYTE;
 				lcr2 = bus_space_read_1(iot, ioh, com_lcr);
 				bus_space_write_1(iot, ioh, com_lcr,
 				    lcr2 | LCR_DLAB);
-#endif
 			default:
 				if (t->c_ispeed <= 1200)
 					fifo |= FIFO_TRIGGER_1;
@@ -1367,10 +1349,8 @@ comparam(tp, t)
 			}
 			bus_space_write_1(iot, ioh, com_fifo, fifo);
 
-#ifdef notyet
 			if (sc->sc_uarttype == COM_UART_TI16750)
 				bus_space_write_1(iot, ioh, com_lcr, lcr2);
-#endif
 		}
 	} else
 		bus_space_write_1(iot, ioh, com_lcr, lcr);

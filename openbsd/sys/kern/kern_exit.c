@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exit.c,v 1.20 1999/08/15 00:07:43 pjanzen Exp $	*/
+/*	$OpenBSD: kern_exit.c,v 1.24 2000/05/05 08:38:23 art Exp $	*/
 /*	$NetBSD: kern_exit.c,v 1.39 1996/04/22 01:38:25 christos Exp $	*/
 
 /*
@@ -63,6 +63,7 @@
 #include <sys/filedesc.h>
 #include <sys/signalvar.h>
 #include <sys/sched.h>
+#include <sys/ktrace.h>
 #ifdef SYSVSHM
 #include <sys/shm.h>
 #endif
@@ -117,9 +118,7 @@ exit1(p, rv)
 	if (p->p_pid == 1)
 		panic("init died (signal %d, exit %d)",
 		    WTERMSIG(rv), WEXITSTATUS(rv));
-#ifdef PGINPROF
-	vmsizmon();
-#endif
+
 	if (p->p_flag & P_PROFIL)
 		stopprofclock(p);
 	MALLOC(p->p_ru, struct rusage *, sizeof(struct rusage),
@@ -136,7 +135,7 @@ exit1(p, rv)
 	}
 	p->p_sigignore = ~0;
 	p->p_siglist = 0;
-	untimeout(realitexpire, (caddr_t)p);
+	timeout_del(&p->p_realit_to);
 
 	/*
 	 * Close open files and release open-file table.
@@ -204,7 +203,6 @@ exit1(p, rv)
 		sp->s_leader = NULL;
 	}
 	fixjobc(p, p->p_pgrp, 0);
-	p->p_rlimit[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 	(void)acct_process(p);
 #ifdef KTRACE
 	/* 
@@ -212,7 +210,7 @@ exit1(p, rv)
 	 */
 	p->p_traceflag = 0;	/* don't trace the vrele() */
 	if (p->p_tracep)
-		vrele(p->p_tracep);
+		ktrsettracevnode(p, NULL);
 #endif
 	/*
 	 * Remove proc from allproc queue and pidhash chain.
@@ -293,8 +291,8 @@ exit1(p, rv)
 	 * Other substructures are freed from wait().
 	 */
 	curproc = NULL;
-	if (--p->p_limit->p_refcnt == 0)
-		FREE(p->p_limit, M_SUBPROC);
+	limfree(p->p_limit);
+	p->p_limit = NULL;
 
 	/*
 	 * Finally, call machine-dependent code to release the remaining

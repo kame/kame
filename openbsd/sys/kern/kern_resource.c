@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_resource.c,v 1.9 1999/07/15 14:07:41 art Exp $	*/
+/*	$OpenBSD: kern_resource.c,v 1.12 2000/05/05 08:34:18 art Exp $	*/
 /*	$NetBSD: kern_resource.c,v 1.38 1996/10/23 07:19:38 matthias Exp $	*/
 
 /*-
@@ -58,7 +58,6 @@
 #include <uvm/uvm_extern.h>
 #endif
 
-void limfree __P((struct plimit *));
 /*
  * Resource controls and accounting.
  */
@@ -105,7 +104,7 @@ sys_getpriority(curp, v, retval)
 	case PRIO_USER:
 		if (SCARG(uap, who) == 0)
 			SCARG(uap, who) = curp->p_ucred->cr_uid;
-		for (p = allproc.lh_first; p != 0; p = p->p_list.le_next)
+		for (p = LIST_FIRST(&allproc); p; p = LIST_NEXT(p, p_list))
 			if (p->p_ucred->cr_uid == SCARG(uap, who) &&
 			    p->p_nice < low)
 				low = p->p_nice;
@@ -166,7 +165,7 @@ sys_setpriority(curp, v, retval)
 	case PRIO_USER:
 		if (SCARG(uap, who) == 0)
 			SCARG(uap, who) = curp->p_ucred->cr_uid;
-		for (p = allproc.lh_first; p != 0; p = p->p_list.le_next)
+		for (p = LIST_FIRST(&allproc); p; p = LIST_NEXT(p, p_list))
 			if (p->p_ucred->cr_uid == SCARG(uap, who)) {
 				error = donice(curp, p, SCARG(uap, prio));
 				found++;
@@ -282,11 +281,19 @@ dosetrlimit(p, which, limp)
 			if (limp->rlim_cur > alimp->rlim_cur) {
 				prot = VM_PROT_ALL;
 				size = limp->rlim_cur - alimp->rlim_cur;
+#ifdef MACHINE_STACK_GROWS_UP
+				addr = USRSTACK + alimp->rlim_cur;
+#else
 				addr = USRSTACK - limp->rlim_cur;
+#endif
 			} else {
 				prot = VM_PROT_NONE;
 				size = alimp->rlim_cur - limp->rlim_cur;
+#ifdef MACHINE_STACK_GROWS_UP
+				addr = USRSTACK + limp->rlim_cur;
+#else
 				addr = USRSTACK - alimp->rlim_cur;
+#endif
 			}
 			addr = trunc_page(addr);
 			size = round_page(size);

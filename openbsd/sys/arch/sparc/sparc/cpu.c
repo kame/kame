@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.18 1999/07/14 23:15:49 deraadt Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.31 2000/02/23 16:43:41 deraadt Exp $	*/
 /*	$NetBSD: cpu.c,v 1.56 1997/09/15 20:52:36 pk Exp $ */
 
 /*
@@ -71,6 +71,7 @@
 #include <sparc/sparc/cache.h>
 #include <sparc/sparc/asm.h>
 #include <sparc/sparc/cpuvar.h>
+#include <sparc/sparc/memreg.h>
 
 /* The following are used externally (sysctl_hw). */
 char	machine[] = MACHINE;		/* from <machine/param.h> */
@@ -79,6 +80,8 @@ char	*cpu_class = "sun4";
 char	cpu_model[130];
 char	cpu_hotfix[40];
 extern char mainbus_model[];		/* from autoconf.c */
+
+int	foundfpu;			/* from machine/cpu.h */
 
 /* The CPU configuration driver. */
 void cpu_attach __P((struct device *, struct device *, void *));
@@ -96,6 +99,7 @@ char *fsrtoname __P((int, int, int, char *));
 void cache_print __P((struct cpu_softc *));
 void cpu_spinup __P((struct cpu_softc *));
 void fpu_init __P((struct cpu_softc *));
+void replacemul __P((void));
 
 #define	IU_IMPL(psr)	((u_int)(psr) >> 28)
 #define	IU_VERS(psr)	(((psr) >> 24) & 0xf)
@@ -236,9 +240,20 @@ cpu_attach(parent, self, aux)
 		cache_print(sc);
 
 	if (sc->master) {
+		int s;
+
 		bcopy(sc, &cpuinfo, sizeof(cpuinfo));
-		/* Enable the cache */
+		/*
+		 * Enable the cache
+		 *
+		 * Disable all interrupts because we don't want anything
+		 * nasty to happen to the pagetables while the cache is
+		 * enabled and we haven't uncached them yet.
+		 */
+		s = splhigh();
 		sc->cache_enable();
+		pmap_cache_enable();
+		splx(s);
 		return;
 	}
 
@@ -346,6 +361,7 @@ cache_print(sc)
 void cpumatch_unknown __P((struct cpu_softc *, struct module_info *, int));
 void cpumatch_sun4 __P((struct cpu_softc *, struct module_info *, int));
 void cpumatch_sun4c __P((struct cpu_softc *, struct module_info *, int));
+void cpumatch_ms __P((struct cpu_softc *, struct module_info *, int));
 void cpumatch_viking __P((struct cpu_softc *, struct module_info *, int));
 void cpumatch_hypersparc __P((struct cpu_softc *, struct module_info *, int));
 void cpumatch_turbosparc __P((struct cpu_softc *, struct module_info *, int));
@@ -364,13 +380,18 @@ void viking_mmu_enable __P((void));
 void swift_mmu_enable __P((void));
 void hypersparc_mmu_enable __P((void));
 
-void srmmu_get_fltstatus __P((void));
-void ms1_get_fltstatus __P((void));
-void viking_get_fltstatus __P((void));
-void swift_get_fltstatus __P((void));
-void turbosparc_get_fltstatus __P((void));
-void hypersparc_get_fltstatus __P((void));
-void cypress_get_fltstatus __P((void));
+void srmmu_get_syncflt __P((void));
+void ms1_get_syncflt __P((void));
+void viking_get_syncflt __P((void));
+void swift_get_syncflt __P((void));
+void turbosparc_get_syncflt __P((void));
+void hypersparc_get_syncflt __P((void));
+void cypress_get_syncflt __P((void));
+
+int srmmu_get_asyncflt __P((u_int *, u_int *));
+int hypersparc_get_asyncflt __P((u_int *, u_int *));
+int cypress_get_asyncflt __P((u_int *, u_int *));
+int no_asyncflt_regs __P((u_int *, u_int *));
 
 struct module_info module_unknown = {
 	CPUTYP_UNKNOWN,
@@ -401,13 +422,17 @@ struct module_info module_sun4 = {
 	0,
 	sun4_cache_enable,
 	0,			/* ncontext set in `match' function */
-	0,			/* get fault regs: unused */
+	0,			/* get_syncflt(); unused in sun4 */
+	0,			/* get_asyncflt(); unused in sun4 */
 	sun4_cache_flush,
 	sun4_vcache_flush_page,
 	sun4_vcache_flush_segment,
 	sun4_vcache_flush_region,
 	sun4_vcache_flush_context,
-	noop_pcache_flush_line
+	noop_pcache_flush_line,
+	noop_pure_vcache_flush,
+	noop_cache_flush_all,
+	0
 };
 
 void
@@ -523,13 +548,17 @@ struct module_info module_sun4c = {
 	0,
 	sun4_cache_enable,
 	0,			/* ncontext set in `match' function */
-	0,
+	0,			/* get_syncflt(); unused in sun4c */
+	0,			/* get_asyncflt(); unused in sun4c */
 	sun4_cache_flush,
 	sun4_vcache_flush_page,
 	sun4_vcache_flush_segment,
 	sun4_vcache_flush_region,
 	sun4_vcache_flush_context,
-	noop_pcache_flush_line
+	noop_pcache_flush_line,
+	noop_pure_vcache_flush,
+	noop_cache_flush_all,
+	0
 };
 
 void
@@ -711,19 +740,23 @@ getcacheinfo_obp(sc, node)
 struct module_info module_ms1 = {
 	CPUTYP_MS1,
 	VAC_NONE,
-	0,
+	cpumatch_ms,
 	getcacheinfo_obp,
 	0,
 	ms1_mmu_enable,
 	ms1_cache_enable,
 	64,
-	ms1_get_fltstatus,
+	ms1_get_syncflt,
+	no_asyncflt_regs,
 	ms1_cache_flush,
 	noop_vcache_flush_page,
 	noop_vcache_flush_segment,
 	noop_vcache_flush_region,
 	noop_vcache_flush_context,
-	noop_pcache_flush_line
+	noop_pcache_flush_line,
+	noop_pure_vcache_flush,
+	ms1_cache_flush_all,
+	memerr4m
 };
 
 void
@@ -735,39 +768,56 @@ ms1_mmu_enable()
 struct module_info module_ms2 = {		/* UNTESTED */
 	CPUTYP_MS2,
 	VAC_WRITETHROUGH,
-	0,
+	cpumatch_ms,
 	getcacheinfo_obp,
 	0, /* was swift_hotfix, */
 	0,
 	swift_cache_enable,
 	256,
-	srmmu_get_fltstatus,
+	srmmu_get_syncflt,
+	srmmu_get_asyncflt,
 	srmmu_cache_flush,
 	srmmu_vcache_flush_page,
 	srmmu_vcache_flush_segment,
 	srmmu_vcache_flush_region,
 	srmmu_vcache_flush_context,
-	noop_pcache_flush_line
+	noop_pcache_flush_line,
+	noop_pure_vcache_flush,
+	srmmu_cache_flush_all,
+	memerr4m
 };
 
 
 struct module_info module_swift = {		/* UNTESTED */
 	CPUTYP_MS2,
 	VAC_WRITETHROUGH,
-	0,
+	cpumatch_ms,
 	getcacheinfo_obp,
 	swift_hotfix,
 	0,
 	swift_cache_enable,
 	256,
-	swift_get_fltstatus,
+	swift_get_syncflt,
+	no_asyncflt_regs,
 	srmmu_cache_flush,
 	srmmu_vcache_flush_page,
 	srmmu_vcache_flush_segment,
 	srmmu_vcache_flush_region,
 	srmmu_vcache_flush_context,
-	srmmu_pcache_flush_line
+	srmmu_pcache_flush_line,
+	noop_pure_vcache_flush,
+	srmmu_cache_flush_all,
+	memerr4m
 };
+
+void
+cpumatch_ms(sc, mp, node)
+	struct cpu_softc *sc;
+	struct module_info *mp;
+	int	node;
+{
+	replacemul();
+}
 
 void
 swift_hotfix(sc)
@@ -794,14 +844,18 @@ struct module_info module_viking = {		/* UNTESTED */
 	viking_mmu_enable,
 	viking_cache_enable,
 	4096,
-	viking_get_fltstatus,
+	viking_get_syncflt,
+	no_asyncflt_regs,
 	/* supersparcs use cached DVMA, no need to flush */
 	noop_cache_flush,
 	noop_vcache_flush_page,
 	noop_vcache_flush_segment,
 	noop_vcache_flush_region,
 	noop_vcache_flush_context,
-	viking_pcache_flush_line
+	viking_pcache_flush_line,
+	noop_pure_vcache_flush,
+	noop_cache_flush_all,
+	viking_memerr
 };
 
 void
@@ -810,6 +864,8 @@ cpumatch_viking(sc, mp, node)
 	struct module_info *mp;
 	int	node;
 {
+	replacemul();
+
 	if (node == 0)
 		viking_hotfix(sc);
 }
@@ -865,20 +921,24 @@ viking_mmu_enable()
 /* ROSS Hypersparc */
 struct module_info module_hypersparc = {		/* UNTESTED */
 	CPUTYP_UNKNOWN,
-	VAC_NONE,
+	VAC_WRITEBACK,
 	cpumatch_hypersparc,
 	getcacheinfo_obp,
 	0,
 	hypersparc_mmu_enable,
 	hypersparc_cache_enable,
 	4096,
-	hypersparc_get_fltstatus,
+	hypersparc_get_syncflt,
+	hypersparc_get_asyncflt,
 	srmmu_cache_flush,
 	srmmu_vcache_flush_page,
 	srmmu_vcache_flush_segment,
 	srmmu_vcache_flush_region,
 	srmmu_vcache_flush_context,
-	srmmu_pcache_flush_line
+	srmmu_pcache_flush_line,
+	hypersparc_pure_vcache_flush,
+	hypersparc_cache_flush_all,
+	hypersparc_memerr
 };
 
 void
@@ -888,7 +948,11 @@ cpumatch_hypersparc(sc, mp, node)
 	int	node;
 {
 	sc->cpu_type = CPUTYP_HS_MBUS;/*XXX*/
-	printf("warning: hypersparc support still under construction\n");
+
+	if (node == 0)
+		sta(0, ASI_HICACHECLR, 0);
+
+	replacemul();
 }
 
 void
@@ -915,13 +979,17 @@ struct module_info module_cypress = {		/* UNTESTED */
 	0,
 	cypress_cache_enable,
 	4096,
-	cypress_get_fltstatus,
+	cypress_get_syncflt,
+	cypress_get_asyncflt,
 	srmmu_cache_flush,
 	srmmu_vcache_flush_page,
 	srmmu_vcache_flush_segment,
 	srmmu_vcache_flush_region,
 	srmmu_vcache_flush_context,
-	srmmu_pcache_flush_line
+	srmmu_pcache_flush_line,
+	noop_pure_vcache_flush,
+	cypress_cache_flush_all,
+	memerr4m
 };
 
 /* Fujitsu Turbosparc */
@@ -934,13 +1002,17 @@ struct module_info module_turbosparc = {	/* UNTESTED */
 	0,
 	turbosparc_cache_enable,
 	256,
-	turbosparc_get_fltstatus,
+	turbosparc_get_syncflt,
+	no_asyncflt_regs,
 	srmmu_cache_flush,
 	srmmu_vcache_flush_page,
 	srmmu_vcache_flush_segment,
 	srmmu_vcache_flush_region,
 	srmmu_vcache_flush_context,
-	srmmu_pcache_flush_line
+	srmmu_pcache_flush_line,
+	noop_pure_vcache_flush,
+	srmmu_cache_flush_all,
+	memerr4m
 };
 
 void
@@ -969,13 +1041,15 @@ cpumatch_turbosparc(sc, mp, node)
 	sc->hotfix = 0;
 	sc->mmu_enable = 0;
 	sc->cache_enable = 0;
-	sc->get_faultstatus = 0;
+	sc->get_syncflt = 0;
 	sc->cache_flush = 0;
 	sc->vcache_flush_page = 0;
 	sc->vcache_flush_segment = 0;
 	sc->vcache_flush_region = 0;
 	sc->vcache_flush_context = 0;
 	sc->pcache_flush_line = 0;
+
+	replacemul();
 }
 
 void
@@ -1153,13 +1227,17 @@ getcpuinfo(sc, node)
 		MPCOPY(hotfix);
 		MPCOPY(mmu_enable);
 		MPCOPY(cache_enable);
-		MPCOPY(get_faultstatus);
+		MPCOPY(get_syncflt);
+		MPCOPY(get_asyncflt);
 		MPCOPY(cache_flush);
 		MPCOPY(vcache_flush_page);
 		MPCOPY(vcache_flush_segment);
 		MPCOPY(vcache_flush_region);
 		MPCOPY(vcache_flush_context);
 		MPCOPY(pcache_flush_line);
+		MPCOPY(pure_vcache_flush);
+		MPCOPY(cache_flush_all);
+		MPCOPY(memerr);
 #undef MPCOPY
 		return;
 	}
@@ -1244,4 +1322,48 @@ fsrtoname(impl, vers, fver, buf)
 			return (p->name);
 	sprintf(buf, "version 0x%x", fver);
 	return (buf);
+}
+
+/*
+ * Whack the slow sun4/sun4c {,u}{mul,div,rem} functions with
+ * fast V8 ones
+ * We are called once before pmap_bootstrap and once after. We only do stuff
+ * in the "before" case. We happen to know that the kernel text is not
+ * write-protected then.
+ * XXX - investigate cache flushing, right now we can't do it because the
+ *       flushes try to do va -> pa conversions.
+ */
+extern int _mulreplace, _mulreplace_end, _mul;
+extern int _umulreplace, _umulreplace_end, _umul;
+extern int _divreplace, _divreplace_end, _div;
+extern int _udivreplace, _udivreplace_end, _udiv;
+extern int _remreplace, _remreplace_end, _rem;
+extern int _uremreplace, _uremreplace_end, _urem;
+
+struct replace {
+	void *from, *frome, *to;
+} ireplace[] = {
+	{ &_mulreplace, &_mulreplace_end, &_mul },
+	{ &_umulreplace, &_umulreplace_end, &_umul },
+	{ &_divreplace, &_divreplace_end, &_div },
+	{ &_udivreplace, &_udivreplace_end, &_udiv },
+	{ &_remreplace, &_remreplace_end, &_rem },
+ 	{ &_uremreplace, &_uremreplace_end, &_urem },
+};
+
+void
+replacemul()
+{
+	static int replacedone = 0;
+	int i, s;
+
+	if (replacedone)
+		return;
+	replacedone = 1;
+
+	s = splhigh();
+	for (i = 0; i < sizeof(ireplace)/sizeof(ireplace[0]); i++)
+		bcopy(ireplace[i].from, ireplace[i].to,
+		    ireplace[i].frome - ireplace[i].from);
+	splx(s);
 }

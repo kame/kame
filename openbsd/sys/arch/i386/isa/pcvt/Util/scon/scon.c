@@ -1,4 +1,4 @@
-/*	$OpenBSD: scon.c,v 1.16 1999/10/16 18:56:37 aaron Exp $	*/
+/*	$OpenBSD: scon.c,v 1.18 2000/01/16 12:39:55 maja Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch
@@ -74,8 +74,6 @@ int lflag = -1;
 int mflag = -1;
 int oflag = -1;
 int current = -1;
-int pflag = -1;
-int hflag = -1;
 int res = -1;
 char *device;
 int dflag = -1;
@@ -209,7 +207,7 @@ char *argv[];
 	int c;
 	int fd;
 	
-	while( (c = getopt(argc, argv, "ab:c:d:f:HVlmos:t:vp:18")) != -1)
+	while( (c = getopt(argc, argv, "ab:c:d:f:lmos:t:vp:18")) != -1)
 	{
 		switch(c)
 		{
@@ -244,14 +242,6 @@ char *argv[];
 				fflag = 1;
 				break;
 				
-			case 'V':
-				pflag = 1;
-				break;
-
-			case 'H':
-				hflag = 1;
-				break;
-
 			case 's':
 				if     (!strncmp(optarg, "25", 2))
 					res = SIZ_25ROWS;
@@ -343,11 +333,8 @@ char *argv[];
 		}
 	}
 
-	if((pflag == 1) && (hflag == 1))
-		usage();
-
-	if(dflag == -1 && lflag == -1 && current == -1 && pflag == -1 &&
-	   hflag == -1 && res == -1 && Pflag == 0 && tflag == 0 && fflag == -1
+	if(dflag == -1 && lflag == -1 && current == -1 &&
+	   res == -1 && Pflag == 0 && tflag == 0 && fflag == -1
 	   && colms == 0 && mflag == -1 && bflag == -1 && oflag == -1)
 	{
 		lflag = 1;
@@ -508,24 +495,6 @@ char *argv[];
 		exit(0);
 	}
 
-	if(pflag == 1)
-	{
-		if(vflag)
-			printf("processing option -V, setting emulation to pure VT220\n");
-		screeninfo.pure_vt_mode = M_PUREVT;
-	}
-	else if(hflag == 1)
-	{
-		if(vflag)
-			printf("processing option -H, setting emulation to VT220 + HP Labels\n");
-		screeninfo.pure_vt_mode = M_HPVT;
-	}
-	else
-	{
-		if(vflag)
-			printf("no change in terminal emulation\n");
-	}
-
 	if(vflag)
 	{
 		if(res == -1)
@@ -575,14 +544,13 @@ success:
 
 void usage()
 {
-	fprintf(stderr,"usage: scon [-almvVH18] [-b n] [-c n] [-d dev] [-f [on|off] [-s n]\n");
+	fprintf(stderr,"usage: scon [-almv18] [-b n] [-c n] [-d dev] [-f [on|off] [-s n]\n");
 	fprintf(stderr,"            [-p [default | list | i,r,g,b]] | [-t sec]\n");
 	fprintf(stderr,"       -a              list video adaptor type (MDA,CGA,EGA or VGA)\n");
 	fprintf(stderr,"       -b <num>        set number of scrollback buffer pages to <num>\n");
 	fprintf(stderr,"       -c <screen no>  switch current virtual screen to <screen no>\n");
 	fprintf(stderr,"       -d <device>     set parameters(-V|-H|-s) for virtual device\n");
 	fprintf(stderr,"       -f <on|off>     force 24 lines in VT 25 lines and HP 28 lines mode\n");
-	fprintf(stderr,"       -H              set VT220/HP emulation mode for a virtual screen\n");
 	fprintf(stderr,"       -l              list current parameters for a virtual screen\n");
 	fprintf(stderr,"       -m              report monitor type (MONO/COLOR)\n");
 	fprintf(stderr,"       -p default      set default VGA palette\n");
@@ -594,7 +562,6 @@ void usage()
 	fprintf(stderr,"       -1              set 132 columns mode\n");
 	fprintf(stderr,"       -8              set 80 columns mode\n");
 	fprintf(stderr,"       -v              verbose mode\n");
-	fprintf(stderr,"       -V              set pure VT220 emulation for a virtual screen\n");
 	exit(1);
 }
 

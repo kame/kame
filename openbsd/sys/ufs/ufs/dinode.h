@@ -1,4 +1,4 @@
-/*	$OpenBSD: dinode.h,v 1.3 1997/02/24 14:27:16 niklas Exp $	*/
+/*	$OpenBSD: dinode.h,v 1.5 1999/12/02 18:38:17 art Exp $	*/
 /*	$NetBSD: dinode.h,v 1.7 1995/06/15 23:22:48 cgd Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)dinode.h	8.6 (Berkeley) 9/13/94
+ *	@(#)dinode.h	8.9 (Berkeley) 3/29/95
  */
 
 #ifndef _UFS_DINODE_H_
@@ -76,7 +76,7 @@ struct dinode {
 	int16_t		di_nlink;	/*   2: File link count. */
 	union {
 		u_int16_t oldids[2];	/*   4: Ffs: old user and group ids. */
-		ino_t	  inumber;	/*   4: Lfs: inode number. */
+		u_int32_t inumber;	/*   4: Lfs: inode number. */
 	} di_u;
 	u_int64_t	di_size;	/*   8: File byte count. */
 	int32_t		di_atime;	/*  16: Last access time. */

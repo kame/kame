@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_acct.c,v 1.7 1998/07/28 00:13:00 millert Exp $	*/
+/*	$OpenBSD: kern_acct.c,v 1.9 2000/05/05 08:38:23 art Exp $	*/
 /*	$NetBSD: kern_acct.c,v 1.42 1996/02/04 02:15:12 christos Exp $	*/
 
 /*-
@@ -56,6 +56,7 @@
 #include <sys/resourcevar.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
+#include <sys/timeout.h>
 
 #include <sys/syscallargs.h>
 
@@ -106,6 +107,7 @@ sys_acct(p, v, retval)
 	} */ *uap = v;
 	struct nameidata nd;
 	int error;
+	static struct timeout acct_timeout;
 
 	/* Make sure that the caller is root. */
 	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
@@ -132,7 +134,7 @@ sys_acct(p, v, retval)
 	 * close the file, and (if no new file was specified, leave).
 	 */
 	if (acctp != NULLVP || savacctp != NULLVP) {
-		untimeout(acctwatch, NULL);
+		timeout_del(&acct_timeout);
 		error = vn_close((acctp != NULLVP ? acctp : savacctp), FWRITE,
 		    p->p_ucred, p);
 		acctp = savacctp = NULLVP;
@@ -145,7 +147,9 @@ sys_acct(p, v, retval)
 	 * free space watcher.
 	 */
 	acctp = nd.ni_vp;
-	acctwatch(NULL);
+	if (!timeout_initialized(&acct_timeout))
+		timeout_set(&acct_timeout, acctwatch, &acct_timeout);
+	acctwatch(&acct_timeout);
 	return (error);
 }
 
@@ -164,11 +168,23 @@ acct_process(p)
 	struct timeval ut, st, tmp;
 	int s, t;
 	struct vnode *vp;
+	struct plimit *oplim = NULL;
+	int error;
 
 	/* If accounting isn't enabled, don't bother */
 	vp = acctp;
 	if (vp == NULLVP)
 		return (0);
+
+	/*
+	 * Raise the file limit so that accounting can't be stopped by the
+	 * user. (XXX - we should think about the cpu limit too).
+	 */
+	if (p->p_limit->p_refcnt > 1) {
+		oplim = p->p_limit;
+		p->p_limit = limcopy(p->p_limit);
+	}
+	p->p_rlimit[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 
 	/*
 	 * Get process accounting information.
@@ -218,8 +234,15 @@ acct_process(p)
 	 * Now, just write the accounting information to the file.
 	 */
 	VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
-	return (vn_rdwr(UIO_WRITE, vp, (caddr_t)&acct, sizeof (acct),
-	    (off_t)0, UIO_SYSSPACE, IO_APPEND|IO_UNIT, p->p_ucred, NULL, p));
+	error = vn_rdwr(UIO_WRITE, vp, (caddr_t)&acct, sizeof (acct),
+	    (off_t)0, UIO_SYSSPACE, IO_APPEND|IO_UNIT, p->p_ucred, NULL, p);
+
+	if (oplim) {
+		limfree(p->p_limit);
+		p->p_limit = oplim;
+	}
+
+	return error;
 }
 
 /*
@@ -269,9 +292,10 @@ encode_comp_t(s, us)
  */
 /* ARGSUSED */
 void
-acctwatch(a)
-	void *a;
+acctwatch(arg)
+	void *arg;
 {
+	struct timeout *to = (struct timeout *)arg;
 	struct statfs sb;
 
 	if (savacctp != NULLVP) {
@@ -300,5 +324,5 @@ acctwatch(a)
 		}
 	} else
 		return;
-	timeout(acctwatch, NULL, acctchkfreq * hz);
+	timeout_add(to, acctchkfreq * hz);
 }

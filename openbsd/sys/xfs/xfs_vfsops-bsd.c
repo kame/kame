@@ -1,3 +1,5 @@
+/*	$OpenBSD: xfs_vfsops-bsd.c,v 1.4 2000/03/03 00:54:59 todd Exp $	*/
+
 /*
  * Copyright (c) 1995, 1996, 1997, 1998, 1999 Kungliga Tekniska Högskolan
  * (Royal Institute of Technology, Stockholm, Sweden).
@@ -38,7 +40,7 @@
 
 #include <xfs/xfs_locl.h>
 
-RCSID("$Id: xfs_vfsops-bsd.c,v 1.1 1999/04/30 01:59:01 art Exp $");
+RCSID("$OpenBSD: xfs_vfsops-bsd.c,v 1.4 2000/03/03 00:54:59 todd Exp $");
 
 /*
  * XFS vfs operations.
@@ -126,10 +128,7 @@ xfs_vget(struct mount * mp,
 int
 xfs_fhtovp(struct mount * mp,
 	   struct fid * fhp,
-	   struct mbuf * nam,
-	   struct vnode ** vpp,
-	   int *exflagsp,
-	   struct ucred ** credanonp)
+	   struct vnode ** vpp)
 {
 #ifdef ARLA_KNFS
     static struct ucred fhtovpcred;
@@ -187,12 +186,6 @@ xfs_fhtovp(struct mount * mp,
 	fhtovpcred.cr_ngroups = 0;
       
 	*vpp = vp;
-#ifdef MNT_EXPUBLIC
-	*exflagsp = MNT_EXPUBLIC;
-#else
-	*exflagsp = 0;
-#endif
-	*credanonp = &fhtovpcred;
 
 	XFSDEB(XDEBVFOPS, ("xfs_fhtovp done\n"));
 
@@ -336,7 +329,6 @@ xfs_fhopen (struct proc *proc,
     int flags = FFLAGS(user_flags);
     int index;
     struct file *fp;
-    extern struct fileops vnops;
 
     XFSDEB(XDEBVFOPS, ("xfs_fhopen: fileid = %ld, flags = %d\n",
 		       fileid, user_flags));

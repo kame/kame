@@ -1,7 +1,7 @@
-/*	$OpenBSD: trap.c,v 1.10 1999/08/16 04:05:38 mickey Exp $	*/
+/*	$OpenBSD: trap.c,v 1.19 2000/02/10 20:29:09 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998 Michael Shalayeff
+ * Copyright (c) 1998-2000 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,7 +31,7 @@
  */
 
 #undef INTRDEBUG
-#define TRAPDEBUG
+#undef TRAPDEBUG
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,48 +47,53 @@
 #include <net/netisr.h>
 
 #include <vm/vm.h>
+#include <vm/vm_kern.h>
 #include <uvm/uvm.h>
 
 #include <machine/iomod.h>
 #include <machine/cpufunc.h>
 #include <machine/reg.h>
-#include <machine/db_machdep.h>
 #include <machine/autoconf.h>
 
-#define	FAULT_TYPE(op)	(VM_PROT_READ|(inst_load(op) ? 0 : VM_PROT_WRITE))
+#ifdef DDB
+#include <machine/db_machdep.h>
+#endif
+
+#if defined(INTRDEBUG) || defined(TRAPDEBUG)
+#include <ddb/db_output.h>
+#endif
+
 
 const char *trap_type[] = {
-	"invalid interrupt vector",
-	"high priority machine check",
+	"invalid",
+	"HPMC",
 	"power failure",
-	"recovery counter trap",
+	"recovery counter",
 	"external interrupt",
-	"low-priority machine check",
-	"instruction TLB miss fault",
-	"instruction protection trap",
-	"Illegal instruction trap",
-	"break instruction trap",
-	"privileged operation trap",
-	"privileged register trap",
-	"overflow trap",
-	"conditional trap",
-	"assist exception trap",
-	"data TLB miss fault",
-	"ITLB non-access miss fault",
-	"DTLB non-access miss fault",
-	"data protection trap/unalligned data reference trap",
-	"data break trap",
-	"TLB dirty bit trap",
-	"page reference trap",
-	"assist emulation trap",
-	"higher-privelege transfer trap",
-	"lower-privilege transfer trap",
-	"taken branch trap",
-	"data access rights trap",
-	"data protection ID trap",
-	"unaligned data ref trap",
-	"reserved",
-	"reserved 2"
+	"LPMC",
+	"ITLB miss fault",
+	"instruction protection",
+	"Illegal instruction",
+	"break instruction",
+	"privileged operation",
+	"privileged register",
+	"overflow",
+	"conditional",
+	"assist exception",
+	"DTLB miss",
+	"ITLB non-access miss",
+	"DTLB non-access miss",
+	"data protection/rights/alignment",
+	"data break",
+	"TLB dirty",
+	"page reference",
+	"assist emulation",
+	"higher-priv transfer",
+	"lower-priv transfer",
+	"taken branch",
+	"data access rights",
+	"data protection",
+	"unaligned data ref",
 };
 int trap_types = sizeof(trap_type)/sizeof(trap_type[0]);
 
@@ -146,79 +151,107 @@ trap(type, frame)
 	struct trapframe *frame;
 {
 	struct proc *p = curproc;
-	register vm_offset_t va;
+	struct pcb *pcbp;
+	register vaddr_t va;
 	register vm_map_t map;
+	struct vmspace *vm;
 	register vm_prot_t vftype;
 	register pa_space_t space;
 	u_int opcode;
 	int ret;
 	union sigval sv;
 	int s, si;
-
+	const char *tts;
+extern db_regs_t ddb_regs;
+ddb_regs = *frame;
+	opcode = frame->tf_iir;
 	if (type == T_ITLBMISS || type == T_ITLBMISSNA) {
 		va = frame->tf_iioq_head;
 		space = frame->tf_iisq_head;
+		vftype = VM_PROT_READ;	/* XXX VM_PROT_EXECUTE ??? */
 	} else {
 		va = frame->tf_ior;
 		space = frame->tf_isr;
+		vftype = inst_store(opcode) ? VM_PROT_WRITE : VM_PROT_READ;
 	}
-	opcode = frame->tf_iir;
-	vftype = FAULT_TYPE(opcode);
 
-	if (USERMODE(frame->tf_iioq_head)) {
-		type |= T_USER;
+	if (frame->tf_flags & TFF_LAST)
 		p->p_md.md_regs = frame;
-	}
+
 #ifdef TRAPDEBUG
-	if ((type & ~T_USER) != T_INTERRUPT &&
-	    (type & ~T_USER) != T_IBREAK)
-		printf ("trap: %d, %s for %x:%x at %x:%x\n",
-			type, trap_type[type & ~T_USER], space, va,
-			frame->tf_iisq_head, frame->tf_iioq_head);
+	if ((type & ~T_USER) > trap_types)
+		tts = "reserved";
+	else
+		tts = trap_type[type & ~T_USER];
+
+	if (type != T_INTERRUPT && (type & ~T_USER) != T_IBREAK)
+		db_printf("trap: %d, %s for %x:%x at %x:%x, fl=%x, fp=%p\n",
+		    type, tts, space, va, frame->tf_iisq_head,
+		    frame->tf_iioq_head, frame->tf_flags, frame);
 	else if ((type & ~T_USER) == T_IBREAK)
-		printf ("trap: break instruction %x:%x at %x:%x\n",
-			break5(opcode), break13(opcode),
-			frame->tf_iisq_head, frame->tf_iioq_head);
+		db_printf("trap: break instruction %x:%x at %x:%x, fp=%p\n",
+		    break5(opcode), break13(opcode),
+		    frame->tf_iisq_head, frame->tf_iioq_head, frame);
+
+	{
+		extern int etext;
+		if (frame < (struct trapframe *)&etext) {
+			printf("trap: bogus frame ptr %p\n", frame);
+			goto dead_end;
+		}
+	}
 #endif
 	switch (type) {
 	case T_NONEXIST:
 	case T_NONEXIST|T_USER:
+#ifndef DDB
 		/* we've got screwed up by the central scrutinizer */
-		panic ("trap: zombie's on the bridge!!!");
+		panic ("trap: elvis has just left the building!");
 		break;
-
+#else
+		goto dead_end;
+#endif
 	case T_RECOVERY:
 	case T_RECOVERY|T_USER:
+#ifndef DDB
 		/* XXX will implement later */
 		printf ("trap: handicapped");
 		break;
-
-#ifdef DIAGNOSTIC
-	case T_HPMC:
-	case T_HPMC | T_USER:
-	case T_EXCEPTION:
-	case T_EMULATION:
-	case T_TLB_DIRTY:
-	case T_TLB_DIRTY | T_USER:
-		panic ("trap: impossible \'%s\' (%d)",
-			trap_type[type & ~T_USER], type);
-		break;
+#else
+		goto dead_end;
 #endif
 
+#ifdef DIAGNOSTIC
+	case T_EXCEPTION:
+		panic("FPU/SFU emulation botch");
+
+		/* these just can't happen ever */
+	case T_PRIV_OP:
+	case T_PRIV_REG:
+		/* these just can't make it to the trap() ever */
+	case T_HPMC:      case T_HPMC | T_USER:
+	case T_EMULATION: case T_EMULATION | T_USER:
+	case T_TLB_DIRTY: case T_TLB_DIRTY | T_USER:
+#endif
 	case T_IBREAK:
 	case T_DATALIGN:
 	case T_DBREAK:
+	dead_end:
 #ifdef DDB
-		if (kdb_trap (type, 0, frame)) {
+		if (kdb_trap (type, va, frame)) {
 			if (type == T_IBREAK) {
 				/* skip break instruction */
-				frame->tf_iioq_head += 4;
+				frame->tf_iioq_head = frame->tf_iioq_tail;
 				frame->tf_iioq_tail += 4;
 			}
 			return;
 		}
+#else
+		if (type == T_DATALIGN)
+			panic ("trap: %s at 0x%x", tts, va);
+		else
+			panic ("trap: no debugger for \"%s\" (%d)", tts, type);
 #endif
-		/* probably panic otherwise */
 		break;
 
 	case T_IBREAK | T_USER:
@@ -226,14 +259,13 @@ trap(type, frame)
 		/* pass to user debugger */
 		break;
 
-	case T_EMULATION | T_USER:
 	case T_EXCEPTION | T_USER:	/* co-proc assist trap */
-		sv.sival_int = frame->tf_ior;
+		sv.sival_int = va;
 		trapsignal(p, SIGFPE, type &~ T_USER, FPE_FLTINV, sv);
 		break;
 
 	case T_OVERFLOW | T_USER:
-		sv.sival_int = frame->tf_ior;
+		sv.sival_int = va;
 		trapsignal(p, SIGFPE, type &~ T_USER, FPE_INTOVF, sv);
 		break;
 		
@@ -241,24 +273,24 @@ trap(type, frame)
 		break;
 
 	case T_ILLEGAL | T_USER:
-		sv.sival_int = frame->tf_ior;
+		sv.sival_int = va;
 		trapsignal(p, SIGILL, type &~ T_USER, ILL_ILLOPC, sv);
 		break;
 
 	case T_PRIV_OP | T_USER:
-		sv.sival_int = frame->tf_ior;
+		sv.sival_int = va;
 		trapsignal(p, SIGILL, type &~ T_USER, ILL_PRVOPC, sv);
 		break;
 
 	case T_PRIV_REG | T_USER:
-		sv.sival_int = frame->tf_ior;
+		sv.sival_int = va;
 		trapsignal(p, SIGILL, type &~ T_USER, ILL_PRVREG, sv);
 		break;
 
 		/* these should never got here */
 	case T_HIGHERPL | T_USER:
 	case T_LOWERPL | T_USER:
-		sv.sival_int = frame->tf_ior;
+		sv.sival_int = va;
 		trapsignal(p, SIGSEGV, type &~ T_USER, SEGV_ACCERR, sv);
 		break;
 
@@ -268,43 +300,104 @@ trap(type, frame)
 		trapsignal(p, SIGSEGV, vftype, SEGV_ACCERR, sv);
 		break;
 
-	case T_IPROT:
 	case T_DPROT:
-	case T_ITLBMISS:
-	case T_ITLBMISS | T_USER:
-	case T_ITLBMISSNA:
-	case T_ITLBMISSNA | T_USER:
-	case T_DTLBMISS:
-	case T_DTLBMISS | T_USER:
-	case T_DTLBMISSNA:
-	case T_DTLBMISSNA | T_USER:
-#if 0
-if (kdb_trap (type, 0, frame))
-return;
-break;
-#endif
+	case T_IPROT:
+	case T_DATACC:   	case T_DATACC   | T_USER:
+	case T_ITLBMISS:	case T_ITLBMISS | T_USER:
+	case T_DTLBMISS:	case T_DTLBMISS | T_USER:
+	case T_ITLBMISSNA:	case T_ITLBMISSNA | T_USER:
+	case T_DTLBMISSNA:	case T_DTLBMISSNA | T_USER:
 		va = trunc_page(va);
-		map = &p->p_vmspace->vm_map;
+		vm = p->p_vmspace;
 
-		ret = uvm_fault(map, va, vftype, FALSE);
+		if (!vm) {
+#ifdef TRAPDEBUG
+			printf("trap: no vm, p=%p\n", p);
+#endif
+			goto dead_end;
+		}
+
+		/*
+		 * it could be a kernel map for exec_map faults
+		 */
+		if (!(type & T_USER) && space == HPPA_SID_KERNEL)
+			map = kernel_map;
+		else
+			map = &vm->vm_map;
+
+		if (map->pmap->pmap_space != space) {
+#ifdef TRAPDEBUG
+			printf("trap: space missmatch %d != %d\n",
+			    space, map->pmap->pmap_space);
+#endif
+			/* actually dump the user, crap the kernel */
+			goto dead_end;
+		}
+
+		ret = uvm_fault(map, va, 0, vftype);
+
+#ifdef TRAPDEBUG
+		printf("uvm_fault(%p, %x, %d, %d)=%d\n",
+		    map, va, 0, vftype, ret);
+#endif
+
+		/*
+		 * If this was a stack access we keep track of the maximum
+		 * accessed stack size.  Also, if uvm_fault gets a protection
+		 * failure it is due to accessing the stack region outside
+		 * the current limit and we need to reflect that as an access
+		 * error.
+		 */
+		if (va >= (vaddr_t)vm->vm_maxsaddr + vm->vm_ssize) {
+			if (ret == KERN_SUCCESS) {
+				vsize_t nss = clrnd(btoc(va - USRSTACK + NBPG));
+				if (nss > vm->vm_ssize)
+					vm->vm_ssize = nss;
+			} else if (ret == KERN_PROTECTION_FAILURE)
+				ret = KERN_INVALID_ADDRESS;
+		}
+
 		if (ret != KERN_SUCCESS) {
 			if (type & T_USER) {
+printf("trapsignal: uvm_fault\n");
 				sv.sival_int = frame->tf_ior;
 				trapsignal(p, SIGSEGV, vftype, SEGV_MAPERR, sv);
-			} else
-				panic ("trap: uvm_fault(%p, %x, %d, %d): %d",
-				       map, frame->tf_ior, vftype, 0, ret);
+			} else {
+				if (p && p->p_addr->u_pcb.pcb_onfault) {
+#ifdef PMAPDEBUG
+					printf("trap: copyin/out %d\n",ret);
+#endif
+					pcbp = &p->p_addr->u_pcb;
+					frame->tf_iioq_tail = 4 +
+					    (frame->tf_iioq_head =
+						pcbp->pcb_onfault);
+					pcbp->pcb_onfault = 0;
+					break;
+				}
+#if 1
+if (kdb_trap (type, va, frame))
+	return;
+#else
+				panic("trap: uvm_fault(%p, %x, %d, %d): %d",
+				    map, va, 0, vftype, ret);
+#endif
+			}
 		}
 		break;
 
 	case T_DATALIGN | T_USER:
-		sv.sival_int = frame->tf_ior;
+		sv.sival_int = va;
 		trapsignal(p, SIGBUS, vftype, BUS_ADRALN, sv);
 		break;
 
 	case T_INTERRUPT:
 	case T_INTERRUPT|T_USER:
+		frame->tf_flags |= TFF_INTR;
 		cpu_intr(frame);
+#if 0
+if (kdb_trap (type, va, frame))
+return;
+#endif
 		/* FALLTHROUGH */
 	case T_LOWERPL:
 		__asm __volatile ("ldcws 0(%1), %0"
@@ -331,7 +424,7 @@ break;
 			DONET(NETISR_IP, ipintr);
 #endif
 #ifdef INET6
-			DONET(NETISR_IPV6, ipv6intr);
+			DONET(NETISR_IPV6, ip6intr);
 #endif
 #ifdef NETATALK
 			DONET(NETISR_ATALK, atintr);
@@ -369,22 +462,22 @@ break;
 	case T_OVERFLOW:
 	case T_CONDITION:
 	case T_ILLEGAL:
-	case T_PRIV_OP:
-	case T_PRIV_REG:
 	case T_HIGHERPL:
 	case T_TAKENBR:
 	case T_POWERFAIL:
 	case T_LPMC:
 	case T_PAGEREF:
-	case T_DATACC:   case T_DATACC   | T_USER:
-	case T_DATAPID:  case T_DATAPID  | T_USER:
+	case T_DATAPID:  	case T_DATAPID  | T_USER:
 		if (0 /* T-chip */) {
 			break;
 		}
 		/* FALLTHROUGH to unimplemented */
 	default:
-		panic ("trap: unimplemented \'%s\' (%d)",
-			trap_type[type & ~T_USER], type);
+#if 1
+if (kdb_trap (type, va, frame))
+	return;
+#endif
+		panic ("trap: unimplemented \'%s\' (%d)", tts, type);
 	}
 
 	if (type & T_USER)
@@ -425,18 +518,19 @@ syscall(frame, args)
 		panic("syscall");
 
 	p = curproc;
+	p->p_md.md_regs = frame;
 	nsys = p->p_emul->e_nsysent;
 	callp = p->p_emul->e_sysent;
-	code = frame->tf_arg0;
+	code = frame->tf_t1;
 	switch (code) {
 	case SYS_syscall:
-		code = frame->tf_arg1;
+		code = *args;
 		args += 1;
 		break;
 	case SYS___syscall:
 		if (callp != sysent)
 			break;
-		code = frame->tf_arg1; /* XXX or arg2? */
+		code = *args;
 		args += 2;
 	}
 
@@ -458,27 +552,29 @@ syscall(frame, args)
 	rval[1] = 0;
 	switch (error = (*callp->sy_call)(p, args, rval)) {
 	case 0:
-		/* curproc may change iside the fork() */
-		p = curproc;
+		p = curproc;			/* changes on exec() */
+		frame = p->p_md.md_regs;
 		frame->tf_ret0 = rval[0];
 		frame->tf_ret1 = rval[1];
+		frame->tf_t1 = 0;
 		break;
 	case ERESTART:
 		frame->tf_iioq_head -= 4; /* right? XXX */
+		frame->tf_iioq_tail -= 4; /* right? XXX */
 		break;
 	case EJUSTRETURN:
+		p = curproc;
 		break;
 	default:
 		if (p->p_emul->e_errno)
 			error = p->p_emul->e_errno[error];
-		frame->tf_ret0 = error;
+		frame->tf_t1 = error;
 		break;
 	}
-
 #ifdef SYSCALL_DEBUG
 	scdebug_ret(p, code, error, rval);
 #endif
-	userret(p, p->p_md.md_regs->tf_rp, 0);
+	userret(p, frame->tf_iioq_head, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p->p_tracep, code, error, rval[0]);
@@ -532,7 +628,7 @@ cpu_intr(frame)
 			/* ((struct iomod *)cpu_gethpa(0))->io_eir = 0; */
 #ifdef INTRDEBUG
 			if (bit != 31)
-				printf ("cpu_intr: 0x%08x\n", (1 << bit));
+				db_printf ("cpu_intr: 0x%08x\n", (1 << bit));
 #endif
 			iv = &cpu_intr_vectors[bit];
 			if (iv->handler) {
@@ -543,14 +639,16 @@ cpu_intr(frame)
 				/* no arg means pass the frame */
 				r = (iv->handler)(iv->arg? iv->arg:frame);
 				splx(s);
-#ifdef DEBUG
+#ifdef INTRDEBUG
 				if (!r)
-					printf ("%s: can't handle interrupt\n",
-						iv->evcnt.ev_name);
+					db_printf ("%s: can't handle interrupt\n",
+						   iv->evcnt.ev_name);
 #endif
-			} else
-				printf ("cpu_intr: stray interrupt %d\n", bit);
+			}
+#ifdef INTRDEBUG
+			else
+				db_printf ("cpu_intr: stray interrupt %d\n", bit);
+#endif
 		}
 	} while (eirr);
 }
-

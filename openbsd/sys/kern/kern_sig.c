@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sig.c,v 1.34 1999/07/18 17:05:13 deraadt Exp $	*/
+/*	$OpenBSD: kern_sig.c,v 1.37 2000/04/21 15:47:27 millert Exp $	*/
 /*	$NetBSD: kern_sig.c,v 1.54 1996/04/22 01:38:32 christos Exp $	*/
 
 /*
@@ -518,7 +518,7 @@ killpg1(cp, signum, pgid, all)
 		/* 
 		 * broadcast 
 		 */
-		for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+		for (p = LIST_FIRST(&allproc); p; p = LIST_NEXT(p, p_list)) {
 			if (p->p_pid <= 1 || p->p_flag & P_SYSTEM || 
 			    p == cp || !cansignal(cp, pc, p, signum))
 				continue;
@@ -1199,7 +1199,7 @@ coredump(p)
 	sprintf(name, "%s.core", p->p_comm);
 	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, p);
 
-	error = vn_open(&nd, O_CREAT | FWRITE | FNOSYMLINK, S_IRUSR | S_IWUSR);
+	error = vn_open(&nd, O_CREAT | FWRITE | O_NOFOLLOW, S_IRUSR | S_IWUSR);
 
 	if (error) {
 		crfree(cred);
@@ -1255,7 +1255,11 @@ coredump(p)
 		if (error)
 			goto out;
 		error = vn_rdwr(UIO_WRITE, vp,
+#ifdef MACHINE_STACK_GROWS_UP
+		    (caddr_t) USRSTACK,
+#else
 		    (caddr_t) trunc_page(USRSTACK - ctob(vm->vm_ssize)),
+#endif
 		    core.c_ssize,
 		    (off_t)(core.c_cpusize + core.c_dsize), UIO_USERSPACE,
 		    IO_NODELOCKED|IO_UNIT, cred, NULL, p);

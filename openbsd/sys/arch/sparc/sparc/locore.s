@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.26 1999/08/06 01:25:12 jason Exp $	*/
+/*	$OpenBSD: locore.s,v 1.37 2000/02/27 05:25:01 deraadt Exp $	*/
 /*	$NetBSD: locore.s,v 1.73 1997/09/13 20:36:48 pk Exp $	*/
 
 /*
@@ -269,8 +269,6 @@ sun4_notsup:
  * kernel space we remap it in configure() to another location and
  * invalidate the mapping at KERNBASE.
  */
-	.globl _msgbuf
-_msgbuf = KERNBASE
 
 /*
  * Each trap has room for four instructions, of which one perforce must
@@ -1264,21 +1262,31 @@ Lpanic_red:
 #define	PTE_OF_ADDR4M(addr, pte, bad, page_offset) \
 	andn	addr, page_offset, pte
 
+/*
+ * After obtaining the PTE through ASI_SRMMUFP, we read the Sync Fault
+ * Status register. This is necessary on Hypersparcs which stores and
+ * locks the fault address and status registers if the translation
+ * fails (thanks to Chris Torek for finding this quirk).
+ */
 /* note: pmap currently does not use the PPROT_R_R and PPROT_RW_RW cases */
-#define CMP_PTE_USER_READ4M(pte) \
+#define CMP_PTE_USER_READ4M(pte, tmp) \
 	or	pte, ASI_SRMMUFP_L3, pte; \
 	lda	[pte] ASI_SRMMUFP, pte; \
+	set	SRMMU_SFSR, tmp; \
 	and	pte, (SRMMU_TETYPE | SRMMU_PROT_MASK), pte; \
 	cmp	pte, (SRMMU_TEPTE | PPROT_RWX_RWX); \
-	be	8f; nop; \
+	be	8f; \
+	 lda	[tmp] ASI_SRMMU, %g0; \
 	cmp	pte, (SRMMU_TEPTE | PPROT_RX_RX); \
 8:
 
 
 /* note: PTE bit 4 set implies no user writes */
-#define CMP_PTE_USER_WRITE4M(pte) \
+#define CMP_PTE_USER_WRITE4M(pte, tmp) \
 	or	pte, ASI_SRMMUFP_L3, pte; \
 	lda	[pte] ASI_SRMMUFP, pte; \
+	set	SRMMU_SFSR, tmp; \
+	lda	[tmp] ASI_SRMMU, %g0; \
 	and	pte, (SRMMU_TETYPE | 0x14), pte; \
 	cmp	pte, (SRMMU_TEPTE | PPROT_WRITE)
 #endif /* 4m */
@@ -1287,8 +1295,8 @@ Lpanic_red:
 
 #define PTE_OF_ADDR(addr, pte, bad, page_offset, label) \
 	PTE_OF_ADDR4M(addr, pte, bad, page_offset)
-#define CMP_PTE_USER_WRITE(pte, tmp, label)	CMP_PTE_USER_WRITE4M(pte)
-#define CMP_PTE_USER_READ(pte, tmp, label)	CMP_PTE_USER_READ4M(pte)
+#define CMP_PTE_USER_WRITE(pte, tmp, label)	CMP_PTE_USER_WRITE4M(pte,tmp)
+#define CMP_PTE_USER_READ(pte, tmp, label)	CMP_PTE_USER_READ4M(pte,tmp)
 
 #elif (defined(SUN4C) || defined(SUN4)) && !defined(SUN4M)
 
@@ -1309,7 +1317,7 @@ label:	b,a	2f; \
 
 #define CMP_PTE_USER_READ(pte, tmp, label) \
 label:	b,a	1f; \
-	CMP_PTE_USER_READ4M(pte); \
+	CMP_PTE_USER_READ4M(pte,tmp); \
 	b,a	2f; \
 1: \
 	CMP_PTE_USER_READ4_4C(pte); \
@@ -1317,7 +1325,7 @@ label:	b,a	1f; \
 
 #define CMP_PTE_USER_WRITE(pte, tmp, label) \
 label:	b,a	1f; \
-	CMP_PTE_USER_WRITE4M(pte); \
+	CMP_PTE_USER_WRITE4M(pte,tmp); \
 	b,a	2f; \
 1: \
 	CMP_PTE_USER_WRITE4_4C(pte); \
@@ -1734,7 +1742,7 @@ memfault_sun4:
 	/* memory error = death for now XXX */
 	clr	%o3
 	clr	%o4
-	call	_memerr			! (0, ser, sva, 0, 0)
+	call	_memerr4_4c
 	 clr	%o0
 	call	_callrom
 	 nop
@@ -1834,8 +1842,7 @@ memfault_sun4c:
 	 * If memerr() returns, return from the trap.
 	 */
 	wr	%l0, PSR_ET, %psr
-	nop
-	call	_memerr			! memerr(0, ser, sva, aer, ava)
+	call	_memerr4_4c
 	 clr	%o0
 
 	ld	[%sp + CCFSZ + 20], %g1	! restore g1 through g7
@@ -1855,7 +1862,7 @@ memfault_sun4c:
 	 * %o1 through %o4 still hold the error reg contents.
 	 */
 1:
-	call	_memerr			! memerr(1, ser, sva, aer, ava)
+	call	_memerr4_4c
 	 mov	1, %o0
 
 	ld	[%sp + CCFSZ + 20], %g1	! restore g1 through g7
@@ -1870,6 +1877,14 @@ memfault_sun4c:
 
 #if defined(SUN4M)
 memfault_sun4m:
+	! DANGER: we use the fact that %lo(CPUINFO_VA) is zero
+.if CPUINFO_VA & 0x1fff
+BARF
+.endif
+	sethi	%hi(CPUINFO_VA), %l4
+	ld	[%l4 + %lo(CPUINFO_VA+CPUINFO_GETSYNCFLT)], %l5
+	jmpl	%l5, %l7
+	 or	%l4, %lo(CPUINFO_SYNCFLTDUMP), %l4
 	TRAP_SETUP(-CCFSZ-80)
 #if defined(UVM)
 	INCR(_uvmexp+V_FAULTS)		! cnt.v_faults++ (clobbers %o0,%o1)
@@ -1882,12 +1897,12 @@ memfault_sun4m:
 
 	std	%g2, [%sp + CCFSZ + 24]	! save g2, g3
 	std	%g4, [%sp + CCFSZ + 32]	! save g4, g5
+	std	%g6, [%sp + CCFSZ + 40]	! save g6, g7
 
-	! get fault status/address
-	set	CPUINFO_VA+CPUINFO_FAULTSTATUS, %o0
-	ld	[%o0], %o0
-	jmpl	%o0, %o7
-	 std	%g6, [%sp + CCFSZ + 40]	! sneak in g6, g7
+	! retrieve sync fault status/address
+	sethi	%hi(CPUINFO_VA+CPUINFO_SYNCFLTDUMP), %o0
+	ld	[%o0 + %lo(CPUINFO_VA+CPUINFO_SYNCFLTDUMP)], %o1
+	ld	[%o0 + %lo(CPUINFO_VA+CPUINFO_SYNCFLTDUMP+4)], %o2
 
 	wr	%l0, PSR_ET, %psr	! reenable traps
 
@@ -1900,9 +1915,8 @@ memfault_sun4m:
 	std	%i2, [%sp + CCFSZ + 56]
 	std	%i4, [%sp + CCFSZ + 64]
 	std	%i6, [%sp + CCFSZ + 72]
-	call	_mem_access_fault4m	! mem_access_fault(type, sfsr, sfva,
-					!		afsr, afva, &tf);
-	 add	%sp, CCFSZ, %o5		! (argument: &tf)
+	call	_mem_access_fault4m	! mem_access_fault(type,sfsr,sfva,&tf);
+	 add	%sp, CCFSZ, %o3		! (argument: &tf)
 
 	ldd	[%sp + CCFSZ + 0], %l0	! load new values
 	ldd	[%sp + CCFSZ + 8], %l2
@@ -2560,8 +2574,8 @@ nmi_sun4c:
 
 nmi_common:
 	! and call C code
-	call	_memerr			! memerr(0, ser, sva, aer, ava)
-	clr	%o0
+	call	_memerr4_4c
+	 clr	%o0
 
 	mov	%l5, %g1		! restore g1 through g7
 	ldd	[%sp + CCFSZ + 0], %g2
@@ -2587,6 +2601,9 @@ nmi_sun4m:
 	INCR(_cnt+V_INTR)		! cnt.v_intr++; (clobbers %o0,%o1)
 #endif
 	/*
+	 * XXX - we don't handle soft nmi, yet.
+	 */
+	/*
 	 * Level 15 interrupts are nonmaskable, so with traps off,
 	 * disable all interrupts to prevent recursion.
 	 */
@@ -2604,21 +2621,15 @@ nmi_sun4m:
 
 	std	%g2, [%sp + CCFSZ + 0]	! save g2, g3
 	rd	%y, %l4			! save y
-
-	! now read sync error registers
-	set	CPUINFO_VA+CPUINFO_FAULTSTATUS, %o0
-	ld	[%o0], %o0
-	jmpl	%o0, %o7
-	 std	%g4, [%sp + CCFSZ + 8]	! save g4,g5
+	std	%g4, [%sp + CCFSZ + 8]	! save g4,g5
 
 	/* Finish stackframe, call C trap handler */
 	mov	%g1, %l5		! save g1,g6,g7
 	mov	%g6, %l6
 	mov	%g7, %l7
-	clr	%o5
 
-	call	_memerr4m		! memerr4m(0, sfsr, sfva, afsr, afva)
-	 clr	%o0
+	call	_nmi_hard
+	 clr	%o5
 
 	mov	%l5, %g1		! restore g1 through g7
 	ldd	[%sp + CCFSZ + 0], %g2
@@ -4061,25 +4072,18 @@ ENTRY(getfp)
  */
 ENTRY(copyinstr)
 	! %o0 = fromaddr, %o1 = toaddr, %o2 = maxlen, %o3 = &lencopied
-#ifdef DIAGNOSTIC
-	tst	%o2			! kernel should never give maxlen <= 0
-	ble	1f
-	 EMPTY
-#endif
+	mov	%o1, %o5		! save = toaddr;
+	tst	%o2			! maxlen == 0?
+	beq,a	Lcstoolong		! yes, return ENAMETOOLONG
+	 sethi	%hi(_cpcb), %o4
+
 	set	KERNBASE, %o4
 	cmp	%o0, %o4		! fromaddr < KERNBASE?
-	blu,a	Lcsdocopy		! yes, go do it
-	sethi	%hi(_cpcb), %o4		! (first instr of copy)
+	blu	Lcsdocopy		! yes, go do it
+	 sethi	%hi(_cpcb), %o4		! (first instr of copy)
 
 	b	Lcsdone			! no, return EFAULT
 	 mov	EFAULT, %o0
-
-1:
-	sethi	%hi(2f), %o0
-	call	_panic
-	 or	%lo(2f), %o0, %o0
-2:	.asciz	"copyinstr"
-	_ALIGN
 
 /*
  * copyoutstr(fromaddr, toaddr, maxlength, &lencopied)
@@ -4089,33 +4093,25 @@ ENTRY(copyinstr)
  */
 ENTRY(copyoutstr)
 	! %o0 = fromaddr, %o1 = toaddr, %o2 = maxlen, %o3 = &lencopied
-#ifdef DIAGNOSTIC
-	tst	%o2
-	ble	1f
-	 EMPTY
-#endif
+	mov	%o1, %o5		! save = toaddr;
+	tst	%o2			! maxlen == 0?
+	beq,a	Lcstoolong		! yes, return ENAMETOOLONG
+	 sethi	%hi(_cpcb), %o4
+
 	set	KERNBASE, %o4
 	cmp	%o1, %o4		! toaddr < KERNBASE?
-	blu,a	Lcsdocopy		! yes, go do it
+	blu	Lcsdocopy		! yes, go do it
 	 sethi	%hi(_cpcb), %o4		! (first instr of copy)
 
 	b	Lcsdone			! no, return EFAULT
 	 mov	EFAULT, %o0
 
-1:
-	sethi	%hi(2f), %o0
-	call	_panic
-	 or	%lo(2f), %o0, %o0
-2:	.asciz	"copyoutstr"
-	_ALIGN
-
 Lcsdocopy:
 !	sethi	%hi(_cpcb), %o4		! (done earlier)
 	ld	[%o4 + %lo(_cpcb)], %o4	! catch faults
-	set	Lcsfault, %o5
-	st	%o5, [%o4 + PCB_ONFAULT]
+	set	Lcsfault, %g1
+	st	%g1, [%o4 + PCB_ONFAULT]
 
-	mov	%o1, %o5		!	save = toaddr;
 ! XXX should do this in bigger chunks when possible
 0:					! loop:
 	ldsb	[%o0], %g1		!	c = *fromaddr;
@@ -4124,10 +4120,10 @@ Lcsdocopy:
 	be	1f			!	if (c == NULL)
 	 inc	%o1			!		goto ok;
 	deccc	%o2			!	if (--len > 0) {
-	bg	0b			!		fromaddr++;
+	bgu	0b			!		fromaddr++;
 	 inc	%o0			!		goto loop;
 					!	}
-					!
+Lcstoolong:				!
 	b	Lcsdone			!	error = ENAMETOOLONG;
 	 mov	ENAMETOOLONG, %o0	!	goto done;
 1:					! ok:
@@ -4153,12 +4149,11 @@ Lcsfault:
  * it does not seem that way to the C compiler.)
  */
 ENTRY(copystr)
-#ifdef DIAGNOSTIC
-	tst	%o2			! 	if (maxlength <= 0)
-	ble	4f			!		panic(...);
-	 EMPTY
-#endif
 	mov	%o1, %o5		!	to0 = to;
+	tst	%o2			! if (maxlength == 0)
+	beq,a	2f			!
+	 mov	ENAMETOOLONG, %o0	!	ret = ENAMETOOLONG; goto done;
+
 0:					! loop:
 	ldsb	[%o0], %o4		!	c = *from;
 	tst	%o4
@@ -4166,7 +4161,7 @@ ENTRY(copystr)
 	be	1f			!	if (c == 0)
 	 inc	%o1			!		goto ok;
 	deccc	%o2			!	if (--len > 0) {
-	bg,a	0b			!		from++;
+	bgu,a	0b			!		from++;
 	 inc	%o0			!		goto loop;
 	b	2f			!	}
 	 mov	ENAMETOOLONG, %o0	!	ret = ENAMETOOLONG; goto done;
@@ -4180,15 +4175,6 @@ ENTRY(copystr)
 3:
 	retl
 	 nop
-#ifdef DIAGNOSTIC
-4:
-	sethi	%hi(5f), %o0
-	call	_panic
-	 or	%lo(5f), %o0, %o0
-5:
-	.asciz	"copystr"
-	_ALIGN
-#endif
 
 /*
  * Copyin(src, dst, len)
@@ -4686,8 +4672,18 @@ Lsw_havectx:
 #endif
 1:
 #if defined(SUN4M)
+	/*
+	 * Flush caches that need to be flushed on context switch.
+	 * We know this is currently only necessary on the sun4m hypersparc.
+	 */
+	set	CPUINFO_VA+CPUINFO_PURE_VCACHE_FLS, %o2
+	ld	[%o2], %o2
+	mov	%o7, %g7	! save return address
+	jmpl	%o2, %o7	! this function must not clobber %o0 and %g7
+	 nop
+
 	set	SRMMU_CXR, %o1
-	retl
+	jmp	%g7 + 8		! (retl, but we saved the ret address in g7)
 	 sta	%o0, [%o1] ASI_SRMMU	! setcontext(vm->vm_pmap.pm_ctxnum);
 #endif
 
@@ -5776,82 +5772,84 @@ ENTRY(raise)
 
 
 /*
- * Read Fault Status registers.
- * On entry: %l1 == PC, %l3 == fault type
- * On exit: %o1 == sync fault status, %o2 == sync fault address
- *	    %o3 == async fault status, %o4 == async fault address
+ * Read Synchronous Fault Status registers.
+ * On entry: %l1 == PC, %l3 == fault type, %l4 == storage, %l7 == return address
+ * Only use %l5 and %l6.
+ * Note: not C callable.
  */
-ALTENTRY(srmmu_get_fltstatus)
-	set	SRMMU_SFADDR, %o2
-	lda	[%o2] ASI_SRMMU, %o2	! sync virt addr; must be read first
-	set	SRMMU_SFSTAT, %o1
-	lda	[%o1] ASI_SRMMU, %o1	! get sync fault status register
+ALTENTRY(srmmu_get_syncflt)
+ALTENTRY(hypersparc_get_syncflt)
+	set	SRMMU_SFAR, %l5
+	lda	[%l5] ASI_SRMMU, %l5	! sync virt addr; must be read first
+	st	%l5, [%l4 + 4]		! => dump.sfva
+	set	SRMMU_SFSR, %l5
+	lda	[%l5] ASI_SRMMU, %l5	! get sync fault status register
+	jmp	%l7 + 8			! return to caller
+	 st	%l5, [%l4]		! => dump.sfsr
 
-	 clr	%o3			! clear %o3 and %o4
-	retl
-	 clr	%o4
-
-ALTENTRY(viking_get_fltstatus)
+ALTENTRY(viking_get_syncflt)
+ALTENTRY(ms1_get_syncflt)
+ALTENTRY(swift_get_syncflt)
+ALTENTRY(turbosparc_get_syncflt)
+ALTENTRY(cypress_get_syncflt)
 	cmp	%l3, T_TEXTFAULT
 	be,a	1f
-	 mov	%l1, %o2		! use PC if type == T_TEXTFAULT
+	 mov	%l1, %l5		! use PC if type == T_TEXTFAULT
 
-	set	SRMMU_SFADDR, %o2
-	lda	[%o2] ASI_SRMMU, %o2	! sync virt addr; must be read first
+	set	SRMMU_SFAR, %l5
+	lda	[%l5] ASI_SRMMU, %l5	! sync virt addr; must be read first
 1:
-	set	SRMMU_SFSTAT, %o1
-	lda	[%o1] ASI_SRMMU, %o1	! get sync fault status register
+	st	%l5, [%l4 + 4]		! => dump.sfva
 
-	 clr	%o3			! clear %o3 and %o4
-	retl
-	 clr	%o4
+	set	SRMMU_SFSR, %l5
+	lda	[%l5] ASI_SRMMU, %l5	! get sync fault status register
+	jmp	%l7 + 8			! return to caller
+	 st	%l5, [%l4]		! => dump.sfsr
 
-ALTENTRY(ms1_get_fltstatus)
-ALTENTRY(swift_get_fltstatus)
-ALTENTRY(turbosparc_get_fltstatus)
-	cmp	%l3, T_TEXTFAULT
-	be,a	1f
-	 mov	%l1, %o2		! use PC if type == T_TEXTFAULT
 
-	set	SRMMU_SFADDR, %o2
-	lda	[%o2] ASI_SRMMU, %o2	! sync virt addr; must be read first
-1:
-	set	SRMMU_SFSTAT, %o1
-	lda	[%o1] ASI_SRMMU, %o1	! get sync fault status register
-
-	 clr	%o3			! clear %o3 and %o4
-	retl
-	 clr	%o4
-
-ALTENTRY(cypress_get_fltstatus)
-	cmp	%l3, T_TEXTFAULT
-	be,a	1f
-	 mov	%l1, %o2		! use PC if type == T_TEXTFAULT
-
-	set	SRMMU_SFADDR, %o2
-	lda	[%o2] ASI_SRMMU, %o2	! sync virt addr; must be read first
-1:
-	set	SRMMU_SFSTAT, %o1
-	lda	[%o1] ASI_SRMMU, %o1	! get sync fault status register
-
-	set	SRMMU_AFSTAT, %o3	! must read status before fault on HS
+/*
+ * Read Asynchronous Fault Status registers.
+ * On entry: %o0 == &afsr, %o1 == &afar
+ * Return 0 if async register are present.
+ */
+ALTENTRY(srmmu_get_asyncflt)
+	set	SRMMU_AFAR, %o4
+	lda	[%o4] ASI_SRMMU, %o4	! get async fault address
+	set	SRMMU_AFSR, %o3	!
+	st	%o4, [%o1]
 	lda	[%o3] ASI_SRMMU, %o3	! get async fault status
-	set	SRMMU_AFADDR, %o4
+	st	%o3, [%o0]
 	retl
-	 lda	[%o4] ASI_SRMMU, %o4	! get async fault address
+	 clr	%o0			! return value
 
-ALTENTRY(hypersparc_get_fltstatus)
-	set	SRMMU_SFADDR, %o2
-	lda	[%o2] ASI_SRMMU, %o2	! sync virt addr; must be read first
-	set	SRMMU_SFSTAT, %o1
-	lda	[%o1] ASI_SRMMU, %o1	! get sync fault status register
-
-	set	SRMMU_AFSTAT, %o3	! must read status before fault on HS
+ALTENTRY(cypress_get_asyncflt)
+ALTENTRY(hypersparc_get_asyncflt)
+	set	SRMMU_AFSR, %o3		! must read status before fault on HS
 	lda	[%o3] ASI_SRMMU, %o3	! get async fault status
-	set	SRMMU_AFADDR, %o4
+	st	%o3, [%o0]
+	btst	AFSR_AFO, %o3		! and only read fault address
+	bz	1f			! if valid.
+	set	SRMMU_AFAR, %o4
+	lda	[%o4] ASI_SRMMU, %o4	! get async fault address
+	clr	%o0			! return value
 	retl
-	 lda	[%o4] ASI_SRMMU, %o4	! get async fault address
+	 st	%o4, [%o1]
+1:
+	retl
+	 clr	%o0			! return value
 
+ALTENTRY(no_asyncflt_regs)
+	retl
+	 mov	1, %o0			! return value
+
+ALTENTRY(hypersparc_pure_vcache_flush)
+	/*
+	 * Flush entire on-chip instruction cache, which is
+	 * a pure vitually-indexed/virtually-tagged cache.
+	 */
+	retl
+	 sta    %g0, [%g0] ASI_HICACHECLR
+	
 #endif /* SUN4M */
 
 /*
@@ -5918,6 +5916,328 @@ ENTRY(ffs)
 	ldsb	[%o2 + %o0], %o0
 	retl
 	add	%o0, 24, %o0
+
+/*
+ * V8 sparc .{,u}{mul,div,rem} replacements.
+ * We try to mimic them 100%.  Full 64 bit sources or outputs, and
+ * these routines are required to update the condition codes.
+ */
+.globl __mulreplace, __mulreplace_end
+__mulreplace:
+	smulcc	%o0, %o1, %o0
+	retl
+	 rd	%y, %o1
+__mulreplace_end:
+
+.globl __umulreplace, __umulreplace_end
+__umulreplace:
+	umulcc	%o0, %o1, %o0
+	retl
+	 rd	%y, %o1
+__umulreplace_end:
+
+.globl __divreplace, __divreplace_end
+__divreplace:
+	sra	%o0, 31, %g1
+	wr	%g1, 0, %y
+	nop
+	nop
+	nop
+	retl
+	 sdivcc	%o0, %o1, %o0
+__divreplace_end:
+
+.globl __udivreplace, __udivreplace_end
+__udivreplace:
+	wr	%g0, 0, %y
+	nop
+	nop
+	nop
+	retl
+	 udivcc	%o0, %o1, %o0
+__udivreplace_end:
+
+.globl __remreplace, __remreplace_end
+__remreplace:
+	sra	%o0, 31, %g1
+	wr	%g1, 0, %y
+	nop
+	nop
+	nop
+	sdiv	%o0, %o1, %o2
+	smul	%o1, %o2, %o2
+	retl
+	 subcc	%o0, %o2, %o0
+__remreplace_end:
+
+.globl __uremreplace, __uremreplace_end
+__uremreplace:
+	wr	%g0, 0, %y
+	nop
+	nop
+	nop
+	udiv	%o0, %o1, %o2
+	umul	%o1, %o2, %o2
+	retl
+	 subcc	%o0, %o2, %o0
+__uremreplace_end:
+
+/*
+ * Signed multiply, from Appendix E of the Sparc Version 8
+ * Architecture Manual.
+ *
+ * Returns %o0 * %o1 in %o1%o0 (i.e., %o1 holds the upper 32 bits of
+ * the 64-bit product).
+ *
+ * This code optimizes short (less than 13-bit) multiplies.
+ */
+.globl .mul, __mul
+.mul:
+__mul:
+	mov	%o0, %y		! multiplier -> Y
+	andncc	%o0, 0xfff, %g0	! test bits 12..31
+	be	Lmul_shortway	! if zero, can do it the short way
+	 andcc	%g0, %g0, %o4	! zero the partial product and clear N and V
+
+	/*
+	 * Long multiply.  32 steps, followed by a final shift step.
+	 */
+	mulscc	%o4, %o1, %o4	! 1
+	mulscc	%o4, %o1, %o4	! 2
+	mulscc	%o4, %o1, %o4	! 3
+	mulscc	%o4, %o1, %o4	! 4
+	mulscc	%o4, %o1, %o4	! 5
+	mulscc	%o4, %o1, %o4	! 6
+	mulscc	%o4, %o1, %o4	! 7
+	mulscc	%o4, %o1, %o4	! 8
+	mulscc	%o4, %o1, %o4	! 9
+	mulscc	%o4, %o1, %o4	! 10
+	mulscc	%o4, %o1, %o4	! 11
+	mulscc	%o4, %o1, %o4	! 12
+	mulscc	%o4, %o1, %o4	! 13
+	mulscc	%o4, %o1, %o4	! 14
+	mulscc	%o4, %o1, %o4	! 15
+	mulscc	%o4, %o1, %o4	! 16
+	mulscc	%o4, %o1, %o4	! 17
+	mulscc	%o4, %o1, %o4	! 18
+	mulscc	%o4, %o1, %o4	! 19
+	mulscc	%o4, %o1, %o4	! 20
+	mulscc	%o4, %o1, %o4	! 21
+	mulscc	%o4, %o1, %o4	! 22
+	mulscc	%o4, %o1, %o4	! 23
+	mulscc	%o4, %o1, %o4	! 24
+	mulscc	%o4, %o1, %o4	! 25
+	mulscc	%o4, %o1, %o4	! 26
+	mulscc	%o4, %o1, %o4	! 27
+	mulscc	%o4, %o1, %o4	! 28
+	mulscc	%o4, %o1, %o4	! 29
+	mulscc	%o4, %o1, %o4	! 30
+	mulscc	%o4, %o1, %o4	! 31
+	mulscc	%o4, %o1, %o4	! 32
+	mulscc	%o4, %g0, %o4	! final shift
+
+	! If %o0 was negative, the result is
+	!	(%o0 * %o1) + (%o1 << 32))
+	! We fix that here.
+
+	tst	%o0
+	bge	1f
+	 rd	%y, %o0
+
+	! %o0 was indeed negative; fix upper 32 bits of result by subtracting 
+	! %o1 (i.e., return %o4 - %o1 in %o1).
+	retl
+	 sub	%o4, %o1, %o1
+
+1:
+	retl
+	 mov	%o4, %o1
+
+Lmul_shortway:
+	/*
+	 * Short multiply.  12 steps, followed by a final shift step.
+	 * The resulting bits are off by 12 and (32-12) = 20 bit positions,
+	 * but there is no problem with %o0 being negative (unlike above).
+	 */
+	mulscc	%o4, %o1, %o4	! 1
+	mulscc	%o4, %o1, %o4	! 2
+	mulscc	%o4, %o1, %o4	! 3
+	mulscc	%o4, %o1, %o4	! 4
+	mulscc	%o4, %o1, %o4	! 5
+	mulscc	%o4, %o1, %o4	! 6
+	mulscc	%o4, %o1, %o4	! 7
+	mulscc	%o4, %o1, %o4	! 8
+	mulscc	%o4, %o1, %o4	! 9
+	mulscc	%o4, %o1, %o4	! 10
+	mulscc	%o4, %o1, %o4	! 11
+	mulscc	%o4, %o1, %o4	! 12
+	mulscc	%o4, %g0, %o4	! final shift
+
+	/*
+	 *  %o4 has 20 of the bits that should be in the low part of the
+	 * result; %y has the bottom 12 (as %y's top 12).  That is:
+	 *
+	 *	  %o4		    %y
+	 * +----------------+----------------+
+	 * | -12- |   -20-  | -12- |   -20-  |
+	 * +------(---------+------)---------+
+	 *  --hi-- ----low-part----
+	 *
+	 * The upper 12 bits of %o4 should be sign-extended to form the
+	 * high part of the product (i.e., highpart = %o4 >> 20).
+	 */
+
+	rd	%y, %o5
+	sll	%o4, 12, %o0	! shift middle bits left 12
+	srl	%o5, 20, %o5	! shift low bits right 20, zero fill at left
+	or	%o5, %o0, %o0	! construct low part of result
+	retl
+	 sra	%o4, 20, %o1	! ... and extract high part of result
+
+/*
+ * Unsigned multiply.  Returns %o0 * %o1 in %o1%o0 (i.e., %o1 holds the
+ * upper 32 bits of the 64-bit product).
+ *
+ * This code optimizes short (less than 13-bit) multiplies.  Short
+ * multiplies require 25 instruction cycles, and long ones require
+ * 45 instruction cycles.
+ *
+ * On return, overflow has occurred (%o1 is not zero) if and only if
+ * the Z condition code is clear, allowing, e.g., the following:
+ *
+ *	call	.umul
+ *	nop
+ *	bnz	overflow	(or tnz)
+ */
+.globl	.umul, __umul
+.umul:
+__umul:
+	or	%o0, %o1, %o4
+	mov	%o0, %y		! multiplier -> Y
+	andncc	%o4, 0xfff, %g0	! test bits 12..31 of *both* args
+	be	Lumul_shortway	! if zero, can do it the short way
+	 andcc	%g0, %g0, %o4	! zero the partial product and clear N and V
+
+	/*
+	 * Long multiply.  32 steps, followed by a final shift step.
+	 */
+	mulscc	%o4, %o1, %o4	! 1
+	mulscc	%o4, %o1, %o4	! 2
+	mulscc	%o4, %o1, %o4	! 3
+	mulscc	%o4, %o1, %o4	! 4
+	mulscc	%o4, %o1, %o4	! 5
+	mulscc	%o4, %o1, %o4	! 6
+	mulscc	%o4, %o1, %o4	! 7
+	mulscc	%o4, %o1, %o4	! 8
+	mulscc	%o4, %o1, %o4	! 9
+	mulscc	%o4, %o1, %o4	! 10
+	mulscc	%o4, %o1, %o4	! 11
+	mulscc	%o4, %o1, %o4	! 12
+	mulscc	%o4, %o1, %o4	! 13
+	mulscc	%o4, %o1, %o4	! 14
+	mulscc	%o4, %o1, %o4	! 15
+	mulscc	%o4, %o1, %o4	! 16
+	mulscc	%o4, %o1, %o4	! 17
+	mulscc	%o4, %o1, %o4	! 18
+	mulscc	%o4, %o1, %o4	! 19
+	mulscc	%o4, %o1, %o4	! 20
+	mulscc	%o4, %o1, %o4	! 21
+	mulscc	%o4, %o1, %o4	! 22
+	mulscc	%o4, %o1, %o4	! 23
+	mulscc	%o4, %o1, %o4	! 24
+	mulscc	%o4, %o1, %o4	! 25
+	mulscc	%o4, %o1, %o4	! 26
+	mulscc	%o4, %o1, %o4	! 27
+	mulscc	%o4, %o1, %o4	! 28
+	mulscc	%o4, %o1, %o4	! 29
+	mulscc	%o4, %o1, %o4	! 30
+	mulscc	%o4, %o1, %o4	! 31
+	mulscc	%o4, %o1, %o4	! 32
+	mulscc	%o4, %g0, %o4	! final shift
+
+
+	/*
+	 * Normally, with the shift-and-add approach, if both numbers are
+	 * positive you get the correct result.  WIth 32-bit two's-complement
+	 * numbers, -x is represented as
+	 *
+	 *		  x		    32
+	 *	( 2  -  ------ ) mod 2  *  2
+	 *		   32
+	 *		  2
+	 *
+	 * (the `mod 2' subtracts 1 from 1.bbbb).  To avoid lots of 2^32s,
+	 * we can treat this as if the radix point were just to the left
+	 * of the sign bit (multiply by 2^32), and get
+	 *
+	 *	-x  =  (2 - x) mod 2
+	 *
+	 * Then, ignoring the `mod 2's for convenience:
+	 *
+	 *   x *  y	= xy
+	 *  -x *  y	= 2y - xy
+	 *   x * -y	= 2x - xy
+	 *  -x * -y	= 4 - 2x - 2y + xy
+	 *
+	 * For signed multiplies, we subtract (x << 32) from the partial
+	 * product to fix this problem for negative multipliers (see mul.s).
+	 * Because of the way the shift into the partial product is calculated
+	 * (N xor V), this term is automatically removed for the multiplicand,
+	 * so we don't have to adjust.
+	 *
+	 * But for unsigned multiplies, the high order bit wasn't a sign bit,
+	 * and the correction is wrong.  So for unsigned multiplies where the
+	 * high order bit is one, we end up with xy - (y << 32).  To fix it
+	 * we add y << 32.
+	 */
+	tst	%o1
+	bl,a	1f		! if %o1 < 0 (high order bit = 1),
+	add	%o4, %o0, %o4	! %o4 += %o0 (add y to upper half)
+1:	rd	%y, %o0		! get lower half of product
+	retl
+	 addcc	%o4, %g0, %o1	! put upper half in place and set Z for %o1==0
+
+Lumul_shortway:
+	/*
+	 * Short multiply.  12 steps, followed by a final shift step.
+	 * The resulting bits are off by 12 and (32-12) = 20 bit positions,
+	 * but there is no problem with %o0 being negative (unlike above),
+	 * and overflow is impossible (the answer is at most 24 bits long).
+	 */
+	mulscc	%o4, %o1, %o4	! 1
+	mulscc	%o4, %o1, %o4	! 2
+	mulscc	%o4, %o1, %o4	! 3
+	mulscc	%o4, %o1, %o4	! 4
+	mulscc	%o4, %o1, %o4	! 5
+	mulscc	%o4, %o1, %o4	! 6
+	mulscc	%o4, %o1, %o4	! 7
+	mulscc	%o4, %o1, %o4	! 8
+	mulscc	%o4, %o1, %o4	! 9
+	mulscc	%o4, %o1, %o4	! 10
+	mulscc	%o4, %o1, %o4	! 11
+	mulscc	%o4, %o1, %o4	! 12
+	mulscc	%o4, %g0, %o4	! final shift
+
+	/*
+	 * %o4 has 20 of the bits that should be in the result; %y has
+	 * the bottom 12 (as %y's top 12).  That is:
+	 *
+	 *	  %o4		    %y
+	 * +----------------+----------------+
+	 * | -12- |   -20-  | -12- |   -20-  |
+	 * +------(---------+------)---------+
+	 *	   -----result-----
+	 *
+	 * The 12 bits of %o4 left of the `result' area are all zero;
+	 * in fact, all top 20 bits of %o4 are zero.
+	 */
+
+	rd	%y, %o5
+	sll	%o4, 12, %o0	! shift middle bits left 12
+	srl	%o5, 20, %o5	! shift low bits right 20
+	or	%o5, %o0, %o0
+	retl
+	 addcc	%g0, %g0, %o1	! %o1 = zero, and set Z
 
 /*
  * Here is a very good random number generator.  This implementation is

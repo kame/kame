@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.5 1999/01/13 07:26:05 niklas Exp $
+#	$OpenBSD: Makefile,v 1.7 1999/11/18 09:03:39 deraadt Exp $
 
 LIB	=	keycap
 CAPDIR	=	/usr/share/misc
@@ -6,9 +6,9 @@ CAPPATH	=	$(CAPDIR)/keycap.pcvt
 KEYCAPSRC=	keycap.src
 CFLAGS	+=	-DKEYCAP_PATH=\"$(CAPPATH)\"
 SRCS	=	keycap.c
-MAN3	=	keycap.${MAN3EXT}
-MAN5	=	keycap.${MAN5EXT}
-#CLEANFILES+=	keycap.0 keycap.0
+MAN3	=	keycap.3 keycap.5
+MLINKS	=	keycap.3 kgetent.3 keycap.3 kgetnum.3 keycap.3 kgetflag.3 \
+		keycap.3 kgetstr.3
 
 beforeinstall:
 	-@if [ ! -d ${DESTDIR}${LIBDIR} ]; then \

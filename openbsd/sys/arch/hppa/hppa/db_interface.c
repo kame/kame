@@ -1,7 +1,7 @@
-/*	$OpenBSD: db_interface.c,v 1.8 1999/09/10 19:56:25 mickey Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.12 2000/01/05 18:37:40 mickey Exp $	*/
 
 /*
- * Copyright (c) 1999 Michael Shalayeff
+ * Copyright (c) 1999-2000 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,12 +39,14 @@
 
 #include <machine/db_machdep.h>
 #include <machine/frame.h>
+#include <machine/cpufunc.h>
 
 #include <ddb/db_access.h>
 #include <ddb/db_command.h>
 #include <ddb/db_output.h>
 #include <ddb/db_run.h>
 #include <ddb/db_sym.h>
+#include <ddb/db_var.h>
 #include <ddb/db_variables.h>
 #include <ddb/db_extern.h>
 #include <ddb/db_interface.h>
@@ -52,7 +54,6 @@
 #include <dev/cons.h>
 
 void kdbprinttrap __P((int, int));
-
 
 extern label_t *db_recover;
 extern int db_active;
@@ -157,6 +158,10 @@ db_write_bytes(addr, size, data)
 
 	while (size--)
 		*dst++ = *data++;
+
+	/* unfortunately ddb does not provide any hooks for these */
+	ficache(HPPA_SID_KERNEL, (vaddr_t)data, size);
+	fdcache(HPPA_SID_KERNEL, (vaddr_t)data, size);
 }
 
 
@@ -184,6 +189,22 @@ kdb_trap(type, code, regs)
 	db_regs_t *regs;
 {
 	int s;
+
+	switch (type) {
+	case T_IBREAK:
+	case T_DBREAK:
+	case -1:
+		break;
+	default:
+		if (!db_panic)
+			return (0);
+
+		kdbprinttrap(type, code);
+		if (db_recover != 0) {
+			db_error("Caught exception in DDB; continuing...\n");
+			/* NOT REACHED */
+		}
+	}
 
 	/* XXX Should switch to kdb`s own stack here. */
 
@@ -223,7 +244,8 @@ db_stack_trace_cmd(addr, have_addr, count, modif)
 	register_t fp, pc, rp, nargs, *argp;
 	db_sym_t sym;
 	db_expr_t off;
-	char *name, **argnp, *argnames[HPPA_FRAME_NARGS];
+	char *name;
+	char **argnp, *argnames[HPPA_FRAME_NARGS];
 
 	if (USERMODE(pc))
 		return;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_param.h,v 1.15 1999/08/23 07:57:17 art Exp $	*/
+/*	$OpenBSD: vm_param.h,v 1.19 2000/03/15 14:17:48 art Exp $	*/
 /*	$NetBSD: vm_param.h,v 1.12 1995/03/26 20:39:16 jtc Exp $	*/
 
 /* 
@@ -91,11 +91,20 @@ typedef	int	boolean_t;
  */
 #define	DEFAULT_PAGE_SIZE	4096
 
+#ifdef _KERNEL
 /*
  *	All references to the size of a page should be done with PAGE_SIZE
- *	or PAGE_SHIFT.  The fact they are variables is hidden here so that
- *	we can easily make them constant if we so desire.
+ *	or PAGE_SHIFT.
+ *	We allow them to be constants in MD code, but when necessary
+ *      (especially in LKMs) they will still be variables.
  */
+#if !defined(PAGE_SIZE) || defined(_LKM)
+/*
+ * We undef those here to avoid problmes with LKMs.
+ */
+#undef PAGE_SIZE
+#undef PAGE_MASK
+#undef PAGE_SHIFT
 #if defined(UVM)
 #define	PAGE_SIZE	uvmexp.pagesize		/* size of page */
 #define	PAGE_MASK	uvmexp.pagemask		/* size of page - 1 */
@@ -104,7 +113,9 @@ typedef	int	boolean_t;
 #define	PAGE_SIZE	cnt.v_page_size		/* size of page */
 #define	PAGE_MASK	page_mask		/* size of page - 1 */
 #define	PAGE_SHIFT	page_shift		/* bits to shift for pages */
-#endif
+#endif /* UVM */
+#endif /* !PAGE_SIZE */
+#endif /* _KERNEL */
 
 #if defined(_KERNEL) && !defined(UVM)
 extern vsize_t		page_mask;
@@ -130,7 +141,8 @@ extern int		page_shift;
 #else
 
 #define VM_UVMEXP	4		/* struct uvmexp */
-#define	VM_MAXID	5		/* number of valid vm ids */
+#define VM_SWAPENCRYPT	5		/* int */
+#define	VM_MAXID	6		/* number of valid vm ids */
 
 #define	CTL_VM_NAMES { \
 	{ 0, 0 }, \
@@ -138,6 +150,7 @@ extern int		page_shift;
 	{ "loadavg", CTLTYPE_STRUCT }, \
 	{ "psstrings", CTLTYPE_STRUCT }, \
 	{ "uvmexp", CTLTYPE_STRUCT }, \
+	{ "swapencrypt", CTLTYPE_INT }, \
 }
 
 #endif

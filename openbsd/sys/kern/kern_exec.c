@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.33 1999/08/09 12:19:07 millert Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.42 2000/04/20 10:03:42 art Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -234,6 +234,9 @@ sys_execve(p, v, retval)
 	char * const *cpp, *dp, *sp;
 	long argc, envc;
 	size_t len;
+#ifdef MACHINE_STACK_GROWS_UP
+	size_t slen;
+#endif
 	char *stack;
 	struct ps_strings arginfo;
 	struct vmspace *vm = p->p_vmspace;
@@ -425,7 +428,12 @@ sys_execve(p, v, retval)
 	arginfo.ps_nargvstr = argc;
 	arginfo.ps_nenvstr = envc;
 
+#ifdef MACHINE_STACK_GROWS_UP
+	stack = (char *)USRSTACK + sizeof(arginfo) + szsigcode;
+	slen = len - sizeof(arginfo) - szsigcode;
+#else
 	stack = (char *)(USRSTACK - len);
+#endif
 	/* Now copy argc, args & environ to new stack */
 	if (!(*pack.ep_emul->e_copyargs)(&pack, &arginfo, stack, argp))
 		goto exec_abort;
@@ -434,10 +442,16 @@ sys_execve(p, v, retval)
 	if (copyout(&arginfo, (char *)PS_STRINGS, sizeof(arginfo)))
 		goto exec_abort;
 
-	/* copy out the process's signal trapoline code */
+	/* copy out the process's signal trampoline code */
+#ifdef MACHINE_STACK_GROWS_UP
+	if (szsigcode && copyout((char *)pack.ep_emul->e_sigcode,
+	    ((char *)PS_STRINGS) + sizeof(arginfo), szsigcode))
+		goto exec_abort;
+#else
 	if (szsigcode && copyout((char *)pack.ep_emul->e_sigcode,
 	    ((char *)PS_STRINGS) - szsigcode, szsigcode))
 		goto exec_abort;
+#endif
 
 	stopprofclock(p);	/* stop profiling */
 	fdcloseexec(p);		/* handle close on exec */
@@ -483,8 +497,7 @@ sys_execve(p, v, retval)
 		 */
 		if (p->p_tracep && !(p->p_traceflag & KTRFAC_ROOT)) {
 			p->p_traceflag = 0;
-			vrele(p->p_tracep);
-			p->p_tracep = NULL;
+			ktrsettracevnode(p, NULL);
 		}
 #endif
 		p->p_ucred = crcopy(cred);
@@ -496,22 +509,38 @@ sys_execve(p, v, retval)
 		p->p_flag |= P_SUGIDEXEC;
 
 		/*
-		 * XXX For setuid processes, attempt to ensure that
-		 * stdin, stdout, and stderr are already allocated.
-		 * We do not want userland to accidentally allocate
-		 * descriptors in this range which has implied meaning
-		 * to libc.
+		 * For set[ug]id processes, a few caveats apply to
+		 * stdin, stdout, and stderr.
 		 */
 		for (i = 0; i < 3; i++) {
-			extern struct fileops vnops;
-			struct nameidata nd;
-			struct file *fp;
-			int indx;
-			short flags;
+			struct file *fp = NULL;
 
-			flags = FREAD | (i == 0 ? 0 : FWRITE);
+			if (i < p->p_fd->fd_nfiles)
+				fp = p->p_fd->fd_ofiles[i];
 
-			if (p->p_fd->fd_ofiles[i] == NULL) {
+#ifdef PROCFS
+			/*
+			 * Close descriptors that are writing to procfs.
+			 */
+			if (fp && fp->f_type == DTYPE_VNODE &&
+			    ((struct vnode *)(fp->f_data))->v_tag == VT_PROCFS &&
+			    (fp->f_flag & FWRITE)) {
+				fdrelease(p, i);
+				fp = NULL;
+			}
+#endif
+
+			/*
+			 * Ensure that stdin, stdout, and stderr are already
+			 * allocated.  We do not want userland to accidentally
+			 * allocate descriptors in this range which has implied
+			 * meaning to libc.
+			 */
+			if (fp == NULL) {
+				short flags = FREAD | (i == 0 ? 0 : FWRITE);
+				struct nameidata nd;
+				int indx;
+
 				if ((error = falloc(p, &fp, &indx)) != 0)
 					continue;
 				NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE,
@@ -528,7 +557,6 @@ sys_execve(p, v, retval)
 				VOP_UNLOCK(nd.ni_vp, 0, p);
 			}
 		}
-
 	} else
 		p->p_flag &= ~P_SUGID;
 	p->p_cred->p_svuid = p->p_ucred->cr_uid;
@@ -537,7 +565,7 @@ sys_execve(p, v, retval)
 	if (p->p_flag & P_SUGIDEXEC) {
 		int i, s = splclock();
 
-		untimeout(realitexpire, (void *)p);
+		timeout_del(&p->p_realit_to);
 		timerclear(&p->p_realtimer.it_interval);
 		timerclear(&p->p_realtimer.it_value);
 		for (i = 0; i < sizeof(p->p_stats->p_timer) /
@@ -563,7 +591,11 @@ sys_execve(p, v, retval)
 		if((*pack.ep_emul->e_fixup)(p, &pack) != 0)
 			goto free_pack_abort;
 	}
+#ifdef MACHINE_STACK_GROWS_UP
+	(*pack.ep_emul->e_setregs)(p, &pack, (u_long)stack + slen, retval);
+#else
 	(*pack.ep_emul->e_setregs)(p, &pack, (u_long)stack, retval);
+#endif
 
 	if (p->p_flag & P_TRACED)
 		psignal(p, SIGTRAP);

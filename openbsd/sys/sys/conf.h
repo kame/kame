@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.h,v 1.30 1999/08/13 05:38:05 fgsch Exp $	*/
+/*	$OpenBSD: conf.h,v 1.36 2000/04/09 21:07:46 matthieu Exp $	*/
 /*	$NetBSD: conf.h,v 1.33 1996/05/03 20:03:32 christos Exp $	*/
 
 /*-
@@ -239,10 +239,10 @@ extern struct cdevsw cdevsw[];
 	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) nullop, \
 	0, dev_init(c,n,select), (dev_type_mmap((*))) enodev, D_TTY }
 
-/* open, close, read, write, mmap */
+/* open, close, read, write, ioctl, mmap */
 #define cdev_mm_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
-	dev_init(c,n,write), (dev_type_ioctl((*))) enodev, \
+	dev_init(c,n,write), dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, seltrue, dev_init(c,n,mmap) }
 
 /* read, write */
@@ -295,6 +295,13 @@ extern struct cdevsw cdevsw[];
 
 /* open, close, ioctl */
 #define       cdev_uk_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
+	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
+	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
+	(dev_type_mmap((*))) enodev }
+
+/* open, close, ioctl */
+#define       cdev_ses_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, (dev_type_select((*))) enodev, \
@@ -368,6 +375,12 @@ void	randomattach __P((void));
 	(dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,select), \
 	(dev_type_mmap((*))) enodev }
+
+/* open, close, write, ioctl */
+#define cdev_ulpt_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
+	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
+	0, (dev_type_select((*))) enodev, (dev_type_mmap((*))) enodev }
 
 #define	cdev_usbdev_init(c,n)	cdev_random_init(c,n)
 #define	cdev_ugen_init(c,n)	cdev_random_init(c,n)
@@ -463,6 +476,8 @@ cdev_decl(ss);
 
 bdev_decl(sd);
 cdev_decl(sd);
+
+cdev_decl(ses);
 
 bdev_decl(st);
 cdev_decl(st);

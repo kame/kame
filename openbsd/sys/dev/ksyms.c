@@ -65,10 +65,10 @@ ksymsattach(num)
 		/*
 		 * If we have a symbol table, fake up a struct exec.
 		 * We only fill in the following non-zero entries:
-		 *	a_text - fake text sement (struct exec only)
+		 *	a_text - fake text segment (struct exec only)
 		 *	a_syms - size of symbol table
 		 *
-		 * We assume __LDPGSZ is a multiple of NBPG (it is)
+		 * We assume __LDPGSZ is a multiple of PAGE_SIZE (it is)
 		 */
 		k1 = (struct exec *)malloc(__LDPGSZ, M_TEMP, M_WAITOK);
 		bzero(k1, __LDPGSZ);

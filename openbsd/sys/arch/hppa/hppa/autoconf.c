@@ -1,7 +1,7 @@
-/*	$OpenBSD: autoconf.c,v 1.5 1999/08/14 03:17:32 mickey Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.10 2000/04/06 20:05:39 todd Exp $	*/
 
 /*
- * Copyright (c) 1998 Michael Shalayeff
+ * Copyright (c) 1998-2000 Michael Shalayeff
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -52,6 +52,7 @@
 #include <sys/conf.h>
 #include <sys/reboot.h>
 #include <sys/device.h>
+#include <sys/timeout.h>
 
 #include <machine/iomod.h>
 #include <machine/autoconf.h>
@@ -68,6 +69,16 @@ void	dumpconf __P((void));
 static int findblkmajor __P((struct device *dv));
 
 void (*cold_hook) __P((void)); /* see below */
+register_t	kpsw = PSW_Q | PSW_P | PSW_C | PSW_D;
+
+/*
+ * LED blinking thing
+ */
+#ifdef USELEDS
+struct timeout heartbeat_tmo;
+void heartbeat __P((void *));
+extern int hz;
+#endif
 
 /*
  * configure:
@@ -81,10 +92,11 @@ configure()
 	splhigh();
 	if (config_rootfound("mainbus", "mainbus") == NULL)
 		panic("no mainbus found");
+
 	/* in spl*() we trust */
+	__asm __volatile("ssm %0, %%r0" :: "i" (PSW_I));
+	kpsw |= PSW_I;
 	spl0();
-	__asm __volatile("nop\n\tnop\n\tssm %0, %%r0\n\tnop\n\tnop\n\tnop"
-			 :: "i" (PSW_I));
 
 	setroot();
 	swapconf();
@@ -92,7 +104,45 @@ configure()
 	cold = 0;
 	if (cold_hook)
 		(*cold_hook)();
+
+#ifdef USELEDS
+	timeout_set(&heartbeat_tmo, heartbeat, NULL);
+	heartbeat(NULL);
+#endif
 }
+
+#ifdef USELEDS
+/*
+ * turn the heartbeat alive.
+ * right thing would be to pass counter to each subsequent timeout
+ * as an argument to heartbeat() incrementing every turn,
+ * i.e. avoiding the static hbcnt, but doing timeout_set() on each
+ * timeout_add() sounds ugly, guts of struct timeout looks ugly
+ * to ponder in even more.
+ */
+void
+heartbeat(v)
+	void *v;
+{
+	static u_int hbcnt = 0;
+
+	/*
+	 * do this:
+	 *
+	 *   |~| |~|
+	 *  _| |_| |_,_,_,_
+	 *   0 1 2 3 4 6 7
+	 */
+	if (hbcnt < 4) {
+		ledctl(0, 0, PALED_HEARTBEAT);
+		hbcnt++;
+		timeout_add(&heartbeat_tmo, hz / 8);
+	} else {
+		hbcnt = 0;
+		timeout_add(&heartbeat_tmo, hz / 2);
+	}
+}
+#endif
 
 /*
  * Configure swap space and related parameters.
@@ -142,7 +192,7 @@ dumpconf()
 	if (nblks <= ctod(1))
 		goto bad;
 	dumpblks = cpu_dumpsize();
-	if (dumpblks < 0)  
+	if (dumpblks < 0)
 		goto bad;
 	dumpblks += ctod(physmem);
 
@@ -320,6 +370,7 @@ pdc_scanbus(self, ca, bus, maxmod)
 	register int i;
 
 	for (i = maxmod; i--; ) {
+		struct confargs nca;
 		struct pdc_iodc_read pdc_iodc_read;
 
 		dp.dp_bc[0] = dp.dp_bc[1] = dp.dp_bc[2] = dp.dp_bc[3] = -1;
@@ -331,21 +382,20 @@ pdc_scanbus(self, ca, bus, maxmod)
 			     PDC_MEMMAP_HPA, &pdc_memmap, &dp) < 0)
 			continue;
 
+		nca = *ca;
 		if (pdc_call((iodcio_t)pdc, 0, PDC_IODC, PDC_IODC_READ,
 			     &pdc_iodc_read, pdc_memmap.hpa, IODC_DATA,
-			     &ca->ca_type, sizeof(ca->ca_type)) < 0)
+			     &nca.ca_type, sizeof(nca.ca_type)) < 0)
 			continue;
 
-		ca->ca_mod = i;
-		ca->ca_hpa = pdc_memmap.hpa;
-		ca->ca_iot = 0;
-		ca->ca_pdc_iodc_read = &pdc_iodc_read;
-		ca->ca_name = hppa_mod_info(ca->ca_type.iodc_type,
-					    ca->ca_type.iodc_sv_model);
+		nca.ca_mod = i;
+		nca.ca_hpa = pdc_memmap.hpa;
+		nca.ca_pdc_iodc_read = &pdc_iodc_read;
+		nca.ca_name = hppa_mod_info(nca.ca_type.iodc_type,
+					    nca.ca_type.iodc_sv_model);
 
-		config_found_sm(self, ca, mbprint, mbsubmatch);
+		config_found_sm(self, &nca, mbprint, mbsubmatch);
 	}
-
 }
 
 const char *

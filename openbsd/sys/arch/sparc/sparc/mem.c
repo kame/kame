@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.7 1999/09/03 18:01:59 art Exp $	*/
+/*	$OpenBSD: mem.c,v 1.12 2000/03/04 16:42:15 art Exp $	*/
 /*	$NetBSD: mem.c,v 1.13 1996/03/30 21:12:16 christos Exp $ */
 
 /*
@@ -58,10 +58,12 @@
 #include <machine/conf.h>
 
 #include <vm/vm.h>
+#include <vm/vm_kern.h>
 
 extern vaddr_t prom_vstart;
 extern vaddr_t prom_vend;
 caddr_t zeropage;
+vaddr_t mem_page;
 
 /*ARGSUSED*/
 int
@@ -108,10 +110,9 @@ mmrw(dev, uio, flags)
 	struct iovec *iov;
 	int error = 0;
 	static int physlock;
-	extern caddr_t vmmap;
 
 	if (minor(dev) == 0) {
-		/* lock against other uses of shared vmmap */
+		/* lock against other uses of shared mem_page */
 		while (physlock > 0) {
 			physlock++;
 			error = tsleep((caddr_t)&physlock, PZERO | PCATCH,
@@ -120,6 +121,15 @@ mmrw(dev, uio, flags)
 				return (error);
 		}
 		physlock = 1;
+#if defined(UVM)
+		if (mem_page == 0)
+			mem_page = uvm_km_valloc_wait(kernel_map, NBPG);
+#else
+		if (mem_page == 0)
+			mem_page = kmem_alloc_pageable(kernel_map, NBPG);
+#endif
+		if (mem_page == 0)
+			panic("mmrw: out of space in kernel_map");
 	}
 	while (uio->uio_resid > 0 && error == 0) {
 		iov = uio->uio_iov;
@@ -134,19 +144,18 @@ mmrw(dev, uio, flags)
 
 		/* minor device 0 is physical memory */
 		case 0:
-			pa = uio->uio_offset;
+			pa = (paddr_t)uio->uio_offset;
 			if (!pmap_pa_exists(pa)) {
 				error = EFAULT;
 				goto unlock;
 			}
-			pmap_enter(pmap_kernel(), (vaddr_t)vmmap,
+			pmap_enter(pmap_kernel(), mem_page,
 			    trunc_page(pa), uio->uio_rw == UIO_READ ?
 			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
-			error = uiomove((caddr_t)vmmap + o, c, uio);
-			pmap_remove(pmap_kernel(), (vaddr_t)vmmap,
-			    (vaddr_t)vmmap + NBPG);
+			error = uiomove((caddr_t)mem_page + o, c, uio);
+			pmap_remove(pmap_kernel(), mem_page, mem_page + NBPG);
 			continue;
 
 		/* minor device 1 is kernel memory */
@@ -195,8 +204,8 @@ mmrw(dev, uio, flags)
 /* minor device 12 (/dev/zero) is source of nulls on read, rathole on write */
 		case 12:
 			if (uio->uio_rw == UIO_WRITE) {
-				c = iov->iov_len;
-				break;
+				uio->uio_resid = 0;
+				return 0;
 			}
 			if (zeropage == NULL) {
 				zeropage = (caddr_t)
@@ -210,12 +219,6 @@ mmrw(dev, uio, flags)
 		default:
 			return (ENXIO);
 		}
-		if (error)
-			break;
-		iov->iov_base += c;
-		iov->iov_len -= c;
-		uio->uio_offset += c;
-		uio->uio_resid -= c;
 	}
 	if (minor(dev) == 0) {
 unlock:
@@ -232,5 +235,17 @@ mmmmap(dev, off, prot)
         int off, prot;
 {
 
+	return (EOPNOTSUPP);
+}
+
+/*ARGSUSED*/
+int
+mmioctl(dev, cmd, data, flags, p)
+	dev_t dev;
+	u_long cmd;
+	caddr_t data;
+	int flags;
+	struct proc *p;
+{
 	return (EOPNOTSUPP);
 }

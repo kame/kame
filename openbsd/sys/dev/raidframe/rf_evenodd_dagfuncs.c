@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_evenodd_dagfuncs.c,v 1.2 1999/02/16 00:02:44 niklas Exp $	*/
-/*	$NetBSD: rf_evenodd_dagfuncs.c,v 1.2 1999/02/05 00:06:11 oster Exp $	*/
+/*	$OpenBSD: rf_evenodd_dagfuncs.c,v 1.5 2000/01/11 18:02:22 peter Exp $	*/
+/*	$NetBSD: rf_evenodd_dagfuncs.c,v 1.4 2000/01/07 03:41:00 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -40,12 +40,10 @@
 #include "rf_dagdegwr.h"
 #include "rf_dagutils.h"
 #include "rf_dagfuncs.h"
-#include "rf_threadid.h"
 #include "rf_etimer.h"
 #include "rf_general.h"
 #include "rf_configure.h"
 #include "rf_parityscan.h"
-#include "rf_sys.h"
 #include "rf_evenodd.h"
 #include "rf_evenodd_dagfuncs.h"
 
@@ -942,7 +940,7 @@ rf_EOWriteDoubleRecoveryFunc(node)
 	 * wudNodes; For current implementation, we assume the simplest case:
 	 * asmap->numStripeUnitsAccessed == 1 and asmap->numDataFailed == 1
 	 * ie. PDAPerDisk = 1 then node->params[numDataCol] must be the new
-	 * data to be writen to the failed disk. We first bxor the new data
+	 * data to be written to the failed disk. We first bxor the new data
 	 * into the old recovered data, then do the same things as small
 	 * write. */
 

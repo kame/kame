@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.3 1998/10/09 02:06:40 rahnds Exp $ */
+/*	$OpenBSD: intr.h,v 1.5 2000/03/31 04:16:34 rahnds Exp $ */
 
 /*
  * Copyright (c) 1997 Per Fogelstrom, Opsycon AB and RTMX Inc, USA.
@@ -49,6 +49,10 @@
 #define	IST_LEVEL	3
 
 #ifndef _LOCORE
+
+#define PPC_NIRQ	65
+#define PPC_CLK_IRQ	64
+extern int intrcnt[PPC_NIRQ];
 
 void setsoftclock __P((void));
 void clearsoftclock __P((void));
@@ -144,6 +148,21 @@ set_sint(pending)
 #define	splhigh()	splraise(0xffffffff)
 #define	spl0()		spllower(0)
 
+/*
+ *	Interrupt control struct used to control the ICU setup.
+ */
+
+struct intrhand {
+	struct	intrhand *ih_next;
+	int	(*ih_fun) __P((void *));
+	void    *ih_arg;
+	u_long  ih_count;
+	int     ih_level;
+	int     ih_irq;
+	char    *ih_what;
+};
+
 #endif /* _LOCORE */
+
 
 #endif /* _MACHINE_INTR_H_ */

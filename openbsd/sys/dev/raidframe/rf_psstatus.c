@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_psstatus.c,v 1.2 1999/02/16 00:03:12 niklas Exp $	*/
-/*	$NetBSD: rf_psstatus.c,v 1.3 1999/02/05 00:06:15 oster Exp $	*/
+/*	$OpenBSD: rf_psstatus.c,v 1.4 2000/01/11 18:02:22 peter Exp $	*/
+/*	$NetBSD: rf_psstatus.c,v 1.5 2000/01/08 22:57:31 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -39,13 +39,11 @@
 
 #include "rf_types.h"
 #include "rf_raid.h"
-#include "rf_threadid.h"
 #include "rf_general.h"
 #include "rf_debugprint.h"
 #include "rf_freelist.h"
 #include "rf_psstatus.h"
 #include "rf_shutdown.h"
-#include "rf_sys.h"
 
 #define Dprintf1(s,a)         if (rf_pssDebug) rf_debug_printf(s,(void *)((unsigned long)a),NULL,NULL,NULL,NULL,NULL,NULL,NULL)
 #define Dprintf2(s,a,b)       if (rf_pssDebug) rf_debug_printf(s,(void *)((unsigned long)a),(void *)((unsigned long)b),NULL,NULL,NULL,NULL,NULL,NULL)
@@ -211,11 +209,10 @@ rf_LookupRUStatus(
 						 * specifying */
 		}
 	if (p && (flags & RF_PSS_RECON_BLOCKED)) {
-		int     tid;
-		rf_get_threadid(tid);
 		p->blockCount++;/* if we're asking to block recon, bump the
 				 * count */
-		Dprintf3("[%d] Blocked recon on psid %ld.  count now %d\n", tid, psID, p->blockCount);
+		Dprintf3("raid%d: Blocked recon on psid %ld.  count now %d\n",
+			 raidPtr->raidid, psID, p->blockCount);
 	}
 	return (p);
 }

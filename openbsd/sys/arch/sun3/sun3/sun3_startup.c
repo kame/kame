@@ -1,4 +1,4 @@
-/*	$OpenBSD: sun3_startup.c,v 1.10 1997/09/07 14:05:21 kstailey Exp $	*/
+/*	$OpenBSD: sun3_startup.c,v 1.12 2000/04/30 15:30:29 miod Exp $	*/
 /*	$NetBSD: sun3_startup.c,v 1.55 1996/11/20 18:57:38 gwr Exp $	*/
 
 /*-
@@ -43,6 +43,7 @@
 #include <sys/reboot.h>
 #include <sys/user.h>
 #include <sys/exec_aout.h>
+#include <sys/msgbuf.h>
 
 #include <vm/vm.h>
 
@@ -65,7 +66,9 @@ extern char kernel_text[];
 
 /* These are defined by the linker */
 extern char etext[], edata[], end[];
-char *esym;	/* DDB */
+#if (defined(DDB) || NKSYMS > 0) && !defined(SYMTAB_SPACE)
+char *esym;
+#endif
 
 /*
  * Globals shared with the pmap code.
@@ -89,7 +92,6 @@ int cpu_has_vme = 0;
 vm_offset_t high_segment_free_start = 0;
 vm_offset_t high_segment_free_end = 0;
 
-int msgbufmapped = 0;
 struct msgbuf *msgbufp = NULL;
 extern vm_offset_t tmp_vpages[];
 extern int physmem;
@@ -281,7 +283,7 @@ int keep;	/* true: steal, false: clear */
 	}
 }
 
-#if defined(DDB) && !defined(SYMTAB_SPACE)
+#if (defined(DDB) || NKSYMS > 0) && !defined(SYMTAB_SPACE)
 /*
  * Preserve DDB symbols and strings by setting esym.
  */
@@ -372,12 +374,14 @@ sun3_vm_init(kehp)
 	 * This is just page-aligned for now, so we can allocate
 	 * some special-purpose pages before rounding to a segment.
 	 */
+#if (defined(DDB) || NKSYMS > 0) && !defined(SYMTAB_SPACE)
 	esym = end;
-#if defined(DDB) && !defined(SYMTAB_SPACE)
 	/* This will advance esym past the symbols. */
 	sun3_save_symtab(kehp);
-#endif
 	virtual_avail = m68k_round_page(esym);
+#else
+	virtual_avail = m68k_round_page(end);
+#endif
 	virtual_end = VM_MAX_KERNEL_ADDRESS;
 
 	/*
@@ -413,8 +417,8 @@ sun3_vm_init(kehp)
 	pte |= PG_NC;
 	set_pte(va, pte);
 	/* offset by half a page to avoid PROM scribbles */
-	msgbufp = (struct msgbuf *)(va + 0x1000);
-	msgbufmapped = 1;
+	msgbufp = (struct msgbuf *)(va + (NBPG >> 1));
+	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	/*
 	 * Virtual and physical pages for proc[0] u-area (already mapped)

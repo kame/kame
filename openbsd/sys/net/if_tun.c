@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tun.c,v 1.27 1999/09/29 04:30:39 deraadt Exp $	*/
+/*	$OpenBSD: if_tun.c,v 1.29 2000/03/21 23:31:27 mickey Exp $	*/
 /*	$NetBSD: if_tun.c,v 1.24 1996/05/07 02:40:48 thorpej Exp $	*/
 
 /*
@@ -221,11 +221,13 @@ tunclose(dev, flag, mode, p)
 			register struct ifaddr *ifa;
 			for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
 			     ifa = ifa->ifa_list.tqe_next) {
+#ifdef INET
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					rtinit(ifa, (int)RTM_DELETE,
 					       (tp->tun_flags & TUN_DSTADDR)?
 							RTF_HOST : 0);
 				}
+#endif
 			}
 		}
 		splx(s);
@@ -251,6 +253,7 @@ tuninit(tp)
 	tp->tun_flags &= ~(TUN_IASET|TUN_DSTADDR|TUN_BRDADDR);
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
 	    ifa = ifa->ifa_list.tqe_next) {
+#ifdef INET
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			struct sockaddr_in *sin;
 
@@ -272,6 +275,7 @@ tuninit(tp)
 			} else
 				tp->tun_flags &= ~TUN_BRDADDR;
 		}
+#endif
 	}
 
 	return 0;
@@ -302,18 +306,11 @@ tun_ioctl(ifp, cmd, data)
 		tuninit((struct tun_softc *)(ifp->if_softc));
 		TUNDEBUG(("%s: broadcast address set\n", ifp->if_xname));
 		break;
-#if 0
 	case SIOCSIFMTU:
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-			break;
-		((struct tun_softc *)(ifp->if_softc))->tun_if.if_mtu
-			= ((struct ifreq *)data)->ifr_mtu;
+		ifp->if_mtu = ((struct ifreq *)data)->ifr_mtu;
 		break;
-	case SIOCGIFMTU:
-		((struct ifreq *)data)->ifr_mtu =
-			((struct tun_softc *)(ifp->if_softc))->tun_if.if_mtu;
+	case SIOCSIFFLAGS:
 		break;
-#endif
 	default:
 		error = EINVAL;
 	}
@@ -610,6 +607,12 @@ tunwrite(dev, uio, ioflag)
 	case AF_INET:
 		ifq = &ipintrq;
 		isr = NETISR_IP;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		ifq = &ip6intrq;
+		isr = NETISR_IPV6;
 		break;
 #endif
 #ifdef NS

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_extern.h,v 1.7 1998/02/08 22:41:49 tholo Exp $	*/
+/*	$OpenBSD: ffs_extern.h,v 1.9 2000/02/07 04:57:18 assar Exp $	*/
 /*	$NetBSD: ffs_extern.h,v 1.4 1996/02/09 22:22:22 christos Exp $	*/
 
 /*-
@@ -115,8 +115,7 @@ int ffs_flushfiles __P((struct mount *, int, struct proc *));
 int ffs_statfs __P((struct mount *, struct statfs *, struct proc *));
 int ffs_sync __P((struct mount *, int, struct ucred *, struct proc *));
 int ffs_vget __P((struct mount *, ino_t, struct vnode **));
-int ffs_fhtovp __P((struct mount *, struct fid *, struct mbuf *,
-		    struct vnode **, int *, struct ucred **));
+int ffs_fhtovp __P((struct mount *, struct fid *, struct vnode **));
 int ffs_vptofh __P((struct vnode *, struct fid *));
 int ffs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 		    struct proc *));
@@ -159,7 +158,7 @@ void  softdep_setup_allocindir_page __P((struct inode *, ufs_lbn_t,
 void  softdep_disk_io_initiation __P((struct buf *));
 void  softdep_disk_write_complete __P((struct buf *));
 int   softdep_sync_metadata __P((struct vop_fsync_args *));
-
+void  softdep_fsync_mountdev __P((struct vnode *));
 __END_DECLS
 
 extern int (**ffs_vnodeop_p) __P((void *));

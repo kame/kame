@@ -1,4 +1,4 @@
-/*	$OpenBSD: disklabel.h,v 1.20 1999/03/23 16:36:18 millert Exp $	*/
+/*	$OpenBSD: disklabel.h,v 1.22 1999/12/04 03:35:57 deraadt Exp $	*/
 /*	$NetBSD: disklabel.h,v 1.3 1996/03/09 20:52:54 ghudson Exp $	*/
 
 /*
@@ -67,6 +67,7 @@ struct dos_partition {
 #define DOSPTYP_FAT32	0x0b		/* 32-bit FAT */
 #define DOSPTYP_FAT32L	0x0c		/* 32-bit FAT, LBA-mapped */
 #define DOSPTYP_FAT16L	0x0e		/* 16-bit FAT, LBA-mapped */
+#define DOSPTYP_EXTENDL 0x0f		/* Extended, LBA-mapped; contains sub-partitions */
 #define DOSPTYP_ONTRACK	0x54
 #define	DOSPTYP_LINUX	0x83		/* That other thing */
 #define DOSPTYP_FREEBSD	0xa5		/* FreeBSD partition type */
@@ -97,8 +98,12 @@ struct cpu_disklabel {
 static __inline u_int32_t get_le __P((void *));
 
 static __inline u_int32_t
+#ifdef __cplusplus
+get_le(void *p)
+#else
 get_le(p)
 	void *p;
+#endif
 {
 	u_int8_t *_p = (u_int8_t *)p;
 	u_int32_t x;

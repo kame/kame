@@ -1,6 +1,6 @@
 #!/bin/sh -
 #
-#	$OpenBSD: newvers.sh,v 1.21 1999/10/14 04:49:29 deraadt Exp $
+#	$OpenBSD: newvers.sh,v 1.24 2000/05/04 05:34:49 deraadt Exp $
 #	$NetBSD: newvers.sh,v 1.17.2.1 1995/10/12 05:17:11 jtc Exp $
 #
 # Copyright (c) 1984, 1986, 1990, 1993
@@ -62,7 +62,7 @@ id=`basename ${d}`
 #
 
 ost="OpenBSD"
-osr="2.6"
+osr="2.7"
 
 echo "char ostype[] = \"${ost}\";" > vers.c
 echo "char osrelease[] = \"${osr}\";" >> vers.c

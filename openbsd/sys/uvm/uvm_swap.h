@@ -1,4 +1,3 @@
-/*	$OpenBSD: uvm_swap.h,v 1.2 1999/02/26 05:32:08 art Exp $	*/
 /*	$NetBSD: uvm_swap.h,v 1.3 1998/02/07 11:09:48 mrg Exp $	*/
 
 /*
@@ -40,4 +39,7 @@ int			uvm_swap_put __P((int, struct vm_page **, int,
 int			uvm_swap_alloc __P((int *wanted, boolean_t lessok));
 void			uvm_swap_free __P((int startslot, int nslots));
 
+#ifdef UVM_SWAP_ENCRYPT
+void			uvm_swap_initcrypt_all __P((void));
+#endif
 #endif /* _UVM_UVM_SWAP_H_ */

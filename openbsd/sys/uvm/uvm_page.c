@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_page.c,v 1.19 1999/05/20 20:07:55 thorpej Exp $	*/
+/*	$NetBSD: uvm_page.c,v 1.23 1999/05/25 01:34:13 thorpej Exp $	*/
 
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -472,7 +472,8 @@ uvm_page_physget(paddrp)
 	int lcv, x;
 
 	/* pass 1: try allocating from a matching end */
-#if (VM_PHYSSEG_STRAT == VM_PSTRAT_BIGFIRST)
+#if (VM_PHYSSEG_STRAT == VM_PSTRAT_BIGFIRST) || \
+	(VM_PHYSSEG_STRAT == VM_PSTRAT_BSEARCH)
 	for (lcv = vm_nphysseg - 1 ; lcv >= 0 ; lcv--)
 #else
 	for (lcv = 0 ; lcv < vm_nphysseg ; lcv++)
@@ -522,7 +523,8 @@ uvm_page_physget(paddrp)
 	}
 
 	/* pass2: forget about matching ends, just allocate something */
-#if (VM_PHYSSEG_STRAT == VM_PSTRAT_BIGFIRST)
+#if (VM_PHYSSEG_STRAT == VM_PSTRAT_BIGFIRST) || \
+	(VM_PHYSSEG_STRAT == VM_PSTRAT_BSEARCH)
 	for (lcv = vm_nphysseg - 1 ; lcv >= 0 ; lcv--)
 #else
 	for (lcv = 0 ; lcv < vm_nphysseg ; lcv++)
@@ -847,9 +849,7 @@ uvm_pagealloc_strat(obj, off, anon, flags, strat, free_list)
 		panic("uvm_pagealloc: obj and anon != NULL");
 #endif
 
-	s = splimp();
-
-	uvm_lock_fpageq();		/* lock free page queue */
+	s = uvm_lock_fpageq();		/* lock free page queue */
 
 	/*
 	 * check to see if we need to generate some free pages waking
@@ -870,7 +870,7 @@ uvm_pagealloc_strat(obj, off, anon, flags, strat, free_list)
 	 */
 
 	use_reserve = (flags & UVM_PGA_USERESERVE) ||
-		(obj && obj->uo_refs == UVM_OBJ_KERN);
+		(obj && UVM_OBJ_IS_KERN_OBJECT(obj));
 	if ((uvmexp.free <= uvmexp.reserve_kernel && !use_reserve) ||
 	    (uvmexp.free <= uvmexp.reserve_pagedaemon &&
 	     !(use_reserve && curproc == uvm.pagedaemon_proc)))
@@ -919,8 +919,7 @@ uvm_pagealloc_strat(obj, off, anon, flags, strat, free_list)
 	TAILQ_REMOVE(freeq, pg, pageq);
 	uvmexp.free--;
 
-	uvm_unlock_fpageq();		/* unlock free page queue */
-	splx(s);
+	uvm_unlock_fpageq(s);		/* unlock free page queue */
 
 	pg->offset = off;
 	pg->uobject = obj;
@@ -945,8 +944,7 @@ uvm_pagealloc_strat(obj, off, anon, flags, strat, free_list)
 	return(pg);
 
  fail:
-	uvm_unlock_fpageq();
-	splx(s);
+	uvm_unlock_fpageq(s);
 	return (NULL);
 }
 
@@ -1137,8 +1135,7 @@ struct vm_page *pg;
 	 * and put on free queue 
 	 */
 
-	s = splimp();
-	uvm_lock_fpageq();
+	s = uvm_lock_fpageq();
 	TAILQ_INSERT_TAIL(&uvm.page_free[uvm_page_lookup_freelist(pg)],
 	    pg, pageq);
 	pg->pqflags = PQ_FREE;
@@ -1148,8 +1145,7 @@ struct vm_page *pg;
 	pg->uanon = (void *)0xdeadbeef;
 #endif
 	uvmexp.free++;
-	uvm_unlock_fpageq();
-	splx(s);
+	uvm_unlock_fpageq(s);
 }
 
 #if defined(UVM_PAGE_TRKOWN)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cache.c,v 1.9 1999/07/20 11:07:09 art Exp $	*/
+/*	$OpenBSD: cache.c,v 1.13 2000/03/17 21:54:07 deraadt Exp $	*/
 /*	$NetBSD: cache.c,v 1.34 1997/09/26 22:17:23 pk Exp $	*/
 
 /*
@@ -111,6 +111,7 @@ sun4_cache_enable()
 #endif
 }
 
+#if defined(SUN4M)
 void
 ms1_cache_enable()
 {
@@ -179,7 +180,8 @@ void
 hypersparc_cache_enable()
 {
 	int i, ls, ts;
-	u_int pcr;
+	u_int pcr, v;
+	extern u_long dvma_cachealign;
 
 	ls = CACHEINFO.c_linesize;
 	ts = CACHEINFO.c_totalsize;
@@ -187,16 +189,11 @@ hypersparc_cache_enable()
 	pcr = lda(SRMMU_PCR, ASI_SRMMU);
 
 	/*
-	 * First we determine what type of cache we have, and
-	 * setup the anti-aliasing constants appropriately.
+	 * Setup the anti-aliasing constants and DVMA alignment constraint.
 	 */
-	if (pcr & HYPERSPARC_PCR_CS) {
-		cache_alias_bits = CACHE_ALIAS_BITS_HS256k;
-		cache_alias_dist = CACHE_ALIAS_DIST_HS256k;
-	} else {
-		cache_alias_bits = CACHE_ALIAS_BITS_HS128k;
-		cache_alias_dist = CACHE_ALIAS_DIST_HS128k;
-	}
+	cache_alias_dist = CACHEINFO.c_totalsize;
+	cache_alias_bits = (cache_alias_dist - 1) & ~PGOFSET;
+	dvma_cachealign = cache_alias_dist;
 
 	/* Now reset cache tag memory if cache not yet enabled */
 	if ((pcr & HYPERSPARC_PCR_CE) == 0)
@@ -206,14 +203,31 @@ hypersparc_cache_enable()
 				sta(i, ASI_DCACHETAG, 0);
 		}
 
-	/* Enable write-back cache */
-	pcr |= (HYPERSPARC_PCR_CE | HYPERSPARC_PCR_CM);
+	pcr &= ~(HYPERSPARC_PCR_CE | HYPERSPARC_PCR_CM);
+
+	hypersparc_cache_flush_all();
+
+	pcr |= HYPERSPARC_PCR_CE;
+	if (CACHEINFO.c_vactype == VAC_WRITEBACK)
+		pcr |= HYPERSPARC_PCR_CM;
+
 	sta(SRMMU_PCR, ASI_SRMMU, pcr);
 	CACHEINFO.c_enabled = 1;
 
 	/* XXX: should add support */
 	if (CACHEINFO.c_hwflush)
 		panic("cache_enable: can't handle 4M with hw-flush cache");
+
+#ifdef notyet
+	/*
+	 * Enable instruction cache and, on single-processor machines,
+	 * disable `Unimplemented Flush Traps'.
+	 */
+	v = HYPERSPARC_ICCR_ICE | (ncpu == 1 ? HYPERSPARC_ICCR_FTD : 0);
+#else
+	v = HYPERSPARC_ICCR_FTD | HYPERSPARC_ICCR_ICE;
+#endif
+	wrasr(v, HYPERSPARC_ASRNUM_ICCR);
 
 	printf("cache enabled\n");
 }
@@ -329,6 +343,7 @@ turbosparc_cache_enable()
 	CACHEINFO.c_enabled = 1;
 	printf("cache enabled\n");
 }
+#endif /* defined(SUN4M) */
 
 /*
  * Flush the current context from the cache.
@@ -615,6 +630,12 @@ srmmu_vcache_flush_page(va)
 		sta(p, ASI_IDCACHELFP, 0);
 }
 
+void
+srmmu_cache_flush_all()
+{
+	srmmu_vcache_flush_context();
+}
+
 /*
  * Flush a range of virtual addresses (in the current context).
  * The first byte is at (base&~PGOFSET) and the last one is just
@@ -695,6 +716,42 @@ ms1_cache_flush(base, len)
 
 	/* XXX investigate other methods instead of blowing the entire cache */
 	sta(0, ASI_DCACHECLR, 0);
+}
+
+/*
+ * Flush entire cache.
+ */
+void
+ms1_cache_flush_all()
+{
+
+	/* Flash-clear both caches */
+	sta(0, ASI_ICACHECLR, 0);
+	sta(0, ASI_DCACHECLR, 0);
+}
+
+void
+hypersparc_cache_flush_all()
+{
+
+	srmmu_vcache_flush_context();
+	/* Flush instruction cache */
+	hypersparc_pure_vcache_flush();
+}
+
+void
+cypress_cache_flush_all()
+{
+	extern char kernel_text[];
+	char *p;
+	int i, ls;
+
+	/* Fill the cache with known read-only content */
+	p = (char *)kernel_text;
+	ls = CACHEINFO.c_linesize;
+	i = CACHEINFO.c_totalsize >> CACHEINFO.c_l2linesize;
+	for (; --i >= 0; p += ls)
+		(*(volatile char *)p);
 }
 
 void

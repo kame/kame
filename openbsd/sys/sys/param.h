@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.25 1999/09/23 08:25:01 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.28 2000/04/08 05:06:24 deraadt Exp $	*/
 /*	$NetBSD: param.h,v 1.23 1996/03/17 01:02:29 thorpej Exp $	*/
 
 /*-
@@ -45,8 +45,8 @@
 #define BSD4_3	1
 #define BSD4_4	1
 
-#define OpenBSD	199912		/* OpenBSD version (year & month). */
-#define OpenBSD2_6 1		/* OpenBSD 2.6 */
+#define OpenBSD	200006		/* OpenBSD version (year & month). */
+#define OpenBSD2_7 1		/* OpenBSD 2.7 */
 
 #ifndef NULL
 #ifdef 	__GNUG__
@@ -122,11 +122,12 @@
 
 #define	CMASK	022		/* default file mask: S_IWGRP|S_IWOTH */
 #define	NODEV	(dev_t)(-1)	/* non-existent device */
-
+#define NETDEV	(dev_t)(-2)	/* network device (for nfs swap) */
+	
 /*
  * Clustering of hardware pages on machines with ridiculously small
  * page sizes is done here.  The paging subsystem deals with units of
- * CLSIZE pte's describing NBPG (from machine/machparam.h) pages each.
+ * CLSIZE pte's describing NBPG (from machine/param.h) pages each.
  */
 #define	CLBYTES		(CLSIZE*NBPG)
 #define	CLOFSET		(CLSIZE*NBPG-1)	/* for clusters, like PGOFSET */

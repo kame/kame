@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.8 1999/09/20 17:06:00 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.11 2000/04/07 21:05:05 mjacob Exp $	*/
 /*	$NetBSD: param.h,v 1.29 1996/03/04 05:04:26 cgd Exp $	*/
 
 /*-
@@ -68,6 +68,11 @@
 #define	PGSHIFT		12		/* LOG2(NBPG) */
 #define	NBPG		(1 << PGSHIFT)	/* bytes/page */
 #define	PGOFSET		(NBPG-1)	/* byte offset into page */
+
+#define PAGE_SHIFT	12
+#define PAGE_SIZE	(1 << PAGE_SHIFT)
+#define PAGE_MASK	(PAGE_SIZE - 1)
+
 #define	NPTEPG		(NBPG/(sizeof (pt_entry_t)))
 
 #define	KERNBASE	0xe0000000		/* start of kernel virtual space */
@@ -77,7 +82,9 @@
 #define	DEV_BSHIFT	9		/* log2(DEV_BSIZE) */
 #define	DEV_BSIZE	(1 << DEV_BSHIFT)
 #define	BLKDEV_IOSIZE	2048
+#ifndef	MAXPHYS
 #define	MAXPHYS		(64 * 1024)	/* max raw I/O transfer size */
+#endif
 
 #define	CLSIZELOG2	0
 #define	CLSIZE		(1 << CLSIZELOG2)
@@ -87,6 +94,10 @@
 #define	SINCR		1		/* increment of stack/NBPG */
 #define	UPAGES		2		/* pages of u-area */
 #define	USPACE		(UPAGES * NBPG)	/* total size of u-area */
+
+#ifndef MSGBUFSIZE
+#define MSGBUFSIZE	2*NBPG		/* default message buffer size */
+#endif
 
 /*
  * Constants related to network buffer management.

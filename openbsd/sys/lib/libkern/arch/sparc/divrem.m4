@@ -1,4 +1,4 @@
-/*	$OpenBSD: divrem.m4,v 1.2 1997/11/07 15:57:33 niklas Exp $	*/
+/*	$OpenBSD: divrem.m4,v 1.4 2000/03/03 11:17:03 art Exp $	*/
 /*	$NetBSD: divrem.m4,v 1.3 1995/04/22 09:37:39 pk Exp $	*/
 
 /*
@@ -49,7 +49,7 @@
 #ifdef notdef
 	.asciz "@(#)divrem.m4	8.1 (Berkeley) 6/4/93"
 #endif
-	.asciz "$OpenBSD: divrem.m4,v 1.2 1997/11/07 15:57:33 niklas Exp $"
+	.asciz "$OpenBSD: divrem.m4,v 1.4 2000/03/03 11:17:03 art Exp $"
 #endif /* LIBC_SCCS and not lint */
 
 /*
@@ -57,6 +57,7 @@
  *
  * m4 parameters:
  *  NAME	name of function to generate
+ *  NAME2	secondary name of function to generate
  *  OP		OP=div => %o0 / %o1; OP=rem => %o0 % %o1
  *  S		S=true => signed; S=false => unsigned
  *
@@ -136,6 +137,8 @@ L.$1.eval(TWOSUPN+$2):
 #include "DEFS.h"
 #include <machine/trap.h>
 
+	.globl NAME2
+NAME2:
 FUNC(NAME)
 ifelse(S, `true',
 `	! compute sign of result; if neither is negative, no problem

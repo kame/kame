@@ -1,5 +1,6 @@
-/*	$OpenBSD: usb_mem.h,v 1.3 1999/09/27 18:03:56 fgsch Exp $	*/
-/*	$NetBSD: usb_mem.h,v 1.8 1999/09/13 19:18:17 augustss Exp $	*/
+/*	$OpenBSD: usb_mem.h,v 1.6 2000/03/28 19:37:50 aaron Exp $ */
+/*	$NetBSD: usb_mem.h,v 1.12 2000/03/12 23:10:29 nathanw Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_mem.h,v 1.9 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -51,7 +52,7 @@ typedef struct usb_dma_block {
 	LIST_ENTRY(usb_dma_block) next;
 } usb_dma_block_t;
 
-#define DMAADDR(dma) ((dma)->block->segs[0].ds_addr + (dma)->offs)
+#define DMAADDR(dma) ((dma)->block->map->dm_segs[0].ds_addr + (dma)->offs)
 #define KERNADDR(dma) ((void *)((dma)->block->kaddr + (dma)->offs))
 
 usbd_status	usb_allocmem __P((usbd_bus_handle,size_t,size_t, usb_dma_t *));
@@ -76,12 +77,14 @@ void		usb_freemem  __P((usbd_bus_handle, usb_dma_t *));
 
 #include <machine/pmap.h>       /* for vtophys */
 
-typedef void * usb_dma_t;
-
 #define		usb_allocmem(t,s,a,p)	(*(p) = malloc(s, M_USB, M_NOWAIT), (*(p) == NULL? USBD_NOMEM: USBD_NORMAL_COMPLETION))
 #define		usb_freemem(t,p)	(free(*(p), M_USB))
 
+#ifdef __alpha__
+#define DMAADDR(dma)	(alpha_XXX_dmamap((vm_offset_t) *(dma)))
+#else
 #define DMAADDR(dma)	(vtophys(*(dma)))
+#endif
 #define KERNADDR(dma)	((void *) *(dma))
 #endif
 

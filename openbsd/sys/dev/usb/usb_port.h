@@ -1,5 +1,6 @@
-/*	$OpenBSD: usb_port.h,v 1.5 1999/09/27 18:03:56 fgsch Exp $	*/
-/*	$NetBSD: usb_port.h,v 1.11 1999/09/11 08:19:27 augustss Exp $	*/
+/*	$OpenBSD: usb_port.h,v 1.14 2000/04/15 17:36:28 jakob Exp $ */
+/*	$NetBSD: usb_port.h,v 1.28 2000/03/30 08:53:31 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.21 1999/11/17 22:33:47 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -50,11 +51,33 @@
 
 #include "opt_usbverbose.h"
 
+#ifdef USB_DEBUG
+#define UHID_DEBUG 1
+#define OHCI_DEBUG 1
+#define UGEN_DEBUG 1
+#define UHCI_DEBUG 1
+#define UHUB_DEBUG 1
+#define ULPT_DEBUG 1
+#define UCOM_DEBUG 1
+#define UMODEM_DEBUG 1
+#define UAUDIO_DEBUG 1
+#define AUE_DEBUG 1
+#define CUE_DEBUG 1
+#define KUE_DEBUG 1
+#define UMASS_DEBUG 1
+#define UVISOR_DEBUG 1
+#define Static
+#else
+#define Static static
+#endif
+
 typedef struct device *device_ptr_t;
 #define USBBASEDEVICE struct device
 #define USBDEV(bdev) (&(bdev))
 #define USBDEVNAME(bdev) ((bdev).dv_xname)
+#define USBDEVUNIT(bdev) ((bdev).dv_unit)
 #define USBDEVPTRNAME(bdevptr) ((bdevptr)->dv_xname)
+#define USBGETSOFTC(d) ((void *)(d))
 
 #define DECLARE_USB_DMA_T \
 	struct usb_dma_block; \
@@ -63,12 +86,20 @@ typedef struct device *device_ptr_t;
 		u_int offs; \
 	} usb_dma_t
 
-#define usb_timeout(f, d, t, h) timeout((f), (d), (t))
-#define usb_untimeout(f, d, h) untimeout((f), (d))
+typedef struct callout usb_callout_t;
+#define usb_callout_init(h)	callout_init(&(h))
+#define	usb_callout(h, t, f, d)	callout_reset(&(h), (t), (f), (d))
+#define	usb_uncallout(h, f, d)	callout_stop(&(h))
+
+#define usb_kthread_create1	kthread_create1
+#define usb_kthread_create	kthread_create
+
+#define Ether_ifattach ether_ifattach
+#define IF_INPUT(ifp, m) (*(ifp)->if_input)((ifp), (m))
 
 #define logprintf printf
 
-#define USB_DECLARE_DRIVER_NAME_INIT(_1, dname, _2)  \
+#define USB_DECLARE_DRIVER(dname)  \
 int __CONCAT(dname,_match) __P((struct device *, struct cfdata *, void *)); \
 void __CONCAT(dname,_attach) __P((struct device *, struct device *, void *)); \
 int __CONCAT(dname,_detach) __P((struct device *, int)); \
@@ -112,8 +143,17 @@ __CONCAT(dname,_attach)(parent, self, aux) \
 
 #define USB_ATTACH_SETUP printf("\n")
 
+#define USB_DETACH(dname) \
+int \
+__CONCAT(dname,_detach)(self, flags) \
+	struct device *self; \
+	int flags;
+
+#define USB_DETACH_START(dname, sc) \
+	struct __CONCAT(dname,_softc) *sc = \
+		(struct __CONCAT(dname,_softc) *)self
+
 #define USB_GET_SC_OPEN(dname, unit, sc) \
-	struct __CONCAT(dname,_softc) *sc; \
 	if (unit >= __CONCAT(dname,_cd).cd_ndevs) \
 		return (ENXIO); \
 	sc = __CONCAT(dname,_cd).cd_devs[unit]; \
@@ -121,7 +161,7 @@ __CONCAT(dname,_attach)(parent, self, aux) \
 		return (ENXIO)
 
 #define USB_GET_SC(dname, unit, sc) \
-	struct __CONCAT(dname,_softc) *sc = __CONCAT(dname,_cd).cd_devs[unit]
+	sc = __CONCAT(dname,_cd).cd_devs[unit]
 
 #define USB_DO_ATTACH(dev, bdev, parent, args, print, sub) \
 	(config_found_sm(parent, args, print, sub))
@@ -130,21 +170,91 @@ __CONCAT(dname,_attach)(parent, self, aux) \
 /*
  * OpenBSD
  */
+#ifdef USB_DEBUG
+#define UHID_DEBUG 1
+#define OHCI_DEBUG 1
+#define UGEN_DEBUG 1
+#define UHCI_DEBUG 1
+#define UHUB_DEBUG 1
+#define ULPT_DEBUG 1
+#define UCOM_DEBUG 1
+#define UMODEM_DEBUG 1
+#define UAUDIO_DEBUG 1
+#define AUE_DEBUG 1
+#define CUE_DEBUG 1
+#define KUE_DEBUG 1
+#define UMASS_DEBUG 1
+#define UVISOR_DEBUG 1
+#endif
+
+#define Static
+
+#define UCOMBUSCF_PORTNO		-1
+#define UCOMBUSCF_PORTNO_DEFAULT	-1
+
+#define SCSI_MODE_SENSE		MODE_SENSE
+#define XS_STS_DONE		ITSDONE
+#define XS_CTL_POLL		SCSI_POLL
+#define XS_CTL_DATA_IN		SCSI_DATA_IN
+#define XS_CTL_DATA_OUT		SCSI_DATA_OUT
+#define scsipi_adapter		scsi_adapter
+#define scsipi_cmd		scsi_cmd
+#define scsipi_device		scsi_device
+#define scsipi_done		scsi_done
+#define scsipi_link		scsi_link
+#define scsipi_minphys		scsi_minphys
+#define scsipi_sense		scsi_sense
+#define scsipi_xfer		scsi_xfer
+#define xs_control		flags
+#define xs_status		status
+
 #define	memcpy(d, s, l)		bcopy((s),(d),(l))
 #define	memset(d, v, l)		bzero((d),(l))
 #define bswap32(x)		swap32(x)
-#define powerhook_establish(h, sc) NULL
-#define powerhook_disestablish(sc) /* nothing */
+#define usb_kthread_create1	kthread_create
+#define usb_kthread_create	kthread_create_deferred
+
+#define	config_pending_incr()
+#define	config_pending_decr()
+
+#define mii_attach(x1,x2,x3,x4,x5,x6) mii_phy_probe(x1,x2,x3)
+#define Ether_ifattach(ifp, eaddr) ether_ifattach(ifp)
+#define if_deactivate(x)
+#define IF_INPUT(ifp, m) do {						\
+	struct ether_header *eh;					\
+									\
+	eh = mtod(m, struct ether_header *);				\
+	m_adj(m, sizeof(struct ether_header));				\
+	ether_input((ifp), (eh), (m));					\
+} while (0)
 
 #define	usbpoll			usbselect
 #define	uhidpoll		uhidselect
 #define	ugenpoll		ugenselect
+#define	uriopoll		urioselect
+
+#define powerhook_establish(fn, sc) (fn)
+#define powerhook_disestablish(hdl)
+#define PWR_RESUME 0
+
+#define logprintf printf
+
+#define swap_bytes_change_sign16_le swap_bytes_change_sign16
+#define change_sign16_swap_bytes_le change_sign16_swap_bytes
+#define change_sign16_le change_sign16
+
+#define realloc usb_realloc
+void *usb_realloc __P((void *, u_int, int, int));
+
+extern int cold;
 
 typedef struct device *device_ptr_t;
 #define USBBASEDEVICE struct device
 #define USBDEV(bdev) (&(bdev))
 #define USBDEVNAME(bdev) ((bdev).dv_xname)
+#define USBDEVUNIT(bdev) ((bdev).dv_unit)
 #define USBDEVPTRNAME(bdevptr) ((bdevptr)->dv_xname)
+#define USBGETSOFTC(d) ((void *)(d))
 
 #define DECLARE_USB_DMA_T \
 	struct usb_dma_block; \
@@ -153,10 +263,12 @@ typedef struct device *device_ptr_t;
 		u_int offs; \
 	} usb_dma_t
 
-#define usb_timeout(f, d, t, h) timeout((f), (d), (t))
-#define usb_untimeout(f, d, h) untimeout((f), (d))
+typedef char usb_callout_t;
+#define usb_callout_init(h)
+#define usb_callout(h, t, f, d) timeout((f), (d), (t))
+#define usb_uncallout(h, f, d) untimeout((f), (d))
 
-#define USB_DECLARE_DRIVER_NAME_INIT(_1, dname, _2)  \
+#define USB_DECLARE_DRIVER(dname)  \
 int __CONCAT(dname,_match) __P((struct device *, void *, void *)); \
 void __CONCAT(dname,_attach) __P((struct device *, struct device *, void *)); \
 int __CONCAT(dname,_detach) __P((struct device *, int)); \
@@ -202,8 +314,17 @@ __CONCAT(dname,_attach)(parent, self, aux) \
 
 #define USB_ATTACH_SETUP printf("\n")
 
+#define USB_DETACH(dname) \
+int \
+__CONCAT(dname,_detach)(self, flags) \
+	struct device *self; \
+	int flags;
+
+#define USB_DETACH_START(dname, sc) \
+	struct __CONCAT(dname,_softc) *sc = \
+		(struct __CONCAT(dname,_softc) *)self
+
 #define USB_GET_SC_OPEN(dname, unit, sc) \
-	struct __CONCAT(dname,_softc) *sc; \
 	if (unit >= __CONCAT(dname,_cd).cd_ndevs) \
 		return (ENXIO); \
 	sc = __CONCAT(dname,_cd).cd_devs[unit]; \
@@ -211,7 +332,7 @@ __CONCAT(dname,_attach)(parent, self, aux) \
 		return (ENXIO)
 
 #define USB_GET_SC(dname, unit, sc) \
-	struct __CONCAT(dname,_softc) *sc = __CONCAT(dname,_cd).cd_devs[unit]
+	sc = __CONCAT(dname,_cd).cd_devs[unit]
 
 #define USB_DO_ATTACH(dev, bdev, parent, args, print, sub) \
 	(config_found_sm(parent, args, print, sub))
@@ -223,35 +344,49 @@ __CONCAT(dname,_attach)(parent, self, aux) \
 
 #include "opt_usb.h"
 
+#define Static
+
+#define USBVERBOSE
+
+#define device_ptr_t device_t
 #define USBBASEDEVICE device_t
 #define USBDEV(bdev) (bdev)
-#define USBDEVNAME(bdev) usbd_devname(bdev)
-#define USBDEVPTRNAME(bdev) usbd_devname(bdev)
+#define USBDEVNAME(bdev) device_get_nameunit(bdev)
+#define USBDEVUNIT(bdev) device_get_unit(bdev)
+#define USBDEVPTRNAME(bdev) device_get_nameunit(bdev)
+#define USBGETSOFTC(bdev) (device_get_softc(bdev))
 
 #define DECLARE_USB_DMA_T typedef void * usb_dma_t
 
 /* XXX Change this when FreeBSD has memset
  */
-#define memset(d, v, s)	\
-		do{			\
-		if ((v) == 0)		\
-			bzero((d), (s));	\
-		else			\
-			panic("Non zero filler for memset, cannot handle!"); \
-		} while (0)
+#define	memcpy(d, s, l)		bcopy((s),(d),(l))
+#define	memset(d, v, l)		bzero((d),(l))
+#define bswap32(x)		swap32(x)
+#define usb_kthread_create1(function, sc, priv, string, name)
+#define usb_kthread_create(create_function, sc)
+#define usb_kthread_exit(err)
 
+typedef struct callout_handle usb_callout_t;
+#define usb_callout_init(h) callout_handle_init(&(h))
+#define usb_callout(h, t, f, d) ((h) = timeout((f), (d), (t)))
+#define usb_uncallout(h, f, d) uncallout((f), (d), (h))
 
-#define usb_timeout(f, d, t, h) ((h) = timeout((f), (d), (t)))
-#define usb_untimeout(f, d, h) untimeout((f), (d), (h))
+#define clalloc(p, s, x) (clist_alloc_cblocks((p), (s), (s)), 0)
+#define clfree(p) clist_free_cblocks((p))
 
-#define USB_DECLARE_DRIVER_NAME_INIT(name, dname, init) \
-static device_probe_t __CONCAT(dname,_match); \
-static device_attach_t __CONCAT(dname,_attach); \
-static device_detach_t __CONCAT(dname,_detach); \
+#define powerhook_establish(fn, sc) (fn)
+#define powerhook_disestablish(hdl)
+#define PWR_RESUME 0
+
+#define USB_DECLARE_DRIVER_INIT(dname, init) \
+Static device_probe_t __CONCAT(dname,_match); \
+Static device_attach_t __CONCAT(dname,_attach); \
+Static device_detach_t __CONCAT(dname,_detach); \
 \
-static devclass_t __CONCAT(dname,_devclass); \
+Static devclass_t __CONCAT(dname,_devclass); \
 \
-static device_method_t __CONCAT(dname,_methods)[] = { \
+Static device_method_t __CONCAT(dname,_methods)[] = { \
         DEVMETHOD(device_probe, __CONCAT(dname,_match)), \
         DEVMETHOD(device_attach, __CONCAT(dname,_attach)), \
         DEVMETHOD(device_detach, __CONCAT(dname,_detach)), \
@@ -259,22 +394,24 @@ static device_method_t __CONCAT(dname,_methods)[] = { \
         {0,0} \
 }; \
 \
-static driver_t __CONCAT(dname,_driver) = { \
-        name, \
+Static driver_t __CONCAT(dname,_driver) = { \
+        #dname, \
         __CONCAT(dname,_methods), \
-        DRIVER_TYPE_MISC, \
         sizeof(struct __CONCAT(dname,_softc)) \
 }
+#define METHODS_NONE			{0,0}
+#define USB_DECLARE_DRIVER(dname)	USB_DECLARE_DRIVER_INIT(dname, METHODS_NONE)
+
 
 #define USB_MATCH(dname) \
-static int \
-__CONCAT(dname,_match)(device_t device)
+Static int \
+__CONCAT(dname,_match)(device_t self)
 
 #define USB_MATCH_START(dname, uaa) \
-        struct usb_attach_arg *uaa = device_get_ivars(device)
+        struct usb_attach_arg *uaa = device_get_ivars(self)
 
 #define USB_ATTACH(dname) \
-static int \
+Static int \
 __CONCAT(dname,_attach)(device_t self)
 
 #define USB_ATTACH_START(dname, sc, uaa) \
@@ -286,47 +423,48 @@ __CONCAT(dname,_attach)(device_t self)
 #define USB_ATTACH_SUCCESS_RETURN	return 0
 
 #define USB_ATTACH_SETUP \
-	usbd_device_set_desc(self, devinfo); \
-	sc->sc_dev = self
+	sc->sc_dev = self; \
+	device_set_desc_copy(self, devinfo)
+
+#define USB_DETACH(dname) \
+Static int \
+__CONCAT(dname,_detach)(device_t self)
+
+#define USB_DETACH_START(dname, sc) \
+	struct __CONCAT(dname,_softc) *sc = device_get_softc(self)
 
 #define USB_GET_SC_OPEN(dname, unit, sc) \
-	struct __CONCAT(dname,_softc) *sc = \
-		devclass_get_softc(__CONCAT(dname,_devclass), unit); \
+	sc = devclass_get_softc(__CONCAT(dname,_devclass), unit); \
 	if (!sc) \
 		return (ENXIO)
 
 #define USB_GET_SC(dname, unit, sc) \
-	struct __CONCAT(dname,_softc) *sc = \
-		devclass_get_softc(__CONCAT(dname,_devclass), unit)
+	sc = devclass_get_softc(__CONCAT(dname,_devclass), unit)
 
 #define USB_DO_ATTACH(dev, bdev, parent, args, print, sub) \
-	(device_probe_and_attach((bdev)) == 0 ? ((dev)->softc = (bdev)) : 0)
+	(device_probe_and_attach((bdev)) == 0 ? (bdev) : 0)
 
 /* conversion from one type of queue to the other */
-#define SIMPLEQ_REMOVE_HEAD	STAILQ_REMOVE_HEAD_UNTIL
+/* XXX In FreeBSD SIMPLEQ_REMOVE_HEAD only removes the head element.
+ */
+#define SIMPLEQ_REMOVE_HEAD(h, e, f)	do {				\
+		if ( (e) != SIMPLEQ_FIRST((h)) )			\
+			panic("Removing other than first element");	\
+		STAILQ_REMOVE_HEAD(h, f);				\
+} while (0)
 #define SIMPLEQ_INSERT_HEAD	STAILQ_INSERT_HEAD
 #define SIMPLEQ_INSERT_TAIL	STAILQ_INSERT_TAIL
 #define SIMPLEQ_NEXT		STAILQ_NEXT
 #define SIMPLEQ_FIRST		STAILQ_FIRST
 #define SIMPLEQ_HEAD		STAILQ_HEAD
 #define SIMPLEQ_INIT		STAILQ_INIT
+#define SIMPLEQ_HEAD_INITIALIZER	STAILQ_HEAD_INITIALIZER
 #define SIMPLEQ_ENTRY		STAILQ_ENTRY
 
+#include <sys/syslog.h>
+/*
+#define logprintf(args...)	log(LOG_DEBUG, args)
+*/
+#define logprintf		printf
+
 #endif /* __FreeBSD__ */
-
-#define NONE {0,0}
-
-#define USB_DECLARE_DRIVER_NAME(name, dname) \
-	USB_DECLARE_DRIVER_NAME_INIT(#name, dname, NONE )
-#define USB_DECLARE_DRIVER_INIT(dname, init) \
-	USB_DECLARE_DRIVER_NAME_INIT(#dname, dname, init)
-#define USB_DECLARE_DRIVER(dname) \
-	USB_DECLARE_DRIVER_NAME_INIT(#dname, dname, NONE )
-
-#undef NONE
-
-
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-#elif defined(__FreeBSD__)
-#endif

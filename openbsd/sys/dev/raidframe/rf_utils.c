@@ -1,5 +1,5 @@
-/*	$OpenBSD: rf_utils.c,v 1.2 1999/02/16 00:03:33 niklas Exp $	*/
-/*	$NetBSD: rf_utils.c,v 1.3 1999/02/05 00:06:18 oster Exp $	*/
+/*	$OpenBSD: rf_utils.c,v 1.4 2000/01/11 18:02:23 peter Exp $	*/
+/*	$NetBSD: rf_utils.c,v 1.5 2000/01/07 03:41:03 oster Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -38,12 +38,10 @@
 
 #include <sys/time.h>
 
-#include "rf_threadid.h"
 #include "rf_utils.h"
 #include "rf_debugMem.h"
 #include "rf_alloclist.h"
 #include "rf_general.h"
-#include "rf_sys.h"
 
 /* creates & zeros 2-d array with b rows and k columns (MCH) */
 RF_RowCol_t **

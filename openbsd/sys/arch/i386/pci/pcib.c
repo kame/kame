@@ -1,3 +1,4 @@
+/*	$OpenBSD: pcib.c,v 1.7 2000/03/27 08:35:22 brad Exp $	*/
 /*	$NetBSD: pcib.c,v 1.6 1997/06/06 23:29:16 thorpej Exp $	*/
 
 /*-
@@ -80,7 +81,7 @@ pcibmatch(parent, match, aux)
 		switch (PCI_PRODUCT(pa->pa_id)) {
 		case PCI_PRODUCT_INTEL_SIO:
 		case PCI_PRODUCT_INTEL_82371MX:
-		case PCI_PRODUCT_INTEL_82371AB:
+		case PCI_PRODUCT_INTEL_82371AB_ISA:
 			/* The above bridges mis-identify themselves */
 			return (1);
 		}
@@ -121,7 +122,7 @@ pcib_callback(self)
 	iba.iba_busname = "isa";
 	iba.iba_iot = I386_BUS_SPACE_IO;
 	iba.iba_memt = I386_BUS_SPACE_MEM;
-#if NISA > 0
+#if NISADMA > 0
 	iba.iba_dmat = &isa_bus_dma_tag;
 #endif
 	config_found(self, &iba, pcib_print);

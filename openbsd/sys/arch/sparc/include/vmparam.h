@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.11 1999/07/09 21:33:37 art Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.14 1999/12/01 22:49:10 deraadt Exp $	*/
 /*	$NetBSD: vmparam.h,v 1.13 1997/07/12 16:20:03 perry Exp $	*/
 
 /*
@@ -45,6 +45,9 @@
  *	@(#)vmparam.h	8.1 (Berkeley) 6/11/93
  */
 
+#ifndef _SPARC_VMPARAM_H_
+#define _SPARC_VMPARAM_H_
+
 /*
  * Machine dependent constants for Sun-4c SPARC
  */
@@ -63,7 +66,7 @@
 #define	MAXTSIZ		(16*1024*1024)		/* max text size */
 #endif
 #ifndef DFLDSIZ
-#define	DFLDSIZ		(24*1024*1024)		/* initial data size limit */
+#define	DFLDSIZ		(32*1024*1024)		/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
 #define	MAXDSIZ		(128*1024*1024)		/* max data size */
@@ -143,15 +146,7 @@
 #define VM_MBUF_SIZE		(NMBCLUSTERS*MCLBYTES)
 #define VM_KMEM_SIZE		(NKMEMCLUSTERS*CLBYTES)
 
-#if defined(UVM)
 #define MACHINE_NEW_NONCONTIG
-#endif
-
-#ifndef MACHINE_NEW_NONCONTIG
-#define MACHINE_NONCONTIG	/* VM <=> pmap interface modifier */
-#endif
-
-#ifdef MACHINE_NEW_NONCONTIG
 
 #define VM_PHYSSEG_MAX		32	/* we only have one "hole" */
 #define VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
@@ -161,16 +156,16 @@
  * pmap specific data stored in the vm_physmem[] array
  */
 struct pmap_physseg {
-	/* NULL */
+	struct pvlist *pv_head;
 };
 
 #define VM_NFREELIST		1
 #define VM_FREELIST_DEFAULT	0
-
-#endif
 
 #if defined (_KERNEL) && !defined(_LOCORE)
 struct vm_map;
 vaddr_t		dvma_mapin __P((struct vm_map *, vaddr_t, int, int));
 void		dvma_mapout __P((vaddr_t, vaddr_t, int));
 #endif
+
+#endif /* _SPARC_VMPARAM_H_ */

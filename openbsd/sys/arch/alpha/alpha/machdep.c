@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.28 1999/05/24 23:08:55 jason Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.33 2000/04/11 02:44:12 pjanzen Exp $	*/
 /*	$NetBSD: machdep.c,v 1.61 1996/12/07 01:54:49 cgd Exp $	*/
 
 /*
@@ -42,7 +42,7 @@
 #ifdef REAL_CLISTS
 #include <sys/clist.h>
 #endif
-#include <sys/callout.h>
+#include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
@@ -95,6 +95,15 @@
 #include <netinet/if_ether.h>
 #include <netinet/ip_var.h>
 #endif
+
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
+
 #include "ppp.h"
 #include "bridge.h"
 
@@ -125,7 +134,6 @@ int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
-int	msgbufmapped = 0;	/* set when safe to use msgbuf */
 int	maxmem;			/* max memory per process */
 
 int	totalphysmem;		/* total amount of physical memory in system */
@@ -424,10 +432,13 @@ unknown_cputype:
 	/*
 	 * Initialize error message buffer (at end of core).
 	 */
-	lastusablepage -= btoc(sizeof (struct msgbuf));
-	msgbufp =
-	    (struct msgbuf *)ALPHA_PHYS_TO_K0SEG(ctob(lastusablepage + 1));
-	msgbufmapped = 1;
+	lastusablepage -= btoc(MSGBUFSIZE);
+	printf("%lx %d\n", (caddr_t)ALPHA_PHYS_TO_K0SEG(ctob(lastusablepage + 1)),
+	    MSGBUFSIZE);
+	initmsgbuf((caddr_t)ALPHA_PHYS_TO_K0SEG(ctob(lastusablepage + 1)),
+	    MSGBUFSIZE);
+	printf("%lx %d\n", (caddr_t)ALPHA_PHYS_TO_K0SEG(ctob(lastusablepage + 1)),
+	    MSGBUFSIZE);
 
 	/*
 	 * Allocate space for system data structures.
@@ -445,7 +456,7 @@ unknown_cputype:
 #ifdef REAL_CLISTS
 	valloc(cfree, struct cblock, nclist);
 #endif
-	valloc(callout, struct callout, ncallout);
+	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -691,12 +702,9 @@ cpu_startup()
 	mb_map = kmem_suballoc(kernel_map, (vm_offset_t *)&mbutl, &maxaddr,
 	    VM_MBUF_SIZE, FALSE);
 	/*
-	 * Initialize callouts
+	 * Initialize timeouts
 	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
-	callout[i-1].c_next = NULL;
+	timeout_init();
 
 #if defined(DEBUG)
 	pmapdebug = opmapdebug;
@@ -935,6 +943,7 @@ dumpsys()
 	daddr_t blkno;
 	int (*dump) __P((dev_t, daddr_t, caddr_t, size_t));
 	int error;
+	extern int msgbufmapped;
 
 	/* Save registers. */
 	savectx(&dumppcb);
@@ -1474,7 +1483,7 @@ netintr()
 	DONETISR(NETISR_IP, ipintr());
 #endif
 #ifdef INET6
-	DONETISR(NETISR_IPV6, ipv6intr());
+	DONETISR(NETISR_IPV6, ip6intr());
 #endif
 #ifdef NETATALK
 	DONETISR(NETISR_ATALK, atintr());
@@ -1609,14 +1618,14 @@ microtime(tvp)
 	*tvp = time;
 #ifdef notdef
 	tvp->tv_usec += clkread();
-	while (tvp->tv_usec > 1000000) {
+	while (tvp->tv_usec >= 1000000) {
 		tvp->tv_sec++;
 		tvp->tv_usec -= 1000000;
 	}
 #endif
 	if (tvp->tv_sec == lasttime.tv_sec &&
 	    tvp->tv_usec <= lasttime.tv_usec &&
-	    (tvp->tv_usec = lasttime.tv_usec + 1) > 1000000) {
+	    (tvp->tv_usec = lasttime.tv_usec + 1) >= 1000000) {
 		tvp->tv_sec++;
 		tvp->tv_usec -= 1000000;
 	}

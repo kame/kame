@@ -1,4 +1,4 @@
-/*	$OpenBSD: mount.h,v 1.31 1999/07/02 23:35:53 deraadt Exp $	*/
+/*	$OpenBSD: mount.h,v 1.35 2000/03/24 19:07:48 millert Exp $	*/
 /*	$NetBSD: mount.h,v 1.48 1996/02/18 11:55:47 fvdl Exp $	*/
 
 /*
@@ -255,7 +255,7 @@ union mount_info {
 /* new statfs structure with mount options */
 struct statfs {
 	u_int32_t  f_flags;		/* copy of mount flags */
-	u_int32_t  f_bsize;		/* fundamental file system block size */
+	int32_t    f_bsize;		/* fundamental file system block size */
 	u_int32_t  f_iosize;		/* optimal transfer block size */
 	u_int32_t  f_blocks;		/* total data blocks in file system */
 	u_int32_t  f_bfree;		/* free blocks in fs */
@@ -456,12 +456,13 @@ struct vfsops {
 	int	(*vfs_vget)	__P((struct mount *mp, ino_t ino,
 				    struct vnode **vpp));
 	int	(*vfs_fhtovp)	__P((struct mount *mp, struct fid *fhp,
-				    struct mbuf *nam, struct vnode **vpp,
-				    int *exflagsp, struct ucred **credanonp));
+				     struct vnode **vpp));
 	int	(*vfs_vptofh)	__P((struct vnode *vp, struct fid *fhp));
 	int	(*vfs_init)	__P((struct vfsconf *));
 	int     (*vfs_sysctl)   __P((int *, u_int, void *, size_t *, void *,
 				     size_t, struct proc *));
+	int	(*vfs_checkexp) __P((struct mount *mp, struct mbuf *nam,
+				    int *extflagsp, struct ucred **credanonp));
 };
 
 #define VFS_MOUNT(MP, PATH, DATA, NDP, P) \
@@ -473,9 +474,11 @@ struct vfsops {
 #define VFS_STATFS(MP, SBP, P)	  (*(MP)->mnt_op->vfs_statfs)(MP, SBP, P)
 #define VFS_SYNC(MP, WAIT, C, P)  (*(MP)->mnt_op->vfs_sync)(MP, WAIT, C, P)
 #define VFS_VGET(MP, INO, VPP)	  (*(MP)->mnt_op->vfs_vget)(MP, INO, VPP)
-#define VFS_FHTOVP(MP, FIDP, NAM, VPP, EXFLG, CRED) \
-	(*(MP)->mnt_op->vfs_fhtovp)(MP, FIDP, NAM, VPP, EXFLG, CRED)
+#define VFS_FHTOVP(MP, FIDP, VPP) \
+	(*(MP)->mnt_op->vfs_fhtovp)(MP, FIDP, VPP)
 #define	VFS_VPTOFH(VP, FIDP)	  (*(VP)->v_mount->mnt_op->vfs_vptofh)(VP, FIDP)
+#define VFS_CHECKEXP(MP, NAM, EXFLG, CRED) \
+	(*(MP)->mnt_op->vfs_checkexp)(MP, NAM, EXFLG, CRED)
 #endif /* _KERNEL */
 
 /*
@@ -539,6 +542,7 @@ int	vfs_export			    /* process mount export info */
 struct	netcred *vfs_export_lookup	    /* lookup host in fs export list */
 	  __P((struct mount *, struct netexport *, struct mbuf *));
 int	vfs_allocate_syncvnode __P((struct mount *));
+int	speedup_syncer __P((void));
 
 int	vfs_syncwait __P((int));	/* sync and wait for complete */
 void	vfs_shutdown __P((void));	/* unmount and sync file systems */
@@ -554,6 +558,10 @@ int	vfs_unregister __P((struct vfsconf *));
 
 #include <sys/cdefs.h>
 
+#ifndef _SYS_STAT_H_
+struct stat;
+#endif
+
 __BEGIN_DECLS
 int	fstatfs __P((int, struct statfs *));
 int	getfh __P((const char *, fhandle_t *));
@@ -562,7 +570,11 @@ int	getmntinfo __P((struct statfs **, int));
 int	mount __P((const char *, const char *, int, void *));
 int	statfs __P((const char *, struct statfs *));
 int	unmount __P((const char *, int));
-
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+int	fhopen __P((const fhandle_t *, int));
+int	fhstat __P((const fhandle_t *, struct stat *));
+int	fhstatfs __P((const fhandle_t *, struct statfs *));
+#endif /* !_POSIX_C_SOURCE */
 
 __END_DECLS
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: exphy.c,v 1.5 1999/09/26 17:50:41 jason Exp $	*/
+/*	$OpenBSD: exphy.c,v 1.7 2000/02/16 05:06:01 jason Exp $	*/
 /*	$NetBSD: exphy.c,v 1.15.6.1 1999/04/23 15:39:33 perry Exp $	*/
 
 /*-
@@ -85,22 +85,16 @@
 #include <dev/mii/miivar.h>
 #include <dev/mii/miidevs.h>
 
-#ifdef __NetBSD__
-int	exphymatch __P((struct device *, struct cfdata *, void *));
-#else
 int	exphymatch __P((struct device *, void *, void *));
-#endif
 void	exphyattach __P((struct device *, struct device *, void *));
 
 struct cfattach exphy_ca = {
 	sizeof(struct mii_softc), exphymatch, exphyattach
 };
 
-#ifdef __OpenBSD__
 struct cfdriver exphy_cd = {
 	NULL, "exphy", DV_DULL
 };
-#endif
 
 int	exphy_service __P((struct mii_softc *, struct mii_data *, int));
 void	exphy_reset __P((struct mii_softc *));
@@ -108,11 +102,7 @@ void	exphy_reset __P((struct mii_softc *));
 int
 exphymatch(parent, match, aux)
 	struct device *parent;
-#ifdef __NetBSD__
-	struct cfdata *match;
-#else
 	void *match;
-#endif
 	void *aux;
 {
 	struct mii_attach_args *ma = aux;
@@ -120,8 +110,10 @@ exphymatch(parent, match, aux)
 	/*
 	 * Argh, 3Com PHY reports oui == 0 model == 0!
 	 */
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) != 0 &&
-	    MII_MODEL(ma->mii_id2) != 0)
+	if ((MII_OUI(ma->mii_id1, ma->mii_id2) != 0 ||
+	     MII_MODEL(ma->mii_id2) != 0) &&
+	    (MII_OUI(ma->mii_id1, ma->mii_id2) != MII_OUI_BROADCOM ||
+	     MII_MODEL(ma->mii_id2) != MII_MODEL_BROADCOM_3C905C))
 		return (0);
 
 	/*
@@ -142,7 +134,15 @@ exphyattach(parent, self, aux)
 	struct mii_attach_args *ma = aux;
 	struct mii_data *mii = ma->mii_data;
 
-	printf(": 3Com internal media interface\n");
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) == 0 &&
+	    MII_MODEL(ma->mii_id2) == 0)
+		printf(": 3Com internal media interface\n");
+	else if (MII_OUI(ma->mii_id1, ma->mii_id2) == MII_OUI_BROADCOM &&
+	    MII_MODEL(ma->mii_id2) == MII_MODEL_BROADCOM_3C905C)
+		printf(": %s, rev. %d\n", MII_STR_BROADCOM_3C905C,
+		    MII_REV(ma->mii_id2));
+	else
+		printf(": unknown phy\n");
 
 	sc->mii_inst = mii->mii_instance;
 	sc->mii_phy = ma->mii_phyno;
@@ -160,24 +160,12 @@ exphyattach(parent, self, aux)
 	}
 	sc->mii_flags |= MIIF_NOISOLATE;
 
-#define	ADD(m, c)	ifmedia_add(&mii->mii_media, (m), (c), NULL)
-
-#if 0 /* See above. */
-	ADD(IFM_MAKEWORD(IFM_ETHER, IFM_NONE, 0, sc->mii_inst),
-	    BMCR_ISO);
-#endif
-
-	ADD(IFM_MAKEWORD(IFM_ETHER, IFM_100_TX, IFM_LOOP, sc->mii_inst),
-	    BMCR_LOOP|BMCR_S100);
-
 	exphy_reset(sc);
 
 	sc->mii_capabilities =
 	    PHY_READ(sc, MII_BMSR) & ma->mii_capmask;
 	if (sc->mii_capabilities & BMSR_MEDIAMASK)
-		mii_add_media(mii, sc->mii_capabilities,
-		    sc->mii_inst);
-#undef ADD
+		mii_add_media(sc);
 }
 
 int
@@ -214,18 +202,8 @@ exphy_service(sc, mii, cmd)
 				return (0);
 			(void) mii_phy_auto(sc, 1);
 			break;
-		case IFM_100_T4:
-			/*
-			 * XXX Not supported as a manual setting right now.
-			 */
-			return (EINVAL);
 		default:
-			/*
-			 * BMCR data is stored in the ifmedia entry.
-			 */
-			PHY_WRITE(sc, MII_ANAR,
-			    mii_anar(ife->ifm_media));
-			PHY_WRITE(sc, MII_BMCR, ife->ifm_data);
+			mii_phy_setmedia(sc);
 		}
 		break;
 
@@ -247,6 +225,10 @@ exphy_service(sc, mii, cmd)
 		 * kicked; it continues in the background.
 		 */
 		break;
+
+	case MII_DOWN:
+		mii_phy_down(sc);
+		return (0);
 	}
 
 	/* Update the media status. */

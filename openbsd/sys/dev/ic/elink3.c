@@ -1,4 +1,4 @@
-/*	$OpenBSD: elink3.c,v 1.35 1999/08/13 19:00:37 deraadt Exp $	*/
+/*	$OpenBSD: elink3.c,v 1.38 2000/02/25 04:26:11 itojun Exp $	*/
 /*	$NetBSD: elink3.c,v 1.32 1997/05/14 00:22:00 thorpej Exp $	*/
 
 /*
@@ -149,7 +149,6 @@ void	ep_vortex_probemedia __P((struct ep_softc *sc));
 void	ep_isa_probemedia __P((struct ep_softc *sc));
 void	eptxstat __P((struct ep_softc *));
 int	epstatus __P((struct ep_softc *));
-void	epinit __P((struct ep_softc *));
 int	epioctl __P((struct ifnet *, u_long, caddr_t));
 void	epstart __P((struct ifnet *));
 void	epwatchdog __P((struct ifnet *));
@@ -1246,12 +1245,19 @@ epget(sc, totlen)
 		sc->next_mb = (sc->next_mb + 1) % MAX_MBS;
 		m->m_data = m->m_pktdat;
 		m->m_flags = M_PKTHDR;
+		bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
 	}
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
 	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
+	len = MHLEN;
+	if (totlen >= MINCLSIZE) {
+		MCLGET(m, M_DONTWAIT);
+		if (m->m_flags & M_EXT)
+			len = MCLBYTES;
+	}
 	m->m_data += pad;
-	len = MHLEN - pad;
+	len -= pad;
 	top = 0;
 	mp = &top;
 

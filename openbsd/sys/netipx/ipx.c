@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx.c,v 1.3 1996/10/26 09:34:48 mickey Exp $	*/
+/*	$OpenBSD: ipx.c,v 1.9 2000/01/15 18:52:13 fgsch Exp $	*/
 
 /*-
  *
@@ -41,12 +41,10 @@
  */
 
 #include <sys/param.h>
-#include <sys/queue.h>
 #include <sys/systm.h>
-#include <sys/mbuf.h>
+#include <sys/malloc.h>
 #include <sys/ioctl.h>
 #include <sys/protosw.h>
-#include <sys/errno.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 
@@ -55,8 +53,6 @@
 
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
-
-int ipx_interfaces;
 
 /*
  * Generic internet control operations (ioctl's).
@@ -104,7 +100,7 @@ ipx_control(so, cmd, data, ifp)
 
 		if (ia == (struct ipx_ifaddr *)NULL) {
 			ia = (struct ipx_ifaddr *)
-				malloc(sizeof *ia, M_IFADDR, M_WAITOK);
+				malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
 			if (ia == (struct ipx_ifaddr *)NULL)
 				return (ENOBUFS);
 			bzero((caddr_t)ia, sizeof(*ia));
@@ -121,10 +117,11 @@ ipx_control(so, cmd, data, ifp)
 				(struct sockaddr *)&ia->ia_dstaddr;
 			if (ifp->if_flags & IFF_BROADCAST) {
 				ia->ia_broadaddr.sipx_family = AF_IPX;
-				ia->ia_broadaddr.sipx_len = sizeof(ia->ia_addr);
-				ia->ia_broadaddr.sipx_addr.ipx_host = ipx_broadhost;
+				ia->ia_broadaddr.sipx_len =
+				    sizeof(ia->ia_addr);
+				ia->ia_broadaddr.sipx_addr.ipx_host =
+				    ipx_broadhost;
 			}
-			ipx_interfaces++;
 		}
 		break;
 
@@ -167,7 +164,8 @@ ipx_control(so, cmd, data, ifp)
 			ia->ia_flags &= ~IFA_ROUTE;
 		}
 		if (ifp->if_ioctl) {
-			error = (*ifp->if_ioctl)(ifp, SIOCSIFDSTADDR, (void *)ia);
+			error = (*ifp->if_ioctl)(ifp, SIOCSIFDSTADDR,
+			    (void *)ia);
 			if (error)
 				return (error);
 		}
@@ -183,12 +181,6 @@ ipx_control(so, cmd, data, ifp)
 		TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 		TAILQ_REMOVE(&ipx_ifaddr, ia, ia_list);
 		IFAFREE((&ia->ia_ifa));
-		if (0 == --ipx_interfaces) {
-			/*
-			 * We reset to virginity and start all over again
-			 */
-			ipx_thishost = ipx_zerohost;
-		}
 		return (0);
 	
 	case SIOCAIFADDR:
@@ -249,7 +241,6 @@ ipx_ifinit(ifp, ia, sipx, scrub)
 	int scrub;
 {
 	struct sockaddr_ipx oldaddr;
-	register union ipx_host *h = &ia->ia_addr.sipx_addr.ipx_host;
 	int s = splimp(), error;
 
 	/*
@@ -261,41 +252,19 @@ ipx_ifinit(ifp, ia, sipx, scrub)
 	/*
 	 * The convention we shall adopt for naming is that
 	 * a supplied address of zero means that "we don't care".
-	 * if there is a single interface, use the address of that
-	 * interface as our 6 byte host address.
-	 * if there are multiple interfaces, use any address already
-	 * used.
+	 * Use the MAC address of the interface. If it is an
+	 * interface without a MAC address, like a serial line, the
+	 * address must be supplied.
 	 *
 	 * Give the interface a chance to initialize
 	 * if this is its first address,
 	 * and to validate the address if necessary.
 	 */
-	if (ipx_hosteqnh(ipx_thishost, ipx_zerohost)) {
-		if (ifp->if_ioctl &&
-		     (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (void *)ia))) {
-			ia->ia_addr = oldaddr;
-			splx(s);
-			return (error);
-		}
-		ipx_thishost = *h;
-	} else if (ipx_hosteqnh(sipx->sipx_addr.ipx_host, ipx_zerohost)
-	    || ipx_hosteqnh(sipx->sipx_addr.ipx_host, ipx_thishost)) {
-		*h = ipx_thishost;
-		if (ifp->if_ioctl &&
-		     (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (void *)ia))) {
-			ia->ia_addr = oldaddr;
-			splx(s);
-			return (error);
-		}
-		if (!ipx_hosteqnh(ipx_thishost,*h)) {
-			ia->ia_addr = oldaddr;
-			splx(s);
-			return (EINVAL);
-		}
-	} else {
+	if (ifp->if_ioctl != NULL &&
+	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (void *)ia))) {
 		ia->ia_addr = oldaddr;
 		splx(s);
-		return (EINVAL);
+		return (error);
 	}
 	ia->ia_ifa.ifa_metric = ifp->if_metric;
 	/*
@@ -309,7 +278,8 @@ ipx_ifinit(ifp, ia, sipx, scrub)
 	if (ifp->if_flags & IFF_POINTOPOINT)
 		rtinit(&(ia->ia_ifa), (int)RTM_ADD, RTF_HOST|RTF_UP);
 	else {
-		ia->ia_broadaddr.sipx_addr.ipx_net = ia->ia_addr.sipx_addr.ipx_net;
+		ia->ia_broadaddr.sipx_addr.ipx_net =
+		    ia->ia_addr.sipx_addr.ipx_net;
 		rtinit(&(ia->ia_ifa), (int)RTM_ADD, RTF_UP);
 	}
 	ia->ia_flags |= IFA_ROUTE;
@@ -327,7 +297,7 @@ ipx_iaonnetof(dst)
 	register struct ipx_ifaddr *ia;
 	register struct ipx_addr *compare;
 	register struct ifnet *ifp;
-	struct ipx_ifaddr *ia_maybe = 0;
+	struct ipx_ifaddr *ia_maybe = NULL;
 	union ipx_net net = dst->ipx_net;
 
 	for (ia = ipx_ifaddr.tqh_first; ia; ia = ia->ia_list.tqe_next) {
@@ -336,10 +306,12 @@ ipx_iaonnetof(dst)
 				compare = &satoipx_addr(ia->ia_dstaddr);
 				if (ipx_hosteq(*dst, *compare))
 					return (ia);
-				if (ipx_neteqnn(net, ia->ia_addr.sipx_addr.ipx_net))
+				if (ipx_neteqnn(net,
+				    ia->ia_addr.sipx_addr.ipx_net))
 					ia_maybe = ia;
 			} else {
-				if (ipx_neteqnn(net, ia->ia_addr.sipx_addr.ipx_net))
+				if (ipx_neteqnn(net,
+				    ia->ia_addr.sipx_addr.ipx_net))
 					return (ia);
 			}
 		}
@@ -347,36 +319,63 @@ ipx_iaonnetof(dst)
 	return (ia_maybe);
 }
 
-#ifdef	IPXDEBUG
-struct ipx_addr
-ipx_addr(str)
-	const char *str;
+void
+ipx_printhost(addr)
+register struct ipx_addr *addr;
 {
-	struct ipx_addr	ret;
+	u_short port;
+	struct ipx_addr work = *addr;
+	register char *p; register u_char *q;
+	register char *net = "", *host = "";
+	char cport[10], chost[15], cnet[15];
 
+	port = ntohs(work.ipx_port);
 
-	return ret;
+	if (ipx_nullnet(work) && ipx_nullhost(work)) {
+
+		if (port)
+			printf("*.%x", port);
+		else
+			printf("*.*");
+
+		return;
+	}
+
+	if (ipx_wildnet(work))
+		net = "any";
+	else if (ipx_nullnet(work))
+		net = "*";
+	else {
+		q = work.ipx_net.c_net;
+		snprintf(cnet, sizeof(cnet), "%x%x%x%x",
+			q[0], q[1], q[2], q[3]);
+		for (p = cnet; *p == '0' && p < cnet + 8; p++)
+			continue;
+		net = p;
+	}
+
+	if (ipx_wildhost(work))
+		host = "any";
+	else if (ipx_nullhost(work))
+		host = "*";
+	else {
+		q = work.ipx_host.c_host;
+		snprintf(chost, sizeof(chost), "%x%x%x%x%x%x",
+			q[0], q[1], q[2], q[3], q[4], q[5]);
+		for (p = chost; *p == '0' && p < chost + 12; p++)
+			continue;
+		host = p;
+	}
+
+	if (port) {
+		if (strcmp(host, "*") == 0) {
+			host = "";
+			snprintf(cport, sizeof(cport), "%x", port);
+		} else
+			snprintf(cport, sizeof(cport), ".%x", port);
+	} else
+		*cport = 0;
+
+	printf("%s.%s%s", net, host, cport);
 }
 
-char *
-ipx_ntoa(ipx)
-	struct ipx_addr	ipx;
-{
-	static char	bufs[4][4+1+(3*6)+5], *cbuf = bufs[4];
-
-	if (cbuf == bufs[4])
-		cbuf = bufs[0];
-	else
-		cbuf++;
-
-	sprintf(cbuf, "%04x.%02x:%02x:%02x:%02x:%02x:%02x.%u",
-		ipx.ipx_net.l_net,
-		ipx.ipx_host.c_host[0], ipx.ipx_host.c_host[1],
-		ipx.ipx_host.c_host[2], ipx.ipx_host.c_host[3],
-		ipx.ipx_host.c_host[4], ipx.ipx_host.c_host[5],
-		ipx.ipx_port);
-
-	return cbuf;
-}
-
-#endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_syscalls.c,v 1.59 1999/07/30 18:27:47 deraadt Exp $	*/
+/*	$OpenBSD: vfs_syscalls.c,v 1.65 2000/04/20 06:32:00 deraadt Exp $	*/
 /*	$NetBSD: vfs_syscalls.c,v 1.71 1996/04/23 10:29:02 mycroft Exp $	*/
 
 /*
@@ -336,7 +336,11 @@ checkdirs(olddp)
 		return;
 	if (VFS_ROOT(olddp->v_mountedhere, &newdp))
 		panic("mount: lost mount");
-	for (p = allproc.lh_first; p != 0; p = p->p_list.le_next) {
+	for (p = LIST_FIRST(&allproc); p != 0; p = LIST_NEXT(p, p_list)) {
+		/*
+		 * XXX - we have a race with fork here. We should probably
+		 *       check if the process is SIDL before we fiddle with it.
+		 */
 		fdp = p->p_fd;
 		if (fdp->fd_cdir == olddp) {
 			vrele(fdp->fd_cdir);
@@ -412,6 +416,10 @@ sys_unmount(p, v, retval)
 		return (EINVAL);
 	}
 	vput(vp);
+
+	if (vfs_busy(mp, 0, NULL, p))
+		return (EBUSY);
+
 	return (dounmount(mp, SCARG(uap, flags), p));
 }
 
@@ -428,13 +436,8 @@ dounmount(mp, flags, p)
 	int error;
 
 	simple_lock(&mountlist_slock);
-	if (mp->mnt_flag & MNT_UNMOUNT) {
-		mp->mnt_flag |= MNT_MWAIT;
-		simple_unlock(&mountlist_slock);
-		sleep(mp, PVFS);
-		return ENOENT;
-	}
 	mp->mnt_flag |= MNT_UNMOUNT;
+	vfs_unbusy(mp, p);
 	lockmgr(&mp->mnt_lock, LK_DRAIN | LK_INTERLOCK, &mountlist_slock, p);
  	mp->mnt_flag &=~ MNT_ASYNC;
 #if !defined(UVM)
@@ -495,7 +498,7 @@ sys_sync(p, v, retval)
 	simple_lock(&mountlist_slock);
 	for (mp = mountlist.cqh_last; mp != (void *)&mountlist; mp = nmp) {
 		if (vfs_busy(mp, LK_NOWAIT, &mountlist_slock, p)) {
-			nmp = mp->mnt_list.cqe_next;
+			nmp = mp->mnt_list.cqe_prev;
 			continue;
 		}
 		if ((mp->mnt_flag & MNT_RDONLY) == 0) {
@@ -509,7 +512,7 @@ sys_sync(p, v, retval)
 				mp->mnt_flag |= MNT_ASYNC;
 		}
 		simple_lock(&mountlist_slock);
-		nmp = mp->mnt_list.cqe_next;
+		nmp = mp->mnt_list.cqe_prev;
 		vfs_unbusy(mp, p);
 	}
 	simple_unlock(&mountlist_slock);
@@ -868,7 +871,6 @@ sys_open(p, v, retval)
 	int type, indx, error, localtrunc = 0;
 	struct flock lf;
 	struct nameidata nd;
-	extern struct fileops vnops;
 
 	if ((error = falloc(p, &nfp, &indx)) != 0)
 		return (error);
@@ -947,6 +949,251 @@ sys_open(p, v, retval)
 	VOP_UNLOCK(vp, 0, p);
 	*retval = indx;
 	return (0);
+}
+
+/*
+ * Get file handle system call
+ */
+int
+sys_getfh(p, v, retval)
+	struct proc *p;
+	register void *v;
+	register_t *retval;
+{
+	register struct sys_getfh_args /* {
+		syscallarg(char *) fname;
+		syscallarg(fhandle_t *) fhp;
+	} */ *uap = v;
+	register struct vnode *vp;
+	fhandle_t fh;
+	int error;
+	struct nameidata nd;
+
+	/*
+	 * Must be super user
+	 */
+	error = suser(p->p_ucred, &p->p_acflag);
+	if(error)
+		return (error);
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE,
+	    SCARG(uap, fname), p);
+	error = namei(&nd);
+	if (error)
+		return (error);
+	vp = nd.ni_vp;
+	bzero((caddr_t)&fh, sizeof(fh));
+	fh.fh_fsid = vp->v_mount->mnt_stat.f_fsid;
+	error = VFS_VPTOFH(vp, &fh.fh_fid);
+	vput(vp);
+	if (error)
+		return (error);
+	error = copyout((caddr_t)&fh, (caddr_t)SCARG(uap, fhp), sizeof (fh));
+	return (error);
+}
+
+/*
+ * Open a file given a file handle.
+ *
+ * Check permissions, allocate an open file structure,
+ * and call the device open routine if any.
+ */
+int
+sys_fhopen(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	register struct sys_fhopen_args /* {
+		syscallarg(const fhandle_t *) fhp;
+		syscallarg(int) flags;
+	} */ *uap = v;
+	struct filedesc *fdp = p->p_fd;
+	struct file *fp;
+	struct vnode *vp = NULL;
+	struct mount *mp;
+	struct ucred *cred = p->p_ucred;
+	int flags;
+	struct file *nfp;
+	int type, indx, error=0;
+	struct flock lf;
+	struct vattr va;
+	fhandle_t fh;
+
+	/*
+	 * Must be super user
+	 */
+	if ((error = suser(p->p_ucred, &p->p_acflag)))
+		return (error);
+
+	flags = FFLAGS(SCARG(uap, flags));
+	if ((flags & (FREAD | FWRITE)) == 0)
+		return (EINVAL);
+	if ((flags & O_CREAT))
+		return (EINVAL);
+
+	if ((error = falloc(p, &nfp, &indx)) != 0)
+		return (error);
+	fp = nfp;
+	if ((error = copyin(SCARG(uap, fhp), &fh, sizeof(fhandle_t))) != 0)
+		goto bad;
+
+	if ((mp = vfs_getvfs(&fh.fh_fsid)) == NULL) {
+		error = ESTALE;
+		goto bad;
+	}
+
+	if ((error = VFS_FHTOVP(mp, &fh.fh_fid, &vp)) != 0) {
+		vp = NULL;	/* most likely unnecessary sanity for bad: */
+		goto bad;
+	}
+
+	/* Now do an effective vn_open */
+
+	if (vp->v_type == VSOCK) {
+		error = EOPNOTSUPP;
+		goto bad;
+	}
+	if (flags & FREAD) {
+		if ((error = VOP_ACCESS(vp, VREAD, cred, p)) != 0)
+			goto bad;
+	}
+	if (flags & (FWRITE | O_TRUNC)) {
+		if (vp->v_type == VDIR) {
+			error = EISDIR;
+			goto bad;
+		}
+		if ((error = vn_writechk(vp)) != 0 ||
+		    (error = VOP_ACCESS(vp, VWRITE, cred, p)) != 0)
+			goto bad;
+	}
+	if (flags & O_TRUNC) {
+		VOP_UNLOCK(vp, 0, p);				/* XXX */
+		VOP_LEASE(vp, p, cred, LEASE_WRITE);
+		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);	/* XXX */
+		VATTR_NULL(&va);
+		va.va_size = 0;
+		if ((error = VOP_SETATTR(vp, &va, cred, p)) != 0)
+			goto bad;
+	}
+	if ((error = VOP_OPEN(vp, flags, cred, p)) != 0)
+		goto bad;
+	if (flags & FWRITE)
+		vp->v_writecount++;
+
+	/* done with modified vn_open, now finish what sys_open does. */
+
+	fp->f_flag = flags & FMASK;
+	fp->f_type = DTYPE_VNODE;
+	fp->f_ops = &vnops;
+	fp->f_data = (caddr_t)vp;
+	if (flags & (O_EXLOCK | O_SHLOCK)) {
+		lf.l_whence = SEEK_SET;
+		lf.l_start = 0;
+		lf.l_len = 0;
+		if (flags & O_EXLOCK)
+			lf.l_type = F_WRLCK;
+		else
+			lf.l_type = F_RDLCK;
+		type = F_FLOCK;
+		if ((flags & FNONBLOCK) == 0)
+			type |= F_WAIT;
+		VOP_UNLOCK(vp, 0, p);
+		error = VOP_ADVLOCK(vp, (caddr_t)fp, F_SETLK, &lf, type);
+		if (error) {
+			(void) vn_close(vp, fp->f_flag, fp->f_cred, p);
+			ffree(fp);
+			fdremove(fdp, indx);
+			return (error);
+		}
+		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
+		fp->f_flag |= FHASLOCK;
+	}
+	VOP_UNLOCK(vp, 0, p);
+	*retval = indx;
+	return (0);
+
+bad:
+	ffree(fp);
+	fdremove(fdp, indx);
+	if (vp != NULL)
+		vput(vp);
+	return (error);
+}
+
+/* ARGSUSED */
+int
+sys_fhstat(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	register struct sys_fhstat_args /* {
+		syscallarg(const fhandle_t *) fhp;
+		syscallarg(struct stat *) sb;
+	} */ *uap = v;
+	struct stat sb;
+	int error;
+	fhandle_t fh;
+	struct mount *mp;
+	struct vnode *vp;
+
+	/*
+	 * Must be super user
+	 */
+	if ((error = suser(p->p_ucred, &p->p_acflag)))
+		return (error);
+
+	if ((error = copyin(SCARG(uap, fhp), &fh, sizeof(fhandle_t))) != 0)
+		return (error);
+
+	if ((mp = vfs_getvfs(&fh.fh_fsid)) == NULL)
+		return (ESTALE);
+	if ((error = VFS_FHTOVP(mp, &fh.fh_fid, &vp)))
+		return (error);
+	error = vn_stat(vp, &sb, p);
+	vput(vp);
+	if (error)
+		return (error);
+	error = copyout(&sb, SCARG(uap, sb), sizeof(sb));
+	return (error);
+}
+
+/* ARGSUSED */
+int
+sys_fhstatfs(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	register struct sys_fhstatfs_args /*
+		syscallarg(const fhandle_t *) fhp;
+		syscallarg(struct statfs *) buf;
+	} */ *uap = v;
+	struct statfs sp;
+	fhandle_t fh;
+	struct mount *mp;
+	struct vnode *vp;
+	int error;
+
+	/*
+	 * Must be super user
+	 */
+	if ((error = suser(p->p_ucred, &p->p_acflag)))
+		return (error);
+
+	if ((error = copyin(SCARG(uap, fhp), &fh, sizeof(fhandle_t))) != 0)
+		return (error);
+
+	if ((mp = vfs_getvfs(&fh.fh_fsid)) == NULL)
+		return (ESTALE);
+	if ((error = VFS_FHTOVP(mp, &fh.fh_fid, &vp)))
+		return (error);
+	mp = vp->v_mount;
+	vput(vp);
+	if ((error = VFS_STATFS(mp, &sp, p)) != 0)
+		return (error);
+	sp.f_flags = mp->mnt_flag & MNT_VISFLAGMASK;
+	return (copyout(&sp, SCARG(uap, buf), sizeof(sp)));
 }
 
 /*
@@ -2550,3 +2797,213 @@ sys_ogetfsstat(p, v, retval)
 		*retval = count;
 	return (0);
 }
+
+
+/*
+ * Positional read system call.
+ */
+int
+sys_pread(p, v, retval)
+        struct proc *p;
+        void *v;
+        register_t *retval;
+{
+        struct sys_pread_args /* {
+                syscallarg(int) fd;
+                syscallarg(void *) buf;
+                syscallarg(size_t) nbyte;
+                syscallarg(off_t) offset;
+        } */ *uap = v;
+        struct filedesc *fdp = p->p_fd;
+        struct file *fp;
+        struct vnode *vp;
+        off_t offset;
+        int error, fd = SCARG(uap, fd);
+
+        if ((u_int)fd >= fdp->fd_nfiles ||
+            (fp = fdp->fd_ofiles[fd]) == NULL ||
+#if notyet
+            (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
+#endif
+            (fp->f_flag & FREAD) == 0)
+                return (EBADF);
+
+#if notyet
+        FILE_USE(fp);
+#endif
+
+        vp = (struct vnode *)fp->f_data;
+        if (fp->f_type != DTYPE_VNODE || vp->v_type == VFIFO) {
+                error = ESPIPE;
+                goto out;
+        }
+
+        offset = SCARG(uap, offset);
+
+        /* dofileread() will unuse the descriptor for us */
+        return (dofileread(p, fd, fp, SCARG(uap, buf), SCARG(uap, nbyte),
+            &offset, retval));
+
+ out:
+#if notyet
+        FILE_UNUSE(fp, p);
+#endif
+        return (error);
+}
+
+/*
+ * Positional scatter read system call.
+ */
+int
+sys_preadv(p, v, retval)
+        struct proc *p;
+        void *v;
+        register_t *retval;
+{
+        struct sys_preadv_args /* {
+                syscallarg(int) fd;
+                syscallarg(const struct iovec *) iovp;
+                syscallarg(int) iovcnt;
+                syscallarg(off_t) offset;
+        } */ *uap = v;
+        struct filedesc *fdp = p->p_fd;
+        struct file *fp;
+        struct vnode *vp;
+        off_t offset;
+        int error, fd = SCARG(uap, fd);
+
+        if ((u_int)fd >= fdp->fd_nfiles ||
+            (fp = fdp->fd_ofiles[fd]) == NULL ||
+#if notyet
+            (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
+#endif
+            (fp->f_flag & FREAD) == 0)
+                return (EBADF);
+
+#if notyet
+        FILE_USE(fp);
+#endif
+
+        vp = (struct vnode *)fp->f_data;
+        if (fp->f_type != DTYPE_VNODE || vp->v_type == VFIFO) {
+                error = ESPIPE;
+                goto out;
+        }
+
+        offset = SCARG(uap, offset);
+
+        /* dofilereadv() will unuse the descriptor for us */
+        return (dofilereadv(p, fd, fp, SCARG(uap, iovp), SCARG(uap, iovcnt),
+            &offset, retval));
+
+ out:
+#if notyet
+        FILE_UNUSE(fp, p);
+#endif
+        return (error);
+}
+
+/*
+ * Positional write system call.
+ */
+int
+sys_pwrite(p, v, retval)
+        struct proc *p;
+        void *v;
+        register_t *retval;
+{
+        struct sys_pwrite_args /* {
+                syscallarg(int) fd;
+                syscallarg(const void *) buf;
+                syscallarg(size_t) nbyte;
+                syscallarg(off_t) offset;
+        } */ *uap = v;
+        struct filedesc *fdp = p->p_fd;
+        struct file *fp;
+        struct vnode *vp;
+        off_t offset;
+        int error, fd = SCARG(uap, fd);
+
+        if ((u_int)fd >= fdp->fd_nfiles ||
+            (fp = fdp->fd_ofiles[fd]) == NULL ||
+#if notyet
+            (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
+#endif
+            (fp->f_flag & FWRITE) == 0)
+                return (EBADF);
+
+#if notyet
+        FILE_USE(fp);
+#endif
+
+        vp = (struct vnode *)fp->f_data;
+        if (fp->f_type != DTYPE_VNODE || vp->v_type == VFIFO) {
+                error = ESPIPE;
+                goto out;
+        }
+
+        offset = SCARG(uap, offset);
+
+        /* dofilewrite() will unuse the descriptor for us */
+        return (dofilewrite(p, fd, fp, SCARG(uap, buf), SCARG(uap, nbyte),
+            &offset, retval));
+
+ out:
+#if notyet
+        FILE_UNUSE(fp, p);
+#endif
+        return (error);
+}
+
+
+/*
+ * Positional gather write system call.
+ */
+int
+sys_pwritev(p, v, retval)
+        struct proc *p;
+        void *v;
+        register_t *retval;
+{
+        struct sys_pwritev_args /* {
+                syscallarg(int) fd;
+                syscallarg(const struct iovec *) iovp;
+                syscallarg(int) iovcnt;
+                syscallarg(off_t) offset;
+        } */ *uap = v;
+        struct filedesc *fdp = p->p_fd;
+        struct file *fp;
+        struct vnode *vp;
+        off_t offset;
+        int error, fd = SCARG(uap, fd);
+
+        if ((u_int)fd >= fdp->fd_nfiles ||
+            (fp = fdp->fd_ofiles[fd]) == NULL ||
+#if notyet
+            (fp->f_iflags & FIF_WANTCLOSE) != 0 ||
+#endif
+            (fp->f_flag & FWRITE) == 0)
+                return (EBADF);
+
+#if notyet
+        FILE_USE(fp);
+#endif
+        vp = (struct vnode *)fp->f_data;
+        if (fp->f_type != DTYPE_VNODE || vp->v_type == VFIFO) {
+                error = ESPIPE;
+                goto out;
+        }
+
+        offset = SCARG(uap, offset);
+
+        /* dofilewritev() will unuse the descriptor for us */
+        return (dofilewritev(p, fd, fp, SCARG(uap, iovp), SCARG(uap, iovcnt),
+            &offset, retval));
+
+ out:
+#if notyet
+        FILE_UNUSE(fp, p);
+#endif
+        return (error);
+}
+

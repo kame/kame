@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.57 1999/08/13 05:38:05 fgsch Exp $	*/
+/*	$OpenBSD: conf.c,v 1.60 2000/04/15 17:36:29 jakob Exp $	*/
 /*	$NetBSD: conf.c,v 1.75 1996/05/03 19:40:20 christos Exp $	*/
 
 /*
@@ -50,6 +50,7 @@ bdev_decl(fd);
 #include "wt.h"
 bdev_decl(wt);
 #include "sd.h"
+#include "ses.h"
 #include "st.h"
 #include "cd.h"
 #include "uk.h"
@@ -199,6 +200,10 @@ cdev_decl(usb);
 cdev_decl(uhid);
 #include "ugen.h"
 cdev_decl(ugen);
+#include "ulpt.h"
+cdev_decl(ulpt);
+#include "urio.h"
+cdev_decl(urio);
 
 #ifdef IPFILTER
 #define NIPF 1
@@ -245,7 +250,7 @@ struct cdevsw	cdevsw[] =
 	cdev_ocis_init(NAPM,apm),	/* 21: Advancded Power Management */
 	cdev_fd_init(1,filedesc),	/* 22: file descriptor pseudo-device */
 	cdev_bpftun_init(NBPFILTER,bpf),/* 23: Berkeley packet filter */
-	cdev_notdef(),			/* 24 */
+	cdev_ses_init(NSES,ses),	/* 24: SES/SAF-TE SCSI */
 #if 0
 	cdev_ocis_init(NPCMCIA,pcmcia), /* 25: PCMCIA Bus */
 #else
@@ -299,6 +304,8 @@ struct cdevsw	cdevsw[] =
 	cdev_usb_init(NUSB,usb),	/* 61: USB controller */
 	cdev_usbdev_init(NUHID,uhid),	/* 62: USB generic HID */
 	cdev_ugen_init(NUGEN,ugen),	/* 63: USB generic driver */
+	cdev_ulpt_init(NULPT,ulpt), 	/* 64: USB printers */
+	cdev_usbdev_init(NURIO,urio),	/* 65: USB Diamond Rio 500 */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

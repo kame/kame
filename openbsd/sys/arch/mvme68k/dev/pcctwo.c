@@ -1,5 +1,5 @@
 
-/*	$OpenBSD: pcctwo.c,v 1.5 1996/11/23 21:46:00 kstailey Exp $ */
+/*	$OpenBSD: pcctwo.c,v 1.7 2000/03/26 23:31:59 deraadt Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -42,7 +42,6 @@
 #include <sys/user.h>
 #include <sys/tty.h>
 #include <sys/uio.h>
-#include <sys/callout.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
@@ -84,7 +83,7 @@ pcctwomatch(parent, vcf, args)
 	struct pcctworeg *pcc2;
 
 	/* the PCC2 only exists on MVME16x's except the 162, right? */
-	if (cputyp == CPU_162 || cputyp == CPU_147)
+	if (cputyp == CPU_162 || cputyp == CPU_147 || cputyp == CPU_172)
 		return (0);
 	pcc2 = (struct pcctworeg *)(IIOV(ca->ca_paddr) + PCC2_PCC2CHIP_OFF);
 	if (badvaddr(pcc2, 1) || pcc2->pcc2_chipid != PCC2_CHIPID)

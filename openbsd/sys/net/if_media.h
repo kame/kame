@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_media.h,v 1.2 1999/07/21 19:55:59 jason Exp $	*/
+/*	$OpenBSD: if_media.h,v 1.6 2000/03/21 23:18:13 mickey Exp $	*/
 /*	$NetBSD: if_media.h,v 1.11 1998/08/12 23:23:29 thorpej Exp $	*/
 
 /*-
@@ -138,14 +138,20 @@ void	ifmedia_set __P((struct ifmedia *ifm, int mword));
 int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
 	    struct ifmedia *ifm, u_long cmd));
 
+/* Locate a media entry */
+struct	ifmedia_entry *ifmedia_match __P((struct ifmedia *ifm,
+	     int flags, int mask));
+
+/* Delete all media for a given media instance */
+void	ifmedia_delete_instance __P((struct ifmedia *, int));
+
 #endif /*_KERNEL */
 
 /*
  * if_media Options word:
  *	Bits	Use
  *	----	-------
- *	0-3	Media variant
- *	4	RFU
+ *	0-4	Media variant		MAX SUBTYPE == 31!
  *	5-7	Media type
  *	8-15	Type specific options
  *	16-19	RFU
@@ -172,6 +178,7 @@ int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
 #define	IFM_1000_LX	15		/* 1000baseLX Single-mode Fiber */
 #define	IFM_1000_CX	16		/* 1000baseCX 150ohm STP */
 #define	IFM_1000_TX	17		/* 1000baseTX 4 pair cat 5 */
+#define	IFM_HPNA_1	18		/* HomePNA 1.0 (1Mb/s) */
 
 /*
  * Token ring
@@ -195,6 +202,18 @@ int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
 #define IFM_FDDI_DA	0x00000100	/* Dual attach / single attach */
 
 /*
+ * IEEE 802.11 Wireless
+ */
+#define	IFM_IEEE80211	0x00000080
+#define	IFM_IEEE80211_FH1	3	/* Frequency Hopping 1Mbps */
+#define	IFM_IEEE80211_FH2	4	/* Frequency Hopping 2Mbps */
+#define	IFM_IEEE80211_DS2	5	/* Direct Sequence 2Mbps */
+#define	IFM_IEEE80211_DS5	6	/* Direct Sequence 5Mbps*/
+#define	IFM_IEEE80211_DS11	7	/* Direct Sequence 11Mbps*/
+#define	IFM_IEEE80211_DS1	8	/* Direct Sequence  1Mbps*/
+#define	IFM_IEEE80211_ADHOC	0x100	/* Operate in Adhoc mode */
+
+/*
  * Shared media sub-types
  */
 #define	IFM_AUTO	0		/* Autoselect best media */
@@ -206,6 +225,7 @@ int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
  */
 #define IFM_FDX		0x00100000	/* Force full duplex */
 #define	IFM_HDX		0x00200000	/* Force half duplex */
+#define	IFM_FLOW	0x00400000	/* enable hardware flow control */
 #define IFM_FLAG0	0x01000000	/* Driver defined flag */
 #define IFM_FLAG1	0x02000000	/* Driver defined flag */
 #define IFM_FLAG2	0x04000000	/* Driver defined flag */
@@ -215,7 +235,7 @@ int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
  * Masks
  */
 #define	IFM_NMASK	0x000000e0	/* Network type */
-#define	IFM_TMASK	0x0000000f	/* Media sub-type */
+#define	IFM_TMASK	0x0000001f	/* Media sub-type */
 #define	IFM_IMASK	0xf0000000	/* Instance */
 #define	IFM_ISHIFT	28		/* Instance shift */
 #define	IFM_OMASK	0x0000ff00	/* Type specific options */
@@ -230,6 +250,15 @@ int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
 #define	IFM_AVALID	0x00000001	/* Active bit valid */
 #define	IFM_ACTIVE	0x00000002	/* Interface attached to working net */
 
+/* Mask of "status valid" bits, for ifconfig(8). */
+#define	IFM_STATUS_VALID	IFM_AVALID
+
+/* List of "status valid" bits, for ifconfig(8). */
+#define	IFM_STATUS_VALID_LIST {						\
+	IFM_AVALID,							\
+	0								\
+}
+
 /*
  * Macros to extract various bits of information from the media word.
  */
@@ -239,6 +268,7 @@ int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
 #define	IFM_OPTIONS(x)	((x) & (IFM_OMASK|IFM_GMASK))
 
 #define	IFM_INST_MAX	IFM_INST(IFM_IMASK)
+#define	IFM_INST_ANY	(-1)
 
 /*
  * Macro to create a media word.
@@ -270,6 +300,7 @@ struct ifmedia_description {
 	{ IFM_TOKEN,			"TokenRing" },			\
 	{ IFM_TOKEN,			"token" },			\
 	{ IFM_FDDI,			"FDDI" },			\
+	{ IFM_IEEE80211,		"IEEE802.11" },			\
 	{ 0, NULL },							\
 }
 
@@ -316,6 +347,8 @@ struct ifmedia_description {
 	{ IFM_ETHER|IFM_1000_LX,	"1000baseLX" },			\
 	{ IFM_ETHER|IFM_1000_CX,	"1000baseCX" },			\
 	{ IFM_ETHER|IFM_1000_TX,	"1000baseTX" },			\
+	{ IFM_ETHER|IFM_HPNA_1,		"HomePNA1" },			\
+	{ IFM_ETHER|IFM_HPNA_1,		"HPNA1" },			\
 									\
 	{ IFM_TOKEN|IFM_TOK_STP4,	"DB9/4Mbit" },			\
 	{ IFM_TOKEN|IFM_TOK_STP4,	"4STP" },			\
@@ -332,6 +365,13 @@ struct ifmedia_description {
 	{ IFM_FDDI|IFM_FDDI_MMF,	"MMF" },			\
 	{ IFM_FDDI|IFM_FDDI_UTP,	"UTP" },			\
 	{ IFM_FDDI|IFM_FDDI_UTP,	"CDDI" },			\
+									\
+	{ IFM_IEEE80211|IFM_IEEE80211_FH1,	"FH1" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_FH2,	"FH2" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS1,	"DS1" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS2,	"DS2" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS5,	"DS5" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS11,	"DS11" },		\
 									\
 	{ 0, NULL },							\
 }
@@ -358,7 +398,34 @@ struct ifmedia_description {
 	{ IFM_FDDI|IFM_FDDI_DA,		"dual-attach" },		\
 	{ IFM_FDDI|IFM_FDDI_DA,		"das" },			\
 									\
+	{ IFM_IEEE80211|IFM_IEEE80211_ADHOC,	"adhoc" },		\
+									\
 	{ 0, NULL },							\
 }
 
+/*
+ * Status bit descriptions for the various media types.
+ */
+struct ifmedia_status_description {
+	int	ifms_type;
+	int	ifms_valid;
+	int	ifms_bit;
+	const char *ifms_string[2];
+};
+
+#define	IFM_STATUS_DESC(ifms, bit)					\
+	(ifms)->ifms_string[((ifms)->ifms_bit & (bit)) ? 1 : 0]
+
+#define	IFM_STATUS_DESCRIPTIONS {					\
+	{ IFM_ETHER,		IFM_AVALID,	IFM_ACTIVE,		\
+	    { "no carrier", "active" } },				\
+	{ IFM_FDDI,		IFM_AVALID,	IFM_ACTIVE,		\
+	    { "no ring", "inserted" } },				\
+	{ IFM_TOKEN,		IFM_AVALID,	IFM_ACTIVE,		\
+	    { "no ring", "inserted" } },				\
+	{ IFM_IEEE80211,	IFM_AVALID,	IFM_ACTIVE,		\
+	    { "no network", "active" } },				\
+	{ 0,			0,		0,			\
+	    { NULL, NULL } }						\
+}
 #endif	/* _NET_IF_MEDIA_H_ */

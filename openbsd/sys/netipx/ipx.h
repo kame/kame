@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx.h,v 1.5 1996/12/23 08:47:03 mickey Exp $	*/
+/*	$OpenBSD: ipx.h,v 1.12 2000/01/17 00:34:00 fgsch Exp $	*/
 
 /*-
  *
@@ -50,51 +50,61 @@
 /*
  * Protocols
  */
-#define IPXPROTO_UNKWN	0		/* Unknown */
-#define IPXPROTO_RI	1		/* RIP Routing Information */
-#define IPXPROTO_ECHO	2		/* Echo Protocol */
-#define IPXPROTO_ERROR	3		/* Error Protocol */
-#define IPXPROTO_PXP	4		/* PXP Packet Exchange */
-#define IPXPROTO_SPX	5		/* SPX Sequenced Packet */
-#define IPXPROTO_NCP	17		/* NCP NetWare Core */
-#define IPXPROTO_PPROP	20		/* complicated flood w/ bcast */
-#define IPXPROTO_RAW	255		/* Placemarker*/
-#define IPXPROTO_MAX	256		/* Placemarker*/
+#define IPXPROTO_UNKWN		0	/* Unknown */
+#define IPXPROTO_RI		1	/* RIP Routing Information */
+#define IPXPROTO_PXP		4	/* IPX Packet Exchange Protocol */
+#define IPXPROTO_SPX		5	/* SPX Sequenced Packet */
+#define IPXPROTO_NCP		17	/* NCP NetWare Core */
+#define IPXPROTO_NETBIOS	20	/* Propagated Packet */
+#define IPXPROTO_RAW		255	/* Placemarker*/
+#define IPXPROTO_MAX		256	/* Placemarker*/
 
 /*
  * Port/Socket numbers: network standard functions
  */
 
-#define IPXPORT_RI	1		/* NS RIP Routing Information */
-#define IPXPORT_ECHO	2		/* NS Echo */
-#define IPXPORT_RE	3		/* NS Router Error */
-#define IPXPORT_FSP	0x0451		/* NW FSP File Service */
-#define IPXPORT_SAP	0x0452		/* NW SAP Service Advertising */
-#define IPXPORT_RIP	0x0453		/* NW RIP Routing Information */
-#define IPXPORT_NETBIOS	0x0455		/* NW NetBIOS */
-#define IPXPORT_DIAGS	0x0456		/* NW Diagnostics */
-#define IPXPORT_WDOG	0x4001		/* NW Watchdog Packets */
-#define IPXPORT_SHELL	0x4003		/* NW Shell Socket */
-#define IPXPORT_MAX	0x8000		/* Maximum User Addressable Port */
+#define IPXPORT_RI		1	/* NS RIP Routing Information */
+#define IPXPORT_ECHO		2	/* NS Echo */
+#define IPXPORT_RE		3	/* NS Router Error */
+#define IPXPORT_FSP		0x0451	/* NW NCP Core Protocol */
+#define IPXPORT_SAP		0x0452	/* NW SAP Service Advertising */
+#define IPXPORT_RIP		0x0453	/* NW RIP Routing Information */
+#define IPXPORT_NETBIOS		0x0455	/* NW NetBIOS */
+#define IPXPORT_DIAGS		0x0456	/* NW Diagnostics */
+#define IPXPORT_SERIAL		0x0457	/* NW Serialization */
+#define IPXPORT_NLSP		0x9001	/* NW NLSP */
+#define IPXPORT_WAN		0x9004	/* NW IPXWAN */
+#define IPXPORT_PING		0x9086	/* NW IPX Ping */
+#define IPXPORT_MOBILE		0x9088	/* NW Mobile IPX Socket */
+/*
+ * Ports < IPXPORT_RESERVED are reserved for privileged
+ */
+#define IPXPORT_RESERVED	0x4000
+/*
+ * Ports > IPXPORT_WELLKNOWN are reserved for privileged
+ * processes (e.g. root).
+ */
+#define IPXPORT_WELLKNOWN	0x6000
 
 /* flags passed to ipx_outputfl as last parameter */
 
 #define IPX_FORWARDING		0x1	/* most of ipx header exists */
 #define IPX_ROUTETOIF		0x10	/* same as SO_DONTROUTE */
-#define IPX_ALLOWBROADCAST		SO_BROADCAST   /* can send broadcast packets */
+#define IPX_ALLOWBROADCAST	SO_BROADCAST   /* can send broadcast packets */
 
 #define IPX_MAXHOPS		15
 
 /* flags passed to get/set socket option */
 #define SO_HEADERS_ON_INPUT	1
 #define SO_HEADERS_ON_OUTPUT	2
-#define SO_DEFAULT_HEADERS		3
+#define SO_DEFAULT_HEADERS	3
 #define SO_LAST_HEADER		4
 #define SO_IPXIP_ROUTE		5
-#define SO_SEQNO			6
+#define SO_SEQNO		6
 #define SO_ALL_PACKETS		7
 #define SO_MTU			8
 #define SO_IPXTUN_ROUTE		9
+#define SO_IPX_CHECKSUM		10
 
 /*
  * IPX addressing
@@ -191,11 +201,12 @@ struct ipx {
 #define	sipxtosa(a)	((struct sockaddr *)(a))
 
 extern int ipxcksum;
+extern int ipxforwarding;
+extern int ipxnetbios;
 extern struct domain ipxdomain;
 extern struct sockaddr_ipx ipx_netmask;
 extern struct sockaddr_ipx ipx_hostmask;
 
-extern union ipx_host	ipx_thishost;
 extern union ipx_net	ipx_zeronet;
 extern union ipx_host	ipx_zerohost;
 extern union ipx_net	ipx_broadnet;
@@ -223,6 +234,7 @@ void	ipx_input __P((struct mbuf *, ...));
 void	ipxintr __P((void));
 int	ipx_output __P((struct mbuf *m0, ...));
 int	ipx_outputfl __P((struct mbuf *m0, struct route *ro, int flags));
+int	ipx_output_type20 __P((struct mbuf *m));
 int	ipx_raw_usrreq __P((struct socket *so, int req, struct mbuf *m,
 			    struct mbuf *nam, struct mbuf *control));
 void	ipx_undo_route __P((struct route *ro));
@@ -230,20 +242,7 @@ int	ipx_usrreq __P((struct socket *so, int req, struct mbuf *m,
 			struct mbuf *nam, struct mbuf *control));
 void	ipx_watch_output __P((struct mbuf *m, struct ifnet *ifp));
 int	ipx_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
-
-#ifdef	IPXDEBUG
-struct ipx_addr	ipx_addr __P((const char *));
-char		*ipx_ntoa __P((struct ipx_addr));
-#endif
-
-#else
-
-#include <sys/cdefs.h>
-
-__BEGIN_DECLS
-struct ipx_addr	ipx_addr __P((const char *));
-char		*ipx_ntoa __P((struct ipx_addr));
-__END_DECLS
+void	ipx_printhost __P((struct ipx_addr *addr));
 
 #endif /* _KERNEL */
 

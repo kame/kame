@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ppp.c,v 1.14 1998/07/12 04:33:20 angelos Exp $	*/
+/*	$OpenBSD: if_ppp.c,v 1.16 2000/03/21 23:31:27 mickey Exp $	*/
 /*	$NetBSD: if_ppp.c,v 1.39 1997/05/17 21:11:59 christos Exp $	*/
 
 /*
@@ -102,6 +102,12 @@
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
+#else
+#ifdef _KERNEL
+#ifdef VJC
+#error ppp device with VJC assumes INET
+#endif
+#endif
 #endif
 
 #include "bpfilter.h"
@@ -531,7 +537,6 @@ pppsioctl(ifp, cmd, data)
     u_long cmd;
     caddr_t data;
 {
-    register struct proc *p = curproc;	/* XXX */
     register struct ppp_softc *sc = ifp->if_softc;
     register struct ifaddr *ifa = (struct ifaddr *)data;
     register struct ifreq *ifr = (struct ifreq *)data;
@@ -558,13 +563,7 @@ pppsioctl(ifp, cmd, data)
 	break;
 
     case SIOCSIFMTU:
-	if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-	    break;
 	sc->sc_if.if_mtu = ifr->ifr_mtu;
-	break;
-
-    case SIOCGIFMTU:
-	ifr->ifr_mtu = sc->sc_if.if_mtu;
 	break;
 
     case SIOCADDMULTI:

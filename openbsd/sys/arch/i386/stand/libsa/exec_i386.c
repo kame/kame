@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_i386.c,v 1.24 1998/09/27 17:41:18 mickey Exp $	*/
+/*	$OpenBSD: exec_i386.c,v 1.26 2000/03/05 18:40:59 niklas Exp $	*/
 
 /*
  * Copyright (c) 1997-1998 Michael Shalayeff
@@ -59,6 +59,15 @@ machdep_exec(xp, howto, loadaddr)
 	dev_t bootdev = bootdev_dip->bootdev;
 	size_t ac = BOOTARG_LEN;
 	caddr_t av = (caddr_t)BOOTARG_OFF;
+	bios_consdev_t cd;
+	extern int com_speed; /* from bioscons.c */
+
+	cd.consdev = cn_tab->cn_dev;
+	cd.conspeed = com_speed;
+	addbootarg(BOOTARG_CONSDEV, sizeof(cd), &cd);
+
+	/* Pass memory map to the kernel */
+	mem_pass();
 
 	makebootargs(av, &ac);
 

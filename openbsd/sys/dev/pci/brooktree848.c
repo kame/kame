@@ -1,4 +1,4 @@
-/* $OpenBSD: brooktree848.c,v 1.12 1999/10/31 20:50:04 deraadt Exp $ */
+/* $OpenBSD: brooktree848.c,v 1.16 2000/02/10 11:22:47 d Exp $ */
 /* $Roger: brooktree848.c,v 1.85 1999/06/12 14:54:54 roger Exp $ */
 
 /* BT848 Driver for Brooktree's Bt848, Bt848A, Bt849A, Bt878, Bt879 based cards.
@@ -17,6 +17,10 @@
       Enjoy,
       Amancio
 
+   The Bt848 was discontinued in July 1999. 
+   http://www.conexant.com/techinfo/data_sheets/multimedia/pci_products/848/l848_b.pdf
+   (Brooktree was purchased by Rockwell, and their entire semiconductor arm
+   renamed as Conexant.)
  */
 
 /*
@@ -1351,7 +1355,7 @@ static int	video_open( bktr_ptr_t bktr );
 static int	video_close( bktr_ptr_t bktr );
 static int      video_read( bktr_ptr_t bktr, int unit, dev_t dev, struct uio *uio );
 static int	video_ioctl( bktr_ptr_t bktr, int unit,
-			     int cmd, caddr_t arg, struct proc* pr );
+			     u_long cmd, caddr_t arg, struct proc* pr );
 
 static void	start_capture( bktr_ptr_t bktr, unsigned type );
 static void	set_fps( bktr_ptr_t bktr, u_short fps );
@@ -1363,7 +1367,7 @@ static void	set_fps( bktr_ptr_t bktr, u_short fps );
 static int	tuner_open( bktr_ptr_t bktr );
 static int	tuner_close( bktr_ptr_t bktr );
 static int	tuner_ioctl( bktr_ptr_t bktr, int unit,
-			     int cmd, caddr_t arg, struct proc* pr );
+			     u_long cmd, caddr_t arg, struct proc* pr );
 static int	tuner_getchnlset( struct bktr_chnlset *chnlset );
 
 static int	tv_channel( bktr_ptr_t bktr, int channel );
@@ -1406,7 +1410,7 @@ static void	remote_read(bktr_ptr_t bktr, struct bktr_remote *remote);
  * ioctls common to both video & tuner.
  */
 static int	common_ioctl( bktr_ptr_t bktr, bt848_ptr_t bt848,
-			      int cmd, caddr_t arg );
+			      u_long cmd, caddr_t arg );
 
 
 /*
@@ -2178,7 +2182,7 @@ vbi_read(bktr_ptr_t bktr, dev_t dev, struct uio *uio)
  * video ioctls
  */
 static int
-video_ioctl( bktr_ptr_t bktr, int unit, int cmd, caddr_t arg, struct proc* pr )
+video_ioctl( bktr_ptr_t bktr, int unit, u_long cmd, caddr_t arg, struct proc* pr )
 {
 	bt848_ptr_t		bt848;
 	volatile u_char		c_temp;
@@ -2782,7 +2786,7 @@ video_ioctl( bktr_ptr_t bktr, int unit, int cmd, caddr_t arg, struct proc* pr )
  * tuner ioctls
  */
 static int
-tuner_ioctl( bktr_ptr_t bktr, int unit, int cmd, caddr_t arg, struct proc* pr )
+tuner_ioctl( bktr_ptr_t bktr, int unit, u_long cmd, caddr_t arg, struct proc* pr )
 {
 	bt848_ptr_t	bt848;
 	int		tmp_int;
@@ -3176,7 +3180,7 @@ tuner_ioctl( bktr_ptr_t bktr, int unit, int cmd, caddr_t arg, struct proc* pr )
  * common ioctls
  */
 int
-common_ioctl( bktr_ptr_t bktr, bt848_ptr_t bt848, int cmd, caddr_t arg )
+common_ioctl( bktr_ptr_t bktr, bt848_ptr_t bt848, u_long cmd, caddr_t arg )
 {
         int                           pixfmt;
 	unsigned int	              temp;
@@ -5432,7 +5436,7 @@ probeCard( bktr_ptr_t bktr, int verbose )
                 subsystem_vendor_id = (byte_254 << 8) | byte_255;
 
 	        if ( bootverbose ) 
-	            printf("subsytem 0x%04x 0x%04x\n",subsystem_vendor_id,
+	            printf("subsystem 0x%04x 0x%04x\n",subsystem_vendor_id,
 		                                  subsystem_id);
 
                 if (subsystem_vendor_id == VENDOR_AVER_MEDIA) {
@@ -8578,9 +8582,6 @@ bktr_mmap( dev_t dev, vm_offset_t offset, int nprot )
 		return( -1 );
 
 	bktr = bktr_cd.cd_devs[unit];
-
-	if (nprot & PROT_EXEC)
-		return( -1 );
 
 	if (offset < 0)
 		return( -1 );

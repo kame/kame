@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.57 1999/10/06 05:25:27 millert Exp $
+#	$OpenBSD: GENERIC,v 1.65 2000/04/26 19:08:23 chris Exp $
 #
 #	Machine-independent option; used by all architectures for their
 #	GENERIC kernel
@@ -13,6 +13,7 @@ option		SWAPPAGER	# paging; REQUIRED
 option		DEVPAGER	# mmap() of devices
 
 option		DDB		# in-kernel debugger
+#option		DDB_SAFE_CONSOLE # allow break into ddb during boot
 #makeoptions	DEBUG="-g"	# compile full symbol table
 #makeoptions	PROF="-pg"	# build profiled kernel
 #option		GPROF		# kernel profiling, kgmon(8)
@@ -20,9 +21,13 @@ option		DIAGNOSTIC	# internal consistency checks
 option		KTRACE		# system call tracing, a la ktrace(1)
 option		KMEMSTATS	# collect malloc(9) statistics
 
+option		CRYPTO		# Cryptographic framework
+
 option		SYSVMSG		# System V-like message queues
 option		SYSVSEM		# System V-like semaphores
 option		SYSVSHM		# System V-like memory sharing
+
+option		UVM_SWAP_ENCRYPT# support encryption of pages going to swap
 
 #option		COMPAT_09	# Kernel compatibility with NetBSD 0.9,
 #option		COMPAT_10	# NetBSD 1.0,
@@ -59,6 +64,7 @@ option		UNION		# union file system
 
 #option		GATEWAY		# packet forwarding
 option		INET		# IP + ICMP + TCP + UDP
+option		INET6		# IPv6 (needs INET)
 option		IPSEC		# IPsec
 #option		KEY		# PF_KEY (implied by IPSEC)
 #option		NS		# XNS
@@ -80,7 +86,7 @@ pseudo-device	sl	2	# CSLIP
 pseudo-device	ppp	2	# PPP
 pseudo-device	sppp		# Sync PPP/HDLC
 pseudo-device	tun	2	# network tunneling over tty
-pseudo-device	enc	1	# IPSEC needs the encapsulation interface
+pseudo-device	enc	4	# IPSEC needs the encapsulation interface
 #pseudo-device	strip	1	# Starmode Radio IP interface
 
 pseudo-device	pty	64	# pseudo-terminals
@@ -89,5 +95,7 @@ pseudo-device	vnd	4	# paging to files
 pseudo-device	ccd	4	# concatenated disk devices
 pseudo-device	ksyms	1	# kernel symbols device
 pseudo-device	bridge	2	# network bridging support
+#pseudo-device	vlan 	2	# IEEE 802.1Q VLAN 
+pseudo-device	gre	1	# GRE encapsulation interface
 
 option		BOOT_CONFIG	# add support for boot -c

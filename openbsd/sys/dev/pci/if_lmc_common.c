@@ -1,3 +1,4 @@
+/*	$OpenBSD: if_lmc_common.c,v 1.3 2000/02/01 18:01:41 chris Exp $ */
 /*	$NetBSD: if_lmc_common.c,v 1.1 1999/03/25 03:32:43 explorer Exp $	*/
 
 /*-
@@ -238,8 +239,7 @@ lmc_reset(lmc_softc_t * const sc)
 	/*
 	 * busy wait for the chip to reset
 	 */
-	while ((LMC_CSR_READ(sc, csr_gp) & LMC_GEP_DP) == 0)
-		;
+	while ((LMC_CSR_READ(sc, csr_gp) & LMC_GEP_DP) == 0);
 
 	/*
 	 * Call media specific init routine

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_output.c,v 1.21 1999/07/06 20:17:53 cmetz Exp $	*/
+/*	$OpenBSD: tcp_output.c,v 1.30 2000/02/21 21:42:13 provos Exp $	*/
 /*	$NetBSD: tcp_output.c,v 1.16 1997/06/03 16:17:09 kml Exp $	*/
 
 /*
@@ -152,19 +152,30 @@ void
 tcp_sack_adjust(tp)
 	struct tcpcb *tp;
 {
-	int i;
-
-	for (i = 0; i < tp->rcv_numsacks; i++) {
-		if (SEQ_LT(tp->snd_nxt, tp->sackblks[i].start))
-			break;
-		if (SEQ_LEQ(tp->sackblks[i].end, tp->snd_nxt))
-			continue;
-		if (tp->sackblks[i].start == 0 && tp->sackblks[i].end == 0)
-			continue;
-		/* snd_nxt must be in middle of block of SACKed data */
-		tp->snd_nxt = tp->sackblks[i].end;
-		break;
+	struct sackhole *cur = tp->snd_holes;
+	if (cur == 0)
+		return; /* No holes */
+	if (SEQ_GEQ(tp->snd_nxt, tp->rcv_lastsack))
+		return; /* We're already beyond any SACKed blocks */
+	/* 
+	 * Two cases for which we want to advance snd_nxt:  
+	 * i) snd_nxt lies between end of one hole and beginning of another
+	 * ii) snd_nxt lies between end of last hole and rcv_lastsack
+	 */
+	while (cur->next) {
+		if (SEQ_LT(tp->snd_nxt, cur->end))
+			return;
+		if (SEQ_GEQ(tp->snd_nxt, cur->next->start)) 
+			cur = cur->next;
+		else {
+			tp->snd_nxt = cur->next->start;
+			return;
+		}
 	}
+	if (SEQ_LT(tp->snd_nxt, cur->end))
+		return;
+	tp->snd_nxt = tp->rcv_lastsack;
+	return;
 }
 #endif /* TCP_SACK */
 
@@ -182,12 +193,12 @@ tcp_output(tp)
 	register struct tcphdr *th;
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned int optlen, hdrlen;
-	int idle, sendalot;
+	int idle, sendalot = 0;
 #ifdef TCP_SACK
 	int i, sack_rxmit = 0;
 	struct sackhole *p;
 #endif
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 	int maxburst = TCP_MAXBURST;
 #endif
 #ifdef TCP_SIGNATURE
@@ -214,7 +225,6 @@ tcp_output(tp)
 		 */
 		tp->snd_cwnd = tp->t_maxseg;
 again:
-	sendalot = 0;
 #ifdef TCP_SACK
 	/*
 	 * If we've recently taken a timeout, snd_max will be greater than
@@ -228,12 +238,6 @@ again:
 	win = ulmin(tp->snd_wnd, tp->snd_cwnd);
 
 	flags = tcp_outflags[tp->t_state];
-	/*
-	 * If in persist timeout with window of 0, send 1 byte.
-	 * Otherwise, if window is small but nonzero
-	 * and timer expired, we will send what we can
-	 * and go to transmit state.
-	 */
 
 #ifdef TCP_SACK
 	/* 
@@ -260,6 +264,13 @@ again:
 	}
 #endif /* TCP_SACK */
 
+	sendalot = 0;
+	/*
+	 * If in persist timeout with window of 0, send 1 byte.
+	 * Otherwise, if window is small but nonzero
+	 * and timer expired, we will send what we can
+	 * and go to transmit state.
+	 */
 	if (tp->t_force) {
 		if (win == 0) {
 			/*
@@ -399,6 +410,19 @@ again:
 	if (flags & TH_FIN &&
 	    ((tp->t_flags & TF_SENTFIN) == 0 || tp->snd_nxt == tp->snd_una))
 		goto send;
+#ifdef TCP_SACK
+	/*
+	 * In SACK, it is possible for tcp_output to fail to send a segment 
+	 * after the retransmission timer has been turned off.  Make sure
+	 * that the retransmission timer is set.
+	 */
+	if (SEQ_GT(tp->snd_max, tp->snd_una) &&
+	    tp->t_timer[TCPT_REXMT] == 0 &&
+	    tp->t_timer[TCPT_PERSIST] == 0) {
+		tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
+		return (0);
+	}
+#endif /* TCP_SACK */
 
 	/*
 	 * TCP window updates are not reliable, rather a polling protocol
@@ -440,17 +464,13 @@ send:
 	 * NOTE: we assume that the IP/TCP header plus TCP options
 	 * always fit in a single mbuf, leaving room for a maximum
 	 * link header, i.e.
-	 *	max_linkhdr + sizeof(network header) + sizeof(struct tcphdr) +
-	 *		optlen <= MHLEN
+	 *	max_linkhdr + sizeof(network header) + sizeof(struct tcphdr +
+	 * 		optlen <= MHLEN
 	 */
 	optlen = 0;
 
-#if defined(INET) && defined(INET6)
 	switch (tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-	switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-	case 0:		/* If tp->pf is 0, then assume IPv4 unless not avail */
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case PF_INET:
 		hdrlen = sizeof(struct ip) + sizeof(struct tcphdr);
@@ -458,7 +478,7 @@ send:
 #endif /* INET */
 #ifdef INET6
 	case PF_INET6:
-		hdrlen = sizeof(struct ipv6) + sizeof(struct tcphdr);
+		hdrlen = sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
 		break;
 #endif /* INET6 */
 	default:
@@ -594,7 +614,7 @@ send:
 	 }
 
 #ifdef DIAGNOSTIC
-	if (max_linkhdr + hdrlen > MHLEN)
+	if (max_linkhdr + hdrlen > MCLBYTES)
 		panic("tcphdr too big");
 #endif
 
@@ -626,13 +646,20 @@ send:
 		m->m_data -= hdrlen;
 #else
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		if (m != NULL) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				m = NULL;
+			}
+		}
 		if (m == NULL) {
 			error = ENOBUFS;
 			goto out;
 		}
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
-		if (len <= MHLEN - hdrlen - max_linkhdr) {
+		if (len <= MCLBYTES - hdrlen - max_linkhdr) {
 			m_copydata(so->so_snd.sb_mb, off, (int) len,
 			    mtod(m, caddr_t) + hdrlen);
 			m->m_len += len;
@@ -664,6 +691,13 @@ send:
 			tcpstat.tcps_sndwinup++;
 
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		if (m != NULL) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				m = NULL;
+			}
+		}
 		if (m == NULL) {
 			error = ENOBUFS;
 			goto out;
@@ -763,12 +797,8 @@ send:
 		tp->snd_up = tp->snd_una;		/* drag it along */
 
 	/* Put TCP length in pseudo-header */
-#if defined(INET) && defined(INET6)
 	switch (tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-	switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-	case 0:
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case AF_INET:
 		if (len + optlen)
@@ -788,14 +818,10 @@ send:
 		union sockaddr_union sa;
 		struct tdb *tdb;
 
-		memset(&sa, 0, sizeof(union sockaddr_union));
+		bzero(&sa, sizeof(union sockaddr_union));
 
-#if defined(INET) && defined(INET6)
-		switch(tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-		switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-		case 0:
+		switch (tp->pf) {
+		case 0:	/*default to PF_INET*/
 #ifdef INET
 		case AF_INET:
 			sa.sa.sa_len = sizeof(struct sockaddr_in);
@@ -807,23 +833,21 @@ send:
 		case AF_INET6:
 			sa.sa.sa_len = sizeof(struct sockaddr_in6);
 			sa.sa.sa_family = AF_INET6;
-			sa.sin6.sin6_addr = mtod(m, struct ipv6 *)->ipv6_dst;
+			sa.sin6.sin6_addr = mtod(m, struct ip6_hdr *)->ip6_dst;
 			break;
 #endif /* INET6 */
 		}
 
+		/* XXX gettdb() should really be called at spltdb().      */
+		/* XXX this is splsoftnet(), currently they are the same. */
 		tdb = gettdb(0, &sa, IPPROTO_TCP);
 		if (tdb == NULL)
 			return (EPERM);
 
 		MD5Init(&ctx);
 
-#if defined(INET) && defined(INET6)
-		switch(tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-		switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-		case 0:
+		switch (tp->pf) {
+		case 0:	/*default to PF_INET*/
 #ifdef INET
 		case AF_INET:
 			{
@@ -873,12 +897,8 @@ send:
 	 * Put TCP length in extended header, and then
 	 * checksum extended header and data.
 	 */
-#if defined(INET) && defined(INET6)
 	switch (tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-	switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-	case 0:
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case AF_INET:
 		th->th_sum = in_cksum(m, (int)(hdrlen + len));
@@ -886,8 +906,9 @@ send:
 #endif /* INET */
 #ifdef INET6
 	case AF_INET6:
-  		th->th_sum = in6_cksum(m, IPPROTO_TCP, hdrlen + len,
-			sizeof(struct ipv6));
+		m->m_pkthdr.len = hdrlen + len;
+  		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
+			hdrlen - sizeof(struct ip6_hdr) + len);
 		break;
 #endif /* INET6 */
 	}
@@ -979,12 +1000,8 @@ send:
 	 */
 	m->m_pkthdr.len = hdrlen + len;
 
-#if defined(INET) && defined(INET6)
 	switch (tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-	switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-	case 0:
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case AF_INET:
 		{
@@ -995,7 +1012,6 @@ send:
 			ip->ip_ttl = tp->t_inpcb->inp_ip.ip_ttl;
 			ip->ip_tos = tp->t_inpcb->inp_ip.ip_tos;
 		}
-
 		error = ip_output(m, tp->t_inpcb->inp_options,
 			&tp->t_inpcb->inp_route, so->so_options & SO_DONTROUTE,
 			0, tp->t_inpcb);
@@ -1004,16 +1020,17 @@ send:
 #ifdef INET6
 	case AF_INET6:
 		{
-			struct ipv6 *ipv6;
+			struct ip6_hdr *ipv6;
 			
-			ipv6->ipv6_length = m->m_pkthdr.len -
-				sizeof(struct ipv6);
-			ipv6->ipv6_nexthdr = IPPROTO_TCP;
+			ipv6 = mtod(m, struct ip6_hdr *);
+			ipv6->ip6_plen = m->m_pkthdr.len -
+				sizeof(struct ip6_hdr);
+			ipv6->ip6_nxt = IPPROTO_TCP;
+			ipv6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
 		}
-
-		error = ipv6_output(m, &tp->t_inpcb->inp_route6,
-			(so->so_options & SO_DONTROUTE), NULL, NULL,
-			tp->t_inpcb->inp_socket);
+		error = ip6_output(m, tp->t_inpcb->inp_outputopts6,
+			  &tp->t_inpcb->inp_route6,
+			  (so->so_options & SO_DONTROUTE), NULL, NULL);
 		break;
 #endif /* INET6 */
 #ifdef TUBA
@@ -1055,7 +1072,7 @@ out:
 		tp->rcv_adv = tp->rcv_nxt + win;
 	tp->last_ack_sent = tp->rcv_nxt;
 	tp->t_flags &= ~(TF_ACKNOW|TF_DELACK);
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 	if (sendalot && --maxburst)
 #else
 	if (sendalot)
@@ -1075,6 +1092,8 @@ tcp_setpersist(tp)
 	/*
 	 * Start/restart persistance timer.
 	 */
+	if (t < tp->t_rttmin)
+		t = tp->t_rttmin;
 	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
 	    t * tcp_backoff[tp->t_rxtshift],
 	    TCPTV_PERSMIN, TCPTV_PERSMAX);

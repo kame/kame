@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_domain.c,v 1.8 1999/03/30 00:19:05 niklas Exp $	*/
+/*	$OpenBSD: uipc_domain.c,v 1.10 2000/03/23 10:42:29 art Exp $	*/
 /*	$NetBSD: uipc_domain.c,v 1.14 1996/02/09 19:00:44 christos Exp $	*/
 
 /*
@@ -47,6 +47,7 @@
 #include <sys/proc.h>
 #include <vm/vm.h>
 #include <sys/sysctl.h>
+#include <sys/timeout.h>
 
 void	pffasttimo __P((void *));
 void	pfslowtimo __P((void *));
@@ -63,13 +64,18 @@ int pfkey_init __P((void));
 void
 domaininit()
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct domain *dp;
+	struct protosw *pr;
+	static struct timeout pffast_timeout;
+	static struct timeout pfslow_timeout;
 
 #undef unix
+	/*
+	 * KAME NOTE: ADDDOMAIN(route) is moved to the last part so that
+	 * it will be initialized as the *first* element.  confusing!
+	 */
 #ifndef lint
 	ADDDOMAIN(unix);
-	ADDDOMAIN(route);
 #ifdef INET
 	ADDDOMAIN(inet);
 #endif
@@ -100,6 +106,12 @@ domaininit()
 	ADDDOMAIN(imp);
 #endif
 #endif
+#ifdef IPSEC
+#ifdef __KAME__
+	ADDDOMAIN(key);
+#endif
+#endif
+	ADDDOMAIN(route);
 #endif
 
 	for (dp = domains; dp; dp = dp->dom_next) {
@@ -114,8 +126,10 @@ if (max_linkhdr < 16)		/* XXX */
 max_linkhdr = 16;
 	max_hdr = max_linkhdr + max_protohdr;
 	max_datalen = MHLEN - max_hdr;
-	timeout(pffasttimo, NULL, 1);
-	timeout(pfslowtimo, NULL, 1);
+	timeout_set(&pffast_timeout, pffasttimo, &pffast_timeout);
+	timeout_set(&pfslow_timeout, pfslowtimo, &pfslow_timeout);
+	timeout_add(&pffast_timeout, 1);
+	timeout_add(&pfslow_timeout, 1);
 }
 
 struct protosw *
@@ -177,14 +191,15 @@ net_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	int family, protocol;
 
 	/*
-	 * All sysctl names at this level are nonterminal;
-	 * next two components are protocol family and protocol number,
-	 * then at least one addition component.
+	 * All sysctl names at this level are nonterminal.
+	 * PF_KEY: next component is protocol family, and then at least one
+	 *	additional component.
+	 * usually: next two components are protocol family and protocol
+	 *	number, then at least one addition component.
 	 */
-	if (namelen < 3)
+	if (namelen < 2)
 		return (EISDIR);		/* overloaded */
 	family = name[0];
-	protocol = name[1];
 
 	if (family == 0)
 		return (0);
@@ -193,6 +208,23 @@ net_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 			goto found;
 	return (ENOPROTOOPT);
 found:
+	switch (family) {
+#ifdef IPSEC
+#ifdef __KAME__
+	case PF_KEY:
+		pr = dp->dom_protosw;
+		if (pr->pr_sysctl)
+			return ((*pr->pr_sysctl)(name + 1, namelen - 1,
+				oldp, oldlenp, newp, newlen));
+		return (ENOPROTOOPT);
+#endif
+#endif
+	default:
+		break;
+	}
+	if (namelen < 3)
+		return (EISDIR);		/* overloaded */
+	protocol = name[1];
 	for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 		if (pr->pr_protocol == protocol && pr->pr_sysctl)
 			return ((*pr->pr_sysctl)(name + 2, namelen - 2,
@@ -218,26 +250,28 @@ void
 pfslowtimo(arg)
 	void *arg;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct timeout *to = (struct timeout *)arg;
+	struct domain *dp;
+	struct protosw *pr;
 
 	for (dp = domains; dp; dp = dp->dom_next)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_slowtimo)
 				(*pr->pr_slowtimo)();
-	timeout(pfslowtimo, NULL, hz/2);
+	timeout_add(to, hz/2);
 }
 
 void
 pffasttimo(arg)
 	void *arg;
 {
-	register struct domain *dp;
-	register struct protosw *pr;
+	struct timeout *to = (struct timeout *)arg;
+	struct domain *dp;
+	struct protosw *pr;
 
 	for (dp = domains; dp; dp = dp->dom_next)
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
 			if (pr->pr_fasttimo)
 				(*pr->pr_fasttimo)();
-	timeout(pffasttimo, NULL, hz/5);
+	timeout_add(to, hz/5);
 }

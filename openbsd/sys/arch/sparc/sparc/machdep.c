@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.41 1999/09/07 03:42:48 jason Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.48 2000/03/23 09:59:56 art Exp $	*/
 /*	$NetBSD: machdep.c,v 1.85 1997/09/12 08:55:02 pk Exp $ */
 
 /*
@@ -58,7 +58,7 @@
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/clist.h>
-#include <sys/callout.h>
+#include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/mount.h>
@@ -75,6 +75,7 @@
 #endif
 #include <sys/exec.h>
 #include <sys/sysctl.h>
+#include <sys/extent.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -90,6 +91,7 @@
 #include <sparc/sparc/asm.h>
 #include <sparc/sparc/cache.h>
 #include <sparc/sparc/vaddrs.h>
+#include <sparc/sparc/cpuvar.h>
 
 #if defined(UVM)
 #include <uvm/uvm.h>
@@ -119,7 +121,6 @@ vm_map_t phys_map = NULL;
 #else
 vm_map_t buffer_map;
 #endif
-extern vaddr_t avail_end;
 
 /*
  * Declare these as initialized data so we can patch them.
@@ -138,10 +139,6 @@ int	bufpages = 0;
 
 int	physmem;
 
-extern struct msgbuf msgbuf;
-struct	msgbuf *msgbufp = &msgbuf;
-int	msgbufmapped = 0;	/* not mapped until pmap_bootstrap */
-
 /* sysctl settable */
 int	sparc_led_blink = 0;
 
@@ -156,8 +153,7 @@ int   safepri = 0;
  * the memory range in `phys_map' (which is mostly a place-holder).
  */
 vaddr_t dvma_base, dvma_end;
-struct map *dvmamap;
-static int ndvmamap;	/* # of entries in dvmamap */
+struct extent *dvmamap_extent;
 
 caddr_t allocsys __P((caddr_t));
 void	dumpsys __P((void));
@@ -185,6 +181,13 @@ cpu_startup()
 	pmapdebug = 0;
 #endif
 
+	/*
+	 * fix message buffer mapping, note phys addr of msgbuf is 0
+	 */
+	pmap_enter(pmap_kernel(), MSGBUF_VA, 0x0, VM_PROT_READ|VM_PROT_WRITE,
+	    TRUE, VM_PROT_READ | VM_PROT_WRITE);
+	initmsgbuf((caddr_t)(MSGBUF_VA + (CPU_ISSUN4 ? 4096 : 0)), MSGBUFSIZE);
+
 	proc0.p_addr = proc0paddr;
 
 	/*
@@ -192,9 +195,6 @@ cpu_startup()
 	 */
 	printf(version);
 	/*identifycpu();*/
-#if !defined(MACHINE_NONCONTIG) && !defined(MACHINE_NEW_NONCONTIG)
-	physmem = btoc(avail_end);
-#endif
 	printf("real mem = %d\n", ctob(physmem));
 
 	/*
@@ -301,7 +301,7 @@ cpu_startup()
 	 */
 #if defined(UVM)
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 16*NCARGS, TRUE, FALSE, NULL);
+				 16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 #else
 	exec_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr,
 				 16*NCARGS, TRUE);
@@ -333,8 +333,10 @@ cpu_startup()
 	if (kmem_alloc_wait(phys_map, (dvma_end-dvma_base)) != dvma_base)
 		panic("unable to allocate from DVMA map");
 #endif
-	rminit(dvmamap, btoc((dvma_end-dvma_base)),
-		vtorc(dvma_base), "dvmamap", ndvmamap);
+	dvmamap_extent = extent_create("dvmamap", dvma_base, dvma_end,
+				       M_DEVBUF, NULL, 0, EX_NOWAIT);
+	if (dvmamap_extent == 0)
+		panic("unable to allocate extent for dvma");
 
 	/*
 	 * Finally, allocate mbuf pool.  Since mclrefcnt is an off-size
@@ -345,18 +347,15 @@ cpu_startup()
 	bzero(mclrefcnt, NMBCLUSTERS+CLBYTES/MCLBYTES);
 #if defined(UVM)
 	mb_map = uvm_km_suballoc(kernel_map, (vaddr_t *)&mbutl, &maxaddr,
-				 VM_MBUF_SIZE, FALSE, FALSE, NULL);
+				 VM_MBUF_SIZE, VM_MAP_INTRSAFE, FALSE, NULL);
 #else
 	mb_map = kmem_suballoc(kernel_map, (vaddr_t *)&mbutl, &maxaddr,
 			       VM_MBUF_SIZE, FALSE);
 #endif
 	/*
-	 * Initialize callouts
+	 * Initialize timeouts
 	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
-	callout[i-1].c_next = NULL;
+	timeout_init();
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
@@ -387,16 +386,6 @@ cpu_startup()
 	 */
 	bzero(proc0paddr, sizeof(struct user));
 
-	/*
-	 * fix message buffer mapping, note phys addr of msgbuf is 0
-	 */
-
-	pmap_enter(pmap_kernel(), MSGBUF_VA, 0x0, VM_PROT_READ|VM_PROT_WRITE,
-		   TRUE, VM_PROT_READ | VM_PROT_WRITE);
-	if (CPU_ISSUN4)
-		msgbufp = (struct msgbuf *)(MSGBUF_VA + 4096);
-	else
-		msgbufp = (struct msgbuf *)MSGBUF_VA;
 	pmap_redzone();
 }
 
@@ -416,7 +405,7 @@ allocsys(v)
 
 #define	valloc(name, type, num) \
 	    v = (caddr_t)(((name) = (type *)v) + (num))
-	valloc(callout, struct callout, ncallout);
+	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -469,11 +458,6 @@ allocsys(v)
 	valloc(swbuf, struct buf, nswbuf);
 #endif
 	valloc(buf, struct buf, nbuf);
-	/*
-	 * Allocate DVMA slots for 1/4 of the number of i/o buffers
-	 * and one for each process too (PHYSIO).
-	 */
-	valloc(dvmamap, struct map, ndvmamap = maxproc + ((nbuf / 4) &~ 1));
 	return (v);
 }
 
@@ -509,9 +493,9 @@ setregs(p, pack, stack, retval)
 		 * we must get rid of it, and the only way to do that is
 		 * to save it.  In any case, get rid of our FPU state.
 		 */
-		if (p == fpproc) {
+		if (p == cpuinfo.fpproc) {
 			savefpstate(fs);
-			fpproc = NULL;
+			cpuinfo.fpproc = NULL;
 		}
 		free((void *)fs, M_SUBPROC);
 		p->p_md.md_fpstate = NULL;
@@ -1139,13 +1123,11 @@ oldmon_w_trace(va)
 #endif
 	write_user_windows();
 
-#define round_up(x) (( (x) + (NBPG-1) ) & (~(NBPG-1)) )
-
 	printf("\nstack trace with sp = 0x%lx\n", va);
-	stop = round_up(va);
+	stop = round_page(va);
 	printf("stop at 0x%lx\n", stop);
 	fp = (struct frame *) va;
-	while (round_up((u_long) fp) == stop) {
+	while (round_page((u_long) fp) == stop) {
 		printf("  0x%x(0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x, 0x%x) fp %p\n", fp->fr_pc,
 		    fp->fr_arg[0], fp->fr_arg[1], fp->fr_arg[2], fp->fr_arg[3],
 		    fp->fr_arg[4], fp->fr_arg[5], fp->fr_arg[6], fp->fr_fp);

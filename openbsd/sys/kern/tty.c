@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.c,v 1.37 1999/06/01 08:23:52 art Exp $	*/
+/*	$OpenBSD: tty.c,v 1.39 2000/03/23 17:20:23 art Exp $	*/
 /*	$NetBSD: tty.c,v 1.68.4.2 1996/06/06 16:04:52 thorpej Exp $	*/
 
 /*-
@@ -1555,10 +1555,8 @@ ttycheckoutq(tp, wait)
 				splx(s);
 				return (0);
 			}
-			timeout((void (*)__P((void *)))wakeup,
-			    (void *)&tp->t_outq, hz);
 			SET(tp->t_state, TS_ASLEEP);
-			tsleep(&tp->t_outq, PZERO - 1, "ttckoutq", 0);
+			tsleep(&tp->t_outq, PZERO - 1, "ttckoutq", hz);
 		}
 	splx(s);
 	return (1);
@@ -2031,7 +2029,7 @@ ttyinfo(tp)
 		ttyprintf(tp, "%ld.%02lds ", stime.tv_sec,
 		    stime.tv_usec / 10000);
 
-#define	pgtok(a)	(((u_long) ((a) * NBPG) / 1024))
+#define	pgtok(a)	(((u_long) ((a) * PAGE_SIZE) / 1024))
 		/* Print percentage cpu, resident set size. */
 		tmp = (pick->p_pctcpu * 10000 + FSCALE / 2) >> FSHIFT;
 		ttyprintf(tp, "%d%% %ldk\n",

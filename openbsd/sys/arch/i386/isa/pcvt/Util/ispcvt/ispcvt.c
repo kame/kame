@@ -1,4 +1,4 @@
-/*	$OpenBSD: ispcvt.c,v 1.7 1999/05/24 15:37:44 aaron Exp $	*/
+/*	$OpenBSD: ispcvt.c,v 1.9 2000/01/19 15:51:54 aaron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis
@@ -216,9 +216,6 @@ char *argv[];
 		fprintf(stderr,"PCVT_CTRL_ALT_DEL    = %s",
 			(pcvtinfo.compile_opts & CONF_CTRL_ALT_DEL) ? "ON" : "OFF");
 		next();
-		fprintf(stderr,"PCVT_EMU_MOUSE       = %s",
-			(pcvtinfo.compile_opts & CONF_EMU_MOUSE) ? "ON" : "OFF");
-		next();
 		fprintf(stderr,"PCVT_INHIBIT_NUMLOCK = %s",
 			(pcvtinfo.compile_opts & CONF_INHIBIT_NUMLOCK) ? "ON" : "OFF");
 		next();
@@ -258,9 +255,6 @@ char *argv[];
 		fprintf(stderr,"PCVT_SETCOLOR        = %s",
 			(pcvtinfo.compile_opts & CONF_SETCOLOR) ? "ON" : "OFF");
 		next();
-		fprintf(stderr,"PCVT_SHOWKEYS        = %s",
-			(pcvtinfo.compile_opts & CONF_SHOWKEYS) ? "ON" : "OFF");
-		next();
 		fprintf(stderr,"PCVT_SIGWINCH        = %s",
 			(pcvtinfo.compile_opts & CONF_SIGWINCH) ? "ON" : "OFF");
 		next();
@@ -269,9 +263,6 @@ char *argv[];
 		next();
 		fprintf(stderr,"PCVT_USEKBDSEC       = %s",
 			(pcvtinfo.compile_opts & CONF_USEKBDSEC) ? "ON" : "OFF");
-		next();
-		fprintf(stderr,"PCVT_VT220KEYB       = %s",
-			((u_int)pcvtinfo.compile_opts & (u_int)CONF_VT220KEYB) ? "ON" : "OFF");
 		next();
 		fprintf(stderr,"PCVT_WAITRETRACE     = %s",
 			(pcvtinfo.compile_opts & CONF_WAITRETRACE) ? "ON" : "OFF");

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcvt_ext.c,v 1.22 1999/09/29 22:29:10 aaron Exp $	*/
+/*	$OpenBSD: pcvt_ext.c,v 1.26 1999/12/01 09:59:59 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch.
@@ -615,72 +615,6 @@ s3testwritable(void)
 	outb(addr_6845+1, old);			/* restore */
 
 	return((new1==0) && (new2==0x0f));
-}
-
-/*---------------------------------------------------------------------------*
- *	return ptr to string describing vga type
- *---------------------------------------------------------------------------*/
-char *
-vga_string(int number)
-{
-	static char *vga_tab[] = {
-		"generic VGA",
-		"ET4000",
-		"ET3000",
-		"PVGA1A",
-		"WD90C00",
-		"WD90C10",
-		"WD90C11",
-		"Video7 VEGA",
-		"Video7 FAST",
-		"Video7 VER5",
-		"Video7 1024i",
-		"unknown Video7",
-		"TVGA 8800BR",
-		"TVGA 8800CS",
-		"TVGA 8900B",
-		"TVGA 8900C",
-		"TVGA 8900CL",
-		"TVGA 9000",
-		"TVGA 9100",
-		"TVGA 9200",
-		"TVGA 9440",
-		"TVGA 9660",
-		"TVGA 9750 (3DImage)",
-		"unknown Trident",
-		"S3 911",
-		"S3 924",
-		"S3 801/805",
-		"S3 928",
-		"S3 864",
-		"S3 964",
-		"S3 732 (Trio32)",
-		"S3 764 (Trio64)",
-		"S3 866",
-		"S3 868",
-		"S3 968",
-		"S3 765 (Trio64 V+)",
-		"S3 ViRGE",
-		"unknown S3",
-		"CL-GD5402",
-		"CL-GD5402r1",
-		"CL-GD5420",
-		"CL-GD5420r1",
-		"CL-GD5422",
-		"CL-GD5424",
-		"CL-GD5426",
-		"CL-GD5428",
-		"CL-GD5430",
-		"CL-GD62x5",
-		"unknown Cirrus",
-						/* VGA_MAX_CHIPSET */
-		"vga_string: chipset name table ptr overflow!"
-	};
-
-	if(number > VGA_MAX_CHIPSET)		/* failsafe */
-		number = VGA_MAX_CHIPSET;
-
-	return(vga_tab[number]);
 }
 
 /*---------------------------------------------------------------------------*
@@ -2387,13 +2321,12 @@ switch_screen(int n, int oldgrafx, int newgrafx)
 	if(!newgrafx)
 	{
 		update_led();	/* update led's */
-		update_hp(vsp);	/* update fkey labels, if present */
 
 		/* if we switch to a vt with force 24 lines mode and	*/
 		/* pure VT emulation and 25 rows charset, then we have	*/
 		/* to clear the last line on display ...		*/
 
-		if(vsp->force24 && (vsp->vt_pure_mode == M_PUREVT) &&
+		if(vsp->force24 &&
 			(vgacs[vsp->vga_charset].screen_size == SIZ_25ROWS))
 		{
 			fillw(' ', (caddr_t)
@@ -2562,7 +2495,7 @@ vgapage(int new_screen)
  *	VT_USL ioctl handling 
  *---------------------------------------------------------------------------*/
 int
-usl_vt_ioctl(Dev_t dev, int cmd, caddr_t data, int flag, struct proc *p)
+usl_vt_ioctl(Dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	int i, j, error, opri, mode;
 	struct vt_mode newmode;

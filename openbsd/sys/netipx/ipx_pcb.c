@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx_pcb.c,v 1.3 1999/04/28 09:28:16 art Exp $	*/
+/*	$OpenBSD: ipx_pcb.c,v 1.8 2000/01/15 18:52:14 fgsch Exp $	*/
 
 /*-
  *
@@ -41,13 +41,10 @@
  */
 
 #include <sys/param.h>
-#include <sys/queue.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
-#include <sys/errno.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/protosw.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -59,16 +56,17 @@
 struct	ipx_addr zeroipx_addr;
 
 #define	IPXPCBHASH(table, faddr, fport, laddr, lport) \
-	&(table)->ipxpt_hashtbl[(ntohl((faddr)->ipx_net.l_net) \
-				+ ntohs((fport)) \
-				+ ntohs((lport))) & (table->ipxpt_hash)]
+	&(table)->ipxpt_hashtbl[(ntohl((faddr)->ipx_net.l_net) + \
+	ntohs((fport)) + ntohs((lport))) & (table->ipxpt_hash)]
+
 void
 ipx_pcbinit(table, hashsize)
-	struct ipxpcbtable	*table;
-	int	hashsize;
+	struct ipxpcbtable *table;
+	int hashsize;
 {
 	CIRCLEQ_INIT(&table->ipxpt_queue);
-	table->ipxpt_hashtbl = hashinit(hashsize, M_PCB, M_WAITOK, &table->ipxpt_hash);
+	table->ipxpt_hashtbl =
+	    hashinit(hashsize, M_PCB, M_WAITOK, &table->ipxpt_hash);
 	table->ipxpt_lport = 0;
 }
 
@@ -78,6 +76,7 @@ ipx_pcballoc(so, head)
 	struct ipxpcbtable *head;
 {
 	register struct ipxpcb *ipxp;
+	int s;
 
 	ipxp = malloc(sizeof(*ipxp), M_PCB, M_DONTWAIT);
 	if (ipxp == NULL)
@@ -85,9 +84,11 @@ ipx_pcballoc(so, head)
 	bzero((caddr_t)ipxp, sizeof(*ipxp));
 	ipxp->ipxp_socket = so;
 	ipxp->ipxp_table = head;
+	s = splnet();
 	CIRCLEQ_INSERT_HEAD(&head->ipxpt_queue, ipxp, ipxp_queue);
 	LIST_INSERT_HEAD(IPXPCBHASH(head, &ipxp->ipxp_faddr, ipxp->ipxp_fport,
 	    &ipxp->ipxp_laddr, ipxp->ipxp_lport), ipxp, ipxp_hash);
+	splx(s);
 	so->so_pcb = (caddr_t)ipxp;
 	return (0);
 }
@@ -105,7 +106,7 @@ ipx_pcbbind(ipxp, nam)
 	if (nam == 0)
 		goto noname;
 	sipx = mtod(nam, struct sockaddr_ipx *);
-	if (nam->m_len != sizeof (*sipx))
+	if (nam->m_len != sizeof(*sipx))
 		return (EINVAL);
 	if (!ipx_nullhost(sipx->sipx_addr)) {
 		int tport = sipx->sipx_port;
@@ -119,7 +120,7 @@ ipx_pcbbind(ipxp, nam)
 	if (lport) {
 		u_short aport = ntohs(lport);
 
-		if (aport < IPXPORT_MAX &&
+		if (aport < IPXPORT_RESERVED &&
 		    (ipxp->ipxp_socket->so_state & SS_PRIV) == 0)
 			return (EACCES);
 		if (ipx_pcblookup(&zeroipx_addr, lport, 0))
@@ -129,8 +130,9 @@ ipx_pcbbind(ipxp, nam)
 noname:
 	if (lport == 0)
 		do {
-			if (ipxcbtable.ipxpt_lport++ < IPXPORT_MAX)
-				ipxcbtable.ipxpt_lport = IPXPORT_MAX;
+			if ((ipxcbtable.ipxpt_lport++ < IPXPORT_RESERVED) ||
+			    (ipxcbtable.ipxpt_lport >= IPXPORT_WELLKNOWN))
+				ipxcbtable.ipxpt_lport = IPXPORT_RESERVED;
 			lport = htons(ipxcbtable.ipxpt_lport);
 		} while (ipx_pcblookup(&zeroipx_addr, lport, 0));
 	ipxp->ipxp_lport = lport;
@@ -154,7 +156,7 @@ ipx_pcbconnect(ipxp, nam)
 	register struct route *ro;
 	struct ifnet *ifp;
 
-	if (nam->m_len != sizeof (*sipx))
+	if (nam->m_len != sizeof(*sipx))
 		return (EINVAL);
 	if (sipx->sipx_family != AF_IPX) {
 #ifdef	DEBUG
@@ -238,11 +240,9 @@ ipx_pcbconnect(ipxp, nam)
 	}
 	if (ipx_pcblookup(&sipx->sipx_addr, ipxp->ipxp_lport, 0))
 		return (EADDRINUSE);
-	if (ipx_nullhost(ipxp->ipxp_laddr)) {
-		if (ipxp->ipxp_lport == 0)
-			(void) ipx_pcbbind(ipxp, (struct mbuf *)0);
-		ipxp->ipxp_laddr.ipx_host = ipx_thishost;
-	}
+	if (ipxp->ipxp_lport == 0)
+		(void) ipx_pcbbind(ipxp, (struct mbuf *)0);
+
 	ipxp->ipxp_faddr = sipx->sipx_addr;
 	/* Includes ipxp->ipxp_fport = sipx->sipx_port; */
 	return (0);
@@ -283,9 +283,9 @@ ipx_setsockaddr(ipxp, nam)
 {
 	register struct sockaddr_ipx *sipx = mtod(nam, struct sockaddr_ipx *);
 	
-	nam->m_len = sizeof (*sipx);
+	nam->m_len = sizeof(*sipx);
 	sipx = mtod(nam, struct sockaddr_ipx *);
-	bzero((caddr_t)sipx, sizeof (*sipx));
+	bzero((caddr_t)sipx, sizeof(*sipx));
 	sipx->sipx_len = sizeof(*sipx);
 	sipx->sipx_family = AF_IPX;
 	sipx->sipx_addr = ipxp->ipxp_laddr;
@@ -298,9 +298,9 @@ ipx_setpeeraddr(ipxp, nam)
 {
 	register struct sockaddr_ipx *sipx = mtod(nam, struct sockaddr_ipx *);
 	
-	nam->m_len = sizeof (*sipx);
+	nam->m_len = sizeof(*sipx);
 	sipx = mtod(nam, struct sockaddr_ipx *);
-	bzero((caddr_t)sipx, sizeof (*sipx));
+	bzero((caddr_t)sipx, sizeof(*sipx));
 	sipx->sipx_len = sizeof(*sipx);
 	sipx->sipx_family = AF_IPX;
 	sipx->sipx_addr = ipxp->ipxp_faddr;

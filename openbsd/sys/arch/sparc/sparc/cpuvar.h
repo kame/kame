@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpuvar.h,v 1.1 1997/08/08 08:40:15 downsj Exp $	*/
+/*	$OpenBSD: cpuvar.h,v 1.4 2000/02/21 17:08:36 art Exp $	*/
 /*	$NetBSD: cpuvar.h,v 1.4 1997/07/06 21:14:25 pk Exp $ */
 
 /*
@@ -56,20 +56,24 @@ struct cpu_softc;
 struct module_info {
 	int  cpu_type;
 	enum vactype vactype;
-	void (*cpu_match)__P((struct cpu_softc *, struct module_info *, int));
-	void (*getcacheinfo)__P((struct cpu_softc *sc, int node));
+	void (*cpu_match) __P((struct cpu_softc *, struct module_info *, int));
+	void (*getcacheinfo) __P((struct cpu_softc *sc, int node));
 	void (*hotfix) __P((struct cpu_softc *));
-	void (*mmu_enable)__P((void));
-	void (*cache_enable)__P((void));
+	void (*mmu_enable) __P((void));
+	void (*cache_enable) __P((void));
 	int  ncontext;			/* max. # of contexts (we use) */
 
-	void (*get_faultstatus)__P((void));
-	void (*cache_flush)__P((caddr_t, u_int));
-	void (*vcache_flush_page)__P((int));
-	void (*vcache_flush_segment)__P((int, int));
-	void (*vcache_flush_region)__P((int));
-	void (*vcache_flush_context)__P((void));
-	void (*pcache_flush_line)__P((int, int));
+	void (*get_syncflt) __P((void));
+	int  (*get_asyncflt) __P((u_int *, u_int *));
+	void (*cache_flush) __P((caddr_t, u_int));
+	void (*vcache_flush_page) __P((int));
+	void (*vcache_flush_segment) __P((int, int));
+	void (*vcache_flush_region) __P((int));
+	void (*vcache_flush_context) __P((void));
+	void (*pcache_flush_line) __P((int, int));
+	void (*pure_vcache_flush) __P((void));
+	void (*cache_flush_all)__P((void));
+	void (*memerr) __P((unsigned, u_int, u_int, struct trapframe *));
 };
 
 
@@ -163,7 +167,14 @@ struct cpu_softc {
 	void	(*hotfix) __P((struct cpu_softc *));
 
 	/* locore defined: */
-	void	(*get_faultstatus) __P((void));
+	void	(*get_syncflt) __P((void));		/* Not C-callable */
+	int	(*get_asyncflt) __P((u_int *, u_int *));
+
+       	/* Synchronous Fault Status; temporary storage */
+       	struct {
+		int     sfsr;
+		int     sfva;
+	} syncfltdump;
 
 	/* Cache handling functions */
 	void	(*cache_enable) __P((void));
@@ -173,6 +184,8 @@ struct cpu_softc {
 	void	(*vcache_flush_region)__P((int));
 	void	(*vcache_flush_context)__P((void));
 	void	(*pcache_flush_line)__P((int, int));
+	void	(*pure_vcache_flush) __P((void));
+	void	(*cache_flush_all)__P((void));
 
 #ifdef SUN4M
 	/* hardware-assisted block operation routines */
@@ -184,6 +197,11 @@ struct cpu_softc {
 	void		(*mbusflush) __P((void));
 #endif
 
+	/*
+	 * Memory error handler; parity errors, unhandled NMIs and other
+	 * unrecoverable faults end up here.
+	 */
+	void    (*memerr)__P((unsigned, u_int, u_int, struct trapframe *));
 	/* XXX: Add more here! */
 };
 

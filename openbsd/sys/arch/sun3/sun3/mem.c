@@ -1,4 +1,4 @@
-/*	$OpenBSD: mem.c,v 1.7 1998/08/31 17:42:42 millert Exp $	*/
+/*	$OpenBSD: mem.c,v 1.9 2000/03/02 23:02:14 todd Exp $	*/
 /*	$NetBSD: mem.c,v 1.19 1995/08/08 21:09:01 gwr Exp $	*/
 
 /*
@@ -172,7 +172,7 @@ mmrw(dev, uio, flags)
 			/* Temporarily map the memory at vmmap. */
 			pmap_enter(pmap_kernel(), vmmap,
 			    trunc_page(v), uio->uio_rw == UIO_READ ?
-			    VM_PROT_READ : VM_PROT_WRITE, TRUE);
+			    VM_PROT_READ : VM_PROT_WRITE, TRUE, 0);
 			o = uio->uio_offset & PGOFSET;
 			c = min(uio->uio_resid, (int)(NBPG - o));
 			error = uiomove((caddr_t)vmmap + o, c, uio);
@@ -314,4 +314,16 @@ mmmmap(dev, off, prot)
 	}
 
 	return (-1);
+}
+
+/*ARGSUSED*/
+int
+mmioctl(dev, cmd, data, flags, p)
+	dev_t dev;
+	u_long cmd;
+	caddr_t data;
+	int flags;
+	struct proc *p;
+{
+	return (EOPNOTSUPP);
 }

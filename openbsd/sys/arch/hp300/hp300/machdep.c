@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.38 1999/09/03 18:00:41 art Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.40 2000/03/23 09:59:54 art Exp $	*/
 /*	$NetBSD: machdep.c,v 1.94 1997/06/12 15:46:29 mrg Exp $	*/
 
 /*
@@ -48,7 +48,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
-#include <sys/callout.h>
+#include <sys/timeout.h>
 #include <sys/clist.h>
 #include <sys/conf.h>
 #include <sys/exec.h>
@@ -133,7 +133,6 @@ int	bufpages = BUFPAGES;
 #else
 int	bufpages = 0;
 #endif
-int	msgbufmapped;		/* set when safe to use msgbuf */
 int	maxmem;			/* max memory per process */
 int	physmem = MAXMEM;	/* max supported memory, changes to actual */
 /*
@@ -247,11 +246,11 @@ cpu_startup()
 	 * Initialize error message buffer (at end of core).
 	 * avail_end was pre-decremented in pmap_bootstrap to compensate.
 	 */
-	for (i = 0; i < btoc(sizeof (struct msgbuf)); i++)
+	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_enter(pmap_kernel(), (vm_offset_t)msgbufp,
 		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
 		    VM_PROT_READ|VM_PROT_WRITE);
-	msgbufmapped = 1;
+	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	/*
 	 * Good {morning,afternoon,evening,night}.
@@ -321,12 +320,9 @@ cpu_startup()
 	mb_map = kmem_suballoc(kernel_map, (vm_offset_t *)&mbutl, &maxaddr,
 			       VM_MBUF_SIZE, FALSE);
 	/*
-	 * Initialize callouts
+	 * Initialize timeouts
 	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
-	callout[i-1].c_next = NULL;
+	timeout_init();
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
@@ -401,7 +397,7 @@ allocsys(v)
 #ifdef REAL_CLISTS
 	valloc(cfree, struct cblock, nclist);
 #endif
-	valloc(callout, struct callout, ncallout);
+	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -889,6 +885,7 @@ dumpsys()
 	cpu_kcore_hdr_t *chdr_p;
 	char dump_hdr[dbtob(1)];	/* XXX assume hdr fits in 1 block */
 #endif	/* HP300_NEWKVM */
+	extern int msgbufmapped;
 
 	/* XXX initialized here because of gcc lossage */
 	maddr = lowram;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.48 1999/03/08 23:47:26 downsj Exp $	*/
+/*	$OpenBSD: locore.s,v 1.50 2000/05/01 00:43:41 mickey Exp $	*/
 /*	$NetBSD: locore.s,v 1.145 1996/05/03 19:41:19 christos Exp $	*/
 
 /*-
@@ -890,6 +890,24 @@ ENTRY(bcopy)
 	popl	%esi
 	cld
 	ret
+
+/*
+ * Emulate memcpy() by swapping the first two arguments and calling bcopy()
+ */
+ENTRY(memcpy)
+	movl	4(%esp),%ecx
+	xchg	8(%esp),%ecx
+	movl	%ecx,4(%esp)
+	jmp	_bcopy
+
+/*
+ * Emulate memcmp() by swapping the first two arguments and calling bcmp()
+ */
+ENTRY(memcmp)
+	movl	4(%esp),%ecx
+	xchg	8(%esp),%ecx
+	movl	%ecx,4(%esp)
+	jmp	_bcmp
 
 /*****************************************************************************/
 

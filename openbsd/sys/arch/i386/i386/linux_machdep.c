@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_machdep.c,v 1.12 1998/07/09 18:22:12 deraadt Exp $	*/
+/*	$OpenBSD: linux_machdep.c,v 1.14 2000/03/28 06:35:57 jasoni Exp $	*/
 /*	$NetBSD: linux_machdep.c,v 1.29 1996/05/03 19:42:11 christos Exp $	*/
 
 /*
@@ -43,7 +43,6 @@
 #include <sys/reboot.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/callout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
@@ -269,6 +268,15 @@ linux_sys_sigreturn(p, v, retval)
 	p->p_sigmask = context.sc_mask & ~sigcantmask;
 
 	return (EJUSTRETURN);
+}
+
+int
+linux_sys_rt_sigreturn(p, v, retval)
+	struct proc *p;
+	void *v;
+	register_t *retval;
+{
+	return(ENOSYS);
 }
 
 #ifdef USER_LDT

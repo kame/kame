@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_vnode.c,v 1.22 1999/03/25 18:48:56 mrg Exp $	*/
+/*	$NetBSD: uvm_vnode.c,v 1.23 1999/04/11 04:04:11 chs Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -1634,7 +1634,7 @@ uvn_io(uvn, pps, npages, flags, rw)
 	if (file_offset >= uvn->u_size) {
 			simple_unlock(&uvn->u_obj.vmobjlock);
 			UVMHIST_LOG(maphist,"<- BAD (size check)",0,0,0,0);
-#ifdef DIAGNOSTIC
+#ifdef DEBUG
 			printf("uvn_io: note: size check fired\n");
 #endif
 			return(VM_PAGER_BAD);
@@ -1850,7 +1850,7 @@ uvm_vnp_uncache(vp)
 	 */
 	if (!VOP_ISLOCKED(vp)) {
 		boolean_t is_ok_anyway = FALSE;
-#if defined(NFSSERVER) || defined(NFSCLIENT)
+#if defined(NFSCLIENT)
 		extern int (**nfsv2_vnodeop_p) __P((void *));
 		extern int (**spec_nfsv2nodeop_p) __P((void *));
 		extern int (**fifo_nfsv2nodeop_p) __P((void *));

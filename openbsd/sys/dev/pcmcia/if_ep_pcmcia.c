@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ep_pcmcia.c,v 1.20 1999/08/16 16:51:19 deraadt Exp $	*/
+/*	$OpenBSD: if_ep_pcmcia.c,v 1.23 2000/04/24 19:43:35 niklas Exp $	*/
 /*	$NetBSD: if_ep_pcmcia.c,v 1.16 1998/08/17 23:20:40 thorpej Exp $  */
 
 /*-
@@ -158,9 +158,15 @@ struct ep_pcmcia_product {
 	{ PCMCIA_PRODUCT_3COM_3CXEM556B,EP_CHIPSET_3C509,
 	  0,				0 },
 
+	{ PCMCIA_PRODUCT_3COM_3C1,	EP_CHIPSET_3C509,
+	  0,				0 },
+
 #ifdef notyet
+	{ PCMCIA_PRODUCT_3COM_3CCFEM556BI, EP_CHIPSET_BOOMERANG,
+	  EP_FLAGS_MII,			0 },
+
 	{ PCMCIA_PRODUCT_3COM_3C574,	EP_CHIPSET_BOOMERANG,
-	  EP_FLAGS_MII,			0}
+	  EP_FLAGS_MII,			0 }
 #endif
 };
 
@@ -249,8 +255,8 @@ ep_pcmcia_disable(sc)
 {
 	struct ep_pcmcia_softc *psc = (struct ep_pcmcia_softc *) sc;
 
-	ep_pcmcia_disable1(sc);
 	pcmcia_intr_disestablish(psc->sc_pf, sc->sc_ih);
+	ep_pcmcia_disable1(sc);
 }
 
 void
@@ -341,6 +347,7 @@ ep_pcmcia_attach(parent, self, aux)
 		 */
 		/* FALLTHROUGH */
 	case PCMCIA_PRODUCT_3COM_3C574:
+	case PCMCIA_PRODUCT_3COM_3CCFEM556BI:
 		/*
 		 * Apparently, some 3c574s do it this way, as well.
 		 */
@@ -401,19 +408,27 @@ ep_pcmcia_activate(dev, act)
 	enum devact act;
 {
 	struct ep_pcmcia_softc *sc = (struct ep_pcmcia_softc *)dev;
+	struct ep_softc *esc = &sc->sc_ep;
+	struct ifnet *ifp = &esc->sc_arpcom.ac_if;
 	int s;
 
 	s = splnet();
 	switch (act) {
 	case DVACT_ACTIVATE:
 		pcmcia_function_enable(sc->sc_pf);
+		printf("%s:", esc->sc_dev.dv_xname);
 		sc->sc_ep.sc_ih =
 		    pcmcia_intr_establish(sc->sc_pf, IPL_NET, epintr, sc);
+		printf("\n");
+		epinit(esc);
 		break;
 
 	case DVACT_DEACTIVATE:
-		pcmcia_function_disable(sc->sc_pf);
+		ifp->if_timer = 0;
+		if (ifp->if_flags & IFF_RUNNING)
+			epstop(esc);
 		pcmcia_intr_disestablish(sc->sc_pf, sc->sc_ep.sc_ih);
+		pcmcia_function_disable(sc->sc_pf);
 		break;
 	}
 	splx(s);

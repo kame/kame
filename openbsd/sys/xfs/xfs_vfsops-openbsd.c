@@ -1,3 +1,5 @@
+/*	$OpenBSD: xfs_vfsops-openbsd.c,v 1.3 2000/03/03 00:54:59 todd Exp $	*/
+
 /*
  * Copyright (c) 1995, 1996, 1997, 1998, 1999 Kungliga Tekniska Högskolan
  * (Royal Institute of Technology, Stockholm, Sweden).
@@ -38,7 +40,7 @@
 
 #include <xfs/xfs_locl.h>
 
-RCSID("$Id: xfs_vfsops-openbsd.c,v 1.1 1999/04/30 01:59:01 art Exp $");
+RCSID("$OpenBSD: xfs_vfsops-openbsd.c,v 1.3 2000/03/03 00:54:59 todd Exp $");
 
 #include <xfs/xfs_common.h>
 #include <xfs/xfs_message.h>
@@ -81,6 +83,22 @@ xfs_init(struct vfsconf *vfs)
     return 0;
 }
 
+static int
+xfs_sysctl (int *name, u_int namelen, void *oldp, size_t *oldlenp,
+	    void *newp, size_t newlen, struct proc *p)
+{
+    XFSDEB(XDEBVFOPS, ("xfs_sysctl\n"));
+    return EOPNOTSUPP;
+}
+
+static int
+xfs_checkexp(struct mount *mp, struct mbuf *nam, int *exflagsp,
+	     struct ucred **credanonp)
+{
+    XFSDEB(XDEBVFOPS, ("xfs_checkexp\n"));
+    return (EOPNOTSUPP);
+}
+
 struct vfsops xfs_vfsops = {
     xfs_mount,
     xfs_start,
@@ -93,7 +111,8 @@ struct vfsops xfs_vfsops = {
     xfs_fhtovp,
     xfs_vptofh,
     xfs_init,
-    NULL,
+    xfs_sysctl,
+    xfs_checkexp
 };
 
 static struct vfsconf xfs_vfc = {

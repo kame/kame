@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcvt_out.c,v 1.14 1999/10/20 19:15:51 deraadt Exp $	*/
+/*	$OpenBSD: pcvt_out.c,v 1.21 2000/04/09 20:21:30 aaron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1995 Hellmuth Michaelis and Joerg Wunsch.
@@ -75,9 +75,6 @@
 #include "pcvt_hdr.h"		/* global include */
 
 static void check_scroll ( struct video_state *svsp );
-static void hp_entry ( U_char ch, struct video_state *svsp );
-static void wrfkl ( int num, u_char *string, struct video_state *svsp );
-static void writefkl ( int num, u_char *string, struct video_state *svsp );
 static __inline void write_char (struct	video_state *, u_short, u_short ch);
 
 static int check_scrollback ( struct video_state *svsp );
@@ -92,56 +89,37 @@ static __inline void write_char (svsp, attrib, ch)
 struct	video_state *svsp;
 u_short	attrib, ch;
 {
-	if (pcdisp && pcdisp_special == 0) {
-		*video = attrib | ch;
-		return;
-	}
-
-	if ((ch >= 0x20) && (ch <= 0x7f))	/* use GL if ch >= 0x20 */
-	{
+	if ((ch >= 0x20) && (ch <= 0x7f)) {	/* use GL if ch >= 0x20 */
 		if(!svsp->ss)		/* single shift G2/G3 -> GL ? */
-		{
 			*video = attrib | svsp->GL[ch-0x20];
-		}
-		else
-		{
+		else {
 			*video = attrib | svsp->Gs[ch-0x20];
 			svsp->ss = 0;
 		}
 	}
-	else
-	{
+	else {
+		if (pcdisp) {
+			*video = attrib | ch;
+			return;
+		}
+
 		svsp->ss = 0;
 
-		if(ch >= 0x80)			/* display controls C1 */
-		{
+		if(ch >= 0x80) {		/* display controls C1 */
 			if(ch >= 0xA0)		/* use GR if ch >= 0xA0 */
-			{
 				*video = attrib | svsp->GR[ch-0xA0];
-			}
-			else
-			{
+			else {
 				if(vgacs[svsp->vga_charset].secondloaded)
-				{
 					*video = attrib | ((ch-0x60) | CSH);
-				}
-				else	/* use normal ibm charset for
-							control display */
-				{
+				else	/* use normal ibm charset  */
 					*video = attrib | ch;
-				}
 			}
 		}
-		else				/* display controls C0 */
-		{
+		else {				/* display controls C0 */
 			if(vgacs[svsp->vga_charset].secondloaded)
-			{
 				*video = attrib | (ch | CSH);
-			}
 			else	/* use normal ibm charset for control display*/
-			{
 				*video = attrib | ch;
-			}
 		}
 	}
 }
@@ -196,234 +174,177 @@ sput (u_char *s, U_char kernel, int len, int page)
 	/* also process the C1 control chars a VT220 recognizes and
 	 * ignore the others.
 	 */
-		if(svsp->dis_fnc)
-		{
-			if(svsp->lastchar && svsp->m_awm
-			   && (svsp->lastrow == svsp->row))
-			{
+		switch(ch) {
+		case 0x00:	/* NUL */
+		case 0x01:	/* SOH */
+		case 0x02:	/* STX */
+		case 0x03:	/* ETX */
+		case 0x04:	/* EOT */
+		case 0x05:	/* ENQ */
+		case 0x06:	/* ACK */
+			break;
+
+		case 0x07:	/* BEL */
+			if(svsp->bell_on)
+				sysbeep(PCVT_SYSBEEPF/1500, hz/4);
+			break;
+
+		case 0x08:	/* BS */
+			if(svsp->col > 0) {
+				svsp->cur_offset--;
+				svsp->col--;
+			}
+			break;
+
+		case 0x09:	/* TAB */
+			while (svsp->col < ((svsp->maxcol)-1)) {
 				svsp->cur_offset++;
-				svsp->col = 0;
-				svsp->lastchar = 0;
-				check_scroll(svsp);
+				if(svsp->tab_stops[++svsp->col])
+					break;
 			}
+			break;
 
-			if(svsp->irm)
-				bcopy((svsp->Crtat + svsp->cur_offset),
-				      (svsp->Crtat + svsp->cur_offset) + 1,
-				      (((svsp->maxcol)-1) - svsp->col)*CHR);
-
-			write_char(svsp, attrib, ch);
-
-			vt_selattr(svsp);
-
-			if(svsp->col >= ((svsp->maxcol)-1)
-			   && ch != 0x0a && ch != 0x0b && ch != 0x0c)
-			{
-				svsp->lastchar = 1;
-				svsp->lastrow = svsp->row;
+		case 0x0a:	/* LF */
+		case 0x0b:	/* VT */
+		case 0x0c:	/* FF */
+			if (check_scrollback(svsp)) {
+				extra = (svsp->cur_offset % svsp->maxcol) ?
+				    svsp->col : 0;
+				bcopy(svsp->Crtat + svsp->cur_offset - extra,
+				    svsp->Scrollback + (svsp->scr_offset *
+				    svsp->maxcol), svsp->maxcol * CHR);
 			}
-			else if(ch == 0x0a || ch == 0x0b || ch == 0x0c)
-			{
+			if(svsp->lnm) {
 				svsp->cur_offset -= svsp->col;
 				svsp->cur_offset += svsp->maxcol;
 				svsp->col = 0;
-				svsp->lastchar = 0;
-				check_scroll(svsp);	/* check scroll up */
 			}
-			else
-			{
-				svsp->cur_offset++;
-				svsp->col++;
-				svsp->lastchar = 0;
+			else {
+				svsp->cur_offset += svsp->maxcol;
 			}
-		}
-		else
-		{
-			switch(ch)
-			{
-				case 0x00:	/* NUL */
-				case 0x01:	/* SOH */
-				case 0x02:	/* STX */
-				case 0x03:	/* ETX */
-				case 0x04:	/* EOT */
-				case 0x05:	/* ENQ */
-				case 0x06:	/* ACK */
-					break;
+			check_scroll(svsp);
+			break;
 
-				case 0x07:	/* BEL */
-					if(svsp->bell_on)
- 					  sysbeep(PCVT_SYSBEEPF/1500, hz/4);
-					break;
+		case 0x0d:	/* CR */
+			svsp->cur_offset -= svsp->col;
+			svsp->col = 0;
+			break;
 
-				case 0x08:	/* BS */
-					if(svsp->col > 0)
-					{
-						svsp->cur_offset--;
-						svsp->col--;
-					}
-					break;
+		case 0x0e:	/* SO */
+			svsp->GL = svsp->G1;
+			break;
 
-				case 0x09:	/* TAB */
-					while(svsp->col < ((svsp->maxcol)-1))
-					{
-						svsp->cur_offset++;
-						if(svsp->
-						   tab_stops[++svsp->col])
-							break;
-					}
-					break;
+		case 0x0f:	/* SI */
+			svsp->GL = svsp->G0;
+			break;
 
-				case 0x0a:	/* LF */
-				case 0x0b:	/* VT */
-				case 0x0c:	/* FF */
-					if (check_scrollback(svsp))
-					{
-						extra = (svsp->cur_offset %
-							svsp->maxcol) ?
-							svsp->col : 0;
-						bcopy(svsp->Crtat +
-						      svsp->cur_offset - extra,
-						      svsp->Scrollback +
-					              (svsp->scr_offset *
-						      svsp->maxcol),
-						      svsp->maxcol * CHR);
-					}
-					if(svsp->lnm)
-					{
-						svsp->cur_offset -= svsp->col;
-						svsp->cur_offset +=
-							svsp->maxcol;
-						svsp->col = 0;
-					}
-					else
-					{
-						svsp->cur_offset +=
-							svsp->maxcol;
-					}
-					check_scroll(svsp);
-					break;
+		case 0x10:	/* DLE */
+		case 0x11:	/* DC1/XON */
+		case 0x12:	/* DC2 */
+		case 0x13:	/* DC3/XOFF */
+		case 0x14:	/* DC4 */
+		case 0x15:	/* NAK */
+		case 0x16:	/* SYN */
+		case 0x17:	/* ETB */
+			break;
 
-				case 0x0d:	/* CR */
-					svsp->cur_offset -= svsp->col;
-					svsp->col = 0;
-					break;
+		case 0x18:	/* CAN */
+			svsp->state = STATE_INIT;
+			clr_parms(svsp);
+			break;
 
-				case 0x0e:	/* SO */
-					svsp->GL = svsp->G1;
-					break;
+		case 0x19:	/* EM */
+			break;
 
-				case 0x0f:	/* SI */
-					svsp->GL = svsp->G0;
-					break;
+		case 0x1a:	/* SUB */
+			svsp->state = STATE_INIT;
+			clr_parms(svsp);
+			break;
 
-				case 0x10:	/* DLE */
-				case 0x11:	/* DC1/XON */
-				case 0x12:	/* DC2 */
-				case 0x13:	/* DC3/XOFF */
-				case 0x14:	/* DC4 */
-				case 0x15:	/* NAK */
-				case 0x16:	/* SYN */
-				case 0x17:	/* ETB */
-					break;
+		case 0x1b:	/* ESC */
+			svsp->state = STATE_ESC;
+			clr_parms(svsp);
+			break;
 
-				case 0x18:	/* CAN */
-					svsp->state = STATE_INIT;
-					clr_parms(svsp);
-					break;
+		case 0x1c:	/* FS */
+		case 0x1d:	/* GS */
+		case 0x1e:	/* RS */
+		case 0x1f:	/* US */
+			break;
 
-				case 0x19:	/* EM */
-					break;
+		case 0x80:	/* */
+		case 0x81:	/* */
+		case 0x82:	/* */
+		case 0x83:	/* */
+			break;
 
-				case 0x1a:	/* SUB */
-					svsp->state = STATE_INIT;
-					clr_parms(svsp);
-					break;
+		case 0x84:      /* IND */
+			vt_ind(svsp);
+			break;
 
-				case 0x1b:	/* ESC */
-					svsp->state = STATE_ESC;
-					clr_parms(svsp);
-					break;
+		case 0x85:      /* NEL */
+			vt_nel(svsp);
+			break;
 
-				case 0x1c:	/* FS */
-				case 0x1d:	/* GS */
-				case 0x1e:	/* RS */
-				case 0x1f:	/* US */
-					break;
+		case 0x86:      /* SSA */
+		case 0x87:      /* ESA */
+			break;
 
-				case 0x80:	/* */
-				case 0x81:	/* */
-				case 0x82:	/* */
-				case 0x83:	/* */
-					break;
+		case 0x88:      /* HTS */
+			svsp->tab_stops[svsp->col] = 1;
+			break;
 
-				case 0x84:      /* IND */
-					vt_ind(svsp);
-					break;
+		case 0x89:      /* HTJ */
+		case 0x8a:      /* VTS */
+		case 0x8b:      /* PLD */
+		case 0x8c:      /* PLU */
+			break;
 
-				case 0x85:      /* NEL */
-					vt_nel(svsp);
-					break;
+		case 0x8d:      /* RI */
+			vt_ri(svsp);
+			break;
 
-				case 0x86:      /* SSA */
-				case 0x87:      /* ESA */
-					break;
+		case 0x8e:      /* SS2 */
+			svsp->Gs = svsp->G2;
+			svsp->ss = 1;
+			break;
 
-				case 0x88:      /* HTS */
-					svsp->tab_stops[svsp->col] = 1;
-					break;
+		case 0x8f:      /* SS3 */
+			svsp->Gs = svsp->G3;
+			svsp->ss = 1;
+			break;
 
-				case 0x89:      /* HTJ */
-				case 0x8a:      /* VTS */
-				case 0x8b:      /* PLD */
-				case 0x8c:      /* PLU */
-					break;
+		case 0x90:      /* DCS */
+			svsp->dcs_state = DCS_INIT;
+			svsp->state = STATE_DCS;
+			break;
 
-				case 0x8d:      /* RI */
-					vt_ri(svsp);
-					break;
+		case 0x91:      /* PU1 */
+		case 0x92:      /* PU2 */
+		case 0x93:      /* STS */
+		case 0x94:      /* CCH */
+		case 0x95:      /* MW */
+		case 0x96:      /* SPA */
+		case 0x97:      /* EPA */
+		case 0x98:      /* */
+		case 0x99:      /* */
+		case 0x9a:      /* */
+			break;
 
-				case 0x8e:      /* SS2 */
-					svsp->Gs = svsp->G2;
-					svsp->ss = 1;
-					break;
+		case 0x9b:      /* CSI */
+			clr_parms(svsp);
+			svsp->state = STATE_CSI;
+			break;
 
-				case 0x8f:      /* SS3 */
-					svsp->Gs = svsp->G3;
-					svsp->ss = 1;
-					break;
+		case 0x9c:      /* ST */
+			svsp->state = STATE_INIT;
+			break;
 
-				case 0x90:      /* DCS */
-					svsp->dcs_state = DCS_INIT;
-					svsp->state = STATE_DCS;
-					break;
-
-				case 0x91:      /* PU1 */
-				case 0x92:      /* PU2 */
-				case 0x93:      /* STS */
-				case 0x94:      /* CCH */
-				case 0x95:      /* MW */
-				case 0x96:      /* SPA */
-				case 0x97:      /* EPA */
-				case 0x98:      /* */
-				case 0x99:      /* */
-				case 0x9a:      /* */
-					break;
-
-				case 0x9b:      /* CSI */
-					clr_parms(svsp);
-					svsp->state = STATE_CSI;
-					break;
-
-				case 0x9c:      /* ST */
-					svsp->state = STATE_INIT;
-					break;
-
-				case 0x9d:      /* OSC */
-				case 0x9e:      /* PM */
-				case 0x9f:      /* APC */
-					/* only in VT320's */
-					break;
-			}
+		case 0x9d:      /* OSC */
+		case 0x9e:      /* PM */
+		case 0x9f:      /* APC */
+			/* only in VT320's */
+			break;
 		}
 	}
 	else
@@ -431,579 +352,536 @@ sput (u_char *s, U_char kernel, int len, int page)
 
 	/* char range 0x20...0xff processing depends on current state */
 
-		switch(svsp->state)
-		{
-			case STATE_INIT:
-				if(svsp->lastchar && svsp->m_awm &&
-				   (svsp->lastrow == svsp->row))
-				{
-					svsp->cur_offset++;
-					svsp->col = 0;
-					svsp->lastchar = 0;
-					if (check_scrollback(svsp))
-					{
-						bcopy(svsp->Crtat +
-						      svsp->cur_offset -
-						      svsp->maxcol,
-		      				      svsp->Scrollback +
-						      (svsp->scr_offset *
-						      svsp->maxcol),
-		      				      svsp->maxcol * CHR);
-					}
-					check_scroll(svsp);
+
+		switch(svsp->state) {
+		case STATE_INIT:
+			if (svsp->lastchar && svsp->m_awm &&
+			    (svsp->lastrow == svsp->row))
+			{
+				svsp->cur_offset++;
+				svsp->col = 0;
+				svsp->lastchar = 0;
+				if (check_scrollback(svsp)) {
+					bcopy(svsp->Crtat + svsp->cur_offset -
+			      	      	    svsp->maxcol, svsp->Scrollback +
+					    (svsp->scr_offset * svsp->maxcol),
+					    svsp->maxcol * CHR);
 				}
+				check_scroll(svsp);
+			}
 
-				if(svsp->irm)
-					bcopy  ((svsp->Crtat
-						 + svsp->cur_offset),
-						(svsp->Crtat
-						 + svsp->cur_offset) + 1,
-						(((svsp->maxcol)-1)
-						 - svsp->col) * CHR);
+			if(svsp->irm)
+				bcopy((svsp->Crtat + svsp->cur_offset),
+				    (svsp->Crtat + svsp->cur_offset) + 1,
+				    (((svsp->maxcol)-1) - svsp->col) * CHR);
 
-				write_char(svsp, attrib, ch);
+			write_char(svsp, attrib, ch);
+			vt_selattr(svsp);
 
-				vt_selattr(svsp);
+			if(svsp->col >= ((svsp->maxcol)-1)) {
+				svsp->lastchar = 1;
+				svsp->lastrow = svsp->row;
+			}
+			else {
+				svsp->lastchar = 0;
+				svsp->cur_offset++;
+				svsp->col++;
+			}
+			break;
 
-				if(svsp->col >= ((svsp->maxcol)-1))
-				{
-					svsp->lastchar = 1;
-					svsp->lastrow = svsp->row;
-				}
-				else
-				{
-					svsp->lastchar = 0;
-					svsp->cur_offset++;
-					svsp->col++;
-				}
+		case STATE_ESC:
+			switch(ch) {
+			case ' ':	/* ESC sp family */
+				svsp->state = STATE_BLANK;
 				break;
 
-			case STATE_ESC:
-				switch(ch)
-				{
-					case ' ':	/* ESC sp family */
-						svsp->state = STATE_BLANK;
-						break;
+			case '#':	/* ESC # family */
+				svsp->state = STATE_HASH;
+				break;
 
-					case '#':	/* ESC # family */
-						svsp->state = STATE_HASH;
-						break;
+			case '(':	/* ESC ( family */
+				svsp->state = STATE_BROPN;
+				break;
 
-					case '&':	/* ESC & family (HP) */
-						if(svsp->vt_pure_mode ==
-						   M_HPVT)
-						{
-							svsp->state =
-								STATE_AMPSND;
-							svsp->hp_state =
-								SHP_INIT;
-						}
-						else
-							svsp->state =
-								STATE_INIT;
-						break;
+			case ')':	/* ESC ) family */
+				svsp->state = STATE_BRCLO;
+				break;
 
-					case '(':	/* ESC ( family */
-						svsp->state = STATE_BROPN;
-						break;
+			case '*':	/* ESC * family */
+				svsp->state = STATE_STAR;
+				break;
 
-					case ')':	/* ESC ) family */
-						svsp->state = STATE_BRCLO;
-						break;
+			case '+':	/* ESC + family */
+				svsp->state = STATE_PLUS;
+				break;
 
-					case '*':	/* ESC * family */
-						svsp->state = STATE_STAR;
-						break;
+			case '-':	/* ESC - family */
+				svsp->state = STATE_MINUS;
+				break;
 
-					case '+':	/* ESC + family */
-						svsp->state = STATE_PLUS;
-						break;
+			case '.':	/* ESC . family */
+				svsp->state = STATE_DOT;
+				break;
 
-					case '-':	/* ESC - family */
-						svsp->state = STATE_MINUS;
-						break;
+			case '/':	/* ESC / family */
+				svsp->state = STATE_SLASH;
+				break;
 
-					case '.':	/* ESC . family */
-						svsp->state = STATE_DOT;
-						break;
+			case '7':	/* SAVE CURSOR */
+				vt_sc(svsp);
+				svsp->state = STATE_INIT;
+				break;
 
-					case '/':	/* ESC / family */
-						svsp->state = STATE_SLASH;
-						break;
+			case '8':	/* RESTORE CURSOR */
+				vt_rc(svsp);
+				if (!kernel)
+					attrib = svsp->c_attr;
+				svsp->state = STATE_INIT;
+				break;
 
-					case '7':	/* SAVE CURSOR */
-						vt_sc(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case '8':	/* RESTORE CURSOR */
-						vt_rc(svsp);
-						if (!kernel)
-							attrib = svsp->c_attr;
-						svsp->state = STATE_INIT;
-						break;
-
-					case '=': /* keypad application mode */
+			case '=': /* keypad application mode */
 #if !PCVT_INHIBIT_NUMLOCK
-						vt_keyappl(svsp);
+				vt_keyappl(svsp);
 #endif
-						svsp->state = STATE_INIT;
-						break;
+				svsp->state = STATE_INIT;
+				break;
 
-					case '>': /* keypad numeric mode */
+			case '>': /* keypad numeric mode */
 #if !PCVT_INHIBIT_NUMLOCK
-						vt_keynum(svsp);
+				vt_keynum(svsp);
 #endif
-						svsp->state = STATE_INIT;
-						break;
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'D':	/* INDEX */
-						vt_ind(svsp);
-						svsp->state = STATE_INIT;
-						break;
+			case 'D':	/* INDEX */
+				vt_ind(svsp);
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'E':	/* NEXT LINE */
-						vt_nel(svsp);
-						svsp->state = STATE_INIT;
-						break;
+			case 'E':	/* NEXT LINE */
+				vt_nel(svsp);
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'H': /* set TAB at current col */
-						svsp->tab_stops[svsp->col] = 1;
-						svsp->state = STATE_INIT;
-						break;
+			case 'H': /* set TAB at current col */
+				svsp->tab_stops[svsp->col] = 1;
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'M':	/* REVERSE INDEX */
-						vt_ri(svsp);
-						svsp->state = STATE_INIT;
-						break;
+			case 'M':	/* REVERSE INDEX */
+				vt_ri(svsp);
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'N':	/* SINGLE SHIFT G2 */
-						svsp->Gs = svsp->G2;
-						svsp->ss = 1;
-						svsp->state = STATE_INIT;
-						break;
+			case 'N':	/* SINGLE SHIFT G2 */
+				svsp->Gs = svsp->G2;
+				svsp->ss = 1;
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'O':	/* SINGLE SHIFT G3 */
-						svsp->Gs = svsp->G3;
-						svsp->ss = 1;
-						svsp->state = STATE_INIT;
-						break;
+			case 'O':	/* SINGLE SHIFT G3 */
+				svsp->Gs = svsp->G3;
+				svsp->ss = 1;
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'P':	/* DCS detected */
-						svsp->dcs_state = DCS_INIT;
-						svsp->state = STATE_DCS;
-						break;
+			case 'P':	/* DCS detected */
+				svsp->dcs_state = DCS_INIT;
+				svsp->state = STATE_DCS;
+				break;
 
-					case 'Z': /* What are you = ESC [ c */
-						vt_da(svsp);
-						svsp->state = STATE_INIT;
-						break;
+			case 'Z': /* What are you = ESC [ c */
+				vt_da(svsp);
+				svsp->state = STATE_INIT;
+				break;
 
-					case '[':	/* CSI detected */
-						clr_parms(svsp);
-						svsp->state = STATE_CSI;
-						break;
+			case '[':	/* CSI detected */
+				clr_parms(svsp);
+				svsp->state = STATE_CSI;
+				break;
 
-					case '\\':	/* String Terminator */
-						svsp->state = STATE_INIT;
-						break;
+			case '\\':	/* String Terminator */
+				svsp->state = STATE_INIT;
+				break;
 
-					case 'c':	/* hard reset */
-						vt_ris(svsp);
-						if (!kernel)
-							attrib = svsp->c_attr;
-						svsp->state = STATE_INIT;
-						break;
-
+			case 'c':	/* hard reset */
+				vt_ris(svsp);
+				if (!kernel)
+					attrib = svsp->c_attr;
+				svsp->state = STATE_INIT;
+				break;
 #if PCVT_SETCOLOR
-					case 'd':	/* set color sgr */
-						if(color)
-						{
-							/* set shiftwidth=4 */
-							sgr_tab_color
-								[svsp->
-								 vtsgr] =
-								 svsp->c_attr
-								 >> 8;
-							user_attr =
-								sgr_tab_color
-								[0] << 8;
-						}
-						svsp->state = STATE_INIT;
-						break;
+			case 'd':	/* set color sgr */
+				if (color) {
+					/* set shiftwidth=4 */
+					sgr_tab_color[svsp->vtsgr] =
+					    svsp->c_attr >> 8;
+					user_attr = sgr_tab_color[0] << 8;
+				}
+				svsp->state = STATE_INIT;
+				break;
 #endif /* PCVT_SETCOLOR */
-					case 'n': /* Lock Shift G2 -> GL */
-						svsp->GL = svsp->G2;
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'o': /* Lock Shift G3 -> GL */
-						svsp->GL = svsp->G3;
-						svsp->state = STATE_INIT;
-						break;
-
-					case '}': /* Lock Shift G2 -> GR */
-						svsp->GR = svsp->G2;
-						svsp->state = STATE_INIT;
-						break;
-
-					case '|': /* Lock Shift G3 -> GR */
-						svsp->GR = svsp->G3;
-						svsp->state = STATE_INIT;
-						break;
-
-					case '~': /* Lock Shift G1 -> GR */
-						svsp->GR = svsp->G1;
-						svsp->state = STATE_INIT;
-						break;
-
-					default:
-						svsp->state = STATE_INIT;
-						break;
-				}
-				break;
-
-			case STATE_BLANK:	/* ESC space [FG], which are */
-				svsp->state = STATE_INIT; /* currently ignored*/
-				break;
-
-			case STATE_HASH:
-				switch(ch)
-				{
-					case '3': /* double height top half */
-					case '4': /*double height bottom half*/
-					case '5': /*single width sngle height*/
-					case '6': /*double width sngle height*/
-						svsp->state = STATE_INIT;
-						break;
-
-					case '8': /* fill sceen with 'E's */
-						vt_aln(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					default: /* anything else */
-						svsp->state = STATE_INIT;
-						break;
-				}
-				break;
-
-			case STATE_BROPN:	/* designate G0 */
-			case STATE_BRCLO:	/* designate G1 */
-			case STATE_STAR:	/* designate G2 */
-			case STATE_PLUS:	/* designate G3 */
-			case STATE_MINUS:	/* designate G1 (96) */
-			case STATE_DOT:		/* designate G2 (96) */
-			case STATE_SLASH:	/* designate G3 (96) */
-				svsp->which[svsp->whichi++] = ch;
-				if(ch >= 0x20 && ch <= 0x2f
-				   && svsp->whichi <= 2)
-					break;
-				else if(ch >=0x30 && ch <= 0x7e)
-				{
-					svsp->which[svsp->whichi] = '\0';
-					vt_designate(svsp);
-				}
-				svsp->whichi = 0;
+			case 'n': /* Lock Shift G2 -> GL */
+				svsp->GL = svsp->G2;
 				svsp->state = STATE_INIT;
 				break;
 
-			case STATE_CSIQM:	/* DEC private modes */
-				switch(ch)
-				{
-					case '0':
-					case '1':
-					case '2':
-					case '3':
-					case '4':
-					case '5':
-					case '6':
-					case '7':
-					case '8':
-					case '9':	/* parameters */
-						svsp->parms[svsp->parmi] *= 10;
-						svsp->parms[svsp->parmi] +=
-							(ch -'0');
-						break;
-
-					case ';':	/* next parameter */
-						svsp->parmi =
-						 (svsp->parmi+1 < MAXPARMS) ?
-						 svsp->parmi+1 : svsp->parmi;
-						break;
-
-					case 'h':	/* set mode */
-						vt_set_dec_priv_qm(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'l':	/* reset mode */
-						vt_reset_dec_priv_qm(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'n':	/* Reports */
-						vt_dsr(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'K': /* selective erase in line */
-						vt_sel(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'J':/*selective erase in display*/
-						vt_sed(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					default:
-						svsp->state = STATE_INIT;
-						break;
-
-				}
-				break;
-
-			case STATE_CSI:
-				switch(ch)
-				{
-					case '0':
-					case '1':
-					case '2':
-					case '3':
-					case '4':
-					case '5':
-					case '6':
-					case '7':
-					case '8':
-					case '9':	/* parameters */
-						svsp->parms[svsp->parmi] *= 10;
-						svsp->parms[svsp->parmi] +=
-							(ch -'0');
-						break;
-
-					case ';':	/* next parameter */
-						svsp->parmi =
-						 (svsp->parmi+1 < MAXPARMS) ?
-						 svsp->parmi+1 : svsp->parmi;
-						break;
-
-					case '?':	/* ESC [ ? family */
-						svsp->state = STATE_CSIQM;
-						break;
-
-					case '@':	/* insert char */
-						vt_ic(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case '"':  /* select char attribute */
-						svsp->state = STATE_DQUOTE;
-						break;
-
-					case '\'': /* for DECELR/DECSLE */
-/* XXX */					/* another state needed -hm */
-						break;
-
-					case '!': /* soft terminal reset */
-						svsp->state = STATE_STR;
-						break;
-
-					case 'A':	/* cursor up */
-						vt_cuu(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'B':	/* cursor down */
-						vt_cud(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'C':	/* cursor forward */
-						vt_cuf(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'D':	/* cursor backward */
-						vt_cub(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'H': /* direct cursor addressing*/
-						vt_curadr(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'J':	/* erase screen */
-						vt_clreos(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'K':	/* erase line */
-						vt_clreol(svsp);
-						svsp->state = STATE_INIT;
-						if (svsp->scr_offset > 0 &&
-						    svsp == vsp)
-							svsp->scr_offset--;
-						break;
-
-					case 'L':	/* insert line */
-						vt_il(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'M':	/* delete line */
-						vt_dl(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'P':	/* delete character */
-						vt_dch(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'S':	/* scroll up */
-						vt_su(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'T':	/* scroll down */
-						vt_sd(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'X':	/* erase character */
-						vt_ech(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'c':	/* device attributes */
-						vt_da(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'f': /* direct cursor addressing*/
-						vt_curadr(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'g':	/* clear tabs */
-						vt_clrtab(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'h':	/* set mode(s) */
-						vt_set_ansi(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'i':	/* media copy */
-						vt_mc(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'l':	/* reset mode(s) */
-						vt_reset_ansi(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'm': /* select graphic rendition*/
-						vt_sgr(svsp);
-						if (!kernel)
-							attrib = svsp->c_attr;
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'n':	/* reports */
-						vt_dsr(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'r': /* set scrolling region */
-						vt_stbm(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'x': /*request/report parameters*/
-						vt_reqtparm(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'y': /* invoke selftest(s) */
-						vt_tst(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'z': /* DECELR, ignored */
-					case '{': /* DECSLE, ignored */
-						svsp->state = STATE_INIT;
-						break;
-
-					default:
-						svsp->state = STATE_INIT;
-						break;
-				}
-				break;
-
-			case STATE_AMPSND:
-				hp_entry(ch,svsp);
-				break;
-
-			case STATE_DCS:
-				vt_dcsentry(ch,svsp);
-				break;
-
-			case STATE_DQUOTE:
-				switch(ch)
-				{
-					case 'p': /* compatibility level */
-						vt_scl(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					case 'q': /* select char attributes */
-						vt_sca(svsp);
-						svsp->state = STATE_INIT;
-						break;
-
-					default:
-						svsp->state = STATE_INIT;
-						break;
-				}
-				break;
-
-			case STATE_STR:
-				switch(ch)
-				{
-					case 'p': /* soft terminal reset */
-						vt_str(svsp);
-						if (!kernel)
-							attrib = svsp->c_attr;
-						svsp->state = STATE_INIT;
-						break;
-
-					default:
-						svsp->state = STATE_INIT;
-						break;
-				}
-				break;
-
-			default:		/* failsafe */
+			case 'o': /* Lock Shift G3 -> GL */
+				svsp->GL = svsp->G3;
 				svsp->state = STATE_INIT;
 				break;
 
+			case '}': /* Lock Shift G2 -> GR */
+				svsp->GR = svsp->G2;
+				svsp->state = STATE_INIT;
+				break;
+
+			case '|': /* Lock Shift G3 -> GR */
+				svsp->GR = svsp->G3;
+				svsp->state = STATE_INIT;
+				break;
+
+			case '~': /* Lock Shift G1 -> GR */
+				svsp->GR = svsp->G1;
+				svsp->state = STATE_INIT;
+				break;
+
+			default:
+				svsp->state = STATE_INIT;
+				break;
+			}
+			break;
+
+		case STATE_BLANK:	/* ESC space [FG], which are */
+			svsp->state = STATE_INIT; /* currently ignored*/
+			break;
+
+		case STATE_HASH:
+			switch(ch) {
+			case '3': /* double height top half */
+			case '4': /* double height bottom half */
+			case '5': /* single width sngle height */
+			case '6': /* double width sngle height */
+				svsp->state = STATE_INIT;
+				break;
+
+			case '8': /* fill sceen with 'E's */
+				vt_aln(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			default: /* anything else */
+				svsp->state = STATE_INIT;
+				break;
+			}
+			break;
+
+		case STATE_BROPN:	/* designate G0 */
+		case STATE_BRCLO:	/* designate G1 */
+		case STATE_STAR:	/* designate G2 */
+		case STATE_PLUS:	/* designate G3 */
+		case STATE_MINUS:	/* designate G1 (96) */
+		case STATE_DOT:		/* designate G2 (96) */
+		case STATE_SLASH:	/* designate G3 (96) */
+			svsp->which[svsp->whichi++] = ch;
+			if (ch >= 0x20 && ch <= 0x2f && svsp->whichi <= 2) {
+				break;
+			} else if (ch >=0x30 && ch <= 0x7e) {
+				 svsp->which[svsp->whichi] = '\0';
+				 vt_designate(svsp);
+			}
+			svsp->whichi = 0;
+			svsp->state = STATE_INIT;
+			break;
+
+		case STATE_CSIQM:	/* DEC private modes */
+			switch(ch) {
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':	/* parameters */
+				svsp->parms[svsp->parmi] *= 10;
+				svsp->parms[svsp->parmi] += (ch - '0');
+				break;
+
+			case ';':	/* next parameter */
+				svsp->parmi = (svsp->parmi+1 < MAXPARMS) ?
+				    svsp->parmi+1 : svsp->parmi;
+				break;
+
+			case 'h':	/* set mode */
+				vt_set_dec_priv_qm(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'l':	/* reset mode */
+				vt_reset_dec_priv_qm(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'n':	/* Reports */
+				vt_dsr(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'K': /* selective erase in line */
+				vt_sel(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'J':/*selective erase in display*/
+				vt_sed(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			default:
+				svsp->state = STATE_INIT;
+				break;
+			}
+			break;
+
+		case STATE_CSI:
+			switch(ch) {
+			case '0':
+			case '1':
+			case '2':
+			case '3':
+			case '4':
+			case '5':
+			case '6':
+			case '7':
+			case '8':
+			case '9':	/* parameters */
+				svsp->parms[svsp->parmi] *= 10;
+				svsp->parms[svsp->parmi] += (ch - '0');
+				break;
+
+			case ';':	/* next parameter */
+				svsp->parmi = (svsp->parmi+1 < MAXPARMS) ?
+				    svsp->parmi+1 : svsp->parmi;
+				break;
+
+			case '?':	/* ESC [ ? family */
+				svsp->state = STATE_CSIQM;
+				break;
+
+			case '@':	/* insert char */
+				vt_ic(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case '"':  /* select char attribute */
+				svsp->state = STATE_DQUOTE;
+				break;
+
+			case '\'': /* for DECELR/DECSLE */
+/* XXX */			/* another state needed -hm */
+				break;
+
+			case '!': /* soft terminal reset */
+				svsp->state = STATE_STR;
+				break;
+
+			case 'A':	/* cursor up */
+				vt_cuu(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'B':	/* cursor down */
+				vt_cud(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'C':	/* cursor forward */
+				vt_cuf(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'D':	/* cursor backward */
+				vt_cub(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'H': /* direct cursor addressing*/
+				vt_curadr(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'J':	/* erase screen */
+				vt_clreos(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'K':	/* erase line */
+				vt_clreol(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'L':	/* insert line */
+				vt_il(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'M':	/* delete line */
+				vt_dl(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'P':	/* delete character */
+				vt_dch(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'S':	/* scroll up */
+				vt_su(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'T':	/* scroll down */
+				vt_sd(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'X':	/* erase character */
+				vt_ech(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'c':	/* device attributes */
+				vt_da(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'f': /* direct cursor addressing*/
+				vt_curadr(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'g':	/* clear tabs */
+				vt_clrtab(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'h':	/* set mode(s) */
+				vt_set_ansi(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'i':	/* media copy */
+				vt_mc(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'l':	/* reset mode(s) */
+				vt_reset_ansi(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'm': /* select graphic rendition*/
+				vt_sgr(svsp);
+				if (!kernel)
+					attrib = svsp->c_attr;
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'n':	/* reports */
+				vt_dsr(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'r': /* set scrolling region */
+				vt_stbm(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 's': /* save cursor position */
+				vt_sc(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'u': /* restore cursor position */
+				vt_rc(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'x': /*request/report parameters*/
+				vt_reqtparm(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'y': /* invoke selftest(s) */
+				vt_tst(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'z': /* DECELR, ignored */
+			case '{': /* DECSLE, ignored */
+				svsp->state = STATE_INIT;
+				break;
+
+			default:
+				svsp->state = STATE_INIT;
+				break;
+			}
+			break;
+
+		case STATE_DCS:
+			vt_dcsentry(ch,svsp);
+			break;
+
+		case STATE_DQUOTE:
+			switch(ch) {
+			case 'p': /* compatibility level */
+				vt_scl(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			case 'q': /* select char attributes */
+				vt_sca(svsp);
+				svsp->state = STATE_INIT;
+				break;
+
+			default:
+				svsp->state = STATE_INIT;
+				break;
+			}
+			break;
+
+		case STATE_STR:
+			switch(ch) {
+			case 'p': /* soft terminal reset */
+				vt_str(svsp);
+				if (!kernel)
+					attrib = svsp->c_attr;
+				svsp->state = STATE_INIT;
+				break;
+
+			default:
+				svsp->state = STATE_INIT;
+				break;
+			}
+			break;
+
+		default:		/* failsafe */
+			svsp->state = STATE_INIT;
+			break;
 		}
 	}
 
 	svsp->row = svsp->cur_offset / svsp->maxcol;	/* current row update */
 
 	/* take care of last character on line behaviour */
-
-	if(svsp->lastchar && (svsp->col < ((svsp->maxcol)-1)))
+	if (svsp->lastchar && (svsp->col < ((svsp->maxcol)-1)))
 		svsp->lastchar = 0;
     }
 
-    if(svsp == vsp)			/* on current displayed page ?	*/
+    if (svsp == vsp)			/* on current displayed page ?	*/
 	cursor_pos_valid = 1;		/* position is valid now */
 }
 
@@ -1023,7 +901,6 @@ vt_coldinit(void)
 
 	do_initialization = 0;		/* reset init necessary flag */
 	pcdisp = 1;			/* turn on traditional pc colors/font */
-	pcdisp_special = 0;
 
 	/* get the equipment byte from the RTC chip */
 
@@ -1129,13 +1006,12 @@ vt_coldinit(void)
 		svsp->Crtat = Crtat;		/* all same until malloc'ed */
 		svsp->Memory = Crtat;		/* until malloc'ed */
 		svsp->Scrollback = 0;		/* until malloc'ed */
-		svsp->scr_offset = 0;		/* scrollback offset (lines) */
+		svsp->scr_offset = -1;		/* scrollback offset (lines) */
 		svsp->scrolling = 0;		/* current scrollback page */
 		svsp->cur_offset = 0;		/* cursor offset */
 		svsp->c_attr = user_attr;	/* non-kernel attributes */
 		svsp->bell_on = 1;		/* enable bell */
 		svsp->sevenbit = 0;		/* set to 8-bit path */
-		svsp->dis_fnc = 0;		/* disable display functions */
 		svsp->transparent = 0;		/* disable internal tranparency */
 		svsp->C1_ctls = 0;	    	/* process only C0 ctls */
 		svsp->lastchar = 0;		/* VTxxx behaviour of last */
@@ -1146,16 +1022,6 @@ vt_coldinit(void)
 		svsp->m_awm = 1;		/* enable auto wrap mode */
 		svsp->m_om = 0;			/* origin mode = absolute */
 		svsp->sc_flag = 0;		/* init saved cursor flag */
-		svsp->which_fkl = SYS_FKL;	/* display system fkey-labels */
-		svsp->labels_on = 1;		/* if in HP-mode, display */
-						/*            fkey-labels */
-		svsp->attribute = 0;		/* HP mode init */
-		svsp->key = 0;			/* HP mode init */
-		svsp->l_len = 0;		/* HP mode init */
-		svsp->s_len = 0;		/* HP mode init */
-		svsp->m_len = 0;		/* HP mode init */
-		svsp->i = 0;			/* HP mode init */
-		svsp->vt_pure_mode = M_PUREVT;	/* initial mode: pure VT220*/
 		svsp->vga_charset = CH_SET0;	/* use bios default charset */
 
 #if PCVT_24LINESDEF				/* true compatibility */
@@ -1211,8 +1077,6 @@ vt_coldinit(void)
 		svsp->GR = svsp->G2;		/* GR = G2 */
 		svsp->whichi = 0;		/* char set designate init */
 		svsp->which[0] = '\0';		/* char set designate init */
-		svsp->hp_state = SHP_INIT;	/* init HP mode state machine*/
-		svsp->dcs_state = DCS_INIT;	/* init DCS mode state machine*/
 		svsp->ss  = 0;			/* init single shift 2/3 */
 		svsp->Gs  = NULL;		/* Gs single shift 2/3 */
 		svsp->maxcol = SCR_COL80;	/* 80 columns now (MUST!!!) */
@@ -1492,440 +1356,6 @@ check_scrollback(struct video_state *svsp)
 }
 
 /*---------------------------------------------------------------------------*
- *	write to one user function key label
- *---------------------------------------------------------------------------*/
-static void
-writefkl(int num, u_char *string, struct video_state *svsp)
-{
-	if((num < 0) || (num > 7))	/* range ok ? */
-		return;
-
-	strncpy(svsp->ufkl[num], string, 16); /* save string in static array */
-
-	if(svsp->which_fkl == USR_FKL)
-		wrfkl(num,string,svsp);
-}
-
-/*---------------------------------------------------------------------------*
- *	write to one system function key label
- *---------------------------------------------------------------------------*/
-void
-swritefkl(int num, u_char *string, struct video_state *svsp)
-{
-	if((num < 0) || (num > 7))	/* range ok ? */
-		return;
-
-	strncpy(svsp->sfkl[num], string, 16); /* save string in static array */
-
-	if(svsp->which_fkl == SYS_FKL)
-		wrfkl(num,string,svsp);
-}
-
-/*---------------------------------------------------------------------------*
- *	write function key label onto screen
- *---------------------------------------------------------------------------*/
-static void
-wrfkl(int num, u_char *string, struct video_state *svsp)
-{
-	register u_short *p;
-	register u_short *p1;
-	register int cnt = 0;
-
-	if(!svsp->labels_on || (svsp->vt_pure_mode == M_PUREVT))
-		return;
-
-	p = (svsp->Crtat
-	     + (svsp->screen_rows * svsp->maxcol)); /* screen_rows+1 line */
-
-	if(svsp->maxcol == SCR_COL80)
-	{
-		if(num < 4)	/* labels 1 .. 4 */
-			p += (num * LABEL_LEN);
-		else		/* labels 5 .. 8 */
-			p += ((num * LABEL_LEN) + LABEL_MID + 1);
-	}
-	else
-	{
-		if(num < 4)	/* labels 1 .. 4 */
-			p += (num * (LABEL_LEN + 6));
-		else		/* labels 5 .. 8 */
-			p += ((num * (LABEL_LEN + 6)) + LABEL_MID + 11);
-
-	}
-	p1 = p + svsp->maxcol;	/* second label line */
-
-	while((*string != '\0') && (cnt < 8))
-	{
-		*p = ((0x70 << 8) + (*string & 0xff));
-		p++;
-		string++;
-		cnt++;
-	}
-	while(cnt < 8)
-	{
-		*p = ((0x70 << 8) + ' ');
-		p++;
-		cnt++;
-	}
-
-	while((*string != '\0') && (cnt < 16))
-	{
-		*p1 = ((0x70 << 8) + (*string & 0xff));
-		p1++;
-		string++;
-		cnt++;
-	}
-	while(cnt < 16)
-	{
-		*p1 = ((0x70 << 8) + ' ');
-		p1++;
-		cnt++;
-	}
-}
-
-/*---------------------------------------------------------------------------*
- *	remove (=blank) function key labels, row/col and status line
- *---------------------------------------------------------------------------*/
-void
-fkl_off(struct video_state *svsp)
-{
-	register u_short *p;
-	register int num;
-	register int size;
-
-	svsp->labels_on = 0;
-
-	if((vgacs[svsp->vga_charset].screen_size==SIZ_28ROWS) && svsp->force24)
-		size = 4;
-	else
-		size = 3;
-
-	p = (svsp->Crtat + (svsp->screen_rows * svsp->maxcol));
-
-	for(num = 0; num < (size * svsp->maxcol); num++)
-		*p++ = ' ';
-}
-
-/*---------------------------------------------------------------------------*
- *	(re-) display function key labels, row/col and status line
- *---------------------------------------------------------------------------*/
-void
-fkl_on(struct video_state *svsp)
-{
-	svsp->labels_on = 1;
-
-	if(svsp->which_fkl == SYS_FKL)
-		sw_sfkl(svsp);
-	else if(svsp->which_fkl == USR_FKL)
-		sw_ufkl(svsp);
-}
-
-/*---------------------------------------------------------------------------*
- *	set emulation mode, switch between pure VTxxx mode and HP/VTxxx mode
- *---------------------------------------------------------------------------*/
-void
-set_emulation_mode(struct video_state *svsp, int mode)
-{
-	if(svsp->vt_pure_mode == mode)
-		return;
-
-	clr_parms(svsp);		/* escape parameter init */
-	svsp->state = STATE_INIT;	/* initial state */
-	svsp->scrr_beg = 0;		/* start of scrolling region */
-	svsp->sc_flag = 0;		/* invalidate saved cursor position */
-	svsp->transparent = 0;		/* disable control code processing */
-
-	if(mode == M_HPVT)		/* vt-pure -> hp/vt-mode */
-	{
-		svsp->screen_rows = svsp->screen_rowsize - 3;
-		if (svsp->force24 && svsp->screen_rows == 25)
-			svsp->screen_rows = 24;
-
-		if (svsp->row >= svsp->screen_rows) {
-			/* Scroll up */
-			int nscroll = svsp->row + 1 - svsp->screen_rows;
-			bcopy (svsp->Crtat + nscroll * svsp->maxcol,
-			       svsp->Crtat,
-			       svsp->screen_rows * svsp->maxcol * CHR);
-			svsp->row -= nscroll;
-			svsp->cur_offset -= nscroll * svsp->maxcol;
-		}
-
-		svsp->vt_pure_mode = M_HPVT;
-
-		if (svsp->vs_tty)
-			svsp->vs_tty->t_winsize.ws_row = svsp->screen_rows;
-
-		svsp->scrr_len = svsp->screen_rows;
-		svsp->scrr_end = svsp->scrr_len - 1;
-
-		update_hp(svsp);
-	}
-	else if(mode == M_PUREVT)	/* hp/vt-mode -> vt-pure */
-	{
-		fillw(user_attr | ' ',
-		      (caddr_t)(svsp->Crtat + svsp->screen_rows * svsp->maxcol),
-		      (svsp->screen_rowsize - svsp->screen_rows)
-		      * svsp->maxcol);
-
-		svsp->vt_pure_mode = M_PUREVT;
-
-		svsp->screen_rows = svsp->screen_rowsize;
-		if (svsp->force24 && svsp->screen_rows == 25)
-			svsp->screen_rows = 24;
-
-		if (svsp->vs_tty)
-			svsp->vs_tty->t_winsize.ws_row = svsp->screen_rows;
-
-		svsp->scrr_len = svsp->screen_rows;
-		svsp->scrr_end = svsp->scrr_len - 1;
-	}
-
-#if PCVT_SIGWINCH
-	if (svsp->vs_tty && svsp->vs_tty->t_pgrp)
-		pgsignal(svsp->vs_tty->t_pgrp, SIGWINCH, 1);
-#endif /* PCVT_SIGWINCH */
-
-}
-
-/*---------------------------------------------------------------------------*
- *	initialize user function key labels
- *---------------------------------------------------------------------------*/
-void
-init_ufkl(struct video_state *svsp)
-{
-	writefkl(0,(u_char *)"   f1",svsp);	/* init fkey labels */
-	writefkl(1,(u_char *)"   f2",svsp);
-	writefkl(2,(u_char *)"   f3",svsp);
-	writefkl(3,(u_char *)"   f4",svsp);
-	writefkl(4,(u_char *)"   f5",svsp);
-	writefkl(5,(u_char *)"   f6",svsp);
-	writefkl(6,(u_char *)"   f7",svsp);
-	writefkl(7,(u_char *)"   f8",svsp);
-}
-
-/*---------------------------------------------------------------------------*
- *	initialize system user function key labels
- *---------------------------------------------------------------------------*/
-void
-init_sfkl(struct video_state *svsp)
-{
-			    /* 1234567812345678 */
-	if(can_do_132col)
-				    /* 1234567812345678 */
-		swritefkl(0,(u_char *)"132     COLUMNS ",svsp);
-	else
-		swritefkl(0,(u_char *)" ",svsp);
-
-			    /* 1234567812345678 */
-	swritefkl(1,(u_char *)"SOFT-RSTTERMINAL",svsp);
-
-	if(svsp->force24)
-		swritefkl(2,(u_char *)"FORCE24 ENABLE *",svsp);
-	else
-		swritefkl(2,(u_char *)"FORCE24 ENABLE  ",svsp);
-
-#if PCVT_SHOWKEYS	    /* 1234567812345678 */
-	if(svsp == &vs[0])
-		swritefkl(3,(u_char *)"KEYBSCANDISPLAY ",svsp);
-	else
-		swritefkl(3,(u_char *)" ",svsp);
-#else
-	swritefkl(3,(u_char *)" ",svsp);
-#endif /* PCVT_SHOWKEYS */
-
-			    /* 1234567812345678 */
-	if(svsp->bell_on)
-		swritefkl(4,(u_char *)"BELL    ENABLE *",svsp);
-	else
-		swritefkl(4,(u_char *)"BELL    ENABLE  ",svsp);
-
-	if(svsp->sevenbit)
-		swritefkl(5,(u_char *)"8-BIT   ENABLE  ",svsp);
-	else
-		swritefkl(5,(u_char *)"8-BIT   ENABLE *",svsp);
-
-	swritefkl(6,(u_char *)"DISPLAY FUNCTNS ",svsp);
-
-	swritefkl(7,(u_char *)"AUTOWRAPENABLE *",svsp);
-			    /* 1234567812345678 */
-}
-
-/*---------------------------------------------------------------------------*
- *	switch display to user function key labels
- *---------------------------------------------------------------------------*/
-void
-sw_ufkl(struct video_state *svsp)
-{
-	int i;
-	svsp->which_fkl = USR_FKL;
-	for(i = 0; i < 8; i++)
-		wrfkl(i,svsp->ufkl[i],svsp);
-}
-
-/*---------------------------------------------------------------------------*
- *	switch display to system function key labels
- *---------------------------------------------------------------------------*/
-void
-sw_sfkl(struct video_state *svsp)
-{
-	int i;
-	svsp->which_fkl = SYS_FKL;
-	for(i = 0; i < 8; i++)
-		wrfkl(i,svsp->sfkl[i],svsp);
-}
-
-/*---------------------------------------------------------------------------*
- *	toggle force 24 lines
- *---------------------------------------------------------------------------*/
-void
-toggl_24l(struct video_state *svsp)
-{
-	if(svsp->which_fkl == SYS_FKL)
-	{
-		if(svsp->force24)
-		{
-			svsp->force24 = 0;
-			swritefkl(2,(u_char *)"FORCE24 ENABLE  ",svsp);
-		}
-		else
-		{
-			svsp->force24 = 1;
-			swritefkl(2,(u_char *)"FORCE24 ENABLE *",svsp);
-		}
-		set_screen_size(svsp, vgacs[(svsp->vga_charset)].screen_size);
-	}
-}
-
-#if PCVT_SHOWKEYS
-/*---------------------------------------------------------------------------*
- *	toggle keyboard scancode display
- *---------------------------------------------------------------------------*/
-void
-toggl_kbddbg(struct video_state *svsp)
-{
-	if((svsp->which_fkl == SYS_FKL) && (svsp == &vs[0]))
-	{
-		if(keyboard_show)
-		{
-			keyboard_show = 0;
-			swritefkl(3,(u_char *)"KEYBSCANDISPLAY ",svsp);
-		}
-		else
-		{
-			keyboard_show = 1;
-			swritefkl(3,(u_char *)"KEYBSCANDISPLAY*",svsp);
-		}
-	}
-}
-#endif /* PCVT_SHOWKEYS */
-
-/*---------------------------------------------------------------------------*
- *	toggle display functions
- *---------------------------------------------------------------------------*/
-void
-toggl_dspf(struct video_state *svsp)
-{
-	if(svsp->which_fkl == SYS_FKL)
-	{
-		if(svsp->dis_fnc)
-		{
-			svsp->dis_fnc = 0;
-			swritefkl(6,(u_char *)"DISPLAY FUNCTNS ",svsp);
-		}
-		else
-		{
-			svsp->dis_fnc = 1;
-			swritefkl(6,(u_char *)"DISPLAY FUNCTNS*",svsp);
-		}
-	}
-}
-
-/*---------------------------------------------------------------------------*
- *	auto wrap on/off
- *---------------------------------------------------------------------------*/
-void
-toggl_awm(struct video_state *svsp)
-{
-	if(svsp->which_fkl == SYS_FKL)
-	{
-		if(svsp->m_awm)
-		{
-			svsp->m_awm = 0;
-			swritefkl(7,(u_char *)"AUTOWRAPENABLE  ",svsp);
-		}
-		else
-		{
-			svsp->m_awm = 1;
-			swritefkl(7,(u_char *)"AUTOWRAPENABLE *",svsp);
-		}
-	}
-}
-
-/*---------------------------------------------------------------------------*
- *	bell on/off
- *---------------------------------------------------------------------------*/
-void
-toggl_bell(struct video_state *svsp)
-{
-	if(svsp->which_fkl == SYS_FKL)
-	{
-		if(svsp->bell_on)
-		{
-			svsp->bell_on = 0;
-			swritefkl(4,(u_char *)"BELL    ENABLE  ",svsp);
-		}
-		else
-		{
-			svsp->bell_on = 1;
-			swritefkl(4,(u_char *)"BELL    ENABLE *",svsp);
-		}
-	}
-}
-
-/*---------------------------------------------------------------------------*
- *	7/8 bit usage
- *---------------------------------------------------------------------------*/
-void
-toggl_sevenbit(struct video_state *svsp)
-{
-	if(svsp->which_fkl == SYS_FKL)
-	{
-		if(svsp->sevenbit)
-		{
-			svsp->sevenbit = 0;
-			swritefkl(5,(u_char *)"8-BIT   ENABLE *",svsp);
-		}
-		else
-		{
-			svsp->sevenbit = 1;
-			swritefkl(5,(u_char *)"8-BIT   ENABLE  ",svsp);
-		}
-	}
-}
-
-/*---------------------------------------------------------------------------*
- *	80 / 132 columns
- *---------------------------------------------------------------------------*/
-void
-toggl_columns(struct video_state *svsp)
-{
-	if(svsp->which_fkl == SYS_FKL)
-	{
-		if(svsp->maxcol == SCR_COL132)
-		{
-			if(vt_col(svsp, SCR_COL80))
-				svsp->maxcol = 80;
-		}
-		else
-		{
-			if(vt_col(svsp, SCR_COL132))
-				svsp->maxcol = 132;
-		}
-	}
-}
-
-/*---------------------------------------------------------------------------*
  *	toggle vga 80/132 column operation
  *---------------------------------------------------------------------------*/
 int
@@ -1933,11 +1363,6 @@ vt_col(struct video_state *svsp, int cols)
 {
 	if(vga_col(svsp, cols) == 0)
 		return(0);
-
-	if(cols == SCR_COL80)
-		swritefkl(0,(u_char *)"132     COLUMNS ",svsp);
-	else
-		swritefkl(0,(u_char *)"132     COLUMNS*",svsp);
 
 	fillw(user_attr | ' ',
 		(caddr_t)(svsp->Crtat),
@@ -1955,8 +1380,6 @@ vt_col(struct video_state *svsp, int cols)
 	svsp->transparent = 0;		/* disable control code processing */
 	svsp->selchar = 0;		/* selective attr off */
 	vt_initsel(svsp);		/* re-init sel attr */
-
-	update_hp(svsp);		/* update labels, row/col, page ind */
 
 	/* Update winsize struct to reflect screen size */
 
@@ -1979,40 +1402,6 @@ vt_col(struct video_state *svsp, int cols)
 }
 
 /*---------------------------------------------------------------------------*
- *	update HP stuff on screen
- *---------------------------------------------------------------------------*/
-void
-update_hp(struct video_state *svsp)
-{
-	if(svsp->vt_pure_mode != M_HPVT)
-		return;
-
-	fillw (user_attr | ' ',
-	       (caddr_t)(svsp->Crtat + svsp->screen_rows * svsp->maxcol),
-	       (svsp->screen_rowsize - svsp->screen_rows) * svsp->maxcol);
-
-	if (!svsp->labels_on)
-		return;
-
-	/* update fkey labels */
-
-	fkl_off(svsp);
-	fkl_on(svsp);
-
-	if(vsp == svsp)
-	{
-		/* update current displayed screen indicator */
-
-		*((svsp->Crtat + ((svsp->screen_rows + 2) * svsp->maxcol))
-		  + svsp->maxcol - 3) = user_attr | '[';
-		*((svsp->Crtat + ((svsp->screen_rows + 2) * svsp->maxcol))
-		  + svsp->maxcol - 2) = user_attr | (current_video_screen + '0');
-		*((svsp->Crtat + ((svsp->screen_rows + 2) * svsp->maxcol))
-		  + svsp->maxcol - 1) = user_attr | ']';
-	}
-}
-
-/*---------------------------------------------------------------------------*
  *	initialize ANSI escape sequence parameter buffers
  *---------------------------------------------------------------------------*/
 void
@@ -2022,302 +1411,6 @@ clr_parms(struct video_state *svsp)
 	for(i=0; i < MAXPARMS; i++)
 		svsp->parms[i] = 0;
 	svsp->parmi = 0;
-}
-
-
-/*---------------------------------------------------------------------------*
- *
- *	partial HP 2392 ANSI mode Emulator
- *	==================================
- *
- *	this part tooks over the emulation of some escape sequences
- *	needed to handle the function key labels
- *
- *	They are modeled after the corresponding escape sequences
- *	introduced with the HP2392 terminals from Hewlett-Packard.
- *
- *	see:
- *	"HP2392A, Display Terminal Reference Manual",
- *	HP Manual Part Number 02390-90001
- *	and:
- *	Reference Manual Supplement
- *	"2392A Display Terminal Option 049, ANSI Operation"
- *	HP Manual Part Number 02390-90023EN
- *
- *---------------------------------------------------------------------------*/
-
-static void
-hp_entry(U_char ch, struct video_state *svsp)
-{
-	switch(svsp->hp_state)
-	{
-		case SHP_INIT:
-			switch(ch)
-			{
-				case 'f':
-					svsp->hp_state = SHP_AND_F;
-					svsp->attribute = 0;
-					svsp->key = 0;
-					svsp->l_len = 0;
-					svsp->s_len = 0;
-					svsp->i = 0;
-					break;
-
-				case 'j':
-					svsp->m_len = 0;
-					svsp->hp_state = SHP_AND_J;
-					break;
-
-				case 's':
-					svsp->hp_state = SHP_AND_ETE;
-					break;
-
-				default:
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					break;
-			}
-			break;
-
-		case SHP_AND_F:
-			if((ch >= '0') && (ch <= '8'))
-			{
-				svsp->attribute = ch;
-				svsp->hp_state = SHP_AND_Fa;
-			}
-			else
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			break;
-
-		case SHP_AND_Fa:
-			if(ch == 'a')
-				svsp->hp_state = SHP_AND_Fak;
-			else if(ch == 'k')
-			{
-				svsp->key = svsp->attribute;
-				svsp->hp_state = SHP_AND_Fakd;
-			}
-			else
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			break;
-
-		case SHP_AND_Fak:
-			if((ch >= '1') && (ch <= '8'))
-			{
-				svsp->key = ch;
-				svsp->hp_state = SHP_AND_Fak1;
-			}
-			else
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			break;
-
-		case SHP_AND_Fak1:
-			if(ch == 'k')
-				svsp->hp_state = SHP_AND_Fakd;
-			else
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			break;
-
-		case SHP_AND_Fakd:
-			if(svsp->l_len > 16)
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			else if(ch >= '0' && ch <= '9')
-			{
-				svsp->l_len *= 10;
-				svsp->l_len += (ch -'0');
-			}
-			else if(ch == 'd')
-				svsp->hp_state = SHP_AND_FakdL;
-			else
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			break;
-
-		case SHP_AND_FakdL:
-			if(svsp->s_len > 80)
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			else if(ch >= '0' && ch <= '9')
-			{
-				svsp->s_len *= 10;
-				svsp->s_len += (ch -'0');
-			}
-			else if(ch == 'L')
-			{
-				svsp->hp_state = SHP_AND_FakdLl;
-				svsp->transparent = 1;
-			}
-			else
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-			}
-			break;
-
-		case SHP_AND_FakdLl:
-			svsp->l_buf[svsp->i] = ch;
-			if(svsp->i >= svsp->l_len-1)
-			{
-				svsp->hp_state = SHP_AND_FakdLls;
-				svsp->i = 0;
-				if(svsp->s_len == 0)
-				{
-					svsp->state = STATE_INIT;
-					svsp->hp_state = SHP_INIT;
-					svsp->transparent = 0;
-					svsp->i = 0;
-					svsp->l_buf[svsp->l_len] = '\0';
-					svsp->s_buf[svsp->s_len] = '\0';
-					writefkl((svsp->key - '0' -1),
-						 svsp->l_buf, svsp);
-				}
-			}
-			else
-				svsp->i++;
-			break;
-
-		case SHP_AND_FakdLls:
-			svsp->s_buf[svsp->i] = ch;
-			if(svsp->i >= svsp->s_len-1)
-			{
-				svsp->state = STATE_INIT;
-				svsp->hp_state = SHP_INIT;
-				svsp->transparent = 0;
-				svsp->i = 0;
-				svsp->l_buf[svsp->l_len] = '\0';
-				svsp->s_buf[svsp->s_len] = '\0';
-				writefkl((svsp->key - '0' -1), svsp->l_buf,
-					 svsp);
-			}
-			else
-				svsp->i++;
-			break;
-
-		case SHP_AND_J:
-			switch(ch)
-			{
-				case '@':	/* enable user keys, remove */
-						/* all labels & status from */
-						/* screen 		    */
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					fkl_off(svsp);
-					break;
-
-				case 'A':	/* enable & display "modes" */
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					fkl_on(svsp);
-					sw_sfkl(svsp);
-					break;
-
-				case 'B':	/* enable & display "user"  */
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					fkl_on(svsp);
-					sw_ufkl(svsp);
-					break;
-
-				case 'C':	/* remove (clear) status line*/
-						/* and restore current labels*/
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					fkl_on(svsp);
-					break;
-
-				case 'R':	/* enable usr/menu keys */
-						/* and fkey label modes */
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					break;
-
-				case 'S':	/* disable usr/menu keys */
-						/* and fkey label modes */
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					break;
-
-				case '0':
-				case '1':
-				case '2':
-				case '3':
-				case '4':
-				case '5':
-				case '6':
-				case '7':
-				case '8':
-				case '9': /* parameters for esc & j xx L mm */
-					svsp->m_len *= 10;
-					svsp->m_len += (ch -'0');
-					break;
-
-				case 'L':
-					svsp->hp_state = SHP_AND_JL;
-					svsp->i = 0;
-					svsp->transparent = 1;
-					break;
-
-				default:
-					svsp->hp_state = SHP_INIT;
-					svsp->state = STATE_INIT;
-					break;
-
-			}
-			break;
-
-
-		case SHP_AND_JL:
-			svsp->m_buf[svsp->i] = ch;
-			if(svsp->i >= svsp->m_len-1)
-			{
-				svsp->state = STATE_INIT;
-				svsp->hp_state = SHP_INIT;
-				svsp->transparent = 0;
-				svsp->i = 0;
-				svsp->m_buf[svsp->m_len] = '\0';
-				/* display status line */
-				/* needs to be implemented */
-				/* see 2392 man, 3-14 */
-
-			}
-			else
-				svsp->i++;
-			break;
-
-		case SHP_AND_ETE:	/* eat chars until uppercase */
-			if(ch >= '@' && ch <= 'Z')
-			{
-				svsp->hp_state = SHP_INIT;
-				svsp->state = STATE_INIT;
-				svsp->transparent = 0;
-			}
-			break;
-
-		default:
-			svsp->hp_state = SHP_INIT;
-			svsp->state = STATE_INIT;
-			svsp->transparent = 0;
-			break;
-	}
 }
 
 #endif	/* NVT > 0 */

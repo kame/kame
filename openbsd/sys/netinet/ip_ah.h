@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ah.h,v 1.16 1999/04/11 19:41:37 niklas Exp $	*/
+/*	$OpenBSD: ip_ah.h,v 1.25 2000/03/17 10:25:22 angelos Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -35,53 +35,45 @@
  * PURPOSE.
  */
 
-/*
- * Authentication Header Processing
- * Per RFC1826 (Atkinson, 1995)
- */
-
-struct ah_old
-{
-    u_int8_t	ah_nh;			/* Next header (protocol) */
-    u_int8_t	ah_hl;			/* AH length, in 32-bit words */
-    u_int16_t	ah_rv;			/* reserved, must be 0 */
-    u_int32_t	ah_spi;			/* Security Parameters Index */
-    u_int8_t	ah_data[1];		/* More, really */
-};
-
-#define AH_OLD_FLENGTH		8	/* size of fixed part */
+#ifndef _NETINET_AH_H_
+#define _NETINET_AH_H_
 
 struct ahstat
 {
-    u_int32_t	ahs_hdrops;	/* packet shorter than header shows */
+    u_int32_t	ahs_hdrops;	/* Packet shorter than header shows */
+    u_int32_t	ahs_nopf;	/* Protocol family not supported */
     u_int32_t	ahs_notdb;
     u_int32_t	ahs_badkcr;
     u_int32_t	ahs_badauth;
     u_int32_t	ahs_noxform;
     u_int32_t	ahs_qfull;
-    u_int32_t   ahs_wrap;
-    u_int32_t   ahs_replay;
-    u_int32_t	ahs_badauthl;	/* bad authenticator length */
+    u_int32_t	ahs_wrap;
+    u_int32_t	ahs_replay;
+    u_int32_t	ahs_badauthl;	/* Bad authenticator length */
     u_int32_t	ahs_input;	/* Input AH packets */
     u_int32_t	ahs_output;	/* Output AH packets */
-    u_int32_t   ahs_invalid;    /* Trying to use an invalid TDB */
-    u_int64_t	ahs_ibytes;	/* input bytes */
-    u_int64_t   ahs_obytes;	/* output bytes */
-    u_int32_t	ahs_toobig;	/* packet got larger than IP_MAXPACKET */
-    u_int32_t	ahs_pdrops;	/* packet blocked due to policy */
+    u_int32_t	ahs_invalid;	/* Trying to use an invalid TDB */
+    u_int64_t	ahs_ibytes;	/* Input bytes */
+    u_int64_t	ahs_obytes;	/* Output bytes */
+    u_int32_t	ahs_toobig;	/* Packet got larger than IP_MAXPACKET */
+    u_int32_t	ahs_pdrops;	/* Packet blocked due to policy */
+    u_int32_t	ahs_crypto;	/* Crypto processing failure */
 };
 
-struct ah_new
+struct ah
 {
-    u_int8_t        ah_nh;                  /* Next header (protocol) */
-    u_int8_t        ah_hl;                  /* AH length, in 32-bit words */
-    u_int16_t       ah_rv;                  /* reserved, must be 0 */
-    u_int32_t       ah_spi;                 /* Security Parameters Index */
-    u_int32_t       ah_rpl;                 /* Replay prevention */
-    u_int8_t        ah_data[AH_HMAC_HASHLEN];/* Authenticator */
+    u_int8_t   ah_nh;
+    u_int8_t   ah_hl;
+    u_int16_t  ah_rv;
+    u_int32_t  ah_spi;
+    u_int32_t  ah_rpl;  /* We may not use this, if we're using old xforms */
 };
 
-#define AH_NEW_FLENGTH		(sizeof(struct ah_new))
+/* Length of base AH header */
+#define AH_FLENGTH		8
+
+/* Size of the largest hash function output used in AH-new, in bytes */
+#define AH_MAX_HASHLEN		20
 
 /*
  * Names for AH sysctl objects
@@ -95,11 +87,7 @@ struct ah_new
 }
 
 #ifdef _KERNEL
-void	ah_input __P((struct mbuf *, ...));
-int	ah_output __P((struct mbuf *, struct sockaddr_encap *,
-    struct tdb *, struct mbuf **));
-int	ah_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
-
 extern int ah_enable;
 struct ahstat ahstat;
 #endif /* _KERNEL */
+#endif /* _NETINET_AH_H_ */

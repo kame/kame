@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_de.c,v 1.41 1999/07/18 03:20:18 csapuntz Exp $	*/
+/*	$OpenBSD: if_de.c,v 1.43 2000/04/27 01:23:29 chris Exp $	*/
 /*	$NetBSD: if_de.c,v 1.45 1997/06/09 00:34:18 thorpej Exp $	*/
 
 /*-
@@ -4538,10 +4538,6 @@ tulip_ifioctl(
 	}
 	break;
     }
-#if defined(SIOCSIFMTU)
-#if !defined(ifr_mtu)
-#define ifr_mtu ifr_metric
-#endif
     case SIOCSIFMTU:
 	/*
 	 * Set the interface MTU.
@@ -4562,7 +4558,6 @@ tulip_ifioctl(
 	tulip_init(sc);
 #endif
 	break;
-#endif /* SIOCSIFMTU */
 
 #ifdef SIOCGADDRROM
     case SIOCGADDRROM: {

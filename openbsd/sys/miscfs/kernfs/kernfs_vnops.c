@@ -1,4 +1,4 @@
-/*	$OpenBSD: kernfs_vnops.c,v 1.16 1999/02/26 03:44:16 art Exp $	*/
+/*	$OpenBSD: kernfs_vnops.c,v 1.19 2000/03/13 04:05:15 millert Exp $	*/
 /*	$NetBSD: kernfs_vnops.c,v 1.43 1996/03/16 23:52:47 christos Exp $	*/
 
 /*
@@ -139,7 +139,7 @@ int	kernfs_getattr	__P((void *));
 int	kernfs_setattr	__P((void *));
 int	kernfs_read	__P((void *));
 int	kernfs_write	__P((void *));
-#define	kernfs_ioctl	eopnotsupp
+#define	kernfs_ioctl	(int (*) __P((void *)))enoioctl
 #define	kernfs_select	eopnotsupp
 #define	kernfs_mmap	eopnotsupp
 #define	kernfs_fsync	nullop
@@ -257,12 +257,31 @@ kernfs_xread(kt, off, bufp, len)
 		extern struct msgbuf *msgbufp;
 		long n;
 
-		if (off >= MSG_BSIZE)
-			return (0);
-		n = msgbufp->msg_bufx + off;
-		if (n >= MSG_BSIZE)
-			n -= MSG_BSIZE;
-		len = min(MSG_BSIZE - n, MSG_BSIZE - off);
+		if (msgbufp == NULL || msgbufp->msg_magic != MSG_MAGIC)
+			return (ENXIO);
+
+		/*
+		 * Note that reads of /kern/msgbuf won't necessarily yield
+		 * consistent results, if the message buffer is modified
+		 * while the read is in progress.  The worst that can happen
+		 * is that incorrect data will be read.  There's no way
+		 * that this can crash the system unless the values in the
+		 * message buffer header are corrupted, but that'll cause
+		 * the system to die anyway.
+		 */
+		if (msgbufp->msg_bufl < msgbufp->msg_bufs) {
+			if (off >= msgbufp->msg_bufx)
+				return (0);
+			n = off;
+			len = msgbufp->msg_bufx - n;
+		} else {
+			if (off >= msgbufp->msg_bufs)
+				return (0);
+			n = msgbufp->msg_bufx + off;
+			if (n >= msgbufp->msg_bufs)
+				n -= msgbufp->msg_bufs;
+			len = min(msgbufp->msg_bufs - n, msgbufp->msg_bufs - off);
+		}
 		*bufp = msgbufp->msg_bufc + n;
 		return (len);
 	}
@@ -308,8 +327,8 @@ kernfs_xread(kt, off, bufp, len)
 #endif
 		break;
 #ifdef IPSEC
-        case KTT_IPSECSPI:
-                return(ipsp_kern(off, bufp, len));
+	case KTT_IPSECSPI:
+		return(ipsp_kern(off, bufp, len));
 #endif
 	default:
 		return (0);

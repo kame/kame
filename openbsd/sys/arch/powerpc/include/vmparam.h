@@ -31,6 +31,9 @@
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef MACHINE_VMPARAM_H
+#define MACHINE_VMPARAM_H
+
 #define	USRTEXT		CLBYTES
 #define	USRSTACK	VM_MAXUSER_ADDRESS
 
@@ -90,11 +93,37 @@
 #define	VM_MAXUSER_ADDRESS	((vm_offset_t)0xfffff000)
 #define	VM_MAX_ADDRESS		VM_MAXUSER_ADDRESS
 #define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)(KERNEL_SR << ADDR_SR_SHFT))
-#define	VM_MAX_KERNEL_ADDRESS	((vm_offset_t)((KERNEL_SR << ADDR_SR_SHFT) \
-						+ SEGMENT_LENGTH))
 
+/* ppc_kvm_size is so that vm space can be stolen before vm is fully
+ * initialized.
+ */
+#define VM_KERN_ADDR_SIZE_DEF	SEGMENT_LENGTH
+extern vm_offset_t ppc_kvm_size;
+#define VM_KERN_ADDRESS_SIZE	(ppc_kvm_size)
+#define	VM_MAX_KERNEL_ADDRESS	((vm_offset_t)((KERNEL_SR << ADDR_SR_SHFT) \
+						+ VM_KERN_ADDRESS_SIZE))
+
+#ifdef UVM
+#define	MACHINE_NEW_NONCONTIG	/* VM <=> pmap interface modifier */
+#else
 #define	MACHINE_NONCONTIG	/* VM <=> pmap interface modifier */
+#endif
 
 #define	VM_KMEM_SIZE		(NKMEMCLUSTERS * CLBYTES)
 #define	VM_MBUF_SIZE		(NMBCLUSTERS * CLBYTES)
 #define	VM_PHYS_SIZE		(USRIOSIZE * CLBYTES)
+
+struct pmap_physseg {
+	struct pv_entry *pvent;
+	char *attrs;
+	/* NULL ??? */
+};
+
+#define	VM_PHYSSEG_MAX	32	/* actually we could have this many segments */
+#define	VM_PHYSSEG_STRAT	VM_PSTRAT_BSEARCH
+#define	VM_PHYSSEG_NOADD	/* can't add RAM after vm_mem_init */
+
+#define VM_NFREELIST		1
+#define VM_FREELIST_DEFAULT	0
+
+#endif

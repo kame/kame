@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_subr.c,v 1.41 1999/08/20 15:37:13 art Exp $	*/
+/*	$OpenBSD: vfs_subr.c,v 1.45 2000/04/25 22:41:57 csapuntz Exp $	*/
 /*	$NetBSD: vfs_subr.c,v 1.53 1996/04/22 01:39:13 christos Exp $	*/
 
 /*
@@ -265,8 +265,7 @@ vfs_getvfs(fsid)
 	register struct mount *mp;
 
 	simple_lock(&mountlist_slock);
-	for (mp = mountlist.cqh_first; mp != (void *)&mountlist;
-	     mp = mp->mnt_list.cqe_next) {
+	CIRCLEQ_FOREACH(mp, &mountlist, mnt_list) {
 		if (mp->mnt_stat.f_fsid.val[0] == fsid->val[0] &&
 		    mp->mnt_stat.f_fsid.val[1] == fsid->val[1]) {
 			simple_unlock(&mountlist_slock);
@@ -1780,21 +1779,42 @@ vfs_syncwait(verbose)
 	int verbose;
 {
 	register struct buf *bp;
-	int iter, nbusy;
+	int iter, nbusy, dcount, s;
+	struct proc *p;
 
-	sys_sync(&proc0, (void *)0, (register_t *)0);
+	p = curproc? curproc : &proc0;
+	sys_sync(p, (void *)0, (register_t *)0);
  
 	/* Wait for sync to finish. */
+	dcount = 10000;
 	for (iter = 0; iter < 20; iter++) {
 		nbusy = 0;
-		for (bp = &buf[nbuf]; --bp >= buf; )
+		for (bp = &buf[nbuf]; --bp >= buf; ) {
 			if ((bp->b_flags & (B_BUSY|B_INVAL)) == B_BUSY)
 				nbusy++;
-			if (nbusy == 0)
-				break;
-			if (verbose)
-				printf("%d ", nbusy);
-			DELAY(40000 * iter);
+			/*
+			 * With soft updates, some buffers that are
+			 * written will be remarked as dirty until other
+			 * buffers are written.
+			 */
+			if (bp->b_flags & B_DELWRI) {
+				s = splbio();
+				bremfree(bp);
+				bp->b_flags |= B_BUSY;
+				splx(s);
+				nbusy++;
+				bawrite(bp);
+				if (dcount-- <= 0) {
+					printf("softdep ");
+					return 1;
+				}
+			}
+		}
+		if (nbusy == 0)
+			break;
+		if (verbose)
+			printf("%d ", nbusy);
+		DELAY(40000 * iter);
 	}   
 
 	return nbusy;
@@ -2042,18 +2062,19 @@ brelvp(bp)
 	register struct buf *bp;
 {
 	struct vnode *vp;
-	struct buf *wasdirty;
 
 	if ((vp = bp->b_vp) == (struct vnode *) 0)
 		panic("brelvp: NULL");
 	/*
 	 * Delete from old vnode list, if on one.
 	 */
-	wasdirty = vp->v_dirtyblkhd.lh_first;
 	if (bp->b_vnbufs.le_next != NOLIST)
 		bufremvn(bp);
-	if (wasdirty && LIST_FIRST(&vp->v_dirtyblkhd) == NULL)
+	if ((vp->v_flag & VONSYNCLIST) &&
+	    LIST_FIRST(&vp->v_dirtyblkhd) == NULL) {
+		vp->v_flag &= ~VONSYNCLIST;
 		LIST_REMOVE(vp, v_synclist);
+	}
 	bp->b_vp = (struct vnode *) 0;
 	HOLDRELE(vp);
 }
@@ -2071,7 +2092,6 @@ reassignbuf(bp, newvp)
 	register struct vnode *newvp;
 {
 	struct buflists *listheadp;
-	struct buf *wasdirty;
 	int delay;
 
 	if (newvp == NULL) {
@@ -2081,7 +2101,6 @@ reassignbuf(bp, newvp)
 	/*
 	 * Delete from old vnode list, if on one.
 	 */
-	wasdirty = newvp->v_dirtyblkhd.lh_first;
 	if (bp->b_vnbufs.le_next != NOLIST)
 		bufremvn(bp);
 	/*
@@ -2090,18 +2109,21 @@ reassignbuf(bp, newvp)
 	 */
 	if ((bp->b_flags & B_DELWRI) == 0) {
 		listheadp = &newvp->v_cleanblkhd;
-		if (wasdirty && LIST_FIRST(&newvp->v_dirtyblkhd) == NULL)
+		if ((newvp->v_flag & VONSYNCLIST) &&
+		    LIST_FIRST(&newvp->v_dirtyblkhd) == NULL) {
+			newvp->v_flag &= ~VONSYNCLIST;
 			LIST_REMOVE(newvp, v_synclist);
+		}
 	} else {
 		listheadp = &newvp->v_dirtyblkhd;
-		if (LIST_FIRST(listheadp) == NULL) {
+		if ((newvp->v_flag & VONSYNCLIST) == 0) {
 			switch (newvp->v_type) {
 			case VDIR:
-				delay = syncdelay / 3;
+				delay = syncdelay / 2;
 				break;
 			case VBLK:
 				if (newvp->v_specmountpoint != NULL) {
-					delay = syncdelay / 2;
+					delay = syncdelay / 3;
 					break;
 				}
 				/* fall through */

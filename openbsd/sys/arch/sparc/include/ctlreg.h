@@ -1,4 +1,4 @@
-/*	$OpenBSD: ctlreg.h,v 1.4 1997/08/08 08:26:12 downsj Exp $	*/
+/*	$OpenBSD: ctlreg.h,v 1.6 2000/02/18 16:12:26 art Exp $	*/
 /*	$NetBSD: ctlreg.h,v 1.15 1997/07/20 18:55:03 pk Exp $ */
 
 /*
@@ -99,6 +99,7 @@
 #define ASI_IDCACHELFU	0x14	/* [4m] flush i&d cache line (user) */
 #define ASI_BYPASS	0x20	/* [4m] sun ref mmu bypass,
 				        ie. direct phys access */
+#define ASI_HICACHECLR	0x31	/* [4m] hypersparc only: I-cache flash clear */
 #define ASI_ICACHECLR	0x36	/* [4m] ms1 only: I-cache flash clear */
 #define ASI_DCACHECLR	0x37	/* [4m] ms1 only: D-cache flash clear */
 #define ASI_DCACHEDIAG	0x39	/* [4m] data cache diagnostic register access */
@@ -196,10 +197,10 @@
 #define SRMMU_PCR	0x00000000	/* Processor control register */
 #define SRMMU_CXTPTR	0x00000100	/* Context table pointer register */
 #define SRMMU_CXR	0x00000200	/* Context register */
-#define SRMMU_SFSTAT	0x00000300	/* Synchronous fault status reg */
-#define SRMMU_SFADDR	0x00000400	/* Synchronous fault address reg */
-#define SRMMU_AFSTAT	0x00000500	/* Asynchronous fault status reg (HS) */
-#define SRMMU_AFADDR	0x00000600	/* Asynchronous fault address reg (HS)*/
+#define SRMMU_SFSR	0x00000300	/* Synchronous fault status reg */
+#define SRMMU_SFAR	0x00000400	/* Synchronous fault address reg */
+#define SRMMU_AFSR	0x00000500	/* Asynchronous fault status reg (HS)*/
+#define SRMMU_AFAR	0x00000600	/* Asynchronous fault address reg (HS)*/
 #define SRMMU_PCFG	0x00000600	/* Processor configuration reg (TURBO)*/
 #define SRMMU_TLBCTRL	0x00001000	/* TLB replacement control reg */
 
@@ -368,3 +369,14 @@
 /* [4m] TLB Replacement Control Register bits */
 #define TLBC_DISABLE	0x00000020	/* Disable replacement counter */
 #define TLBC_RCNTMASK	0x0000001f	/* Replacement counter (0-31) */
+
+/*
+ * The Ross Hypersparc has an Instruction Cache Control Register (ICCR)
+ * It contains an enable bit for the on-chip instruction cache and a bit
+ * that controls whether a FLUSH instruction causes an Unimplemented
+ * Flush Trap or just flushes the appropriate instruction cache line.
+ * The ICCR register is implemented as Ancillary State register number 31.
+ */
+#define	HYPERSPARC_ICCR_ICE	1	/* Instruction cache enable */
+#define	HYPERSPARC_ICCR_FTD	2	/* Unimpl. flush trap disable */
+#define	HYPERSPARC_ASRNUM_ICCR	31	/* ICCR == ASR#31 */

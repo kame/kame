@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.29 1999/06/29 23:51:59 provos Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.34 2000/05/06 17:08:14 deraadt Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -58,6 +58,7 @@
 #include <sys/disklabel.h>
 #include <vm/vm.h>
 #include <sys/sysctl.h>
+#include <sys/msgbuf.h>
 
 #if defined(UVM)
 #include <uvm/uvm_extern.h>
@@ -172,7 +173,7 @@ sys___sysctl(p, v, retval)
 		memlock.sl_lock = 1;
 		if (dolock)
 #if defined(UVM)
-			uvm_vslock(p, SCARG(uap, old), oldlen);
+			uvm_vslock(p, SCARG(uap, old), oldlen, VM_PROT_NONE);
 #else
 			vslock(SCARG(uap, old), oldlen);
 #endif
@@ -349,6 +350,14 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 #else
 		return (sysctl_rdint(oldp, oldlenp, newp, 0));
 #endif
+	case KERN_MSGBUFSIZE:
+		/*
+		 * deal with cases where the message buffer has
+		 * become corrupted.
+		 */
+		if (!msgbufp || msgbufp->msg_magic != MSG_MAGIC)
+			return (ENXIO);
+		return (sysctl_rdint(oldp, oldlenp, newp, msgbufp->msg_bufs));
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -708,10 +717,10 @@ sysctl_doproc(name, namelen, where, sizep)
 
 	if (namelen != 2 && !(namelen == 1 && name[0] == KERN_PROC_ALL))
 		return (EINVAL);
-	p = allproc.lh_first;
+	p = LIST_FIRST(&allproc);
 	doingzomb = 0;
 again:
-	for (; p != 0; p = p->p_list.le_next) {
+	for (; p != 0; p = LIST_NEXT(p, p_list)) {
 		/*
 		 * Skip embryonic processes.
 		 */
@@ -768,7 +777,7 @@ again:
 		needed += sizeof(struct kinfo_proc);
 	}
 	if (doingzomb == 0) {
-		p = zombproc.lh_first;
+		p = LIST_FIRST(&zombproc);
 		doingzomb++;
 		goto again;
 	}
@@ -836,5 +845,5 @@ fill_eproc(p, ep)
 	ep->e_login[MAXLOGNAME-1] = '\0';
 	strncpy(ep->e_emul, p->p_emul->e_name, EMULNAMELEN);
 	ep->e_emul[EMULNAMELEN] = '\0';
-	ep->e_maxrss = p->p_rlimit[RLIMIT_RSS].rlim_cur;
+	ep->e_maxrss = p->p_rlimit ? p->p_rlimit[RLIMIT_RSS].rlim_cur : 0;
 }

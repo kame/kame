@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_vfsops.c,v 1.27 1999/06/10 05:55:16 millert Exp $	*/
+/*	$OpenBSD: nfs_vfsops.c,v 1.30 2000/02/07 04:57:17 assar Exp $	*/
 /*	$NetBSD: nfs_vfsops.c,v 1.46.4.1 1996/05/25 22:40:35 fvdl Exp $	*/
 
 /*
@@ -74,6 +74,9 @@ extern int nfs_ticks;
 
 int nfs_sysctl
     __P((int *, u_int, void *, size_t *, void *, size_t, struct proc *));
+int nfs_checkexp
+    __P((struct mount *mp, struct mbuf *nam,
+	 int *extflagsp, struct ucred **credanonp));
 
 /*
  * nfs vfs operations.
@@ -90,7 +93,8 @@ struct vfsops nfs_vfsops = {
 	nfs_fhtovp,
 	nfs_vptofh,
 	nfs_vfs_init,
-	nfs_sysctl
+	nfs_sysctl,
+	nfs_checkexp
 };
 
 extern u_int32_t nfs_procids[NFS_NPROCS];
@@ -149,11 +153,11 @@ nfs_statfs(mp, sbp, p)
 	if (v3) {
 		sbp->f_bsize = NFS_FABLKSIZE;
 		tquad = fxdr_hyper(&sfp->sf_tbytes);
-		sbp->f_blocks = (long)(tquad / ((u_quad_t)NFS_FABLKSIZE));
+		sbp->f_blocks = (u_int32_t)(tquad / (u_quad_t)NFS_FABLKSIZE);
 		tquad = fxdr_hyper(&sfp->sf_fbytes);
-		sbp->f_bfree = (long)(tquad / ((u_quad_t)NFS_FABLKSIZE));
+		sbp->f_bfree = (u_int32_t)(tquad / (u_quad_t)NFS_FABLKSIZE);
 		tquad = fxdr_hyper(&sfp->sf_abytes);
-		sbp->f_bavail = (long)(tquad / ((u_quad_t)NFS_FABLKSIZE));
+		sbp->f_bavail = (int32_t)((quad_t)tquad / (quad_t)NFS_FABLKSIZE);
 		sbp->f_files = (fxdr_unsigned(int32_t,
 		    sfp->sf_tfiles.nfsuquad[1]) & 0x7fffffff);
 		sbp->f_ffree = (fxdr_unsigned(int32_t,
@@ -346,6 +350,12 @@ nfs_mountroot()
 	 */
 	vp->v_type = VREG;
 	vp->v_flag = 0;
+	/* 
+	 * Next line is a hack to make swapmount() work on NFS swap files. 
+	 * XXX-smurph 
+	 */ 
+	swdevt[0].sw_dev = NETDEV;
+	/* end hack */
 	swdevt[0].sw_vp = vp;
 
 	/*
@@ -961,13 +971,10 @@ nfs_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
  */
 /* ARGSUSED */
 int
-nfs_fhtovp(mp, fhp, nam, vpp, exflagsp, credanonp)
+nfs_fhtovp(mp, fhp, vpp)
 	register struct mount *mp;
 	struct fid *fhp;
-	struct mbuf *nam;
 	struct vnode **vpp;
-	int *exflagsp;
-	struct ucred **credanonp;
 {
 
 	return (EINVAL);
@@ -1013,5 +1020,19 @@ nfs_quotactl(mp, cmd, uid, arg, p)
 	struct proc *p;
 {
 
+	return (EOPNOTSUPP);
+}
+
+/*
+ * check export permission, not supported
+ */
+/* ARGUSED */
+int
+nfs_checkexp(mp, nam, exflagsp, credanonp)
+	register struct mount *mp;
+	struct mbuf *nam;
+	int *exflagsp;
+	struct ucred **credanonp;
+{
 	return (EOPNOTSUPP);
 }

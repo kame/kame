@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.h,v 1.9 1999/08/08 00:43:00 niklas Exp $	*/
+/*	$OpenBSD: if_ether.h,v 1.12 2000/03/07 18:15:47 chris Exp $	*/
 /*	$NetBSD: if_ether.h,v 1.22 1996/05/11 13:00:00 mycroft Exp $	*/
 
 /*
@@ -49,6 +49,21 @@ struct ether_addr {
  */
 #define	ETHER_ADDR_LEN	6
 
+/*
+ * The number of bytes in the type field.
+ */
+#define ETHER_TYPE_LEN	2
+
+/*
+ * The number of bytes in the trailing CRC field.
+ */
+#define ETHER_CRC_LEN	4
+
+/*
+ * The length of the combined header.
+ */
+#define ETHER_HDR_LEN	(ETHER_ADDR_LEN*2+ETHER_TYPE_LEN)
+
 struct	ether_header {
 	u_int8_t  ether_dhost[ETHER_ADDR_LEN];
 	u_int8_t  ether_shost[ETHER_ADDR_LEN];
@@ -59,7 +74,11 @@ struct	ether_header {
 #define	ETHERTYPE_IP		0x0800	/* IP protocol */
 #define	ETHERTYPE_ARP		0x0806	/* address resolution protocol */
 #define	ETHERTYPE_REVARP	0x8035	/* reverse addr resolution protocol */
+#define	ETHERTYPE_8021Q		0x8100	/* IEEE 802.1Q VLAN tagging */
 #define	ETHERTYPE_IPV6		0x86DD	/* IPv6 protocol */
+#define	ETHERTYPE_PPPOEDISC	0x8863	/* PPP Over Ethernet Discovery Stage */
+#define	ETHERTYPE_PPPOE		0x8864	/* PPP Over Ethernet Session Stage */
+#define	ETHERTYPE_LOOPBACK	0x9000	/* used to test interfaces */
 
 /*
  * The ETHERTYPE_NTRAILER packet types starting at ETHERTYPE_TRAIL have
@@ -90,6 +109,23 @@ struct	ether_header {
 	(enaddr)[3] = ((u_int8_t *)ipaddr)[1] & 0x7f;			\
 	(enaddr)[4] = ((u_int8_t *)ipaddr)[2];				\
 	(enaddr)[5] = ((u_int8_t *)ipaddr)[3];				\
+}
+
+/*
+ * Macro to map an IPv6 multicast address to an Ethernet multicast address.
+ * The high-order 16 bits of the Ethernet address are statically assigned,
+ * and the low-order 32 bits are taken from the low end of the IPv6 address.
+ */
+#define ETHER_MAP_IPV6_MULTICAST(ip6addr, enaddr)			\
+	/* struct in6_addr *ip6addr; */					\
+	/* u_int8_t enaddr[ETHER_ADDR_LEN]; */				\
+{									\
+	(enaddr)[0] = 0x33;						\
+	(enaddr)[1] = 0x33;						\
+	(enaddr)[2] = ((u_int8_t *)ip6addr)[12];			\
+	(enaddr)[3] = ((u_int8_t *)ip6addr)[13];			\
+	(enaddr)[4] = ((u_int8_t *)ip6addr)[14];			\
+	(enaddr)[5] = ((u_int8_t *)ip6addr)[15];			\
 }
 #endif
 

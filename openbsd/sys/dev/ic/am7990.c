@@ -1,4 +1,4 @@
-/*	$OpenBSD: am7990.c,v 1.15 1999/02/28 05:02:16 jason Exp $	*/
+/*	$OpenBSD: am7990.c,v 1.19 2000/03/15 14:37:49 deraadt Exp $	*/
 /*	$NetBSD: am7990.c,v 1.22 1996/10/13 01:37:19 christos Exp $	*/
 
 /*-
@@ -157,8 +157,8 @@ am7990_config(sc)
 	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
 #endif
 
-	if (sc->sc_memsize > 131072)
-		sc->sc_memsize = 131072;
+	if (sc->sc_memsize > 262144)
+		sc->sc_memsize = 262144;
 
 	switch (sc->sc_memsize) {
 	case 8192:
@@ -180,6 +180,10 @@ am7990_config(sc)
 	case 131072:
 		sc->sc_nrbuf = 64;
 		sc->sc_ntbuf = 16;
+		break;
+	case 262144:
+		sc->sc_nrbuf = 128;
+		sc->sc_ntbuf = 32;
 		break;
 	default:
 		panic("am7990_config: weird memory size %d", sc->sc_memsize);
@@ -416,10 +420,15 @@ am7990_get(sc, boff, totlen)
 			}
 			len = MLEN;
 		}
-		if (top && totlen >= MINCLSIZE) {
+		if (totlen >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
-			if (m->m_flags & M_EXT)
+			if (m->m_flags & M_EXT) {
 				len = MCLBYTES;
+				if (!top) {
+					m->m_data += pad;
+					len -= pad;
+				}
+			}
 		}
 		m->m_len = len = min(totlen, len);
 		(*sc->sc_copyfrombuf)(sc, mtod(m, caddr_t), boff, len);
@@ -539,7 +548,7 @@ am7990_rint(sc)
 			    sc->sc_dev.dv_xname);
 			ifp->if_ierrors++;
 		} else {
-#ifdef LEDEBUG
+#ifdef LEDEBUG1
 			if (sc->sc_debug)
 				am7990_recv_print(sc, sc->sc_last_rd);
 #endif
@@ -552,7 +561,7 @@ am7990_rint(sc)
 		rmd.rmd3 = 0;
 		(*sc->sc_copytodesc)(sc, &rmd, rp, sizeof(rmd));
 
-#ifdef LEDEBUG
+#ifdef LEDEBUG1
 		if (sc->sc_debug)
 			printf("sc->sc_last_rd = %x, rmd: "
 			       "ladr %04x, hadr %02x, flags %02x, "
@@ -660,15 +669,17 @@ am7990_intr(arg)
 
 	isr = (*sc->sc_rdcsr)(sc, LE_CSR0);
 #ifdef LEDEBUG
-	if (sc->sc_debug)
+	if (sc->sc_debug){
 		printf("%s: am7990_intr entering with isr=%04x\n",
 		    sc->sc_dev.dv_xname, isr);
+		printf(" isr: 0x%b\n", isr, LE_C0_BITS);
+	}
 #endif
 	if ((isr & LE_C0_INTR) == 0)
 		return (0);
 
 	(*sc->sc_wrcsr)(sc, LE_CSR0,
-	    isr & (LE_C0_INEA | LE_C0_BABL | LE_C0_MISS | LE_C0_MERR |
+	    isr & (LE_C0_INEA | LE_C0_BABL | LE_C0_CERR | LE_C0_MISS | LE_C0_MERR |
 		   LE_C0_RINT | LE_C0_TINT | LE_C0_IDON));
 	if (isr & LE_C0_ERR) {
 		if (isr & LE_C0_BABL) {
@@ -808,6 +819,9 @@ am7990_start(ifp)
 			bix = 0;
 
 		if (++sc->sc_no_td == sc->sc_ntbuf) {
+#ifdef LEDEBUG
+			printf("\nequal!\n");
+#endif
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: biosvar.h,v 1.30 1999/08/25 00:54:18 mickey Exp $	*/
+/*	$OpenBSD: biosvar.h,v 1.35 2000/03/26 22:38:33 mickey Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -60,22 +60,37 @@
 #define	BIOS_MAP_ACPI	0x03	/* ACPI Reclaim memory */
 #define	BIOS_MAP_NVS	0x04	/* ACPI NVS memory */
 
-/* 
+/*
+ * BIOS32
+ */
+typedef
+struct bios32_entry_info {
+	paddr_t	bei_base;
+	psize_t	bei_size;
+	paddr_t	bei_entry;
+} *bios32_entry_info_t;
+
+typedef
+struct bios32_entry {
+	caddr_t	offset;
+	u_int16_t segment;
+} __attribute__((__packed__)) *bios32_entry_t;
+
+#define	BIOS32_MAKESIG(a, b, c, d) \
+	((a) | ((b) << 8) | ((c) << 16) | ((d) << 24))
+
+/*
  * CTL_BIOS definitions.
  */
 #define	BIOS_DEV		1	/* int: BIOS boot device */
 #define	BIOS_DISKINFO		2	/* struct: BIOS boot device info */
-#define	BIOS_CNVMEM		3	/* int: amount of conventional memory */
-#define	BIOS_EXTMEM		4	/* int: amount of extended memory */
-#define BIOS_CKSUMLEN		5	/* int: disk cksum block count */
-#define	BIOS_MAXID		6	/* number of valid machdep ids */
+#define BIOS_CKSUMLEN		3	/* int: disk cksum block count */
+#define	BIOS_MAXID		4	/* number of valid machdep ids */
 
 #define	CTL_BIOS_NAMES { \
 	{ 0, 0 }, \
 	{ "biosdev", CTLTYPE_INT }, \
 	{ "diskinfo", CTLTYPE_STRUCT }, \
-	{ "cnvmem", CTLTYPE_INT }, \
-	{ "extmem", CTLTYPE_INT }, \
 	{ "cksumlen", CTLTYPE_INT }, \
 }
 
@@ -136,13 +151,17 @@ typedef struct _bios_apminfo {
 #define	BOOTARG_PCIINFO 4
 typedef struct _bios_pciinfo {
 	/* PCI BIOS v2.0+ - Installation check values */
-	u_int32_t	pci_chars;		/* Characteristics (%eax) */
-	u_int32_t	pci_rev;		/* BCD Revision (%ebx) */
+	u_int32_t	pci_chars;	/* Characteristics (%eax) */
+	u_int32_t	pci_rev;	/* BCD Revision (%ebx) */
 	u_int32_t	pci_entry32;	/* PM entry point for PCI BIOS */
 	u_int32_t	pci_lastbus;	/* Number of last PCI bus */
 } bios_pciinfo_t;
 
-#define	BOOTARG_CONSDEV	5		/* dev_t */
+#define	BOOTARG_CONSDEV	5
+typedef struct _bios_consdev {
+	dev_t	consdev;
+	int	conspeed;
+} bios_consdev_t;
 
 #if defined(_KERNEL) || defined (_STANDALONE)
 
@@ -190,8 +209,15 @@ void bioscninit __P((struct consdev *));
 void bioscnputc __P((dev_t, int));
 int bioscngetc __P((dev_t));
 void bioscnpollc __P((dev_t, int));
+void bios_getopt __P((void));
 
-extern	u_int bootapiver;
+/* bios32.c */
+void bios32_init __P((void));
+int  bios32_service __P((u_int32_t, bios32_entry_t, bios32_entry_info_t));
+
+extern u_int bootapiver;
+extern bios_memmap_t *bios_memmap;
+extern bios_pciinfo_t *bios_pciinfo;
 
 #endif /* _KERNEL */
 #endif /* _LOCORE */

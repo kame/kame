@@ -1,4 +1,4 @@
-/*	$OpenBSD: ofbus.c,v 1.5 1998/09/20 23:03:03 rahnds Exp $	*/
+/*	$OpenBSD: ofbus.c,v 1.8 2000/03/31 06:06:28 rahnds Exp $	*/
 /*	$NetBSD: ofbus.c,v 1.3 1996/10/13 01:38:11 christos Exp $	*/
 
 /*
@@ -40,7 +40,6 @@
 
 /* a bit of a hack to prevent conflicts between ofdisk and sd/wd */
 #include "sd.h"
-#include "wd.h"
 
 int ofrprobe __P((struct device *, void *, void *));
 void ofrattach __P((struct device *, struct device *, void *));
@@ -79,11 +78,16 @@ ofbprint(aux, name)
 		l = sizeof child - 1;
 	child[l] = 0;
 	
-	if (name)
+	if (name) {
+		/* Dont print anything here, be quiet
 		printf("%s at %s", child, name);
-	else
+		return UNCONF;
+		*/
+		return QUIET;
+	} else {
 		printf(" (%s)", child);
-	return UNCONF;
+	return QUIET;
+	}
 }
 
 int
@@ -121,7 +125,7 @@ ofrattach(parent, dev, aux)
 	ofbprint(ofp, 0);
 	printf("\n");
 
-	if ((l = OF_getprop(ofp->phandle, "name", ofname, sizeof ofname - 1)) < 0)
+	if ((l = OF_getprop(ofp->phandle, "model", ofname, sizeof ofname - 1)) < 0)
 	{
 		/* no system name? */
 	} else {
@@ -187,9 +191,9 @@ ofbattach(parent, dev, aux)
 			units = 7; /* What about wide or hostid != 7?	XXX */
 #endif
 		} else if (!strcmp(name, "ide")) {
-#if NWD > 0
-			units = 0; /* if wd driver in kernel, dont use ofw */
-else 
+#if NSD > 0
+			units = 0; /* if sd? driver in kernel, dont use ofw */
+#else 
 			units = 2;
 #endif
 		}

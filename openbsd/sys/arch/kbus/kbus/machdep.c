@@ -54,7 +54,7 @@
 #include <sys/reboot.h>
 #include <sys/conf.h>
 #include <sys/file.h>
-#include <sys/callout.h>
+#include <sys/timeout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
@@ -136,6 +136,7 @@ static int _mapped;	/* TG: FIXME.  */
 extern char end[], _edata[];
 extern vm_offset_t   avail_start;
 extern vm_offset_t   avail_end;
+extern vm_size_t     mem_size;
 
 /*
  * dvmamap is used to manage DVMA memory. Note: this coincides with
@@ -328,11 +329,7 @@ long dumplo;
 int physmem;
 
 extern int bootdev;
-extern cyloffset;
-
-/* pmap_enter prototype */
-void pmap_enter __P((register pmap_t, vm_offset_t, register vm_offset_t,
-	vm_prot_t, boolean_t));
+extern int cyloffset;
 
 void
 cpu_startup(void)
@@ -463,11 +460,9 @@ cpu_startup(void)
 	mb_map = kmem_suballoc(kernel_map, (vm_offset_t *)&mbutl, &maxaddr,
 			       VM_MBUF_SIZE, FALSE);
 	/*
-	 * Initialize callouts
+	 * Initialize timeouts
 	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
+	timeout_init();
 
 	printf("avail mem = 0x%x\n", ptoa(cnt.v_free_count));
 	printf("using %d buffers containing %d bytes of memory\n",
@@ -507,7 +502,7 @@ allocsys(v)
 	    (name) = (type *)v; v = (caddr_t)((name)+(num))
 #define	valloclim(name, type, num, lim) \
 	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
-	valloc(callout, struct callout, ncallout);
+	valloc(timeouts, struct timeout, ntimeout);
 #ifdef SYSVSHM
 	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
 #endif
@@ -517,11 +512,12 @@ allocsys(v)
 	 * memory. Insure a minimum of 16 buffers.
 	 * We allocate 1/2 as many swap buffer headers as file i/o buffers.
 	 */
-	if (bufpages == 0)
+	if (bufpages == 0) {
 		if (physmem < (2 * 1024 * 1024))
 			bufpages = physmem / 10 / CLSIZE;
 		else
 			bufpages = ((2 * 1024 * 1024 + physmem) / 40) / CLSIZE;
+	}
 
 	bufpages = min(NKMEMCLUSTERS*2/5, bufpages);  /* XXX ? - cgd */
 
@@ -577,7 +573,7 @@ microtime(tvp)
 
 	*tvp = time;
 	tvp->tv_usec += tick;
-	while (tvp->tv_usec > 1000000) {
+	while (tvp->tv_usec >= 1000000) {
 		tvp->tv_sec++;
 		tvp->tv_usec -= 1000000;
 	}
@@ -1231,7 +1227,8 @@ cpu_exec_aout_makecmds(p, epp)
 	int error = ENOEXEC;
 
 #ifdef COMPAT_SUNOS
-	extern sunos_exec_aout_makecmds __P((struct proc *, struct exec_package *));
+	extern int sunos_exec_aout_makecmds __P((struct proc *,
+						 struct exec_package *));
 	if ((error = sunos_exec_aout_makecmds(p, epp)) == 0)
 		return 0;
 #endif

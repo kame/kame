@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.19 1999/08/17 16:09:21 art Exp $	*/
+/*	$OpenBSD: trap.c,v 1.23 2000/02/21 21:05:59 art Exp $	*/
 /*	$NetBSD: trap.c,v 1.58 1997/09/12 08:55:01 pk Exp $ */
 
 /*
@@ -200,11 +200,12 @@ static __inline void userret __P((struct proc *, int,  u_quad_t));
 void trap __P((unsigned, int, int, struct trapframe *));
 static __inline void share_fpu __P((struct proc *, struct trapframe *));
 void mem_access_fault __P((unsigned, int, u_int, int, int, struct trapframe *));
-void mem_access_fault4m __P((unsigned, u_int, u_int, u_int, u_int, struct trapframe *));
+void mem_access_fault4m __P((unsigned, u_int, u_int, struct trapframe *));
 void syscall __P((register_t, struct trapframe *, register_t));
 
 int ignore_bogus_traps = 0;
 
+int want_ast = 0;
 /*
  * Define the code needed before returning to user mode, for
  * trap, mem_access_fault, and syscall.
@@ -265,7 +266,7 @@ static __inline void share_fpu(p, tf)
 	struct proc *p;
 	struct trapframe *tf;
 {
-	if ((tf->tf_psr & PSR_EF) != 0 && fpproc != p)
+	if ((tf->tf_psr & PSR_EF) != 0 && cpuinfo.fpproc != p)
 		tf->tf_psr &= ~PSR_EF;
 }
 
@@ -418,11 +419,11 @@ badtrap:
 			fpu_cleanup(p, fs);
 			break;
 		}
-		if (fpproc != p) {		/* we do not have it */
-			if (fpproc != NULL)	/* someone else had it */
-				savefpstate(fpproc->p_md.md_fpstate);
+		if (cpuinfo.fpproc != p) {	/* we do not have it */
+			if (cpuinfo.fpproc != NULL) /* someone else had it */
+				savefpstate(cpuinfo.fpproc->p_md.md_fpstate);
 			loadfpstate(fs);
-			fpproc = p;		/* now we do have it */
+			cpuinfo.fpproc = p;	/* now we do have it */
 		}
 		tf->tf_psr |= PSR_EF;
 		break;
@@ -507,10 +508,10 @@ badtrap:
 		 * will not match once fpu_cleanup does its job, so
 		 * we must not save again later.)
 		 */
-		if (p != fpproc)
+		if (p != cpuinfo.fpproc)
 			panic("fpe without being the FP user");
 		savefpstate(p->p_md.md_fpstate);
-		fpproc = NULL;
+		cpuinfo.fpproc = NULL;
 		/* tf->tf_psr &= ~PSR_EF; */	/* share_fpu will do this */
 		fpu_cleanup(p, p->p_md.md_fpstate);
 		/* fpu_cleanup posts signals if needed */
@@ -814,12 +815,10 @@ int dfdebug = 0;
 #endif
 
 void
-mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
+mem_access_fault4m(type, sfsr, sfva, tf)
 	unsigned type;
 	u_int sfsr;
 	u_int sfva;
-	u_int afsr;
-	u_int afva;
 	struct trapframe *tf;
 {
 	int pc, psr;
@@ -856,9 +855,9 @@ mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
 	 * user's guide for more info, and for a possible solution which we
 	 * don't implement here.
 	 */
-	if ((afsr & AFSR_AFO) != 0 || type == T_STOREBUFFAULT ||
+	if (type == T_STOREBUFFAULT ||
 	    (type == T_DATAFAULT && !(sfsr & SFSR_FAV))) {
-		memerr4m(type, sfsr, sfva, afsr, afva, tf);
+		(*cpuinfo.memerr)(type, sfsr, sfva, tf);
 		/*
 		 * If we get here, exit the trap handler and wait for the
 		 * trap to re-occur.
@@ -915,7 +914,8 @@ mem_access_fault4m(type, sfsr, sfva, afsr, afva, tf)
 		if ((lda((sfva & 0xFFFFF000) | ASI_SRMMUFP_LN, ASI_SRMMUFP) &
 		    SRMMU_TETYPE) != SRMMU_TEPTE)
 			goto fault;	/* Translation bad */
-		else goto out;	/* Translation OK, retry operation */
+		lda(SRMMU_SFSR, ASI_SRMMU);
+		goto out;	/* Translation OK, retry operation */
 	}
 
 	va = trunc_page(sfva);
@@ -1017,7 +1017,7 @@ kfault:
 			    (int)p->p_addr->u_pcb.pcb_onfault : 0;
 			if (!onfault) {
 				(void) splhigh();
-				printf("data fault: pc=0x%x addr=0x%x sfsr=%b\n",
+				printf("data fault: pc=0x%x sfva=0x%x sfsr=%b\n",
 				       pc, sfva, sfsr, SFSR_BITS);
 				panic("kernel fault");
 				/* NOTREACHED */
