@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1598 2001/03/11 06:08:47 jinmei Exp $
+$KAME: CHANGELOG,v 1.1599 2001/03/12 11:19:24 itojun Exp $
 
 <200103>
+Mon Mar 12 20:17:43 JST 2001  itojun@iijlab.net
+	* sys/crypto/sha2/sha2.c: hmac-sha2-{256,384,512} support.  attaches
+	  96 bits of crypto checksum (not sure if this is right - there's no
+	  draft on this).
+	  TODO: interop tests
+
 2001-03-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_output): added a couple of
 	missing splx() for OpenBSD IPsec.
