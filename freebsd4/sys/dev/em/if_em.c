@@ -461,6 +461,7 @@ em_start(struct ifnet *ifp)
 	struct em_tx_buffer   *tx_buffer;
 	struct em_tx_desc *current_tx_desc = NULL;
 	struct adapter * adapter = ifp->if_softc;
+	int pkts = 0;
 
 	if (!adapter->link_active)
 		return;
@@ -499,6 +500,7 @@ em_start(struct ifnet *ifp)
 			}
 		}
 		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 		STAILQ_REMOVE_HEAD(&adapter->free_tx_buffer_list, em_tx_entry);
 
 		tx_buffer->num_tx_desc_used = 0;
@@ -571,6 +573,8 @@ em_start(struct ifnet *ifp)
 	} /* end of while loop */
 
 	splx(s);
+	if (pkts == 0)
+		return;
 
 	/* Set timeout in case chip has problems transmitting */
 	ifp->if_timer = EM_TX_TIMEOUT;
