@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.107 2000/05/12 23:52:27 itojun Exp $	*/
+/*	$KAME: key.c,v 1.108 2000/05/18 07:24:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3188,7 +3188,7 @@ key_setdumpsa(sav, type, satype, seq, pid)
 	u_int32_t seq, pid;
 {
 	struct mbuf *result = NULL, *tres = NULL, *m;
-	int l;
+	int l = 0;
 	int i;
 	void *p;
 	int dumporder[] = {
@@ -5364,7 +5364,7 @@ key_acquire(saidx, sp)
 #endif
 	struct secpolicyindex *spidx = NULL;
 	u_int8_t satype;
-	int error;
+	int error = -1;
 	u_int32_t seq;
 	union sadb_x_ident_id id;
 
@@ -5975,7 +5975,7 @@ key_expire(sav)
 	int satype;
 	struct mbuf *result = NULL, *m;
 	int len;
-	int error;
+	int error = -1;
 	struct sadb_lifetime *lt;
 
 	/* XXX: Why do we lock ? */
