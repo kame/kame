@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#	$KAME: prefix.sh,v 1.3 2001/02/04 03:23:09 jinmei Exp $
+#	$KAME: prefix.sh,v 1.4 2001/02/04 03:24:24 itojun Exp $
 
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -65,7 +65,7 @@ case $command in
 	done
     ;;
     *)
-    usage
-    exit 1
+	usage
+	exit 1
     ;;
 esac
