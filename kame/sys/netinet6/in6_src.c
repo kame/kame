@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.41 2001/07/23 07:06:50 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.42 2001/07/25 05:18:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,69 +172,25 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	}
 
 	/*
-	 * If the destination address is a link-local unicast address or
-	 * a multicast address, and if the outgoing interface is specified
-	 * by the sin6_scope_id filed, use an address associated with the
-	 * interface.
-	 * XXX: We're now trying to define more specific semantics of
-	 *      sin6_scope_id field, so this part will be rewritten in
-	 *      the near future.
-	 */
-	if ((IN6_IS_ADDR_LINKLOCAL(dst) || IN6_IS_ADDR_MULTICAST(dst)) &&
-	    dstsock->sin6_scope_id) {
-		/*
-		 * I'm not sure if boundary check for scope_id is done
-		 * somewhere...
-		 */
-		if (dstsock->sin6_scope_id < 0 ||
-		    if_index < dstsock->sin6_scope_id) {
-			*errorp = ENXIO; /* XXX: better error? */
-			return(0);
-		}
-		ia6 = in6_ifawithscope(ifindex2ifnet[dstsock->sin6_scope_id],
-				       dst);
-		if (ia6 == 0) {
-			*errorp = EADDRNOTAVAIL;
-			return(0);
-		}
-		return(&satosin6(&ia6->ia_addr)->sin6_addr);
-	}
-
-	/*
-	 * If the destination address is a multicast address and
-	 * the outgoing interface for the address is specified
-	 * by the caller, use an address associated with the interface.
-	 * There is a sanity check here; if the destination has node-local
-	 * scope, the outgoing interfacde should be a loopback address.
-	 * Even if the outgoing interface is not specified, we also
-	 * choose a loopback interface as the outgoing interface.
+	 * If the destination address is a multicast address and the outgoing
+	 * interface for the address is specified by the caller, use an address
+	 * associated with the interface.  The specified interface must be in
+	 * the scope zone of the destination.
 	 */
 	if (IN6_IS_ADDR_MULTICAST(dst)) {
 		struct ifnet *ifp = mopts ? mopts->im6o_multicast_ifp : NULL;
-#ifdef __bsdi__
-#if _BSDI_VERSION >= 199802
-		extern struct ifnet *loifp;
-#else
-		extern struct ifnet loif;
-		struct ifnet *loifp = &loif;
-#endif
-#endif
-
-		if (ifp == NULL && IN6_IS_ADDR_MC_NODELOCAL(dst)) {
-#ifdef __bsdi__
-			ifp = loifp;
-#elif defined(__OpenBSD__)
-			ifp = lo0ifp;
-#else
-			ifp = &loif[0];
-#endif
-		}
 
 		if (ifp) {
-			ia6 = in6_ifawithscope(ifp, dst);
-			if (ia6 == 0) {
+			if (in6_addr2scopeid(ifp, dst) !=
+			    dstsock->sin6_scope_id) {
 				*errorp = EADDRNOTAVAIL;
-				return(0);
+				return(NULL);
+			}
+
+			ia6 = in6_ifawithscope(ifp, dst);
+			if (ia6 == NULL) {
+				*errorp = EADDRNOTAVAIL;
+				return(NULL);
 			}
 			return(&satosin6(&ia6->ia_addr)->sin6_addr);
 		}
@@ -631,7 +587,7 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 		scopeid = scope6_addr2default(in6);
 #endif
 
-	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_NODELOCAL(in6)) {
+	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
 		struct in6_pktinfo *pi;
 
 		/*
@@ -681,7 +637,7 @@ in6_recoverscope(sin6, in6, ifp)
 	const struct in6_addr *in6;
 	struct ifnet *ifp;
 {
-	u_int32_t scopeid;
+	u_int32_t zoneid;
 
 	sin6->sin6_addr = *in6;
 
@@ -691,19 +647,19 @@ in6_recoverscope(sin6, in6, ifp)
 	 */
 
 	sin6->sin6_scope_id = 0;
-	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_NODELOCAL(in6)) {
+	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
 		/*
 		 * KAME assumption: link id == interface id
 		 */
-		scopeid = ntohs(sin6->sin6_addr.s6_addr16[1]);
-		if (scopeid) {
+		zoneid = ntohs(sin6->sin6_addr.s6_addr16[1]);
+		if (zoneid) {
 			/* sanity check */
-			if (scopeid < 0 || if_index < scopeid)
+			if (zoneid < 0 || if_index < zoneid)
 				return ENXIO;
-			if (ifp && ifp->if_index != scopeid)
+			if (ifp && ifp->if_index != zoneid)
 				return ENXIO;
 			sin6->sin6_addr.s6_addr16[1] = 0;
-			sin6->sin6_scope_id = scopeid;
+			sin6->sin6_scope_id = zoneid;
 		}
 	}
 
@@ -718,6 +674,6 @@ void
 in6_clearscope(addr)
 	struct in6_addr *addr;
 {
-	if (IN6_IS_SCOPE_LINKLOCAL(addr) || IN6_IS_ADDR_MC_NODELOCAL(addr))
+	if (IN6_IS_SCOPE_LINKLOCAL(addr) || IN6_IS_ADDR_MC_INTFACELOCAL(addr))
 		addr->s6_addr16[1] = 0;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.205 2001/07/24 08:55:29 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.206 2001/07/25 05:18:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -673,7 +673,7 @@ ip6_input(m)
 			ip6stat.ip6s_badscope++;
 			goto bad;
 		}
-		if ((IN6_IS_ADDR_MC_NODELOCAL(&ip6->ip6_dst) ||
+		if ((IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) ||
 		     IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) &&
 		    ip6->ip6_dst.s6_addr16[1]) {
 			ip6stat.ip6s_badscope++;
@@ -681,10 +681,16 @@ ip6_input(m)
 		}
 	}
 
+	/*
+	 * Embed interface ID as the zone ID for interface-local and
+	 * link-local addresses.
+	 * XXX: KAME assumes one-to-one mapping between interfaces and
+	 * links.
+	 */
 	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
 		ip6->ip6_src.s6_addr16[1]
 			= htons(m->m_pkthdr.rcvif->if_index);
-	if (IN6_IS_ADDR_MC_NODELOCAL(&ip6->ip6_dst) ||
+	if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) ||
 	    IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
 		ip6->ip6_dst.s6_addr16[1]
 			= htons(m->m_pkthdr.rcvif->if_index);
@@ -1589,7 +1595,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 		struct in6_pktinfo pi6, *prevpi = NULL;
 		bcopy(&ip6->ip6_dst, &pi6.ipi6_addr, sizeof(struct in6_addr));
 		if (IN6_IS_SCOPE_LINKLOCAL(&pi6.ipi6_addr) ||
-		    IN6_IS_ADDR_MC_NODELOCAL(&pi6.ipi6_addr))
+		    IN6_IS_ADDR_MC_INTFACELOCAL(&pi6.ipi6_addr))
 			pi6.ipi6_addr.s6_addr16[1] = 0;
 		pi6.ipi6_ifindex = (m && m->m_pkthdr.rcvif)
 					? m->m_pkthdr.rcvif->if_index

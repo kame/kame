@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.201 2001/07/23 07:45:36 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.202 2001/07/25 05:18:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -674,9 +674,18 @@ skip_ipsec2:;
 		dst->sin6_addr = ip6->ip6_dst;
 #ifdef SCOPEDROUTING
 		/* XXX: sin6_scope_id should already be fixed at this point */
-		if (IN6_IS_SCOPE_LINKLOCAL(&dst->sin6_addr) ||
-		    IN6_IS_ADDR_MC_NODELOCAL(&dst->sin6_addr))
-			dst->sin6_scope_id = ntohs(dst->sin6_addr.s6_addr16[1]);
+		if (dst->sin6_scope_id == 0) {
+			struct sockaddr_in6 dst0 = *dst;
+
+			/* XXX: in6_recoverscope will clear the embedded ID */
+			error = in6_recoverscope(&dst0, &dst->sin6_addr, NULL);
+			if (error != 0) {
+				ip6stat.ip6s_badscope++;
+				in6_ifstat_inc(ifp, ifs6_out_discard);
+				goto bad;
+			}
+			dst->sin6_scope_id = dst0.sin6_scope_id;
+		}
 #endif
 	}
 #ifdef IPSEC
@@ -876,32 +885,6 @@ skip_ipsec2:;
 		if (opt && opt->ip6po_pktinfo && opt->ip6po_pktinfo->ipi6_ifindex)
 			ifp = ifindex2ifnet[opt->ip6po_pktinfo->ipi6_ifindex];
 
-		/*
-		 * If the destination is a node-local scope multicast,
-		 * the packet should be loop-backed only.
-		 */
-		if (IN6_IS_ADDR_MC_NODELOCAL(&ip6->ip6_dst)) {
-			/*
-			 * If the outgoing interface is already specified,
-			 * it should be a loopback interface.
-			 */
-			if (ifp && (ifp->if_flags & IFF_LOOPBACK) == 0) {
-				ip6stat.ip6s_badscope++;
-				error = ENETUNREACH; /* XXX: better error? */
-				/* XXX correct ifp? */
-				in6_ifstat_inc(ifp, ifs6_out_discard);
-				goto bad;
-			} else {
-#ifdef __bsdi__
-				ifp = loifp;
-#elif defined(__OpenBSD__)
-				ifp = lo0ifp;
-#else
-				ifp = &loif[0];
-#endif
-			}
-		}
-
 		if (opt && opt->ip6po_hlim != -1)
 			ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
 		if (opt) {
@@ -912,7 +895,7 @@ skip_ipsec2:;
 		/*
 		 * If caller did not provide an interface lookup a
 		 * default in the routing table.  This is either a
-		 * default for the speicfied group (i.e. a host
+		 * default for the specified group (i.e. a host
 		 * route), or a multicast default (a route for the
 		 * ``net'' ff00::/8).
 		 */
@@ -939,6 +922,32 @@ skip_ipsec2:;
 		if ((flags & IPV6_FORWARDING) == 0)
 			in6_ifstat_inc(ifp, ifs6_out_request);
 		in6_ifstat_inc(ifp, ifs6_out_mcast);
+
+		/*
+		 * The outgoing interface must be in the scope zone of the
+		 * destination.
+		 */
+#ifndef SCOPEDROUTING
+		if (dst->sin6_scope_id == 0) { /* XXX: should've been filled */
+			struct sockaddr_in6 dst0 = *dst;
+
+			error = in6_recoverscope(&dst0, &dst->sin6_addr, ifp);
+			if (error != 0) {
+				ip6stat.ip6s_badscope++;
+				in6_ifstat_inc(ifp, ifs6_out_discard);
+				goto bad;
+			}
+			dst->sin6_scope_id = dst0.sin6_scope_id;
+		}
+#endif
+		if (in6_addr2scopeid(ifp, &dst->sin6_addr) !=
+		    dst->sin6_scope_id) {
+			/* on which interface should we count the error? */
+			ip6stat.ip6s_badscope++;
+			in6_ifstat_inc(ifp, ifs6_out_discard);
+			error = ENETUNREACH; /* XXX better error? */
+			goto bad;
+		}
 
 		/*
 		 * Confirm that the outgoing interface supports multicast.
@@ -986,7 +995,8 @@ skip_ipsec2:;
 		 * loop back a copy if this host actually belongs to the
 		 * destination group on the loopback interface.
 		 */
-		if (ip6->ip6_hlim == 0 || (ifp->if_flags & IFF_LOOPBACK)) {
+		if (ip6->ip6_hlim == 0 || (ifp->if_flags & IFF_LOOPBACK) ||
+		    IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst)) {
 			m_freem(m);
 			goto done;
 		}
@@ -1088,9 +1098,8 @@ skip_ipsec2:;
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_src.s6_addr16[1])];
 		else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
-		else if (IN6_IS_ADDR_MC_NODELOCAL(&ip6->ip6_dst))
+		else if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst))
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
-		/* there will be no nodelocal on src */
 
 		/*
 		 * XXX: origifp can be NULL even in those two cases above.
@@ -3391,35 +3400,23 @@ ip6_setmoptions(optname, im6op, m)
 		 */
 		if (mreq->ipv6mr_interface == 0) {
 			/*
-			 * If the multicast address is in node-local scope,
-			 * the interface should be a loopback interface.
-			 * Otherwise, look up the routing table for the
+			 * Look up the routing table for the
 			 * address, and choose the outgoing interface.
 			 *   XXX: is it a good approach?
 			 */
-			if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr)) {
-#ifdef __bsdi__
-				ifp = loifp;
-#elif defined(__OpenBSD__)
-				ifp = lo0ifp;
-#else
-				ifp = &loif[0];
-#endif
-			} else {
-				ro.ro_rt = NULL;
-				dst = (struct sockaddr_in6 *)&ro.ro_dst;
-				bzero(dst, sizeof(*dst));
-				dst->sin6_len = sizeof(struct sockaddr_in6);
-				dst->sin6_family = AF_INET6;
-				dst->sin6_addr = mreq->ipv6mr_multiaddr;
-				rtalloc((struct route *)&ro);
-				if (ro.ro_rt == NULL) {
-					error = EADDRNOTAVAIL;
-					break;
-				}
-				ifp = ro.ro_rt->rt_ifp;
-				rtfree(ro.ro_rt);
+			ro.ro_rt = NULL;
+			dst = (struct sockaddr_in6 *)&ro.ro_dst;
+			bzero(dst, sizeof(*dst));
+			dst->sin6_len = sizeof(struct sockaddr_in6);
+			dst->sin6_family = AF_INET6;
+			dst->sin6_addr = mreq->ipv6mr_multiaddr;
+			rtalloc((struct route *)&ro);
+			if (ro.ro_rt == NULL) {
+				error = EADDRNOTAVAIL;
+				break;
 			}
+			ifp = ro.ro_rt->rt_ifp;
+			rtfree(ro.ro_rt);
 		} else
 			ifp = ifindex2ifnet[mreq->ipv6mr_interface];
 
@@ -3434,8 +3431,9 @@ ip6_setmoptions(optname, im6op, m)
 		/*
 		 * Put interface index into the multicast address,
 		 * if the address has interface/link-local scope.
+		 * XXX: the embedded form is a KAME-local hack. 
 		 */
-		if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr) ||
+		if (IN6_IS_ADDR_MC_INTFACELOCAL(&mreq->ipv6mr_multiaddr) ||
 		    IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
 			mreq->ipv6mr_multiaddr.s6_addr16[1]
 				= htons(mreq->ipv6mr_interface);
@@ -3501,7 +3499,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Put interface index into the multicast address,
 		 * if the address has interface/link-local scope.
 		 */
-		if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr) ||
+		if (IN6_IS_ADDR_MC_INTFACELOCAL(&mreq->ipv6mr_multiaddr) ||
 		    IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
 			mreq->ipv6mr_multiaddr.s6_addr16[1]
 				= htons(mreq->ipv6mr_interface);

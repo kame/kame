@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.47 2001/07/23 06:52:30 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.48 2001/07/25 05:18:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1111,7 +1111,7 @@ ip6_mforward(ip6, ifp, m)
 	 * Don't forward a packet with Hop limit of zero or one,
 	 * or a packet destined to a local-only group.
 	 */
-	if (ip6->ip6_hlim <= 1 || IN6_IS_ADDR_MC_NODELOCAL(&ip6->ip6_dst) ||
+	if (ip6->ip6_hlim <= 1 || IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) ||
 	    IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst))
 		return 0;
 	ip6->ip6_hlim--;

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.219 2001/07/24 13:51:08 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.220 2001/07/25 05:18:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1181,15 +1181,16 @@ in6_update_ifa(ifp, ifra, ia)
 				(struct sockaddr *)&mltmask;
 			info.rti_info[RTAX_IFA] =
 				(struct sockaddr *)&ia->ia_addr;
-			info.rti_flags = RTF_UP | RTF_CLONING; /* XXX(why?) */
+			/* XXX: we need RTF_CLONING to fake nd6_rtrequest */
+			info.rti_flags = RTF_UP | RTF_CLONING;
 			error = rtrequest1(RTM_ADD, &info, NULL);
 #else
 			error = rtrequest(RTM_ADD,
-			    (struct sockaddr *)&mltaddr,
-			    (struct sockaddr *)&ia->ia_addr,
-			    (struct sockaddr *)&mltmask,
-			    RTF_UP | RTF_CLONING,  /* xxx */
-			    (struct rtentry **)0);
+					  (struct sockaddr *)&mltaddr,
+					  (struct sockaddr *)&ia->ia_addr,
+					  (struct sockaddr *)&mltmask,
+					  RTF_UP | RTF_CLONING,
+					  (struct rtentry **)0);
 #endif
 			if (error)
 				goto cleanup;
@@ -1240,14 +1241,31 @@ in6_update_ifa(ifp, ifra, ia)
 		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
 		if (!in6m) {
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+			struct rt_addrinfo info;
+
+			bzero(&info, sizeof(info));
+			info.rti_info[RTAX_DST] = (struct sockaddr *)&mltaddr;
+			info.rti_info[RTAX_GATEWAY] =
+				(struct sockaddr *)&ia->ia_addr;
+			info.rti_info[RTAX_NETMASK] =
+				(struct sockaddr *)&mltmask;
+			info.rti_info[RTAX_IFA] =
+				(struct sockaddr *)&ia->ia_addr;
+			info.rti_flags = RTF_UP | RTF_CLONING;
+			error = rtrequest1(RTM_ADD, &info, NULL);
+#else
 			error = rtrequest(RTM_ADD,
-			    (struct sockaddr *)&mltaddr,
-			    (struct sockaddr *)&ia->ia_addr,
-			    (struct sockaddr *)&mltmask,
-			    RTF_UP, (struct rtentry **)0);
+					  (struct sockaddr *)&mltaddr,
+					  (struct sockaddr *)&ia->ia_addr,
+					  (struct sockaddr *)&mltmask,
+					  RTF_UP | RTF_CLONING,
+					  (struct rtentry **)0);
+#endif
 			if (error)
 				goto cleanup;
 		}
+
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
 		if (imm) {
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.27 2001/04/04 05:17:30 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.28 2001/07/25 05:18:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -187,7 +187,7 @@ mld6_stop_listening(in6m)
 
 	if (in6m->in6m_state == MLD6_IREPORTEDLAST &&
 	    (!IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &mld6_all_nodes_linklocal)) &&
-	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) > IPV6_ADDR_SCOPE_NODELOCAL)
+	    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) > IPV6_ADDR_SCOPE_INTFACELOCAL)
 		mld6_sendpkt(in6m, MLD6_LISTENER_DONE,
 			     &mld6_all_routers_linklocal);
 }

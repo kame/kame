@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.12 2001/07/24 15:15:59 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.13 2001/07/25 05:18:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -217,8 +217,8 @@ struct in6_addr *addr;
 		 * return scope doesn't work.
 		 */
 		switch (scope) {
-		case IPV6_ADDR_SCOPE_NODELOCAL:
-			return IPV6_ADDR_SCOPE_NODELOCAL;
+		case IPV6_ADDR_SCOPE_INTFACELOCAL:
+			return IPV6_ADDR_SCOPE_INTFACELOCAL;
 			break;
 		case IPV6_ADDR_SCOPE_LINKLOCAL:
 			return IPV6_ADDR_SCOPE_LINKLOCAL;
@@ -234,9 +234,9 @@ struct in6_addr *addr;
 
 	if (bcmp(&in6addr_loopback, addr, sizeof(addr) - 1) == 0) {
 		if (addr->s6_addr8[15] == 1) /* loopback */
-			return IPV6_ADDR_SCOPE_NODELOCAL;
+			return IPV6_ADDR_SCOPE_INTFACELOCAL;
 		if (addr->s6_addr8[15] == 0) /* unspecified */
-			return IPV6_ADDR_SCOPE_LINKLOCAL;
+			return IPV6_ADDR_SCOPE_LINKLOCAL; /* XXX: correct? */
 	}
 
 	return IPV6_ADDR_SCOPE_GLOBAL;
@@ -256,8 +256,8 @@ in6_addr2scopeid(ifp, addr)
 
 #define SID scope6_ids[ifp->if_index]
 	switch(scope) {
-	case IPV6_ADDR_SCOPE_NODELOCAL:
-		return(-1);	/* XXX: is this an appropriate value? */
+	case IPV6_ADDR_SCOPE_INTFACELOCAL: /* should be interface index */
+		return(SID.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL]);
 
 	case IPV6_ADDR_SCOPE_LINKLOCAL:
 		return(SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL]);
