@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.154 2002/08/06 11:00:54 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.155 2002/08/11 05:00:47 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1754,7 +1754,11 @@ mip6_exthdr_create(m, opt, mip6opt)
 		if (mip6opt->mip6po_mobility != NULL)
 			need_hao = 1;
 	}
-	if ((mbu->mbu_flags & IP6MU_HOME) == 0) {
+	if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
+		/* to my home agent. */
+		if (!need_hao && mbu->mbu_fsm_state == MIP6_BU_FSM_STATE_IDLE)
+			goto noneed;
+	} else {
 		/* to any of correspondent nodes. */
 		if (!need_hao && mbu->mbu_fsm_state != MIP6_BU_FSM_STATE_BOUND)
 			goto noneed;
