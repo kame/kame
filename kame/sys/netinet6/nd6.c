@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.58 2000/04/29 04:51:35 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.59 2000/04/29 05:57:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1985,7 +1985,13 @@ nd6_output(ifp, m0, dst, rt0)
 	if (rt && (rt->rt_flags & RTF_LLINFO) != 0)
 		ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	else {
-		if ((rt = nd6_lookup(&dst->sin6_addr, 1, ifp)) != NULL)
+		/*
+		 * Since nd6_is_addr_neighbor() internally calls nd6_lookup,
+		 * the condition below is not very efficient. But we believe
+		 * it is tolerable, because this should be a rare case.
+		 */
+		if (nd6_is_addr_neighbor(dst, ifp) &&
+		    (rt = nd6_lookup(&dst->sin6_addr, 1, ifp)) != NULL)
 			ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	}
 	if (!ln || !rt) {
@@ -1997,6 +2003,7 @@ nd6_output(ifp, m0, dst, rt0)
 			    ip6_sprintf(&dst->sin6_addr), ln, rt);
 			senderr(EIO);	/* XXX: good error? */
 		}
+
 		goto sendpkt;	/* send anyway */
 	}
 
