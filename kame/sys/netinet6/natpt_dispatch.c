@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.42 2002/02/01 08:54:45 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.43 2002/02/21 19:06:54 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -78,11 +78,11 @@ caddr_t			 natptctl_vars[NATPTCTL_NUM]  = NATPTCTL_VARS;
  *
  */
 
-int		natpt_in6		__P((struct mbuf *, struct mbuf **));
-int		natpt_in4		__P((struct mbuf *, struct mbuf **));
-int		natpt_config6		__P((struct mbuf *, struct pcv *));
-caddr_t		natpt_lastpyld		__P((struct mbuf *, int *, int *, struct ip6_frag **));
-int		natpt_config4		__P((struct mbuf *, struct pcv *));
+int		natpt_in6	__P((struct mbuf *, struct mbuf **));
+int		natpt_in4	__P((struct mbuf *, struct mbuf **));
+int		natpt_config6	__P((struct mbuf *, struct pcv *));
+caddr_t		natpt_lastpyld	__P((struct mbuf *, int *, int *, struct ip6_frag **));
+int		natpt_config4	__P((struct mbuf *, struct pcv *));
 
 MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
 
@@ -96,9 +96,9 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 {
 	const char	*fn = __FUNCTION__;
 
-	struct pcv	 cv6;
+	struct pcv	cv6;
 	struct ip6_hdr	*ip6;
-	struct in6_addr	 match;
+	struct in6_addr	match;
 	struct pAddr	*pad;
 
 	if (natpt_initialized == 0)
@@ -317,9 +317,9 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 int
 natpt_config6(struct mbuf *m, struct pcv *cv6)
 {
-	int		 proto;
-	int		 offset;
-	caddr_t		 tcpudp;
+	int		proto;
+	int		offset;
+	caddr_t		tcpudp;
 
 	bzero(cv6, sizeof(struct pcv));
 	cv6->sa_family = AF_INET6;
@@ -348,8 +348,8 @@ caddr_t
 natpt_lastpyld(struct mbuf *m, int *proto, int *offset, struct ip6_frag **fh)
 {
 	struct ip6_hdr	*ip6;
-	caddr_t		 ip6end;
-	caddr_t		 pyld;
+	caddr_t		ip6end;
+	caddr_t		pyld;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6end = (caddr_t)(ip6 + 1) + ntohs(ip6->ip6_plen);
@@ -363,9 +363,9 @@ natpt_lastpyld(struct mbuf *m, int *proto, int *offset, struct ip6_frag **fh)
 caddr_t
 natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag **fh)
 {
-	int		 nxt;
-	int		 hdrsz = 0;
-	caddr_t		 ip6ext;
+	int		nxt;
+	int		hdrsz = 0;
+	caddr_t		ip6ext;
 	struct ip6_frag *ip6fh = NULL;
 
 	if (proto)	*proto = 0;
