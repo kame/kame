@@ -2,7 +2,6 @@
 
 DISTNAME=	tcpdump-2000_01_25
 PKGNAME=	tcpdump-20000125
-
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
