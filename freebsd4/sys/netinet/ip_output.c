@@ -152,16 +152,6 @@ ip_output(m0, opt, ro, flags, imo)
 	divert_cookie = 0;
 #endif
 
-	/*
-	 * NOTE: If IP_SOCKINMRCVIF flag is set, 'socket *' is kept in
-	 * m->m_pkthdr.rcvif for later IPSEC check. In this case,
-	 * m->m_pkthdr will be NULL cleared after the contents is saved in
-	 * 'so'.
-	 * NULL clearance of rcvif should be natural because the packet should
-	 * have been sent from my own socket and has no rcvif in this case.
-	 * It is also necessary because someone might consider it as
-	 * 'ifnet *', and cause SEGV.
-	 */
 #if defined(IPFIREWALL) && defined(DUMMYNET)
         /*  
          * dummynet packet are prepended a vestigial mbuf with
@@ -184,10 +174,8 @@ ip_output(m0, opt, ro, flags, imo)
 
             m0 = m = m->m_next ;
 #ifdef IPSEC
-	    if ((flags & IP_SOCKINMRCVIF) != 0) {
-	        so = (struct socket *)m->m_pkthdr.rcvif;
-	        m->m_pkthdr.rcvif = NULL;
-	    }
+	    so = ipsec_getsocket(m);
+	    ipsec_setsocket(m, NULL);
 #endif
             ip = mtod(m, struct ip *);
             hlen = IP_VHL_HL(ip->ip_vhl) << 2 ;
@@ -196,10 +184,8 @@ ip_output(m0, opt, ro, flags, imo)
             rule = NULL ;
 #endif
 #ifdef IPSEC
-	if ((flags & IP_SOCKINMRCVIF) != 0) {
-		so = (struct socket *)m->m_pkthdr.rcvif;
-		m->m_pkthdr.rcvif = NULL;
-	}
+	so = ipsec_getsocket(m);
+	ipsec_setsocket(m, NULL);
 #endif
 
 #ifdef	DIAGNOSTIC

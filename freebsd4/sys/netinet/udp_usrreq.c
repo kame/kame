@@ -722,8 +722,7 @@ udp_output(inp, m, addr, control, p)
 	ipsec_setsocket(m, inp->inp_socket);
 #endif /*IPSEC*/
 	error = ip_output(m, inp->inp_options, &inp->inp_route,
-	    (inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST))
-	    | IP_SOCKINMRCVIF,
+	    (inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST)),
 	    inp->inp_moptions);
 
 	if (addr) {

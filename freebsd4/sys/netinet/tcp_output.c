@@ -854,7 +854,7 @@ send:
  	ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
-	    (so->so_options & SO_DONTROUTE)|IP_SOCKINMRCVIF, 0);
+	    (so->so_options & SO_DONTROUTE), 0);
     }
 	if (error) {
 out:
