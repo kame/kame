@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.17 2002/11/29 07:48:33 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.18 2002/12/05 11:16:28 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -490,6 +490,8 @@ hfsc_class_destroy(cl)
 		FREE(cl->cl_fsc, M_DEVBUF);
 	if (cl->cl_rsc != NULL)
 		FREE(cl->cl_rsc, M_DEVBUF);
+	if (cl->cl_usc != NULL)
+		FREE(cl->cl_usc, M_DEVBUF);
 	FREE(cl->cl_q, M_DEVBUF);
 	FREE(cl, M_DEVBUF);
 
