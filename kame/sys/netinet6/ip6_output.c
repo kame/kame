@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.226 2001/10/15 05:38:45 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.227 2001/10/17 05:05:32 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -340,7 +340,17 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 * layer. so, we don't care about the duplicate
 		 * allocation of ip6e_rthdr.
 		 */
+		/*
+		 * XXX: see the comments of
+		 * mip6.c:mip6_exthdr_create().
+		 */
 		MAKE_EXTHDR(pktopt_mip6rthdr, &exthdrs.ip6e_rthdr);
+
+		/*
+		 * if a routing header exists dest1 must be inserted
+		 * if it exists.
+		 */
+		MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
 	}
 	MAKE_EXTHDR(pktopt_haddr, &exthdrs.ip6e_haddr);
 	if (pktopt_mip6dest2) {
