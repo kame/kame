@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.157 2001/06/29 15:31:50 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.158 2001/07/17 02:19:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1084,7 +1084,7 @@ nd6_free(rt)
 			/*
 			 * Temporarily fake the state to choose a new default
 			 * router and to perform on-link determination of
-			 * prefixes coreectly.
+			 * prefixes correctly.
 			 * Below the state will be set correctly,
 			 * or the entry itself will be deleted.
 			 */
