@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 3.4
 KAME project
-$Id: INSTALL,v 1.13 2000/01/18 11:35:40 itojun Exp $
+$Id: INSTALL,v 1.14 2000/02/05 12:36:55 jinmei Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -90,9 +90,9 @@ E-1. Most of configuration files are placed in /usr/local/v6/etc.
 
 E-2. If you would like to use IPv6-ready inetd, you will need to also invoke
      /usr/local/v6/sbin/inet46d.
-     It can coexist with original /usr/sbin/inetd, but when each of them is
+     It can coexist with original /usr/sbin/inetd, but when both of them are
      invoked, IPv4 connection accept is always treated by /usr/sbin/inetd.
-     When only /usr/local/v6/sbin/inet46d is invoked, it accept each of
+     When only /usr/local/v6/sbin/inet46d is invoked, it accepts each of
      IPv4 and IPv6 connection request.
      Configuration file is placed in /usr/local/v6/etc/inet6d.conf, but with
      enhanced syntax. Inet46d accepts either of IPv4 and IPv6 connection by 
