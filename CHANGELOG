@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2531 2004/01/22 09:52:32 t-momose Exp $
+$KAME: CHANGELOG,v 1.2532 2004/01/23 10:24:10 t-momose Exp $
 
 <200401>
+2004-01-23  MOMOSE Tsuyoshi  <momose@momose.org>
+	* mip6control:
+	Add a new option '-N' to show the list of nounces that a host 
+	maintains as a correspondent node.
+
 2004-01-22  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
 	* kame/kame/had/haadic.c:
 	A global home agent address is registerred even
