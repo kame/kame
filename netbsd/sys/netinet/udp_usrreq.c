@@ -392,11 +392,27 @@ udp6_input(mp, offp, proto)
 	src.sin6_family = AF_INET6;
 	src.sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_src, &src.sin6_addr, sizeof(src.sin6_addr));
+	if (IN6_IS_SCOPE_LINKLOCAL(&src.sin6_addr))
+		src.sin6_addr.s6_addr16[1] = 0;
+	if (m->m_pkthdr.rcvif) {
+		if (IN6_IS_SCOPE_LINKLOCAL(&src.sin6_addr))
+			src.sin6_scope_id = m->m_pkthdr.rcvif->if_index;
+		else
+			src.sin6_scope_id = 0;
+	}
 	src.sin6_port = uh->uh_sport;
 	bzero(&dst, sizeof(dst));
 	dst.sin6_family = AF_INET6;
 	dst.sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_dst, &dst.sin6_addr, sizeof(dst.sin6_addr));
+	if (IN6_IS_SCOPE_LINKLOCAL(&dst.sin6_addr))
+		dst.sin6_addr.s6_addr16[1] = 0;
+	if (m->m_pkthdr.rcvif) {
+		if (IN6_IS_SCOPE_LINKLOCAL(&dst.sin6_addr))
+			dst.sin6_scope_id = m->m_pkthdr.rcvif->if_index;
+		else
+			dst.sin6_scope_id = 0;
+	}
 	dst.sin6_port = uh->uh_dport;
 
 	if (udp6_realinput(AF_INET6, &src, &dst, m, off) == 0) {
