@@ -1,9 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2578 2004/04/02 04:19:19 suz Exp $
+$KAME: CHANGELOG,v 1.2579 2004/04/02 08:22:29 suz Exp $
 
 <200404>
 
 <200403>
+2004-04-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* netbsd/sys/netinet/udp_usrreq.c
+	code cleanup: uses a per-socket/interface MSF-check functions 
+	implemented at Feb 6 2004.
+
 2004-04-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd[45]/sys/netinet/igmp.c
 	fixed a freebsd-specific bug that IGMPv3 Query is ignored, due to 
