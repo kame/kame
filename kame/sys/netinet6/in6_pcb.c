@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.86 2001/02/26 08:02:45 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.87 2001/03/14 05:18:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -260,7 +260,7 @@ in6_pcbbind(in6p, nam)
 				return(EADDRNOTAVAIL);
 		}
 		if (lport) {
-#if !(defined(__NetBSD__) && !defined(IPNOPRIVPORTS))
+#if !(defined(__NetBSD__) && defined(IPNOPRIVPORTS))
 			int priv;
 
 			/*
