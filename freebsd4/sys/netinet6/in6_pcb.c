@@ -1,4 +1,4 @@
-/*	$KAME$	*/
+/*	$KAME: in6_pcb.c,v 1.3 2000/03/30 12:45:09 sumikawa Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,8 +103,6 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
-#include <netinet6/ipsec6.h>
-#include <netinet6/ah6.h>
 #include <netkey/key.h>
 #ifdef IPSEC_DEBUG
 #include <netkey/key_debug.h>
