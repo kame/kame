@@ -90,7 +90,7 @@ main(argc, argv)
 	}
 #endif /*ICMP6_FILTER*/
 
-	nfdset = howmany(sock, NFDBITS);
+	nfdset = howmany(sock + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdsetp = malloc(nfdset)) == NULL) {
 		err(1, "malloc");
 		/*NOTREACHED*/

@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.39 2000/12/22 15:11:05 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.40 2001/01/12 18:49:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -924,7 +924,7 @@ wait_for_reply(sock, mhdr)
 	struct timeval wait;
 	int cc = 0, fdsn;
 
-	fdsn = howmany(sock+1, NFDBITS) * sizeof(fd_mask);
+	fdsn = howmany(sock + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdsp = (fd_set *)malloc(fdsn)) == NULL)
 		err(1, "malloc");
 	memset(fdsp, 0, fdsn);

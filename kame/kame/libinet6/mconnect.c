@@ -1,4 +1,4 @@
-/*	$KAME: mconnect.c,v 1.4 2000/11/06 14:42:06 jinmei Exp $ */
+/*	$KAME: mconnect.c,v 1.5 2001/01/12 18:49:33 itojun Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -127,7 +127,7 @@ mconnect(ai0, errorp)
 	}
 
 	/* prepare fd_set for select(2) */
-	fdmasks = howmany(maxsock + 1, NFDBITS);
+	fdmasks = howmany(maxsock + 1, NFDBITS) * sizeof(fd_mask);
 	if ((rfdmaskp = (fd_set *)malloc(fdmasks)) == NULL ||
 	    (wfdmaskp = (fd_set *)malloc(fdmasks)) == NULL) {
 		error = errno;

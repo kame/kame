@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.14 2000/10/07 13:06:58 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.15 2001/01/12 18:49:33 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -916,7 +916,7 @@ wait_for_reply(register int sock, register struct sockaddr_in *fromp,
 	register int cc = 0;
 	int fromlen = sizeof(*fromp);
 
-	nfds = howmany(sock + 1, NFDBITS);
+	nfds = howmany(sock + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdsp = malloc(nfds)) == NULL)
 		err(1, "malloc");
 	memset(fdsp, 0, nfds);
