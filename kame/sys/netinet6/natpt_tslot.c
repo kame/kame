@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.60 2002/08/05 05:26:06 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.61 2002/08/08 06:12:13 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1035,8 +1035,8 @@ natpt_init_tslot()
 
 	maxFragment = 120;				/* [sec] */
 
-	natpt_TCPT_2MSL	  = 120;			/* [sec] */
-	natpt_tcp_maxidle = 600;			/* [sec] */
+	natpt_TCPT_2MSL	  = 10;				/* [sec] */
+	natpt_tcp_maxidle = 10;				/* [sec] */
 
 	maxTTLany = 86400;
 
