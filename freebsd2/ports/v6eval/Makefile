@@ -2,10 +2,10 @@
 # Date created:		26 Mar 1999 23:00 JST
 # Whom:			TANAKA Takashi <tanaka@tahi.org>
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:39 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/13 02:39:31 itojun Exp $
 #
 
-DISTNAME=	v6eval-0.2
+DISTNAME=	v6eval-0.3
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.tahi.org/pub/TAHI/v6eval/
 # you might need debugging, it's a developer release !

@@ -9,9 +9,13 @@ bin/pktrecv
 bin/cleardefr.rmt
 bin/clearnc.rmt
 bin/clearprefix.rmt
+bin/clearroute.rmt
 bin/loginout.rmt
+bin/manualaddrconf.rmt
+bin/ping6.rmt
 bin/reboot.rmt
 bin/reboot_async.rmt
+bin/route.rmt
 etc/tn.def.sample
 etc/nut.def.sample
 include/std.def
