@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.20 2001/09/18 09:45:33 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.21 2001/09/18 10:49:57 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -146,6 +146,7 @@ main(argc, argv)
 #endif
 		ip6optlen += CMSG_SPACE(sizeof(int));
 	}
+#ifdef IPV6_NEXTHOP
 	if (nexthop != NULL) {
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = AF_INET6;
@@ -162,11 +163,14 @@ main(argc, argv)
 
 		ip6optlen += CMSG_SPACE(nextlen);
 	}
+#endif
+#ifdef IPV6_RTHDR_TYPE_0
 	if (argc > 1) {		/* intermediate node(s) exist(s) */
 		hops = argc - 1;
 		rthlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, hops);
 		ip6optlen += CMSG_SPACE(rthlen);
 	}
+#endif
 	if (ip6optlen) {
 		char *scmsg;
 
@@ -180,6 +184,7 @@ main(argc, argv)
 	if (argc == 0)
 		usage();
 
+#ifdef IPV6_HOPLIMIT
 	if (hlimp != NULL) {
 		cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
 		cmsgp->cmsg_level = IPPROTO_IPV6;
@@ -189,9 +194,17 @@ main(argc, argv)
 		*(int *)CMSG_DATA(cmsgp) = hlim;
 		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 	}
+#endif
+#ifdef IPV6_HOPOPTS
 	if (hbhlen > 0) setopthdr(hbhlen, IPV6_HOPOPTS);
+#endif
+#ifdef IPV6_RTHDRDSTOPTS
 	if (dsthdr1len > 0) setopthdr(dsthdr1len, IPV6_RTHDRDSTOPTS);
+#endif
+#ifdef IPV6_DSTOPTS
 	if (dsthdr2len > 0) setopthdr(dsthdr2len, IPV6_DSTOPTS);
+#endif
+#ifdef IPV6_NEXTHOP
 	if (sa_next != NULL) {
 		cmsgp->cmsg_len = CMSG_LEN(nextlen);
 		cmsgp->cmsg_level = IPPROTO_IPV6;
@@ -199,6 +212,8 @@ main(argc, argv)
 		memcpy(CMSG_DATA(cmsgp), sa_next, nextlen);
 		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 	}
+#endif
+#ifdef IPV6_RTHDR
 	if (argc > 1) {
 		struct ip6_rthdr *rthdr;
 		struct in6_addr middle;
@@ -224,6 +239,7 @@ main(argc, argv)
 
 		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
 	}
+#endif
 	finaldst = argv[argc - 1];
 
 	if (strcmp(portstr, "echo") == 0) {
@@ -248,6 +264,7 @@ main(argc, argv)
 	    < 0)
 		err(1, "socket");
 
+#ifdef IPV6_RECVPATHMTU
 	if (mflag) {
 		int on = 1;
 
@@ -255,7 +272,9 @@ main(argc, argv)
 			       sizeof(on)) != 0)
 			err(1, "setsockopt(IPV6_RECVPATHMTU)");
 	}
+#endif
 
+#ifdef IPV6_USE_MIN_MTU
 	if (minmtu) {
 		int on = 1;
 
@@ -263,6 +282,7 @@ main(argc, argv)
 			       sizeof(on)) != 0)
 			err(1, "setsockopt(IPV6_USE_MIN_MTU)");
 	}
+#endif
 
 #if 0
 	bzero(&local, sizeof(local));

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.8 2001/09/18 09:45:33 jinmei Exp $ */
+/*	$KAME: common.c,v 1.9 2001/09/18 10:49:56 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -78,7 +78,9 @@ print_options(mh)
 	void *hbh = NULL, *dst1 = NULL, *dst2 = NULL, *rthdr = NULL;
 	char ifnambuf[IF_NAMESIZE];
 	/* XXX: KAME specific at this moment */
+#ifdef __KAME__
 	struct ip6_mtuinfo *mtuinfo = NULL;
+#endif
 
 	if (mh->msg_controllen == 0) {
 		printf("No IPv6 option is received\n");
@@ -97,28 +99,37 @@ print_options(mh)
 			continue;
 
 		switch(cm->cmsg_type) {
+#ifdef IPV6_PKTINFO
 		case IPV6_PKTINFO:
 			if (cm->cmsg_len ==
 			    CMSG_LEN(sizeof(struct in6_pktinfo)))
 				pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
 		break;
+#endif
 
+#ifdef IPV6_HOPLIMIT
 		case IPV6_HOPLIMIT:
 			if (cm->cmsg_len == CMSG_LEN(sizeof(int)))
 				hlimp = (int *)CMSG_DATA(cm);
 			break;
+#endif
 
+#ifdef IPV6_RTHDR
 		case IPV6_RTHDR:
 			if (rthdr)
 				printf("there're more than one rthdr (ignored).\n");
 			else
 				rthdr = CMSG_DATA(cm);
 			break;
+#endif
 
+#ifdef IPV6_HOPOPTS
 		case IPV6_HOPOPTS:
 			hbh = CMSG_DATA(cm);
 			break;
+#endif
 
+#ifdef IPV6_RTHDRDSTOPTS
 		case IPV6_RTHDRDSTOPTS:
 			if (dst1)
 				printf("there's more than one dstopt hdr "
@@ -126,7 +137,9 @@ print_options(mh)
 			else
 				dst1 = CMSG_DATA(cm);
 			break;
+#endif
 
+#ifdef IPV6_DSTOPTS
 		case IPV6_DSTOPTS:
 			if (dst2)
 				printf("there's more than one dstopt hdr "
@@ -134,12 +147,15 @@ print_options(mh)
 			else
 				dst2 = CMSG_DATA(cm);
 			break;
+#endif
 
+#if defined(IPV6_PATHMTU) && defined(__KAME__)
 		case IPV6_PATHMTU:
 			if (cm->cmsg_len == CMSG_LEN(sizeof(*mtuinfo)))
 				mtuinfo = (struct ip6_mtuinfo *)CMSG_DATA(cm);
 			break;
 		}
+#endif
 	}
 
 	printf("Received IPv6 options (size %d):\n", mh->msg_controllen);
@@ -168,12 +184,14 @@ print_options(mh)
 		printf("  Destination Options Header (after rthdr)\n");
 		print_opthdr(dst2);
 	}
+#ifdef __KAME__
 	if (mtuinfo) {
 		printf("  Path MTU: destination=%s, from=%s, mtu=%lu\n",
 		       ip6str(&mtuinfo->ip6m_addr),
 		       ip6str((struct sockaddr_in6 *)mh->msg_name),
 		       (u_long)mtuinfo->ip6m_mtu);
 	}
+#endif
 }
 
 void
@@ -204,6 +222,7 @@ print_opthdr(void *extbuf)
 		 * Note that inet6_opt_next automatically skips any padding
 		 * options.
 		 */
+#ifdef IP6OPT_JUMBO
 		case IP6OPT_JUMBO:
 			offset = 0;
 			offset = inet6_opt_get_val(databuf, offset,
@@ -211,6 +230,8 @@ print_opthdr(void *extbuf)
 			printf("    Jumbo Payload Opt: Length %u\n",
 			       (unsigned int)ntohl(value4));
 			break;
+#endif
+#ifdef IP6OPT_ROUTER_ALERT
 		case IP6OPT_ROUTER_ALERT:
 			offset = 0;
 			offset = inet6_opt_get_val(databuf, offset,
@@ -218,6 +239,7 @@ print_opthdr(void *extbuf)
 			printf("    Router Alert Opt: Type %u\n",
 			       ntohs(value2));
 			break;
+#endif
 		default:
 			printf("    Received Opt %u len %u\n", type, len);
 			break;

@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.18 2001/09/18 03:01:59 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.19 2001/09/18 10:49:56 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -61,11 +61,12 @@ main(argc, argv)
 	int ch, s, s0, remotelen, on, proto, error;
 	char *portstr = DEFAULTPORT;
 	char *protostr = NULL, *addrstr = NULL;
-	struct sockaddr_in6 remote;
+	struct sockaddr_in6 remote, sa6_raw;
 	struct msghdr rcvmh;
 	struct iovec iov[2];
 	char recvbuf[1024];	/* xxx hardcoding */
 	struct addrinfo hints, *res;
+	struct addrinfo ai_raw;
 
 	while ((ch = getopt(argc, argv, "adDhilP:p:ru")) != -1)
 		switch(ch) {
@@ -131,11 +132,27 @@ main(argc, argv)
 		hints.ai_socktype = SOCK_DGRAM;
 		break;
 	default:
-		hints.ai_socktype = SOCK_RAW;
-		/* XXX */
-		portstr = NULL;
-		addrstr = "::";
-		break;
+		/*
+		 * XXX: Some systems do not allow getaddrinfo() to take
+		 * SOCK_RAW as ai_socktype.
+		 */
+		memset(&ai_raw, 0, sizeof(ai_raw));
+		ai_raw.ai_family = AF_INET6;
+		ai_raw.ai_socktype = SOCK_RAW;
+		ai_raw.ai_protocol = proto;
+
+		memset(&sa6_raw, 0, sizeof(sa6_raw));
+		sa6_raw.sin6_family = AF_INET6;
+#ifdef SIN6_LEN
+		sa6_raw.sin6_len = sizeof(sa6_raw);
+#endif
+
+		ai_raw.ai_addrlen = sizeof(sa6_raw);
+		ai_raw.ai_addr = &sa6_raw;
+
+		res = &ai_raw;
+
+		goto open;
 	}
 	hints.ai_protocol = proto;
 	hints.ai_flags = AI_PASSIVE;
@@ -144,6 +161,7 @@ main(argc, argv)
 	if (error)
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
 
+  open:
 	if ((s = socket(res->ai_family, res->ai_socktype, res->ai_protocol))
 	    < 0)
 		err(1, "socket");
@@ -152,38 +170,51 @@ main(argc, argv)
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(SO_REUSEADDR)");
+#ifdef IPV6_RECVPKTINFO
 	if ((aflag || iflag) &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVPKTINFO)");
+#endif
 	/* specify to tell value of hoplimit field of received IP6 hdr */
+#ifdef IPV6_RECVHOPLIMIT
 	if ((aflag || lflag) &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
+#endif
 	/* specify to show received dst opts hdrs before a rthdr (if any) */
+#ifdef IPV6_RECVRTHDRDSTOPTS
 	if ((aflag || Dflag) &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVRTHDRDSTOPTS)");
+#endif
 	/* specify to show a received dst opts header after a rthdr (if any) */
+#ifdef IPV6_RECVDSTOPTS
 	if ((aflag || dflag) &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVDSTOPTS, &on,
 		       sizeof(on)) < 0)
 		err(1, "setsockot(IPV6_RECVDSTOPTS)");
+#endif
 	/* specify to show a received hop-by-hop options header (if any) */
+#ifdef IPV6_RECVHOPOPTS
 	if ((aflag || hflag) &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVHOPOPTS, &on, sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVHOPOPTS)");
+#endif
 	/* specify to show received routing headers (if any) */
+#ifdef IPV6_RECVRTHDR
 	if ((aflag || rflag) &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVRTHDR)");
+#endif
 
 	if (bind(s, res->ai_addr, res->ai_addrlen) < 0)
 		err(1, "bind");
 
-	freeaddrinfo(res);
+	if (res != &ai_raw)
+		freeaddrinfo(res);
 
 	if (proto == IPPROTO_TCP) {
 		if (listen(s, 1) < 0)

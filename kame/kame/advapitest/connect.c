@@ -1,4 +1,4 @@
-/*	$KAME: connect.c,v 1.9 2001/03/29 03:41:39 jinmei Exp $ */
+/*	$KAME: connect.c,v 1.10 2001/09/18 10:49:57 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -102,6 +102,7 @@ main(argc, argv)
 		/* handle special control messages */
 		if (strncasecmp(readbuf, "quit", 4) == 0)
 			break;
+#ifdef IPV6_HOPLIMIT
 		if (strncasecmp(readbuf, "hlim", 4) == 0) {
 			hlim = atoi(&readbuf[4]);
 
@@ -109,12 +110,20 @@ main(argc, argv)
 				       &hlim, sizeof(hlim)))
 				warn("setsockopt(IPV6_HOPLIMIT %d)", hlim);
 		}
+#endif
+#ifdef IPV6_HOPOPTS
 		if (strncasecmp(readbuf, "hbh", 3) == 0)
 			setopthdr(atoi(&readbuf[3]), IPV6_HOPOPTS);
+#endif
+#ifdef IPV6_RTHDRDSTOPTS
 		if (strncasecmp(readbuf, "rdst", 4) == 0)
 			setopthdr(atoi(&readbuf[4]), IPV6_RTHDRDSTOPTS);
+#endif
+#ifdef IPV6_DSTOPTS
 		if (strncasecmp(readbuf, "dst", 3) == 0)
 			setopthdr(atoi(&readbuf[3]), IPV6_DSTOPTS);
+#endif
+#ifdef IPV6_RTHDR_TYPE_0
 		if (strncasecmp(readbuf, "rthdr", 5) == 0) {
 			struct ip6_rthdr *rthdr = NULL;
 			int i, hops = atoi(&readbuf[5]), rthlen = 0;
@@ -144,6 +153,7 @@ main(argc, argv)
 				warn("setsockopt(IPV6_RTHDR)");
 			free(rthdr);
 		}
+#endif
 
 	  sendbuf:
 		if (write(s, readbuf, strlen(readbuf)) < 0)
@@ -213,15 +223,21 @@ setopthdr(optlen, hdrtype)
 	if (setsockopt(s, IPPROTO_IPV6, hdrtype,
 		       (void *)hbh, opthlen)) {
 		switch(hdrtype) {
+#ifdef IPV6_HOPOPTS
 		case IPV6_HOPOPTS:
 			warn("setsockopt(IPV6_HOPOPTS)");
 			break;
+#endif
+#ifdef IPV6_RTHDRDSTOPTS
 		case IPV6_RTHDRDSTOPTS:
 			warn("setsockopt(IPV6_RTHDRDSTOPTS)");
 			break;
+#endif
+#ifdef IPV6_DSTOPTS
 		case IPV6_DSTOPTS:
 			warn("setsockopt(IPV6_DSTOPTS)");
 			break;
+#endif
 		}
 	}
 	free(hbh);
