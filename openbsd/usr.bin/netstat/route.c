@@ -530,6 +530,9 @@ p_sockaddr(sa, mask, flags, width)
 			    "link#%d", sdl->sdl_index);
 		else switch (sdl->sdl_type) {
 		case IFT_ETHER:
+#ifdef IFT_VRRP
+		case IFT_VRRP:
+#endif
 		    {
 			int i;
 			u_char *lla = (u_char *)sdl->sdl_data +

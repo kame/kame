@@ -329,6 +329,9 @@ intpr(interval, ifnetaddr)
 				m = printf("%-11.11s ", "<Link>");
 				if (sdl->sdl_type == IFT_ETHER ||
 				    sdl->sdl_type == IFT_FDDI ||
+#ifdef IFT_VRRP
+				    sdl->sdl_type == IFT_VRRP ||
+#endif
 				    sdl->sdl_type == IFT_ISO88025)
 					printf("%-17.17s ",
 					    ether_ntoa((struct ether_addr *)LLADDR(sdl)));
