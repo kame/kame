@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.141 2001/07/21 10:15:32 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.142 2001/07/21 10:42:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,7 +98,7 @@ extern int nd6_recalc_reachtm_interval;
 
 static struct ifnet *nd6_defifp;
 int nd6_defifindex;
-static struct ifnet *nd6_defif_installed = NULL;
+static struct ifaddr *nd6_defif_installed = NULL;
 
 int ip6_use_tempaddr = 0;
 
@@ -590,7 +590,8 @@ defrouter_addifreq(ifp)
 		}
 	}
 
-	nd6_defif_installed = ifp;
+	nd6_defif_installed = ifa;
+	IFAREF(ifa);
 }
 
 /* Remove a default route points to interface */
@@ -600,28 +601,16 @@ defrouter_delifreq()
 	struct sockaddr_in6 def, mask;
 	struct rtentry *oldrt = NULL;
 	struct ifaddr *ifa;
-	struct ifnet *ifp = nd6_defif_installed;
 
-	if (!ifp)
+	if (!nd6_defif_installed)
 		return;
+	ifa = nd6_defif_installed;
 
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
 
 	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
 	def.sin6_family = mask.sin6_family = AF_INET6;
-
-	/*
-	 * Search for an ifaddr beloging to the specified interface.
-	 * XXX: An IPv6 address are required to be assigned on the interface.
-	 */
-	if ((ifa = ifaof_ifpforaddr((struct sockaddr *)&def, ifp)) == NULL) {
-		nd6log((LOG_ERR,	/* better error? */
-		    "defrouter_delifreq: failed to find an ifaddr "
-		    "to install a route to interface %s\n",
-		    if_name(ifp)));
-		return;
-	}
 
 	rtrequest(RTM_DELETE, (struct sockaddr *)&def,
 	    (struct sockaddr *)ifa->ifa_addr,
@@ -638,6 +627,7 @@ defrouter_delifreq()
 		}
 	}
 
+	IFAFREE(nd6_defif_installed);
 	nd6_defif_installed = NULL;
 }
 
