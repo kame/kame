@@ -9,8 +9,6 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 
 #options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
-options 	NEW_STRUCT_ROUTE		# mandatory
-
 options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	SCTP_DEBUG	# adds debugging support for SCTP
 #options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
