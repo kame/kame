@@ -21,12 +21,10 @@ SRCS+=	res_init.c res_mkquery.c res_query.c
 SRCS+=	res_send.c
 SRCS+=	inet_pton.c inet_addr.c
 SRCS+=	bindresvport.c
-SRCS+=	getifaddrs.c
 
 MAN=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
 	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \
-	inet6_rthdr_space.3 bindresvport.3 inet6_opt_init.3 inet6_rth_space.3 \
-	getifaddrs.3 strlcpy.3
+	inet6_rthdr_space.3 bindresvport.3 inet6_opt_init.3 inet6_rth_space.3
 MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		getipnodebyname.3 freehostent.3 \
 		getaddrinfo.3 freeaddrinfo.3 \
@@ -57,9 +55,7 @@ MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		inet6_rth_space.3 inet6_rth_add.3 \
 		inet6_rth_space.3 inet6_rth_reverse.3 \
 		inet6_rth_space.3 inet6_rth_segments.3 \
-		inet6_rth_space.3 inet6_rth_getaddr.3 \
-		getifaddrs.3 freeifaddrs.3 \
-		strlcpy.3 strlcat.3
+		inet6_rth_space.3 inet6_rth_getaddr.3
 
 .PATH:	${SRCDIR} ${SRCDIR}/resolv
 
