@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_init.c	8.1 (Berkeley) 6/7/93";
-static char rcsid[] = "$Id: res_init.c,v 1.4 2000/02/27 09:28:49 itojun Exp $";
+static char rcsid[] = "$Id: res_init.c,v 1.5 2000/02/28 03:34:34 jinmei Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
@@ -345,9 +345,7 @@ res_init()
 		if (MATCH(buf, "nameserver") && nserv < MAXNS) {
 #ifdef INET6
 		    char *q;
-		    struct in6_addr a6;
 		    struct addrinfo hints, *res;
-		    int gaierror;
 		    char pbuf[NI_MAXSERV];
 #else
 		    struct in_addr a;
