@@ -3,7 +3,7 @@ SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump \
 	rrenumd rtadvd rtsold setkey traceroute traceroute6
 SUBDIR+=altqd pvcbridge pvcsif pvctxctl tbrconfig
 SUBDIR+=natptconfig
-#SUBDIR+=natptlog
+SUBDIR+=natptlog
 #SUBDIR+=ifmcstat
 SUBDIR+=racoon
 
