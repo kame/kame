@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1579 2001/03/01 16:57:22 itojun Exp $
+$KAME: CHANGELOG,v 1.1580 2001/03/01 23:55:27 itojun Exp $
 
 <200103>
 Fri Mar  2 01:48:24 JST 2001  itojun@iijlab.net
@@ -50,8 +50,11 @@ Mon Feb 26 18:21:08 JST 2001  itojun@iijlab.net
 	  on other platforms, we can only read it (you can set it if the
 	  value is same as the default - non-changeable - behavior).
 
-	  TODO: synchronize AF_INET6 socket behavior with 2553bis-03.
-	  (at least netbsd does not meet 2553bis-03)
+	  TODO: synchronize AF_INET6 socket behavior with 2553bis-03, from
+	  IPV6_V6ONLY POV (at least netbsd does not meet 2553bis-03, as the
+	  socket option controls inbound only, should control both inbound
+	  and outbound).  *bsd have their own preference on kernel default
+	  behavior due to security risks, so will change that.
 
 	  NOTE: netbsd IPV6_BINDV6ONLY is now obsoleted.  old binaries should
 	  just work (IPV6_V6ONLY uses same socket option # as IPV6_BINDV6ONLY).
