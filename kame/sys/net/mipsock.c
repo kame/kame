@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.5 2005/02/25 16:44:53 t-momose Exp $ */
+/* $Id: mipsock.c,v 1.6 2005/02/28 19:08:06 keiichi Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -69,15 +69,36 @@ static struct	sockaddr mips_dst = { 2, PF_MOBILITY, };
 static struct	sockaddr mips_src = { 2, PF_MOBILITY, };
 static struct	sockproto mips_proto = { PF_MOBILITY, };
 
-static struct mbuf *mips_msg1(int type, int len);
 #ifdef __FreeBSD__
-static int	 mips_output __P((struct mbuf *, struct socket *));
-#else
-static int	 mips_output __P((struct mbuf *, ...));
+static int mips_abort(struct socket *);
 #endif
-
+#if __FreeBSD_version >= 50300
+static int mips_attach(struct socket *, int, struct thread *);
+static int mips_bind(struct socket *, struct sockaddr *, struct thread *);
+static int mips_connect(struct socket *, struct sockaddr *, struct thread *);
+static int mips_send(struct socket *, int, struct mbuf *, struct sockaddr *,
+    struct mbuf *, struct thread *);
+#else /* __FreeBSD_version >= 50300 */
+static int mips_attach(struct socket *, int, struct proc *);
+static int mips_bind(struct socket *, struct sockaddr *, struct proc *);
+static int mips_connect(struct socket *, struct sockaddr *, struct proc *);
+static int mips_send(struct socket *, int, struct mbuf *, struct sockaddr *,
+    struct mbuf *, strut proc *);
+#endif /* __FreeBSD_version >= 50300 */
+static int mips_detach(struct socket *);
+static int mips_disconnect(struct socket *);
+static int mips_peeraddr(struct socket *, struct sockaddr **);
+static int mips_shutdown(struct socket *);
+static int mips_sockaddr(struct socket *, struct sockaddr **);
+#ifdef __FreeBSD__
+static int mips_output(struct mbuf *, struct socket *);
+#else
+static int mips_output(struct mbuf *, ...);
+#endif
+static struct mbuf *mips_msg1(int type, int len);
 #ifdef __NetBSD__
-int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
+int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
+    struct mbuf *, struct proc *);
 #endif
 
 #ifdef __FreeBSD__
@@ -86,7 +107,8 @@ int mips_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf 
  * with raw_usrreq.c, since its functionality is so restricted.  XXX
  */
 static int
-mips_abort(struct socket *so)
+mips_abort(so)
+	struct socket *so;
 {
 	int s, error;
 	s = splnet();
@@ -98,13 +120,14 @@ mips_abort(struct socket *so)
 /* pru_accept is EOPNOTSUPP */
 
 static int
-mips_attach(struct socket *so, int proto,
+mips_attach(so, proto, p)
+	struct socket *so;
+	int proto;
 #if __FreeBSD_version >= 503000
-	    struct thread *td
+	struct thread *p;
 #else
-	    struct proc *p
+	struct proc *p;
 #endif
-	    )
 {
 	struct rawcb *rp;
 	int s, error;
@@ -144,15 +167,17 @@ mips_attach(struct socket *so, int proto,
 }
 
 static int
-mips_bind(struct socket *so, struct sockaddr *nam,
+mips_bind(so, nam, p)
+	struct socket *so;
+	struct sockaddr *nam;
 #if __FreeBSD_version >= 503000
-	  struct thread *p
+	struct thread *p;
 #else
-	  struct proc *p
+	struct proc *p;
 #endif
-	  )
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_bind(so, nam, p); /* xxx just EINVAL */
 	splx(s);
@@ -160,15 +185,17 @@ mips_bind(struct socket *so, struct sockaddr *nam,
 }
 
 static int
-mips_connect(struct socket *so, struct sockaddr *nam,
+mips_connect(so, nam, p)
+	struct socket *so;
+	struct sockaddr *nam;
 #if __FreeBSD_version >= 503000
-	  struct thread *p
+	struct thread *p;
 #else
-	  struct proc *p
+	struct proc *p;
 #endif
-	  )
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_connect(so, nam, p); /* XXX just EINVAL */
 	splx(s);
@@ -179,7 +206,8 @@ mips_connect(struct socket *so, struct sockaddr *nam,
 /* pru_control is EOPNOTSUPP */
 
 static int
-mips_detach(struct socket *so)
+mips_detach(so)
+	struct socket *so;
 {
 	struct rawcb *rp = sotorawcb(so);
 	int s, error;
@@ -199,9 +227,11 @@ mips_detach(struct socket *so)
 }
 
 static int
-mips_disconnect(struct socket *so)
+mips_disconnect(so)
+	struct socket *so;
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_disconnect(so);
 	splx(s);
@@ -211,9 +241,12 @@ mips_disconnect(struct socket *so)
 /* pru_listen is EOPNOTSUPP */
 
 static int
-mips_peeraddr(struct socket *so, struct sockaddr **nam)
+mips_peeraddr(so, nam)
+	struct socket *so;
+	struct sockaddr **nam;
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_peeraddr(so, nam);
 	splx(s);
@@ -224,16 +257,20 @@ mips_peeraddr(struct socket *so, struct sockaddr **nam)
 /* pru_rcvoob is EOPNOTSUPP */
 
 static int
-mips_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
-	 struct mbuf *control,
+mips_send(so, flags, m, nam, control, p)
+	struct socket *so;
+	int flags;
+	struct mbuf *m;
+	struct sockaddr *nam;
+	struct mbuf *control;
 #if __FreeBSD_version >= 503000
-	  struct thread *p
+	struct thread *p;
 #else
-	  struct proc *p
+	struct proc *p;
 #endif
-	  )
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_send(so, flags, m, nam, control, p);
 	splx(s);
@@ -243,9 +280,11 @@ mips_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 /* pru_sense is null */
 
 static int
-mips_shutdown(struct socket *so)
+mips_shutdown(so)
+	struct socket *so;
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_shutdown(so);
 	splx(s);
@@ -253,9 +292,12 @@ mips_shutdown(struct socket *so)
 }
 
 static int
-mips_sockaddr(struct socket *so, struct sockaddr **nam)
+mips_sockaddr(so, nam)
+	struct socket *so;
+	struct sockaddr **nam;
 {
 	int s, error;
+
 	s = splnet();
 	error = raw_usrreqs.pru_sockaddr(so, nam);
 	splx(s);
@@ -277,7 +319,9 @@ int
 mips_usrreq(so, req, m, nam, control, p)
 	struct socket *so;
 	int req;
-	struct mbuf *m, *nam, *control;
+	struct mbuf *m;
+	struct mbuf *nam;
+	struct mbuf *control;
 	struct proc *p;
 {
 	int error = 0;
@@ -527,7 +571,7 @@ mips_msg1(type, len)
 	return (m);
 }
 
-/*
+#if 0
 void
 mips_notify_bc(type, mbc)
 	u_char type;
@@ -551,7 +595,7 @@ mips_notify_bc(type, mbc)
 	coa_sin6->sin6_addr = mbc->mbc_pcoa;
 	raw_input(m, &mips_proto, &mips_src, &mips_dst);
 }
-*/
+#endif
 
 #if 0
 void
@@ -732,8 +776,8 @@ static struct protosw mipsw[] = {
 };
 
 struct domain mipdomain =
-    { PF_MOBILITY, "mip", 0, 0, 0,
-      mipsw, &mipsw[sizeof(mipsw)/sizeof(mipsw[0])] };
+{ PF_MOBILITY, "mip", 0, 0, 0,
+  mipsw, &mipsw[sizeof(mipsw)/sizeof(mipsw[0])] };
 
 #ifdef __FreeBSD__
 DOMAIN_SET(mip);
