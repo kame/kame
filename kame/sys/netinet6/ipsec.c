@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.120 2001/07/31 13:33:24 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.121 2001/08/02 04:19:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2904,17 +2904,17 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 	struct sockaddr_in6 *sin6;
 
 	if (!state)
-		panic("state == NULL in ipsec6_output");
+		panic("state == NULL in ipsec6_output_trans");
 	if (!state->m)
-		panic("state->m == NULL in ipsec6_output");
+		panic("state->m == NULL in ipsec6_output_trans");
 	if (!nexthdrp)
-		panic("nexthdrp == NULL in ipsec6_output");
+		panic("nexthdrp == NULL in ipsec6_output_trans");
 	if (!mprev)
-		panic("mprev == NULL in ipsec6_output");
+		panic("mprev == NULL in ipsec6_output_trans");
 	if (!sp)
-		panic("sp == NULL in ipsec6_output");
+		panic("sp == NULL in ipsec6_output_trans");
 	if (!tun)
-		panic("tun == NULL in ipsec6_output");
+		panic("tun == NULL in ipsec6_output_trans");
 
 	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
 		printf("ipsec6_output_trans: applyed SP\n");
@@ -3080,11 +3080,11 @@ ipsec6_output_tunnel(state, sp, flags)
 	int s;
 
 	if (!state)
-		panic("state == NULL in ipsec6_output");
+		panic("state == NULL in ipsec6_output_tunnel");
 	if (!state->m)
-		panic("state->m == NULL in ipsec6_output");
+		panic("state->m == NULL in ipsec6_output_tunnel");
 	if (!sp)
-		panic("sp == NULL in ipsec6_output");
+		panic("sp == NULL in ipsec6_output_tunnel");
 
 	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
 		printf("ipsec6_output_tunnel: applyed SP\n");
