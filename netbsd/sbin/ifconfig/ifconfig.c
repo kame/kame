@@ -1525,7 +1525,11 @@ in6_alias(creq)
 		if (ioctl(s, SIOCGIFALIFETIME_IN6, (caddr_t)&ifr6) < 0) {
 			if (errno != EADDRNOTAVAIL)
 				warn("SIOCGIFALIFETIME_IN6");
-		} else if (lifetime->ia6t_preferred || lifetime->ia6t_expire) {
+		} else
+#if 0
+		if (lifetime->ia6t_preferred || lifetime->ia6t_expire)
+#endif
+		{
 			time_t t = time(NULL);
 			printf(" pltime ");
 			if (lifetime->ia6t_preferred) {
