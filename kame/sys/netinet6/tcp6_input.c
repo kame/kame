@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.46 2002/01/10 13:13:59 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.47 2002/01/10 13:22:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -736,17 +736,7 @@ findpcb:
 			in6p->in6p_laddr = ip6->ip6_dst;
 			in6p->in6p_lport = th->th_dport;
 
-			/*
-			 * Inherit socket options from the listening socket.
-			 * Note that in6p_inputopts are not (even should not
-			 * be) copied, since it stores previously received
-			 * options and is used to detect if each new option is
-			 * different than the previous one and hence should be
-			 * passed to a user.
-			 * If we copied in6p_inputopts, a user would not be
-			 * able to receive options just after calling the
-			 * accept system call.
-			 */
+			/* Inherit socket options from the listening socket. */
 			in6p->in6p_flags |=
 				(oin6p->in6p_flags & IN6P_CONTROLOPTS);
 			if (oin6p->in6p_outputopts)
