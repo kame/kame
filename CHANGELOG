@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1528 2001/02/04 05:32:25 jinmei Exp $
+$KAME: CHANGELOG,v 1.1529 2001/02/04 05:53:07 jinmei Exp $
 
 <200102>
+2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.h (IFA6_IS_{DEPRECATED, INVALID}): added
+	to hide implementation of address lifetimes.  As a middle term
+	solution, we should clarify the relationship among ia6t_xxx
+	members and the IN6_IFF_DEPRECATED flag.  If you add code about
+	address lifetimes, do not assume its implementation, and stick to
+	use these macros.
+
 2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/rtadvd.c (main): the -R (router renumbering)
 	option is currently ignored (with a warning message).  We will
