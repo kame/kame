@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.81 2001/10/25 09:38:34 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.82 2001/10/25 11:54:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,7 +221,6 @@ in6_gif_output(ifp, family, m)
 				  time_second >= sc->rtcache_expire)) {
 		RTFREE(sc->gif_ro6.ro_rt);
 		sc->gif_ro6.ro_rt = NULL;
-
 	}
 
 	if (sc->gif_ro6.ro_rt == NULL) {
