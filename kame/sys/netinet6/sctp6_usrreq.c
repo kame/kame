@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.22 2003/11/25 06:40:55 ono Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.23 2003/11/25 07:30:00 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1063,9 +1063,9 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		ret = sctp_output(inp, inp->pkt , addr, inp->control, p);
 		inp->pkt = NULL;
 		inp->control = NULL;
-		return(ret);
+		return (ret);
 	} else {
-		return(0);
+		return (0);
 	}
 }
 

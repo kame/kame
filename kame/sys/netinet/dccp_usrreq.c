@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.26 2003/11/18 08:07:52 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.27 2003/11/25 07:34:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1810,7 +1810,7 @@ again:
 
 	if (error) {
 		DCCP_DEBUG((LOG_INFO, "IP output failed!\n"));
-		return(error);
+		return (error);
 	}
 
 #if defined(__NetBSD__) && defined(INET6)
@@ -2868,7 +2868,7 @@ dccp_get_option(char *options, int optlen, int type, char *buffer, int buflen)
 	
 	for (i=0; i < optlen;) {
 		t = options[i++];
-		if (t >= 32){		  
+		if (t >= 32) {		  
 			size = options[i++] - 2;
 			if (t == type) {
 				if (size > buflen)

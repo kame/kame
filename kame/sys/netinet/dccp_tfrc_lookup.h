@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc_lookup.h,v 1.4 2003/10/22 08:54:15 itojun Exp $	*/
+/*	$KAME: dccp_tfrc_lookup.h,v 1.5 2003/11/25 07:34:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -1079,28 +1079,28 @@ double tfrc_flookup_reverse(double);
 double
 tfrc_flookup_reverse(double fvalue)
 {
-  int ctr;
-  if(fvalue >= flarge_table[1])
-    return 1.0;
-  else if (fvalue >= flarge_table[FLARGELEN]){
-    ctr = FLARGELEN;
-    while(ctr > 1 && fvalue >= flarge_table[ctr])
-      ctr--;
+	int ctr;
+	if (fvalue >= flarge_table[1])
+		return 1.0;
+	else if (fvalue >= flarge_table[FLARGELEN]) {
+		ctr = FLARGELEN;
+		while (ctr > 1 && fvalue >= flarge_table[ctr])
+			ctr--;
 
-    /* round to smallest */
-    ctr = ctr + 1;
+		/* round to smallest */
+		ctr = ctr + 1;
     
-    /* round to nearest */
-    /*    if (flarge_table[ctr] - fvalue > fvalue - flarge_table[ctr+1])
-          ctr = ctr+1;*/
-    return ((double)(1.0/((double) ctr)));
-  } else if ( fvalue >= fsmall_table[0]){
-    ctr = 0;
-    while(ctr < FSMALLLEN+1 && fvalue > fsmall_table[ctr])
-      ctr++;
-    return ((double)(ctr))*FSMALLSTEP;
-  } 
-  return TFRC_SMALLEST_P;
+		/* round to nearest */
+		/*    if (flarge_table[ctr] - fvalue > fvalue - flarge_table[ctr+1])
+		      ctr = ctr+1;*/
+		return ((double)(1.0/((double) ctr)));
+	} else if ( fvalue >= fsmall_table[0]) {
+		ctr = 0;
+		while (ctr < FSMALLLEN+1 && fvalue > fsmall_table[ctr])
+			ctr++;
+		return ((double)(ctr))*FSMALLSTEP;
+	} 
+	return TFRC_SMALLEST_P;
 }
 
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc_print.h,v 1.4 2003/10/22 08:54:15 itojun Exp $	*/
+/*	$KAME: dccp_tfrc_print.h,v 1.5 2003/11/25 07:34:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -37,80 +37,80 @@
 
 #define PRINTFLOAT(num) \
         do{ \
-        if((num) > 2000000000)  \
+        if ((num) > 2000000000)  \
            TFRC_DEBUG((LOG_INFO,"Large")); \
         else if ((num) < 0.0)   \
            TFRC_DEBUG((LOG_INFO,"Negative")); \
         else { \
            TFRC_DEBUG((LOG_INFO,"%u+%u*10^-6",(u_int32_t) (num),(u_int32_t) ((num - (double) ((u_int32_t) (num)))*1000000) )); \
 	} \
-        } while(0)
+        } while (0)
 
 #define PRINTTIMEVALu(tvp)    \
         do{  TFRC_DEBUG((LOG_INFO,"%u s, %u us",(u_int32_t) (tvp)->tv_sec,(u_int32_t) (tvp)->tv_usec)); \
-        } while(0)
+        } while (0)
 #define PRINTTIMEVALi(tvp)    \
         do{  TFRC_DEBUG((LOG_INFO,"%i s, %i us",(int) (tvp)->tv_sec,(int) (tvp)->tv_usec)); \
-        } while(0)
+        } while (0)
 
 #define PRINTSHISTENTRY(shp) \
         do {  TFRC_DEBUG((LOG_INFO,"Entry: seq=%u, win_count=%u t_sent=(",(shp)->seq,(shp)->win_count)); \
               PRINTTIMEVALu(&((shp)->t_sent)); \
               TFRC_DEBUG((LOG_INFO,")\n")); \
-        } while(0)
+        } while (0)
 
 #define PRINTSENDHIST(ccbp,elmp) \
         do {    \
-            if(STAILQ_EMPTY(&((ccbp)->hist))) \
+            if (STAILQ_EMPTY(&((ccbp)->hist))) \
                TFRC_DEBUG((LOG_INFO, "Send history is empty\n")); \
             else {   \
                 TFRC_DEBUG((LOG_INFO, "Send history:\n")); \
 	      (elmp)= STAILQ_FIRST(&((ccbp)->hist)); \
-	      while((elmp) != NULL){  \
+	      while ((elmp) != NULL) {  \
 		 PRINTSHISTENTRY((elmp)); \
                  (elmp) = STAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
-         } while(0)
+         } while (0)
 
 
 #define PRINTRHISTENTRY(rhp) \
         do {  TFRC_DEBUG((LOG_INFO,"Entry: type=%u, seq=%u, win_count=%u, ndp=%u, t_recv=(",(rhp)->type,(rhp)->seq,(rhp)->win_count,(rhp)->ndp)); \
               PRINTTIMEVALu(&((rhp)->t_recv)); \
               TFRC_DEBUG((LOG_INFO,")\n")); \
-        } while(0)
+        } while (0)
 
 #define PRINTRECVHIST(ccbp,elmp) \
         do {    \
-            if(STAILQ_EMPTY(&((ccbp)->hist))) \
+            if (STAILQ_EMPTY(&((ccbp)->hist))) \
                TFRC_DEBUG((LOG_INFO, "Recv history is empty\n")); \
             else {   \
                 TFRC_DEBUG((LOG_INFO, "Recv history:\n")); \
 	      (elmp)= STAILQ_FIRST(&((ccbp)->hist)); \
-	      while((elmp) != NULL){  \
+	      while ((elmp) != NULL) {  \
 		 PRINTRHISTENTRY((elmp)); \
                  (elmp) = STAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
-         } while(0)
+         } while (0)
 
 #define PRINTLIHISTENTRY(lihp) \
         do {  TFRC_DEBUG((LOG_INFO,"Entry: seqstart=%u, win_count=%u, interval=%u\n",(lihp)->seq,(lihp)->win_count,(lihp)->interval)); \
-        } while(0)
+        } while (0)
 
 #define PRINTLIHIST(ccbp,elmp) \
         do {    \
-            if(TAILQ_EMPTY(&((ccbp)->li_hist))) \
+            if (TAILQ_EMPTY(&((ccbp)->li_hist))) \
                TFRC_DEBUG((LOG_INFO, "Loss interval history is empty\n")); \
             else {   \
                 TFRC_DEBUG((LOG_INFO, "Loss interval history:\n")); \
 	      (elmp)= TAILQ_FIRST(&((ccbp)->li_hist)); \
-	      while((elmp) != NULL){  \
+	      while ((elmp) != NULL) {  \
 		 PRINTLIHISTENTRY((elmp)); \
                  (elmp) = TAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
-         } while(0)
+         } while (0)
 
 
 #define PRINTSCCB(ccbp,elmp)\
@@ -136,7 +136,7 @@
            TFRC_DEBUG((LOG_INFO, ")\n"));   \
            PRINTSENDHIST(ccbp,elmp); \
            TFRC_DEBUG((LOG_INFO, "\n")); \
-        } while(0)
+        } while (0)
 
 #define PRINTRCCB(ccbp,relmp,lielmp)\
         do{   \
@@ -149,6 +149,6 @@
            PRINTRECVHIST(ccbp,relmp); \
            PRINTLIHIST(ccbp,lielmp); \
            TFRC_DEBUG((LOG_INFO, "\n")); \
-        } while(0)
+        } while (0)
 
 #endif
