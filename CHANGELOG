@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1416 2000/12/02 08:22:43 itojun Exp $
+$KAME: CHANGELOG,v 1.1417 2000/12/02 08:28:24 itojun Exp $
 
 <200012>
+Sat Dec  2 17:27:30 JST 2000  itojun@iijlab.net
+	* bsdi3, bsdi4, freebsd2, netbsd: do not pass incomplete tcp header
+	  to syn_cache_unreach.
+
 Sat Dec  2 17:19:58 JST 2000  itojun@iijlab.net
 	* netbsd: catch up with netbsd 1.5.  ALTQ nor MIP6 do not compile.
 	  NATPT may not work.  pvcbridge does not work for now.
