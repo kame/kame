@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$Id: inet6.c,v 1.16 2000/06/11 17:30:22 jinmei Exp $");*/
+/*__RCSID("$Id: inet6.c,v 1.17 2000/06/11 17:34:45 jinmei Exp $");*/
 #endif
 #endif /* not lint */
 
@@ -896,6 +896,8 @@ icmp6_stats(off, name)
 	p_5(icp6s_ounknown, "\t\t%qu unknown\n");
 
 	p(icp6s_reflect, "\t%qu message response%s generated\n");
+	p(icp6s_nd_toomanyopt, "\t%qu message%s with too many ND options\n");
+#undef p_5
 #undef p
 }
 
