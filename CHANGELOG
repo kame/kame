@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2478 2003/09/24 02:04:07 jinmei Exp $
+$KAME: CHANGELOG,v 1.2479 2003/09/24 18:20:15 jinmei Exp $
 
 <200309>
+2003-09-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/setkey/setkey.c (sysctldump): disabled this function
+	when KEYCTL_DUMPSA is undefined.  This change fixes the output
+	of setkey -D or -DP on FreeBSD.
+
+2003-09-25  itojun
+	* kame/sys/netkey/key_var.h: undefined KEYCTL_DUMPSA and
+	KEYCTL_DUMPSP for FreeBSD since it does not work for now.  The
+	change implicitly corrected the termination behavior of racoon.
+
 2003-09-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/kame/racoon/session.c (check_flushsa): correctly
 	handled the case where pfkey_dump_sadb() returns NULL.  Otherwise,
