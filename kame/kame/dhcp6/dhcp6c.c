@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.155 2005/03/02 07:26:28 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.156 2005/03/02 08:32:27 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -278,7 +278,7 @@ client6_init()
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 	hints.ai_flags = AI_PASSIVE;
-	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
+	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
 		    gai_strerror(error));
@@ -325,7 +325,7 @@ client6_init()
 	freeaddrinfo(res);
 
 	hints.ai_flags = 0;
-	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
+	error = getaddrinfo("::", DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
 		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
 		    gai_strerror(error));
@@ -367,7 +367,7 @@ client6_init()
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 	hints.ai_flags = AI_PASSIVE;
-	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
+	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
 		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
 		    gai_strerror(error));
