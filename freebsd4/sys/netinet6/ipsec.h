@@ -269,6 +269,11 @@ struct ipsec_output_state {
 	struct sockaddr *dst;
 };
 
+struct ipsec_history {
+        int ih_proto;
+        u_int32_t ih_spi;
+};
+
 extern int ipsec_debug;
 
 extern struct ipsecstat ipsecstat;
@@ -321,8 +326,12 @@ extern int ipsec4_output __P((struct ipsec_output_state *, struct secpolicy *,
 	int));
 extern int ipsec4_tunnel_validate __P((struct ip *, u_int, struct secasvar *));
 extern struct mbuf *ipsec_copypkt __P((struct mbuf *));
+extern void ipsec_delaux __P((struct mbuf *));
 extern void ipsec_setsocket __P((struct mbuf *, struct socket *));
 extern struct socket *ipsec_getsocket __P((struct mbuf *));
+extern void ipsec_addhist __P((struct mbuf *, int, u_int32_t));
+extern struct ipsec_history *ipsec_gethist __P((struct mbuf *, int *));
+extern void ipsec_clearhist __P((struct mbuf *));
 #endif /*_KERNEL*/
 
 #ifndef _KERNEL
