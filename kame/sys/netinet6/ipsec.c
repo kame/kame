@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.135 2002/01/31 14:14:52 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.136 2002/05/19 00:36:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -289,6 +289,10 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 	}
 	if (!pcbsp->cache[dir])
 		return NULL;
+	if (pcbsp->cache[dir]->state != IPSEC_SPSTATE_ALIVE) {
+		ipsec_invalpcbcache(pcbsp, dir);
+		return NULL;
+	}
 	if ((pcbsp->cacheflags & IPSEC_PCBSP_CONNECTED) == 0) {
 		if (!pcbsp->cache[dir])
 			return NULL;
