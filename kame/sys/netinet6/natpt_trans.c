@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.39 2001/06/18 14:34:22 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.40 2001/07/15 09:50:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,6 +143,7 @@ void		 tr_icmp6TimeExceed		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6ParamProb		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoRequest		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoReply		__P((struct _cv *, struct _cv *));
+void		 tr_icmp6MimicPayload		__P((struct _cv *, struct _cv *, struct pAddr *));
 
 void		 translatingPYLD4To6		__P((struct _cv *));
 int		 translatingFTP4ReplyTo6	__P((struct _cv *));
@@ -1416,6 +1417,7 @@ translatingICMPv6To4(struct _cv *cv6, struct pAddr *pad)
     {
       case ICMP6_DST_UNREACH:
 	tr_icmp6DstUnreach(cv6, &cv4);
+	tr_icmp6MimicPayload(cv6, &cv4, pad);
 	break;
 
       case ICMP6_PACKET_TOO_BIG:
@@ -1424,6 +1426,7 @@ translatingICMPv6To4(struct _cv *cv6, struct pAddr *pad)
 
       case ICMP6_TIME_EXCEEDED:
 	tr_icmp6TimeExceed(cv6, &cv4);
+	tr_icmp6MimicPayload(cv6, &cv4, pad);
 	break;
 
       case ICMP6_PARAM_PROB:
@@ -1602,6 +1605,71 @@ tr_icmp6EchoReply(struct _cv *cv6, struct _cv *cv4)
 	bcopy(icmp6off, icmp4off, dlen);
 
 	ip4->ip_len = cv4->m->m_len = sizeof(struct ip) + ICMP_MINLEN + dlen;
+    }
+}
+
+
+void
+tr_icmp6MimicPayload(struct _cv *cv6, struct _cv *cv4, struct pAddr *pad)
+{
+    int			 dgramlen;
+    struct ip		*icmpip4, *ip4 = cv4->_ip._ip4;
+    struct ip6_hdr	*icmpip6, *ip6 = cv6->_ip._ip6;
+    struct icmp		*icmp4;
+    struct icmp6_hdr	*icmp6;
+    caddr_t		 ip6end;
+    caddr_t		 icmpip6pyld, icmpip4pyld;
+
+    ip6end = (caddr_t)(ip6 + 1) + ntohs(ip6->ip6_plen);
+    icmp6 = cv6->_payload._icmp6;
+    icmpip6 = (struct ip6_hdr *)((caddr_t)icmp6 + sizeof(struct icmp6_hdr));
+    icmpip6pyld = natpt_pyldaddr(icmpip6, ip6end, NULL);
+    if (icmpip6pyld == NULL)
+	return ;
+
+    icmp4 = cv4->_payload._icmp4;
+    icmpip4 = (struct ip *)((caddr_t)icmp4 + ICMP_MINLEN);
+    icmpip4pyld = (caddr_t)icmpip4 + sizeof(struct ip);
+
+    dgramlen = (caddr_t)icmp6 + ntohs(ip6->ip6_plen) - icmpip6pyld;
+
+    bzero(icmpip4, sizeof(struct ip));
+    bcopy(icmpip6pyld, icmpip4pyld, dgramlen);
+
+#ifdef _IP_VHL
+    icmpip4->ip_vhl = IP_MAKE_VHL(IPVERSION, sizeof(struct ip) >> 2);
+#else
+    icmpip4->ip_v  = IPVERSION;
+    icmpip4->ip_hl = sizeof(struct ip) >> 2;
+#endif
+    icmpip4->ip_tos = 0;
+    icmpip4->ip_len = ntohs(icmpip6->ip6_plen) + sizeof(struct ip);
+    icmpip4->ip_id  = 0;
+    icmpip4->ip_off = 0;
+    icmpip4->ip_ttl = icmpip6->ip6_hlim;
+    icmpip4->ip_p   = icmpip6->ip6_nxt;
+    icmpip4->ip_src = pad->in4dst;
+    icmpip4->ip_dst = pad->in4src;
+
+    ip4->ip_len = sizeof(struct ip) + ICMP_MINLEN + sizeof(struct ip) + dgramlen;
+    cv4->m->m_pkthdr.len
+	= cv4->m->m_len
+	= ip4->ip_len;
+
+    switch (icmp6->icmp6_type)
+    {
+      case ICMP6_DST_UNREACH:
+      case ICMP6_TIME_EXCEEDED:
+	{
+	    struct udphdr	*udp4 = (struct udphdr *)icmpip4pyld;
+
+	    if ((pad->_dport != 0) || (pad->_sport != 0))
+	    {
+		udp4->uh_sport = pad->_dport;
+		udp4->uh_dport = pad->_sport;
+	    }
+	}
+	break;
     }
 }
 
