@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.318 1999/12/07 10:50:44 sumikawa Exp $
+$Id: CHANGELOG,v 1.319 1999/12/07 11:40:16 jinmei Exp $
 
 <199912>
+1999-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/mping: was added for debugging IPv6 multicast.
+	Contributed by: kato@wide.ad.jp
+
 Tue Dec  7 19:46:49 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/qmail: sync with ports-current.
 	* freebsd3/ports/pident6d: upgrade to current IPv6 patch.
