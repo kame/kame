@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/udp_var.h,v 1.22 1999/12/29 04:41:03 peter Exp $
+ * $FreeBSD: src/sys/netinet/udp_var.h,v 1.22.2.1 2001/02/18 07:12:25 luigi Exp $
  */
 
 #ifndef _NETINET_UDP_VAR_H_
@@ -53,16 +53,6 @@ struct	udpiphdr {
 #define	ui_dport	ui_u.uh_dport
 #define	ui_ulen		ui_u.uh_ulen
 #define	ui_sum		ui_u.uh_sum
-
-struct	udpcb {
-	/* XXX - these should be by reference so we can do options quickly */
-	struct	ip udb_ip;
-	struct	udphdr udb_uh;
-	struct	sockaddr_in udb_conn;
-	struct	in_hostcache *udb_hc;
-	struct	mbuf *udb_queue;
-};
-#define	inptoudpcb(inp)	((struct udpdb *)(inp)->inp_ppcb)
 
 struct	udpstat {
 				/* input statistics: */
@@ -115,7 +105,7 @@ extern int	log_in_vain;
 
 void	udp_ctlinput __P((int, struct sockaddr *, void *));
 void	udp_init __P((void));
-void	udp_input __P((struct mbuf *, int, int));
+void	udp_input __P((struct mbuf *, int));
 
 void	udp_notify __P((struct inpcb *inp, int errno));
 int	udp_shutdown __P((struct socket *so));

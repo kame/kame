@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.26 2001/07/26 06:53:18 jinmei Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.27 2001/08/14 08:29:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -87,12 +87,7 @@
 #define IPLEN_FLIPPED
 
 #ifdef INET
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#include <netinet/ipprotosw.h>
-extern struct ipprotosw inetsw[];
-#else
 extern struct protosw inetsw[];
-#endif
 #if defined(__bsdi__) || defined(__NetBSD__)
 extern u_char ip_protox[];
 #endif
@@ -121,7 +116,11 @@ ipcomp4_input(m, va_alist)
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = va_arg(ap, int);
+#else
+	proto = mtod(m, struct ip *)->ip_p;
+#endif
 	va_end(ap);
 
 	if (m->m_pkthdr.len < off + sizeof(struct ipcomp)) {
@@ -242,7 +241,11 @@ ipcomp4_input(m, va_alist)
 			ipsecstat.in_polvio++;
 			goto fail;
 		}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+		(*inetsw[ip_protox[nxt]].pr_input)(m, off);
+#else
 		(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
+#endif
 	} else
 		m_freem(m);
 	m = NULL;

@@ -64,8 +64,6 @@
 #include <netinet/udp_var.h>
 #include <netinet/ip_encap.h>
 
-#include <netinet/ipprotosw.h>
-
 /*
  * TCP/IP protocol family: IP, ICMP, UDP, TCP.
  */
@@ -107,7 +105,7 @@ struct pr_usrreqs natpt_usrreqs;
 extern	struct domain inetdomain;
 static	struct pr_usrreqs nousrreqs;
 
-struct ipprotosw inetsw[] = {
+struct protosw inetsw[] = {
 { 0,		&inetdomain,	0,		0,
   0,		0,		0,		0,
   0,
@@ -229,7 +227,7 @@ struct ipprotosw inetsw[] = {
 };
 
 #if NGIF > 0
-struct ipprotosw in_gif_protosw =
+struct protosw in_gif_protosw =
 { SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
   in_gif_input, rip_output,	0,		rip_ctloutput,
   0,
@@ -239,7 +237,7 @@ struct ipprotosw in_gif_protosw =
 #endif /*NGIF*/
 
 #if NSTF > 0
-struct ipprotosw in_stf_protosw =
+struct protosw in_stf_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   in_stf_input, rip_output,	0,		rip_ctloutput,
   0,

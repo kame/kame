@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.61 2001/07/27 07:27:52 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.62 2001/08/14 08:29:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,12 +96,7 @@
 #define IPLEN_FLIPPED
 
 #ifdef INET
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#include <netinet/ipprotosw.h>
-extern struct ipprotosw inetsw[];
-#else
 extern struct protosw inetsw[];
-#endif
 #if defined(__bsdi__) || defined(__NetBSD__)
 extern u_char ip_protox[];
 #endif
@@ -132,7 +127,11 @@ ah4_input(m, va_alist)
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = va_arg(ap, int);
+#else
+	proto = mtod(m, struct ip *)->ip_p;
+#endif
 	va_end(ap);
 
 #ifndef PULLDOWN_TEST
@@ -582,7 +581,11 @@ ah4_input(m, va_alist)
 				ipsecstat.in_polvio++;
 				goto fail;
 			}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			(*inetsw[ip_protox[nxt]].pr_input)(m, off);
+#else
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
+#endif
 		} else
 			m_freem(m);
 		m = NULL;

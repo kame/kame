@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.66 2001/07/29 04:46:09 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.67 2001/08/14 08:29:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,13 +352,13 @@ in_gif_input(m, va_alist)
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
-#ifndef __OpenBSD__
+#if !defined(__OpenBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = va_arg(ap, int);
 #endif
 	va_end(ap);
 
 	ip = mtod(m, struct ip *);
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = ip->ip_p;
 #endif
 

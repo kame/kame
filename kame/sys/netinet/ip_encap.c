@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.57 2001/07/29 05:14:25 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.58 2001/08/14 08:29:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,9 +102,6 @@
 #endif /* MROUTING */
 #ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
-#endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#include <netinet/ipprotosw.h>
 #endif
 
 #ifdef INET6
@@ -341,26 +338,22 @@ encap4_input(m, va_alist)
 	va_dcl
 #endif
 {
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	struct ip *ip;
 #endif
 	int off, proto;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	const struct ipprotosw *psw;
-#else
 	const struct protosw *psw;
-#endif
 	struct encaptab *match;
 	va_list ap;
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
-#ifndef __OpenBSD__
+#if !defined(__OpenBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = va_arg(ap, int);
 #endif
 	va_end(ap);
 
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	ip = mtod(m, struct ip *);
 	proto = ip->ip_p;
 #endif
@@ -369,49 +362,50 @@ encap4_input(m, va_alist)
 
 	if (match) {
 		/* found a match, "match" has the best one */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-		psw = (const struct ipprotosw *)match->psw;
-#else
 		psw = match->psw;
-#endif
 		if (psw && psw->pr_input) {
 			encap_fillarg(m, match);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			(*psw->pr_input)(m, off);
+#else
 			(*psw->pr_input)(m, off, proto);
+#endif
 		} else
 			m_freem(m);
 		return;
 	}
 
-	/* for backward compatibility */
-#ifdef __OpenBSD__
-# if defined(MROUTING) || defined(IPSEC)
-#  define COMPATFUNC	ip4_input
-# endif
-#elif defined(__NetBSD__)
-# if 0 /*def MROUTING*/
-	if (proto == IPPROTO_IPV4 && mrt_ipip_input(m, off)) {
-		/*
-		 * Multicast routing code claimed this one.  No
-		 * more processing at this level.
-		 */
-  		return;
-	}
-# endif
-#else
-# ifdef MROUTING
-#  define COMPATFUNC	ipip_input
-# endif /*MROUTING*/
-#endif
-
-#ifdef COMPATFUNC
+	/* for backward compatibility - messy... */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	if (proto == IPPROTO_IPV4) {
-		COMPATFUNC(m, off, proto);
+		ipip_input(m, off);
 		return;
 	}
-#endif
+
+	/* last resort: inject to raw socket */
+	rip_input(m, off);
+#elif defined(__NetBSD__)
+	/* last resort: inject to raw socket */
+	rip_input(m, off, proto);
+#elif defined(__OpenBSD__)
+# if defined(MROUTING) || defined(IPSEC)
+	if (proto == IPPROTO_IPV4) {
+		ip4_input(m, off, proto);
+		return;
+	}
+# endif
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
+#else
+	if (proto == IPPROTO_IPV4) {
+		ipip_input(m, off, proto);
+		return;
+	}
+
+	/* last resort: inject to raw socket */
+	rip_input(m, off, proto);
+#endif
 }
 #endif
 
@@ -679,6 +673,8 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	case AF_INET6:
 		l = sizeof(*pack6);
 		break;
+	default:
+		goto fail;
 	}
 
 #ifdef DIAGNOSTIC
