@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1109 2000/07/08 00:46:17 itojun Exp $
+$Id: CHANGELOG,v 1.1110 2000/07/08 01:59:38 itojun Exp $
 
 <200006>
+Sat Jul  8 10:57:36 JST 2000  itojun@iijlab.net
+	* {netbsd,openbsd}/usr.sbin/inetd: allow square-bracket for the first
+	  element on inetd.conf, to disambiguate IPv6 address and colon
+	  separator.
+	* openbsd/usr.sbin/inetd: handle IPv6 address in first element on
+	  inetd.conf line.
+
 Sat Jul  8 09:43:26 JST 2000  itojun@iijlab.net
 	* {bsdi3,openbsd,netbsd}/libexec/ftpd: plug setproctitle issue in
 	  CERT Advisory CA-2000-13.  NOTE: bsdi3 uses wu-ftpd.  it may have
