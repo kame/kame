@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.3 1999/09/01 05:27:42 sakane Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.4 1999/09/14 03:44:15 itojun Exp $ */
 
 #ifdef _KERNEL
 # ifndef KERNEL
@@ -408,11 +408,20 @@ kdebug_sadb_x_policy(ext)
 			addr = (struct sockaddr *)((caddr_t)addr + addr->sa_len);
 			kdebug_sockaddr(addr);
 
+			printf(" }\n");
+
+			/* prevent infinite loop */
+			if (xisr->sadb_x_ipsecrequest_len <= 0)
+				panic("kdebug_sadb_x_policy: wrong policy struct.\n");
+
 			tlen -= xisr->sadb_x_ipsecrequest_len;
 
 			xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xisr
 			                + xisr->sadb_x_ipsecrequest_len);
 		}
+
+		if (tlen != 0)
+			panic("kdebug_sadb_x_policy: wrong policy struct.\n");
 	}
 
 	return;
