@@ -136,7 +136,7 @@ config_vifs_from_kernel()
 		ifc.ifc_buf = realloc (ifc.ifc_buf,ifc.ifc_len);
 
 	}
-	if ( ifc.ifc_buf == NULL)
+	if (ifc.ifc_buf == NULL)
 	    log(LOG_ERR, 0, "config_vifs_from_kernel: ran out of memory");
 	
 
