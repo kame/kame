@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#) $Header: tcpdump.c,v 1.129 97/06/13 13:10:11 leres Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/tcpdump.c,v 1.1.1.1 1999/08/08 23:32:12 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -67,6 +67,7 @@ int Sflag;			/* print raw TCP sequence numbers */
 int tflag = 1;			/* print packet arrival time */
 int vflag;			/* verbose */
 int xflag;			/* print packet in hex */
+int Xflag;			/* print packet in ascii as well as hex */
 
 char *ahsecret = NULL;		/* AH secret key */
 char *espsecret = NULL;		/* ESP secret key */
@@ -156,7 +157,7 @@ main(int argc, char **argv)
 
 	opterr = 0;
 	while (
-	    (op = getopt(argc, argv, "ac:deE:fF:i:lnNOpqr:Rs:StT:vw:xY")) != EOF)
+	    (op = getopt(argc, argv, "ac:deE:fF:i:lnNOpqr:Rs:StT:vw:xXY")) != EOF)
 		switch (op) {
 
 		case 'a':
@@ -277,6 +278,15 @@ main(int argc, char **argv)
 		case 'w':
 			WFileName = optarg;
 			break;
+
+		case 'x':
+			++xflag;
+			break;
+
+		case 'X':
+			++Xflag;
+			break;
+
 #ifdef YYDEBUG
 		case 'Y':
 			{
@@ -286,10 +296,6 @@ main(int argc, char **argv)
 			}
 			break;
 #endif
-		case 'x':
-			++xflag;
-			break;
-
 		default:
 			usage();
 			/* NOTREACHED */
@@ -415,6 +421,10 @@ default_print_unaligned(register const u_char *cp, register u_int length)
 	register u_int i, s;
 	register int nshorts;
 
+	if (Xflag) {
+		ascii_print(cp, length);
+		return;
+	}
 	nshorts = (u_int) length / sizeof(u_short);
 	i = 0;
 	while (--nshorts >= 0) {
@@ -438,27 +448,7 @@ default_print_unaligned(register const u_char *cp, register u_int length)
 void
 default_print(register const u_char *bp, register u_int length)
 {
-	register const u_short *sp;
-	register u_int i;
-	register int nshorts;
-
-	if ((long)bp & 1) {
-		default_print_unaligned(bp, length);
-		return;
-	}
-	sp = (u_short *)bp;
-	nshorts = (u_int) length / sizeof(u_short);
-	i = 0;
-	while (--nshorts >= 0) {
-		if ((i++ % 8) == 0)
-			(void)printf("\n\t\t\t");
-		(void)printf(" %04x", ntohs(*sp++));
-	}
-	if (length & 1) {
-		if ((i % 8) == 0)
-			(void)printf("\n\t\t\t");
-		(void)printf(" %02x", *(u_char *)sp);
-	}
+	default_print_unaligned(bp, length);
 }
 
 __dead void
@@ -470,7 +460,7 @@ usage(void)
 	(void)fprintf(stderr, "%s version %s\n", program_name, version);
 	(void)fprintf(stderr, "libpcap version %s\n", pcap_version);
 	(void)fprintf(stderr,
-"Usage: %s [-adeflnNOpqStvx] [-c count] [ -F file ]\n", program_name);
+"Usage: %s [-adeflnNOpqStvxX] [-c count] [ -F file ]\n", program_name);
 	(void)fprintf(stderr,
 "\t\t[ -i interface ] [ -r file ] [ -s snaplen ]\n");
 	(void)fprintf(stderr,
