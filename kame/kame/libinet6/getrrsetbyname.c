@@ -1,3 +1,4 @@
+/* $KAME: getrrsetbyname.c,v 1.2 2001/08/07 00:43:36 itojun Exp $ */
 /* $OpenBSD: getrrsetbyname.c,v 1.2 2001/08/06 15:00:48 jakob Exp $ */
 
 /*
