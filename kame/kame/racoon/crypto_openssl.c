@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.5 1999/08/19 15:21:06 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.6 1999/08/19 15:22:25 itojun Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -732,7 +732,7 @@ eay_dh_generate(prime, g, publen, pub, priv)
 	if ((dh = DH_new()) == NULL)
 		goto end;
 	dh->p = p;
-	p = NULL;
+	p = NULL;	/* p is now part of dh structure */
 	dh->g = NULL;
 	if ((dh->g = BN_new()) == NULL)
 		goto end;
