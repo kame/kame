@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.28 2000/11/15 16:51:45 itojun Exp $
+	$KAME: USAGE,v 1.29 2000/11/15 16:52:32 itojun Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -56,7 +56,7 @@ is described at next section)
 If you want to assign a global address by "ifconfig", don't forget to
 specify the "alias" argument to keep the link-local address.
 
-# ifconfig de0 inet6 3ffe:501:808:1:200:f8ff:fe01:6317 alias
+# ifconfig de0 inet6 3ffe:501:808:1:200:f8ff:fe01:6317 prefixlen 64 alias
 # ifconfig de0
 de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
         inet6 fe80::200:f8ff:fe01:6317%de0 prefixlen 64 scopeid 0x1
