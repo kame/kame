@@ -129,8 +129,6 @@ main(int argc, char *argv[])
 #ifdef FAITH_NS
 	char *ns;
 #endif /* FAITH_NS */
-	extern int optind;
-	extern char *optarg;
 
 	/*
 	 * Initializing stuff
