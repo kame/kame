@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.90 2002/09/20 21:59:55 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.91 2002/09/24 13:47:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.90 2002/09/20 21:59:55 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.91 2002/09/24 13:47:02 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -603,7 +603,8 @@ ripalarm()
 void
 init()
 {
-	int	i, int0, int255, error;
+	int	i, error;
+	const int int0 = 0, int1 = 1, int255 = 255;
 	struct	addrinfo hints, *res;
 	char	port[10];
 
@@ -627,7 +628,6 @@ init()
 		/*NOTREACHED*/
 	}
 
-	int0 = 0; int255 = 255;
 	ripsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (ripsock < 0) {
 		fatal("rip socket");
@@ -635,6 +635,11 @@ init()
 	}
 	if (bind(ripsock, res->ai_addr, res->ai_addrlen) < 0) {
 		fatal("rip bind");
+		/*NOTREACHED*/
+	}
+	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_V6ONLY,
+	    &int1, sizeof(int1)) < 0) {
+		fatal("rip IPV6_V6ONLY");
 		/*NOTREACHED*/
 	}
 	if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
