@@ -201,8 +201,10 @@ int	tcprexmtthresh = 3;
 #ifdef INET6
 #define ND6_HINT(tp) \
 do { \
-	if (tp && tp->t_in6pcb && tp->t_in6pcb->in6p_route.ro_rt) \
+	if (tp && tp->t_in6pcb && tp->t_family == AF_INET6 \
+	 && tp->t_in6pcb->in6p_route.ro_rt) { \
 		nd6_nud_hint(tp->t_in6pcb->in6p_route.ro_rt, NULL); \
+	} \
 } while (0)
 #else
 #define ND6_HINT(tp)
