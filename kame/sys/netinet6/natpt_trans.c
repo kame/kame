@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.156 2002/12/11 04:19:23 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.157 2002/12/11 05:47:58 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -76,6 +76,15 @@
 
 #undef HAVE_IP6_SETPKTADDRS
 #endif
+
+
+/*
+ * The number of bytes to compare when translator examines whether TCP
+ * packet was retransmitted.
+ * This includes source and destination port, sequence number,
+ * acknowledgement number, header length, and flags.
+ */
+#define	TCPCHKSZ	14
 
 
 #define	FTP_DATA		20
@@ -2772,7 +2781,7 @@ natpt_updateSeqAck(struct pcv *cv, caddr_t tcphdr, int delta)
 
 		if ((ts->pkthdr[fromto] == NULL)
 		    || ((tp != NULL)
-			&& (bcmp(tp, tcphdr, TCPHDRSZ) != 0))) {
+			&& (bcmp(tp, tcphdr, TCPCHKSZ) != 0))) {
 			bcopy(tcphdr, tp, TCPHDRSZ);
 			ts->delta[fromto] += delta;
 			ts->seq[fromto] = th->th_seq;
