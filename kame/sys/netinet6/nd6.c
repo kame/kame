@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.256 2002/05/26 23:31:10 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.257 2002/05/27 03:21:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2016,7 +2016,6 @@ nd6_slowtimo(ignored_arg)
 #else
 	int s = splnet();
 #endif
-	int i;
 	struct nd_ifinfo *nd6if;
 	struct ifnet *ifp;
 
