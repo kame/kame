@@ -32,7 +32,7 @@ BINMODE = 4555
 
 SRCDIR=	${.CURDIR}/../../../kame/pim6sd/mtrace6
 
-CFLAGS+= -I$(.CURDIR)/../../../kame/pim6sd
+CFLAGS+= -I$(.CURDIR)/../../../kame/pim6sd -DHAVE_GETIFADDRS
 LDADD+=	-L/usr/local/v6/lib -L${.OBJDIR}/../../../lib/libinet6 \
 	-L${.OBJDIR}/../../../lib/libinet6/obj -linet6
 DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
