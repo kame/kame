@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.13 2002/02/12 10:14:01 kjc Exp $	*/
+/*	$KAME: parser.c,v 1.14 2002/02/13 05:39:57 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2002
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -281,11 +281,13 @@ qcmd_config(void)
 		LOG(LOG_ERR, 0, "Error in %s, line %d.  config failed.",
 		    altqconfigfile, line_no);
 		(void) qcmd_destroyall();
-	}
+		rval = QOPERR_INVAL;
+	} else
+		rval = 0;
 
 	(void)fclose(fp);
 	line_no = 0;
-	return (0);
+	return (rval);
 }
 
 static int 
