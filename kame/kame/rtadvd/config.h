@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.5 2002/06/29 13:02:55 itojun Exp $	*/
+/*	$KAME: config.h,v 1.6 2002/06/29 13:11:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -41,3 +41,4 @@ extern void make_packet __P((struct rainfo *));
  * so it should be okay to limit it
  */
 #define MAXPREFIX	100
+#define MAXROUTE	100

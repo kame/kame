@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.70 2002/06/29 13:02:55 itojun Exp $	*/
+/*	$KAME: config.c,v 1.71 2002/06/29 13:11:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -421,24 +421,24 @@ getconfig(intface)
 	}
 
 	/* route information */
-#ifndef ROUTEINFO
-	MAYHAVE(val, "routes", -1);
-	if (val != -1)
-		syslog(LOG_INFO, "route information option is not available");
-#else
-	MAYHAVE(val, "routes", 0);
-	if (val < 0 || val > 0xffffffff) {
-		/* does this check is really necessary? (jinmei) */
-		syslog(LOG_ERR,
-		       "<%s> number of route (%ld) on %s information improper",
-		       __func__, val, intface);
-		exit(1);
-	}
-	tmp->routes = val;
-	for (i = 0; i < tmp->routes; i++) {
+#ifdef ROUTEINFO
+	tmp->routes = 0;
+	for (i = -1; i < MAXROUTE; i++) {
 		struct rtinfo *rti;
 		char entbuf[256], oentbuf[256];
-		int added = (tmp->routes > 1) ? 1 : 0;
+
+		makeentry(entbuf, sizeof(entbuf), i, "rtprefix");
+		addr = (char *)agetstr(entbuf, &bp);
+		if (addr == NULL) {
+			makeentry(oentbuf, sizeof(oentbuf), i, "rtrprefix");
+			addr = (char *)agetstr(oentbuf, &bp);
+			if (addr) {
+				fprintf(stderr, "%s was obsoleted.  Use %s.\n",
+					oentbuf, entbuf);
+			}
+		}
+		if (addr == NULL)
+			continue;
 
 		/* allocate memory to store prefix information */
 		if ((rti = malloc(sizeof(struct rtinfo))) == NULL) {
@@ -451,23 +451,8 @@ getconfig(intface)
 
 		/* link into chain */
 		insque(rti, &tmp->route);
+		tmp->routes++;
 
-		makeentry(entbuf, sizeof(entbuf), i, "rtprefix");
-		addr = (char *)agetstr(entbuf, &bp);
-		if (addr == NULL) {
-			makeentry(oentbuf, sizeof(oentbuf), i, "rtrprefix");
-			addr = (char *)agetstr(oentbuf, &bp);
-			if (addr) {
-				fprintf(stderr, "%s was obsoleted.  Use %s.\n",
-					oentbuf, entbuf);
-			}
-		}
-		if (addr == NULL) {
-			syslog(LOG_ERR,
-			       "<%s> need %s as a route for interface %s", 
-			       __func__, entbuf, intface);
-			exit(1);
-		}
 		if (inet_pton(AF_INET6, addr, &rti->prefix) != 1) {
 			syslog(LOG_ERR, "<%s> inet_pton failed for %s",
 			       __func__, addr);

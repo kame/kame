@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.42 2002/06/29 13:02:55 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.43 2002/06/29 13:11:45 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -276,30 +276,10 @@ explicitly.
 The following items are for ICMPv6 route information option,
 which will be attached to router advertisement header.
 These items are optional.
-In the following list, each keyword beginning with
-.Dq rt
-could be replaced with the one beginning with
-.Dq rtr
-for compatibility reason.
-For example,
-.Cm rtrplen
-is accepted instead of
-.Cm rtplen .
-However, the former type of keywords has basically been obsoleted,
-and should not be used any more.
+Each items can be augmented with number, like
+.Dq Li rtplen2 ,
+to specify multiple routes.
 .Bl -tag -width indent
-.It Cm \&routes
-(num) Number of routes.
-Its default is 0, so it must explicitly be set to positve values
-if you want to specify any route information option.
-If its value is 0, no route information is sent.
-If its value is more than 1, you must specify the index of the routes
-for each item below.
-Indices vary from 0 to N-1, where N is the
-value of
-.Cm routes.
-Each index shall follow the name of each item, e.g.,
-.Dq rtplen2 .
 .It Cm \&rtprefix
 (str) The prefix filled into the Prefix field of route information option.
 Since
@@ -339,6 +319,19 @@ allows this item to be unspecified, and uses the router lifetime
 as the default value in such a case, just for compatibility with an
 old version of the program.
 .El
+.Pp
+In the above list, each keyword beginning with
+.Dq Li rt
+could be replaced with the one beginning with
+.Dq Li rtr
+for backward compatibility reason.
+For example,
+.Cm rtrplen
+is accepted instead of
+.Cm rtplen .
+However, keywords that start with
+.Dq Li rtr
+have basically been obsoleted, and should not be used any more.
 .Pp
 You can also refer one line from another by using
 .Cm tc
