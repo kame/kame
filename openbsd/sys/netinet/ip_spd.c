@@ -294,7 +294,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 
 #ifdef INET6
 	case AF_INET6:
-		if ((SA6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6)) ||
+		if ((IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_dst.sin6.sin6_addr)) ||
 		    (bcmp(&ipo->ipo_dst.sin6.sin6_addr, &in6mask128,
 			sizeof(in6mask128)) == 0))
 			dignore = 1;
@@ -313,7 +313,7 @@ ipsp_spd_lookup(struct mbuf *m, int af, int hlen, int *error, int direction,
 
 #ifdef INET6
 	case AF_INET6:
-		if (SA6_IS_ADDR_UNSPECIFIED(&ipo->ipo_src.sin6))
+		if (IN6_IS_ADDR_UNSPECIFIED(&ipo->ipo_src.sin6.sin6_addr))
 			signore = 1;
 		break;
 #endif /* INET6 */

@@ -1243,7 +1243,7 @@ ipsp_is_unspecified(union sockaddr_union addr)
 
 #ifdef INET6
 	case AF_INET6:
-		if (SA6_IS_ADDR_UNSPECIFIED(&addr.sin6))
+		if (IN6_IS_ADDR_UNSPECIFIED(&addr.sin6.sin6_addr))
 			return 1;
 		else
 			return 0;

@@ -211,7 +211,6 @@ udp_input(struct mbuf *m, ...)
 	} srcsa, dstsa;
 #ifdef INET6
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 src_sa6, dst_sa6;
 #endif /* INET6 */
 #ifdef IPSEC
 	struct m_tag *mtag;
@@ -257,19 +256,6 @@ udp_input(struct mbuf *m, ...)
 	default:
 		goto bad;
 	}
-
-#ifdef INET6
-	if (ip6) {
-		/*
-		 * extract full sockaddr structures for the src/dst
-		 * addresses, and make local copies of them.
-		 */
-		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6)) {
-			m_freem(m);
-			return;
-		}
-	}
-#endif /* INET6 */
 
 	IP6_EXTHDR_GET(uh, struct udphdr *, m, iphlen, sizeof(struct udphdr));
 	if (!uh) {
@@ -392,13 +378,15 @@ udp_input(struct mbuf *m, ...)
 #if 0 /*XXX inbound flowinfo */
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ip6->ip6_flow;
 #endif
-		sa6_copy_addr(&src_sa6, &srcsa.sin6);
+		in6_recoverscope(&srcsa.sin6, &ip6->ip6_src,
+		    m->m_pkthdr.rcvif);
 
 		bzero(&dstsa, sizeof(struct sockaddr_in6));
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		dstsa.sin6.sin6_family = AF_INET6;
 		dstsa.sin6.sin6_port = uh->uh_dport;
-		sa6_copy_addr(&dst_sa6, &dstsa.sin6);
+		in6_recoverscope(&dstsa.sin6, &ip6->ip6_dst,
+		    m->m_pkthdr.rcvif);
 
 		/*
 		 * XXX: the address may have embedded scope zone ID, which
@@ -469,9 +457,9 @@ udp_input(struct mbuf *m, ...)
 				continue;
 #ifdef INET6
 			if (ip6) {
-				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
-					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa,
-								&dstsa.sin6))
+				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
+					if (!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6,
+								&dstsa.sin6.sin6_addr))
 						continue;
 			} else
 #endif /* INET6 */
@@ -482,9 +470,9 @@ udp_input(struct mbuf *m, ...)
 			}
 #ifdef INET6
 			if (ip6) {
-				if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa))
-					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
-								&srcsa.sin6) ||
+				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
+					if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6,
+								&srcsa.sin6.sin6_addr) ||
 					    inp->inp_fport != uh->uh_sport)
 						continue;
 			} else
@@ -757,13 +745,6 @@ scan_ipv6:
 						sorwakeup(last);
 					opts = NULL;
 				}
-				/*
-				 * XXX: m_copy above removes m_aux that
-				 * contains the packet addresses, while we
-				 * still need them for IPsec.
-				 */
-				if (!ip6_setpktaddrs(m, &src_sa6, &dst_sa6))
-					goto bad; /* XXX */
 			}
 #endif /* IGMPV3 || MLDV2 */
 
@@ -819,8 +800,8 @@ inp_found:
 	 */
 #ifdef INET6
 	if (ip6)
-		inp = in6_pcbhashlookup(&udbtable, &src_sa6, uh->uh_sport,
-		    &dst_sa6, uh->uh_dport);
+		inp = in6_pcbhashlookup(&udbtable, &ip6->ip6_src, uh->uh_sport,
+		    &ip6->ip6_dst, uh->uh_dport);
 	else
 #endif /* INET6 */
 	inp = in_pcbhashlookup(&udbtable, ip->ip_src, uh->uh_sport,
@@ -830,7 +811,7 @@ inp_found:
 #ifdef INET6
 		if (ip6) {
 			inp = in_pcblookup(&udbtable,
-			    &src_sa6, uh->uh_sport, &dst_sa6,
+			    &ip6->ip6_src, uh->uh_sport, &ip6->ip6_dst,
 			    uh->uh_dport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
 		} else
 #endif /* INET6 */
@@ -1075,10 +1056,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcbhashlookup(&udbtable, sa6,
-					      uh.uh_dport,
-					      (struct sockaddr_in6 *)sa6_src,
-					      uh.uh_sport))
+			if (in6_pcbhashlookup(&udbtable, &sa6->sin6_addr, uh.uh_dport,
+					      (struct in6_addr *)&sa6_src->sin6_addr, uh.uh_sport))
 				valid = 1;
 			else if (in_pcblookup(&udbtable, sa6,
 					      uh.uh_dport,
@@ -1378,7 +1357,7 @@ udp_usrreq(so, req, m, addr, control)
 	case PRU_CONNECT:
 #ifdef INET6
 		if (inp->inp_flags & INP_IPV6) {
-			if (!SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa)) {
+			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
 				error = EISCONN;
 				break;
 			}
@@ -1417,7 +1396,7 @@ udp_usrreq(so, req, m, addr, control)
 	case PRU_DISCONNECT:
 #ifdef INET6
 		if (inp->inp_flags & INP_IPV6) {
-			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_fsa)) {
+			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
 				error = ENOTCONN;
 				break;
 			}

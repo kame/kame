@@ -1162,12 +1162,6 @@ send:
 #endif
 		}
 		ip6oflags = so->so_options & SO_DONTROUTE;
-		if (!ip6_setpktaddrs(m, &tp->t_inpcb->in6p_lsa,
-				     &tp->t_inpcb->in6p_fsa)) {
-			m_freem(m);
-			error = ENOBUFS;
-			goto out;
-		}
 		error = ip6_output(m, tp->t_inpcb->inp_outputopts6,
 		    &tp->t_inpcb->inp_route6, ip6oflags, NULL, NULL);
 		break;

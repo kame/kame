@@ -270,8 +270,8 @@ struct inpcb *
 			       u_int, struct in_addr, u_int);
 #ifdef INET6
 struct inpcb *
-	 in6_pcbhashlookup(struct inpcbtable *, struct sockaddr_in6 *,
-			       u_int, struct sockaddr_in6 *, u_int);
+	 in6_pcbhashlookup(struct inpcbtable *, struct in6_addr *,
+			       u_int, struct in6_addr *, u_int);
 int	 in6_pcbbind(struct inpcb *, struct mbuf *);
 int	 in6_pcbconnect(struct inpcb *, struct mbuf *);
 int	 in6_setsockaddr(struct inpcb *, struct mbuf *);
@@ -300,6 +300,6 @@ int	in6_pcbnotify(struct inpcbtable *, struct sockaddr *,
 	u_int, struct sockaddr *, u_int, int, void *,
 	void (*)(struct inpcb *, int));
 int	in6_selecthlim(struct inpcb *, struct ifnet *);
-int	in6_pcbsetport(struct sockaddr_in6 *, struct inpcb *, struct proc *);
+int	in6_pcbsetport(struct in6_addr *, struct inpcb *, struct proc *);
 #endif /* _KERNEL */
 #endif /* _NETINET_IN_PCB_H_ */

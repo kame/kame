@@ -334,9 +334,6 @@ tcp_respond(tp, template, m, ack, seq, flags)
 	struct route *ro = 0;
 	register struct tcphdr *th;
 	register struct tcpiphdr *ti = (struct tcpiphdr *)template;
-#ifdef INET6
-	struct sockaddr_in6 nsrc6, ndst6, src6, dst6;
-#endif /* INET6 */
 	int af;		/* af on wire */
 
 	if (tp) {
@@ -367,8 +364,8 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		switch (af) {
 #ifdef INET6
 		case AF_INET6:
-			src6 = tp->t_inpcb->in6p_lsa;
-			dst6 = tp->t_inpcb->in6p_fsa;
+			bcopy(ti, mtod(m, caddr_t), sizeof(struct tcphdr) +
+			    sizeof(struct ip6_hdr));
 			break;
 #endif /* INET6 */
 		case AF_INET:
@@ -388,14 +385,6 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		switch (af) {
 #ifdef INET6
 		case AF_INET6:
-			if (ip6_getpktaddrs(m, &src6, &dst6)) {
-				m_freem(m);
-				return;
-			}
-			nsrc6 = dst6;
-			ndst6 = src6;
-			src6 = nsrc6;
-			dst6 = ndst6;
 			m->m_len = sizeof(struct tcphdr) + sizeof(struct ip6_hdr);
 			xchg(((struct ip6_hdr *)ti)->ip6_dst,
 			    ((struct ip6_hdr *)ti)->ip6_src, struct in6_addr);
@@ -460,10 +449,6 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		    (tp->t_inpcb->in6p_outputopts->ip6po_minmtu ==
 		     IP6PO_MINMTU_ALL)) {
 			ip6oflags |= IPV6_MINMTU;
-		}
-		if (!ip6_setpktaddrs(m, &src6, &dst6)) {
-			m_freem(m);
-			return;
 		}
 #ifdef NEW_STRUCT_ROUTE
 		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
@@ -609,8 +594,8 @@ tcp_close(struct tcpcb *tp)
 	if (tp->pf == PF_INET6) {
 		if (rt)
 			bound_to_specific =
-			    !(SA6_IS_ADDR_UNSPECIFIED(
-			      (struct sockaddr_in6 *)rt_key(rt)));
+			    !(IN6_IS_ADDR_UNSPECIFIED(&
+			      ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr));
 	} else {
 		if (rt)
 			bound_to_specific =
@@ -870,13 +855,13 @@ tcp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcbhashlookup(&tcbtable, sa6,
+			if (in6_pcbhashlookup(&tcbtable, &sa6->sin6_addr,
 					      th.th_dport,
-					      (struct sockaddr_in6 *)sa6_src,
+					      (struct in6_addr *)&sa6_src->sin6_addr,
 					      th.th_sport))
 				valid++;
-			else if (in_pcblookup(&tcbtable, sa6,
-			    th.th_dport, (struct sockaddr_in6 *)sa6_src,
+			else if (in_pcblookup(&tcbtable, &sa6->sin6_addr,
+			    th.th_dport, (struct sockaddr_in6 *)&sa6_src->sin6_addr,
 			    th.th_sport, INPLOOKUP_IPV6))
 				valid++;
 

@@ -790,6 +790,7 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	struct sockaddr_in *fin, *lin;
 #ifdef INET6
 	struct sockaddr_in6 *fin6, *lin6;
+	struct in6_addr f6, l6;
 #endif
 
 	if (oldp == NULL || newp != NULL || newlen != 0)
@@ -802,15 +803,13 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 #ifdef INET6
 	case AF_INET6:
 		fin6 = (struct sockaddr_in6 *)&tir.faddr;
-		/*
-		 * intentionally disable using the default zone, since this is
-		 * for identification.
-		 */
-		if ((error = scope6_check_id(fin6, 0)) != 0)
-			return(error);
+		error = in6_embedscope(&f6, fin6);
+		if (error)
+			return EINVAL;
 		lin6 = (struct sockaddr_in6 *)&tir.laddr;
-		if ((error = scope6_check_id(lin6, 0)) != 0)
-			return(error);
+		error = in6_embedscope(&l6, lin6);
+		if (error)
+			return EINVAL;
 		break;
 #endif
 	case AF_INET:
@@ -825,8 +824,8 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	switch (tir.faddr.ss_family) {
 #ifdef INET6
 	case AF_INET6:
-		inp = in6_pcbhashlookup(&tcbtable, fin6,
-		    fin6->sin6_port, lin6, lin6->sin6_port);
+		inp = in6_pcbhashlookup(&tcbtable, &f6,
+		    fin6->sin6_port, &l6, lin6->sin6_port);
 		break;
 #endif
 	case AF_INET:
