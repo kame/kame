@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.25 2001/09/02 19:06:25 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.26 2001/09/03 00:48:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -357,7 +357,7 @@ natpt_testLog(caddr_t addr)
 	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 	char			*fragile;
 
-	MALLOC(fragile, char *, mbox->size, M_NATPT, M_WAITOK);
+	fragile = (char *)malloc(mbox->size, M_NATPT, M_WAITOK);
 	if (fragile == NULL)
 		return (ENOBUFS);
 	copyin(mbox->freight, fragile, mbox->size);
