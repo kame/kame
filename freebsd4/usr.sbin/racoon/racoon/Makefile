@@ -14,7 +14,7 @@ CFLAGS+=-I${SRCDIR}/missing -DHAVE_ARC4RANDOM=1
 
 # debugging code with print-isakmp.c
 #SRCS+=	print-isakmp.c
-#CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl
+#CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 	-DHAVE_PRINT_ISAKMP_C=1
 
 # for debugging malloc/mfree
