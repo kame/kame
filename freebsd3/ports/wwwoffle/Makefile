@@ -3,7 +3,7 @@
 # Whom:			Peter Mutsaers
 #
 # $FreeBSD: ports/www/wwwoffle/Makefile,v 1.10 2000/07/10 22:35:32 ben Exp $
-# $KAME: Makefile,v 1.6 2000/11/20 17:22:27 sumikawa Exp $
+# $KAME: Makefile,v 1.7 2000/11/20 17:31:42 sumikawa Exp $
 #
 
 PORTNAME=	wwwoffle
@@ -60,7 +60,7 @@ do-configure:
 post-install:
 	@${MKDIR} ${SPOOL}/wwwoffle
 	@${INSTALL_SCRIPT} ${WRKSRC}/upgrade-config.pl ${SPOOL}/wwwoffle
-	@${INSTALL_SCRIPT} ${FILESDIR}/wwwoffled.sh ${PREFIX}/etc/rc.d/wwwoffled.sh.sample
+	@${SED} 's@%PREFIX%@${LOCALBASE}@' ${FILESDIR}/wwwoffled.sh > ${PREFIX}/etc/rc.d/wwwoffled.sh
 	@${CAT} ${PKGMESSAGE}
 
 .include <bsd.port.mk>

@@ -5,7 +5,7 @@ bin/wwwoffle-read
 bin/wwwoffle-rm
 bin/wwwoffle-tools
 bin/wwwoffle-write
-etc/rc.d/wwwoffled.sh.sample
+etc/rc.d/wwwoffled.sh
 sbin/wwwoffled
 share/doc/wwwoffle/CHANGES.CONF
 share/doc/wwwoffle/CONVERT
