@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.135 2003/04/23 09:15:49 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.136 2003/08/07 08:46:14 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -588,12 +588,8 @@ DOMAIN_SET(inet6);
 #endif /* GATEWAY6 */
 #endif /* !IPV6FORWARDING */
 
-#ifndef	IPV6_SENDREDIRECTS
-#define	IPV6_SENDREDIRECTS	1
-#endif
-
 int	ip6_forwarding = IPV6FORWARDING;	/* act as router? */
-int	ip6_sendredirects = IPV6_SENDREDIRECTS;
+int	ip6_sendredirects = 1;
 int	ip6_defhlim = IPV6_DEFHLIM;
 int	ip6_defmcasthlim = IPV6_DEFAULT_MULTICAST_HOPS;
 int	ip6_accept_rtadv = 0;	/* "IPV6FORWARDING ? 0 : 1" is dangerous */
