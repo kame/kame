@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.14 2001/11/29 11:29:38 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.15 2001/12/27 02:21:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -697,7 +697,13 @@ mip6_subnet_prefix_timeout(mspfx, msha)
 	mpfx->mpfx_plremain -= MIP6_SUBNET_TIMEOUT_INTERVAL;
 #endif
 
-	 /* XXX: TODO */
+	/*
+	 * XXX: TODO
+	 *
+	 * expiration check and home address autoconfiguration on hif0.
+	 */
+
+	/* XXX: TODO */
 	if (mpfx->mpfx_plremain < (mpfx->mpfx_plremain / 2)) {
 		mip6_icmp6_mp_sol_output(mpfx, mha);
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.15 2001/12/27 02:13:40 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.16 2001/12/27 02:21:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -61,10 +61,6 @@ struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
 	struct in6_addr         mpfx_prefix;
 	u_int8_t                mpfx_prefixlen;
-#if 0
-	u_int32_t               mpfx_lifetime;
-	int64_t                 mpfx_remain;
-#endif
 	u_int32_t               mpfx_vltime;
 	u_int64_t               mpfx_vlremain;
 	u_int32_t               mpfx_pltime;
@@ -187,26 +183,10 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 #define MIP6_LEQ(a,b)   ((int8_t)((a)-(b)) <= 0)
 #endif /* MIP6_DRAFT13 */
 
-/* authdata calculation template structure */
-struct mip6_authdata_template {
-	u_int8_t mauth_src[16];
-	u_int8_t mauth_coa[16];
-	u_int8_t mauth_haddr[16];
-	u_int8_t mauth_type;
-	u_int8_t mauth_len;
-	u_int8_t mauth_flags;
-	u_int8_t mauth_reserved[2];
-	u_int8_t mauth_seqno;
-	u_int8_t mauth_lifetime[4];
-	/* followed by all the sub-options */
-	/* type of the authentication data sub-option (== 0x04) */
-	/* len  of the authentication data sub-option */
-	/* the value of SPI */
-} __attribute__((__packed__));
-
 struct mip6_config {
-	u_int32_t mcfg_debug;
-	u_int32_t mcfg_type;
+	u_int8_t mcfg_type;
+	u_int8_t mcfg_use_ipsec;
+	u_int8_t mcfg_debug;
 };
 #define MIP6_CONFIG_TYPE_MN 1
 #define MIP6_CONFIG_TYPE_HA 2

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.40 2001/12/17 12:06:10 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.41 2001/12/27 02:21:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -105,7 +105,6 @@ struct mip6_subopt_authdata {
 
 extern struct mip6_config mip6_config;
 
-extern struct nd_defrouter *mip6_dr;
 extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
 
 void mip6_init __P((void));
@@ -131,6 +130,8 @@ int mip6_exthdr_create			 __P((struct mbuf *,
 					      struct ip6_pktopts *,
 					      struct mip6_pktopts *));
 int mip6_ba_destopt_create		 __P((struct ip6_dest **,
+					      struct in6_addr *,
+					      struct in6_addr *,
 					      u_int8_t,
 					      MIP6_SEQNO_T,
 					      u_int32_t,
@@ -291,12 +292,26 @@ struct mip6_bc *mip6_bc_list_find_withphaddr
 struct mip6_bc *mip6_bc_list_find_withpcoa
 					__P((struct mip6_bc_list *,
 					     struct in6_addr *));
-
+#ifndef MIP6_DRAFT13
+#if defined(IPSEC) && !defined(__OpenBSD__)
+struct secasvar;
 struct mip6_subopt_authdata *mip6_authdata_create
-					__P((struct in6_addr *,
-					     struct in6_addr *,
-					     struct in6_addr *,
-					     struct ip6_opt_binding_update *));
+					__P((struct secasvar *));
+int mip6_bu_authdata_calc __P((struct secasvar *,
+			       struct in6_addr *,
+			       struct in6_addr *,
+			       struct in6_addr *,
+			       struct ip6_opt_binding_update *,
+			       struct mip6_subopt_authdata *,
+			       caddr_t));
+int mip6_ba_authdata_calc __P((struct secasvar *,
+			       struct in6_addr *,
+			       struct in6_addr *,
+			       struct ip6_opt_binding_ack *,
+			       struct mip6_subopt_authdata *,
+			       caddr_t));
+#endif /* IPSEC && !__OpenBSD__ */
+#endif /* !MIP6_DRAFT13 */
 
 int mip6_dad_success			__P((struct ifaddr *));
 int mip6_dad_duplicated			__P((struct ifaddr *));

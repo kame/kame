@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.96 2001/12/27 02:13:39 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.97 2001/12/27 02:21:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -78,6 +78,8 @@
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#include <netkey/keydb.h>
 #endif
 
 #include <netinet6/mip6.h>
@@ -88,9 +90,6 @@ extern struct mip6_prefix_list mip6_prefix_list;
 extern struct mip6_bc_list mip6_bc_list;
 
 struct mip6_config mip6_config;
-
-struct nd_defrouter *mip6_dr;
-
 
 #ifdef __NetBSD__
 struct callout mip6_pfx_ch = CALLOUT_INITIALIZER;
@@ -132,20 +131,34 @@ static void mip6_find_offset __P((struct mip6_buffer *));
 static void mip6_align_destopt __P((struct mip6_buffer *));
 static caddr_t mip6_add_opt2dh __P((caddr_t, struct mip6_buffer *));
 #ifndef MIP6_DRAFT13
-static int mip6_add_subopt2dh __P((u_int8_t *, struct mip6_buffer *));
-#endif
+#ifndef __OpenBSD__
+static caddr_t mip6_add_subopt2dh __P((u_int8_t *, u_int8_t *,
+				       struct mip6_buffer *));
+#endif /* !__OpenBSD__ */
+#endif /* !MIP6_DRAFT13 */
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+struct ipsecrequest *mip6_getipsecrequest __P((struct in6_addr *,
+					       struct in6_addr *,
+					       struct secpolicy *));
+struct secpolicy *mip6_getpolicybyaddr __P((struct in6_addr *,
+					    struct in6_addr *,
+					    u_int));
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 void
 mip6_init()
 {
+	bzero(&mip6_config, sizeof(mip6_config));
 	mip6_config.mcfg_type = 0;
 #ifdef MIP6_DEBUG
 	mip6_config.mcfg_debug = 1;
 #else /* MIP6_DEBUG */
 	mip6_config.mcfg_debug = 0;
 #endif /* MIP6_DEBUG */
-
-	mip6_dr = NULL;
+	mip6_config.mcfg_use_ipsec = 0;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
         callout_init(&mip6_pfx_ch);
@@ -1285,25 +1298,24 @@ mip6_exthdr_create(m, opt, mip6opt)
 	src = &ip6->ip6_src; /* if this node is MN, src = HoA */
 	dst = &ip6->ip6_dst; /* final destination */
 
-	/*
-	 * add the routing header for the route optimization if there
-	 * exists a valid binding cache entry for this destination
-	 * node.
-	 */
 #ifdef __NetBSD__
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
+
+	/*
+	 * add the routing header for the route optimization if there
+	 * exists a valid binding cache entry for this destination
+	 * node.
+	 */
 	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr, dst, opt);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: rthdr creation failed.\n",
 			 __FILE__, __LINE__));
-		splx(s);
 		goto bad;
 	}
-	splx(s);
 
 	if ((opt != NULL) &&
 	    (opt->ip6po_rthdr != NULL) &&
@@ -1327,24 +1339,17 @@ mip6_exthdr_create(m, opt, mip6opt)
 	/*
 	 * insert BA/BR if pending BA/BR exist.
 	 */
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
 	error = mip6_babr_destopt_create(&mip6opt->mip6po_dest2, dst, opt);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: BA/BR destopt insertion failed.\n",
 			 __FILE__, __LINE__));
-		splx(s);
 		goto bad;
 	}
 
 	/* following stuff is applied only for MN. */
 	if (!MIP6_IS_MN) {
-		splx(s);
-		return (0);
+		goto noneed;
 	}
 
 	/*
@@ -1357,35 +1362,39 @@ mip6_exthdr_create(m, opt, mip6opt)
 		 * this source addrss is not one of our home addresses.
 		 * we don't need any special care about this packet.
 		 */
-		splx(s);
-		return (0);
+		goto noneed;
 	}
 
 	/* check home registration status */
 	mbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
 	if (mbu == NULL) {
 		/* no home registration action started yet. */
-		splx(s);
-		return (0);
+		goto noneed;
 	}
 	if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_NOTREG) {
 		/*
 		 * we have not registered yet.  this means we are still
 		 * home.
 		 */
-		splx(s);
-		return (0);
+		goto noneed;
 	}
 
 	/* create bu destopt. */
-	error = mip6_bu_destopt_create(&mip6opt->mip6po_dest2,
-				       src, dst, opt, sc);
+	error = mip6_bu_destopt_create(&mip6opt->mip6po_dest2, src, dst,
+				       opt, sc);
 	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: BU destopt insertion failed.\n",
-			 __FILE__, __LINE__));
-		splx(s);
-		goto bad;
+		if (error == EACCES) {
+			/*
+			 * no security association found.  we can't
+			 * send binding update to this destination
+			 * node.
+			 */
+		} else {
+			mip6log((LOG_ERR,
+				 "%s:%d: BU destopt insertion failed.\n",
+				 __FILE__, __LINE__));
+			goto bad;
+		}
 	}
 
 	/* create haddr destopt. */
@@ -1394,14 +1403,13 @@ mip6_exthdr_create(m, opt, mip6opt)
 		mip6log((LOG_ERR,
 			 "%s:%d: homeaddress insertion failed.\n",
 			 __FILE__, __LINE__));
-		
-		splx(s);
 		goto bad;
 	}
 
-	splx(s);
-	return (0);
+ noneed:
+	error = 0; /* normal exit. */
  bad:
+	splx(s);
 	return (error);
 }
 
@@ -1497,10 +1505,14 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct hif_softc *sc;
 {
 	struct ip6_opt_binding_update bu_opt, *bu_opt_pos;
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
-	int suboptlen;
-	struct mip6_subopt_authdata *authdata;
-#endif
+	struct mip6_subopt_authdata *authdata, *authdata_pos;
+	struct secpolicy *sp = NULL;
+	struct ipsecrequest *isr = NULL;
+	struct secasvar *sav = NULL;
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 	struct mip6_buffer optbuf;
 	struct mip6_bu *mbu;
 	struct mip6_bu *hrmbu;
@@ -1578,6 +1590,28 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		return (0);
 	}
 
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+	/*
+	 * search the security policy db entry and the security
+	 * association between this node and the destination node.
+	 */
+	sp = mip6_getpolicybyaddr(src, dst, IPSEC_DIR_OUTBOUND);
+	if (sp != NULL) {
+		isr = mip6_getipsecrequest(src, dst, sp);
+		if (isr != NULL) {
+			sav = isr->sav;
+		}
+	}
+	if (sav == NULL) {
+		/* no security association. */
+		mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT; /* XXX */
+		error = EACCES;
+		goto freesp;
+	}
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
+
 	/* update sequence number of this binding update entry. */
 	mbu->mbu_seqno++;
 
@@ -1622,7 +1656,8 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	/* XXX MIP6_BUFFER_SIZE = IPV6_MIMMTU is OK?? */
 	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
-		return (ENOMEM);
+		error = ENOMEM;
+		goto freesp;
 	}
 	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
 	optbuf.off = 2;
@@ -1655,24 +1690,54 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	}
 
 	/*
-	 * add a binding update destination option (and other user
-	 * specified optiosns if any)
+	 * add a binding update destination option at the end of the
+	 * destination option buffer.
 	 */
 	bu_opt_pos = (struct ip6_opt_binding_update *)
 		mip6_add_opt2dh((u_int8_t *)&bu_opt, &optbuf);
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
-	authdata = mip6_authdata_create(src, dst, &mbu->mbu_coa, bu_opt_pos);
+	/*
+	 * create and insert an authentication data sub-option.
+	 */
+	authdata = mip6_authdata_create(sav);
 	if (authdata == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: failed to create authdata sub-option.\n",
-			 __FILE__, __LINE__));
 		free(optbuf.buf, M_IP6OPT);
-		return (EINVAL);
+		mip6log((LOG_ERR,
+			 "%s:%d: authdata create failed.\n",
+			 __FILE__, __LINE__));
+		error = ENOMEM;
+		goto freesp;
 	}
-	suboptlen = mip6_add_subopt2dh((u_int8_t *)authdata, &optbuf);
-	bu_opt_pos->ip6ou_len += suboptlen;
+	authdata_pos = (struct mip6_subopt_authdata *)
+		mip6_add_subopt2dh((u_int8_t *)authdata,
+				   (u_int8_t *)bu_opt_pos, &optbuf);
 	free(authdata, M_TEMP);
+	if (authdata_pos == NULL) {
+		free(optbuf.buf, M_IP6OPT);
+		mip6log((LOG_ERR,
+			 "%s:%d: authdata create failed.\n",
+			 __FILE__, __LINE__));
+		error = ENOMEM;
+		goto freesp;
+	}
+
+	/* calc checksum. */
+	error = mip6_bu_authdata_calc(sav, src, dst, &mbu->mbu_coa,
+				      bu_opt_pos,
+				      authdata_pos,
+				      (caddr_t)(authdata_pos + 1));
+	if (error) {
+		free(optbuf.buf, M_IP6OPT);
+		mip6log((LOG_ERR,
+			 "%s:%d: authdata create failed.\n",
+			 __FILE__, __LINE__));
+		error = ENOMEM;
+		goto freesp;
+	}
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 	
 	mip6_align_destopt(&optbuf);
 
@@ -1683,6 +1748,14 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	/* hoping that the binding update will be sent with no accident. */
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT;
 
+	error = 0;
+ freesp:
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+	if (sp != NULL)
+		key_freesp(sp);
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 	return (error);
 }
 
@@ -1826,19 +1899,53 @@ mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 }
 
 int
-mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
+mip6_ba_destopt_create(pktopt_badest2, src, dst,
+		       status, seqno, lifetime, refresh)
 	struct ip6_dest **pktopt_badest2;
+	struct in6_addr *src;
+	struct in6_addr *dst;
 	u_int8_t status;
 	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
 	u_int32_t refresh;
 {
-	struct ip6_opt_binding_ack ba_opt;
+	struct ip6_opt_binding_ack ba_opt, *ba_opt_pos;
 	struct mip6_buffer optbuf;
+	int error = 0;
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+	struct mip6_subopt_authdata *authdata, *authdata_pos;
+	struct secpolicy *sp = NULL;
+	struct ipsecrequest *isr = NULL;
+	struct secasvar *sav = NULL;
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+	/*
+	 * search the security policy db entry and the security
+	 * association between this node and the destination node.
+	 */
+	sp = mip6_getpolicybyaddr(src, dst, IPSEC_DIR_OUTBOUND);
+	if (sp != NULL) {
+		isr = mip6_getipsecrequest(src, dst, sp);
+		if (isr != NULL) {
+			sav = isr->sav;
+		}
+	}
+	if (sav == NULL) {
+		/* no security association. */
+		error = EACCES;
+		goto freesp;
+	}
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_IP6OPT, M_NOWAIT);
 	if (optbuf.buf == NULL) {
-		return (ENOMEM);
+		error = ENOMEM;
+		goto freesp;
 	}
 	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
 	optbuf.off = 3; /* insert leading PAD1 first for optimization. */
@@ -1857,14 +1964,65 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	bcopy((caddr_t)&refresh, (caddr_t)ba_opt.ip6oa_refresh,
 	      sizeof(refresh));
 
-	/* add BU option (and other user specified optiosn if any) */
-	mip6_add_opt2dh((u_int8_t *)&ba_opt, &optbuf);
+	/* add a binding ack destination option. */
+	ba_opt_pos = (struct ip6_opt_binding_ack *)
+		mip6_add_opt2dh((u_int8_t *)&ba_opt, &optbuf);
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+	/*
+	 * create and insert an authentication data sub-option.
+	 */
+	authdata = mip6_authdata_create(sav);
+	if (authdata == NULL) {
+		free(optbuf.buf, M_IP6OPT);
+		mip6log((LOG_ERR,
+			 "%s:%d: authdata create failed.\n",
+			 __FILE__, __LINE__));
+		error = ENOMEM;
+		goto freesp;
+	}
+	authdata_pos = (struct mip6_subopt_authdata *)
+		mip6_add_subopt2dh((u_int8_t *)authdata,
+				   (u_int8_t *)ba_opt_pos, &optbuf);
+	free(authdata, M_TEMP);
+	if (authdata_pos == NULL) {
+		free(optbuf.buf, M_IP6OPT);
+		mip6log((LOG_ERR,
+			 "%s:%d: authdata create failed.\n",
+			 __FILE__, __LINE__));
+		error = ENOMEM;
+		goto freesp;
+	}
+
+	/* calc checksum. */
+	error = mip6_ba_authdata_calc(sav, src, dst,
+				      ba_opt_pos,
+				      authdata_pos,
+				      (caddr_t)(authdata_pos + 1));
+	if (error) {
+		free(optbuf.buf, M_IP6OPT);
+		mip6log((LOG_ERR,
+			 "%s:%d: authdata calculation failed.\n",
+			 __FILE__, __LINE__));
+		goto freesp;
+	}
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
+
 	mip6_align_destopt(&optbuf);
 
 	*pktopt_badest2 = (struct ip6_dest *)optbuf.buf;
 
-	return (0);
-	
+	error = 0;
+ freesp:
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+	if (sp != NULL)
+		key_freesp(sp);
+#endif
+#endif
+	return (error);
 }
 
 void
@@ -1882,6 +2040,158 @@ mip6_destopt_discard(mip6opt)
 
 	return;
 }
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+struct ipsecrequest *
+mip6_getipsecrequest(src, dst, sp)
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct secpolicy *sp;
+{
+	struct ipsecrequest *isr = NULL;
+	struct secasindex saidx;
+	struct sockaddr_in6 *sin6;
+
+	for (isr = sp->req; isr; isr = isr->next) {
+#if 0
+		if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
+			/* the rest will be handled by ipsec6_output_tunnel() */
+			break;
+		}
+#endif /* 0 */
+
+		/* make SA index for search proper SA */
+		bcopy(&isr->saidx, &saidx, sizeof(saidx));
+		saidx.mode = isr->saidx.mode;
+		saidx.reqid = isr->saidx.reqid;
+		sin6 = (struct sockaddr_in6 *)&saidx.src;
+		if (sin6->sin6_len == 0) {
+			sin6->sin6_len = sizeof(*sin6);
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = IPSEC_PORT_ANY;
+			bcopy(src, &sin6->sin6_addr, sizeof(*src));
+#if 0
+			if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
+				/* fix scope id for comparing SPD */
+				sin6->sin6_addr.s6_addr16[1] = 0;
+				sin6->sin6_scope_id = ntohs(ip6->ip6_src.s6_addr16[1]);
+			}
+#endif
+		}
+		sin6 = (struct sockaddr_in6 *)&saidx.dst;
+		if (sin6->sin6_len == 0) {
+			sin6->sin6_len = sizeof(*sin6);
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = IPSEC_PORT_ANY;
+			bcopy(dst, &sin6->sin6_addr, sizeof(*dst));
+#if 0
+			if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
+				/* fix scope id for comparing SPD */
+				sin6->sin6_addr.s6_addr16[1] = 0;
+				sin6->sin6_scope_id = ntohs(ip6->ip6_dst.s6_addr16[1]);
+			}
+#endif
+		}
+
+		if (key_checkrequest(isr, &saidx) == ENOENT) {
+			/*
+			 * IPsec processing is required, but no SA found.
+			 * I assume that key_acquire() had been called
+			 * to get/establish the SA. Here I discard
+			 * this packet because it is responsibility for
+			 * upper layer to retransmit the packet.
+			 */
+#if 0
+			ipsec6stat.out_nosa++;
+			error = ENOENT;
+
+			/*
+			 * Notify the fact that the packet is discarded
+			 * to ourselves. I believe this is better than
+			 * just silently discarding. (jinmei@kame.net)
+			 * XXX: should we restrict the error to TCP packets?
+			 * XXX: should we directly notify sockets via
+			 *      pfctlinputs?
+			 *
+			 * Noone have initialized rcvif until this point,
+			 * so clear it.
+			 */
+			if ((state->m->m_flags & M_PKTHDR) != 0)
+				state->m->m_pkthdr.rcvif = NULL;
+			icmp6_error(state->m, ICMP6_DST_UNREACH,
+				    ICMP6_DST_UNREACH_ADMIN, 0);
+			state->m = NULL; /* icmp6_error freed the mbuf */
+			goto bad;
+#endif /* 0 */
+			return (NULL);
+		}
+
+		/* validity check */
+		if (isr->sav == NULL) {
+#if 0
+			switch (ipsec_get_reqlevel(isr)) {
+			case IPSEC_LEVEL_USE:
+				continue;
+			case IPSEC_LEVEL_REQUIRE:
+				/* must be not reached here. */
+				panic("ipsec6_output_trans: no SA found, but required.");
+			}
+#endif /* 0 */
+			return (NULL);
+		}
+
+		/*
+		 * If there is no valid SA, we give up to process.
+		 * see same place at ipsec4_output().
+		 */
+		if (isr->sav->state != SADB_SASTATE_MATURE
+		 && isr->sav->state != SADB_SASTATE_DYING) {
+#if 0
+			ipsec6stat.out_nosa++;
+			error = EINVAL;
+			goto bad;
+#endif /* 0 */
+			return (NULL);
+		}
+		break;
+	}
+	return (isr);
+}
+
+struct secpolicy *
+mip6_getpolicybyaddr(src, dst, dir)
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	u_int dir;
+{
+	struct secpolicy *sp = NULL;
+	struct secpolicyindex spidx;
+	struct sockaddr_in6 *sin6;
+
+	if (src == NULL || dst == NULL)
+		return (NULL);
+
+	bzero(&spidx, sizeof(spidx));
+
+	spidx.dir = dir;
+	sin6 = (struct sockaddr_in6 *)&spidx.src;
+	sin6->sin6_len = sizeof(*sin6);
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_addr = *src;
+	sin6 = (struct sockaddr_in6 *)&spidx.dst;
+	sin6->sin6_len = sizeof(*sin6);
+	sin6->sin6_family = AF_INET6;
+	sin6->sin6_addr = *dst;
+	spidx.ul_proto = IPPROTO_DSTOPTS; /* XXX */
+
+	sp = key_allocsp(&spidx, dir);
+
+	/* return value may be NULL. */
+	return (sp);
+}
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 /*
  ******************************************************************************
@@ -2126,14 +2436,17 @@ mip6_add_opt2dh(opt, dh)
 }
 
 #ifndef MIP6_DRAFT13
-static int
-mip6_add_subopt2dh(subopt, dh)
+#ifndef __OpenBSD__
+static caddr_t
+mip6_add_subopt2dh(subopt, opt, dh)
 	u_int8_t *subopt; /* MIP6 sub-options */
+	u_int8_t *opt; /* MIP6 destination option */
 	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH */
 {
 	int suboptlen = 0;
+	caddr_t subopt_pos = NULL;
 	u_int8_t type, padn;
-	u_int8_t len, off;
+	u_int8_t len;
 	int rest;
 
 	/* verify input */
@@ -2148,50 +2461,51 @@ mip6_add_subopt2dh(subopt, dh)
 	padn = MIP6SUBOPT_PADN;
 	type = *subopt;
 	switch (type) {
+#ifndef MIP6_DRAFT13
 		case MIP6SUBOPT_AUTHDATA:
 			/*
 			 * Authentication Data alignment requirement
 			 * (8n + 6)
 			 */
 			rest = dh->off % 8;
+			suboptlen = 0;
 			if (rest <= 4) {
 				/* Add a PADN option with length X */
 				len = 6 - rest - 2;
 				bzero((caddr_t)dh->buf + dh->off, len + 2);
 				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
 				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
-				dh->off += len + 2;
-				suboptlen += len + 2;
+				suboptlen = len + 2;
 			} else if (rest == 5) {
 				/* Add a PAD1 option */
 				bzero((caddr_t)dh->buf + dh->off, 1);
-				dh->off += 1;
-				suboptlen += 1;
+				suboptlen = 1;
 			} else if (rest == 7) {
 				/* Add a PADN option with length 5 */
 				len = 5;
 				bzero((caddr_t)dh->buf + dh->off, len + 2);
 				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
 				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
-				dh->off += len + 2;
-				suboptlen += len + 2;
+				suboptlen = len + 2;
 			}
+			dh->off += suboptlen;
+			((struct ip6_opt *)opt)->ip6o_len += suboptlen;
 
 			/* Append sub-option to the destination option. */
-			len = 2 + *(subopt + 1);
-			off = dh->off;
-			bzero((caddr_t)dh->buf + off, len);
-			bcopy((caddr_t)subopt, (caddr_t)dh->buf + off, len);
-
-			suboptlen += len;
+			suboptlen = 2 + *(subopt + 1);
+			subopt_pos = (caddr_t)dh->buf + dh->off;
+			bcopy((caddr_t)subopt, subopt_pos, suboptlen);
 
 			/* adjust offset. */
-			dh->off += len;
+			dh->off += suboptlen;
+			((struct ip6_opt *)opt)->ip6o_len += suboptlen;
 			break;
+#endif /* !MIP6_DRAFT13 */
 	}
 
-	return (suboptlen);
+	return (subopt_pos);
 }
+#endif /* !__OpenBSD__ */
 #endif /* !MIP6_DRAFT13 */
 
 /*

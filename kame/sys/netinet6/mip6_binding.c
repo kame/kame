@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.53 2001/12/27 02:13:39 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.54 2001/12/27 02:21:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -41,6 +41,9 @@
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
 #endif
+#ifdef __NetBSD__
+#include "opt_ipsec.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -75,6 +78,13 @@
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#include <netinet6/ipsec.h>
+#include <netinet6/ah.h>
+#include <netkey/key.h>
+#include <netkey/keydb.h>
+#endif /* IPSEC && !__OpenBSD__ */
+
 #include <netinet6/mip6.h>
 
 extern struct protosw mip6_tunnel_protosw;
@@ -94,8 +104,6 @@ struct timeout mip6_bc_ch;
 #endif
 static int mip6_bu_count = 0;
 static int mip6_bc_count = 0;
-
-int mip6_use_ipsec = 0;
 
 /* binding update functions. */
 static int mip6_bu_list_remove __P((struct mip6_bu_list *, struct mip6_bu *));
@@ -136,15 +144,24 @@ static int mip6_process_hurbu __P((struct in6_addr *, struct in6_addr *,
 static int mip6_dad_start __P((struct mip6_bc *, struct in6_addr *));
 static int mip6_dad_stop __P((struct mip6_bc *));
 static int mip6_tunnel_control __P((int, void *, 
-				    int (*) __P((const struct mbuf *, int, int, void *)),
+				    int (*) __P((const struct mbuf *,
+						 int, int, void *)),
 				    const struct encaptab **));
 static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
 				    u_int8_t));
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
-static int mip6_verify_authdata __P((struct mbuf *,
-				     struct ip6_opt_binding_update *,
-				     struct mip6_subopt_authdata *));
-#endif
+static int mip6_bu_authdata_verify __P((struct in6_addr *,
+					struct in6_addr *,
+					struct in6_addr *,
+					struct ip6_opt_binding_update *,
+					struct mip6_subopt_authdata *));
+static int mip6_ba_authdata_verify __P((struct in6_addr *,
+					struct in6_addr *,
+					struct ip6_opt_binding_ack *,
+					struct mip6_subopt_authdata *));
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 #ifdef MIP6_DEBUG
 void mip6_bu_print __P((struct mip6_bu *));
@@ -732,48 +749,65 @@ mip6_validate_bu(m, opt)
 	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
-	struct in6_addr *ip6_coa;
 	struct mbuf *n;
 	struct ip6aux *ip6a = NULL;
 	struct ip6_opt_binding_update *bu_opt;
 	MIP6_SEQNO_T seqno;
 	struct mip6_bc *mbc;
-#ifndef MIP6_DRAFT13
 	int error = 0;
+#if defined(IPSEC) && !defined(__OpenBSD__)
 	int ipsec_protected = 0;
+#ifndef MIP6_DRAFT13
 	struct mip6_subopt_authdata *authdata = NULL;
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	bu_opt = (struct ip6_opt_binding_update *)(opt);
 	    
-	/* Make sure that the BU is protected by an AH (see 4.4, 10.12). */
-#ifdef IPSEC
-#ifndef __OpenBSD__
-	if (!mip6_use_ipsec &&
+#if defined(IPSEC) && !defined(__OpenBSD__)
+	/*
+	 * check if the incoming binding update is protected by the
+	 * ipsec mechanism.
+	 */
+	if (!mip6_config.mcfg_use_ipsec &&
 	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
 #ifdef MIP6_DRAFT13
+		/*
+		 * draft-13 requires that the binding update must be
+		 * protected by the ipsec authentication mechanism.
+		 * if this packet is not protected, ignore this.
+		 */
 		mip6log((LOG_NOTICE,
 			 "%s:%d: an unprotected binding update from %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 
-		/* silently ignore */
+		/* silently ignore. */
 		return (1);
 #else
 		/*
-		 * if ipsec is available and we can validate this
-		 * packet using ipsec, it is enough to protect the
-		 * binding update.
+		 * draft-15 and later introduces authentication data
+		 * sub-option to protect the binding update.  if this
+		 * binding update is not protected by the ipsec, we
+		 * will check the authentication data sub-option
+		 * later in this function.
 		 */
 #endif /* MIP6_DRAFT13 */
 	} else {
+		/*
+		 * if the ipsec is available and once we have checked
+		 * this packet is protected by the ipsec, no further
+		 * authentication check is needed.
+		 */
 		ipsec_protected = 1;
 	}
-#endif /* __OpenBSD__ */
-#endif /* IPSEC */
+#endif /* IPSEC && !__OpenBSD__ */
 
-	/* check if this packet contains a home address destopt. */
+	/*
+	 * check if this packet contains a home address destination
+	 * option.
+	 */
 	n = ip6_findaux(m);
 	if (!n) {
 		mip6log((LOG_NOTICE,
@@ -783,39 +817,29 @@ mip6_validate_bu(m, opt)
 			 ip6_sprintf(&ip6->ip6_src)));
 		return (1);
 	}
+
+	/*
+	 * find ip6aux to get the home address and coa information of
+	 * the sending node.
+	 */
 	ip6a = mtod(n, struct ip6aux *);
 	if ((ip6a == NULL) || (ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: no Home Address option found "
+			 "%s:%d: no home address destination option found "
 			 "in the binding update from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		return (1);
 	}
-	if ((ip6a->ip6a_flags & IP6A_SWAP) == 0) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: "
-			 "the home address option is not processed yet.\n",
-			 __FILE__, __LINE__));
-		ip6_coa = &ip6->ip6_src;
-	} else {
-		ip6_coa = &ip6a->ip6a_careof;
-	}
 
 	/*
-	 * XXX: TODO
-	 *
-	 * draft-15 introduces a new sub-option to authenticate
-	 * binding packets.  we should check the sub-option and make
-	 * sure the packet is protected by the some authentication
-	 * mechanisms.
+	 * make sure that the length field of the incoming binding
+	 * update is >= IP6OPT_BULEN.
 	 */
-
-	/* Make sure that the length field in the BU is >= IP6OPT_BULEN. */
 	if (bu_opt->ip6ou_len < IP6OPT_BULEN) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
-			 "%s:%d: an BU length is too short (%d) "
+			 "%s:%d: too short binding update (%d) "
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 bu_opt->ip6ou_len,
@@ -845,23 +869,34 @@ mip6_validate_bu(m, opt)
 			case MIP6SUBOPT_PAD1:
 				optlen = 1;
 				break;
+
 			case MIP6SUBOPT_ALTCOA:
 				/* XXX */
 				optlen = *(opt + 1) + 2;
 				break;
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
 			case MIP6SUBOPT_AUTHDATA:
 				authdata = (struct mip6_subopt_authdata *)opt;
 				optlen = *(opt + 1) + 2;
 				break;
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
+
 			default:
 				optlen = *(opt + 1) + 2;
 				break;
 			}
 		}
 	}
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
+	/*
+	 * if the packet is protected by the ipsec, we believe it.
+	 * otherwise, check the authentication sub-option.
+	 */
 	if (ipsec_protected == 0) {
 		if (authdata == NULL) {
 			/*
@@ -878,16 +913,16 @@ mip6_validate_bu(m, opt)
 			/* XXX */
 		} else {
 			/*
-			 * if the packet is not protected by the ipsec
-			 * and do * not have a authentication data, we
-			 * think it is * protected by ipsec.  if both
-			 * the ipsec protection * and a authentication
-			 * data exist, check the * authentication
-			 * data.  if it seems good, we think * this
-			 * packet is protected by some week auth *
-			 * mechanism.
+			 * if the ipsec protection is not provided but
+			 * an authentication data exist, check the
+			 * authentication data.  if it seems good, we
+			 * think this packet is protected by some week
+			 * auth mechanism.
 			 */
-			if (mip6_verify_authdata(m, bu_opt, authdata)) {
+			if (mip6_bu_authdata_verify(&ip6a->ip6a_home,
+						    &ip6->ip6_dst,
+						    &ip6a->ip6a_careof,
+						    bu_opt, authdata)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: authenticate binding update "
 					 "failed from host %s\n",
@@ -899,15 +934,16 @@ mip6_validate_bu(m, opt)
 			/* verified. */
 		}
 	}
-	/*
-	 * if the packet is protected by the ipsec, we believe it.
-	 */
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
-	/* The received BU sequence number > received seqno before. */
+	/*
+	 * check if the received sequence number of the binding update
+	 * > the last received sequence number.
+	 */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &ip6a->ip6a_home);
 	if (mbc == NULL) {
-		/* no BC yet.  create it later. */
+		/* no binding cache entry yet.  create it later. */
 		return (0);
 	}
 #ifdef MIP6_DRAFT13
@@ -934,7 +970,7 @@ mip6_validate_bu(m, opt)
 		 * might have changed after it had registered before.
 		 */
 		error = mip6_bc_send_ba(&mbc->mbc_addr,
-					&mbc->mbc_phaddr, ip6_coa,
+					&mbc->mbc_phaddr, &ip6a->ip6a_careof,
 					MIP6_BA_STATUS_SEQNO_TOO_SMALL,
 					mbc->mbc_seqno,
 					0, 0);
@@ -947,13 +983,12 @@ mip6_validate_bu(m, opt)
 		return (1);
 	}
 
-	/* we have a valid BU */
+	/* we have a valid binding update. */
 	return (0);
 }
 
 /*
- * process incoming binding update.
- * draft-14 section 8.2 / 9.1 / 9.2
+ * process the incoming binding update.
  */
 int
 mip6_process_bu(m, opt)
@@ -1759,7 +1794,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		return (ENOMEM);
 	}
 
-	error =  mip6_ba_destopt_create(&pktopt_badest2,
+	error =  mip6_ba_destopt_create(&pktopt_badest2, src, dst,
 					status, seqno, lifetime, refresh);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1779,7 +1814,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	}
 
 	free(opt.ip6po_dest2, M_IP6OPT);
-	return (0);
+
+	return (error);
 }
 
 static int
@@ -2029,19 +2065,26 @@ mip6_validate_ba(m, opt)
 	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
+	struct mbuf *n;
+	struct ip6aux *ip6a = NULL;
+	struct in6_addr *ip6_home = NULL;
 	struct ip6_opt_binding_ack *ba_opt;
 	MIP6_SEQNO_T seqno;
 	struct mip6_bu *mbu;
 	struct hif_softc *sc;
+#if defined(IPSEC) && !defined(__OpenBSD__)
 	int ipsec_protected = 0;
+#ifndef MIP6_DRAFT13
+	struct mip6_subopt_authdata *authdata = NULL;
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ba_opt = (struct ip6_opt_binding_ack *)(opt);
 
 	/* Make sure that the BA is protected by an AH (see 4.4, 10.12). */
-#ifdef IPSEC
-#ifndef __OpenBSD__
-	if (!mip6_use_ipsec &&
+#if defined(IPSEC) && !defined(__OpenBSD__)
+	if (!mip6_config.mcfg_use_ipsec &&
 	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
 #ifdef MIP6_DRAFT13
 		mip6log((LOG_NOTICE,
@@ -2060,14 +2103,33 @@ mip6_validate_ba(m, opt)
 	} else {
 		ipsec_protected = 1;
 	}
-#endif /* __OpenBSD__ */
-#endif /* IPSEC */
+#endif /* IPSEC && !__OpenBSD__ */
 
-	/* Make sure that the length field in the BA is >= IP6OPT_BALEN. */
+	/*
+	 * check if this packet contains a home address destination
+	 * option.
+	 */
+	ip6_home = &ip6->ip6_src;
+	n = ip6_findaux(m);
+	if (n != NULL) {
+		ip6a = mtod(n, struct ip6aux *);
+		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
+			/*
+			 * the node sending this binding ack is a
+			 * mobile node.  get its home address.
+			 */
+			ip6_home = &ip6a->ip6a_home;
+		}
+	}
+
+	/*
+	 * check if the length field of the incoming binding ack is >=
+	 * IP6OPT_BALEN.
+	 */
 	if (ba_opt->ip6oa_len < IP6OPT_BALEN) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
-			 "%s:%d: received BA is too short (%d) from host %s.\n",
+			 "%s:%d: too short binding ack (%d) from host %s.\n",
 			 __FILE__, __LINE__,
 			 ba_opt->ip6oa_len,
 			 ip6_sprintf(&ip6->ip6_src)));
@@ -2075,18 +2137,89 @@ mip6_validate_ba(m, opt)
 		return (1);
 	}
 
+
+	/* check sub-options. */
+	if (ba_opt->ip6oa_len > IP6OPT_BALEN) {
+		/* we have sub-option(s). */
+		int suboptlen = ba_opt->ip6oa_len - IP6OPT_BALEN;
+		u_int8_t *opt = (u_int8_t *)(ba_opt + 1);
+		int optlen;
+		for (optlen = 0;
+		     suboptlen > 0;
+		     suboptlen -= optlen, opt += optlen) {
+			if (*opt != MIP6SUBOPT_PAD1 &&
+			    (suboptlen < 2 || *(opt + 1) + 2 > suboptlen)) {
+				mip6log((LOG_ERR,
+					 "%s:%d: "
+					 "sub-option too small\n",
+					 __FILE__, __LINE__));
+				return (-1);
+			}
+			switch (*opt) {
+			case MIP6SUBOPT_PAD1:
+				optlen = 1;
+				break;
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
+			case MIP6SUBOPT_AUTHDATA:
+				authdata = (struct mip6_subopt_authdata *)opt;
+				optlen = *(opt + 1) + 2;
+				break;
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
+
+			default:
+				optlen = *(opt + 1) + 2;
+				break;
+			}
+		}
+	}
+
+#if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
 	/*
-	 * XXX: TODO
-	 *
-	 * draft-15 introduces a new sub-option to authenticate
-	 * binding packets.  we should check the sub-option and make
-	 * sure the packet is protected by the some authentication
-	 * mechanisms.
+	 * if the packet is protected by the ipsec, we believe it.
+	 * otherwise, check the authentication sub-option.
 	 */
 	if (ipsec_protected == 0) {
-		/* todo suboption write soon! this nonesense code is
-		 * to prevent the buildlab error temporally */
+		if (authdata == NULL) {
+			/*
+			 * if the packet is not protected by ipsec and
+			 * do not have a authentication data either,
+			 * this packet is not reliable.
+			 */
+			mip6log((LOG_ERR,
+				 "%s:%d: an unprotected binding ack "
+				 "from host %s\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(&ip6->ip6_src)));
+			/* discard. */
+			/* XXX */
+		} else {
+			/*
+			 * if the ipsec protection is not provided but
+			 * an authentication data exist, check the
+			 * authentication data.  if it seems good, we
+			 * think this packet is protected by some week
+			 * auth mechanism.
+			 */
+			if (mip6_ba_authdata_verify(ip6_home,
+						    &ip6->ip6_dst,
+						    ba_opt, authdata)) {
+				mip6log((LOG_ERR,
+					 "%s:%d: authenticate binding ack "
+					 "failed from host %s\n",
+					 __FILE__, __LINE__,
+					 ip6_sprintf(&ip6->ip6_src)));
+				/* discard. */
+				/* XXX */
+			}
+			/* verified. */
+		}			
 	}
+#endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 	/*
 	 * check if the seq number of the send BU == the seq number of
@@ -2308,50 +2441,264 @@ success:
 	return (0);
 }
 
+#if defined(IPSEC) && !defined(__OpenBSD__)
 #ifndef MIP6_DRAFT13
 static int
-mip6_verify_authdata(m, bu_opt, authdata)
-	struct mbuf *m;
-	struct ip6_opt_binding_update *bu_opt;
-	struct mip6_subopt_authdata *authdata;
-{
-	/* XXX: TODO */
-	return (0);
-}
-
-struct mip6_subopt_authdata *
-mip6_authdata_create(src, dst, coa, bu_opt)
+mip6_bu_authdata_verify(src, dst, coa, bu_opt, authdata)
 	struct in6_addr *src;
 	struct in6_addr *dst;
 	struct in6_addr *coa;
 	struct ip6_opt_binding_update *bu_opt;
+	struct mip6_subopt_authdata *authdata;
+{
+	struct secasvar *sav = NULL;
+	const struct ah_algorithm *algo;
+	u_int32_t authdata_spi;
+	u_char sumbuf[AH_MAXSUMSIZE];
+	int error = 0;
+
+	bcopy((caddr_t)&authdata->spi, &authdata_spi, sizeof(authdata_spi));
+
+	sav = key_allocsa(AF_INET6, (caddr_t)src, (caddr_t)dst,
+			  IPPROTO_AH, authdata_spi);
+	if (sav == NULL) {
+		/* no secirity association found. */
+		error = EACCES;
+		goto freesa;
+	}
+	if ((sav->state != SADB_SASTATE_MATURE) &&
+	    (sav->state != SADB_SASTATE_DYING)) {
+		/* no secirity association found. */
+		error = EACCES;
+		goto freesa;
+	}
+
+	error = mip6_bu_authdata_calc(sav, src, dst, coa,
+				      bu_opt, authdata, &sumbuf[0]);
+	if (error)
+		goto freesa;
+
+	/* find the calculation algorithm. */
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (algo == NULL) {
+		error = EACCES;
+		goto freesa;
+	}
+
+	if (bcmp((caddr_t)(authdata + 1), &sumbuf[0],
+		 (*algo->sumsiz)(sav)) != 0) {
+		/* checksum mismatch. */
+		error = EACCES;
+		goto freesa;
+	}
+
+	error = 0;
+ freesa:
+	if (sav != NULL)
+		key_freesav(sav);
+	return (error);
+}
+
+static int
+mip6_ba_authdata_verify(src, dst, ba_opt, authdata)
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct ip6_opt_binding_ack *ba_opt;
+	struct mip6_subopt_authdata *authdata;
+{
+	struct secasvar *sav = NULL;
+	const struct ah_algorithm *algo;
+	u_int32_t authdata_spi;
+	u_char sumbuf[AH_MAXSUMSIZE];
+	int error = 0;
+
+	bcopy((caddr_t)&authdata->spi, &authdata_spi, sizeof(authdata_spi));
+
+	sav = key_allocsa(AF_INET6, (caddr_t)src, (caddr_t)dst,
+			  IPPROTO_AH, authdata_spi);
+	if (sav == NULL) {
+		/* no secirity association found. */
+		error = EACCES;
+		goto freesa;
+	}
+	if ((sav->state != SADB_SASTATE_MATURE) &&
+	    (sav->state != SADB_SASTATE_DYING)) {
+		/* no secirity association found. */
+		error = EACCES;
+		goto freesa;
+	}
+
+	error = mip6_ba_authdata_calc(sav, src, dst,
+				      ba_opt, authdata, &sumbuf[0]);
+	if (error)
+		goto freesa;
+
+	/* find the calculation algorithm. */
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (algo == NULL) {
+		error = EACCES;
+		goto freesa;
+	}
+
+	if (bcmp((caddr_t)(authdata + 1), &sumbuf[0],
+		 (*algo->sumsiz)(sav)) != 0) {
+		/* checksum mismatch. */
+		error = EACCES;
+		goto freesa;
+	}
+
+	error = 0;
+ freesa:
+	if (sav != NULL)
+		key_freesav(sav);
+	return (error);
+}
+
+struct mip6_subopt_authdata *
+mip6_authdata_create(sav)
+	struct secasvar *sav;
 {
 	struct mip6_subopt_authdata *authdata;
-	int size;
-	int authdata_size = 0;
+	const struct ah_algorithm *algo;
+	int authdata_size;
+	int sumsize = 0;
 
-	/* XXX: TODO */
-	/* find SPI for this src, dst pair. */
-	/* determine authdata_size from the SPI found above. */
-	authdata_size = 0;
-	size = sizeof(*authdata) + authdata_size;
-	authdata = malloc(size, M_TEMP, M_NOWAIT);
+	/* sanity check. */
+	if (sav == NULL)
+		return (NULL);
+
+	/* find the calculation algorithm. */
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (algo == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: unsupported algorithm.\n",
+			 __FILE__, __LINE__));
+		return (NULL);
+	}
+
+	/* calculate the sumsize and the authentication data size. */
+	sumsize = (*algo->sumsiz)(sav);
+	authdata_size = sizeof(*authdata) + sumsize;
+	authdata = malloc(authdata_size, M_TEMP, M_NOWAIT);
 	if (authdata == NULL) {
 		mip6log((LOG_ERR,
 			 "%s:%d: failed to alloc memory.\n",
 			 __FILE__, __LINE__));
 		return (NULL);
 	}
+	bzero((caddr_t)authdata, authdata_size);
 
-	bzero((caddr_t)authdata, size);
-	/* XXX: TODO */
-	/* calc authdata */
+	/* fill the authentication data sub-option. */
 	authdata->type = MIP6SUBOPT_AUTHDATA;
-	authdata->len = size - 2;
+	authdata->len = authdata_size - 2;
+	authdata->spi = sav->spi;
+
+	/* checksum calculation will be done after. */
 
 	return (authdata);
 }
+
+int
+mip6_bu_authdata_calc(sav, src, dst, coa, bu_opt, authdata, sumbuf)
+	struct secasvar *sav;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct in6_addr *coa;
+	struct ip6_opt_binding_update *bu_opt;
+	struct mip6_subopt_authdata *authdata;
+	caddr_t sumbuf;
+{
+	const struct ah_algorithm *algo;
+	struct ah_algorithm_state algos;
+	int suboptlen = 0;
+
+	/* sanity check. */
+	if (sav == NULL)
+		return (EINVAL);
+
+	/* find the calculation algorithm. */
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (algo == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: unsupported algorithm.\n",
+			 __FILE__, __LINE__));
+		return (EACCES);
+	}
+
+	/*
+	 * calculate the checksum based on the algorithm specified by
+	 * the security association.
+	 */
+	(algo->init)(&algos, sav);
+	(algo->update)(&algos, (caddr_t)dst, 16);
+	(algo->update)(&algos, (caddr_t)coa, 16);
+	(algo->update)(&algos, (caddr_t)src, 16);
+	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_type, 1);
+	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_len, 1);
+	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_flags, 1);
+	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_reserved, 2);
+	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_seqno, 1);
+	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_lifetime[0], 4);
+	suboptlen = (caddr_t)authdata - (caddr_t)(bu_opt + 1);
+	(algo->update)(&algos, (caddr_t)(bu_opt + 1), suboptlen);
+	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
+	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
+	/* calculate the result. */
+	(algo->result)(&algos, sumbuf);
+
+	return (0);
+}
+
+int
+mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
+	struct secasvar *sav;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct ip6_opt_binding_ack *ba_opt;
+	struct mip6_subopt_authdata *authdata;
+	caddr_t sumbuf;
+{
+	const struct ah_algorithm *algo;
+	struct ah_algorithm_state algos;
+	int suboptlen = 0;
+
+	/* sanity check. */
+	if (sav == NULL)
+		return (EINVAL);
+
+	/* find the calculation algorithm. */
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (algo == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: unsupported algorithm.\n",
+			 __FILE__, __LINE__));
+		return (EACCES);
+	}
+
+	/*
+	 * calculate the checksum based on the algorithm specified by
+	 * the security association.
+	 */
+	(algo->init)(&algos, sav);
+	(algo->update)(&algos, (caddr_t)dst, 16);
+	(algo->update)(&algos, (caddr_t)src, 16);
+	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_type, 1);
+	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_len, 1);
+	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_status, 1);
+	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_seqno, 1);
+	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_lifetime[0], 4);
+	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_refresh[0], 4);
+	suboptlen = (caddr_t)authdata - (caddr_t)(ba_opt + 1);
+	(algo->update)(&algos, (caddr_t)(ba_opt + 1), suboptlen);
+	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
+	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
+	/* calculate the result. */
+	(algo->result)(&algos, sumbuf);
+
+	return (0);
+}
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 /*
  * binding request management functions
