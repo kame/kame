@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.93 2003/05/14 17:01:58 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.94 2003/05/15 03:27:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -367,20 +367,20 @@ ip6_mrouter_set(cmd, so, m)
 	struct mbuf *m;
 {
 	if (cmd != MRT6_INIT && so != ip6_mrouter)
-		return EACCES;
+		return (EACCES);
 
 	switch (cmd) {
 #ifdef MRT6_OINIT
-	case MRT6_OINIT:	return ip6_mrouter_init(so, m, cmd);
+	case MRT6_OINIT:	return (ip6_mrouter_init(so, m, cmd));
 #endif
-	case MRT6_INIT:		return ip6_mrouter_init(so, m, cmd);
-	case MRT6_DONE:		return ip6_mrouter_done();
-	case MRT6_ADD_MIF:	return add_m6if(mtod(m, struct mif6ctl *));
-	case MRT6_DEL_MIF:	return del_m6if(mtod(m, mifi_t *));
-	case MRT6_ADD_MFC:	return add_m6fc(mtod(m, struct mf6cctl *));
-	case MRT6_DEL_MFC:	return del_m6fc(mtod(m, struct mf6cctl *));
-	case MRT6_PIM:		return set_pim6(mtod(m, int *));
-	default:		return EOPNOTSUPP;
+	case MRT6_INIT:		return (ip6_mrouter_init(so, m, cmd));
+	case MRT6_DONE:		return (ip6_mrouter_done());
+	case MRT6_ADD_MIF:	return (add_m6if(mtod(m, struct mif6ctl *)));
+	case MRT6_DEL_MIF:	return (del_m6if(mtod(m, mifi_t *)));
+	case MRT6_ADD_MFC:	return (add_m6fc(mtod(m, struct mf6cctl *)));
+	case MRT6_DEL_MFC:	return (del_m6fc(mtod(m, struct mf6cctl *)));
+	case MRT6_PIM:		return (set_pim6(mtod(m, int *)));
+	default:		return (EOPNOTSUPP);
 	}
 }
 #endif
@@ -396,7 +396,7 @@ ip6_mrouter_get(so, sopt)
 {
 	int error = 0;
 
-	if (so != ip6_mrouter) return EACCES;
+	if (so != ip6_mrouter) return (EACCES);
 
 	switch (sopt->sopt_name) {
 		case MRT6_PIM:
@@ -414,16 +414,16 @@ ip6_mrouter_get(cmd, so, m)
 {
 	struct mbuf *mb;
 
-	if (so != ip6_mrouter) return EACCES;
+	if (so != ip6_mrouter) return (EACCES);
 
 	*m = mb = m_get(M_WAIT, MT_SOOPTS);
 
 	switch (cmd) {
 	case MRT6_PIM:
-		return get_pim6(mb);
+		return (get_pim6(mb));
 	default:
 		m_free(mb);
-		return EOPNOTSUPP;
+		return (EOPNOTSUPP);
 	}
 }
 #endif
@@ -474,7 +474,7 @@ get_sg_cnt(req)
 		req->pktcnt = req->bytecnt = req->wrong_if = 0xffffffff;
 #endif
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -487,14 +487,14 @@ get_mif6_cnt(req)
 	mifi_t mifi = req->mifi;
 
 	if (mifi >= nummifs)
-		return EINVAL;
+		return (EINVAL);
 
 	req->icount = mif6table[mifi].m6_pkt_in;
 	req->ocount = mif6table[mifi].m6_pkt_out;
 	req->ibytes = mif6table[mifi].m6_bytes_in;
 	req->obytes = mif6table[mifi].m6_bytes_out;
 
-	return 0;
+	return (0);
 }
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >=3)
@@ -511,7 +511,7 @@ get_pim6(m)
 
 	*i = pim6;
 
-	return 0;
+	return (0);
 }
 #endif
 
@@ -520,11 +520,11 @@ set_pim6(i)
 	int *i;
 {
 	if ((*i != 1) && (*i != 0))
-		return EINVAL;
+		return (EINVAL);
 
 	pim6 = *i;
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -547,16 +547,16 @@ ip6_mrouter_init(so, m, cmd)
 
 	if (so->so_type != SOCK_RAW ||
 	    so->so_proto->pr_protocol != IPPROTO_ICMPV6)
-		return EOPNOTSUPP;
+		return (EOPNOTSUPP);
 
 	if (!m || (m->m_len != sizeof(int *)))
-		return ENOPROTOOPT;
+		return (ENOPROTOOPT);
 
 	v = mtod(m, int *);
 	if (*v != 1)
-		return ENOPROTOOPT;
+		return (ENOPROTOOPT);
 
-	if (ip6_mrouter != NULL) return EADDRINUSE;
+	if (ip6_mrouter != NULL) return (EADDRINUSE);
 
 	ip6_mrouter = so;
 	ip6_mrouter_ver = cmd;
@@ -581,7 +581,7 @@ ip6_mrouter_init(so, m, cmd)
 		log(LOG_DEBUG, "ip6_mrouter_init\n");
 #endif
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -692,7 +692,7 @@ ip6_mrouter_done()
 		log(LOG_DEBUG, "ip6_mrouter_done\n");
 #endif
 
-	return 0;
+	return (0);
 }
 
 static struct sockaddr_in6 sin6 = { sizeof(sin6), AF_INET6 };
@@ -715,12 +715,12 @@ add_m6if(mifcp)
 #endif
 
 	if (mifcp->mif6c_mifi >= MAXMIFS)
-		return EINVAL;
+		return (EINVAL);
 	mifp = mif6table + mifcp->mif6c_mifi;
 	if (mifp->m6_ifp)
-		return EADDRINUSE; /* XXX: is it appropriate? */
+		return (EADDRINUSE); /* XXX: is it appropriate? */
 	if (mifcp->mif6c_pifi == 0 || mifcp->mif6c_pifi > if_index)
-		return ENXIO;
+		return (ENXIO);
 	/*
 	 * XXX: some OSes can remove ifp and clear ifindex2ifnet[id]
 	 * even for id between 0 and if_index.
@@ -731,7 +731,7 @@ add_m6if(mifcp)
 	ifp = ifindex2ifnet[mifcp->mif6c_pifi];
 #endif
 	if (ifp == NULL)
-		return ENXIO;
+		return (ENXIO);
 
 	if (mifcp->mif6c_flags & MIFF_REGISTER) {
 		ifp = &multicast_register_if;
@@ -755,7 +755,7 @@ add_m6if(mifcp)
 	else {
 		/* Make sure the interface supports multicast */
 		if ((ifp->if_flags & IFF_MULTICAST) == 0)
-			return EOPNOTSUPP;
+			return (EOPNOTSUPP);
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
@@ -775,7 +775,7 @@ add_m6if(mifcp)
 #endif
 		splx(s);
 		if (error)
-			return error;
+			return (error);
 	}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -808,7 +808,7 @@ add_m6if(mifcp)
 		    ifp->if_name, ifp->if_unit);
 #endif
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -827,9 +827,9 @@ del_m6if(mifip)
 	int s;
 
 	if (*mifip >= nummifs)
-		return EINVAL;
+		return (EINVAL);
 	if (mifp->m6_ifp == NULL)
-		return EINVAL;
+		return (EINVAL);
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
@@ -880,7 +880,7 @@ del_m6if(mifip)
 		log(LOG_DEBUG, "del_m6if %d, nummifs %d\n", *mifip, nummifs);
 #endif
 
-	return 0;
+	return (0);
 }
 
 /*
@@ -917,7 +917,7 @@ add_m6fc(mfccp)
 		rt->mf6c_parent = mfccp->mf6cc_parent;
 		rt->mf6c_ifset = mfccp->mf6cc_ifset;
 		splx(s);
-		return 0;
+		return (0);
 	}
 
 	/*
@@ -1022,7 +1022,7 @@ add_m6fc(mfccp)
 						  M_NOWAIT);
 			if (rt == NULL) {
 				splx(s);
-				return ENOBUFS;
+				return (ENOBUFS);
 			}
 
 			/* insert new entry at head of hash chain */
@@ -1043,7 +1043,7 @@ add_m6fc(mfccp)
 		}
 	}
 	splx(s);
-	return 0;
+	return (0);
 }
 
 #ifdef UPCALL_TIMING
@@ -1117,7 +1117,7 @@ del_m6fc(mfccp)
 	}
 	if (rt == NULL) {
 		splx(s);
-		return EADDRNOTAVAIL;
+		return (EADDRNOTAVAIL);
 	}
 
 	*nptr = rt->mf6c_next;
@@ -1125,7 +1125,7 @@ del_m6fc(mfccp)
 
 	splx(s);
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -1139,11 +1139,11 @@ socket_send(s, mm, src)
 				 (struct sockaddr *)src,
 				 mm, (struct mbuf *)0) != 0) {
 			sorwakeup(s);
-			return 0;
+			return (0);
 		}
 	}
 	m_freem(mm);
-	return -1;
+	return (-1);
 }
 
 /*
@@ -1185,7 +1185,7 @@ ip6_mforward(ip6, ifp, m)
 	 */
 	if (ip6->ip6_hlim <= 1 || IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) ||
 	    IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst))
-		return 0;
+		return (0);
 	ip6->ip6_hlim--;
 
 	/*
@@ -1208,7 +1208,7 @@ ip6_mforward(ip6, ifp, m)
 			    m->m_pkthdr.rcvif ?
 			    if_name(m->m_pkthdr.rcvif) : "?");
 		}
-		return 0;
+		return (0);
 	}
 
 	/*
@@ -1258,7 +1258,7 @@ ip6_mforward(ip6, ifp, m)
 					      M_NOWAIT);
 		if (rte == NULL) {
 			splx(s);
-			return ENOBUFS;
+			return (ENOBUFS);
 		}
 		mb0 = m_copy(m, 0, M_COPYALL);
 		/*
@@ -1271,7 +1271,7 @@ ip6_mforward(ip6, ifp, m)
 		if (mb0 == NULL) {
 			free(rte, M_MRTABLE);
 			splx(s);
-			return ENOBUFS;
+			return (ENOBUFS);
 		}
 
 		/* is there an upcall waiting for this packet? */
@@ -1298,7 +1298,7 @@ ip6_mforward(ip6, ifp, m)
 				free(rte, M_MRTABLE);
 				m_freem(mb0);
 				splx(s);
-				return ENOBUFS;
+				return (ENOBUFS);
 			}
 			/*
 			 * Make a copy of the header to send to the user
@@ -1311,7 +1311,7 @@ ip6_mforward(ip6, ifp, m)
 				m_freem(mb0);
 				free(rt, M_MRTABLE);
 				splx(s);
-				return ENOBUFS;
+				return (ENOBUFS);
 			}
 
 			/*
@@ -1341,7 +1341,7 @@ ip6_mforward(ip6, ifp, m)
 				m_freem(mb0);
 				free(rt, M_MRTABLE);
 				splx(s);
-				return EINVAL;
+				return (EINVAL);
 			}
 
 #ifdef MRT6DEBUG
@@ -1374,7 +1374,7 @@ ip6_mforward(ip6, ifp, m)
 				m_freem(mb0);
 				free(rt, M_MRTABLE);
 				splx(s);
-				return ENOBUFS;
+				return (ENOBUFS);
 			}
 
 			mrt6stat.mrt6s_upcalls++;
@@ -1407,7 +1407,7 @@ ip6_mforward(ip6, ifp, m)
 					free(rte, M_MRTABLE);
 					m_freem(mb0);
 					splx(s);
-					return 0;
+					return (0);
 				}
 
 			/* Add this entry to the end of the queue */
@@ -1423,7 +1423,7 @@ ip6_mforward(ip6, ifp, m)
 
 		splx(s);
 
-		return 0;
+		return (0);
 	}
 }
 
@@ -1569,7 +1569,7 @@ ip6_mdq(m, ifp, rt)
 				     mm->m_len < sizeof(struct ip6_hdr)))
 					mm = m_pullup(mm, sizeof(struct ip6_hdr));
 				if (mm == NULL)
-					return ENOBUFS;
+					return (ENOBUFS);
 
 #ifdef MRT6_OINIT
 				oim = NULL;
@@ -1590,7 +1590,7 @@ ip6_mdq(m, ifp, rt)
 					break;
 				default:
 					m_freem(mm);
-					return EINVAL;
+					return (EINVAL);
 				}
 
 				for (mifp = mif6table, iif = 0;
@@ -1620,10 +1620,10 @@ ip6_mdq(m, ifp, rt)
 						log(LOG_WARNING, "mdq, ip6_mrouter socket queue full\n");
 #endif
 					++mrt6stat.mrt6s_upq_sockfull;
-					return ENOBUFS;
+					return (ENOBUFS);
 				}	/* if socket Q full */
 			}		/* if PIM */
-		return 0;
+		return (0);
 	}			/* if wrong iif */
 
 	/* If I sourced this packet, it counts as output, else it was input. */
@@ -1681,7 +1681,7 @@ ip6_mdq(m, ifp, rt)
 	/* recover the packet addresses */
 	if (!ip6_setpktaddrs(m, &src_sa, &dst_sa))
 		return (-1);
-	return 0;
+	return (0);
 }
 
 static void
@@ -1826,21 +1826,21 @@ register_send(ip6, mif, m, src, dst)
 	/* Make a copy of the packet to send to the user level process */
 	MGETHDR(mm, M_DONTWAIT, MT_HEADER);
 	if (mm == NULL)
-		return ENOBUFS;
+		return (ENOBUFS);
 	mm->m_pkthdr.rcvif = NULL;
 	mm->m_data += max_linkhdr;
 	mm->m_len = sizeof(struct ip6_hdr);
 
 	if ((mm->m_next = m_copy(m, 0, M_COPYALL)) == NULL) {
 		m_freem(mm);
-		return ENOBUFS;
+		return (ENOBUFS);
 	}
 	i = MHLEN - M_LEADINGSPACE(mm);
 	if (i > len)
 		i = len;
 	mm = m_pullup(mm, i);
 	if (mm == NULL)
-		return ENOBUFS;
+		return (ENOBUFS);
 /* TODO: check it! */
 	mm->m_pkthdr.len = len + sizeof(struct ip6_hdr);
 
@@ -1863,9 +1863,9 @@ register_send(ip6, mif, m, src, dst)
 			    "register_send: ip6_mrouter socket queue full\n");
 #endif
 		++mrt6stat.mrt6s_upq_sockfull;
-		return ENOBUFS;
+		return (ENOBUFS);
 	}
-	return 0;
+	return (0);
 }
 
 /*
@@ -1930,7 +1930,7 @@ pim6_input(mp, offp, proto)
 	IP6_EXTHDR_GET(pim, struct pim *, m, off, minlen);
 	if (pim == NULL) {
 		pim6stat.pim6s_rcv_tooshort++;
-		return IPPROTO_DONE;
+		return (IPPROTO_DONE);
 	}
 #endif
 
