@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.12 2000/04/25 07:52:54 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.13 2000/09/23 17:14:24 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -45,6 +45,7 @@
 #endif
 
 #include <net/if.h>
+#include <net/route.h>
 #include <net/net_osdep.h>
 
 #include <netinet/in.h>
