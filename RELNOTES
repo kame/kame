@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/08 06:00:06 $
+		     $Date: 1999/10/08 06:09:41 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -38,6 +38,10 @@ and the next STABLE release,
    -add /etc/start_if.fxpX for each of fxp0, fxp1... and do following in
     those files,
      ifconfig fxpX up 
+- IPv6 interface identifier generator is revisited.  The logic became more
+  strict about the use of "u" bit in IEEE802/EUI64.  If you upgrade from past
+  STABLE kit, you may experience change in interface identifier, and change
+  in your IPv6 link-local/global addresses.
 
 PLATFORM DIFFERENCES
 ====================
