@@ -376,19 +376,6 @@ udp6_input(mp, offp, proto)
 	}
 
 	/*
-	 * Be proactive about unspecified IPv6 address in source.
-	 * As we use all-zero to indicate unbounded/unconnected pcb,
-	 * unspecified IPv6 address can be used to confuse us.
-	 *
-	 * Note that packets with unspecified IPv6 destination is
-	 * already dropped in ip6_input.
-	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
-		/* XXX stat */
-		goto bad;
-	}
-
-	/*
 	 * Checksum extended UDP header and data.
 	 */
 	if (uh->uh_sum == 0)

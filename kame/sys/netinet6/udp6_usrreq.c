@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.57 2000/07/27 02:54:09 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.58 2000/07/27 06:22:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,19 +216,6 @@ udp6_input(mp, offp, proto)
 	/* Be proactive about malicious use of IPv4 mapped address */
 	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
-		/* XXX stat */
-		goto bad;
-	}
-
-	/*
-	 * Be proactive about unspecified IPv6 address in source.
-	 * As we use all-zero to indicate unbounded/unconnected pcb,
-	 * unspecified IPv6 address can be used to confuse us.
-	 *
-	 * Note that packets with unspecified IPv6 destination is
-	 * already dropped in ip6_input.
-	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 		/* XXX stat */
 		goto bad;
 	}
