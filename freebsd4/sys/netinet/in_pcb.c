@@ -796,8 +796,7 @@ in_rtchange(inp, errno)
 /*
  * we never select the wildcard pcb which has INP_IPV6 flag if we have
  * INP_IPV4 only wildcard pcb.  INP_LOOKUP_MAPPED_PCB_COST must be
- * greater than the max value of matchwild (currently 3) in the
- * condition when no IPv6 pcb exists.
+ * greater than the max value of matchwild (currently 3).
  */
 #define INP_LOOKUP_MAPPED_PCB_COST 4
 struct inpcb *
@@ -929,7 +928,6 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard,
 		struct inpcb *local_wild = NULL;
 #if defined(INET6)
 		struct inpcb *local_wild_mapped = NULL;
-		struct inpcb *local_match_mapped = NULL;
 #endif /* defined(INET6) */
 
 		head = &pcbinfo->hashbase[INP_PCBHASH(INADDR_ANY, lport, 0, pcbinfo->hashmask)];
@@ -946,11 +944,6 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard,
 					continue;
 #endif
 				if (inp->inp_laddr.s_addr == laddr.s_addr)
-#ifdef INET6
-					if ((inp->inp_vflag & INP_IPV6) != 0)
-						local_match_mapped = inp;
-					else
-#endif
 					return (inp);
 				else if (inp->inp_laddr.s_addr == INADDR_ANY) {
 #if defined(INET6)
@@ -964,8 +957,6 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard,
 			}
 		}
 #if defined(INET6)
-		if (local_match_mapped)
-			return (local_match_mapped);
 		if (local_wild == NULL)
 			return (local_wild_mapped);
 #endif /* defined(INET6) */
