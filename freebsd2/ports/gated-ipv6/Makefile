@@ -3,7 +3,7 @@
 # Date created:		Wed Oct 21 11:39:18 JST 1998
 # Whom:			itojun
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/09 01:37:01 itojun Exp $
+# $Id: Makefile,v 1.1.1.1.2.1 1999/10/12 05:11:29 itojun Exp $
 #
 
 DISTNAME=	gated-pubipv6-snapshot.031999
@@ -16,6 +16,8 @@ PATCHFILES=	gatedv6-snap0399-19990330.diff.gz
 PATCH_DIST_STRIP=	-p2
 
 MAINTAINER=	itojun@itojun.org
+
+BROKEN=		"out of sync with recent header file"
 
 NO_PACKAGE=	"binary redistribution restricted to members"
 NO_CDROM=	"binary redistribution restricted to members"
