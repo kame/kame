@@ -13,4 +13,6 @@ SUBDIR+=racoon
 
 SUBDIR+=pppd
 
+SUBDIR+=mip6control had
+
 .include <bsd.subdir.mk>
