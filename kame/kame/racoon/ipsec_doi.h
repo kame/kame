@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.h,v 1.30 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: ipsec_doi.h,v 1.31 2000/10/19 03:23:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,3 +204,4 @@ extern int ipsecdoi_t2satrns __P((struct isakmp_pl_t *,
 	struct saprop *, struct saproto *, struct satrns *));
 extern int ipsecdoi_authalg2trnsid __P((int));
 extern int idtype2doi __P((int));
+extern int doi2idtype __P((int));

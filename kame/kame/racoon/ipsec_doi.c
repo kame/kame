@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.117 2000/10/18 09:51:44 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.118 2000/10/19 03:23:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2887,7 +2887,6 @@ ipsecdoi_checkid1(iph1)
 	struct ph1handle *iph1;
 {
 	struct ipsecdoi_id_b *id_b;
-	vchar_t *ident = NULL;
 
 	if (iph1->id_p == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -2974,18 +2973,36 @@ ipsecdoi_checkid1(iph1)
 
 	/* compare with the ID if specified. */
 	if (iph1->rmconf->idv_p) {
-		 if (iph1->rmconf->idvtype_p != id_b->type) {
+		vchar_t *ident0 = NULL;
+		vchar_t ident;
+
+		if (iph1->rmconf->idvtype_p != doi2idtype(id_b->type)) {
 			plog(logp, LOCATION, NULL,
 				"WARNINIG: ID type mismatched.\n");
 			/*FALLTHROUGH*/
 		}
-		ident = getidval(iph1->rmconf->idvtype_p, iph1->rmconf->idv_p);
-		if (memcmp(ident->v, id_b + 1, ident->l)) {
-			plog(logp, LOCATION, NULL,
-				"WARNINIG: ID value mismatched.\n");
-			/*FALLTHROUGH*/
+
+		ident0 = getidval(iph1->rmconf->idvtype_p, iph1->rmconf->idv_p);
+
+		switch (iph1->rmconf->idvtype_p) {
+		case IDTYPE_ASN1DN:
+			ident.v = (caddr_t)(id_b + 1);
+			ident.l = ident0->l;
+			if (eay_cmp_asn1dn(ident0, &ident)) {
+				plog(logp, LOCATION, NULL,
+					"WARNINIG: ID value mismatched.\n");
+				/*FALLTHROUGH*/
+			}
+			break;
+		default:
+			if (memcmp(ident0->v, id_b + 1, ident0->l)) {
+				plog(logp, LOCATION, NULL,
+					"WARNINIG: ID value mismatched.\n");
+				/*FALLTHROUGH*/
+			}
+			break;
 		}
-		vfree(ident);
+		vfree(ident0);
 	}
 
 	return 0;
@@ -3748,5 +3765,32 @@ idtype2doi(idtype)
 	if (ARRAYLEN(rm_idtype2doi) > idtype)
 		return rm_idtype2doi[idtype];
 	return -1;
+}
+
+int
+doi2idtype(doi)
+	int doi;
+{
+	switch(doi) {
+	case IPSECDOI_ID_FQDN:
+		return(IDTYPE_FQDN);
+	case IPSECDOI_ID_USER_FQDN:
+		return(IDTYPE_USERFQDN);
+	case IPSECDOI_ID_KEY_ID:
+		return(IDTYPE_KEYID);
+	case IPSECDOI_ID_DER_ASN1_DN:
+		return(IDTYPE_ASN1DN);
+	case IPSECDOI_ID_IPV4_ADDR:
+	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
+	case IPSECDOI_ID_IPV6_ADDR:
+	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
+		return(IDTYPE_ADDRESS);
+	default:
+		plog(logp, LOCATION, NULL,
+			"WARNING: Inproper idtype:%d in this function.\n",
+			s_ipsecdoi_ident(doi));
+		return(IDTYPE_ADDRESS);	/* XXX */
+	}
+	/*NOTREACHED*/
 }
 
