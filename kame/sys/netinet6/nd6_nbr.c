@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.154 2005/01/21 03:14:49 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.155 2005/02/10 03:00:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1438,33 +1438,8 @@ nd6_dad_timer(ifa)
 		}
 
 		if (dp->dad_ns_icount) {
-#if 0 /* heuristics */
-			/*
-			 * if
-			 * - we have sent many(?) DAD NS, and
-			 * - the number of NS we sent equals to the
-			 *   number of NS we've got, and
-			 * - we've got no NA
-			 * we may have a faulty network card/driver which
-			 * loops back multicasts to myself.
-			 */
-			if (3 < dp->dad_count &&
-			    dp->dad_ns_icount == dp->dad_count &&
-			    dp->dad_na_icount == 0) {
-				log(LOG_INFO, "DAD questionable for %s(%s): "
-				    "network card loops back multicast?\n",
-				    ip6_sprintf(&ia->ia_addr.sin6_addr),
-				    if_name(ifa->ifa_ifp));
-				/* XXX consider it a duplicate or not? */
-				/* duplicate++; */
-			} else {
-				/* We've seen NS, means DAD has failed. */
-				duplicate++;
-			}
-#else
 			/* We've seen NS, means DAD has failed. */
 			duplicate++;
-#endif
 		}
 
 		if (duplicate) {
