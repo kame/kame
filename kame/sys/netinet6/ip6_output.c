@@ -3090,8 +3090,8 @@ ip6_optlen(in6p)
 {
 	int len;
 
-        if (!in6p->in6p_outputopts)
-                return 0;
+	if (!in6p->in6p_outputopts)
+		return 0;
 
 	len = 0;
 #define elen(x) \
