@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.164 2002/05/28 10:24:24 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.165 2002/05/29 06:26:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -872,6 +872,14 @@ in6_ifattach(ifp, altifp)
 		return;
 #endif
 	}
+
+	/*
+	 * if link mtu is too small, don't try to configure IPv6.
+	 * remember there could be some link-layer that has special
+	 * fragmentation logic.
+	 */
+	if (ifp->if_mtu < IPV6_MMTU)
+		return;
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	/* create a multicast kludge storage (if we have not had one) */
