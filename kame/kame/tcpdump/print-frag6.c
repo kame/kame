@@ -82,7 +82,7 @@ frag6_print(register const u_char *bp, register const u_char *bp2)
 			       (long)(bp - bp2) - sizeof(struct ip6_frag));
 	}
 
-#if 0
+#if 1
 	/* it is meaningless to decode non-first fragment */
 	if (ntohs(dp->ip6f_offlg & IP6F_OFF_MASK) != 0)
 		return 65535;
