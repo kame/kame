@@ -6,7 +6,7 @@ $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.5 2000/01/11 19:47:41 itojun Exp $';
+$rcsid = '$Id: sandiego.pl,v 1.6 2000/01/11 21:27:48 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
@@ -118,8 +118,6 @@ remote anonymous
 	identifier address;
 	nonce_size 16;
 
-	lifetime time 600 sec;
-
 	# for aggressive mode definition.
 	dh_group modp1024;
 
@@ -128,19 +126,22 @@ remote anonymous
 		hash_algorithm md5;
 		authentication_method pre_shared_key ;
 		dh_group modp1024;
+		lifetime time 600 sec;
 	}
 	proposal {
 		encryption_algorithm des;
 		hash_algorithm sha1;
 		authentication_method pre_shared_key ;
 		dh_group modp1024;
+		lifetime time 1000 sec;
 	}
-	proposal {
-		encryption_algorithm 3des;
-		hash_algorithm sha1;
-		authentication_method rsasig ;
-		dh_group modp1024;
-	}
+#	proposal {
+#		encryption_algorithm 3des;
+#		hash_algorithm sha1;
+#		authentication_method rsasig ;
+#		dh_group modp1024;
+#		lifetime time 600 sec;
+#	}
 }
 
 remote 194.100.55.1 [500]
@@ -184,7 +185,7 @@ remote 194.100.55.1 [500]
 
 policy $me/32 $you/32 any inout ipsec
 {
-	#pfs_group modp768;
+	pfs_group modp1024;
 
 	# This proposal means IP2|AH|ESP|ULP.
 	proposal {
