@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.163 2000/09/25 15:31:31 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.164 2000/09/26 17:33:54 itojun Exp $
 
 1. IPv6
 
@@ -1433,6 +1433,9 @@ IPsec is implemented as the following three components.
 Note that KAME/OpenBSD does NOT include support for KAME IPsec code,
 as OpenBSD team has their home-brew IPsec stack and they have no plan
 to replace it.  IPv6 support for IPsec is, therefore, lacking on KAME/OpenBSD.
+
+http://www.netbsd.org/Documentation/network/ipsec/ has more information
+including usage examples.
 
 4.1 Policy Management
 
