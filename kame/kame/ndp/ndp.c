@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.80 2001/10/25 13:08:20 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.81 2001/11/08 09:43:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -932,7 +932,7 @@ ifinfo(argc, argv)
 		/* NOTREACHED */
 	}
 	bzero(&nd, sizeof(nd));
-	strcpy(nd.ifname, ifname);
+	strncpy(nd.ifname, ifname, sizeof(nd.ifname));
 	if (ioctl(s, SIOCGIFINFO_IN6, (caddr_t)&nd) < 0) {
  		err(1, "ioctl(SIOCGIFINFO_IN6)");
 		/* NOTREACHED */
