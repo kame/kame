@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.46 2000/08/24 06:57:51 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.47 2000/08/24 11:08:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1138,6 +1138,10 @@ oakley_validate_auth(iph1)
 					LC_PATHTYPE_CERT,
 					iph1->rmconf->peerscertfile);
 				cert = eay_get_x509cert(path);
+				YIPSDEBUG(DEBUG_CERT,
+					char *p = eay_get_x509text(cert);
+					plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
+					free(p));
 				break;
 			default:
 				plog(logp, LOCATION, NULL,
@@ -1170,12 +1174,11 @@ oakley_validate_auth(iph1)
 
 		/* don't cache the certificate passed. */
 
-#if 0
 		switch (iph1->rmconf->certtype) {
 		case ISAKMP_CERT_X509SIGN:
-			/* XXX to be checked subjectAltName */
 			error = eay_check_x509cert(iph1->cert_p,
 					lcconf->pathinfo[LC_PATHTYPE_CERT]);
+			/* XXX to be checked subjectAltName */
 			break;
 		default:
 			plog(logp, LOCATION, NULL,
@@ -1191,7 +1194,6 @@ oakley_validate_auth(iph1)
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL,
 				"certificate authenticated\n"));
-#endif
 
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_IDENT:
@@ -1282,6 +1284,10 @@ oakley_getmycert(iph1)
 			LC_PATHTYPE_CERT,
 			iph1->rmconf->mycertfile);
 		cert = eay_get_x509cert(path);
+		YIPSDEBUG(DEBUG_CERT,
+			char *p = eay_get_x509text(cert);
+			plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
+			free(p));
 		break;
 	default:
 		plog(logp, LOCATION, NULL,
@@ -1304,7 +1310,8 @@ oakley_getmycert(iph1)
 	memcpy(iph1->cert->v + 1, cert->v, cert->l);
 	iph1->cert->v[0] = iph1->rmconf->certtype;
 
-	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get CERT:\n"));
+	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL,
+		"created CERT payload:\n"));
 	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert));
 
 	error = 0;
@@ -1398,6 +1405,10 @@ oakley_savecert(iph1, gen)
 		memcpy(iph1->cert_p->v, data, len);
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL, "CERT saved:\n"));
+		YIPSDEBUG(DEBUG_CERT,
+			char *p = eay_get_x509text(iph1->cert_p);
+			plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
+			free(p));
 		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
 		break;
 	case ISAKMP_CERT_CRL:
