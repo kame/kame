@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.81 2001/06/01 10:12:55 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.82 2001/06/28 11:39:52 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -387,8 +387,15 @@ The default is off.
 .\"
 .It Ic generate_policy (on \(ba off) ;
 This directive is for the responder.
+Therefore you should set
+.Ic passive
+on in order that
+.Xr racoon 8
+only becomes a responder.
 If the responder does not have any policy in SPD during phase 2 negotiation,
-and the directive is set on, then racoon will choice the first proposal in the
+and the directive is set on, then
+.Xr racoon 8
+will choice the first proposal in the
 SA payload from the initiator, and generate policy entries from the proposal.
 It is useful to negotiate with the client which is allocated IP address
 dynamically and the communication needs IPSec tunnel mode.
