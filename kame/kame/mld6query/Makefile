@@ -33,9 +33,9 @@ BINGRP  = bin
 CFLAGS+= -Wall
 .endif
 .if (${OPSYS} != "NetBSD")
-CFLAGS+= -DINET6 -DIPSEC
+CFLAGS+= -DINET6 -DIPSEC -DUSE_RFC2292BIS
 .else
-CPPFLAGS+= -DINET6 -DIPSEC
+CPPFLAGS+= -DINET6 -DIPSEC -DUSE_RFC2292BIS
 .endif
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 	-L/usr/local/v6/lib -linet6
