@@ -843,7 +843,10 @@ findpcb:
 			      oldinpcb->inp_ipv6.ip6_flow;
 			  }
 
-			  /* inherit socket options from the listening socket */
+			  /*
+			   * inherit socket options from the listening
+			   * socket.
+			   */
 			  if (ipv6) {
 			    inp->inp_flags |=
 				(oldinpcb->inp_flags & IN6P_CONTROLOPTS);
