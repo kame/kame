@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1515 2001/01/28 15:27:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1516 2001/01/29 04:04:20 itojun Exp $
 
 <200101>
+Mon Jan 29 JST 2001  itojun@iijlab.net
+	* {freebsd*,openbsd}/ports/bind: disable it for security issues.
+	  these were based on 8.1.2...
+	* freebsd4/include/netdb.h: do not pollute namespace by inclusion of
+	  sys/types.h.  declare _BSD_SOCKLEN_T_ in machine/ansi.h, avoid
+	  duplicated declarations.
+	  based on SUSv2, netdb.h should not pull in sys/types.h.
+	  if your code become not compilable due to the change, it is because
+	  of bug (or SUSv2 non-conformance) in your code.
+	  (you can't assume that netdb.h would pull in sys/types.h)
+
 Mon Jan 29 00:24:00 JST 2001  itojun@iijlab.net
 	* sys/netinet/icmp6.h: synchronize some of declarations, like RA packet
 	  header structure and value #defines with 2292bis-02.
