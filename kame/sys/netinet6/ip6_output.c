@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.460 2004/12/27 05:41:18 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.461 2005/01/11 06:37:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3726,14 +3726,6 @@ ip6_setmoptions(optname, im6op, m)
 		sa6_mc.sin6_addr = mreq->ipv6mr_multiaddr;
 
 		/*
-		 * If the interface is specified, validate it.
-		 */
-		if (mreq->ipv6mr_interface < 0 ||
-		    if_indexlim <= mreq->ipv6mr_interface) {
-			error = ENXIO;	/* XXX EINVAL? */
-			break;
-		}
-		/*
 		 * If no interface was explicitly specified, choose an
 		 * appropriate one according to the given multicast address.
 		 */
@@ -3757,11 +3749,23 @@ ip6_setmoptions(optname, im6op, m)
 			ifp = ro.ro_rt->rt_ifp;
 			rtfree(ro.ro_rt);
 		} else {
+			/*
+			 * If the interface is specified, validate it.
+			 */
+			if (mreq->ipv6mr_interface < 0 ||
+			    if_indexlim <= mreq->ipv6mr_interface) {
+				error = ENXIO;	/* XXX EINVAL? */
+				break;
+			}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 			ifp = ifnet_byindex(mreq->ipv6mr_interface);
 #else
 			ifp = ifindex2ifnet[mreq->ipv6mr_interface];
 #endif
+			if (!ifp) {
+				error = ENXIO;	/* XXX EINVAL? */
+				break;
+			}
 		}
 
 		/*
@@ -3844,11 +3848,15 @@ ip6_setmoptions(optname, im6op, m)
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
 		}
+		if (mreq->ipv6mr_interface == 0)
+			ifp = NULL;
+		else {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
-		ifp = ifnet_byindex(mreq->ipv6mr_interface);
+			ifp = ifnet_byindex(mreq->ipv6mr_interface);
 #else
-		ifp = ifindex2ifnet[mreq->ipv6mr_interface];
+			ifp = ifindex2ifnet[mreq->ipv6mr_interface];
 #endif
+		}
 
 		/* Fill in the scope zone ID */
 		if (ifp) {
